@@ -23,7 +23,7 @@ npm run preview
 
 ## Styling
 
-Tailwind CSS v4 is installed using its official Vite plugin. The app theme lives in `src/styles.css` under `@theme`; use its `vela-*` utilities (for example, `bg-vela-surface`) instead of repeating raw color values.
+Tailwind CSS v4 is installed using its official Vite plugin. The semantic theme lives in `src/styles.css`: `--ui-*` CSS variables are exposed as Tailwind utilities such as `bg-ui-surface` and `text-ui-muted`. The root HTML element starts with the dark `default` theme and compact density; set `data-ui-theme`, `data-ui-density`, or `data-ui-motion` there (or from application state later) to change them.
 
 ## API integration
 
