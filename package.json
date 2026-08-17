@@ -7,7 +7,7 @@
     "node": ">=20.19.0 || >=22.12.0"
   },
   "scripts": {
-    "dev": "pnpm --parallel --filter @vela/web --filter @vela/server dev",
+    "dev": "pnpm --filter @vela/model build && pnpm --parallel --filter @vela/model --filter @vela/web --filter @vela/server dev",
     "build": "pnpm -r --if-present run build",
     "dev:web": "pnpm --filter @vela/web dev",
     "dev:server": "pnpm --filter @vela/server dev",

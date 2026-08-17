@@ -10,6 +10,7 @@
     "refresh-stars": "python3 scripts/refresh_iau_stars.py"
   },
   "dependencies": {
+    "@vela/model": "workspace:*",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router": "^8.3.0"

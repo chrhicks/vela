@@ -7,7 +7,9 @@ Vela is a local-first astronomy-control workspace. The React SPA is the control 
 ```text
 apps/
   web/       # Vite, React, React Router, and Tailwind CSS
-  server/    # Fastify API and future device adapters
+  server/    # Fastify API and device adapters
+packages/
+  model/     # Shared types for web and server
 ```
 
 ## Prerequisites
