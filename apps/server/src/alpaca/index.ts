@@ -1,1 +1,1 @@
-export { createAlpacaClient } from './alpaca-client.js';
+export { createAlpacaClient } from './client.js';
