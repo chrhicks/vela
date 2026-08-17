@@ -1,0 +1,7 @@
+packages:
+  - apps/*
+
+# Vite needs esbuild's postinstall binary. Other dependency build scripts stay blocked.
+allowBuilds:
+  esbuild: true
+  msgpackr-extract: true
