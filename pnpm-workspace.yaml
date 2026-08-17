@@ -1,5 +1,6 @@
 packages:
   - apps/*
+  - packages/*
 
 # Vite needs esbuild's postinstall binary. Other dependency build scripts stay blocked.
 allowBuilds:

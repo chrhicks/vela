@@ -5,13 +5,14 @@ import { ApiExample } from './routes/api-example'
 import { Home } from './routes/home'
 import './styles.css'
 import { Shell } from './components/app'
+import { HomeProvider } from './pages/HomeProvider'
 
 const router = createBrowserRouter([
   {
     path: '/',
     Component: Shell,
     children: [
-      { index: true, Component: Home },
+      { index: true, Component: () => <HomeProvider><Home /></HomeProvider> },
       { path: 'api', Component: ApiExample },
     ],
   },
