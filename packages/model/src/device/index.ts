@@ -15,6 +15,7 @@ export type DeviceStatus =
   | { state: 'error', message: string }
   | { state: 'unknown' }
 
+export type ConnectionStatus = 'connected' | 'disconnected' | 'unavailable'
 
 export interface DeviceSummary {
   id: string
@@ -22,10 +23,10 @@ export interface DeviceSummary {
   kind: DeviceKind
   name: string
   driver: {
-    name?: string
+    info?: string
     version?: string
   }
-  connection: 'connected' | 'disconnected' | 'unavailable'
+  connection: ConnectionStatus
   status: DeviceStatus
   updatedAt: string
 }

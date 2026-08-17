@@ -1,5 +1,5 @@
 import { Schema } from 'effect';
-import type { DeviceRig } from '../devices.js';
+import type { DeviceRig } from '../config/devices.js';
 import {
   configuredDevicesResponse,
   connectedResponse,
@@ -11,6 +11,7 @@ import {
   driverVersionResponse,
   interfaceVersionResponse,
   supportedActionsResponse,
+  type ConfiguredDevicesResponse,
 } from './types/index.js';
 
 interface AlpacaClient {
@@ -36,10 +37,10 @@ export const createAlpacaClient = (rig: DeviceRig): AlpacaClient => {
   }
 
   return {
-    devices: async () => {
+    devices: async (): Promise<ConfiguredDevice[]> => {
       const url = `${rig.url}${mgmtBasePath}/configureddevices`;
-      const response = await request(url, configuredDevicesResponse);
-      return response.Value;
+      const response: ConfiguredDevicesResponse = await request(url, configuredDevicesResponse);
+      return response.Value as ConfiguredDevice[];
     },
 
     connected: async (device: ConfiguredDevice) => {
