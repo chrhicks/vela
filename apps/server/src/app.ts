@@ -1,6 +1,7 @@
 import Fastify from 'fastify'
 import deviceConfig from './devices.js';
 import { createAlpacaClient } from './alpaca/index.js';
+import type { HomeView } from '@vela/model/web';
 
 export function buildApp() {
   const app = Fastify({ logger: true })
@@ -39,6 +40,21 @@ export function buildApp() {
       }, null, 2));
     }
     return deviceConfig;
+  })
+
+  app.get('/api/web/home', async () => {
+    const rigConfigs = deviceConfig.rigs
+    const homeViewMock: HomeView = {
+      rigs: rigConfigs.map(cr => ({
+        id: cr.id,
+        name: cr.name,
+        reachable: false,
+        devices: []
+      })),
+      refreshedAt: new Date().toISOString()
+    }
+
+    return homeViewMock
   })
 
   return app

@@ -4,7 +4,7 @@ import { useHome } from "../pages/useHome";
 
 export function Home() {
   const { home, loading, error, refresh} = useHome();
-  console.log(home);
+  
   return (
     <section>
       <div className={classes(
