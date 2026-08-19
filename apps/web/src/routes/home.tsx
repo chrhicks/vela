@@ -26,7 +26,20 @@ export function Home() {
             home?.rigs.map(rig => (
               <div className="bg-ui-surface rounded-lg p-4" key={rig.id}>
                 <h2 className="text-lg font-bold">{rig.name}</h2>
-                <p className="text-sm text-ui-muted">Rig Devices Here</p>
+                <p className="text-sm text-ui-muted">Devices</p>
+                <ul>
+                  {rig.devices.map(device => (
+                    <li className="flex items-center" key={device.id}>
+                      <div className={classes(
+                        'rounded-full h-4 w-4 mr-2',
+                        device.connection === 'connected' ? 'bg-ui-positive'
+                          : device.connection === 'disconnected' ? 'bg-ui-danger'
+                          : 'bg-ui-warning'
+                      )}></div>
+                      <span className="text-sm">{device.name}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
             ))
           )}

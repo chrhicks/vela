@@ -29,7 +29,7 @@ export const createAlpacaClient = (rig: DeviceRig): AlpacaClient => {
   const apiBasePath = '/api/v1'
   const mgmtBasePath = '/management/v1'
 
-  function request<S extends Schema.ConstraintDecoder<unknown>>(url: string, schema: S): Promise<S["Type"]> {
+  async function request<S extends Schema.ConstraintDecoder<unknown>>(url: string, schema: S): Promise<S["Type"]> {
     console.log(`Requesting ${url}`);
     return fetch(url)
       .then(res => res.json())
