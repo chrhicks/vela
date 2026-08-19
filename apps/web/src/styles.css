@@ -110,3 +110,15 @@ button { font: inherit; }
     transition-duration: 0.01ms !important;
   }
 }
+
+.vela-ui-adapter {
+  --vela-control-height: var(--ui-control-height);
+  --vela-border-width: 1px;
+  --vela-radius: var(--ui-radius);
+  --vela-line: var(--ui-line);
+  --vela-line-strong: var(--ui-line-strong);
+  --vela-text: var(--ui-text);
+  --vela-text-muted: var(--ui-muted);
+  --vela-surface-raised: var(--ui-surface-raised);
+  --vela-focus: var(--ui-focus);
+}
