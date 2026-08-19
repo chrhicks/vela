@@ -34,9 +34,9 @@ export function Gallery({ theme, profileName, density, baselineDrift, onOpenSpec
 
       <section className="diagnostic-strip">
         <div><span className={`diagnostic-state ${contrastWarnings.length ? 'warning' : 'clear'}`} /> <strong>Contrast</strong><small>{contrastWarnings.length ? `${contrastWarnings.length} focused warning${contrastWarnings.length === 1 ? '' : 's'}` : `${findings.length} focused pairs clear`}</small></div>
-        <div><span className={`diagnostic-state ${sourceFindings.length ? 'warning' : 'clear'}`} /> <strong>Token use</strong><small>{sourceFindings.length ? `${sourceFindings.length} literal color finding${sourceFindings.length === 1 ? '' : 's'}` : 'No literal colors in draft source'}</small></div>
+        <div><span className={`diagnostic-state ${sourceFindings.length ? 'warning' : 'clear'}`} /> <strong>Token use</strong><small>{sourceFindings.length ? `${sourceFindings.length} literal color finding${sourceFindings.length === 1 ? '' : 's'}` : 'No literal colors in component source'}</small></div>
         <div><span className={`diagnostic-state ${baselineDrift ? 'warning' : 'clear'}`} /> <strong>Baseline</strong><small>{baselineDrift ? 'Profile fingerprint differs' : 'Profile matches current default'}</small></div>
-        <details><summary>Review diagnostics</summary><div className="diagnostic-popover"><h3>Focused contrast</h3>{findings.map((finding) => <div className="diagnostic-row" key={finding.id}><span>{finding.mode} · {finding.label}</span><strong data-pass={finding.passes}>{finding.ratio.toFixed(2)}:1</strong></div>)}<h3>Literal colors</h3>{sourceFindings.length ? sourceFindings.map((finding) => <div className="diagnostic-row" key={`${finding.file}-${finding.value}`}><span>{finding.file}</span><code>{finding.value}</code></div>) : <p>No hexadecimal or functional color literals found in draft components or package styles.</p>}</div></details>
+        <details><summary>Review diagnostics</summary><div className="diagnostic-popover"><h3>Focused contrast</h3>{findings.map((finding) => <div className="diagnostic-row" key={finding.id}><span>{finding.mode} · {finding.label}</span><strong data-pass={finding.passes}>{finding.ratio.toFixed(2)}:1</strong></div>)}<h3>Literal colors</h3>{sourceFindings.length ? sourceFindings.map((finding) => <div className="diagnostic-row" key={`${finding.file}-${finding.value}`}><span>{finding.file}</span><code>{finding.value}</code></div>) : <p>No hexadecimal or functional color literals found in component source or package styles.</p>}</div></details>
       </section>
 
       <section className="gallery-section">
@@ -47,7 +47,7 @@ export function Gallery({ theme, profileName, density, baselineDrift, onOpenSpec
             if (!specimen) return null
             return (
               <article className="gallery-card" key={group.id}>
-                <div className="gallery-card__heading"><div><span>{group.name.slice(0, 1)}</span><div><strong>{group.name}</strong><small>{specimen.name}</small></div></div><button onClick={() => onOpenSpecimen(group.id, specimen.id)}>{group.specimens.length} specimen{group.specimens.length === 1 ? '' : 's'} · Open ↗</button></div>
+                <div className="gallery-card__heading"><div><span>{group.name.slice(0, 1)}</span><div><strong>{group.name} <b className="stability-label" data-stability={group.stability}>{group.stability}</b></strong><small>{specimen.name}</small></div></div><button onClick={() => onOpenSpecimen(group.id, specimen.id)}>{group.specimens.length} specimen{group.specimens.length === 1 ? '' : 's'} · Open ↗</button></div>
                 <div className="paired-preview">
                   {(['light', 'dark'] as const).map((mode) => <div className="vela-theme gallery-surface" data-mode={mode} key={mode} style={themeStyle(theme, mode) as CSSProperties}><small>{mode}</small><div>{specimen.render(specimen.defaultProps)}</div></div>)}
                 </div>

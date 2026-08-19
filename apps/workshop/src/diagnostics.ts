@@ -15,7 +15,7 @@ export interface SourceFinding {
 }
 
 const sourceModules = import.meta.glob<string>(
-  ['../../../packages/ui/src/drafts/*.{ts,tsx}', '../../../packages/ui/src/styles.css'],
+  ['../../../packages/ui/src/{components,drafts}/*.{ts,tsx}', '../../../packages/ui/src/styles.css'],
   { eager: true, query: '?raw', import: 'default' },
 )
 

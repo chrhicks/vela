@@ -50,6 +50,7 @@ The typed browser API client is in `apps/web/src/lib/api.ts`. Browser-safe value
 ## Design documents
 
 - [Component Workshop Decision Record](docs/component-workshop.md)
+- [Component Workshop Operations Guide](docs/component-workshop-operations.md)
 - [Component Workshop Usage](apps/workshop/README.md)
 
 ## Star catalogue

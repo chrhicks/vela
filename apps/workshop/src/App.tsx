@@ -118,19 +118,19 @@ export function App() {
       ) : <>
 
       <aside className="library-panel">
-        <div className="panel-heading"><span>Draft library</span><em>{componentGroups.length}</em></div>
+        <div className="panel-heading"><span>Component library</span><em>{componentGroups.length}</em></div>
         <div className="component-list">
           {componentGroups.map((group) => (
             <div key={group.id}>
               <button className={`component-item ${workshop.session.componentId === group.id ? 'active' : ''}`} onClick={() => workshop.selectSpecimen(group.id, group.specimens[0]?.id ?? '')}>
                 <span className="component-icon">{group.name.slice(0, 1)}</span>
-                <span><strong>{group.name}</strong><small>{group.specimens.length} specimen{group.specimens.length === 1 ? '' : 's'}</small></span>
+                <span><strong>{group.name}</strong><small><b data-stability={group.stability}>{group.stability}</b> · {group.specimens.length} specimen{group.specimens.length === 1 ? '' : 's'}</small></span>
               </button>
               {workshop.session.componentId === group.id && group.specimens.length > 1 ? group.specimens.map((entry) => <button className="specimen-item" key={entry.id} onClick={() => workshop.selectSpecimen(group.id, entry.id)}>{entry.name}</button>) : null}
             </div>
           ))}
         </div>
-        <div className="library-note"><span>Draft source</span><code>packages/ui/src/drafts</code><p>Edits refresh directly through Vite HMR.</p></div>
+        <div className="library-note"><span>Source boundaries</span><code>components/ · stable</code><code>drafts/ · experimental</code><p>Both refresh directly through Vite HMR.</p></div>
       </aside>
 
       <main className="stage">

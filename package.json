@@ -12,6 +12,10 @@
     "build": "pnpm -r --if-present run build",
     "dev:web": "pnpm --filter @vela/web dev",
     "dev:server": "pnpm --filter @vela/server dev",
+    "test": "vitest run",
     "start": "pnpm --filter @vela/server start"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.11"
   }
 }

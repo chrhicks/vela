@@ -1,5 +1,5 @@
-import { Button } from './Button'
 import type { ComponentSpecimen } from '../themes'
+import { Button } from './Button'
 
 export const specimen: ComponentSpecimen = {
   componentId: 'button',

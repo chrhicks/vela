@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react'
-import { Badge, Button, Checkbox, IconButton, Input, Panel, Select, Tabs } from '@vela/ui/drafts'
+import { Button } from '@vela/ui'
+import { Badge, Checkbox, IconButton, Input, Panel, Select, Tabs } from '@vela/ui/drafts'
 import { DEFAULT_PROFILE, resolveTheme, themeStyle } from '@vela/ui/themes'
 import type { ComponentSpecimen, ThemeMode, ThemeParameters, WorkingSession } from '@vela/ui/themes'
 

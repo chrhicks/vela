@@ -12,7 +12,7 @@ Open `http://127.0.0.1:5174` for the focused workbench or `http://127.0.0.1:5174
 
 ## Current workshop
 
-- Draft Button, IconButton, Input, Select, Checkbox, Badge, Tabs, and Panel/Card components
+- Stable Button plus draft IconButton, Input, Select, Checkbox, Badge, Tabs, and Panel/Card components
 - Auto-discovered colocated specimens
 - One primary specimen per component, with additional specimens added only for concrete scenarios that prop controls cannot express
 - A searchable gallery with paired light and dark previews
@@ -43,10 +43,13 @@ The boundary accepts only the fixed session and profile routes, validates payloa
 
 ```text
 packages/ui/src/themes/       token contract and defaults
+packages/ui/src/components/   stable React components and specimens
 packages/ui/src/drafts/       draft React components and specimens
 apps/workshop/src/            workshop experience
 apps/workshop/designs/        named tracked profiles
 apps/workshop/.local/         ignored recovery state
 ```
 
-Drafts are available through the explicit `@vela/ui/drafts` development boundary. They are not exported from the stable `@vela/ui` root.
+Stable components are exported from the `@vela/ui` root. Drafts are available only through the explicit `@vela/ui/drafts` development boundary.
+
+See the [operations guide](../../docs/component-workshop-operations.md) for adding drafts, authoring interactive specimens, persistence, targeted browser proof, manual promotion, and later one-at-a-time Vela adoption.
