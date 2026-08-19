@@ -1,8 +1,23 @@
-import { IconButton } from '@vela/ui'
+import { IconButton, Panel, Badge } from '@vela/ui'
 
 import { RefreshIcon } from "../components/ui/icons";
 import { classes } from "../components/ui/utils";
 import { useHome } from "../pages/useHome";
+
+const connectionBadge = {
+  connected: {
+    label: 'Connected',
+    tone: 'positive',
+  },
+  disconnected: {
+    label: 'Disconnected',
+    tone: 'danger',
+  },
+  unavailable: {
+    label: 'Unavailable',
+    tone: 'warning',
+  },
+} as const
 
 export function Home() {
   const { home, loading, error, refresh} = useHome();
@@ -15,7 +30,6 @@ export function Home() {
         <div className="flex items-center gap-2">
           <span className="text-2xl font-bold">Devices</span>
           <IconButton
-            className="vela-ui-adapter"
             type="button"
             label="Refresh devices"
             tone="quiet"
@@ -32,23 +46,32 @@ export function Home() {
             <p role="alert">{error}</p>
           ) : (
             home?.rigs.map(rig => (
-              <div className="bg-ui-surface rounded-lg p-4" key={rig.id}>
-                <h2 className="text-lg font-bold">{rig.name}</h2>
-                <p className="text-sm text-ui-muted">Devices</p>
-                <ul>
-                  {rig.devices.map(device => (
-                    <li className="flex items-center" key={device.id}>
-                      <div className={classes(
-                        'rounded-full h-4 w-4 mr-2',
-                        device.connection === 'connected' ? 'bg-ui-positive'
-                          : device.connection === 'disconnected' ? 'bg-ui-danger'
-                          : 'bg-ui-warning'
-                      )}></div>
-                      <span className="text-sm">{device.name}</span>
-                    </li>
-                  ))}
+              <Panel
+                key={rig.id}
+                title={rig.name}
+                description={`${rig.devices.length} devices`}
+                elevation="raised"
+              >
+                <ul className="flex flex-col gap-2">
+                  {rig.devices.map(device => {
+                    const presentation = connectionBadge[device.connection]
+
+                    return (
+                      <li className="flex items-center justify-between" key={device.id}>
+                        <span className="text-sm">{device.name}</span>
+
+                        <Badge
+                          size="small"
+                          tone={presentation.tone}
+                          marker={<i />}
+                        >
+                          {presentation.label}
+                        </Badge>
+                      </li>
+                    )
+                  })}
                 </ul>
-              </div>
+              </Panel>
             ))
           )}
         </div>

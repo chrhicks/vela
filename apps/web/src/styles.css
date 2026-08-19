@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "@vela/ui/styles.css";
 
 /* Semantic tokens; data attributes on <html> select the active theme and density. */
 :root,
@@ -60,23 +61,19 @@
 }
 
 @theme inline {
-  --font-sans: var(--ui-font-sans);
-  --font-mono: var(--ui-font-mono);
-  --color-ui-bg: var(--ui-bg);
-  --color-ui-surface: var(--ui-surface);
-  --color-ui-surface-raised: var(--ui-surface-raised);
-  --color-ui-line: var(--ui-line);
-  --color-ui-line-strong: var(--ui-line-strong);
-  --color-ui-text: var(--ui-text);
-  --color-ui-muted: var(--ui-muted);
-  --color-ui-accent: var(--ui-accent);
-  --color-ui-accent-surface: var(--ui-accent-surface);
-  --color-ui-positive: var(--ui-positive);
-  --color-ui-warning: var(--ui-warning);
-  --color-ui-danger: var(--ui-danger);
-  --color-ui-info: var(--ui-info);
-  --color-ui-focus: var(--ui-focus);
-  --radius-ui: var(--ui-radius);
+  --color-ui-bg: var(--vela-canvas);
+  --color-ui-surface: var(--vela-surface);
+  --color-ui-surface-raised: var(--vela-surface-raised);
+  --color-ui-line: var(--vela-line);
+  --color-ui-line-strong: var(--vela-line-strong);
+  --color-ui-text: var(--vela-text);
+  --color-ui-muted: var(--vela-text-muted);
+  --color-ui-accent: var(--vela-accent);
+  --color-ui-accent-surface: var(--vela-accent-surface);
+  --color-ui-positive: var(--vela-positive);
+  --color-ui-warning: var(--vela-warning);
+  --color-ui-danger: var(--vela-danger);
+  --color-ui-focus: var(--vela-focus);
 }
 
 :root { color-scheme: light; }
@@ -109,16 +106,4 @@ button { font: inherit; }
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
-}
-
-.vela-ui-adapter {
-  --vela-control-height: var(--ui-control-height);
-  --vela-border-width: 1px;
-  --vela-radius: var(--ui-radius);
-  --vela-line: var(--ui-line);
-  --vela-line-strong: var(--ui-line-strong);
-  --vela-text: var(--ui-text);
-  --vela-text-muted: var(--ui-muted);
-  --vela-surface-raised: var(--ui-surface-raised);
-  --vela-focus: var(--ui-focus);
 }
