@@ -1,5 +1,5 @@
 import { RAMP_STEPS, SEMANTIC_TOKEN_KEYS, referencePalette } from '@vela/ui/themes'
-import type { ReferenceToken, ThemeMode, ThemeParameters } from '@vela/ui/themes'
+import type { RampName, ReferenceToken, ThemeMode, ThemeParameters } from '@vela/ui/themes'
 
 interface ThemeEditorProps {
   mode: ThemeMode
@@ -31,10 +31,11 @@ export function ThemeEditor({ mode, theme, onEdit }: ThemeEditorProps) {
   const palette = referencePalette(theme)
   const referenceTokens = Object.keys(palette) as ReferenceToken[]
 
-  function editLightness(ramp: 'neutralLightness' | 'accentLightness', index: number, value: number) {
-    const next = [...theme[ramp]]
+  function editLightness(ramp: RampName, index: number, value: number) {
+    const key = `${ramp}Lightness` as const
+    const next = [...theme[key]]
     next[index] = value
-    onEdit({ [ramp]: next })
+    onEdit({ [key]: next })
   }
 
   function editSemantic(key: (typeof SEMANTIC_TOKEN_KEYS)[number], value: ReferenceToken) {
@@ -67,11 +68,37 @@ export function ThemeEditor({ mode, theme, onEdit }: ThemeEditorProps) {
                     <input
                       max={0.99}
                       min={0.05}
-                      onChange={(event) => editLightness(`${ramp}Lightness`, index, Number(event.target.value))}
+                      onChange={(event) => editLightness(ramp, index, Number(event.target.value))}
                       step={0.01}
                       type="range"
                       value={theme[`${ramp}Lightness`][index]}
                     />
+                  </label>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </details>
+
+      <details>
+        <summary>Status color ramps</summary>
+        <div className="inspector-section">
+          {(['positive', 'warning', 'danger'] as const).map((ramp) => (
+            <div className="status-ramp" key={ramp}>
+              <div className="status-ramp__heading">
+                <span>{ramp}</span>
+                <span>{theme[`${ramp}Hue`]}°</span>
+              </div>
+              <RangeField label="Hue" max={360} min={0} onChange={(value) => onEdit({ [`${ramp}Hue`]: value })} step={1} value={theme[`${ramp}Hue`]} suffix="°" />
+              <RangeField label="Chroma" max={0.3} min={0.01} onChange={(value) => onEdit({ [`${ramp}Chroma`]: value })} step={0.005} value={theme[`${ramp}Chroma`]} />
+              <div className="swatch-row">
+                {RAMP_STEPS.map((step) => <span key={step} style={{ background: palette[`${ramp}-${step}`] }} title={`${ramp}-${step}`} />)}
+              </div>
+              <div className="ramp-sliders">
+                {RAMP_STEPS.map((step, index) => (
+                  <label key={step} title={`${ramp}-${step}: ${Math.round((theme[`${ramp}Lightness`][index] ?? 0) * 100)}%`}>
+                    <input max={0.99} min={0.05} onChange={(event) => editLightness(ramp, index, Number(event.target.value))} step={0.01} type="range" value={theme[`${ramp}Lightness`][index]} />
                   </label>
                 ))}
               </div>
