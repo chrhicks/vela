@@ -44,6 +44,10 @@ Fastify binds to `127.0.0.1` by default. This intentionally prevents device-cont
 
 The typed browser API client is in `apps/web/src/lib/api.ts`. Browser-safe values use `VITE_*` variables. Credentials and device protocol calls belong in `apps/server`, never in the SPA.
 
+## Design documents
+
+- [Component Workshop Decision Record](docs/component-workshop.md)
+
 ## Star catalogue
 
 Refresh the public star-name data with:
