@@ -13,7 +13,7 @@ export const specimen: ComponentSpecimen = {
     size: { type: 'select', label: 'Size', options: ['small', 'medium'] },
   },
   defaultProps: { selected: 'status', size: 'medium' },
-  render: (props) => (
+  render: (props, onPropsChange) => (
     <div style={{ width: 'min(100%, 34rem)' }}>
       <Tabs
         items={[
@@ -22,6 +22,7 @@ export const specimen: ComponentSpecimen = {
           { id: 'history', label: 'History', content: <div className="vela-specimen-copy"><strong>42 completed exposures</strong><p>Last frame completed 18 seconds ago.</p></div> },
         ]}
         size={String(props.size) as 'small' | 'medium'}
+        onValueChange={(selected) => onPropsChange?.({ selected })}
         value={String(props.selected)}
       />
     </div>

@@ -20,7 +20,7 @@ export const specimen: ComponentSpecimen = {
     disabled: { type: 'boolean', label: 'Disabled' },
   },
   defaultProps: { label: 'Imaging camera', value: 'asi2600', invalid: false, disabled: false },
-  render: (props) => (
+  render: (props, onPropsChange) => (
     <div style={{ width: 'min(100%, 24rem)' }}>
       <Select
         disabled={Boolean(props.disabled)}
@@ -28,7 +28,7 @@ export const specimen: ComponentSpecimen = {
         label={String(props.label)}
         message={Boolean(props.invalid) ? 'Choose an available device.' : 'Used for the next capture sequence'}
         options={cameras}
-        onChange={() => undefined}
+        onChange={(event) => onPropsChange?.({ value: event.target.value })}
         value={String(props.value)}
       />
     </div>

@@ -95,6 +95,9 @@ export interface ComponentSpecimen {
   description: string
   controls: Record<string, ControlDefinition>
   defaultProps: Record<string, string | number | boolean>
-  render: (props: Record<string, string | number | boolean>) => ReactNode
+  render: (
+    props: Record<string, string | number | boolean>,
+    onPropsChange?: (patch: Record<string, string | number | boolean>) => void,
+  ) => ReactNode
 }
 import type { ReactNode } from 'react'
