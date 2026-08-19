@@ -12,11 +12,11 @@ Open `http://127.0.0.1:5174` for the focused workbench or `http://127.0.0.1:5174
 
 ## Current workshop
 
-- Stable Button plus draft IconButton, Input, Select, Checkbox, Badge, Tabs, and Panel/Card components
+- Stable Button, IconButton, Input, Select, Checkbox, Badge, Tabs, and Panel/Card components
 - Auto-discovered colocated specimens
 - One primary specimen per component, with additional specimens added only for concrete scenarios that prop controls cannot express
 - A searchable gallery with paired light and dark previews
-- Fixed isolated, form/settings, toolbar/action-row, and card/data-list compositions built from the real drafts
+- Fixed isolated, form/settings, toolbar/action-row, and card/data-list compositions built from the real components
 - Generated and individually adjustable neutral, accent, positive, warning, and danger OKLCH ramps
 - Editable paired light and dark semantic mappings
 - Typography, geometry, density, prop, context, and viewport controls
@@ -50,6 +50,6 @@ apps/workshop/designs/        named tracked profiles
 apps/workshop/.local/         ignored recovery state
 ```
 
-Stable components are exported from the `@vela/ui` root. Drafts are available only through the explicit `@vela/ui/drafts` development boundary.
+All current baseline components are exported from the `@vela/ui` root. The empty `@vela/ui/drafts` development boundary remains available for future experimental components.
 
 See the [operations guide](../../docs/component-workshop-operations.md) for adding drafts, authoring interactive specimens, persistence, targeted browser proof, manual promotion, and later one-at-a-time Vela adoption.

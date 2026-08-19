@@ -3,15 +3,14 @@ import * as stable from './index'
 import * as drafts from './drafts'
 
 describe('@vela/ui export boundaries', () => {
-  it('exports promoted Button from the stable root', () => {
-    expect(stable.Button).toBeTypeOf('function')
+  it('exports the complete initial component baseline from the stable root', () => {
+    for (const name of ['Badge', 'Button', 'Checkbox', 'IconButton', 'Input', 'Panel', 'Select', 'Tabs']) {
+      expect(stable).toHaveProperty(name)
+      expect(stable[name as keyof typeof stable]).toBeTypeOf('function')
+    }
   })
 
-  it('does not expose Button or other draft components from the draft boundary incorrectly', () => {
-    expect(drafts).not.toHaveProperty('Button')
-    expect(stable).not.toHaveProperty('Input')
-    expect(stable).not.toHaveProperty('Panel')
-    expect(drafts.Input).toBeTypeOf('function')
-    expect(drafts.Panel).toBeTypeOf('function')
+  it('keeps the draft export surface empty after baseline promotion', () => {
+    expect(Object.keys(drafts)).toEqual([])
   })
 })
