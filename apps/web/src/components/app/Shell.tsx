@@ -1,10 +1,14 @@
-import type { ReactNode } from "react";
+import type { ReactNode, CSSProperties } from "react";
 import { NavLink, Outlet } from "react-router";
+import { DEFAULT_PROFILE, resolveTheme, themeStyle } from '@vela/ui'
+
 import { classes } from "../ui/utils";
+
+const theme = resolveTheme(DEFAULT_PROFILE)
 
 export default function Shell() {
   return (
-    <div>
+    <div style={themeStyle(theme, 'dark') as CSSProperties}>
       <header className="bg-ui-surface flex items-center min-h-13 px-3 border-0 border-b border-b-ui-line">
         <section className="flex h-full">
           <span className="h-7 w-7 border border-ui-accent grid place-items-center font-bold text-ui-accent">
@@ -31,7 +35,7 @@ export default function Shell() {
 
 function Link({ to, children, active }: { to: string, children: ReactNode, active?:boolean }) {
 	return (
-		<NavLink 
+		<NavLink
 			className={classes(
         'relative grid place-items-center min-w-14.5 uppercase text-xs text-ui-muted px-2.5 hover:text-ui-text',
         'after:absolute after:right-2.5 after:bottom-0 after:left-2.5 after:h-0.5 after:origin-center ',
