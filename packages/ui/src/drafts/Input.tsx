@@ -1,3 +1,4 @@
+import { useId } from 'react'
 import type { InputHTMLAttributes } from 'react'
 
 export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size'> {
@@ -7,7 +8,8 @@ export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 
 }
 
 export function Input({ label, message, invalid = false, className = '', id, ...props }: InputProps) {
-  const inputId = id ?? `vela-input-${label?.toLowerCase().replace(/[^a-z0-9]+/g, '-') ?? 'field'}`
+  const generatedId = useId()
+  const inputId = id ?? `vela-input-${generatedId.replace(/:/g, '')}`
   return (
     <label className="vela-field" htmlFor={inputId}>
       {label ? <span className="vela-field__label">{label}</span> : null}

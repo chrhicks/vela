@@ -1,11 +1,13 @@
 import type { DesignProfile, WorkingSession } from '@vela/ui/themes'
 
 const numericThemeKeys = new Set([
-  'neutralHue', 'neutralChroma', 'accentHue', 'accentChroma', 'fontSize', 'fontWeight',
+  'neutralHue', 'neutralChroma', 'accentHue', 'accentChroma', 'positiveHue', 'positiveChroma',
+  'warningHue', 'warningChroma', 'dangerHue', 'dangerChroma', 'fontSize', 'fontWeight',
   'lineHeight', 'letterSpacing', 'spacingUnit', 'radius', 'borderWidth', 'controlHeight',
   'panelPadding', 'density',
 ])
-const themeKeys = new Set([...numericThemeKeys, 'neutralLightness', 'accentLightness', 'fontStack', 'semantic'])
+const lightnessKeys = ['neutralLightness', 'accentLightness', 'positiveLightness', 'warningLightness', 'dangerLightness']
+const themeKeys = new Set([...numericThemeKeys, ...lightnessKeys, 'fontStack', 'semantic'])
 const semanticKeys = [
   'canvas', 'surface', 'surfaceRaised', 'line', 'lineStrong', 'text', 'textMuted',
   'accent', 'accentText', 'accentSurface', 'positive', 'warning', 'danger', 'focus',
@@ -60,7 +62,7 @@ function isThemeOverrides(value: unknown): boolean {
   if (!isRecord(value) || Object.keys(value).some((key) => !themeKeys.has(key))) return false
   for (const [key, entry] of Object.entries(value)) {
     if (numericThemeKeys.has(key) && (typeof entry !== 'number' || !Number.isFinite(entry))) return false
-    if ((key === 'neutralLightness' || key === 'accentLightness') && !(Array.isArray(entry) && entry.length === 11 && entry.every((item) => typeof item === 'number' && item >= 0 && item <= 1))) return false
+    if (lightnessKeys.includes(key) && !(Array.isArray(entry) && entry.length === 11 && entry.every((item) => typeof item === 'number' && item >= 0 && item <= 1))) return false
     if (key === 'fontStack' && !['sans', 'serif', 'mono'].includes(String(entry))) return false
     if (key === 'semantic' && !isSemanticPair(entry)) return false
   }
@@ -71,7 +73,7 @@ function isSemanticPair(value: unknown): boolean {
   if (!isRecord(value)) return false
   return ['light', 'dark'].every((mode) => {
     const mapping = value[mode]
-    return isRecord(mapping) && semanticKeys.every((key) => typeof mapping[key] === 'string' && /^(neutral|accent)-(50|100|200|300|400|500|600|700|800|900|950)$/.test(mapping[key]))
+    return isRecord(mapping) && semanticKeys.every((key) => typeof mapping[key] === 'string' && /^(neutral|accent|positive|warning|danger)-(50|100|200|300|400|500|600|700|800|900|950)$/.test(mapping[key]))
   })
 }
 

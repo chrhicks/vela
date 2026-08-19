@@ -11,9 +11,9 @@ const lightSemantic: SemanticMapping = {
   accent: 'accent-700',
   accentText: 'neutral-50',
   accentSurface: 'accent-100',
-  positive: 'accent-800',
-  warning: 'accent-700',
-  danger: 'accent-900',
+  positive: 'positive-700',
+  warning: 'warning-700',
+  danger: 'danger-700',
   focus: 'accent-600',
 }
 
@@ -28,9 +28,9 @@ const darkSemantic: SemanticMapping = {
   accent: 'accent-400',
   accentText: 'neutral-950',
   accentSurface: 'accent-900',
-  positive: 'accent-300',
-  warning: 'accent-400',
-  danger: 'accent-300',
+  positive: 'positive-300',
+  warning: 'warning-300',
+  danger: 'danger-300',
   focus: 'accent-300',
 }
 
@@ -39,8 +39,17 @@ export const DEFAULT_THEME_PARAMETERS: ThemeParameters = {
   neutralChroma: 0.018,
   accentHue: 72,
   accentChroma: 0.12,
+  positiveHue: 150,
+  positiveChroma: 0.12,
+  warningHue: 82,
+  warningChroma: 0.13,
+  dangerHue: 28,
+  dangerChroma: 0.15,
   neutralLightness: [0.985, 0.955, 0.9, 0.82, 0.7, 0.58, 0.46, 0.35, 0.25, 0.17, 0.1],
   accentLightness: [0.97, 0.93, 0.85, 0.76, 0.68, 0.6, 0.52, 0.44, 0.35, 0.27, 0.2],
+  positiveLightness: [0.97, 0.93, 0.85, 0.76, 0.68, 0.6, 0.52, 0.44, 0.35, 0.27, 0.2],
+  warningLightness: [0.97, 0.93, 0.85, 0.76, 0.68, 0.6, 0.52, 0.44, 0.35, 0.27, 0.2],
+  dangerLightness: [0.97, 0.93, 0.85, 0.76, 0.68, 0.6, 0.52, 0.44, 0.35, 0.27, 0.2],
   fontStack: 'sans',
   fontSize: 14,
   fontWeight: 450,
@@ -56,7 +65,7 @@ export const DEFAULT_THEME_PARAMETERS: ThemeParameters = {
 }
 
 export const BASELINE_ID = 'vela-ui-default'
-export const BASELINE_FINGERPRINT = 'vela-ui-default-v1-2026-08-19'
+export const BASELINE_FINGERPRINT = 'vela-ui-default-v2-2026-08-19'
 
 export const DEFAULT_PROFILE: DesignProfile = {
   schemaVersion: 1,

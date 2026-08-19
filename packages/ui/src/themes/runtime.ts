@@ -1,13 +1,15 @@
 import { DEFAULT_THEME_PARAMETERS, BASELINE_FINGERPRINT } from './defaults'
-import { RAMP_STEPS, SEMANTIC_TOKEN_KEYS } from './types'
+import { RAMP_NAMES, RAMP_STEPS, SEMANTIC_TOKEN_KEYS } from './types'
 import type { DesignProfile, ReferenceToken, SemanticMapping, ThemeMode, ThemeParameters, WorkingSession } from './types'
 
 const numericThemeKeys = new Set([
-  'neutralHue', 'neutralChroma', 'accentHue', 'accentChroma', 'fontSize', 'fontWeight',
+  'neutralHue', 'neutralChroma', 'accentHue', 'accentChroma', 'positiveHue', 'positiveChroma',
+  'warningHue', 'warningChroma', 'dangerHue', 'dangerChroma', 'fontSize', 'fontWeight',
   'lineHeight', 'letterSpacing', 'spacingUnit', 'radius', 'borderWidth', 'controlHeight',
   'panelPadding', 'density',
 ])
-const themeKeys = new Set([...numericThemeKeys, 'neutralLightness', 'accentLightness', 'fontStack', 'semantic'])
+const lightnessKeys = RAMP_NAMES.map((ramp) => `${ramp}Lightness`)
+const themeKeys = new Set([...numericThemeKeys, ...lightnessKeys, 'fontStack', 'semantic'])
 
 const fontStacks = {
   sans: 'Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
@@ -23,6 +25,9 @@ export function resolveTheme(profile: DesignProfile, scratch: Partial<ThemeParam
     semantic: scratch.semantic ?? profile.overrides.semantic ?? DEFAULT_THEME_PARAMETERS.semantic,
     neutralLightness: scratch.neutralLightness ?? profile.overrides.neutralLightness ?? DEFAULT_THEME_PARAMETERS.neutralLightness,
     accentLightness: scratch.accentLightness ?? profile.overrides.accentLightness ?? DEFAULT_THEME_PARAMETERS.accentLightness,
+    positiveLightness: scratch.positiveLightness ?? profile.overrides.positiveLightness ?? DEFAULT_THEME_PARAMETERS.positiveLightness,
+    warningLightness: scratch.warningLightness ?? profile.overrides.warningLightness ?? DEFAULT_THEME_PARAMETERS.warningLightness,
+    dangerLightness: scratch.dangerLightness ?? profile.overrides.dangerLightness ?? DEFAULT_THEME_PARAMETERS.dangerLightness,
   }
 }
 
@@ -32,9 +37,13 @@ function oklch(lightness: number, chroma: number, hue: number): string {
 
 export function referencePalette(theme: ThemeParameters): Record<ReferenceToken, string> {
   const entries: [ReferenceToken, string][] = []
-  for (const [index, step] of RAMP_STEPS.entries()) {
-    entries.push([`neutral-${step}`, oklch(theme.neutralLightness[index] ?? 0.5, theme.neutralChroma, theme.neutralHue)])
-    entries.push([`accent-${step}`, oklch(theme.accentLightness[index] ?? 0.5, theme.accentChroma, theme.accentHue)])
+  for (const ramp of RAMP_NAMES) {
+    const lightness = theme[`${ramp}Lightness`]
+    const chroma = theme[`${ramp}Chroma`]
+    const hue = theme[`${ramp}Hue`]
+    for (const [index, step] of RAMP_STEPS.entries()) {
+      entries.push([`${ramp}-${step}`, oklch(lightness[index] ?? 0.5, chroma, hue)])
+    }
   }
   return Object.fromEntries(entries) as Record<ReferenceToken, string>
 }
@@ -110,7 +119,7 @@ function isThemeOverrides(value: unknown): value is Partial<ThemeParameters> {
   if (!isRecord(value) || Object.keys(value).some((key) => !themeKeys.has(key))) return false
   for (const [key, entry] of Object.entries(value)) {
     if (numericThemeKeys.has(key) && (typeof entry !== 'number' || !Number.isFinite(entry))) return false
-    if ((key === 'neutralLightness' || key === 'accentLightness') && !isLightnessRamp(entry)) return false
+    if (lightnessKeys.includes(key) && !isLightnessRamp(entry)) return false
     if (key === 'fontStack' && !['sans', 'serif', 'mono'].includes(String(entry))) return false
     if (key === 'semantic' && !isSemanticPair(entry)) return false
   }
@@ -126,7 +135,7 @@ function isSemanticPair(value: unknown): value is Record<ThemeMode, SemanticMapp
   if (!isRecord(value)) return false
   return ['light', 'dark'].every((mode) => {
     const mapping = value[mode]
-    return isRecord(mapping) && SEMANTIC_TOKEN_KEYS.every((key) => typeof mapping[key] === 'string' && /^(neutral|accent)-(50|100|200|300|400|500|600|700|800|900|950)$/.test(mapping[key]))
+    return isRecord(mapping) && SEMANTIC_TOKEN_KEYS.every((key) => typeof mapping[key] === 'string' && /^(neutral|accent|positive|warning|danger)-(50|100|200|300|400|500|600|700|800|900|950)$/.test(mapping[key]))
   })
 }
 

@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { BASELINE_FINGERPRINT } from '@vela/ui/themes'
+import { Gallery } from './Gallery'
 import { componentGroups } from './registry'
 import { PreviewCanvas } from './PreviewCanvas'
 import { ThemeEditor } from './ThemeEditor'
@@ -13,7 +15,32 @@ const viewportPresets = [
 export function App() {
   const workshop = useWorkshop()
   const [copyLabel, setCopyLabel] = useState('Copy context')
+  const [pathname, setPathname] = useState(window.location.pathname)
   const unsavedCount = Object.keys(workshop.session.unsavedOverrides).length
+  const baselineDrift = workshop.activeProfile.baselineFingerprint !== BASELINE_FINGERPRINT
+  const isGallery = pathname === '/gallery'
+
+  useEffect(() => {
+    const updatePath = () => setPathname(window.location.pathname)
+    window.addEventListener('popstate', updatePath)
+    return () => window.removeEventListener('popstate', updatePath)
+  }, [])
+
+  function navigate(path: '/' | '/gallery') {
+    window.history.pushState(null, '', `${path}${window.location.search}`)
+    setPathname(path)
+  }
+
+  function openSpecimen(componentId: string, specimenId: string) {
+    workshop.selectSpecimen(componentId, specimenId)
+    navigate('/')
+  }
+
+  function openComposition(componentId: string, specimenId: string, context: typeof workshop.session.context) {
+    workshop.selectSpecimen(componentId, specimenId)
+    workshop.patchSession({ context })
+    navigate('/')
+  }
 
   async function copyContext() {
     const context = {
@@ -53,22 +80,42 @@ export function App() {
   }
 
   return (
-    <div className="workshop-shell">
+    <div className={`workshop-shell ${isGallery ? 'workshop-shell--gallery' : ''}`}>
       <header className="topbar">
-        <div className="brand-lockup">
-          <div className="brand-mark">V</div>
-          <div><strong>Component Workshop</strong><span>Vela UI · local source</span></div>
+        <div className="topbar__identity">
+          <div className="brand-lockup">
+            <div className="brand-mark">V</div>
+            <div><strong>Component Workshop</strong><span>Vela UI · local source</span></div>
+          </div>
+          <nav className="view-switch" aria-label="Workshop view">
+            <button className={!isGallery ? 'active' : ''} onClick={() => navigate('/')}>Workbench</button>
+            <button className={isGallery ? 'active' : ''} onClick={() => navigate('/gallery')}>Gallery</button>
+          </nav>
         </div>
         <div className="topbar__controls">
-          <div className="segmented" title="Preview mode">
+          {isGallery ? <select className="gallery-profile" onChange={(event) => workshop.selectProfile(event.target.value)} value={workshop.activeProfile.id}>{workshop.profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}{profile.readonly ? ' · reference' : ''}</option>)}</select> : null}
+          {!isGallery ? <div className="segmented" title="Preview mode">
             {(['dark', 'light'] as const).map((mode) => <button className={workshop.session.mode === mode ? 'active' : ''} key={mode} onClick={() => workshop.patchSession({ mode })}>{mode}</button>)}
-          </div>
+          </div> : null}
           <label className="density-control"><span>Density</span><input max={1.25} min={0.75} onChange={(event) => workshop.patchSession({ density: Number(event.target.value) })} step={0.01} type="range" value={workshop.session.density} /><output>{Math.round(workshop.session.density * 100)}%</output></label>
-          <button className="button button--quiet" disabled={!workshop.undoCount} onClick={workshop.undo}>Undo <kbd>⌘Z</kbd></button>
-          <button className="button button--quiet" disabled={!workshop.redoCount} onClick={workshop.redo}>Redo</button>
-          <button className="button" onClick={() => void copyContext()}>{copyLabel}</button>
+          {!isGallery ? <>
+            <button className="button button--quiet" disabled={!workshop.undoCount} onClick={workshop.undo}>Undo <kbd>⌘Z</kbd></button>
+            <button className="button button--quiet" disabled={!workshop.redoCount} onClick={workshop.redo}>Redo</button>
+            <button className="button" onClick={() => void copyContext()}>{copyLabel}</button>
+          </> : null}
         </div>
       </header>
+
+      {isGallery ? (
+        <Gallery
+          density={workshop.session.density}
+          onOpenComposition={openComposition}
+          onOpenSpecimen={openSpecimen}
+          profileName={workshop.activeProfile.name}
+          baselineDrift={baselineDrift}
+          theme={workshop.theme}
+        />
+      ) : <>
 
       <aside className="library-panel">
         <div className="panel-heading"><span>Draft library</span><em>{componentGroups.length}</em></div>
@@ -115,7 +162,7 @@ export function App() {
 
       <aside className="inspector-panel">
         <section className="profile-bar">
-          <div className="panel-heading"><span>Design profile</span>{unsavedCount ? <em>{unsavedCount} unsaved</em> : <em>saved</em>}</div>
+          <div className="panel-heading"><span>Design profile</span>{unsavedCount ? <em>{unsavedCount} unsaved</em> : baselineDrift ? <em className="warning-text">baseline drift</em> : <em>saved</em>}</div>
           <select onChange={(event) => workshop.selectProfile(event.target.value)} value={workshop.activeProfile.id}>
             {workshop.profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}{profile.readonly ? ' · reference' : ''}</option>)}
           </select>
@@ -152,6 +199,7 @@ export function App() {
           <ThemeEditor mode={workshop.session.mode} onEdit={workshop.editTheme} theme={workshop.theme} />
         </section>
       </aside>
+      </>}
     </div>
   )
 }

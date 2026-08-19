@@ -3,6 +3,8 @@ export const RAMP_STEPS = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950]
 export type RampStep = (typeof RAMP_STEPS)[number]
 export type ThemeMode = 'light' | 'dark'
 export type FontStack = 'sans' | 'serif' | 'mono'
+export const RAMP_NAMES = ['neutral', 'accent', 'positive', 'warning', 'danger'] as const
+export type RampName = (typeof RAMP_NAMES)[number]
 
 export const SEMANTIC_TOKEN_KEYS = [
   'canvas',
@@ -22,7 +24,7 @@ export const SEMANTIC_TOKEN_KEYS = [
 ] as const
 
 export type SemanticTokenKey = (typeof SEMANTIC_TOKEN_KEYS)[number]
-export type ReferenceToken = `neutral-${RampStep}` | `accent-${RampStep}`
+export type ReferenceToken = `${RampName}-${RampStep}`
 export type SemanticMapping = Record<SemanticTokenKey, ReferenceToken>
 
 export interface ThemeParameters {
@@ -30,8 +32,17 @@ export interface ThemeParameters {
   neutralChroma: number
   accentHue: number
   accentChroma: number
+  positiveHue: number
+  positiveChroma: number
+  warningHue: number
+  warningChroma: number
+  dangerHue: number
+  dangerChroma: number
   neutralLightness: number[]
   accentLightness: number[]
+  positiveLightness: number[]
+  warningLightness: number[]
+  dangerLightness: number[]
   fontStack: FontStack
   fontSize: number
   fontWeight: number
