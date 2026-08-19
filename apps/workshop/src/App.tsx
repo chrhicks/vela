@@ -155,7 +155,14 @@ export function App() {
         </div>
 
         <div className="canvas-scroll">
-          <PreviewCanvas compare={workshop.session.compareBaseline} mode={workshop.session.mode} session={workshop.session} specimen={workshop.specimen} theme={workshop.theme} />
+          <PreviewCanvas
+            compare={workshop.session.compareBaseline}
+            mode={workshop.session.mode}
+            onPropsChange={(patch) => workshop.patchSession({ props: { ...workshop.session.props, ...patch } })}
+            session={workshop.session}
+            specimen={workshop.specimen}
+            theme={workshop.theme}
+          />
         </div>
         <footer className="stage-status"><span className="status-dot" />{workshop.status}<span>·</span><span>Stable URL updated</span></footer>
       </main>

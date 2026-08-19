@@ -9,6 +9,7 @@ interface PreviewCanvasProps {
   session: WorkingSession
   specimen: ComponentSpecimen
   theme: ThemeParameters
+  onPropsChange: (patch: Record<string, string | number | boolean>) => void
 }
 
 function ContextFrame({ context, children }: { context: WorkingSession['context']; children: ReactNode }) {
@@ -33,23 +34,23 @@ function ContextFrame({ context, children }: { context: WorkingSession['context'
   return <div className="context-isolated">{children}</div>
 }
 
-function Preview({ label, mode, session, specimen, theme }: { label: string; mode: ThemeMode; session: WorkingSession; specimen: ComponentSpecimen; theme: ThemeParameters }) {
+function Preview({ label, mode, session, specimen, theme, onPropsChange }: { label: string; mode: ThemeMode; session: WorkingSession; specimen: ComponentSpecimen; theme: ThemeParameters; onPropsChange: (patch: Record<string, string | number | boolean>) => void }) {
   return (
     <section className="preview-column">
       <div className="preview-label"><span>{label}</span><span>{mode} · {Math.round(theme.density * 100)}%</span></div>
       <div className="vela-theme preview-surface" data-mode={mode} style={themeStyle(theme, mode) as CSSProperties}>
-        <ContextFrame context={session.context}>{specimen.render(session.props)}</ContextFrame>
+        <ContextFrame context={session.context}>{specimen.render(session.props, onPropsChange)}</ContextFrame>
       </div>
     </section>
   )
 }
 
-export function PreviewCanvas({ compare, mode, session, specimen, theme }: PreviewCanvasProps) {
+export function PreviewCanvas({ compare, mode, session, specimen, theme, onPropsChange }: PreviewCanvasProps) {
   const baseline = resolveTheme(DEFAULT_PROFILE, { density: session.density })
   return (
     <div className={`preview-grid ${compare ? 'preview-grid--compare' : ''}`} style={{ width: `${session.viewport}px` }}>
-      {compare ? <Preview label="Baseline" mode={mode} session={session} specimen={specimen} theme={baseline} /> : null}
-      <Preview label={compare ? 'Active profile' : specimen.name} mode={mode} session={session} specimen={specimen} theme={theme} />
+      {compare ? <Preview label="Baseline" mode={mode} onPropsChange={onPropsChange} session={session} specimen={specimen} theme={baseline} /> : null}
+      <Preview label={compare ? 'Active profile' : specimen.name} mode={mode} onPropsChange={onPropsChange} session={session} specimen={specimen} theme={theme} />
     </div>
   )
 }
