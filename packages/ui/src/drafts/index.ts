@@ -1,7 +1,1 @@
-export * from './Badge'
-export * from './Checkbox'
-export * from './IconButton'
-export * from './Input'
-export * from './Panel'
-export * from './Select'
-export * from './Tabs'
+export {}

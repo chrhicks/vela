@@ -60,7 +60,7 @@ export function Gallery({ theme, profileName, density, baselineDrift, onOpenSpec
       </section>
 
       <section className="gallery-section gallery-section--compositions">
-        <div className="gallery-section__heading"><div><h2>Compositions</h2><p>Fixed arrangements built from the real draft primitives—not a freeform canvas.</p></div><em>{compositions.length}</em></div>
+        <div className="gallery-section__heading"><div><h2>Compositions</h2><p>Fixed arrangements built from the real primitives—not a freeform canvas.</p></div><em>{compositions.length}</em></div>
         <div className="composition-grid">
           {compositions.map((composition) => <article className="composition-card" key={composition.id}><div className="composition-card__heading"><div><strong>{composition.name}</strong><p>{composition.description}</p></div><button onClick={() => onOpenComposition(composition.componentId, composition.specimenId, composition.context)}>Open context ↗</button></div><div className="composition-pair"><CompositionPreview composition={composition} mode="light" theme={theme} /><CompositionPreview composition={composition} mode="dark" theme={theme} /></div></article>)}
         </div>

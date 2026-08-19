@@ -11,7 +11,7 @@ apps/
   server/    # Fastify API and device adapters
 packages/
   model/     # Shared types for web and server
-  ui/        # @vela/ui tokens, draft components, and stable exports
+  ui/        # @vela/ui tokens, stable components, and draft workspace
 ```
 
 ## Prerequisites

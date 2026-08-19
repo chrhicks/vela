@@ -1,4 +1,4 @@
-import { Button } from '../components'
+import { Button } from './Button'
 import { Panel } from './Panel'
 import type { ComponentSpecimen } from '../themes'
 

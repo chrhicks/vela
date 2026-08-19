@@ -147,7 +147,7 @@ Then:
 8. Review the final diff for unrelated adoption, profile, or default-theme changes.
 9. Commit the promotion as a meaningful, explicit change.
 
-Button at the CHI-86 fixed point is the first proven example of this procedure.
+Button at the CHI-86 fixed point is the first individually proven example of this procedure. After that proof was accepted, the owner explicitly approved the remaining seven components as the initial stable component baseline; they followed the same source, export, test, and browser-proof operation. The draft boundary remains empty and ready for future experimental work.
 
 ## Adopt one stable component in Vela later
 
