@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "id": "field-draft",
+  "name": "Field Draft",
+  "baselineId": "vela-ui-default",
+  "baselineFingerprint": "vela-ui-default-v1-2026-08-19",
+  "overrides": {}
+}

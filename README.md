@@ -7,9 +7,11 @@ Vela is a local-first astronomy-control workspace. The React SPA is the control 
 ```text
 apps/
   web/       # Vite, React, React Router, and Tailwind CSS
+  workshop/  # Source-backed component design workshop
   server/    # Fastify API and device adapters
 packages/
   model/     # Shared types for web and server
+  ui/        # @vela/ui tokens, draft components, and stable exports
 ```
 
 ## Prerequisites
@@ -31,6 +33,7 @@ Useful focused commands:
 
 ```sh
 pnpm dev:web
+pnpm dev:workshop
 pnpm dev:server
 pnpm build
 pnpm start
@@ -47,6 +50,7 @@ The typed browser API client is in `apps/web/src/lib/api.ts`. Browser-safe value
 ## Design documents
 
 - [Component Workshop Decision Record](docs/component-workshop.md)
+- [Component Workshop Usage](apps/workshop/README.md)
 
 ## Star catalogue
 

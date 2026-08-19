@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "pnpm --filter @vela/model build && pnpm --parallel --filter @vela/model --filter @vela/web --filter @vela/server dev",
+    "dev:workshop": "pnpm --filter @vela/workshop dev",
     "build": "pnpm -r --if-present run build",
     "dev:web": "pnpm --filter @vela/web dev",
     "dev:server": "pnpm --filter @vela/server dev",
