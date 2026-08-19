@@ -92,7 +92,7 @@ export const createAlpacaService = (rig: DeviceRig): AlpacaService => {
         name: device.DeviceName,
         driver,
         connection,
-        status: { state: 'unknown' }, // temp until using camera alpaca client
+        status: { state: 'unknown' }, // TODO: temp. until using camera alpaca client
         updatedAt: new Date().toISOString()
       })
     }
