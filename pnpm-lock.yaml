@@ -39,6 +39,9 @@ importers:
       '@vela/model':
         specifier: workspace:*
         version: link:../../packages/model
+      '@vela/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       react:
         specifier: ^19.2.8
         version: 19.2.8

@@ -1,22 +1,30 @@
+import { IconButton } from '@vela/ui'
+
 import { RefreshIcon } from "../components/ui/icons";
 import { classes } from "../components/ui/utils";
 import { useHome } from "../pages/useHome";
 
 export function Home() {
   const { home, loading, error, refresh} = useHome();
-  
+
   return (
     <section>
       <div className={classes(
         'mx-auto max-w-[80vw] mt-8',
       )}>
-        <div className="flex items-center">
-          <span className="text-2xl font-bold mr-4">Devices</span>
-          <button type="button" onClick={refresh} disabled={loading} aria-label="Refresh devices">
-            <RefreshIcon className="size-5 text-ui-text" />
-          </button>
+        <div className="flex items-center gap-2">
+          <span className="text-2xl font-bold">Devices</span>
+          <IconButton
+            className="vela-ui-adapter"
+            type="button"
+            label="Refresh devices"
+            tone="quiet"
+            icon={<RefreshIcon />}
+            onClick={refresh}
+            disabled={loading}
+          />
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-8">
           {loading ? (
             <Loading />
