@@ -5,25 +5,32 @@ interface SpecimenModule {
 }
 
 const modules = import.meta.glob<SpecimenModule>(
-  '../../../packages/ui/src/drafts/*.specimen.tsx',
+  '../../../packages/ui/src/{components,drafts}/*.specimen.tsx',
   { eager: true },
 )
 
-export const specimens = Object.values(modules)
-  .map((module) => module.specimen)
-  .sort((left, right) => left.componentName.localeCompare(right.componentName))
+const discoveredSpecimens = Object.entries(modules)
+  .map(([path, module]) => ({
+    specimen: module.specimen,
+    stability: path.includes('/components/') ? 'stable' as const : 'draft' as const,
+  }))
+  .sort((left, right) => left.specimen.componentName.localeCompare(right.specimen.componentName))
 
-const groupedSpecimens = specimens.reduce<Record<string, ComponentSpecimen[]>>((groups, specimen) => {
-  const group = groups[specimen.componentId] ?? []
-  group.push(specimen)
-  groups[specimen.componentId] = group
+export const specimens = discoveredSpecimens.map((entry) => entry.specimen)
+
+const groupedSpecimens = discoveredSpecimens.reduce<Record<string, { stability: 'stable' | 'draft'; specimens: ComponentSpecimen[] }>>((groups, entry) => {
+  const group = groups[entry.specimen.componentId] ?? { stability: entry.stability, specimens: [] }
+  group.specimens.push(entry.specimen)
+  if (entry.stability === 'stable') group.stability = 'stable'
+  groups[entry.specimen.componentId] = group
   return groups
 }, {})
 
-export const componentGroups = Object.entries(groupedSpecimens).map(([id, entries]) => ({
+export const componentGroups = Object.entries(groupedSpecimens).map(([id, group]) => ({
   id,
-  name: entries[0]?.componentName ?? id,
-  specimens: entries,
+  name: group.specimens[0]?.componentName ?? id,
+  specimens: group.specimens,
+  stability: group.stability,
 }))
 
 export function findSpecimen(componentId: string, specimenId: string): ComponentSpecimen {
