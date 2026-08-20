@@ -1,1 +1,1 @@
-export type { HomeView, RigView } from './home.js';
+export type { HomeView } from './home.js'

@@ -1,7 +1,8 @@
 import Fastify from 'fastify'
 import deviceConfig from './config/devices.js';
 import { createAlpacaClient } from './alpaca/index.js';
-import type { HomeView, RigView } from '@vela/model/web';
+import type { HomeView } from '@vela/model/web';
+import type { RigView } from '@vela/model/rig';
 import { createAlpacaService } from './alpaca/service.js';
 
 export function buildApp() {
@@ -50,12 +51,15 @@ export function buildApp() {
     await Promise.all(rigConfigs.map(async (cr) => {
       const alpacaService = createAlpacaService(cr)
       const devices = await alpacaService.devices()
+      const lastSeenAt = new Date().toISOString()
 
       rigs.push({
         id: cr.id,
         name: cr.name,
-        reachable: true, // TODO: how to determine this? connection error catch I assume.
-        devices
+        reachability: 'reachable',
+        lastSeenAt,
+        devices,
+        capabilities: []
       })
     }))
     

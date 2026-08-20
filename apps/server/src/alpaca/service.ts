@@ -1,25 +1,11 @@
-import type { ConnectionStatus, DeviceKind, DeviceSummary } from '@vela/model/device'
+import type { ConnectionStatus, DeviceSummary } from '@vela/model/device'
 import type { DeviceRig } from '../config/devices.js'
 import { createAlpacaClient } from './client.js'
+import { toDeviceKind } from './device-kind.js'
 import type { ConfiguredDevice } from './types/management.js'
 
 export interface AlpacaService {
   devices(): Promise<DeviceSummary[]>
-}
-
-function toDeviceKind(alpacaType: string): DeviceKind {
-  switch (alpacaType) {
-    case 'Telescope':
-      return 'telescope'
-    case 'Camera':
-      return 'camera'
-    case 'Focuser':
-      return 'focuser'
-    case 'ObservingConditions':
-      return 'observing-conditions'
-    default:
-      return 'unknown'
-  }
 }
 
 export const createAlpacaService = (rig: DeviceRig): AlpacaService => {

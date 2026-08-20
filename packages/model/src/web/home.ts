@@ -1,13 +1,6 @@
-import type { DeviceSummary } from "../device/index.js"
-
-export interface RigView {
-  id: string
-  name: string
-  reachable: boolean
-  devices: DeviceSummary[]
-}
+import type { IsoDateTime, RigView } from '../rig/index.js'
 
 export interface HomeView {
-  rigs: RigView[]
-  refreshedAt: string 
+  readonly rigs: ReadonlyArray<RigView>
+  readonly refreshedAt: IsoDateTime
 }
