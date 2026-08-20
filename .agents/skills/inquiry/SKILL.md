@@ -17,7 +17,7 @@ As I answer questions, take the information and re-calculate the decision tree. 
 
 As you interact with the user if your understanding substantially changes, the user introduces new information or contradicts previous information, or you see a potential opportunity to simplify the scope - pause and recalibrate with the user.
 
-Example recalibration message:
+Example recalibration message (you can have multiple of these if needed):
 
 ```
 🔄 <headline of what you want to address>
@@ -30,3 +30,5 @@ Example recalibration message:
 After gaining alignment, you may continue with your questioning.
 
 The goal is to gain full alignment with the user. Your understandiing of the task and the user's should be clear and unambiguous. The questions should be designed to uncover any gaps in understanding, clarify ambiguities, and ensure that the final output meets the user's expectations.
+
+When alignment is gained. Review your decision tree and the answers the user provided in a final pass to ensure everything is addressed and there are no remaining ambiguities. If any are found, ask additional questions to resolve them. Otherwise yield to the user for next steps.
