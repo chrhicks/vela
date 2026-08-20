@@ -8,7 +8,10 @@ const theme = resolveTheme(DEFAULT_PROFILE)
 
 export default function Shell() {
   return (
-    <div style={themeStyle(theme, 'dark') as CSSProperties}>
+    <div
+      className="vela-theme min-h-screen"
+      style={themeStyle(theme, 'dark') as CSSProperties}
+    >
       <header className="bg-ui-surface flex items-center min-h-13 px-3 border-0 border-b border-b-ui-line">
         <section className="flex h-full">
           <span className="h-7 w-7 border border-ui-accent grid place-items-center font-bold text-ui-accent">
