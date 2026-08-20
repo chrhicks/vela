@@ -11,6 +11,10 @@
     "./device": {
       "types": "./dist/device/index.d.ts",
       "import": "./dist/device/index.js"
+    },
+    "./rig": {
+      "types": "./dist/rig/index.d.ts",
+      "import": "./dist/rig/index.js"
     }
   },
   "files": [
@@ -18,9 +22,11 @@
   ],
   "scripts": {
     "dev": "tsc -p tsconfig.json --watch --preserveWatchOutput",
-    "build": "tsc -p tsconfig.json"
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run test"
   },
   "devDependencies": {
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
   }
 }
