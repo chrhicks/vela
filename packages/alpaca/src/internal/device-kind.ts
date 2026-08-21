@@ -1,7 +1,7 @@
-import type { DeviceKind } from '@vela/model/device'
+import type { AlpacaDeviceKind } from '../model.js'
 
-/** Normalize Alpaca device classification without implying operational support. */
-export function toDeviceKind(alpacaType: string): DeviceKind {
+/** Normalize Alpaca classification without implying operational support. */
+export function toDeviceKind(alpacaType: string): AlpacaDeviceKind {
   switch (alpacaType) {
     case 'Camera':
       return 'camera'

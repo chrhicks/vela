@@ -1,4 +1,4 @@
-import { Schema } from 'effect';
+import { Schema } from 'effect'
 import {
   alpacaResponse,
   boolResponse,
@@ -10,7 +10,7 @@ import {
   stringArrayResponse,
   stringResponse,
   timeStamp,
-} from './common.js';
+} from './common.js'
 
 export const cameraState = Schema.Literals([0, 1, 2, 3, 4, 5])
 export type CameraState = typeof cameraState.Type

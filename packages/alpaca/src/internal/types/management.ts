@@ -1,4 +1,5 @@
-import { Schema } from 'effect';
+import { Schema } from 'effect'
+import { alpacaResponse } from './common.js'
 
 export const configuredDevice = Schema.Struct({
   DeviceName: Schema.String,
@@ -8,7 +9,5 @@ export const configuredDevice = Schema.Struct({
 })
 export type ConfiguredDevice = typeof configuredDevice.Type
 
-export const configuredDevicesResponse = Schema.Struct({
-  Value: Schema.Array(configuredDevice),
-})
+export const configuredDevicesResponse = alpacaResponse(Schema.Array(configuredDevice))
 export type ConfiguredDevicesResponse = typeof configuredDevicesResponse.Type

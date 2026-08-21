@@ -10,6 +10,7 @@ apps/
   workshop/  # Source-backed component design workshop
   server/    # Fastify API and device adapters
 packages/
+  alpaca/    # Server-side Alpaca protocol adapter and normalized provider boundary
   model/     # Shared types for web and server
   ui/        # @vela/ui tokens, stable components, and draft workspace
 ```

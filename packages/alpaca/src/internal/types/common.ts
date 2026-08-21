@@ -1,4 +1,4 @@
-import { Schema, SchemaGetter } from 'effect';
+import { Schema, SchemaGetter } from 'effect'
 
 export const alpacaResponse = <S extends Schema.ConstraintDecoder<unknown>>(Value: S) =>
   Schema.Struct({

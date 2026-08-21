@@ -14,12 +14,12 @@ importers:
 
   apps/server:
     dependencies:
+      '@vela/alpaca':
+        specifier: workspace:*
+        version: link:../../packages/alpaca
       '@vela/model':
         specifier: workspace:*
         version: link:../../packages/model
-      effect:
-        specifier: 4.0.0-beta.107
-        version: 4.0.0-beta.107
       fastify:
         specifier: ^5.12.0
         version: 5.12.0
@@ -113,6 +113,16 @@ importers:
       vite:
         specifier: ^8.2.1
         version: 8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)
+
+  packages/alpaca:
+    dependencies:
+      effect:
+        specifier: 4.0.0-beta.107
+        version: 4.0.0-beta.107
+    devDependencies:
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
 
   packages/model:
     devDependencies:
