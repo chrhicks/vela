@@ -51,7 +51,7 @@ export function createAlpacaProvider({
   async function listDevices(): Promise<ReadonlyArray<AlpacaDevice>> {
     const devices: AlpacaDevice[] = []
 
-    for (const device of await client.devices()) {
+    for (const device of await client.configuredDevices()) {
       devices.push({
         providerDeviceId: device.UniqueID,
         kind: toDeviceKind(device.DeviceType),

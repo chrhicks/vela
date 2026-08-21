@@ -10,6 +10,15 @@ export interface AlpacaProviderErrorOptions {
   errorNumber?: number
 }
 
+export class AlpacaDiscoveryError extends Error {
+  readonly reason = 'transport' as const
+
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options?.cause === undefined ? undefined : { cause: options.cause })
+    this.name = 'AlpacaDiscoveryError'
+  }
+}
+
 export class AlpacaProviderError extends Error {
   readonly reason: AlpacaProviderErrorReason
   readonly endpoint: string
