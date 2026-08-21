@@ -19,7 +19,7 @@ export interface AlpacaClient {
   apiVersions(): Promise<ReadonlyArray<number>>
   serverDescription(): Promise<ServerDescription>
   inspectableDevices(): Promise<ReadonlyArray<InspectableConfiguredDevice>>
-  devices(): Promise<ReadonlyArray<ConfiguredDevice>>
+  configuredDevices(): Promise<ReadonlyArray<ConfiguredDevice>>
   connected(device: ConfiguredDevice): Promise<boolean>
   driverInfo(device: ConfiguredDevice): Promise<string>
   driverVersion(device: ConfiguredDevice): Promise<string>
@@ -190,7 +190,7 @@ export function createAlpacaClient({
         Schema.Array(inspectableConfiguredDevice),
       ),
 
-    devices: () =>
+    configuredDevices: () =>
       requestValue(
         `${managementBasePath}/configureddevices`,
         Schema.Array(configuredDevice),
