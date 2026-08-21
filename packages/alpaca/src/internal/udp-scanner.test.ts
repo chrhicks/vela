@@ -75,6 +75,9 @@ describe('IPv4 UDP scanner', () => {
     for (const socket of sockets) {
       socket.onSend = (activeSocket) => {
         activeSocket.emitMessage('not json', '192.168.4.104')
+        activeSocket.emitMessage('[]', '192.168.4.104')
+        activeSocket.emitMessage('null', '192.168.4.104')
+        activeSocket.emitMessage('{"AlpacaPort":70000}', '192.168.4.104')
         activeSocket.emitMessage('{"alpacaport":11111}', '192.168.4.104')
       }
     }

@@ -1,6 +1,6 @@
 import { createSocket as createNodeSocket } from 'node:dgram'
 import { networkInterfaces as readNodeNetworkInterfaces } from 'node:os'
-import { Schema } from 'effect'
+import { Schema, SchemaTransformation } from 'effect'
 import { AlpacaDiscoveryError } from '../error.js'
 import type {
   AlpacaEndpoint,
@@ -14,6 +14,11 @@ const retryIntervalMs = 250
 const discoveryResponse = Schema.Struct({
   AlpacaPort: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 65535 })),
 })
+
+const jsonObjectFromString = Schema.String.pipe(
+  Schema.decodeTo(Schema.Unknown, SchemaTransformation.fromJsonString()),
+  Schema.decodeTo(Schema.Record(Schema.String, Schema.Unknown)),
+)
 
 interface Ipv4Interface {
   readonly address: string
@@ -71,19 +76,16 @@ function broadcastAddress(networkInterface: Ipv4Interface): string | undefined {
 }
 
 function parseDiscoveryResponse(message: Uint8Array): number | undefined {
-  let json: unknown
+  let record: Readonly<Record<string, unknown>>
 
   try {
-    json = JSON.parse(new TextDecoder().decode(message).trim())
+    record = Schema.decodeUnknownSync(jsonObjectFromString)(
+      new TextDecoder().decode(message).trim(),
+    )
   } catch {
     return undefined
   }
 
-  if (json === null || typeof json !== 'object' || Array.isArray(json)) {
-    return undefined
-  }
-
-  const record = json as Record<string, unknown>
   const portEntry = Object.entries(record).find(([name]) => name.toLowerCase() === 'alpacaport')
   if (portEntry === undefined) return undefined
 
