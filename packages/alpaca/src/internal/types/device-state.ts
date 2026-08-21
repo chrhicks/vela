@@ -1,5 +1,5 @@
-import { Schema } from 'effect';
-import { fromDeviceStateValues, timeStamp } from './common.js';
+import { Schema } from 'effect'
+import { fromDeviceStateValues, timeStamp } from './common.js'
 
 export const focuserState = fromDeviceStateValues({
   IsMoving: Schema.optionalKey(Schema.Boolean),

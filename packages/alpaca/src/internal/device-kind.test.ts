@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { toDeviceKind } from '../src/alpaca/device-kind.js'
+import { toDeviceKind } from './device-kind.js'
 
 describe('Alpaca device-kind normalization', () => {
   it.each([
