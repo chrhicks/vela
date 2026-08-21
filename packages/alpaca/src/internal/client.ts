@@ -8,10 +8,17 @@ import {
 } from './types/common.js'
 import {
   configuredDevice,
+  inspectableConfiguredDevice,
+  serverDescription,
   type ConfiguredDevice,
+  type InspectableConfiguredDevice,
+  type ServerDescription,
 } from './types/management.js'
 
 export interface AlpacaClient {
+  apiVersions(): Promise<ReadonlyArray<number>>
+  serverDescription(): Promise<ServerDescription>
+  inspectableDevices(): Promise<ReadonlyArray<InspectableConfiguredDevice>>
   devices(): Promise<ReadonlyArray<ConfiguredDevice>>
   connected(device: ConfiguredDevice): Promise<boolean>
   driverInfo(device: ConfiguredDevice): Promise<string>
@@ -21,6 +28,8 @@ export interface AlpacaClient {
 export interface AlpacaClientOptions {
   baseUrl: string
   fetch: typeof globalThis.fetch
+  signal?: AbortSignal
+  requestTimeoutMs?: number
 }
 
 interface AlpacaEnvelope<Value> {
@@ -29,7 +38,16 @@ interface AlpacaEnvelope<Value> {
   ErrorMessage: string
 }
 
-export function createAlpacaClient({ baseUrl, fetch }: AlpacaClientOptions): AlpacaClient {
+function signalReason(signal: AbortSignal): unknown {
+  return signal.reason ?? new DOMException('The operation was aborted', 'AbortError')
+}
+
+export function createAlpacaClient({
+  baseUrl,
+  fetch,
+  signal,
+  requestTimeoutMs,
+}: AlpacaClientOptions): AlpacaClient {
   const normalizedBaseUrl = baseUrl.replace(/\/$/, '')
   const apiBasePath = '/api/v1'
   const managementBasePath = '/management/v1'
@@ -38,11 +56,39 @@ export function createAlpacaClient({ baseUrl, fetch }: AlpacaClientOptions): Alp
     endpoint: string,
     schema: S,
   ): Promise<S['Type']> {
-    let response: Response
+    const controller = new AbortController()
+    let timedOut = false
 
-    try {
-      response = await fetch(`${normalizedBaseUrl}${endpoint}`)
-    } catch (cause) {
+    const onAbort = () => controller.abort(signal === undefined ? undefined : signalReason(signal))
+    if (signal?.aborted) {
+      onAbort()
+    } else {
+      signal?.addEventListener('abort', onAbort, { once: true })
+    }
+
+    const timeout = requestTimeoutMs === undefined
+      ? undefined
+      : setTimeout(() => {
+          timedOut = true
+          controller.abort(new DOMException('The request timed out', 'TimeoutError'))
+        }, requestTimeoutMs)
+
+    function throwTransportError(cause: unknown): never {
+      if (signal?.aborted) {
+        throw signalReason(signal)
+      }
+
+      if (timedOut) {
+        throw new AlpacaProviderError(
+          `Alpaca endpoint ${endpoint} timed out after ${requestTimeoutMs}ms`,
+          {
+            reason: 'transport',
+            endpoint,
+            cause,
+          },
+        )
+      }
+
       throw new AlpacaProviderError(`Unable to reach Alpaca endpoint ${endpoint}`, {
         reason: 'transport',
         endpoint,
@@ -50,36 +96,57 @@ export function createAlpacaClient({ baseUrl, fetch }: AlpacaClientOptions): Alp
       })
     }
 
-    if (!response.ok) {
-      throw new AlpacaProviderError(
-        `Alpaca endpoint ${endpoint} returned HTTP ${response.status}`,
-        {
-          reason: 'transport',
+    try {
+      let response: Response
+
+      try {
+        response = await fetch(`${normalizedBaseUrl}${endpoint}`, {
+          signal: controller.signal,
+        })
+      } catch (cause) {
+        throwTransportError(cause)
+      }
+
+      if (!response.ok) {
+        throw new AlpacaProviderError(
+          `Alpaca endpoint ${endpoint} returned HTTP ${response.status}`,
+          {
+            reason: 'transport',
+            endpoint,
+          },
+        )
+      }
+
+      let json: unknown
+
+      try {
+        json = await response.json()
+      } catch (cause) {
+        if (controller.signal.aborted) {
+          throwTransportError(cause)
+        }
+
+        throw new AlpacaProviderError(`Alpaca endpoint ${endpoint} returned invalid JSON`, {
+          reason: 'invalid-response',
           endpoint,
-        },
-      )
-    }
+          cause,
+        })
+      }
 
-    let json: unknown
-
-    try {
-      json = await response.json()
-    } catch (cause) {
-      throw new AlpacaProviderError(`Alpaca endpoint ${endpoint} returned invalid JSON`, {
-        reason: 'invalid-response',
-        endpoint,
-        cause,
-      })
-    }
-
-    try {
-      return Schema.decodeUnknownSync(schema)(json)
-    } catch (cause) {
-      throw new AlpacaProviderError(`Alpaca endpoint ${endpoint} returned an invalid response`, {
-        reason: 'invalid-response',
-        endpoint,
-        cause,
-      })
+      try {
+        return Schema.decodeUnknownSync(schema)(json)
+      } catch (cause) {
+        throw new AlpacaProviderError(`Alpaca endpoint ${endpoint} returned an invalid response`, {
+          reason: 'invalid-response',
+          endpoint,
+          cause,
+        })
+      }
+    } finally {
+      if (timeout !== undefined) {
+        clearTimeout(timeout)
+      }
+      signal?.removeEventListener('abort', onAbort)
     }
   }
 
@@ -111,6 +178,18 @@ export function createAlpacaClient({ baseUrl, fetch }: AlpacaClientOptions): Alp
   }
 
   return {
+    apiVersions: () =>
+      requestValue('/management/apiversions', Schema.Array(Schema.Int)),
+
+    serverDescription: () =>
+      requestValue(`${managementBasePath}/description`, serverDescription),
+
+    inspectableDevices: () =>
+      requestValue(
+        `${managementBasePath}/configureddevices`,
+        Schema.Array(inspectableConfiguredDevice),
+      ),
+
     devices: () =>
       requestValue(
         `${managementBasePath}/configureddevices`,
