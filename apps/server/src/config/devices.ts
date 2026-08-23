@@ -1,11 +1,11 @@
 export interface DeviceConfig {
-  rigs: DeviceRig[];
+  rigs: ConfiguredRig[]
 }
 
-export interface DeviceRig {
-  id: string;
-  name: string;
-  url: string;
+export interface ConfiguredRig {
+  id: string
+  name: string
+  url: string
 }
 
 const deviceConfig: DeviceConfig = {
@@ -18,4 +18,4 @@ const deviceConfig: DeviceConfig = {
   ]
 }
 
-export default deviceConfig;
+export default deviceConfig

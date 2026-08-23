@@ -4,11 +4,11 @@ import {
   type AlpacaDeviceKind,
   type AlpacaProvider,
 } from '@vela/alpaca'
-import type { DeviceRig } from '../config/devices.js'
-import type { RigDevice, RigDeviceKind } from './model.js'
+import type { ConfiguredRig } from '../config/devices.js'
+import type { ObservedRigDevice, RigDeviceKind } from './model.js'
 
 export interface RigDeviceInventory {
-  listDevices(): Promise<ReadonlyArray<RigDevice>>
+  listDevices(): Promise<ReadonlyArray<ObservedRigDevice>>
 }
 
 export interface RigDeviceInventoryOptions {
@@ -33,11 +33,11 @@ function toRigDeviceKind(kind: AlpacaDeviceKind): RigDeviceKind {
   }
 }
 
-function toRigDevice(
-  rig: DeviceRig,
+function toObservedRigDevice(
+  rig: ConfiguredRig,
   device: AlpacaDevice,
   observedAt: Date,
-): RigDevice {
+): ObservedRigDevice {
   return {
     id: `${rig.id}-${device.providerDeviceId}`,
     rigId: rig.id,
@@ -51,7 +51,7 @@ function toRigDevice(
 }
 
 export function createRigDeviceInventory(
-  rig: DeviceRig,
+  rig: ConfiguredRig,
   options: RigDeviceInventoryOptions = {},
 ): RigDeviceInventory {
   const now = options.now ?? (() => new Date())
@@ -61,7 +61,7 @@ export function createRigDeviceInventory(
     async listDevices() {
       const devices = await provider.listDevices()
       const observedAt = now()
-      return devices.map((device) => toRigDevice(rig, device, observedAt))
+      return devices.map((device) => toObservedRigDevice(rig, device, observedAt))
     },
   }
 }

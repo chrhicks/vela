@@ -13,7 +13,7 @@ export type RigDeviceKind =
 
 export type RigDeviceConnection = 'connected' | 'disconnected' | 'unavailable'
 
-export interface RigDevice {
+export interface ObservedRigDevice {
   id: string
   rigId: string
   kind: RigDeviceKind

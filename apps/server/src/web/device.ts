@@ -1,7 +1,7 @@
 import type { DeviceSummary } from '@vela/model/device'
-import type { RigDevice } from '../device/model.js'
+import type { ObservedRigDevice } from '../device/model.js'
 
-export function toDeviceSummary(device: RigDevice): DeviceSummary {
+export function toDeviceSummary(device: ObservedRigDevice): DeviceSummary {
   return {
     id: device.id,
     rigId: device.rigId,
