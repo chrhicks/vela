@@ -44,6 +44,10 @@ export interface RigServerView {
 
 export type DiscoveryCandidateDisposition =
   | { readonly state: 'new' }
+  | {
+      readonly state: 'ineligible'
+      readonly reason: 'no-stable-device-id'
+    }
   | { readonly state: 'already-added'; readonly rigId: RigId }
   | { readonly state: 'conflict' }
 
@@ -54,4 +58,28 @@ export interface DiscoveryCandidateView {
   readonly inspectedAt: IsoDateTime
   readonly devices: ReadonlyArray<RigDeviceView>
   readonly disposition: DiscoveryCandidateDisposition
+}
+
+export type RigDiscoveryRequest =
+  | { readonly mode: 'scan' }
+  | {
+      readonly mode: 'manual'
+      readonly host: string
+      readonly port?: number
+    }
+
+export type DiscoveryFailureReason =
+  | 'scan-failed'
+  | 'unreachable'
+  | 'invalid-response'
+  | 'protocol-error'
+
+export interface DiscoveryFailureView {
+  readonly endpoint?: RigEndpoint
+  readonly reason: DiscoveryFailureReason
+}
+
+export interface DiscoveryResultView {
+  readonly candidates: ReadonlyArray<DiscoveryCandidateView>
+  readonly failures: ReadonlyArray<DiscoveryFailureView>
 }
