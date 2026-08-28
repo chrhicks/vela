@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import './Dialog.discovery.specimen.css'
 import { Badge } from '../components/Badge'
 import { Button } from '../components/Button'
@@ -63,9 +63,19 @@ function DiscoveryDialogPreview({ props, onPropsChange }: PreviewProps) {
   const [host, setHost] = useState('ascom-remote.local')
   const [port, setPort] = useState('11111')
   const scanTimer = useRef<number | undefined>(undefined)
+  const scanGeneration = useRef(0)
+  const currentView = useRef(view)
   const open = view !== 'dismissed' && view !== 'complete'
 
   useEffect(() => () => window.clearTimeout(scanTimer.current), [])
+
+  useLayoutEffect(() => {
+    currentView.current = view
+    if (view !== 'scanning') {
+      scanGeneration.current += 1
+      window.clearTimeout(scanTimer.current)
+    }
+  }, [view])
 
   function update(patch: Record<string, string | number | boolean>) {
     onPropsChange?.(patch)
@@ -73,11 +83,17 @@ function DiscoveryDialogPreview({ props, onPropsChange }: PreviewProps) {
 
   function beginScan() {
     window.clearTimeout(scanTimer.current)
+    const generation = ++scanGeneration.current
     update({ view: 'scanning', selected: false })
-    scanTimer.current = window.setTimeout(() => update({ view: 'results' }), 900)
+    scanTimer.current = window.setTimeout(() => {
+      if (scanGeneration.current === generation && currentView.current === 'scanning') {
+        update({ view: 'results' })
+      }
+    }, 900)
   }
 
   function dismiss() {
+    scanGeneration.current += 1
     window.clearTimeout(scanTimer.current)
     update({ view: 'dismissed', selected: false })
   }

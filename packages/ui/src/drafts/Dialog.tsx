@@ -1,14 +1,6 @@
+import { createFocusTrap } from 'focus-trap'
 import { useEffect, useId, useRef } from 'react'
 import type { HTMLAttributes, KeyboardEvent, MouseEvent, ReactNode } from 'react'
-
-const focusableSelector = [
-  'a[href]',
-  'button:not(:disabled)',
-  'input:not(:disabled)',
-  'select:not(:disabled)',
-  'textarea:not(:disabled)',
-  '[tabindex]:not([tabindex="-1"])',
-].join(',')
 
 export interface DialogProps extends Omit<HTMLAttributes<HTMLElement>, 'title'> {
   open: boolean
@@ -33,19 +25,27 @@ export function Dialog({
   const titleId = `vela-dialog-title-${useId().replace(/:/g, '')}`
   const descriptionId = `vela-dialog-description-${useId().replace(/:/g, '')}`
   const dialogRef = useRef<HTMLElement>(null)
-  const previousFocusRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
-    if (!open) return
+    const dialog = dialogRef.current
+    if (!open || !dialog) return
 
-    previousFocusRef.current = document.activeElement instanceof HTMLElement
+    const returnFocus = document.activeElement instanceof HTMLElement
       ? document.activeElement
-      : null
-    const animationFrame = window.requestAnimationFrame(() => dialogRef.current?.focus())
+      : document.body
+    const focusTrap = createFocusTrap(dialog, {
+      allowOutsideClick: true,
+      delayInitialFocus: false,
+      escapeDeactivates: false,
+      fallbackFocus: dialog,
+      initialFocus: dialog,
+      preventScroll: true,
+      setReturnFocus: returnFocus,
+    })
+    focusTrap.activate()
 
     return () => {
-      window.cancelAnimationFrame(animationFrame)
-      if (previousFocusRef.current?.isConnected) previousFocusRef.current.focus()
+      focusTrap.deactivate()
     }
   }, [open])
 
@@ -57,34 +57,10 @@ export function Dialog({
 
   function handleKeyDown(event: KeyboardEvent<HTMLElement>) {
     props.onKeyDown?.(event)
-    if (event.defaultPrevented) return
+    if (event.defaultPrevented || event.key !== 'Escape') return
 
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      onDismiss?.()
-      return
-    }
-
-    if (event.key !== 'Tab' || !dialogRef.current) return
-
-    const focusable = [...dialogRef.current.querySelectorAll<HTMLElement>(focusableSelector)]
-    if (focusable.length === 0) {
-      event.preventDefault()
-      dialogRef.current.focus()
-      return
-    }
-
-    const first = focusable[0]
-    const last = focusable.at(-1)
-    const active = document.activeElement
-
-    if (event.shiftKey && (active === first || active === dialogRef.current || !dialogRef.current.contains(active))) {
-      event.preventDefault()
-      last?.focus()
-    } else if (!event.shiftKey && active === last) {
-      event.preventDefault()
-      first?.focus()
-    }
+    event.preventDefault()
+    onDismiss?.()
   }
 
   return (

@@ -17,7 +17,7 @@ packages/ui/src/
   drafts/                      experimental component source and specimens
   themes/                      token contract, defaults, resolution, validation
   styles.css                   shared component styles using Vela tokens
-  **/*.specimen.css            non-exported product-example styling
+  **/*.specimen.css            non-exported specimen-only styling
 ```
 
 `@vela/ui` has two intentionally different component surfaces:
@@ -57,6 +57,15 @@ git diff --check
 ```
 
 The focused tests cover shared artifact validation, local persistence validation, paired light/dark token resolution, complete reference ramps, and stable-versus-draft exports.
+
+Dialog behavior also has a focused Chromium suite because modal focus, dismissal, and restoration depend on browser behavior. Install its browser once, then run it with:
+
+```sh
+pnpm --filter @vela/workshop exec playwright install chromium
+pnpm --filter @vela/workshop test:browser
+```
+
+The suite starts the workshop itself and checks passive gallery previews, modal focus containment and restoration, dismissal, simulated responsive and comparison canvases, and asynchronous specimen state updates.
 
 ## Add a draft component
 
@@ -122,7 +131,7 @@ Copy Context adds density, baseline identity and fingerprint, plus unsaved overr
 
 ## Targeted browser checklist
 
-Run this checklist for a meaningful library change and every promotion. Record the result in the corresponding Linear issue; do not add broad browser automation until repeated use proves it worthwhile.
+Run this checklist for a meaningful library change and every promotion. Record the result in the corresponding Linear issue. Keep browser automation focused on behavior that genuinely depends on a browser rather than turning every visual state into a brittle test.
 
 1. Start from a fresh browser load of `/gallery` and confirm there are no console errors.
 2. Confirm every expected component is discoverable and labeled Stable or Draft correctly.
@@ -135,7 +144,7 @@ Run this checklist for a meaningful library change and every promotion. Record t
 9. Change density and enable baseline comparison.
 10. Review focused contrast and literal-color diagnostics.
 11. Reload the stable URL and confirm recovery is coherent.
-12. Run `pnpm test`, `pnpm build`, and `git diff --check`.
+12. Run `pnpm test`, `pnpm build`, `pnpm --filter @vela/workshop test:browser` when relevant, and `git diff --check`.
 
 This checklist is targeted evidence, not an exhaustive state generator or accessibility audit.
 

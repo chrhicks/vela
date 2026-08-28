@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Button } from '../components/Button'
 import { Input } from '../components/Input'
 import type { ComponentSpecimen } from '../themes'
@@ -10,10 +11,15 @@ interface PreviewProps {
 }
 
 function DialogPreview({ props, onPropsChange }: PreviewProps) {
-  const open = Boolean(props.open)
+  const [galleryOpen, setGalleryOpen] = useState(false)
+  const open = onPropsChange ? Boolean(props.open) : galleryOpen
   const title = String(props.title)
   const description = String(props.description)
-  const update = (patch: Record<string, string | number | boolean>) => onPropsChange?.(patch)
+
+  function setOpen(next: boolean) {
+    if (onPropsChange) onPropsChange({ open: next })
+    else setGalleryOpen(next)
+  }
 
   return (
     <div className="vela-dialog-specimen">
@@ -21,18 +27,18 @@ function DialogPreview({ props, onPropsChange }: PreviewProps) {
         <small>Primitive preview</small>
         <h2>Dialog anatomy</h2>
         <p>The surrounding application owns the trigger and every piece of product content inside the dialog.</p>
-        <Button onClick={() => update({ open: true })} tone="accent">Open dialog</Button>
+        <Button onClick={() => setOpen(true)} tone="accent">Open dialog</Button>
       </div>
 
       <Dialog
         description={description}
         footer={(
           <>
-            <Button onClick={() => update({ open: false })} tone="quiet">Cancel</Button>
-            <Button onClick={() => update({ open: false })} tone="accent">Confirm</Button>
+            <Button onClick={() => setOpen(false)} tone="quiet">Cancel</Button>
+            <Button onClick={() => setOpen(false)} tone="accent">Confirm</Button>
           </>
         )}
-        onDismiss={() => update({ open: false })}
+        onDismiss={() => setOpen(false)}
         open={open}
         title={title}
       >
