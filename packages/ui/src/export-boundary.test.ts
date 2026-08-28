@@ -10,7 +10,8 @@ describe('@vela/ui export boundaries', () => {
     }
   })
 
-  it('keeps the draft export surface empty after baseline promotion', () => {
-    expect(Object.keys(drafts)).toEqual([])
+  it('keeps experimental components on the draft boundary', () => {
+    expect(drafts.Dialog).toBeTypeOf('function')
+    expect(stable).not.toHaveProperty('Dialog')
   })
 })
