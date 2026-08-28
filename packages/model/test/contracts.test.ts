@@ -9,6 +9,9 @@ import type {
 import type {
   DiscoveryCandidateDisposition,
   DiscoveryCandidateView,
+  DiscoveryFailureReason,
+  DiscoveryFailureView,
+  DiscoveryResultView,
   IsoDateTime,
   RigCapability,
   RigDeviceView,
@@ -65,6 +68,13 @@ describe('@vela/model boundaries', () => {
     expectTypeOf<RigServerView>().toMatchTypeOf<Readonly<Record<string, string | undefined>>>()
     expectTypeOf<DiscoveryCandidateDisposition>().toMatchTypeOf<{ readonly state: string }>()
     expectTypeOf<DiscoveryCandidateView['endpoint']>().toEqualTypeOf<RigEndpoint>()
+    expectTypeOf<DiscoveryFailureReason>().toEqualTypeOf<
+      'scan-failed' | 'unreachable' | 'invalid-response' | 'protocol-error'
+    >()
+    expectTypeOf<DiscoveryFailureView['endpoint']>().toEqualTypeOf<RigEndpoint | undefined>()
+    expectTypeOf<DiscoveryResultView['candidates']>().toEqualTypeOf<
+      ReadonlyArray<DiscoveryCandidateView>
+    >()
     expectTypeOf<HomeView['rigs']>().toEqualTypeOf<ReadonlyArray<RigView>>()
   })
 })

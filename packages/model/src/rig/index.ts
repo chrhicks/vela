@@ -60,14 +60,6 @@ export interface DiscoveryCandidateView {
   readonly disposition: DiscoveryCandidateDisposition
 }
 
-export type RigDiscoveryRequest =
-  | { readonly mode: 'scan' }
-  | {
-      readonly mode: 'manual'
-      readonly host: string
-      readonly port?: number
-    }
-
 export type DiscoveryFailureReason =
   | 'scan-failed'
   | 'unreachable'
