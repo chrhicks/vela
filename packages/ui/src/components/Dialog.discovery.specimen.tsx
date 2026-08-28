@@ -1,8 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import './Dialog.discovery.specimen.css'
-import { Badge } from '../components/Badge'
-import { Button } from '../components/Button'
-import { Input } from '../components/Input'
+import { Badge } from './Badge'
+import { Button } from './Button'
+import { Input } from './Input'
 import type { ComponentSpecimen } from '../themes'
 import { Dialog } from './Dialog'
 

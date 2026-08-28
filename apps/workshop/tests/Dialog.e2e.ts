@@ -27,6 +27,7 @@ test('gallery Dialog previews stay passive until opened and restore their trigge
   await expect(page.getByRole('dialog')).toHaveCount(0)
 
   const dialogCard = page.locator('.gallery-card').filter({ hasText: 'Dialog' })
+  await expect(dialogCard.locator('.stability-label')).toHaveAttribute('data-stability', 'stable')
   const trigger = dialogCard.getByRole('button', { name: 'Open dialog' }).first()
   await trigger.click()
 

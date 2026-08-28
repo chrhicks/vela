@@ -1,6 +1,7 @@
 export * from './Badge'
 export * from './Button'
 export * from './Checkbox'
+export * from './Dialog'
 export * from './IconButton'
 export * from './Input'
 export * from './Panel'

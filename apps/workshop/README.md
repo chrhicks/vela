@@ -13,7 +13,7 @@ Open `http://127.0.0.1:5174` for the focused workbench or `http://127.0.0.1:5174
 ## Current workshop
 
 - Stable Button, IconButton, Input, Select, Checkbox, Badge, Tabs, and Panel/Card components
-- An experimental Dialog with both primitive anatomy and a fixture-backed Rig discovery product example
+- A stable Dialog with both primitive anatomy and a fixture-backed Rig discovery product example
 - Auto-discovered colocated specimens
 - One primitive-focused specimen per component, with additional product examples only for concrete compositions that prop controls cannot express
 - A searchable gallery with paired light and dark previews
@@ -59,6 +59,6 @@ apps/workshop/designs/        named tracked profiles
 apps/workshop/.local/         ignored recovery state
 ```
 
-All current baseline components are exported from the `@vela/ui` root. The `@vela/ui/drafts` development boundary contains experimental components such as Dialog without exposing them from the stable package root.
+All current components, including Dialog, are exported from the `@vela/ui` root. The currently empty `@vela/ui/drafts` boundary remains available for future experimental components without exposing them from the stable package root.
 
 See the [operations guide](../../docs/component-workshop-operations.md) for adding drafts, authoring interactive specimens, persistence, targeted browser proof, manual promotion, and later one-at-a-time Vela adoption.
