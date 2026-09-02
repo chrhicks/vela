@@ -1,0 +1,288 @@
+import { expect, test } from '@playwright/test'
+import type { Page, Route } from '@playwright/test'
+import type { HomeView } from '@vela/model/web'
+
+const endpoint = { host: '192.168.4.104', port: 11111 }
+const inspectedAt = '2026-09-02T20:00:00.000Z'
+
+function emptyHome(): HomeView {
+  return { rigs: [], refreshedAt: inspectedAt }
+}
+
+function homeWithRig(reachability: 'reachable' | 'unreachable' = 'reachable'): HomeView {
+  return {
+    rigs: [{
+      id: 'rig-1',
+      name: 'Backyard rig',
+      reachability,
+      lastSeenAt: inspectedAt,
+      devices: [{
+        id: 'rig-1-camera-1',
+        rigId: 'rig-1',
+        kind: 'camera',
+        name: 'Main camera',
+        driver: {},
+        connection: reachability === 'reachable' ? 'connected' : 'unavailable',
+        status: { state: 'unknown' },
+        updatedAt: inspectedAt,
+      }],
+      capabilities: ['forget'],
+    }],
+    refreshedAt: inspectedAt,
+  }
+}
+
+async function fulfillJson(route: Route, body: unknown, status = 200) {
+  await route.fulfill({
+    status,
+    contentType: 'application/json',
+    body: JSON.stringify(body),
+  })
+}
+
+async function useHome(page: Page, getHome: () => HomeView, delay = 0) {
+  await page.route('**/api/web/home', async (route) => {
+    if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay))
+    await fulfillJson(route, getHome())
+  })
+}
+
+test('adds an explicitly selected new Rig from mixed discovery results', async ({ page }) => {
+  let home = emptyHome()
+  let addPayload: unknown
+  let addAttempts = 0
+  await useHome(page, () => home, 100)
+  await page.route('**/api/rigs/discovery', (route) => fulfillJson(route, {
+    candidates: [
+      {
+        endpoint,
+        server: { name: 'ASCOM Remote' },
+        inspectedAt,
+        devices: [{ kind: 'camera', name: 'Main camera' }],
+        disposition: { state: 'new' },
+      },
+      {
+        endpoint: { host: '192.168.4.105', port: 11111 },
+        server: { name: 'Known server' },
+        inspectedAt,
+        devices: [{ kind: 'camera', name: 'Known camera' }],
+        disposition: { state: 'already-added', rigId: 'rig-known' },
+      },
+      {
+        endpoint: { host: '192.168.4.106', port: 11111 },
+        server: { name: 'Conflicting server' },
+        inspectedAt,
+        devices: [{ kind: 'camera', name: 'Conflicting camera' }],
+        disposition: { state: 'conflict' },
+      },
+    ],
+    failures: [{
+      endpoint: { host: '192.168.4.107', port: 11111 },
+      reason: 'unreachable',
+    }],
+  }))
+  await page.route('**/api/rigs', async (route) => {
+    addAttempts += 1
+    addPayload = route.request().postDataJSON()
+    if (addAttempts === 1) {
+      await fulfillJson(route, { error: 'rig-conflict' }, 409)
+      return
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 150))
+    home = homeWithRig()
+    await fulfillJson(route, { rigId: 'rig-1' }, 201)
+  })
+
+  await page.goto('/')
+  await expect(page.getByText('Loading…')).toBeVisible()
+  await expect(page.getByRole('dialog', { name: 'Find your observatory rig' })).toBeVisible()
+  await page.getByRole('button', { name: 'Scan for rigs' }).click()
+
+  await expect(page.getByText('Already added')).toBeVisible()
+  await expect(page.getByText('Needs attention')).toBeVisible()
+  await expect(page.getByText('One server could not be inspected')).toBeVisible()
+  const review = page.getByRole('button', { name: 'Review rig' })
+  await expect(review).toBeDisabled()
+
+  await page.getByRole('button', { name: /ASCOM Remote/ }).click()
+  await expect(review).toBeEnabled()
+  await review.click()
+  await page.getByLabel('Rig name').fill('')
+  await expect(page.getByRole('button', { name: 'Add rig' })).toBeDisabled()
+  await page.getByLabel('Rig name').fill('Backyard rig')
+  await page.getByRole('button', { name: 'Add rig' }).click()
+  await expect(page.getByRole('alert')).toContainText('conflicts with another saved rig')
+
+  await page.getByRole('button', { name: 'Add rig' }).click()
+  await expect(page.getByRole('button', { name: 'Adding rig…' })).toBeDisabled()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog', { name: 'Review this rig' })).toBeVisible()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Backyard rig' })).toBeVisible()
+  expect(addPayload).toEqual({ name: 'Backyard rig', endpoint })
+})
+
+test('cancels stale scans and keeps useful manual-address failures', async ({ page }) => {
+  await useHome(page, emptyHome)
+  await page.route('**/api/rigs/discovery', async (route) => {
+    const request = route.request().postDataJSON()
+    if (request.mode === 'scan') {
+      await new Promise((resolve) => setTimeout(resolve, 300))
+      await fulfillJson(route, {
+        candidates: [{
+          endpoint,
+          inspectedAt,
+          devices: [{ kind: 'camera', name: 'Late camera' }],
+          disposition: { state: 'new' },
+        }],
+        failures: [],
+      }).catch(() => {})
+      return
+    }
+    if (request.host === 'http://bad') {
+      await fulfillJson(route, { error: 'invalid-discovery-request' }, 400)
+      return
+    }
+    await fulfillJson(route, {
+      candidates: [],
+      failures: [{ endpoint: request, reason: 'unreachable' }],
+    })
+  })
+
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Scan for rigs' }).click()
+  await page.getByRole('button', { name: 'Cancel' }).click()
+  await expect(page.getByRole('heading', { name: 'No rig configured' })).toBeVisible()
+  await page.waitForTimeout(350)
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+
+  await page.getByRole('button', { name: 'Set up a rig' }).click()
+  await page.getByRole('button', { name: 'Enter an address manually' }).click()
+  await page.getByLabel('Host or IP address').fill('http://bad')
+  await page.getByRole('button', { name: 'Inspect address' }).click()
+  await expect(page.getByRole('alert')).toContainText('Enter a hostname or IPv4 address')
+  await expect(page.getByLabel('Host or IP address')).toHaveValue('http://bad')
+
+  await page.getByLabel('Host or IP address').fill('missing.local')
+  await page.getByRole('button', { name: 'Inspect address' }).click()
+  await expect(page.getByText('Could not inspect this address')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Change address' })).toBeVisible()
+})
+
+test('explains results when no discovered candidate can be added', async ({ page }) => {
+  await useHome(page, emptyHome)
+  await page.route('**/api/rigs/discovery', (route) => fulfillJson(route, {
+    candidates: [
+      {
+        endpoint,
+        inspectedAt,
+        devices: [{ kind: 'camera', name: 'Known camera' }],
+        disposition: { state: 'already-added', rigId: 'rig-1' },
+      },
+      {
+        endpoint: { host: '192.168.4.105', port: 11111 },
+        inspectedAt,
+        devices: [{ kind: 'camera', name: 'Legacy camera' }],
+        disposition: { state: 'ineligible', reason: 'no-stable-device-id' },
+      },
+      {
+        endpoint: { host: '192.168.4.106', port: 11111 },
+        inspectedAt,
+        devices: [{ kind: 'camera', name: 'Ambiguous camera' }],
+        disposition: { state: 'conflict' },
+      },
+    ],
+    failures: [],
+  }))
+
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Scan for rigs' }).click()
+
+  await expect(page.getByText('No rigs can be added')).toBeVisible()
+  await expect(page.getByText('Already added')).toBeVisible()
+  await expect(page.getByText('Unavailable')).toBeVisible()
+  await expect(page.getByText('Needs attention')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Review rig' })).toBeDisabled()
+})
+
+test('ignores an older refresh that finishes after Forget Rig', async ({ page }) => {
+  let home = homeWithRig()
+  let homeRequests = 0
+  await page.route('**/api/web/home', async (route) => {
+    homeRequests += 1
+    const response = home
+    if (homeRequests === 2) {
+      await new Promise((resolve) => setTimeout(resolve, 300))
+    }
+    await fulfillJson(route, response)
+  })
+  await page.route('**/api/rigs/rig-1', async (route) => {
+    home = emptyHome()
+    await route.fulfill({ status: 204, body: '' })
+  })
+
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'Backyard rig' })).toBeVisible()
+  await page.getByRole('button', { name: 'Refresh devices' }).click()
+  await page.getByRole('button', { name: 'Forget rig' }).click()
+  await page.getByRole('dialog', { name: 'Forget Backyard rig?' })
+    .getByRole('button', { name: 'Forget rig' })
+    .click()
+
+  await expect(page.getByRole('heading', { name: 'No rig configured' })).toBeVisible()
+  await page.waitForTimeout(350)
+  await expect(page.getByRole('heading', { name: 'Backyard rig' })).toHaveCount(0)
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  expect(homeRequests).toBe(3)
+})
+
+test('shows loading and server errors, refreshes, and guards Forget Rig', async ({ page }) => {
+  let homeRequests = 0
+  let home = homeWithRig('unreachable')
+  let failHome = true
+  let deleteRequests = 0
+  await page.route('**/api/web/home', async (route) => {
+    homeRequests += 1
+    await new Promise((resolve) => setTimeout(resolve, 75))
+    if (failHome) {
+      failHome = false
+      await fulfillJson(route, { error: 'unavailable' }, 500)
+      return
+    }
+    await fulfillJson(route, home)
+  })
+  await page.route('**/api/rigs/rig-1', async (route) => {
+    deleteRequests += 1
+    home = emptyHome()
+    await route.fulfill({ status: 204, body: '' })
+  })
+
+  await page.goto('/')
+  await expect(page.getByText('Loading…')).toBeVisible()
+  await expect(page.getByRole('alert')).toContainText('could not load your rigs')
+  await page.getByRole('button', { name: 'Refresh devices' }).click()
+
+  await expect(page.getByRole('heading', { name: 'Backyard rig' })).toBeVisible()
+  await expect(page.getByText('Offline')).toBeVisible()
+  await expect(page.getByText(/Last seen/)).toBeVisible()
+  expect(homeRequests).toBe(2)
+
+  failHome = true
+  await page.getByRole('button', { name: 'Refresh devices' }).click()
+  await expect(page.getByRole('alert')).toContainText('Showing the previous state')
+  await expect(page.getByRole('heading', { name: 'Backyard rig' })).toBeVisible()
+  expect(homeRequests).toBe(3)
+
+  await page.getByRole('button', { name: 'Forget rig' }).click()
+  const confirmation = page.getByRole('dialog', { name: 'Forget Backyard rig?' })
+  await expect(confirmation).toBeVisible()
+  await confirmation.getByRole('button', { name: 'Cancel' }).click()
+  expect(deleteRequests).toBe(0)
+
+  await page.getByRole('button', { name: 'Forget rig' }).click()
+  await confirmation.getByRole('button', { name: 'Forget rig' }).click()
+  await expect(page.getByRole('heading', { name: 'No rig configured' })).toBeVisible()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  expect(deleteRequests).toBe(1)
+})

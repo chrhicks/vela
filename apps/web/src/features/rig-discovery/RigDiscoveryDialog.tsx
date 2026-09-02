@@ -1,6 +1,7 @@
 import type { DiscoveryCandidateView, DiscoveryResultView } from '@vela/model/rig'
 import { Button, Dialog } from '@vela/ui'
 import { useEffect, useRef, useState } from 'react'
+import { addRig, AddRigError } from './add-rig'
 import {
   discoverRigs,
   DiscoverRigsError,
@@ -15,6 +16,7 @@ import './RigDiscoveryDialog.css'
 
 interface Props {
   open: boolean
+  onAdded(): Promise<void>
   onDismiss(): void
 }
 
@@ -34,10 +36,12 @@ type DiscoveryState =
       result: DiscoveryResultView
       candidate: DiscoveryCandidateView
       rigName: string
+      adding: boolean
+      error?: string
     }
   | { view: 'request-failed'; request: DiscoverRigsRequest }
 
-export default function RigDiscoveryDialog({ open, onDismiss }: Props) {
+export default function RigDiscoveryDialog({ open, onAdded, onDismiss }: Props) {
   const [discoveryState, setDiscoveryState] = useState<DiscoveryState>({ view: 'start' })
   const requestController = useRef<AbortController | null>(null)
 
@@ -135,6 +139,7 @@ export default function RigDiscoveryDialog({ open, onDismiss }: Props) {
       result: discoveryState.result,
       candidate,
       rigName: candidate.server?.name?.trim() || candidate.endpoint.host,
+      adding: false,
     })
   }
 
@@ -160,7 +165,34 @@ export default function RigDiscoveryDialog({ open, onDismiss }: Props) {
 
   function changeRigName(rigName: string) {
     if (discoveryState.view !== 'review') return
-    setDiscoveryState({ ...discoveryState, rigName })
+    setDiscoveryState({ ...discoveryState, rigName, error: undefined })
+  }
+
+  async function addReviewedRig() {
+    if (discoveryState.view !== 'review' || !discoveryState.rigName.trim()) return
+
+    const review = discoveryState
+    const controller = new AbortController()
+    requestController.current = controller
+    setDiscoveryState({ ...review, adding: true, error: undefined })
+
+    try {
+      await addRig(review.rigName.trim(), review.candidate.endpoint, controller.signal)
+      if (requestController.current !== controller) return
+
+      requestController.current = null
+      await onAdded()
+    } catch (error) {
+      if (!controller.signal.aborted && requestController.current === controller) {
+        setDiscoveryState({
+          ...review,
+          adding: false,
+          error: addRigFailureMessage(error),
+        })
+      }
+    } finally {
+      if (requestController.current === controller) requestController.current = null
+    }
   }
 
   const manualCanSubmit = discoveryState.view === 'manual'
@@ -206,7 +238,18 @@ export default function RigDiscoveryDialog({ open, onDismiss }: Props) {
           </>
         )
       case 'review':
-        return <Button onClick={returnToResults} tone="quiet">Back</Button>
+        return (
+          <>
+            <Button disabled={discoveryState.adding} onClick={returnToResults} tone="quiet">Back</Button>
+            <Button
+              disabled={discoveryState.adding || !discoveryState.rigName.trim()}
+              onClick={() => void addReviewedRig()}
+              tone="accent"
+            >
+              {discoveryState.adding ? 'Adding rig…' : 'Add rig'}
+            </Button>
+          </>
+        )
       case 'request-failed':
         return (
           <>
@@ -223,7 +266,7 @@ export default function RigDiscoveryDialog({ open, onDismiss }: Props) {
     <Dialog
       description={copy.description}
       footer={footer}
-      onDismiss={dismiss}
+      onDismiss={discoveryState.view === 'review' && discoveryState.adding ? undefined : dismiss}
       open={open}
       title={copy.title}
     >
@@ -249,7 +292,9 @@ export default function RigDiscoveryDialog({ open, onDismiss }: Props) {
       ) : null}
       {discoveryState.view === 'review' ? (
         <RigReview
+          adding={discoveryState.adding}
           candidate={discoveryState.candidate}
+          error={discoveryState.error}
           onRigNameChange={changeRigName}
           rigName={discoveryState.rigName}
         />
@@ -294,6 +339,25 @@ function RequestFailure() {
       <p>Check that the Vela server is reachable, then try again.</p>
     </div>
   )
+}
+
+function addRigFailureMessage(error: unknown): string {
+  if (!(error instanceof AddRigError)) {
+    return 'Vela could not reach the server to add this rig. Try again.'
+  }
+
+  switch (error.reason) {
+    case 'already-added':
+      return 'This rig is already in Vela. Close this dialog and refresh the Rig list.'
+    case 'conflict':
+      return 'This server now conflicts with another saved rig. Scan again before continuing.'
+    case 'inspection-failed':
+      return 'Vela could not confirm the server and devices. Check the address and try again.'
+    case 'no-stable-device-id':
+      return 'The server no longer reports a stable device ID, so Vela cannot add it safely.'
+    case 'unknown':
+      return 'Vela could not save this rig. Try again.'
+  }
 }
 
 function discoveryCopy(state: DiscoveryState) {

@@ -2,12 +2,14 @@ import type { DiscoveryCandidateView } from '@vela/model/rig'
 import { Badge, Input } from '@vela/ui'
 
 interface Props {
+  adding: boolean
   candidate: DiscoveryCandidateView
+  error?: string
   rigName: string
   onRigNameChange(name: string): void
 }
 
-export function RigReview({ candidate, rigName, onRigNameChange }: Props) {
+export function RigReview({ adding, candidate, error, rigName, onRigNameChange }: Props) {
   const reportedName = candidate.server?.name ?? candidate.endpoint.host
 
   return (
@@ -22,11 +24,16 @@ export function RigReview({ candidate, rigName, onRigNameChange }: Props) {
       </section>
 
       <Input
+        disabled={adding}
         label="Rig name"
         message={`Reported as ${reportedName}. Keep this name or choose one that means more to you.`}
         onChange={(event) => onRigNameChange(event.target.value)}
         value={rigName}
       />
+
+      {error ? (
+        <div className="rig-discovery-review__error" role="alert">{error}</div>
+      ) : null}
 
       <section>
         <div className="rig-discovery-review__heading">
@@ -46,10 +53,12 @@ export function RigReview({ candidate, rigName, onRigNameChange }: Props) {
         </ul>
       </section>
 
-      <div className="rig-discovery-review__notice">
-        <strong>Nothing has been added yet</strong>
-        <p>Vela is showing the configuration it would use and has not changed this server or its devices.</p>
-      </div>
+      {!error ? (
+        <div className="rig-discovery-review__notice">
+          <strong>Ready to add</strong>
+          <p>Adding saves this Rig in Vela. It does not connect devices or change the Alpaca server.</p>
+        </div>
+      ) : null}
     </div>
   )
 }
