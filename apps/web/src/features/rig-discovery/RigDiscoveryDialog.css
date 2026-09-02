@@ -46,6 +46,12 @@
   font-weight: 620;
 }
 
+.rig-discovery-manual > p[data-tone="danger"] {
+  border-color: color-mix(in oklch, var(--vela-danger) 42%, var(--vela-line));
+  color: var(--vela-danger);
+  background: color-mix(in oklch, var(--vela-danger) 7%, var(--vela-surface));
+}
+
 .rig-discovery-progress {
   min-height: 20rem;
   align-content: center;

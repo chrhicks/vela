@@ -49,6 +49,10 @@ test('modal focus includes summary and ignores hidden controls', async ({ page }
   const dialog = page.getByRole('dialog', { name: 'Dialog title' })
   await expect(dialog).toBeVisible()
 
+  const comparisonToggle = page.getByLabel('Compare baseline', { exact: true })
+  await comparisonToggle.click({ force: true })
+  await expect(comparisonToggle).not.toBeChecked()
+
   await dialog.evaluate((element) => {
     const details = document.createElement('details')
     const summary = document.createElement('summary')
@@ -73,8 +77,9 @@ test('modal focus includes summary and ignores hidden controls', async ({ page }
 })
 
 test('Dialog follows the simulated phone and comparison canvases', async ({ page }) => {
-  await page.goto('/?component=dialog&specimen=dialog-primitive&prop.open=true')
-  await page.getByRole('button', { name: 'Phone' }).click({ force: true })
+  await page.goto('/?component=dialog&specimen=dialog-primitive&prop.open=false')
+  await page.getByRole('button', { name: 'Phone' }).click()
+  await page.getByRole('button', { name: 'Open dialog' }).click()
 
   const previewGrid = page.locator('.preview-grid')
   const phoneLayer = page.locator('.vela-dialog-layer')
@@ -85,7 +90,10 @@ test('Dialog follows the simulated phone and comparison canvases', async ({ page
   expect(phoneLayerBox).not.toBeNull()
   expect(phoneLayerBox!.width).toBeLessThanOrEqual(phoneGridBox!.width)
 
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog')).toHaveCount(0)
   await page.getByLabel('Compare baseline', { exact: true }).check({ force: true })
+  await page.getByRole('button', { name: 'Open dialog' }).first().click()
   const dialogs = page.getByRole('dialog', { name: 'Dialog title' })
   await expect(dialogs).toHaveCount(2)
   const firstBox = await dialogs.nth(0).boundingBox()

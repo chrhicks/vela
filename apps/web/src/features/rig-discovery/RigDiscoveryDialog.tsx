@@ -1,7 +1,11 @@
 import type { DiscoveryCandidateView, DiscoveryResultView } from '@vela/model/rig'
 import { Button, Dialog } from '@vela/ui'
 import { useEffect, useRef, useState } from 'react'
-import { discoverRigs, type DiscoverRigsRequest } from './discover-rigs'
+import {
+  discoverRigs,
+  DiscoverRigsError,
+  type DiscoverRigsRequest,
+} from './discover-rigs'
 import { DiscoveryOrbit } from './DiscoveryOrbit'
 import { DiscoveryResults } from './DiscoveryResults'
 import { DiscoveryScanner } from './DiscoveryScanner'
@@ -16,7 +20,7 @@ interface Props {
 
 type DiscoveryState =
   | { view: 'start' }
-  | { view: 'manual'; host: string; port: string }
+  | { view: 'manual'; host: string; port: string; error?: string }
   | { view: 'scanning'; request: DiscoverRigsRequest }
   | {
       view: 'results'
@@ -61,9 +65,18 @@ export default function RigDiscoveryDialog({ open, onDismiss }: Props) {
       if (requestController.current === controller) {
         setDiscoveryState({ view: 'results', request, result, selected: null })
       }
-    } catch {
+    } catch (error) {
       if (!controller.signal.aborted && requestController.current === controller) {
-        setDiscoveryState({ view: 'request-failed', request })
+        if (request.mode === 'manual' && error instanceof DiscoverRigsError) {
+          setDiscoveryState({
+            view: 'manual',
+            host: request.host,
+            port: String(request.port),
+            error: 'Enter a hostname or IPv4 address without a URL, path, or port.',
+          })
+        } else {
+          setDiscoveryState({ view: 'request-failed', request })
+        }
       }
     } finally {
       if (requestController.current === controller) {
@@ -99,12 +112,12 @@ export default function RigDiscoveryDialog({ open, onDismiss }: Props) {
 
   function changeManualHost(host: string) {
     if (discoveryState.view !== 'manual') return
-    setDiscoveryState({ ...discoveryState, host })
+    setDiscoveryState({ ...discoveryState, host, error: undefined })
   }
 
   function changeManualPort(port: string) {
     if (discoveryState.view !== 'manual') return
-    setDiscoveryState({ ...discoveryState, port })
+    setDiscoveryState({ ...discoveryState, port, error: undefined })
   }
 
   function selectCandidate(candidate: DiscoveryCandidateView | null) {
@@ -217,6 +230,7 @@ export default function RigDiscoveryDialog({ open, onDismiss }: Props) {
       {discoveryState.view === 'start' ? <DiscoveryStart /> : null}
       {discoveryState.view === 'manual' ? (
         <ManualDiscoveryForm
+          error={discoveryState.error}
           host={discoveryState.host}
           onHostChange={changeManualHost}
           onPortChange={changeManualPort}
@@ -228,6 +242,7 @@ export default function RigDiscoveryDialog({ open, onDismiss }: Props) {
       {discoveryState.view === 'results' ? (
         <DiscoveryResults
           onSelectedChange={selectCandidate}
+          request={discoveryState.request}
           result={discoveryState.result}
           selected={discoveryState.selected}
         />
@@ -301,7 +316,7 @@ function discoveryCopy(state: DiscoveryState) {
     case 'results':
       return {
         title: state.request.mode === 'manual' ? 'Rig at this address' : 'Rigs on this network',
-        description: 'Choose the server you want Vela to use. Nothing is added until you confirm it.',
+        description: 'Review what Vela found. Discovery does not change configuration or hardware.',
       }
     case 'review':
       return {

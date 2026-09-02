@@ -24,17 +24,19 @@ export function Dialog({
 }: DialogProps) {
   const titleId = `vela-dialog-title-${useId().replace(/:/g, '')}`
   const descriptionId = `vela-dialog-description-${useId().replace(/:/g, '')}`
+  const layerRef = useRef<HTMLDivElement>(null)
   const dialogRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
+    const layer = layerRef.current
     const dialog = dialogRef.current
-    if (!open || !dialog) return
+    if (!open || !layer || !dialog) return
 
     const returnFocus = document.activeElement instanceof HTMLElement
       ? document.activeElement
       : document.body
     const focusTrap = createFocusTrap(dialog, {
-      allowOutsideClick: true,
+      allowOutsideClick: (event) => event.target === layer,
       delayInitialFocus: false,
       escapeDeactivates: false,
       fallbackFocus: dialog,
@@ -64,7 +66,7 @@ export function Dialog({
   }
 
   return (
-    <div className="vela-dialog-layer" onMouseDown={dismissFromBackdrop}>
+    <div className="vela-dialog-layer" onMouseDown={dismissFromBackdrop} ref={layerRef}>
       <section
         {...props}
         aria-describedby={description ? descriptionId : undefined}

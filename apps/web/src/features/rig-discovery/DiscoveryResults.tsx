@@ -1,27 +1,33 @@
 import type { DiscoveryCandidateView, DiscoveryFailureView, DiscoveryResultView } from '@vela/model/rig'
 import { Badge } from '@vela/ui'
+import type { DiscoverRigsRequest } from './discover-rigs'
 
 interface Props {
+  request: DiscoverRigsRequest
   result: DiscoveryResultView
   selected: DiscoveryCandidateView | null
   onSelectedChange(candidate: DiscoveryCandidateView | null): void
 }
 
-export function DiscoveryResults({ result, selected, onSelectedChange }: Props) {
+export function DiscoveryResults({ request, result, selected, onSelectedChange }: Props) {
   if (result.candidates.length === 0) {
     return (
       <div className="rig-discovery-results">
-        <EmptyDiscoveryResult failures={result.failures} />
+        <EmptyDiscoveryResult failures={result.failures} request={request} />
         <DiscoveryFailures failures={result.failures.filter((failure) => failure.reason !== 'scan-failed')} />
       </div>
     )
   }
 
+  const selectableCandidates = result.candidates.filter(
+    (candidate) => candidate.disposition.state === 'new',
+  ).length
+
   return (
     <div className="rig-discovery-results">
       <div className="rig-discovery-results__summary">
-        <strong>{result.candidates.length} {result.candidates.length === 1 ? 'server' : 'servers'} found</strong>
-        <span>Select one to continue</span>
+        <strong>{result.candidates.length} {result.candidates.length === 1 ? 'server' : 'servers'} inspected</strong>
+        <span>{selectableCandidates > 0 ? 'Select one to continue' : 'No rigs can be added'}</span>
       </div>
       <div className="rig-discovery-results__candidates">
         {result.candidates.map((candidate) => (
@@ -91,8 +97,25 @@ function DiscoveryCandidate({
   )
 }
 
-function EmptyDiscoveryResult({ failures }: { failures: ReadonlyArray<DiscoveryFailureView> }) {
+function EmptyDiscoveryResult({
+  failures,
+  request,
+}: {
+  failures: ReadonlyArray<DiscoveryFailureView>
+  request: DiscoverRigsRequest
+}) {
   const scanFailed = failures.some((failure) => failure.reason === 'scan-failed')
+
+  if (request.mode === 'manual') {
+    return (
+      <div className="rig-discovery-message" data-tone="danger">
+        <strong>Could not inspect this address</strong>
+        <p>
+          Confirm the host and port, and check that the Alpaca server is running before trying again.
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className="rig-discovery-message" data-tone={scanFailed ? 'danger' : 'neutral'}>
