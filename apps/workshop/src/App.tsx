@@ -158,7 +158,7 @@ export function App() {
           <PreviewCanvas
             compare={workshop.session.compareBaseline}
             mode={workshop.session.mode}
-            onPropsChange={(patch) => workshop.patchSession({ props: { ...workshop.session.props, ...patch } })}
+            onPropsChange={workshop.patchProps}
             session={workshop.session}
             specimen={workshop.specimen}
             theme={workshop.theme}
@@ -185,15 +185,15 @@ export function App() {
             {Object.entries(workshop.specimen.controls).map(([key, control]) => {
               const value = workshop.session.props[key] ?? workshop.specimen.defaultProps[key] ?? ''
               if (control.type === 'boolean') {
-                return <label className="toggle toggle--wide" key={key}><input checked={Boolean(value)} onChange={(event) => workshop.patchSession({ props: { ...workshop.session.props, [key]: event.target.checked } })} type="checkbox" /><span /> {control.label}</label>
+                return <label className="toggle toggle--wide" key={key}><input checked={Boolean(value)} onChange={(event) => workshop.patchProps({ [key]: event.target.checked })} type="checkbox" /><span /> {control.label}</label>
               }
               return (
                 <label className="control-field" key={key}>
                   <span>{control.label}</span>
                   {control.type === 'select' ? (
-                    <select onChange={(event) => workshop.patchSession({ props: { ...workshop.session.props, [key]: event.target.value } })} value={String(value)}>{control.options.map((option) => <option key={option}>{option}</option>)}</select>
+                    <select onChange={(event) => workshop.patchProps({ [key]: event.target.value })} value={String(value)}>{control.options.map((option) => <option key={option}>{option}</option>)}</select>
                   ) : (
-                    <input onChange={(event) => workshop.patchSession({ props: { ...workshop.session.props, [key]: event.target.value } })} type="text" value={String(value)} />
+                    <input onChange={(event) => workshop.patchProps({ [key]: event.target.value })} type="text" value={String(value)} />
                   )}
                 </label>
               )

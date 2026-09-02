@@ -1,8 +1,9 @@
-import { IconButton, Panel, Badge } from '@vela/ui'
-
-import { RefreshIcon } from "../components/ui/icons";
-import { classes } from "../components/ui/utils";
-import { useHome } from "../pages/useHome";
+import { useState } from 'react'
+import { Badge, Button, IconButton, Panel } from '@vela/ui'
+import { RefreshIcon } from '../components/ui/icons'
+import { classes } from '../components/ui/utils'
+import RigDiscoveryDialog from '../features/rig-discovery/RigDiscoveryDialog'
+import { useHome } from '../pages/useHome'
 
 const connectionBadge = {
   connected: {
@@ -20,7 +21,9 @@ const connectionBadge = {
 } as const
 
 export function Home() {
-  const { home, loading, error, refresh} = useHome();
+  const { home, loading, error, refresh } = useHome()
+  const [discoveryDismissed, setDiscoveryDismissed] = useState(false)
+  const noRigs = !loading && !error && home?.rigs.length === 0
 
   return (
     <section>
@@ -30,12 +33,12 @@ export function Home() {
         <div className="flex items-center gap-2">
           <span className="text-2xl font-bold">Devices</span>
           <IconButton
-            type="button"
-            label="Refresh devices"
-            tone="quiet"
-            icon={<RefreshIcon />}
-            onClick={refresh}
             disabled={loading}
+            icon={<RefreshIcon />}
+            label="Refresh devices"
+            onClick={refresh}
+            tone="quiet"
+            type="button"
           />
         </div>
 
@@ -44,16 +47,18 @@ export function Home() {
             <Loading />
           ) : error ? (
             <p role="alert">{error}</p>
+          ) : home === undefined ? null : home.rigs.length === 0 ? (
+            <NoRigs onSetup={() => setDiscoveryDismissed(false)} />
           ) : (
-            home?.rigs.map(rig => (
+            home.rigs.map((rig) => (
               <Panel
-                key={rig.id}
-                title={rig.name}
                 description={`${rig.devices.length} devices`}
                 elevation="raised"
+                key={rig.id}
+                title={rig.name}
               >
                 <ul className="flex flex-col gap-2">
-                  {rig.devices.map(device => {
+                  {rig.devices.map((device) => {
                     const presentation = connectionBadge[device.connection]
 
                     return (
@@ -61,9 +66,9 @@ export function Home() {
                         <span className="text-sm">{device.name}</span>
 
                         <Badge
+                          marker={<i />}
                           size="small"
                           tone={presentation.tone}
-                          marker={<i />}
                         >
                           {presentation.label}
                         </Badge>
@@ -76,12 +81,30 @@ export function Home() {
           )}
         </div>
       </div>
+
+      <RigDiscoveryDialog
+        onDismiss={() => setDiscoveryDismissed(true)}
+        open={noRigs && !discoveryDismissed}
+      />
     </section>
   )
 }
 
-function Loading() {
+function NoRigs({ onSetup }: { onSetup(): void }) {
   return (
-    <div>Loading...</div>
+    <div className="col-span-full grid min-h-80 place-items-center rounded-lg border border-ui-line bg-ui-surface px-6 text-center">
+      <div className="grid max-w-sm justify-items-center gap-4">
+        <span className="text-xs font-bold tracking-[.12em] text-ui-accent">GET STARTED</span>
+        <h1 className="m-0 text-2xl font-bold">No rig configured</h1>
+        <p className="m-0 text-sm leading-6 text-ui-muted">
+          Set up the observatory you want Vela to monitor and control.
+        </p>
+        <Button onClick={onSetup} tone="accent">Set up a rig</Button>
+      </div>
+    </div>
   )
+}
+
+function Loading() {
+  return <div>Loading...</div>
 }
