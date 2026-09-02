@@ -30,15 +30,22 @@ const reachabilityBadge = {
 
 export function Home() {
   const { home, loading, error, refresh } = useHome()
-  const [discoveryDismissed, setDiscoveryDismissed] = useState(false)
+  const [discoveryOpen, setDiscoveryOpen] = useState(false)
+  const [initialDiscoveryDismissed, setInitialDiscoveryDismissed] = useState(false)
   const [rigToForget, setRigToForget] = useState<RigView | null>(null)
   const [forgetting, setForgetting] = useState(false)
   const [forgetError, setForgetError] = useState<string>()
   const noRigs = !loading && !error && home?.rigs.length === 0
 
   async function handleAdded() {
-    setDiscoveryDismissed(true)
+    setDiscoveryOpen(false)
+    setInitialDiscoveryDismissed(true)
     await refresh()
+  }
+
+  function dismissDiscovery() {
+    setDiscoveryOpen(false)
+    setInitialDiscoveryDismissed(true)
   }
 
   function askToForget(rig: RigView) {
@@ -59,7 +66,7 @@ export function Home() {
     setForgetError(undefined)
     try {
       await forgetRig(rigToForget.id)
-      setDiscoveryDismissed(true)
+      setInitialDiscoveryDismissed(true)
       setRigToForget(null)
       await refresh()
     } catch {
@@ -84,6 +91,11 @@ export function Home() {
             tone="quiet"
             type="button"
           />
+          {home && home.rigs.length > 0 ? (
+            <Button onClick={() => setDiscoveryOpen(true)} size="small" tone="accent">
+              Add rig
+            </Button>
+          ) : null}
         </div>
 
         {error ? <p className="text-sm text-ui-danger" role="alert">{error}</p> : null}
@@ -92,7 +104,7 @@ export function Home() {
           {home === undefined && loading ? (
             <Loading />
           ) : home === undefined ? null : home.rigs.length === 0 ? (
-            <NoRigs onSetup={() => setDiscoveryDismissed(false)} />
+            <NoRigs onSetup={() => setDiscoveryOpen(true)} />
           ) : (
             home.rigs.map((rig) => (
               <RigCard key={rig.id} onForget={() => askToForget(rig)} rig={rig} />
@@ -103,8 +115,8 @@ export function Home() {
 
       <RigDiscoveryDialog
         onAdded={handleAdded}
-        onDismiss={() => setDiscoveryDismissed(true)}
-        open={noRigs && !discoveryDismissed}
+        onDismiss={dismissDiscovery}
+        open={discoveryOpen || (noRigs && !initialDiscoveryDismissed)}
       />
 
       <Dialog

@@ -206,6 +206,39 @@ test('explains results when no discovered candidate can be added', async ({ page
   await expect(page.getByRole('button', { name: 'Review rig' })).toBeDisabled()
 })
 
+test('opens manual discovery from an existing Rig view', async ({ page }) => {
+  await useHome(page, () => homeWithRig())
+  let discoveryPayload: unknown
+  await page.route('**/api/rigs/discovery', async (route) => {
+    discoveryPayload = route.request().postDataJSON()
+    await fulfillJson(route, {
+      candidates: [{
+        endpoint: { host: '192.168.4.63', port: 32323 },
+        server: { name: 'ASCOM Alpaca' },
+        inspectedAt,
+        devices: [{ kind: 'camera', name: 'Seestar camera' }],
+        disposition: { state: 'new' },
+      }],
+      failures: [],
+    })
+  })
+
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Add rig' }).click()
+  await page.getByRole('button', { name: 'Enter an address manually' }).click()
+  await page.getByLabel('Host or IP address').fill('192.168.4.63')
+  await page.getByLabel('Port').fill('32323')
+  await page.getByRole('button', { name: 'Inspect address' }).click()
+
+  await expect(page.getByRole('heading', { name: 'Rig at this address' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /ASCOM Alpaca/ })).toBeVisible()
+  expect(discoveryPayload).toEqual({
+    mode: 'manual',
+    host: '192.168.4.63',
+    port: 32323,
+  })
+})
+
 test('ignores an older refresh that finishes after Forget Rig', async ({ page }) => {
   let home = homeWithRig()
   let homeRequests = 0
