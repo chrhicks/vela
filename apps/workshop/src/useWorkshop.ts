@@ -92,6 +92,14 @@ export function useWorkshop() {
     setSession((current) => ({ ...current, ...patch, updatedAt: current.updatedAt }))
   }, [])
 
+  const patchProps = useCallback((patch: Record<string, string | number | boolean>) => {
+    setSession((current) => ({
+      ...current,
+      props: { ...current.props, ...patch },
+      updatedAt: current.updatedAt,
+    }))
+  }, [])
+
   const selectSpecimen = useCallback((componentId: string, specimenId: string) => {
     const next = findSpecimen(componentId, specimenId)
     patchSession({ componentId, specimenId, props: { ...next.defaultProps } })
@@ -157,6 +165,7 @@ export function useWorkshop() {
     activeProfile,
     editTheme,
     hydrated,
+    patchProps,
     patchSession,
     profiles,
     redo,

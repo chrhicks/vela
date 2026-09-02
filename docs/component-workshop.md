@@ -77,7 +77,7 @@ A deliberately promoted component under the stable component boundary and export
 
 ### Specimen
 
-A source-backed, curated scenario colocated with a component, for example `Button.specimen.tsx`. Specimens document useful states and contexts; they do not attempt to generate every possible prop combination. Specimen code is discoverable by the workshop but excluded from stable package exports.
+A source-backed, curated scenario colocated with a component, for example `Button.specimen.tsx`. Each component begins with a primitive-focused specimen that explains the reusable contract. A materially useful real workflow may appear as a visibly named product-example specimen showing what the primitive can enable. Product examples remain non-exported design references: application features own their copy, state, domain composition, and illustrations, while example-only styling stays in colocated `*.specimen.css`. Specimens do not attempt to generate every possible prop combination.
 
 ## Decision log
 
@@ -115,6 +115,7 @@ A source-backed, curated scenario colocated with a component, for example `Butto
 | D-030 | Adopt stable components in Vela one at a time. | Incremental adoption is tangible, reversible, and does not force a coordinated UI or theme replacement. |
 | D-031 | Let promoted components inherit compatible Vela variables. | Trying one component must not require a theme migration. Package defaults fill missing values, and named profiles remain optional overlays. |
 | D-032 | Deliver meaningful vertical capabilities. | Review points should produce useful workflows, not isolated property-by-property changes. |
+| D-033 | Contrast primitive anatomy with optional product examples. | A primitive-focused specimen makes the reusable component understandable; a non-exported, specimen-local real workflow can demonstrate its capability without becoming code that `apps/web` imports or copies wholesale. Product examples justify new primitives only after repeated use reveals a durable contract. |
 
 ## Design-token model
 
@@ -156,7 +157,8 @@ The workshop has two levels:
 
 The focused workbench provides:
 
-- Curated named specimens and interactive prop controls
+- A primitive-focused specimen plus optional, visibly named product-example specimens
+- Curated interactive prop controls for reproducible states
 - Light/dark and density controls
 - A freely resizable canvas
 - Wide desktop, compact laptop/tablet, and phone presets
@@ -167,7 +169,7 @@ The focused workbench provides:
 - A stable URL identifying the active component and specimen
 - Copy Context output containing the complete visual working context
 
-The workshop automatically discovers component specimens and design-profile files from their prescribed locations and validates profile data against the shared schema.
+The workshop automatically discovers component specimens and design-profile files from their prescribed locations and validates profile data against the shared schema. Primitive and product-example specimens share the same controls, stable URLs, and responsive canvas, but have different ownership: only the primitive is a candidate for application import and promotion.
 
 ## Local persistence boundary
 
@@ -186,9 +188,11 @@ The persistence rules are:
 The primary loop is:
 
 ```text
-Create draft component and specimens
+Create a draft component and primitive-focused specimen
               ↓
-Render it in the workshop
+Add a product example only when real context improves evaluation
+              ↓
+Render both in the workshop
               ↓
 Adjust profile, props, context, density, and viewport
               ↓
@@ -292,7 +296,8 @@ Deferred work is not scheduled by this decision record. It should be introduced 
 - Workshop architecture and ownership boundaries
 - Artifact terminology
 - Adding a draft component
-- Authoring and discovering specimens
+- Authoring and discovering primitive-focused and product-example specimens
+- Keeping product-example styling and assets non-exported
 - Creating, saving, and comparing design profiles
 - Working-session recovery behavior
 - Using stable URLs and Copy Context with Codex

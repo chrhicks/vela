@@ -1,0 +1,77 @@
+.rig-discovery-scanner {
+  position: relative;
+  display: grid;
+  width: 8rem;
+  height: 8rem;
+  margin-bottom: calc(var(--vela-space) * 5);
+  border: var(--vela-border-width) solid color-mix(in oklch, var(--vela-accent) 25%, transparent);
+  border-radius: 50%;
+  place-items: center;
+}
+
+.rig-discovery-scanner::before,
+.rig-discovery-scanner::after {
+  position: absolute;
+  border: var(--vela-border-width) solid color-mix(in oklch, var(--vela-accent) 28%, transparent);
+  border-radius: 50%;
+  content: "";
+}
+
+.rig-discovery-scanner::before {
+  inset: 1.25rem;
+}
+
+.rig-discovery-scanner::after {
+  inset: 2.5rem;
+  background: var(--vela-accent-surface);
+}
+
+.rig-discovery-scanner__sweep {
+  position: absolute;
+  z-index: 2;
+  width: 50%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--vela-accent));
+  transform: translateX(50%);
+  transform-origin: left center;
+  animation: rig-discovery-scan 1.8s linear infinite;
+}
+
+.rig-discovery-scanner__signal {
+  position: absolute;
+  z-index: 3;
+  width: .38rem;
+  height: .38rem;
+  border-radius: 50%;
+  background: var(--vela-accent);
+  box-shadow: 0 0 .7rem var(--vela-accent);
+}
+
+.rig-discovery-scanner__signal--one {
+  top: 1.5rem;
+  right: 2.1rem;
+}
+
+.rig-discovery-scanner__signal--two {
+  right: 1.4rem;
+  bottom: 2.2rem;
+  opacity: .7;
+}
+
+.rig-discovery-scanner__signal--three {
+  bottom: 1.3rem;
+  left: 2.3rem;
+  opacity: .45;
+}
+
+@keyframes rig-discovery-scan {
+  to {
+    transform: translateX(50%) rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rig-discovery-scanner__sweep {
+    animation: none;
+  }
+}

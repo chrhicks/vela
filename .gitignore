@@ -5,3 +5,5 @@ dist
 *.tsbuildinfo
 .DS_Store
 apps/workshop/.local/
+apps/workshop/playwright-report/
+apps/workshop/test-results/

@@ -14,7 +14,10 @@ const discoveredSpecimens = Object.entries(modules)
     specimen: module.specimen,
     stability: path.includes('/components/') ? 'stable' as const : 'draft' as const,
   }))
-  .sort((left, right) => left.specimen.componentName.localeCompare(right.specimen.componentName))
+  .sort((left, right) =>
+    left.specimen.componentName.localeCompare(right.specimen.componentName)
+      || left.specimen.id.localeCompare(right.specimen.id),
+  )
 
 export const specimens = discoveredSpecimens.map((entry) => entry.specimen)
 
