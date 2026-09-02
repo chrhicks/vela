@@ -1,13 +1,47 @@
 import Fastify from 'fastify'
-import { createAlpacaDiscovery, type AlpacaDiscovery } from '@vela/alpaca'
-import type { DiscoveryResultView, RigView } from '@vela/model/rig'
-import type { HomeView } from '@vela/model/web'
-import deviceConfig from './config/devices.js'
-import { createRigDeviceInventory } from './device/inventory.js'
-import { toDeviceSummary } from './web/device.js'
-import { discoverRigs, parseDiscoverRigsInput } from './rig/discovery.js'
+import {
+  AlpacaProviderError,
+  createAlpacaDiscovery,
+  type AlpacaDiscovery,
+} from '@vela/alpaca'
+import type { DiscoveryResultView } from '@vela/model/rig'
+import {
+  createRigDeviceInventory,
+  type RigDeviceInventory,
+  type RigInventorySource,
+} from './device/inventory.js'
+import {
+  createMemoryRigCatalog,
+  type RigCatalog,
+} from './rig/catalog.js'
+import {
+  discoverRigs,
+  parseDiscoverRigsInput,
+  toObservedRigInventory,
+} from './rig/discovery.js'
+import { loadHomeView } from './rig/home.js'
 
-export function buildApp(alpacaDiscovery: AlpacaDiscovery = createAlpacaDiscovery()) {
+interface BuildAppOptions {
+  readonly alpacaDiscovery?: AlpacaDiscovery
+  readonly createInventory?: (rig: RigInventorySource) => RigDeviceInventory
+  readonly now?: () => Date
+  readonly rigCatalog?: RigCatalog
+}
+
+interface AddRigRequest {
+  readonly name: string
+  readonly endpoint: {
+    readonly host: string
+    readonly port: number
+  }
+}
+
+export function buildApp({
+  alpacaDiscovery = createAlpacaDiscovery(),
+  createInventory = createRigDeviceInventory,
+  now = () => new Date(),
+  rigCatalog = createMemoryRigCatalog(),
+}: BuildAppOptions = {}) {
   const app = Fastify({ logger: true })
 
   app.get('/api/health', async () => ({ status: 'ok' }))
@@ -26,6 +60,8 @@ export function buildApp(alpacaDiscovery: AlpacaDiscovery = createAlpacaDiscover
     try {
       const result = await discoverRigs(input, {
         alpaca: alpacaDiscovery,
+        catalog: rigCatalog,
+        now,
         signal: controller.signal,
       })
 
@@ -51,42 +87,87 @@ export function buildApp(alpacaDiscovery: AlpacaDiscovery = createAlpacaDiscover
     }
   })
 
-  app.get('/api/connecttest', async () => {
-    const rig = deviceConfig.rigs.find((candidate) => candidate.id === 'askar-fra-400')
-    if (!rig) {
-      throw new Error('Rig not found')
+  app.post('/api/rigs', async (request, reply) => {
+    const input = parseAddRigRequest(request.body)
+    if (input === undefined) {
+      return reply.code(400).send({ error: 'invalid-rig' })
     }
 
-    const devices = await createRigDeviceInventory(rig).listDevices()
-    console.log(JSON.stringify(devices, null, 2))
-
-    return deviceConfig
-  })
-
-  app.get('/api/web/home', async () => {
-    const rigs: RigView[] = await Promise.all(
-      deviceConfig.rigs.map(async (rig) => {
-        const devices = await createRigDeviceInventory(rig).listDevices()
-        const lastSeenAt = new Date().toISOString()
-
-        return {
-          id: rig.id,
-          name: rig.name,
-          reachability: 'reachable',
-          lastSeenAt,
-          devices: devices.map(toDeviceSummary),
-          capabilities: [],
-        }
-      }),
-    )
-
-    const homeView: HomeView = {
-      rigs,
-      refreshedAt: new Date().toISOString(),
+    let inspection
+    try {
+      inspection = await alpacaDiscovery.inspect(input.endpoint)
+    } catch (error) {
+      if (error instanceof AlpacaProviderError) {
+        request.log.warn({ err: error, endpoint: input.endpoint }, 'Rig inspection failed before addition')
+        return reply.code(502).send({ error: 'rig-inspection-failed' })
+      }
+      throw error
     }
 
-    return homeView
+    const inventory = toObservedRigInventory(inspection, now().toISOString())
+    if (inventory.devices.length === 0) {
+      return reply.code(422).send({ error: 'no-stable-device-id' })
+    }
+
+    const result = await rigCatalog.add({
+      name: input.name,
+      endpoint: input.endpoint,
+      inventory,
+    })
+    switch (result.state) {
+      case 'added':
+        return reply.code(201).send({ rigId: result.rig.id })
+      case 'known':
+        return reply.code(409).send({ error: 'rig-already-added', rigId: result.rigId })
+      case 'conflict':
+        return reply.code(409).send({ error: 'rig-conflict' })
+    }
   })
+
+  app.delete<{ Params: { rigId: string } }>('/api/rigs/:rigId', async (request, reply) => {
+    if (!await rigCatalog.forget(request.params.rigId)) {
+      return reply.code(404).send({ error: 'rig-not-found' })
+    }
+    return reply.code(204).send()
+  })
+
+  app.get('/api/web/home', async (request) => loadHomeView(rigCatalog, {
+    createInventory,
+    now,
+    onConflict(rig) {
+      request.log.warn({ rigId: rig.id }, 'Known Rig identity conflicts with its current endpoint')
+    },
+    onUnavailable(rig, cause) {
+      request.log.warn({ err: cause, rigId: rig.id }, 'Known Rig is unavailable')
+    },
+  }))
 
   return app
+}
+
+function parseAddRigRequest(value: unknown): AddRigRequest | undefined {
+  if (
+    !isRecord(value)
+    || Object.keys(value).some((key) => key !== 'name' && key !== 'endpoint')
+    || typeof value.name !== 'string'
+    || value.name.trim().length === 0
+    || !isRecord(value.endpoint)
+  ) {
+    return undefined
+  }
+
+  const discoveryInput = parseDiscoverRigsInput({
+    ...value.endpoint,
+    mode: 'manual',
+  })
+  if (discoveryInput?.mode !== 'manual') return undefined
+
+  return {
+    name: value.name.trim(),
+    endpoint: discoveryInput.endpoint,
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
 }

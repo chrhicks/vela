@@ -30,6 +30,8 @@ pnpm dev
 
 `pnpm dev` starts the web app and Fastify together. Vite proxies `/api/*` to Fastify at `http://127.0.0.1:3001`; visit `http://localhost:5173/api` in the SPA to exercise `GET /api/health`.
 
+The server stores added Rigs in the Git-ignored `data/rigs.yaml`. Set `VELA_RIG_CATALOG_PATH` to use a different location; [`data/rigs.example.yaml`](data/rigs.example.yaml) shows the file shape.
+
 Useful focused commands:
 
 ```sh

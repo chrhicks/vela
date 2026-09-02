@@ -9,6 +9,10 @@ import type {
   AlpacaUdpScanner,
 } from './discovery-model.js'
 import { createAlpacaClient } from './internal/client.js'
+import {
+  rejectDuplicateDeviceIds,
+  stableDeviceId,
+} from './internal/configured-device.js'
 import { toDeviceKind } from './internal/device-kind.js'
 import { createNodeUdpScanner } from './internal/udp-scanner.js'
 
@@ -74,10 +78,11 @@ export function createAlpacaDiscovery({
     // Management operations remain serial for compatibility with finicky servers.
     const apiVersions = await client.apiVersions()
     const description = await client.serverDescription()
-    const configuredDevices = await client.inspectableDevices()
+    const configuredDevices = await client.configuredDevices()
+    rejectDuplicateDeviceIds(configuredDevices)
 
     const devices: AlpacaInspectionDevice[] = configuredDevices.map((device) => {
-      const providerDeviceId = device.UniqueID?.trim()
+      const providerDeviceId = stableDeviceId(device)
       return {
         kind: toDeviceKind(device.DeviceType),
         name: device.DeviceName,

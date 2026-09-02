@@ -1,4 +1,8 @@
 import { createAlpacaClient } from './internal/client.js'
+import {
+  rejectDuplicateDeviceIds,
+  stableDeviceId,
+} from './internal/configured-device.js'
 import { toDeviceKind } from './internal/device-kind.js'
 import type { ConfiguredDevice } from './internal/types/management.js'
 import type { AlpacaConnectionStatus, AlpacaDevice } from './model.js'
@@ -10,13 +14,20 @@ export interface AlpacaProvider {
 export interface AlpacaProviderOptions {
   baseUrl: string
   fetch?: typeof globalThis.fetch
+  requestTimeoutMs?: number
 }
+
+const defaultRequestTimeoutMs = 3_000
 
 export function createAlpacaProvider({
   baseUrl,
   fetch = globalThis.fetch,
+  requestTimeoutMs = defaultRequestTimeoutMs,
 }: AlpacaProviderOptions): AlpacaProvider {
-  const client = createAlpacaClient({ baseUrl, fetch })
+  if (!Number.isInteger(requestTimeoutMs) || requestTimeoutMs <= 0) {
+    throw new RangeError('Provider request timeout must be a positive integer')
+  }
+  const client = createAlpacaClient({ baseUrl, fetch, requestTimeoutMs })
 
   async function connection(device: ConfiguredDevice): Promise<AlpacaConnectionStatus> {
     try {
@@ -49,11 +60,16 @@ export function createAlpacaProvider({
   }
 
   async function listDevices(): Promise<ReadonlyArray<AlpacaDevice>> {
+    const configuredDevices = await client.configuredDevices()
+    rejectDuplicateDeviceIds(configuredDevices)
     const devices: AlpacaDevice[] = []
 
-    for (const device of await client.configuredDevices()) {
+    for (const device of configuredDevices) {
+      const providerDeviceId = stableDeviceId(device)
+      if (providerDeviceId === undefined) continue
+
       devices.push({
-        providerDeviceId: device.UniqueID,
+        providerDeviceId,
         kind: toDeviceKind(device.DeviceType),
         name: device.DeviceName,
         connection: await connection(device),

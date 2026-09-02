@@ -8,17 +8,14 @@ import {
 } from './types/common.js'
 import {
   configuredDevice,
-  inspectableConfiguredDevice,
   serverDescription,
   type ConfiguredDevice,
-  type InspectableConfiguredDevice,
   type ServerDescription,
 } from './types/management.js'
 
 export interface AlpacaClient {
   apiVersions(): Promise<ReadonlyArray<number>>
   serverDescription(): Promise<ServerDescription>
-  inspectableDevices(): Promise<ReadonlyArray<InspectableConfiguredDevice>>
   configuredDevices(): Promise<ReadonlyArray<ConfiguredDevice>>
   connected(device: ConfiguredDevice): Promise<boolean>
   driverInfo(device: ConfiguredDevice): Promise<string>
@@ -183,12 +180,6 @@ export function createAlpacaClient({
 
     serverDescription: () =>
       requestValue(`${managementBasePath}/description`, serverDescription),
-
-    inspectableDevices: () =>
-      requestValue(
-        `${managementBasePath}/configureddevices`,
-        Schema.Array(inspectableConfiguredDevice),
-      ),
 
     configuredDevices: () =>
       requestValue(
