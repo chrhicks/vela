@@ -7,6 +7,7 @@ import {
   type AlpacaInspection,
 } from '@vela/alpaca'
 import { buildApp } from '../app.js'
+import { createMemoryRigCatalog } from './catalog.js'
 import { discoverRigs, parseDiscoverRigsInput } from './discovery.js'
 
 const endpointA: AlpacaEndpoint = { host: '192.168.4.104', port: 11111 }
@@ -92,6 +93,52 @@ describe('discoverRigs', () => {
         cause: providerError,
       }],
     })
+  })
+
+  it('marks a known Rig and updates its changed endpoint from stable device evidence', async () => {
+    const catalog = createMemoryRigCatalog([{
+      id: 'rig-1',
+      name: 'Backyard rig',
+      endpoint: endpointB,
+      addedAt: '2026-09-01T20:00:00.000Z',
+      lastObservedInventory: {
+        observedAt: '2026-09-01T20:00:00.000Z',
+        devices: [{ uniqueId: 'camera-1', kind: 'camera', name: 'Old camera name' }],
+      },
+    }])
+    const alpaca: AlpacaDiscovery = {
+      async scan() {
+        return [endpointA]
+      },
+      async inspect() {
+        return inspection(endpointA, [{
+          providerDeviceId: 'camera-1',
+          kind: 'camera',
+          name: 'Main Camera',
+        }])
+      },
+    }
+
+    const result = await discoverRigs({ mode: 'scan' }, {
+      alpaca,
+      catalog,
+      now: () => new Date('2026-09-02T20:00:00.000Z'),
+    })
+
+    expect(result.candidates[0]?.disposition).toEqual({
+      state: 'already-added',
+      rigId: 'rig-1',
+    })
+    await expect(catalog.list()).resolves.toEqual([{
+      id: 'rig-1',
+      name: 'Backyard rig',
+      endpoint: endpointA,
+      addedAt: '2026-09-01T20:00:00.000Z',
+      lastObservedInventory: {
+        observedAt: '2026-09-02T20:00:00.000Z',
+        devices: [{ uniqueId: 'camera-1', kind: 'camera', name: 'Main Camera' }],
+      },
+    }])
   })
 
   it('turns a known UDP scan failure into a sanitized failure while retaining its cause', async () => {
@@ -181,7 +228,7 @@ describe('POST /api/rigs/discovery', () => {
         throw providerError
       },
     }
-    const app = buildApp(alpaca)
+    const app = buildApp({ alpacaDiscovery: alpaca })
 
     try {
       const response = await app.inject({
@@ -203,7 +250,7 @@ describe('POST /api/rigs/discovery', () => {
   it('rejects invalid request input before touching Alpaca', async () => {
     const scan = vi.fn<AlpacaDiscovery['scan']>()
     const inspect = vi.fn<AlpacaDiscovery['inspect']>()
-    const app = buildApp({ scan, inspect })
+    const app = buildApp({ alpacaDiscovery: { scan, inspect } })
 
     try {
       const response = await app.inject({

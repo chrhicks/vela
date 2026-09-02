@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   AlpacaProviderError,
   createAlpacaProvider,
@@ -42,8 +42,12 @@ const configuredCamera = {
   DeviceName: 'Main Camera',
   DeviceType: 'Camera',
   DeviceNumber: 0,
-  UniqueID: 'camera-1',
+  UniqueID: ' camera-1 ',
 }
+
+afterEach(() => {
+  vi.useRealTimers()
+})
 
 describe('createAlpacaProvider', () => {
   it('returns normalized devices without exposing wire fields', async () => {
@@ -58,6 +62,11 @@ describe('createAlpacaProvider', () => {
             DeviceType: 'Video',
             DeviceNumber: 2,
             UniqueID: 'mystery-1',
+          },
+          {
+            DeviceName: 'Legacy device',
+            DeviceType: 'Camera',
+            DeviceNumber: 3,
           },
         ]),
         '/api/v1/camera/0/connected': envelope(true),
@@ -112,6 +121,47 @@ describe('createAlpacaProvider', () => {
         driver: {},
       },
     ])
+  })
+
+  it('rejects duplicate stable device IDs as an invalid response', async () => {
+    const provider = createAlpacaProvider({
+      baseUrl: 'http://alpaca.test',
+      fetch: fakeFetch({
+        '/management/v1/configureddevices': envelope([
+          configuredCamera,
+          { ...configuredCamera, DeviceNumber: 1, UniqueID: 'camera-1' },
+        ]),
+      }),
+    })
+
+    await expect(provider.listDevices()).rejects.toMatchObject({
+      name: 'AlpacaProviderError',
+      reason: 'invalid-response',
+    })
+  })
+
+  it('times out a stalled management request', async () => {
+    vi.useFakeTimers()
+    const fetch = vi.fn((_input: RequestInfo | URL, init?: RequestInit) =>
+      new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(init.signal?.reason), {
+          once: true,
+        })
+      }),
+    ) as typeof globalThis.fetch
+    const provider = createAlpacaProvider({
+      baseUrl: 'http://alpaca.test',
+      fetch,
+    })
+
+    const request = provider.listDevices()
+    const rejection = expect(request).rejects.toMatchObject({
+      name: 'AlpacaProviderError',
+      reason: 'transport',
+    })
+    await vi.advanceTimersByTimeAsync(3_000)
+
+    await rejection
   })
 
   it('rejects nonzero management response errors as protocol errors', async () => {

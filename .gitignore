@@ -7,3 +7,5 @@ dist
 apps/workshop/.local/
 apps/workshop/playwright-report/
 apps/workshop/test-results/
+data/*
+!data/rigs.example.yaml
