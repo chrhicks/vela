@@ -1,7 +1,6 @@
-import { createContext, useEffect } from "react";
-import type { HomeView } from "@vela/model/web";
-import { useState } from "react";
-import { api } from "../lib/api";
+import type { HomeView } from '@vela/model/web'
+import { createContext, useEffect, useRef, useState } from 'react'
+import { api } from '../lib/api'
 
 interface HomeContextValue {
   home?: HomeView
@@ -10,34 +9,49 @@ interface HomeContextValue {
   refresh(): Promise<void>
 }
 
-export const HomeContext = createContext<HomeContextValue | null>(null);
+export const HomeContext = createContext<HomeContextValue | null>(null)
 
 export function HomeProvider({ children }: { children: React.ReactNode }) {
-  const [homeView, setHomeView] = useState<HomeView | null> (null)
-  const [loading, setLoading] = useState<boolean>(false)
+  const [homeView, setHomeView] = useState<HomeView | null>(null)
+  const [loading, setLoading] = useState(true)
+  const initialLoadStarted = useRef(false)
+  const requestGeneration = useRef(0)
+  const [error, setError] = useState<string>()
 
   async function fetchHomeView() {
+    const generation = ++requestGeneration.current
     setLoading(true)
-    const response = await api<HomeView>('web/home')
-    setHomeView(response)
-    setLoading(false)
+    setError(undefined)
+
+    try {
+      const response = await api<HomeView>('web/home')
+      if (requestGeneration.current === generation) setHomeView(response)
+    } catch {
+      if (requestGeneration.current !== generation) return
+
+      setError(homeView === null
+        ? 'Vela could not load your rigs. Check the server and try again.'
+        : 'Vela could not refresh your rigs. Showing the previous state.')
+    } finally {
+      if (requestGeneration.current === generation) setLoading(false)
+    }
   }
 
   useEffect(() => {
-    fetchHomeView()
+    if (initialLoadStarted.current) return
+
+    initialLoadStarted.current = true
+    void fetchHomeView()
   }, [])
 
-  function refresh() {
-    return fetchHomeView()
-  }
-
   return (
-    <HomeContext.Provider value={({
+    <HomeContext.Provider value={{
       home: homeView ?? undefined,
       loading,
-      refresh
-    })}>
+      error,
+      refresh: fetchHomeView,
+    }}>
       {children}
     </HomeContext.Provider>
-  );
+  )
 }

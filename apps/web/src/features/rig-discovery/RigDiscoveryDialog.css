@@ -388,6 +388,16 @@ button.rig-discovery-candidate:focus-visible {
   font-size: .66em;
 }
 
+.rig-discovery-review__error {
+  padding: calc(var(--vela-space) * 2.5) calc(var(--vela-space) * 3);
+  border: var(--vela-border-width) solid color-mix(in oklch, var(--vela-danger) 42%, var(--vela-line));
+  border-radius: var(--vela-radius);
+  color: var(--vela-danger);
+  background: color-mix(in oklch, var(--vela-danger) 7%, var(--vela-surface));
+  font-size: .74em;
+  line-height: 1.45;
+}
+
 .rig-discovery-review__notice {
   display: grid;
   gap: calc(var(--vela-space) * .8);

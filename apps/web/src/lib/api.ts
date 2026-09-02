@@ -4,6 +4,7 @@ export class ApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    readonly code?: string,
   ) {
     super(message)
     this.name = 'ApiError'
@@ -21,8 +22,20 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   })
 
   if (!response.ok) {
-    throw new ApiError(`Request failed with ${response.status}`, response.status)
+    let code: string | undefined
+    try {
+      const body: unknown = await response.json()
+      if (isRecord(body) && typeof body.error === 'string') code = body.error
+    } catch {
+      // An error response may have no JSON body.
+    }
+    throw new ApiError(`Request failed with ${response.status}`, response.status, code)
   }
+  if (response.status === 204) return undefined as T
 
   return response.json() as Promise<T>
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
