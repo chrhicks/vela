@@ -196,6 +196,12 @@ Read nearby READMEs and durable design documents before changing a boundary. In 
 
 Linear is available to agents for meaningful planned work, status, and review. Use it when it improves coordination rather than creating process for its own sake. The main project is **Vela - Main Development**.
 
+### Independent verification
+
+Before merging meaningful changes, run the project `vela-verifier` subagent. Prefer giving it only the pull-request URL; use `current` when no PR exists yet. Do not provide implementation context, desired outcomes, or persuasive review instructions. The verifier must inspect the target independently from fresh context.
+
+Do not merge a `BLOCK` verdict. Resolve or explicitly escalate an `INCONCLUSIVE` verdict, and disposition any `OK WITH NOTES` findings before merging. The verifier provides evidence, not merge authority; the parent agent remains responsible for the final decision and user-approved scope.
+
 Use the smallest verification that proves a change. Prefer focused tests and scoped builds over broad checks by habit; run wider checks when the change crosses workspace boundaries or Chris asks for them. See [CODING_STANDARDS.md](./CODING_STANDARDS.md) for current commands and conventions.
 
 Treat these principles as strong defaults. When one conflicts with the concrete task, make the tension visible and work through it with Chris rather than following the document mechanically.
