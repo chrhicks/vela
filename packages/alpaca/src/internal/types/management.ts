@@ -5,20 +5,12 @@ export const configuredDevice = Schema.Struct({
   DeviceName: Schema.String,
   DeviceType: Schema.String,
   DeviceNumber: Schema.Number,
-  UniqueID: Schema.String,
+  UniqueID: Schema.optionalKey(Schema.String),
 })
 export type ConfiguredDevice = typeof configuredDevice.Type
 
 export const configuredDevicesResponse = alpacaResponse(Schema.Array(configuredDevice))
 export type ConfiguredDevicesResponse = typeof configuredDevicesResponse.Type
-
-export const inspectableConfiguredDevice = Schema.Struct({
-  DeviceName: Schema.String,
-  DeviceType: Schema.String,
-  DeviceNumber: Schema.Number,
-  UniqueID: Schema.optionalKey(Schema.String),
-})
-export type InspectableConfiguredDevice = typeof inspectableConfiguredDevice.Type
 
 export const serverDescription = Schema.Struct({
   ServerName: Schema.optionalKey(Schema.String),

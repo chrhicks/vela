@@ -6,11 +6,14 @@ import {
   type AlpacaInspection,
 } from '@vela/alpaca'
 import type {
+  DiscoveryCandidateDisposition,
   DiscoveryCandidateView,
   DiscoveryFailureReason,
   DiscoveryFailureView,
   RigEndpoint,
 } from '@vela/model/rig'
+import type { ObservedRigInventory } from './contracts.js'
+import type { RigCatalog } from './catalog.js'
 
 const defaultAlpacaPort = 11111
 
@@ -30,6 +33,8 @@ interface RigDiscoveryResult {
 
 interface DiscoverRigsOptions {
   readonly alpaca: AlpacaDiscovery
+  readonly catalog?: RigCatalog
+  readonly now?: () => Date
   readonly signal?: AbortSignal
 }
 
@@ -100,28 +105,73 @@ function hasServerDescription(inspection: AlpacaInspection): boolean {
   return Object.values(inspection.server).some((value) => value !== undefined)
 }
 
-function candidateView(inspection: AlpacaInspection): DiscoveryCandidateView {
-  const hasStableDevice = inspection.devices.some(
-    (device) => device.providerDeviceId !== undefined,
-  )
+export function toObservedRigInventory(
+  inspection: AlpacaInspection,
+  observedAt: string,
+): ObservedRigInventory {
+  return {
+    observedAt,
+    devices: inspection.devices.flatMap((device) =>
+      device.providerDeviceId === undefined
+        ? []
+        : [{
+            uniqueId: device.providerDeviceId,
+            kind: device.kind,
+            name: device.name,
+          }],
+    ),
+  }
+}
+
+async function candidateDisposition(
+  inspection: AlpacaInspection,
+  inventory: ObservedRigInventory,
+  catalog: RigCatalog | undefined,
+): Promise<DiscoveryCandidateDisposition> {
+  if (inventory.devices.length === 0) {
+    return { state: 'ineligible', reason: 'no-stable-device-id' }
+  }
+  if (catalog === undefined) return { state: 'new' }
+
+  const match = await catalog.observe(inspection.endpoint, inventory)
+  switch (match.state) {
+    case 'new':
+      return { state: 'new' }
+    case 'known':
+      return { state: 'already-added', rigId: match.rigId }
+    case 'conflict':
+      return { state: 'conflict' }
+  }
+}
+
+async function candidateView(
+  inspection: AlpacaInspection,
+  catalog: RigCatalog | undefined,
+  now: () => Date,
+): Promise<DiscoveryCandidateView> {
+  const inspectedAt = now().toISOString()
+  const inventory = toObservedRigInventory(inspection, inspectedAt)
 
   return {
     endpoint: inspection.endpoint,
     ...(hasServerDescription(inspection) ? { server: inspection.server } : {}),
-    inspectedAt: new Date().toISOString(),
+    inspectedAt,
     devices: inspection.devices.map((device) => ({
       kind: device.kind,
       name: device.name,
     })),
-    disposition: hasStableDevice
-      ? { state: 'new' }
-      : { state: 'ineligible', reason: 'no-stable-device-id' },
+    disposition: await candidateDisposition(inspection, inventory, catalog),
   }
 }
 
 export async function discoverRigs(
   input: DiscoverRigsInput,
-  { alpaca, signal }: DiscoverRigsOptions,
+  {
+    alpaca,
+    catalog,
+    now = () => new Date(),
+    signal,
+  }: DiscoverRigsOptions,
 ): Promise<RigDiscoveryResult> {
   throwIfCancelled(signal)
   let endpoints: ReadonlyArray<RigEndpoint>
@@ -153,7 +203,8 @@ export async function discoverRigs(
         endpoint,
         signal === undefined ? {} : { signal },
       )
-      candidates.push(candidateView(inspection))
+      throwIfCancelled(signal)
+      candidates.push(await candidateView(inspection, catalog, now))
     } catch (error) {
       throwIfCancelled(signal)
       if (error instanceof AlpacaProviderError) {

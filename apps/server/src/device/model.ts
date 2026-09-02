@@ -16,6 +16,7 @@ export type RigDeviceConnection = 'connected' | 'disconnected' | 'unavailable'
 export interface ObservedRigDevice {
   id: string
   rigId: string
+  uniqueId: string
   kind: RigDeviceKind
   name: string
   driver: {

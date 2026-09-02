@@ -1,0 +1,13 @@
+rigs:
+  - id: 4f60579c-2bdd-46c6-941a-117693883785
+    name: Backyard rig
+    endpoint:
+      host: 192.168.4.104
+      port: 11111
+    addedAt: 2026-09-02T20:00:00.000Z
+    lastObservedInventory:
+      observedAt: 2026-09-02T20:00:00.000Z
+      devices:
+        - uniqueId: camera-1
+          kind: camera
+          name: Main camera

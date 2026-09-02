@@ -11,7 +11,8 @@
   "dependencies": {
     "@vela/alpaca": "workspace:*",
     "@vela/model": "workspace:*",
-    "fastify": "^5.12.0"
+    "fastify": "^5.12.0",
+    "yaml": "^2.9.0"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",

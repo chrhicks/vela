@@ -81,7 +81,7 @@ describe('createAlpacaDiscovery', () => {
             DeviceName: 'Main Camera',
             DeviceType: 'Camera',
             DeviceNumber: 0,
-            UniqueID: 'camera-1',
+            UniqueID: ' camera-1 ',
           },
           {
             DeviceName: 'Legacy Device',
@@ -119,6 +119,34 @@ describe('createAlpacaDiscovery', () => {
       '/management/v1/configureddevices',
     ])
     expect(requests.every((request) => request.startsWith('/management'))).toBe(true)
+  })
+
+  it('rejects duplicate stable device IDs', async () => {
+    const discovery = createAlpacaDiscovery({
+      fetch: fakeFetch({
+        '/management/apiversions': envelope([1]),
+        '/management/v1/description': envelope({}),
+        '/management/v1/configureddevices': envelope([
+          {
+            DeviceName: 'Main Camera',
+            DeviceType: 'Camera',
+            DeviceNumber: 0,
+            UniqueID: 'camera-1',
+          },
+          {
+            DeviceName: 'Guide Camera',
+            DeviceType: 'Camera',
+            DeviceNumber: 1,
+            UniqueID: ' camera-1 ',
+          },
+        ]),
+      }),
+    })
+
+    await expect(discovery.inspect(endpoint)).rejects.toMatchObject({
+      name: 'AlpacaProviderError',
+      reason: 'invalid-response',
+    })
   })
 
   it('rejects malformed Management API JSON', async () => {

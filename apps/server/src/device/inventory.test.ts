@@ -5,8 +5,7 @@ import { toDeviceSummary } from '../web/device.js'
 
 const rig = {
   id: 'rig-1',
-  name: 'Test Rig',
-  url: 'http://alpaca.test',
+  endpoint: { host: 'alpaca.test', port: 11111 },
 }
 
 describe('Rig device inventory', () => {
@@ -33,6 +32,7 @@ describe('Rig device inventory', () => {
     expect(devices).toEqual([{
       id: 'rig-1-camera-1',
       rigId: 'rig-1',
+      uniqueId: 'camera-1',
       kind: 'camera',
       name: 'Main Camera',
       driver: { version: '1.2.3' },
