@@ -65,7 +65,9 @@ describe('Alpaca device inspection', () => {
         '/api/v1/telescope/0/athome': envelope(true),
         '/api/v1/telescope/0/slewing': envelope(false),
         '/api/v1/telescope/0/tracking': envelope(true),
+        '/api/v1/focuser/0/absolute': envelope(true),
         '/api/v1/focuser/0/position': envelope(32888),
+        '/api/v1/focuser/0/maxstep': envelope(50000),
         '/api/v1/focuser/0/ismoving': envelope(false),
         '/api/v1/focuser/0/temperature': envelope(27),
         '/api/v1/filterwheel/0/position': envelope(1),
@@ -76,7 +78,7 @@ describe('Alpaca device inspection', () => {
         '/api/v1/switch/0/maxswitch': envelope(1),
         '/api/v1/switch/0/getswitchname?Id=0': envelope('Input Voltage'),
         '/api/v1/switch/0/getswitchdescription?Id=0': envelope('Voltage'),
-        '/api/v1/switch/0/getswitchvalue?Id=0': envelope(12.9),
+        '/api/v1/switch/0/getswitchvalue?Id=0': envelope(12.94),
         '/api/v1/switch/0/getswitch?Id=0': envelope(true),
         '/api/v1/switch/0/minswitchvalue?Id=0': envelope(0),
         '/api/v1/switch/0/maxswitchvalue?Id=0': envelope(16),
@@ -129,7 +131,7 @@ describe('Alpaca device inspection', () => {
           availability: 'complete',
           values: {
             kind: 'switch',
-            channels: [{ id: 0, name: 'Input Voltage', description: 'Voltage', value: 12.9, on: true, minimum: 0, maximum: 16, step: 0.1, writable: false }],
+            channels: [{ id: 0, name: 'Input Voltage', description: 'Voltage', value: 12.94, on: true, minimum: 0, maximum: 16, step: 0.1, writable: false }],
           },
         },
       },
@@ -318,6 +320,143 @@ describe('Alpaca device inspection', () => {
     })
   })
 
+  it('reads cooler power while cooling is off when the camera reports it', async () => {
+    const requests: string[] = []
+    const provider = createAlpacaProvider({
+      baseUrl: 'http://alpaca.test',
+      fetch: fakeFetch({
+        '/management/v1/configureddevices': envelope([devices[0]]),
+        '/api/v1/camera/0/connected': envelope(true),
+        '/api/v1/camera/0/name': envelope('Cooled camera'),
+        '/api/v1/camera/0/camerastate': envelope(0),
+        '/api/v1/camera/0/ccdtemperature': envelope(-2),
+        '/api/v1/camera/0/cansetccdtemperature': envelope(true),
+        '/api/v1/camera/0/cangetcoolerpower': envelope(true),
+        '/api/v1/camera/0/cooleron': envelope(false),
+        '/api/v1/camera/0/coolerpower': envelope(0),
+      }, requests),
+    })
+
+    const [inspection] = await provider.inspectDevices()
+    expect(inspection?.telemetry).toEqual({
+      availability: 'complete',
+      values: {
+        kind: 'camera',
+        activity: 'idle',
+        sensorTemperatureC: -2,
+        cooling: {
+          state: 'off',
+          setpointControl: true,
+          powerReporting: true,
+          powerPercent: 0,
+        },
+      },
+    })
+    expect(requests).toContain('/api/v1/camera/0/coolerpower')
+  })
+
+  it('marks missing temperature partial when setpoint control implies temperature support', async () => {
+    const provider = createAlpacaProvider({
+      baseUrl: 'http://alpaca.test',
+      fetch: fakeFetch({
+        '/management/v1/configureddevices': envelope([devices[0]]),
+        '/api/v1/camera/0/connected': envelope(true),
+        '/api/v1/camera/0/name': envelope('Cooled camera'),
+        '/api/v1/camera/0/camerastate': envelope(0),
+        '/api/v1/camera/0/ccdtemperature': envelope(0, 1024, 'Not implemented'),
+        '/api/v1/camera/0/cansetccdtemperature': envelope(true),
+        '/api/v1/camera/0/cangetcoolerpower': envelope(false),
+        '/api/v1/camera/0/cooleron': envelope(false),
+      }),
+    })
+
+    const [inspection] = await provider.inspectDevices()
+    expect(inspection?.telemetry.availability).toBe('partial')
+  })
+
+  it('keeps optional telescope slewing separate from mandatory mount state', async () => {
+    const telescope = devices[1]
+    const routes = {
+      '/management/v1/configureddevices': envelope([telescope]),
+      '/api/v1/telescope/0/connected': envelope(true),
+      '/api/v1/telescope/0/name': envelope('Mount'),
+      '/api/v1/telescope/0/atpark': envelope(false),
+      '/api/v1/telescope/0/athome': envelope(false),
+      '/api/v1/telescope/0/slewing': envelope(false, 1024, 'Not implemented'),
+      '/api/v1/telescope/0/tracking': envelope(false),
+    }
+    const provider = createAlpacaProvider({ baseUrl: 'http://alpaca.test', fetch: fakeFetch(routes) })
+
+    const [inspection] = await provider.inspectDevices()
+    expect(inspection?.telemetry).toEqual({
+      availability: 'complete',
+      values: { kind: 'telescope', parked: false, atHome: false, tracking: false },
+    })
+
+    const invalidProvider = createAlpacaProvider({
+      baseUrl: 'http://alpaca.test',
+      fetch: fakeFetch({
+        ...routes,
+        '/api/v1/telescope/0/athome': envelope(false, 1024, 'Not implemented'),
+      }),
+    })
+    const [invalidInspection] = await invalidProvider.inspectDevices()
+    expect(invalidInspection?.telemetry.availability).toBe('partial')
+  })
+
+  it('omits invalid absolute focuser positions and requires motion state', async () => {
+    const focuser = devices[2]
+    const routes = {
+      '/management/v1/configureddevices': envelope([focuser]),
+      '/api/v1/focuser/0/connected': envelope(true),
+      '/api/v1/focuser/0/name': envelope('Focuser'),
+      '/api/v1/focuser/0/absolute': envelope(true),
+      '/api/v1/focuser/0/position': envelope(12.5),
+      '/api/v1/focuser/0/maxstep': envelope(100),
+      '/api/v1/focuser/0/ismoving': envelope(false),
+      '/api/v1/focuser/0/temperature': envelope(0, 1024, 'Not implemented'),
+    }
+    const provider = createAlpacaProvider({ baseUrl: 'http://alpaca.test', fetch: fakeFetch(routes) })
+
+    const [inspection] = await provider.inspectDevices()
+    expect(inspection?.telemetry).toEqual({
+      availability: 'partial',
+      values: { kind: 'focuser', moving: false },
+    })
+
+    const missingMotionProvider = createAlpacaProvider({
+      baseUrl: 'http://alpaca.test',
+      fetch: fakeFetch({
+        ...routes,
+        '/api/v1/focuser/0/position': envelope(50),
+        '/api/v1/focuser/0/ismoving': envelope(false, 1024, 'Not implemented'),
+      }),
+    })
+    const [missingMotion] = await missingMotionProvider.inspectDevices()
+    expect(missingMotion?.telemetry.availability).toBe('partial')
+  })
+
+  it('marks one-sided humidity and dew-point support partial', async () => {
+    const conditions = devices[4]
+    const provider = createAlpacaProvider({
+      baseUrl: 'http://alpaca.test',
+      fetch: fakeFetch({
+        '/management/v1/configureddevices': envelope([conditions]),
+        '/api/v1/observingconditions/0/connected': envelope(true),
+        '/api/v1/observingconditions/0/name': envelope('Weather station'),
+        '/api/v1/observingconditions/0/temperature': envelope(23),
+        '/api/v1/observingconditions/0/humidity': envelope(50),
+        '/api/v1/observingconditions/0/dewpoint': envelope(0, 1024, 'Not implemented'),
+      }),
+    })
+
+    const [inspection] = await provider.inspectDevices()
+    expect(inspection?.telemetry).toEqual({
+      availability: 'partial',
+      values: { kind: 'observing-conditions', temperatureC: 23, humidityPercent: 50 },
+    })
+  })
+
   it('omits humidity outside the protocol range and marks conditions partial', async () => {
     const conditions = devices[4]
     const provider = createAlpacaProvider({
@@ -387,6 +526,80 @@ describe('Alpaca device inspection', () => {
 
     const [inspection] = await provider.inspectDevices()
     expect(inspection?.telemetry.availability).toBe('partial')
+  })
+
+  it('omits contradictory switch ranges and marks the channel partial', async () => {
+    const provider = createAlpacaProvider({
+      baseUrl: 'http://alpaca.test',
+      fetch: fakeFetch({
+        '/management/v1/configureddevices': envelope([devices[5]]),
+        '/api/v1/switch/0/connected': envelope(true),
+        '/api/v1/switch/0/name': envelope('Power box'),
+        '/api/v1/switch/0/maxswitch': envelope(1),
+        '/api/v1/switch/0/getswitchname?Id=0': envelope('Output'),
+        '/api/v1/switch/0/getswitchdescription?Id=0': envelope('Output channel'),
+        '/api/v1/switch/0/getswitchvalue?Id=0': envelope(99),
+        '/api/v1/switch/0/getswitch?Id=0': envelope(true),
+        '/api/v1/switch/0/minswitchvalue?Id=0': envelope(10),
+        '/api/v1/switch/0/maxswitchvalue?Id=0': envelope(0),
+        '/api/v1/switch/0/switchstep?Id=0': envelope(0),
+        '/api/v1/switch/0/canwrite?Id=0': envelope(false),
+      }),
+    })
+
+    const [inspection] = await provider.inspectDevices()
+    expect(inspection?.telemetry).toEqual({
+      availability: 'partial',
+      values: {
+        kind: 'switch',
+        channels: [{ id: 0, name: 'Output', description: 'Output channel', on: true, writable: false }],
+      },
+    })
+  })
+
+  it('marks a missing required switch description partial', async () => {
+    const provider = createAlpacaProvider({
+      baseUrl: 'http://alpaca.test',
+      fetch: fakeFetch({
+        '/management/v1/configureddevices': envelope([devices[5]]),
+        '/api/v1/switch/0/connected': envelope(true),
+        '/api/v1/switch/0/name': envelope('Power box'),
+        '/api/v1/switch/0/maxswitch': envelope(1),
+        '/api/v1/switch/0/getswitchname?Id=0': envelope('Output'),
+        '/api/v1/switch/0/getswitchdescription?Id=0': envelope('', 1024, 'Not implemented'),
+        '/api/v1/switch/0/getswitchvalue?Id=0': envelope(1),
+        '/api/v1/switch/0/getswitch?Id=0': envelope(true),
+        '/api/v1/switch/0/minswitchvalue?Id=0': envelope(0),
+        '/api/v1/switch/0/maxswitchvalue?Id=0': envelope(1),
+        '/api/v1/switch/0/switchstep?Id=0': envelope(1),
+        '/api/v1/switch/0/canwrite?Id=0': envelope(false),
+      }),
+    })
+
+    const [inspection] = await provider.inspectDevices()
+    expect(inspection?.telemetry.availability).toBe('partial')
+  })
+
+  it('reports connected kinds without an inspector as unavailable telemetry', async () => {
+    const dome = configured('Dome', 0)
+    const provider = createAlpacaProvider({
+      baseUrl: 'http://alpaca.test',
+      fetch: fakeFetch({
+        '/management/v1/configureddevices': envelope([dome]),
+        '/api/v1/dome/0/connected': envelope(true),
+        '/api/v1/dome/0/name': envelope('Dome'),
+      }),
+    })
+
+    const [inspection] = await provider.inspectDevices()
+    expect(inspection).toEqual({
+      providerDeviceId: 'dome-0',
+      kind: 'dome',
+      configuredName: 'Dome slot',
+      name: 'Dome',
+      connection: 'connected',
+      telemetry: { availability: 'unavailable' },
+    })
   })
 
   it('does not report unknown switch inventory as an empty observed list', async () => {

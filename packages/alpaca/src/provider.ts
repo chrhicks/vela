@@ -128,6 +128,18 @@ export function createAlpacaProvider({
         continue
       }
 
+      if (!supportsTelemetry(kind)) {
+        inspections.push({
+          providerDeviceId,
+          kind,
+          configuredName: device.DeviceName,
+          name: name ?? device.DeviceName,
+          connection: deviceConnection,
+          telemetry: { availability: 'unavailable' },
+        })
+        continue
+      }
+
       const read: TelemetryRead = { partial: false }
       const values = await inspectTelemetry(client, device, kind, read, signal)
       inspections.push({
@@ -163,18 +175,33 @@ async function operationalName(
   }
 }
 
+type OptionalReadResult<Value> =
+  | { readonly state: 'available'; readonly value: Value }
+  | { readonly state: 'unsupported' }
+  | { readonly state: 'failed' }
+
+async function optionalReadResult<Value>(
+  read: TelemetryRead,
+  operation: () => Promise<Value>,
+  signal?: AbortSignal,
+): Promise<OptionalReadResult<Value>> {
+  try {
+    return { state: 'available', value: await operation() }
+  } catch (error) {
+    if (signal?.aborted) throw error
+    if (isUnsupported(error)) return { state: 'unsupported' }
+    read.partial = true
+    return { state: 'failed' }
+  }
+}
+
 async function optionalRead<Value>(
   read: TelemetryRead,
   operation: () => Promise<Value>,
   signal?: AbortSignal,
 ): Promise<Value | undefined> {
-  try {
-    return await operation()
-  } catch (error) {
-    if (signal?.aborted) throw error
-    if (!isUnsupported(error)) read.partial = true
-    return undefined
-  }
+  const result = await optionalReadResult(read, operation, signal)
+  return result.state === 'available' ? result.value : undefined
 }
 
 async function requiredRead<Value>(
@@ -195,6 +222,15 @@ function isUnsupported(error: unknown): boolean {
   if (!(error instanceof AlpacaProviderError) || error.reason !== 'protocol-error') return false
   if (error.errorNumber === 1024) return true
   return /not implemented|not supported|not present/i.test(error.message)
+}
+
+function supportsTelemetry(kind: AlpacaDeviceKind): boolean {
+  return kind === 'camera'
+    || kind === 'telescope'
+    || kind === 'focuser'
+    || kind === 'filter-wheel'
+    || kind === 'observing-conditions'
+    || kind === 'switch'
 }
 
 async function inspectTelemetry(
@@ -246,33 +282,28 @@ async function inspectCamera(
     signal,
   )
   const reportsCoolingCapability = canSetTemperature === true || canGetCoolerPower === true
-  let cooling: {
-    state: 'on' | 'off'
-    setpointControl?: boolean
-    powerReporting?: boolean
-    powerPercent?: number
-  } | undefined
+  if (sensorTemperatureC === undefined && canSetTemperature === true) read.partial = true
+  if (coolerOn === undefined && reportsCoolingCapability) read.partial = true
 
-  if (coolerOn === undefined) {
-    if (reportsCoolingCapability) read.partial = true
-  } else {
-    const reportedPower = coolerOn && canGetCoolerPower
-      ? await requiredRead(read, () => client.readNumber(device, 'coolerpower', signal), signal)
-      : undefined
-    const powerPercent = reportedPower !== undefined
-      && reportedPower >= 0
-      && reportedPower <= 100
-      ? reportedPower
-      : undefined
-    if (reportedPower !== undefined && powerPercent === undefined) read.partial = true
+  const reportedPower = canGetCoolerPower === true
+    ? await requiredRead(read, () => client.readNumber(device, 'coolerpower', signal), signal)
+    : undefined
+  const powerPercent = reportedPower !== undefined
+    && reportedPower >= 0
+    && reportedPower <= 100
+    && (coolerOn !== false || reportedPower === 0)
+    ? reportedPower
+    : undefined
+  if (reportedPower !== undefined && powerPercent === undefined) read.partial = true
 
-    cooling = {
-      state: coolerOn ? 'on' : 'off',
-      ...(canSetTemperature === undefined ? {} : { setpointControl: canSetTemperature }),
-      ...(canGetCoolerPower === undefined ? {} : { powerReporting: canGetCoolerPower }),
-      ...(powerPercent === undefined ? {} : { powerPercent }),
-    }
-  }
+  const cooling = coolerOn === undefined
+    ? undefined
+    : {
+        state: coolerOn ? 'on' as const : 'off' as const,
+        ...(canSetTemperature === undefined ? {} : { setpointControl: canSetTemperature }),
+        ...(canGetCoolerPower === undefined ? {} : { powerReporting: canGetCoolerPower }),
+        ...(powerPercent === undefined ? {} : { powerPercent }),
+      }
 
   const activity = cameraActivity(state)
   if (state !== undefined && activity === undefined) read.partial = true
@@ -294,12 +325,12 @@ async function inspectTelescope(
   read: TelemetryRead,
   signal?: AbortSignal,
 ): Promise<AlpacaDeviceTelemetry> {
-  const parked = await optionalRead(
+  const parked = await requiredRead(
     read,
     () => client.readBoolean(device, 'atpark', signal),
     signal,
   )
-  const atHome = await optionalRead(
+  const atHome = await requiredRead(
     read,
     () => client.readBoolean(device, 'athome', signal),
     signal,
@@ -309,7 +340,7 @@ async function inspectTelescope(
     () => client.readBoolean(device, 'slewing', signal),
     signal,
   )
-  const tracking = await optionalRead(
+  const tracking = await requiredRead(
     read,
     () => client.readBoolean(device, 'tracking', signal),
     signal,
@@ -330,12 +361,28 @@ async function inspectFocuser(
   read: TelemetryRead,
   signal?: AbortSignal,
 ): Promise<AlpacaDeviceTelemetry> {
-  const position = await optionalRead(
+  const absolute = await requiredRead(
     read,
-    () => client.readNumber(device, 'position', signal),
+    () => client.readBoolean(device, 'absolute', signal),
     signal,
   )
-  const moving = await optionalRead(
+  const reportedPosition = absolute === true
+    ? await requiredRead(read, () => client.readNumber(device, 'position', signal), signal)
+    : undefined
+  const maxStep = absolute === true
+    ? await requiredRead(read, () => client.readNumber(device, 'maxstep', signal), signal)
+    : undefined
+  const validPosition = reportedPosition !== undefined
+    && maxStep !== undefined
+    && Number.isSafeInteger(reportedPosition)
+    && Number.isSafeInteger(maxStep)
+    && maxStep >= 0
+    && reportedPosition >= 0
+    && reportedPosition <= maxStep
+  const position = validPosition ? reportedPosition : undefined
+  if (reportedPosition !== undefined && !validPosition) read.partial = true
+
+  const moving = await requiredRead(
     read,
     () => client.readBoolean(device, 'ismoving', signal),
     signal,
@@ -370,7 +417,8 @@ async function inspectFilterWheel(
   } else if (position !== undefined) {
     const validPosition = Number.isSafeInteger(position)
       && position >= 0
-      && (names === undefined || position < names.length)
+      && names !== undefined
+      && position < names.length
     if (validPosition) {
       moving = false
       selectedPosition = position
@@ -399,21 +447,29 @@ async function inspectConditions(
     () => client.readNumber(device, 'temperature', signal),
     signal,
   )
-  const humidity = await optionalRead(
+  const humidityResult = await optionalReadResult(
     read,
     () => client.readNumber(device, 'humidity', signal),
     signal,
   )
+  const humidity = humidityResult.state === 'available' ? humidityResult.value : undefined
   const humidityPercent = humidity !== undefined && humidity >= 0 && humidity <= 100
     ? humidity
     : undefined
   if (humidity !== undefined && humidityPercent === undefined) read.partial = true
 
-  const dewPointC = await optionalRead(
+  const dewPointResult = await optionalReadResult(
     read,
     () => client.readNumber(device, 'dewpoint', signal),
     signal,
   )
+  const dewPointC = dewPointResult.state === 'available' ? dewPointResult.value : undefined
+  if (
+    (humidityResult.state === 'unsupported' && dewPointResult.state === 'available')
+    || (humidityResult.state === 'available' && dewPointResult.state === 'unsupported')
+  ) {
+    read.partial = true
+  }
 
   return {
     kind: 'observing-conditions',
@@ -445,24 +501,36 @@ async function inspectSwitch(
   for (let id = 0; id < count; id += 1) {
     const suffix = `?Id=${id}`
     const name = await requiredRead(read, () => client.readString(device, `getswitchname${suffix}`, signal), signal)
-    const description = await optionalRead(read, () => client.readString(device, `getswitchdescription${suffix}`, signal), signal)
+    const description = await requiredRead(read, () => client.readString(device, `getswitchdescription${suffix}`, signal), signal)
     const value = await requiredRead(read, () => client.readNumber(device, `getswitchvalue${suffix}`, signal), signal)
     const on = await requiredRead(read, () => client.readBoolean(device, `getswitch${suffix}`, signal), signal)
     const minimum = await requiredRead(read, () => client.readNumber(device, `minswitchvalue${suffix}`, signal), signal)
     const maximum = await requiredRead(read, () => client.readNumber(device, `maxswitchvalue${suffix}`, signal), signal)
     const step = await requiredRead(read, () => client.readNumber(device, `switchstep${suffix}`, signal), signal)
     const writable = await requiredRead(read, () => client.readBoolean(device, `canwrite${suffix}`, signal), signal)
+    const range = validSwitchRange(value, minimum, maximum, step)
+    if (value !== undefined && minimum !== undefined && maximum !== undefined && step !== undefined && range === undefined) {
+      read.partial = true
+    }
     channels.push({
       id,
       name: name?.trim() || `Switch ${id + 1}`,
       ...(description === undefined ? {} : { description }),
-      ...(value === undefined ? {} : { value }),
+      ...(range === undefined ? {} : range),
       ...(on === undefined ? {} : { on }),
-      ...(minimum === undefined ? {} : { minimum }),
-      ...(maximum === undefined ? {} : { maximum }),
-      ...(step === undefined ? {} : { step }),
       ...(writable === undefined ? {} : { writable }),
     })
   }
   return { kind: 'switch', channels }
+}
+
+function validSwitchRange(
+  value: number | undefined,
+  minimum: number | undefined,
+  maximum: number | undefined,
+  step: number | undefined,
+): Pick<AlpacaSwitchChannel, 'value' | 'minimum' | 'maximum' | 'step'> | undefined {
+  if (value === undefined || minimum === undefined || maximum === undefined || step === undefined) return undefined
+  if (maximum <= minimum || step <= 0 || value < minimum || value > maximum) return undefined
+  return { value, minimum, maximum, step }
 }
