@@ -38,6 +38,8 @@ Types should clarify the domain and the critical path.
 - Normalize external values before they enter application workflows.
 - Keep raw ALPACA fields, response envelopes, device numbers, transport details, and protocol errors inside `packages/alpaca` or another appropriate adapter boundary.
 - Keep browser/server shared contracts in `packages/model` free of transport, persistence, React, and application behavior.
+- Resolve server-owned application state into intentional, renderable concepts in page-level views. The browser owns visual composition, copy, and formatting, but should not reconstruct domain state or duplicate precedence, reconciliation, or capability logic.
+- Keep views semantic and typed rather than reducing them to generic property bags or preformatted display strings.
 
 Do not widen a shared model merely because an adapter exposes more data. Add values the application can name and use intentionally.
 
