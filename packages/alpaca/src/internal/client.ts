@@ -208,7 +208,7 @@ export function createAlpacaClient({
       requestValue(deviceEndpoint(device, operation), Schema.Boolean, operationSignal),
 
     readNumber: (device, operation, operationSignal) =>
-      requestValue(deviceEndpoint(device, operation), Schema.Number, operationSignal),
+      requestValue(deviceEndpoint(device, operation), Schema.Finite, operationSignal),
 
     readString: (device, operation, operationSignal) =>
       requestValue(deviceEndpoint(device, operation), Schema.String, operationSignal),

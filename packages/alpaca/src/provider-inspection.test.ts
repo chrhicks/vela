@@ -726,6 +726,34 @@ describe('Alpaca device inspection', () => {
     expect(requests).toHaveLength(4)
   })
 
+  it('rejects exponent-overflow numbers before they reach normalized telemetry', async () => {
+    const conditions = devices[4]
+    const fallback = fakeFetch({
+      '/management/v1/configureddevices': envelope([conditions]),
+      '/api/v1/observingconditions/0/connected': envelope(true),
+      '/api/v1/observingconditions/0/name': envelope('Weather station'),
+      '/api/v1/observingconditions/0/humidity': envelope(50),
+      '/api/v1/observingconditions/0/dewpoint': envelope(12),
+    })
+    const fetch = (async (input, init) => {
+      const url = new URL(String(input))
+      if (url.pathname.endsWith('/temperature')) {
+        return new Response(
+          '{"Value":1e400,"ClientTransactionID":0,"ServerTransactionID":1,"ErrorNumber":0,"ErrorMessage":""}',
+          { headers: { 'content-type': 'application/json' } },
+        )
+      }
+      return fallback(input, init)
+    }) as typeof globalThis.fetch
+    const provider = createAlpacaProvider({ baseUrl: 'http://alpaca.test', fetch })
+
+    const [inspection] = await provider.inspectDevices()
+    expect(inspection?.telemetry).toEqual({
+      availability: 'partial',
+      values: { kind: 'observing-conditions', humidityPercent: 50, dewPointC: 12 },
+    })
+  })
+
   it('propagates explicit cancellation instead of degrading it to partial data', async () => {
     const controller = new AbortController()
     const fetch = vi.fn((_input: RequestInfo | URL, init?: RequestInit) =>
