@@ -113,7 +113,7 @@ export function createAlpacaClient({
         throw new AlpacaProviderError(
           `Alpaca endpoint ${endpoint} returned HTTP ${response.status}`,
           {
-            reason: 'transport',
+            reason: 'protocol-error',
             endpoint,
           },
         )

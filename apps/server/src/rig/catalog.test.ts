@@ -247,9 +247,15 @@ describe('Rig catalog reconciliation', () => {
       endpoint: nextEndpoint,
       inventory: nextInventory,
     })).resolves.toEqual({ state: 'known', rigId: 'rig-a' })
+    await expect(catalog.get('rig-a')).resolves.toEqual({
+      ...original,
+      endpoint: nextEndpoint,
+      lastObservedInventory: nextInventory,
+    })
 
     await expect(catalog.forget('rig-a')).resolves.toBe(true)
     await expect(catalog.forget('rig-a')).resolves.toBe(false)
+    await expect(catalog.get('rig-a')).resolves.toBeUndefined()
     await expect(catalog.list()).resolves.toEqual([])
   })
 

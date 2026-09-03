@@ -24,6 +24,7 @@ export type AddRigResult =
 
 export interface RigCatalog {
   list(): Promise<ReadonlyArray<RigCatalogRecord>>
+  get(rigId: RigId): Promise<RigCatalogRecord | undefined>
   observe(
     endpoint: RigEndpoint,
     inventory: ObservedRigInventory,
@@ -116,6 +117,12 @@ function createRigCatalog(
     async list() {
       await pendingChange
       return copyRecords(records)
+    },
+
+    async get(rigId) {
+      await pendingChange
+      const record = records.find((candidate) => candidate.id === rigId)
+      return record === undefined ? undefined : copyRecord(record)
     },
 
     observe(endpoint, inventory) {

@@ -78,13 +78,13 @@ describe('createAlpacaDiscovery', () => {
         }),
         '/management/v1/configureddevices': envelope([
           {
-            DeviceName: 'Main Camera',
+            DeviceName: ' Main Camera ',
             DeviceType: 'Camera',
             DeviceNumber: 0,
             UniqueID: ' camera-1 ',
           },
           {
-            DeviceName: 'Legacy Device',
+            DeviceName: ' Legacy Device ',
             DeviceType: 'Video',
             DeviceNumber: 1,
           },

@@ -11,6 +11,9 @@ const rig = {
 describe('Rig device inventory', () => {
   it('maps normalized provider devices into server models and web projections', async () => {
     const provider: AlpacaProvider = {
+      async inspectDevices() {
+        return []
+      },
       async listDevices() {
         return [{
           providerDeviceId: 'camera-1',

@@ -29,8 +29,8 @@ The package has no runtime dependencies. In particular, it does not own:
 
 Protocol adapters normalize their values before they cross into these
 contracts. Recognizing a `DeviceKind` does not mean Vela implements operations
-for that kind. Until a device-specific adapter deliberately supplies status,
-the device remains in the normalized `unknown` status state.
+for that kind. Rig-detail views distinguish connected devices whose detail is
+`unsupported` from devices whose current status is `unavailable`.
 
 ## Verification
 
