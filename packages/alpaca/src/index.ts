@@ -12,9 +12,18 @@ export type {
   AlpacaUdpScanner,
 } from './discovery-model.js'
 export { createAlpacaProvider } from './provider.js'
-export type { AlpacaProvider, AlpacaProviderOptions } from './provider.js'
 export type {
+  AlpacaInspectDevicesOptions,
+  AlpacaProvider,
+  AlpacaProviderOptions,
+} from './provider.js'
+export type {
+  AlpacaCameraActivity,
   AlpacaConnectionStatus,
   AlpacaDevice,
+  AlpacaDeviceInspection,
   AlpacaDeviceKind,
+  AlpacaDeviceTelemetry,
+  AlpacaSwitchChannel,
+  AlpacaTelemetryAvailability,
 } from './model.js'

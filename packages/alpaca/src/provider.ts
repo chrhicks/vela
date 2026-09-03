@@ -1,14 +1,28 @@
-import { createAlpacaClient } from './internal/client.js'
+import { AlpacaProviderError } from './error.js'
+import { createAlpacaClient, type AlpacaClient } from './internal/client.js'
 import {
   rejectDuplicateDeviceIds,
   stableDeviceId,
 } from './internal/configured-device.js'
 import { toDeviceKind } from './internal/device-kind.js'
 import type { ConfiguredDevice } from './internal/types/management.js'
-import type { AlpacaConnectionStatus, AlpacaDevice } from './model.js'
+import type {
+  AlpacaCameraActivity,
+  AlpacaConnectionStatus,
+  AlpacaDevice,
+  AlpacaDeviceInspection,
+  AlpacaDeviceKind,
+  AlpacaDeviceTelemetry,
+  AlpacaSwitchChannel,
+} from './model.js'
 
 export interface AlpacaProvider {
   listDevices(): Promise<ReadonlyArray<AlpacaDevice>>
+  inspectDevices(options?: AlpacaInspectDevicesOptions): Promise<ReadonlyArray<AlpacaDeviceInspection>>
+}
+
+export interface AlpacaInspectDevicesOptions {
+  readonly signal?: AbortSignal
 }
 
 export interface AlpacaProviderOptions {
@@ -18,6 +32,11 @@ export interface AlpacaProviderOptions {
 }
 
 const defaultRequestTimeoutMs = 3_000
+const maximumSwitchChannels = 256
+
+interface TelemetryRead {
+  partial: boolean
+}
 
 export function createAlpacaProvider({
   baseUrl,
@@ -29,10 +48,14 @@ export function createAlpacaProvider({
   }
   const client = createAlpacaClient({ baseUrl, fetch, requestTimeoutMs })
 
-  async function connection(device: ConfiguredDevice): Promise<AlpacaConnectionStatus> {
+  async function connection(
+    device: ConfiguredDevice,
+    signal?: AbortSignal,
+  ): Promise<AlpacaConnectionStatus> {
     try {
-      return (await client.connected(device)) ? 'connected' : 'disconnected'
-    } catch {
+      return (await client.connected(device, signal)) ? 'connected' : 'disconnected'
+    } catch (error) {
+      if (signal?.aborted) throw error
       return 'unavailable'
     }
   }
@@ -80,5 +103,484 @@ export function createAlpacaProvider({
     return devices
   }
 
-  return { listDevices }
+  async function inspectDevices({ signal }: AlpacaInspectDevicesOptions = {}): Promise<ReadonlyArray<AlpacaDeviceInspection>> {
+    const configuredDevices = await client.configuredDevices(signal)
+    rejectDuplicateDeviceIds(configuredDevices)
+    const inspections: AlpacaDeviceInspection[] = []
+
+    for (const device of configuredDevices) {
+      const providerDeviceId = stableDeviceId(device)
+      if (providerDeviceId === undefined) continue
+
+      const kind = toDeviceKind(device.DeviceType)
+      const deviceConnection = await connection(device, signal)
+      const name = await operationalName(client, device, signal)
+
+      if (deviceConnection !== 'connected') {
+        inspections.push({
+          providerDeviceId,
+          kind,
+          configuredName: device.DeviceName,
+          name: name ?? device.DeviceName,
+          connection: deviceConnection,
+          telemetry: { availability: 'unavailable' },
+        })
+        continue
+      }
+
+      if (!supportsTelemetry(kind)) {
+        inspections.push({
+          providerDeviceId,
+          kind,
+          configuredName: device.DeviceName,
+          name: name ?? device.DeviceName,
+          connection: deviceConnection,
+          telemetry: { availability: 'unavailable' },
+        })
+        continue
+      }
+
+      const read: TelemetryRead = { partial: false }
+      const values = await inspectTelemetry(client, device, kind, read, signal)
+      inspections.push({
+        providerDeviceId,
+        kind,
+        configuredName: device.DeviceName,
+        name: name ?? device.DeviceName,
+        connection: deviceConnection,
+        telemetry: {
+          availability: read.partial ? 'partial' : 'complete',
+          values,
+        },
+      })
+    }
+
+    return inspections
+  }
+
+  return { listDevices, inspectDevices }
+}
+
+async function operationalName(
+  client: AlpacaClient,
+  device: ConfiguredDevice,
+  signal?: AbortSignal,
+): Promise<string | undefined> {
+  try {
+    const name = (await client.readString(device, 'name', signal)).trim()
+    return name.length === 0 ? undefined : name
+  } catch (error) {
+    if (signal?.aborted) throw error
+    return undefined
+  }
+}
+
+type OptionalReadResult<Value> =
+  | { readonly state: 'available'; readonly value: Value }
+  | { readonly state: 'unsupported' }
+  | { readonly state: 'failed' }
+
+async function optionalReadResult<Value>(
+  read: TelemetryRead,
+  operation: () => Promise<Value>,
+  signal?: AbortSignal,
+): Promise<OptionalReadResult<Value>> {
+  try {
+    return { state: 'available', value: await operation() }
+  } catch (error) {
+    if (signal?.aborted) throw error
+    if (isUnsupported(error)) return { state: 'unsupported' }
+    read.partial = true
+    return { state: 'failed' }
+  }
+}
+
+async function optionalRead<Value>(
+  read: TelemetryRead,
+  operation: () => Promise<Value>,
+  signal?: AbortSignal,
+): Promise<Value | undefined> {
+  const result = await optionalReadResult(read, operation, signal)
+  return result.state === 'available' ? result.value : undefined
+}
+
+async function requiredRead<Value>(
+  read: TelemetryRead,
+  operation: () => Promise<Value>,
+  signal?: AbortSignal,
+): Promise<Value | undefined> {
+  try {
+    return await operation()
+  } catch (error) {
+    if (signal?.aborted) throw error
+    read.partial = true
+    return undefined
+  }
+}
+
+function isUnsupported(error: unknown): boolean {
+  if (!(error instanceof AlpacaProviderError) || error.reason !== 'protocol-error') return false
+  if (error.errorNumber === 1024) return true
+  return /not implemented|not supported|not present/i.test(error.message)
+}
+
+function supportsTelemetry(kind: AlpacaDeviceKind): boolean {
+  return kind === 'camera'
+    || kind === 'telescope'
+    || kind === 'focuser'
+    || kind === 'filter-wheel'
+    || kind === 'observing-conditions'
+    || kind === 'switch'
+}
+
+async function inspectTelemetry(
+  client: AlpacaClient,
+  device: ConfiguredDevice,
+  kind: AlpacaDeviceKind,
+  read: TelemetryRead,
+  signal?: AbortSignal,
+): Promise<AlpacaDeviceTelemetry> {
+  switch (kind) {
+    case 'camera':
+      return inspectCamera(client, device, read, signal)
+    case 'telescope':
+      return inspectTelescope(client, device, read, signal)
+    case 'focuser':
+      return inspectFocuser(client, device, read, signal)
+    case 'filter-wheel':
+      return inspectFilterWheel(client, device, read, signal)
+    case 'observing-conditions':
+      return inspectConditions(client, device, read, signal)
+    case 'switch':
+      return inspectSwitch(client, device, read, signal)
+    default:
+      return { kind: 'unknown' }
+  }
+}
+
+async function inspectCamera(
+  client: AlpacaClient,
+  device: ConfiguredDevice,
+  read: TelemetryRead,
+  signal?: AbortSignal,
+): Promise<AlpacaDeviceTelemetry> {
+  const state = await requiredRead(read, () => client.readNumber(device, 'camerastate', signal), signal)
+  const sensorTemperatureC = await optionalRead(read, () => client.readNumber(device, 'ccdtemperature', signal), signal)
+  const canSetTemperature = await requiredRead(
+    read,
+    () => client.readBoolean(device, 'cansetccdtemperature', signal),
+    signal,
+  )
+  const canGetCoolerPower = await requiredRead(
+    read,
+    () => client.readBoolean(device, 'cangetcoolerpower', signal),
+    signal,
+  )
+  const coolerOn = await optionalRead(
+    read,
+    () => client.readBoolean(device, 'cooleron', signal),
+    signal,
+  )
+  const reportsCoolingCapability = canSetTemperature === true || canGetCoolerPower === true
+  if (sensorTemperatureC === undefined && canSetTemperature === true) read.partial = true
+  if (coolerOn === undefined && reportsCoolingCapability) read.partial = true
+
+  const reportedPower = canGetCoolerPower === true
+    ? await requiredRead(read, () => client.readNumber(device, 'coolerpower', signal), signal)
+    : undefined
+  const powerPercent = reportedPower !== undefined
+    && reportedPower >= 0
+    && reportedPower <= 100
+    && (coolerOn !== false || reportedPower === 0)
+    ? reportedPower
+    : undefined
+  if (reportedPower !== undefined && powerPercent === undefined) read.partial = true
+
+  const cooling = coolerOn === undefined
+    ? undefined
+    : {
+        state: coolerOn ? 'on' as const : 'off' as const,
+        ...(canSetTemperature === undefined ? {} : { setpointControl: canSetTemperature }),
+        ...(canGetCoolerPower === undefined ? {} : { powerReporting: canGetCoolerPower }),
+        ...(powerPercent === undefined ? {} : { powerPercent }),
+      }
+
+  const activity = cameraActivity(state)
+  if (state !== undefined && activity === undefined) read.partial = true
+  return {
+    kind: 'camera',
+    ...(activity === undefined ? {} : { activity }),
+    ...(sensorTemperatureC === undefined ? {} : { sensorTemperatureC }),
+    ...(cooling === undefined ? {} : { cooling }),
+  }
+}
+
+function cameraActivity(state: number | undefined): AlpacaCameraActivity | undefined {
+  return ['idle', 'waiting', 'exposing', 'reading', 'downloading', 'error'][state ?? -1] as AlpacaCameraActivity | undefined
+}
+
+async function inspectTelescope(
+  client: AlpacaClient,
+  device: ConfiguredDevice,
+  read: TelemetryRead,
+  signal?: AbortSignal,
+): Promise<AlpacaDeviceTelemetry> {
+  const parked = await requiredRead(
+    read,
+    () => client.readBoolean(device, 'atpark', signal),
+    signal,
+  )
+  const atHome = await requiredRead(
+    read,
+    () => client.readBoolean(device, 'athome', signal),
+    signal,
+  )
+  const slewing = await optionalRead(
+    read,
+    () => client.readBoolean(device, 'slewing', signal),
+    signal,
+  )
+  const tracking = await requiredRead(
+    read,
+    () => client.readBoolean(device, 'tracking', signal),
+    signal,
+  )
+
+  const normalized = normalizeTelescopeState({ parked, atHome, slewing, tracking })
+  if (normalized.partial) read.partial = true
+
+  return {
+    kind: 'telescope',
+    ...(normalized.parked === undefined ? {} : { parked: normalized.parked }),
+    ...(normalized.atHome === undefined ? {} : { atHome: normalized.atHome }),
+    ...(normalized.slewing === undefined ? {} : { slewing: normalized.slewing }),
+    ...(normalized.tracking === undefined ? {} : { tracking: normalized.tracking }),
+  }
+}
+
+interface TelescopeState {
+  readonly parked: boolean | undefined
+  readonly atHome: boolean | undefined
+  readonly slewing: boolean | undefined
+  readonly tracking: boolean | undefined
+}
+
+function normalizeTelescopeState(state: TelescopeState): TelescopeState & { readonly partial: boolean } {
+  const invalid = new Set<keyof TelescopeState>()
+  if (state.parked === true && state.tracking === true) {
+    invalid.add('parked')
+    invalid.add('tracking')
+  }
+  if (state.parked === true && state.slewing === true) {
+    invalid.add('parked')
+    invalid.add('slewing')
+  }
+  if (state.atHome === true && state.slewing === true) {
+    invalid.add('atHome')
+    invalid.add('slewing')
+  }
+  if (state.atHome === true && state.tracking === true) {
+    invalid.add('atHome')
+    invalid.add('tracking')
+  }
+
+  return {
+    parked: invalid.has('parked') ? undefined : state.parked,
+    atHome: invalid.has('atHome') ? undefined : state.atHome,
+    slewing: invalid.has('slewing') ? undefined : state.slewing,
+    tracking: invalid.has('tracking') ? undefined : state.tracking,
+    partial: invalid.size > 0,
+  }
+}
+
+async function inspectFocuser(
+  client: AlpacaClient,
+  device: ConfiguredDevice,
+  read: TelemetryRead,
+  signal?: AbortSignal,
+): Promise<AlpacaDeviceTelemetry> {
+  const absolute = await requiredRead(
+    read,
+    () => client.readBoolean(device, 'absolute', signal),
+    signal,
+  )
+  const reportedPosition = absolute === true
+    ? await requiredRead(read, () => client.readNumber(device, 'position', signal), signal)
+    : undefined
+  const maxStep = absolute === true
+    ? await requiredRead(read, () => client.readNumber(device, 'maxstep', signal), signal)
+    : undefined
+  const validPosition = reportedPosition !== undefined
+    && maxStep !== undefined
+    && Number.isSafeInteger(reportedPosition)
+    && Number.isSafeInteger(maxStep)
+    && maxStep >= 0
+    && reportedPosition >= 0
+    && reportedPosition <= maxStep
+  const position = validPosition ? reportedPosition : undefined
+  if (reportedPosition !== undefined && !validPosition) read.partial = true
+
+  const moving = await requiredRead(
+    read,
+    () => client.readBoolean(device, 'ismoving', signal),
+    signal,
+  )
+  const temperatureC = await optionalRead(
+    read,
+    () => client.readNumber(device, 'temperature', signal),
+    signal,
+  )
+
+  return {
+    kind: 'focuser',
+    ...(position === undefined ? {} : { position }),
+    ...(moving === undefined ? {} : { moving }),
+    ...(temperatureC === undefined ? {} : { temperatureC }),
+  }
+}
+
+async function inspectFilterWheel(
+  client: AlpacaClient,
+  device: ConfiguredDevice,
+  read: TelemetryRead,
+  signal?: AbortSignal,
+): Promise<AlpacaDeviceTelemetry> {
+  const position = await requiredRead(read, () => client.readNumber(device, 'position', signal), signal)
+  const names = await requiredRead(read, () => client.readStrings(device, 'names', signal), signal)
+  let moving: boolean | undefined
+  let selectedPosition: number | undefined
+
+  if (position === -1) {
+    moving = true
+  } else if (position !== undefined) {
+    const validPosition = Number.isSafeInteger(position)
+      && position >= 0
+      && names !== undefined
+      && position < names.length
+    if (validPosition) {
+      moving = false
+      selectedPosition = position
+    } else {
+      read.partial = true
+    }
+  }
+
+  const filterName = selectedPosition === undefined ? undefined : names?.[selectedPosition]
+  return {
+    kind: 'filter-wheel',
+    ...(selectedPosition === undefined ? {} : { position: selectedPosition }),
+    ...(filterName === undefined ? {} : { filterName }),
+    ...(moving === undefined ? {} : { moving }),
+  }
+}
+
+async function inspectConditions(
+  client: AlpacaClient,
+  device: ConfiguredDevice,
+  read: TelemetryRead,
+  signal?: AbortSignal,
+): Promise<AlpacaDeviceTelemetry> {
+  const temperatureC = await optionalRead(
+    read,
+    () => client.readNumber(device, 'temperature', signal),
+    signal,
+  )
+  const humidityResult = await optionalReadResult(
+    read,
+    () => client.readNumber(device, 'humidity', signal),
+    signal,
+  )
+  const humidity = humidityResult.state === 'available' ? humidityResult.value : undefined
+  const humidityPercent = humidity !== undefined && humidity >= 0 && humidity <= 100
+    ? humidity
+    : undefined
+  if (humidity !== undefined && humidityPercent === undefined) read.partial = true
+
+  const dewPointResult = await optionalReadResult(
+    read,
+    () => client.readNumber(device, 'dewpoint', signal),
+    signal,
+  )
+  const dewPointC = dewPointResult.state === 'available' ? dewPointResult.value : undefined
+  if (
+    (humidityResult.state === 'unsupported' && dewPointResult.state === 'available')
+    || (humidityResult.state === 'available' && dewPointResult.state === 'unsupported')
+  ) {
+    read.partial = true
+  }
+
+  return {
+    kind: 'observing-conditions',
+    ...(temperatureC === undefined ? {} : { temperatureC }),
+    ...(humidityPercent === undefined ? {} : { humidityPercent }),
+    ...(dewPointC === undefined ? {} : { dewPointC }),
+  }
+}
+
+async function inspectSwitch(
+  client: AlpacaClient,
+  device: ConfiguredDevice,
+  read: TelemetryRead,
+  signal?: AbortSignal,
+): Promise<AlpacaDeviceTelemetry> {
+  const count = await requiredRead(read, () => client.readNumber(device, 'maxswitch', signal), signal)
+  if (
+    count === undefined
+    || !Number.isSafeInteger(count)
+    || count < 0
+    || count > maximumSwitchChannels
+  ) {
+    if (count !== undefined) read.partial = true
+    return { kind: 'switch' }
+  }
+
+  const channels: AlpacaSwitchChannel[] = []
+
+  for (let id = 0; id < count; id += 1) {
+    const suffix = `?Id=${id}`
+    const name = await requiredRead(read, () => client.readString(device, `getswitchname${suffix}`, signal), signal)
+    const description = await requiredRead(read, () => client.readString(device, `getswitchdescription${suffix}`, signal), signal)
+    const value = await requiredRead(read, () => client.readNumber(device, `getswitchvalue${suffix}`, signal), signal)
+    const on = await requiredRead(read, () => client.readBoolean(device, `getswitch${suffix}`, signal), signal)
+    const minimum = await requiredRead(read, () => client.readNumber(device, `minswitchvalue${suffix}`, signal), signal)
+    const maximum = await requiredRead(read, () => client.readNumber(device, `maxswitchvalue${suffix}`, signal), signal)
+    const step = await requiredRead(read, () => client.readNumber(device, `switchstep${suffix}`, signal), signal)
+    const writable = await requiredRead(read, () => client.readBoolean(device, `canwrite${suffix}`, signal), signal)
+    const range = validSwitchRange(value, minimum, maximum, step)
+    if (value !== undefined && minimum !== undefined && maximum !== undefined && step !== undefined && range === undefined) {
+      read.partial = true
+    }
+    const contradictoryState = range !== undefined
+      && on !== undefined
+      && on !== (range.value !== range.minimum)
+    if (contradictoryState) read.partial = true
+
+    channels.push({
+      id,
+      name: name?.trim() || `Switch ${id + 1}`,
+      ...(description === undefined ? {} : { description }),
+      ...(range === undefined
+        ? {}
+        : {
+            minimum: range.minimum,
+            maximum: range.maximum,
+            step: range.step,
+            ...(contradictoryState ? {} : { value: range.value }),
+          }),
+      ...(on === undefined || contradictoryState ? {} : { on }),
+      ...(writable === undefined ? {} : { writable }),
+    })
+  }
+  return { kind: 'switch', channels }
+}
+
+function validSwitchRange(
+  value: number | undefined,
+  minimum: number | undefined,
+  maximum: number | undefined,
+  step: number | undefined,
+): Pick<AlpacaSwitchChannel, 'value' | 'minimum' | 'maximum' | 'step'> | undefined {
+  if (value === undefined || minimum === undefined || maximum === undefined || step === undefined) return undefined
+  if (maximum <= minimum || step <= 0 || value < minimum || value > maximum) return undefined
+  return { value, minimum, maximum, step }
 }
