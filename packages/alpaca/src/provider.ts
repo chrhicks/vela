@@ -177,6 +177,20 @@ async function optionalRead<Value>(
   }
 }
 
+async function requiredRead<Value>(
+  read: TelemetryRead,
+  operation: () => Promise<Value>,
+  signal?: AbortSignal,
+): Promise<Value | undefined> {
+  try {
+    return await operation()
+  } catch (error) {
+    if (signal?.aborted) throw error
+    read.partial = true
+    return undefined
+  }
+}
+
 function isUnsupported(error: unknown): boolean {
   if (!(error instanceof AlpacaProviderError) || error.reason !== 'protocol-error') return false
   if (error.errorNumber === 1024) return true
@@ -214,19 +228,19 @@ async function inspectCamera(
   read: TelemetryRead,
   signal?: AbortSignal,
 ): Promise<AlpacaDeviceTelemetry> {
-  const state = await optionalRead(read, () => client.readNumber(device, 'camerastate', signal), signal)
+  const state = await requiredRead(read, () => client.readNumber(device, 'camerastate', signal), signal)
   const sensorTemperatureC = await optionalRead(read, () => client.readNumber(device, 'ccdtemperature', signal), signal)
-  const canSetTemperature = await optionalRead(
+  const canSetTemperature = await requiredRead(
     read,
     () => client.readBoolean(device, 'cansetccdtemperature', signal),
     signal,
   )
-  const canGetCoolerPower = await optionalRead(
+  const canGetCoolerPower = await requiredRead(
     read,
     () => client.readBoolean(device, 'cangetcoolerpower', signal),
     signal,
   )
-  const coolerOn = await optionalRead(
+  const coolerOn = await requiredRead(
     read,
     () => client.readBoolean(device, 'cooleron', signal),
     signal,
@@ -242,9 +256,16 @@ async function inspectCamera(
   if (coolerOn === undefined) {
     if (reportsCoolingCapability) read.partial = true
   } else {
-    const powerPercent = coolerOn && canGetCoolerPower
-      ? await optionalRead(read, () => client.readNumber(device, 'coolerpower', signal), signal)
+    const reportedPower = coolerOn && canGetCoolerPower
+      ? await requiredRead(read, () => client.readNumber(device, 'coolerpower', signal), signal)
       : undefined
+    const powerPercent = reportedPower !== undefined
+      && reportedPower >= 0
+      && reportedPower <= 100
+      ? reportedPower
+      : undefined
+    if (reportedPower !== undefined && powerPercent === undefined) read.partial = true
+
     cooling = {
       state: coolerOn ? 'on' : 'off',
       ...(canSetTemperature === undefined ? {} : { setpointControl: canSetTemperature }),
@@ -339,8 +360,8 @@ async function inspectFilterWheel(
   read: TelemetryRead,
   signal?: AbortSignal,
 ): Promise<AlpacaDeviceTelemetry> {
-  const position = await optionalRead(read, () => client.readNumber(device, 'position', signal), signal)
-  const names = await optionalRead(read, () => client.readStrings(device, 'names', signal), signal)
+  const position = await requiredRead(read, () => client.readNumber(device, 'position', signal), signal)
+  const names = await requiredRead(read, () => client.readStrings(device, 'names', signal), signal)
   let moving: boolean | undefined
   let selectedPosition: number | undefined
 
@@ -408,8 +429,7 @@ async function inspectSwitch(
   read: TelemetryRead,
   signal?: AbortSignal,
 ): Promise<AlpacaDeviceTelemetry> {
-  const count = await optionalRead(read, () => client.readNumber(device, 'maxswitch', signal), signal)
-  const channels: AlpacaSwitchChannel[] = []
+  const count = await requiredRead(read, () => client.readNumber(device, 'maxswitch', signal), signal)
   if (
     count === undefined
     || !Number.isSafeInteger(count)
@@ -417,19 +437,21 @@ async function inspectSwitch(
     || count > maximumSwitchChannels
   ) {
     if (count !== undefined) read.partial = true
-    return { kind: 'switch', channels }
+    return { kind: 'switch' }
   }
+
+  const channels: AlpacaSwitchChannel[] = []
 
   for (let id = 0; id < count; id += 1) {
     const suffix = `?Id=${id}`
-    const name = await optionalRead(read, () => client.readString(device, `getswitchname${suffix}`, signal), signal)
+    const name = await requiredRead(read, () => client.readString(device, `getswitchname${suffix}`, signal), signal)
     const description = await optionalRead(read, () => client.readString(device, `getswitchdescription${suffix}`, signal), signal)
-    const value = await optionalRead(read, () => client.readNumber(device, `getswitchvalue${suffix}`, signal), signal)
-    const on = await optionalRead(read, () => client.readBoolean(device, `getswitch${suffix}`, signal), signal)
-    const minimum = await optionalRead(read, () => client.readNumber(device, `minswitchvalue${suffix}`, signal), signal)
-    const maximum = await optionalRead(read, () => client.readNumber(device, `maxswitchvalue${suffix}`, signal), signal)
-    const step = await optionalRead(read, () => client.readNumber(device, `switchstep${suffix}`, signal), signal)
-    const writable = await optionalRead(read, () => client.readBoolean(device, `canwrite${suffix}`, signal), signal)
+    const value = await requiredRead(read, () => client.readNumber(device, `getswitchvalue${suffix}`, signal), signal)
+    const on = await requiredRead(read, () => client.readBoolean(device, `getswitch${suffix}`, signal), signal)
+    const minimum = await requiredRead(read, () => client.readNumber(device, `minswitchvalue${suffix}`, signal), signal)
+    const maximum = await requiredRead(read, () => client.readNumber(device, `maxswitchvalue${suffix}`, signal), signal)
+    const step = await requiredRead(read, () => client.readNumber(device, `switchstep${suffix}`, signal), signal)
+    const writable = await requiredRead(read, () => client.readBoolean(device, `canwrite${suffix}`, signal), signal)
     channels.push({
       id,
       name: name?.trim() || `Switch ${id + 1}`,

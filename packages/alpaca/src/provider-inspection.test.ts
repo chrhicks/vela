@@ -229,6 +229,38 @@ describe('Alpaca device inspection', () => {
     }])
   })
 
+  it('omits invalid cooler power and marks the inspection partial', async () => {
+    const provider = createAlpacaProvider({
+      baseUrl: 'http://alpaca.test',
+      fetch: fakeFetch({
+        '/management/v1/configureddevices': envelope([devices[0]]),
+        '/api/v1/camera/0/connected': envelope(true),
+        '/api/v1/camera/0/name': envelope('Cooled camera'),
+        '/api/v1/camera/0/camerastate': envelope(0),
+        '/api/v1/camera/0/ccdtemperature': envelope(-2),
+        '/api/v1/camera/0/cansetccdtemperature': envelope(true),
+        '/api/v1/camera/0/cangetcoolerpower': envelope(true),
+        '/api/v1/camera/0/cooleron': envelope(true),
+        '/api/v1/camera/0/coolerpower': envelope(150),
+      }),
+    })
+
+    const [inspection] = await provider.inspectDevices()
+    expect(inspection?.telemetry).toEqual({
+      availability: 'partial',
+      values: {
+        kind: 'camera',
+        activity: 'idle',
+        sensorTemperatureC: -2,
+        cooling: {
+          state: 'on',
+          setpointControl: true,
+          powerReporting: true,
+        },
+      },
+    })
+  })
+
   it('preserves an off open-loop cooler state without setpoint or power capabilities', async () => {
     const provider = createAlpacaProvider({
       baseUrl: 'http://alpaca.test',
@@ -311,6 +343,44 @@ describe('Alpaca device inspection', () => {
     })
   })
 
+  it('marks a missing capability-backed cooler power reading partial', async () => {
+    const provider = createAlpacaProvider({
+      baseUrl: 'http://alpaca.test',
+      fetch: fakeFetch({
+        '/management/v1/configureddevices': envelope([devices[0]]),
+        '/api/v1/camera/0/connected': envelope(true),
+        '/api/v1/camera/0/name': envelope('Cooled camera'),
+        '/api/v1/camera/0/camerastate': envelope(0),
+        '/api/v1/camera/0/ccdtemperature': envelope(-2),
+        '/api/v1/camera/0/cansetccdtemperature': envelope(false),
+        '/api/v1/camera/0/cangetcoolerpower': envelope(true),
+        '/api/v1/camera/0/cooleron': envelope(true),
+        '/api/v1/camera/0/coolerpower': envelope(0, 1024, 'Not implemented'),
+      }),
+    })
+
+    const [inspection] = await provider.inspectDevices()
+    expect(inspection?.telemetry.availability).toBe('partial')
+  })
+
+  it('does not report unknown switch inventory as an empty observed list', async () => {
+    const provider = createAlpacaProvider({
+      baseUrl: 'http://alpaca.test',
+      fetch: fakeFetch({
+        '/management/v1/configureddevices': envelope([devices[5]]),
+        '/api/v1/switch/0/connected': envelope(true),
+        '/api/v1/switch/0/name': envelope('Power box'),
+        '/api/v1/switch/0/maxswitch': envelope(0, 1024, 'Not implemented'),
+      }),
+    })
+
+    const [inspection] = await provider.inspectDevices()
+    expect(inspection?.telemetry).toEqual({
+      availability: 'partial',
+      values: { kind: 'switch' },
+    })
+  })
+
   it('bounds malformed switch channel counts before reading individual channels', async () => {
     const requests: string[] = []
     const provider = createAlpacaProvider({
@@ -331,7 +401,7 @@ describe('Alpaca device inspection', () => {
       connection: 'connected',
       telemetry: {
         availability: 'partial',
-        values: { kind: 'switch', channels: [] },
+        values: { kind: 'switch' },
       },
     }])
     expect(requests).toHaveLength(4)
