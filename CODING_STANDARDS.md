@@ -87,6 +87,8 @@ Prefer fewer intentional tests over many broad-reaching ones.
 
 ### Adapter tests
 
+Before requesting independent verification for an adapter change, audit each new or changed external value against its governing contract. Check its meaning, valid domain and sentinel values, capability relationships, required-versus-optional support, and how malformed, unsupported, or contradictory responses affect completeness. Capture the important cases with deterministic tests.
+
 Exercise the complexity the adapter exists to contain:
 
 - wire decoding and runtime validation
