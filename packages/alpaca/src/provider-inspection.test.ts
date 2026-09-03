@@ -571,6 +571,43 @@ describe('Alpaca device inspection', () => {
     expect(inspection?.telemetry.availability).toBe('partial')
   })
 
+  it('omits contradictory switch boolean and numeric state', async () => {
+    const provider = createAlpacaProvider({
+      baseUrl: 'http://alpaca.test',
+      fetch: fakeFetch({
+        '/management/v1/configureddevices': envelope([devices[5]]),
+        '/api/v1/switch/0/connected': envelope(true),
+        '/api/v1/switch/0/name': envelope('Power box'),
+        '/api/v1/switch/0/maxswitch': envelope(1),
+        '/api/v1/switch/0/getswitchname?Id=0': envelope('Output'),
+        '/api/v1/switch/0/getswitchdescription?Id=0': envelope('Output channel'),
+        '/api/v1/switch/0/getswitchvalue?Id=0': envelope(0),
+        '/api/v1/switch/0/getswitch?Id=0': envelope(true),
+        '/api/v1/switch/0/minswitchvalue?Id=0': envelope(0),
+        '/api/v1/switch/0/maxswitchvalue?Id=0': envelope(1),
+        '/api/v1/switch/0/switchstep?Id=0': envelope(1),
+        '/api/v1/switch/0/canwrite?Id=0': envelope(false),
+      }),
+    })
+
+    const [inspection] = await provider.inspectDevices()
+    expect(inspection?.telemetry).toEqual({
+      availability: 'partial',
+      values: {
+        kind: 'switch',
+        channels: [{
+          id: 0,
+          name: 'Output',
+          description: 'Output channel',
+          minimum: 0,
+          maximum: 1,
+          step: 1,
+          writable: false,
+        }],
+      },
+    })
+  })
+
   it('omits contradictory switch ranges and marks the channel partial', async () => {
     const provider = createAlpacaProvider({
       baseUrl: 'http://alpaca.test',

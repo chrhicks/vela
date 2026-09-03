@@ -550,12 +550,24 @@ async function inspectSwitch(
     if (value !== undefined && minimum !== undefined && maximum !== undefined && step !== undefined && range === undefined) {
       read.partial = true
     }
+    const contradictoryState = range !== undefined
+      && on !== undefined
+      && on !== (range.value !== range.minimum)
+    if (contradictoryState) read.partial = true
+
     channels.push({
       id,
       name: name?.trim() || `Switch ${id + 1}`,
       ...(description === undefined ? {} : { description }),
-      ...(range === undefined ? {} : range),
-      ...(on === undefined ? {} : { on }),
+      ...(range === undefined
+        ? {}
+        : {
+            minimum: range.minimum,
+            maximum: range.maximum,
+            step: range.step,
+            ...(contradictoryState ? {} : { value: range.value }),
+          }),
+      ...(on === undefined || contradictoryState ? {} : { on }),
       ...(writable === undefined ? {} : { writable }),
     })
   }
