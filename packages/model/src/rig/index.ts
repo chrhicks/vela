@@ -15,6 +15,16 @@ export interface RigEndpoint {
 /** Reachability of the Rig's server endpoint, distinct from device connection state. */
 export type RigReachability = 'reachable' | 'unreachable' | 'unknown'
 
+/** Resolved application state used by a detailed Rig view. */
+export type RigState = 'reachable' | 'offline' | 'needs-attention'
+
+export interface RigDeviceConnectionSummary {
+  readonly total: number
+  readonly connected: number
+  readonly disconnected: number
+  readonly unavailable: number
+}
+
 /** Action the server currently permits the web application to offer for a Rig. */
 export type RigCapability = 'forget'
 
@@ -24,6 +34,7 @@ export interface RigView {
   readonly name: string
   readonly reachability: RigReachability
   readonly lastSeenAt?: IsoDateTime
+  readonly connections: RigDeviceConnectionSummary
   readonly devices: ReadonlyArray<DeviceSummary>
   readonly capabilities: ReadonlyArray<RigCapability>
 }

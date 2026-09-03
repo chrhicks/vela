@@ -1,1 +1,22 @@
 export type { HomeView } from './home.js'
+export type {
+  RigCameraDeviceView,
+  RigCameraStatus,
+  RigDetailView,
+  RigDeviceDetailView,
+  RigDeviceStatusAvailability,
+  RigFilterWheelDeviceView,
+  RigFilterWheelStatus,
+  RigFocuserDeviceView,
+  RigFocuserStatus,
+  RigObservingConditionsDeviceView,
+  RigObservingConditionsStatus,
+  RigSwitchChannelView,
+  RigSwitchDeviceView,
+  RigSwitchStatus,
+  RigTelescopeDeviceView,
+  RigTelescopeStatus,
+  UnavailableRigDeviceStatus,
+  UnsupportedRigDeviceStatus,
+  UnsupportedRigDeviceView,
+} from './rig-detail.js'
