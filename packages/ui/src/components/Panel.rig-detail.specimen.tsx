@@ -10,7 +10,7 @@ import './Panel.rig-detail.specimen.css'
 
 const screens = ['rig', 'home'] as const
 const rigs = ['askar', 'seestar'] as const
-const scenarios = ['live', 'mixed', 'stale', 'offline'] as const
+const scenarios = ['live', 'disconnected', 'mixed', 'stale', 'offline'] as const
 
 type Screen = (typeof screens)[number]
 type RigId = (typeof rigs)[number]
@@ -296,6 +296,20 @@ function scenarioDevices(rig: RigFixture, scenario: Scenario): ReadonlyArray<Dev
     return rig.devices.map((device) => ({ ...device, connection: 'last-known' }))
   }
 
+  if (scenario === 'disconnected') {
+    return rig.devices.map((device) => ({
+      id: device.id,
+      kind: device.kind,
+      kindLabel: device.kindLabel,
+      name: device.name,
+      ...(device.configuredName === undefined ? {} : { configuredName: device.configuredName }),
+      activity: 'Disconnected',
+      activityNote: 'Connect this device in its driver to see live status',
+      connection: 'disconnected',
+      metrics: [],
+    }))
+  }
+
   return rig.devices.map((device, index) => {
     if (index === 2) {
       return {
@@ -387,10 +401,10 @@ function reachability(scenario: Scenario) {
   return { label: 'Reachable', tone: 'positive' as const }
 }
 
-function HomeView({ onOpen }: { onOpen: (rig: RigId) => void }) {
+function HomeView({ onOpen }: { onOpen: (rig: RigId, scenario: Scenario) => void }) {
   const cards = [
-    { rig: askar, connected: 6, state: 'Reachable', tone: 'positive' as const },
-    { rig: seestar, connected: 0, state: 'Reachable', tone: 'positive' as const },
+    { rig: askar, connected: 6, scenario: 'live' as const, state: 'Reachable', tone: 'positive' as const },
+    { rig: seestar, connected: 0, scenario: 'disconnected' as const, state: 'Reachable', tone: 'positive' as const },
   ]
 
   return (
@@ -401,7 +415,7 @@ function HomeView({ onOpen }: { onOpen: (rig: RigId) => void }) {
       </div>
       <div className="vela-rig-home__grid">
         {cards.map((card) => (
-          <button className="vela-rig-summary" key={card.rig.id} onClick={() => onOpen(card.rig.id)} type="button">
+          <button className="vela-rig-summary" key={card.rig.id} onClick={() => onOpen(card.rig.id, card.scenario)} type="button">
             <span className="vela-rig-summary__heading"><strong>{card.rig.name}</strong><Badge marker={<i />} size="small" tone={card.tone}>{card.state}</Badge></span>
             <span className="vela-rig-summary__server">{card.rig.server}</span>
             <span className="vela-rig-summary__footer">
@@ -515,7 +529,7 @@ function RigDetailPreview({ props, onPropsChange }: PreviewProps) {
     <div className="vela-rig-demo">
       <ShellHeader />
       {screen === 'home' ? (
-        <HomeView onOpen={(nextRig) => update({ screen: 'rig', rig: nextRig })} />
+        <HomeView onOpen={(nextRig, nextScenario) => update({ screen: 'rig', rig: nextRig, scenario: nextScenario })} />
       ) : (
         <RigView
           detailsOpen={detailsOpen}
