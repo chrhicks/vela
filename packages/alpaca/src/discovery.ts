@@ -10,6 +10,7 @@ import type {
 } from './discovery-model.js'
 import { createAlpacaClient } from './internal/client.js'
 import {
+  normalizeConfiguredDevices,
   rejectDuplicateDeviceIds,
   stableDeviceId,
 } from './internal/configured-device.js'
@@ -78,7 +79,9 @@ export function createAlpacaDiscovery({
     // Management operations remain serial for compatibility with finicky servers.
     const apiVersions = await client.apiVersions()
     const description = await client.serverDescription()
-    const configuredDevices = await client.configuredDevices()
+    const configuredDevices = normalizeConfiguredDevices(
+      await client.configuredDevices(),
+    )
     rejectDuplicateDeviceIds(configuredDevices)
 
     const devices: AlpacaInspectionDevice[] = configuredDevices.map((device) => {

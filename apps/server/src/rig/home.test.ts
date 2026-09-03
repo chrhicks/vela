@@ -58,6 +58,7 @@ describe('Home Rig projection', () => {
           name: 'Rig online',
           reachability: 'reachable',
           lastSeenAt: '2026-09-02T20:00:00.000Z',
+          connections: { total: 1, connected: 1, disconnected: 0, unavailable: 0 },
           devices: [{
             id: 'online-camera-1',
             rigId: 'online',
@@ -75,6 +76,7 @@ describe('Home Rig projection', () => {
           name: 'Rig offline',
           reachability: 'unreachable',
           lastSeenAt: '2026-09-01T20:00:00.000Z',
+          connections: { total: 1, connected: 0, disconnected: 0, unavailable: 1 },
           devices: [{
             id: 'offline-camera-2',
             rigId: 'offline',
@@ -134,6 +136,7 @@ describe('Home Rig projection', () => {
     expect(home.rigs[0]).toMatchObject({
       id: 'rig-a',
       reachability: 'unknown',
+      connections: { total: 1, connected: 0, disconnected: 0, unavailable: 1 },
       devices: [{
         id: 'rig-a-camera-a',
         name: 'Prior camera',

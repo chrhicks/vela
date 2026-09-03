@@ -35,7 +35,12 @@ Defaults:
 - Three-second timeout per Management API request
 - `AbortSignal` cancellation for both operations
 
-Malformed UDP packets are ignored. A scan with no responses returns an empty array. Management transport, decoding, and protocol failures reject with structured errors. Configured devices without a non-empty stable ID remain in the normalized inspection so the Vela server can own candidate-eligibility policy.
+Malformed UDP packets are ignored. A scan with no responses returns an empty
+array. Management transport, decoding, and protocol failures reject with
+structured errors. Configured device names are trimmed and unusable blank names
+reject the inspection. Configured devices without a non-empty stable ID remain
+in the normalized inspection so the Vela server can own candidate-eligibility
+policy.
 
 The intended application flow is server-owned:
 
@@ -47,7 +52,14 @@ Manual host entry skips `scan()` and converges at `inspect(endpoint)`.
 
 ## Operational provider
 
-`createAlpacaProvider()` is the normalized operational boundary for known Rigs. `listDevices()` remains the lightweight inventory operation used to observe configured identities, connection state, and driver metadata.
+`createAlpacaProvider()` is the normalized operational boundary for known Rigs.
+`listDevices()` remains the lightweight inventory operation used to observe
+configured identities, connection state, and driver metadata. Operational
+inventory fails as an invalid response if any configured device lacks a stable
+ID or usable name, preventing an incomplete response from replacing a known
+Rig's durable identity inventory. A received non-successful HTTP response is a
+protocol error, distinct from a transport failure where the server did not
+respond.
 
 `inspectDevices({ signal })` is the separate read-only detail operation. It reads the operational device name and the small kind-specific status set Vela currently uses for cameras, telescopes, focusers, filter wheels, observing conditions, and switches. Explicitly unsupported properties are omitted. Other individual read failures produce partial telemetry without hiding the device, while endpoint-level inventory failure rejects the operation. A disconnected device retains its identity without triggering predictable telemetry failures.
 

@@ -11,6 +11,11 @@ import {
   type RigInventorySource,
 } from './device/inventory.js'
 import {
+  createRigDeviceInspector,
+  type RigDeviceInspector,
+  type RigInspectionSource,
+} from './device/inspection.js'
+import {
   createMemoryRigCatalog,
   type RigCatalog,
 } from './rig/catalog.js'
@@ -19,11 +24,13 @@ import {
   parseDiscoverRigsInput,
   toObservedRigInventory,
 } from './rig/discovery.js'
+import { loadRigDetailView } from './rig/detail.js'
 import { loadHomeView } from './rig/home.js'
 
 interface BuildAppOptions {
   readonly alpacaDiscovery?: AlpacaDiscovery
   readonly createInventory?: (rig: RigInventorySource) => RigDeviceInventory
+  readonly createInspector?: (rig: RigInspectionSource) => RigDeviceInspector
   readonly now?: () => Date
   readonly rigCatalog?: RigCatalog
 }
@@ -39,6 +46,7 @@ interface AddRigRequest {
 export function buildApp({
   alpacaDiscovery = createAlpacaDiscovery(),
   createInventory = createRigDeviceInventory,
+  createInspector = createRigDeviceInspector,
   now = () => new Date(),
   rigCatalog = createMemoryRigCatalog(),
 }: BuildAppOptions = {}) {
@@ -141,6 +149,34 @@ export function buildApp({
       request.log.warn({ err: cause, rigId: rig.id }, 'Known Rig is unavailable')
     },
   }))
+
+  app.get<{ Params: { rigId: string } }>('/api/web/rigs/:rigId', async (request, reply) => {
+    const controller = new AbortController()
+    const cancel = () => controller.abort(new Error('Rig detail requester disconnected'))
+    request.raw.on('aborted', cancel)
+    reply.raw.on('close', cancel)
+
+    try {
+      const result = await loadRigDetailView(rigCatalog, request.params.rigId, {
+        createInspector,
+        now,
+        signal: controller.signal,
+        onConflict(rig) {
+          request.log.warn({ rigId: rig.id }, 'Known Rig identity conflicts with its current endpoint')
+        },
+        onUnavailable(rig, state, cause) {
+          request.log.warn({ err: cause, rigId: rig.id, state }, 'Known Rig detail is unavailable')
+        },
+      })
+      if (result.state === 'not-found') {
+        return reply.code(404).send({ error: 'rig-not-found' })
+      }
+      return result.view
+    } finally {
+      request.raw.removeListener('aborted', cancel)
+      reply.raw.removeListener('close', cancel)
+    }
+  })
 
   return app
 }
