@@ -123,7 +123,7 @@ test('adds an explicitly selected new Rig from mixed discovery results', async (
   expect(addPayload).toEqual({ name: 'Backyard rig', endpoint })
 })
 
-test('cancels stale scans and keeps useful manual-address failures', async ({ page }) => {
+test('cancels stale scans and keeps useful discovery failures', async ({ page }) => {
   await useHome(page, emptyHome)
   await page.route('**/api/rigs/discovery', async (route) => {
     const request = route.request().postDataJSON()
@@ -142,6 +142,10 @@ test('cancels stale scans and keeps useful manual-address failures', async ({ pa
     }
     if (request.host === 'http://bad') {
       await fulfillJson(route, { error: 'invalid-discovery-request' }, 400)
+      return
+    }
+    if (request.host === 'malformed.local') {
+      await fulfillJson(route, {})
       return
     }
     await fulfillJson(route, {
@@ -167,7 +171,12 @@ test('cancels stale scans and keeps useful manual-address failures', async ({ pa
   await page.getByLabel('Host or IP address').fill('missing.local')
   await page.getByRole('button', { name: 'Inspect address' }).click()
   await expect(page.getByText('Could not inspect this address')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Change address' })).toBeVisible()
+  await page.getByRole('button', { name: 'Change address' }).click()
+
+  await page.getByLabel('Host or IP address').fill('malformed.local')
+  await page.getByRole('button', { name: 'Inspect address' }).click()
+  await expect(page.getByRole('heading', { name: 'Could not look for rigs' })).toBeVisible()
+  await expect(page.getByRole('alert')).toContainText('Discovery request failed')
 })
 
 test('explains results when no discovered candidate can be added', async ({ page }) => {
