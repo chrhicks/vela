@@ -51,7 +51,7 @@ Manual host entry skips `scan()` and converges at `inspect(endpoint)`.
 
 `inspectDevices({ signal })` is the separate read-only detail operation. It reads the operational device name and the small kind-specific status set Vela currently uses for cameras, telescopes, focusers, filter wheels, observing conditions, and switches. Explicitly unsupported properties are omitted. Other individual read failures produce partial telemetry without hiding the device, while endpoint-level inventory failure rejects the operation. A disconnected device retains its identity without triggering predictable telemetry failures.
 
-Switch inspection returns generic channel names, descriptions, values, ranges, steps, and writability. It does not infer vendor semantics or units.
+Switch inspection returns generic channel names, descriptions, values, ranges, steps, and writability. It validates that ranges are ordered, steps are positive, and current values are in range, but it does not require read-only measurements to align to the advertised control step: Pegasus sensors report useful precision finer than `SwitchStep`. It does not infer vendor semantics or units.
 
 Both flows keep HTTP requests serial within each invocation. The provider does not cache, poll, connect devices, or issue writes.
 
