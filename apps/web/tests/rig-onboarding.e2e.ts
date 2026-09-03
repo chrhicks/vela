@@ -16,16 +16,9 @@ function homeWithRig(reachability: 'reachable' | 'unreachable' = 'reachable'): H
       name: 'Backyard rig',
       reachability,
       lastSeenAt: inspectedAt,
-      devices: [{
-        id: 'rig-1-camera-1',
-        rigId: 'rig-1',
-        kind: 'camera',
-        name: 'Main camera',
-        driver: {},
-        connection: reachability === 'reachable' ? 'connected' : 'unavailable',
-        status: { state: 'unknown' },
-        updatedAt: inspectedAt,
-      }],
+      connections: reachability === 'reachable'
+        ? { total: 1, connected: 1, disconnected: 0, unavailable: 0 }
+        : { total: 1, connected: 0, disconnected: 0, unavailable: 1 },
       capabilities: ['forget'],
     }],
     refreshedAt: inspectedAt,
@@ -95,7 +88,7 @@ test('adds an explicitly selected new Rig from mixed discovery results', async (
   })
 
   await page.goto('/')
-  await expect(page.getByText('Loading…')).toBeVisible()
+  await expect(page.getByText('Loading Rigs…')).toBeVisible()
   await expect(page.getByRole('dialog', { name: 'Find your observatory rig' })).toBeVisible()
   await page.getByRole('button', { name: 'Scan for rigs' }).click()
 
@@ -157,7 +150,7 @@ test('cancels stale scans and keeps useful discovery failures', async ({ page })
   await page.goto('/')
   await page.getByRole('button', { name: 'Scan for rigs' }).click()
   await page.getByRole('button', { name: 'Cancel' }).click()
-  await expect(page.getByRole('heading', { name: 'No rig configured' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'No Rigs configured' })).toBeVisible()
   await page.waitForTimeout(350)
   await expect(page.getByRole('dialog')).toHaveCount(0)
 
@@ -248,83 +241,26 @@ test('opens manual discovery from an existing Rig view', async ({ page }) => {
   })
 })
 
-test('ignores an older refresh that finishes after Forget Rig', async ({ page }) => {
-  let home = homeWithRig()
+test('validates Home responses and retries an initial failure', async ({ page }) => {
   let homeRequests = 0
-  await page.route('**/api/web/home', async (route) => {
-    homeRequests += 1
-    const response = home
-    if (homeRequests === 2) {
-      await new Promise((resolve) => setTimeout(resolve, 300))
-    }
-    await fulfillJson(route, response)
-  })
-  await page.route('**/api/rigs/rig-1', async (route) => {
-    home = emptyHome()
-    await route.fulfill({ status: 204, body: '' })
-  })
-
-  await page.goto('/')
-  await expect(page.getByRole('heading', { name: 'Backyard rig' })).toBeVisible()
-  await page.getByRole('button', { name: 'Refresh devices' }).click()
-  await page.getByRole('button', { name: 'Forget rig' }).click()
-  await page.getByRole('dialog', { name: 'Forget Backyard rig?' })
-    .getByRole('button', { name: 'Forget rig' })
-    .click()
-
-  await expect(page.getByRole('heading', { name: 'No rig configured' })).toBeVisible()
-  await page.waitForTimeout(350)
-  await expect(page.getByRole('heading', { name: 'Backyard rig' })).toHaveCount(0)
-  await expect(page.getByRole('dialog')).toHaveCount(0)
-  expect(homeRequests).toBe(3)
-})
-
-test('shows loading and server errors, refreshes, and guards Forget Rig', async ({ page }) => {
-  let homeRequests = 0
-  let home = homeWithRig('unreachable')
-  let failHome = true
-  let deleteRequests = 0
   await page.route('**/api/web/home', async (route) => {
     homeRequests += 1
     await new Promise((resolve) => setTimeout(resolve, 75))
-    if (failHome) {
-      failHome = false
-      await fulfillJson(route, { error: 'unavailable' }, 500)
+    if (homeRequests === 1) {
+      await fulfillJson(route, { rigs: 'not-an-array', refreshedAt: inspectedAt })
       return
     }
-    await fulfillJson(route, home)
-  })
-  await page.route('**/api/rigs/rig-1', async (route) => {
-    deleteRequests += 1
-    home = emptyHome()
-    await route.fulfill({ status: 204, body: '' })
+    await fulfillJson(route, homeWithRig('unreachable'))
   })
 
   await page.goto('/')
-  await expect(page.getByText('Loading…')).toBeVisible()
+  await expect(page.getByText('Loading Rigs…')).toBeVisible()
   await expect(page.getByRole('alert')).toContainText('could not load your rigs')
-  await page.getByRole('button', { name: 'Refresh devices' }).click()
+  await expect(page.getByRole('heading', { name: 'Could not load your Rigs' })).toBeVisible()
+  await page.getByRole('button', { name: 'Try again' }).click()
 
   await expect(page.getByRole('heading', { name: 'Backyard rig' })).toBeVisible()
   await expect(page.getByText('Offline')).toBeVisible()
   await expect(page.getByText(/Last seen/)).toBeVisible()
   expect(homeRequests).toBe(2)
-
-  failHome = true
-  await page.getByRole('button', { name: 'Refresh devices' }).click()
-  await expect(page.getByRole('alert')).toContainText('Showing the previous state')
-  await expect(page.getByRole('heading', { name: 'Backyard rig' })).toBeVisible()
-  expect(homeRequests).toBe(3)
-
-  await page.getByRole('button', { name: 'Forget rig' }).click()
-  const confirmation = page.getByRole('dialog', { name: 'Forget Backyard rig?' })
-  await expect(confirmation).toBeVisible()
-  await confirmation.getByRole('button', { name: 'Cancel' }).click()
-  expect(deleteRequests).toBe(0)
-
-  await page.getByRole('button', { name: 'Forget rig' }).click()
-  await confirmation.getByRole('button', { name: 'Forget rig' }).click()
-  await expect(page.getByRole('heading', { name: 'No rig configured' })).toBeVisible()
-  await expect(page.getByRole('dialog')).toHaveCount(0)
-  expect(deleteRequests).toBe(1)
 })

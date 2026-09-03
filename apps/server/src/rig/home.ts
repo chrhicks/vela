@@ -1,4 +1,3 @@
-import type { DeviceSummary } from '@vela/model/device'
 import type { RigView } from '@vela/model/rig'
 import type { HomeView } from '@vela/model/web'
 import {
@@ -7,7 +6,7 @@ import {
   type RigInventorySource,
 } from '../device/inventory.js'
 import type { ObservedRigDevice } from '../device/model.js'
-import { summarizeDeviceConnections, toDeviceSummary } from '../web/device.js'
+import { summarizeDeviceConnections } from '../web/device.js'
 import type { RigCatalog } from './catalog.js'
 import type { ObservedRigInventory, RigCatalogRecord } from './contracts.js'
 
@@ -71,14 +70,12 @@ function reachableRig(
   devices: ReadonlyArray<ObservedRigDevice>,
   lastSeenAt: string,
 ): RigView {
-  const summaries = devices.map(toDeviceSummary)
   return {
     id: record.id,
     name: record.name,
     reachability: 'reachable',
     lastSeenAt,
-    connections: summarizeDeviceConnections(summaries),
-    devices: summaries,
+    connections: summarizeDeviceConnections(devices),
     capabilities: ['forget'],
   }
 }
@@ -87,24 +84,17 @@ function lastKnownRig(
   record: RigCatalogRecord,
   reachability: 'unreachable' | 'unknown',
 ): RigView {
-  const devices = record.lastObservedInventory.devices.map((device): DeviceSummary => ({
-    id: `${record.id}-${device.uniqueId}`,
-    rigId: record.id,
-    kind: device.kind,
-    name: device.name,
-    driver: {},
-    connection: 'unavailable',
-    status: { state: 'unknown' },
-    updatedAt: record.lastObservedInventory.observedAt,
-  }))
-
   return {
     id: record.id,
     name: record.name,
     reachability,
     lastSeenAt: record.lastObservedInventory.observedAt,
-    connections: summarizeDeviceConnections(devices),
-    devices,
+    connections: {
+      total: record.lastObservedInventory.devices.length,
+      connected: 0,
+      disconnected: 0,
+      unavailable: record.lastObservedInventory.devices.length,
+    },
     capabilities: ['forget'],
   }
 }
