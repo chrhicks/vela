@@ -401,11 +401,17 @@ function reachability(scenario: Scenario) {
   return { label: 'Reachable', tone: 'positive' as const }
 }
 
-function HomeView({ onOpen }: { onOpen: (rig: RigId, scenario: Scenario) => void }) {
+function HomeView({
+  forgottenRigs,
+  onOpen,
+}: {
+  forgottenRigs: ReadonlySet<RigId>
+  onOpen: (rig: RigId, scenario: Scenario) => void
+}) {
   const cards = [
     { rig: askar, connected: 6, scenario: 'live' as const, state: 'Reachable', tone: 'positive' as const },
     { rig: seestar, connected: 0, scenario: 'disconnected' as const, state: 'Reachable', tone: 'positive' as const },
-  ]
+  ].filter((card) => !forgottenRigs.has(card.rig.id))
 
   return (
     <main className="vela-rig-home">
@@ -413,21 +419,29 @@ function HomeView({ onOpen }: { onOpen: (rig: RigId, scenario: Scenario) => void
         <div><small>OBSERVATORY</small><h1>Rigs</h1><p>Choose a Rig to see what is connected and what it is doing.</p></div>
         <Button size="small" tone="accent">Add rig</Button>
       </div>
-      <div className="vela-rig-home__grid">
-        {cards.map((card) => (
-          <button className="vela-rig-summary" key={card.rig.id} onClick={() => onOpen(card.rig.id, card.scenario)} type="button">
-            <span className="vela-rig-summary__heading"><strong>{card.rig.name}</strong><Badge marker={<i />} size="small" tone={card.tone}>{card.state}</Badge></span>
-            <span className="vela-rig-summary__server">{card.rig.server}</span>
-            <span className="vela-rig-summary__footer">
-              <span className="vela-rig-summary__connections" data-state={card.connected === card.rig.devices.length ? 'complete' : 'attention'}>
-                <strong>{card.connected} of {card.rig.devices.length}</strong>
-                <small>devices connected</small>
+      {cards.length === 0 ? (
+        <section className="vela-rig-home__empty">
+          <strong>No Rigs configured</strong>
+          <p>Set up the observatory you want Vela to monitor.</p>
+          <Button tone="accent">Set up a rig</Button>
+        </section>
+      ) : (
+        <div className="vela-rig-home__grid">
+          {cards.map((card) => (
+            <button className="vela-rig-summary" key={card.rig.id} onClick={() => onOpen(card.rig.id, card.scenario)} type="button">
+              <span className="vela-rig-summary__heading"><strong>{card.rig.name}</strong><Badge marker={<i />} size="small" tone={card.tone}>{card.state}</Badge></span>
+              <span className="vela-rig-summary__server">{card.rig.server}</span>
+              <span className="vela-rig-summary__footer">
+                <span className="vela-rig-summary__connections" data-state={card.connected === card.rig.devices.length ? 'complete' : 'attention'}>
+                  <strong>{card.connected} of {card.rig.devices.length}</strong>
+                  <small>devices connected</small>
+                </span>
+                <strong>View rig <i>→</i></strong>
               </span>
-              <strong>View rig <i>→</i></strong>
-            </span>
-          </button>
-        ))}
-      </div>
+            </button>
+          ))}
+        </div>
+      )}
     </main>
   )
 }
@@ -520,6 +534,8 @@ function RigDetailPreview({ props, onPropsChange }: PreviewProps) {
   const detailsOpen = Boolean(props.detailsOpen)
   const rig = rigId === 'askar' ? askar : seestar
   const [forgetOpen, setForgetOpen] = useState(false)
+  const [forgottenRigs, setForgottenRigs] = useState<ReadonlySet<RigId>>(() => new Set())
+  const effectiveScreen = screen === 'rig' && forgottenRigs.has(rig.id) ? 'home' : screen
 
   function update(patch: Record<string, string | number | boolean>) {
     onPropsChange?.(patch)
@@ -528,8 +544,11 @@ function RigDetailPreview({ props, onPropsChange }: PreviewProps) {
   return (
     <div className="vela-rig-demo">
       <ShellHeader />
-      {screen === 'home' ? (
-        <HomeView onOpen={(nextRig, nextScenario) => update({ screen: 'rig', rig: nextRig, scenario: nextScenario })} />
+      {effectiveScreen === 'home' ? (
+        <HomeView
+          forgottenRigs={forgottenRigs}
+          onOpen={(nextRig, nextScenario) => update({ screen: 'rig', rig: nextRig, scenario: nextScenario })}
+        />
       ) : (
         <RigView
           detailsOpen={detailsOpen}
@@ -544,7 +563,7 @@ function RigDetailPreview({ props, onPropsChange }: PreviewProps) {
 
       <Dialog
         description="This removes the saved Rig from Vela. It does not change the Alpaca server or any hardware."
-        footer={<><Button onClick={() => setForgetOpen(false)} tone="quiet">Cancel</Button><Button className="vela-rig__confirm-forget" onClick={() => { setForgetOpen(false); update({ screen: 'home' }) }}>Forget rig</Button></>}
+        footer={<><Button onClick={() => setForgetOpen(false)} tone="quiet">Cancel</Button><Button className="vela-rig__confirm-forget" onClick={() => { setForgetOpen(false); setForgottenRigs((current) => new Set([...current, rig.id])); update({ screen: 'home' }) }}>Forget rig</Button></>}
         onDismiss={() => setForgetOpen(false)}
         open={forgetOpen}
         title={`Forget ${rig.name}?`}
