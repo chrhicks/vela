@@ -30,6 +30,10 @@ function fakeFetch(
       throw result
     }
 
+    if (result instanceof Response) {
+      return result
+    }
+
     if (result === undefined) {
       return new Response('Not found', { status: 404 })
     }
@@ -39,7 +43,7 @@ function fakeFetch(
 }
 
 const configuredCamera = {
-  DeviceName: 'Main Camera',
+  DeviceName: ' Main Camera ',
   DeviceType: 'Camera',
   DeviceNumber: 0,
   UniqueID: ' camera-1 ',
@@ -145,6 +149,24 @@ describe('createAlpacaProvider', () => {
     })
   })
 
+  it('rejects a configured device without a usable name', async () => {
+    const provider = createAlpacaProvider({
+      baseUrl: 'http://alpaca.test',
+      fetch: fakeFetch({
+        '/management/v1/configureddevices': envelope([{
+          ...configuredCamera,
+          DeviceName: '   ',
+        }]),
+      }),
+    })
+
+    await expect(provider.inspectDevices()).rejects.toMatchObject({
+      name: 'AlpacaProviderError',
+      reason: 'invalid-response',
+      endpoint: '/management/v1/configureddevices',
+    })
+  })
+
   it('rejects duplicate stable device IDs as an invalid response', async () => {
     const provider = createAlpacaProvider({
       baseUrl: 'http://alpaca.test',
@@ -184,6 +206,21 @@ describe('createAlpacaProvider', () => {
     await vi.advanceTimersByTimeAsync(3_000)
 
     await rejection
+  })
+
+  it('classifies an HTTP error response as a protocol error', async () => {
+    const provider = createAlpacaProvider({
+      baseUrl: 'http://alpaca.test',
+      fetch: fakeFetch({
+        '/management/v1/configureddevices': new Response('Server error', { status: 500 }),
+      }),
+    })
+
+    await expect(provider.listDevices()).rejects.toMatchObject({
+      name: 'AlpacaProviderError',
+      reason: 'protocol-error',
+      endpoint: '/management/v1/configureddevices',
+    })
   })
 
   it('rejects nonzero management response errors as protocol errors', async () => {

@@ -1,6 +1,7 @@
 import { AlpacaProviderError } from './error.js'
 import { createAlpacaClient, type AlpacaClient } from './internal/client.js'
 import {
+  normalizeConfiguredDevices,
   rejectDuplicateDeviceIds,
   rejectMissingDeviceIds,
   stableDeviceId,
@@ -84,7 +85,9 @@ export function createAlpacaProvider({
   }
 
   async function listDevices(): Promise<ReadonlyArray<AlpacaDevice>> {
-    const configuredDevices = await client.configuredDevices()
+    const configuredDevices = normalizeConfiguredDevices(
+      await client.configuredDevices(),
+    )
     rejectMissingDeviceIds(configuredDevices)
     rejectDuplicateDeviceIds(configuredDevices)
     const devices: AlpacaDevice[] = []
@@ -106,7 +109,9 @@ export function createAlpacaProvider({
   }
 
   async function inspectDevices({ signal }: AlpacaInspectDevicesOptions = {}): Promise<ReadonlyArray<AlpacaDeviceInspection>> {
-    const configuredDevices = await client.configuredDevices(signal)
+    const configuredDevices = normalizeConfiguredDevices(
+      await client.configuredDevices(signal),
+    )
     rejectMissingDeviceIds(configuredDevices)
     rejectDuplicateDeviceIds(configuredDevices)
     const inspections: AlpacaDeviceInspection[] = []
