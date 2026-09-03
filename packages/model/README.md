@@ -17,7 +17,9 @@ Server application code resolves domain state into those views so the browser
 can render the result without reconstructing precedence, reconciliation, or
 capability decisions. Views remain semantic, typed contracts rather than
 generic property bags or preformatted display strings; visual composition,
-copy, and formatting remain browser concerns.
+copy, and formatting remain browser concerns. Home Rig projections carry a
+compact connection aggregate; per-device observations belong to the Rig-detail
+view.
 
 The package has no runtime dependencies. In particular, it does not own:
 

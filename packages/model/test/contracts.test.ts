@@ -78,7 +78,6 @@ describe('@vela/model boundaries', () => {
     }>()
     expectTypeOf<RigView['capabilities']>().toEqualTypeOf<ReadonlyArray<RigCapability>>()
     expectTypeOf<RigView['connections']>().toEqualTypeOf<RigDeviceConnectionSummary>()
-    expectTypeOf<RigView['devices']>().toEqualTypeOf<ReadonlyArray<DeviceSummary>>()
     expectTypeOf<RigDeviceView['kind']>().toEqualTypeOf<DeviceKind>()
     expectTypeOf<RigServerView>().toMatchTypeOf<Readonly<Record<string, string | undefined>>>()
     expectTypeOf<DiscoveryCandidateDisposition>().toMatchTypeOf<{ readonly state: string }>()

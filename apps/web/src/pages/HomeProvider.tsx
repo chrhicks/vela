@@ -1,6 +1,6 @@
 import type { HomeView } from '@vela/model/web'
 import { createContext, useEffect, useRef, useState } from 'react'
-import { api } from '../lib/api'
+import { loadHome } from '../features/home/load-home'
 
 interface HomeContextValue {
   home?: HomeView
@@ -24,7 +24,7 @@ export function HomeProvider({ children }: { children: React.ReactNode }) {
     setError(undefined)
 
     try {
-      const response = await api<HomeView>('web/home')
+      const response = await loadHome()
       if (requestGeneration.current === generation) setHomeView(response)
     } catch {
       if (requestGeneration.current !== generation) return

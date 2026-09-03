@@ -59,16 +59,6 @@ describe('Home Rig projection', () => {
           reachability: 'reachable',
           lastSeenAt: '2026-09-02T20:00:00.000Z',
           connections: { total: 1, connected: 1, disconnected: 0, unavailable: 0 },
-          devices: [{
-            id: 'online-camera-1',
-            rigId: 'online',
-            kind: 'camera',
-            name: 'Current camera',
-            driver: { version: '1.2.3' },
-            connection: 'connected',
-            status: { state: 'unknown' },
-            updatedAt: '2026-09-02T20:00:00.000Z',
-          }],
           capabilities: ['forget'],
         },
         {
@@ -77,16 +67,6 @@ describe('Home Rig projection', () => {
           reachability: 'unreachable',
           lastSeenAt: '2026-09-01T20:00:00.000Z',
           connections: { total: 1, connected: 0, disconnected: 0, unavailable: 1 },
-          devices: [{
-            id: 'offline-camera-2',
-            rigId: 'offline',
-            kind: 'camera',
-            name: 'Prior camera',
-            driver: {},
-            connection: 'unavailable',
-            status: { state: 'unknown' },
-            updatedAt: '2026-09-01T20:00:00.000Z',
-          }],
           capabilities: ['forget'],
         },
       ],
@@ -137,11 +117,6 @@ describe('Home Rig projection', () => {
       id: 'rig-a',
       reachability: 'unknown',
       connections: { total: 1, connected: 0, disconnected: 0, unavailable: 1 },
-      devices: [{
-        id: 'rig-a-camera-a',
-        name: 'Prior camera',
-        connection: 'unavailable',
-      }],
     })
     expect(onConflict).toHaveBeenCalledWith(rigA)
     await expect(catalog.list()).resolves.toEqual([rigA, rigB])

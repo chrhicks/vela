@@ -1,4 +1,4 @@
-import type { DeviceKind, DeviceSummary } from '../device/index.js'
+import type { DeviceKind } from '../device/index.js'
 
 /** Stable Vela-owned Rig identity. Runtime generation and validation are server concerns. */
 export type RigId = string
@@ -35,7 +35,6 @@ export interface RigView {
   readonly reachability: RigReachability
   readonly lastSeenAt?: IsoDateTime
   readonly connections: RigDeviceConnectionSummary
-  readonly devices: ReadonlyArray<DeviceSummary>
   readonly capabilities: ReadonlyArray<RigCapability>
 }
 
