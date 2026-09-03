@@ -240,7 +240,7 @@ async function inspectCamera(
     () => client.readBoolean(device, 'cangetcoolerpower', signal),
     signal,
   )
-  const coolerOn = await requiredRead(
+  const coolerOn = await optionalRead(
     read,
     () => client.readBoolean(device, 'cooleron', signal),
     signal,
