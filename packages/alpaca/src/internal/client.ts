@@ -14,12 +14,16 @@ import {
 } from './types/management.js'
 
 export interface AlpacaClient {
-  apiVersions(): Promise<ReadonlyArray<number>>
-  serverDescription(): Promise<ServerDescription>
-  configuredDevices(): Promise<ReadonlyArray<ConfiguredDevice>>
-  connected(device: ConfiguredDevice): Promise<boolean>
-  driverInfo(device: ConfiguredDevice): Promise<string>
-  driverVersion(device: ConfiguredDevice): Promise<string>
+  apiVersions(signal?: AbortSignal): Promise<ReadonlyArray<number>>
+  serverDescription(signal?: AbortSignal): Promise<ServerDescription>
+  configuredDevices(signal?: AbortSignal): Promise<ReadonlyArray<ConfiguredDevice>>
+  connected(device: ConfiguredDevice, signal?: AbortSignal): Promise<boolean>
+  driverInfo(device: ConfiguredDevice, signal?: AbortSignal): Promise<string>
+  driverVersion(device: ConfiguredDevice, signal?: AbortSignal): Promise<string>
+  readBoolean(device: ConfiguredDevice, operation: string, signal?: AbortSignal): Promise<boolean>
+  readNumber(device: ConfiguredDevice, operation: string, signal?: AbortSignal): Promise<number>
+  readString(device: ConfiguredDevice, operation: string, signal?: AbortSignal): Promise<string>
+  readStrings(device: ConfiguredDevice, operation: string, signal?: AbortSignal): Promise<ReadonlyArray<string>>
 }
 
 export interface AlpacaClientOptions {
@@ -52,15 +56,16 @@ export function createAlpacaClient({
   async function request<S extends Schema.ConstraintDecoder<unknown>>(
     endpoint: string,
     schema: S,
+    operationSignal = signal,
   ): Promise<S['Type']> {
     const controller = new AbortController()
     let timedOut = false
 
-    const onAbort = () => controller.abort(signal === undefined ? undefined : signalReason(signal))
-    if (signal?.aborted) {
+    const onAbort = () => controller.abort(operationSignal === undefined ? undefined : signalReason(operationSignal))
+    if (operationSignal?.aborted) {
       onAbort()
     } else {
-      signal?.addEventListener('abort', onAbort, { once: true })
+      operationSignal?.addEventListener('abort', onAbort, { once: true })
     }
 
     const timeout = requestTimeoutMs === undefined
@@ -71,8 +76,8 @@ export function createAlpacaClient({
         }, requestTimeoutMs)
 
     function throwTransportError(cause: unknown): never {
-      if (signal?.aborted) {
-        throw signalReason(signal)
+      if (operationSignal?.aborted) {
+        throw signalReason(operationSignal)
       }
 
       if (timedOut) {
@@ -143,17 +148,19 @@ export function createAlpacaClient({
       if (timeout !== undefined) {
         clearTimeout(timeout)
       }
-      signal?.removeEventListener('abort', onAbort)
+      operationSignal?.removeEventListener('abort', onAbort)
     }
   }
 
   async function requestValue<S extends Schema.ConstraintDecoder<unknown>>(
     endpoint: string,
     valueSchema: S,
+    operationSignal?: AbortSignal,
   ): Promise<S['Type']> {
     const response = await request(
       endpoint,
       alpacaResponse(valueSchema),
+      operationSignal,
     ) as unknown as AlpacaEnvelope<S['Type']>
 
     if (response.ErrorNumber !== 0) {
@@ -175,25 +182,38 @@ export function createAlpacaClient({
   }
 
   return {
-    apiVersions: () =>
-      requestValue('/management/apiversions', Schema.Array(Schema.Int)),
+    apiVersions: (operationSignal) =>
+      requestValue('/management/apiversions', Schema.Array(Schema.Int), operationSignal),
 
-    serverDescription: () =>
-      requestValue(`${managementBasePath}/description`, serverDescription),
+    serverDescription: (operationSignal) =>
+      requestValue(`${managementBasePath}/description`, serverDescription, operationSignal),
 
-    configuredDevices: () =>
+    configuredDevices: (operationSignal) =>
       requestValue(
         `${managementBasePath}/configureddevices`,
         Schema.Array(configuredDevice),
+        operationSignal,
       ),
 
-    connected: (device) =>
-      requestValue(deviceEndpoint(device, 'connected'), connectedResponse.fields.Value),
+    connected: (device, operationSignal) =>
+      requestValue(deviceEndpoint(device, 'connected'), connectedResponse.fields.Value, operationSignal),
 
-    driverInfo: (device) =>
-      requestValue(deviceEndpoint(device, 'driverinfo'), driverInfoResponse.fields.Value),
+    driverInfo: (device, operationSignal) =>
+      requestValue(deviceEndpoint(device, 'driverinfo'), driverInfoResponse.fields.Value, operationSignal),
 
-    driverVersion: (device) =>
-      requestValue(deviceEndpoint(device, 'driverversion'), driverVersionResponse.fields.Value),
+    driverVersion: (device, operationSignal) =>
+      requestValue(deviceEndpoint(device, 'driverversion'), driverVersionResponse.fields.Value, operationSignal),
+
+    readBoolean: (device, operation, operationSignal) =>
+      requestValue(deviceEndpoint(device, operation), Schema.Boolean, operationSignal),
+
+    readNumber: (device, operation, operationSignal) =>
+      requestValue(deviceEndpoint(device, operation), Schema.Number, operationSignal),
+
+    readString: (device, operation, operationSignal) =>
+      requestValue(deviceEndpoint(device, operation), Schema.String, operationSignal),
+
+    readStrings: (device, operation, operationSignal) =>
+      requestValue(deviceEndpoint(device, operation), Schema.Array(Schema.String), operationSignal),
   }
 }
