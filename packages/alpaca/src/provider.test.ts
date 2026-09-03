@@ -63,11 +63,6 @@ describe('createAlpacaProvider', () => {
             DeviceNumber: 2,
             UniqueID: 'mystery-1',
           },
-          {
-            DeviceName: 'Legacy device',
-            DeviceType: 'Camera',
-            DeviceNumber: 3,
-          },
         ]),
         '/api/v1/camera/0/connected': envelope(true),
         '/api/v1/camera/0/driverinfo': envelope('Camera driver'),
@@ -121,6 +116,33 @@ describe('createAlpacaProvider', () => {
         driver: {},
       },
     ])
+  })
+
+  it('rejects an incomplete operational identity inventory', async () => {
+    const provider = createAlpacaProvider({
+      baseUrl: 'http://alpaca.test',
+      fetch: fakeFetch({
+        '/management/v1/configureddevices': envelope([
+          configuredCamera,
+          {
+            DeviceName: 'Legacy device',
+            DeviceType: 'Camera',
+            DeviceNumber: 3,
+          },
+        ]),
+      }),
+    })
+
+    await expect(provider.listDevices()).rejects.toMatchObject({
+      name: 'AlpacaProviderError',
+      reason: 'invalid-response',
+      endpoint: '/management/v1/configureddevices',
+    })
+    await expect(provider.inspectDevices()).rejects.toMatchObject({
+      name: 'AlpacaProviderError',
+      reason: 'invalid-response',
+      endpoint: '/management/v1/configureddevices',
+    })
   })
 
   it('rejects duplicate stable device IDs as an invalid response', async () => {

@@ -8,6 +8,20 @@ export function stableDeviceId(device: ConfiguredDevice): string | undefined {
   return id === undefined || id.length === 0 ? undefined : id
 }
 
+export function rejectMissingDeviceIds(
+  devices: ReadonlyArray<ConfiguredDevice>,
+): void {
+  if (devices.some((device) => stableDeviceId(device) === undefined)) {
+    throw new AlpacaProviderError(
+      'Alpaca returned a configured device without a stable UniqueID',
+      {
+        reason: 'invalid-response',
+        endpoint: configuredDevicesEndpoint,
+      },
+    )
+  }
+}
+
 export function rejectDuplicateDeviceIds(
   devices: ReadonlyArray<ConfiguredDevice>,
 ): void {
