@@ -216,19 +216,33 @@ async function inspectCamera(
 ): Promise<AlpacaDeviceTelemetry> {
   const state = await optionalRead(read, () => client.readNumber(device, 'camerastate', signal), signal)
   const sensorTemperatureC = await optionalRead(read, () => client.readNumber(device, 'ccdtemperature', signal), signal)
-  const canCool = await optionalRead(read, () => client.readBoolean(device, 'cansetccdtemperature', signal), signal)
+  const canSetTemperature = await optionalRead(
+    read,
+    () => client.readBoolean(device, 'cansetccdtemperature', signal),
+    signal,
+  )
+  const canGetCoolerPower = await optionalRead(
+    read,
+    () => client.readBoolean(device, 'cangetcoolerpower', signal),
+    signal,
+  )
+  const coolerOn = await optionalRead(
+    read,
+    () => client.readBoolean(device, 'cooleron', signal),
+    signal,
+  )
+  const hasCooler = coolerOn === true || canSetTemperature === true || canGetCoolerPower === true
   let cooling: { state: 'on' | 'off'; powerPercent?: number } | undefined
 
-  if (canCool) {
-    const coolerOn = await optionalRead(read, () => client.readBoolean(device, 'cooleron', signal), signal)
-    if (coolerOn !== undefined) {
-      const powerPercent = coolerOn
-        ? await optionalRead(read, () => client.readNumber(device, 'coolerpower', signal), signal)
-        : undefined
-      cooling = {
-        state: coolerOn ? 'on' : 'off',
-        ...(powerPercent === undefined ? {} : { powerPercent }),
-      }
+  if (hasCooler && coolerOn === undefined) {
+    read.partial = true
+  } else if (hasCooler) {
+    const powerPercent = coolerOn && canGetCoolerPower
+      ? await optionalRead(read, () => client.readNumber(device, 'coolerpower', signal), signal)
+      : undefined
+    cooling = {
+      state: coolerOn ? 'on' : 'off',
+      ...(powerPercent === undefined ? {} : { powerPercent }),
     }
   }
 
@@ -342,11 +356,16 @@ async function inspectConditions(
     () => client.readNumber(device, 'temperature', signal),
     signal,
   )
-  const humidityPercent = await optionalRead(
+  const humidity = await optionalRead(
     read,
     () => client.readNumber(device, 'humidity', signal),
     signal,
   )
+  const humidityPercent = humidity !== undefined && humidity >= 0 && humidity <= 100
+    ? humidity
+    : undefined
+  if (humidity !== undefined && humidityPercent === undefined) read.partial = true
+
   const dewPointC = await optionalRead(
     read,
     () => client.readNumber(device, 'dewpoint', signal),
@@ -384,7 +403,7 @@ async function inspectSwitch(
     const name = await optionalRead(read, () => client.readString(device, `getswitchname${suffix}`, signal), signal)
     const description = await optionalRead(read, () => client.readString(device, `getswitchdescription${suffix}`, signal), signal)
     const value = await optionalRead(read, () => client.readNumber(device, `getswitchvalue${suffix}`, signal), signal)
-    const enabled = await optionalRead(read, () => client.readBoolean(device, `getswitch${suffix}`, signal), signal)
+    const on = await optionalRead(read, () => client.readBoolean(device, `getswitch${suffix}`, signal), signal)
     const minimum = await optionalRead(read, () => client.readNumber(device, `minswitchvalue${suffix}`, signal), signal)
     const maximum = await optionalRead(read, () => client.readNumber(device, `maxswitchvalue${suffix}`, signal), signal)
     const step = await optionalRead(read, () => client.readNumber(device, `switchstep${suffix}`, signal), signal)
@@ -394,7 +413,7 @@ async function inspectSwitch(
       name: name?.trim() || `Switch ${id + 1}`,
       ...(description === undefined ? {} : { description }),
       ...(value === undefined ? {} : { value }),
-      ...(enabled === undefined ? {} : { enabled }),
+      ...(on === undefined ? {} : { on }),
       ...(minimum === undefined ? {} : { minimum }),
       ...(maximum === undefined ? {} : { maximum }),
       ...(step === undefined ? {} : { step }),

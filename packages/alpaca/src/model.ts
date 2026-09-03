@@ -80,7 +80,7 @@ export interface AlpacaSwitchChannel {
   readonly name: string
   readonly description?: string
   readonly value?: number
-  readonly enabled?: boolean
+  readonly on?: boolean
   readonly minimum?: number
   readonly maximum?: number
   readonly step?: number
