@@ -123,7 +123,7 @@ export function createAlpacaProvider({
           configuredName: device.DeviceName,
           name: name ?? device.DeviceName,
           connection: deviceConnection,
-          telemetry: { availability: deviceConnection === 'unavailable' ? 'unavailable' : 'complete' },
+          telemetry: { availability: 'unavailable' },
         })
         continue
       }
@@ -231,17 +231,24 @@ async function inspectCamera(
     () => client.readBoolean(device, 'cooleron', signal),
     signal,
   )
-  const hasCooler = coolerOn === true || canSetTemperature === true || canGetCoolerPower === true
-  let cooling: { state: 'on' | 'off'; powerPercent?: number } | undefined
+  const reportsCoolingCapability = canSetTemperature === true || canGetCoolerPower === true
+  let cooling: {
+    state: 'on' | 'off'
+    setpointControl?: boolean
+    powerReporting?: boolean
+    powerPercent?: number
+  } | undefined
 
-  if (hasCooler && coolerOn === undefined) {
-    read.partial = true
-  } else if (hasCooler) {
+  if (coolerOn === undefined) {
+    if (reportsCoolingCapability) read.partial = true
+  } else {
     const powerPercent = coolerOn && canGetCoolerPower
       ? await optionalRead(read, () => client.readNumber(device, 'coolerpower', signal), signal)
       : undefined
     cooling = {
       state: coolerOn ? 'on' : 'off',
+      ...(canSetTemperature === undefined ? {} : { setpointControl: canSetTemperature }),
+      ...(canGetCoolerPower === undefined ? {} : { powerReporting: canGetCoolerPower }),
       ...(powerPercent === undefined ? {} : { powerPercent }),
     }
   }
@@ -334,14 +341,29 @@ async function inspectFilterWheel(
 ): Promise<AlpacaDeviceTelemetry> {
   const position = await optionalRead(read, () => client.readNumber(device, 'position', signal), signal)
   const names = await optionalRead(read, () => client.readStrings(device, 'names', signal), signal)
-  const moving = position === -1
-  const selectedPosition = position === undefined || moving ? undefined : position
+  let moving: boolean | undefined
+  let selectedPosition: number | undefined
+
+  if (position === -1) {
+    moving = true
+  } else if (position !== undefined) {
+    const validPosition = Number.isSafeInteger(position)
+      && position >= 0
+      && (names === undefined || position < names.length)
+    if (validPosition) {
+      moving = false
+      selectedPosition = position
+    } else {
+      read.partial = true
+    }
+  }
+
   const filterName = selectedPosition === undefined ? undefined : names?.[selectedPosition]
   return {
     kind: 'filter-wheel',
     ...(selectedPosition === undefined ? {} : { position: selectedPosition }),
     ...(filterName === undefined ? {} : { filterName }),
-    ...(position === undefined ? {} : { moving }),
+    ...(moving === undefined ? {} : { moving }),
   }
 }
 

@@ -41,6 +41,8 @@ export type AlpacaDeviceTelemetry =
       readonly sensorTemperatureC?: number
       readonly cooling?: {
         readonly state: 'on' | 'off'
+        readonly setpointControl?: boolean
+        readonly powerReporting?: boolean
         readonly powerPercent?: number
       }
     }
