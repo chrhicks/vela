@@ -73,7 +73,7 @@ export type AlpacaDeviceTelemetry =
     }
   | {
       readonly kind: 'switch'
-      readonly channels: ReadonlyArray<AlpacaSwitchChannel>
+      readonly channels?: ReadonlyArray<AlpacaSwitchChannel>
     }
   | { readonly kind: 'unknown' }
 
