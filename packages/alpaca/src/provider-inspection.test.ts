@@ -62,7 +62,7 @@ describe('Alpaca device inspection', () => {
         '/api/v1/camera/0/cooleron': envelope(true),
         '/api/v1/camera/0/coolerpower': envelope(42.5),
         '/api/v1/telescope/0/atpark': envelope(false),
-        '/api/v1/telescope/0/athome': envelope(true),
+        '/api/v1/telescope/0/athome': envelope(false),
         '/api/v1/telescope/0/slewing': envelope(false),
         '/api/v1/telescope/0/tracking': envelope(true),
         '/api/v1/focuser/0/absolute': envelope(true),
@@ -111,7 +111,7 @@ describe('Alpaca device inspection', () => {
       },
       {
         providerDeviceId: 'telescope-0', kind: 'telescope', configuredName: 'Telescope slot', name: 'Telescope hardware', connection: 'connected',
-        telemetry: { availability: 'complete', values: { kind: 'telescope', parked: false, atHome: true, slewing: false, tracking: true } },
+        telemetry: { availability: 'complete', values: { kind: 'telescope', parked: false, atHome: false, slewing: false, tracking: true } },
       },
       {
         providerDeviceId: 'focuser-0', kind: 'focuser', configuredName: 'Focuser slot', name: 'Focuser hardware', connection: 'connected',
@@ -402,6 +402,49 @@ describe('Alpaca device inspection', () => {
     })
     const [invalidInspection] = await invalidProvider.inspectDevices()
     expect(invalidInspection?.telemetry.availability).toBe('partial')
+  })
+
+  it('omits contradictory parked, home, slewing, and tracking combinations', async () => {
+    const telescope = devices[1]
+    const cases = [
+      {
+        state: { parked: true, atHome: false, slewing: false, tracking: true },
+        values: { kind: 'telescope', atHome: false, slewing: false },
+      },
+      {
+        state: { parked: true, atHome: false, slewing: true, tracking: false },
+        values: { kind: 'telescope', atHome: false, tracking: false },
+      },
+      {
+        state: { parked: false, atHome: true, slewing: true, tracking: false },
+        values: { kind: 'telescope', parked: false, tracking: false },
+      },
+      {
+        state: { parked: false, atHome: true, slewing: false, tracking: true },
+        values: { kind: 'telescope', parked: false, slewing: false },
+      },
+    ]
+
+    for (const testCase of cases) {
+      const provider = createAlpacaProvider({
+        baseUrl: 'http://alpaca.test',
+        fetch: fakeFetch({
+          '/management/v1/configureddevices': envelope([telescope]),
+          '/api/v1/telescope/0/connected': envelope(true),
+          '/api/v1/telescope/0/name': envelope('Mount'),
+          '/api/v1/telescope/0/atpark': envelope(testCase.state.parked),
+          '/api/v1/telescope/0/athome': envelope(testCase.state.atHome),
+          '/api/v1/telescope/0/slewing': envelope(testCase.state.slewing),
+          '/api/v1/telescope/0/tracking': envelope(testCase.state.tracking),
+        }),
+      })
+
+      const [inspection] = await provider.inspectDevices()
+      expect(inspection?.telemetry).toEqual({
+        availability: 'partial',
+        values: testCase.values,
+      })
+    }
   })
 
   it('omits invalid absolute focuser positions and requires motion state', async () => {

@@ -346,12 +346,50 @@ async function inspectTelescope(
     signal,
   )
 
+  const normalized = normalizeTelescopeState({ parked, atHome, slewing, tracking })
+  if (normalized.partial) read.partial = true
+
   return {
     kind: 'telescope',
-    ...(parked === undefined ? {} : { parked }),
-    ...(atHome === undefined ? {} : { atHome }),
-    ...(slewing === undefined ? {} : { slewing }),
-    ...(tracking === undefined ? {} : { tracking }),
+    ...(normalized.parked === undefined ? {} : { parked: normalized.parked }),
+    ...(normalized.atHome === undefined ? {} : { atHome: normalized.atHome }),
+    ...(normalized.slewing === undefined ? {} : { slewing: normalized.slewing }),
+    ...(normalized.tracking === undefined ? {} : { tracking: normalized.tracking }),
+  }
+}
+
+interface TelescopeState {
+  readonly parked: boolean | undefined
+  readonly atHome: boolean | undefined
+  readonly slewing: boolean | undefined
+  readonly tracking: boolean | undefined
+}
+
+function normalizeTelescopeState(state: TelescopeState): TelescopeState & { readonly partial: boolean } {
+  const invalid = new Set<keyof TelescopeState>()
+  if (state.parked === true && state.tracking === true) {
+    invalid.add('parked')
+    invalid.add('tracking')
+  }
+  if (state.parked === true && state.slewing === true) {
+    invalid.add('parked')
+    invalid.add('slewing')
+  }
+  if (state.atHome === true && state.slewing === true) {
+    invalid.add('atHome')
+    invalid.add('slewing')
+  }
+  if (state.atHome === true && state.tracking === true) {
+    invalid.add('atHome')
+    invalid.add('tracking')
+  }
+
+  return {
+    parked: invalid.has('parked') ? undefined : state.parked,
+    atHome: invalid.has('atHome') ? undefined : state.atHome,
+    slewing: invalid.has('slewing') ? undefined : state.slewing,
+    tracking: invalid.has('tracking') ? undefined : state.tracking,
+    partial: invalid.size > 0,
   }
 }
 
