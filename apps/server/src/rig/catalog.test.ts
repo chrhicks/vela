@@ -14,6 +14,20 @@ import {
 
 const endpointA: RigEndpoint = { host: '192.168.4.104', port: 11111 }
 const endpointB: RigEndpoint = { host: 'ascom-remote.local', port: 11111 }
+const validCatalog = `rigs:
+  - id: rig-1
+    name: Backyard rig
+    endpoint:
+      host: 192.168.4.104
+      port: 11111
+    addedAt: 2026-09-02T20:00:00.000Z
+    lastObservedInventory:
+      observedAt: 2026-09-02T20:01:00.000Z
+      devices:
+        - uniqueId: camera-1
+          kind: camera
+          name: Main camera
+`
 
 function inventory(
   observedAt: string,
@@ -94,6 +108,27 @@ describe('file Rig catalog', () => {
       path,
     } satisfies Partial<RigCatalogFileError>)
     expect(await readFile(path, 'utf8')).toBe('rigs:\n  - name: Missing required fields\n')
+  })
+
+  it.each([
+    ['Rig IDs with surrounding whitespace', 'id: rig-1', 'id: " rig-1"'],
+    ['hosts with surrounding whitespace', 'host: 192.168.4.104', 'host: "192.168.4.104 "'],
+    ['device IDs with surrounding whitespace', 'uniqueId: camera-1', 'uniqueId: " camera-1"'],
+    [
+      'noncanonical added timestamps',
+      'addedAt: 2026-09-02T20:00:00.000Z',
+      'addedAt: 2026-09-02T20:00:00Z',
+    ],
+    [
+      'noncanonical observation timestamps',
+      'observedAt: 2026-09-02T20:01:00.000Z',
+      'observedAt: 2026-09-02T20:01:00Z',
+    ],
+  ])('rejects %s', async (_description, valid, invalid) => {
+    const path = await catalogPath()
+    await writeFile(path, validCatalog.replace(valid, invalid))
+
+    await expect(openFileRigCatalog(path)).rejects.toBeInstanceOf(RigCatalogFileError)
   })
 
   it('rejects invalid observed inventory without corrupting the file', async () => {

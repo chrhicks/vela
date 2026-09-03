@@ -287,7 +287,7 @@ function parseRigRecord(value: unknown): RigCatalogRecord {
     throw new Error('Invalid Rig record')
   }
 
-  if (!isNonEmptyString(value.id) || !isNonEmptyString(value.name)) {
+  if (!isCanonicalNonEmptyString(value.id) || !isNonEmptyString(value.name)) {
     throw new Error('Rig id and name are required')
   }
   if (!isIsoDateTime(value.addedAt)) throw new Error('Invalid addedAt timestamp')
@@ -305,7 +305,7 @@ function parseEndpoint(value: unknown): RigEndpoint {
   if (
     !isRecord(value)
     || !hasOnlyKeys(value, ['host', 'port'])
-    || !isNonEmptyString(value.host)
+    || !isCanonicalNonEmptyString(value.host)
     || !Number.isInteger(value.port)
     || Number(value.port) < 1
     || Number(value.port) > 65535
@@ -344,7 +344,7 @@ function parseDevice(value: unknown): ObservedDeviceRecord {
   if (
     !isRecord(value)
     || !hasOnlyKeys(value, ['uniqueId', 'kind', 'name'])
-    || !isNonEmptyString(value.uniqueId)
+    || !isCanonicalNonEmptyString(value.uniqueId)
     || !deviceKinds.has(value.kind as DeviceKind)
     || !isNonEmptyString(value.name)
   ) {
@@ -392,8 +392,15 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0
 }
 
+function isCanonicalNonEmptyString(value: unknown): value is string {
+  return isNonEmptyString(value) && value === value.trim()
+}
+
 function isIsoDateTime(value: unknown): value is string {
-  return typeof value === 'string' && !Number.isNaN(Date.parse(value))
+  if (typeof value !== 'string') return false
+
+  const date = new Date(value)
+  return !Number.isNaN(date.getTime()) && date.toISOString() === value
 }
 
 function isFileError(error: unknown): error is NodeJS.ErrnoException {
