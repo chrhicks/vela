@@ -292,6 +292,32 @@ describe('Alpaca device inspection', () => {
     })
   })
 
+  it('treats unsupported cooler state as optional when the camera reports no cooling capabilities', async () => {
+    const provider = createAlpacaProvider({
+      baseUrl: 'http://alpaca.test',
+      fetch: fakeFetch({
+        '/management/v1/configureddevices': envelope([devices[0]]),
+        '/api/v1/camera/0/connected': envelope(true),
+        '/api/v1/camera/0/name': envelope('Uncooled camera'),
+        '/api/v1/camera/0/camerastate': envelope(0),
+        '/api/v1/camera/0/ccdtemperature': envelope(18),
+        '/api/v1/camera/0/cansetccdtemperature': envelope(false),
+        '/api/v1/camera/0/cangetcoolerpower': envelope(false),
+        '/api/v1/camera/0/cooleron': envelope(false, 1024, 'Not implemented'),
+      }),
+    })
+
+    const [inspection] = await provider.inspectDevices()
+    expect(inspection?.telemetry).toEqual({
+      availability: 'complete',
+      values: {
+        kind: 'camera',
+        activity: 'idle',
+        sensorTemperatureC: 18,
+      },
+    })
+  })
+
   it('omits humidity outside the protocol range and marks conditions partial', async () => {
     const conditions = devices[4]
     const provider = createAlpacaProvider({
