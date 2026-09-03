@@ -98,7 +98,12 @@ describe('Alpaca device inspection', () => {
             kind: 'camera',
             activity: 'exposing',
             sensorTemperatureC: -5.2,
-            cooling: { state: 'on', powerPercent: 42.5 },
+            cooling: {
+              state: 'on',
+              setpointControl: true,
+              powerReporting: true,
+              powerPercent: 42.5,
+            },
           },
         },
       },
@@ -148,7 +153,7 @@ describe('Alpaca device inspection', () => {
       configuredName: 'Camera slot',
       name: 'Camera slot',
       connection: 'disconnected',
-      telemetry: { availability: 'complete' },
+      telemetry: { availability: 'unavailable' },
     }])
     expect(requests).toEqual([
       '/management/v1/configureddevices',
@@ -213,10 +218,46 @@ describe('Alpaca device inspection', () => {
           kind: 'camera',
           activity: 'idle',
           sensorTemperatureC: -2,
-          cooling: { state: 'on', powerPercent: 75 },
+          cooling: {
+            state: 'on',
+            setpointControl: false,
+            powerReporting: true,
+            powerPercent: 75,
+          },
         },
       },
     }])
+  })
+
+  it('preserves an off open-loop cooler state without setpoint or power capabilities', async () => {
+    const provider = createAlpacaProvider({
+      baseUrl: 'http://alpaca.test',
+      fetch: fakeFetch({
+        '/management/v1/configureddevices': envelope([devices[0]]),
+        '/api/v1/camera/0/connected': envelope(true),
+        '/api/v1/camera/0/name': envelope('Open-loop camera'),
+        '/api/v1/camera/0/camerastate': envelope(0),
+        '/api/v1/camera/0/ccdtemperature': envelope(-2),
+        '/api/v1/camera/0/cansetccdtemperature': envelope(false),
+        '/api/v1/camera/0/cangetcoolerpower': envelope(false),
+        '/api/v1/camera/0/cooleron': envelope(false),
+      }),
+    })
+
+    const [inspection] = await provider.inspectDevices()
+    expect(inspection?.telemetry).toEqual({
+      availability: 'complete',
+      values: {
+        kind: 'camera',
+        activity: 'idle',
+        sensorTemperatureC: -2,
+        cooling: {
+          state: 'off',
+          setpointControl: false,
+          powerReporting: false,
+        },
+      },
+    })
   })
 
   it('omits humidity outside the protocol range and marks conditions partial', async () => {
@@ -248,6 +289,26 @@ describe('Alpaca device inspection', () => {
         },
       },
     }])
+  })
+
+  it('omits invalid filter positions and marks the inspection partial', async () => {
+    const filterWheel = devices[3]
+    const provider = createAlpacaProvider({
+      baseUrl: 'http://alpaca.test',
+      fetch: fakeFetch({
+        '/management/v1/configureddevices': envelope([filterWheel]),
+        '/api/v1/filterwheel/0/connected': envelope(true),
+        '/api/v1/filterwheel/0/name': envelope('Filter wheel'),
+        '/api/v1/filterwheel/0/position': envelope(-2),
+        '/api/v1/filterwheel/0/names': envelope(['Clear', 'Dark']),
+      }),
+    })
+
+    const [inspection] = await provider.inspectDevices()
+    expect(inspection?.telemetry).toEqual({
+      availability: 'partial',
+      values: { kind: 'filter-wheel' },
+    })
   })
 
   it('bounds malformed switch channel counts before reading individual channels', async () => {
