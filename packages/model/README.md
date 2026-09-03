@@ -13,6 +13,12 @@ package.
   discovery projections.
 - `@vela/model/web` composes those contracts into page-level views.
 
+Server application code resolves domain state into those views so the browser
+can render the result without reconstructing precedence, reconciliation, or
+capability decisions. Views remain semantic, typed contracts rather than
+generic property bags or preformatted display strings; visual composition,
+copy, and formatting remain browser concerns.
+
 The package has no runtime dependencies. In particular, it does not own:
 
 - Alpaca wire fields, response envelopes, schemas, or device numbers;
