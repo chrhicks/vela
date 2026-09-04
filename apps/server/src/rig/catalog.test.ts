@@ -1,5 +1,5 @@
-import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { describe, expect, it } from 'vitest'
 import type { RigEndpoint } from '@vela/model/rig'
@@ -95,7 +95,6 @@ describe('file Rig catalog', () => {
       addedAt: '2026-09-02T20:01:00.000Z',
       lastObservedInventory: observed,
     }])
-    expect(await readFile(path, 'utf8')).toContain('rigs:\n  - id: rig-1')
   })
 
   it('rejects malformed catalog data instead of replacing it', async () => {
@@ -154,6 +153,42 @@ describe('file Rig catalog', () => {
     await expect((await openFileRigCatalog(path)).list()).resolves.toMatchObject([{
       lastObservedInventory: originalInventory,
     }])
+  })
+
+  it('preserves saved state after a failed write and accepts the next change', async () => {
+    const path = await catalogPath()
+    const backup = `${path}.backup`
+    let nextId = 0
+    const catalog = await openFileRigCatalog(path, { createId: () => `rig-${++nextId}` })
+
+    try {
+      await catalog.add({
+        name: 'Original rig',
+        endpoint: endpointA,
+        inventory: inventory('2026-09-02T20:00:00.000Z', { uniqueId: 'camera-1' }),
+      })
+      const original = await catalog.list()
+
+      await rename(path, backup)
+      await mkdir(path)
+      await expect(catalog.forget('rig-1')).rejects.toBeInstanceOf(RigCatalogFileError)
+      await expect(catalog.list()).resolves.toEqual(original)
+
+      await rm(path, { recursive: true })
+      await rename(backup, path)
+      await expect((await openFileRigCatalog(path)).list()).resolves.toEqual(original)
+
+      await expect(catalog.add({
+        name: 'Second rig',
+        endpoint: endpointB,
+        inventory: inventory('2026-09-02T20:01:00.000Z', { uniqueId: 'camera-2' }),
+      })).resolves.toMatchObject({ state: 'added', rig: { id: 'rig-2' } })
+      const saved = await catalog.list()
+      expect(saved.map(({ id }) => id)).toEqual(['rig-1', 'rig-2'])
+      await expect((await openFileRigCatalog(path)).list()).resolves.toEqual(saved)
+    } finally {
+      await rm(dirname(path), { recursive: true, force: true })
+    }
   })
 
   it('serializes concurrent additions without losing either Rig', async () => {

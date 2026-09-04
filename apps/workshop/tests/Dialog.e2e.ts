@@ -104,22 +104,24 @@ test('Dialog follows the simulated phone and comparison canvases', async ({ page
 })
 
 test('scan completion preserves newer props and cannot revive an abandoned scan', async ({ page }) => {
+  await page.clock.install()
+  await page.clock.pauseAt(new Date())
   await page.goto('/?component=dialog&specimen=dialog-rig-discovery&prop.view=start&prop.scenario=mixed&prop.selected=false&prop.rigName=ASCOM%20Remote')
   await page.getByRole('button', { name: 'Scan for rigs' }).click()
   await expect(page.locator('.vela-discovery-scanning[role="status"]')).toBeVisible()
 
   await changeSelectOutsideModal(page, 'Results', 'single')
   await changeInputOutsideModal(page, 'Rig name', 'Backyard rig')
-  await page.waitForTimeout(1000)
+  await page.clock.runFor(1_000)
 
   await expect(page.getByRole('heading', { name: 'Rigs on this network' })).toBeVisible()
   await expect(inspectorControl(page, 'Results', 'select')).toHaveValue('single')
   await expect(inspectorControl(page, 'Rig name', 'input')).toHaveValue('Backyard rig')
 
   await page.getByRole('button', { name: 'Scan again' }).click()
-  await page.waitForTimeout(820)
+  await expect(page.locator('.vela-discovery-scanning[role="status"]')).toBeVisible()
   await changeSelectOutsideModal(page, 'View', 'manual')
-  await page.waitForTimeout(200)
+  await page.clock.runFor(1_000)
 
   await expect(page.getByRole('heading', { name: 'Enter an Alpaca address' })).toBeVisible()
   await expect(inspectorControl(page, 'View', 'select')).toHaveValue('manual')

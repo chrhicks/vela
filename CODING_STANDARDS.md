@@ -85,6 +85,13 @@ A command may reject a known impossible device state. Do not turn environmental 
 
 Prefer fewer intentional tests over many broad-reaching ones.
 
+Name a plausible regression each test catches, and establish that the test would
+fail if it happened. For asynchronous behavior, establish the pending state,
+control completion, and assert after the relevant result arrives. Prefer fakes
+that respond to requests and state over scripts that advance merely because a
+function was called. When the protection is unclear, try a targeted temporary
+mutation; do not require a mutation campaign for every change.
+
 ### Adapter tests
 
 Before requesting independent verification for an adapter change, audit each new or changed external value against its governing contract. Check its meaning, valid domain and sentinel values, capability relationships, required-versus-optional support, and how malformed, unsupported, or contradictory responses affect completeness. Capture the important cases with deterministic tests.
@@ -170,6 +177,11 @@ Run the model package's focused suite:
 ```sh
 pnpm --filter @vela/model test
 ```
+
+This runs the model's contract typecheck before its runtime tests. Plain Vitest
+execution does not check `expectTypeOf` assertions. Use
+`pnpm --filter @vela/model test:types` for type contracts alone. The root test
+command also includes this check and excludes generated `dist` tests.
 
 When a change crosses several workspace boundaries, the full available checks are:
 

@@ -187,15 +187,17 @@ describe('Rig device connection coordinator', () => {
       inspection('dome-0', 'dome', 'disconnected'),
       inspection('switch-0', 'switch', 'disconnected'),
     ]
-    const final = initial.map((device) =>
-      device.kind === 'camera' || device.kind === 'switch'
+    let devices = initial
+    const createInspector = () => ({ inspectDevices: async () => devices })
+    const deviceConnector = connector(async (id) => {
+      devices = devices.map((device) => device.providerDeviceId === id
         ? { ...device, connection: 'connected' as const }
         : device)
-    const inspector = inspectorSequence(initial, final)
-    const deviceConnector = connector(async () => connected)
+      return connected
+    })
     const coordinator = createRigConnectionCoordinator({
       catalog: createMemoryRigCatalog([record('rig-1', initial)]),
-      createInspector: inspector.createInspector,
+      createInspector,
       createConnector: deviceConnector.createConnector,
       now,
     })
@@ -380,22 +382,21 @@ describe('Rig device connection coordinator', () => {
       inspection('camera-0', 'camera', 'disconnected'),
       inspection('telescope-0', 'telescope', 'disconnected'),
     ]
-    const partiallyConnected = [
-      { ...disconnected[0]!, connection: 'connected' as const },
-      disconnected[1]!,
-    ]
-    const fullyConnected = partiallyConnected.map((device) => ({ ...device, connection: 'connected' as const }))
-    const inspector = inspectorSequence(disconnected, partiallyConnected, fullyConnected)
+    let devices = disconnected
+    const createInspector = () => ({ inspectDevices: async () => devices })
     const controller = new AbortController()
     const calls: string[] = []
     const deviceConnector = connector(async (id) => {
       calls.push(id)
+      devices = devices.map((device) => device.providerDeviceId === id
+        ? { ...device, connection: 'connected' as const }
+        : device)
       if (id === 'camera-0') controller.abort(new DOMException('Cancelled', 'AbortError'))
       return connected
     })
     const coordinator = createRigConnectionCoordinator({
       catalog: createMemoryRigCatalog([record('rig-1', disconnected)]),
-      createInspector: inspector.createInspector,
+      createInspector,
       createConnector: deviceConnector.createConnector,
       now,
     })
@@ -415,14 +416,18 @@ describe('Rig device connection coordinator', () => {
   it('rejects same-Rig overlap and exposes active progress through the observation View', async () => {
     const initial = [inspection('camera-0', 'camera', 'disconnected')]
     const final = [{ ...initial[0]!, connection: 'connected' as const }]
-    const inspector = inspectorSequence(initial, initial, final)
+    let devices = initial
+    const createInspector = () => ({ inspectDevices: async () => devices })
     let finishConnection: ((value: AlpacaDeviceConnectionResult) => void) | undefined
     const deviceConnector = connector(() => new Promise((resolve) => {
-      finishConnection = resolve
+      finishConnection = (result) => {
+        devices = final
+        resolve(result)
+      }
     }))
     const coordinator = createRigConnectionCoordinator({
       catalog: createMemoryRigCatalog([record('rig-1', initial)]),
-      createInspector: inspector.createInspector,
+      createInspector,
       createConnector: deviceConnector.createConnector,
       now,
     })
@@ -436,10 +441,18 @@ describe('Rig device connection coordinator', () => {
       view: { connectionPreparation: { state: 'in-progress', capabilities: [] } },
     })
 
+    await expect(coordinator.loadObservation('rig-1')).resolves.toMatchObject({
+      state: 'found',
+      view: { rig: { connections: { disconnected: 1, connected: 0 } } },
+    })
+
     finishConnection?.(connected)
     await expect(operation).resolves.toMatchObject({
       state: 'finished',
-      result: { outcome: 'complete' },
+      result: {
+        outcome: 'complete',
+        view: { rig: { connections: { disconnected: 0, connected: 1 } } },
+      },
     })
   })
 
@@ -447,14 +460,18 @@ describe('Rig device connection coordinator', () => {
     const initial = [inspection('camera-0', 'camera', 'disconnected')]
     const final = [{ ...initial[0]!, connection: 'connected' as const }]
     const catalog = createMemoryRigCatalog([record('rig-1', initial)])
-    const inspector = inspectorSequence(initial, final)
+    let devices = initial
+    const createInspector = () => ({ inspectDevices: async () => devices })
     let finishConnection: ((value: AlpacaDeviceConnectionResult) => void) | undefined
     const deviceConnector = connector(() => new Promise((resolve) => {
-      finishConnection = resolve
+      finishConnection = (result) => {
+        devices = final
+        resolve(result)
+      }
     }))
     const coordinator = createRigConnectionCoordinator({
       catalog,
-      createInspector: inspector.createInspector,
+      createInspector,
       createConnector: deviceConnector.createConnector,
       now,
     })

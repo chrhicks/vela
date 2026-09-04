@@ -28,9 +28,10 @@ describe('theme resolution', () => {
   })
 
   it('applies profile and scratch overrides without mutating the default', () => {
-    const theme = resolveTheme({ ...DEFAULT_PROFILE, overrides: { radius: 12 } }, { density: 0.85 })
+    const theme = resolveTheme({ ...DEFAULT_PROFILE, overrides: { radius: 12, spacingUnit: 5 } }, { radius: 6, density: 0.85 })
 
-    expect(theme.radius).toBe(12)
+    expect(theme.radius).toBe(6)
+    expect(theme.spacingUnit).toBe(5)
     expect(theme.density).toBe(0.85)
     expect(DEFAULT_THEME_PARAMETERS.radius).toBe(8)
   })

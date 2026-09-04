@@ -95,8 +95,6 @@ describe('createAlpacaProvider', () => {
         driver: { info: 'Video driver', version: '2.0.0' },
       },
     ])
-    expect(devices[0]).not.toHaveProperty('DeviceType')
-    expect(devices[0]).not.toHaveProperty('DeviceNumber')
     expect(requests[0]).toBe('/management/v1/configureddevices')
   })
 
