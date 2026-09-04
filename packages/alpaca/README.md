@@ -65,7 +65,17 @@ respond.
 
 Switch inspection returns generic channel names, descriptions, values, ranges, steps, and writability. It validates that ranges are ordered, steps are positive, and current values are in range, but it does not require read-only measurements to align to the advertised control step: Pegasus sensors report useful precision finer than `SwitchStep`. It does not infer vendor semantics or units.
 
-Both flows keep HTTP requests serial within each invocation. The provider does not cache, poll, connect devices, or issue writes.
+Both read flows keep HTTP requests serial within each invocation. The provider does not cache or poll operational telemetry.
+
+## Device connection command
+
+`connectDevice(providerDeviceId, { signal })` is the package's only write capability. It accepts the stable normalized provider identity rather than an Alpaca device type or number. It reads `Connected` first and returns confirmed success without a write when the device is already connected.
+
+For a disconnected device, the provider uses the Alpaca v1 compatibility contract: `PUT connected` with an `application/x-www-form-urlencoded` body containing `Connected=true`. A successful response is verified with another `Connected` read. If the provider reports the Platform 7 `Connecting` completion property, Vela observes it at a bounded interval until the transition ends, then reads `Connected` again. This is a narrow connection-completion loop, not a generic retry mechanism, and the write is never replayed.
+
+The result distinguishes confirmed connection, confirmed rejection or remaining disconnection, and an uncertain outcome. A malformed or response-less write is reconciled through read-only state when possible. Cancellation before the write rejects normally because no command was issued. Cancellation during or after the write returns an uncertain result because aborting HTTP cannot prove that physical-device work stopped, unless the provider's decoded response already supplies stronger evidence such as a confirmed protocol rejection.
+
+The newer Platform 7 asynchronous `Connect` method is not used by this compatibility capability. Its command-initiation response and `Connecting` completion contract must not be mistaken for the synchronous legacy setter response if Vela adopts that method later.
 
 ## Testing
 
