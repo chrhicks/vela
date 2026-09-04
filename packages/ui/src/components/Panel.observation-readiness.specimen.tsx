@@ -203,7 +203,9 @@ function RigEntry({
     ? 'Device connection is in progress'
     : state === 'offline'
       ? `${rig.deviceCount} devices unavailable`
-      : `${connected ?? 0} of ${rig.deviceCount} devices connected`
+      : state === 'uncertain'
+        ? `${connected ?? 0} confirmed connected`
+        : `${connected ?? 0} of ${rig.deviceCount} devices connected`
   const reachable = state !== 'offline'
 
   return (
@@ -341,7 +343,9 @@ function ObservationWorkspace({
   const serverState = state === 'offline' ? 'Offline' : 'Reachable'
   const deviceState = connected === undefined
     ? state === 'connecting' ? 'Connecting' : `${rig.deviceCount} known devices`
-    : `${connected} of ${rig.deviceCount} connected`
+    : state === 'uncertain'
+      ? `${connected} confirmed connected`
+      : `${connected} of ${rig.deviceCount} connected`
   const liveState = state === 'ready'
     ? 'Available'
     : state === 'partial' ? 'Partially available'

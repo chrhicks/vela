@@ -70,6 +70,9 @@ test('Askar interrupted outcomes refer only to its own equipment', async ({ page
   await inspectorSelect(page, 'Readiness').selectOption('uncertain')
   await expect(page.getByText('Guide camera', { exact: true })).toBeVisible()
   await expect(page.getByText('Filter wheel', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('2 confirmed connected', { exact: true })).toBeVisible()
+  await inspectorSelect(page, 'Screen').selectOption('rig')
+  await expect(page.getByText('2 confirmed connected', { exact: true })).toBeVisible()
 })
 
 test('an abandoned connection preview cannot overwrite a newer uncertain state', async ({ page }) => {
