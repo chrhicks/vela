@@ -75,7 +75,7 @@ describe('Alpaca device inspection', () => {
         '/api/v1/observingconditions/0/temperature': envelope(23.8),
         '/api/v1/observingconditions/0/humidity': envelope(67),
         '/api/v1/observingconditions/0/dewpoint': envelope(17.3),
-        '/api/v1/switch/0/maxswitch': envelope(1),
+        '/api/v1/switch/0/maxswitch': envelope(2),
         '/api/v1/switch/0/getswitchname?Id=0': envelope('Input Voltage'),
         '/api/v1/switch/0/getswitchdescription?Id=0': envelope('Voltage'),
         '/api/v1/switch/0/getswitchvalue?Id=0': envelope(12.94),
@@ -84,6 +84,14 @@ describe('Alpaca device inspection', () => {
         '/api/v1/switch/0/maxswitchvalue?Id=0': envelope(16),
         '/api/v1/switch/0/switchstep?Id=0': envelope(0.1),
         '/api/v1/switch/0/canwrite?Id=0': envelope(false),
+        '/api/v1/switch/0/getswitchname?Id=1': envelope('Dew heater'),
+        '/api/v1/switch/0/getswitchdescription?Id=1': envelope('Heater output'),
+        '/api/v1/switch/0/getswitchvalue?Id=1': envelope(35),
+        '/api/v1/switch/0/getswitch?Id=1': envelope(true),
+        '/api/v1/switch/0/minswitchvalue?Id=1': envelope(0),
+        '/api/v1/switch/0/maxswitchvalue?Id=1': envelope(100),
+        '/api/v1/switch/0/switchstep?Id=1': envelope(1),
+        '/api/v1/switch/0/canwrite?Id=1': envelope(true),
       }),
     })
 
@@ -131,7 +139,10 @@ describe('Alpaca device inspection', () => {
           availability: 'complete',
           values: {
             kind: 'switch',
-            channels: [{ id: 0, name: 'Input Voltage', description: 'Voltage', value: 12.94, on: true, minimum: 0, maximum: 16, step: 0.1, writable: false }],
+            channels: [
+              { id: 0, name: 'Input Voltage', description: 'Voltage', value: 12.94, on: true, minimum: 0, maximum: 16, step: 0.1, writable: false },
+              { id: 1, name: 'Dew heater', description: 'Heater output', value: 35, on: true, minimum: 0, maximum: 100, step: 1, writable: true },
+            ],
           },
         },
       },
@@ -754,18 +765,45 @@ describe('Alpaca device inspection', () => {
     })
   })
 
-  it('propagates explicit cancellation instead of degrading it to partial data', async () => {
-    const controller = new AbortController()
-    const fetch = vi.fn((_input: RequestInfo | URL, init?: RequestInit) =>
-      new Promise<Response>((_resolve, reject) => {
-        init?.signal?.addEventListener('abort', () => reject(init.signal?.reason), { once: true })
-      }),
-    ) as typeof globalThis.fetch
-    const provider = createAlpacaProvider({ baseUrl: 'http://alpaca.test', fetch })
+  it.each(['camerastate', 'ccdtemperature'])(
+    'propagates cancellation during %s without degrading it to partial data',
+    async (operation) => {
+      const controller = new AbortController()
+      const cancellation = new Error('superseded')
+      let markReadStarted!: () => void
+      const readStarted = new Promise<void>((resolve) => {
+        markReadStarted = resolve
+      })
+      const requests: string[] = []
+      const fallback = fakeFetch({
+        '/management/v1/configureddevices': envelope([devices[0]]),
+        '/api/v1/camera/0/connected': envelope(true),
+        '/api/v1/camera/0/name': envelope('Camera'),
+        '/api/v1/camera/0/camerastate': envelope(0),
+        '/api/v1/camera/0/cansetccdtemperature': envelope(false),
+        '/api/v1/camera/0/cangetcoolerpower': envelope(false),
+        '/api/v1/camera/0/cooleron': envelope(false),
+      })
+      const fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        const path = new URL(String(input)).pathname
+        requests.push(path)
+        if (path === `/api/v1/camera/0/${operation}`) {
+          return new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => reject(init.signal?.reason), { once: true })
+            markReadStarted()
+          })
+        }
+        return fallback(input, init)
+      })
+      const provider = createAlpacaProvider({ baseUrl: 'http://alpaca.test', fetch })
 
-    const inspection = provider.inspectDevices({ signal: controller.signal })
-    controller.abort(new Error('superseded'))
+      const inspection = provider.inspectDevices({ signal: controller.signal })
+      await readStarted
+      const requestsBeforeCancellation = [...requests]
+      controller.abort(cancellation)
 
-    await expect(inspection).rejects.toThrow('superseded')
-  })
+      await expect(inspection).rejects.toBe(cancellation)
+      expect(requests).toEqual(requestsBeforeCancellation)
+    },
+  )
 })

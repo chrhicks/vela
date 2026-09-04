@@ -203,6 +203,44 @@ describe('Rig device detail mapping', () => {
     })
   })
 
+  it('shows slewing ahead of tracking while a mount moves', () => {
+    const mount = currentDeviceView('rig-1', inspection({
+      kind: 'telescope',
+      telemetry: {
+        availability: 'complete',
+        values: { kind: 'telescope', parked: false, slewing: true, tracking: true },
+      },
+    }), observedAt)
+
+    expect(mount.status).toMatchObject({ activity: 'slewing', tracking: 'on' })
+  })
+
+  it.each(['focuser', 'filter-wheel'] as const)(
+    'does not call a %s idle when movement is unavailable',
+    (kind) => {
+      const device = currentDeviceView('rig-1', inspection({
+        kind,
+        telemetry: { availability: 'partial', values: { kind, position: 1 } },
+      }), observedAt)
+
+      expect(device.status).toEqual({ availability: 'partial', activity: 'unknown', position: 1 })
+    },
+  )
+
+  it('distinguishes unavailable switch channels from an observed empty channel list', () => {
+    const unavailable = currentDeviceView('rig-1', inspection({
+      kind: 'switch',
+      telemetry: { availability: 'partial', values: { kind: 'switch' } },
+    }), observedAt)
+    const empty = currentDeviceView('rig-1', inspection({
+      kind: 'switch',
+      telemetry: { availability: 'complete', values: { kind: 'switch', channels: [] } },
+    }), observedAt)
+
+    expect(unavailable.status).toEqual({ availability: 'partial', activity: 'unknown' })
+    expect(empty.status).toEqual({ availability: 'complete', activity: 'reporting', channels: [] })
+  })
+
   it('distinguishes unsupported detail from unavailable device state', () => {
     const connectedDome = currentDeviceView('rig-1', inspection({
       kind: 'dome',

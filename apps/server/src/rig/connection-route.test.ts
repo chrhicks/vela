@@ -68,13 +68,15 @@ describe('Rig connection API', () => {
   })
 
   it('connects through one command and returns a refreshed semantic result', async () => {
+    let camera = disconnectedCamera
     const connectDevice = vi.fn(async (_id: string, options?: { readonly signal?: AbortSignal }) => {
       expect(options?.signal).toBeInstanceOf(AbortSignal)
+      camera = connectedCamera
       return { outcome: 'connected', command: 'requested' } as const
     })
     const app = buildApp({
       rigCatalog: createMemoryRigCatalog([record]),
-      createInspector: createInspector([disconnectedCamera], [connectedCamera]),
+      createInspector: () => ({ inspectDevices: async () => [camera] }),
       createConnector: () => ({ connectDevice }),
       now,
     })
@@ -202,16 +204,20 @@ describe('Rig connection API', () => {
   })
 
   it('rejects an overlapping command for the same Rig', async () => {
+    let camera = disconnectedCamera
     let finish: (() => void) | undefined
     const connectDevice = vi.fn(() => new Promise<{
       readonly outcome: 'connected'
       readonly command: 'requested'
     }>((resolve) => {
-      finish = () => resolve({ outcome: 'connected', command: 'requested' })
+      finish = () => {
+        camera = connectedCamera
+        resolve({ outcome: 'connected', command: 'requested' })
+      }
     }))
     const app = buildApp({
       rigCatalog: createMemoryRigCatalog([record]),
-      createInspector: createInspector([disconnectedCamera], [connectedCamera]),
+      createInspector: () => ({ inspectDevices: async () => [camera] }),
       createConnector: () => ({ connectDevice }),
       now,
     })

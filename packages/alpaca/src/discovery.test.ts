@@ -32,6 +32,14 @@ function fakeFetch(
   }) as typeof globalThis.fetch
 }
 
+function deferred() {
+  let resolve!: () => void
+  const promise = new Promise<void>((resolvePromise) => {
+    resolve = resolvePromise
+  })
+  return { promise, resolve }
+}
+
 const endpoint: AlpacaEndpoint = { host: '192.168.4.104', port: 11111 }
 
 afterEach(() => {
@@ -67,32 +75,55 @@ describe('createAlpacaDiscovery', () => {
 
   it('inspects Management API endpoints serially and normalizes the result', async () => {
     const requests: string[] = []
+    const fixtureFetch = fakeFetch({
+      '/management/apiversions': envelope([1]),
+      '/management/v1/description': envelope({
+        ServerName: 'ASCOM Remote Server',
+        Manufacturer: 'ASCOM Initiative',
+        ManufacturerVersion: '7.0',
+        Location: 'Observatory',
+      }),
+      '/management/v1/configureddevices': envelope([
+        {
+          DeviceName: ' Main Camera ',
+          DeviceType: 'Camera',
+          DeviceNumber: 0,
+          UniqueID: ' camera-1 ',
+        },
+        {
+          DeviceName: ' Legacy Device ',
+          DeviceType: 'Video',
+          DeviceNumber: 1,
+        },
+      ]),
+    }, requests)
+    const stages = Array.from({ length: 3 }, () => ({
+      started: deferred(),
+      release: deferred(),
+    }))
+    let stageIndex = 0
     const discovery = createAlpacaDiscovery({
-      fetch: fakeFetch({
-        '/management/apiversions': envelope([1]),
-        '/management/v1/description': envelope({
-          ServerName: 'ASCOM Remote Server',
-          Manufacturer: 'ASCOM Initiative',
-          ManufacturerVersion: '7.0',
-          Location: 'Observatory',
-        }),
-        '/management/v1/configureddevices': envelope([
-          {
-            DeviceName: ' Main Camera ',
-            DeviceType: 'Camera',
-            DeviceNumber: 0,
-            UniqueID: ' camera-1 ',
-          },
-          {
-            DeviceName: ' Legacy Device ',
-            DeviceType: 'Video',
-            DeviceNumber: 1,
-          },
-        ]),
-      }, requests),
+      fetch: async (input, init) => {
+        const stage = stages[stageIndex++]!
+        const response = await fixtureFetch(input, init)
+        stage.started.resolve()
+        await stage.release.promise
+        return response
+      },
     })
 
-    await expect(discovery.inspect(endpoint)).resolves.toEqual({
+    const inspection = discovery.inspect(endpoint)
+    try {
+      for (let index = 0; index < stages.length; index += 1) {
+        await stages[index]!.started.promise
+        expect(requests).toHaveLength(index + 1)
+        stages[index]!.release.resolve()
+      }
+    } finally {
+      for (const stage of stages) stage.release.resolve()
+    }
+
+    await expect(inspection).resolves.toEqual({
       endpoint,
       apiVersions: [1],
       server: {
@@ -118,7 +149,6 @@ describe('createAlpacaDiscovery', () => {
       '/management/v1/description',
       '/management/v1/configureddevices',
     ])
-    expect(requests.every((request) => request.startsWith('/management'))).toBe(true)
   })
 
   it('rejects duplicate stable device IDs', async () => {

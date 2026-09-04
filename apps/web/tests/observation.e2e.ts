@@ -112,9 +112,57 @@ test('handles already prepared, offline, missing and malformed observations', as
   status = 200
   await page.reload()
   await expect(page.getByRole('heading', { name: 'Could not load this Rig' })).toBeVisible()
-  response = observation('available', 'wrong-rig')
-  await page.getByRole('button', { name: 'Try again' }).click()
+})
+
+test('rejects an otherwise valid observation belonging to another Rig', async ({ page }) => {
+  await page.route('**/api/web/rigs/rig-1/observe', (route) => respond(route, observation('available', 'wrong-rig')))
+  await page.goto('/rigs/rig-1/observe')
   await expect(page.getByRole('heading', { name: 'Could not load this Rig' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Connect devices' })).toHaveCount(0)
+})
+
+test('failed reconciliation keeps commands blocked until an explicit successful state check', async ({ page }) => {
+  await page.clock.install()
+  await page.clock.pauseAt(new Date())
+  let commands = 0
+  let reads = 0
+  let failReads = false
+  await page.route('**/api/web/rigs/rig-1/observe', (route) => {
+    reads++
+    return failReads ? route.abort() : respond(route, observation())
+  })
+  await page.route('**/api/rigs/rig-1/connections', (route) => {
+    commands++
+    failReads = true
+    return route.abort()
+  })
+  await page.goto('/rigs/rig-1/observe')
+  await page.clock.runFor(1)
+  await page.getByRole('button', { name: 'Connect devices' }).click()
+  await expect(page.getByText('Current state is also unavailable. The values shown are last known.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Check Rig again' })).toBeEnabled()
+  expect(reads).toBe(2)
+  await expect(page.getByText('Last known state', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Connect devices' })).toHaveCount(0)
+
+  await page.clock.runFor(5_000)
+  await expect.poll(() => reads).toBe(3)
+  await expect(page.getByRole('button', { name: 'Check Rig again' })).toBeEnabled()
+  expect(commands).toBe(1)
+
+  failReads = false
+  await page.clock.runFor(5_000)
+  await expect.poll(() => reads).toBe(4)
+  await expect(page.getByRole('button', { name: 'Check Rig again' })).toBeEnabled()
+  await expect(page.getByText('Current state is also unavailable. The values shown are last known.')).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'The connection result is uncertain' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Connect devices' })).toHaveCount(0)
+  expect(commands).toBe(1)
+
+  await page.getByRole('button', { name: 'Check Rig again' }).click()
+  await expect(page.getByRole('button', { name: 'Connect devices' })).toBeVisible()
+  await expect(page.getByText('The command response could not be confirmed.', { exact: false })).toHaveCount(0)
+  expect(commands).toBe(1)
 })
 
 test('retains last-known state during failed refresh and restores command eligibility on recovery', async ({ page }) => {
@@ -134,20 +182,42 @@ test('retains last-known state during failed refresh and restores command eligib
 
 test('leaving a pending command cannot overwrite another Rig', async ({ page }) => {
   let finish!: () => void
+  let commandStarted!: () => void
+  let commandSettled!: () => void
   const pending = new Promise<void>((resolve) => { finish = resolve })
+  const started = new Promise<void>((resolve) => { commandStarted = resolve })
+  const settled = new Promise<void>((resolve) => { commandSettled = resolve })
+  await page.route('**/api/web/home', (route) => respond(route, {
+    rigs: ['rig-1', 'rig-2'].map((id) => {
+      const { name, connections, capabilities, refreshedAt } = observation('available', id).rig
+      return { id, name, connections, capabilities, reachability: 'reachable', lastSeenAt: refreshedAt }
+    }),
+    refreshedAt: observation().rig.refreshedAt,
+  }))
   await page.route('**/api/web/rigs/*/observe', (route) => respond(route, observation('available', route.request().url().includes('rig-2') ? 'rig-2' : 'rig-1')))
-  await page.route('**/api/web/rigs/rig-1', (route) => respond(route, observation().rig))
+  await page.route('**/api/web/rigs/rig-*', (route) => respond(route, observation('available', route.request().url().endsWith('rig-2') ? 'rig-2' : 'rig-1').rig))
   await page.route('**/api/rigs/rig-1/connections', async (route) => {
+    commandStarted()
     await pending
     await respond(route, { outcome: 'complete', command: 'not-needed', confirmedConnected: [], view: observation('complete') }).catch(() => {})
+    commandSettled()
   })
   await page.goto('/rigs/rig-1/observe')
+  await page.evaluate(() => { document.documentElement.dataset.navigationTest = 'same-document' })
   await page.getByRole('button', { name: 'Connect devices' }).click()
+  await started
   await page.getByRole('link', { name: 'Rig details' }).click()
-  await page.goto('/rigs/rig-2/observe')
+  await page.getByRole('link', { name: 'All rigs' }).click()
+  await page.getByRole('link', { name: 'View Askar FRA 400' }).click()
+  await page.getByRole('button', { name: 'Start observing' }).click()
+  await expect(page.getByRole('heading', { name: 'Observing with Askar FRA 400' })).toBeVisible()
   finish()
+  await settled
+  await expect(page.locator('html')).toHaveAttribute('data-navigation-test', 'same-document')
+  await expect(page).toHaveURL(/\/rigs\/rig-2\/observe$/)
   await expect(page.getByRole('heading', { name: 'Observing with Askar FRA 400' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Connect devices' })).toBeVisible()
+  await expect(page.getByText('Last connection attempt:', { exact: false })).toHaveCount(0)
 })
 
 for (const width of [390, 768, 1280]) {
