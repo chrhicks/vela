@@ -4,6 +4,8 @@
 **Date:** 2026-08-19  
 **Scope:** Product definition and MVP architecture; no implementation is authorized by this document.
 
+This record preserves the MVP decisions and their original rationale. For current agent ownership, task authorization, proportionate verification, and review gates, follow [AGENTS.md](../AGENTS.md#working-with-chris) and the [operations guide](component-workshop-operations.md). An agreed implementation scope can include promotion and adoption without repeated approval requests; exploratory workshop work alone does not.
+
 ## Summary
 
 Vela will gain a separate, source-backed component workshop for visually designing a new UI library. The workshop is a solo developer tool, not an end-user theme editor. It will render real React components from a new `@vela/ui` workspace package, provide live visual controls and representative contexts, and support an iterative workflow in which component source is edited through an editor or Codex and refreshed through Vite HMR.

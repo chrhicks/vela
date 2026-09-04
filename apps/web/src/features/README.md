@@ -1,10 +1,8 @@
 # Features
 
-Major sections of the application
+Current application capabilities:
 
-- **Rigs** - Choose a configured observatory Rig and inspect its live device state
-- **Plan** - scheduling sequences to run for a session. A session is an evening of observations/capture
-- **Observe** - Prepare the selected Rig from current server state and explicitly connect its supported devices; see [observation](observation/README.md).
-- **Library** - Where all the files land, uses preview images as a small abstraction on raw FIT files from a session
-- **Process** - Where you do processing of images - stacking basically - to create a master FITS file.
-- **Develop** - Develop a master FITS with photo editing tools, background extraction, star extraction, SPCC, color saturation, etc
+- **Rigs** — Choose a configured observatory Rig and inspect its live device state.
+- **Observe** — Prepare the selected Rig from current server state and explicitly connect its supported devices; see [observation](observation/README.md).
+
+Earlier ideas for Plan, Library, Process, and Develop are not an implementation roadmap. New capabilities should follow concrete observing needs and the scope in [AGENTS.md](../../../../AGENTS.md). Durable sequences and deep image processing remain outside the current product scope.

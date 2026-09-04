@@ -1,34 +1,32 @@
 ---
 name: inquiry
-description: Structured way to ask questions to gain alignment on user requirements, new task work, new features, or when the user is generally uncertain about what they want.
+description: Align on material decisions before a new Vela ticket or workstream, or when changed requirements affect the agreed scope. Use existing context to avoid reopening settled decisions.
 ---
 
-Map out a decision tree and group the questions by node such that each node (or area of inquiry) is at most 5 questions. Then ask me questions until there are no more ambiguities. Pose the questions using this format:
+Gain enough shared understanding to act: stop asking when there are **no unresolved decisions that materially affect the agreed task**.
 
-```
-❓ Q<N>: How many cars do you expect to have?
+Read the request, relevant ticket, repository guidance, and prior decisions first. Map the remaining decisions and their dependencies. Group questions by decision area, with at most five questions in a group; ask fewer when one answer determines the next branch. Do not manufacture questions to fill a group or show a formal tree unless it helps Chris decide.
 
-💡 I suggest no more than 6 due to the fact that your garage and drive way can comfortably support that. Any more and guests would have to park on the street and potentially disrupt your neighbors
-```
+Ask about choices that change the outcome, scope, product experience, important architectural boundaries, acceptance criteria, or authorization. Use judgment for routine, reversible implementation details. State consequential assumptions rather than asking Chris to choose every detail. Existing answers and authorization persist unless Chris changes them or new evidence creates a material conflict.
 
-Where `<N>` is the question number.
+Pose questions using this format, with continuous numbering through the inquiry:
 
-As I answer questions, take the information and re-calculate the decision tree. This allows you to discover new gaps, or apply my answers as context to future questions (other branches of the tree).
+```text
+❓ Q<N>: <One concrete question>
 
-As you interact with the user if your understanding substantially changes, the user introduces new information or contradicts previous information, or you see a potential opportunity to simplify the scope - pause and recalibrate with the user.
-
-Example recalibration message (you can have multiple of these if needed):
-
-```
-🔄 <headline of what you want to address>
-
-🧭 <description of the recalibration needed>
-
-💡 <recommended path forward>
+💡 <Your recommended choice and the relevant reason or tradeoff.>
 ```
 
-After gaining alignment, you may continue with your questioning.
+As answers arrive, update the decision tree and drop questions the answers have resolved. Continue useful work that does not depend on a pending answer; wait for required answers before taking dependent actions. Elapsed time is not an answer or approval.
 
-The goal is to gain full alignment with the user. Your understandiing of the task and the user's should be clear and unambiguous. The questions should be designed to uncover any gaps in understanding, clarify ambiguities, and ensure that the final output meets the user's expectations.
+When new information substantially changes the understanding or suggests a smaller scope, explain the change and recommendation before asking the next material question:
 
-When alignment is gained. Review your decision tree and the answers the user provided in a final pass to ensure everything is addressed and there are no remaining ambiguities. If any are found, ask additional questions to resolve them. Otherwise yield to the user for next steps.
+```text
+🔄 <What changed>
+
+🧭 <How it affects the agreed task>
+
+💡 <Recommended path forward>
+```
+
+At completion, review the decisions once for remaining material gaps and briefly state the agreed scope and consequential assumptions. If execution is already requested, continue under the repository's delivery workflow without asking for another start signal. If Chris requested exploration or planning only, yield the agreed scope for next steps. Inquiry does not replace workshop collaboration, independent verification, or the browser-review requirement in AGENTS.md.

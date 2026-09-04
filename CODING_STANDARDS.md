@@ -146,6 +146,8 @@ This security boundary is separate from rig safety policy. Protecting credential
 
 Use the smallest command that proves the change, then widen only when the affected boundary warrants it.
 
+Once relevant checks pass, broaden or repeat them only for new changes, failures, or unresolved concerns. Add tests for meaningful behavior and reachable failure cases; do not add tests that merely mirror implementation or assert documentation wording. This stopping rule also applies to workshop work and independent verification.
+
 Run a specific Vitest file from the workspace root:
 
 ```sh
