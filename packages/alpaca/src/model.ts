@@ -13,6 +13,22 @@ export type AlpacaDeviceKind =
 
 export type AlpacaConnectionStatus = 'connected' | 'disconnected' | 'unavailable'
 
+export type AlpacaDeviceConnectionResult =
+  | {
+      readonly outcome: 'connected'
+      readonly command: 'not-needed' | 'requested'
+    }
+  | {
+      readonly outcome: 'failed'
+      readonly reason: 'device-not-found' | 'rejected' | 'remained-disconnected'
+      readonly message?: string
+      readonly errorNumber?: number
+    }
+  | {
+      readonly outcome: 'uncertain'
+      readonly reason: 'cancelled' | 'verification-timeout' | 'verification-unavailable' | 'write-outcome-unknown'
+    }
+
 export interface AlpacaDevice {
   providerDeviceId: string
   kind: AlpacaDeviceKind

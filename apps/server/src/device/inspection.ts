@@ -18,7 +18,7 @@ export interface RigDeviceInspector {
 }
 
 export interface RigDeviceInspectorOptions {
-  readonly provider?: AlpacaProvider
+  readonly provider?: Pick<AlpacaProvider, 'inspectDevices'>
 }
 
 export function createRigDeviceInspector(

@@ -18,7 +18,7 @@ export interface RigDeviceInventory {
 
 export interface RigDeviceInventoryOptions {
   now?: () => Date
-  provider?: AlpacaProvider
+  provider?: Pick<AlpacaProvider, 'listDevices'>
 }
 
 function toRigDeviceKind(kind: AlpacaDeviceKind): RigDeviceKind {

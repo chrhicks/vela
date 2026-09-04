@@ -12,6 +12,7 @@ import type {
   AlpacaCameraActivity,
   AlpacaConnectionStatus,
   AlpacaDevice,
+  AlpacaDeviceConnectionResult,
   AlpacaDeviceInspection,
   AlpacaDeviceKind,
   AlpacaDeviceTelemetry,
@@ -21,9 +22,14 @@ import type {
 export interface AlpacaProvider {
   listDevices(): Promise<ReadonlyArray<AlpacaDevice>>
   inspectDevices(options?: AlpacaInspectDevicesOptions): Promise<ReadonlyArray<AlpacaDeviceInspection>>
+  connectDevice(providerDeviceId: string, options?: AlpacaConnectDeviceOptions): Promise<AlpacaDeviceConnectionResult>
 }
 
 export interface AlpacaInspectDevicesOptions {
+  readonly signal?: AbortSignal
+}
+
+export interface AlpacaConnectDeviceOptions {
   readonly signal?: AbortSignal
 }
 
@@ -31,9 +37,13 @@ export interface AlpacaProviderOptions {
   baseUrl: string
   fetch?: typeof globalThis.fetch
   requestTimeoutMs?: number
+  connectionPollIntervalMs?: number
+  connectionVerificationTimeoutMs?: number
 }
 
 const defaultRequestTimeoutMs = 3_000
+const defaultConnectionPollIntervalMs = 250
+const defaultConnectionVerificationTimeoutMs = 30_000
 const maximumSwitchChannels = 256
 
 interface TelemetryRead {
@@ -44,9 +54,17 @@ export function createAlpacaProvider({
   baseUrl,
   fetch = globalThis.fetch,
   requestTimeoutMs = defaultRequestTimeoutMs,
+  connectionPollIntervalMs = defaultConnectionPollIntervalMs,
+  connectionVerificationTimeoutMs = defaultConnectionVerificationTimeoutMs,
 }: AlpacaProviderOptions): AlpacaProvider {
   if (!Number.isInteger(requestTimeoutMs) || requestTimeoutMs <= 0) {
     throw new RangeError('Provider request timeout must be a positive integer')
+  }
+  if (!Number.isInteger(connectionPollIntervalMs) || connectionPollIntervalMs <= 0) {
+    throw new RangeError('Connection poll interval must be a positive integer')
+  }
+  if (!Number.isInteger(connectionVerificationTimeoutMs) || connectionVerificationTimeoutMs <= 0) {
+    throw new RangeError('Connection verification timeout must be a positive integer')
   }
   const client = createAlpacaClient({ baseUrl, fetch, requestTimeoutMs })
 
@@ -166,7 +184,131 @@ export function createAlpacaProvider({
     return inspections
   }
 
-  return { listDevices, inspectDevices }
+  async function connectDevice(
+    providerDeviceId: string,
+    { signal }: AlpacaConnectDeviceOptions = {},
+  ): Promise<AlpacaDeviceConnectionResult> {
+    signal?.throwIfAborted()
+    const configuredDevices = normalizeConfiguredDevices(
+      await client.configuredDevices(signal),
+    )
+    rejectMissingDeviceIds(configuredDevices)
+    rejectDuplicateDeviceIds(configuredDevices)
+    const device = configuredDevices.find((candidate) => stableDeviceId(candidate) === providerDeviceId)
+
+    if (device === undefined) {
+      return { outcome: 'failed', reason: 'device-not-found' }
+    }
+
+    if (await client.connected(device, signal)) {
+      return { outcome: 'connected', command: 'not-needed' }
+    }
+
+    signal?.throwIfAborted()
+    let writeOutcomeUnknown = false
+
+    try {
+      await client.setConnected(device, signal)
+    } catch (error) {
+      if (
+        error instanceof AlpacaProviderError
+        && error.reason === 'protocol-error'
+        && error.errorNumber !== undefined
+      ) {
+        return {
+          outcome: 'failed',
+          reason: 'rejected',
+          message: error.message,
+          errorNumber: error.errorNumber,
+        }
+      }
+      if (signal?.aborted) return { outcome: 'uncertain', reason: 'cancelled' }
+      writeOutcomeUnknown = true
+    }
+
+    return verifyConnection(device, writeOutcomeUnknown, signal)
+  }
+
+  async function verifyConnection(
+    device: ConfiguredDevice,
+    writeOutcomeUnknown: boolean,
+    signal?: AbortSignal,
+  ): Promise<AlpacaDeviceConnectionResult> {
+    try {
+      if (await client.connected(device, signal)) {
+        return { outcome: 'connected', command: 'requested' }
+      }
+    } catch {
+      return verificationFailure(signal)
+    }
+
+    let connecting: boolean
+    try {
+      connecting = await client.connecting(device, signal)
+    } catch (error) {
+      if (signal?.aborted) return { outcome: 'uncertain', reason: 'cancelled' }
+      if (isUnsupported(error)) {
+        return writeOutcomeUnknown
+          ? { outcome: 'uncertain', reason: 'write-outcome-unknown' }
+          : { outcome: 'failed', reason: 'remained-disconnected' }
+      }
+      return { outcome: 'uncertain', reason: 'verification-unavailable' }
+    }
+
+    if (!connecting) {
+      return writeOutcomeUnknown
+        ? { outcome: 'uncertain', reason: 'write-outcome-unknown' }
+        : { outcome: 'failed', reason: 'remained-disconnected' }
+    }
+
+    const deadline = Date.now() + connectionVerificationTimeoutMs
+    while (connecting) {
+      const remainingMs = deadline - Date.now()
+      if (remainingMs <= 0) return { outcome: 'uncertain', reason: 'verification-timeout' }
+
+      try {
+        await wait(Math.min(connectionPollIntervalMs, remainingMs), signal)
+        connecting = await client.connecting(device, signal)
+      } catch {
+        return verificationFailure(signal)
+      }
+    }
+
+    try {
+      return (await client.connected(device, signal))
+        ? { outcome: 'connected', command: 'requested' }
+        : { outcome: 'failed', reason: 'remained-disconnected' }
+    } catch {
+      return verificationFailure(signal)
+    }
+  }
+
+  return { listDevices, inspectDevices, connectDevice }
+}
+
+function verificationFailure(signal?: AbortSignal): AlpacaDeviceConnectionResult {
+  return signal?.aborted
+    ? { outcome: 'uncertain', reason: 'cancelled' }
+    : { outcome: 'uncertain', reason: 'verification-unavailable' }
+}
+
+function wait(durationMs: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(signal.reason)
+      return
+    }
+
+    const onAbort = () => {
+      clearTimeout(timeout)
+      reject(signal?.reason)
+    }
+    const timeout = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort)
+      resolve()
+    }, durationMs)
+    signal?.addEventListener('abort', onAbort, { once: true })
+  })
 }
 
 async function operationalName(

@@ -9,10 +9,7 @@ const rig = {
 
 describe('Rig device inventory', () => {
   it('maps normalized provider devices into server models and web projections', async () => {
-    const provider: AlpacaProvider = {
-      async inspectDevices() {
-        return []
-      },
+    const provider = {
       async listDevices() {
         return [{
           providerDeviceId: 'camera-1',
@@ -22,7 +19,7 @@ describe('Rig device inventory', () => {
           driver: { version: '1.2.3' },
         }]
       },
-    }
+    } satisfies Pick<AlpacaProvider, 'listDevices'>
     const observedAt = new Date('2026-08-21T12:00:00.000Z')
     const inventory = createRigDeviceInventory(rig, {
       provider,

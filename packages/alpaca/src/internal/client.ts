@@ -1,6 +1,7 @@
 import { Schema } from 'effect'
 import { AlpacaProviderError } from '../error.js'
 import {
+  alpacaMethodResponse,
   alpacaResponse,
   connectedResponse,
   driverInfoResponse,
@@ -18,6 +19,8 @@ export interface AlpacaClient {
   serverDescription(signal?: AbortSignal): Promise<ServerDescription>
   configuredDevices(signal?: AbortSignal): Promise<ReadonlyArray<ConfiguredDevice>>
   connected(device: ConfiguredDevice, signal?: AbortSignal): Promise<boolean>
+  connecting(device: ConfiguredDevice, signal?: AbortSignal): Promise<boolean>
+  setConnected(device: ConfiguredDevice, signal?: AbortSignal): Promise<void>
   driverInfo(device: ConfiguredDevice, signal?: AbortSignal): Promise<string>
   driverVersion(device: ConfiguredDevice, signal?: AbortSignal): Promise<string>
   readBoolean(device: ConfiguredDevice, operation: string, signal?: AbortSignal): Promise<boolean>
@@ -33,10 +36,13 @@ export interface AlpacaClientOptions {
   requestTimeoutMs?: number
 }
 
-interface AlpacaEnvelope<Value> {
-  Value: Value
+interface AlpacaResult {
   ErrorNumber: number
   ErrorMessage: string
+}
+
+interface AlpacaEnvelope<Value> extends AlpacaResult {
+  Value: Value
 }
 
 function signalReason(signal: AbortSignal): unknown {
@@ -57,6 +63,7 @@ export function createAlpacaClient({
     endpoint: string,
     schema: S,
     operationSignal = signal,
+    init?: Omit<RequestInit, 'signal'>,
   ): Promise<S['Type']> {
     const controller = new AbortController()
     let timedOut = false
@@ -103,6 +110,7 @@ export function createAlpacaClient({
 
       try {
         response = await fetch(`${normalizedBaseUrl}${endpoint}`, {
+          ...init,
           signal: controller.signal,
         })
       } catch (cause) {
@@ -152,29 +160,68 @@ export function createAlpacaClient({
     }
   }
 
+  function rejectProtocolError(endpoint: string, response: AlpacaResult): void {
+    if (response.ErrorNumber === 0) return
+
+    throw new AlpacaProviderError(
+      response.ErrorMessage || `Alpaca protocol error ${response.ErrorNumber}`,
+      {
+        reason: 'protocol-error',
+        endpoint,
+        errorNumber: response.ErrorNumber,
+      },
+    )
+  }
+
+  function decodeResponse<S extends Schema.ConstraintDecoder<unknown>>(
+    endpoint: string,
+    schema: S,
+    value: unknown,
+  ): S['Type'] {
+    try {
+      return Schema.decodeUnknownSync(schema)(value)
+    } catch (cause) {
+      throw new AlpacaProviderError(`Alpaca endpoint ${endpoint} returned an invalid response`, {
+        reason: 'invalid-response',
+        endpoint,
+        cause,
+      })
+    }
+  }
+
   async function requestValue<S extends Schema.ConstraintDecoder<unknown>>(
     endpoint: string,
     valueSchema: S,
     operationSignal?: AbortSignal,
   ): Promise<S['Type']> {
-    const response = await request(
+    const value = await request(endpoint, Schema.Unknown, operationSignal)
+    const result = decodeResponse(endpoint, alpacaMethodResponse, value) as AlpacaResult
+    rejectProtocolError(endpoint, result)
+    const response = decodeResponse(
       endpoint,
       alpacaResponse(valueSchema),
-      operationSignal,
+      value,
     ) as unknown as AlpacaEnvelope<S['Type']>
-
-    if (response.ErrorNumber !== 0) {
-      throw new AlpacaProviderError(
-        response.ErrorMessage || `Alpaca protocol error ${response.ErrorNumber}`,
-        {
-          reason: 'protocol-error',
-          endpoint,
-          errorNumber: response.ErrorNumber,
-        },
-      )
-    }
-
     return response.Value
+  }
+
+  async function requestCommand(
+    endpoint: string,
+    body: URLSearchParams,
+    operationSignal?: AbortSignal,
+  ): Promise<void> {
+    const response = await request(
+      endpoint,
+      alpacaMethodResponse,
+      operationSignal,
+      {
+        method: 'PUT',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body,
+      },
+    ) as AlpacaResult
+
+    rejectProtocolError(endpoint, response)
   }
 
   function deviceEndpoint(device: ConfiguredDevice, operation: string): string {
@@ -197,6 +244,16 @@ export function createAlpacaClient({
 
     connected: (device, operationSignal) =>
       requestValue(deviceEndpoint(device, 'connected'), connectedResponse.fields.Value, operationSignal),
+
+    connecting: (device, operationSignal) =>
+      requestValue(deviceEndpoint(device, 'connecting'), connectedResponse.fields.Value, operationSignal),
+
+    setConnected: (device, operationSignal) =>
+      requestCommand(
+        deviceEndpoint(device, 'connected'),
+        new URLSearchParams({ Connected: 'true' }),
+        operationSignal,
+      ),
 
     driverInfo: (device, operationSignal) =>
       requestValue(deviceEndpoint(device, 'driverinfo'), driverInfoResponse.fields.Value, operationSignal),

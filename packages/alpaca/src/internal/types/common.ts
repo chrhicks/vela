@@ -1,12 +1,16 @@
 import { Schema, SchemaGetter } from 'effect'
 
+export const alpacaMethodResponse = Schema.Struct({
+  ClientTransactionID: Schema.Number,
+  ServerTransactionID: Schema.Number,
+  ErrorNumber: Schema.Number,
+  ErrorMessage: Schema.String,
+})
+
 export const alpacaResponse = <S extends Schema.ConstraintDecoder<unknown>>(Value: S) =>
   Schema.Struct({
     Value,
-    ClientTransactionID: Schema.Number,
-    ServerTransactionID: Schema.Number,
-    ErrorNumber: Schema.Number,
-    ErrorMessage: Schema.String,
+    ...alpacaMethodResponse.fields,
   })
 
 export const boolResponse = alpacaResponse(Schema.Boolean)
