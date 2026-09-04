@@ -1,5 +1,14 @@
 export type { HomeView } from './home.js'
 export type {
+  ConnectRigDevicesResult,
+  RigConnectionCapability,
+  RigConnectionDeviceView,
+  RigConnectionFailureReason,
+  RigConnectionPreparation,
+  RigConnectionUncertaintyReason,
+  RigObservationView,
+} from './observation.js'
+export type {
   RigCameraDeviceView,
   RigCameraStatus,
   RigDetailView,

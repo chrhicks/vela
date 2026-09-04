@@ -11,6 +11,11 @@ import {
   type RigInventorySource,
 } from './device/inventory.js'
 import {
+  createRigDeviceConnector,
+  type RigConnectionSource,
+  type RigDeviceConnector,
+} from './device/connection.js'
+import {
   createRigDeviceInspector,
   type RigDeviceInspector,
   type RigInspectionSource,
@@ -24,11 +29,16 @@ import {
   parseDiscoverRigsInput,
   toObservedRigInventory,
 } from './rig/discovery.js'
+import {
+  createRigConnectionCoordinator,
+  type RigConnectionRequestOptions,
+} from './rig/connection.js'
 import { loadRigDetailView } from './rig/detail.js'
 import { loadHomeView } from './rig/home.js'
 
 interface BuildAppOptions {
   readonly alpacaDiscovery?: AlpacaDiscovery
+  readonly createConnector?: (rig: RigConnectionSource) => RigDeviceConnector
   readonly createInventory?: (rig: RigInventorySource) => RigDeviceInventory
   readonly createInspector?: (rig: RigInspectionSource) => RigDeviceInspector
   readonly now?: () => Date
@@ -45,12 +55,19 @@ interface AddRigRequest {
 
 export function buildApp({
   alpacaDiscovery = createAlpacaDiscovery(),
+  createConnector = createRigDeviceConnector,
   createInventory = createRigDeviceInventory,
   createInspector = createRigDeviceInspector,
   now = () => new Date(),
   rigCatalog = createMemoryRigCatalog(),
 }: BuildAppOptions = {}) {
   const app = Fastify({ logger: true })
+  const rigConnections = createRigConnectionCoordinator({
+    catalog: rigCatalog,
+    createConnector,
+    createInspector,
+    now,
+  })
 
   app.get('/api/health', async () => ({ status: 'ok' }))
 
@@ -133,7 +150,11 @@ export function buildApp({
   })
 
   app.delete<{ Params: { rigId: string } }>('/api/rigs/:rigId', async (request, reply) => {
-    if (!await rigCatalog.forget(request.params.rigId)) {
+    const operation = await rigConnections.forgetRig(request.params.rigId)
+    if (operation.state === 'in-progress') {
+      return reply.code(409).send({ error: 'rig-operation-in-progress' })
+    }
+    if (operation.state === 'not-found') {
       return reply.code(404).send({ error: 'rig-not-found' })
     }
     return reply.code(204).send()
@@ -149,6 +170,51 @@ export function buildApp({
       request.log.warn({ err: cause, rigId: rig.id }, 'Known Rig is unavailable')
     },
   }))
+
+  app.get<{ Params: { rigId: string } }>('/api/web/rigs/:rigId/observe', async (request, reply) => {
+    const controller = new AbortController()
+    const cancel = () => controller.abort(new Error('Observation requester disconnected'))
+    request.raw.on('aborted', cancel)
+    reply.raw.on('close', cancel)
+
+    try {
+      const result = await rigConnections.loadObservation(request.params.rigId, {
+        ...rigConnectionLogging(request),
+        signal: controller.signal,
+      })
+      if (result.state === 'not-found') {
+        return reply.code(404).send({ error: 'rig-not-found' })
+      }
+      return result.view
+    } finally {
+      request.raw.removeListener('aborted', cancel)
+      reply.raw.removeListener('close', cancel)
+    }
+  })
+
+  app.post<{ Params: { rigId: string } }>('/api/rigs/:rigId/connections', async (request, reply) => {
+    const controller = new AbortController()
+    const cancel = () => controller.abort(new Error('Connection requester disconnected'))
+    request.raw.on('aborted', cancel)
+    reply.raw.on('close', cancel)
+
+    try {
+      const operation = await rigConnections.connectDevices(request.params.rigId, {
+        ...rigConnectionLogging(request),
+        signal: controller.signal,
+      })
+      if (operation.state === 'not-found') {
+        return reply.code(404).send({ error: 'rig-not-found' })
+      }
+      if (operation.state === 'in-progress') {
+        return reply.code(409).send({ error: 'rig-operation-in-progress' })
+      }
+      return operation.result
+    } finally {
+      request.raw.removeListener('aborted', cancel)
+      reply.raw.removeListener('close', cancel)
+    }
+  })
 
   app.get<{ Params: { rigId: string } }>('/api/web/rigs/:rigId', async (request, reply) => {
     const controller = new AbortController()
@@ -179,6 +245,23 @@ export function buildApp({
   })
 
   return app
+}
+
+function rigConnectionLogging(
+  request: { readonly log: { warn(value: object, message: string): void } },
+): Pick<RigConnectionRequestOptions, 'onConflict' | 'onProviderResult' | 'onUnavailable'> {
+  return {
+    onConflict(rig) {
+      request.log.warn({ rigId: rig.id }, 'Known Rig identity conflicts before device connection')
+    },
+    onProviderResult(providerDeviceId, result) {
+      if (!(result instanceof AlpacaProviderError) && result.outcome === 'connected') return
+      request.log.warn({ providerDeviceId, result }, 'Rig device connection did not confirm success')
+    },
+    onUnavailable(rig, state, cause) {
+      request.log.warn({ err: cause, rigId: rig.id, state }, 'Known Rig connection state is unavailable')
+    },
+  }
 }
 
 function parseAddRigRequest(value: unknown): AddRigRequest | undefined {

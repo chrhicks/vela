@@ -24,10 +24,14 @@ import type {
   RigView,
 } from '../src/rig/index.js'
 import type {
+  ConnectRigDevicesResult,
   HomeView,
+  RigConnectionDeviceView,
+  RigConnectionPreparation,
   RigDetailView,
   RigDeviceDetailView,
   RigDeviceStatusAvailability,
+  RigObservationView,
 } from '../src/web/index.js'
 
 describe('@vela/model boundaries', () => {
@@ -157,5 +161,44 @@ describe('@vela/model boundaries', () => {
     }>().not.toMatchTypeOf<RigDeviceDetailView>()
 
     expect(view.devices).toHaveLength(2)
+  })
+
+  it('keeps connection preparation distinct from future observing permission', () => {
+    expectTypeOf<RigConnectionPreparation['state']>().toEqualTypeOf<
+      'available' | 'complete' | 'in-progress' | 'unavailable'
+    >()
+    expectTypeOf<Extract<
+      RigConnectionPreparation,
+      { readonly state: 'available' }
+    >['capabilities']>().toEqualTypeOf<readonly ['connect-devices']>()
+    expectTypeOf<RigObservationView['rig']>().toEqualTypeOf<RigDetailView>()
+    expectTypeOf<ConnectRigDevicesResult['outcome']>().toEqualTypeOf<
+      'complete' | 'failed' | 'partial' | 'uncertain' | 'unavailable'
+    >()
+
+    expectTypeOf<Extract<
+      ConnectRigDevicesResult,
+      { readonly command: 'not-needed' }
+    >['confirmedConnected']>().toEqualTypeOf<readonly []>()
+    expectTypeOf<Extract<
+      ConnectRigDevicesResult,
+      { readonly outcome: 'failed' }
+    >['confirmedConnected']>().toEqualTypeOf<readonly []>()
+    expectTypeOf<Extract<
+      ConnectRigDevicesResult,
+      { readonly outcome: 'partial' }
+    >['confirmedConnected'][0]>().toEqualTypeOf<RigConnectionDeviceView>()
+    expectTypeOf<Extract<
+      ConnectRigDevicesResult,
+      { readonly outcome: 'failed' }
+    >['failed']['reason']>().toEqualTypeOf<
+      'connection-check-failed' | 'device-not-found' | 'rejected' | 'remained-disconnected'
+    >()
+    expectTypeOf<Extract<
+      ConnectRigDevicesResult,
+      { readonly outcome: 'uncertain' }
+    >['uncertain']['reason']>().toEqualTypeOf<
+      'cancelled' | 'verification-timeout' | 'verification-unavailable' | 'write-outcome-unknown'
+    >()
   })
 })
