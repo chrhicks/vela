@@ -245,7 +245,7 @@
   color: var(--vela-warning);
 }
 
-.vela-observation-equipment__status[data-state="connecting"] > span {
+.vela-observation-equipment__status[data-state="status-updating"] > span {
   color: var(--vela-accent);
 }
 

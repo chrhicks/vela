@@ -39,6 +39,17 @@ test('connection progress is one operation and settles as ready', async ({ page 
   await expect(inspectorSelect(page, 'Readiness')).toHaveValue('ready')
 })
 
+test('Rig details keeps device progress neutral while the sequential operation runs', async ({ page }) => {
+  await page.goto('/?component=panel&specimen=panel-observation-readiness&prop.screen=observe&prop.rig=seestar&prop.state=disconnected')
+
+  await page.getByRole('button', { name: 'Connect devices' }).click()
+  await page.getByRole('button', { name: 'Rig details' }).click()
+
+  const deviceStatuses = page.locator('.vela-observation-equipment__status strong')
+  await expect(deviceStatuses).toHaveText(['Status updating', 'Status updating', 'Status updating'])
+  await expect(page.getByText('Connecting', { exact: true })).toHaveCount(0)
+})
+
 test('readiness remains truthful when returning through Rig details', async ({ page }) => {
   await page.goto('/?component=panel&specimen=panel-observation-readiness&prop.screen=observe&prop.rig=seestar&prop.state=ready')
 

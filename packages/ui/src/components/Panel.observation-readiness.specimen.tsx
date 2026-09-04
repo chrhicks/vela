@@ -183,7 +183,7 @@ function connectedCount(rig: RigFixture, state: ReadinessState): number | undefi
 function entryDeviceState(rig: RigFixture, state: ReadinessState, deviceName: string): string {
   if (state === 'ready') return 'Connected'
   if (state === 'offline') return 'Unavailable'
-  if (state === 'connecting') return 'Connecting'
+  if (state === 'connecting') return 'Status updating'
   if ((state === 'partial' || state === 'uncertain') && rig.interruptedConnection.confirmedDevices.includes(deviceName)) return 'Connected'
   if (state === 'uncertain' && rig.interruptedConnection.stoppedDevice === deviceName) return 'Not confirmed'
   return 'Disconnected'
