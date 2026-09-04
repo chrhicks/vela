@@ -200,6 +200,8 @@ Linear is available to agents for meaningful planned work, status, and review. U
 
 Before merging meaningful changes, run the project `vela-verifier` subagent. Prefer giving it only the pull-request URL; use `current` when no PR exists yet. Do not provide implementation context, desired outcomes, or persuasive review instructions. The verifier must inspect the target independently from fresh context.
 
+The tracked verification policy is `.pi/agents/vela-verifier.md`. An optional local Codex port may live at `.codex/agents/vela-verifier.toml`; `.codex/` is ignored by Git. Keep any local port aligned with the tracked policy. In Codex, spawn the verifier without conversation history (`fork_turns: "none"` when available). If the local port is absent or the client cannot select a custom agent, instruct a fresh subagent to read the policy body after the frontmatter in `.pi/agents/vela-verifier.md` and supply only the review target. Do not use a history-inheriting invocation as a substitute for independent verification.
+
 Do not merge a `BLOCK` verdict. Resolve or explicitly escalate an `INCONCLUSIVE` verdict, and disposition any `OK WITH NOTES` findings before merging. The verifier provides evidence, not merge authority; the parent agent remains responsible for the final decision and user-approved scope.
 
 Use the smallest verification that proves a change. Prefer focused tests and scoped builds over broad checks by habit; run wider checks when the change crosses workspace boundaries or Chris asks for them. See [CODING_STANDARDS.md](./CODING_STANDARDS.md) for current commands and conventions.

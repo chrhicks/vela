@@ -1,0 +1,230 @@
+/* Production composition follows Panel.observation-readiness.specimen.css.
+   Panel owns its border, surface, and base spacing; feature layout stays here. */
+.vela-observe-entry {
+  margin-bottom: calc(var(--vela-space) * 6);
+}
+
+.vela-observe-entry > .vela-panel__body {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: calc(var(--vela-space) * 4);
+  padding: calc(var(--vela-space) * 5);
+}
+
+.vela-observe-entry small,
+.vela-observe-hero small,
+.vela-observe-section-heading small {
+  color: var(--vela-text-muted);
+  font-size: .74em;
+}
+
+.vela-observe-entry h2 {
+  margin: calc(var(--vela-space) * .8) 0 0;
+  font-size: 1.22em;
+  letter-spacing: -.02em;
+}
+
+.vela-observe-entry p {
+  margin: calc(var(--vela-space) * 1.2) 0 0;
+  color: var(--vela-text-muted);
+  font-size: .8em;
+  line-height: 1.55;
+}
+
+.vela-observe-entry-mark {
+  display: grid;
+  width: 4rem;
+  height: 4rem;
+  border: var(--vela-border-width) solid var(--vela-line);
+  border-radius: 50%;
+  color: var(--vela-accent);
+  background: var(--vela-accent-surface);
+  place-items: center;
+}
+
+.vela-observe-entry-mark svg,
+.vela-observe-mark svg {
+  width: 2rem;
+  height: 2rem;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.3;
+}
+
+.vela-observe-hero {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: calc(var(--vela-space) * 4);
+  margin-bottom: calc(var(--vela-space) * 7);
+}
+
+.vela-observe-hero h1 {
+  margin: calc(var(--vela-space) * 1.1) 0 0;
+  font-size: clamp(1.75em, 4.4vw, 2.55em);
+  font-weight: 740;
+  letter-spacing: -.04em;
+}
+
+.vela-observe-hero p {
+  margin: calc(var(--vela-space) * 1.25) 0 0;
+  color: var(--vela-text-muted);
+  font-size: .8em;
+}
+
+.vela-observe-section-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: calc(var(--vela-space) * 3);
+  margin-bottom: calc(var(--vela-space) * 3);
+}
+
+.vela-observe-section-heading h2 {
+  margin: calc(var(--vela-space) * .75) 0 0;
+  font-size: 1.15em;
+  letter-spacing: -.02em;
+}
+
+.vela-observe-section-heading > span {
+  color: var(--vela-text-muted);
+  font-size: .7em;
+}
+
+.vela-observe-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(16rem, .72fr);
+  align-items: start;
+  gap: calc(var(--vela-space) * 3);
+}
+
+.vela-observe-readiness,
+.vela-observe-facts {
+  min-width: 0;
+}
+
+.vela-observe-readiness > .vela-panel__body {
+  gap: calc(var(--vela-space) * 4);
+  padding: calc(var(--vela-space) * 5);
+}
+
+.vela-observe-summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: calc(var(--vela-space) * 3);
+}
+
+.vela-observe-summary h3 {
+  margin: 0;
+  font-size: 1.08em;
+  letter-spacing: -.015em;
+}
+
+.vela-observe-summary h3:focus {
+  outline: calc(var(--vela-border-width) * 2) solid var(--vela-focus);
+  outline-offset: calc(var(--vela-space) * 1.5);
+  border-radius: var(--vela-radius);
+}
+
+.vela-observe p {
+  margin: 0;
+  color: var(--vela-text-muted);
+  font-size: .8em;
+  line-height: 1.55;
+}
+
+.vela-observe-summary p {
+  margin-top: var(--vela-space);
+}
+
+.vela-observe-mark {
+  display: grid;
+  width: 3.45rem;
+  height: 3.45rem;
+  border: var(--vela-border-width) solid var(--vela-line);
+  border-radius: 50%;
+  color: var(--vela-warning);
+  place-items: center;
+  font-size: 1.35em;
+}
+
+.vela-observe-readiness[data-tone="positive"] .vela-observe-mark { color: var(--vela-positive); }
+.vela-observe-readiness[data-tone="danger"] .vela-observe-mark { color: var(--vela-danger); }
+.vela-observe-readiness[data-tone="accent"] .vela-observe-mark { color: var(--vela-accent); }
+
+.vela-observe-mark svg { width: 1.7rem; height: 1.7rem; }
+.vela-observe-spinner {
+  width: 1.4rem;
+  height: 1.4rem;
+  border: 2px solid var(--vela-line);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: vela-observe-spin 1s linear infinite;
+}
+
+.vela-observe-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--vela-space) * 3);
+  padding-top: calc(var(--vela-space) * 4);
+  border-top: var(--vela-border-width) solid var(--vela-line);
+}
+
+.vela-observe-result h4 { margin: 0 0 calc(var(--vela-space) * 2); font-size: .8em; }
+.vela-observe-result dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  border: var(--vela-border-width) solid var(--vela-line);
+  border-radius: var(--vela-radius);
+}
+.vela-observe-result dl > div {
+  padding: calc(var(--vela-space) * 2.5);
+  border-right: var(--vela-border-width) solid var(--vela-line);
+}
+.vela-observe-result dl > div:last-child { border-right: 0; }
+.vela-observe dt { color: var(--vela-text-muted); font-size: .7em; }
+.vela-observe dd { margin: var(--vela-space) 0 0; font-size: .8em; overflow-wrap: anywhere; }
+.vela-observe-facts dl { margin: 0; }
+.vela-observe-facts dl > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: baseline;
+  gap: calc(var(--vela-space) * 2);
+  padding: calc(var(--vela-space) * 2.3) 0;
+  border-bottom: var(--vela-border-width) solid var(--vela-line);
+}
+.vela-observe-facts dl > div:first-child { padding-top: 0; }
+.vela-observe-facts dd { text-align: right; margin: 0; }
+.vela-observe .vela-observe-warning { color: var(--vela-warning); }
+
+@keyframes vela-observe-spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 47rem) {
+  .vela-observe-grid { grid-template-columns: 1fr; }
+  .vela-observe-entry > .vela-panel__body { grid-template-columns: auto minmax(0, 1fr); }
+  .vela-observe-entry .vela-button { grid-column: 2; justify-self: start; }
+}
+
+@media (max-width: 31rem) {
+  .vela-observe-entry > .vela-panel__body,
+  .vela-observe-readiness > .vela-panel__body { padding: calc(var(--vela-space) * 4); }
+  .vela-observe-entry > .vela-panel__body,
+  .vela-observe-summary,
+  .vela-observe-result dl { grid-template-columns: 1fr; }
+  .vela-observe-entry .vela-button { grid-column: auto; width: 100%; }
+  .vela-observe-entry-mark { width: 3.2rem; height: 3.2rem; }
+  .vela-observe-hero { grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: calc(var(--vela-space) * 2.5); }
+  .vela-observe-hero > .vela-badge { grid-column: 1 / -1; justify-self: start; }
+  .vela-observe-actions > button { width: 100%; }
+  .vela-observe-result dl > div { border-right: 0; border-bottom: var(--vela-border-width) solid var(--vela-line); }
+  .vela-observe-result dl > div:last-child { border-bottom: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vela-observe-spinner { animation: none; }
+}
