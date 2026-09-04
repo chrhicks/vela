@@ -77,6 +77,37 @@ function provider(results: ReadonlyArray<RouteResult>, requests: RecordedRequest
   })
 }
 
+function connectingProvider(connectionDurationMs: number) {
+  let requestedAt: number | undefined
+  const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const path = new URL(String(input)).pathname
+    const method = init?.method ?? 'GET'
+    if (method === 'GET' && path === '/management/v1/configureddevices') {
+      return Response.json(inventory)
+    }
+    if (method === 'PUT' && path === '/api/v1/camera/0/connected') {
+      requestedAt = Date.now()
+      return Response.json(methodEnvelope())
+    }
+    const connected = requestedAt !== undefined && Date.now() - requestedAt >= connectionDurationMs
+    if (method === 'GET' && path === '/api/v1/camera/0/connected') {
+      return Response.json(envelope(connected))
+    }
+    if (method === 'GET' && path === '/api/v1/camera/0/connecting') {
+      return Response.json(envelope(requestedAt !== undefined && !connected))
+    }
+    throw new Error(`Unexpected request: ${method} ${path}`)
+  })
+  const alpaca = createAlpacaProvider({
+    baseUrl: 'http://alpaca.test',
+    fetch,
+    requestTimeoutMs: 20,
+    connectionPollIntervalMs: 10,
+    connectionVerificationTimeoutMs: 30,
+  })
+  return { alpaca, fetch }
+}
+
 afterEach(() => {
   vi.useRealTimers()
 })
@@ -131,16 +162,7 @@ describe('Alpaca device connection', () => {
 
   it('observes supported asynchronous completion before confirming the connection', async () => {
     vi.useFakeTimers()
-    const alpaca = provider([
-      inventory,
-      envelope(false),
-      methodEnvelope(),
-      envelope(false),
-      envelope(true),
-      envelope(true),
-      envelope(false),
-      envelope(true),
-    ])
+    const { alpaca } = connectingProvider(20)
 
     const connection = alpaca.connectDevice('camera-1')
     await vi.advanceTimersByTimeAsync(30)
@@ -150,17 +172,7 @@ describe('Alpaca device connection', () => {
 
   it('stops bounded asynchronous verification without replaying the write', async () => {
     vi.useFakeTimers()
-    const requests: RecordedRequest[] = []
-    const alpaca = provider([
-      inventory,
-      envelope(false),
-      methodEnvelope(),
-      envelope(false),
-      envelope(true),
-      envelope(true),
-      envelope(true),
-      envelope(true),
-    ], requests)
+    const { alpaca, fetch } = connectingProvider(Infinity)
 
     const connection = alpaca.connectDevice('camera-1')
     await vi.advanceTimersByTimeAsync(30)
@@ -169,7 +181,7 @@ describe('Alpaca device connection', () => {
       outcome: 'uncertain',
       reason: 'verification-timeout',
     })
-    expect(requests.filter(({ method }) => method === 'PUT')).toHaveLength(1)
+    expect(fetch.mock.calls.filter(([, init]) => init?.method === 'PUT')).toHaveLength(1)
   })
 
   it('returns a confirmed failure when the provider rejects the write', async () => {
