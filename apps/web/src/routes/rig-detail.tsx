@@ -1,11 +1,13 @@
 import type { RigDetailView, RigDeviceDetailView } from '@vela/model/web'
-import { Badge, Button, Dialog, IconButton } from '@vela/ui'
+import { Badge, Button, Dialog, IconButton, Panel } from '@vela/ui'
 import { useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { RefreshIcon } from '../components/ui/icons'
 import { RigDeviceCard } from '../features/rig-detail/RigDeviceCard'
 import { useRigDetail } from '../features/rig-detail/use-rig-detail'
 import { forgetRig } from '../features/rig-management/forget-rig'
+import { ObservationMark } from '../features/observation/ObservationMark'
+import './observe.css'
 
 const kindOrder = [
   'telescope',
@@ -93,6 +95,14 @@ export function RigDetail() {
           />
         </div>
       </header>
+
+      <Panel className="vela-observe-entry" elevation="raised">
+        <span className="vela-observe-entry-mark"><ObservationMark /></span>
+        <div><small>Observation workspace</small><h2>Ready to use this Rig?</h2>
+          <p>Open a focused workspace for preparing and observing with {view.name}.</p>
+        </div>
+        <Button tone="accent" size="large" onClick={() => navigate(`/rigs/${encodeURIComponent(view.id)}/observe`)}>Start observing</Button>
+      </Panel>
 
       {interrupted ? (
         <Notice

@@ -109,7 +109,7 @@ function devicePresentation(device: RigDeviceDetailView): DevicePresentation {
     return {
       activity: device.connection === 'disconnected' ? 'Disconnected' : 'Status unavailable',
       note: device.connection === 'disconnected'
-        ? 'Connect this device in its driver to see live status'
+        ? 'Live status requires a device connection'
         : 'No live information from this device',
       metrics: [],
     }

@@ -4,6 +4,7 @@ dist
 .env.local
 *.tsbuildinfo
 .DS_Store
+.codex/
 apps/workshop/.local/
 apps/workshop/playwright-report/
 apps/workshop/test-results/
