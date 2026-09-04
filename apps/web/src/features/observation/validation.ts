@@ -19,9 +19,8 @@ export function isConnectRigDevicesResult(value: unknown): value is ConnectRigDe
   const { confirmedConnected, notAttempted } = value
   if (!devices(confirmedConnected)) return false
   if (value.outcome === 'complete') {
-    return value.view.connectionPreparation.state === 'complete'
-      && (value.command === 'not-needed' ? confirmedConnected.length === 0
-        : value.command === 'completed' && confirmedConnected.length > 0)
+    return value.command === 'not-needed' ? confirmedConnected.length === 0
+      : value.command === 'completed' && confirmedConnected.length > 0
   }
   if (!devices(notAttempted)) return false
   const confirmedIds = confirmedConnected.map((item) => item.id)

@@ -177,3 +177,18 @@ test('failed reads stop presenting last-known progress as active', async ({ page
   await expect(page.getByText('Status updating', { exact: true })).toHaveCount(0)
   await expect(page.getByText('Last known state', { exact: true })).toBeVisible()
 })
+
+for (const state of ['available', 'unavailable'] as const) {
+  test(`keeps confirmed command evidence when the subsequent view is ${state}`, async ({ page }) => {
+    await page.route('**/api/web/rigs/rig-1/observe', (route) => respond(route, observation()))
+    await page.route('**/api/rigs/rig-1/connections', (route) => respond(route, {
+      outcome: 'complete', command: 'completed', confirmedConnected: [device(0), device(1), device(2)],
+      view: observation(state),
+    }))
+    await page.goto('/rigs/rig-1/observe')
+    await page.getByRole('button', { name: 'Connect devices' }).click()
+    await expect(page.getByText('Last connection attempt: 3 device connections confirmed.')).toBeVisible()
+    await expect(page.getByRole('heading', { name: state === 'available' ? 'Connect this Rig’s devices' : 'Device state needs attention' })).toBeVisible()
+    await expect(page.getByText('The command response could not be confirmed.', { exact: false })).toHaveCount(0)
+  })
+}

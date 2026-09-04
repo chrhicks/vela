@@ -25,6 +25,15 @@ describe('observation response validation', () => {
     ]) expect(isConnectRigDevicesResult(result)).toBe(true)
   })
 
+  it('preserves completed command evidence independently of the subsequent observation', () => {
+    for (const state of ['complete', 'available', 'unavailable'] as const) {
+      expect(isConnectRigDevicesResult({
+        outcome: 'complete', command: 'completed', confirmedConnected: [device(0)],
+        view: observation(state),
+      })).toBe(true)
+    }
+  })
+
   it('rejects conflicting variant fields even when they are null', () => {
     const base = { outcome: 'uncertain', view: observation(), confirmedConnected: [], notAttempted: [], uncertain: { ...device(1), reason: 'write-outcome-unknown' } }
     for (const field of ['failed', 'stoppedAfter']) {
