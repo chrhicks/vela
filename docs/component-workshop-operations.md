@@ -4,6 +4,8 @@ This guide is the repeatable operating procedure for designing, validating, prom
 
 The workshop is a local developer tool. None of the procedures below publish a package, change Vela's default theme, apply a named design profile to Vela, or adopt a component into the Vela application automatically.
 
+The current collaboration and delivery policy is in [AGENTS.md](../AGENTS.md#working-with-chris). Chris shapes the design with the agent in the workshop; the agent performs source changes, verification, promotion, and adoption needed for the agreed implementation. Approval of that scope carries through those operations without a separate permission request for each file or component. Material design departures or global-theme changes outside that scope return to alignment. User-facing changes receive Chris's implementation review after an independent **OK** verdict and before merge.
+
 ## Workspace boundaries
 
 ```text
@@ -48,15 +50,14 @@ Open:
 
 Source and specimen edits refresh through Vite HMR. The local persistence server binds to `127.0.0.1` and exposes only the fixed session and profile routes.
 
-Run the repeatable non-browser proof with:
+Choose focused tests and builds for the affected boundary using [CODING_STANDARDS.md](../CODING_STANDARDS.md#focused-verification), then check the diff. For example, a UI component change may use:
 
 ```sh
-pnpm test
-pnpm build
+pnpm --filter @vela/ui build
 git diff --check
 ```
 
-The focused tests cover shared artifact validation, local persistence validation, paired light/dark token resolution, complete reference ramps, and stable-versus-draft exports.
+Run the relevant existing test files for shared artifact validation, local persistence, token resolution, or stable-versus-draft exports when those behaviors are affected. Full `pnpm test` and `pnpm build` are appropriate when the change crosses enough workspace boundaries to warrant them, not as a default for every specimen edit.
 
 Dialog behavior also has a focused Chromium suite because modal focus, dismissal, and restoration depend on browser behavior. Install its browser once, then run it with:
 
@@ -131,7 +132,7 @@ Copy Context adds density, baseline identity and fingerprint, plus unsaved overr
 
 ## Targeted browser checklist
 
-Run this checklist for a meaningful library change and every promotion. Record the result in the corresponding Linear issue. Keep browser automation focused on behavior that genuinely depends on a browser rather than turning every visual state into a brittle test.
+Use the relevant checks below for a meaningful library change and every promotion. Exercise the changed component and affected shared behavior; expand to the whole gallery when shared tokens, discovery, or composition change. Record the evidence in the corresponding Linear issue. Keep browser automation focused on behavior that genuinely depends on a browser rather than turning every visual state into a brittle test.
 
 1. Start from a fresh browser load of `/gallery` and confirm there are no console errors.
 2. Confirm every expected component is discoverable and labeled Stable or Draft correctly.
@@ -144,13 +145,13 @@ Run this checklist for a meaningful library change and every promotion. Record t
 9. Change density and enable baseline comparison.
 10. Review focused contrast and literal-color diagnostics.
 11. Reload the stable URL and confirm recovery is coherent.
-12. Run `pnpm test`, `pnpm build`, `pnpm --filter @vela/workshop test:browser` when relevant, and `git diff --check`.
+12. Run focused tests and builds for the affected boundary, the relevant workshop browser tests when browser behavior changed, and `git diff --check`. Stop once the necessary evidence is established unless a new concern requires more checks.
 
 This checklist is targeted evidence, not an exhaustive state generator or accessibility audit.
 
 ## Manually promote a component
 
-Promotion requires explicit owner approval for a named component. It is deliberately performed through an inspectable source diff.
+Promotion is an intentional source operation within an agreed design and implementation scope. The agent may carry it out when that scope includes making the component available to the application; exploratory draft work alone does not authorize promotion. Preserve an inspectable source diff.
 
 Before promotion, confirm:
 
@@ -158,7 +159,7 @@ Before promotion, confirm:
 - Representative specimens exist.
 - Paired light and dark rendering is coherent.
 - The component uses the shared token contract.
-- Focused tests and the workspace build pass.
+- Relevant focused tests and builds pass.
 
 Then:
 
@@ -176,7 +177,7 @@ Button at the CHI-86 fixed point is the first individually proven example of thi
 
 ## Adopt one stable component in Vela later
 
-Promotion does not adopt a component. Adoption is a separate, explicitly approved Vela change performed one component and one real use site at a time. When a component has a product-example specimen, `apps/web` imports only the promoted primitive. Rebuild the production feature from web-owned state, copy, domain markup, and assets; never import the specimen or treat its TSX as a feature module.
+Promotion does not itself adopt a component. Adoption is a deliberate Vela source change within the agreed feature scope. Keep it incremental and limited to real use sites that scope needs. Run and visually inspect the approved product example before implementing it; preserve its intended hierarchy, typography, borders, and artwork while keeping wording honest for real operational states. When a component has a product-example specimen, `apps/web` imports only the promoted primitive. Rebuild the production feature from web-owned state, copy, domain markup, and assets; never import the specimen or treat its TSX as a feature module.
 
 For a future Button adoption:
 
@@ -189,11 +190,11 @@ For a future Button adoption:
 
 Any missing variable must be handled deliberately at that adoption boundary. Adoption must not silently change global defaults.
 
-## What remains manual
+## What remains an explicit operation
 
 - Source edits and specimen authoring
 - Profile Save and Save As
-- Owner approval for promotion
+- Agreeing the design and implementation scope with Chris
 - File movement and export changes
 - Browser checklist execution
 - Vela adoption
