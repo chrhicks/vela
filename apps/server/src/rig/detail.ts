@@ -25,7 +25,21 @@ export type LoadRigDetailResult =
   | { readonly state: 'found'; readonly view: RigDetailView }
   | { readonly state: 'not-found' }
 
-interface RigDetailOptions {
+export type InspectRigDetailResult =
+  | {
+      readonly state: 'current'
+      readonly view: RigDetailView
+      readonly inspections: ReadonlyArray<AlpacaDeviceInspection>
+    }
+  | {
+      readonly state: 'unavailable'
+      readonly reason: 'needs-attention' | 'offline'
+      readonly view: RigDetailView
+    }
+  | { readonly state: 'conflict'; readonly view: RigDetailView }
+  | { readonly state: 'not-found' }
+
+export interface RigDetailOptions {
   readonly createInspector?: (rig: RigInspectionSource) => RigDeviceInspector
   readonly now?: () => Date
   readonly onUnavailable?: (
@@ -37,7 +51,7 @@ interface RigDetailOptions {
   readonly signal?: AbortSignal
 }
 
-export async function loadRigDetailView(
+export async function inspectRigDetail(
   catalog: RigCatalog,
   rigId: string,
   {
@@ -47,7 +61,7 @@ export async function loadRigDetailView(
     onConflict = () => {},
     signal,
   }: RigDetailOptions = {},
-): Promise<LoadRigDetailResult> {
+): Promise<InspectRigDetailResult> {
   const record = await catalog.get(rigId)
   if (record === undefined) return { state: 'not-found' }
 
@@ -63,7 +77,8 @@ export async function loadRigDetailView(
     const state = error.reason === 'transport' ? 'offline' : 'needs-attention'
     onUnavailable(record, state, error)
     return {
-      state: 'found',
+      state: 'unavailable',
+      reason: state,
       view: lastKnownRigDetail(record, state, now().toISOString()),
     }
   }
@@ -74,7 +89,7 @@ export async function loadRigDetailView(
   if (match.state !== 'known' || match.rigId !== record.id) {
     onConflict(record)
     return {
-      state: 'found',
+      state: 'conflict',
       view: lastKnownRigDetail(record, 'needs-attention', refreshedAt),
     }
   }
@@ -82,7 +97,8 @@ export async function loadRigDetailView(
   const devices = inspections.map((inspection) =>
     currentDeviceView(record.id, inspection, refreshedAt))
   return {
-    state: 'found',
+    state: 'current',
+    inspections,
     view: {
       id: record.id,
       name: record.name,
@@ -96,6 +112,17 @@ export async function loadRigDetailView(
       capabilities: ['forget'],
     },
   }
+}
+
+export async function loadRigDetailView(
+  catalog: RigCatalog,
+  rigId: string,
+  options: RigDetailOptions = {},
+): Promise<LoadRigDetailResult> {
+  const result = await inspectRigDetail(catalog, rigId, options)
+  return result.state === 'not-found'
+    ? result
+    : { state: 'found', view: result.view }
 }
 
 function resolvedRigState(devices: ReadonlyArray<RigDeviceDetailView>): RigState {
