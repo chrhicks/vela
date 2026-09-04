@@ -14,6 +14,7 @@ Open `http://127.0.0.1:5174` for the focused workbench or `http://127.0.0.1:5174
 
 - Stable Button, IconButton, Input, Select, Checkbox, Badge, Tabs, and Panel/Card components
 - A fixture-backed Rig overview product example for evaluating clickable Rig summaries and kind-specific live device cards
+- A fixture-backed observation-readiness product example for evaluating the Start Observing transition, Rig-level connection preparation, and honest partial or uncertain outcomes
 - A stable Dialog with both primitive anatomy and a fixture-backed Rig discovery product example
 - Auto-discovered colocated specimens
 - One primitive-focused specimen per component, with additional product examples only for concrete compositions that prop controls cannot express
