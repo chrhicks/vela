@@ -19,7 +19,16 @@ capability decisions. Views remain semantic, typed contracts rather than
 generic property bags or preformatted display strings; visual composition,
 copy, and formatting remain browser concerns. Home Rig projections carry a
 compact connection aggregate; per-device observations belong to the Rig-detail
-view.
+view. Observation views compose that existing Rig detail with a focused
+connection-preparation state. `complete` means no currently supported interface
+needs a connection command; it is not permission to perform every observing
+activity. Connection command results report interfaces confirmed connected by
+the current operation separately from a failed or uncertain interface and from
+interfaces that were not attempted. Interfaces already connected before the
+operation remain represented by the refreshed Rig connection aggregate. When a
+refresh resolves an uncertain write after sequencing has already stopped,
+`stoppedAfter` identifies the now-confirmed interface while later interfaces
+remain `notAttempted`.
 
 The package has no runtime dependencies. In particular, it does not own:
 
