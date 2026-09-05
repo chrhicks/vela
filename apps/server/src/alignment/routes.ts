@@ -1,11 +1,12 @@
 import type { FastifyInstance } from 'fastify'
 import { createAlpacaAcquisition } from '@vela/alpaca'
 import type { AlignmentView } from '@vela/model/web'
+import { createRigOperations, type RigOperations } from '../rig/operations.js'
 import type { RigCatalog } from '../rig/catalog.js'
 import { createAlignmentController, type AlignmentSettings } from './controller.js'
 import { createAstapSolver } from './solver.js'
 
-export function registerAlignment(app: FastifyInstance, catalog: RigCatalog, settings?: AlignmentSettings) {
+export function registerAlignment(app: FastifyInstance, catalog: RigCatalog, settings?: AlignmentSettings, operations: RigOperations = createRigOperations()) {
   const alignment = settings ? createAlignmentController(settings,
     createAlpacaAcquisition({ baseUrl: settings.endpoint }),
     createAstapSolver({ executable: settings.executable, catalogPath: settings.catalogPath, fieldHeightDegrees: settings.fieldHeightDegrees })) : undefined
@@ -18,7 +19,12 @@ export function registerAlignment(app: FastifyInstance, catalog: RigCatalog, set
       && rig.lastObservedInventory.devices.some(device => device.uniqueId === settings.cameraId && device.kind === 'camera')
       && rig.lastObservedInventory.devices.some(device => device.uniqueId === settings.telescopeId && device.kind === 'telescope')
     const state = alignment?.snapshot()
-    if (enabled && state) return { ...state, rigId, rigName: rig.name }
+    if (state && (enabled || state.active && state.rigId === rigId)) {
+      const owner = operations.owner(rigId)
+      const available = !owner || owner === 'alignment'
+      return { ...state, rigId, rigName: rig.name, enabled: available,
+        unavailableReason: available ? null : 'Another Rig operation is in progress.' }
+    }
     return { rigId, rigName: rig.name, enabled: false, unavailableReason: 'Polar alignment is not configured for this Rig.',
       phase: 'setup', activity: 'idle', active: false, position: 0, solvedPositions: 0,
       exposureSeconds: settings?.exposureSeconds ?? 2, exposureStartedAt: null, measuredAt: null,
@@ -31,21 +37,30 @@ export function registerAlignment(app: FastifyInstance, catalog: RigCatalog, set
   app.post<{ Params: { rigId: string; command: string } }>('/api/rigs/:rigId/alignment/:command', async (request, reply) => {
     if (!request.headers['content-type']?.startsWith('application/json') || !request.body || typeof request.body !== 'object'
       || Array.isArray(request.body) || Object.keys(request.body).length > 0) return reply.code(400).send({ error: 'Expected an empty JSON object' })
-    const view = await rigView(request.params.rigId)
-    if (!view) return reply.code(404).send({ error: 'Rig not found' })
-    if (!view.enabled || !alignment) return reply.code(409).send({ error: view.unavailableReason })
+    const release = request.params.command === 'start' ? operations.acquire(request.params.rigId, 'alignment') : undefined
+    if (request.params.command === 'start' && !release) return reply.code(409).send({ error: 'Another Rig operation is in progress' })
+    let started = false
     try {
-      if (request.params.command === 'start') return await alignment.start(view.rigId, view.rigName)
+      const view = await rigView(request.params.rigId)
+      if (!view) return reply.code(404).send({ error: 'Rig not found' })
+      if (!view.enabled || !alignment) return reply.code(409).send({ error: view.unavailableReason })
+      if (request.params.command === 'start') {
+        const result = await alignment.start(view.rigId, view.rigName, release)
+        started = true
+        return result
+      }
       if (request.params.command === 'stop') return await alignment.stop()
       if (request.params.command === 'finish') return await alignment.stop(true)
       return reply.code(404).send({ error: 'Unknown alignment command' })
     } catch (error) {
       return reply.code(409).send({ error: error instanceof Error ? error.message : 'Alignment command failed' })
+    } finally {
+      if (!started) release?.()
     }
   })
   app.get<{ Params: { rigId: string; imageId: string } }>('/api/rigs/:rigId/alignment/images/:imageId', async (request, reply) => {
     const view = await rigView(request.params.rigId)
-    const image = view?.enabled ? alignment?.image(request.params.imageId) : undefined
+    const image = view && alignment?.snapshot().rigId === request.params.rigId ? alignment.image(request.params.imageId) : undefined
     if (!image) return reply.code(404).send({ error: 'Frame no longer available' })
     return reply.type('image/png').header('cache-control', 'private, max-age=3600, immutable').send(image)
   })
