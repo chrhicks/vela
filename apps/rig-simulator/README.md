@@ -1,15 +1,15 @@
 # Rig simulator
 
-Development-only sky and equatorial mount foundation for offline polar alignment.
+Development-only sky, cameras and equatorial mount for offline capture and polar alignment.
 The simulator generates image pixels; it does not supply alignment answers to Vela.
 The local Alpaca service and separate controls implement the approved workshop
-design. Vela’s production polar-alignment operation remains follow-on work.
+design. The simulator feeds Vela’s actual capture and polar-alignment adapters.
 
 ## Current capability
 
 `mount.ts` models a rigid camera on an equatorial mount with altitude/azimuth
 misalignment. `sky.ts` projects catalog stars through that camera and renders
-monochrome exposures. `fits.ts` writes the pixels for an external solver.
+monochrome and raw RGGB exposures. `fits.ts` writes the pixels for an external solver.
 `catalog.ts` reads a locally provisioned ASTAP D05 catalog. No catalog or solver
 is downloaded at import, build or test time.
 
@@ -32,12 +32,13 @@ produces background noise without stars, so solving actually fails.
   Earth rotation then transforms the whole mount into the sky frame.
   A perfectly aligned tracking mount keeps the entire image fixed.
 - Exposures have a real waiting/completion lifecycle, but their pixels are an
-  instantaneous snapshot at exposure start. Duration does not yet change star
-  brightness. Motion blur and photometric realism are not modeled.
+  instantaneous snapshot at exposure start. Duration scales star and sky brightness
+  from a two-second baseline, with sensor saturation. Motion blur and calibrated
+  photometry are not modeled.
 - The catalog loader defaults to RA 0–70°, Dec 50–70° for the proof. This is
   deliberately a sky patch, not all-sky coverage. Later movement controls must
   honor coverage or load a larger region; an empty patch is not a cloud model.
-- No refraction, precession/nutation, flexure, optical distortion, Bayer sensor,
+- No refraction, precession/nutation, flexure, optical distortion,
   seeing model or physical hardware is modeled. Catalog and solver use the same
   star data. Successful simulation does not establish real-sky precision.
 
@@ -116,8 +117,8 @@ The proof also checks the solver's reference pixel against the optical center.
 
 The inverse measurement code is confined to this opt-in evidence harness. It is
 not shared with the generator and is not the production polar-alignment engine.
-Single-frame adjustment, real Alpaca transfer and operation-state integration
-belong to the subsequent validation ticket.
+The separate HTTP proof below exercises real Alpaca transfer and production
+capture and alignment contracts.
 
 
 ## Run the development rig
@@ -136,7 +137,7 @@ outside the current scope. `pnpm build` builds the server and control assets;
 `pnpm start` starts the compiled Alpaca service.
 
 In Vela, use manual host entry to add `127.0.0.1`, port `7850`. Its normal
-inspection and connection flow sees a camera and telescope with stable identities.
+inspection and connection flow sees two cameras and one telescope with stable identities.
 This assumes the Vela server and simulator run on the same machine. No real rig
 is involved and the simulator never forwards requests to physical devices.
 
@@ -148,20 +149,46 @@ read-only polling reconnects. Closing the control page does not stop the service
 ## Supported device and control boundaries
 
 The Alpaca service supports the management/identity/connection/telemetry reads
-used by Vela, a fixed 1600×1200 monochrome camera (binning 1), start/abort exposure,
-image readiness and JSON `ImageArray`, and RA-axis movement/tracking/stop for one
-equatorial mount. JSON image arrays use Alpaca order `[x][y]`, `Type: 2`, `Rank: 2`.
+used by Vela, two independent cameras (binning 1), start/abort exposure, image
+readiness, and RA-axis movement/tracking/stop for one shared equatorial mount.
+
+| Camera | Identity | Sensor | ADU range |
+| --- | --- | --- | --- |
+| 0 · Simulator Camera | `vela-simulator-camera` (unchanged) | Monochrome | 0–32767 |
+| 1 · Simulator Color Camera | `vela-simulator-color-camera` | Raw RGGB, zero Bayer offsets | 0–65535 |
+
+Both default to 1600×1200 for quick iteration. Each can independently use
+6248×4176 to exercise the FRA camera's pixel count and Vela's full-size image
+path. Both retain a synthetic 3° field height; this does not reproduce FRA optics.
+D05 provides positions and magnitude, not measured colors. Repeatable warm,
+neutral and cool assignments exercise color reconstruction without claiming
+astronomical color accuracy. The mono two-second baseline retains its original
+rendering for alignment regression.
+
+`ImageArray` negotiates `application/imagebytes` when explicitly accepted by the
+client; otherwise it streams JSON. Both encode the same cached frame in Alpaca
+order `[x][y]`. ImageBytes uses a 44-byte little-endian header, Int32 source type,
+UInt16 transmission, and rank 2. JSON uses `Type: 2`, `Rank: 2`.
 Unused capabilities return unsupported errors. This is a bounded development
-subset, not a claim of complete ASCOM driver conformance. No UDP discovery or
-ImageBytes path is implemented yet.
+subset, not complete ASCOM driver conformance. No UDP discovery is implemented.
+
+The asynchronous renderer yields between small stripes and keeps floating-point
+scratch below 512 KiB; only the UInt16 output scales with frame area. Binary
+transfer needs one additional two-byte-per-pixel buffer. JSON streams columns
+instead of constructing a full nested image. Reset, disconnect and new exposures
+invalidate pending generation and serialization; discarded images cannot become
+successful replacement frames. Full-size frames are a deliberate stress mode,
+not the default iteration cost.
 
 Exposure images are captured from the modeled pose and camera obstruction at
 start, become available after duration elapses, and remain the last completed
 image until a new exposure starts or abort/reset/disconnect invalidates them.
-Movement and offset changes are rejected during exposure. Camera obscuring
-changes the next exposure only. Reset aborts pending exposure, removes its image,
+Movement and offset changes are rejected while either camera exposes. One camera
+can disconnect or abort without interrupting the other. Camera obscuring
+changes the next exposure on both cameras only. Resolution changes require that
+camera to be idle and discard its old frame. Reset aborts both exposures, removes both images,
 stops axis movement, restores the preset and clears the camera; device connection
-flags are preserved. In-flight browser requests are not evidence of fresh images.
+flags and resolutions are preserved; noise seeds restart for repeatable scenarios. In-flight browser requests are not evidence of fresh images.
 
 The simulation-only API is separate from Alpaca:
 
@@ -169,7 +196,7 @@ The simulation-only API is separate from Alpaca:
 | --- | --- |
 | `GET /simulator/state` | Read current actual simulation state |
 | `PUT /simulator/adjust` | Absolute signed `altitudeArcsec`, `azimuthArcsec` |
-| `PUT /simulator/camera` | Set boolean `obscured` for the next exposure |
+| `PUT /simulator/camera` | Set boolean `obscured`, or `cameraNumber` (0/1) and `resolution` (`fast`/`full`) |
 | `POST /simulator/reset` | Apply `preset`: `large-error`, `near-aligned`, `aligned` |
 
 Mutations require JSON. Offset limits are ±18000 arcseconds. The approved presets
@@ -179,9 +206,8 @@ separate development controls can see and change that truth.
 
 The current catalog patch limits useful acquisition. Movement has a bounded
 nominal RA interval; requests to expose outside the supported field return an
-explicit error rather than treating missing catalog stars as clouds. Production
-alignment acquisition/movement adapters and full measured-correction integration
-are tracked separately in CHI-153.
+explicit error rather than treating missing catalog stars as clouds. The HTTP proof below exercises production alignment acquisition, movement,
+solving and measured correction against this patch.
 
 ## HTTP acquisition and alignment proof
 
@@ -200,7 +226,11 @@ The server's actual ASTAP adapter and alignment geometry fit three solved
 positions, then measure partial, near, and zero adjustments against that same
 baseline. The proof also obscures the camera to produce a genuine ASTAP failure,
 clears it to recover, and cancels an active exposure before checking a fresh
-restart. It stops acquisition and closes its own simulator when finished.
+restart. It then exercises Vela’s imaging-camera selection and Capture extension
+with color → mono → color, compares every fast-frame pixel across ImageBytes and
+JSON, checks actual color in PNGs, inspects native/Fit full-size previews, and
+confirms the latest image survives Stop. It stops acquisition and closes its own
+simulator when finished.
 
 Only standard Alpaca pointing and local sidereal time supply measurement inputs;
 the sidereal angle is advanced to the exposure timestamp on the shared host clock.
