@@ -4,7 +4,9 @@ import { useEffect, useRef } from 'react'
 import { Link, useParams } from 'react-router'
 import { readinessPresentation } from '../features/observation/presentation'
 import { useObservation } from '../features/observation/use-observation'
-import { ConnectionMark, ObservationMark } from '../features/observation/ObservationMark'
+import { CaptureHub } from '../features/capture/CaptureHub'
+import '../routes/capture.css'
+import { ConnectionMark } from '../features/observation/ObservationMark'
 import './observe.css'
 
 export function Observe() {
@@ -36,14 +38,15 @@ function ObservationPage({ rigId }: { rigId: string }) {
   const title = uncertain && !busy ? 'The connection result is uncertain' : presentation.title
   const { rig } = view
 
-  return <section className="vela-rig-page vela-observe">
+  return <section className="vela-rig-page vela-observe vela-observe-hub">
     {back}
-    <header className="vela-observe-hero">
-      <span className="vela-observe-entry-mark"><ObservationMark /></span>
-      <div><small>Observation</small><h1>Observing with {rig.name}</h1><p>Prepare this Rig and confirm what Vela can see before using it.</p></div>
+    <header className="capture-page__heading">
+      <div><p>{rig.name}</p><h1>Observe</h1></div>
       <Badge marker={<i />} tone={uncertain ? 'warning' : presentation.tone}>{uncertain ? 'Confirmation needed' : presentation.badge}</Badge>
     </header>
-    <Link className="vela-rig-page__back" to={`/rigs/${encodeURIComponent(rigId)}/observe/alignment`}>Polar alignment →</Link>
+    <p className="vela-capture-intro">{interrupted ? 'Waiting for rig updates. The information shown is last known.' : view.connectionPreparation.state === 'complete' ? 'Connection preparation is complete. What would you like to do?' : 'Check your rig’s connections, then choose an activity.'}</p>
+    <details className="capture-page__rig vela-capture-rig" open={busy || uncertain || interrupted || view.connectionPreparation.state !== 'complete' ? true : undefined}>
+      <summary><span><i data-offline={interrupted || undefined} />{title}</span><span>Device details</span></summary>
     <div className="vela-observe-section-heading">
       <div><small>Preparation</small><h2>Rig readiness</h2></div>
       <span>{interrupted || busy ? 'Last received' : 'Checked'} <time dateTime={rig.refreshedAt}>{new Date(rig.refreshedAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</time></span>
@@ -78,6 +81,8 @@ function ObservationPage({ rigId }: { rigId: string }) {
         <p>Opening this workspace does not start an exposure or save an observation.</p>
       </Panel>
     </div>
+    </details>
+    <CaptureHub rigId={rigId} />
   </section>
 }
 

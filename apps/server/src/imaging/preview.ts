@@ -1,6 +1,6 @@
 import { deflateSync } from 'node:zlib'
 
-/** A display stretch only; the solver always receives the original pixels. */
+/** A display stretch at native dimensions; acquisition pixels remain unchanged. */
 export function previewPng(width: number, height: number, pixels: ArrayLike<number>): Buffer {
   const sample = Array.from({ length: Math.ceil(pixels.length / 32) }, (_, i) => pixels[i * 32]!).sort((a, b) => a - b)
   const background = sample[Math.floor(sample.length * 0.5)] ?? 0
