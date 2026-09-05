@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { CaptureView } from '@vela/model/web'
 import { capturePreviews, type ImageColor } from '../imaging/preview.js'
+import { measureStars } from '../imaging/statistics.js'
 
 export interface CaptureFrame {
   width: number
@@ -55,7 +56,13 @@ export function createCaptureController(
         // A completed acquisition wins a race with Stop: publish the actual result.
         if (!signal.aborted) patch({ phase: 'reading' })
         const id = randomUUID()
-        const previews = await capturePreviews(frame.width, frame.height, frame.pixels, frame.color)
+        const [previews, statistics] = await Promise.all([
+          capturePreviews(frame.width, frame.height, frame.pixels, frame.color),
+          measureStars(frame.width, frame.height, frame.pixels, frame.color).catch(error => {
+            console.warn('Capture image star measurements unavailable', error)
+            return null
+          }),
+        ])
         images.set(id, previews)
         while (images.size > 3) images.delete(images.keys().next().value!)
         patch({ phase: 'complete', completedCount: view.completedCount + 1, elapsedSeconds: exposureSeconds, latestImage: {
@@ -63,7 +70,7 @@ export function createCaptureController(
           ...(previews.fit ? { fitImageUrl: `/api/rigs/${encodeURIComponent(settings.rigId)}/capture/images/${id}/fit` } : {}),
           width: frame.width, height: frame.height, exposureSeconds,
           capturedAt: frame.capturedAt, receivedAt: new Date(now()).toISOString(), cameraName,
-          color: frame.color?.kind === 'bayer' ? 'color' : 'mono',
+          color: frame.color?.kind === 'bayer' ? 'color' : 'mono', statistics,
         } })
       } while (repeat && !signal.aborted)
     } catch (error) {

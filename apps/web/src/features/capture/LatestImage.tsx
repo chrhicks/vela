@@ -153,8 +153,17 @@ export function LatestImage({ image, busy, interrupted }: {
           <p>{busy || loading ? 'The image will appear when it is received.' : 'Choose an exposure time, then take an image to check what the camera sees.'}</p>
         </div>}
     </div>
+    {frame && <div className="capture-image__statistics">
+      <dl aria-label="Image statistics">
+        <div><dt>Dimensions</dt><dd>{frame.width} × {frame.height}</dd></div>
+        <div><dt title="Detected stars with a reliable measurement">Stars</dt><dd>{frame.statistics?.detectedStars ?? '—'}</dd></div>
+        <div><dt title="Median half-flux radius in native image pixels">HFR · px</dt><dd>{frame.statistics?.medianHfrPixels?.toFixed(2) ?? '—'}</dd></div>
+      </dl>
+      {!frame.statistics ? <p>Star measurements unavailable for this image.</p>
+        : frame.statistics.detectedStars === 0 ? <p>No measurable stars in this image.</p> : null}
+    </div>}
     {frame && <footer>
-      <span>{frame.exposureSeconds} s <i>·</i> {frame.color === 'color' ? 'Color' : 'Mono'} <i>·</i> {frame.width} × {frame.height}</span>
+      <span>{frame.exposureSeconds} s <i>·</i> {frame.color === 'color' ? 'Color' : 'Mono'}</span>
       <span>{nativeVisible ? 'Scroll to inspect' : 'Display stretched'}</span>
     </footer>}
   </section>
