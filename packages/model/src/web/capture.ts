@@ -14,7 +14,7 @@ export interface CaptureImage {
   color: 'mono' | 'color'
 }
 
-/** Server-owned single exposure and the most recent retained image. */
+/** Server-owned ephemeral capture run and the most recent retained image. */
 export interface CaptureView {
   rigId: string
   rigName: string
@@ -23,6 +23,9 @@ export interface CaptureView {
   unavailableReason: string | null
   phase: 'idle' | 'exposing' | 'reading' | 'stopping' | 'complete' | 'stopped' | 'failed'
   active: boolean
+  repeat: boolean
+  /** Completed images published during the current or most recent run. */
+  completedCount: number
   exposureSeconds: number
   elapsedSeconds: number
   error: string | null
