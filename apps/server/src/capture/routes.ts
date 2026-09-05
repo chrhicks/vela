@@ -10,18 +10,15 @@ import { CaptureStoppedError, createCaptureController, type CaptureCamera } from
 export interface CaptureSettings {
   endpoint: string
   cameraId: string
-}
-
-interface ResolvedCaptureSettings extends CaptureSettings {
   expectedCameraName: string
 }
 
 interface CaptureRouteOptions {
-  createCamera?: (settings: ResolvedCaptureSettings) => CaptureCamera
+  createCamera?: (settings: CaptureSettings) => CaptureCamera
   createInspector?: RigDetailOptions['createInspector']
 }
 
-function configuredCamera(settings: ResolvedCaptureSettings): CaptureCamera {
+function configuredCamera(settings: CaptureSettings): CaptureCamera {
   const acquisition = createAlpacaAcquisition({ baseUrl: settings.endpoint })
   return {
     async capture({ exposureSeconds, signal, onProgress }) {
@@ -42,15 +39,14 @@ export function registerCapture(
   app: FastifyInstance,
   catalog: RigCatalog,
   operations: RigOperations,
-  legacySettings?: CaptureSettings,
   { createCamera = configuredCamera, createInspector }: CaptureRouteOptions = {},
 ) {
   const controllers = new Map<string, ReturnType<typeof createCaptureController>>()
 
   function cameraSettings(rig: RigCatalogRecord): CaptureSettings | undefined {
     const endpoint = `http://${rig.endpoint.host}:${rig.endpoint.port}`
-    if (rig.imagingCamera) return { endpoint, cameraId: rig.imagingCamera.uniqueId }
-    return legacySettings?.endpoint === endpoint ? legacySettings : undefined
+    if (rig.imagingCamera) return { endpoint, cameraId: rig.imagingCamera.uniqueId, expectedCameraName: rig.imagingCamera.name }
+    return undefined
   }
 
   async function rigView(rigId: string): Promise<CaptureView | undefined> {
@@ -62,7 +58,7 @@ export function registerCapture(
     }
     const unavailable = (reason: string): CaptureView => ({ ...current(), rigName: rig.name, enabled: false, unavailableReason: reason })
     const target = cameraSettings(rig)
-    if (!target) return unavailable('No imaging camera is configured for this Rig.')
+    if (!target) return unavailable('Choose an imaging camera on Observe before taking an exposure.')
     const detail = await inspectRigDetail(catalog, rigId, createInspector ? { createInspector } : {})
     if (detail.state === 'not-found') return undefined
     if (detail.state === 'conflict') return unavailable('Rig identity needs attention before capture.')
@@ -135,6 +131,13 @@ export function registerCapture(
   app.get<{ Params: { rigId: string, imageId: string } }>('/api/rigs/:rigId/capture/images/:imageId', async (request, reply) => {
     const rig = await catalog.get(request.params.rigId)
     const image = rig ? controllers.get(rig.id)?.image(request.params.imageId) : undefined
+    if (!image) return reply.code(404).send({ error: 'Frame no longer available' })
+    return reply.type('image/png').header('cache-control', 'private, max-age=3600, immutable').send(image)
+  })
+
+  app.get<{ Params: { rigId: string, imageId: string } }>('/api/rigs/:rigId/capture/images/:imageId/fit', async (request, reply) => {
+    const rig = await catalog.get(request.params.rigId)
+    const image = rig ? controllers.get(rig.id)?.fitImage(request.params.imageId) : undefined
     if (!image) return reply.code(404).send({ error: 'Frame no longer available' })
     return reply.type('image/png').header('cache-control', 'private, max-age=3600, immutable').send(image)
   })

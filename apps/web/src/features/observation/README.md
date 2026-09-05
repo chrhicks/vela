@@ -26,3 +26,6 @@ and Polar alignment remain prominent entry points. The Capture tile reads the
 same server-owned capture projection as the Capture page, preserving the last
 loaded image with its metadata. Preparation and capture availability remain
 separate facts; completing device connection does not imply capture support.
+
+The imaging-camera setting sits between preparation and activities. Its saved
+identity comes from the rig catalog; see [imaging camera](../imaging-camera/README.md).
