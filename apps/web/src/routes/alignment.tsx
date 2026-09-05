@@ -121,12 +121,15 @@ function AlignmentPage({ rigId }: { rigId: string }) {
   const activityArea = <div className="vela-polar-activity">
     <div className="vela-polar-activity__line" role="status"><span className="vela-polar-activity__spinner" style={{ visibility: view.active && !offline ? 'visible' : 'hidden' }} aria-hidden="true" /><strong>{activity}</strong>{view.activity === 'exposing' && !offline && <span className="vela-polar-activity__time">{elapsed.toFixed(1)} / {view.exposureSeconds} s</span>}</div>
     <progress style={{ visibility: view.activity === 'exposing' && !offline ? 'visible' : 'hidden' }} value={elapsed} max={view.exposureSeconds} aria-label="Exposure progress in seconds" />
-    {view.warning && <p className="vela-polar-activity__warning" role="status">{view.warning}</p>}
     <div className="vela-polar-activity__age"><span>Last alignment update</span><span>{age}</span></div>
     <p>{offline ? 'Readings and overlay are last known. Reconnecting…' : view.active ? 'Wait for a fresh alignment update after each adjustment.' : 'Readings and overlay are from the last successful solve.'}</p>
   </div>
   return <section className="vela-rig-page vela-alignment" data-pending={pending || undefined}>{back}
     <header className="vela-polar-heading"><div><p>{view.rigName} · Rig preparation</p><h1>Polar alignment</h1></div><Badge tone={offline || view.phase === 'failed' ? 'warning' : view.active ? 'accent' : 'neutral'}>{offline ? 'Disconnected' : view.phase === 'setup' ? 'Not started' : view.phase === 'baseline' ? 'Measuring' : view.phase}</Badge></header>
+    {view.warning && <div className="vela-polar-solve-warning" role="alert">
+      <strong>Plate-solving failed</strong>
+      <p>{view.active && !offline && view.activity !== 'stopping' ? 'Trying another image. ' : ''}{measurement ? 'Showing the last successful solve.' : 'No alignment result yet.'}</p>
+    </div>}
     {imageError && <p className="vela-polar-notice" role="status">The latest solved image could not be loaded. Previous readings and overlay remain together.</p>}
     {(error || view.error || !view.enabled) && <p className="vela-polar-notice" role="status">{error || view.error || view.unavailableReason}</p>}
     {baseline ? <div className="vela-polar-baseline">
