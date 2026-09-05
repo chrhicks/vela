@@ -84,17 +84,39 @@ Factory injection supports fake `fetch` and UDP scanner boundaries. Package test
 ## Exposure and primary-axis acquisition
 
 `createAlpacaAcquisition({ baseUrl })` is a separate narrow capability for a
-connected monochrome camera and equatorial mount. It resolves stable provider
+connected monochrome or unbinned RGGB Bayer camera and equatorial mount. It resolves stable provider
 IDs through management inventory; device numbers and JSON wire shapes remain
 private. The server owns operation serialization and decides which rigs and
 coordinate frames its workflow supports.
 
 - `capture({ cameraId, exposureSeconds, signal, onProgress })` starts one light
   exposure, observes `ImageReady`, and returns `{ width, height, pixels,
-  capturedAt }`. Pixels are row-major `Float64Array`; the timestamp is UTC.
-  The current boundary accepts monochrome, rank-2 Int32 JSON ImageArray only,
-  validates dimensions and pixels, and transposes Alpaca's `[x][y]` layout.
-  Color/Bayer cameras and ImageBytes are deliberately not supported yet.
+  capturedAt, color }`. Pixels are row-major `Float64Array`; the timestamp is UTC.
+  The boundary requests ImageBytes with JSON fallback on the same ImageArray
+  GET, using the response Content-Type to choose decoding. It accepts rank-2
+  Int32 source images and transposes Alpaca's `[x][y]` layout without changing
+  samples. ImageBytes v1 supports Int32, Int16, UInt16, and Byte transmission
+  elements; metadata, offsets, dimensions, payload length, and UTF-8 protocol
+  errors are checked before allocating normalized samples.
+  `color` is `{ kind: 'mono' }` or `{ kind: 'bayer', pattern }`, where the pattern
+  (`rggb`, `grbg`, `gbrg`, `bggr`) describes the returned image's top-left 2×2
+  samples. ASCOM Bayer offsets refer to the full sensor; the adapter combines
+  them with the subframe origin before exposing this normalized pattern.
+  Debayering and display stretching belong to the consumer. Bayer capture
+  requires 1×1 binning because mixed or driver-specific binned color samples
+  cannot be interpreted reliably from the Bayer offsets alone. Missing or
+  malformed color metadata rejects before exposure. Multi-plane RGB, other
+  color matrices, and other binary source/transmission types remain unsupported. `monochromeOnly: true`
+  retains a pre-exposure mono restriction for consumers such as alignment.
+  Images remain bounded to 40 million pixels. Binary data is decoded directly
+  into Float64 samples without an intermediate nested array. JSON fallback
+  still requires substantial transient memory for a full 26 MP camera. Image transfer has a separate 60-second
+  timeout (`imageTimeoutMs`); ordinary device requests retain their 5-second
+  default (`requestTimeoutMs`).
+- Optional `expectedCameraName` checks the fresh operational name immediately
+  before the exposure write. This detects a changed attached camera when a
+  driver retains the same stable slot identity. A mismatch or missing name
+  rejects without commanding or aborting that camera.
 - An already active camera is rejected before writing. A retained image with
   the same exposure timestamp is rejected as unconfirmed freshness; drivers
   with coarse timestamps may therefore require more spacing between captures.

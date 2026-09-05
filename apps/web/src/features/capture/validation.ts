@@ -17,6 +17,7 @@ function isCaptureImage(value: unknown, rigId: string): value is CaptureImage {
   // Preview URLs are same-origin resources belonging to this rig and immutable image ID.
   const expected = `/api/rigs/${encodeURIComponent(rigId)}/capture/images/${encodeURIComponent(value.id)}`
   return value.imageUrl === expected
+    && (value.color === 'mono' || value.color === 'color')
     && finite(value.width) && Number.isInteger(value.width) && value.width > 0
     && finite(value.height) && Number.isInteger(value.height) && value.height > 0
     && finite(value.exposureSeconds) && value.exposureSeconds >= 0.1 && value.exposureSeconds <= 600

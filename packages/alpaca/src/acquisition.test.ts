@@ -5,9 +5,19 @@ function observatory() {
   const camera = { DeviceName: 'Camera', DeviceType: 'Camera', DeviceNumber: 7, UniqueID: 'camera-id' }
   const telescope = { DeviceName: 'Mount', DeviceType: 'Telescope', DeviceNumber: 3, UniqueID: 'mount-id' }
   const state = {
+    cameraName: ' Camera ',
+    sensorType: 0,
+    binX: 1,
+    binY: 1,
+    offsetX: 0,
+    offsetY: 0,
+    startX: 0,
+    startY: 0,
+    unsupportedOffset: false,
     ready: true,
     exposing: false,
     rate: 0,
+    imageBinary: null as ArrayBuffer | null,
     image: { Type: 2, Rank: 2, Value: [[1, 3], [2, 4]] } as Record<string, unknown>,
     stamp: '2026-09-05T01:00:00',
     stale: false,
@@ -27,8 +37,17 @@ function observatory() {
     let Value: unknown
     if (operation === 'configureddevices') Value = [camera, telescope]
     else if (operation === 'connected' || operation === 'canabortexposure' || operation === 'canmoveaxis' || operation === 'tracking') Value = true
+    else if (operation === 'name') Value = state.cameraName
     else if (operation === 'axisrates') Value = [{ Minimum: 0, Maximum: 1.5 }]
-    else if (operation === 'sensortype') Value = 0
+    else if (operation === 'sensortype') Value = state.sensorType
+    else if (operation === 'binx') Value = state.binX
+    else if (operation === 'biny') Value = state.binY
+    else if (operation === 'bayeroffsetx' || operation === 'bayeroffsety') {
+      if (state.unsupportedOffset) return Response.json({ ClientTransactionID: 0, ServerTransactionID: 1, ErrorNumber: 1024, ErrorMessage: 'Not implemented' })
+      Value = operation === 'bayeroffsetx' ? state.offsetX : state.offsetY
+    }
+    else if (operation === 'startx') Value = state.startX
+    else if (operation === 'starty') Value = state.startY
     else if (operation === 'numx' || operation === 'numy') Value = 2
     else if (operation === 'camerastate') Value = state.exposing ? 2 : 0
     else if (operation === 'imageready') Value = state.ready
@@ -55,6 +74,7 @@ function observatory() {
       state.rate = rate
       if (rate !== 0 && state.lostMove) throw new TypeError('Response lost after motion began')
     } else if (operation === 'imagearray') {
+      if (state.imageBinary) return new Response(state.imageBinary, { headers: { 'content-type': 'application/imagebytes' } })
       return Response.json({ ClientTransactionID: 0, ServerTransactionID: 1, ErrorNumber: 0, ErrorMessage: '', ...state.image })
     } else throw new Error(`Unexpected request ${url.pathname}`)
     return Response.json({ ClientTransactionID: 0, ServerTransactionID: 1, ErrorNumber: 0, ErrorMessage: '', Value })
@@ -78,13 +98,82 @@ describe('normalized Alpaca acquisition', () => {
   it('waits for a new completed exposure and transposes x/y wire pixels into row-major pixels', async () => {
     const rig = observatory()
     let resolved = false
-    const result = rig.acquisition.capture({ cameraId: 'camera-id', exposureSeconds: 1 }).then(frame => { resolved = true; return frame })
+    const result = rig.acquisition.capture({ cameraId: 'camera-id', expectedCameraName: 'Camera', exposureSeconds: 1 }).then(frame => { resolved = true; return frame })
     await started(rig)
     expect(resolved).toBe(false)
     rig.complete()
     const frame = await result
     expect(Array.from(frame.pixels)).toEqual([1, 2, 3, 4])
+    expect(frame.color).toEqual({ kind: 'mono' })
     expect(frame.capturedAt).toBe('2026-09-05T01:00:02Z')
+    expect(rig.state.aborts).toBe(0)
+  })
+
+  it('captures a Bayer ImageBytes exposure through the same normalized frame contract', async () => {
+    const rig = observatory()
+    rig.state.sensorType = 2
+    const bytes = new ArrayBuffer(52)
+    const view = new DataView(bytes)
+    const header = [1, 0, 0, 1, 44, 2, 8, 2, 2, 2, 0]
+    header.forEach((value, index) => view.setInt32(index * 4, value, true))
+    const samples = [1, 3, 2, 65535]
+    samples.forEach((value, index) => view.setUint16(44 + index * 2, value, true))
+    rig.state.imageBinary = bytes
+    const result = rig.acquisition.capture({ cameraId: 'camera-id', exposureSeconds: 1 })
+    await started(rig)
+    rig.complete()
+    const frame = await result
+    expect(frame.color).toEqual({ kind: 'bayer', pattern: 'rggb' })
+    expect(Array.from(frame.pixels)).toEqual([1, 2, 3, 65535])
+  })
+
+  it.each(['Different camera', ''])('rejects a changed or missing operational camera identity before exposure: %j', async cameraName => {
+    const rig = observatory()
+    rig.state.cameraName = cameraName
+    await expect(rig.acquisition.capture({ cameraId: 'camera-id', expectedCameraName: 'Camera', exposureSeconds: 1 })).rejects.toThrow()
+    expect(rig.state.starts).toBe(0)
+    expect(rig.state.aborts).toBe(0)
+  })
+
+  it.each([
+    { offsetX: 0, offsetY: 0, startX: 0, startY: 0, pattern: 'rggb' },
+    { offsetX: 1, offsetY: 0, startX: 0, startY: 0, pattern: 'grbg' },
+    { offsetX: 0, offsetY: 1, startX: 0, startY: 0, pattern: 'gbrg' },
+    { offsetX: 1, offsetY: 1, startX: 0, startY: 0, pattern: 'bggr' },
+    { offsetX: 0, offsetY: 0, startX: 3, startY: 5, pattern: 'bggr' },
+    { offsetX: 1, offsetY: 1, startX: 3, startY: 5, pattern: 'rggb' },
+    { offsetX: 1, offsetY: 0, startX: 3, startY: 4, pattern: 'rggb' },
+  ])('normalizes Bayer phase for sensor offsets and subframe origin: %j', async ({ pattern, ...settings }) => {
+    const rig = observatory()
+    Object.assign(rig.state, settings, { sensorType: 2 })
+    const result = rig.acquisition.capture({ cameraId: 'camera-id', exposureSeconds: 1 })
+    await started(rig)
+    rig.complete()
+    const frame = await result
+    expect(frame.color).toEqual({ kind: 'bayer', pattern })
+    expect(Array.from(frame.pixels)).toEqual([1, 2, 3, 4])
+  })
+
+  it.each([
+    { sensorType: 1 }, { sensorType: 3 }, { sensorType: 4 }, { sensorType: 5 },
+    { sensorType: -1 }, { sensorType: 1.5 },
+    { binX: 2 }, { binY: 2 }, { binX: 0 }, { binY: 1.5 },
+    { offsetX: 2 }, { offsetY: -1 }, { offsetX: 0.5 },
+    { startX: -1 }, { startY: 0.5 }, { startX: 2147483648 },
+    { unsupportedOffset: true },
+  ])('rejects unsupported or malformed color interpretation before starting: %j', async settings => {
+    const rig = observatory()
+    Object.assign(rig.state, { sensorType: 2 }, settings)
+    await expect(rig.acquisition.capture({ cameraId: 'camera-id', exposureSeconds: 1 })).rejects.toThrow()
+    expect(rig.state.starts).toBe(0)
+    expect(rig.state.aborts).toBe(0)
+  })
+
+  it('preserves the pre-exposure restriction for a monochrome-only consumer', async () => {
+    const rig = observatory()
+    rig.state.sensorType = 2
+    await expect(rig.acquisition.capture({ cameraId: 'camera-id', exposureSeconds: 1, monochromeOnly: true })).rejects.toThrow('requires a monochrome camera')
+    expect(rig.state.starts).toBe(0)
     expect(rig.state.aborts).toBe(0)
   })
 

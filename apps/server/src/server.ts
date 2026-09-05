@@ -1,7 +1,6 @@
 import { buildApp } from './app.js'
 import { openFileRigCatalog } from './rig/catalog.js'
 import { resolveRigCatalogPath } from './rig/catalog-path.js'
-import { captureSettings } from './capture/settings.js'
 import { alignmentSettings } from './alignment/routes.js'
 
 const port = Number(process.env.PORT ?? 3001)
@@ -12,8 +11,7 @@ const rigCatalogPath = resolveRigCatalogPath(process.env.VELA_RIG_CATALOG_PATH)
 try {
   const rigCatalog = await openFileRigCatalog(rigCatalogPath)
   const alignment = alignmentSettings(process.env)
-  const capture = captureSettings(process.env)
-  const app = buildApp({ rigCatalog, ...(alignment ? { alignment } : {}), ...(capture ? { capture } : {}) })
+  const app = buildApp({ rigCatalog, ...(alignment ? { alignment } : {}) })
   await app.listen({ port, host })
 } catch (error) {
   console.error(error)
