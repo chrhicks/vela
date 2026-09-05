@@ -216,3 +216,55 @@ test('repeating capture restores server settings and can stop during image recei
   await page.getByText('Repeat until stopped', { exact: true }).click()
   await expect(page.getByRole('button', { name: 'Take exposure' })).toBeEnabled()
 })
+
+test('displays completed downloads during faster frame arrivals and coalesces pending images without mislabeling Fit', async ({ page }) => {
+  const frame = (number: number) => ({ ...firstImage, id: `stream-${number}`,
+    imageUrl: `/api/rigs/rig-1/capture/images/stream-${number}`,
+    fitImageUrl: `/api/rigs/rig-1/capture/images/stream-${number}/fit`, exposureSeconds: number,
+  })
+  let current = { ...idle, active: true, repeat: true, phase: 'exposing', completedCount: 1, latestImage: frame(1) }
+  const pending = new Map<string, Route>()
+  const requested: string[] = []
+  await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, current))
+  await page.route('**/api/rigs/rig-1/capture/images/**', route => {
+    const path = new URL(route.request().url()).pathname
+    requested.push(path)
+    pending.set(path, route)
+  })
+  const finish = async (url: string) => {
+    await expect.poll(() => pending.has(url)).toBe(true)
+    await pending.get(url)!.fulfill({ contentType: 'image/png', body: preview })
+    pending.delete(url)
+  }
+  const arrive = async (number: number) => {
+    current = { ...current, completedCount: number, latestImage: frame(number) }
+    await expect(page.locator('.capture-page__count')).toHaveText(`${number}images completed`)
+  }
+  await page.goto('/rigs/rig-1/observe/capture')
+  const image = page.getByRole('region', { name: 'Latest image', exact: true })
+  await expect.poll(() => requested).toContain(frame(1).fitImageUrl)
+  await arrive(2)
+  await arrive(3)
+  await finish(frame(1).fitImageUrl)
+  await expect(image.getByRole('img')).toHaveAttribute('src', frame(1).fitImageUrl)
+  await expect(image.getByRole('img')).toHaveAttribute('alt', '1 second exposure from Simulator Camera')
+  await expect.poll(() => requested).toContain(frame(3).fitImageUrl)
+  expect(requested).not.toContain(frame(2).fitImageUrl)
+
+  await arrive(4)
+  await arrive(5)
+  await finish(frame(3).fitImageUrl)
+  await expect(image.getByRole('img')).toHaveAttribute('src', frame(3).fitImageUrl)
+  await expect(image.locator('footer')).toContainText('3 s')
+  await expect.poll(() => requested).toContain(frame(5).fitImageUrl)
+  expect(requested).not.toContain(frame(4).fitImageUrl)
+  await page.getByRole('button', { name: '100%', exact: true }).click()
+  await finish(frame(5).fitImageUrl)
+  await expect(image.getByRole('img')).toHaveAttribute('src', frame(5).fitImageUrl)
+  await expect(image.locator('footer')).toContainText('5 s')
+  await expect(page.getByRole('button', { name: '100%', exact: true })).toHaveAttribute('aria-pressed', 'false')
+  await expect(page.getByRole('region', { name: 'Image at 100 percent. Scroll to inspect.' })).toHaveCount(0)
+  await finish(frame(5).imageUrl)
+  await expect(image.getByRole('img')).toHaveAttribute('src', frame(5).imageUrl)
+  await expect(page.getByRole('button', { name: '100%', exact: true })).toHaveAttribute('aria-pressed', 'true')
+})

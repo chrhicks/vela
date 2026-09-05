@@ -11,7 +11,10 @@ replacing the newer state. A missing or invalid command response is never
 replayed. Starting again requires an explicit read confirming no active exposure.
 
 `useLoadedImage` preloads each immutable image URL and commits its metadata with
-the image only when loading succeeds. A failed new image leaves the previous
+the image only when loading succeeds. An in-flight download completes even when
+new frames arrive faster than image delivery; after settling, it loads only the
+newest pending frame. This keeps a running capture visibly advancing without an
+unbounded download queue. A failed new image leaves the previous
 frame and metadata together. GET retries are bounded; native dimensions drive
 100% scrolling. Observe consumes the same projection and loading primitive.
 
