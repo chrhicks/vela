@@ -8,7 +8,7 @@ const view: CaptureView = {
   error: null, repeat: true, completedCount: 1,
   latestImage: {
     id: 'frame-1', imageUrl: '/api/rigs/rig-1/capture/images/frame-1', width: 1600, height: 1200,
-    exposureSeconds: 2, capturedAt: '2026-09-05T18:00:00.000Z', receivedAt: '2026-09-05T18:00:03.000Z', cameraName: 'Simulator Camera', color: 'mono',
+    exposureSeconds: 2, capturedAt: '2026-09-05T18:00:00.000Z', receivedAt: '2026-09-05T18:00:03.000Z', cameraName: 'Simulator Camera', color: 'mono', statistics: { detectedStars: 12, medianHfrPixels: 2.35 },
   },
 }
 
@@ -16,6 +16,9 @@ describe('capture response validation', () => {
   it('accepts a previous image with its own exposure metadata while another exposure runs', () => {
     expect(isCaptureView(view, 'rig-1')).toBe(true)
     expect(isCaptureView({ ...view, latestImage: null }, 'rig-1')).toBe(true)
+    for (const statistics of [null, { detectedStars: 0, medianHfrPixels: null }]) {
+      expect(isCaptureView({ ...view, latestImage: { ...view.latestImage, statistics } }, 'rig-1')).toBe(true)
+    }
   })
 
   it('rejects mismatched rigs, contradictory active states, and invalid exposure progress', () => {
@@ -34,6 +37,9 @@ describe('capture response validation', () => {
       { imageUrl: 'https://other.example/image.png' },
       { imageUrl: '/api/rigs/other-rig/capture/images/frame-1' },
       { imageUrl: '/api/rigs/rig-1/capture/images/other-frame' },
+      { statistics: undefined }, { statistics: { detectedStars: -1, medianHfrPixels: 2 } },
+      { statistics: { detectedStars: 0, medianHfrPixels: 2 } }, { statistics: { detectedStars: 2, medianHfrPixels: null } },
+      { statistics: { detectedStars: 2.5, medianHfrPixels: 2 } }, { statistics: { detectedStars: 2, medianHfrPixels: NaN } },
       { width: 0 }, { height: 1.5 }, { exposureSeconds: -1 },
       { capturedAt: 'yesterday' }, { receivedAt: '2026-09-05T17:59:00.000Z' },
     ]) expect(isCaptureView({ ...view, latestImage: { ...view.latestImage, ...patch } }, 'rig-1')).toBe(false)

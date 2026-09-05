@@ -23,6 +23,7 @@ function isCaptureImage(value: unknown, rigId: string): value is CaptureImage {
     && finite(value.width) && Number.isInteger(value.width) && value.width > 0
     && finite(value.height) && Number.isInteger(value.height) && value.height > 0
     && finite(value.exposureSeconds) && value.exposureSeconds >= 0.1 && value.exposureSeconds <= 600
+    && isStatistics(value.statistics)
     && timestamp(value.capturedAt) && timestamp(value.receivedAt)
     && Date.parse(value.receivedAt) >= Date.parse(value.capturedAt)
 }
@@ -35,4 +36,11 @@ function nullableText(value: unknown) { return value === null || text(value) }
 function finite(value: unknown): value is number { return typeof value === 'number' && Number.isFinite(value) }
 function timestamp(value: unknown): value is string {
   return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T.+Z$/.test(value) && Number.isFinite(Date.parse(value))
+}
+
+function isStatistics(value: unknown): boolean {
+  if (value === null) return true
+  if (!record(value) || !Number.isSafeInteger(value.detectedStars) || Number(value.detectedStars) < 0) return false
+  return value.detectedStars === 0 ? value.medianHfrPixels === null
+    : finite(value.medianHfrPixels) && value.medianHfrPixels > 0
 }

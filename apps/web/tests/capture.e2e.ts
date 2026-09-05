@@ -53,7 +53,7 @@ test('a command stays responsive during polling and a late read cannot replace i
 const preview = readFileSync(new URL('../../../packages/ui/src/components/fixtures/capture-star-field.png', import.meta.url))
 const firstImage = {
   id: 'frame-1', imageUrl: '/api/rigs/rig-1/capture/images/frame-1', width: 1600, height: 1200,
-  exposureSeconds: 2, capturedAt: '2026-09-05T18:00:00.000Z', receivedAt: '2026-09-05T18:00:03.000Z', cameraName: 'Simulator Camera', color: 'mono',
+  exposureSeconds: 2, capturedAt: '2026-09-05T18:00:00.000Z', receivedAt: '2026-09-05T18:00:03.000Z', cameraName: 'Simulator Camera', color: 'mono', statistics: { detectedStars: 12, medianHfrPixels: 2.35 },
 }
 
 test('loads a fitted preview first and only presents 100 percent after its native image loads', async ({ page }) => {
@@ -107,11 +107,13 @@ test('keeps the loaded image and its metadata together through a failed new-imag
   await expect(image.getByRole('img')).toHaveAttribute('src', firstImage.imageUrl)
   await expect(image.locator('footer')).toContainText('2 s')
 
-  current = { ...current, latestImage: { ...firstImage, id: 'frame-2', imageUrl: '/api/rigs/rig-1/capture/images/frame-2', exposureSeconds: 30 } }
+  current = { ...current, latestImage: { ...firstImage, id: 'frame-2', imageUrl: '/api/rigs/rig-1/capture/images/frame-2', exposureSeconds: 30, statistics: { detectedStars: 7, medianHfrPixels: 3.6 } } }
   await expect.poll(() => newImageRequests).toBe(1)
   await expect(image.getByRole('img')).toHaveAttribute('src', firstImage.imageUrl)
   await expect(image.locator('footer')).toContainText('2 s')
   await expect(image.locator('footer')).not.toContainText('30 s')
+  await expect(image.locator('.capture-image__statistics')).toContainText('12')
+  await expect(image.locator('.capture-image__statistics')).toContainText('2.35')
   failFirstRequest()
   await expect.poll(() => newImageRequests).toBe(2)
   await expect(image.getByRole('img')).toHaveAttribute('src', firstImage.imageUrl)
@@ -121,6 +123,9 @@ test('keeps the loaded image and its metadata together through a failed new-imag
   await expect(image.getByRole('img')).toHaveAttribute('src', current.latestImage!.imageUrl)
   await expect(image.locator('footer')).toContainText('30 s')
   await expect(image.getByRole('img')).toHaveAttribute('alt', '30 second exposure from Simulator Camera')
+  await expect(image.locator('.capture-image__statistics')).toContainText('7')
+  await expect(image.locator('.capture-image__statistics')).toContainText('3.60')
+  await expect(image.locator('.capture-image__statistics')).not.toContainText('2.35')
 })
 
 test('retains the image during interrupted updates and shows the server exposure after reopening', async ({ page }) => {
@@ -267,4 +272,19 @@ test('displays completed downloads during faster frame arrivals and coalesces pe
   await finish(frame(5).imageUrl)
   await expect(image.getByRole('img')).toHaveAttribute('src', frame(5).imageUrl)
   await expect(page.getByRole('button', { name: '100%', exact: true })).toHaveAttribute('aria-pressed', 'true')
+})
+
+
+test('distinguishes unavailable star measurements from an image with no measurable stars', async ({ page }) => {
+  let current = { ...idle, phase: 'complete', latestImage: { ...firstImage, statistics: null as { detectedStars: number, medianHfrPixels: number | null } | null } }
+  await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, current))
+  await page.route('**/api/rigs/rig-1/capture/images/*', route => route.fulfill({ contentType: 'image/png', body: preview }))
+  await page.goto('/rigs/rig-1/observe/capture')
+  const statistics = page.locator('.capture-image__statistics')
+  await expect(statistics).toContainText('1600 × 1200')
+  await expect(statistics).toContainText('Star measurements unavailable')
+  await expect(statistics.locator('dd')).toHaveText(['1600 × 1200', '—', '—'])
+  current = { ...current, latestImage: { ...firstImage, id: 'starless', imageUrl: '/api/rigs/rig-1/capture/images/starless', statistics: { detectedStars: 0, medianHfrPixels: null } } }
+  await expect(statistics).toContainText('No measurable stars')
+  await expect(statistics.locator('dd')).toHaveText(['1600 × 1200', '0', '—'])
 })
