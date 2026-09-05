@@ -2,7 +2,8 @@
 
 Development-only sky and equatorial mount foundation for offline polar alignment.
 The simulator generates image pixels; it does not supply alignment answers to Vela.
-The Alpaca service and workshop-designed adjustment controls are subsequent work.
+The local Alpaca service and separate controls implement the approved workshop
+design. Vela’s production polar-alignment operation remains follow-on work.
 
 ## Current capability
 
@@ -30,8 +31,9 @@ produces background noise without stars, so solving actually fails.
   Tracking subtracts elapsed sidereal rotation from the mechanical joint;
   Earth rotation then transforms the whole mount into the sky frame.
   A perfectly aligned tracking mount keeps the entire image fixed.
-- Exposure rendering is instantaneous at the supplied pose. Exposure duration,
-  motion blur, start/stop state and asynchronous commands are not yet modeled.
+- Exposures have a real waiting/completion lifecycle, but their pixels are an
+  instantaneous snapshot at exposure start. Duration does not yet change star
+  brightness. Motion blur and photometric realism are not modeled.
 - The catalog loader defaults to RA 0–70°, Dec 50–70° for the proof. This is
   deliberately a sky patch, not all-sky coverage. Later movement controls must
   honor coverage or load a larger region; an empty patch is not a cloud model.
@@ -116,3 +118,67 @@ The inverse measurement code is confined to this opt-in evidence harness. It is
 not shared with the generator and is not the production polar-alignment engine.
 Single-frame adjustment, real Alpaca transfer and operation-state integration
 belong to the subsequent validation ticket.
+
+
+## Run the development rig
+
+Start the service with the provisioned catalog (from this directory):
+
+```sh
+VELA_STAR_CATALOG="$PWD/.local/assets/catalog/opt/astap" pnpm dev:server
+```
+
+In a second terminal, run `pnpm --filter @vela/rig-simulator dev:controls` from
+the workspace root. Open `http://127.0.0.1:5177`. The controls proxy only
+`/simulator` requests to the service at `127.0.0.1:7850`. Both listeners are
+local by default. This is the developer workflow; a packaged deployment is
+outside the current scope. `pnpm build` builds the server and control assets;
+`pnpm start` starts the compiled Alpaca service.
+
+In Vela, use manual host entry to add `127.0.0.1`, port `7850`. Its normal
+inspection and connection flow sees a camera and telescope with stable identities.
+This assumes the Vela server and simulator run on the same machine. No real rig
+is involved and the simulator never forwards requests to physical devices.
+
+The control page shows server-confirmed state. Writes disable conflicting UI
+commands while pending. Failed responses are reconciled with a read, never a
+repeated write. Lost connections retain a clearly marked last-known state until
+read-only polling reconnects. Closing the control page does not stop the service.
+
+## Supported device and control boundaries
+
+The Alpaca service supports the management/identity/connection/telemetry reads
+used by Vela, a fixed 1600×1200 monochrome camera (binning 1), start/abort exposure,
+image readiness and JSON `ImageArray`, and RA-axis movement/tracking/stop for one
+equatorial mount. JSON image arrays use Alpaca order `[x][y]`, `Type: 2`, `Rank: 2`.
+Unused capabilities return unsupported errors. This is a bounded development
+subset, not a claim of complete ASCOM driver conformance. No UDP discovery or
+ImageBytes path is implemented yet.
+
+Exposure images are captured from the modeled pose and camera obstruction at
+start, become available after duration elapses, and remain the last completed
+image until a new exposure starts or abort/reset/disconnect invalidates them.
+Movement and offset changes are rejected during exposure. Camera obscuring
+changes the next exposure only. Reset aborts pending exposure, removes its image,
+stops axis movement, restores the preset and clears the camera; device connection
+flags are preserved. In-flight browser requests are not evidence of fresh images.
+
+The simulation-only API is separate from Alpaca:
+
+| Endpoint | Operation |
+| --- | --- |
+| `GET /simulator/state` | Read current actual simulation state |
+| `PUT /simulator/adjust` | Absolute signed `altitudeArcsec`, `azimuthArcsec` |
+| `PUT /simulator/camera` | Set boolean `obscured` for the next exposure |
+| `POST /simulator/reset` | Apply `preset`: `large-error`, `near-aligned`, `aligned` |
+
+Mutations require JSON. Offset limits are ±18000 arcseconds. The approved presets
+are (+480, −360), (+12, −9), and (0, 0). The standard Alpaca API exposes pixels and
+pointing, not the true alignment offsets or a plate-solved answer. Only these
+separate development controls can see and change that truth.
+
+The current catalog patch limits useful acquisition. Movement has a bounded
+nominal RA interval; requests to expose outside the supported field return an
+explicit error rather than treating missing catalog stars as clouds. Production
+alignment acquisition/movement adapters and full measured-correction integration
+are tracked separately in CHI-153.
