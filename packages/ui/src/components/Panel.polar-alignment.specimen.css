@@ -39,7 +39,18 @@
 .vela-polar-activity progress::-moz-progress-bar { background: var(--vela-accent); }
 .vela-polar-activity__age { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 8px; margin-top: 10px; font-variant-numeric: tabular-nums; }
 .vela-polar-activity p { margin: 7px 0 0; }
-.vela-polar-activity__warning { color: var(--vela-warning); }
+.vela-polar-solve-warning {
+  padding: 14px 16px;
+  margin-bottom: 18px;
+  border: 1px solid color-mix(in oklch, var(--vela-warning) 38%, var(--vela-line));
+  border-radius: var(--vela-radius);
+  background: color-mix(in oklch, var(--vela-warning) 8%, var(--vela-surface));
+  color: var(--vela-warning);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.vela-polar-solve-warning strong { font-size: 16px; font-weight: 600; }
+.vela-polar-solve-warning p { margin: 4px 0 0; }
 .vela-polar-activity__spinner { width: 10px; height: 10px; flex: 0 0 10px; border: 1px solid var(--vela-line-strong); border-top-color: var(--vela-accent); border-radius: 50%; animation: vela-polar-working 1.2s linear infinite; }
 @keyframes vela-polar-working { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .vela-polar-activity__spinner { animation: none; } }

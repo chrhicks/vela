@@ -1,6 +1,7 @@
 import { buildApp } from './app.js'
 import { openFileRigCatalog } from './rig/catalog.js'
 import { resolveRigCatalogPath } from './rig/catalog-path.js'
+import { alignmentSettings } from './alignment/routes.js'
 
 const port = Number(process.env.PORT ?? 3001)
 // Device-control APIs are local by default. Set HOST explicitly to expose them.
@@ -9,7 +10,8 @@ const rigCatalogPath = resolveRigCatalogPath(process.env.VELA_RIG_CATALOG_PATH)
 
 try {
   const rigCatalog = await openFileRigCatalog(rigCatalogPath)
-  const app = buildApp({ rigCatalog })
+  const alignment = alignmentSettings(process.env)
+  const app = buildApp({ rigCatalog, ...(alignment ? { alignment } : {}) })
   await app.listen({ port, host })
 } catch (error) {
   console.error(error)

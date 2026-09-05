@@ -54,3 +54,8 @@ pnpm --filter @vela/model build
 
 The contract tests compile representative server/web usage and verify that the
 package manifest stays free of runtime dependencies.
+
+The polar-alignment page contract carries ephemeral operation phase/activity,
+last solved measurements and the matching preview reference. It contains no
+Alpaca wire fields or simulator ground truth. Geometry and operation ownership
+remain on the server.

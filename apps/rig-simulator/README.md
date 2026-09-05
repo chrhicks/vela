@@ -182,3 +182,35 @@ nominal RA interval; requests to expose outside the supported field return an
 explicit error rather than treating missing catalog stars as clouds. Production
 alignment acquisition/movement adapters and full measured-correction integration
 are tracked separately in CHI-153.
+
+## HTTP acquisition and alignment proof
+
+After provisioning the catalog and ASTAP above, run:
+
+```sh
+VELA_STAR_CATALOG=/path/to/astap-catalog \
+VELA_ASTAP=/path/to/astap_cli \
+pnpm --filter @vela/rig-simulator prove:http
+```
+
+This opt-in command builds the model, Alpaca boundary and server, then starts an isolated
+simulator on a random loopback port. It connects using the normal provider and
+acquires images and primary-axis movement through `createAlpacaAcquisition`.
+The server's actual ASTAP adapter and alignment geometry fit three solved
+positions, then measure partial, near, and zero adjustments against that same
+baseline. The proof also obscures the camera to produce a genuine ASTAP failure,
+clears it to recover, and cancels an active exposure before checking a fresh
+restart. It stops acquisition and closes its own simulator when finished.
+
+Only standard Alpaca pointing and local sidereal time supply measurement inputs;
+the sidereal angle is advanced to the exposure timestamp on the shared host clock.
+Configured simulator offsets are used for scenario setup and assertions only.
+No physical rig, saved Vela catalog, or existing simulator process is touched.
+The 36-degree baseline allows 10 arcseconds of component error. The initial
+18-degree span amplified plate-solve error to about 20 arcseconds; widening the
+span recovered components within 4 arcseconds in the validated run. It proves the ideal
+synthetic integration, not real-world alignment accuracy or coordinate conversion.
+Results are written to `.local/http-proof/results.json` (override with
+`VELA_SIM_OUTPUT`). Generated server declarations must exist to typecheck this
+proof; the command builds them explicitly before execution. The default test
+suite does not require external catalogs, ASTAP, or a listening socket.

@@ -43,6 +43,7 @@ function ObservationPage({ rigId }: { rigId: string }) {
       <div><small>Observation</small><h1>Observing with {rig.name}</h1><p>Prepare this Rig and confirm what Vela can see before using it.</p></div>
       <Badge marker={<i />} tone={uncertain ? 'warning' : presentation.tone}>{uncertain ? 'Confirmation needed' : presentation.badge}</Badge>
     </header>
+    <Link className="vela-rig-page__back" to={`/rigs/${encodeURIComponent(rigId)}/observe/alignment`}>Polar alignment →</Link>
     <div className="vela-observe-section-heading">
       <div><small>Preparation</small><h2>Rig readiness</h2></div>
       <span>{interrupted || busy ? 'Last received' : 'Checked'} <time dateTime={rig.refreshedAt}>{new Date(rig.refreshedAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</time></span>
