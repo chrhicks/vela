@@ -54,7 +54,7 @@ export function registerCapture(
     if (!rig) return undefined
     const current = (): CaptureView => controllers.get(rigId)?.snapshot() ?? {
       rigId, rigName: rig.name, camera: null, enabled: false, unavailableReason: null,
-      phase: 'idle', active: false, exposureSeconds: 2, elapsedSeconds: 0, error: null, latestImage: null,
+      phase: 'idle', active: false, repeat: true, completedCount: 0, exposureSeconds: 2, elapsedSeconds: 0, error: null, latestImage: null,
     }
     const unavailable = (reason: string): CaptureView => ({ ...current(), rigName: rig.name, enabled: false, unavailableReason: reason })
     const target = cameraSettings(rig)
@@ -87,9 +87,10 @@ export function registerCapture(
   app.post<{ Params: { rigId: string } }>('/api/rigs/:rigId/capture/start', async (request, reply) => {
     const body = request.body
     if (!request.headers['content-type']?.startsWith('application/json') || !isObject(body)
-      || Object.keys(body).length !== 1 || typeof body.exposureSeconds !== 'number'
+      || Object.keys(body).some(key => key !== 'exposureSeconds' && key !== 'repeat')
+      || ('repeat' in body && typeof body.repeat !== 'boolean') || typeof body.exposureSeconds !== 'number'
       || !Number.isFinite(body.exposureSeconds) || body.exposureSeconds < 0.1 || body.exposureSeconds > 600) {
-      return reply.code(400).send({ error: 'Expected exposureSeconds between 0.1 and 600.' })
+      return reply.code(400).send({ error: 'Expected exposureSeconds between 0.1 and 600 and an optional boolean repeat.' })
     }
     const release = operations.acquire(request.params.rigId, 'capture')
     if (!release) return reply.code(409).send({ error: 'Another Rig operation is in progress.' })
@@ -107,7 +108,7 @@ export function registerCapture(
         controller = createCaptureController({ rigId: view.rigId, rigName: view.rigName })
         controllers.set(view.rigId, controller)
       }
-      const result = await controller.start(body.exposureSeconds, createCamera(settings), view.camera.name, release)
+      const result = await controller.start(body.exposureSeconds, createCamera(settings), view.camera.name, release, body.repeat === true)
       started = true
       return result
     } catch (error) {

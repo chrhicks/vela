@@ -6,8 +6,8 @@ import { isCaptureView } from './validation'
 export function captureActivity(view: CaptureView, offline: boolean) {
   if (offline) return 'Connection interrupted'
   return {
-    idle: 'Ready for an exposure', exposing: 'Exposing', reading: 'Receiving image', stopping: 'Stopping exposure',
-    complete: 'Image received', stopped: 'Exposure stopped', failed: 'Exposure failed',
+    idle: 'Ready for an exposure', exposing: 'Exposing', reading: 'Receiving image', stopping: 'Stopping capture',
+    complete: 'Image received', stopped: 'Capture stopped', failed: 'Capture stopped · camera error',
   }[view.phase]
 }
 
@@ -80,9 +80,9 @@ export function useCapture(rigId: string) {
   }, [read])
 
   const canStart = !!view?.enabled && !view.active && !offline && !pending && !commandUnconfirmed
-  const canStop = view?.phase === 'exposing' && !offline && !pending
+  const canStop = !!view?.active && view.phase !== 'stopping' && !offline && !pending
 
-  async function command(action: 'start' | 'stop', exposureSeconds?: number) {
+  async function command(action: 'start' | 'stop', exposureSeconds?: number, repeat = false) {
     if (writing.current || !alive.current || (action === 'start' ? !canStart : !canStop)) return
     if (action === 'start' && (exposureSeconds === undefined || !Number.isFinite(exposureSeconds) || exposureSeconds < 0.1 || exposureSeconds > 600)) return
     const controller = new AbortController()
@@ -98,7 +98,7 @@ export function useCapture(rigId: string) {
     try {
       const next = await api<unknown>(`rigs/${encodeURIComponent(rigId)}/capture/${action}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(action === 'start' ? { exposureSeconds } : {}),
+        body: JSON.stringify(action === 'start' ? { exposureSeconds, repeat } : {}),
         signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]),
       })
       if (!isCaptureView(next, rigId)) throw new Error('Invalid capture response')
@@ -120,5 +120,5 @@ export function useCapture(rigId: string) {
   }
 
   return { view, offline, pending, refreshing, error, commandUnconfirmed, canStart, canStop,
-    start: (seconds: number) => command('start', seconds), stop: () => command('stop'), refresh: () => read(true) }
+    start: (seconds: number, repeat: boolean) => command('start', seconds, repeat), stop: () => command('stop'), refresh: () => read(true) }
 }

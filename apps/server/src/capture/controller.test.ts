@@ -19,7 +19,7 @@ function setup() {
     },
   }
   const actual = createCaptureController({ rigId: 'fra 400', rigName: 'FRA 400' }, () => Date.parse('2026-09-05T16:00:10Z'))
-  const controller = { ...actual, start: (seconds: number, settled?: () => void) => actual.start(seconds, camera, 'Main camera', settled) }
+  const controller = { ...actual, start: (seconds: number, settled?: () => void, repeat = false) => actual.start(seconds, camera, 'Main camera', settled, repeat) }
   const frame: CaptureFrame = { width: 4, height: 2, pixels: [0, 100, 500, 1000, 500, 0, 200, 100], capturedAt: '2026-09-05T16:00:00Z' }
   async function complete(seconds = 10) {
     await controller.start(seconds)
@@ -118,4 +118,45 @@ it('publishes Bayer acquisition as a color PNG with matching image metadata', as
   const image = controller.snapshot().latestImage!
   expect(image.color).toBe('color')
   expect(controller.image(image.id)![25]).toBe(2)
+})
+
+it('repeats completed exposures under one lease and keeps the last frame and count after failure', async () => {
+  const { controller, requests, frame } = setup()
+  const settled = vi.fn()
+  expect(controller.snapshot()).toMatchObject({ repeat: true, completedCount: 0 })
+  await controller.start(10, settled, true)
+  requests[0]!.resolve(frame)
+  await vi.waitFor(() => expect(requests).toHaveLength(2))
+  const previous = controller.snapshot().latestImage!
+  expect(controller.snapshot()).toMatchObject({ active: true, phase: 'exposing', repeat: true, completedCount: 1, elapsedSeconds: 0 })
+  expect(settled).not.toHaveBeenCalled()
+  requests[1]!.reject(new Error('Readout failed'))
+  await vi.waitFor(() => expect(controller.active()).toBe(false))
+  expect(controller.snapshot()).toMatchObject({ phase: 'failed', completedCount: 1, latestImage: previous, error: 'Readout failed' })
+  expect(settled).toHaveBeenCalledOnce()
+  await controller.start(20)
+  expect(controller.snapshot()).toMatchObject({ repeat: false, completedCount: 0, latestImage: previous })
+  const stopping = controller.stop()
+  requests[2]!.reject(new CaptureStoppedError())
+  await stopping
+})
+
+it.each(['readout', 'preview'] as const)('stops during %s without another exposure and publishes a frame that wins the race', async phase => {
+  const { controller, requests, frame } = setup()
+  const settled = vi.fn()
+  await controller.start(10, settled, true)
+  requests[0]!.onProgress({ phase: 'reading', elapsedSeconds: 10 })
+  if (phase === 'preview') {
+    requests[0]!.resolve(frame)
+    // Acquisition has completed, while asynchronous PNG compression is pending.
+    await Promise.resolve()
+  }
+  expect(controller.snapshot().phase).toBe('reading')
+  const stopping = controller.stop()
+  expect(controller.snapshot()).toMatchObject({ phase: 'stopping', active: true, completedCount: 0 })
+  expect(settled).not.toHaveBeenCalled()
+  requests[0]!.resolve(frame)
+  expect(await stopping).toMatchObject({ phase: 'complete', active: false, completedCount: 1, latestImage: { capturedAt: frame.capturedAt } })
+  expect(requests).toHaveLength(1)
+  expect(settled).toHaveBeenCalledOnce()
 })

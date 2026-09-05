@@ -8,6 +8,7 @@ export function isCaptureView(value: unknown, rigId: string): value is CaptureVi
   if (value.active !== ['exposing', 'reading', 'stopping'].includes(String(value.phase))) return false
   if (!finite(value.exposureSeconds) || value.exposureSeconds < 0 || value.exposureSeconds > 600) return false
   if (value.active && value.exposureSeconds < 0.1) return false
+  if (typeof value.repeat !== 'boolean' || !Number.isSafeInteger(value.completedCount) || Number(value.completedCount) < 0) return false
   return finite(value.elapsedSeconds) && value.elapsedSeconds >= 0 && nullableText(value.error)
     && (value.latestImage === null || isCaptureImage(value.latestImage, rigId))
 }
