@@ -76,12 +76,21 @@ function useSolvedMeasurement(view: AlignmentView | null) {
   useEffect(() => {
     const measurement = view?.measurement
     if (!measurement) { setSolved(null); setImageError(false); return }
+    const next = { measurement, measuredAt: view.measuredAt }
     let current = true
-    const image = new Image()
-    image.onload = () => { if (current) { setSolved({ measurement, measuredAt: view.measuredAt }); setImageError(false) } }
-    image.onerror = () => { if (current) setImageError(true) }
-    image.src = measurement.imageUrl
-    return () => { current = false }
+    let retry: ReturnType<typeof setTimeout> | undefined
+    function load() {
+      const image = new Image()
+      image.onload = () => { if (current) { setSolved(next); setImageError(false) } }
+      image.onerror = () => {
+        if (!current) return
+        setImageError(true)
+        retry = setTimeout(load, 1500)
+      }
+      image.src = next.measurement.imageUrl
+    }
+    load()
+    return () => { current = false; clearTimeout(retry) }
   }, [view?.measurement?.imageUrl])
   return { solved, imageError }
 }
