@@ -4,7 +4,7 @@ import type { AlpacaDeviceInspection } from '@vela/alpaca'
 import { createMemoryRigCatalog } from '../rig/catalog.js'
 import { createRigOperations } from '../rig/operations.js'
 import { CaptureStoppedError, type CaptureCamera, type CaptureFrame } from './controller.js'
-import { registerCapture } from './routes.js'
+import { registerCapture, type CaptureSettings } from './routes.js'
 
 const record = {
   id: 'sim', name: 'Simulator', endpoint: { host: '127.0.0.1', port: 11111 },
@@ -25,7 +25,7 @@ function deferred<T>() {
   return { promise, resolve, reject }
 }
 
-function setup(selection: { uniqueId: string, name: string } | null = record.imagingCamera) {
+function setup(selection: { uniqueId: string, name: string } | null = record.imagingCamera, legacySettings?: CaptureSettings) {
   const app = Fastify()
   const { imagingCamera: _, ...unselected } = record
   const catalog = createMemoryRigCatalog([{ ...unselected, ...(selection ? { imagingCamera: selection } : {}) }])
@@ -38,7 +38,7 @@ function setup(selection: { uniqueId: string, name: string } | null = record.ima
   let inspectionGate: Promise<void> | undefined
   let inspections = 0
   const captures: Array<Parameters<CaptureCamera['capture']>[0] & ReturnType<typeof deferred<CaptureFrame>>> = []
-  registerCapture(app, catalog, operations, {
+  registerCapture(app, catalog, operations, legacySettings, {
     createInspector: () => ({ async inspectDevices(): Promise<ReadonlyArray<AlpacaDeviceInspection>> {
       inspections++
       await inspectionGate
@@ -174,4 +174,29 @@ it('binds each exposure to the current selection and endpoint while retaining ea
   await vi.waitFor(() => expect(subject.operations.owner('sim')).toBeUndefined())
   expect((await subject.get()).json().latestImage.cameraName).toBe('Other camera')
   expect((await subject.app.inject(previous.imageUrl)).statusCode).toBe(200)
+})
+
+it('preserves explicitly configured legacy Capture until a persisted selection exists', async () => {
+  const legacy = { endpoint: 'http://127.0.0.1:11111', cameraId: 'camera' }
+  const subject = setup(null, legacy)
+  expect((await subject.get()).json().enabled).toBe(true)
+  expect((await subject.start()).statusCode).toBe(200)
+  expect(subject.bindings[0]).toEqual({ ...legacy, expectedCameraName: 'Main camera' })
+  expect((await subject.catalog.get('sim'))?.imagingCamera).toBeUndefined()
+  subject.captures[0]!.resolve(frame)
+  await vi.waitFor(() => expect(subject.operations.owner('sim')).toBeUndefined())
+
+  for (const selection of [{ uniqueId: 'missing', name: 'Main camera' }, { uniqueId: 'camera', name: 'Changed camera' }]) {
+    await subject.catalog.setImagingCamera('sim', selection)
+    expect((await subject.start()).statusCode).toBe(409)
+  }
+  expect(subject.captures).toHaveLength(1)
+  await subject.catalog.setImagingCamera('sim', { uniqueId: 'other', name: 'Other camera' })
+  subject.replaceCamera('other', 'Other camera')
+  expect((await subject.start()).statusCode).toBe(200)
+  expect(subject.bindings.at(-1)?.cameraId).toBe('other')
+
+  const otherRig = setup(null, { ...legacy, endpoint: 'http://other:11111' })
+  expect((await otherRig.start()).statusCode).toBe(409)
+  expect(otherRig.captures).toHaveLength(0)
 })

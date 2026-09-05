@@ -4,11 +4,20 @@ Capture owns one server-side exposure and its most recent image. Browser request
 start the work and read its projection; disconnecting the browser does not stop
 acquisition. A server restart loses the operation and in-memory previews.
 
-The imaging camera is explicitly selected in Rig setup and remembered in the
+The imaging-camera setup API remembers an explicitly selected camera in the
 Rig catalog by stable provider ID and its reported camera name. An inventory
 camera is never selected automatically. A missing identity or changed reported
 name requires explicit reselection; a different camera in the same configured
-provider slot is not silently accepted. Route
+provider slot is not silently accepted.
+
+While the production setup interface awaits adoption, the existing
+`VELA_CAPTURE_ENDPOINT` and `VELA_CAPTURE_CAMERA_ID` configuration continues to
+work for its exact endpoint when that Rig has no saved imaging-camera selection.
+A saved selection always takes precedence, including when missing or changed;
+those states never fall back to environment configuration. The legacy path
+checks a fresh reported camera name again before exposure and does not persist
+an automatic selection. Setup API state describes saved selection, so it stays
+`unselected` for an environment-configured Rig. Route
 composition acquires the same Rig operation lease used by alignment and
 connection commands before checking the selected identity and connection. The lease
 lasts through acquisition cleanup. Device protocol preconditions and abort
@@ -41,9 +50,11 @@ Choose the simulator imaging camera through the same Rig setup API used for a
 physical Rig: GET `/api/web/rigs/:rigId/imaging-camera` returns current choices;
 PUT `/api/rigs/:rigId/imaging-camera` with `{ id, name }` remembers an explicitly
 selected current choice. The name echo rejects a choice that changed since it
-was displayed. The server catalog owns the selection; no environment setting
-implicitly enables Capture. Use the isolated simulator review catalog and app
-proxy described in `../alignment/README.md`.
+was displayed. Alternatively, the existing simulator review configuration remains
+supported: `VELA_CAPTURE_ENDPOINT=http://127.0.0.1:7850` and
+`VELA_CAPTURE_CAMERA_ID=vela-simulator-camera`. Both values are required when using
+the legacy path. Use the isolated simulator review catalog and app proxy described
+in `../alignment/README.md`.
 
 From Observe, open Capture, choose an exposure duration and take an image. Return
 to Observe during a longer exposure to see its activity and the previous-image
