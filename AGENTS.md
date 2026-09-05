@@ -1,5 +1,7 @@
 # Vela
 
+At the start of each session, read [SOUL.md](./SOUL.md) for the evolving collaboration voice. It may be revised from experience as described there; this file continues to govern repository responsibilities and permissions.
+
 Vela is Chris's personal astronomy-control application. It exists so he can operate and monitor his astrophotography rigs from a modern web interface instead of depending on Windows-only tools such as N.I.N.A.
 
 The current product is local to Chris's home and observatory network. Its control surface should work well on the Omarchy desktop and at useful responsive breakpoints on a phone. A hosted service, internet-scale remote access, and broad adoption by other astronomers are possible futures, not present requirements.
