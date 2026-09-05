@@ -7,7 +7,7 @@ const respond = (route: Route, body: unknown) => route.fulfill({ contentType: 'a
 const idle: CaptureView = {
   rigId: 'rig-1', rigName: 'Offline rig', camera: { name: 'Simulator Camera' }, enabled: true,
   unavailableReason: null, phase: 'idle', active: false, exposureSeconds: 2, elapsedSeconds: 0,
-  error: null, latestImage: null, repeat: false, completedCount: 0,
+  error: null, saveFrames: false, savedImageCount: 0, latestImage: null, repeat: false, completedCount: 0,
 }
 
 test('a command stays responsive during polling and a late read cannot replace its result', async ({ page }) => {
@@ -52,7 +52,7 @@ test('a command stays responsive during polling and a late read cannot replace i
 
 const preview = readFileSync(new URL('../../../packages/ui/src/components/fixtures/capture-star-field.png', import.meta.url))
 const firstImage = {
-  id: 'frame-1', imageUrl: '/api/rigs/rig-1/capture/images/frame-1', width: 1600, height: 1200,
+  id: 'frame-1', saved: false, imageUrl: '/api/rigs/rig-1/capture/images/frame-1', width: 1600, height: 1200,
   exposureSeconds: 2, capturedAt: '2026-09-05T18:00:00.000Z', receivedAt: '2026-09-05T18:00:03.000Z', cameraName: 'Simulator Camera', color: 'mono', statistics: { detectedStars: 12, medianHfrPixels: 2.35 },
 }
 
@@ -205,7 +205,7 @@ test('repeating capture restores server settings and can stop during image recei
   await page.goto('/rigs/rig-1/observe/capture')
   await expect(page.getByRole('checkbox', { name: 'Repeat until stopped' })).toBeChecked()
   await page.getByRole('button', { name: 'Start run' }).click()
-  expect(startBody).toEqual({ exposureSeconds: 2, repeat: true })
+  expect(startBody).toEqual({ exposureSeconds: 2, repeat: true, saveFrames: false })
   await expect(page.getByRole('button', { name: 'Stop run' })).toBeEnabled()
   current = { ...current, completedCount: 2, latestImage: firstImage, phase: 'reading' }
   await page.reload()
@@ -287,4 +287,53 @@ test('distinguishes unavailable star measurements from an image with no measurab
   current = { ...current, latestImage: { ...firstImage, id: 'starless', imageUrl: '/api/rigs/rig-1/capture/images/starless', statistics: { detectedStars: 0, medianHfrPixels: null } } }
   await expect(statistics).toContainText('No measurable stars')
   await expect(statistics.locator('dd')).toHaveText(['1600 × 1200', '0', '—'])
+})
+
+
+test('keeping the displayed frame remains independent of Stop when a newer preview is delayed', async ({ page }) => {
+  let current = { ...idle, active: true, phase: 'exposing', latestImage: firstImage }
+  let keptId = ''
+  let stopped = false
+  let releaseKeep!: () => void
+  const gate = new Promise<void>(resolve => { releaseKeep = resolve })
+  await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, current))
+  await page.route('**/api/rigs/rig-1/capture/images/frame-1', route => route.fulfill({ contentType: 'image/png', body: preview }))
+  await page.route('**/api/rigs/rig-1/capture/images/frame-2', route => route.abort())
+  await page.route('**/api/rigs/rig-1/capture/images/*/keep', async route => {
+    keptId = route.request().url().split('/').at(-2)!
+    await gate
+    await route.fulfill({ status: 410, body: '{}' })
+  })
+  await page.route('**/api/rigs/rig-1/capture/stop', route => {
+    stopped = true
+    return respond(route, { ...current, active: false, phase: 'stopped' })
+  })
+  await page.goto('/rigs/rig-1/observe/capture')
+  await expect(page.getByRole('button', { name: 'Keep this image' })).toBeVisible()
+  current = { ...current, latestImage: { ...firstImage, id: 'frame-2', imageUrl: '/api/rigs/rig-1/capture/images/frame-2' } }
+  await page.waitForTimeout(1300)
+  await page.getByRole('button', { name: 'Keep this image' }).click()
+  await expect.poll(() => keptId).toBe('frame-1')
+  await page.getByRole('button', { name: 'Stop exposure' }).click()
+  await expect.poll(() => stopped).toBe(true)
+  releaseKeep()
+  await expect(page.getByText('This exposure is no longer available to save.', { exact: false })).toBeVisible()
+})
+
+test('saved collection opens a retained image and original downloads without camera state', async ({ page }) => {
+  const saved = { ...firstImage, saved: true, rigId: 'rig-1', savedAt: firstImage.receivedAt,
+    imageUrl: '/api/rigs/rig-1/saved-images/frame-1/preview', fitsUrl: '/api/rigs/rig-1/saved-images/frame-1/fits',
+    previewDownloadUrl: '/api/rigs/rig-1/saved-images/frame-1/download-preview' }
+  let deviceReads = 0
+  await page.route('**/api/web/rigs/rig-1/capture', route => { deviceReads++; return route.abort() })
+  await page.route('**/api/web/rigs/rig-1/saved-images', route => respond(route, { rigId: 'rig-1', rigName: 'Offline rig', images: [saved] }))
+  await page.route('**/api/web/rigs/rig-1/saved-images/frame-1', route => respond(route, { rigId: 'rig-1', rigName: 'Offline rig', image: saved }))
+  await page.route('**/api/rigs/rig-1/saved-images/frame-1/preview', route => route.fulfill({ contentType: 'image/png', body: preview }))
+  await page.goto('/rigs/rig-1/observe/saved-images')
+  await expect(page.getByRole('heading', { name: 'Saved images', exact: true })).toBeVisible()
+  await page.locator('.vela-saved-card').click()
+  await expect(page.getByRole('region', { name: 'Saved preview' }).getByRole('img')).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Download FITS' })).toHaveAttribute('href', saved.fitsUrl)
+  await expect(page.getByRole('link', { name: 'Download preview' })).toHaveAttribute('href', saved.previewDownloadUrl)
+  expect(deviceReads).toBe(0)
 })

@@ -21,6 +21,27 @@ export interface CaptureImage {
   color: 'mono' | 'color'
   /** Null means analysis was unavailable; zero detectedStars is a valid starless result. */
   statistics: CaptureImageStatistics | null
+  /** Original data and preview have both been durably saved. */
+  saved: boolean
+}
+
+export interface SavedImage extends CaptureImage {
+  rigId: string
+  savedAt: string
+  fitsUrl: string
+  previewDownloadUrl: string
+}
+
+export interface SavedImagesView {
+  rigId: string
+  rigName: string
+  images: SavedImage[]
+}
+
+export interface SavedImageView {
+  rigId: string
+  rigName: string
+  image: SavedImage
 }
 
 /** Server-owned ephemeral capture run and the most recent retained image. */
@@ -30,9 +51,11 @@ export interface CaptureView {
   camera: { name: string } | null
   enabled: boolean
   unavailableReason: string | null
-  phase: 'idle' | 'exposing' | 'reading' | 'stopping' | 'complete' | 'stopped' | 'failed'
+  phase: 'idle' | 'exposing' | 'reading' | 'saving' | 'stopping' | 'complete' | 'stopped' | 'failed'
   active: boolean
   repeat: boolean
+  saveFrames: boolean
+  savedImageCount: number | null
   /** Completed images published during the current or most recent run. */
   completedCount: number
   exposureSeconds: number

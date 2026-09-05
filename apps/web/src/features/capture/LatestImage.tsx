@@ -1,7 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Button } from '@vela/ui'
+import { Badge, Button } from '@vela/ui'
 import type { CaptureImage } from '@vela/model/web'
 import './latest-image.css'
+import { api, ApiError } from '../../lib/api'
+import { isSavedImage } from './validation'
 
 export type { CaptureImage } from '@vela/model/web'
 
@@ -104,7 +106,9 @@ export function CameraMark() {
   </svg>
 }
 
-export function LatestImage({ image, busy, interrupted }: {
+export function LatestImage({ image, busy, interrupted, rigId, savedDetail = false }: {
+  rigId?: string
+  savedDetail?: boolean
   image: CaptureImage | null
   busy: boolean
   interrupted: boolean
@@ -132,13 +136,13 @@ export function LatestImage({ image, busy, interrupted }: {
   const age = seconds < 60 ? `${seconds} s ago` : seconds < 3600 ? `${Math.floor(seconds / 60)} min ago` : `${Math.floor(seconds / 3600)} h ago`
   const previous = busy || interrupted || (!!frame && frame.id !== image?.id)
 
-  return <section className="capture-image" aria-label="Latest image">
+  return <section className="capture-image" aria-label={savedDetail ? 'Saved preview' : 'Latest image'}>
     <header>
-      <div><h2>Latest image</h2><span>{frame ? `${age}${previous ? ' · Previous exposure' : ''}` : loading ? 'Loading image…' : 'No exposure yet'}</span></div>
-      {frame && <div className="capture-image__zoom" role="group" aria-label="Image scale">
+      <div><h2>{savedDetail && frame ? new Date(frame.capturedAt).toLocaleTimeString() : 'Latest image'}</h2><span>{savedDetail && frame ? new Date(frame.capturedAt).toLocaleDateString() : frame ? `${age}${previous ? ' · Previous exposure' : ''}` : loading ? 'Loading image…' : 'No exposure yet'}</span></div>
+      {frame && <div className="capture-image__actions"><div className="capture-image__zoom" role="group" aria-label="Image scale">
         <Button size="small" tone={nativeVisible ? 'quiet' : 'neutral'} aria-pressed={!nativeVisible} onClick={() => setZoomed(false)}>Fit</Button>
         <Button size="small" tone={nativeVisible ? 'neutral' : 'quiet'} aria-pressed={nativeVisible} onClick={() => setZoomed(true)}>100%</Button>
-      </div>}
+      </div>{savedDetail ? <Badge tone="positive">Saved</Badge> : rigId && <KeepImage key={`${rigId}/${frame.id}`} rigId={rigId} imageId={frame.id} saved={frame.saved || (image?.id === frame.id && image.saved)} />}</div>}
     </header>
     {loadingNative && <p className="capture-image__error" role="status">Loading full-resolution image… The fitted preview stays visible.</p>}
     {failed && <p className="capture-image__error" role="status">{zoomed && frame?.id === image?.id ? 'The full-resolution image could not be loaded. The fitted preview is kept below.' : `The latest image could not be loaded.${frame ? ' The previous exposure is kept below.' : ' No image is available to display.'}`}</p>}
@@ -167,4 +171,38 @@ export function LatestImage({ image, busy, interrupted }: {
       <span>{nativeVisible ? 'Scroll to inspect' : 'Display stretched'}</span>
     </footer>}
   </section>
+}
+
+function KeepImage({ rigId, imageId, saved }: { rigId: string, imageId: string, saved: boolean }) {
+  const [confirmed, setConfirmed] = useState(false)
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const writing = useRef(false)
+  useEffect(() => {
+    if (saved) setConfirmed(true)
+  }, [saved])
+  async function keep() {
+    if (writing.current || saved || confirmed) return
+    writing.current = true
+    setPending(true)
+    setError(null)
+    try {
+      const result = await api<unknown>(`rigs/${encodeURIComponent(rigId)}/capture/images/${encodeURIComponent(imageId)}/keep`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(30_000),
+      })
+      if (!isSavedImage(result, rigId) || result.id !== imageId) throw new Error('Invalid saved image response')
+      setConfirmed(true)
+    } catch (cause) {
+      setError(cause instanceof ApiError && cause.status === 410
+        ? 'This exposure is no longer available to save. Keep a newer image, or turn on Save frames before capturing.'
+        : 'Saving could not be confirmed. Check Saved images, or try keeping this image again.')
+    } finally {
+      writing.current = false
+      setPending(false)
+    }
+  }
+  return <div className="capture-image__keep">
+    {saved || confirmed ? <Badge tone="positive">Saved</Badge> : <Button size="small" disabled={pending} onClick={() => void keep()}>{pending ? 'Saving…' : 'Keep this image'}</Button>}
+    {error && !saved && !confirmed && <p role="status">{error}</p>}
+  </div>
 }

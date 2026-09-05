@@ -4,6 +4,19 @@ import { device, observation, offlineObservation } from './fixtures/observation'
 
 const respond = (route: Route, body: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
 
+// Keep adjacent Observe features deterministic; these tests own readiness only.
+test.beforeEach(async ({ page }) => {
+  await page.route('**/api/web/rigs/*/capture', route => respond(route, {
+    rigId: route.request().url().split('/').at(-2), rigName: 'Test rig', camera: null,
+    enabled: false, unavailableReason: 'No imaging camera selected.', phase: 'idle', active: false,
+    exposureSeconds: 2, elapsedSeconds: 0, repeat: false, saveFrames: false, savedImageCount: 0,
+    completedCount: 0, error: null, latestImage: null,
+  }))
+  await page.route('**/api/web/rigs/*/imaging-camera', route => respond(route, {
+    rigId: route.request().url().split('/').at(-2), editable: true, state: 'unselected', selected: null, cameras: [],
+  }))
+})
+
 test('enters and leaves observation without a hardware command', async ({ page }) => {
   let commands = 0
   await page.route('**/api/rigs/*/connections', async (route) => { commands++; await respond(route, {}) })
@@ -33,12 +46,15 @@ test('connects once, shows neutral progress, and focuses the confirmed result', 
   await page.goto('/rigs/rig-1/observe')
   await page.getByRole('button', { name: 'Connect devices' }).dblclick()
   await expect(page.getByRole('button', { name: 'Connecting devices…' })).toBeDisabled()
-  await expect(page.getByRole('status')).toContainText('Device status is updating')
+  await expect(page.locator('.vela-observe-readiness').getByRole('status')).toContainText('Device status is updating')
   await page.waitForTimeout(5_100)
   expect(reads).toBe(1)
   expect(commands).toBe(1)
   finish()
-  await expect(page.getByRole('heading', { name: 'Connection preparation complete' })).toBeFocused()
+  const summary = page.locator('.vela-capture-rig > summary')
+  await expect(summary).toContainText('Connection preparation complete')
+  await expect(summary).toBeFocused()
+  await summary.click()
   await expect(page.getByText('3 confirmed connected', { exact: true })).toBeVisible()
 })
 
@@ -101,6 +117,8 @@ test('handles already prepared, offline, missing and malformed observations', as
   let status = 200
   await page.route('**/api/web/rigs/rig-1/observe', (route) => respond(route, response, status))
   await page.goto('/rigs/rig-1/observe')
+  await expect(page.locator('.vela-capture-rig > summary')).toContainText('Connection preparation complete')
+  await page.locator('.vela-capture-rig > summary').click()
   await expect(page.getByRole('heading', { name: 'Connection preparation complete' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Connect devices' })).toHaveCount(0)
   response = offlineObservation()
@@ -210,12 +228,14 @@ test('leaving a pending command cannot overwrite another Rig', async ({ page }) 
   await page.getByRole('link', { name: 'All rigs' }).click()
   await page.getByRole('link', { name: 'View Askar FRA 400' }).click()
   await page.getByRole('button', { name: 'Start observing' }).click()
-  await expect(page.getByRole('heading', { name: 'Observing with Askar FRA 400' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Observe', exact: true })).toBeVisible()
+  await expect(page.locator('.capture-page__heading')).toContainText('Askar FRA 400')
   finish()
   await settled
   await expect(page.locator('html')).toHaveAttribute('data-navigation-test', 'same-document')
   await expect(page).toHaveURL(/\/rigs\/rig-2\/observe$/)
-  await expect(page.getByRole('heading', { name: 'Observing with Askar FRA 400' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Observe', exact: true })).toBeVisible()
+  await expect(page.locator('.capture-page__heading')).toContainText('Askar FRA 400')
   await expect(page.getByRole('button', { name: 'Connect devices' })).toBeVisible()
   await expect(page.getByText('Last connection attempt:', { exact: false })).toHaveCount(0)
 })

@@ -67,4 +67,9 @@ start/receipt timestamps and optional star measurements. Null measurements mean
 analysis unavailable; zero detected stars with null HFR is a valid measured
 result. HFR is the median half-flux radius in native image pixels. It is shared by the Observe thumbnail and Capture
 page. The count resets on start, while the latest image remains until a new image is
-published. It does not represent a durable capture sequence or an artifact archive.
+published. The saveFrames flag is the active run's retention choice; savedImageCount
+is null when storage cannot be inspected. The saving phase remains active while
+the server writes an image. CaptureImage.saved confirms retention of that image's
+original data and preview. SavedImage and SavedImagesView describe durable artifacts
+and their download resources separately from the ephemeral capture run. Neither
+contract represents a durable sequence or resumable execution.

@@ -102,7 +102,7 @@ function SavedImagesPreview({ props, onPropsChange }: { props: Props, onPropsCha
     <main className="vela-capture-main">
       {screen !== 'observe' && <Button className="vela-capture-back" tone="quiet" size="small" onClick={() => update({ screen: screen === 'detail' ? 'saved' : 'observe' })}>← {screen === 'detail' ? 'Saved images' : 'Observe'}</Button>}
       <header className="vela-capture-heading"><div><p>Offline rig</p><h1 ref={heading} tabIndex={-1}>{screen === 'observe' ? 'Observe' : screen === 'capture' ? 'Capture' : screen === 'detail' ? 'Saved image' : 'Saved images'}</h1></div>
-        {screen === 'capture' ? <Button size="small" tone="quiet" onClick={() => update({ screen: 'saved' })}>Saved images ({saved.length}) →</Button> : screen === 'observe' ? <Badge tone="positive">Connected</Badge> : <span className="vela-saved-count">{saved.length} {saved.length === 1 ? 'image' : 'images'}</span>}
+        {screen === 'capture' ? <Button onClick={() => update({ screen: 'saved' })}>Saved images ({saved.length}) →</Button> : screen === 'observe' ? <Badge tone="positive">Connected</Badge> : <span className="vela-saved-count">{saved.length} {saved.length === 1 ? 'image' : 'images'}</span>}
       </header>
       {screen === 'observe' && <>
         <p className="vela-capture-intro">{busy ? 'Your capture is running. You can browse saved images while it continues.' : 'Your rig is connected. What would you like to do?'}</p>
