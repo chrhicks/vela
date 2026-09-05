@@ -36,4 +36,3 @@ export function bayerPixel(width: number, height: number, pixels: ArrayLike<numb
   }
   return values.map((value, channel) => counts[channel] ? value / counts[channel]! : pixels[y * width + x]!)
 }
-
