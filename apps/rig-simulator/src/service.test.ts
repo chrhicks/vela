@@ -18,10 +18,10 @@ function setup() {
 }
 
 describe('simulator Alpaca boundary', () => {
-  it('discovers only its camera and telescope, validates writes, and reports disconnected state', async () => {
+  it('discovers its two cameras and shared telescope, validates writes, and reports disconnected state', async () => {
     const { app, get, put } = setup()
     const devices = (await app.inject('/management/v1/configureddevices')).json().Value
-    expect(devices.map((device: { DeviceType: string; DeviceNumber: number }) => [device.DeviceType, device.DeviceNumber])).toEqual([['Camera', 0], ['Telescope', 0]])
+    expect(devices.map((device: { DeviceType: string; DeviceNumber: number }) => [device.DeviceType, device.DeviceNumber])).toEqual([['Camera', 0], ['Camera', 1], ['Telescope', 0]])
     expect((await get('camera', 'camerastate')).ErrorNumber).toBe(0x407)
     expect((await put('camera', 'connected', { Connected: 'maybe' })).ErrorNumber).toBe(0x401)
     expect(await put('camera', 'connected', { Connected: 'true', ClientTransactionID: '42' })).toMatchObject({ ErrorNumber: 0, ClientTransactionID: 42 })

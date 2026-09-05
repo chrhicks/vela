@@ -37,3 +37,11 @@ body { margin: 0; min-width: 320px; }
 .sim-connection, .sim-notice { font-size: 12px; line-height: 1.6; color: var(--vela-text-muted); margin-bottom: 20px; }
 .sim-summary { font: inherit; color: inherit; background: transparent; border: 0; padding: 6px 0; cursor: pointer; }
 @media (max-width: 500px) { .sim-page { padding: 0; } .sim-controls { border: 0; } }
+
+.sim-camera-row + .sim-camera-row { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--vela-line); }
+.sim-camera-title { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.sim-camera-title h2 { margin: 0; font-size: 15px; font-weight: 550; }
+.sim-camera-title span, .sim-camera-meta { font-size: 11px; color: var(--vela-text-muted); }
+.sim-camera-meta { margin: 5px 0 16px; }
+.sim-camera-activity { font-size: 12px; line-height: 1.5; margin: 12px 0 0; }
+.sim-camera-note { font-size: 11px; line-height: 1.6; margin: 12px 0 0; color: var(--vela-text-muted); }

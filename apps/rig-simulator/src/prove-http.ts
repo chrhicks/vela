@@ -1,5 +1,12 @@
 /** Opt-in end-to-end proof. Never imports simulator geometry or supplies truth to the solver. */
 import assert from 'node:assert/strict'
+import Fastify from 'fastify'
+import { inflateSync } from 'node:zlib'
+import type { CaptureView, ImagingCameraView } from '../../../packages/model/dist/web/index.js'
+import { createMemoryRigCatalog } from '../../server/dist/rig/catalog.js'
+import { createRigOperations } from '../../server/dist/rig/operations.js'
+import { registerImagingCamera } from '../../server/dist/rig/imaging-camera.js'
+import { registerCapture } from '../../server/dist/capture/routes.js'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { resolve, join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -39,7 +46,7 @@ async function exposure() {
   const pointingObservedAt = Date.now()
   assert.equal(pointing.coordinateSystem, 'other')
   assert.equal(pointing.tracking, true)
-  const frame = await hardware.capture({ cameraId, exposureSeconds: 0.1, signal })
+  const frame = await hardware.capture({ cameraId, exposureSeconds: 2, signal })
   const solved = await solver.solve(frame, {
     raDegrees: pointing.rightAscensionDegrees, decDegrees: pointing.declinationDegrees,
   }, signal)
@@ -66,6 +73,139 @@ function check(name: string, measurement: AlignmentMeasurement, altitudeArcsec: 
   const report = { name, expected: { altitudeArcsec, azimuthArcsec }, measured: measurement }
   reports.push(report)
   console.log(JSON.stringify(report))
+}
+
+// Exercise the production selection and Capture routes with their real Alpaca
+// boundaries. Only the catalog is isolated in memory; no saved rigs are touched.
+async function proveCapture() {
+  const colorId = 'vela-simulator-color-camera'
+  assert.equal((await provider.connectDevice(colorId)).outcome, 'connected')
+  const devices = await provider.inspectDevices()
+  const catalog = createMemoryRigCatalog([{
+    id: 'proof', name: 'Simulator proof',
+    endpoint: { host: '127.0.0.1', port: Number(new URL(baseUrl).port) },
+    addedAt: new Date().toISOString(),
+    lastObservedInventory: { observedAt: new Date().toISOString(), devices: devices.map(device => ({
+      uniqueId: device.providerDeviceId, kind: device.kind, name: device.configuredName,
+    })) },
+  }])
+  const vela = Fastify()
+  const operations = createRigOperations()
+  registerImagingCamera(vela, catalog, operations)
+  registerCapture(vela, catalog, operations)
+  const captureView = async () => (await vela.inject('/api/web/rigs/proof/capture')).json<CaptureView>()
+  async function select(id: string) {
+    const choices = (await vela.inject('/api/web/rigs/proof/imaging-camera')).json<ImagingCameraView>()
+    assert.equal(choices.cameras.length, 2)
+    const camera = choices.cameras.find(camera => camera.id === id)
+    assert.ok(camera?.name)
+    const response = await vela.inject({ method: 'PUT', url: '/api/rigs/proof/imaging-camera', payload: { id, name: camera.name } })
+    assert.equal(response.statusCode, 200, response.body)
+    assert.equal((await catalog.get('proof'))?.imagingCamera?.uniqueId, id)
+    assert.equal((await vela.inject('/api/web/rigs/proof/imaging-camera')).json<ImagingCameraView>().selected?.id, id)
+  }
+  async function capture() {
+    const response = await vela.inject({ method: 'POST', url: '/api/rigs/proof/capture/start', payload: { exposureSeconds: 2 } })
+    assert.equal(response.statusCode, 200, response.body)
+    assert.equal(response.json<CaptureView>().active, true)
+    const deadline = Date.now() + 60000
+    while (true) {
+      const view = await captureView()
+      if (!view.active) {
+        assert.equal(view.phase, 'complete', view.error ?? 'Capture must complete')
+        assert.ok(view.latestImage)
+        return view.latestImage
+      }
+      if (Date.now() > deadline) throw new Error('Capture proof timed out')
+      await delay(50)
+    }
+  }
+  async function preview(url: string, width: number, height: number, color: boolean) {
+    const response = await vela.inject(url)
+    assert.equal(response.statusCode, 200)
+    const png = response.rawPayload
+    assert.equal(png.subarray(1, 4).toString(), 'PNG')
+    assert.equal(png.readUInt32BE(16), width)
+    assert.equal(png.readUInt32BE(20), height)
+    assert.equal(png[25], color ? 2 : 0)
+    if (color) {
+      const chunks: Buffer[] = []
+      for (let offset = 8; offset < png.length;) {
+        const length = png.readUInt32BE(offset)
+        if (png.toString('ascii', offset + 4, offset + 8) === 'IDAT') chunks.push(png.subarray(offset + 8, offset + 8 + length))
+        offset += length + 12
+      }
+      const decoded = inflateSync(Buffer.concat(chunks))
+      let coloredPixels = 0
+      for (let y = 0; y < height; y++) {
+        const row = y * (width * 3 + 1)
+        assert.equal(decoded[row], 0)
+        for (let x = 0; x < width; x++) {
+          const offset = row + 1 + x * 3
+          const r = decoded[offset]!, g = decoded[offset + 1]!, b = decoded[offset + 2]!
+          if (Math.max(r, g, b) > 100 && Math.max(r, g, b) - Math.min(r, g, b) > 30) coloredPixels++
+        }
+      }
+      assert.ok(coloredPixels > 100, 'Preview must contain visible color, not just an RGB-encoded gray frame')
+    }
+    return png.length
+  }
+  try {
+    assert.equal((await captureView()).enabled, false, 'No implicit camera selection')
+    await select(colorId)
+    const color = await capture()
+    assert.equal(color.color, 'color')
+    await preview(color.imageUrl, 1600, 1200, true)
+
+    // Read the same retained sensor frame using both negotiated transports.
+    const raw = await fetch(`${baseUrl}/api/v1/camera/1/imagearray`, { headers: { accept: 'application/imagebytes' } })
+    assert.match(raw.headers.get('content-type') ?? '', /^application\/imagebytes/)
+    const binary = Buffer.from(await raw.arrayBuffer())
+    const json = await fetch(`${baseUrl}/api/v1/camera/1/imagearray`, { headers: { accept: 'application/json' } })
+      .then(response => response.json()) as { ErrorNumber: number, Value: number[][] }
+    assert.equal(json.ErrorNumber, 0)
+    assert.equal(binary.readInt32LE(16), 44)
+    assert.equal(binary.readInt32LE(24), 8)
+    assert.equal(binary.readInt32LE(32), 1600)
+    assert.equal(binary.readInt32LE(36), 1200)
+    assert.equal(binary.length, 44 + 1600 * 1200 * 2)
+    for (let x = 0; x < 1600; x++) for (let y = 0; y < 1200; y++) {
+      assert.equal(binary.readUInt16LE(44 + (x * 1200 + y) * 2), json.Value[x]![y])
+    }
+
+    await select(cameraId)
+    const mono = await capture()
+    assert.equal(mono.color, 'mono')
+    assert.notEqual(mono.id, color.id)
+    await preview(mono.imageUrl, 1600, 1200, false)
+    await preview(color.imageUrl, 1600, 1200, true)
+
+    await control('camera', { cameraNumber: 1, resolution: 'full' })
+    await select(colorId)
+    const started = performance.now()
+    const full = await capture()
+    assert.equal(full.color, 'color')
+    assert.equal(full.width, 6248)
+    assert.equal(full.height, 4176)
+    assert.ok(full.fitImageUrl)
+    const nativeBytes = await preview(full.imageUrl, 6248, 4176, true)
+    const fitBytes = await preview(full.fitImageUrl, 1562, 1044, true)
+    assert.ok(fitBytes < nativeBytes)
+
+    const pending = await vela.inject({ method: 'POST', url: '/api/rigs/proof/capture/start', payload: { exposureSeconds: 10 } })
+    assert.equal(pending.statusCode, 200)
+    assert.equal((await captureView()).latestImage?.id, full.id)
+    const stopped = await vela.inject({ method: 'POST', url: '/api/rigs/proof/capture/stop', payload: {} })
+    assert.equal(stopped.json<CaptureView>().phase, 'stopped', stopped.body)
+    assert.equal(stopped.json<CaptureView>().latestImage?.id, full.id)
+    reports.push({ name: 'capture', cameraSelection: 'explicit color → mono → color',
+      transportParityPixels: 1600 * 1200, retainedAfterStop: true,
+      full: { width: full.width, height: full.height, nativeBytes, fitBytes, elapsedMs: performance.now() - started } })
+  } finally {
+    await vela.inject({ method: 'POST', url: '/api/rigs/proof/capture/stop', payload: {} })
+    await vela.close()
+    await hardware.abort(colorId, telescopeId)
+  }
 }
 
 try {
@@ -119,6 +259,7 @@ try {
   const idle = await fetch(`${baseUrl}/simulator/state`).then(response => response.json()) as { cameraActivity: string, raRateDegreesPerSecond: number }
   assert.equal(idle.cameraActivity, 'idle')
   assert.equal(idle.raRateDegreesPerSecond, 0)
+  await proveCapture()
   await writeFile(join(output, 'results.json'), JSON.stringify({ toleranceArcsec, reports,
     obscured: 'real ASTAP no-solution', cancellation: 'exposure aborted and fresh restart solved' }, null, 2))
   console.log(`HTTP proof passed: ${join(output, 'results.json')}`)
