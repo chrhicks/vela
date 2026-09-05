@@ -1,3 +1,10 @@
+/** Conservative star measurements from this image's linear samples. */
+export interface CaptureImageStatistics {
+  detectedStars: number
+  /** Median radius enclosing half a measured star's light, in native image pixels. */
+  medianHfrPixels: number | null
+}
+
 /** Metadata belongs to this image, independent of any subsequent exposure. */
 export interface CaptureImage {
   id: string
@@ -12,6 +19,8 @@ export interface CaptureImage {
   receivedAt: string
   cameraName: string
   color: 'mono' | 'color'
+  /** Null means analysis was unavailable; zero detectedStars is a valid starless result. */
+  statistics: CaptureImageStatistics | null
 }
 
 /** Server-owned ephemeral capture run and the most recent retained image. */
