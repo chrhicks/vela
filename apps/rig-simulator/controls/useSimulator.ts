@@ -80,4 +80,12 @@ function isState(value: unknown): value is SimulatorState {
     'rightAscensionHours', 'declinationDegrees'].every(key => typeof state[key] === 'number' && Number.isFinite(state[key]))
     && ['obscured', 'cameraConnected', 'telescopeConnected', 'imageReady', 'tracking'].every(key => typeof state[key] === 'boolean')
     && ['idle', 'exposing'].includes(String(state.cameraActivity))
+    && Array.isArray(state.cameras) && state.cameras.length === 2
+    && state.cameras.every((camera, number) => camera && camera.number === number
+      && typeof camera.connected === 'boolean' && typeof camera.imageReady === 'boolean'
+      && ['idle', 'exposing'].includes(camera.activity)
+      && ['fast', 'full'].includes(camera.resolution)
+      && camera.sensor === (number === 0 ? 'mono' : 'rggb')
+      && camera.width === (camera.resolution === 'full' ? 6248 : 1600)
+      && camera.height === (camera.resolution === 'full' ? 4176 : 1200))
 }

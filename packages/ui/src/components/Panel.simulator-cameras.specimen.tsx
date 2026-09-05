@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import type { ComponentSpecimen } from '../themes'
-import { Panel } from '../components/Panel'
-import { Button } from '../components/Button'
-import { Select } from '../components/Select'
+import { Panel } from './Panel'
+import { Button } from './Button'
+import { Select } from './Select'
 import './Panel.simulator-cameras.specimen.css'
 
 type Resolution = 'fast' | 'full'
@@ -86,7 +86,7 @@ function CamerasPreview({ props, onPropsChange }: {
 
 export const specimen: ComponentSpecimen = {
   componentId: 'panel', componentName: 'Panel / Card', id: 'panel-simulator-cameras',
-  name: 'Simulator cameras · Draft product example',
+  name: 'Simulator cameras · Product example',
   description: 'Two cameras sharing a mount and sky, with separate image sizes and honest exposure and unavailable states. Local fixtures only.',
   controls: {
     state: { type: 'select', label: 'Camera state', options: ['idle', 'exposing', 'image-ready', 'disconnected', 'unavailable'] },
