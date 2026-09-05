@@ -76,7 +76,7 @@ function setup(selection: { uniqueId: string, name: string } | null = record.ima
 
 it('rejects malformed input before acquiring or operating a camera', async () => {
   const subject = setup()
-  for (const body of [{}, { exposureSeconds: '10' }, { exposureSeconds: 0.09 }, { exposureSeconds: 601 }, { exposureSeconds: 1, gain: 0 }, []]) {
+  for (const body of [{}, { exposureSeconds: '10' }, { exposureSeconds: 0.09 }, { exposureSeconds: 601 }, { exposureSeconds: 1, gain: 0 }, { exposureSeconds: 1, repeat: 'true' }, { exposureSeconds: 1, repeat: null }, []]) {
     expect((await subject.start(body)).statusCode).toBe(400)
   }
   expect(subject.inspections()).toBe(0)
@@ -149,7 +149,6 @@ it('retains image metadata across failure and serves it while disconnected, whil
   expect(subject.captures).toHaveLength(3)
 })
 
-
 it('does not advertise a camera owned outside Vela as ready', async () => {
   const subject = setup()
   subject.externallyBusy()
@@ -174,4 +173,24 @@ it('binds each exposure to the current selection and endpoint while retaining ea
   await vi.waitFor(() => expect(subject.operations.owner('sim')).toBeUndefined())
   expect((await subject.get()).json().latestImage.cameraName).toBe('Other camera')
   expect((await subject.app.inject(previous.imageUrl)).statusCode).toBe(200)
+})
+
+it('owns repeated capture across reads and releases the Rig lease only after confirmed Stop', async () => {
+  const subject = setup()
+  expect((await subject.get()).json()).toMatchObject({ repeat: true, completedCount: 0 })
+  expect((await subject.start({ exposureSeconds: 10, repeat: true })).json()).toMatchObject({ repeat: true, active: true })
+  subject.captures[0]!.resolve(frame)
+  await vi.waitFor(() => expect(subject.captures).toHaveLength(2))
+  const current = (await subject.get()).json()
+  expect(current).toMatchObject({ repeat: true, active: true, completedCount: 1, phase: 'exposing' })
+  expect(subject.operations.acquire('sim', 'alignment')).toBeUndefined()
+  expect((await subject.start()).statusCode).toBe(409)
+  const stopping = subject.app.inject({ method: 'POST', url: '/api/rigs/sim/capture/stop', payload: {} })
+  void stopping.then(() => {})
+  await vi.waitFor(() => expect(subject.captures[1]!.signal.aborted).toBe(true))
+  expect(subject.operations.owner('sim')).toBe('capture')
+  subject.captures[1]!.reject(new CaptureStoppedError())
+  expect((await stopping).json()).toMatchObject({ phase: 'stopped', completedCount: 1, latestImage: current.latestImage })
+  expect(subject.operations.owner('sim')).toBeUndefined()
+  expect(subject.captures).toHaveLength(2)
 })

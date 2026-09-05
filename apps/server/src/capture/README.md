@@ -1,6 +1,7 @@
 # Capture
 
-Capture owns one server-side exposure and its most recent image. Browser requests
+Capture owns one server-side capture run and its most recent image. A run takes
+one exposure or repeats the requested duration until stopped. Browser requests
 start the work and read its projection; disconnecting the browser does not stop
 acquisition. A server restart loses the operation and in-memory previews.
 
@@ -16,13 +17,14 @@ previously environment-configured rigs need one explicit choice in Observe.
 Route
 composition acquires the same Rig operation lease used by alignment and
 connection commands before checking the selected identity and connection. The lease
-lasts through acquisition cleanup. Device protocol preconditions and abort
+lasts across every exposure and through final acquisition cleanup. Device protocol preconditions and abort
 confirmation belong to the ALPACA adapter.
 
 The controller depends on `CaptureCamera`, not a concrete transport. A successful
 frame publishes its own exposure settings, acquisition start timestamp and
-receipt timestamp. Later pending or failed exposures retain that image and its
-metadata. Preview stretching preserves native dimensions for 100% inspection;
+receipt timestamp. Later pending, failed or stopped exposures retain that image and its
+metadata. The run count increments only when an image is published and resets
+on each start. Any acquisition or preview failure ends the run without replay. Preview stretching preserves native dimensions for 100% inspection;
 only the latest three image pairs remain in memory. This is not an artifact archive.
 
 Unbinned Bayer frames are bilinearly debayered at native dimensions. A shared
@@ -37,12 +39,15 @@ describes the original exposure and its native dimensions.
 
 Stop waits for confirmed cleanup. A typed cancellation result means stopped;
 uncertain cleanup remains failed. If a completed frame wins a race with Stop,
-the actual completed image is published. Stop and image retrieval do not depend
+the actual completed image is published. Stop during readout or preview preparation
+prevents another exposure; it waits for that acquisition and preview to settle. Stop and image retrieval do not depend
 on the current camera being ready for another exposure.
 
-The HTTP boundary accepts a single exposure duration from 0.1 through 600 seconds.
-Repeated capture runs, physical camera settings and FITS retention are separate
-capabilities.
+The HTTP boundary accepts exposureSeconds from 0.1 through 600 and an optional
+boolean repeat. Omitting repeat retains the single-exposure API behavior; the web
+interface explicitly requests repetition by default. Runs and counts are ephemeral,
+with no durable sequence or resumption after server restart. Physical camera
+settings and FITS retention are separate capabilities.
 
 ## Local review
 

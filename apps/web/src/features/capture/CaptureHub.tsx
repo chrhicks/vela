@@ -22,9 +22,10 @@ export function CaptureHub({ rigId }: { rigId: string }) {
         <span>{image ? 'Latest exposure' : 'See what your camera sees'}</span>
       </div>
       <div className="vela-capture-entry__body">
-        <h2>Capture</h2><p>Take an exposure and inspect the image.</p>
+        <h2>Capture</h2><p>Capture images and inspect the latest exposure.</p>
         <div className="vela-capture-entry__status" role="status">
-          {offline ? 'Capture updates interrupted · last known state' : view?.active ? view.phase === 'stopping' ? 'Stopping exposure…' : view.phase === 'reading' ? 'Receiving image…' : 'Exposing…' : view?.phase === 'failed' ? 'Exposure failed' : view?.phase === 'stopped' ? 'Exposure stopped' : !view ? 'Loading capture state…' : !view.enabled ? view.unavailableReason : !image ? loading ? 'Loading latest image…' : 'No image captured yet' : null}
+          {offline ? 'Capture updates interrupted · last known state' : view?.active ? view.phase === 'stopping' ? 'Stopping capture…' : view.phase === 'reading' ? 'Receiving image…' : 'Exposing…' : view?.phase === 'failed' ? 'Exposure failed' : view?.phase === 'stopped' ? 'Capture stopped' : !view ? 'Loading capture state…' : !view.enabled ? view.unavailableReason : !image ? loading ? 'Loading latest image…' : 'No image captured yet' : null}
+          {view?.active && <span>{view.completedCount} completed{offline ? ' · last known' : ''}</span>}
           {image && <span>{image.exposureSeconds} s · {age} s ago</span>}
           {failed && <span>The latest image could not be loaded.</span>}
         </div>
