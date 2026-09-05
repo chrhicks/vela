@@ -29,3 +29,4 @@ export type {
   UnsupportedRigDeviceStatus,
   UnsupportedRigDeviceView,
 } from './rig-detail.js'
+export type { AlignmentView } from './alignment.js'

@@ -69,7 +69,7 @@ Both read flows keep HTTP requests serial within each invocation. The provider d
 
 ## Device connection command
 
-`connectDevice(providerDeviceId, { signal })` is the package's only write capability. It accepts the stable normalized provider identity rather than an Alpaca device type or number. It reads `Connected` first and returns confirmed success without a write when the device is already connected.
+`connectDevice(providerDeviceId, { signal })` is the operational provider's connection write capability. It accepts the stable normalized provider identity rather than an Alpaca device type or number. It reads `Connected` first and returns confirmed success without a write when the device is already connected.
 
 For a disconnected device, the provider uses the Alpaca v1 compatibility contract: `PUT connected` with an `application/x-www-form-urlencoded` body containing `Connected=true`. A successful response is verified with another `Connected` read. If the provider reports the Platform 7 `Connecting` completion property, Vela observes it at a bounded interval until the transition ends, then reads `Connected` again. This is a narrow connection-completion loop, not a generic retry mechanism, and the write is never replayed.
 
@@ -80,3 +80,41 @@ The newer Platform 7 asynchronous `Connect` method is not used by this compatibi
 ## Testing
 
 Factory injection supports fake `fetch` and UDP scanner boundaries. Package tests use only deterministic fakes and never touch the real LAN.
+
+## Exposure and primary-axis acquisition
+
+`createAlpacaAcquisition({ baseUrl })` is a separate narrow capability for a
+connected monochrome camera and equatorial mount. It resolves stable provider
+IDs through management inventory; device numbers and JSON wire shapes remain
+private. The server owns operation serialization and decides which rigs and
+coordinate frames its workflow supports.
+
+- `capture({ cameraId, exposureSeconds, signal, onProgress })` starts one light
+  exposure, observes `ImageReady`, and returns `{ width, height, pixels,
+  capturedAt }`. Pixels are row-major `Float64Array`; the timestamp is UTC.
+  The current boundary accepts monochrome, rank-2 Int32 JSON ImageArray only,
+  validates dimensions and pixels, and transposes Alpaca's `[x][y]` layout.
+  Color/Bayer cameras and ImageBytes are deliberately not supported yet.
+- An already active camera is rejected before writing. A retained image with
+  the same exposure timestamp is rejected as unconfirmed freshness; drivers
+  with coarse timestamps may therefore require more spacing between captures.
+  Completion is bounded by exposure duration plus 60 seconds. Failed or
+  cancelled captures attempt an independent, bounded abort. A lost start
+  response never causes a second exposure command.
+- `pointing(telescopeId, signal)` returns right ascension, declination, local
+  sidereal time, and site latitude in degrees, plus tracking and the named
+  equatorial coordinate system. It does not convert epochs or treat `other`
+  as J2000. Consumers must resolve their own coordinate-frame requirements.
+- `move(telescopeId, rateDegreesPerSecond, durationSeconds, signal)` checks
+  primary-axis capability and advertised unsigned rate ranges, issues one
+  signed mechanical rate, and always sends rate zero in cleanup—even when
+  the start response is lost or the caller cancels. Stop confirmation requires
+  `Slewing=false`. Mechanical rate sign is mount-dependent, not a promise of
+  increasing/decreasing sky RA. This narrow operation allows at most 120
+  seconds and rates up to 10 degrees/second.
+- `abort(cameraId, telescopeId)` attempts both stop operations independently
+  and reports failures rather than claiming that both devices stopped.
+
+Protocol references: [ASCOM camera interface](https://ascom-standards.org/newdocs/camera.html),
+[ASCOM telescope interface](https://ascom-standards.org/newdocs/telescope.html), and
+[Alpaca API reference](https://ascom-standards.org/AlpacaDeveloper/ASCOMAlpacaAPIReference.html).
