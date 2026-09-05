@@ -115,3 +115,32 @@ test('reconciles a lost save response from persisted selection without replaying
   await expect(panel.getByText(/save response could not be confirmed/)).toHaveCount(0)
   expect(writes).toBe(1)
 })
+
+test('an explicit check unlocks an unsaved uncertain choice without replaying it', async ({ page }) => {
+  let current = empty
+  let writes = 0
+  await page.route('**/api/web/rigs/rig-1/imaging-camera', route => respond(route, current))
+  await page.route('**/api/rigs/rig-1/imaging-camera', async route => {
+    writes++
+    if (writes === 1) await route.abort()
+    else { current = saved; await respond(route, current) }
+  })
+  await observe(page)
+  const panel = page.getByRole('region', { name: 'Imaging camera', exact: true })
+  await panel.getByRole('combobox', { name: 'Camera', exact: true }).selectOption('main')
+  await panel.getByRole('button', { name: 'Use this camera' }).click()
+  await expect(panel.getByText(/save response could not be confirmed/)).toBeVisible()
+  await expect(panel.getByRole('button', { name: 'Use this camera' })).toBeDisabled()
+  current = { ...empty, editable: false }
+  await panel.getByRole('button', { name: 'Check saved camera' }).click()
+  await expect(panel.getByText(/Another rig operation/)).toBeVisible()
+  await expect(panel.getByRole('button', { name: 'Use this camera' })).toBeDisabled()
+  current = empty
+  await panel.getByRole('button', { name: 'Check saved camera' }).click()
+  await expect(panel.getByText(/requested camera is not the saved selection/)).toBeVisible()
+  await expect(panel.getByRole('button', { name: 'Use this camera' })).toBeEnabled()
+  expect(writes).toBe(1)
+  await panel.getByRole('button', { name: 'Use this camera' }).click()
+  await expect(panel.getByRole('button', { name: 'Change', exact: true })).toBeEnabled()
+  expect(writes).toBe(2)
+})
