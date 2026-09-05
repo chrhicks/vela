@@ -9,6 +9,7 @@ import { CaptureStoppedError, createCaptureController, type CaptureCamera } from
 export interface CaptureSettings {
   endpoint: string
   cameraId: string
+  expectedCameraName: string
 }
 
 interface CaptureRouteOptions {
@@ -21,7 +22,7 @@ function configuredCamera(settings: CaptureSettings): CaptureCamera {
   return {
     async capture({ exposureSeconds, signal, onProgress }) {
       try {
-        return await acquisition.capture({ cameraId: settings.cameraId, exposureSeconds, signal,
+        return await acquisition.capture({ cameraId: settings.cameraId, expectedCameraName: settings.expectedCameraName, exposureSeconds, signal,
           onProgress: elapsedSeconds => onProgress({ phase: 'exposing', elapsedSeconds }),
           onReadout: () => onProgress({ phase: 'reading', elapsedSeconds: exposureSeconds }),
         })
@@ -37,7 +38,6 @@ export function registerCapture(
   app: FastifyInstance,
   catalog: RigCatalog,
   operations: RigOperations,
-  settings?: CaptureSettings,
   { createCamera = configuredCamera, createInspector }: CaptureRouteOptions = {},
 ) {
   const controllers = new Map<string, ReturnType<typeof createCaptureController>>()
@@ -50,16 +50,15 @@ export function registerCapture(
       phase: 'idle', active: false, exposureSeconds: 2, elapsedSeconds: 0, error: null, latestImage: null,
     }
     const unavailable = (reason: string): CaptureView => ({ ...current(), rigName: rig.name, enabled: false, unavailableReason: reason })
-    if (!settings || `http://${rig.endpoint.host}:${rig.endpoint.port}` !== settings.endpoint) {
-      return unavailable('Capture is not configured for this Rig.')
-    }
+    if (!rig.imagingCamera) return unavailable('Choose an imaging camera in Rig setup.')
     const detail = await inspectRigDetail(catalog, rigId, createInspector ? { createInspector } : {})
     if (detail.state === 'not-found') return undefined
     if (detail.state === 'conflict') return unavailable('Rig identity needs attention before capture.')
     if (detail.state === 'unavailable') return unavailable('Camera state is unavailable. Check the Rig connection.')
-    const camera = detail.inspections.find(device => device.providerDeviceId === settings.cameraId && device.kind === 'camera')
+    const camera = detail.inspections.find(device => device.providerDeviceId === rig.imagingCamera!.uniqueId && device.kind === 'camera')
     if (!camera) return unavailable('The configured capture camera was not found.')
-    const cameraView = { name: camera.name ?? camera.configuredName }
+    const cameraView = { name: rig.imagingCamera.name }
+    if (!camera.name?.trim() || camera.name.trim() !== rig.imagingCamera.name) return { ...unavailable('Camera identity changed or is unavailable. Select the imaging camera again in Rig setup.'), camera: cameraView }
     if (camera.connection !== 'connected') return { ...unavailable('Connect the camera before taking an exposure.'), camera: cameraView }
     const owner = operations.owner(rigId)
     if (owner && owner !== 'capture') return { ...unavailable('Another Rig operation is in progress.'), camera: cameraView }
@@ -90,13 +89,16 @@ export function registerCapture(
     try {
       const view = await rigView(request.params.rigId)
       if (!view) return reply.code(404).send({ error: 'Rig not found' })
-      if (!view.enabled || !view.camera || !settings) return reply.code(409).send({ error: view.unavailableReason })
+      if (!view.enabled || !view.camera) return reply.code(409).send({ error: view.unavailableReason })
+      const rig = await catalog.get(view.rigId)
+      if (!rig?.imagingCamera) return reply.code(409).send({ error: 'Imaging camera selection is unavailable.' })
+      const settings = { endpoint: `http://${rig.endpoint.host}:${rig.endpoint.port}`, cameraId: rig.imagingCamera.uniqueId, expectedCameraName: rig.imagingCamera.name }
       let controller = controllers.get(view.rigId)
       if (!controller) {
-        controller = createCaptureController({ rigId: view.rigId, rigName: view.rigName, cameraName: view.camera.name }, createCamera(settings))
+        controller = createCaptureController({ rigId: view.rigId, rigName: view.rigName })
         controllers.set(view.rigId, controller)
       }
-      const result = await controller.start(body.exposureSeconds, release)
+      const result = await controller.start(body.exposureSeconds, createCamera(settings), view.camera.name, release)
       started = true
       return result
     } catch (error) {

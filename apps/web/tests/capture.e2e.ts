@@ -53,7 +53,7 @@ test('a command stays responsive during polling and a late read cannot replace i
 const preview = readFileSync(new URL('../../../packages/ui/src/components/fixtures/capture-star-field.png', import.meta.url))
 const firstImage = {
   id: 'frame-1', imageUrl: '/api/rigs/rig-1/capture/images/frame-1', width: 1600, height: 1200,
-  exposureSeconds: 2, capturedAt: '2026-09-05T18:00:00.000Z', receivedAt: '2026-09-05T18:00:03.000Z', cameraName: 'Simulator Camera',
+  exposureSeconds: 2, capturedAt: '2026-09-05T18:00:00.000Z', receivedAt: '2026-09-05T18:00:03.000Z', cameraName: 'Simulator Camera', color: 'mono',
 }
 
 test('keeps the loaded image and its metadata together through a failed new-image request and retry', async ({ page }) => {

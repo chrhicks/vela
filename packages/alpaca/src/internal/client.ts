@@ -37,6 +37,7 @@ export interface AlpacaClientOptions {
   fetch: typeof globalThis.fetch
   signal?: AbortSignal
   requestTimeoutMs?: number
+  imageTimeoutMs?: number
 }
 
 interface AlpacaResult {
@@ -57,6 +58,7 @@ export function createAlpacaClient({
   fetch,
   signal,
   requestTimeoutMs,
+  imageTimeoutMs = requestTimeoutMs,
 }: AlpacaClientOptions): AlpacaClient {
   const normalizedBaseUrl = baseUrl.replace(/\/$/, '')
   const apiBasePath = '/api/v1'
@@ -67,6 +69,8 @@ export function createAlpacaClient({
     schema: S,
     operationSignal = signal,
     init?: Omit<RequestInit, 'signal'>,
+    timeoutMs = requestTimeoutMs,
+    readBody: (response: Response) => Promise<unknown> = response => response.json(),
   ): Promise<S['Type']> {
     const controller = new AbortController()
     let timedOut = false
@@ -78,12 +82,12 @@ export function createAlpacaClient({
       operationSignal?.addEventListener('abort', onAbort, { once: true })
     }
 
-    const timeout = requestTimeoutMs === undefined
+    const timeout = timeoutMs === undefined
       ? undefined
       : setTimeout(() => {
           timedOut = true
           controller.abort(new DOMException('The request timed out', 'TimeoutError'))
-        }, requestTimeoutMs)
+        }, timeoutMs)
 
     function throwTransportError(cause: unknown): never {
       if (operationSignal?.aborted) {
@@ -92,7 +96,7 @@ export function createAlpacaClient({
 
       if (timedOut) {
         throw new AlpacaProviderError(
-          `Alpaca endpoint ${endpoint} timed out after ${requestTimeoutMs}ms`,
+          `Alpaca endpoint ${endpoint} timed out after ${timeoutMs}ms`,
           {
             reason: 'transport',
             endpoint,
@@ -133,13 +137,14 @@ export function createAlpacaClient({
       let json: unknown
 
       try {
-        json = await response.json()
+        json = await readBody(response)
       } catch (cause) {
         if (controller.signal.aborted) {
           throwTransportError(cause)
         }
 
-        throw new AlpacaProviderError(`Alpaca endpoint ${endpoint} returned invalid JSON`, {
+        if (cause instanceof AlpacaProviderError) throw cause
+        throw new AlpacaProviderError(`Alpaca endpoint ${endpoint} returned an invalid response body`, {
           reason: 'invalid-response',
           endpoint,
           cause,
@@ -240,7 +245,15 @@ export function createAlpacaClient({
 
     image: async (device, operationSignal) => {
       const endpoint = deviceEndpoint(device, 'imagearray')
-      const value = await request(endpoint, Schema.Unknown, operationSignal, { headers: { accept: 'application/json' } })
+      const value = await request(endpoint, Schema.Unknown, operationSignal,
+        { headers: { accept: 'application/imagebytes, application/json;q=0.9' } }, imageTimeoutMs,
+        response => {
+          const contentType = response.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase()
+          if (contentType === 'application/imagebytes') return response.arrayBuffer()
+          if (contentType === 'application/json') return response.json()
+          throw new AlpacaProviderError('Unsupported camera image Content-Type', { reason: 'invalid-response', endpoint })
+        })
+      if (value instanceof ArrayBuffer) return value
       const result = decodeResponse(endpoint, alpacaMethodResponse, value) as AlpacaResult
       rejectProtocolError(endpoint, result)
       return value

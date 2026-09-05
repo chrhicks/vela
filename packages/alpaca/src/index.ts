@@ -30,4 +30,4 @@ export type {
   AlpacaTelemetryAvailability,
 } from './model.js'
 export { createAlpacaAcquisition, AlpacaCaptureStoppedError } from './acquisition.js'
-export type { AlpacaAcquisition, AlpacaAcquisitionOptions, AlpacaCaptureOptions, AlpacaFrame, AlpacaPointing } from './acquisition.js'
+export type { AlpacaAcquisition, AlpacaAcquisitionOptions, AlpacaCaptureOptions, AlpacaFrame, AlpacaFrameColor, AlpacaPointing } from './acquisition.js'

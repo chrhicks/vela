@@ -9,6 +9,7 @@ export interface CaptureImage {
   capturedAt: string
   receivedAt: string
   cameraName: string
+  color: 'mono' | 'color'
 }
 
 /** Server-owned single exposure and the most recent retained image. */

@@ -127,7 +127,7 @@ export function LatestImage({ image, busy, interrupted }: {
         </div>}
     </div>
     {frame && <footer>
-      <span>{frame.exposureSeconds} s <i>·</i> Mono <i>·</i> {frame.width} × {frame.height}</span>
+      <span>{frame.exposureSeconds} s <i>·</i> {frame.color === 'color' ? 'Color' : 'Mono'} <i>·</i> {frame.width} × {frame.height}</span>
       <span>{zoomed ? 'Scroll to inspect' : 'Display stretched'}</span>
     </footer>}
   </section>
