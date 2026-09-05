@@ -1,0 +1,39 @@
+.sim-controls { width: 100%; max-width: 64rem; container-type: inline-size; background: var(--vela-canvas); color: var(--vela-text); border: 1px solid var(--vela-line); border-radius: var(--vela-radius); padding: 20px; box-sizing: border-box; }
+.sim-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.sim-heading p { margin: 0 0 5px; color: var(--vela-text-muted); font-size: 12px; }
+.sim-heading h1 { margin: 0; font-size: 24px; font-weight: 600; }
+.sim-heading > span { font-size: 11px; color: var(--vela-text-muted); }
+.sim-intro { font-size: 13px; line-height: 1.6; color: var(--vela-text-muted); margin: 12px 0 22px; }
+.sim-layout, .sim-side { display: grid; gap: 16px; align-items: start; }
+.sim-controls .vela-panel__body { padding: 16px; }
+.sim-axes { display: grid; gap: 20px; margin-top: 24px; }
+.sim-axes section + section { border-top: 1px solid var(--vela-line); padding-top: 20px; }
+.sim-axis-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.sim-axis-heading h2 { margin: 0; font-size: 14px; font-weight: 550; }
+.sim-axis-heading span { font-size: 11px; color: var(--vela-text-muted); }
+.sim-axes strong { display: block; margin-top: 10px; font-size: 30px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.sim-axes p { margin: 4px 0 14px; font-size: 12px; color: var(--vela-text-muted); }
+.sim-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.sim-controls .vela-button { min-height: 44px; }
+.sim-controls .vela-button:hover:not(:disabled) { transform: none; }
+.sim-controls[data-pending="true"] .vela-button:disabled { opacity: 1; cursor: progress; }
+.sim-note, .sim-camera p { font-size: 12px; line-height: 1.6; color: var(--vela-text-muted); margin: 16px 0; }
+.sim-status { border-top: 1px solid var(--vela-line); padding-top: 12px; font-size: 11px; line-height: 1.5; color: var(--vela-text-muted); }
+.sim-details { margin-top: 16px; font-size: 12px; }
+.sim-details summary { cursor: pointer; padding-block: 6px; }
+.sim-details form { display: grid; gap: 12px; margin-top: 12px; }
+.sim-camera strong { font-size: 16px; font-weight: 550; }
+.sim-camera p { margin-top: 8px; }
+.sim-side .vela-button { width: 100%; }
+.sim-controls footer { margin-top: 20px; font-size: 10px; line-height: 1.5; color: var(--vela-text-muted); text-align: center; }
+@container (min-width: 650px) {
+  .sim-layout { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 20px; }
+}
+
+:root { color-scheme: dark; }
+body { margin: 0; min-width: 320px; }
+.sim-page { min-height: 100vh; padding: 24px; box-sizing: border-box; background: var(--vela-canvas); }
+.sim-controls { margin: auto; }
+.sim-connection, .sim-notice { font-size: 12px; line-height: 1.6; color: var(--vela-text-muted); margin-bottom: 20px; }
+.sim-summary { font: inherit; color: inherit; background: transparent; border: 0; padding: 6px 0; cursor: pointer; }
+@media (max-width: 500px) { .sim-page { padding: 0; } .sim-controls { border: 0; } }
