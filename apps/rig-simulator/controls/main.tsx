@@ -44,7 +44,7 @@ function Controls() {
     if ([altitude, azimuth].every(value => Number.isInteger(value) && Math.abs(value) <= 18000)) void adjust(altitude, azimuth)
   }
   return <main className="vela-theme sim-page" data-mode="dark" style={themeStyle(resolveTheme(VELA_CURRENT_PROFILE), 'dark') as CSSProperties}>
-    <article className="sim-controls">
+    <article className="sim-controls" data-pending={pending}>
       <header className="sim-heading"><div><p>Development rig</p><h1>Rig simulator</h1></div><span>{available ? 'Local simulator' : 'Disconnected'}</span></header>
       <p className="sim-intro">Adjust the rig here. Watch Vela respond in its own window.</p>
       <p className="sim-connection">Add rig in Vela: <strong>127.0.0.1:7850</strong>{state ? ` · Camera ${state.cameraConnected ? 'connected' : 'disconnected'} · Mount ${state.telescopeConnected ? 'connected' : 'disconnected'}` : ''}</p>
