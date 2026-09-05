@@ -159,3 +159,28 @@ it('moves back from a drifted field without jumping to a catalog boundary', () =
   expect(drifted - moved).toBeGreaterThan(0.99)
   expect(drifted - moved).toBeLessThan(1)
 })
+
+it('uses net sky motion for slow negative rates at both catalog boundaries', () => {
+  let now = 0
+  const runtime = new SimulatorRuntime([], () => now)
+  runtime.move(1.5)
+  now = 20000
+  expect(runtime.state().raAxisDegrees).toBe(50)
+  // Earth rotation exceeds this mechanical westward rate: net motion is east.
+  expect(() => runtime.move(-0.001)).toThrow('leave the catalog sky patch')
+  runtime.move(-1)
+  now += 100
+  runtime.move(0)
+  expect(runtime.state().raAxisDegrees).toBeLessThan(50)
+  runtime.move(-0.001)
+  now += 100000
+  expect(runtime.state()).toMatchObject({ raAxisDegrees: 50, raRateDegreesPerSecond: 0 })
+  runtime.move(-1.5)
+  now += 100000
+  expect(runtime.state().raAxisDegrees).toBeCloseTo(10)
+  runtime.move(-0.001)
+  now += 1000
+  expect(runtime.state().raAxisDegrees).toBeGreaterThan(10)
+  expect(runtime.state().raRateDegreesPerSecond).toBe(-0.001)
+  runtime.move(0)
+})

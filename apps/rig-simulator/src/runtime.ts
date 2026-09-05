@@ -60,9 +60,10 @@ export class SimulatorRuntime {
     this.joint += seconds * (this.rate !== 0 ? this.rate : this.tracking ? -siderealDegreesPerSecond : 0)
     this.updated = time
     const ra = this.joint + this.elapsed() * siderealDegreesPerSecond
-    if ((this.rate < 0 && ra < 10) || (this.rate > 0 && ra > 50)) {
+    const netRaRate = this.rate + siderealDegreesPerSecond
+    if (this.rate !== 0 && ((netRaRate < 0 && ra < 10) || (netRaRate > 0 && ra > 50))) {
       const boundary = ra < 10 ? 10 : 50
-      const secondsToBoundary = (boundary - previousRa) / (this.rate + siderealDegreesPerSecond)
+      const secondsToBoundary = (boundary - previousRa) / netRaRate
       const remainingSeconds = Math.max(0, seconds - secondsToBoundary)
       const drift = this.tracking ? 0 : remainingSeconds * siderealDegreesPerSecond
       this.joint = boundary + drift - this.elapsed() * siderealDegreesPerSecond
@@ -140,7 +141,8 @@ export class SimulatorRuntime {
     if (rate !== 0) this.requireIdle()
     if (!Number.isFinite(rate) || Math.abs(rate) > 1.5) throw new SimulatorError(0x401, 'RA rate must be within ±1.5 degrees per second')
     const ra = this.state().raAxisDegrees
-    if ((ra <= 10 && rate < 0) || (ra >= 50 && rate > 0)) throw new SimulatorError(0x40b, 'Movement would leave the catalog sky patch')
+    const netRaRate = rate + siderealDegreesPerSecond
+    if (rate !== 0 && ((ra <= 10 && netRaRate < 0) || (ra >= 50 && netRaRate > 0))) throw new SimulatorError(0x40b, 'Movement would leave the catalog sky patch')
     this.rate = rate
   }
   startExposure(duration: number, light: boolean) {
