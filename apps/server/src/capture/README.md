@@ -10,14 +10,10 @@ camera is never selected automatically. A missing identity or changed reported
 name requires explicit reselection; a different camera in the same configured
 provider slot is not silently accepted.
 
-While the production setup interface awaits adoption, the existing
-`VELA_CAPTURE_ENDPOINT` and `VELA_CAPTURE_CAMERA_ID` configuration continues to
-work for its exact endpoint when that Rig has no saved imaging-camera selection.
-A saved selection always takes precedence, including when missing or changed;
-those states never fall back to environment configuration. The legacy path
-checks a fresh reported camera name again before exposure and does not persist
-an automatic selection. Setup API state describes saved selection, so it stays
-`unselected` for an environment-configured Rig. Route
+The Observe chooser is the setup path. It replaces the temporary
+`VELA_CAPTURE_ENDPOINT` / `VELA_CAPTURE_CAMERA_ID` environment configuration;
+previously environment-configured rigs need one explicit choice in Observe.
+Route
 composition acquires the same Rig operation lease used by alignment and
 connection commands before checking the selected identity and connection. The lease
 lasts through acquisition cleanup. Device protocol preconditions and abort
@@ -27,13 +23,17 @@ The controller depends on `CaptureCamera`, not a concrete transport. A successfu
 frame publishes its own exposure settings, acquisition start timestamp and
 receipt timestamp. Later pending or failed exposures retain that image and its
 metadata. Preview stretching preserves native dimensions for 100% inspection;
-only the latest three PNGs remain in memory. This is not an artifact archive.
+only the latest three image pairs remain in memory. This is not an artifact archive.
 
 Unbinned Bayer frames are bilinearly debayered at native dimensions. A shared
 asinh display stretch uses sampled black/white points across sensor phases;
 this is a viewing aid, not calibrated color processing. Acquisition samples
 are unchanged. Preview computation yields between row batches and compression
 runs asynchronously to keep the server responsive with full-resolution frames.
+Frames larger than 1600 pixels on their longest edge also receive an averaged
+fitted preview. Observe and Fit load that smaller image; 100% requests the native
+PNG and stays fitted until the native image is available. Image metadata always
+describes the original exposure and its native dimensions.
 
 Stop waits for confirmed cleanup. A typed cancellation result means stopped;
 uncertain cleanup remains failed. If a completed frame wins a race with Stop,
@@ -50,10 +50,7 @@ Choose the simulator imaging camera through the same Rig setup API used for a
 physical Rig: GET `/api/web/rigs/:rigId/imaging-camera` returns current choices;
 PUT `/api/rigs/:rigId/imaging-camera` with `{ id, name }` remembers an explicitly
 selected current choice. The name echo rejects a choice that changed since it
-was displayed. Alternatively, the existing simulator review configuration remains
-supported: `VELA_CAPTURE_ENDPOINT=http://127.0.0.1:7850` and
-`VELA_CAPTURE_CAMERA_ID=vela-simulator-camera`. Both values are required when using
-the legacy path. Use the isolated simulator review catalog and app proxy described
+was displayed. The Observe chooser uses those same routes. Use the isolated simulator review catalog and app proxy described
 in `../alignment/README.md`.
 
 From Observe, open Capture, choose an exposure duration and take an image. Return

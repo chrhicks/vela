@@ -14,3 +14,8 @@ replayed. Starting again requires an explicit read confirming no active exposure
 the image only when loading succeeds. A failed new image leaves the previous
 frame and metadata together. GET retries are bounded; native dimensions drive
 100% scrolling. Observe consumes the same projection and loading primitive.
+
+Large frames offer a smaller fitted preview. Observe and Fit request it first;
+100% loads the native image on demand, preserving the fitted view until that
+request completes. The requested image URL and metadata commit together, so a
+delayed or failed native-image request never labels a scaled preview as 100%.

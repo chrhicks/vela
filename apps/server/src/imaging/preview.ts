@@ -8,6 +8,39 @@ const compress = promisify(deflate)
 export type ImageColor = { kind: 'mono' } | { kind: 'bayer', pattern: 'rggb' | 'grbg' | 'gbrg' | 'bggr' }
 
 export async function previewPng(width: number, height: number, pixels: ArrayLike<number>, color: ImageColor = { kind: 'mono' }): Promise<Buffer> {
+  const { data, channels } = await stretch(width, height, pixels, color)
+  return encodePng(width, height, channels, data)
+}
+
+export async function capturePreviews(width: number, height: number, pixels: ArrayLike<number>, color: ImageColor = { kind: 'mono' }) {
+  const { data, channels } = await stretch(width, height, pixels, color)
+  const native = await encodePng(width, height, channels, data)
+  const factor = Math.ceil(Math.max(width, height) / 1600)
+  if (factor <= 1) return { native, fit: undefined }
+
+  const fitWidth = Math.ceil(width / factor), fitHeight = Math.ceil(height / factor)
+  const fitStride = fitWidth * channels + 1
+  const nativeStride = width * channels + 1
+  const fitted = Buffer.alloc(fitStride * fitHeight)
+  // Average displayed pixels so narrow stars contribute even between sampling points.
+  for (let y = 0; y < fitHeight; y++) {
+    if (y % 16 === 0) await setImmediate()
+    for (let x = 0; x < fitWidth; x++) {
+      const xEnd = Math.min(width, (x + 1) * factor), yEnd = Math.min(height, (y + 1) * factor)
+      const count = (xEnd - x * factor) * (yEnd - y * factor)
+      for (let channel = 0; channel < channels; channel++) {
+        let sum = 0
+        for (let sy = y * factor; sy < yEnd; sy++) for (let sx = x * factor; sx < xEnd; sx++) {
+          sum += data[sy * nativeStride + sx * channels + channel + 1]!
+        }
+        fitted[y * fitStride + x * channels + channel + 1] = Math.round(sum / count)
+      }
+    }
+  }
+  return { native, fit: await encodePng(fitWidth, fitHeight, channels, fitted) }
+}
+
+async function stretch(width: number, height: number, pixels: ArrayLike<number>, color: ImageColor) {
   // An odd stride samples every Bayer phase rather than just one sensor color.
   const sampleStride = Math.max(1, Math.floor(pixels.length / 200_000) | 1)
   const sample = Array.from({ length: Math.ceil(pixels.length / sampleStride) }, (_, i) => pixels[i * sampleStride]!).sort((a, b) => a - b)
@@ -27,6 +60,10 @@ export async function previewPng(width: number, height: number, pixels: ArrayLik
       }
     }
   }
+  return { data, channels }
+}
+
+async function encodePng(width: number, height: number, channels: number, data: Buffer) {
   const header = Buffer.alloc(13)
   header.writeUInt32BE(width, 0)
   header.writeUInt32BE(height, 4)

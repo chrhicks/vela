@@ -1,6 +1,6 @@
 import { inflateSync } from 'node:zlib'
 import { describe, expect, it } from 'vitest'
-import { previewPng, type ImageColor } from './preview.js'
+import { capturePreviews, previewPng, type ImageColor } from './preview.js'
 
 function decode(png: Buffer) {
   const chunks: Buffer[] = []
@@ -13,6 +13,19 @@ function decode(png: Buffer) {
 }
 
 describe('native image preview', () => {
+  it('keeps native pixels and averages a smaller fitted preview without dropping narrow stars', async () => {
+    const pixels = new Float64Array(1602 * 2)
+    pixels[1] = 1000
+    pixels[pixels.length - 1] = 1000
+    const result = await capturePreviews(1602, 2, pixels)
+    const native = decode(result.native)
+    const fit = decode(result.fit!)
+    expect(native).toMatchObject({ width: 1602, height: 2 })
+    expect(fit).toMatchObject({ width: 801, height: 1 })
+    expect(fit.pixels[1]).toBe(64)
+    expect(fit.pixels.at(-1)).toBe(64)
+    expect((await capturePreviews(2, 2, [0, 1, 2, 3])).fit).toBeUndefined()
+  })
   it('preserves the acquisition samples while producing a native monochrome stretch', async () => {
     const pixels = Float64Array.from([0, 10, 100, 1000, 2000, 4000])
     const before = pixels.slice()

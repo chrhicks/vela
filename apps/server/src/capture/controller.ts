@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { CaptureView } from '@vela/model/web'
-import { previewPng, type ImageColor } from '../imaging/preview.js'
+import { capturePreviews, type ImageColor } from '../imaging/preview.js'
 
 export interface CaptureFrame {
   width: number
@@ -42,7 +42,7 @@ export function createCaptureController(
   }
   let running: Promise<void> | undefined
   let cancellation: AbortController | undefined
-  const images = new Map<string, Buffer>()
+  const images = new Map<string, { native: Buffer, fit: Buffer | undefined }>()
   function patch(next: Partial<CaptureView>) { view = { ...view, ...next } }
 
   async function acquire(exposureSeconds: number, signal: AbortSignal, camera: CaptureCamera, cameraName: string) {
@@ -53,11 +53,12 @@ export function createCaptureController(
       // A completed acquisition wins a race with Stop: publish the actual result.
       patch({ phase: 'reading' })
       const id = randomUUID()
-      const png = await previewPng(frame.width, frame.height, frame.pixels, frame.color)
-      images.set(id, png)
+      const previews = await capturePreviews(frame.width, frame.height, frame.pixels, frame.color)
+      images.set(id, previews)
       while (images.size > 3) images.delete(images.keys().next().value!)
       patch({ phase: 'complete', elapsedSeconds: exposureSeconds, latestImage: {
         id, imageUrl: `/api/rigs/${encodeURIComponent(settings.rigId)}/capture/images/${id}`,
+        ...(previews.fit ? { fitImageUrl: `/api/rigs/${encodeURIComponent(settings.rigId)}/capture/images/${id}/fit` } : {}),
         width: frame.width, height: frame.height, exposureSeconds,
         capturedAt: frame.capturedAt, receivedAt: new Date(now()).toISOString(), cameraName,
         color: frame.color?.kind === 'bayer' ? 'color' : 'mono',
@@ -91,5 +92,6 @@ export function createCaptureController(
     return view
   }
 
-  return { start, stop, snapshot: () => view, image: (id: string) => images.get(id), active: () => !!running }
+  return { start, stop, snapshot: () => view, image: (id: string) => images.get(id)?.native,
+    fitImage: (id: string) => images.get(id)?.fit, active: () => !!running }
 }
