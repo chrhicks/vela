@@ -2,7 +2,7 @@
 
 The app implements the approved workshop layout using the server's CaptureView.
 The specimen is a design reference, never a runtime dependency. The server owns
-exposure lifetime, readiness and operation outcomes; the browser owns pending
+capture-run lifetime, completed-image count, readiness and operation outcomes; the browser owns pending
 form edits, Fit/100% presentation and loaded-image state.
 
 `useCapture` serializes commands and polls current state. A deliberate command
@@ -19,3 +19,9 @@ Large frames offer a smaller fitted preview. Observe and Fit request it first;
 100% loads the native image on demand, preserving the fitted view until that
 request completes. The requested image URL and metadata commit together, so a
 delayed or failed native-image request never labels a scaled preview as 100%.
+
+Repeat until stopped defaults to enabled for a new controller. The form sends
+that choice with the exposure duration, and server projections restore it while
+a run is active. Stop remains available during image receipt as well as exposure;
+the view waits for confirmed cleanup and never starts the next image itself.
+Observe shows the same server count, so page navigation does not control the run.

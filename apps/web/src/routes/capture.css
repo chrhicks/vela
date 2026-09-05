@@ -38,3 +38,8 @@
   .capture-page__heading { margin-bottom: 20px; }
   .capture-page__layout { grid-template-columns: minmax(0, 1.75fr) minmax(240px, .75fr); gap: 20px; }
 }
+
+.capture-page__controls .vela-checkbox { margin-top: 14px; }
+.capture-page__count { display: flex; align-items: baseline; gap: 8px; margin-top: 18px; font-variant-numeric: tabular-nums; }
+.capture-page__count strong { font-size: 22px; font-weight: 550; }
+.capture-page__count span { font-size: 12px; color: var(--vela-text-muted); }
