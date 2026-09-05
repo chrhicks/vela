@@ -23,3 +23,6 @@
 .capture-image__statistics dt { font-size: 11px; color: var(--vela-text-muted); margin-bottom: 5px; }
 .capture-image__statistics dd { margin: 0; font-size: 14px; font-weight: 550; font-variant-numeric: tabular-nums; }
 .capture-image__statistics p { margin: 10px 0 0; font-size: 11px; color: var(--vela-text-muted); }
+
+.capture-image__actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.capture-image__keep > p { max-width: 34ch; font-size: 12px; line-height: 1.5; color: var(--vela-text-muted); }

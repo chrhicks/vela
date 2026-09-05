@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto'
-import type { CaptureView } from '@vela/model/web'
+import type { CaptureImage, CaptureView } from '@vela/model/web'
 import { capturePreviews, type ImageColor } from '../imaging/preview.js'
 import { measureStars } from '../imaging/statistics.js'
+import { encodeCaptureFits } from '../imaging/fits.js'
+import { createMemorySavedImageStore, type SavedImageStore } from '../saved-images/store.js'
 
 export interface CaptureFrame {
   width: number
@@ -35,18 +37,37 @@ export class CaptureStoppedError extends Error {
 export function createCaptureController(
   settings: { rigId: string, rigName: string },
   now = Date.now,
+  savedImages: SavedImageStore = createMemorySavedImageStore(),
 ) {
   let view: CaptureView = {
     rigId: settings.rigId, rigName: settings.rigName, camera: null,
     enabled: true, unavailableReason: null, phase: 'idle', active: false,
-    repeat: true, completedCount: 0, exposureSeconds: 2, elapsedSeconds: 0, error: null, latestImage: null,
+    repeat: true, saveFrames: false, savedImageCount: 0, completedCount: 0, exposureSeconds: 2, elapsedSeconds: 0, error: null, latestImage: null,
   }
   let running: Promise<void> | undefined
   let cancellation: AbortController | undefined
-  const images = new Map<string, { native: Buffer, fit: Buffer | undefined }>()
+  const images = new Map<string, { native: Buffer, fit: Buffer | undefined, fits?: Buffer, metadata: CaptureImage }>()
   function patch(next: Partial<CaptureView>) { view = { ...view, ...next } }
 
-  async function acquire(exposureSeconds: number, signal: AbortSignal, camera: CaptureCamera, cameraName: string, repeat: boolean) {
+  async function keep(imageId: string) {
+    const existing = await savedImages.get(settings.rigId, imageId)
+    const image = images.get(imageId)
+    if (!existing && !image?.fits) return savedImages.get(settings.rigId, imageId)
+    const saved = existing ?? await savedImages.save(settings.rigId, image!.metadata, {
+      fits: image!.fits!, native: image!.native, ...(image!.fit ? { fit: image!.fit } : {}),
+    })
+    if (image && !image.metadata.saved) {
+      image.metadata = { ...image.metadata, saved: true }
+      // Saved files are now owned by the archive; release the temporary raw copy.
+      delete image.fits
+      patch({ savedImageCount: (view.savedImageCount ?? 0) + 1,
+        ...(view.latestImage?.id === imageId ? { latestImage: image.metadata } : {}),
+      })
+    }
+    return saved
+  }
+
+  async function acquire(exposureSeconds: number, signal: AbortSignal, camera: CaptureCamera, cameraName: string, repeat: boolean, saveFrames: boolean) {
     try {
       do {
         patch({ phase: 'exposing', elapsedSeconds: 0 })
@@ -56,22 +77,31 @@ export function createCaptureController(
         // A completed acquisition wins a race with Stop: publish the actual result.
         if (!signal.aborted) patch({ phase: 'reading' })
         const id = randomUUID()
-        const [previews, statistics] = await Promise.all([
+        const [previews, statistics, fits] = await Promise.all([
           capturePreviews(frame.width, frame.height, frame.pixels, frame.color),
           measureStars(frame.width, frame.height, frame.pixels, frame.color).catch(error => {
             console.warn('Capture image star measurements unavailable', error)
             return null
           }),
+          encodeCaptureFits(frame, { exposureSeconds, cameraName }),
         ])
-        images.set(id, previews)
-        while (images.size > 3) images.delete(images.keys().next().value!)
-        patch({ phase: 'complete', completedCount: view.completedCount + 1, elapsedSeconds: exposureSeconds, latestImage: {
+        const metadata: CaptureImage = {
           id, imageUrl: `/api/rigs/${encodeURIComponent(settings.rigId)}/capture/images/${id}`,
           ...(previews.fit ? { fitImageUrl: `/api/rigs/${encodeURIComponent(settings.rigId)}/capture/images/${id}/fit` } : {}),
           width: frame.width, height: frame.height, exposureSeconds,
           capturedAt: frame.capturedAt, receivedAt: new Date(now()).toISOString(), cameraName,
-          color: frame.color?.kind === 'bayer' ? 'color' : 'mono', statistics,
-        } })
+          color: frame.color?.kind === 'bayer' ? 'color' : 'mono', statistics, saved: false,
+        }
+        images.set(id, { ...previews, fits, metadata })
+        while (images.size > 3) images.delete(images.keys().next().value!)
+        patch({ phase: saveFrames ? 'saving' : 'complete', completedCount: view.completedCount + 1, elapsedSeconds: exposureSeconds, latestImage: metadata })
+        if (saveFrames) {
+          try { await keep(id) }
+          catch (error) {
+            throw new Error(`Image could not be saved. Capture stopped; try keeping the latest image again. ${error instanceof Error ? error.message : 'Storage unavailable.'}`)
+          }
+          patch({ phase: 'complete' })
+        }
       } while (repeat && !signal.aborted)
     } catch (error) {
       if (signal.aborted && error instanceof CaptureStoppedError) patch({ phase: 'stopped' })
@@ -81,12 +111,12 @@ export function createCaptureController(
     }
   }
 
-  async function start(exposureSeconds: number, camera: CaptureCamera, cameraName: string, onSettled?: () => void, repeat = false) {
+  async function start(exposureSeconds: number, camera: CaptureCamera, cameraName: string, onSettled?: () => void, repeat = false, saveFrames = false) {
     if (running) throw new Error('An exposure is already running')
     if (!Number.isFinite(exposureSeconds) || exposureSeconds <= 0) throw new Error('Exposure duration must be positive')
     cancellation = new AbortController()
-    patch({ camera: { name: cameraName }, phase: 'exposing', active: true, repeat, completedCount: 0, exposureSeconds, elapsedSeconds: 0, error: null })
-    running = acquire(exposureSeconds, cancellation.signal, camera, cameraName, repeat).finally(() => {
+    patch({ camera: { name: cameraName }, phase: 'exposing', active: true, repeat, saveFrames, completedCount: 0, exposureSeconds, elapsedSeconds: 0, error: null })
+    running = acquire(exposureSeconds, cancellation.signal, camera, cameraName, repeat, saveFrames).finally(() => {
       running = undefined
       onSettled?.()
     })
@@ -102,6 +132,6 @@ export function createCaptureController(
     return view
   }
 
-  return { start, stop, snapshot: () => view, image: (id: string) => images.get(id)?.native,
+  return { start, stop, keep, snapshot: () => view, image: (id: string) => images.get(id)?.native,
     fitImage: (id: string) => images.get(id)?.fit, active: () => !!running }
 }

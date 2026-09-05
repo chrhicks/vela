@@ -40,8 +40,11 @@ import { registerCapture } from './capture/routes.js'
 import { registerImagingCamera } from './rig/imaging-camera.js'
 import { registerAlignment } from './alignment/routes.js'
 import type { AlignmentSettings } from './alignment/controller.js'
+import { createMemorySavedImageStore, type SavedImageStore } from './saved-images/store.js'
+import { registerSavedImages } from './saved-images/routes.js'
 
 interface BuildAppOptions {
+  readonly savedImages?: SavedImageStore
   readonly alignment?: AlignmentSettings
   readonly alpacaDiscovery?: AlpacaDiscovery
   readonly createConnector?: (rig: RigConnectionSource) => RigDeviceConnector
@@ -67,11 +70,13 @@ export function buildApp({
   createInspector = createRigDeviceInspector,
   now = () => new Date(),
   rigCatalog = createMemoryRigCatalog(),
+  savedImages = createMemorySavedImageStore(),
 }: BuildAppOptions = {}) {
   const app = Fastify({ logger: true })
   const operations = createRigOperations()
   registerAlignment(app, rigCatalog, alignment, operations)
-  registerCapture(app, rigCatalog, operations, { createInspector })
+  registerCapture(app, rigCatalog, operations, { createInspector, savedImages })
+  registerSavedImages(app, rigCatalog, savedImages)
   registerImagingCamera(app, rigCatalog, operations, { createInspector })
   const rigConnections = createRigConnectionCoordinator({
     catalog: rigCatalog,

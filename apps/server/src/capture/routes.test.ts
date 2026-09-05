@@ -5,6 +5,8 @@ import { createMemoryRigCatalog } from '../rig/catalog.js'
 import { createRigOperations } from '../rig/operations.js'
 import { CaptureStoppedError, type CaptureCamera, type CaptureFrame } from './controller.js'
 import { registerCapture } from './routes.js'
+import { createMemorySavedImageStore } from '../saved-images/store.js'
+import { registerSavedImages } from '../saved-images/routes.js'
 
 const record = {
   id: 'sim', name: 'Simulator', endpoint: { host: '127.0.0.1', port: 11111 },
@@ -30,6 +32,7 @@ function setup(selection: { uniqueId: string, name: string } | null = record.ima
   const { imagingCamera: _, ...unselected } = record
   const catalog = createMemoryRigCatalog([{ ...unselected, ...(selection ? { imagingCamera: selection } : {}) }])
   const operations = createRigOperations()
+  const savedImages = createMemorySavedImageStore()
   let cameraId = 'camera'
   let cameraName = 'Main camera'
   const bindings: Array<{ endpoint: string, cameraId: string, expectedCameraName: string }> = []
@@ -39,6 +42,7 @@ function setup(selection: { uniqueId: string, name: string } | null = record.ima
   let inspections = 0
   const captures: Array<Parameters<CaptureCamera['capture']>[0] & ReturnType<typeof deferred<CaptureFrame>>> = []
   registerCapture(app, catalog, operations, {
+    savedImages,
     createInspector: () => ({ async inspectDevices(): Promise<ReadonlyArray<AlpacaDeviceInspection>> {
       inspections++
       await inspectionGate
@@ -56,13 +60,14 @@ function setup(selection: { uniqueId: string, name: string } | null = record.ima
     } }
     },
   })
+  registerSavedImages(app, catalog, savedImages)
   cleanups.push(async () => {
     for (const capture of captures) capture.reject(new CaptureStoppedError())
     await app.close()
   })
   const start = (body: unknown = { exposureSeconds: 10 }) => app.inject({ method: 'POST', url: '/api/rigs/sim/capture/start', payload: body as object })
   const get = () => app.inject({ method: 'GET', url: '/api/web/rigs/sim/capture' })
-  return { app, catalog, operations, captures, start, get, bindings,
+  return { app, catalog, operations, captures, start, get, bindings, savedImages,
     replaceCamera: (id: string, name: string) => {
       cameraId = id
       cameraName = name
@@ -76,7 +81,7 @@ function setup(selection: { uniqueId: string, name: string } | null = record.ima
 
 it('rejects malformed input before acquiring or operating a camera', async () => {
   const subject = setup()
-  for (const body of [{}, { exposureSeconds: '10' }, { exposureSeconds: 0.09 }, { exposureSeconds: 601 }, { exposureSeconds: 1, gain: 0 }, { exposureSeconds: 1, repeat: 'true' }, { exposureSeconds: 1, repeat: null }, []]) {
+  for (const body of [{}, { exposureSeconds: '10' }, { exposureSeconds: 0.09 }, { exposureSeconds: 601 }, { exposureSeconds: 1, gain: 0 }, { exposureSeconds: 1, repeat: 'true' }, { exposureSeconds: 1, repeat: null }, { exposureSeconds: 1, saveFrames: 'true' }, { exposureSeconds: 1, saveFrames: null }, []]) {
     expect((await subject.start(body)).statusCode).toBe(400)
   }
   expect(subject.inspections()).toBe(0)
@@ -193,4 +198,45 @@ it('owns repeated capture across reads and releases the Rig lease only after con
   expect((await stopping).json()).toMatchObject({ phase: 'stopped', completedCount: 1, latestImage: current.latestImage })
   expect(subject.operations.owner('sim')).toBeUndefined()
   expect(subject.captures).toHaveLength(2)
+})
+
+it('retains a displayed frame and serves original and preview downloads while disconnected', async () => {
+  const subject = setup()
+  await subject.start()
+  subject.captures[0]!.resolve(frame)
+  await vi.waitFor(() => expect(subject.operations.owner('sim')).toBeUndefined())
+  const image = (await subject.get()).json().latestImage
+  const originalPreview = (await subject.app.inject(image.imageUrl)).rawPayload
+  subject.disconnect()
+  const keepUrl = `${image.imageUrl}/keep`
+  expect((await subject.app.inject({ method: 'POST', url: keepUrl, payload: { all: true } })).statusCode).toBe(400)
+  const kept = await subject.app.inject({ method: 'POST', url: keepUrl, payload: {} })
+  expect(kept.statusCode).toBe(200)
+  const saved = kept.json()
+  expect(saved).toMatchObject({ id: image.id, rigId: 'sim', saved: true, exposureSeconds: 10 })
+  expect((await subject.app.inject({ method: 'POST', url: keepUrl, payload: {} })).json()).toEqual(saved)
+  expect((await subject.get()).json()).toMatchObject({ savedImageCount: 1, latestImage: { saved: true } })
+  const listing = (await subject.app.inject('/api/web/rigs/sim/saved-images')).json()
+  expect(listing).toMatchObject({ rigId: 'sim', rigName: 'Simulator', images: [saved] })
+  expect((await subject.app.inject(`/api/web/rigs/sim/saved-images/${saved.id}`)).json()).toEqual({ rigId: 'sim', rigName: 'Simulator', image: saved })
+  const fits = await subject.app.inject(saved.fitsUrl)
+  expect(fits.headers['content-type']).toBe('application/fits')
+  expect(fits.headers['content-disposition']).toContain('attachment; filename=')
+  expect(fits.rawPayload.readInt32BE(2880 + 12)).toBe(1000)
+  expect((await subject.app.inject(saved.previewDownloadUrl)).rawPayload).toEqual(originalPreview)
+  expect((await subject.app.inject(saved.imageUrl)).rawPayload).toEqual(originalPreview)
+  expect((await subject.app.inject('/api/web/rigs/other/saved-images')).statusCode).toBe(404)
+})
+
+it('auto-saves a single exposure and returns honest errors for unavailable storage or expired frames', async () => {
+  const subject = setup()
+  await subject.start({ exposureSeconds: 10, saveFrames: true })
+  subject.captures[0]!.resolve(frame)
+  await vi.waitFor(() => expect(subject.operations.owner('sim')).toBeUndefined())
+  expect((await subject.get()).json()).toMatchObject({ saveFrames: true, savedImageCount: 1, latestImage: { saved: true } })
+  expect((await subject.app.inject({ method: 'POST', url: '/api/rigs/sim/capture/images/expired/keep', payload: {} })).statusCode).toBe(410)
+  vi.spyOn(subject.savedImages, 'list').mockRejectedValue(new Error('Storage unreadable'))
+  expect((await subject.app.inject('/api/web/rigs/sim/saved-images')).statusCode).toBe(503)
+  vi.spyOn(subject.savedImages, 'count').mockRejectedValue(new Error('Storage unreadable'))
+  expect((await subject.get()).json()).toMatchObject({ enabled: true, savedImageCount: null })
 })
