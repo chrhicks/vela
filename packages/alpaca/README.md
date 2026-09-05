@@ -118,3 +118,10 @@ coordinate frames its workflow supports.
 Protocol references: [ASCOM camera interface](https://ascom-standards.org/newdocs/camera.html),
 [ASCOM telescope interface](https://ascom-standards.org/newdocs/telescope.html), and
 [Alpaca API reference](https://ascom-standards.org/AlpacaDeveloper/ASCOMAlpacaAPIReference.html).
+
+Capture's optional `onReadout` callback marks the actual image transfer after
+freshness is confirmed. A cancelled acquisition throws `AlpacaCaptureStoppedError`
+when cancellation precedes the exposure write, or after independent abort and
+idle confirmation succeed. Cleanup failures
+remain failures, allowing the server to distinguish stopped from unconfirmed
+physical state without inferring success from an aborted browser request.

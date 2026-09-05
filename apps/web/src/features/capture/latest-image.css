@@ -1,0 +1,19 @@
+.capture-image { min-width: 0; border: 1px solid var(--vela-line); border-radius: var(--vela-radius); overflow: hidden; background: var(--vela-surface); align-self: start; }
+.capture-image > header { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--vela-line); }
+.capture-image h2 { margin: 0 0 4px; font-size: 14px; font-weight: 550; }
+.capture-image > header > div > span { font-size: 11px; color: var(--vela-text-muted); font-variant-numeric: tabular-nums; }
+.capture-image__zoom { display: flex; gap: 3px; }
+.capture-image__zoom .vela-button { min-height: 40px; }
+.capture-image__zoom .vela-button:hover:not(:disabled) { transform: none; }
+.capture-image__window { width: 100%; aspect-ratio: 4 / 3; overflow: hidden; }
+.capture-image__window > img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.capture-image__window[data-zoomed] { overflow: auto; }
+.capture-image__window[data-zoomed] > img { max-width: none; margin: auto; }
+.capture-image__window:focus-visible { outline: 2px solid var(--vela-accent); outline-offset: -2px; }
+.capture-image__empty { min-height: 100%; box-sizing: border-box; display: grid; justify-items: center; align-content: center; padding: 24px; text-align: center; }
+.capture-image__empty svg { width: 48px; height: 48px; margin-bottom: 14px; color: var(--vela-text-muted); }
+.capture-image__empty h3 { margin: 0; font-size: 15px; font-weight: 550; }
+.capture-image__empty p { color: var(--vela-text-muted); max-width: 30ch; font-size: 12px; line-height: 1.6; margin: 8px 0 0; }
+.capture-image > footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; padding: 12px 14px; color: var(--vela-text-muted); font-size: 11px; border-top: 1px solid var(--vela-line); }
+.capture-image > footer i { margin: 0 5px; font-style: normal; }
+.capture-image__error { margin: 0; padding: 12px 14px; font-size: 12px; line-height: 1.6; color: var(--vela-warning); border-bottom: 1px solid var(--vela-line); }

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createAlpacaAcquisition } from './acquisition.js'
+import { createAlpacaAcquisition, AlpacaCaptureStoppedError } from './acquisition.js'
 
 function observatory() {
   const camera = { DeviceName: 'Camera', DeviceType: 'Camera', DeviceNumber: 7, UniqueID: 'camera-id' }
@@ -17,6 +17,7 @@ function observatory() {
     lostStart: false,
     lostMove: false,
     stopFails: false,
+    cameraStopFails: false,
   }
   const fetch: typeof globalThis.fetch = async (input, init) => {
     init?.signal?.throwIfAborted()
@@ -44,6 +45,7 @@ function observatory() {
       if (state.lostStart) throw new TypeError('Response lost after accepting exposure')
     } else if (operation === 'abortexposure') {
       state.aborts++
+      if (state.cameraStopFails) throw new TypeError('Cannot reach camera to stop it')
       state.exposing = false
       state.ready = false
     } else if (operation === 'moveaxis') {
@@ -107,16 +109,40 @@ describe('normalized Alpaca acquisition', () => {
     await expect(rig.acquisition.capture({ cameraId: 'camera-id', exposureSeconds: 1 })).rejects.toThrow('freshness is unconfirmed')
   })
 
+  it('confirms cancellation before starting without aborting someone else’s exposure', async () => {
+    const rig = observatory()
+    rig.state.exposing = true
+    const controller = new AbortController()
+    controller.abort()
+    await expect(rig.acquisition.capture({ cameraId: 'camera-id', exposureSeconds: 1, signal: controller.signal })).rejects.toBeInstanceOf(AlpacaCaptureStoppedError)
+    expect(rig.state.starts).toBe(0)
+    expect(rig.state.aborts).toBe(0)
+    expect(rig.state.exposing).toBe(true)
+  })
+
   it('aborts a pending exposure with an independent signal after cancellation', async () => {
     const rig = observatory()
     const controller = new AbortController()
     const result = rig.acquisition.capture({ cameraId: 'camera-id', exposureSeconds: 1, signal: controller.signal })
-    const rejection = expect(result).rejects.toThrow()
+    const rejection = expect(result).rejects.toBeInstanceOf(AlpacaCaptureStoppedError)
     await started(rig)
     controller.abort()
     await rejection
     expect(rig.state.aborts).toBe(1)
     expect(rig.state.exposing).toBe(false)
+  })
+
+  it('does not report confirmed cancellation when camera cleanup fails', async () => {
+    const rig = observatory()
+    const controller = new AbortController()
+    const result = rig.acquisition.capture({ cameraId: 'camera-id', exposureSeconds: 1, signal: controller.signal })
+    const rejection = expect(result).rejects.not.toBeInstanceOf(AlpacaCaptureStoppedError)
+    await started(rig)
+    rig.state.cameraStopFails = true
+    controller.abort()
+    await rejection
+    expect(rig.state.exposing).toBe(true)
+    expect(rig.state.aborts).toBe(1)
   })
 
   it('does not replay an exposure whose command response was lost', async () => {

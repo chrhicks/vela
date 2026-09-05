@@ -59,3 +59,8 @@ The polar-alignment page contract carries ephemeral operation phase/activity,
 last solved measurements and the matching preview reference. It contains no
 Alpaca wire fields or simulator ground truth. Geometry and operation ownership
 remain on the server.
+
+The Capture view describes one ephemeral exposure, its readiness and phase,
+and the latest completed image with its own duration, camera, dimensions and
+start/receipt timestamps. It is shared by the Observe thumbnail and Capture
+page. It does not represent a capture sequence or an artifact archive.

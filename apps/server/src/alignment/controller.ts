@@ -4,7 +4,7 @@ import type { AlignmentView } from '@vela/model/web'
 import type { AlpacaAcquisition } from '@vela/alpaca'
 import { createAlignmentBaseline, measureAlignment, type AlignmentSample } from './geometry.js'
 import { createAstapSolver, projectSky } from './solver.js'
-import { previewPng } from './preview.js'
+import { previewPng } from '../imaging/preview.js'
 
 export interface AlignmentSettings {
   endpoint: string
@@ -30,7 +30,7 @@ export function createAlignmentController(settings: AlignmentSettings, hardware:
   const images = new Map<string, Buffer>()
   function patch(next: Partial<AlignmentView>) { view = { ...view, ...next } }
 
-  async function start(rigId: string, rigName: string) {
+  async function start(rigId: string, rigName: string, onSettled?: () => void) {
     if (running) throw new Error('A measurement is already running')
     controller = new AbortController()
     previousSample = undefined
@@ -41,6 +41,7 @@ export function createAlignmentController(settings: AlignmentSettings, hardware:
     }).finally(() => {
       patch({ active: false, activity: 'idle', exposureStartedAt: null })
       running = undefined
+      onSettled?.()
     })
     return view
   }
