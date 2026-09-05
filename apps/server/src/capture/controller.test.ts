@@ -1,3 +1,4 @@
+import * as statistics from '../imaging/statistics.js'
 import { expect, it, vi } from 'vitest'
 import { inflateSync } from 'node:zlib'
 import { CaptureStoppedError, createCaptureController, type CaptureCamera, type CaptureFrame } from './controller.js'
@@ -159,4 +160,18 @@ it.each(['readout', 'preview'] as const)('stops during %s without another exposu
   expect(await stopping).toMatchObject({ phase: 'complete', active: false, completedCount: 1, latestImage: { capturedAt: frame.capturedAt } })
   expect(requests).toHaveLength(1)
   expect(settled).toHaveBeenCalledOnce()
+})
+
+
+it('retains an acquired image when optional star analysis is unavailable', async () => {
+  const measure = vi.spyOn(statistics, 'measureStars').mockRejectedValueOnce(new Error('Analysis failed'))
+  const warning = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  try {
+    const { controller, complete } = setup()
+    await complete()
+    expect(controller.snapshot()).toMatchObject({ phase: 'complete', completedCount: 1, latestImage: { statistics: null } })
+  } finally {
+    measure.mockRestore()
+    warning.mockRestore()
+  }
 })

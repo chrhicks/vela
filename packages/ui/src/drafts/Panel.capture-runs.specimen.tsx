@@ -41,6 +41,9 @@ function CaptureRunPreview({ props, onPropsChange }: {
   const completed = Math.max(0, Math.floor(Number(values.completed) || 0))
   const frame = Math.max(0, Math.floor(Number(values.frame) || 0))
   const conditions = String(values.conditions ?? 'changing') as 'changing' | 'clear' | 'haze' | 'soft' | 'streak'
+  const statistics = String(values.statistics ?? 'measured')
+  const starCount = statistics === 'no-stars' ? 0 : conditions === 'haze' ? 78 : 128 + (frame % 7) * 3
+  const hfr = conditions === 'soft' ? 3.42 : 2.18 + (frame % 5) * 0.06
   const disconnected = phase === 'disconnected'
   const validExposure = exposure.trim() !== '' && Number.isFinite(seconds) && seconds >= 0.1 && seconds <= 600
   const [playing, setPlaying] = useState(false)
@@ -156,7 +159,15 @@ function CaptureRunPreview({ props, onPropsChange }: {
             <div className="vela-capture-image__window" data-zoomed={hasImage && zoomed || undefined} ref={imageWindow} tabIndex={hasImage && zoomed ? 0 : undefined} role={hasImage && zoomed ? 'region' : undefined} aria-label={hasImage && zoomed ? 'Image at 100 percent. Scroll to inspect.' : undefined}>
               {hasImage ? <CaptureRunExposure frame={frame} conditions={conditions} /> : <div className="vela-capture-empty"><CameraMark /><h3>{busy ? 'Taking your first exposure' : 'Your first image starts here'}</h3><p>{busy ? 'You can watch the progress beside this view.' : 'Choose an exposure time, then start capturing to see what the camera sees.'}</p></div>}
             </div>
-            {hasImage && <footer><span>{imageSeconds} s <i>·</i> Color <i>·</i> 1600 × 1200</span><span>{zoomed ? 'Scroll to inspect' : 'Display stretched'}</span></footer>}
+            {hasImage && <div className="vela-capture-image-statistics">
+              <dl aria-label="Image statistics">
+                <div><dt>Dimensions</dt><dd>1600 × 1200</dd></div>
+                <div><dt title="Detected stars with a reliable measurement">Stars</dt><dd>{statistics === 'unavailable' ? '—' : starCount}</dd></div>
+                <div><dt title="Median half-flux radius in native image pixels">HFR · px</dt><dd>{statistics === 'measured' ? hfr.toFixed(2) : '—'}</dd></div>
+              </dl>
+              {statistics !== 'measured' && <p>{statistics === 'no-stars' ? 'No measurable stars in this image.' : 'Star measurements unavailable for this image.'}</p>}
+            </div>}
+            {hasImage && <footer><span>{imageSeconds} s <i>·</i> Color</span><span>{zoomed ? 'Scroll to inspect' : 'Display stretched'}</span></footer>}
           </section>
 
           <Panel className="vela-capture-controls" title="Capture images">
@@ -199,7 +210,8 @@ export const specimen: ComponentSpecimen = {
     completed: { type: 'text', label: 'Images completed in run' },
     frame: { type: 'text', label: 'Example frame number' },
     conditions: { type: 'select', label: 'Example sky', options: ['changing', 'clear', 'haze', 'soft', 'streak'] },
+    statistics: { type: 'select', label: 'Image measurements', options: ['measured', 'no-stars', 'unavailable'] },
   },
-  defaultProps: { screen: 'capture', phase: 'idle', hasImage: true, exposure: '5', imageSeconds: '5', repeat: true, completed: '0', frame: '0', conditions: 'changing' },
+  defaultProps: { screen: 'capture', phase: 'idle', hasImage: true, exposure: '5', imageSeconds: '5', repeat: true, completed: '0', frame: '0', conditions: 'changing', statistics: 'measured' },
   render: (props, onPropsChange) => <CaptureRunPreview props={props} {...(onPropsChange ? { onPropsChange } : {})} />,
 }

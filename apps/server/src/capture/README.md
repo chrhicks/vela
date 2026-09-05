@@ -22,7 +22,10 @@ confirmation belong to the ALPACA adapter.
 
 The controller depends on `CaptureCamera`, not a concrete transport. A successful
 frame publishes its own exposure settings, acquisition start timestamp and
-receipt timestamp. Later pending, failed or stopped exposures retain that image and its
+receipt timestamp, and star measurements from its linear samples. Dimensions,
+detected-star count and median HFR remain attached to that image. An unavailable
+analysis never discards the acquired image; see [image processing](../imaging/README.md)
+for measurement limits. Later pending, failed or stopped exposures retain that image and its
 metadata. The run count increments only when an image is published and resets
 on each start. Any acquisition or preview failure ends the run without replay. Preview stretching preserves native dimensions for 100% inspection;
 only the latest three image pairs remain in memory. This is not an artifact archive.

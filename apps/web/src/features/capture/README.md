@@ -28,3 +28,8 @@ that choice with the exposure duration, and server projections restore it while
 a run is active. Stop remains available during image receipt as well as exposure;
 the view waits for confirmed cleanup and never starts the next image itself.
 Observe shows the same server count, so page navigation does not control the run.
+
+The latest-image statistics row uses the loaded image's dimensions and measured
+star count/HFR. Image pixels, exposure metadata and measurements commit together,
+including when a newer image fails to load or intermediate arrivals are skipped.
+Zero measured stars and unavailable analysis have distinct presentations.
