@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto'
 import type { CaptureView } from '@vela/model/web'
-import { previewPng } from '../imaging/preview.js'
+import { capturePreviews, type ImageColor } from '../imaging/preview.js'
 
 export interface CaptureFrame {
   width: number
   height: number
   pixels: ArrayLike<number>
   capturedAt: string
+  color?: ImageColor
 }
 
 export interface CaptureProgress {
@@ -31,21 +32,20 @@ export class CaptureStoppedError extends Error {
 }
 
 export function createCaptureController(
-  settings: { rigId: string, rigName: string, cameraName: string },
-  camera: CaptureCamera,
+  settings: { rigId: string, rigName: string },
   now = Date.now,
 ) {
   let view: CaptureView = {
-    rigId: settings.rigId, rigName: settings.rigName, camera: { name: settings.cameraName },
+    rigId: settings.rigId, rigName: settings.rigName, camera: null,
     enabled: true, unavailableReason: null, phase: 'idle', active: false,
     exposureSeconds: 2, elapsedSeconds: 0, error: null, latestImage: null,
   }
   let running: Promise<void> | undefined
   let cancellation: AbortController | undefined
-  const images = new Map<string, Buffer>()
+  const images = new Map<string, { native: Buffer, fit: Buffer | undefined }>()
   function patch(next: Partial<CaptureView>) { view = { ...view, ...next } }
 
-  async function acquire(exposureSeconds: number, signal: AbortSignal) {
+  async function acquire(exposureSeconds: number, signal: AbortSignal, camera: CaptureCamera, cameraName: string) {
     try {
       const frame = await camera.capture({ exposureSeconds, signal, onProgress(progress) {
         if (!signal.aborted) patch({ phase: progress.phase, elapsedSeconds: progress.elapsedSeconds })
@@ -53,13 +53,15 @@ export function createCaptureController(
       // A completed acquisition wins a race with Stop: publish the actual result.
       patch({ phase: 'reading' })
       const id = randomUUID()
-      const png = previewPng(frame.width, frame.height, frame.pixels)
-      images.set(id, png)
+      const previews = await capturePreviews(frame.width, frame.height, frame.pixels, frame.color)
+      images.set(id, previews)
       while (images.size > 3) images.delete(images.keys().next().value!)
       patch({ phase: 'complete', elapsedSeconds: exposureSeconds, latestImage: {
         id, imageUrl: `/api/rigs/${encodeURIComponent(settings.rigId)}/capture/images/${id}`,
+        ...(previews.fit ? { fitImageUrl: `/api/rigs/${encodeURIComponent(settings.rigId)}/capture/images/${id}/fit` } : {}),
         width: frame.width, height: frame.height, exposureSeconds,
-        capturedAt: frame.capturedAt, receivedAt: new Date(now()).toISOString(), cameraName: settings.cameraName,
+        capturedAt: frame.capturedAt, receivedAt: new Date(now()).toISOString(), cameraName,
+        color: frame.color?.kind === 'bayer' ? 'color' : 'mono',
       } })
     } catch (error) {
       if (signal.aborted && error instanceof CaptureStoppedError) patch({ phase: 'stopped' })
@@ -69,12 +71,12 @@ export function createCaptureController(
     }
   }
 
-  async function start(exposureSeconds: number, onSettled?: () => void) {
+  async function start(exposureSeconds: number, camera: CaptureCamera, cameraName: string, onSettled?: () => void) {
     if (running) throw new Error('An exposure is already running')
     if (!Number.isFinite(exposureSeconds) || exposureSeconds <= 0) throw new Error('Exposure duration must be positive')
     cancellation = new AbortController()
-    patch({ phase: 'exposing', active: true, exposureSeconds, elapsedSeconds: 0, error: null })
-    running = acquire(exposureSeconds, cancellation.signal).finally(() => {
+    patch({ camera: { name: cameraName }, phase: 'exposing', active: true, exposureSeconds, elapsedSeconds: 0, error: null })
+    running = acquire(exposureSeconds, cancellation.signal, camera, cameraName).finally(() => {
       running = undefined
       onSettled?.()
     })
@@ -90,5 +92,6 @@ export function createCaptureController(
     return view
   }
 
-  return { start, stop, snapshot: () => view, image: (id: string) => images.get(id), active: () => !!running }
+  return { start, stop, snapshot: () => view, image: (id: string) => images.get(id)?.native,
+    fitImage: (id: string) => images.get(id)?.fit, active: () => !!running }
 }

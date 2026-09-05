@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react'
 import { Link, useParams } from 'react-router'
 import { readinessPresentation } from '../features/observation/presentation'
 import { useObservation } from '../features/observation/use-observation'
+import { ImagingCamera } from '../features/imaging-camera/ImagingCamera'
 import { CaptureHub } from '../features/capture/CaptureHub'
 import '../routes/capture.css'
 import { ConnectionMark } from '../features/observation/ObservationMark'
@@ -82,6 +83,7 @@ function ObservationPage({ rigId }: { rigId: string }) {
       </Panel>
     </div>
     </details>
+    <ImagingCamera rigId={rigId} interrupted={interrupted} connecting={busy} />
     <CaptureHub rigId={rigId} />
   </section>
 }

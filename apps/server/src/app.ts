@@ -36,13 +36,13 @@ import {
 import { loadRigDetailView } from './rig/detail.js'
 import { loadHomeView } from './rig/home.js'
 import { createRigOperations } from './rig/operations.js'
-import { registerCapture, type CaptureSettings } from './capture/routes.js'
+import { registerCapture } from './capture/routes.js'
+import { registerImagingCamera } from './rig/imaging-camera.js'
 import { registerAlignment } from './alignment/routes.js'
 import type { AlignmentSettings } from './alignment/controller.js'
 
 interface BuildAppOptions {
   readonly alignment?: AlignmentSettings
-  readonly capture?: CaptureSettings
   readonly alpacaDiscovery?: AlpacaDiscovery
   readonly createConnector?: (rig: RigConnectionSource) => RigDeviceConnector
   readonly createInventory?: (rig: RigInventorySource) => RigDeviceInventory
@@ -61,7 +61,6 @@ interface AddRigRequest {
 
 export function buildApp({
   alignment,
-  capture,
   alpacaDiscovery = createAlpacaDiscovery(),
   createConnector = createRigDeviceConnector,
   createInventory = createRigDeviceInventory,
@@ -72,7 +71,8 @@ export function buildApp({
   const app = Fastify({ logger: true })
   const operations = createRigOperations()
   registerAlignment(app, rigCatalog, alignment, operations)
-  registerCapture(app, rigCatalog, operations, capture)
+  registerCapture(app, rigCatalog, operations, { createInspector })
+  registerImagingCamera(app, rigCatalog, operations, { createInspector })
   const rigConnections = createRigConnectionCoordinator({
     catalog: rigCatalog,
     createConnector,

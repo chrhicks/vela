@@ -7,7 +7,7 @@ import './capture-hub.css'
 
 export function CaptureHub({ rigId }: { rigId: string }) {
   const { view, offline } = useCapture(rigId)
-  const { loadedImage: image, failed, loading } = useLoadedImage(view?.latestImage ?? null)
+  const { loadedImage: image, loadedUrl, failed, loading } = useLoadedImage(view?.latestImage ?? null)
   const [now, setNow] = useState(Date.now)
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000)
@@ -18,7 +18,7 @@ export function CaptureHub({ rigId }: { rigId: string }) {
   return <div className="vela-capture-hub">
     <Panel className="vela-capture-entry" elevation="raised">
       <div className="vela-capture-entry__preview">
-        {image ? <img src={image.imageUrl} alt={`Latest completed exposure from ${image.cameraName}`} /> : <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><rect x="6" y="12" width="36" height="26" rx="5" /><path d="m15 12 3-5h12l3 5" /><circle cx="24" cy="25" r="8" /></svg>}
+        {image ? <img src={loadedUrl} alt={`Latest completed exposure from ${image.cameraName}`} /> : <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><rect x="6" y="12" width="36" height="26" rx="5" /><path d="m15 12 3-5h12l3 5" /><circle cx="24" cy="25" r="8" /></svg>}
         <span>{image ? 'Latest exposure' : 'See what your camera sees'}</span>
       </div>
       <div className="vela-capture-entry__body">

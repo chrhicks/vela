@@ -2,6 +2,8 @@
 export interface CaptureImage {
   id: string
   imageUrl: string
+  /** Smaller display preview; imageUrl always retains native resolution. */
+  fitImageUrl?: string
   width: number
   height: number
   exposureSeconds: number
@@ -9,6 +11,7 @@ export interface CaptureImage {
   capturedAt: string
   receivedAt: string
   cameraName: string
+  color: 'mono' | 'color'
 }
 
 /** Server-owned single exposure and the most recent retained image. */
