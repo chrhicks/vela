@@ -1,0 +1,15 @@
+{
+  "name": "@vela/rig-simulator",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prove": "node --import tsx src/prove.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "tsx": "^4.21.0",
+    "typescript": "^7.0.2"
+  }
+}
