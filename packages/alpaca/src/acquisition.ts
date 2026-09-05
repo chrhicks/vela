@@ -4,6 +4,13 @@ import { createAlpacaClient } from './internal/client.js'
 import type { ConfiguredDevice } from './internal/types/management.js'
 import { rejectDuplicateDeviceIds, stableDeviceId } from './internal/configured-device.js'
 
+export class AlpacaCaptureStoppedError extends Error {
+  constructor() {
+    super('Exposure cancellation confirmed')
+    this.name = 'AbortError'
+  }
+}
+
 export interface AlpacaFrame {
   width: number
   height: number
@@ -17,6 +24,7 @@ export interface AlpacaCaptureOptions {
   exposureSeconds: number
   signal?: AbortSignal
   onProgress?: (elapsedSeconds: number) => void
+  onReadout?: () => void
 }
 
 export interface AlpacaAcquisitionOptions {
@@ -89,23 +97,25 @@ export function createAlpacaAcquisition({ baseUrl, fetch = globalThis.fetch, req
   }
 
   return {
-    async capture({ cameraId, exposureSeconds, signal, onProgress }) {
+    async capture({ cameraId, exposureSeconds, signal, onProgress, onReadout }) {
       bounded(exposureSeconds, 0.001, 3600, 'exposure duration')
-      const camera = await device(cameraId, 'camera', signal)
-      if (!(await client.connected(camera, signal))) throw new Error('Camera is disconnected')
-      if (await client.readNumber(camera, 'sensortype', signal) !== 0) throw new Error('Only monochrome cameras are supported')
-      if (await client.readNumber(camera, 'camerastate', signal) !== 0) throw new Error('Camera is already active')
-      if (!(await client.readBoolean(camera, 'canabortexposure', signal))) throw new Error('Camera cannot abort an exposure')
-      const width = await client.readNumber(camera, 'numx', signal)
-      const height = await client.readNumber(camera, 'numy', signal)
-      if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || width * height > 40_000_000) invalid('Invalid camera image dimensions', 'numx/numy')
-      const previousStart = await client.readBoolean(camera, 'imageready', signal)
-        ? await client.readString(camera, 'lastexposurestarttime', signal)
-        : undefined
-      signal?.throwIfAborted()
-      const startedAt = performance.now()
-      let completed = false
+      let camera: ConfiguredDevice | undefined
+      let attempted = false
       try {
+        camera = await device(cameraId, 'camera', signal)
+        if (!(await client.connected(camera, signal))) throw new Error('Camera is disconnected')
+        if (await client.readNumber(camera, 'sensortype', signal) !== 0) throw new Error('Only monochrome cameras are supported')
+        if (await client.readNumber(camera, 'camerastate', signal) !== 0) throw new Error('Camera is already active')
+        if (!(await client.readBoolean(camera, 'canabortexposure', signal))) throw new Error('Camera cannot abort an exposure')
+        const width = await client.readNumber(camera, 'numx', signal)
+        const height = await client.readNumber(camera, 'numy', signal)
+        if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || width * height > 40_000_000) invalid('Invalid camera image dimensions', 'numx/numy')
+        const previousStart = await client.readBoolean(camera, 'imageready', signal)
+          ? await client.readString(camera, 'lastexposurestarttime', signal)
+          : undefined
+        signal?.throwIfAborted()
+        const startedAt = performance.now()
+        attempted = true
         // A lost response can still mean the exposure started. Never replay it.
         await client.command(camera, 'startexposure', { Duration: String(exposureSeconds), Light: 'true' }, signal)
         while (!(await client.readBoolean(camera, 'imageready', signal))) {
@@ -121,11 +131,17 @@ export function createAlpacaAcquisition({ baseUrl, fetch = globalThis.fetch, req
         if (stamp === previousStart) invalid('Camera returned the previous exposure; freshness is unconfirmed', 'lastexposurestarttime')
         const capturedAt = /Z$/.test(stamp) ? stamp : `${stamp}Z`
         if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/.test(capturedAt) || !Number.isFinite(Date.parse(capturedAt))) invalid('Invalid exposure UTC timestamp', 'lastexposurestarttime')
+        onReadout?.()
         const frame = monoFrame(await client.image(camera, signal), width, height, capturedAt)
-        completed = true
         return frame
-      } finally {
-        if (!completed) await stopCamera(camera)
+      } catch (error) {
+        // Cleanup failure must win over cancellation: an aborted request alone
+        // cannot establish that the physical exposure stopped.
+        if (attempted && camera) await stopCamera(camera)
+        if (signal?.aborted && (error === signal.reason || error instanceof Error && error.name === 'AbortError')) {
+          throw new AlpacaCaptureStoppedError()
+        }
+        throw error
       }
     },
 

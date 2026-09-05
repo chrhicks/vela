@@ -10,7 +10,7 @@ server's measurement path.
 server-owned controller. `controller.ts` takes three solved positions, constructs
 a baseline, and then solves fresh exposures to measure physical adjustments.
 `geometry.ts` operates on solved sightlines and observed sidereal angles;
-`solver.ts` owns FITS, the bounded external process and WCS. `preview.ts` stretches
+`solver.ts` owns FITS, the bounded external process and WCS. `../imaging/preview.ts` stretches
 only the display copy. Solver input retains original integer pixels.
 
 The operation remains active across browser disconnects. Stop cancels the current

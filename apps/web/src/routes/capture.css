@@ -1,0 +1,40 @@
+.capture-page { container-type: inline-size; }
+.capture-page__heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.capture-page__heading p { margin: 0 0 4px; font-size: 12px; color: var(--vela-text-muted); }
+.capture-page__heading h1 { margin: 0; font-size: 26px; line-height: 1.2; font-weight: 600; }
+.capture-page__layout { display: grid; gap: 16px; }
+.capture-page__controls { align-self: start; min-width: 0; }
+.capture-page__controls .vela-panel__header { padding: 16px 16px 0; border-bottom: 0; }
+.capture-page__controls .vela-panel__body { padding: 16px; }
+.capture-page__camera { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+.capture-page__camera svg { width: 30px; height: 30px; flex-shrink: 0; color: var(--vela-text-muted); }
+.capture-page__camera > div { display: grid; gap: 4px; }
+.capture-page__camera strong { font-size: 13px; font-weight: 550; }
+.capture-page__camera span { color: var(--vela-text-muted); font-size: 11px; }
+.capture-page__command { margin-top: 14px; }
+.capture-page__command .vela-button { width: 100%; min-height: 44px; }
+.capture-page .vela-button:hover:not(:disabled) { transform: none; }
+.capture-page__progress { border-top: 1px solid var(--vela-line); padding-top: 14px; margin-top: 20px; font-size: 12px; }
+.capture-page__progress > div { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px; justify-content: space-between; }
+.capture-page__progress strong { font-size: 12px; font-weight: 550; }
+.capture-page__progress span { color: var(--vela-text-muted); font-variant-numeric: tabular-nums; }
+.capture-page__progress progress { display: block; width: 100%; height: 4px; margin: 12px 0 0; accent-color: var(--vela-accent); }
+.capture-page__progress p { color: var(--vela-text-muted); font-size: 12px; line-height: 1.6; margin: 8px 0 0; }
+.capture-page__warning { border: 1px solid color-mix(in oklch, var(--vela-warning) 38%, var(--vela-line)); background: color-mix(in oklch, var(--vela-warning) 8%, var(--vela-surface)); color: var(--vela-warning); border-radius: var(--vela-radius); padding: 14px 16px; margin-bottom: 18px; line-height: 1.5; }
+.capture-page__warning strong { font-size: 15px; font-weight: 600; }
+.capture-page__warning p { font-size: 13px; margin: 5px 0 0; }
+.capture-page__warning .vela-button { margin-top: 12px; }
+.capture-page__rig { padding: 13px 0; border-top: 1px solid var(--vela-line); border-bottom: 1px solid var(--vela-line); color: var(--vela-text-muted); font-size: 12px; margin: 20px 0; }
+.capture-page__rig summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; cursor: pointer; }
+.capture-page__rig summary > span:first-child { display: flex; gap: 8px; align-items: center; color: var(--vela-text); }
+.capture-page__rig summary > span:last-child::after { content: ' +'; }
+.capture-page__rig[open] summary > span:last-child::after { content: ' −'; }
+.capture-page__rig i { width: 6px; height: 6px; border-radius: 50%; background: var(--vela-positive); }
+.capture-page__rig i[data-offline] { background: var(--vela-warning); }
+.capture-page__rig a { color: var(--vela-text); }
+.capture-page__rig summary:focus-visible, .capture-page__rig a:focus-visible { outline: 2px solid var(--vela-accent); outline-offset: 4px; }
+@container (min-width: 680px) {
+  .capture-page__heading h1 { font-size: 30px; }
+  .capture-page__heading { margin-bottom: 20px; }
+  .capture-page__layout { grid-template-columns: minmax(0, 1.75fr) minmax(240px, .75fr); gap: 20px; }
+}
