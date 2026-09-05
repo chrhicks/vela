@@ -1,0 +1,21 @@
+.vela-sim-cameras { width: 100%; max-width: 64rem; box-sizing: border-box; container-type: inline-size; padding: 20px; border: 1px solid var(--vela-line); border-radius: var(--vela-radius); background: var(--vela-canvas); color: var(--vela-text); }
+.vela-sim-cameras header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.vela-sim-cameras header p { margin: 0 0 5px; font-size: 12px; color: var(--vela-text-muted); }
+.vela-sim-cameras h1 { margin: 0; font-size: 24px; font-weight: 600; }
+.vela-sim-cameras header > span { font-size: 11px; color: var(--vela-text-muted); }
+.vela-sim-cameras-intro { margin: 12px 0 22px; font-size: 13px; line-height: 1.6; color: var(--vela-text-muted); }
+.vela-sim-cameras-grid, .vela-sim-cameras-side { display: grid; gap: 16px; align-items: start; }
+.vela-sim-cameras .vela-panel__body { padding: 16px; }
+.vela-sim-camera-row + .vela-sim-camera-row { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--vela-line); }
+.vela-sim-camera-title { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.vela-sim-camera-title h2 { margin: 0; font-size: 15px; font-weight: 550; }
+.vela-sim-camera-title span, .vela-sim-camera-meta { font-size: 11px; color: var(--vela-text-muted); }
+.vela-sim-camera-meta { margin: 5px 0 16px; }
+.vela-sim-camera-activity { font-size: 12px; line-height: 1.5; margin: 12px 0 0; }
+.vela-sim-cameras-copy, .vela-sim-cameras-note { font-size: 12px; line-height: 1.6; margin: 12px 0; color: var(--vela-text-muted); }
+.vela-sim-cameras-note { margin-bottom: 0; font-size: 11px; }
+.vela-sim-cameras-side strong { font-size: 16px; font-weight: 550; }
+.vela-sim-cameras .vela-button { min-height: 44px; width: 100%; }
+.vela-sim-cameras-warning { padding: 12px; border: 1px solid var(--vela-warning); border-radius: var(--vela-radius); font-size: 13px; line-height: 1.5; }
+.vela-sim-cameras footer { margin-top: 20px; font-size: 10px; line-height: 1.5; text-align: center; color: var(--vela-text-muted); }
+@container (min-width: 650px) { .vela-sim-cameras-grid { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 20px; } }
