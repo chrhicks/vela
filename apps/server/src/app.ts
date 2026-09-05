@@ -35,8 +35,11 @@ import {
 } from './rig/connection.js'
 import { loadRigDetailView } from './rig/detail.js'
 import { loadHomeView } from './rig/home.js'
+import { registerAlignment } from './alignment/routes.js'
+import type { AlignmentSettings } from './alignment/controller.js'
 
 interface BuildAppOptions {
+  readonly alignment?: AlignmentSettings
   readonly alpacaDiscovery?: AlpacaDiscovery
   readonly createConnector?: (rig: RigConnectionSource) => RigDeviceConnector
   readonly createInventory?: (rig: RigInventorySource) => RigDeviceInventory
@@ -54,6 +57,7 @@ interface AddRigRequest {
 }
 
 export function buildApp({
+  alignment,
   alpacaDiscovery = createAlpacaDiscovery(),
   createConnector = createRigDeviceConnector,
   createInventory = createRigDeviceInventory,
@@ -62,6 +66,7 @@ export function buildApp({
   rigCatalog = createMemoryRigCatalog(),
 }: BuildAppOptions = {}) {
   const app = Fastify({ logger: true })
+  const alignmentOperations = registerAlignment(app, rigCatalog, alignment)
   const rigConnections = createRigConnectionCoordinator({
     catalog: rigCatalog,
     createConnector,
@@ -150,6 +155,7 @@ export function buildApp({
   })
 
   app.delete<{ Params: { rigId: string } }>('/api/rigs/:rigId', async (request, reply) => {
+    if (alignmentOperations.active(request.params.rigId)) return reply.code(409).send({ error: 'rig-operation-in-progress' })
     const operation = await rigConnections.forgetRig(request.params.rigId)
     if (operation.state === 'in-progress') {
       return reply.code(409).send({ error: 'rig-operation-in-progress' })
@@ -193,6 +199,7 @@ export function buildApp({
   })
 
   app.post<{ Params: { rigId: string } }>('/api/rigs/:rigId/connections', async (request, reply) => {
+    if (alignmentOperations.active(request.params.rigId)) return reply.code(409).send({ error: 'rig-operation-in-progress' })
     const controller = new AbortController()
     const cancel = () => controller.abort(new Error('Connection requester disconnected'))
     request.raw.on('aborted', cancel)

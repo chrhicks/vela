@@ -15,6 +15,9 @@ import {
 } from './types/management.js'
 
 export interface AlpacaClient {
+  command(device: ConfiguredDevice, operation: string, parameters: Record<string, string>, signal?: AbortSignal): Promise<void>
+  readValue(device: ConfiguredDevice, operation: string, signal?: AbortSignal): Promise<unknown>
+  image(device: ConfiguredDevice, signal?: AbortSignal): Promise<unknown>
   apiVersions(signal?: AbortSignal): Promise<ReadonlyArray<number>>
   serverDescription(signal?: AbortSignal): Promise<ServerDescription>
   configuredDevices(signal?: AbortSignal): Promise<ReadonlyArray<ConfiguredDevice>>
@@ -229,6 +232,20 @@ export function createAlpacaClient({
   }
 
   return {
+    command: (device, operation, parameters, operationSignal) =>
+      requestCommand(deviceEndpoint(device, operation), new URLSearchParams(parameters), operationSignal),
+
+    readValue: (device, operation, operationSignal) =>
+      requestValue(deviceEndpoint(device, operation), Schema.Unknown, operationSignal),
+
+    image: async (device, operationSignal) => {
+      const endpoint = deviceEndpoint(device, 'imagearray')
+      const value = await request(endpoint, Schema.Unknown, operationSignal, { headers: { accept: 'application/json' } })
+      const result = decodeResponse(endpoint, alpacaMethodResponse, value) as AlpacaResult
+      rejectProtocolError(endpoint, result)
+      return value
+    },
+
     apiVersions: (operationSignal) =>
       requestValue('/management/apiversions', Schema.Array(Schema.Int), operationSignal),
 
