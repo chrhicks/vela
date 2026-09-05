@@ -9,6 +9,7 @@ export interface RigCatalogRecord {
   readonly id: RigId
   readonly name: string
   readonly endpoint: RigEndpoint
+  readonly imagingCamera?: { readonly uniqueId: string, readonly name: string }
   readonly addedAt: IsoDateTime
   readonly lastObservedInventory: ObservedRigInventory
 }

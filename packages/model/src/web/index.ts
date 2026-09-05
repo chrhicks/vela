@@ -31,3 +31,5 @@ export type {
 } from './rig-detail.js'
 export type { AlignmentView } from './alignment.js'
 export type { CaptureImage, CaptureView } from './capture.js'
+
+export type { ImagingCameraView } from './imaging-camera.js'

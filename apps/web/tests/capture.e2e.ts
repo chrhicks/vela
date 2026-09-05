@@ -53,8 +53,35 @@ test('a command stays responsive during polling and a late read cannot replace i
 const preview = readFileSync(new URL('../../../packages/ui/src/components/fixtures/capture-star-field.png', import.meta.url))
 const firstImage = {
   id: 'frame-1', imageUrl: '/api/rigs/rig-1/capture/images/frame-1', width: 1600, height: 1200,
-  exposureSeconds: 2, capturedAt: '2026-09-05T18:00:00.000Z', receivedAt: '2026-09-05T18:00:03.000Z', cameraName: 'Simulator Camera',
+  exposureSeconds: 2, capturedAt: '2026-09-05T18:00:00.000Z', receivedAt: '2026-09-05T18:00:03.000Z', cameraName: 'Simulator Camera', color: 'mono',
 }
+
+test('loads a fitted preview first and only presents 100 percent after its native image loads', async ({ page }) => {
+  const fitImageUrl = `${firstImage.imageUrl}/fit`
+  let nativeRequests = 0
+  let releaseNative!: () => void
+  const nativeGate = new Promise<void>(resolve => { releaseNative = resolve })
+  await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, { ...idle, phase: 'complete', latestImage: { ...firstImage, fitImageUrl } }))
+  await page.route(`**${fitImageUrl}`, route => route.fulfill({ contentType: 'image/png', body: preview }))
+  await page.route(`**${firstImage.imageUrl}`, async route => {
+    nativeRequests++
+    await nativeGate
+    await route.fulfill({ contentType: 'image/png', body: preview })
+  })
+  await page.goto('/rigs/rig-1/observe/capture')
+  const image = page.getByRole('region', { name: 'Latest image', exact: true })
+  await expect(image.getByRole('img')).toHaveAttribute('src', fitImageUrl)
+  expect(nativeRequests).toBe(0)
+  await page.getByRole('button', { name: '100%', exact: true }).click()
+  await expect.poll(() => nativeRequests).toBe(1)
+  await expect(image).toContainText('Loading full-resolution image')
+  await expect(image.getByRole('img')).toHaveAttribute('src', fitImageUrl)
+  await expect(page.getByRole('region', { name: 'Image at 100 percent. Scroll to inspect.' })).toHaveCount(0)
+  releaseNative()
+  await expect(image.getByRole('img')).toHaveAttribute('src', firstImage.imageUrl)
+  await expect(page.getByRole('region', { name: 'Image at 100 percent. Scroll to inspect.' })).toBeVisible()
+  await expect(image.locator('footer')).toContainText('2 s')
+})
 
 test('keeps the loaded image and its metadata together through a failed new-image request and retry', async ({ page }) => {
   let current: CaptureView = { ...idle, phase: 'complete', latestImage: firstImage }

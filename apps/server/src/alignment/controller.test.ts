@@ -4,7 +4,8 @@ import { createAlignmentController } from './controller.js'
 import type { MonoFrame, PlateSolver, SkyPosition, SolveResult } from './solver.js'
 
 const cadence = vi.hoisted(() => ({ waits: [] as Array<() => void> }))
-vi.mock('node:timers/promises', () => ({
+vi.mock('node:timers/promises', async importOriginal => ({
+  ...await importOriginal<typeof import('node:timers/promises')>(),
   setTimeout: (_ms: number, _value: unknown, options: { signal: AbortSignal }) => new Promise<void>((resolve, reject) => {
     const finish = () => { options.signal.removeEventListener('abort', abort); resolve() }
     const abort = () => {
@@ -43,7 +44,7 @@ function setup() {
       exposures++
       if (captureOverride) return captureOverride(signal!)
       return { width: 4, height: 4, pixels: new Float64Array([0, 500, 300, 100, ...Array(12).fill(0)]),
-        capturedAt: new Date(1_700_000_000_000 + exposures * 1000).toISOString() }
+        capturedAt: new Date(1_700_000_000_000 + exposures * 1000).toISOString(), color: { kind: 'mono' } }
     },
     async move(_id, rate, duration) { ra += rate * duration },
     async abort() {},

@@ -11,13 +11,15 @@ function deferred<T>() {
 
 function setup() {
   const requests: Array<Parameters<CaptureCamera['capture']>[0] & ReturnType<typeof deferred<CaptureFrame>>> = []
-  const controller = createCaptureController({ rigId: 'fra 400', rigName: 'FRA 400', cameraName: 'Main camera' }, {
+  const camera: CaptureCamera = {
     capture(input) {
       const result = deferred<CaptureFrame>()
       requests.push({ ...input, ...result })
       return result.promise
     },
-  }, () => Date.parse('2026-09-05T16:00:10Z'))
+  }
+  const actual = createCaptureController({ rigId: 'fra 400', rigName: 'FRA 400' }, () => Date.parse('2026-09-05T16:00:10Z'))
+  const controller = { ...actual, start: (seconds: number, settled?: () => void) => actual.start(seconds, camera, 'Main camera', settled) }
   const frame: CaptureFrame = { width: 4, height: 2, pixels: [0, 100, 500, 1000, 500, 0, 200, 100], capturedAt: '2026-09-05T16:00:00Z' }
   async function complete(seconds = 10) {
     await controller.start(seconds)
@@ -106,4 +108,14 @@ it('bounds image retention while preserving the newest image', async () => {
   expect(controller.image(retained.id)).toBeDefined()
   expect(controller.image(newest.id)).toBeDefined()
   expect(controller.snapshot().latestImage).toBe(newest)
+})
+
+it('publishes Bayer acquisition as a color PNG with matching image metadata', async () => {
+  const { controller, requests, frame } = setup()
+  await controller.start(2)
+  requests[0]!.resolve({ ...frame, color: { kind: 'bayer', pattern: 'rggb' } })
+  await vi.waitFor(() => expect(controller.active()).toBe(false))
+  const image = controller.snapshot().latestImage!
+  expect(image.color).toBe('color')
+  expect(controller.image(image.id)![25]).toBe(2)
 })

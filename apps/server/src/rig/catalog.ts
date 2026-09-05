@@ -30,6 +30,7 @@ export interface RigCatalog {
     inventory: ObservedRigInventory,
   ): Promise<RigCandidateMatch>
   add(input: AddRigInput): Promise<AddRigResult>
+  setImagingCamera(rigId: RigId, camera: NonNullable<RigCatalogRecord['imagingCamera']>): Promise<boolean>
   forget(rigId: RigId): Promise<boolean>
 }
 
@@ -172,6 +173,15 @@ function createRigCatalog(
       })
     },
 
+    setImagingCamera(rigId, camera) {
+      return change(async () => {
+        if (!isCanonicalNonEmptyString(camera.uniqueId) || !isNonEmptyString(camera.name)) throw new Error('Invalid imaging camera')
+        if (!records.some(record => record.id === rigId)) return false
+        await replace(records.map(record => record.id === rigId ? { ...record, imagingCamera: { ...camera } } : record))
+        return true
+      })
+    },
+
     forget(rigId) {
       return change(async () => {
         const nextRecords = records.filter((record) => record.id !== rigId)
@@ -289,6 +299,7 @@ function parseRigRecord(value: unknown): RigCatalogRecord {
     'name',
     'endpoint',
     'addedAt',
+    'imagingCamera',
     'lastObservedInventory',
   ])) {
     throw new Error('Invalid Rig record')
@@ -299,7 +310,13 @@ function parseRigRecord(value: unknown): RigCatalogRecord {
   }
   if (!isIsoDateTime(value.addedAt)) throw new Error('Invalid addedAt timestamp')
 
+  if (value.imagingCamera !== undefined && (!isRecord(value.imagingCamera)
+    || !hasOnlyKeys(value.imagingCamera, ['uniqueId', 'name'])
+    || !isCanonicalNonEmptyString(value.imagingCamera.uniqueId)
+    || !isNonEmptyString(value.imagingCamera.name))) throw new Error('Invalid imaging camera')
+
   return {
+    ...(value.imagingCamera ? { imagingCamera: { uniqueId: value.imagingCamera.uniqueId as string, name: value.imagingCamera.name as string } } : {}),
     id: value.id,
     name: value.name,
     endpoint: parseEndpoint(value.endpoint),
@@ -374,6 +391,7 @@ function copyRecords(
 function copyRecord(record: RigCatalogRecord): RigCatalogRecord {
   return {
     ...record,
+    ...(record.imagingCamera ? { imagingCamera: { ...record.imagingCamera } } : {}),
     endpoint: { ...record.endpoint },
     lastObservedInventory: copyInventory(record.lastObservedInventory),
   }

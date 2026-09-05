@@ -1,5 +1,6 @@
 import { setTimeout as delay } from 'node:timers/promises'
 import { AlpacaProviderError } from './error.js'
+import { imageBytesPixels } from './internal/image-bytes.js'
 import { createAlpacaClient } from './internal/client.js'
 import type { ConfiguredDevice } from './internal/types/management.js'
 import { rejectDuplicateDeviceIds, stableDeviceId } from './internal/configured-device.js'
@@ -11,17 +12,27 @@ export class AlpacaCaptureStoppedError extends Error {
   }
 }
 
+export type AlpacaFrameColor =
+  | { kind: 'mono' }
+  | { kind: 'bayer'; pattern: 'rggb' | 'grbg' | 'gbrg' | 'bggr' }
+
 export interface AlpacaFrame {
   width: number
   height: number
   /** Row-major, pixels[y * width + x]. */
   pixels: Float64Array
   capturedAt: string
+  /** Color layout at the returned image origin, after accounting for subframe position. */
+  color: AlpacaFrameColor
 }
 
 export interface AlpacaCaptureOptions {
   cameraId: string
+  /** Confirm the operational camera name when a driver slot can host different hardware. */
+  expectedCameraName?: string
   exposureSeconds: number
+  /** Reject color before starting when the consumer requires monochrome samples. */
+  monochromeOnly?: boolean
   signal?: AbortSignal
   onProgress?: (elapsedSeconds: number) => void
   onReadout?: () => void
@@ -31,6 +42,7 @@ export interface AlpacaAcquisitionOptions {
   baseUrl: string
   fetch?: typeof globalThis.fetch
   requestTimeoutMs?: number
+  imageTimeoutMs?: number
 }
 
 const coordinateSystems = ['other', 'topocentric', 'j2000', 'j2050', 'b1950'] as const
@@ -59,8 +71,9 @@ function bounded(value: number, minimum: number, maximum: number, label: string)
   return value
 }
 
-function monoFrame(raw: unknown, width: number, height: number, capturedAt: string): AlpacaFrame {
+function decodeFrame(raw: unknown, width: number, height: number, capturedAt: string, color: AlpacaFrameColor): AlpacaFrame {
   const endpoint = 'imagearray'
+  if (raw instanceof ArrayBuffer) return { width, height, pixels: imageBytesPixels(raw, width, height), capturedAt, color }
   if (typeof raw !== 'object' || raw === null) invalid('Invalid image response', endpoint)
   const image = raw as Record<string, unknown>
   if (image.Rank !== 2 || image.Type !== 2) invalid('Only rank-2 Int32 camera images are supported', endpoint)
@@ -75,12 +88,13 @@ function monoFrame(raw: unknown, width: number, height: number, capturedAt: stri
       pixels[y * width + x] = value
     }
   }
-  return { width, height, pixels, capturedAt }
+  return { width, height, pixels, capturedAt, color }
 }
 
-export function createAlpacaAcquisition({ baseUrl, fetch = globalThis.fetch, requestTimeoutMs = 5_000 }: AlpacaAcquisitionOptions): AlpacaAcquisition {
+export function createAlpacaAcquisition({ baseUrl, fetch = globalThis.fetch, requestTimeoutMs = 5_000, imageTimeoutMs = 60_000 }: AlpacaAcquisitionOptions): AlpacaAcquisition {
   if (!Number.isInteger(requestTimeoutMs) || requestTimeoutMs <= 0) throw new RangeError('Invalid request timeout')
-  const client = createAlpacaClient({ baseUrl, fetch, requestTimeoutMs })
+  if (!Number.isInteger(imageTimeoutMs) || imageTimeoutMs <= 0) throw new RangeError('Invalid image timeout')
+  const client = createAlpacaClient({ baseUrl, fetch, requestTimeoutMs, imageTimeoutMs })
 
   async function device(id: string, kind: string, signal?: AbortSignal) {
     signal?.throwIfAborted()
@@ -96,15 +110,39 @@ export function createAlpacaAcquisition({ baseUrl, fetch = globalThis.fetch, req
     if (await client.readNumber(camera, 'camerastate') !== 0) throw new Error('Camera did not confirm exposure stopped')
   }
 
+  async function frameColor(camera: ConfiguredDevice, monochromeOnly: boolean, signal?: AbortSignal): Promise<AlpacaFrameColor> {
+    const sensorType = await client.readNumber(camera, 'sensortype', signal)
+    if (!Number.isInteger(sensorType) || sensorType < 0 || sensorType > 5) invalid('Invalid camera sensor type', 'sensortype')
+    if (sensorType === 0) return { kind: 'mono' }
+    if (monochromeOnly) throw new Error('This acquisition requires a monochrome camera')
+    if (sensorType !== 2) throw new Error('Only monochrome and RGGB Bayer camera sensors are supported')
+    const binX = await client.readNumber(camera, 'binx', signal)
+    const binY = await client.readNumber(camera, 'biny', signal)
+    if (!Number.isInteger(binX) || !Number.isInteger(binY) || binX < 1 || binY < 1) invalid('Invalid camera binning', 'binx/biny')
+    if (binX !== 1 || binY !== 1) throw new Error('Bayer color capture requires 1 × 1 binning')
+    const offsetX = await client.readNumber(camera, 'bayeroffsetx', signal)
+    const offsetY = await client.readNumber(camera, 'bayeroffsety', signal)
+    if (![offsetX, offsetY].every(value => value === 0 || value === 1)) invalid('Invalid RGGB Bayer offset', 'bayeroffsetx/bayeroffsety')
+    const startX = await client.readNumber(camera, 'startx', signal)
+    const startY = await client.readNumber(camera, 'starty', signal)
+    if (![startX, startY].every(value => Number.isInteger(value) && value >= 0 && value <= 2147483647)) invalid('Invalid camera subframe origin', 'startx/starty')
+    // ASCOM offsets refer to the full sensor and do not include StartX/StartY.
+    // A 2×2 matrix repeats, so subtracting and adding its offset have equal parity.
+    const patterns = ['rggb', 'grbg', 'gbrg', 'bggr'] as const
+    const pattern = patterns[((startY + offsetY) % 2) * 2 + (startX + offsetX) % 2]!
+    return { kind: 'bayer', pattern }
+  }
+
   return {
-    async capture({ cameraId, exposureSeconds, signal, onProgress, onReadout }) {
+    async capture({ cameraId, expectedCameraName, exposureSeconds, monochromeOnly = false, signal, onProgress, onReadout }) {
       bounded(exposureSeconds, 0.001, 3600, 'exposure duration')
+      if (expectedCameraName !== undefined && expectedCameraName.trim() === '') throw new RangeError('Expected camera name must not be blank')
       let camera: ConfiguredDevice | undefined
       let attempted = false
       try {
         camera = await device(cameraId, 'camera', signal)
         if (!(await client.connected(camera, signal))) throw new Error('Camera is disconnected')
-        if (await client.readNumber(camera, 'sensortype', signal) !== 0) throw new Error('Only monochrome cameras are supported')
+        const color = await frameColor(camera, monochromeOnly, signal)
         if (await client.readNumber(camera, 'camerastate', signal) !== 0) throw new Error('Camera is already active')
         if (!(await client.readBoolean(camera, 'canabortexposure', signal))) throw new Error('Camera cannot abort an exposure')
         const width = await client.readNumber(camera, 'numx', signal)
@@ -113,6 +151,11 @@ export function createAlpacaAcquisition({ baseUrl, fetch = globalThis.fetch, req
         const previousStart = await client.readBoolean(camera, 'imageready', signal)
           ? await client.readString(camera, 'lastexposurestarttime', signal)
           : undefined
+        if (expectedCameraName !== undefined) {
+          const currentName = (await client.readString(camera, 'name', signal)).trim()
+          if (!currentName) invalid('Camera returned a blank operational name', 'name')
+          if (currentName !== expectedCameraName.trim()) throw new Error('The camera in this driver slot has changed; select the imaging camera again')
+        }
         signal?.throwIfAborted()
         const startedAt = performance.now()
         attempted = true
@@ -132,7 +175,7 @@ export function createAlpacaAcquisition({ baseUrl, fetch = globalThis.fetch, req
         const capturedAt = /Z$/.test(stamp) ? stamp : `${stamp}Z`
         if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/.test(capturedAt) || !Number.isFinite(Date.parse(capturedAt))) invalid('Invalid exposure UTC timestamp', 'lastexposurestarttime')
         onReadout?.()
-        const frame = monoFrame(await client.image(camera, signal), width, height, capturedAt)
+        const frame = decodeFrame(await client.image(camera, signal), width, height, capturedAt, color)
         return frame
       } catch (error) {
         // Cleanup failure must win over cancellation: an aborted request alone
