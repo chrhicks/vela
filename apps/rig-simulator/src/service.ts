@@ -1,7 +1,9 @@
 import Fastify from 'fastify'
+import { Readable } from 'node:stream'
+import { acceptsImageBytes, encodeImageBytes, imageBytesError, imageJsonChunks } from './image-bytes.js'
 import type { FastifyRequest } from 'fastify'
 import type { Star } from './catalog.js'
-import { SimulatorError, SimulatorRuntime, imageHeight, imageWidth } from './runtime.js'
+import { SimulatorError, SimulatorRuntime } from './runtime.js'
 
 function parameters(value: unknown): Record<string, unknown> {
   if (value === undefined || value === null) return {}
@@ -60,8 +62,14 @@ export function buildSimulator({ stars, now }: { stars: readonly Star[]; now?: (
     runtime.adjust(body.altitudearcsec, body.azimutharcsec)
   }))
   app.put('/simulator/camera', async request => control(request, body => {
-    if (typeof body.obscured !== 'boolean') throw new SimulatorError(0x401, 'Obscured must be a boolean')
-    runtime.setObscured(body.obscured)
+    if (body.obscured !== undefined && typeof body.obscured !== 'boolean') throw new SimulatorError(0x401, 'Obscured must be a boolean')
+    if (body.resolution !== undefined && body.resolution !== 'fast' && body.resolution !== 'full') throw new SimulatorError(0x401, 'Unknown resolution')
+    const cameraNumber = body.cameranumber === undefined ? 0 : numberParameter(body, 'cameranumber')
+    if (!Number.isInteger(cameraNumber) || ![0, 1].includes(cameraNumber)) throw new SimulatorError(0x401, 'Unknown camera')
+    if (body.obscured === undefined && body.resolution === undefined) throw new SimulatorError(0x401, 'Camera control is empty')
+    // Configure first: a rejected busy/unsupported mode must not change obstruction.
+    if (body.resolution !== undefined) runtime.configureCamera(cameraNumber, body.resolution as 'fast' | 'full')
+    if (typeof body.obscured === 'boolean') runtime.setObscured(body.obscured)
   }))
   app.post('/simulator/reset', async request => control(request, body => {
     if (body.preset !== 'large-error' && body.preset !== 'near-aligned' && body.preset !== 'aligned') throw new SimulatorError(0x401, 'Unknown preset')
@@ -77,6 +85,7 @@ export function buildSimulator({ stars, now }: { stars: readonly Star[]; now?: (
   app.get('/management/v1/description', async () => ({ Value: { ServerName: 'Vela Rig Simulator', Manufacturer: 'Vela', ManufacturerVersion: '0.0.0', Location: 'Local development' }, ClientTransactionID: 0, ServerTransactionID: ++transaction, ErrorNumber: 0, ErrorMessage: '' }))
   app.get('/management/v1/configureddevices', async () => ({ Value: [
     { DeviceName: 'Simulator Camera', DeviceType: 'Camera', DeviceNumber: 0, UniqueID: 'vela-simulator-camera' },
+    { DeviceName: 'Simulator Color Camera', DeviceType: 'Camera', DeviceNumber: 1, UniqueID: 'vela-simulator-color-camera' },
     { DeviceName: 'Simulator Telescope', DeviceType: 'Telescope', DeviceNumber: 0, UniqueID: 'vela-simulator-telescope' },
   ], ClientTransactionID: 0, ServerTransactionID: ++transaction, ErrorNumber: 0, ErrorMessage: '' }))
   app.route<{ Params: { device: string; number: string; member: string } }>({
@@ -93,32 +102,43 @@ export function buildSimulator({ stars, now }: { stars: readonly Star[]; now?: (
         }
         const device = request.params.device.toLowerCase()
         const member = request.params.member.toLowerCase()
-        if (!['camera', 'telescope'].includes(device) || request.params.number !== '0') return reply.code(404).send({ error: 'Unknown simulator device' })
+        if (!['camera', 'telescope'].includes(device) || !(request.params.number === '0' || device === 'camera' && request.params.number === '1')) return reply.code(404).send({ error: 'Unknown simulator device' })
         const kind = device as 'camera' | 'telescope'
+        const cameraNumber = Number(request.params.number)
         const state = runtime.state()
+        const camera = runtime.cameraState(cameraNumber)
         if (member === 'connected') {
-          if (request.method === 'GET') return { ...envelope, Value: kind === 'camera' ? state.cameraConnected : state.telescopeConnected }
-          runtime.connect(kind, booleanParameter(params, 'connected'))
+          if (request.method === 'GET') return { ...envelope, Value: kind === 'camera' ? camera.connected : state.telescopeConnected }
+          runtime.connect(kind, booleanParameter(params, 'connected'), cameraNumber)
           return envelope
         }
-        const common: Record<string, unknown> = { name: `Simulator ${kind === 'camera' ? 'Camera' : 'Telescope'}`,
+        const common: Record<string, unknown> = { name: `Simulator ${kind === 'camera' ? cameraNumber === 1 ? 'Color Camera' : 'Camera' : 'Telescope'}`,
           description: 'Development-only Vela sky simulator', driverinfo: 'Bounded Alpaca subset for local development',
           driverversion: '0.0.0', interfaceversion: 3, supportedactions: [] }
         if (request.method === 'GET' && Object.hasOwn(common, member)) return { ...envelope, Value: common[member] }
-        runtime.requireConnected(kind)
+        runtime.requireConnected(kind, cameraNumber)
         if (request.method === 'GET') {
           if (kind === 'camera') {
-            const values: Record<string, unknown> = { camerastate: state.cameraActivity === 'exposing' ? 2 : 0,
-              imageready: state.imageReady, cameraxsize: imageWidth, cameraysize: imageHeight,
-              numx: imageWidth, numy: imageHeight, startx: 0, starty: 0, binx: 1, biny: 1,
-              maxbinx: 1, maxbiny: 1, sensortype: 0, sensorname: 'Synthetic monochrome',
-              maxadu: 32767, pixelsizex: 3.76, pixelsizey: 3.76, canabortexposure: true,
+            const values: Record<string, unknown> = { camerastate: camera.activity === 'exposing' ? 2 : 0,
+              imageready: camera.imageReady, cameraxsize: camera.width, cameraysize: camera.height,
+              numx: camera.width, numy: camera.height, startx: 0, starty: 0, binx: 1, biny: 1,
+              maxbinx: 1, maxbiny: 1, sensortype: camera.sensor === 'rggb' ? 2 : 0, sensorname: camera.sensor === 'rggb' ? 'Synthetic RGGB' : 'Synthetic monochrome',
+              ...(camera.sensor === 'rggb' ? { bayeroffsetx: 0, bayeroffsety: 0 } : {}),
+              maxadu: camera.sensor === 'rggb' ? 65535 : 32767, pixelsizex: 3.76, pixelsizey: 3.76, canabortexposure: true,
               canstopexposure: false, canasymmetricbin: false, cansetccdtemperature: false,
               cangetcoolerpower: false, hasshutter: true, exposuremin: 0, exposuremax: 3600, exposureresolution: 0.001 }
             if (Object.hasOwn(values, member)) return { ...envelope, Value: values[member] }
-            if (member === 'imagearray') return { ...envelope, Type: 2, Rank: 2, Value: runtime.image() }
-            if (member === 'lastexposureduration') return { ...envelope, Value: runtime.lastExposure().duration }
-            if (member === 'lastexposurestarttime') return { ...envelope, Value: runtime.lastExposure().timestamp }
+            if (member === 'imagearray') {
+              const frame = await runtime.frame(cameraNumber)
+              const assertCurrent = frame.assertCurrent
+              if (acceptsImageBytes(request.headers.accept)) {
+                const bytes = await encodeImageBytes(frame, envelope, assertCurrent)
+                return reply.type('application/imagebytes').send(bytes)
+              }
+              return reply.type('application/json').send(Readable.from(imageJsonChunks(frame, envelope, assertCurrent)))
+            }
+            if (member === 'lastexposureduration') return { ...envelope, Value: runtime.lastExposure(cameraNumber).duration }
+            if (member === 'lastexposurestarttime') return { ...envelope, Value: runtime.lastExposure(cameraNumber).timestamp }
           } else {
             const values: Record<string, unknown> = { atpark: false, athome: false, slewing: state.raRateDegreesPerSecond !== 0,
               tracking: state.tracking, rightascension: state.rightAscensionHours, declination: state.declinationDegrees,
@@ -131,14 +151,14 @@ export function buildSimulator({ stars, now }: { stars: readonly Star[]; now?: (
           }
         } else if (kind === 'camera') {
           if (member === 'startexposure') {
-            runtime.startExposure(numberParameter(params, 'duration'), booleanParameter(params, 'light'))
+            runtime.startExposure(numberParameter(params, 'duration'), booleanParameter(params, 'light'), cameraNumber)
             return envelope
           }
           if (member === 'abortexposure') {
-            runtime.abortExposure()
+            runtime.abortExposure(cameraNumber)
             return envelope
           }
-          const fixed: Record<string, number> = { binx: 1, biny: 1, startx: 0, starty: 0, numx: imageWidth, numy: imageHeight }
+          const fixed: Record<string, number> = { binx: 1, biny: 1, startx: 0, starty: 0, numx: camera.width, numy: camera.height }
           if (Object.hasOwn(fixed, member)) {
             if (numberParameter(params, member) !== fixed[member]) throw new SimulatorError(0x401, `${member} is fixed at ${fixed[member]}`)
             return envelope
@@ -161,7 +181,12 @@ export function buildSimulator({ stars, now }: { stars: readonly Star[]; now?: (
         throw new SimulatorError(0x400, `${member} is not implemented`)
       } catch (error) {
         if (!(error instanceof SimulatorError)) throw error
-        return { ...envelope, ErrorNumber: error.number, ErrorMessage: error.message }
+        const failure = { ...envelope, ErrorNumber: error.number, ErrorMessage: error.message }
+        if (request.method === 'GET' && request.params.device.toLowerCase() === 'camera'
+          && request.params.member.toLowerCase() === 'imagearray' && acceptsImageBytes(request.headers.accept)) {
+          return reply.type('application/imagebytes').send(imageBytesError(failure))
+        }
+        return failure
       }
     },
   })
