@@ -35,7 +35,9 @@ function axisParameter(params: Record<string, unknown>) {
 }
 
 export function buildSimulator({ stars, now }: { stars: readonly Star[]; now?: () => number }) {
-  const app = Fastify({ routerOptions: { ignoreTrailingSlash: true, caseSensitive: false } })
+  // Match Node's idle timeout: longer-lived sockets stalled later PUTs with
+  // Node 26's fetch client during the real movement/stop integration proof.
+  const app = Fastify({ keepAliveTimeout: 5000, routerOptions: { ignoreTrailingSlash: true, caseSensitive: false } })
   const runtime = new SimulatorRuntime(stars, now)
   let transaction = 0
   app.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'string' }, (_request, body, done) => {
@@ -122,7 +124,7 @@ export function buildSimulator({ stars, now }: { stars: readonly Star[]; now?: (
               tracking: state.tracking, rightascension: state.rightAscensionHours, declination: state.declinationDegrees,
               cansettracking: true, canpark: false, canunpark: false, canfindhome: false, canslew: false,
               canslewasync: false, cansync: false, canpulseguide: false, equatorialsystem: 0,
-              alignmentmode: 2, sitelatitude: 40 }
+              alignmentmode: 2, sitelatitude: 40, siderealtime: runtime.siderealTimeHours() }
             if (Object.hasOwn(values, member)) return { ...envelope, Value: values[member] }
             if (member === 'canmoveaxis') return { ...envelope, Value: axisParameter(params) === 0 }
             if (member === 'axisrates') return { ...envelope, Value: axisParameter(params) === 0 ? [{ Minimum: 0, Maximum: 1.5 }] : [] }

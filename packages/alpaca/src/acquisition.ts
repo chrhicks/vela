@@ -1,0 +1,179 @@
+import { setTimeout as delay } from 'node:timers/promises'
+import { AlpacaProviderError } from './error.js'
+import { createAlpacaClient } from './internal/client.js'
+import type { ConfiguredDevice } from './internal/types/management.js'
+import { rejectDuplicateDeviceIds, stableDeviceId } from './internal/configured-device.js'
+
+export interface AlpacaFrame {
+  width: number
+  height: number
+  /** Row-major, pixels[y * width + x]. */
+  pixels: Float64Array
+  capturedAt: string
+}
+
+export interface AlpacaCaptureOptions {
+  cameraId: string
+  exposureSeconds: number
+  signal?: AbortSignal
+  onProgress?: (elapsedSeconds: number) => void
+}
+
+export interface AlpacaAcquisitionOptions {
+  baseUrl: string
+  fetch?: typeof globalThis.fetch
+  requestTimeoutMs?: number
+}
+
+const coordinateSystems = ['other', 'topocentric', 'j2000', 'j2050', 'b1950'] as const
+export interface AlpacaPointing {
+  rightAscensionDegrees: number
+  declinationDegrees: number
+  siderealTimeDegrees: number
+  latitudeDegrees: number
+  tracking: boolean
+  coordinateSystem: typeof coordinateSystems[number]
+}
+
+export interface AlpacaAcquisition {
+  capture(options: AlpacaCaptureOptions): Promise<AlpacaFrame>
+  pointing(telescopeId: string, signal?: AbortSignal): Promise<AlpacaPointing>
+  move(telescopeId: string, rateDegreesPerSecond: number, durationSeconds: number, signal?: AbortSignal): Promise<void>
+  abort(cameraId: string, telescopeId: string): Promise<void>
+}
+
+function invalid(message: string, endpoint: string): never {
+  throw new AlpacaProviderError(message, { reason: 'invalid-response', endpoint })
+}
+
+function bounded(value: number, minimum: number, maximum: number, label: string): number {
+  if (!Number.isFinite(value) || value < minimum || value > maximum) throw new RangeError(`Invalid ${label}`)
+  return value
+}
+
+function monoFrame(raw: unknown, width: number, height: number, capturedAt: string): AlpacaFrame {
+  const endpoint = 'imagearray'
+  if (typeof raw !== 'object' || raw === null) invalid('Invalid image response', endpoint)
+  const image = raw as Record<string, unknown>
+  if (image.Rank !== 2 || image.Type !== 2) invalid('Only rank-2 Int32 camera images are supported', endpoint)
+  if (!Array.isArray(image.Value) || image.Value.length !== width) invalid('Image width differs from exposure dimensions', endpoint)
+  const pixels = new Float64Array(width * height)
+  for (let x = 0; x < width; x++) {
+    const column: unknown = image.Value[x]
+    if (!Array.isArray(column) || column.length !== height) invalid('Image has inconsistent column dimensions', endpoint)
+    for (let y = 0; y < height; y++) {
+      const value: unknown = column[y]
+      if (typeof value !== 'number' || !Number.isInteger(value) || value < -2147483648 || value > 2147483647) invalid('Image has an invalid Int32 pixel', endpoint)
+      pixels[y * width + x] = value
+    }
+  }
+  return { width, height, pixels, capturedAt }
+}
+
+export function createAlpacaAcquisition({ baseUrl, fetch = globalThis.fetch, requestTimeoutMs = 5_000 }: AlpacaAcquisitionOptions): AlpacaAcquisition {
+  if (!Number.isInteger(requestTimeoutMs) || requestTimeoutMs <= 0) throw new RangeError('Invalid request timeout')
+  const client = createAlpacaClient({ baseUrl, fetch, requestTimeoutMs })
+
+  async function device(id: string, kind: string, signal?: AbortSignal) {
+    signal?.throwIfAborted()
+    const devices = await client.configuredDevices(signal)
+    rejectDuplicateDeviceIds(devices)
+    const found = devices.find(candidate => stableDeviceId(candidate) === id && candidate.DeviceType.toLowerCase() === kind)
+    if (!found) throw new Error(`Configured ${kind} ${id} was not found`)
+    return found
+  }
+
+  async function stopCamera(camera: ConfiguredDevice) {
+    await client.command(camera, 'abortexposure', {})
+    if (await client.readNumber(camera, 'camerastate') !== 0) throw new Error('Camera did not confirm exposure stopped')
+  }
+
+  return {
+    async capture({ cameraId, exposureSeconds, signal, onProgress }) {
+      bounded(exposureSeconds, 0.001, 3600, 'exposure duration')
+      const camera = await device(cameraId, 'camera', signal)
+      if (!(await client.connected(camera, signal))) throw new Error('Camera is disconnected')
+      if (await client.readNumber(camera, 'sensortype', signal) !== 0) throw new Error('Only monochrome cameras are supported')
+      if (await client.readNumber(camera, 'camerastate', signal) !== 0) throw new Error('Camera is already active')
+      if (!(await client.readBoolean(camera, 'canabortexposure', signal))) throw new Error('Camera cannot abort an exposure')
+      const width = await client.readNumber(camera, 'numx', signal)
+      const height = await client.readNumber(camera, 'numy', signal)
+      if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || width * height > 40_000_000) invalid('Invalid camera image dimensions', 'numx/numy')
+      const previousStart = await client.readBoolean(camera, 'imageready', signal)
+        ? await client.readString(camera, 'lastexposurestarttime', signal)
+        : undefined
+      signal?.throwIfAborted()
+      const startedAt = performance.now()
+      let completed = false
+      try {
+        // A lost response can still mean the exposure started. Never replay it.
+        await client.command(camera, 'startexposure', { Duration: String(exposureSeconds), Light: 'true' }, signal)
+        while (!(await client.readBoolean(camera, 'imageready', signal))) {
+          const elapsed = (performance.now() - startedAt) / 1000
+          if (elapsed > exposureSeconds + 60) throw new Error('Camera exposure did not complete in time')
+          const cameraState = await client.readNumber(camera, 'camerastate', signal)
+          if (!Number.isInteger(cameraState) || cameraState < 0 || cameraState > 5) invalid('Invalid camera activity state', 'camerastate')
+          if (cameraState === 5) throw new Error('Camera reported an exposure error')
+          onProgress?.(Math.min(elapsed, exposureSeconds))
+          await delay(200, undefined, signal === undefined ? {} : { signal })
+        }
+        const stamp = await client.readString(camera, 'lastexposurestarttime', signal)
+        if (stamp === previousStart) invalid('Camera returned the previous exposure; freshness is unconfirmed', 'lastexposurestarttime')
+        const capturedAt = /Z$/.test(stamp) ? stamp : `${stamp}Z`
+        if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/.test(capturedAt) || !Number.isFinite(Date.parse(capturedAt))) invalid('Invalid exposure UTC timestamp', 'lastexposurestarttime')
+        const frame = monoFrame(await client.image(camera, signal), width, height, capturedAt)
+        completed = true
+        return frame
+      } finally {
+        if (!completed) await stopCamera(camera)
+      }
+    },
+
+    async pointing(telescopeId, signal) {
+      const telescope = await device(telescopeId, 'telescope', signal)
+      const ra = bounded(await client.readNumber(telescope, 'rightascension', signal), 0, 24, 'right ascension')
+      const dec = bounded(await client.readNumber(telescope, 'declination', signal), -90, 90, 'declination')
+      const sidereal = bounded(await client.readNumber(telescope, 'siderealtime', signal), 0, 24, 'sidereal time')
+      if (ra === 24 || sidereal === 24) invalid('Hours must be less than 24', 'rightascension/siderealtime')
+      const latitude = bounded(await client.readNumber(telescope, 'sitelatitude', signal), -90, 90, 'latitude')
+      const tracking = await client.readBoolean(telescope, 'tracking', signal)
+      const system = await client.readNumber(telescope, 'equatorialsystem', signal)
+      const coordinateSystem = coordinateSystems[system]
+      if (coordinateSystem === undefined) invalid('Invalid equatorial coordinate system', 'equatorialsystem')
+      return { rightAscensionDegrees: ra * 15, declinationDegrees: dec, siderealTimeDegrees: sidereal * 15, latitudeDegrees: latitude, tracking, coordinateSystem }
+    },
+
+    async move(telescopeId, rateDegreesPerSecond, durationSeconds, signal) {
+      bounded(rateDegreesPerSecond, -10, 10, 'axis rate')
+      bounded(durationSeconds, 0, 120, 'movement duration')
+      const telescope = await device(telescopeId, 'telescope', signal)
+      if (!(await client.connected(telescope, signal))) throw new Error('Telescope is disconnected')
+      if (!(await client.readBoolean(telescope, 'canmoveaxis?Axis=0', signal))) throw new Error('Telescope cannot move its primary axis')
+      if (await client.readBoolean(telescope, 'slewing', signal)) throw new Error('Telescope is already moving')
+      const ranges = await client.readValue(telescope, 'axisrates?Axis=0', signal)
+      if (!Array.isArray(ranges) || ranges.some(range => typeof range !== 'object' || range === null || !Number.isFinite(range.Minimum) || !Number.isFinite(range.Maximum) || range.Minimum < 0 || range.Maximum < range.Minimum)) invalid('Invalid axis rate ranges', 'axisrates')
+      if (rateDegreesPerSecond !== 0 && !ranges.some(range => Math.abs(rateDegreesPerSecond) >= range.Minimum && Math.abs(rateDegreesPerSecond) <= range.Maximum)) throw new Error('Requested rate is not supported by telescope')
+      signal?.throwIfAborted()
+      try {
+        await client.command(telescope, 'moveaxis', { Axis: '0', Rate: String(rateDegreesPerSecond) }, signal)
+        await delay(durationSeconds * 1000, undefined, signal === undefined ? {} : { signal })
+      } finally {
+        // The user's cancellation must not cancel the stop command.
+        await client.command(telescope, 'moveaxis', { Axis: '0', Rate: '0' })
+        if (await client.readBoolean(telescope, 'slewing')) throw new Error('Telescope did not confirm movement stopped')
+      }
+    },
+
+    async abort(cameraId, telescopeId) {
+      const results = await Promise.allSettled([
+        device(cameraId, 'camera').then(stopCamera),
+        device(telescopeId, 'telescope').then(async telescope => {
+          await client.command(telescope, 'moveaxis', { Axis: '0', Rate: '0' })
+          if (await client.readBoolean(telescope, 'slewing')) throw new Error('Telescope did not confirm movement stopped')
+        }),
+      ])
+      const errors = results.filter(result => result.status === 'rejected').map(result => result.reason as unknown)
+      if (errors.length > 0) throw new AggregateError(errors, 'Could not confirm acquisition stopped')
+    },
+  }
+}

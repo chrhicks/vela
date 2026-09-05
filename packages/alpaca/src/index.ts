@@ -29,3 +29,5 @@ export type {
   AlpacaSwitchChannel,
   AlpacaTelemetryAvailability,
 } from './model.js'
+export { createAlpacaAcquisition } from './acquisition.js'
+export type { AlpacaAcquisition, AlpacaAcquisitionOptions, AlpacaCaptureOptions, AlpacaFrame, AlpacaPointing } from './acquisition.js'
