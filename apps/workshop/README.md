@@ -17,6 +17,7 @@ Open `http://127.0.0.1:5174` for the focused workbench or `http://127.0.0.1:5174
 - A fixture-backed observation-readiness product example for evaluating the Start Observing transition, Rig-level connection preparation, and honest partial or uncertain outcomes
 - A polar-alignment adjustment product sketch with phone/desktop layouts, illustrative large-error and near-aligned fixtures, a three-position starting/measurement preview, a fixed-scale reticle, activity/freshness and solve-retry snapshots, and manual stop/finish states; it does not control hardware or measure alignment
 - A stable Dialog with both primitive anatomy and a fixture-backed Rig discovery product example
+- A simulator-control product sketch with coarse/fine mount nudges, exact offset setup, clear/obscured camera and preset reset; local interactive fixtures only, with no simulator service connected
 - Auto-discovered colocated specimens
 - One primitive-focused specimen per component, with additional product examples only for concrete compositions that prop controls cannot express
 - A searchable gallery with paired light and dark previews
