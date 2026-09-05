@@ -37,3 +37,15 @@ cases. Relevant references:
 - [Photutils circular curve of growth](https://photutils.readthedocs.io/en/stable/api/photutils.profiles.CurveOfGrowth.html)
 - [Photutils detection criteria](https://photutils.readthedocs.io/en/stable/api/photutils.detection.DAOStarFinder.html)
 - [ASTAP HFD implementation](https://github.com/han-k59/astap/blob/main/command-line_version/unit_command_line_general.pas)
+
+Preview orchestration stays in `preview.ts`. `bayer.ts` owns bilinear color
+reconstruction: complete interior neighborhoods use direct channel sums, while
+borders retain in-frame neighbor averaging. `display-stretch.ts` reuses exact
+quarter-step sensor values in a lookup table capped at 256 KiB, with the original
+asinh calculation for other values and larger ranges. Table construction yields
+in batches. `png.ts` owns lossless compression and PNG framing, including a
+byte-table CRC-32 and bounded checksum batches.
+These optimizations preserve the prior native and fitted image bytes; they do
+not change stretching, resolution or acquisition data. Equivalence tests cover
+all Bayer patterns and borders, and an independent bitwise checksum reference
+checks PNG framing across multiple batches.
