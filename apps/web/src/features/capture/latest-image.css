@@ -16,10 +16,13 @@
 .capture-image__empty p { color: var(--vela-text-muted); max-width: 30ch; font-size: 12px; line-height: 1.6; margin: 8px 0 0; }
 .capture-image > footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; padding: 12px 14px; color: var(--vela-text-muted); font-size: 11px; border-top: 1px solid var(--vela-line); }
 .capture-image > footer i { margin: 0 5px; font-style: normal; }
-.capture-image__error { margin: 0; padding: 12px 14px; font-size: 12px; line-height: 1.6; color: var(--vela-warning); border-bottom: 1px solid var(--vela-line); }
+.capture-image__error, .capture-image__retention { margin: 0; padding: 12px 14px; font-size: 12px; line-height: 1.6; color: var(--vela-warning); border-bottom: 1px solid var(--vela-line); }
+.capture-image__retention:not([data-failed]) { color: var(--vela-text-muted); }
 
 .capture-image__statistics { padding: 12px 14px; border-top: 1px solid var(--vela-line); }
 .capture-image__statistics dl { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 12px; margin: 0; }
 .capture-image__statistics dt { font-size: 11px; color: var(--vela-text-muted); margin-bottom: 5px; }
 .capture-image__statistics dd { margin: 0; font-size: 14px; font-weight: 550; font-variant-numeric: tabular-nums; }
 .capture-image__statistics p { margin: 10px 0 0; font-size: 11px; color: var(--vela-text-muted); }
+
+.capture-image__actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }

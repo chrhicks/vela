@@ -6,6 +6,7 @@ import type { RigCatalog } from '../rig/catalog.js'
 import type { RigOperations } from '../rig/operations.js'
 import { inspectRigDetail, type RigDetailOptions } from '../rig/detail.js'
 import { CaptureStoppedError, createCaptureController, type CaptureCamera } from './controller.js'
+import { createMemorySavedImageStore, type SavedImageStore } from '../saved-images/store.js'
 
 export interface CaptureSettings {
   endpoint: string
@@ -14,6 +15,7 @@ export interface CaptureSettings {
 }
 
 interface CaptureRouteOptions {
+  savedImages?: SavedImageStore
   createCamera?: (settings: CaptureSettings) => CaptureCamera
   createInspector?: RigDetailOptions['createInspector']
 }
@@ -39,7 +41,7 @@ export function registerCapture(
   app: FastifyInstance,
   catalog: RigCatalog,
   operations: RigOperations,
-  { createCamera = configuredCamera, createInspector }: CaptureRouteOptions = {},
+  { createCamera = configuredCamera, createInspector, savedImages = createMemorySavedImageStore() }: CaptureRouteOptions = {},
 ) {
   const controllers = new Map<string, ReturnType<typeof createCaptureController>>()
 
@@ -52,10 +54,11 @@ export function registerCapture(
   async function rigView(rigId: string): Promise<CaptureView | undefined> {
     const rig = await catalog.get(rigId)
     if (!rig) return undefined
-    const current = (): CaptureView => controllers.get(rigId)?.snapshot() ?? {
+    const savedImageCount = await savedImages.count(rigId).catch(() => null)
+    const current = (): CaptureView => ({ ...(controllers.get(rigId)?.snapshot() ?? {
       rigId, rigName: rig.name, camera: null, enabled: false, unavailableReason: null,
-      phase: 'idle', active: false, repeat: true, completedCount: 0, exposureSeconds: 2, elapsedSeconds: 0, error: null, latestImage: null,
-    }
+      phase: 'idle', active: false, repeat: true, saveFrames: false, completedCount: 0, exposureSeconds: 2, elapsedSeconds: 0, error: null, latestImage: null,
+    }), savedImageCount })
     const unavailable = (reason: string): CaptureView => ({ ...current(), rigName: rig.name, enabled: false, unavailableReason: reason })
     const target = cameraSettings(rig)
     if (!target) return unavailable('Choose an imaging camera on Observe before taking an exposure.')
@@ -87,10 +90,11 @@ export function registerCapture(
   app.post<{ Params: { rigId: string } }>('/api/rigs/:rigId/capture/start', async (request, reply) => {
     const body = request.body
     if (!request.headers['content-type']?.startsWith('application/json') || !isObject(body)
-      || Object.keys(body).some(key => key !== 'exposureSeconds' && key !== 'repeat')
+      || Object.keys(body).some(key => key !== 'exposureSeconds' && key !== 'repeat' && key !== 'saveFrames')
+      || ('saveFrames' in body && typeof body.saveFrames !== 'boolean')
       || ('repeat' in body && typeof body.repeat !== 'boolean') || typeof body.exposureSeconds !== 'number'
       || !Number.isFinite(body.exposureSeconds) || body.exposureSeconds < 0.1 || body.exposureSeconds > 600) {
-      return reply.code(400).send({ error: 'Expected exposureSeconds between 0.1 and 600 and an optional boolean repeat.' })
+      return reply.code(400).send({ error: 'Expected exposureSeconds between 0.1 and 600 and optional boolean repeat and saveFrames.' })
     }
     const release = operations.acquire(request.params.rigId, 'capture')
     if (!release) return reply.code(409).send({ error: 'Another Rig operation is in progress.' })
@@ -105,12 +109,12 @@ export function registerCapture(
       const settings = { ...target, expectedCameraName: view.camera.name }
       let controller = controllers.get(view.rigId)
       if (!controller) {
-        controller = createCaptureController({ rigId: view.rigId, rigName: view.rigName })
+        controller = createCaptureController({ rigId: view.rigId, rigName: view.rigName }, Date.now, savedImages)
         controllers.set(view.rigId, controller)
       }
-      const result = await controller.start(body.exposureSeconds, createCamera(settings), view.camera.name, release, body.repeat === true)
+      const result = await controller.start(body.exposureSeconds, createCamera(settings), view.camera.name, release, body.repeat === true, body.saveFrames === true)
       started = true
-      return result
+      return { ...result, savedImageCount: view.savedImageCount }
     } catch (error) {
       return reply.code(409).send({ error: error instanceof Error ? error.message : 'Could not start exposure' })
     } finally {
@@ -131,16 +135,33 @@ export function registerCapture(
 
   app.get<{ Params: { rigId: string, imageId: string } }>('/api/rigs/:rigId/capture/images/:imageId', async (request, reply) => {
     const rig = await catalog.get(request.params.rigId)
-    const image = rig ? controllers.get(rig.id)?.image(request.params.imageId) : undefined
+    const image = rig ? controllers.get(rig.id)?.image(request.params.imageId) ?? await savedImages.file(rig.id, request.params.imageId, 'native') : undefined
     if (!image) return reply.code(404).send({ error: 'Frame no longer available' })
     return reply.type('image/png').header('cache-control', 'private, max-age=3600, immutable').send(image)
   })
 
   app.get<{ Params: { rigId: string, imageId: string } }>('/api/rigs/:rigId/capture/images/:imageId/fit', async (request, reply) => {
     const rig = await catalog.get(request.params.rigId)
-    const image = rig ? controllers.get(rig.id)?.fitImage(request.params.imageId) : undefined
+    const image = rig ? controllers.get(rig.id)?.fitImage(request.params.imageId) ?? await savedImages.file(rig.id, request.params.imageId, 'fit') : undefined
     if (!image) return reply.code(404).send({ error: 'Frame no longer available' })
     return reply.type('image/png').header('cache-control', 'private, max-age=3600, immutable').send(image)
+  })
+
+  app.post<{ Params: { rigId: string, imageId: string } }>('/api/rigs/:rigId/capture/images/:imageId/keep', async (request, reply) => {
+    if (!request.headers['content-type']?.startsWith('application/json') || !isObject(request.body) || Object.keys(request.body).length !== 0) {
+      return reply.code(400).send({ error: 'Expected an empty JSON object' })
+    }
+    const { rigId, imageId } = request.params
+    if (!await catalog.get(rigId)) return reply.code(404).send({ error: 'Rig not found' })
+    try {
+      const image = controllers.has(rigId)
+        ? await controllers.get(rigId)!.keep(imageId)
+        : await savedImages.get(rigId, imageId)
+      return image ?? reply.code(410).send({ error: 'This frame is no longer available to save. Keep a more recent image, or enable Save frames before your next run.' })
+    } catch (error) {
+      request.log.error(error, 'Could not retain capture image')
+      return reply.code(503).send({ error: 'Image could not be saved. Check storage and try again.' })
+    }
   })
 
   app.addHook('onClose', async () => { await Promise.all([...controllers.values()].map(controller => controller.stop())) })

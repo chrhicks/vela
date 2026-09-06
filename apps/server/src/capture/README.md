@@ -3,7 +3,8 @@
 Capture owns one server-side capture run and its most recent image. A run takes
 one exposure or repeats the requested duration until stopped. Browser requests
 start the work and read its projection; disconnecting the browser does not stop
-acquisition. A server restart loses the operation and in-memory previews.
+acquisition. A server restart loses the operation and in-memory previews;
+explicitly saved images remain available through the saved-images boundary.
 
 The imaging-camera setup API remembers an explicitly selected camera in the
 Rig catalog by stable provider ID and its reported camera name. An inventory
@@ -28,7 +29,11 @@ analysis never discards the acquired image; see [image processing](../imaging/RE
 for measurement limits. Later pending, failed or stopped exposures retain that image and its
 metadata. The run count increments only when an image is published and resets
 on each start. Any acquisition or preview failure ends the run without replay. Preview stretching preserves native dimensions for 100% inspection;
-only the latest three image pairs remain in memory. This is not an artifact archive.
+only the latest three image pairs and their temporary original FITS buffers remain
+in memory. Saving releases the temporary original buffer after the archive confirms
+the write. This bounded cache lets Keep this image target the displayed frame when
+browser image loading trails the latest acquisition. An expired unsaved frame
+returns an explicit unavailable result; it never saves a different frame instead.
 
 Unbinned Bayer frames are bilinearly debayered at native dimensions. A shared
 asinh display stretch uses sampled black/white points across sensor phases;
@@ -46,11 +51,17 @@ the actual completed image is published. Stop during readout or preview preparat
 prevents another exposure; it waits for that acquisition and preview to settle. Stop and image retrieval do not depend
 on the current camera being ready for another exposure.
 
-The HTTP boundary accepts exposureSeconds from 0.1 through 600 and an optional
-boolean repeat. Omitting repeat retains the single-exposure API behavior; the web
+The HTTP boundary accepts exposureSeconds from 0.1 through 600 and optional
+boolean repeat and saveFrames. Omitting repeat retains the single-exposure API behavior; the web
 interface explicitly requests repetition by default. Runs and counts are ephemeral,
-with no durable sequence or resumption after server restart. Physical camera
-settings and FITS retention are separate capabilities.
+with no durable sequence or resumption after server restart. saveFrames defaults
+to false. When enabled, each completed image is published and saved before another
+exposure starts. The saving phase remains active and keeps the Rig lease; Stop
+waits for that save to settle. A failed automatic save ends the run while retaining
+the latest unsaved frame for an explicit retry. Keep this image is an independent,
+idempotent artifact command and does not enable saving later frames. Neither
+browsing saved images nor keeping an available frame requires a connected camera.
+See [saved images](../saved-images/README.md) for durable storage and FITS details.
 
 ## Local review
 
