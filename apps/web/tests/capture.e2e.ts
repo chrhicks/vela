@@ -337,3 +337,34 @@ test('saved collection opens a retained image and original downloads without cam
   await expect(page.getByRole('link', { name: 'Download preview' })).toHaveAttribute('href', saved.previewDownloadUrl)
   expect(deviceReads).toBe(0)
 })
+
+test('keeps a manual save outcome and retry attached to its image after newer pixels load', async ({ page }) => {
+  let current = { ...idle, active: true, phase: 'exposing', latestImage: firstImage }
+  const requestedIds: string[] = []
+  let finish!: () => void
+  const pending = new Promise<void>(resolve => { finish = resolve })
+  const saved = { ...firstImage, saved: true, rigId: 'rig-1', savedAt: firstImage.receivedAt,
+    imageUrl: '/api/rigs/rig-1/saved-images/frame-1/preview', fitsUrl: '/api/rigs/rig-1/saved-images/frame-1/fits',
+    previewDownloadUrl: '/api/rigs/rig-1/saved-images/frame-1/download-preview' }
+  await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, current))
+  await page.route('**/api/rigs/rig-1/capture/images/*', route => route.fulfill({ contentType: 'image/png', body: preview }))
+  await page.route('**/api/rigs/rig-1/capture/images/*/keep', async route => {
+    requestedIds.push(route.request().url().split('/').at(-2)!)
+    if (requestedIds.length === 1) {
+      await pending
+      await respond(route, {}, 503)
+    } else await respond(route, saved)
+  })
+  await page.goto('/rigs/rig-1/observe/capture')
+  await page.getByRole('button', { name: 'Keep this image' }).click()
+  await expect.poll(() => requestedIds.length).toBe(1)
+  current = { ...current, latestImage: { ...firstImage, id: 'frame-2', imageUrl: '/api/rigs/rig-1/capture/images/frame-2' } }
+  await expect(page.getByRole('region', { name: 'Latest image' }).getByRole('img')).toHaveAttribute('src', current.latestImage.imageUrl)
+  await expect(page.getByText('Saving image from', { exact: false })).toBeVisible()
+  finish()
+  await expect(page.getByText('Saving could not be confirmed.', { exact: false })).toBeVisible()
+  await page.getByRole('button', { name: 'Retry saving image' }).click()
+  await expect.poll(() => requestedIds).toEqual(['frame-1', 'frame-1'])
+  await expect(page.getByText(/Image from .+ saved\./)).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Keep this image' })).toBeEnabled()
+})
