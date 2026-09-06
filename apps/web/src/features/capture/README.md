@@ -33,3 +33,19 @@ The latest-image statistics row uses the loaded image's dimensions and measured
 star count/HFR. Image pixels, exposure metadata and measurements commit together,
 including when a newer image fails to load or intermediate arrivals are skipped.
 Zero measured stars and unavailable analysis have distinct presentations.
+
+Save frames is an explicit per-run option, off on a new controller and restored
+from the active server projection. Keep this image targets the image whose pixels
+have actually loaded. Its idempotent storage request has separate pending/error
+state, so it never prevents stopping an exposure or claims a camera command failed.
+The immutable loaded metadata is supplemented by confirmed save responses and the
+matching current projection's saved flag.
+
+Saved images are available at the per-rig Observe/saved-images route independently
+of camera readiness. The dated collection and detail page validate retained-image
+metadata and exact same-origin download resources. They use the approved workshop
+layout with real preview URLs and native download links for FITS and preview PNG.
+
+Manual-save feedback is owned by the image viewer rather than a keyed frame
+button. A new exposure may replace displayed pixels while an earlier save is
+pending; its outcome and explicit retry stay associated with the selected image.

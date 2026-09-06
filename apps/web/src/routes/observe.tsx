@@ -18,9 +18,14 @@ export function Observe() {
 function ObservationPage({ rigId }: { rigId: string }) {
   const observation = useObservation(rigId)
   const heading = useRef<HTMLHeadingElement>(null)
+  const readiness = useRef<HTMLDetailsElement>(null)
+  const readinessSummary = useRef<HTMLElement>(null)
   const { view, result, connecting, refreshing, interrupted, commandUnconfirmed, completedCommands } = observation
   useEffect(() => {
-    if (completedCommands > 0) heading.current?.focus()
+    if (completedCommands > 0) {
+      const resultTarget = readiness.current?.open ? heading.current : readinessSummary.current
+      resultTarget?.focus()
+    }
   }, [completedCommands])
 
   const back = <Link className="vela-rig-page__back" to={`/rigs/${encodeURIComponent(rigId)}`}>← Rig details</Link>
@@ -46,8 +51,8 @@ function ObservationPage({ rigId }: { rigId: string }) {
       <Badge marker={<i />} tone={uncertain ? 'warning' : presentation.tone}>{uncertain ? 'Confirmation needed' : presentation.badge}</Badge>
     </header>
     <p className="vela-capture-intro">{interrupted ? 'Waiting for rig updates. The information shown is last known.' : view.connectionPreparation.state === 'complete' ? 'Connection preparation is complete. What would you like to do?' : 'Check your rig’s connections, then choose an activity.'}</p>
-    <details className="capture-page__rig vela-capture-rig" open={busy || uncertain || interrupted || view.connectionPreparation.state !== 'complete' ? true : undefined}>
-      <summary><span><i data-offline={interrupted || undefined} />{title}</span><span>Device details</span></summary>
+    <details ref={readiness} className="capture-page__rig vela-capture-rig" open={busy || uncertain || interrupted || view.connectionPreparation.state !== 'complete' ? true : undefined}>
+      <summary ref={readinessSummary}><span><i data-offline={interrupted || undefined} />{title}</span><span>Device details</span></summary>
     <div className="vela-observe-section-heading">
       <div><small>Preparation</small><h2>Rig readiness</h2></div>
       <span>{interrupted || busy ? 'Last received' : 'Checked'} <time dateTime={rig.refreshedAt}>{new Date(rig.refreshedAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</time></span>

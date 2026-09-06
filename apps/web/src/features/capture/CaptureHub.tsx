@@ -24,7 +24,7 @@ export function CaptureHub({ rigId }: { rigId: string }) {
       <div className="vela-capture-entry__body">
         <h2>Capture</h2><p>Capture images and inspect the latest exposure.</p>
         <div className="vela-capture-entry__status" role="status">
-          {offline ? 'Capture updates interrupted · last known state' : view?.active ? view.phase === 'stopping' ? 'Stopping capture…' : view.phase === 'reading' ? 'Receiving image…' : 'Exposing…' : view?.phase === 'failed' ? 'Exposure failed' : view?.phase === 'stopped' ? 'Capture stopped' : !view ? 'Loading capture state…' : !view.enabled ? view.unavailableReason : !image ? loading ? 'Loading latest image…' : 'No image captured yet' : null}
+          {offline ? 'Capture updates interrupted · last known state' : view?.active ? view.phase === 'stopping' ? 'Stopping capture…' : view.phase === 'saving' ? 'Saving image…' : view.phase === 'reading' ? 'Receiving image…' : 'Exposing…' : view?.phase === 'failed' ? 'Capture stopped' : view?.phase === 'stopped' ? 'Capture stopped' : !view ? 'Loading capture state…' : !view.enabled ? view.unavailableReason : !image ? loading ? 'Loading latest image…' : 'No image captured yet' : null}
           {view?.active && <span>{view.completedCount} completed{offline ? ' · last known' : ''}</span>}
           {image && <span>{image.exposureSeconds} s · {age} s ago</span>}
           {failed && <span>The latest image could not be loaded.</span>}
@@ -32,6 +32,7 @@ export function CaptureHub({ rigId }: { rigId: string }) {
         <Link className="vela-button" data-tone="accent" data-size="large" to={`${base}/capture`}>{view?.active ? 'View capture' : 'Open capture'} →</Link>
       </div>
     </Panel>
+    <Panel className="vela-capture-entry"><div className="vela-capture-entry__body"><h2>Saved images</h2><p>Your retained frames, ready to browse and take into your processing tools.</p><div className="vela-capture-entry__status">{view?.savedImageCount != null ? `${view.savedImageCount} images · ` : ''}Original FITS + preview{offline ? ' · Last known count' : ''}</div><Link className="vela-button" data-tone="neutral" data-size="medium" to={`${base}/saved-images`}>Browse saved images →</Link></div></Panel>
     <Panel className="vela-capture-alignment">
       <div className="vela-capture-alignment__mark" aria-hidden="true">◎</div>
       <h2>Polar alignment</h2><p>Measure your alignment and adjust the mount when you need to.</p>
