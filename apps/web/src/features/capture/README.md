@@ -45,3 +45,7 @@ Saved images are available at the per-rig Observe/saved-images route independent
 of camera readiness. The dated collection and detail page validate retained-image
 metadata and exact same-origin download resources. They use the approved workshop
 layout with real preview URLs and native download links for FITS and preview PNG.
+
+Manual-save feedback is owned by the image viewer rather than a keyed frame
+button. A new exposure may replace displayed pixels while an earlier save is
+pending; its outcome and explicit retry stay associated with the selected image.
