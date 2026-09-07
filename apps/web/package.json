@@ -13,6 +13,7 @@
   "dependencies": {
     "@vela/model": "workspace:*",
     "@vela/ui": "workspace:*",
+    "aladin-lite": "3.8.2",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router": "^8.3.0"

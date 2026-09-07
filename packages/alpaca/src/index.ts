@@ -31,3 +31,5 @@ export type {
 } from './model.js'
 export { createAlpacaAcquisition, AlpacaCaptureStoppedError } from './acquisition.js'
 export type { AlpacaAcquisition, AlpacaAcquisitionOptions, AlpacaCaptureOptions, AlpacaFrame, AlpacaFrameColor, AlpacaPointing } from './acquisition.js'
+export { createAlpacaFraming, AlpacaFramingStoppedError } from './framing.js'
+export type { AlpacaFraming, AlpacaFramingOptions, AlpacaCameraGeometry, AlpacaTelescopeStatus, AlpacaSlewOptions, AlpacaCoordinateSystem } from './framing.js'

@@ -60,8 +60,15 @@ it('cancels a running solver and removes its scratch directory after process ter
 
 it('bounds a hung executable and rejects bad frames before spawning it', async () => {
   const { solver, marker } = await fixture('setInterval(() => {}, 1000)', 100)
-  await expect(solver.solve({ ...frame, pixels: [1] }, hint, new AbortController().signal)).rejects.toThrow('mono image')
+  await expect(solver.solve({ ...frame, pixels: [1] }, hint, new AbortController().signal)).rejects.toThrow('image dimensions')
   await expect(access(marker)).rejects.toThrow()
   await expect(solver.solve(frame, hint, new AbortController().signal)).rejects.toThrow('timed out')
   await expect(access(dirname(await readFile(marker, 'utf8')))).rejects.toThrow()
+})
+
+it('preserves negative acquisition samples and tells ASTAP to check a Bayer exposure', async () => {
+  const { solver } = await fixture(`const image = fs.readFileSync(path)
+if (image.readInt32BE(2880) !== -40 || !image.subarray(0,2880).toString().includes("'GBRG'") || !process.argv.includes('-check')) process.exit(16)
+fs.writeFileSync(path.replace('.fits','.ini'), ${JSON.stringify(ini)})`)
+  await expect(solver.solve({ ...frame, pixels: [-40, 65535, 1, 2], color: { kind: 'bayer', pattern: 'gbrg' } }, hint, new AbortController().signal)).resolves.toMatchObject({ status: 'solved' })
 })

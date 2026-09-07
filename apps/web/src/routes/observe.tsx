@@ -89,6 +89,7 @@ function ObservationPage({ rigId }: { rigId: string }) {
     </div>
     </details>
     <ImagingCamera rigId={rigId} interrupted={interrupted} connecting={busy} />
+    <Panel title="Targets & framing" description="Explore the sky, compose your image, and check where the camera lands."><Link className="vela-button" to={`/rigs/${encodeURIComponent(rigId)}/observe/targets`}>Choose a target →</Link></Panel>
     <CaptureHub rigId={rigId} />
   </section>
 }
