@@ -12,12 +12,15 @@ type Props = Record<string, string | number | boolean>
 const clamp = (value: number) => Math.max(27, Math.min(73, value))
 const position = (value: unknown) => clamp(Number.isFinite(Number(value)) ? Number(value) : 50)
 
-function SkyPath({ peak, culmination, compact = false }: { peak: number, culmination: number, compact?: boolean }) {
+function SkyPath({ peak, culmination, sampleTime, compact = false }: { peak: number, culmination: number, sampleTime: string, compact?: boolean }) {
   const top = 106 - peak * 1.15
-  return <svg className="vela-target-path" viewBox="0 0 320 140" role="img" aria-label={`Illustrative sky path, highest altitude ${peak} degrees. Obstructions unknown.`}>
+  const hoursAfterStart = (Number(sampleTime.slice(0, 2)) + 4) % 24
+  const nowX = 28 + hoursAfterStart / 8 * 272
+  return <svg className="vela-target-path" viewBox="0 0 320 140" role="img" aria-label={`Illustrative sky path, highest altitude ${peak} degrees. Sample current time ${sampleTime}. Obstructions unknown.`}>
     {!compact && <><path className="vela-target-gridline" d="M28 32H300 M28 67H300" /><text x="0" y="35">60°</text><text x="0" y="70">30°</text></>}
     <path className="vela-target-horizon" d="M28 106H300" />
     <path className="vela-target-arc" d={`M28 102 C${culmination - 45} 102 ${culmination - 45} ${top} ${culmination} ${top} S${culmination + 65} 102 300 102`} />
+    <g className="vela-target-time"><title>Sample current time: {sampleTime}</title><line x1={nowX} x2={nowX} y1="24" y2="106" /><text x={nowX} y="17" textAnchor="middle">Now</text></g>
     <text x="28" y="129">20:00</text><text x="149" y="129">00:00</text><text x="270" y="129">04:00</text>
     {!compact && <text x="235" y="100">Horizon</text>}
   </svg>
@@ -46,6 +49,7 @@ function TargetFramingPreview({ props, onPropsChange }: { props: Props, onPropsC
   const x = position(values.frameX)
   const y = position(values.frameY)
   const query = String(values.query ?? '')
+  const sampleTime = ['21:00', '23:00', '01:00', '03:00'].includes(String(values.sampleTime)) ? String(values.sampleTime) : '23:00'
   const matches = targets.filter(item => `${item.name} ${item.catalog} ${item.kind}`.toLowerCase().replace(/\s/g, '').includes(query.toLowerCase().replace(/\s/g, '')))
   const [running, setRunning] = useState(false)
   const heading = useRef<HTMLHeadingElement>(null)
@@ -85,7 +89,7 @@ function TargetFramingPreview({ props, onPropsChange }: { props: Props, onPropsC
         <div className="vela-target-grid">
           {matches.map(item => <button key={item.id} className="vela-target-card" onClick={() => update({ target: item.id, screen: 'compose', phase: 'idle', frameX: 50, frameY: 50 })}>
             <div className="vela-target-thumbnail"><ReferenceImage source={item.image} name={item.name} unavailable={Boolean(values.imageUnavailable)} /><span>{item.kind}</span></div>
-            <div className="vela-target-card-copy"><span>{item.catalog}</span><h2>{item.name}</h2><p>{item.description}</p><SkyPath peak={item.peak} culmination={item.culmination} compact /><div className="vela-target-card-bottom"><span>{item.window}</span><strong>Frame it <span aria-hidden="true">→</span></strong></div></div>
+            <div className="vela-target-card-copy"><span>{item.catalog}</span><h2>{item.name}</h2><p>{item.description}</p><SkyPath peak={item.peak} culmination={item.culmination} sampleTime={sampleTime} compact /><div className="vela-target-card-bottom"><span>{item.window}</span><strong>Frame it <span aria-hidden="true">→</span></strong></div></div>
           </button>)}
         </div>
         {matches.length === 0 && <Panel><div className="vela-target-empty"><h2>No matching sample targets</h2><p>Try M13, Andromeda, or nebula. This sketch contains a small reference collection.</p><Button onClick={() => update({ query: '' })}>Clear search</Button></div></Panel>}
@@ -111,8 +115,8 @@ function TargetFramingPreview({ props, onPropsChange }: { props: Props, onPropsC
           </div>
         </section>
         <aside className="vela-target-sidebar">
-          <Panel title="Through the night" description="Illustrative sky · local time">
-            <SkyPath peak={target.peak} culmination={target.culmination} />
+          <Panel title="Through the night" description={`Sample night · now ${sampleTime}`}>
+            <SkyPath peak={target.peak} culmination={target.culmination} sampleTime={sampleTime} />
             <div className="vela-target-sky-facts"><strong>{target.window}</strong><span>{target.peak}° highest altitude · sample values</span></div>
             <p className="vela-target-obstructions">Obstructions unknown</p>
           </Panel>
@@ -141,12 +145,13 @@ export const specimen: ComponentSpecimen = {
     screen: { type: 'select', label: 'View', options: ['browse', 'compose'] },
     target: { type: 'select', label: 'Target', options: targets.map(target => target.id) },
     query: { type: 'text', label: 'Search' },
+    sampleTime: { type: 'select', label: 'Sample current time', options: ['21:00', '23:00', '01:00', '03:00'] },
     phase: { type: 'select', label: 'Slew preview', options: ['idle', 'slewing', 'check', 'stopped', 'failed'] },
     frameX: { type: 'text', label: 'Frame horizontal position (%)' },
     frameY: { type: 'text', label: 'Frame vertical position (%)' },
     imageUnavailable: { type: 'boolean', label: 'Reference image unavailable' },
     failSlew: { type: 'boolean', label: 'Simulate unconfirmed slew' },
   },
-  defaultProps: { screen: 'browse', target: 'm13', query: '', phase: 'idle', frameX: 50, frameY: 50, imageUnavailable: false, failSlew: false },
+  defaultProps: { sampleTime: '23:00', screen: 'browse', target: 'm13', query: '', phase: 'idle', frameX: 50, frameY: 50, imageUnavailable: false, failSlew: false },
   render: (props, onPropsChange) => <TargetFramingPreview props={props} {...(onPropsChange ? { onPropsChange } : {})} />,
 }
