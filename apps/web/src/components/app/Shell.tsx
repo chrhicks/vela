@@ -1,9 +1,9 @@
-import { DEFAULT_PROFILE, resolveTheme, themeStyle } from '@vela/ui'
+import { VELA_CURRENT_PROFILE, resolveTheme, themeStyle } from '@vela/ui'
 import type { CSSProperties } from 'react'
 import { Link, Outlet, useLocation } from 'react-router'
 import { classes } from '../ui/utils'
 
-const theme = resolveTheme(DEFAULT_PROFILE)
+const theme = resolveTheme(VELA_CURRENT_PROFILE)
 
 export default function Shell() {
   const { pathname } = useLocation()
