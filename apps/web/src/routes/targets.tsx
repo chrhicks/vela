@@ -114,7 +114,7 @@ function TargetComposition({ rigId, targetId }: { rigId: string, targetId: strin
   }[view.phase]
   const exposure = Number(seconds), focal = Number(focalLength)
   return <>{back}
-    <header className="vela-target-heading"><div><p>{view?.rigName ?? 'Observe'} / Targets</p><h1 ref={heading} tabIndex={-1}>{target.name}</h1></div><Badge>{target.catalog}</Badge></header>
+    <header className="vela-target-heading"><div><p>{view?.rigName ?? 'Observe'} / Targets</p><div className="vela-target-identity"><h1 ref={heading} tabIndex={-1}>{target.name}</h1><Badge>{target.catalog}</Badge></div></div></header>
     <div className="vela-target-layout">
       <section className="vela-target-composition" aria-label="Composition"><header><strong>{checked ? 'Check the framing' : 'Compose your image'}</strong><span>{actual ? 'Solid: desired · dashed: last solved exposure' : 'Drag the frame to reposition'}</span></header>
         <SurveyField target={target} desired={position} camera={view?.camera ?? null} actual={actual} locked={locked} onChange={setDesired} />

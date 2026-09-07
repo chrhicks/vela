@@ -7,6 +7,7 @@
 .vela-target-heading p { margin: 0 0 8px; color: var(--vela-text-muted); font-size: .92em; }
 .vela-target-heading h1 { margin: 0; font-size: 2em; font-weight: 550; line-height: 1.2; }
 .vela-target-heading h1:focus { outline: none; }
+.vela-target-identity { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .vela-target-intro { color: var(--vela-text-muted); line-height: 1.6; margin: 0 0 24px; }
 .vela-target-section-heading { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: baseline; margin: 26px 0 14px; }
 .vela-target-section-heading h2 { margin: 0; font-weight: 550; font-size: 1.15em; }
