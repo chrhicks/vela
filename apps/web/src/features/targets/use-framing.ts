@@ -13,15 +13,23 @@ export function useFraming(rigId: string) {
   const request = useRef<AbortController | null>(null)
   const lastView = useRef<FramingView | null>(null)
   const writing = useRef(false)
+  const explicitRead = useRef(false)
   const generation = useRef(0)
   const alive = useRef(false)
 
   const read = useCallback(async (explicit = false) => {
-    if (request.current || !alive.current) return
+    if (!alive.current || writing.current || explicitRead.current || (request.current && !explicit)) return
+    // A deliberate check supersedes a quiet poll without exposing polling as
+    // button activity or allowing the cancelled response to overwrite it.
+    if (request.current) {
+      request.current.abort()
+      generation.current++
+    }
     const controller = new AbortController()
     const current = generation.current
     request.current = controller
-    setRefreshing(true)
+    explicitRead.current = explicit
+    setRefreshing(explicit)
     try {
       const next = await api<unknown>(`web/rigs/${encodeURIComponent(rigId)}/framing`, {
         signal: AbortSignal.any([controller.signal, AbortSignal.timeout(5000)]),
@@ -51,6 +59,7 @@ export function useFraming(rigId: string) {
     } finally {
       if (request.current === controller) {
         request.current = null
+        explicitRead.current = false
         if (alive.current && current === generation.current) setRefreshing(false)
       }
     }
@@ -73,6 +82,7 @@ export function useFraming(rigId: string) {
       request.current?.abort()
       request.current = null
       writing.current = false
+      explicitRead.current = false
     }
   }, [read])
 
@@ -92,6 +102,7 @@ export function useFraming(rigId: string) {
     request.current = controller
     const current = ++generation.current
     writing.current = true
+    explicitRead.current = false
     setRefreshing(false)
     setPending(true)
     setError(null)
