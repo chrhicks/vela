@@ -179,3 +179,33 @@ for (const failureSource of ['command', 'poll'] as const) {
     await expect(page.getByRole('alert').filter({ hasText: 'Telescope stop could not be confirmed' })).toBeVisible()
   })
 }
+
+test('quiet polling leaves Check rig state enabled and an explicit check supersedes a slow poll', async ({ page }) => {
+  let reads = 0
+  let armed = false
+  let releasePoll!: () => void
+  let releaseCheck!: () => void
+  const pollHeld = new Promise<void>(resolve => { releasePoll = resolve })
+  const checkHeld = new Promise<void>(resolve => { releaseCheck = resolve })
+  await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
+  await page.route('**/api/survey/**', route => route.abort())
+  await page.route('**/api/web/rigs/rig-1/framing', async route => {
+    const read = armed ? ++reads : 0
+    if (read === 1) await pollHeld
+    if (read === 2) await checkHeld
+    await respond(route, { ...idle, observedAt: new Date().toISOString() })
+  })
+  await page.goto('/rigs/rig-1/observe/targets/m31')
+  const check = page.getByRole('button', { name: 'Check rig state' })
+  await expect(page.getByRole('button', { name: 'Slew & check' })).toBeEnabled()
+  armed = true
+  await expect.poll(() => reads).toBe(1)
+  await expect(check).toBeEnabled()
+  await check.click()
+  await expect.poll(() => reads).toBe(2)
+  await expect(check).toBeDisabled()
+  releasePoll()
+  await expect(check).toBeDisabled()
+  releaseCheck()
+  await expect(check).toBeEnabled()
+})
