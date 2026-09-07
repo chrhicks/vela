@@ -9,6 +9,7 @@ export function SurveyField({ target, desired, camera, actual, locked, onChange 
   target: TargetPosition, desired: TargetPosition, camera: FramingView['camera'], actual: FramingView['actual'], locked: boolean, onChange: (position: TargetPosition) => void
 }) {
   const host = useRef<HTMLDivElement>(null)
+  const overlay = useRef<SVGSVGElement>(null)
   const viewer = useRef<Viewer | null>(null)
   const [ready, setReady] = useState(false)
   const [failed, setFailed] = useState(false)
@@ -59,6 +60,25 @@ export function SurveyField({ target, desired, camera, actual, locked, onChange 
     }
   }, [ready, camera?.fieldWidthDegrees])
 
+  useEffect(() => {
+    const element = overlay.current
+    const canvas = host.current?.querySelector('.aladin-catalogCanvas')
+    if (!ready || !element || !canvas) return
+    // The draggable footprint sits above Aladin's interaction canvas. Forward
+    // wheel input so its native zoom behavior is identical on both surfaces.
+    const zoom = (event: WheelEvent) => {
+      event.preventDefault()
+      event.stopPropagation()
+      canvas.dispatchEvent(new WheelEvent('wheel', {
+        bubbles: true, cancelable: true, deltaX: event.deltaX, deltaY: event.deltaY,
+        deltaZ: event.deltaZ, deltaMode: event.deltaMode, clientX: event.clientX, clientY: event.clientY,
+        ctrlKey: event.ctrlKey, shiftKey: event.shiftKey, altKey: event.altKey, metaKey: event.metaKey,
+      }))
+    }
+    element.addEventListener('wheel', zoom, { passive: false })
+    return () => element.removeEventListener('wheel', zoom)
+  }, [ready])
+
   const project = (points: TargetPosition[]) => {
     if (!ready || !viewer.current) return ''
     try {
@@ -85,7 +105,7 @@ export function SurveyField({ target, desired, camera, actual, locked, onChange 
     <div className="vela-target-field" data-disabled={locked}>
       <div className="vela-target-survey" ref={host} aria-label="Interactive DSS2 sky survey" />
       {!ready && <div className="vela-target-survey-message" role="status"><strong>{failed ? 'Reference survey unavailable' : 'Loading reference survey…'}</strong><p>{failed ? 'Your coordinates remain available. Check the survey connection to compose visually.' : 'DSS2 color sky survey'}</p>{failed && <Button onClick={() => setAttempt(a => a + 1)}>Retry survey</Button>}</div>}
-      {ready && <svg className="vela-target-overlay" aria-label="Calibrated camera footprint" role="img">
+      {ready && <svg ref={overlay} className="vela-target-overlay" aria-label="Calibrated camera footprint" role="img">
         {points && <path className="vela-target-shade" fillRule="evenodd" d={`M0 0H10000V10000H0Z M${points.split(" ").join(" L")}Z`} />}
         {points && <polygon className="vela-target-footprint" points={points} tabIndex={locked ? -1 : 0} role="slider" aria-label="Camera frame position" aria-valuetext={`RA ${desired.raDegrees.toFixed(4)}, Dec ${desired.decDegrees.toFixed(4)} degrees`} aria-disabled={locked}
           onPointerDown={event => {
