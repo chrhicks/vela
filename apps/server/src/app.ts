@@ -42,8 +42,12 @@ import { registerAlignment } from './alignment/routes.js'
 import type { AlignmentSettings } from './alignment/controller.js'
 import { createMemorySavedImageStore, type SavedImageStore } from './saved-images/store.js'
 import { registerSavedImages } from './saved-images/routes.js'
+import { registerTargets, type TargetOptions } from './targets/routes.js'
+import { createSurveyCache, registerSurvey, type SurveyCache } from './targets/survey.js'
 
 interface BuildAppOptions {
+  readonly targets?: TargetOptions
+  readonly surveyCache?: SurveyCache
   readonly savedImages?: SavedImageStore
   readonly alignment?: AlignmentSettings
   readonly alpacaDiscovery?: AlpacaDiscovery
@@ -63,6 +67,8 @@ interface AddRigRequest {
 }
 
 export function buildApp({
+  targets,
+  surveyCache,
   alignment,
   alpacaDiscovery = createAlpacaDiscovery(),
   createConnector = createRigDeviceConnector,
@@ -78,6 +84,8 @@ export function buildApp({
   registerCapture(app, rigCatalog, operations, { createInspector, savedImages })
   registerSavedImages(app, rigCatalog, savedImages)
   registerImagingCamera(app, rigCatalog, operations, { createInspector })
+  registerTargets(app, rigCatalog, operations, { ...targets, createInspector, now })
+  registerSurvey(app, surveyCache ?? createSurveyCache())
   const rigConnections = createRigConnectionCoordinator({
     catalog: rigCatalog,
     createConnector,

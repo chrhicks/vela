@@ -9,6 +9,7 @@ import { RigDetail } from './routes/rig-detail'
 import { Alignment } from './routes/alignment'
 import { Observe } from './routes/observe'
 import { SavedImages } from './routes/saved-images'
+import { Targets } from './routes/targets'
 import { Capture } from './routes/capture'
 import { Shell } from './components/app'
 import { HomeProvider } from './pages/HomeProvider'
@@ -21,6 +22,8 @@ const router = createBrowserRouter([
       { index: true, Component: () => <HomeProvider><Home /></HomeProvider> },
       { path: 'rigs/:rigId', Component: RigDetail },
       { path: 'rigs/:rigId/observe', Component: Observe },
+      { path: 'rigs/:rigId/observe/targets', Component: Targets },
+      { path: 'rigs/:rigId/observe/targets/:targetId', Component: Targets },
       { path: 'rigs/:rigId/observe/capture', Component: Capture },
       { path: 'rigs/:rigId/observe/saved-images', Component: SavedImages },
       { path: 'rigs/:rigId/observe/saved-images/:imageId', Component: SavedImages },

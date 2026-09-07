@@ -147,3 +147,39 @@ when cancellation precedes the exposure write, or after independent abort and
 idle confirmation succeed. Cleanup failures
 remain failures, allowing the server to distinguish stopped from unconfirmed
 physical state without inferring success from an aborted browser request.
+
+## Framing geometry and absolute slews
+
+`createAlpacaFraming({ baseUrl })` provides a separate camera-geometry and telescope
+capability; acquisition callers do not change. `cameraGeometry({ cameraId,
+expectedCameraName }, signal)` validates the connected camera's operational
+identity, physical sensor dimensions and pixel sizes, and current binning and
+subframe. Sensor dimensions and pixel microns are unbinned; `width`, `height`,
+`startX`, and `startY` are binned pixels. Contradictory subframes reject.
+
+`telescopeStatus(telescopeId, signal)` reports degrees with the driver's named
+coordinate system, tracking, slewing, park state, and observation time. Optional
+site latitude, east-positive longitude, and elevation are omitted only when the
+driver explicitly reports them unsupported. Unsupported frame metadata becomes
+`unknown`; ASCOM `equOther` remains `other`. Neither is treated as J2000.
+
+`setTracking(telescopeId, boolean, signal)` confirms the requested state by reading
+it, including after a lost setter response. `slew({ telescopeId,
+rightAscensionDegrees, declinationDegrees, coordinateSystem }, signal)` requires
+an explicit supported frame matching the driver. Frame conversion belongs to the
+consumer. The mount must be connected, unparked, idle, tracking, and capable of
+asynchronous slews before a single `SlewToCoordinatesAsync` write is issued.
+The boundary converts RA degrees to protocol hours and waits for confirmed
+`Slewing=false`, bounded by a 180-second default deadline. That confirms driver
+completion; it does not substitute for plate-solved pointing accuracy.
+
+A failed or cancelled slew independently sends `AbortSlew` and confirms stopping,
+with a cleanup deadline of at most 15 seconds. No command is blindly retried.
+A lost slew response remains an error even after stopping is confirmed.
+`AlpacaFramingStoppedError` identifies cancellation only after successful cleanup;
+an unconfirmed stop remains a failure. `abortTelescope(telescopeId)` provides the
+same independent stop without touching a camera. Factory options expose request,
+slew, and polling intervals for deterministic boundary tests.
+
+Protocol contracts are the [ASCOM telescope interface](https://ascom-standards.org/newdocs/telescope.html)
+and [ASCOM camera interface](https://ascom-standards.org/newdocs/camera.html).

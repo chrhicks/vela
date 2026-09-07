@@ -73,3 +73,10 @@ the server writes an image. CaptureImage.saved confirms retention of that image'
 original data and preview. SavedImage and SavedImagesView describe durable artifacts
 and their download resources separately from the ephemeral capture run. Neither
 contract represents a durable sequence or resumable execution.
+
+Target views carry fixed J2000 catalog positions, reference-image resources and
+server-calculated sky paths. Framing views expose the ephemeral slew/exposure/
+solve phase, requested center, camera field size and timestamped solved footprint.
+`checkCurrent` distinguishes a current check from a preserved older exposure;
+`canCenter` is the server's separate correction precondition. Neither contract
+contains a device protocol, coordinate conversion or durable observing plan.
