@@ -111,7 +111,7 @@ function TargetComposition({ rigId, targetId }: { rigId: string, targetId: strin
   const locked = !!view?.active || pending || checked
   const settingsLocked = locked || offline || commandUnconfirmed
   const actual = matching ? view?.actual ?? null : null
-  const status = offline ? 'Connection interrupted · last known state' : pending ? 'Sending command…' : !view ? 'Loading rig state…' : {
+  const status = offline ? 'Connection interrupted · last known state' : pending ? 'Sending command…' : !view ? 'Loading rig state…' : commandUnconfirmed && !view.active ? 'Check rig state before continuing' : {
     idle: 'Ready to frame', slewing: 'Slewing to composition', exposing: 'Taking test exposure', solving: 'Solving test exposure', checked: checked ? 'Framing checked' : 'Composition not checked', stopping: 'Stopping framing', stopped: 'Framing stopped', failed: 'Framing not confirmed',
   }[view.phase]
   const exposure = Number(seconds), focal = Number(focalLength)
