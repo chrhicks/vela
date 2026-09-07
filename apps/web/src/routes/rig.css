@@ -31,7 +31,7 @@
 .vela-rig-home__heading small,
 .vela-rig-section-heading small {
   color: var(--vela-accent);
-  font-size: .64rem;
+  font-size: .64em;
   font-weight: 780;
   letter-spacing: .13em;
 }
@@ -39,7 +39,7 @@
 .vela-rig-hero h1,
 .vela-rig-home__heading h1 {
   margin: calc(var(--vela-space) * 1.25) 0 0;
-  font-size: clamp(1.85rem, 5vw, 2.7rem);
+  font-size: clamp(1.85em, 5vw, 2.7em);
   font-weight: 740;
   letter-spacing: -.04em;
 }
@@ -48,7 +48,7 @@
 .vela-rig-home__heading p {
   margin: calc(var(--vela-space) * 1.5) 0 0;
   color: var(--vela-text-muted);
-  font-size: .8rem;
+  font-size: .8em;
 }
 
 .vela-rig-hero__status {
@@ -60,7 +60,7 @@
 }
 
 .vela-rig-hero__status > .vela-badge { grid-column: 1 / -1; }
-.vela-rig-hero__status > span { color: var(--vela-text-muted); font-size: .68rem; }
+.vela-rig-hero__status > span { color: var(--vela-text-muted); font-size: .68em; }
 .vela-rig-refresh svg { width: 1rem; height: 1rem; }
 .vela-rig-refresh[data-refreshing="true"] svg { animation: vela-rig-refresh-spin 700ms linear infinite; }
 
@@ -82,7 +82,7 @@
 .vela-rig-notice::before {
   color: var(--vela-warning);
   content: "●";
-  font-size: .62rem;
+  font-size: .62em;
   transform: translateY(.35em);
 }
 
@@ -92,11 +92,11 @@
 }
 
 .vela-rig-notice[data-tone="danger"]::before { color: var(--vela-danger); }
-.vela-rig-notice strong { font-size: .8rem; }
+.vela-rig-notice strong { font-size: .8em; }
 .vela-rig-notice span {
   grid-column: 2;
   color: var(--vela-text-muted);
-  font-size: .72rem;
+  font-size: .72em;
   line-height: 1.5;
 }
 
@@ -110,11 +110,11 @@
 
 .vela-rig-section-heading h2 {
   margin: calc(var(--vela-space) * .75) 0 0;
-  font-size: 1.15rem;
+  font-size: 1.15em;
   letter-spacing: -.02em;
 }
 
-.vela-rig-section-heading > span { color: var(--vela-text-muted); font-size: .66rem; }
+.vela-rig-section-heading > span { color: var(--vela-text-muted); font-size: .66em; }
 .vela-rig-devices__empty {
   margin: 0;
   padding: calc(var(--vela-space) * 6);
@@ -150,8 +150,8 @@
   white-space: nowrap;
 }
 
-.vela-rig-device .vela-panel__title { font-size: .96rem; }
-.vela-rig-device .vela-panel__description { font-size: .7rem; }
+.vela-rig-device .vela-panel__title { font-size: .96em; }
+.vela-rig-device .vela-panel__description { font-size: .7em; }
 .vela-rig-device .vela-panel__body { gap: calc(var(--vela-space) * 3); }
 .vela-rig-device__state {
   display: grid;
@@ -183,16 +183,16 @@
 .vela-rig-device__state p { display: grid; gap: calc(var(--vela-space) * .45); margin: 0; }
 .vela-rig-device__state small {
   color: var(--vela-text-muted);
-  font-size: .57rem;
+  font-size: .57em;
   font-weight: 720;
   letter-spacing: .1em;
 }
 
-.vela-rig-device__state strong { font-size: .9rem; }
+.vela-rig-device__state strong { font-size: .9em; }
 .vela-rig-device__state p > span {
   overflow: hidden;
   color: var(--vela-text-muted);
-  font-size: .66rem;
+  font-size: .66em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -219,7 +219,7 @@
 .vela-rig-device__metrics dt {
   overflow: hidden;
   color: var(--vela-text-muted);
-  font-size: .59rem;
+  font-size: .59em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -227,7 +227,7 @@
 .vela-rig-device__metrics dd {
   overflow: hidden;
   margin: 0;
-  font-size: .78rem;
+  font-size: .78em;
   font-weight: 670;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -246,8 +246,8 @@
   background: var(--vela-surface);
 }
 
-.vela-rig-device__channels small { color: var(--vela-text-muted); font-size: .58rem; }
-.vela-rig-device__channels strong { font-size: .62rem; }
+.vela-rig-device__channels small { color: var(--vela-text-muted); font-size: .58em; }
+.vela-rig-device__channels strong { font-size: .62em; }
 .vela-rig-device__channels em { color: var(--vela-text-muted); font-size: .56rem; font-style: normal; }
 .vela-rig-device__empty {
   margin: 0;
@@ -255,7 +255,7 @@
   border: var(--vela-border-width) dashed var(--vela-line);
   border-radius: calc(var(--vela-radius) * .7);
   color: var(--vela-text-muted);
-  font-size: .68rem;
+  font-size: .68em;
   line-height: 1.45;
   text-align: center;
 }
@@ -302,11 +302,11 @@
   gap: calc(var(--vela-space) * 2);
 }
 
-.vela-rig-details__summary strong { font-size: .76rem; }
+.vela-rig-details__summary strong { font-size: .76em; }
 .vela-rig-details__summary small {
   overflow: hidden;
   color: var(--vela-text-muted);
-  font-size: .65rem;
+  font-size: .65em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -329,8 +329,8 @@
 }
 
 .vela-rig-details__body > div { display: grid; gap: calc(var(--vela-space) * .65); }
-.vela-rig-details__body dt { color: var(--vela-text-muted); font-size: .62rem; }
-.vela-rig-details__body dd { margin: 0; font-size: .72rem; font-weight: 610; }
+.vela-rig-details__body dt { color: var(--vela-text-muted); font-size: .62em; }
+.vela-rig-details__body dd { margin: 0; font-size: .72em; font-weight: 610; }
 .vela-rig-management {
   display: flex;
   align-items: center;
@@ -341,11 +341,11 @@
   border-top: var(--vela-border-width) solid var(--vela-line);
 }
 
-.vela-rig-management strong { font-size: .76rem; }
+.vela-rig-management strong { font-size: .76em; }
 .vela-rig-management p {
   margin: calc(var(--vela-space) * .8) 0 0;
   color: var(--vela-text-muted);
-  font-size: .66rem;
+  font-size: .66em;
   line-height: 1.45;
 }
 
@@ -361,7 +361,7 @@
   background: var(--vela-danger) !important;
 }
 
-.vela-rig-forget-copy { margin: 0; color: var(--vela-text-muted); font-size: .84rem; line-height: 1.5; }
+.vela-rig-forget-copy { margin: 0; color: var(--vela-text-muted); font-size: .84em; line-height: 1.5; }
 .vela-rig-forget-error { color: var(--vela-danger); font-size: .78rem; }
 .vela-rig-home__heading {
   display: flex;
@@ -393,13 +393,13 @@
   text-align: center;
 }
 
-.vela-rig-home__empty h2 { margin: 0; font-size: 1.05rem; }
+.vela-rig-home__empty h2 { margin: 0; font-size: 1.05em; }
 .vela-rig-home__empty p,
 .vela-rig-route-state p {
   max-width: 28rem;
   margin: 0 0 calc(var(--vela-space) * 2);
   color: var(--vela-text-muted);
-  font-size: .76rem;
+  font-size: .76em;
 }
 
 .vela-rig-route-state h1 { margin: 0; font-size: 1.45rem; }
@@ -439,12 +439,12 @@
   gap: calc(var(--vela-space) * 3);
 }
 
-.vela-rig-summary__heading > h2 { margin: 0; font-size: 1rem; }
+.vela-rig-summary__heading > h2 { margin: 0; font-size: 1em; }
 .vela-rig-summary__description {
   align-self: start;
   margin: 0;
   color: var(--vela-text-muted);
-  font-size: .7rem;
+  font-size: .7em;
 }
 .vela-rig-summary__footer {
   display: flex;
@@ -457,10 +457,10 @@
 }
 
 .vela-rig-summary__connections { display: flex; align-items: baseline; gap: calc(var(--vela-space) * 1); }
-.vela-rig-summary__connections strong { color: var(--vela-positive); font-size: .76rem; }
-.vela-rig-summary__connections small { color: var(--vela-text-muted); font-size: .64rem; }
+.vela-rig-summary__connections strong { color: var(--vela-positive); font-size: .76em; }
+.vela-rig-summary__connections small { color: var(--vela-text-muted); font-size: .64em; }
 .vela-rig-summary__connections[data-state="attention"] strong { color: var(--vela-warning); }
-.vela-rig-summary__footer > strong { color: var(--vela-accent); font-size: .68rem; }
+.vela-rig-summary__footer > strong { color: var(--vela-accent); font-size: .68em; }
 .vela-rig-summary__footer i {
   display: inline-block;
   margin-left: calc(var(--vela-space) * .8);

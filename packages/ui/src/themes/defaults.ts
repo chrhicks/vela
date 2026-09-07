@@ -77,6 +77,8 @@ export const DEFAULT_PROFILE: DesignProfile = {
   overrides: {},
 }
 
+// The adopted app profile and the workshop's starting point. Keep the generic
+// library baseline above available for comparison and alternate design work.
 export const VELA_CURRENT_PROFILE: DesignProfile = {
   schemaVersion: 1,
   id: 'vela-current',
@@ -100,7 +102,7 @@ export const DEFAULT_SESSION: WorkingSession = {
   schemaVersion: 1,
   componentId: 'button',
   specimenId: 'button-primary',
-  profileId: DEFAULT_PROFILE.id,
+  profileId: VELA_CURRENT_PROFILE.id,
   mode: 'dark',
   context: 'isolated',
   viewport: 920,

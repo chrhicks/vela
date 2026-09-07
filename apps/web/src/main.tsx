@@ -1,3 +1,6 @@
+// Load shared foundations before routes and their approved composition styles.
+import './styles.css'
+import './routes/rig.css'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { RouterProvider, createBrowserRouter } from 'react-router'
@@ -7,8 +10,6 @@ import { Alignment } from './routes/alignment'
 import { Observe } from './routes/observe'
 import { SavedImages } from './routes/saved-images'
 import { Capture } from './routes/capture'
-import './styles.css'
-import './routes/rig.css'
 import { Shell } from './components/app'
 import { HomeProvider } from './pages/HomeProvider'
 
