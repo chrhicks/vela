@@ -134,9 +134,10 @@ export function registerTargets(app: FastifyInstance, catalog: RigCatalog, opera
   app.post<{ Params: { rigId: string, command: string } }>('/api/rigs/:rigId/framing/:command', async (request, reply) => {
     const { rigId, command } = request.params
     if (!['start', 'stop', 'center'].includes(command)) return reply.code(404).send({ error: 'Unknown framing command' })
-    const fields = command === 'start' ? ['targetId', 'raDegrees', 'decDegrees', 'exposureSeconds'] : []
+    const fields = command === 'start' ? ['targetId', 'raDegrees', 'decDegrees', 'exposureSeconds'] : command === 'center' ? ['checkId'] : []
     if (!jsonBody(request, fields)) return reply.code(400).send({ error: 'Invalid framing command body' })
     const body = request.body
+    if (command === 'center' && (typeof body.checkId !== 'string' || !body.checkId.trim())) return reply.code(400).send({ error: 'Expected the solved framing check ID.' })
     if (command === 'start' && (typeof body.targetId !== 'string' || !getTarget(body.targetId)
       || !isNumber(body.raDegrees, 0, 360) || body.raDegrees === 360 || !isNumber(body.decDegrees, -90, 90)
       || !isNumber(body.exposureSeconds, 0.1, 60))) return reply.code(400).send({ error: 'Expected a catalog target, J2000 coordinates and 0.1–60 second exposure.' })
@@ -153,8 +154,11 @@ export function registerTargets(app: FastifyInstance, catalog: RigCatalog, opera
       const ready = await readiness(rig)
       let controller = controllers.get(rigId)
       if (!controller) { controller = createFramingController(now); controllers.set(rigId, controller) }
-      if (command === 'center' && !controller.canCenter(ready.mount, ready.configuration)) throw new Error('A current solved framing check is required before centering.')
       const previous = controller.snapshot()
+      if (command === 'center') {
+        if (previous.actual?.checkId !== body.checkId) throw new Error('The framing check has changed. Review the latest check before centering.')
+        if (!controller.canCenter(ready.mount, ready.configuration)) throw new Error('A current solved framing check is required before centering.')
+      }
       const desired = command === 'center' ? previous.desired! : { raDegrees: body.raDegrees as number, decDegrees: body.decDegrees as number }
       const solver = options.createSolver?.(ready.camera.fieldHeightDegrees) ?? (options.solver ? createAstapSolver({ ...options.solver, fieldHeightDegrees: ready.camera.fieldHeightDegrees }) : undefined)
       if (!solver) throw new Error('Plate solving is not configured on the Vela server.')

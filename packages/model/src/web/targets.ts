@@ -42,7 +42,7 @@ export interface FramingView {
   active: boolean
   desired: TargetPosition | null
   targetId: string | null
-  actual: (TargetPosition & { capturedAt: string, corners: TargetPosition[], rotationDegrees: number, offsetArcminutes: number }) | null
+  actual: (TargetPosition & { checkId: string, capturedAt: string, corners: TargetPosition[], rotationDegrees: number, offsetArcminutes: number }) | null
   error: string | null
   exposureSeconds: number
   canCenter: boolean

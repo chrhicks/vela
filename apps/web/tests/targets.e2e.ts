@@ -70,12 +70,12 @@ test('survey footprint uses projected coordinates and keyboard adjustment; tile 
 })
 
 test('checked framing offers one correction, active operations lock edits, and stale state blocks commands', async ({ page }) => {
-  let state: FramingView = { ...idle, phase: 'checked', checkCurrent: true, desired: target, targetId: target.id, canCenter: true, actual: { ...target, capturedAt: new Date().toISOString(), rotationDegrees: 32, offsetArcminutes: 2.4, corners: [{ raDegrees: 9, decDegrees: 40 }, { raDegrees: 11, decDegrees: 40 }, { raDegrees: 11, decDegrees: 42 }, { raDegrees: 9, decDegrees: 42 }] } }
+  let state: FramingView = { ...idle, phase: 'checked', checkCurrent: true, desired: target, targetId: target.id, canCenter: true, actual: { ...target, checkId: 'displayed-check', capturedAt: new Date().toISOString(), rotationDegrees: 32, offsetArcminutes: 2.4, corners: [{ raDegrees: 9, decDegrees: 40 }, { raDegrees: 11, decDegrees: 40 }, { raDegrees: 11, decDegrees: 42 }, { raDegrees: 9, decDegrees: 42 }] } }
   let offline = false, corrections = 0, stops = 0
   await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
   await page.route('**/api/web/rigs/rig-1/framing', route => offline ? route.abort() : respond(route, state))
   await page.route('**/api/survey/**', route => route.abort())
-  await page.route('**/api/rigs/rig-1/framing/center', route => { corrections++; state = { ...state, phase: 'slewing', active: true, canCenter: false, checkCurrent: false }; return respond(route, state) })
+  await page.route('**/api/rigs/rig-1/framing/center', route => { expect(route.request().postDataJSON()).toEqual({ checkId: 'displayed-check' }); corrections++; state = { ...state, phase: 'slewing', active: true, canCenter: false, checkCurrent: false }; return respond(route, state) })
   await page.route('**/api/rigs/rig-1/framing/stop', route => { stops++; state = { ...state, phase: 'stopped', active: false }; return respond(route, state) })
   await page.goto('/rigs/rig-1/observe/targets/m31')
   await expect(page.getByRole('link', { name: 'Continue to capture' })).toBeVisible()

@@ -29,5 +29,5 @@ export function isFramingView(v: unknown, rigId: string): v is FramingView {
   return (v.focalLengthMm === null || finite(v.focalLengthMm) && v.focalLengthMm > 0)
     && (v.desired === null || isPosition(v.desired))
     && (v.camera === null || record(v.camera) && typeof v.camera.name === 'string' && ['width','height','fieldWidthDegrees','fieldHeightDegrees'].every(k => finite((v.camera as Record<string, unknown>)[k]) && Number((v.camera as Record<string, unknown>)[k]) > 0))
-    && (v.actual === null || record(v.actual) && isPosition(v.actual) && record(v.actual) && date(v.actual.capturedAt) && finite(v.actual.rotationDegrees) && finite(v.actual.offsetArcminutes) && Array.isArray(v.actual.corners) && v.actual.corners.length === 4 && v.actual.corners.every(isPosition))
+    && (v.actual === null || record(v.actual) && isPosition(v.actual) && record(v.actual) && typeof v.actual.checkId === 'string' && v.actual.checkId.length > 0 && date(v.actual.capturedAt) && finite(v.actual.rotationDegrees) && finite(v.actual.offsetArcminutes) && Array.isArray(v.actual.corners) && v.actual.corners.length === 4 && v.actual.corners.every(isPosition))
 }
