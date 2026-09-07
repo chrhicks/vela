@@ -21,8 +21,11 @@ the requested J2000 position. No command rotates the camera.
 
 Command responses supersede outstanding reads. Ambiguous commands are never
 repeated automatically, and require an explicit current-state read before a new
-start. Last-known state survives transport interruption and controls remain
-blocked. A centering action requests one server-owned correction and recheck.
+start. Last-known state survives transport interruption and device commands remain
+blocked. Local composition edits stay available during recovery; an active or
+pending framing operation pauses them, and a checked composition requires the
+explicit Adjust composition action. A centering action identifies the displayed
+solved check and requests one server-owned correction and recheck.
 
 Aladin attribution: retain the renderer’s linked CDS logo and the footer credit.
 The npm manifest lists GPL-3; the distributed LICENSE is LGPL-3.0 and incorporates

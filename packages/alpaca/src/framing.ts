@@ -182,8 +182,22 @@ export function createAlpacaFraming({ baseUrl, fetch = globalThis.fetch, request
       catch (error) { commandError = error }
       // A lost setter response is resolved by observing the requested state,
       // never by replaying the write. Caller cancellation cannot cancel inspection.
-      if (!(await client.connected(telescope)) || await client.readBoolean(telescope, 'tracking') !== tracking) {
-        throw new Error('Telescope tracking change was not confirmed', { cause: commandError })
+      const confirmation = AbortSignal.timeout(requestTimeoutMs)
+      const commandDetail = commandError instanceof Error ? ` Setter reported: ${commandError.message}.` : ''
+      try {
+        while (true) {
+          if (!(await client.connected(telescope, confirmation))) throw new Error('Telescope disconnected during tracking confirmation')
+          if (await client.readBoolean(telescope, 'tracking', confirmation) === tracking) break
+          // A decoded rejection is stronger evidence than a delayed state read.
+          if (commandError instanceof AlpacaProviderError && commandError.reason === 'protocol-error' && commandError.errorNumber !== undefined) {
+            throw new Error('The telescope rejected the tracking change')
+          }
+          await delay(pollIntervalMs, undefined, { signal: confirmation })
+        }
+      } catch (error) {
+        const detail = confirmation.aborted ? 'Requested tracking state was not observed before the confirmation deadline'
+          : error instanceof Error ? error.message : 'Tracking state inspection failed'
+        throw new Error(`Telescope tracking change was not confirmed. ${detail}.${commandDetail}`, { cause: error })
       }
       signal?.throwIfAborted()
     },

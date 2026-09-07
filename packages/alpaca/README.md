@@ -164,7 +164,10 @@ driver explicitly reports them unsupported. Unsupported frame metadata becomes
 `unknown`; ASCOM `equOther` remains `other`. Neither is treated as J2000.
 
 `setTracking(telescopeId, boolean, signal)` confirms the requested state by reading
-it, including after a lost setter response. `slew({ telescopeId,
+it, including after a lost setter response. Confirmation polls read-only for up
+to the request timeout (5 seconds by default), never replaying the setter. It
+survives caller cancellation long enough to establish the outcome, and retains
+driver rejection or inspection failure details if confirmation fails. `slew({ telescopeId,
 rightAscensionDegrees, declinationDegrees, coordinateSystem }, signal)` requires
 an explicit supported frame matching the driver. Frame conversion belongs to the
 consumer. The mount must be connected, unparked, idle, tracking, and capable of

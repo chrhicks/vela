@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { AlpacaFramingStoppedError, createAlpacaFraming } from './framing.js'
 
-function observatory() {
+function observatory(requestTimeoutMs = 100) {
   const values: Record<string, unknown> = {
     connected: true, name: ' Camera ', cameraxsize: 6000, cameraysize: 4000,
     pixelsizex: 3.76, pixelsizey: 3.76, binx: 2, biny: 2, numx: 2000, numy: 1500, startx: 50, starty: 100,
@@ -13,7 +13,9 @@ function observatory() {
   const unsupported = new Set<string>()
   let started!: () => void
   const whenStarted = new Promise<void>(resolve => { started = resolve })
-  const state = { loseSlew: false, loseTracking: false, stopFails: false, onSlew: () => {} }
+  const state = { loseSlew: false, loseTracking: false, stopFails: false, onSlew: () => {}, onTracking: () => {},
+    trackingDelayReads: 0, rejectTracking: false, trackingReadFails: false }
+  let requestedTracking: boolean | undefined
   const fetch: typeof globalThis.fetch = async (input, init) => {
     init?.signal?.throwIfAborted()
     const operation = new URL(String(input)).pathname.split('/').at(-1)!
@@ -34,16 +36,26 @@ function observatory() {
         if (state.stopFails) throw new TypeError('Abort unreachable')
         values.slewing = false
       } else if (operation === 'tracking') {
-        values.tracking = parameters.get('Tracking') === 'true'
+        if (state.rejectTracking) return Response.json({ ClientTransactionID: 0, ServerTransactionID: 1, ErrorNumber: 1280, ErrorMessage: 'Mount rejected tracking mode' })
+        requestedTracking = parameters.get('Tracking') === 'true'
+        if (!state.trackingDelayReads) values.tracking = requestedTracking
+        state.onTracking()
         if (state.loseTracking) throw new TypeError('Setter response lost')
       } else throw new Error(`Unexpected write ${operation}`)
       return envelope()
+    }
+    if (operation === 'tracking') {
+      if (state.trackingReadFails) throw new TypeError('Tracking state unavailable')
+      if (requestedTracking !== undefined && state.trackingDelayReads > 0) {
+        state.trackingDelayReads -= 1
+        if (!state.trackingDelayReads) values.tracking = requestedTracking
+      }
     }
     if (unsupported.has(operation)) return envelope(undefined, 1024)
     if (!(operation in values)) throw new Error(`Unexpected read ${operation}`)
     return envelope(values[operation])
   }
-  const framing = createAlpacaFraming({ baseUrl: 'http://fake', fetch, pollIntervalMs: 1, slewTimeoutMs: 100 })
+  const framing = createAlpacaFraming({ baseUrl: 'http://fake', fetch, requestTimeoutMs, pollIntervalMs: 1, slewTimeoutMs: 100 })
   return { framing, values, writes, unsupported, state, whenStarted }
 }
 const target = { telescopeId: 'mount-id', rightAscensionDegrees: 45, declinationDegrees: 25, coordinateSystem: 'topocentric' as const }
@@ -148,5 +160,67 @@ describe('framing boundary', () => {
     await fake.framing.abortTelescope('mount-id')
     expect(fake.writes.map(write => write.operation)).toEqual(['tracking', 'abortslew'])
     expect(fake.values.slewing).toBe(false)
+  })
+
+  it.each([false, true])('observes delayed tracking without replay after a setter (lost response: %s)', async lost => {
+    const fake = observatory()
+    fake.state.trackingDelayReads = 3
+    fake.state.loseTracking = lost
+    await fake.framing.setTracking('mount-id', false)
+    expect(fake.values.tracking).toBe(false)
+    expect(fake.state.trackingDelayReads).toBe(0)
+    expect(fake.writes.map(write => write.operation)).toEqual(['tracking'])
+  })
+
+  it('preserves a decoded tracking rejection without replay or claiming success', async () => {
+    const fake = observatory()
+    fake.state.rejectTracking = true
+    await expect(fake.framing.setTracking('mount-id', false)).rejects.toThrow('Setter reported: Mount rejected tracking mode')
+    expect(fake.values.tracking).toBe(true)
+    expect(fake.writes.map(write => write.operation)).toEqual(['tracking'])
+  })
+
+  it('reports disconnection during confirmation and never repeats the setter', async () => {
+    const fake = observatory()
+    fake.state.onTracking = () => { fake.values.connected = false }
+    await expect(fake.framing.setTracking('mount-id', false)).rejects.toThrow('Telescope disconnected during tracking confirmation')
+    expect(fake.writes.map(write => write.operation)).toEqual(['tracking'])
+  })
+
+  it('preserves the setter and inspection errors when confirmation is unavailable', async () => {
+    const fake = observatory()
+    fake.state.loseTracking = true
+    fake.state.onTracking = () => { fake.state.trackingReadFails = true }
+    await expect(fake.framing.setTracking('mount-id', false)).rejects.toThrow('Unable to reach Alpaca endpoint /api/v1/telescope/3/tracking. Setter reported: Unable to reach Alpaca endpoint /api/v1/telescope/3/tracking')
+    expect(fake.writes.map(write => write.operation)).toEqual(['tracking'])
+  })
+
+  it('bounds unconfirmed tracking while preserving uncertainty after cancellation', async () => {
+    const fake = observatory(10)
+    const controller = new AbortController()
+    fake.state.trackingDelayReads = Infinity
+    fake.state.onTracking = () => { controller.abort() }
+    await expect(fake.framing.setTracking('mount-id', false, controller.signal)).rejects.toThrow('Requested tracking state was not observed before the confirmation deadline')
+    expect(fake.values.tracking).toBe(true)
+    expect(fake.writes.map(write => write.operation)).toEqual(['tracking'])
+  })
+
+  it('finishes independent confirmation after cancellation but still rejects the caller', async () => {
+    const fake = observatory()
+    const controller = new AbortController()
+    fake.state.trackingDelayReads = 3
+    fake.state.onTracking = () => { controller.abort() }
+    await expect(fake.framing.setTracking('mount-id', false, controller.signal)).rejects.toMatchObject({ name: 'AbortError' })
+    expect(fake.values.tracking).toBe(false)
+    expect(fake.state.trackingDelayReads).toBe(0)
+    expect(fake.writes.map(write => write.operation)).toEqual(['tracking'])
+  })
+
+  it('does not write tracking when cancelled before the setter', async () => {
+    const fake = observatory()
+    const controller = new AbortController()
+    controller.abort()
+    await expect(fake.framing.setTracking('mount-id', false, controller.signal)).rejects.toMatchObject({ name: 'AbortError' })
+    expect(fake.writes).toEqual([])
   })
 })
