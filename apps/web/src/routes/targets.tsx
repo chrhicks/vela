@@ -57,7 +57,7 @@ function TargetBrowser({ rigId }: { rigId: string }) {
     {skyStale && view && <p role="status">Sky updates interrupted · paths show the last calculation.</p>}
     {error && !view && <Panel><p>Could not load the target catalog.</p><Button onClick={() => setRetry(r => r + 1)}>Try again</Button></Panel>}
     {view?.siteUnavailableReason && <p role="status">{view.siteUnavailableReason}</p>}
-    <div className="vela-target-grid">{view?.targets.map(target => <Link key={target.id} className="vela-target-card" to={`/rigs/${encodeURIComponent(rigId)}/observe/targets/${encodeURIComponent(target.id)}`}>
+    <div className="vela-target-grid">{view?.targets.map(target => <Link key={target.id} className="vela-target-card" to={{ pathname: `/rigs/${encodeURIComponent(rigId)}/observe/targets/${encodeURIComponent(target.id)}`, search: params.toString() }}>
       <div className="vela-target-thumbnail"><ReferenceImage target={target} /><span>{target.kind}</span></div>
       <div className="vela-target-card-copy"><span>{target.catalog}</span><h2>{target.name}</h2><p>{target.kind}{target.sizeArcminutes !== null ? ` · ${target.sizeArcminutes}′ across` : ''}</p><SkyPath sky={target.sky} compact stale={skyStale} /><div className="vela-target-card-bottom"><span>{target.sky ? skyWindow(target.sky) : 'Sky path unavailable'}</span><strong>Frame it →</strong></div></div>
     </Link>)}</div>
@@ -70,6 +70,7 @@ function TargetBrowser({ rigId }: { rigId: string }) {
 }
 
 function TargetComposition({ rigId, targetId }: { rigId: string, targetId: string }) {
+  const [params] = useSearchParams()
   const [target, setTarget] = useState<TargetView | null>(null)
   const [skyStale, setSkyStale] = useState(false)
   const [loadError, setLoadError] = useState(false)
@@ -101,7 +102,7 @@ function TargetComposition({ rigId, targetId }: { rigId: string, targetId: strin
     setSeconds(String(view.exposureSeconds))
     heading.current?.focus()
   }, [view, target, targetId])
-  const back = <Link className="vela-target-back vela-button" to={`/rigs/${encodeURIComponent(rigId)}/observe/targets`}>← Targets</Link>
+  const back = <Link className="vela-target-back vela-button" to={{ pathname: `/rigs/${encodeURIComponent(rigId)}/observe/targets`, search: params.toString() }}>← Targets</Link>
   if (!target) return <>{back}<p role="status">{loadError ? 'Could not load this target.' : 'Loading target…'}</p>{loadError && <Button onClick={() => setRetry(r => r + 1)}>Try again</Button>}</>
   const matching = view?.targetId === targetId
   const position = desired ?? target

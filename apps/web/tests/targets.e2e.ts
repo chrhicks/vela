@@ -222,3 +222,25 @@ test('quiet polling leaves Check rig state enabled and an explicit check superse
   releaseCheck()
   await expect(check).toBeEnabled()
 })
+
+test('Targets breadcrumb preserves search and results page through a detail reload', async ({ page }) => {
+  const queries: string[] = []
+  await page.route('**/api/web/rigs/rig-1/targets?*', route => {
+    queries.push(route.request().url())
+    return respond(route, { rigId: 'rig-1', rigName: 'Test rig', targets: [target], total: 49, site: null, siteUnavailableReason: null })
+  })
+  await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
+  await page.route('**/api/web/rigs/rig-1/framing', route => respond(route, idle))
+  await page.route('**/api/targets/*/thumbnail', route => route.abort())
+  await page.route('**/api/survey/**', route => route.abort())
+  await page.goto('/rigs/rig-1/observe/targets?q=galaxy&offset=24')
+  await expect(page.getByLabel('Find a target')).toHaveValue('galaxy')
+  await page.getByRole('link').filter({ has: page.getByRole('heading', { name: target.name }) }).click()
+  await expect(page).toHaveURL(/targets\/m31\?q=galaxy&offset=24$/)
+  await page.reload()
+  await page.getByRole('link', { name: '← Targets', exact: true }).click()
+  await expect(page).toHaveURL(/targets\?q=galaxy&offset=24$/)
+  await expect(page.getByLabel('Find a target')).toHaveValue('galaxy')
+  await expect(page.getByText('25–48 of 49')).toBeVisible()
+  expect(queries.at(-1)).toContain('q=galaxy&offset=24')
+})
