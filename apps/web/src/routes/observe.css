@@ -71,7 +71,7 @@
 .vela-observe-hero p {
   margin: calc(var(--vela-space) * 1.25) 0 0;
   color: var(--vela-text-muted);
-  font-size: .8em;
+  font-size: .78em;
 }
 
 .vela-observe-section-heading {
