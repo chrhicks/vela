@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import type { FramingView, TargetPosition } from '@vela/model/web'
 import type { MonoFrame, PlateSolver } from '../plate-solving/solver.js'
 import { angularDistance, fromMount, plateCorners, toMount, type Site } from './sky.js'
@@ -92,6 +93,7 @@ export function createFramingController(now = () => new Date()) {
         checkedPointing = fixedPointing(finalMount)
         checkedConfiguration = input.configuration
         state = { ...state, phase: 'checked', actual: {
+          checkId: randomUUID(),
           raDegrees: solved.raDegrees, decDegrees: solved.decDegrees, capturedAt: solved.capturedAt,
           corners: plateCorners(solved.wcs), rotationDegrees: -Math.atan2(solved.wcs.cd[1], solved.wcs.cd[3]) * 180 / Math.PI,
           offsetArcminutes: angularDistance(input.desired, solved) * 60,

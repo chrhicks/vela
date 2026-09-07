@@ -91,7 +91,7 @@ export function useFraming(rigId: string) {
 
   async function command(action: 'start' | 'stop' | 'center' | 'settings', body: object = {}) {
     const allowed = action === 'stop' ? canStop
-      : action === 'center' ? canStart && !!view?.canCenter
+      : action === 'center' ? canStart && !!view?.canCenter && !!view.actual
       : action === 'settings' ? !!view && !pending && !offline && !view.active && !commandUnconfirmed
       : canStart
     if (writing.current || !alive.current || !allowed) return
@@ -137,5 +137,5 @@ export function useFraming(rigId: string) {
   }
 
   return { view, offline, pending, refreshing, error, commandUnconfirmed, canStart, canStop,
-    start: (body: { targetId: string, raDegrees: number, decDegrees: number, exposureSeconds: number }) => command('start', body), center: () => command('center'), settings: (focalLengthMm: number) => command('settings', { focalLengthMm }), stop: () => command('stop'), refresh: () => read(true) }
+    start: (body: { targetId: string, raDegrees: number, decDegrees: number, exposureSeconds: number }) => command('start', body), center: () => command('center', { checkId: view?.actual?.checkId }), settings: (focalLengthMm: number) => command('settings', { focalLengthMm }), stop: () => command('stop'), refresh: () => read(true) }
 }
