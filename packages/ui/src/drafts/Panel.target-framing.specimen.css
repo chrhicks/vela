@@ -94,3 +94,6 @@
 .vela-target-credits { padding: 0 20px 16px; font-size: .78em; color: var(--vela-text-muted); line-height: 1.6; }
 .vela-target-credits h2 { font-size: 1em; font-weight: 550; margin: 0 0 8px; }
 .vela-target-credits a { color: var(--vela-text); }
+
+.vela-target-time line { stroke: var(--vela-text-muted); stroke-width: 1; stroke-dasharray: 3 4; opacity: .65; }
+.vela-target-time text { font-size: 10px; }
