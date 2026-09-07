@@ -95,6 +95,7 @@ function TargetFramingPreview({ props, onPropsChange }: { props: Props, onPropsC
           <header><strong>{checking ? 'Check the framing' : 'Compose your image'}</strong><span>{checking ? 'Dashed: example pointing' : 'Drag the frame to reposition'}</span></header>
           <div className="vela-target-field" data-disabled={busy || checking} onPointerDown={event => {
             if (busy || checking || event.button !== 0) return
+            event.preventDefault()
             drag.current = { x, y, startX: event.clientX, startY: event.clientY }
             event.currentTarget.setPointerCapture(event.pointerId)
           }} onPointerMove={moveFrame} onPointerUp={() => { drag.current = null }} onPointerCancel={() => { drag.current = null }}>
