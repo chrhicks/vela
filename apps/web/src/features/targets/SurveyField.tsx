@@ -16,6 +16,7 @@ export function SurveyField({ target, desired, camera, actual, locked, onChange 
   const [revision, setRevision] = useState(0)
   const [attempt, setAttempt] = useState(0)
   const drag = useRef<{ x: number, y: number, cx: number, cy: number } | null>(null)
+  useEffect(() => { if (locked) drag.current = null }, [locked])
   const initialWidth = camera?.fieldWidthDegrees ?? 2
   const geometryInitialized = useRef(false)
 
@@ -115,7 +116,7 @@ export function SurveyField({ target, desired, camera, actual, locked, onChange 
             event.currentTarget.setPointerCapture(event.pointerId)
           }}
           onPointerMove={event => { if (drag.current) move(drag.current.cx + event.clientX - drag.current.x, drag.current.cy + event.clientY - drag.current.y) }}
-          onPointerUp={() => { drag.current = null }} onPointerCancel={() => { drag.current = null }}
+          onPointerUp={() => { drag.current = null }} onPointerCancel={() => { drag.current = null }} onLostPointerCapture={() => { drag.current = null }}
           onKeyDown={event => {
             const delta = { ArrowLeft: [1, 0], ArrowRight: [-1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] }[event.key]
             if (delta) { event.preventDefault(); nudge(delta[0]!, delta[1]!) }

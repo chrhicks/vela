@@ -63,22 +63,27 @@ export function registerTargets(app: FastifyInstance, catalog: RigCatalog, opera
   }
 
   async function framingView(rig: RigCatalogRecord): Promise<FramingView> {
+    let ready: Awaited<ReturnType<typeof readiness>> | undefined
+    let unavailableReason: string | null = null
+    try {
+      ready = await readiness(rig)
+    } catch (error) {
+      unavailableReason = message(error)
+    }
+    // Inspection can span an operation transition. Read the controller and its
+    // check flags together after that await so every field describes one state.
     const controller = controllers.get(rig.id)
     const state = controller?.snapshot() ?? createFramingController(now).snapshot()
-    const view: FramingView = { ...state, rigId: rig.id, rigName: rig.name, observedAt: now().toISOString(), enabled: false, unavailableReason: null, focalLengthMm: rig.focalLengthMm ?? null, camera: null, canCenter: false, checkCurrent: false }
-    try {
-      const ready = await readiness(rig)
-      const owner = operations.owner(rig.id)
-      const reason = owner && owner !== 'framing' ? 'Another rig operation is in progress.'
-        : ready.mount.parked ? 'Unpark the mount before framing.'
-          : ready.mount.slewing && !state.active ? 'The mount is already moving.'
-            : !options.solver && !options.createSolver ? 'Plate solving is not configured on the Vela server.' : null
-      return { ...view, camera: ready.camera, enabled: !reason, unavailableReason: reason,
-        checkCurrent: !reason && (controller?.checkCurrent(ready.mount, ready.configuration) ?? false),
-        canCenter: !reason && (controller?.canCenter(ready.mount, ready.configuration) ?? false) }
-    } catch (error) {
-      return { ...view, unavailableReason: message(error) }
-    }
+    const view: FramingView = { ...state, rigId: rig.id, rigName: rig.name, observedAt: now().toISOString(), enabled: false, unavailableReason, focalLengthMm: rig.focalLengthMm ?? null, camera: null, canCenter: false, checkCurrent: false }
+    if (!ready) return view
+    const owner = operations.owner(rig.id)
+    const reason = owner && owner !== 'framing' ? 'Another rig operation is in progress.'
+      : ready.mount.parked ? 'Unpark the mount before framing.'
+        : ready.mount.slewing && !state.active ? 'The mount is already moving.'
+          : !options.solver && !options.createSolver ? 'Plate solving is not configured on the Vela server.' : null
+    return { ...view, camera: ready.camera, enabled: !reason, unavailableReason: reason,
+      checkCurrent: !reason && (controller?.checkCurrent(ready.mount, ready.configuration) ?? false),
+      canCenter: !reason && (controller?.canCenter(ready.mount, ready.configuration) ?? false) }
   }
 
   async function siteView(rig: RigCatalogRecord): Promise<{ site: Site | null, siteUnavailableReason: string | null }> {
@@ -167,7 +172,7 @@ export function registerTargets(app: FastifyInstance, catalog: RigCatalog, opera
         exposureSeconds: command === 'center' ? previous.exposureSeconds : body.exposureSeconds as number,
         configuration: ready.configuration, center: command === 'center' }, hardware, solver, release)
       started = true
-      return { ...await framingView(rig), ...controller.snapshot() }
+      return framingView(rig)
     } catch (error) {
       return reply.code(409).send({ error: message(error) })
     } finally { if (!started) release() }

@@ -159,6 +159,34 @@ describe('target and framing HTTP boundary', () => {
     expect(subject.solver.solve).toHaveBeenCalledTimes(1)
   })
 
+  it.each([false, true])('reports a completed operation consistently when a pending readiness read fails: %s', async fails => {
+    const subject = setup({ offsetDegrees: 0.1 })
+    expect((await command(subject.app)).statusCode).toBe(200)
+    await vi.waitFor(() => expect(subject.hardware.capture).toHaveBeenCalledTimes(1))
+    const geometry = await subject.adapter.cameraGeometry({ cameraId: 'camera', expectedCameraName: 'Imaging camera' })
+    let entered!: () => void
+    let release!: () => void
+    const inspecting = new Promise<void>(resolve => { entered = resolve })
+    const held = new Promise<void>(resolve => { release = resolve })
+    vi.mocked(subject.adapter.cameraGeometry).mockImplementationOnce(async () => {
+      entered()
+      await held
+      if (fails) throw new Error('Camera inspection interrupted')
+      return geometry
+    })
+    const response = subject.app.inject('/api/web/rigs/rig/framing').then(result => result.json())
+    await inspecting
+    subject.complete()
+    await vi.waitFor(() => expect(subject.operations.owner('rig')).toBeUndefined())
+    release()
+    expect(await response).toMatchObject({
+      active: false, phase: 'checked', targetId: start.targetId,
+      actual: { checkId: expect.any(String), capturedAt: stamp },
+      checkCurrent: !fails, canCenter: !fails,
+      unavailableReason: fails ? 'Camera inspection interrupted' : null,
+    })
+  })
+
   it.each(['same target', 'different target'])('rejects an older browser check after another check of the %s', async target => {
     const subject = setup({ offsetDegrees: 0.1 })
     async function check(body: typeof start, count: number) {
