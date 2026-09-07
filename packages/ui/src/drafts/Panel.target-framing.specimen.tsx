@@ -129,7 +129,7 @@ function TargetFramingPreview({ props, onPropsChange }: { props: Props, onPropsC
         </aside>
       </div>}
     </main>
-    <details className="vela-target-credits"><summary>Reference image credits</summary>{targets.map(item => <p key={item.id}><a href={item.source} target="_blank" rel="noreferrer">{item.name}</a> — {item.credit}. <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a> · Cropped for display.</p>)}</details>
+    <section className="vela-target-credits" aria-label="Reference image credits"><h2>Reference image credits</h2>{targets.map(item => <p key={item.id}><a href={item.source} target="_blank" rel="noreferrer">{item.name}</a> — {item.credit}. <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a> · Cropped for display.</p>)}</section>
     <footer className="vela-target-disclaimer">Design sketch · Sample sky and camera geometry · Reference photos, not your exposures · No hardware commands</footer>
   </article>
 }
