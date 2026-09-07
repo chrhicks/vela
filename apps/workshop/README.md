@@ -21,6 +21,7 @@ Open `http://127.0.0.1:5174` for the focused workbench or `http://127.0.0.1:5174
 - An imaging-camera setup sketch on Observe with explicit remembered choice and missing, changed, offline and busy states; local fixtures only.
 - A stable Dialog with both primitive anatomy and a fixture-backed Rig discovery product example
 - A simulator-control product sketch with coarse/fine mount nudges, exact offset setup, clear/obscured camera and preset reset; local interactive fixtures only, with no simulator service connected
+- A draft visual target-selection and framing sketch with locally bundled reference photographs, instant sample search, illustrative sky paths, a movable fixed-orientation camera frame, and simulated slew/check/adjust states. It does not calculate real visibility or control devices.
 - Auto-discovered colocated specimens
 - One primitive-focused specimen per component, with additional product examples only for concrete compositions that prop controls cannot express
 - A searchable gallery with paired light and dark previews
