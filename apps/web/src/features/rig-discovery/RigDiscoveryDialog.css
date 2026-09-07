@@ -8,7 +8,7 @@
 .rig-discovery-start {
   min-height: 100%;
   align-content: center;
-  gap: calc(var(--vela-space) * 4);
+  gap: calc(var(--vela-space) * 5);
 }
 
 .rig-discovery-start > p {
@@ -102,7 +102,7 @@
 
 .rig-discovery-results {
   display: grid;
-  gap: calc(var(--vela-space) * 3);
+  gap: calc(var(--vela-space) * 2.5);
 }
 
 .rig-discovery-results__summary {
@@ -215,7 +215,7 @@ button.rig-discovery-candidate:focus-visible {
 
 .rig-discovery-message {
   display: grid;
-  min-height: 15rem;
+  min-height: 17rem;
   align-content: center;
   justify-items: center;
   gap: calc(var(--vela-space) * 2.5);
@@ -299,7 +299,7 @@ button.rig-discovery-candidate:focus-visible {
 .rig-discovery-review__server > div {
   display: grid;
   min-width: 0;
-  gap: calc(var(--vela-space) * .7);
+  gap: calc(var(--vela-space) * .65);
 }
 
 .rig-discovery-review__server small {

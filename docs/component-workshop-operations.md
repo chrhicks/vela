@@ -6,6 +6,34 @@ The workshop is a local developer tool. None of the procedures below publish a p
 
 The current collaboration and delivery policy is in [AGENTS.md](../AGENTS.md#working-with-chris). Chris shapes the design with the agent in the workshop; the agent performs source changes, verification, promotion, and adoption needed for the agreed implementation. Approval of that scope carries through those operations without a separate permission request for each file or component. Material design departures or global-theme changes outside that scope return to alignment. User-facing changes receive Chris's implementation review after an independent **OK** verdict and before merge.
 
+## Application visual authority
+
+The approved workshop specimen and profile define the design; `@vela/ui` owns
+its shared implementation, and `apps/web` adopts it. The application's adopted
+profile is `VELA_CURRENT_PROFILE` (**Vela Current**) from `@vela/ui/themes`.
+The app shell and a fresh workshop session both select it. `DEFAULT_PROFILE`
+(**Vela UI Default**) remains the library baseline for comparison, not the
+application's active theme.
+
+When comparing a specimen with the app, use Vela Current, dark mode, density 1,
+and no unsaved profile overrides. Match the relevant state and content width.
+The workshop's surrounding editor is not part of the specimen's design.
+
+Keep approved shared geometry and styling in `@vela/ui`; app feature styles may
+compose the primitives, but must preserve the corresponding specimen's visual
+choices. Check rendered borders, corners, typography, and spacing in both
+runtimes—importing the same component does not prove they use the same theme.
+Deliberate feature differences need a concrete reason, such as operational
+state or different content, rather than an app-only restyling.
+
+Load shared UI styles before importing feature modules and their composition
+styles in each runtime. Equal-specificity rules depend on that order: for
+example, the capture specimen's 44px command button must override the shared
+large-button minimum height in both workshop and app.
+
+Workshop scratch changes and alternate profiles remain exploratory until
+explicitly adopted; the application does not read workshop session files.
+
 ## Workspace boundaries
 
 ```text
