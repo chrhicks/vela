@@ -42,6 +42,7 @@ test('ambiguous command is not repeated and requires explicit current state chec
   await expect(page.getByRole('button', { name: 'Slew & check' })).toBeEnabled()
   await page.getByRole('button', { name: 'Slew & check' }).click()
   await expect(page.getByRole('alert')).toContainText('could not be confirmed')
+  await expect(page.getByText('Check rig state before continuing', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Slew & check' })).toBeDisabled()
   await page.waitForTimeout(1200)
   expect(commands).toBe(1)
