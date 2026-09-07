@@ -81,7 +81,7 @@ function TargetFramingPreview({ props, onPropsChange }: { props: Props, onPropsC
     <header className="vela-target-shell"><strong>Vela</strong><span>Askar FRA 400</span><Badge>Workshop preview</Badge></header>
     <main className="vela-target-main">
       {composing && <Button className="vela-target-back" tone="quiet" disabled={busy} onClick={() => update({ screen: 'browse', phase: 'idle' })}>← Targets</Button>}
-      <header className="vela-target-heading"><div><p>Observe / Targets</p><h1 ref={heading} tabIndex={-1}>{composing ? target.name : 'What would you like to see?'}</h1></div>{composing && <Badge>{target.catalog}</Badge>}</header>
+      <header className="vela-target-heading"><div><p>Observe / Targets</p><div className="vela-target-identity"><h1 ref={heading} tabIndex={-1}>{composing ? target.name : 'What would you like to see?'}</h1>{composing && <Badge>{target.catalog}</Badge>}</div></div></header>
       {!composing ? <>
         <p className="vela-target-intro">Find something familiar, or let a picture catch your eye.</p>
         <Input label="Find a target" type="search" placeholder="Name, catalog number, or object type" value={query} onChange={event => update({ query: event.target.value })} />
