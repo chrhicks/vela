@@ -31,6 +31,7 @@ export interface RigCatalog {
   ): Promise<RigCandidateMatch>
   add(input: AddRigInput): Promise<AddRigResult>
   setImagingCamera(rigId: RigId, camera: NonNullable<RigCatalogRecord['imagingCamera']>): Promise<boolean>
+  setFocalLength(rigId: RigId, focalLengthMm: number): Promise<boolean>
   forget(rigId: RigId): Promise<boolean>
 }
 
@@ -182,6 +183,15 @@ function createRigCatalog(
       })
     },
 
+    setFocalLength(rigId, focalLengthMm) {
+      return change(async () => {
+        if (!Number.isFinite(focalLengthMm) || focalLengthMm < 10 || focalLengthMm > 20000) throw new Error('Invalid focal length')
+        if (!records.some(record => record.id === rigId)) return false
+        await replace(records.map(record => record.id === rigId ? { ...record, focalLengthMm } : record))
+        return true
+      })
+    },
+
     forget(rigId) {
       return change(async () => {
         const nextRecords = records.filter((record) => record.id !== rigId)
@@ -300,6 +310,7 @@ function parseRigRecord(value: unknown): RigCatalogRecord {
     'endpoint',
     'addedAt',
     'imagingCamera',
+    'focalLengthMm',
     'lastObservedInventory',
   ])) {
     throw new Error('Invalid Rig record')
@@ -309,6 +320,7 @@ function parseRigRecord(value: unknown): RigCatalogRecord {
     throw new Error('Rig id and name are required')
   }
   if (!isIsoDateTime(value.addedAt)) throw new Error('Invalid addedAt timestamp')
+  if (value.focalLengthMm !== undefined && (typeof value.focalLengthMm !== 'number' || !Number.isFinite(value.focalLengthMm) || value.focalLengthMm < 10 || value.focalLengthMm > 20000)) throw new Error('Invalid focal length')
 
   if (value.imagingCamera !== undefined && (!isRecord(value.imagingCamera)
     || !hasOnlyKeys(value.imagingCamera, ['uniqueId', 'name'])
@@ -317,6 +329,7 @@ function parseRigRecord(value: unknown): RigCatalogRecord {
 
   return {
     ...(value.imagingCamera ? { imagingCamera: { uniqueId: value.imagingCamera.uniqueId as string, name: value.imagingCamera.name as string } } : {}),
+    ...(typeof value.focalLengthMm === 'number' ? { focalLengthMm: value.focalLengthMm } : {}),
     id: value.id,
     name: value.name,
     endpoint: parseEndpoint(value.endpoint),

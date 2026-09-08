@@ -6,9 +6,11 @@ describe('@vela/alpaca export boundary', () => {
     expect(Object.keys(alpaca).sort()).toEqual([
       'AlpacaCaptureStoppedError',
       'AlpacaDiscoveryError',
+      'AlpacaFramingStoppedError',
       'AlpacaProviderError',
       'createAlpacaAcquisition',
       'createAlpacaDiscovery',
+      'createAlpacaFraming',
       'createAlpacaProvider',
     ])
   })

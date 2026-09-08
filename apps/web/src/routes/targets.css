@@ -98,3 +98,22 @@
 
 .vela-target-time line { stroke: var(--vela-text-muted); stroke-width: 1; stroke-dasharray: 3 4; opacity: .65; }
 .vela-target-time text { font-size: 10px; }
+/* Web-owned adoption of the approved target/framing product composition. */
+.vela-target-card { text-decoration: none; }
+.vela-target-survey { position: absolute; inset: 0; width: 100%; height: 100%; }
+.vela-target-survey-message { position: absolute; inset: 0; display: grid; align-content: center; justify-items: center; padding: 24px; text-align: center; color: var(--vela-text-muted); }
+.vela-target-overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.vela-target-footprint { fill: transparent; stroke: var(--vela-accent); stroke-width: 2; pointer-events: all; cursor: grab; }
+.vela-target-footprint:focus-visible { stroke-width: 4; outline: none; }
+.vela-target-footprint[aria-disabled="true"] { cursor: default; }
+.vela-target-footprint--actual { fill: none; stroke: var(--vela-warning); stroke-dasharray: 7 5; pointer-events: none; }
+.vela-target-cross { fill: var(--vela-accent); font-size: 20px; }
+.vela-target-darkness { fill: var(--vela-accent); opacity: .09; }
+.vela-target-pagination { display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 24px; }
+.vela-target-settings { margin-top: 18px; font-size: .85em; }
+.vela-target-settings summary { cursor: pointer; padding: 8px 0; }
+.vela-target-settings .vela-input { margin: 8px 0; }
+.vela-target-adjustments > div { flex-wrap: wrap; }
+.vela-target-nudges .vela-button { min-width: 40px; min-height: 40px; }
+
+.vela-target-shade { fill: color-mix(in srgb, var(--vela-canvas) 45%, transparent); }
