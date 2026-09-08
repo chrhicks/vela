@@ -2,7 +2,8 @@ import Fastify from 'fastify'
 import { Readable } from 'node:stream'
 import { acceptsImageBytes, encodeImageBytes, imageBytesError, imageJsonChunks } from './image-bytes.js'
 import type { FastifyRequest } from 'fastify'
-import type { Star } from './catalog.js'
+import { cameraGeometry } from './optics.js'
+import type { Star, StarSource } from './catalog.js'
 import { SimulatorError, SimulatorRuntime } from './runtime.js'
 
 function parameters(value: unknown): Record<string, unknown> {
@@ -36,7 +37,7 @@ function axisParameter(params: Record<string, unknown>) {
   return axis
 }
 
-export function buildSimulator({ stars, now }: { stars: readonly Star[]; now?: () => number }) {
+export function buildSimulator({ stars, now }: { stars: readonly Star[] | StarSource; now?: () => number }) {
   // Match Node's idle timeout: longer-lived sockets stalled later PUTs with
   // Node 26's fetch client during the real movement/stop integration proof.
   const app = Fastify({ keepAliveTimeout: 5000, routerOptions: { ignoreTrailingSlash: true, caseSensitive: false } })
@@ -124,7 +125,7 @@ export function buildSimulator({ stars, now }: { stars: readonly Star[]; now?: (
               numx: camera.width, numy: camera.height, startx: 0, starty: 0, binx: 1, biny: 1,
               maxbinx: 1, maxbiny: 1, sensortype: camera.sensor === 'rggb' ? 2 : 0, sensorname: camera.sensor === 'rggb' ? 'Synthetic RGGB' : 'Synthetic monochrome',
               ...(camera.sensor === 'rggb' ? { bayeroffsetx: 0, bayeroffsety: 0 } : {}),
-              maxadu: camera.sensor === 'rggb' ? 65535 : 32767, pixelsizex: 3.76, pixelsizey: 3.76, canabortexposure: true,
+              maxadu: camera.sensor === 'rggb' ? 65535 : 32767, pixelsizex: cameraGeometry(camera.resolution).pixelSizeMicrons, pixelsizey: cameraGeometry(camera.resolution).pixelSizeMicrons, canabortexposure: true,
               canstopexposure: false, canasymmetricbin: false, cansetccdtemperature: false,
               cangetcoolerpower: false, hasshutter: true, exposuremin: 0, exposuremax: 3600, exposureresolution: 0.001 }
             if (Object.hasOwn(values, member)) return { ...envelope, Value: values[member] }
@@ -140,11 +141,11 @@ export function buildSimulator({ stars, now }: { stars: readonly Star[]; now?: (
             if (member === 'lastexposureduration') return { ...envelope, Value: runtime.lastExposure(cameraNumber).duration }
             if (member === 'lastexposurestarttime') return { ...envelope, Value: runtime.lastExposure(cameraNumber).timestamp }
           } else {
-            const values: Record<string, unknown> = { atpark: false, athome: false, slewing: state.raRateDegreesPerSecond !== 0,
+            const values: Record<string, unknown> = { atpark: false, athome: false, slewing: state.slewing,
               tracking: state.tracking, rightascension: state.rightAscensionHours, declination: state.declinationDegrees,
               cansettracking: true, canpark: false, canunpark: false, canfindhome: false, canslew: false,
-              canslewasync: false, cansync: false, canpulseguide: false, equatorialsystem: 0,
-              alignmentmode: 2, sitelatitude: 40, siderealtime: runtime.siderealTimeHours() }
+              canslewasync: true, cansync: false, canpulseguide: false, equatorialsystem: 2,
+              alignmentmode: 2, sitelatitude: 40, sitelongitude: -75, siteelevation: 0, siderealtime: runtime.siderealTimeHours() }
             if (Object.hasOwn(values, member)) return { ...envelope, Value: values[member] }
             if (member === 'canmoveaxis') return { ...envelope, Value: axisParameter(params) === 0 }
             if (member === 'axisrates') return { ...envelope, Value: axisParameter(params) === 0 ? [{ Minimum: 0, Maximum: 1.5 }] : [] }
@@ -169,7 +170,11 @@ export function buildSimulator({ stars, now }: { stars: readonly Star[]; now?: (
             return envelope
           }
           if (member === 'abortslew') {
-            runtime.move(0)
+            runtime.stop()
+            return envelope
+          }
+          if (member === 'slewtocoordinatesasync') {
+            runtime.slewTo(numberParameter(params, 'rightascension'), numberParameter(params, 'declination'))
             return envelope
           }
           if (member === 'moveaxis') {

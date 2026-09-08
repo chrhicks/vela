@@ -2,7 +2,7 @@
 
 This first integration connects the approved alignment interface to the local
 simulated rig through ordinary Alpaca acquisition and real ASTAP image solves.
-It is an explicitly configured synthetic-frame workflow, not yet a physical-rig
+It is an explicitly configured synthetic-clock workflow, not yet a physical-rig
 polar-alignment implementation. No generator state or true offsets enter the
 server's measurement path.
 
@@ -24,8 +24,9 @@ there is no durable execution or recovery.
 ## Configuration and local review
 
 Configure the endpoint and stable device IDs deliberately. The first model uses
-northern latitude, the simulator's fixed catalog frame (`EquatorialSystem=Other`),
-2-second mono exposures, a 3-degree camera field, and a prepared baseline near RA 12°, 30° and 48°. Axis movement uses
+northern latitude, the simulator's fixed catalog frame (`EquatorialSystem=J2000`, synthetic sidereal clock),
+2-second mono exposures, a 3-degree camera field, and a prepared baseline near RA 12°, 30° and 48° at nominal Dec 60°. Reset the simulator
+after target framing before starting this workflow. Axis movement uses
 1.5 degrees/second with observed pointing for the first position. These assumptions must not silently carry over to physical
 rigs: epoch conversion, mount direction, field calibration and actual device
 validation are future work. The ordinary app leaves alignment unavailable unless

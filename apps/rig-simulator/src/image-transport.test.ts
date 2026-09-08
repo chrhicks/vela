@@ -1,3 +1,4 @@
+import { imageWidth, imageHeight } from './optics.js'
 import { afterEach, expect, it } from 'vitest'
 import { acceptsImageBytes, encodeImageBytes, imageJsonChunks } from './image-bytes.js'
 import { buildSimulator } from './service.js'
@@ -56,8 +57,8 @@ it('negotiates both cameras and preserves a completed frame across binary and JS
     expect(binary.rawPayload.readUInt32LE(8)).toBe(12)
     const json = (await app.inject(`${path}/imagearray`)).json()
     expect(json).toMatchObject({ Type: 2, Rank: 2, ErrorNumber: 0 })
-    for (const [x, y] of [[0, 0], [799, 600], [1599, 1199]]) {
-      expect(binary.rawPayload.readUInt16LE(44 + (x! * 1200 + y!) * 2)).toBe(json.Value[x!][y!])
+    for (const [x, y] of [[0, 0], [Math.floor(imageWidth / 2), Math.floor(imageHeight / 2)], [imageWidth - 1, imageHeight - 1]]) {
+      expect(binary.rawPayload.readUInt16LE(44 + (x! * imageHeight + y!) * 2)).toBe(json.Value[x!][y!])
     }
   }
 })
