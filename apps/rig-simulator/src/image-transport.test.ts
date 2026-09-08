@@ -44,6 +44,7 @@ afterEach(async () => { await Promise.all(apps.splice(0).map(app => app.close())
 
 it('negotiates both cameras and preserves a completed frame across binary and JSON reads', async () => {
   const app = buildSimulator({ stars: [] })
+  for (const cameraNumber of [0, 1]) await app.inject({ method: 'PUT', url: '/simulator/camera', payload: { cameraNumber, resolution: 'fast' } })
   apps.push(app)
   for (const number of [0, 1]) {
     const path = `/api/v1/camera/${number}`

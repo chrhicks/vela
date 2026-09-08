@@ -72,7 +72,7 @@ export class SimulatorRuntime {
   private azimuth = -360
   private obscured = false
   private telescopeConnected = false
-  private cameras: Camera[] = [0, 1].map(() => ({ connected: false, resolution: 'fast', seed: 0, exposure: undefined, completed: undefined, rendering: undefined, cancellation: undefined }))
+  private cameras: Camera[] = [0, 1].map(() => ({ connected: false, resolution: 'full', seed: 0, exposure: undefined, completed: undefined, rendering: undefined, cancellation: undefined }))
   private camera(number = 0) {
     const camera = this.cameras[number]
     if (!camera) throw new SimulatorError(0x401, 'Unknown camera')

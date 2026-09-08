@@ -21,7 +21,8 @@ const executable = process.env.VELA_ASTAP
 if (!catalogPath || !executable) throw new Error('Set VELA_STAR_CATALOG and VELA_ASTAP; see README.md')
 const output = resolve(process.env.VELA_SIM_OUTPUT ?? '.local/framing-proof')
 await mkdir(output, { recursive: true })
-const simulator = buildSimulator({ stars: createStarSource(catalogPath) })
+let clockOffset = 0
+const simulator = buildSimulator({ stars: createStarSource(catalogPath), now: () => performance.now() + clockOffset })
 const vela = Fastify()
 const reports: object[] = []
 
@@ -86,8 +87,10 @@ try {
   }
 
   assert.equal((await view()).enabled, true)
-  const fastGeometry = (await view()).camera!
-  assert.ok(Math.abs(fastGeometry.fieldHeightDegrees - 3) < 1e-10)
+  const defaultGeometry = (await view()).camera!
+  assert.equal(defaultGeometry.width, 6248)
+  assert.equal(defaultGeometry.height, 4176)
+  assert.ok(Math.abs(defaultGeometry.fieldHeightDegrees - 3) < 1e-10)
   await start()
   const firstState = await finish()
   const first = checked(firstState)
@@ -144,8 +147,8 @@ try {
   const fullGeometry = (await view()).camera!
   assert.equal(fullGeometry.width, 6248)
   assert.equal(fullGeometry.height, 4176)
-  assert.equal(fullGeometry.fieldHeightDegrees, fastGeometry.fieldHeightDegrees)
-  assert.equal(fullGeometry.fieldWidthDegrees, fastGeometry.fieldWidthDegrees)
+  assert.equal(fullGeometry.fieldHeightDegrees, defaultGeometry.fieldHeightDegrees)
+  assert.equal(fullGeometry.fieldWidthDegrees, defaultGeometry.fieldWidthDegrees)
   await start()
   const full = checked(await finish())
   assert.ok(Math.abs(full.offsetArcminutes - first.offsetArcminutes) < 0.1)
@@ -164,7 +167,7 @@ try {
     centeredOffsetArcminutes: colorCentered.offsetArcminutes })
 
   // Browser regression: the crowded Crescent field failed at five seconds
-  // with ASTAP's normal catalog search overlap despite abundant image stars.
+  // in the old low-resolution renderer despite abundant image stars.
   const crescent = { raDegrees: 303.02729167, decDegrees: 38.34497497555 }
   for (const seconds of [2, 5]) {
     await start(seconds, crescent)
@@ -176,8 +179,18 @@ try {
       firstOffsetArcminutes: before.offsetArcminutes, centeredOffsetArcminutes: after.offsetArcminutes })
   }
 
+  // An established browser session samples a different polar-error orientation
+  // and pixel phase than a freshly reset rig. Exercise that centered field too.
+  clockOffset += 25 * 60 * 1000
+  await start(5, { raDegrees: 303.02729167, decDegrees: 38.35494444 })
+  const aged = checked(await finish())
+  await command('center', { checkId: aged.checkId })
+  const agedCentered = checked(await finish())
+  assert.ok(agedCentered.offsetArcminutes < 0.5)
+  reports.push({ scenario: 'crescent-after-25-minutes', centeredOffsetArcminutes: agedCentered.offsetArcminutes })
+
   await catalog.setImagingCamera('proof', { uniqueId: cameraId, name: 'Simulator Camera' })
-  await control('camera', { cameraNumber: 0, resolution: 'fast' })
+  await control('camera', { cameraNumber: 0, resolution: 'full' })
   for (const position of [{ raDegrees: 359.9, decDegrees: 0 }, { raDegrees: 45, decDegrees: 89 }]) {
     await start(2, position)
     const result = checked(await finish())

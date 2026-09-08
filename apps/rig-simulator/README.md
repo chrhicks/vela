@@ -168,15 +168,21 @@ movement; either exposure blocks a new movement or mount adjustment.
 | 0 · Simulator Camera | `vela-simulator-camera` (unchanged) | Monochrome | 0–32767 |
 | 1 · Simulator Color Camera | `vela-simulator-color-camera` | Raw RGGB, zero Bayer offsets | 0–65535 |
 
-Both default to 1562×1044 for quick iteration. Each can independently use
-6248×4176 to exercise the FRA camera's pixel count and Vela's full-size image
-path. Both retain the same synthetic sensor area and 3° field height. Full frames
-report 3.76 µm pixels; fast frames report 15.04 µm pixels, sampling each dimension
-at one quarter the resolution. Both report binning 1: the RGGB pattern is generated
-at that sampling, not produced by binning Bayer pixels. This does not reproduce
-FRA optics. Set the simulator rig’s effective focal length in Vela to
-**299.813 mm** (300 mm is a useful rounded value). Switching resolution then
-preserves the framing footprint and solver field hint.
+Both default to **6248×4176**, matching the FRA camera's pixel count and exercising
+Vela's real image path. Each can explicitly select 1562×1044 for lightweight
+transport/UI tests. Both retain the same synthetic sensor area and 3° field
+height. Full frames report 3.76 µm pixels; fast frames report 15.04 µm pixels.
+Both report binning 1: the RGGB pattern is generated at that sampling, not produced
+by binning Bayer pixels. This does not reproduce FRA optics. Set the simulator
+rig’s effective focal length in Vela to **299.813 mm** (300 mm is a useful rounded
+value). Switching resolution preserves the footprint, but not image fidelity.
+
+The renderer uses the same Gaussian width in pixels at each resolution. Fast
+stars are consequently four times wider on the sky (28″ versus 7″ FWHM), causing
+blended detections in crowded fields. Fast mode is not a faithful downsample and
+is not the framing reference. Preserve full-resolution acquisition and address
+sustained capture resource costs in the image pipeline separately.
+
 D05 provides positions and magnitude, not measured colors. Repeatable warm,
 neutral and cool assignments exercise color reconstruction without claiming
 astronomical color accuracy. The renderer’s independent 1600×1200 numerical fixture remains available; the
@@ -196,8 +202,8 @@ scratch below 512 KiB; only the UInt16 output scales with frame area. Binary
 transfer needs one additional two-byte-per-pixel buffer. JSON streams columns
 instead of constructing a full nested image. Reset, disconnect and new exposures
 invalidate pending generation and serialization; discarded images cannot become
-successful replacement frames. Full-size frames are a deliberate stress mode,
-not the default iteration cost.
+successful replacement frames. Full-size frames are the normal observing simulation; smaller frames are an
+explicit lightweight test option.
 
 Exposure images are captured from the modeled pose and camera obstruction at
 start, become available after duration elapses, and remain the last completed
@@ -278,20 +284,23 @@ pnpm --filter @vela/rig-simulator prove:framing
 This starts an isolated simulator on a random loopback port and exercises Vela’s
 production framing routes, Alpaca adapters, and real ASTAP process. It checks the
 Eagle field and a separate Center command, stops during movement and exposure,
-recovers from a genuinely obscured solve, checks both image resolutions and the
-color camera, and solves fields crossing RA zero and the north pole. The saved
+recovers from a genuinely obscured solve, checks full-resolution mono and
+color cameras, and solves fields crossing RA zero and the north pole. The saved
 rig catalog and physical devices are untouched. Results go to
 `.local/framing-proof/results.json` (`VELA_SIM_OUTPUT` overrides the directory).
 The existing `prove:http` remains the capture and polar-alignment regression.
 
-Vela asks ASTAP to use up to 1,000 stars. A retained crowded Eagle field failed
-at the default 500-star selection but solved correctly with 1,000, without any
-image or coordinate changes. The proof exercises this choice with actual pixels;
-there is no fallback that supplies a known answer to the solver. Synthetic
-residuals are integration evidence, not a real-sky accuracy promise.
-Raw Bayer frames pass `-check y` to ASTAP to enable its check-pattern filter;
-the flag without its value does not enable that filter in the reference CLI.
-ASTAP also uses `-speed slow` to overlap catalog search fields. Chris's five-second
-Crescent color exposure failed with normal overlap and solved unchanged with
-this setting at the original match tolerance. The framing proof covers Crescent
-check and centering at two and five seconds as well as Eagle.
+Vela uses one ASTAP invocation with up to 1,000 stars and the normal search mode.
+Raw Bayer frames pass `-check y` to enable the check-pattern filter. There is no
+alternate star-selection pass or relaxed match tolerance. The proof covers
+Crescent check and centering at two and five seconds, including an advanced
+simulator clock, as well as Eagle and the coordinate-boundary fields.
+
+A separate 12-field audit covered initial, subpixel-offset and elapsed-clock
+pointing, mono/color, and two-, five- and ten-second exposures. Full frames passed
+216/216 solves and WCS truth checks (center ≤0.25 pixels; corners ≤1 pixel).
+Worst measured full-frame center error was 0.059″ and corner error 0.224″.
+The original fast rendering passed only 58/72 five-second cases. Injected catalog
+positions were precise; blended detected centroids were the issue. Removing
+saturation did not cure it. These are synthetic integration residuals against
+the same catalog, not real-sky accuracy promises.
