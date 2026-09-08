@@ -54,7 +54,8 @@ export function createAstapSolver(config: {
         signal.throwIfAborted()
         const code = await runAstap(executable, ['-f', path, '-d', catalog,
           '-fov', String(config.fieldHeightDegrees), '-ra', String(hint.raDegrees / 15),
-          '-spd', String(hint.decDegrees + 90), '-r', '5', '-s', '1000',
+          // Overlapping catalog fields avoid missing matches in crowded images.
+          '-spd', String(hint.decDegrees + 90), '-r', '5', '-s', '1000', '-speed', 'slow',
           ...(frame.color?.kind === 'bayer' ? ['-check', 'y'] : [])], signal, timeout)
         signal.throwIfAborted()
         // ASTAP exit 1 means no match, 2 means not enough stars. Database,

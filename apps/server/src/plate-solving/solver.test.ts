@@ -21,6 +21,7 @@ async function fixture(body: string, timeoutMs = 3000) {
 
 it('sends raw signed-32 FITS, normalizes a solved center and removes per-exposure artifacts', async () => {
   const fixtureData = await fixture(`const image = fs.readFileSync(path)
+if (process.argv[process.argv.indexOf('-speed') + 1] !== 'slow') process.exit(16)
 if (!image.subarray(0,2880).toString().includes('BITPIX  =                   32') || image.readInt32BE(2884) !== 65535) process.exit(16)
 fs.writeFileSync(path.replace('.fits','.ini'), ${JSON.stringify(ini)})`)
   const solution = await fixtureData.solver.solve(frame, hint, new AbortController().signal)
