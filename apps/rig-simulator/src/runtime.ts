@@ -1,10 +1,12 @@
-import type { Star } from './catalog.js'
+import type { Star, StarSource } from './catalog.js'
+import { cameraGeometry, fieldHeightDegrees } from './optics.js'
+export { imageWidth, imageHeight } from './optics.js'
 import { cameraPose, siderealRadiansPerSecond } from './mount.js'
 import type { CameraPose } from './mount.js'
 import { renderSkyAsync } from './sky.js'
 
-export const imageWidth = 1600
-export const imageHeight = 1200
+const normalizeDegrees = (value: number) => ((value % 360) + 360) % 360
+const slewDegreesPerSecond = 30
 const siderealDegreesPerSecond = siderealRadiansPerSecond * 180 / Math.PI
 export type Preset = 'large-error' | 'near-aligned' | 'aligned'
 export interface CameraState {
@@ -36,6 +38,7 @@ export interface SimulatorState {
   cameraActivity: 'idle' | 'exposing'
   imageReady: boolean
   tracking: boolean
+  slewing: boolean
   raAxisDegrees: number
   raRateDegreesPerSecond: number
   rightAscensionHours: number
@@ -61,13 +64,15 @@ export class SimulatorRuntime {
   private epoch: number
   private updated: number
   private joint = 30
+  private declination = 60
+  private slew: { start: number; duration: number; ra: number; dec: number; deltaRa: number; deltaDec: number } | undefined
   private rate = 0
   private tracking = true
   private altitude = 480
   private azimuth = -360
   private obscured = false
   private telescopeConnected = false
-  private cameras: Camera[] = [0, 1].map(() => ({ connected: false, resolution: 'fast', seed: 0, exposure: undefined, completed: undefined, rendering: undefined, cancellation: undefined }))
+  private cameras: Camera[] = [0, 1].map(() => ({ connected: false, resolution: 'full', seed: 0, exposure: undefined, completed: undefined, rendering: undefined, cancellation: undefined }))
   private camera(number = 0) {
     const camera = this.cameras[number]
     if (!camera) throw new SimulatorError(0x401, 'Unknown camera')
@@ -78,8 +83,8 @@ export class SimulatorRuntime {
     const camera = this.camera(number)
     return { number, connected: camera.connected, activity: camera.exposure ? 'exposing' : 'idle',
       imageReady: !!camera.completed, sensor: number === 0 ? 'mono' : 'rggb', resolution: camera.resolution,
-      width: camera.resolution === 'full' ? 6248 : imageWidth,
-      height: camera.resolution === 'full' ? 4176 : imageHeight }
+      width: cameraGeometry(camera.resolution).width,
+      height: cameraGeometry(camera.resolution).height }
   }
   configureCamera(number: number, resolution: 'fast' | 'full') {
     this.advance()
@@ -90,25 +95,25 @@ export class SimulatorRuntime {
     this.abortExposure(number)
     camera.resolution = resolution
   }
-  constructor(private readonly stars: readonly Star[], private readonly now: () => number = () => performance.now()) {
+  constructor(private readonly stars: readonly Star[] | StarSource, private readonly now: () => number = () => performance.now()) {
     this.epoch = this.updated = now()
   }
   private advance() {
     const time = Math.max(this.updated, this.now())
     const seconds = (time - this.updated) / 1000
-    const previousRa = this.joint + this.elapsed() * siderealDegreesPerSecond
-    this.joint += seconds * (this.rate !== 0 ? this.rate : this.tracking ? -siderealDegreesPerSecond : 0)
-    this.updated = time
-    const ra = this.joint + this.elapsed() * siderealDegreesPerSecond
-    const netRaRate = this.rate + siderealDegreesPerSecond
-    if (this.rate !== 0 && ((netRaRate < 0 && ra < 10) || (netRaRate > 0 && ra > 50))) {
-      const boundary = ra < 10 ? 10 : 50
-      const secondsToBoundary = (boundary - previousRa) / netRaRate
-      const remainingSeconds = Math.max(0, seconds - secondsToBoundary)
-      const drift = this.tracking ? 0 : remainingSeconds * siderealDegreesPerSecond
-      this.joint = boundary + drift - this.elapsed() * siderealDegreesPerSecond
-      this.rate = 0
+    if (this.slew) {
+      const slew = this.slew
+      const fraction = Math.min(1, (time - slew.start) / slew.duration)
+      const ra = slew.ra + slew.deltaRa * fraction
+      this.declination = slew.dec + slew.deltaDec * fraction
+      this.joint = ra - (time - this.epoch) / 1000 * siderealDegreesPerSecond
+      if (fraction === 1) {
+        this.slew = undefined
+      }
+    } else {
+      this.joint += seconds * (this.rate !== 0 ? this.rate : this.tracking ? -siderealDegreesPerSecond : 0)
     }
+    this.updated = time
     for (const camera of this.cameras) {
       if (camera.exposure && time >= camera.exposure.start + camera.exposure.duration * 1000) {
         camera.completed = camera.exposure
@@ -126,21 +131,21 @@ export class SimulatorRuntime {
   private pose() {
     return cameraPose({ latitudeDegrees: 40, altitudeErrorDegrees: this.altitude / 3600,
       azimuthErrorDegrees: this.azimuth / 3600, raAxisDegrees: this.joint,
-      declinationDegrees: 60, elapsedSeconds: this.elapsed(), tracking: false })
+      declinationDegrees: this.declination, elapsedSeconds: this.elapsed(), tracking: false })
   }
   state(): SimulatorState {
     this.advance()
-    const direction = this.pose().direction
     const cameras = this.cameras.map((_, number) => this.cameraState(number))
     const mono = cameras[0]!
     return { altitudeArcsec: this.altitude, azimuthArcsec: this.azimuth, obscured: this.obscured,
       cameras, cameraConnected: mono.connected, telescopeConnected: this.telescopeConnected,
       cameraActivity: mono.activity, imageReady: mono.imageReady,
       tracking: this.rate === 0 && this.tracking,
+      slewing: !!this.slew || this.rate !== 0,
       raAxisDegrees: this.joint + this.elapsed() * siderealDegreesPerSecond,
       raRateDegreesPerSecond: this.rate,
-      rightAscensionHours: ((Math.atan2(direction[1], direction[0]) * 180 / Math.PI + 360) % 360) / 15,
-      declinationDegrees: Math.asin(direction[2]) * 180 / Math.PI }
+      rightAscensionHours: normalizeDegrees(this.joint + this.elapsed() * siderealDegreesPerSecond) / 15,
+      declinationDegrees: this.declination }
   }
   connect(device: 'camera' | 'telescope', connected: boolean, number = 0) {
     this.advance()
@@ -149,7 +154,7 @@ export class SimulatorRuntime {
       if (!connected) this.abortExposure(number)
     } else {
       this.telescopeConnected = connected
-      if (!connected) this.rate = 0
+      if (!connected) this.stop()
     }
   }
   requireConnected(device: 'camera' | 'telescope', number = 0) {
@@ -161,6 +166,7 @@ export class SimulatorRuntime {
   }
   adjust(altitude: number, azimuth: number) {
     this.requireIdle()
+    if (this.slew || this.rate !== 0) throw new SimulatorError(0x40b, 'Stop mount movement before adjusting the mount')
     if (![altitude, azimuth].every(value => Number.isFinite(value) && Math.abs(value) <= 18000)) throw new SimulatorError(0x401, 'Offsets must be within ±18000 arcseconds')
     this.altitude = altitude
     this.azimuth = azimuth
@@ -176,6 +182,8 @@ export class SimulatorRuntime {
     })
     this.epoch = this.updated
     this.joint = 30
+    this.declination = 60
+    this.slew = undefined
     this.rate = 0
     this.tracking = true
     this.obscured = false
@@ -184,39 +192,58 @@ export class SimulatorRuntime {
   }
   setTracking(tracking: boolean) {
     this.requireIdle()
-    if (this.rate !== 0) throw new SimulatorError(0x40b, 'Stop axis movement before changing tracking')
+    if (this.rate !== 0 || this.slew) throw new SimulatorError(0x40b, 'Stop mount movement before changing tracking')
     this.tracking = tracking
   }
   move(rate: number) {
     this.advance()
     if (rate !== 0) this.requireIdle()
     if (!Number.isFinite(rate) || Math.abs(rate) > 1.5) throw new SimulatorError(0x401, 'RA rate must be within ±1.5 degrees per second')
-    const ra = this.state().raAxisDegrees
-    const netRaRate = rate + siderealDegreesPerSecond
-    if (rate !== 0 && ((ra <= 10 && netRaRate < 0) || (ra >= 50 && netRaRate > 0))) throw new SimulatorError(0x40b, 'Movement would leave the catalog sky patch')
+    if (this.slew) throw new SimulatorError(0x40b, 'Stop coordinate slew before moving an axis')
     this.rate = rate
+  }
+  slewTo(rightAscensionHours: number, declinationDegrees: number) {
+    this.requireIdle()
+    if (!Number.isFinite(rightAscensionHours) || rightAscensionHours < 0 || rightAscensionHours >= 24
+      || !Number.isFinite(declinationDegrees) || Math.abs(declinationDegrees) > 90) {
+      throw new SimulatorError(0x401, 'Slew coordinates must be RA [0, 24) hours and Dec [-90, 90] degrees')
+    }
+    if (this.slew || this.rate !== 0) throw new SimulatorError(0x40b, 'Stop mount movement before starting a slew')
+    if (!this.tracking) throw new SimulatorError(0x40b, 'Equatorial slew requires tracking')
+    const ra = normalizeDegrees(this.joint + this.elapsed() * siderealDegreesPerSecond)
+    const deltaRa = normalizeDegrees(rightAscensionHours * 15 - ra + 180) - 180
+    const deltaDec = declinationDegrees - this.declination
+    const duration = Math.max(Math.abs(deltaRa), Math.abs(deltaDec)) / slewDegreesPerSecond * 1000
+    if (duration === 0) return
+    this.slew = { start: this.updated, duration, ra, dec: this.declination, deltaRa, deltaDec }
+  }
+  stop() {
+    this.advance()
+    this.slew = undefined
+    this.rate = 0
   }
   startExposure(duration: number, light: boolean, number = 0) {
     this.advance()
     const camera = this.camera(number)
     if (camera.exposure) throw new SimulatorError(0x40b, 'An exposure is in progress')
     if (!Number.isFinite(duration) || duration < 0 || duration > 3600) throw new SimulatorError(0x401, 'Exposure duration must be between 0 and 3600 seconds')
-    if (this.rate !== 0) throw new SimulatorError(0x40b, 'Stop axis movement before exposing')
+    if (this.rate !== 0 || this.slew) throw new SimulatorError(0x40b, 'Stop mount movement before exposing')
     // The rendered field must fit wholly inside the provisioned catalog patch.
     // A circumscribed spherical field also covers image corners and camera roll.
-    const state = this.state()
+    const pose = this.pose()
+    const ra = normalizeDegrees(Math.atan2(pose.direction[1], pose.direction[0]) * 180 / Math.PI)
+    const dec = Math.asin(pose.direction[2]) * 180 / Math.PI
     const { width, height } = this.cameraState(number)
-    const fieldRadius = Math.atan(Math.tan(1.5 * Math.PI / 180) * Math.hypot(width / height, 1))
+    const fieldRadius = Math.atan(Math.tan(fieldHeightDegrees / 2 * Math.PI / 180) * Math.hypot(width / height, 1))
     const declinationMargin = fieldRadius * 180 / Math.PI
-    const raMargin = Math.asin(Math.sin(fieldRadius) / Math.cos(state.declinationDegrees * Math.PI / 180)) * 180 / Math.PI
-    const ra = state.rightAscensionHours * 15
-    if (ra - raMargin < 0 || ra + raMargin > 70 || state.declinationDegrees - declinationMargin < 50
-      || state.declinationDegrees + declinationMargin > 70) {
+    const raMargin = Math.asin(Math.sin(fieldRadius) / Math.cos(dec * Math.PI / 180)) * 180 / Math.PI
+    if (typeof this.stars !== 'function' && (ra - raMargin < 0 || ra + raMargin > 70 || dec - declinationMargin < 50
+      || dec + declinationMargin > 70)) {
       throw new SimulatorError(0x40b, 'Camera field is outside the supported catalog patch (RA 0–70°, Dec 50–70°); move back or reset the simulator')
     }
     this.abortExposure(number)
     camera.exposure = { start: this.updated, duration, timestamp: new Date().toISOString().replace(/Z$/, ''),
-      pose: this.pose(), obscured: this.obscured || !light, seed: ++camera.seed, width, height }
+      pose, obscured: this.obscured || !light, seed: ++camera.seed, width, height }
   }
   abortExposure(number = 0) {
     const camera = this.camera(number)
@@ -240,11 +267,25 @@ export class SimulatorRuntime {
     }
     if (!camera.rendering) {
       camera.cancellation = new AbortController()
-      camera.rendering = renderSkyAsync(this.stars, exposure.pose, {
-        width: exposure.width, height: exposure.height, fieldHeightDegrees: 3,
-        seed: exposure.seed, obscured: exposure.obscured,
-        sensor: number === 0 ? 'monochrome' : 'rggb', exposureSeconds: exposure.duration,
-      }, camera.cancellation.signal)
+      const signal = camera.cancellation.signal
+      camera.rendering = (async () => {
+        const direction = exposure.pose.direction
+        const radiusDegrees = Math.atan(Math.tan(fieldHeightDegrees / 2 * Math.PI / 180)
+          * Math.hypot(exposure.width / exposure.height, 1)) * 180 / Math.PI
+          + fieldHeightDegrees / exposure.height * 12
+        const stars = typeof this.stars === 'function' ? await this.stars({
+          raDegrees: normalizeDegrees(Math.atan2(direction[1], direction[0]) * 180 / Math.PI),
+          decDegrees: Math.asin(direction[2]) * 180 / Math.PI,
+          radiusDegrees,
+        }, signal) : this.stars
+        assertCurrent()
+        signal.throwIfAborted()
+        return renderSkyAsync(stars, exposure.pose, {
+          width: exposure.width, height: exposure.height, fieldHeightDegrees,
+          seed: exposure.seed, obscured: exposure.obscured,
+          sensor: number === 0 ? 'monochrome' : 'rggb', exposureSeconds: exposure.duration,
+        }, signal)
+      })()
     }
     try {
       const pixels = await camera.rendering

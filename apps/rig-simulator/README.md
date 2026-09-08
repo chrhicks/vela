@@ -1,9 +1,9 @@
 # Rig simulator
 
-Development-only sky, cameras and equatorial mount for offline capture and polar alignment.
+Development-only sky, cameras and equatorial mount for capture, target framing and offline polar alignment.
 The simulator generates image pixels; it does not supply alignment answers to Vela.
 The local Alpaca service and separate controls implement the approved workshop
-design. The simulator feeds Vela’s actual capture and polar-alignment adapters.
+design. The simulator feeds Vela’s actual capture, framing and polar-alignment adapters.
 
 ## Current capability
 
@@ -21,9 +21,14 @@ produces background noise without stars, so solving actually fails.
 ## Coordinate conventions and limits
 
 - Angles in public mount values are degrees; elapsed time is seconds.
-- The synthetic sky uses one fixed equatorial frame, with pole +Z and local
-  sidereal angle zero at t=0. Latitude defaults in the proof to 40° north.
-  This is a reproducible synthetic epoch, not conversion from today's UTC.
+- The synthetic sky uses fixed J2000-oriented equatorial axes, with pole +Z.
+  Alpaca advertises `EquatorialSystem=J2000`; reported RA/Dec are nominal mount
+  coordinates, while the rendered camera pose includes polar-axis error. That
+  difference is what Vela measures during a framing check.
+- The synthetic sidereal clock starts at zero on reset. Site metadata is fixed
+  at latitude 40°, longitude −75°, elevation 0 m. This reproducible clock is not
+  derived from today’s UTC or longitude; the simulation does not model the
+  current local horizon or real-sky polar alignment.
 - Positive altitude error raises the polar axis; positive azimuth error turns
   it east of north. Azimuth is the mechanical angle; its contribution to total
   polar error depends on latitude. Errors are limited to ±5°.
@@ -35,9 +40,11 @@ produces background noise without stars, so solving actually fails.
   instantaneous snapshot at exposure start. Duration scales star and sky brightness
   from a two-second baseline, with sensor saturation. Motion blur and calibrated
   photometry are not modeled.
-- The catalog loader defaults to RA 0–70°, Dec 50–70° for the proof. This is
-  deliberately a sky patch, not all-sky coverage. Later movement controls must
-  honor coverage or load a larger region; an empty patch is not a cloud model.
+- The development service loads catalog stars around the exposure’s actual
+  camera direction, including image corners, RA wrap and either pole. It caches
+  one padded field, decoding catalog tiles without retaining an all-sky object
+  graph. Missing/malformed catalog data is an error. Fixed-array numerical proof
+  fixtures still use RA 0–70°, Dec 50–70° and reject exposures outside that patch.
 - No refraction, precession/nutation, flexure, optical distortion,
   seeing model or physical hardware is modeled. Catalog and solver use the same
   star data. Successful simulation does not establish real-sky precision.
@@ -150,20 +157,38 @@ read-only polling reconnects. Closing the control page does not stop the service
 
 The Alpaca service supports the management/identity/connection/telemetry reads
 used by Vela, two independent cameras (binning 1), start/abort exposure, image
-readiness, and RA-axis movement/tracking/stop for one shared equatorial mount.
+readiness, RA-axis movement/tracking/stop, and asynchronous RA/Dec coordinate
+slews for one shared equatorial mount. Slews require tracking, take the shorter
+RA path at up to 30°/second, and report `Slewing` until arrival. Stop freezes the
+intermediate position and retains tracking. Both cameras reject exposures during
+movement; either exposure blocks a new movement or mount adjustment.
 
 | Camera | Identity | Sensor | ADU range |
 | --- | --- | --- | --- |
 | 0 · Simulator Camera | `vela-simulator-camera` (unchanged) | Monochrome | 0–32767 |
 | 1 · Simulator Color Camera | `vela-simulator-color-camera` | Raw RGGB, zero Bayer offsets | 0–65535 |
 
-Both default to 1600×1200 for quick iteration. Each can independently use
-6248×4176 to exercise the FRA camera's pixel count and Vela's full-size image
-path. Both retain a synthetic 3° field height; this does not reproduce FRA optics.
+Both default to **6248×4176**, matching the FRA camera's pixel count and exercising
+Vela's real image path. Each can explicitly select 1562×1044 for lightweight
+transport/UI tests. Both retain the same synthetic sensor area and 3° field
+height. Full frames report 3.76 µm pixels; fast frames report 15.04 µm pixels.
+Both report binning 1: the RGGB pattern is generated at that sampling, not produced
+by binning Bayer pixels. This does not reproduce FRA optics. Set the simulator
+rig’s effective focal length in Vela to **299.813 mm** (300 mm is a useful rounded
+value). Switching resolution preserves the footprint, but not image fidelity.
+
+The renderer uses the same Gaussian width in pixels at each resolution. Fast
+stars are consequently four times wider on the sky (28″ versus 7″ FWHM), causing
+blended detections in crowded fields. Fast mode is not a faithful downsample and
+is not the framing reference. Preserve full-resolution acquisition and address
+sustained capture resource costs in the image pipeline separately.
+
 D05 provides positions and magnitude, not measured colors. Repeatable warm,
 neutral and cool assignments exercise color reconstruction without claiming
-astronomical color accuracy. The mono two-second baseline retains its original
-rendering for alignment regression.
+astronomical color accuracy. The renderer’s independent 1600×1200 numerical fixture remains available; the
+HTTP alignment proof verifies the current service image dimensions.
+Mono and color use the same focused Gaussian star profile; Bayer sampling changes
+the channel response, not the simulated focus.
 
 `ImageArray` negotiates `application/imagebytes` when explicitly accepted by the
 client; otherwise it streams JSON. Both encode the same cached frame in Alpaca
@@ -177,8 +202,8 @@ scratch below 512 KiB; only the UInt16 output scales with frame area. Binary
 transfer needs one additional two-byte-per-pixel buffer. JSON streams columns
 instead of constructing a full nested image. Reset, disconnect and new exposures
 invalidate pending generation and serialization; discarded images cannot become
-successful replacement frames. Full-size frames are a deliberate stress mode,
-not the default iteration cost.
+successful replacement frames. Full-size frames are the normal observing simulation; smaller frames are an
+explicit lightweight test option.
 
 Exposure images are captured from the modeled pose and camera obstruction at
 start, become available after duration elapses, and remain the last completed
@@ -204,10 +229,10 @@ are (+480, −360), (+12, −9), and (0, 0). The standard Alpaca API exposes pix
 pointing, not the true alignment offsets or a plate-solved answer. Only these
 separate development controls can see and change that truth.
 
-The current catalog patch limits useful acquisition. Movement has a bounded
-nominal RA interval; requests to expose outside the supported field return an
-explicit error rather than treating missing catalog stars as clouds. The HTTP proof below exercises production alignment acquisition, movement,
-solving and measured correction against this patch.
+Reset returns the nominal mount to RA 30°, Dec 60° for polar alignment. After
+framing another target, stop work in Vela and reset before starting alignment.
+The HTTP proof below exercises production alignment acquisition, movement,
+solving and measured correction against that northern baseline.
 
 ## HTTP acquisition and alignment proof
 
@@ -244,3 +269,38 @@ Results are written to `.local/http-proof/results.json` (override with
 `VELA_SIM_OUTPUT`). Generated server declarations must exist to typecheck this
 proof; the command builds them explicitly before execution. The default test
 suite does not require external catalogs, ASTAP, or a listening socket.
+
+
+## Target framing proof
+
+With the same local ASTAP and catalog assets:
+
+```sh
+VELA_STAR_CATALOG=/path/to/astap-catalog \
+VELA_ASTAP=/path/to/astap_cli \
+pnpm --filter @vela/rig-simulator prove:framing
+```
+
+This starts an isolated simulator on a random loopback port and exercises Vela’s
+production framing routes, Alpaca adapters, and real ASTAP process. It checks the
+Eagle field and a separate Center command, stops during movement and exposure,
+recovers from a genuinely obscured solve, checks full-resolution mono and
+color cameras, and solves fields crossing RA zero and the north pole. The saved
+rig catalog and physical devices are untouched. Results go to
+`.local/framing-proof/results.json` (`VELA_SIM_OUTPUT` overrides the directory).
+The existing `prove:http` remains the capture and polar-alignment regression.
+
+Vela uses one ASTAP invocation with up to 1,000 stars and the normal search mode.
+Raw Bayer frames pass `-check y` to enable the check-pattern filter. There is no
+alternate star-selection pass or relaxed match tolerance. The proof covers
+Crescent check and centering at two and five seconds, including an advanced
+simulator clock, as well as Eagle and the coordinate-boundary fields.
+
+A separate 12-field audit covered initial, subpixel-offset and elapsed-clock
+pointing, mono/color, and two-, five- and ten-second exposures. Full frames passed
+216/216 solves and WCS truth checks (center ≤0.25 pixels; corners ≤1 pixel).
+Worst measured full-frame center error was 0.059″ and corner error 0.224″.
+The original fast rendering passed only 58/72 five-second cases. Injected catalog
+positions were precise; blended detected centroids were the issue. Removing
+saturation did not cure it. These are synthetic integration residuals against
+the same catalog, not real-sky accuracy promises.

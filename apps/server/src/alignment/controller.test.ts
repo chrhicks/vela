@@ -33,20 +33,26 @@ afterEach(async () => { await Promise.all(stops.splice(0).map(stop => stop())); 
 
 function setup() {
   let ra = 10
+  let dec = 60
+  let coordinateSystem: Awaited<ReturnType<AlpacaAcquisition['pointing']>>['coordinateSystem'] = 'j2000'
   let exposures = 0
+  let moves = 0
   let siderealOffset = 0
   let captureOverride: ((signal: AbortSignal) => Promise<AlpacaFrame>) | undefined
   const requests: Array<{ frame: MonoFrame, hint: SkyPosition, result: ReturnType<typeof deferred<SolveResult>> }> = []
   const hardware: AlpacaAcquisition = {
-    async pointing() { return { rightAscensionDegrees: ra, declinationDegrees: 60,
-      siderealTimeDegrees: ((exposures + 1) * 360 / 86164.0905 + siderealOffset + 360) % 360, latitudeDegrees: 40, tracking: true, coordinateSystem: 'other' } },
+    async pointing() { return { rightAscensionDegrees: ra, declinationDegrees: dec,
+      siderealTimeDegrees: ((exposures + 1) * 360 / 86164.0905 + siderealOffset + 360) % 360, latitudeDegrees: 40, tracking: true, coordinateSystem } },
     async capture({ signal }) {
       exposures++
       if (captureOverride) return captureOverride(signal!)
       return { width: 4, height: 4, pixels: new Float64Array([0, 500, 300, 100, ...Array(12).fill(0)]),
         capturedAt: new Date(1_700_000_000_000 + exposures * 1000).toISOString(), color: { kind: 'mono' } }
     },
-    async move(_id, rate, duration) { ra += rate * duration },
+    async move(_id, rate, duration) {
+      moves++
+      ra += rate * duration
+    },
     async abort() {},
   }
   const solver: PlateSolver = {
@@ -75,7 +81,12 @@ function setup() {
     for (let position = 0; position < 3; position++) solve(await nextSolve())
     await vi.waitFor(() => expect(controller.snapshot().measurement).not.toBeNull())
   }
-  return { controller, nextSolve, solve, baseline, exposures: () => exposures,
+  return { controller, nextSolve, solve, baseline, exposures: () => exposures, moves: () => moves,
+    setPointing: (position: { ra: number, dec: number, frame: typeof coordinateSystem }) => {
+      ra = position.ra
+      dec = position.dec
+      coordinateSystem = position.frame
+    },
     resetSidereal: () => { siderealOffset -= 10 },
     setCapture: (capture: typeof captureOverride) => { captureOverride = capture } }
 }
@@ -163,4 +174,20 @@ it('stops with the last good image retained when a simulator reset changes the s
   expect(subject.controller.snapshot()).toMatchObject({ phase: 'failed', measurement: previous.measurement, measuredAt: previous.measuredAt })
   expect(subject.controller.snapshot().error).toContain('rig clock or simulator baseline changed')
   expect(cadence.waits).toHaveLength(0)
+})
+
+
+it.each([
+  { ra: 30, dec: 60, frame: 'other' as const },
+  { ra: 30, dec: 60, frame: 'topocentric' as const },
+  { ra: 30, dec: -14, frame: 'j2000' as const },
+  { ra: 274, dec: 60, frame: 'j2000' as const },
+])('requires the declared simulator frame and reset alignment position before moving: %j', async position => {
+  const subject = setup()
+  subject.setPointing(position)
+  await subject.controller.start('sim', 'Simulator')
+  await vi.waitFor(() => expect(subject.controller.snapshot().active).toBe(false))
+  expect(subject.controller.snapshot().phase).toBe('failed')
+  expect(subject.exposures()).toBe(0)
+  expect(subject.moves()).toBe(0)
 })

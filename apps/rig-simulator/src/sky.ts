@@ -75,7 +75,9 @@ function* renderStripes(
   const stripeRows = Math.max(1, Math.floor(stripePixelBudget / width))
   const stripes: ProjectedStar[][] = Array.from({ length: Math.ceil(height / stripeRows) }, () => [])
   const focalPixels = height / (2 * Math.tan(fieldHeightDegrees * Math.PI / 360))
-  const sigma = colorSensor ? 2 : 1.15
+  // Both cameras share focused optics. Color changes spectral response, not
+  // star width; unnecessarily broad stars blend in crowded Milky Way fields.
+  const sigma = 1.15
   const radius = colorSensor ? 8 : 5
   if (!options.obscured) {
     for (let index = 0; index < stars.length; index++) {

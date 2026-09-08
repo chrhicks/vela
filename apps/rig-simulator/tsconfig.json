@@ -21,6 +21,7 @@
     "src"
   ],
   "exclude": [
-    "src/prove-http.ts"
+    "src/prove-http.ts",
+    "src/prove-framing.ts"
   ]
 }

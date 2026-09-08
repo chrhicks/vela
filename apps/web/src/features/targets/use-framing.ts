@@ -137,5 +137,7 @@ export function useFraming(rigId: string) {
   }
 
   return { view, offline, pending, refreshing, error, commandUnconfirmed, canStart, canStop,
-    start: (body: { targetId: string, raDegrees: number, decDegrees: number, exposureSeconds: number }) => command('start', body), center: () => command('center', { checkId: view?.actual?.checkId }), settings: (focalLengthMm: number) => command('settings', { focalLengthMm }), stop: () => command('stop'), refresh: () => read(true) }
+    start: ({ targetId, raDegrees, decDegrees, exposureSeconds }: { targetId: string, raDegrees: number, decDegrees: number, exposureSeconds: number }) =>
+      command('start', { targetId, raDegrees, decDegrees, exposureSeconds }),
+    center: () => command('center', { checkId: view?.actual?.checkId }), settings: (focalLengthMm: number) => command('settings', { focalLengthMm }), stop: () => command('stop'), refresh: () => read(true) }
 }

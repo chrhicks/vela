@@ -13,6 +13,35 @@ const idle: FramingView = { rigId: 'rig-1', rigName: 'Test rig', enabled: true, 
 const allsky = readFileSync(new URL('./fixtures/survey-allsky.jpg', import.meta.url))
 const tile = readFileSync(new URL('./fixtures/survey-tile.jpg', import.meta.url))
 
+test('an untouched target and Reset frame send only the accepted slew fields', async ({ page }) => {
+  let state = { ...idle }
+  const submissions: unknown[] = []
+  await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
+  await page.route('**/api/web/rigs/rig-1/framing', route => respond(route, state))
+  await page.route('**/api/survey/**', route => route.abort())
+  await page.route('**/api/rigs/rig-1/framing/start', route => {
+    const body = route.request().postDataJSON()
+    submissions.push(body)
+    if (Object.keys(body).sort().join(',') !== 'decDegrees,exposureSeconds,raDegrees,targetId') {
+      return route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ error: 'Invalid framing command body' }) })
+    }
+    state = { ...state, targetId: body.targetId, desired: { raDegrees: body.raDegrees, decDegrees: body.decDegrees },
+      phase: 'checked', checkCurrent: true, actual: { raDegrees: body.raDegrees, decDegrees: body.decDegrees,
+        checkId: `check-${submissions.length}`, capturedAt: new Date().toISOString(), rotationDegrees: 0, offsetArcminutes: 0,
+        corners: [{ raDegrees: 9, decDegrees: 40 }, { raDegrees: 11, decDegrees: 40 }, { raDegrees: 11, decDegrees: 42 }, { raDegrees: 9, decDegrees: 42 }] } }
+    return respond(route, state)
+  })
+  await page.goto('/rigs/rig-1/observe/targets/m31')
+  await page.getByRole('button', { name: 'Slew & check' }).click()
+  await expect(page.getByText('Framing checked', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Adjust composition' }).click()
+  await page.getByRole('button', { name: 'Move frame →' }).click()
+  await page.getByRole('button', { name: 'Reset frame' }).click()
+  await page.getByRole('button', { name: 'Slew & check' }).click()
+  await expect(page.getByText('Framing checked', { exact: true })).toBeVisible()
+  expect(submissions).toEqual(Array(2).fill({ targetId: target.id, raDegrees: target.raDegrees, decDegrees: target.decDegrees, exposureSeconds: 2 }))
+})
+
 test('catalog is paged and search updates use actual server results; missing site and image stay honest on mobile', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   const queries: string[] = []
