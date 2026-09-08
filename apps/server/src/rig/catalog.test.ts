@@ -63,6 +63,19 @@ async function catalogPath() {
 }
 
 describe('file Rig catalog', () => {
+  it('keeps effective focal length across restart and rejects malformed saved optics', async () => {
+    const path = await catalogPath()
+    try {
+      await writeFile(path, validCatalog)
+      const catalog = await openFileRigCatalog(path)
+      await expect(catalog.setFocalLength('rig-1', 400)).resolves.toBe(true)
+      await expect((await openFileRigCatalog(path)).get('rig-1')).resolves.toMatchObject({ focalLengthMm: 400 })
+      await expect(catalog.setFocalLength('rig-1', 0)).rejects.toThrow('focal length')
+      await writeFile(path, validCatalog.replace('    name: Backyard rig', '    focalLengthMm: .nan\n    name: Backyard rig'))
+      await expect(openFileRigCatalog(path)).rejects.toThrow(RigCatalogFileError)
+    } finally { await rm(dirname(path), { recursive: true, force: true }) }
+  })
+
   it('starts empty when the file is missing and survives a restart after the first add', async () => {
     const path = await catalogPath()
     const observed = inventory('2026-09-02T20:00:00.000Z', { uniqueId: 'camera-1' })
