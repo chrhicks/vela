@@ -153,6 +153,9 @@ async function proveCapture() {
   }
   try {
     assert.equal((await captureView()).enabled, false, 'No implicit camera selection')
+    // Small frames keep the exhaustive JSON/binary transport check bounded.
+    // Alignment above and native capture below use the default full frames.
+    for (const cameraNumber of [0, 1]) await control('camera', { cameraNumber, resolution: 'fast' })
     await select(colorId)
     const color = await capture()
     assert.equal(color.color, 'color')

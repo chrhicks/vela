@@ -7,11 +7,12 @@ import { renderSky } from './sky.js'
 
 const apps: ReturnType<typeof buildSimulator>[] = []
 afterEach(async () => { await Promise.all(apps.splice(0).map(app => app.close())) })
-function setup() {
+async function setup() {
   let time = 0
   const stars = [{ raDegrees: 30, decDegrees: 60, magnitude: 7 }]
   const app = buildSimulator({ stars, now: () => time })
   apps.push(app)
+  await app.inject({ method: 'PUT', url: '/simulator/camera', payload: { resolution: 'fast' } })
   const get = async (device: string, member: string) => (await app.inject(`/api/v1/${device}/0/${member}`)).json()
   const put = async (device: string, member: string, params: Record<string, string>) => (await app.inject({ method: 'PUT', url: `/api/v1/${device}/0/${member}`,
     headers: { 'content-type': 'application/x-www-form-urlencoded' }, payload: new URLSearchParams(params).toString() })).json()
@@ -20,7 +21,7 @@ function setup() {
 
 describe('simulator Alpaca boundary', () => {
   it('discovers its two cameras and shared telescope, validates writes, and reports disconnected state', async () => {
-    const { app, get, put } = setup()
+    const { app, get, put } = await setup()
     const devices = (await app.inject('/management/v1/configureddevices')).json().Value
     expect(devices.map((device: { DeviceType: string; DeviceNumber: number }) => [device.DeviceType, device.DeviceNumber])).toEqual([['Camera', 0], ['Camera', 1], ['Telescope', 0]])
     expect((await get('camera', 'camerastate')).ErrorNumber).toBe(0x407)
@@ -36,7 +37,7 @@ describe('simulator Alpaca boundary', () => {
   })
 
   it('waits for completion and transfers actual rendered pixels in Alpaca X/Y order', async () => {
-    const { app, stars, get, put, advance } = setup()
+    const { app, stars, get, put, advance } = await setup()
     await app.inject({ method: 'POST', url: '/simulator/reset', payload: { preset: 'aligned' } })
     await put('camera', 'connected', { Connected: 'true' })
     expect((await put('camera', 'startexposure', { Duration: '2', Light: 'true' })).ErrorNumber).toBe(0)
@@ -69,7 +70,7 @@ describe('simulator Alpaca boundary', () => {
   })
 
   it('rejects busy adjustments, resets pending images, and validates simulator controls', async () => {
-    const { app, get, put, advance } = setup()
+    const { app, get, put, advance } = await setup()
     await put('camera', 'connected', { Connected: 'true' })
     await put('camera', 'startexposure', { Duration: '10', Light: 'true' })
     expect((await app.inject({ method: 'PUT', url: '/simulator/adjust', payload: { altitudeArcsec: 0, azimuthArcsec: 0 } })).statusCode).toBe(409)
@@ -84,7 +85,7 @@ describe('simulator Alpaca boundary', () => {
   })
 
   it('moves RA over elapsed time, continues beyond the old catalog patch and refuses unsupported axes', async () => {
-    const { app, get, put, advance } = setup()
+    const { app, get, put, advance } = await setup()
     await put('telescope', 'connected', { Connected: 'true' })
     expect((await get('telescope', 'canmoveaxis?Axis=1')).Value).toBe(false)
     expect((await get('telescope', 'axisrates?Axis=1')).Value).toEqual([])
@@ -139,7 +140,7 @@ it('restores tracking-off after an explicit stop and refuses exposures after dri
 })
 
 it('cover changes during exposure apply to the next frame while pending pixels retain their snapshot', async () => {
-  const { app, get, put, advance } = setup()
+  const { app, get, put, advance } = await setup()
   await app.inject({ method: 'POST', url: '/simulator/reset', payload: { preset: 'aligned' } })
   await put('camera', 'connected', { Connected: 'true' })
   await put('camera', 'startexposure', { Duration: '1', Light: 'true' })
@@ -165,7 +166,7 @@ it('moves back from a drifted field without jumping to a catalog boundary', () =
 })
 
 it('declares J2000 and handles asynchronous slews, invalid coordinates and cancellation', async () => {
-  const { get, put, advance } = setup()
+  const { get, put, advance } = await setup()
   await put('telescope', 'connected', { Connected: 'true' })
   expect((await get('telescope', 'equatorialsystem')).Value).toBe(2)
   expect((await get('telescope', 'canslewasync')).Value).toBe(true)
@@ -193,11 +194,23 @@ it('declares J2000 and handles asynchronous slews, invalid coordinates and cance
 })
 
 it('reports coarser fast pixels for the same physical sensor', async () => {
-  const { app, get, put } = setup()
+  const { app, get, put } = await setup()
   await put('camera', 'connected', { Connected: 'true' })
   expect((await get('camera', 'pixelsizex')).Value).toBe(15.04)
   expect((await get('camera', 'cameraxsize')).Value).toBe(1562)
   await app.inject({ method: 'PUT', url: '/simulator/camera', payload: { resolution: 'full' } })
   expect((await get('camera', 'pixelsizex')).Value).toBe(3.76)
   expect((await get('camera', 'cameraxsize')).Value).toBe(6248)
+})
+
+it('starts both cameras at full resolution and reports native pixel geometry', async () => {
+  const app = buildSimulator({ stars: [] })
+  apps.push(app)
+  const state = (await app.inject('/simulator/state')).json()
+  expect(state.cameras.map((camera: { resolution: string, width: number, height: number }) => [camera.resolution, camera.width, camera.height]))
+    .toEqual([['full', 6248, 4176], ['full', 6248, 4176]])
+  for (const number of [0, 1]) {
+    await app.inject({ method: 'PUT', url: `/api/v1/camera/${number}/connected`, payload: { Connected: true } })
+    expect((await app.inject(`/api/v1/camera/${number}/pixelsizex`)).json().Value).toBe(3.76)
+  }
 })

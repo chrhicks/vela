@@ -22,11 +22,11 @@ function CamerasPreview({ props, onPropsChange }: {
   props: Record<string, string | number | boolean>
   onPropsChange?: (patch: Record<string, string | number | boolean>) => void
 }) {
-  const [mono, setMono] = useState<Resolution>(props.mono === 'full' ? 'full' : 'fast')
-  const [color, setColor] = useState<Resolution>(props.color === 'full' ? 'full' : 'fast')
+  const [mono, setMono] = useState<Resolution>(props.mono === 'fast' ? 'fast' : 'full')
+  const [color, setColor] = useState<Resolution>(props.color === 'fast' ? 'fast' : 'full')
   const [obscured, setObscured] = useState(props.sky === 'obscured')
-  useEffect(() => setMono(props.mono === 'full' ? 'full' : 'fast'), [props.mono])
-  useEffect(() => setColor(props.color === 'full' ? 'full' : 'fast'), [props.color])
+  useEffect(() => setMono(props.mono === 'fast' ? 'fast' : 'full'), [props.mono])
+  useEffect(() => setColor(props.color === 'fast' ? 'fast' : 'full'), [props.color])
   useEffect(() => setObscured(props.sky === 'obscured'), [props.sky])
   const available = props.state !== 'unavailable'
   const cameras: Camera[] = [mono, color].map((resolution, number) => ({
@@ -94,6 +94,6 @@ export const specimen: ComponentSpecimen = {
     color: { type: 'select', label: 'Color resolution', options: ['fast', 'full'] },
     sky: { type: 'select', label: 'Shared sky', options: ['clear', 'obscured'] },
   },
-  defaultProps: { state: 'idle', mono: 'fast', color: 'fast', sky: 'clear' },
+  defaultProps: { state: 'idle', mono: 'full', color: 'full', sky: 'clear' },
   render: (props, onPropsChange) => <CamerasPreview props={props} {...(onPropsChange ? { onPropsChange } : {})} />,
 }
