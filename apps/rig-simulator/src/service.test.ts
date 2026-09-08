@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { buildSimulator } from './service.js'
 import { SimulatorRuntime } from './runtime.js'
 import { cameraPose } from './mount.js'
+import { imageWidth, imageHeight } from './optics.js'
 import { renderSky } from './sky.js'
 
 const apps: ReturnType<typeof buildSimulator>[] = []
@@ -50,15 +51,15 @@ describe('simulator Alpaca boundary', () => {
     expect((await get('camera', 'lastexposurestarttime')).Value).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d/)
     const image = await get('camera', 'imagearray')
     expect(image).toMatchObject({ Type: 2, Rank: 2, ErrorNumber: 0 })
-    expect(image.Value.length).toBe(1600)
-    expect(image.Value[0].length).toBe(1200)
+    expect(image.Value.length).toBe(imageWidth)
+    expect(image.Value[0].length).toBe(imageHeight)
     const expected = renderSky(stars, cameraPose({ latitudeDegrees: 40, altitudeErrorDegrees: 0,
       azimuthErrorDegrees: 0, raAxisDegrees: 30, declinationDegrees: 60, elapsedSeconds: 0, tracking: true }),
-    { width: 1600, height: 1200, fieldHeightDegrees: 3, seed: 1 })
-    for (const [x, y] of [[0, 0], [800, 600], [899, 1000], [1599, 1199]]) {
-      expect(image.Value[x!][y!]).toBe(expected[y! * 1600 + x!]!)
+    { width: imageWidth, height: imageHeight, fieldHeightDegrees: 3, seed: 1 })
+    for (const [x, y] of [[0, 0], [781, 522], [899, 1000], [1561, 1043]]) {
+      expect(image.Value[x!][y!]).toBe(expected[y! * imageWidth + x!]!)
     }
-    expect(image.Value[800][600]).toBeGreaterThan(1000)
+    expect(image.Value[781][522]).toBeGreaterThan(1000)
     await put('camera', 'startexposure', { Duration: '100', Light: 'true' })
     expect((await get('camera', 'imageready')).Value).toBe(false)
     await put('camera', 'abortexposure', {})
@@ -82,7 +83,7 @@ describe('simulator Alpaca boundary', () => {
     expect((await app.inject({ method: 'PUT', url: '/simulator/camera', payload: { obscured: 'true' } })).statusCode).toBe(400)
   })
 
-  it('moves RA over elapsed time, stops at catalog coverage and refuses unsupported axes', async () => {
+  it('moves RA over elapsed time, continues beyond the old catalog patch and refuses unsupported axes', async () => {
     const { app, get, put, advance } = setup()
     await put('telescope', 'connected', { Connected: 'true' })
     expect((await get('telescope', 'canmoveaxis?Axis=1')).Value).toBe(false)
@@ -102,8 +103,10 @@ describe('simulator Alpaca boundary', () => {
     expect((await app.inject('/simulator/state')).json().raAxisDegrees).toBeCloseTo(state.raAxisDegrees)
     await put('telescope', 'moveaxis', { Axis: '0', Rate: '1.5' })
     advance(100000)
-    expect((await app.inject('/simulator/state')).json()).toMatchObject({ raAxisDegrees: 50, raRateDegreesPerSecond: 0 })
-    expect((await put('telescope', 'moveaxis', { Axis: '0', Rate: '1' })).ErrorNumber).toBe(0x40b)
+    const moving = (await app.inject('/simulator/state')).json()
+    expect(moving.raAxisDegrees).toBeGreaterThan(185)
+    expect(moving.raRateDegreesPerSecond).toBe(1.5)
+    await put('telescope', 'abortslew', {})
   })
 })
 
@@ -123,12 +126,13 @@ it('tracking changes preserve orientation and monotonic time ignores a backwards
   expect(runtime.state().rightAscensionHours).toBe(drifted.rightAscensionHours)
 })
 
-it('restores tracking-off after a boundary stop and refuses exposures after drifting beyond catalog coverage', () => {
+it('restores tracking-off after an explicit stop and refuses exposures after drifting beyond catalog coverage', () => {
   let now = 0
   const runtime = new SimulatorRuntime([], () => now)
   runtime.setTracking(false)
   runtime.move(1.5)
   now = 20000
+  runtime.stop()
   expect(runtime.state()).toMatchObject({ tracking: false, raRateDegreesPerSecond: 0 })
   now = 20000000
   expect(() => runtime.startExposure(1, true)).toThrow('outside the supported catalog patch')
@@ -141,9 +145,9 @@ it('cover changes during exposure apply to the next frame while pending pixels r
   await put('camera', 'startexposure', { Duration: '1', Light: 'true' })
   expect((await app.inject({ method: 'PUT', url: '/simulator/camera', payload: { obscured: true } })).statusCode).toBe(200)
   advance(1000)
-  expect((await get('camera', 'imagearray')).Value[800][600]).toBeGreaterThan(1000)
+  expect((await get('camera', 'imagearray')).Value[781][522]).toBeGreaterThan(1000)
   await put('camera', 'startexposure', { Duration: '0', Light: 'true' })
-  expect((await get('camera', 'imagearray')).Value[800][600]).toBeLessThan(507)
+  expect((await get('camera', 'imagearray')).Value[781][522]).toBeLessThan(507)
 })
 
 it('moves back from a drifted field without jumping to a catalog boundary', () => {
@@ -160,27 +164,40 @@ it('moves back from a drifted field without jumping to a catalog boundary', () =
   expect(drifted - moved).toBeLessThan(1)
 })
 
-it('uses net sky motion for slow negative rates at both catalog boundaries', () => {
-  let now = 0
-  const runtime = new SimulatorRuntime([], () => now)
-  runtime.move(1.5)
-  now = 20000
-  expect(runtime.state().raAxisDegrees).toBe(50)
-  // Earth rotation exceeds this mechanical westward rate: net motion is east.
-  expect(() => runtime.move(-0.001)).toThrow('leave the catalog sky patch')
-  runtime.move(-1)
-  now += 100
-  runtime.move(0)
-  expect(runtime.state().raAxisDegrees).toBeLessThan(50)
-  runtime.move(-0.001)
-  now += 100000
-  expect(runtime.state()).toMatchObject({ raAxisDegrees: 50, raRateDegreesPerSecond: 0 })
-  runtime.move(-1.5)
-  now += 100000
-  expect(runtime.state().raAxisDegrees).toBeCloseTo(10)
-  runtime.move(-0.001)
-  now += 1000
-  expect(runtime.state().raAxisDegrees).toBeGreaterThan(10)
-  expect(runtime.state().raRateDegreesPerSecond).toBe(-0.001)
-  runtime.move(0)
+it('declares J2000 and handles asynchronous slews, invalid coordinates and cancellation', async () => {
+  const { get, put, advance } = setup()
+  await put('telescope', 'connected', { Connected: 'true' })
+  expect((await get('telescope', 'equatorialsystem')).Value).toBe(2)
+  expect((await get('telescope', 'canslewasync')).Value).toBe(true)
+  expect((await get('telescope', 'sitelongitude')).Value).toBe(-75)
+  expect((await get('telescope', 'siteelevation')).Value).toBe(0)
+  expect((await get('telescope', 'rightascension')).Value).toBe(2)
+  expect((await get('telescope', 'declination')).Value).toBe(60)
+  await put('telescope', 'tracking', { Tracking: 'false' })
+  expect((await put('telescope', 'slewtocoordinatesasync', { RightAscension: '6', Declination: '0' })).ErrorNumber).toBe(0x40b)
+  expect((await get('telescope', 'slewing')).Value).toBe(false)
+  await put('telescope', 'tracking', { Tracking: 'true' })
+  for (const [ra, dec] of [['24', '0'], ['-1', '0'], ['1', '91'], ['1', 'NaN']]) {
+    expect((await put('telescope', 'slewtocoordinatesasync', { RightAscension: ra!, Declination: dec! })).ErrorNumber).toBe(0x401)
+  }
+  expect((await put('telescope', 'slewtocoordinatesasync', { RightAscension: '6', Declination: '0' })).ErrorNumber).toBe(0)
+  expect((await get('telescope', 'slewing')).Value).toBe(true)
+  expect((await get('telescope', 'tracking')).Value).toBe(true)
+  advance(1000)
+  expect((await get('telescope', 'rightascension')).Value).toBeCloseTo(4)
+  expect((await get('telescope', 'declination')).Value).toBeCloseTo(30)
+  await put('telescope', 'abortslew', {})
+  advance(10000)
+  expect((await get('telescope', 'rightascension')).Value).toBeCloseTo(4)
+  expect((await get('telescope', 'slewing')).Value).toBe(false)
+})
+
+it('reports coarser fast pixels for the same physical sensor', async () => {
+  const { app, get, put } = setup()
+  await put('camera', 'connected', { Connected: 'true' })
+  expect((await get('camera', 'pixelsizex')).Value).toBe(15.04)
+  expect((await get('camera', 'cameraxsize')).Value).toBe(1562)
+  await app.inject({ method: 'PUT', url: '/simulator/camera', payload: { resolution: 'full' } })
+  expect((await get('camera', 'pixelsizex')).Value).toBe(3.76)
+  expect((await get('camera', 'cameraxsize')).Value).toBe(6248)
 })

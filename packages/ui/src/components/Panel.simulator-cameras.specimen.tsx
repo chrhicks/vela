@@ -16,7 +16,7 @@ type Camera = {
   sensor: 'mono' | 'rggb'
   resolution: Resolution
 }
-const dimensions = { fast: [1600, 1200], full: [6248, 4176] } as const
+const dimensions = { fast: [1562, 1044], full: [6248, 4176] } as const
 
 function CamerasPreview({ props, onPropsChange }: {
   props: Record<string, string | number | boolean>
@@ -51,7 +51,7 @@ function CamerasPreview({ props, onPropsChange }: {
           <div className="vela-sim-camera-title"><h2>{camera.sensor === 'mono' ? 'Mono camera' : 'Color camera'}</h2><span>{camera.connected ? 'Connected' : 'Disconnected'}</span></div>
           <p className="vela-sim-camera-meta">Camera {camera.number} · {camera.sensor === 'mono' ? 'Monochrome' : 'RGGB sensor'}</p>
           <Select label={`${camera.sensor === 'mono' ? 'Mono' : 'Color'} image size`} value={camera.resolution} disabled={!available || camera.activity === 'exposing'} options={[
-            { value: 'fast', label: 'Fast · 1600 × 1200' },
+            { value: 'fast', label: 'Fast · 1562 × 1044' },
             { value: 'full', label: 'Full · 6248 × 4176' },
           ]} onChange={event => {
             const value = event.target.value as Resolution
