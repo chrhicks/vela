@@ -163,6 +163,19 @@ try {
   reports.push({ scenario: 'color-check-and-center', firstOffsetArcminutes: colorFirst.offsetArcminutes,
     centeredOffsetArcminutes: colorCentered.offsetArcminutes })
 
+  // Browser regression: the crowded Crescent field failed at five seconds
+  // with ASTAP's normal catalog search overlap despite abundant image stars.
+  const crescent = { raDegrees: 303.02729167, decDegrees: 38.34497497555 }
+  for (const seconds of [2, 5]) {
+    await start(seconds, crescent)
+    const before = checked(await finish())
+    await command('center', { checkId: before.checkId })
+    const after = checked(await finish())
+    assert.ok(after.offsetArcminutes < 0.5)
+    reports.push({ scenario: 'crescent-color-check-and-center', exposureSeconds: seconds,
+      firstOffsetArcminutes: before.offsetArcminutes, centeredOffsetArcminutes: after.offsetArcminutes })
+  }
+
   await catalog.setImagingCamera('proof', { uniqueId: cameraId, name: 'Simulator Camera' })
   await control('camera', { cameraNumber: 0, resolution: 'fast' })
   for (const position of [{ raDegrees: 359.9, decDegrees: 0 }, { raDegrees: 45, decDegrees: 89 }]) {

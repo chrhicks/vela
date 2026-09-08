@@ -291,3 +291,7 @@ there is no fallback that supplies a known answer to the solver. Synthetic
 residuals are integration evidence, not a real-sky accuracy promise.
 Raw Bayer frames pass `-check y` to ASTAP to enable its check-pattern filter;
 the flag without its value does not enable that filter in the reference CLI.
+ASTAP also uses `-speed slow` to overlap catalog search fields. Chris's five-second
+Crescent color exposure failed with normal overlap and solved unchanged with
+this setting at the original match tolerance. The framing proof covers Crescent
+check and centering at two and five seconds as well as Eagle.
