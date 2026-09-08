@@ -27,8 +27,8 @@ export interface PlateSolver {
   solve(frame: MonoFrame, hint: SkyPosition, signal: AbortSignal): Promise<SolveResult>
 }
 
-/** ASTAP CLI boundary. Coordinates are ASTAP's fixed catalog frame; converting
- * these to apparent/topocentric positions is a separate, currently unsupported step.
+/** ASTAP CLI boundary. Coordinates are ASTAP's fixed catalog frame; conversion
+ * to apparent/topocentric positions belongs to the consuming workflow.
  * CLI contract: https://www.hnsky.org/astap.htm#command_line */
 export function createAstapSolver(config: {
   executable: string
@@ -54,7 +54,8 @@ export function createAstapSolver(config: {
         signal.throwIfAborted()
         const code = await runAstap(executable, ['-f', path, '-d', catalog,
           '-fov', String(config.fieldHeightDegrees), '-ra', String(hint.raDegrees / 15),
-          '-spd', String(hint.decDegrees + 90), '-r', '5', ...(frame.color?.kind === 'bayer' ? ['-check'] : [])], signal, timeout)
+          '-spd', String(hint.decDegrees + 90), '-r', '5', '-s', '1000',
+          ...(frame.color?.kind === 'bayer' ? ['-check', 'y'] : [])], signal, timeout)
         signal.throwIfAborted()
         // ASTAP exit 1 means no match, 2 means not enough stars. Database,
         // process, image and output failures must not become endless sky retries.

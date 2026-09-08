@@ -9,7 +9,8 @@
     "dev:server": "node --import tsx src/server.ts",
     "dev:controls": "vite --host 127.0.0.1 --port 5177 --strictPort",
     "start": "node dist/server.js",
-    "prove:http": "pnpm --filter @vela/model build && pnpm --filter @vela/alpaca build && pnpm --filter @vela/server build && tsc --ignoreConfig --noEmit --module NodeNext --target ES2022 --strict --skipLibCheck src/prove-http.ts && node --import tsx src/prove-http.ts"
+    "prove:http": "pnpm --filter @vela/model build && pnpm --filter @vela/alpaca build && pnpm --filter @vela/server build && tsc --ignoreConfig --noEmit --module NodeNext --target ES2022 --strict --skipLibCheck src/prove-http.ts && node --import tsx src/prove-http.ts",
+    "prove:framing": "pnpm --filter @vela/model build && pnpm --filter @vela/alpaca build && pnpm --filter @vela/server build && tsc --ignoreConfig --noEmit --module NodeNext --target ES2022 --strict --skipLibCheck src/prove-framing.ts && node --import tsx src/prove-framing.ts"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",

@@ -68,7 +68,7 @@ it('bounds a hung executable and rejects bad frames before spawning it', async (
 
 it('preserves negative acquisition samples and tells ASTAP to check a Bayer exposure', async () => {
   const { solver } = await fixture(`const image = fs.readFileSync(path)
-if (image.readInt32BE(2880) !== -40 || !image.subarray(0,2880).toString().includes("'GBRG'") || !process.argv.includes('-check')) process.exit(16)
+if (image.readInt32BE(2880) !== -40 || !image.subarray(0,2880).toString().includes("'GBRG'") || process.argv[process.argv.indexOf('-check') + 1] !== 'y') process.exit(16)
 fs.writeFileSync(path.replace('.fits','.ini'), ${JSON.stringify(ini)})`)
   await expect(solver.solve({ ...frame, pixels: [-40, 65535, 1, 2], color: { kind: 'bayer', pattern: 'gbrg' } }, hint, new AbortController().signal)).resolves.toMatchObject({ status: 'solved' })
 })

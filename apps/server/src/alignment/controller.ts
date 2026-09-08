@@ -6,6 +6,7 @@ import { createAlignmentBaseline, measureAlignment, type AlignmentSample } from 
 import { createAstapSolver, projectSky } from './solver.js'
 import { previewPng } from '../imaging/preview.js'
 
+/** Deliberately configured offline model: J2000 axes with a synthetic sidereal clock. */
 export interface AlignmentSettings {
   endpoint: string
   cameraId: string
@@ -59,7 +60,7 @@ export function createAlignmentController(settings: AlignmentSettings, hardware:
   async function acquire(signal: AbortSignal) {
     const pointing = await hardware.pointing(settings.telescopeId, signal)
     const pointingObservedAt = now()
-    if (pointing.coordinateSystem !== 'other') throw new Error('This configured alignment model requires the synthetic equatorial frame')
+    if (pointing.coordinateSystem !== 'j2000') throw new Error('This configured alignment model requires the simulator’s J2000 coordinate frame')
     if (!pointing.tracking) throw new Error('Tracking must be enabled before measuring alignment')
     patch({ activity: 'exposing', exposureStartedAt: new Date().toISOString() })
     const frame = await hardware.capture({ cameraId: settings.cameraId, exposureSeconds: settings.exposureSeconds, signal, monochromeOnly: true })
@@ -96,8 +97,8 @@ export function createAlignmentController(settings: AlignmentSettings, hardware:
 
   async function run(signal: AbortSignal) {
     const initial = await hardware.pointing(settings.telescopeId, signal)
-    if (initial.coordinateSystem !== 'other' || !initial.tracking) throw new Error('The configured synthetic frame and tracking are required')
-    if (initial.rightAscensionDegrees < 8 || initial.rightAscensionDegrees > 52) throw new Error('Reset the simulator to its supported northern sky patch before measuring')
+    if (initial.coordinateSystem !== 'j2000' || !initial.tracking) throw new Error('The configured simulator’s J2000 frame and tracking are required')
+    if (initial.rightAscensionDegrees < 8 || initial.rightAscensionDegrees > 52 || Math.abs(initial.declinationDegrees - 60) > 0.01) throw new Error('Reset the simulator to its northern alignment position before measuring')
     // A wide baseline limits amplification of subpixel plate-solve uncertainty.
     // This sweep belongs to the explicitly configured offline model.
     const preparationDegrees = 12 - initial.rightAscensionDegrees

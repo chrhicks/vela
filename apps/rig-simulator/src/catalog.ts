@@ -7,6 +7,60 @@ export interface Star {
   magnitude: number
 }
 
+export interface StarField {
+  raDegrees: number
+  decDegrees: number
+  radiusDegrees: number
+}
+
+export type StarSource = (field: StarField, signal?: AbortSignal) => Promise<readonly Star[]>
+
+const radians = Math.PI / 180
+
+function angularDistance(a: Pick<Star, 'raDegrees' | 'decDegrees'>, b: Pick<Star, 'raDegrees' | 'decDegrees'>) {
+  const decA = a.decDegrees * radians
+  const decB = b.decDegrees * radians
+  const haversine = Math.sin((decB - decA) / 2) ** 2
+    + Math.cos(decA) * Math.cos(decB) * Math.sin((b.raDegrees - a.raDegrees) * radians / 2) ** 2
+  return 2 * Math.asin(Math.sqrt(Math.max(0, Math.min(1, haversine)))) / radians
+}
+
+// Retain one padded field, not an all-sky object graph. Each cache miss owns its
+// reads, so cancelling one camera cannot cancel another camera's acquisition.
+export function createStarSource(directory: string): StarSource {
+  let cached: { field: StarField, stars: readonly Star[] } | undefined
+  return async (requested, signal) => {
+    const field = { ...requested }
+    if (![field.raDegrees, field.decDegrees, field.radiusDegrees].every(Number.isFinite)
+        || field.raDegrees < 0 || field.raDegrees >= 360
+        || Math.abs(field.decDegrees) > 90 || field.radiusDegrees <= 0 || field.radiusDegrees > 180) {
+      throw new Error('Catalog field requires RA within 0–360°, declination within -90–90°, and radius within 0–180°')
+    }
+    signal?.throwIfAborted()
+    if (cached && angularDistance(field, cached.field) + field.radiusDegrees <= cached.field.radiusDegrees) {
+      return cached.stars.filter(star => angularDistance(field, star) <= field.radiusDegrees)
+    }
+    const padded = { ...field, radiusDegrees: Math.min(180, field.radiusDegrees + 1) }
+    const names = (await readdir(directory)).filter(name => /^d05_\d+\.1476$/i.test(name)).sort()
+    signal?.throwIfAborted()
+    if (names.length === 0) throw new Error(`No ASTAP D05 .1476 tiles found in ${directory}`)
+    const stars: Star[] = []
+    for (const name of names) {
+      signal?.throwIfAborted()
+      // Decode one tile at a time and discard stars outside this field.
+      const tile = decodeD05(await readFile(join(directory, name), { signal }), name)
+      for (const star of tile) {
+        if (Math.abs(star.decDegrees - padded.decDegrees) <= padded.radiusDegrees
+            && angularDistance(padded, star) <= padded.radiusDegrees) stars.push(star)
+      }
+    }
+    signal?.throwIfAborted()
+    if (stars.length === 0) throw new Error('D05 catalog contains no stars around the requested simulator field')
+    cached = { field: padded, stars }
+    return stars.filter(star => angularDistance(field, star) <= field.radiusDegrees)
+  }
+}
+
 export interface CatalogBounds {
   minRaDegrees: number
   maxRaDegrees: number

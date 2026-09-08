@@ -16,17 +16,17 @@ type Camera = {
   sensor: 'mono' | 'rggb'
   resolution: Resolution
 }
-const dimensions = { fast: [1600, 1200], full: [6248, 4176] } as const
+const dimensions = { fast: [1562, 1044], full: [6248, 4176] } as const
 
 function CamerasPreview({ props, onPropsChange }: {
   props: Record<string, string | number | boolean>
   onPropsChange?: (patch: Record<string, string | number | boolean>) => void
 }) {
-  const [mono, setMono] = useState<Resolution>(props.mono === 'full' ? 'full' : 'fast')
-  const [color, setColor] = useState<Resolution>(props.color === 'full' ? 'full' : 'fast')
+  const [mono, setMono] = useState<Resolution>(props.mono === 'fast' ? 'fast' : 'full')
+  const [color, setColor] = useState<Resolution>(props.color === 'fast' ? 'fast' : 'full')
   const [obscured, setObscured] = useState(props.sky === 'obscured')
-  useEffect(() => setMono(props.mono === 'full' ? 'full' : 'fast'), [props.mono])
-  useEffect(() => setColor(props.color === 'full' ? 'full' : 'fast'), [props.color])
+  useEffect(() => setMono(props.mono === 'fast' ? 'fast' : 'full'), [props.mono])
+  useEffect(() => setColor(props.color === 'fast' ? 'fast' : 'full'), [props.color])
   useEffect(() => setObscured(props.sky === 'obscured'), [props.sky])
   const available = props.state !== 'unavailable'
   const cameras: Camera[] = [mono, color].map((resolution, number) => ({
@@ -51,7 +51,7 @@ function CamerasPreview({ props, onPropsChange }: {
           <div className="vela-sim-camera-title"><h2>{camera.sensor === 'mono' ? 'Mono camera' : 'Color camera'}</h2><span>{camera.connected ? 'Connected' : 'Disconnected'}</span></div>
           <p className="vela-sim-camera-meta">Camera {camera.number} · {camera.sensor === 'mono' ? 'Monochrome' : 'RGGB sensor'}</p>
           <Select label={`${camera.sensor === 'mono' ? 'Mono' : 'Color'} image size`} value={camera.resolution} disabled={!available || camera.activity === 'exposing'} options={[
-            { value: 'fast', label: 'Fast · 1600 × 1200' },
+            { value: 'fast', label: 'Fast · 1562 × 1044' },
             { value: 'full', label: 'Full · 6248 × 4176' },
           ]} onChange={event => {
             const value = event.target.value as Resolution
@@ -94,6 +94,6 @@ export const specimen: ComponentSpecimen = {
     color: { type: 'select', label: 'Color resolution', options: ['fast', 'full'] },
     sky: { type: 'select', label: 'Shared sky', options: ['clear', 'obscured'] },
   },
-  defaultProps: { state: 'idle', mono: 'fast', color: 'fast', sky: 'clear' },
+  defaultProps: { state: 'idle', mono: 'full', color: 'full', sky: 'clear' },
   render: (props, onPropsChange) => <CamerasPreview props={props} {...(onPropsChange ? { onPropsChange } : {})} />,
 }

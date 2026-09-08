@@ -34,6 +34,7 @@ function Controls() {
   const [exactOpen, setExactOpen] = useState(false)
   const blocked = !available || pending
   const exposing = state?.cameras.some(camera => camera.activity === 'exposing') ?? false
+  const mountBusy = exposing || !!state?.slewing
   const adjust = (altitudeArcsec: number, azimuthArcsec: number) => command('/simulator/adjust', 'PUT',
     { altitudeArcsec, azimuthArcsec }, 'Offsets applied · next exposure uses this position')
   function applyExact(event: FormEvent<HTMLFormElement>) {
@@ -55,17 +56,17 @@ function Controls() {
             { value: '60', label: 'Coarse · 1 arcminute' }, { value: '5', label: 'Fine · 5 arcseconds' },
           ]} />
           <div className="sim-axes">
-            <Axis axis="altitude" value={state.altitudeArcsec} step={Number(step)} disabled={blocked || exposing} adjust={delta => void adjust(Math.max(-18000, Math.min(18000, state.altitudeArcsec + delta)), state.azimuthArcsec)} />
-            <Axis axis="azimuth" value={state.azimuthArcsec} step={Number(step)} disabled={blocked || exposing} adjust={delta => void adjust(state.altitudeArcsec, Math.max(-18000, Math.min(18000, state.azimuthArcsec + delta)))} />
+            <Axis axis="altitude" value={state.altitudeArcsec} step={Number(step)} disabled={blocked || mountBusy} adjust={delta => void adjust(Math.max(-18000, Math.min(18000, state.altitudeArcsec + delta)), state.azimuthArcsec)} />
+            <Axis axis="azimuth" value={state.azimuthArcsec} step={Number(step)} disabled={blocked || mountBusy} adjust={delta => void adjust(state.altitudeArcsec, Math.max(-18000, Math.min(18000, state.azimuthArcsec + delta)))} />
           </div>
           <p className="sim-note">Actual simulated offsets, not Vela’s measured alignment error.</p>
-          <div className="sim-status" role="status">{exposing ? 'Exposing image · wait before adjusting the mount' : pending ? 'Applying change…' : notice === 'Connecting to simulator…' ? 'Ready for adjustments' : notice}</div>
+          <div className="sim-status" role="status">{exposing ? 'Exposing image · wait before adjusting the mount' : state.slewing ? 'Mount moving · wait before adjusting' : pending ? 'Applying change…' : notice === 'Connecting to simulator…' ? 'Ready for adjustments' : notice}</div>
           <div className="sim-details">
             <button className="sim-summary" aria-expanded={exactOpen} onClick={() => setExactOpen(!exactOpen)}>{exactOpen ? '▾' : '▸'} Set exact offsets</button>
             {exactOpen && <form onSubmit={applyExact}>
               <Input name="altitude" required label="Altitude · arcseconds" type="number" min={-18000} max={18000} step={1} defaultValue={state.altitudeArcsec} message="Positive is above the pole." />
               <Input name="azimuth" required label="Azimuth · arcseconds" type="number" min={-18000} max={18000} step={1} defaultValue={state.azimuthArcsec} message="Positive is east of north." />
-              <Button type="submit" tone="neutral" disabled={blocked || exposing}>Apply offsets</Button>
+              <Button type="submit" tone="neutral" disabled={blocked || mountBusy}>Apply offsets</Button>
             </form>}
           </div>
         </Panel>
@@ -75,7 +76,7 @@ function Controls() {
               <div className="sim-camera-title"><h2>{camera.sensor === 'mono' ? 'Mono camera' : 'Color camera'}</h2><span>{camera.connected ? 'Connected' : 'Disconnected'}</span></div>
               <p className="sim-camera-meta">Camera {camera.number} · {camera.sensor === 'mono' ? 'Monochrome' : 'RGGB sensor'}</p>
               <Select label={`${camera.sensor === 'mono' ? 'Mono' : 'Color'} image size`} value={camera.resolution} disabled={blocked || camera.activity === 'exposing'} options={[
-                { value: 'fast', label: 'Fast · 1600 × 1200' },
+                { value: 'fast', label: 'Fast · 1562 × 1044' },
                 { value: 'full', label: 'Full · 6248 × 4176' },
               ]} onChange={event => void command('/simulator/camera', 'PUT', { cameraNumber: camera.number, resolution: event.target.value }, `${camera.sensor === 'mono' ? 'Mono' : 'Color'} image size updated for the next exposure`)} />
               <p className="sim-camera-activity" role="status">{camera.activity === 'exposing'

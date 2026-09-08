@@ -13,6 +13,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { createAlpacaAcquisition, createAlpacaProvider } from '../../../packages/alpaca/dist/index.js'
 import { createAlignmentBaseline, measureAlignment, type AlignmentSample, type AlignmentMeasurement } from '../../server/dist/alignment/geometry.js'
 import { createAstapSolver } from '../../server/dist/alignment/solver.js'
+import { imageWidth, imageHeight } from './optics.js'
 import { loadCatalog } from './catalog.js'
 import { buildSimulator } from './service.js'
 
@@ -44,7 +45,7 @@ async function exposure() {
   // These hints and observer coordinates come only from standard Alpaca reads.
   const pointing = await hardware.pointing(telescopeId, signal)
   const pointingObservedAt = Date.now()
-  assert.equal(pointing.coordinateSystem, 'other')
+  assert.equal(pointing.coordinateSystem, 'j2000')
   assert.equal(pointing.tracking, true)
   const frame = await hardware.capture({ cameraId, exposureSeconds: 2, signal })
   const solved = await solver.solve(frame, {
@@ -152,10 +153,13 @@ async function proveCapture() {
   }
   try {
     assert.equal((await captureView()).enabled, false, 'No implicit camera selection')
+    // Small frames keep the exhaustive JSON/binary transport check bounded.
+    // Alignment above and native capture below use the default full frames.
+    for (const cameraNumber of [0, 1]) await control('camera', { cameraNumber, resolution: 'fast' })
     await select(colorId)
     const color = await capture()
     assert.equal(color.color, 'color')
-    await preview(color.imageUrl, 1600, 1200, true)
+    await preview(color.imageUrl, imageWidth, imageHeight, true)
 
     // Read the same retained sensor frame using both negotiated transports.
     const raw = await fetch(`${baseUrl}/api/v1/camera/1/imagearray`, { headers: { accept: 'application/imagebytes' } })
@@ -166,19 +170,19 @@ async function proveCapture() {
     assert.equal(json.ErrorNumber, 0)
     assert.equal(binary.readInt32LE(16), 44)
     assert.equal(binary.readInt32LE(24), 8)
-    assert.equal(binary.readInt32LE(32), 1600)
-    assert.equal(binary.readInt32LE(36), 1200)
-    assert.equal(binary.length, 44 + 1600 * 1200 * 2)
-    for (let x = 0; x < 1600; x++) for (let y = 0; y < 1200; y++) {
-      assert.equal(binary.readUInt16LE(44 + (x * 1200 + y) * 2), json.Value[x]![y])
+    assert.equal(binary.readInt32LE(32), imageWidth)
+    assert.equal(binary.readInt32LE(36), imageHeight)
+    assert.equal(binary.length, 44 + imageWidth * imageHeight * 2)
+    for (let x = 0; x < imageWidth; x++) for (let y = 0; y < imageHeight; y++) {
+      assert.equal(binary.readUInt16LE(44 + (x * imageHeight + y) * 2), json.Value[x]![y])
     }
 
     await select(cameraId)
     const mono = await capture()
     assert.equal(mono.color, 'mono')
     assert.notEqual(mono.id, color.id)
-    await preview(mono.imageUrl, 1600, 1200, false)
-    await preview(color.imageUrl, 1600, 1200, true)
+    await preview(mono.imageUrl, imageWidth, imageHeight, false)
+    await preview(color.imageUrl, imageWidth, imageHeight, true)
 
     await control('camera', { cameraNumber: 1, resolution: 'full' })
     await select(colorId)
@@ -199,7 +203,7 @@ async function proveCapture() {
     assert.equal(stopped.json<CaptureView>().phase, 'stopped', stopped.body)
     assert.equal(stopped.json<CaptureView>().latestImage?.id, full.id)
     reports.push({ name: 'capture', cameraSelection: 'explicit color → mono → color',
-      transportParityPixels: 1600 * 1200, retainedAfterStop: true,
+      transportParityPixels: imageWidth * imageHeight, retainedAfterStop: true,
       full: { width: full.width, height: full.height, nativeBytes, fitBytes, elapsedMs: performance.now() - started } })
   } finally {
     await vela.inject({ method: 'POST', url: '/api/rigs/proof/capture/stop', payload: {} })
