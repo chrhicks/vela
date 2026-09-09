@@ -1,7 +1,16 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { angularSeparationDegrees, horizonAt, horizonSectors, projectSky, visibleSkyPath, type HorizonPoint, type SkyCoordinate } from './sky-path-geometry'
 
-export type SkyPathSample = SkyCoordinate & { label: string }
+export type SkyLightPhase = 'daylight' | 'civil' | 'nautical' | 'astronomical' | 'night'
+const skyLightLabels: Record<SkyLightPhase, string> = {
+  daylight: 'Daylight', civil: 'Civil twilight', nautical: 'Nautical twilight',
+  astronomical: 'Astronomical twilight', night: 'Astronomical darkness',
+}
+export type SkyPathSample = SkyCoordinate & {
+  label: string
+  /** Optional caller-supplied phase. Applies from this sample to the next. */
+  light?: SkyLightPhase
+}
 export type SkyPathMoonSample = SkyCoordinate & { illuminationFraction: number; waxing: boolean }
 export type SkyPathHorizon = {
   state: 'calibrated' | 'uncalibrated'
@@ -46,6 +55,8 @@ export function SkyPath({ samples, moonSamples, targetName, selectedIndex, onSel
   const safeIndex = Number.isFinite(selectedIndex) ? Math.round(selectedIndex) : 0
   const index = Math.max(0, Math.min(samples.length - 1, safeIndex))
   const selected = samples[index]
+  const hasLight = samples.some(sample => sample.light !== undefined)
+  const lightStatus = hasLight ? selected?.light ? skyLightLabels[selected.light] : 'Light phase unavailable' : undefined
   const moon = selected ? moonSamples?.[index] : undefined
   const moonStatus = moonSamples === undefined ? undefined
     : !moon ? 'Moon position unavailable'
@@ -70,7 +81,7 @@ export function SkyPath({ samples, moonSamples, targetName, selectedIndex, onSel
       <div className="vela-sky-path__orientation"><span>Looking up</span><span>Zenith at center</span></div>
       <svg className="vela-sky-path__map" viewBox={`0 0 ${size} ${size}`} role="img" aria-labelledby={`${id}-title ${id}-description`}>
         <title id={`${id}-title`}>{targetName} through the night</title>
-        <desc id={`${id}-description`}>Overhead sky dome. North is up, east is left. Outer ring is altitude zero; center is altitude 90 degrees. {selected ? `${selected.label}, altitude ${selected.altitudeDegrees.toFixed(0)} degrees. ${selectedStatus}.` : selectedStatus} {moonStatus}</desc>
+        <desc id={`${id}-description`}>Overhead sky dome. North is up, east is left. Outer ring is altitude zero; center is altitude 90 degrees. {selected ? `${selected.label}, altitude ${selected.altitudeDegrees.toFixed(0)} degrees. ${selectedStatus}.` : selectedStatus} {lightStatus} {moonStatus}</desc>
         <defs>
           <pattern id={`${id}-unknown`} width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(35)"><line x1="0" x2="0" y1="0" y2="6" className="vela-sky-path__hatch" /></pattern>
         </defs>
@@ -83,9 +94,12 @@ export function SkyPath({ samples, moonSamples, targetName, selectedIndex, onSel
         <path d={`M${center - radius},${center}H${center + radius} M${center},${center - radius}V${center + radius}`} className="vela-sky-path__axis" />
         {labels.altitudes.map(label => <text key={label.text} x={label.x} y={label.y} textAnchor="middle" className="vela-sky-path__altitude">{label.text}</text>)}
         {horizon?.wires?.map((wire, wireIndex) => <path key={wireIndex} d={visibleSkyPath(wire, center, radius)} className="vela-sky-path__wire" />)}
-        <path d={visibleSkyPath(samples, center, radius)} className="vela-sky-path__track" />
+        {hasLight ? samples.slice(0, -1).map((sample, index) => <path key={index}
+          d={visibleSkyPath([sample, samples[index + 1]!], center, radius)}
+          className="vela-sky-path__track vela-sky-path__light-track" data-light={sample.light ?? 'unknown'}
+        />) : <path d={visibleSkyPath(samples, center, radius)} className="vela-sky-path__track" />}
         {labels.times.map(label => <g key={label.sampleIndex}>
-          <circle cx={point(samples[label.sampleIndex]!).x} cy={point(samples[label.sampleIndex]!).y} r="2.5" className="vela-sky-path__hour" />
+          <circle cx={point(samples[label.sampleIndex]!).x} cy={point(samples[label.sampleIndex]!).y} r="2.5" className="vela-sky-path__hour" data-light={samples[label.sampleIndex]!.light} />
           <text x={label.x} y={label.y} textAnchor="middle" className="vela-sky-path__time">{label.text}</text>
         </g>)}
         {now && now.altitudeDegrees >= 0 && <circle cx={point(now).x} cy={point(now).y} r="7" className="vela-sky-path__now" />}
@@ -100,9 +114,11 @@ export function SkyPath({ samples, moonSamples, targetName, selectedIndex, onSel
         {!samples.length && <text x={center} y={center} textAnchor="middle" className="vela-sky-path__time">No path available</text>}
       </svg>
       <div className="vela-sky-path__readout"><strong>{selected?.label ?? 'No time selected'}</strong>{selected && <span>{selected.altitudeDegrees.toFixed(0)}° altitude</span>}</div>
+      {lightStatus && <p className="vela-sky-path__light-status" role="status"><i data-light={selected?.light ?? 'unknown'} />{lightStatus}</p>}
       <label className="vela-sky-path__sr-only" htmlFor={`${id}-time`}>Preview time for {targetName}</label>
-      <input id={`${id}-time`} className="vela-sky-path__range" type="range" min="0" max={Math.max(1, samples.length - 1)} step="1" value={Math.max(0, index)} disabled={samples.length < 2} aria-valuetext={selected ? `${selected.label}, ${selected.altitudeDegrees.toFixed(0)} degrees altitude. ${selectedStatus}${moonStatus ? `. ${moonStatus}` : ''}` : 'No path samples'} onChange={event => onSelectedIndexChange(Number(event.target.value))} />
+      <input id={`${id}-time`} className="vela-sky-path__range" type="range" min="0" max={Math.max(1, samples.length - 1)} step="1" value={Math.max(0, index)} disabled={samples.length < 2} aria-valuetext={selected ? `${selected.label}, ${selected.altitudeDegrees.toFixed(0)} degrees altitude. ${selectedStatus}${lightStatus ? `. ${lightStatus}` : ''}${moonStatus ? `. ${moonStatus}` : ''}` : 'No path samples'} onChange={event => onSelectedIndexChange(Number(event.target.value))} />
       {samples.length > 0 && <div className="vela-sky-path__extent"><span>{samples[0]!.label}</span><span>{samples[samples.length - 1]!.label}</span></div>}
+      {hasLight && <div className="vela-sky-path__light-legend" aria-label="Path colors by light phase">{Object.entries(skyLightLabels).map(([phase, label]) => <span key={phase}><i data-light={phase} />{label}</span>)}</div>}
       <p className="vela-sky-path__status">{selectedStatus}{horizon?.state === 'uncalibrated' ? ' · Provisional horizon' : ''}</p>
       {moonStatus && <p className="vela-sky-path__moon-status">{moonStatus}</p>}
       {horizon && <>
