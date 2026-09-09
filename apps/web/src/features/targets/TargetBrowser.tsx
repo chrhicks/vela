@@ -40,15 +40,21 @@ export function TargetBrowser({ rigId }: { rigId: string }) {
   const [input, setInput] = useState(selection.query)
   const { view, loading, error, saved, refresh } = useDiscovery(rigId, selection)
   const resultsHeading = useRef<HTMLDivElement>(null)
-  const previousOffset = useRef(view?.offset)
+  const pageNavigation = useRef<DiscoverySelection | null>(null)
   useEffect(() => {
-    if (view && previousOffset.current !== undefined && previousOffset.current !== view.offset) {
-      resultsHeading.current?.scrollIntoView({ block: 'start' })
-      resultsHeading.current?.focus({ preventScroll: true })
+    const requested = pageNavigation.current
+    if (!requested) return
+    if (error || requested.query !== selection.query || requested.category !== selection.category || requested.filter !== selection.filter || requested.offset !== selection.offset) {
+      pageNavigation.current = null
+      return
     }
-    previousOffset.current = view?.offset
-  }, [view])
+    if (loading || !view || view.query !== requested.query.trim() || view.category !== requested.category || view.filter !== requested.filter || view.offset !== requested.offset) return
+    pageNavigation.current = null
+    resultsHeading.current?.scrollIntoView({ block: 'start' })
+    resultsHeading.current?.focus({ preventScroll: true })
+  }, [view, loading, error, selection.query, selection.category, selection.filter, selection.offset])
   const update = (patch: Partial<DiscoverySelection>) => {
+    pageNavigation.current = null
     const next = { ...selection, offset: 0, ...patch }
     const values = new URLSearchParams({ category: next.category, filter: next.filter })
     if (next.query) values.set('q', next.query)
@@ -69,12 +75,20 @@ export function TargetBrowser({ rigId }: { rigId: string }) {
     if (selection.offset) update({ offset: 0 })
     refresh()
   }
+  const turnPage = (offset: number) => {
+    const next = { ...displayed, offset }
+    update(next)
+    pageNavigation.current = next
+  }
   const noSite = view?.status === 'site-unavailable'
   const search = view?.query
   return <section className="vela-discovery" aria-label="Target discovery">
     <header className="vela-discovery__header"><div><p className="vela-discovery__eyebrow">{view?.rigName ?? 'Observe'} / Targets</p><h1>Find your next subject</h1><p>{search ? 'Search the deep-sky catalog, with tonight’s context.' : noSite ? 'Explore the catalog while the observing site is unavailable.' : 'Explore the night from your observing site.'}</p></div><Button tone="quiet" disabled={loading} onClick={refreshFromNow}>{loading ? 'Loading…' : 'Refresh'}</Button></header>
     <div className="vela-discovery__snapshot" role="status"><span>{view ? `${saved ? 'Saved suggestions' : 'Calculated'} · ${dateTime(view.calculatedAt)}` : error ? 'Suggestions unavailable' : 'Finding tonight’s subjects…'}</span><span>{view?.site ? `${Math.abs(view.site.latitudeDegrees).toFixed(2)}° ${view.site.latitudeDegrees < 0 ? 'S' : 'N'} · ${Math.abs(view.site.longitudeDegrees).toFixed(2)}° ${view.site.longitudeDegrees < 0 ? 'W' : 'E'}` : view ? 'Site unavailable' : 'Reading observing site'}</span></div>
-    <Input label="Find a target" type="search" placeholder="Name, catalog number, or object type" value={input} onChange={event => setInput(event.target.value)} />
+    <Input label="Find a target" type="search" placeholder="Name, catalog number, or object type" value={input} onFocus={() => { pageNavigation.current = null }} onChange={event => {
+      pageNavigation.current = null
+      setInput(event.target.value)
+    }} />
     <nav className="vela-discovery__filters" aria-label="Object type">{categories.map(([key, label]) => <button key={key} type="button" aria-pressed={selection.category === key} onClick={() => update({ category: key })}>{label}</button>)}</nav>
     <nav className="vela-discovery__filters vela-discovery__light" aria-label="Imaging filter">{filters.map(([key, label]) => <button key={key} type="button" aria-pressed={selection.filter === key} onClick={() => update({ filter: key })}>{label}</button>)}</nav>
     <p className="vela-discovery__filter-note">Your filter: <strong>Optolong L-Ultimate · dual 3nm Hα / O III</strong><span>Filter advice is for imaging. Installation is not detected.</span></p>
@@ -96,7 +110,7 @@ export function TargetBrowser({ rigId }: { rigId: string }) {
       </article>
     })}</div>
     {view?.total === 0 && <Panel><div className="vela-target-empty"><h2>{view.status === 'no-darkness' && !view.query ? 'No astronomical darkness ahead' : 'No matching subjects'}</h2><p>{view.status === 'no-darkness' && !view.query ? 'The Sun does not reach 18° below the horizon in the calculation window. You can still search the catalog.' : 'Try another object type, imaging filter, or catalog search.'}</p><Button onClick={() => { setInput(''); update({ query: '', category: 'all', filter: 'all' }) }}>Clear filters</Button></div></Panel>}
-    {view && view.total > 0 && <nav className="vela-discovery__footer" aria-label="Target pages"><span>{view.offset + 1}–{Math.min(view.offset + view.pageSize, view.total)} of {view.total.toLocaleString()}</span><div><Button tone="quiet" disabled={loading || view.offset === 0} onClick={() => update({ ...displayed, offset: Math.max(0, view.offset - view.pageSize) })}>Previous</Button><Button tone="quiet" disabled={loading || view.offset + view.pageSize >= view.total} onClick={() => update({ ...displayed, offset: view.offset + view.pageSize })}>Next</Button></div></nav>}
+    {view && view.total > 0 && <nav className="vela-discovery__footer" aria-label="Target pages"><span>{view.offset + 1}–{Math.min(view.offset + view.pageSize, view.total)} of {view.total.toLocaleString()}</span><div><Button tone="quiet" disabled={loading || view.offset === 0} onClick={() => turnPage(Math.max(0, view.offset - view.pageSize))}>Previous</Button><Button tone="quiet" disabled={loading || view.offset + view.pageSize >= view.total} onClick={() => turnPage(view.offset + view.pageSize)}>Next</Button></div></nav>}
     <details className="vela-discovery__method"><summary>How these suggestions work</summary><p>Ranked for photographic interest using object type, apparent size and familiar showpieces, balanced against remaining time above 30° during astronomical darkness (Sun below −18°). These approximate windows start at the calculation time or later. Refresh recalculates from now; the list stays steady while you browse.</p><p>Search includes catalog objects even without a useful window. Rankings do not predict weather, Moon interference, local obstructions, or how a subject fits your camera. Check the sky path and framing before choosing.</p>{view?.night && <p>Calculation window: {dateTime(view.night.startsAt)} to {dateTime(view.night.endsAt)}{view.night.kind === 'polar-night' ? ' · polar night, limited to 24 hours' : ''}. Times use this browser’s timezone.</p>}</details>
     <p className="vela-target-footnote">Reference imagery: DSS2 color / CDS. <a href="https://archive.stsci.edu/dss/acknowledging.html" target="_blank" rel="noreferrer">Survey credits ↗</a></p>
     <p className="vela-target-footnote">Catalog adapted from <a href="https://github.com/mattiaverga/OpenNGC/tree/da90466031b0372c896588b85be6016c617e205b" target="_blank" rel="noreferrer">OpenNGC</a> by Mattia Verga and <a href="/third-party/openngc-authors.txt" target="_blank" rel="noreferrer">contributors</a> · <a href="/third-party/openngc-license.txt" target="_blank" rel="noreferrer">CC BY-SA 4.0</a>.</p>
