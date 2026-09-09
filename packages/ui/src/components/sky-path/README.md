@@ -62,4 +62,5 @@ Missing phases inside a colored path remain dashed/unknown; callers that omit
 phases entirely retain the original appearance. The selected phase is named in
 the visible readout and slider accessibility text. Colors are an intentional
 illustration palette with light/dark variants, separate from command status.
-The web app does not supply phases yet; this preview awaits workshop acceptance.
+The web app supplies phases from its server-provided solar-altitude samples;
+workshop phase windows remain invented fixtures.

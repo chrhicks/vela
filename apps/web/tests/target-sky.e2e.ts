@@ -6,7 +6,7 @@ const samples: TargetSkyPath['samples'] = Array.from({ length: 97 }, (_, index) 
   at: new Date(start + index * 900_000).toISOString(),
   azimuthDegrees: (50 + index * 3) % 360,
   altitudeDegrees: 35 + 20 * Math.sin(index / 15),
-  sunAltitudeDegrees: index > 12 && index < 50 ? -25 : 10,
+  sunAltitudeDegrees: index < 4 ? 10 : index < 8 ? -3 : index < 12 ? -6 : index < 16 ? -12 : index < 50 ? -18 : 10,
   moon: { azimuthDegrees: (170 + index * 2) % 360, altitudeDegrees: 50 * Math.cos(index * Math.PI / 48), illuminationFraction: .68, waxing: true },
 }))
 const sky: TargetSkyPath = { observedAt: samples[18]!.at, startsAt: samples[0]!.at, endsAt: samples.at(-1)!.at, samples, currentAltitudeDegrees: samples[18]!.altitudeDegrees, highestAltitudeDegrees: 55, aboveHorizonDuringDarkness: [{ startsAt: samples[13]!.at, endsAt: samples[50]!.at }] }
@@ -25,11 +25,21 @@ for (const width of [1440, 390]) {
     const time = sidebar.getByRole('slider', { name: 'Preview time for Andromeda Galaxy' })
     await expect(sidebar.getByText('Local obstructions not included', { exact: true })).toBeVisible()
     await expect(sidebar.locator('.vela-sky-path__moon-status')).toContainText('68% illuminated')
+    for (const [index, phase] of [[0, 'Daylight'], [4, 'Civil twilight'], [8, 'Nautical twilight'], [12, 'Astronomical twilight'], [16, 'Astronomical darkness']] as const) {
+      await time.fill(String(index))
+      await expect(sidebar.locator('.vela-sky-path__light-status')).toHaveText(phase)
+      await expect(time).toHaveAttribute('aria-valuetext', new RegExp(phase))
+    }
+    const colors = await sidebar.locator('.vela-sky-path__light-track').evaluateAll(paths => [...new Set(paths.map(path => getComputedStyle(path).stroke))])
+    expect(colors).toHaveLength(5)
+    await expect(sidebar.locator('.vela-sky-path__light-track[data-light="night"]').first()).toHaveCSS('stroke', 'rgb(99, 214, 239)')
+    await expect(sidebar.getByText(/Light boundaries approximate/)).toBeVisible()
     await time.fill('23')
     const expand = page.getByRole('button', { name: 'Expand sky view' })
     await expand.click()
     const dialog = page.getByRole('dialog')
     await expect(dialog.getByRole('slider')).toHaveValue('23')
+    await expect(dialog.locator('.vela-sky-path__light-status')).toHaveText('Astronomical darkness')
     await expect(page.locator('.vela-theme > main')).toHaveAttribute('inert', '')
     await dialog.getByRole('slider').fill('30')
     await expect(dialog.locator('.vela-sky-path__moon-status')).toHaveText('Moon below horizon')
@@ -57,6 +67,7 @@ test('interrupted sky updates keep the selected time and label the old calculati
   await page.clock.fastForward(61000)
   await expect(page.getByText('Sky updates interrupted · last calculation shown.')).toBeVisible()
   await expect(time).toHaveValue('22')
+  await expect(page.locator('.vela-sky-path__light-status')).toHaveText('Astronomical darkness')
   await expect(page.locator('.vela-sky-path__map').getByText('Last', { exact: true })).toBeVisible()
   await expect(page.locator('.vela-sky-path__map').getByText('Now', { exact: true })).toHaveCount(0)
 })
