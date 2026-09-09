@@ -31,3 +31,8 @@ hardware. File routes serve the original FITS and exact native preview downloads
 the optional fitted preview is used for collection thumbnails. There is no target
 grouping until capture has actual target metadata, and no run history is inferred
 from the image collection.
+
+Estimated exposure starts retain `capturedAtSource: server-estimate` in metadata.
+Their FITS `DATE-OBS` uses that same start, with `TIMESRC = SERVER-ESTIMATE` and a
+comment explaining the server UTC estimate before StartExposure. Legacy metadata
+without a source remains camera-reported; reading it does not rewrite files.

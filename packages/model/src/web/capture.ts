@@ -16,6 +16,8 @@ export interface CaptureImage {
   exposureSeconds: number
   /** Exposure start, as reported by the acquisition boundary. */
   capturedAt: string
+  /** Absent on legacy images means camera-reported; estimates use the server clock before exposure start. */
+  capturedAtSource?: 'camera' | 'server-estimate'
   receivedAt: string
   cameraName: string
   color: 'mono' | 'color'

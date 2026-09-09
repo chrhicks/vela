@@ -54,3 +54,12 @@ describe('original capture FITS', () => {
     await pending
   })
 })
+
+it('annotates only server-estimated exposure starts', async () => {
+  for (const capturedAtSource of [undefined, 'camera', 'server-estimate'] as const) {
+    const fits = await encodeCaptureFits({ ...frame, capturedAtSource }, { exposureSeconds: 2, cameraName: 'Camera' })
+    const header = fits.toString('ascii', 0, 2880)
+    expect(header).toContain("DATE-OBS= '2026-09-05T23:00:00.000Z'")
+    expect(header.includes("TIMESRC = 'SERVER-ESTIMATE'")).toBe(capturedAtSource === 'server-estimate')
+  }
+})

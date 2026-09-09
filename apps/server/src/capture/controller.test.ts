@@ -242,3 +242,17 @@ it('bounds unsaved frame availability but keeps saved frames idempotent after ev
   expect(await controller.keep(expired.id)).toBeUndefined()
   expect(await controller.keep(saved.id)).toMatchObject({ id: saved.id, saved: true })
 })
+
+it('preserves an estimated start in the published image, retained metadata and original FITS', async () => {
+  const { controller, requests, frame, savedImages } = setup()
+  await controller.start(10, undefined, false, true)
+  requests[0]!.resolve({ ...frame, capturedAtSource: 'server-estimate' })
+  await vi.waitFor(() => expect(controller.active()).toBe(false))
+  const image = controller.snapshot().latestImage!
+  expect(image).toMatchObject({ capturedAt: frame.capturedAt, capturedAtSource: 'server-estimate', saved: true })
+  expect(await savedImages.get('fra 400', image.id)).toMatchObject({ capturedAt: frame.capturedAt, capturedAtSource: 'server-estimate' })
+  const fits = (await savedImages.file('fra 400', image.id, 'fits'))!.toString('ascii', 0, 2880)
+  expect(fits).toContain("DATE-OBS= '2026-09-05T16:00:00.000Z'")
+  expect(fits).toContain("TIMESRC = 'SERVER-ESTIMATE'")
+  expect(fits).toContain('COMMENT DATE-OBS estimated from server UTC before StartExposure.')
+})

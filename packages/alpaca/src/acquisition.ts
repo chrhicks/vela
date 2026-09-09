@@ -22,6 +22,8 @@ export interface AlpacaFrame {
   /** Row-major, pixels[y * width + x]. */
   pixels: Float64Array
   capturedAt: string
+  /** Missing means a camera-supplied timestamp (including older callers). */
+  capturedAtSource?: 'camera' | 'server-estimate'
   /** Color layout at the returned image origin, after accounting for subframe position. */
   color: AlpacaFrameColor
 }
@@ -133,6 +135,17 @@ export function createAlpacaAcquisition({ baseUrl, fetch = globalThis.fetch, req
     return { kind: 'bayer', pattern }
   }
 
+  async function exposureStart(camera: ConfiguredDevice, signal?: AbortSignal): Promise<string | undefined> {
+    try {
+      const stamp = await client.readString(camera, 'lastexposurestarttime', signal)
+      // ASI drivers can return blank success for this optional property.
+      return stamp.trim() === '' ? undefined : stamp
+    } catch (error) {
+      if (error instanceof AlpacaProviderError && error.reason === 'protocol-error' && error.errorNumber === 1024) return undefined
+      throw error
+    }
+  }
+
   return {
     async capture({ cameraId, expectedCameraName, exposureSeconds, monochromeOnly = false, signal, onProgress, onReadout }) {
       bounded(exposureSeconds, 0.001, 3600, 'exposure duration')
@@ -149,7 +162,7 @@ export function createAlpacaAcquisition({ baseUrl, fetch = globalThis.fetch, req
         const height = await client.readNumber(camera, 'numy', signal)
         if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || width * height > 40_000_000) invalid('Invalid camera image dimensions', 'numx/numy')
         const previousStart = await client.readBoolean(camera, 'imageready', signal)
-          ? await client.readString(camera, 'lastexposurestarttime', signal)
+          ? await exposureStart(camera, signal)
           : undefined
         if (expectedCameraName !== undefined) {
           const currentName = (await client.readString(camera, 'name', signal)).trim()
@@ -158,10 +171,13 @@ export function createAlpacaAcquisition({ baseUrl, fetch = globalThis.fetch, req
         }
         signal?.throwIfAborted()
         const startedAt = performance.now()
+        const requestedAt = new Date().toISOString()
         attempted = true
         // A lost response can still mean the exposure started. Never replay it.
         await client.command(camera, 'startexposure', { Duration: String(exposureSeconds), Light: 'true' }, signal)
+        let observedNotReady = false
         while (!(await client.readBoolean(camera, 'imageready', signal))) {
+          observedNotReady = true
           const elapsed = (performance.now() - startedAt) / 1000
           if (elapsed > exposureSeconds + 60) throw new Error('Camera exposure did not complete in time')
           const cameraState = await client.readNumber(camera, 'camerastate', signal)
@@ -170,13 +186,14 @@ export function createAlpacaAcquisition({ baseUrl, fetch = globalThis.fetch, req
           onProgress?.(Math.min(elapsed, exposureSeconds))
           await delay(200, undefined, signal === undefined ? {} : { signal })
         }
-        const stamp = await client.readString(camera, 'lastexposurestarttime', signal)
-        if (stamp === previousStart) invalid('Camera returned the previous exposure; freshness is unconfirmed', 'lastexposurestarttime')
-        const capturedAt = /Z$/.test(stamp) ? stamp : `${stamp}Z`
+        const stamp = await exposureStart(camera, signal)
+        if (stamp === undefined && !observedNotReady) invalid('Camera exposure freshness is unconfirmed without a timestamp or image-ready transition', 'imageready')
+        if (stamp !== undefined && stamp === previousStart) invalid('Camera returned the previous exposure; freshness is unconfirmed', 'lastexposurestarttime')
+        const capturedAt = stamp === undefined ? requestedAt : /Z$/.test(stamp) ? stamp : `${stamp}Z`
         if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/.test(capturedAt) || !Number.isFinite(Date.parse(capturedAt))) invalid('Invalid exposure UTC timestamp', 'lastexposurestarttime')
         onReadout?.()
         const frame = decodeFrame(await client.image(camera, signal), width, height, capturedAt, color)
-        return frame
+        return stamp === undefined ? { ...frame, capturedAtSource: 'server-estimate' } : frame
       } catch (error) {
         // Cleanup failure must win over cancellation: an aborted request alone
         // cannot establish that the physical exposure stopped.

@@ -177,6 +177,7 @@ export function LatestImage({ image, busy, interrupted, rigId, savedDetail = fal
         <div><dt title="Detected stars with a reliable measurement">Stars</dt><dd>{frame.statistics?.detectedStars ?? '—'}</dd></div>
         <div><dt title="Median half-flux radius in native image pixels">HFR · px</dt><dd>{frame.statistics?.medianHfrPixels?.toFixed(2) ?? '—'}</dd></div>
       </dl>
+      {frame.capturedAtSource === 'server-estimate' && <p>Start time estimated</p>}
       {!frame.statistics ? <p>Star measurements unavailable for this image.</p>
         : frame.statistics.detectedStars === 0 ? <p>No measurable stars in this image.</p> : null}
     </div>}

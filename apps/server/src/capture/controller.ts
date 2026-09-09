@@ -10,6 +10,7 @@ export interface CaptureFrame {
   height: number
   pixels: ArrayLike<number>
   capturedAt: string
+  capturedAtSource?: CaptureImage['capturedAtSource']
   color?: ImageColor
 }
 
@@ -89,6 +90,7 @@ export function createCaptureController(
           id, imageUrl: `/api/rigs/${encodeURIComponent(settings.rigId)}/capture/images/${id}`,
           ...(previews.fit ? { fitImageUrl: `/api/rigs/${encodeURIComponent(settings.rigId)}/capture/images/${id}/fit` } : {}),
           width: frame.width, height: frame.height, exposureSeconds,
+          ...(frame.capturedAtSource ? { capturedAtSource: frame.capturedAtSource } : {}),
           capturedAt: frame.capturedAt, receivedAt: new Date(now()).toISOString(), cameraName,
           color: frame.color?.kind === 'bayer' ? 'color' : 'mono', statistics, saved: false,
         }
