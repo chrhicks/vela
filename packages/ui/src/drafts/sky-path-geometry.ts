@@ -70,3 +70,14 @@ export function horizonSectors(points: readonly HorizonPoint[], margin: number, 
     return { unknown, silhouette: polygon([0, 0], lower), band: polygon(lower, upper) }
   })
 }
+
+// Great-circle separation, independent of distortion in the overhead projection.
+export function angularSeparationDegrees(first: SkyCoordinate, second: SkyCoordinate): number {
+  const radians = Math.PI / 180
+  const firstAltitude = first.altitudeDegrees * radians
+  const secondAltitude = second.altitudeDegrees * radians
+  const cosine = Math.sin(firstAltitude) * Math.sin(secondAltitude)
+    + Math.cos(firstAltitude) * Math.cos(secondAltitude)
+    * Math.cos((first.azimuthDegrees - second.azimuthDegrees) * radians)
+  return Math.acos(Math.max(-1, Math.min(1, cosine))) / radians
+}
