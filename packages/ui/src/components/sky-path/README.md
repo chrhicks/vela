@@ -1,7 +1,7 @@
 # Sky-path workshop fixtures
 
-These are entirely invented, public-safe sample data for the draft overhead
-sky-path specimen. They contain no observer location, real observing date,
+These are entirely invented, public-safe sample data for the stable overhead
+sky-path primitive specimen. They contain no observer location, real observing date,
 private panorama, measured skyline, or calibration data. Familiar target IDs
 connect the samples to the target-selection product example; their tracks are
 illustrations, not predictions for those catalog objects.

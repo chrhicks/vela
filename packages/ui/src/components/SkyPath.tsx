@@ -17,13 +17,15 @@ export type SkyPathProps = {
   selectedIndex: number
   onSelectedIndexChange: (index: number) => void
   nowIndex?: number
+  /** Text for the reference-time marker, such as Last calculation for stale data. */
+  nowLabel?: string
   horizon?: SkyPathHorizon
   marginDegrees?: number
   onMarginDegreesChange?: (degrees: number) => void
   compact?: boolean
 }
 
-export function SkyPath({ samples, moonSamples, targetName, selectedIndex, onSelectedIndexChange, nowIndex, horizon, marginDegrees = 5, onMarginDegreesChange, compact = false }: SkyPathProps) {
+export function SkyPath({ samples, moonSamples, targetName, selectedIndex, onSelectedIndexChange, nowIndex, nowLabel = 'Now', horizon, marginDegrees = 5, onMarginDegreesChange, compact = false }: SkyPathProps) {
   const root = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(280)
   const id = useId()
@@ -61,7 +63,7 @@ export function SkyPath({ samples, moonSamples, targetName, selectedIndex, onSel
     : selected.altitudeDegrees < localAltitude + margin ? 'Within the elevation margin'
     : 'Above the silhouette and elevation margin'
   const point = (sample: SkyCoordinate) => projectSky(sample, center, radius)
-  const labels = skyLabels(samples, now, selected, moon, size, compact)
+  const labels = skyLabels(samples, now, nowLabel, selected, moon, size, compact)
 
   return (
     <div ref={root} className="vela-sky-path" data-compact={compact || undefined}>
@@ -87,7 +89,7 @@ export function SkyPath({ samples, moonSamples, targetName, selectedIndex, onSel
           <text x={label.x} y={label.y} textAnchor="middle" className="vela-sky-path__time">{label.text}</text>
         </g>)}
         {now && now.altitudeDegrees >= 0 && <circle cx={point(now).x} cy={point(now).y} r="7" className="vela-sky-path__now" />}
-        {labels.now && <text x={labels.now.x} y={labels.now.y} textAnchor="middle" className="vela-sky-path__time">Now</text>}
+        {labels.now && <text x={labels.now.x} y={labels.now.y} textAnchor="middle" className="vela-sky-path__time">{nowLabel}</text>}
         {moon && moon.altitudeDegrees >= 0 && <g className="vela-sky-path__moon" transform={`translate(${point(moon).x} ${point(moon).y})`}>
           <circle r="8" className="vela-sky-path__moon-disk" />
           <path d={moonPhasePath(moon.illuminationFraction)} transform={moon.waxing ? undefined : 'scale(-1 1)'} className="vela-sky-path__moon-lit" />
@@ -119,7 +121,7 @@ type LabelBox = { left: number; right: number; top: number; bottom: number }
 
 // Text stays at a fixed pixel size as the dome resizes. Reserve each label's
 // footprint so a short, high-altitude arc does not become a stack of times.
-function skyLabels(samples: readonly SkyPathSample[], now: SkyPathSample | undefined, selected: SkyPathSample | undefined, moon: SkyPathMoonSample | null | undefined, size: number, compact: boolean) {
+function skyLabels(samples: readonly SkyPathSample[], now: SkyPathSample | undefined, referenceLabel: string, selected: SkyPathSample | undefined, moon: SkyPathMoonSample | null | undefined, size: number, compact: boolean) {
   const center = size / 2
   const radius = center - 27
   const occupied: LabelBox[] = []
@@ -145,7 +147,7 @@ function skyLabels(samples: readonly SkyPathSample[], now: SkyPathSample | undef
     if (belowFirst) vertical.reverse()
     return place(text, [...vertical, { x: x - text.length * 3.5 - 16, y: y + 4 }, { x: x + text.length * 3.5 + 16, y: y + 4 }])
   }
-  const nowLabel = now && now.altitudeDegrees >= 0 ? near('Now', now, true) : undefined
+  const nowLabel = now && now.altitudeDegrees >= 0 ? near(referenceLabel, now, true) : undefined
   const moonLabel = moon && moon.altitudeDegrees >= 0 ? near('Moon', moon) : undefined
   const altitudes = [30, 60].flatMap(altitude => {
     const y = center + radius * (90 - altitude) / 90 - 5
