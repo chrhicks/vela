@@ -5,6 +5,7 @@ import { createMemoryRigCatalog } from '../rig/catalog.js'
 import { createRigOperations } from '../rig/operations.js'
 import { CaptureStoppedError, type CaptureCamera, type CaptureFrame } from './controller.js'
 import { registerCapture } from './routes.js'
+import { registerNavigation } from '../navigation.js'
 import { createMemorySavedImageStore } from '../saved-images/store.js'
 import { registerSavedImages } from '../saved-images/routes.js'
 
@@ -41,7 +42,7 @@ function setup(selection: { uniqueId: string, name: string } | null = record.ima
   let inspectionGate: Promise<void> | undefined
   let inspections = 0
   const captures: Array<Parameters<CaptureCamera['capture']>[0] & ReturnType<typeof deferred<CaptureFrame>>> = []
-  registerCapture(app, catalog, operations, {
+  const capture = registerCapture(app, catalog, operations, {
     savedImages,
     createInspector: () => ({ async inspectDevices(): Promise<ReadonlyArray<AlpacaDeviceInspection>> {
       inspections++
@@ -60,6 +61,7 @@ function setup(selection: { uniqueId: string, name: string } | null = record.ima
     } }
     },
   })
+  registerNavigation(app, catalog, capture)
   registerSavedImages(app, catalog, savedImages)
   cleanups.push(async () => {
     for (const capture of captures) capture.reject(new CaptureStoppedError())
@@ -239,4 +241,40 @@ it('auto-saves a single exposure and returns honest errors for unavailable stora
   expect((await subject.app.inject('/api/web/rigs/sim/saved-images')).statusCode).toBe(503)
   vi.spyOn(subject.savedImages, 'count').mockRejectedValue(new Error('Storage unreadable'))
   expect((await subject.get()).json()).toMatchObject({ enabled: true, savedImageCount: null })
+})
+
+
+it('projects navigation progress and terminal state without inspecting devices or saved images', async () => {
+  const subject = setup()
+  const navigation = async () => (await subject.app.inject('/api/web/navigation')).json()
+  expect(await navigation()).toEqual({ rigs: [{ id: 'sim', name: 'Simulator' }], captures: [] })
+  expect(subject.inspections()).toBe(0)
+
+  await subject.start({ exposureSeconds: 10, repeat: true })
+  const inspectionsAtStart = subject.inspections()
+  const count = vi.spyOn(subject.savedImages, 'count')
+  const list = vi.spyOn(subject.savedImages, 'list')
+  subject.captures[0]!.onProgress({ phase: 'exposing', elapsedSeconds: 4 })
+  expect((await navigation()).captures).toEqual([{
+    rigId: 'sim', rigName: 'Simulator', active: true, phase: 'exposing',
+    completedCount: 0, elapsedSeconds: 4, exposureSeconds: 10, error: null,
+  }])
+  subject.captures[0]!.resolve(frame)
+  await vi.waitFor(() => expect(subject.captures).toHaveLength(2))
+  subject.captures[1]!.onProgress({ phase: 'reading', elapsedSeconds: 10 })
+  expect((await navigation()).captures).toEqual([{
+    rigId: 'sim', rigName: 'Simulator', active: true, phase: 'reading',
+    completedCount: 1, elapsedSeconds: 10, exposureSeconds: 10, error: null,
+  }])
+  subject.captures[1]!.reject(new Error('Readout failed'))
+  await vi.waitFor(() => expect(subject.operations.owner('sim')).toBeUndefined())
+  expect((await navigation()).captures[0]).toMatchObject({
+    rigId: 'sim', rigName: 'Simulator', phase: 'failed', active: false, completedCount: 1, error: 'Readout failed',
+  })
+  expect(subject.inspections()).toBe(inspectionsAtStart)
+  expect(count).not.toHaveBeenCalled()
+  expect(list).not.toHaveBeenCalled()
+
+  await subject.catalog.forget('sim')
+  expect(await navigation()).toEqual({ rigs: [], captures: [] })
 })

@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { AlpacaCaptureStoppedError, createAlpacaAcquisition } from '@vela/alpaca'
-import type { CaptureView } from '@vela/model/web'
+import type { CaptureView, NavigationCapture } from '@vela/model/web'
 import type { RigCatalogRecord } from '../rig/contracts.js'
 import type { RigCatalog } from '../rig/catalog.js'
 import type { RigOperations } from '../rig/operations.js'
@@ -165,6 +165,15 @@ export function registerCapture(
   })
 
   app.addHook('onClose', async () => { await Promise.all([...controllers.values()].map(controller => controller.stop())) })
+
+  return {
+    snapshot(rigId: string): NavigationCapture | undefined {
+      const view = controllers.get(rigId)?.snapshot()
+      if (!view) return undefined
+      const { rigName, phase, active, completedCount, elapsedSeconds, exposureSeconds, error } = view
+      return { rigId, rigName, phase, active, completedCount, elapsedSeconds, exposureSeconds, error }
+    },
+  }
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
