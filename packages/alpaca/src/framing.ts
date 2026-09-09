@@ -4,6 +4,7 @@ import { createAlpacaClient } from './internal/client.js'
 import { rejectDuplicateDeviceIds, stableDeviceId } from './internal/configured-device.js'
 import type { ConfiguredDevice } from './internal/types/management.js'
 
+const trackingRates = ['sidereal', 'lunar', 'solar', 'king'] as const
 const coordinateSystems = ['other', 'topocentric', 'j2000', 'j2050', 'b1950'] as const
 export type AlpacaCoordinateSystem = typeof coordinateSystems[number] | 'unknown'
 
@@ -31,6 +32,13 @@ export interface AlpacaTelescopeStatus {
   longitudeDegrees?: number
   elevationMeters?: number
   tracking: boolean
+  trackingRate?: typeof trackingRates[number]
+  /** Offset from sidereal, in seconds of RA per sidereal second. */
+  rightAscensionRateSecondsPerSiderealSecond?: number
+  /** Offset from zero declination motion, in arcseconds per SI second. */
+  declinationRateArcsecondsPerSecond?: number
+  /** ASCOM pointing state: east is normal, west is through the pole. */
+  pierSide?: 'east' | 'west' | 'unknown'
   slewing: boolean
   parked: boolean
   observedAt: string
@@ -54,7 +62,7 @@ export interface AlpacaFramingOptions {
 
 export interface AlpacaFraming {
   cameraGeometry(options: { cameraId: string; expectedCameraName?: string }, signal?: AbortSignal): Promise<AlpacaCameraGeometry>
-  telescopeStatus(telescopeId: string, signal?: AbortSignal): Promise<AlpacaTelescopeStatus>
+  telescopeStatus(telescopeId: string, signal?: AbortSignal, options?: { includeAlignmentObservations?: boolean }): Promise<AlpacaTelescopeStatus>
   setTracking(telescopeId: string, tracking: boolean, signal?: AbortSignal): Promise<void>
   slew(options: AlpacaSlewOptions, signal?: AbortSignal): Promise<void>
   abortTelescope(telescopeId: string): Promise<void>
@@ -154,7 +162,7 @@ export function createAlpacaFraming({ baseUrl, fetch = globalThis.fetch, request
       return { cameraName, sensorWidthPixels, sensorHeightPixels, pixelWidthMicrons, pixelHeightMicrons, binX, binY, width, height, startX, startY }
     },
 
-    async telescopeStatus(telescopeId, signal) {
+    async telescopeStatus(telescopeId, signal, options) {
       const telescope = await device(telescopeId, 'telescope', signal)
       const ra = validateNumber(await client.readNumber(telescope, 'rightascension', signal), 0, 24, 'rightascension')
       if (ra === 24) invalid('Right ascension must be less than 24 hours', 'rightascension')
@@ -166,7 +174,24 @@ export function createAlpacaFraming({ baseUrl, fetch = globalThis.fetch, request
       const tracking = await client.readBoolean(telescope, 'tracking', signal)
       const slewing = await client.readBoolean(telescope, 'slewing', signal)
       const parked = await client.readBoolean(telescope, 'atpark', signal)
-      return { rightAscensionDegrees: ra * 15, declinationDegrees, coordinateSystem, ...(latitudeDegrees === undefined ? {} : { latitudeDegrees }), ...(longitudeDegrees === undefined ? {} : { longitudeDegrees }), ...(elevationMeters === undefined ? {} : { elevationMeters }), tracking, slewing, parked, observedAt: new Date().toISOString() }
+      const alignment: Partial<AlpacaTelescopeStatus> = {}
+      if (options?.includeAlignmentObservations) {
+        const rate = await optionalNumber(telescope, 'trackingrate', 0, 3, signal)
+        if (rate !== undefined) {
+          if (!Number.isInteger(rate)) invalid('Invalid trackingrate', 'trackingrate')
+          alignment.trackingRate = trackingRates[rate]!
+        }
+        const raRate = await optionalNumber(telescope, 'rightascensionrate', -Infinity, Infinity, signal)
+        if (raRate !== undefined) alignment.rightAscensionRateSecondsPerSiderealSecond = raRate
+        const decRate = await optionalNumber(telescope, 'declinationrate', -Infinity, Infinity, signal)
+        if (decRate !== undefined) alignment.declinationRateArcsecondsPerSecond = decRate
+        const side = await optionalNumber(telescope, 'sideofpier', -1, 1, signal)
+        if (side !== undefined) {
+          if (!Number.isInteger(side)) invalid('Invalid sideofpier', 'sideofpier')
+          alignment.pierSide = side === -1 ? 'unknown' : side === 0 ? 'east' : 'west'
+        }
+      }
+      return { ...alignment, rightAscensionDegrees: ra * 15, declinationDegrees, coordinateSystem, ...(latitudeDegrees === undefined ? {} : { latitudeDegrees }), ...(longitudeDegrees === undefined ? {} : { longitudeDegrees }), ...(elevationMeters === undefined ? {} : { elevationMeters }), tracking, slewing, parked, observedAt: new Date().toISOString() }
     },
 
     async setTracking(telescopeId, tracking, signal) {

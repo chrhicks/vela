@@ -1,0 +1,91 @@
+{
+  "site": {
+    "latitudeDegrees": 40,
+    "longitudeDegrees": -75,
+    "elevationMeters": 100
+  },
+  "cases": [
+    {
+      "altitude": 480,
+      "azimuth": -360,
+      "samples": [
+        {
+          "solved": {
+            "raDegrees": 9.301819215854604,
+            "decDegrees": 59.73463697178923
+          },
+          "capturedAt": "2026-09-09T05:45:59.579844Z",
+          "sidereal": 359.7999970651532
+        },
+        {
+          "solved": {
+            "raDegrees": 27.3802729433445,
+            "decDegrees": 59.78628199290804
+          },
+          "capturedAt": "2026-09-09T05:46:49.579844Z",
+          "sidereal": 0.00890078808102146
+        },
+        {
+          "solved": {
+            "raDegrees": 45.617346277499685,
+            "decDegrees": 59.859198070529146
+          },
+          "capturedAt": "2026-09-09T05:48:09.579844Z",
+          "sidereal": 0.3431467447541223
+        }
+      ],
+      "adjusted": {
+        "solved": {
+          "raDegrees": 45.761895306968526,
+          "decDegrees": 59.887571464285415
+        },
+        "capturedAt": "2026-09-09T05:50:09.579844Z"
+      },
+      "target": {
+        "raDegrees": 45.81000396317339,
+        "decDegrees": 59.89738742536565
+      }
+    },
+    {
+      "altitude": 0,
+      "azimuth": 0,
+      "samples": [
+        {
+          "solved": {
+            "raDegrees": 9.406819987531222,
+            "decDegrees": 59.85280158146061
+          },
+          "capturedAt": "2026-09-09T05:45:59.579844Z",
+          "sidereal": 359.7999970651532
+        },
+        {
+          "solved": {
+            "raDegrees": 27.53976472820067,
+            "decDegrees": 59.86846550830065
+          },
+          "capturedAt": "2026-09-09T05:46:49.579844Z",
+          "sidereal": 0.00890078808102146
+        },
+        {
+          "solved": {
+            "raDegrees": 45.810005057467066,
+            "decDegrees": 59.897387880299576
+          },
+          "capturedAt": "2026-09-09T05:48:09.579844Z",
+          "sidereal": 0.3431467447541223
+        }
+      ],
+      "adjusted": {
+        "solved": {
+          "raDegrees": 45.81000396317339,
+          "decDegrees": 59.89738742536565
+        },
+        "capturedAt": "2026-09-09T05:50:09.579844Z"
+      },
+      "target": {
+        "raDegrees": 45.81000396317339,
+        "decDegrees": 59.89738742536565
+      }
+    }
+  ]
+}

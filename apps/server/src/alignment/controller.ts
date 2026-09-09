@@ -5,9 +5,11 @@ import type { AlpacaAcquisition } from '@vela/alpaca'
 import { createAlignmentBaseline, measureAlignment, type AlignmentSample } from './geometry.js'
 import { createAstapSolver, projectSky } from './solver.js'
 import { previewPng } from '../imaging/preview.js'
+import type { PhysicalAlignment } from './physical.js'
 
-/** Deliberately configured offline model: J2000 axes with a synthetic sidereal clock. */
+/** Explicit server configuration keeps the synthetic clock separate from physical rigs. */
 export interface AlignmentSettings {
+  mode?: 'offline' | 'physical'
   endpoint: string
   cameraId: string
   telescopeId: string
@@ -18,12 +20,15 @@ export interface AlignmentSettings {
 }
 
 type Solver = ReturnType<typeof createAstapSolver>
-export function createAlignmentController(settings: AlignmentSettings, hardware: AlpacaAcquisition, solver: Solver, now = Date.now) {
+export function createAlignmentController(settings: AlignmentSettings, hardware: AlpacaAcquisition, solver: Solver | ((fieldHeightDegrees: number) => Solver), now = Date.now, physical?: PhysicalAlignment) {
+  let fieldHeightDegrees = settings.fieldHeightDegrees
+  let activeSolver = typeof solver === 'function' ? undefined : solver
   let view: AlignmentView = {
     rigId: '', rigName: '', enabled: true, unavailableReason: null,
     phase: 'setup', activity: 'idle', active: false, position: 0, solvedPositions: 0,
     exposureSeconds: settings.exposureSeconds, exposureStartedAt: null, measuredAt: null,
     warning: null, error: null, measurement: null,
+    ...(physical ? { mode: 'physical' as const, cameraName: physical.cameraName } : {}),
   }
   let running: Promise<void> | undefined
   let controller: AbortController | undefined
@@ -58,23 +63,26 @@ export function createAlignmentController(settings: AlignmentSettings, hardware:
   }
 
   async function acquire(signal: AbortSignal) {
-    const pointing = await hardware.pointing(settings.telescopeId, signal)
+    const actual = physical ? await physical.pointing(signal) : undefined
+    const pointing = actual ? undefined : await hardware.pointing(settings.telescopeId, signal)
     const pointingObservedAt = now()
-    if (pointing.coordinateSystem !== 'j2000') throw new Error('This configured alignment model requires the simulator’s J2000 coordinate frame')
-    if (!pointing.tracking) throw new Error('Tracking must be enabled before measuring alignment')
+    if (pointing && pointing.coordinateSystem !== 'j2000') throw new Error('This configured alignment model requires the simulator’s J2000 coordinate frame')
+    if (pointing && !pointing.tracking) throw new Error('Tracking must be enabled before measuring alignment')
     patch({ activity: 'exposing', exposureStartedAt: new Date().toISOString() })
-    const frame = await hardware.capture({ cameraId: settings.cameraId, exposureSeconds: settings.exposureSeconds, signal, monochromeOnly: true })
+    const frame = await hardware.capture({ cameraId: settings.cameraId, exposureSeconds: settings.exposureSeconds, signal,
+      ...(physical ? { expectedCameraName: physical.cameraName } : { monochromeOnly: true }) })
     signal.throwIfAborted()
+    if (physical) await physical.validate(signal, frame)
     patch({ activity: 'solving', exposureStartedAt: null })
-    const solved = await solver.solve(frame, { raDegrees: pointing.rightAscensionDegrees, decDegrees: pointing.declinationDegrees }, signal)
+    const solved = await activeSolver!.solve(frame, actual?.hint ?? { raDegrees: pointing!.rightAscensionDegrees, decDegrees: pointing!.declinationDegrees }, signal)
     signal.throwIfAborted()
     if (solved.status === 'no-solution') {
       patch({ warning: 'Plate-solving failed. Trying a new image.' })
       return undefined
     }
     patch({ warning: null })
-    const sample: AlignmentSample = { raDegrees: solved.raDegrees, decDegrees: solved.decDegrees,
-      capturedAt: frame.capturedAt, siderealTimeDegrees: (pointing.siderealTimeDegrees
+    const sample: AlignmentSample = physical ? physical.sample(solved, { capturedAt: frame.capturedAt, exposureSeconds: settings.exposureSeconds }) : { raDegrees: solved.raDegrees, decDegrees: solved.decDegrees,
+      capturedAt: frame.capturedAt, siderealTimeDegrees: (pointing!.siderealTimeDegrees
         + (Date.parse(frame.capturedAt) - pointingObservedAt) / 1000 * 360 / 86164.0905 + 360) % 360 }
     if (previousSample) {
       const elapsed = (Date.parse(sample.capturedAt) - Date.parse(previousSample.capturedAt)) / 1000
@@ -83,7 +91,7 @@ export function createAlignmentController(settings: AlignmentSettings, hardware:
       if (elapsed <= 0 || Math.abs(observed - expected) > 0.01) throw new Error('The rig clock or simulator baseline changed. Stop and measure again.')
     }
     previousSample = sample
-    return { frame, solved, sample, latitude: pointing.latitudeDegrees }
+    return { frame, solved, sample, latitude: actual?.latitude ?? pointing!.latitudeDegrees }
   }
 
   async function solvedFrame(signal: AbortSignal) {
@@ -96,22 +104,28 @@ export function createAlignmentController(settings: AlignmentSettings, hardware:
   }
 
   async function run(signal: AbortSignal) {
-    const initial = await hardware.pointing(settings.telescopeId, signal)
-    if (initial.coordinateSystem !== 'j2000' || !initial.tracking) throw new Error('The configured simulator’s J2000 frame and tracking are required')
-    if (initial.rightAscensionDegrees < 8 || initial.rightAscensionDegrees > 52 || Math.abs(initial.declinationDegrees - 60) > 0.01) throw new Error('Reset the simulator to its northern alignment position before measuring')
-    // A wide baseline limits amplification of subpixel plate-solve uncertainty.
-    // This sweep belongs to the explicitly configured offline model.
-    const preparationDegrees = 12 - initial.rightAscensionDegrees
-    if (Math.abs(preparationDegrees) > 0.1) {
-      patch({ activity: 'moving' })
-      await hardware.move(settings.telescopeId, Math.sign(preparationDegrees) * 1.5, Math.abs(preparationDegrees) / 1.5, signal)
+    if (physical) {
+      fieldHeightDegrees = (await physical.prepare(signal)).fieldHeightDegrees
+      activeSolver = typeof solver === 'function' ? solver(fieldHeightDegrees) : solver
+    } else {
+      const initial = await hardware.pointing(settings.telescopeId, signal)
+      if (initial.coordinateSystem !== 'j2000' || !initial.tracking) throw new Error('The configured simulator’s J2000 frame and tracking are required')
+      if (initial.rightAscensionDegrees < 8 || initial.rightAscensionDegrees > 52 || Math.abs(initial.declinationDegrees - 60) > 0.01) throw new Error('Reset the simulator to its northern alignment position before measuring')
+      // A wide baseline limits amplification of subpixel plate-solve uncertainty.
+      // This sweep belongs to the explicitly configured offline model.
+      const preparationDegrees = 12 - initial.rightAscensionDegrees
+      if (Math.abs(preparationDegrees) > 0.1) {
+        patch({ activity: 'moving' })
+        await hardware.move(settings.telescopeId, Math.sign(preparationDegrees) * 1.5, Math.abs(preparationDegrees) / 1.5, signal)
+      }
     }
     const first = await solvedFrame(signal)
     const samples: AlignmentSample[] = [first.sample]
     let current = first
     for (let position = 2; position <= 3; position++) {
       patch({ activity: 'moving', position, solvedPositions: position - 1 })
-      await hardware.move(settings.telescopeId, 1.5, 12, signal)
+      if (physical) await physical.move(signal)
+      else await hardware.move(settings.telescopeId, 1.5, 12, signal)
       current = await solvedFrame(signal)
       samples.push(current.sample)
     }
@@ -120,17 +134,19 @@ export function createAlignmentController(settings: AlignmentSettings, hardware:
     while (true) {
       const measured = measureAlignment(baseline, current.sample, true)
       const imageId = randomUUID()
-      const preview = await previewPng(current.frame.width, current.frame.height, current.frame.pixels)
+      const preview = await previewPng(current.frame.width, current.frame.height, current.frame.pixels, current.frame.color)
       signal.throwIfAborted()
+      if (physical) await physical.validate(signal)
       images.set(imageId, preview)
       while (images.size > 4) images.delete(images.keys().next().value!)
-      const target = projectSky(current.solved.wcs, measured.correctionTarget)
+      const target = physical ? physical.project(current.solved.wcs, measured.correctionTarget, current.sample) : projectSky(current.solved.wcs, measured.correctionTarget)
       if (!target) throw new Error('Alignment target is outside the solvable camera projection')
       patch({ measuredAt: current.frame.capturedAt, activity: 'waiting', measurement: {
         altitudeArcsec: measured.altitudeArcsec, azimuthArcsec: measured.azimuthArcsec,
         totalArcsec: measured.totalArcsec, imageUrl: `/api/rigs/${encodeURIComponent(view.rigId)}/alignment/images/${imageId}`,
         imageWidth: current.frame.width, imageHeight: current.frame.height,
-        targetX: target.x, targetY: target.y, fieldHeightDegrees: settings.fieldHeightDegrees,
+        targetX: target.x, targetY: target.y, fieldHeightDegrees,
+        ...(current.frame.capturedAtSource ? { capturedAtSource: current.frame.capturedAtSource } : {}),
       } })
       // A calm adjustment window between exposures; never infer solver progress from elapsed time.
       await delay(3000, undefined, { signal })
