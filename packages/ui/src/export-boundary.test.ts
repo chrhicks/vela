@@ -13,6 +13,11 @@ describe('@vela/ui export boundaries', () => {
     expect(stable).toHaveProperty('SkyPath')
   })
 
+  it('exports NavigationBar only from the stable root', () => {
+    expect(stable).toHaveProperty('NavigationBar')
+    expect(drafts).not.toHaveProperty('NavigationBar')
+  })
+
   it('removes promoted components from the draft boundary', () => {
     expect(drafts).not.toHaveProperty('Dialog')
     expect(drafts).not.toHaveProperty('SkyPath')

@@ -80,3 +80,7 @@ solve phase, requested center, camera field size and timestamped solved footprin
 `checkCurrent` distinguishes a current check from a preserved older exposure;
 `canCenter` is the server's separate correction precondition. Neither contract
 contains a device protocol, coordinate conversion or durable observing plan.
+
+NavigationView combines catalog identities with small snapshots of known capture
+controllers, including terminal phases. An absent controller does not confirm
+that a previously observed run finished; these snapshots are lost on restart.
