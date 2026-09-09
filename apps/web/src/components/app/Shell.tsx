@@ -12,6 +12,7 @@ export default function Shell() {
   return (
     <div
       className="vela-theme min-h-screen"
+      data-mode="dark"
       style={themeStyle(theme, 'dark') as CSSProperties}
     >
       <header className="bg-ui-surface flex items-center min-h-13 px-3 border-0 border-b border-b-ui-line overflow-hidden">

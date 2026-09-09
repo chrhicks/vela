@@ -50,3 +50,13 @@ container, with background interaction disabled until dismissal.
 No local obstruction profile is currently loaded. The geometric dome explicitly
 excludes local obstructions; synthetic workshop fixtures are never imported by
 the app. Site coordinates continue to come from the mount at runtime.
+
+Through the night colors the supplied target samples using their geometric
+solar altitude: daylight at/above zero, civil twilight below zero, nautical
+at/below −6°, astronomical twilight at/below −12°, darkness at/below −18°.
+The [NWS twilight definitions](https://www.weather.gov/fsd/twilight) describe
+the twilight limits. The zero-degree boundary is a geometric convention, not
+a refracted upper-limb sunrise/sunset prediction. Light colors, legend and
+selected-phase text come from the approved Light windows specimen. Phase
+changes follow the existing 15-minute samples and are explicitly approximate.
+Both compact and expanded views share the same phases and selected time.
