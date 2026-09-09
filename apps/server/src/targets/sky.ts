@@ -1,5 +1,5 @@
 import {
-  BaryState, Body, C_AUDAY, Equator, EquatorFromVector, Horizon, MakeTime,
+  BaryState, Body, C_AUDAY, Equator, EquatorFromVector, Horizon, Illumination, MakeTime, MoonPhase,
   Observer, ObserverState, RotateVector, Rotation_EQD_EQJ, Rotation_EQJ_EQD,
   Spherical, Vector, VectorFromSphere,
 } from 'astronomy-engine'
@@ -83,14 +83,28 @@ export function skyPath(target: TargetPosition, site: Site, now: Date): TargetSk
     const sunNow = Equator(Body.Sun, now, observer, true, true)
     if (Horizon(now, observer, sunNow.ra, sunNow.dec).altitude < -18) noon -= 86_400_000
   }
-  const altitude = (at: Date) => {
+  const horizontal = (at: Date) => {
     const apparent = toMount(target, 'topocentric', at, site)
-    return Horizon(at, observer, apparent.raDegrees / 15, apparent.decDegrees).altitude
+    return Horizon(at, observer, apparent.raDegrees / 15, apparent.decDegrees)
   }
   const samples = Array.from({ length: 97 }, (_, index) => {
     const at = new Date(noon + index * 900_000)
     const sun = Equator(Body.Sun, at, observer, true, true)
-    return { at: at.toISOString(), altitudeDegrees: altitude(at), sunAltitudeDegrees: Horizon(at, observer, sun.ra, sun.dec).altitude }
+    const targetHorizontal = horizontal(at)
+    const moon = Equator(Body.Moon, at, observer, true, true)
+    const moonHorizontal = Horizon(at, observer, moon.ra, moon.dec)
+    return {
+      at: at.toISOString(),
+      azimuthDegrees: targetHorizontal.azimuth,
+      altitudeDegrees: targetHorizontal.altitude,
+      sunAltitudeDegrees: Horizon(at, observer, sun.ra, sun.dec).altitude,
+      moon: {
+        azimuthDegrees: moonHorizontal.azimuth,
+        altitudeDegrees: moonHorizontal.altitude,
+        illuminationFraction: Illumination(Body.Moon, at).phase_fraction,
+        waxing: MoonPhase(at) < 180,
+      },
+    }
   })
   const windows: TargetSkyPath['aboveHorizonDuringDarkness'] = []
   let start: string | null = null
@@ -105,7 +119,7 @@ export function skyPath(target: TargetPosition, site: Site, now: Date): TargetSk
   }
   return {
     observedAt: now.toISOString(), startsAt: samples[0]!.at, endsAt: samples.at(-1)!.at,
-    samples, currentAltitudeDegrees: altitude(now), highestAltitudeDegrees: Math.max(...samples.map(sample => sample.altitudeDegrees)),
+    samples, currentAltitudeDegrees: horizontal(now).altitude, highestAltitudeDegrees: Math.max(...samples.map(sample => sample.altitudeDegrees)),
     aboveHorizonDuringDarkness: windows,
   }
 }

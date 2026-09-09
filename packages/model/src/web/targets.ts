@@ -15,7 +15,20 @@ export interface TargetSkyPath {
   observedAt: string
   startsAt: string
   endsAt: string
-  samples: Array<{ at: string, altitudeDegrees: number, sunAltitudeDegrees: number }>
+  samples: Array<{
+    at: string
+    /** Geometric horizontal coordinates; azimuth increases eastward from north. */
+    azimuthDegrees: number
+    altitudeDegrees: number
+    sunAltitudeDegrees: number
+    moon: {
+      azimuthDegrees: number
+      altitudeDegrees: number
+      /** Illuminated fraction as seen from Earth's center, from 0 to 1. */
+      illuminationFraction: number
+      waxing: boolean
+    }
+  }>
   currentAltitudeDegrees: number
   highestAltitudeDegrees: number
   aboveHorizonDuringDarkness: Array<{ startsAt: string, endsAt: string }>
