@@ -7,11 +7,26 @@ const optionalText = (v: unknown) => v === null || typeof v === 'string'
 export function isPosition(v: unknown): v is TargetPosition {
   return record(v) && finite(v.raDegrees) && v.raDegrees >= 0 && v.raDegrees < 360 && finite(v.decDegrees) && Math.abs(v.decDegrees) <= 90
 }
+function isHorizontal(v: unknown): boolean {
+  return record(v) && finite(v.azimuthDegrees) && v.azimuthDegrees >= 0 && v.azimuthDegrees < 360
+    && finite(v.altitudeDegrees) && Math.abs(v.altitudeDegrees) <= 90
+}
+function isMoon(v: unknown): boolean {
+  return record(v) && isHorizontal(v) && finite(v.illuminationFraction) && v.illuminationFraction >= 0 && v.illuminationFraction <= 1 && typeof v.waxing === 'boolean'
+}
 function isSky(v: unknown): v is TargetSkyPath {
-  return record(v) && date(v.observedAt) && date(v.startsAt) && date(v.endsAt) && Date.parse(v.endsAt) > Date.parse(v.startsAt)
-    && finite(v.currentAltitudeDegrees) && finite(v.highestAltitudeDegrees) && Array.isArray(v.samples) && v.samples.length > 1
-    && v.samples.every(s => record(s) && date(s.at) && finite(s.altitudeDegrees) && Math.abs(s.altitudeDegrees) <= 90 && finite(s.sunAltitudeDegrees))
-    && Array.isArray(v.aboveHorizonDuringDarkness) && v.aboveHorizonDuringDarkness.every(w => record(w) && date(w.startsAt) && date(w.endsAt))
+  if (!record(v) || !date(v.observedAt) || !date(v.startsAt) || !date(v.endsAt)
+    || !finite(v.currentAltitudeDegrees) || !finite(v.highestAltitudeDegrees)
+    || !Array.isArray(v.samples) || v.samples.length < 2) return false
+  const start = Date.parse(v.startsAt)
+  const duration = Date.parse(v.endsAt) - start
+  const interval = duration / (v.samples.length - 1)
+  if (duration <= 0) return false
+  return v.samples.every((sample, index) => record(sample) && date(sample.at)
+    && isHorizontal(sample) && isMoon(sample.moon) && finite(sample.sunAltitudeDegrees)
+    && Math.abs(Date.parse(sample.at) - (start + index * interval)) < 1)
+    && Array.isArray(v.aboveHorizonDuringDarkness)
+    && v.aboveHorizonDuringDarkness.every(window => record(window) && date(window.startsAt) && date(window.endsAt))
 }
 export function isTarget(v: unknown): v is TargetView {
   return record(v) && isPosition(v) && ['id', 'name', 'catalog', 'kind'].every(k => typeof (v as unknown as Record<string, unknown>)[k] === 'string')

@@ -13,6 +13,12 @@ environmental safety policy exists. Darkness means Sun below −18°. The paths
 and displayed windows are sampled at 15-minute intervals and are approximate.
 Morning after astronomical dawn selects the coming night; before dawn retains
 the active night. Polar day/night and unavailable site data remain explicit.
+Every sample includes target azimuth and the Moon's topocentric azimuth and
+altitude at the same time and site, without atmospheric refraction. Azimuth is
+0° north, increasing eastward. Lunar illumination is the geocentric illuminated
+fraction from Astronomy Engine `Illumination`; waxing means `MoonPhase` is
+between new and full (0° inclusive to 180° exclusive). These provide observing
+context, not a brightness forecast or a target-quality restriction.
 
 `sky.ts` isolates Astronomy Engine's precession/nutation and the distant-object
 aberration correction. Catalog and solved coordinates are J2000. Only J2000 and

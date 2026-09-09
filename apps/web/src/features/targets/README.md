@@ -1,7 +1,7 @@
 # Targets and framing
 
 The target routes adopt the approved target/framing workshop composition. The
-catalog, site-based altitude paths, calibrated camera dimensions, and operation
+catalog, site-based sky paths, calibrated camera dimensions, and operation
 state arrive from the server. The browser owns unsaved composition offsets and
 survey navigation. It never derives observatory readiness from device telemetry.
 
@@ -37,3 +37,16 @@ and `survey-tile.jpg`), created with ImageMagick on 2026-09-07. They contain no
 survey imagery: dimensions match the HiPS Allsky atlas (1728×1856) and tile
 (512×512) so tests exercise the real renderer without external downloads. They
 are generated Vela test fixtures, never application assets.
+
+`SkyInspection` adopts the promoted SkyPath primitive in Through the night.
+The server supplies target azimuth/altitude and topocentric Moon positions at
+matching 15-minute timestamps. The browser formats local time and retains the
+selected timestamp across refreshes and compact/expanded views. A new night
+resets selection. The view reports daylight/twilight/darkness for the selected
+sample and keeps the last calculation explicitly marked during interruption.
+The expanded dialog is portaled inside the app theme, outside the framing
+container, with background interaction disabled until dismissal.
+
+No local obstruction profile is currently loaded. The geometric dome explicitly
+excludes local obstructions; synthetic workshop fixtures are never imported by
+the app. Site coordinates continue to come from the mount at runtime.
