@@ -37,6 +37,7 @@ import { loadRigDetailView } from './rig/detail.js'
 import { loadHomeView } from './rig/home.js'
 import { createRigOperations } from './rig/operations.js'
 import { registerCapture } from './capture/routes.js'
+import { registerNavigation } from './navigation.js'
 import { registerImagingCamera } from './rig/imaging-camera.js'
 import { registerAlignment } from './alignment/routes.js'
 import type { AlignmentSettings } from './alignment/controller.js'
@@ -81,7 +82,8 @@ export function buildApp({
   const app = Fastify({ logger: true })
   const operations = createRigOperations()
   registerAlignment(app, rigCatalog, alignment, operations)
-  registerCapture(app, rigCatalog, operations, { createInspector, savedImages })
+  const capture = registerCapture(app, rigCatalog, operations, { createInspector, savedImages })
+  registerNavigation(app, rigCatalog, capture)
   registerSavedImages(app, rigCatalog, savedImages)
   registerImagingCamera(app, rigCatalog, operations, { createInspector })
   registerTargets(app, rigCatalog, operations, { ...targets, createInspector, now })
