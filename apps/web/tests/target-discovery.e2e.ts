@@ -97,3 +97,70 @@ test('returning to the saved selection cancels a pending page without leaving Re
   await expect(page.getByRole('heading', { name: 'Andromeda Galaxy' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'All objects', exact: true })).toHaveAttribute('aria-pressed', 'true')
 })
+
+for (const width of [1280, 390]) {
+  test(`page navigation moves to results but search, filters and refresh retain focus at ${width}px`, async ({ page }) => {
+    await seed(page)
+    await page.setViewportSize({ width, height: 844 })
+    await page.route('**/api/web/rigs/rig-1/target-discovery?*', route => route.fulfill({ json: response(new URL(route.request().url())) }))
+    await page.goto('/rigs/rig-1/observe/targets')
+    const results = page.locator('.vela-discovery__results')
+    const search = page.getByRole('searchbox', { name: 'Find a target' })
+    const next = page.getByRole('button', { name: 'Next', exact: true })
+    const previous = page.getByRole('button', { name: 'Previous', exact: true })
+    await next.click()
+    await expect(results).toBeFocused()
+    await next.click()
+    await expect(page.getByLabel('Target pages')).toContainText('5–6 of 6')
+    await expect(next).toBeDisabled()
+    await previous.click()
+    await expect(results).toBeFocused()
+    await expect(page.getByLabel('Target pages')).toContainText('3–4 of 6')
+
+    await search.fill('M31')
+    await expect(results).toContainText('Results for “M31”')
+    await expect(page.getByLabel('Target pages')).toContainText('1–2 of 6')
+    await expect(search).toBeFocused()
+    await expect(search).toBeInViewport()
+    await search.press('End')
+    await search.pressSequentially(' galaxy')
+    await expect(results).toContainText('Results for “M31 galaxy”')
+    await expect(search).toBeFocused()
+
+    for (const control of [page.getByRole('button', { name: 'Galaxies', exact: true }), page.getByRole('button', { name: 'Broadband subjects', exact: true }), page.getByRole('button', { name: 'Refresh', exact: true })]) {
+      await next.click()
+      await expect(page.getByLabel('Target pages')).toContainText('3–4 of 6')
+      await control.click()
+      await expect(page.getByLabel('Target pages')).toContainText('1–2 of 6')
+      await expect(results).not.toBeFocused()
+      await expect(control).toBeInViewport()
+    }
+    await next.click()
+    await expect(page.getByLabel('Target pages')).toContainText('3–4 of 6')
+    await page.goBack()
+    await expect(page.getByLabel('Target pages')).toContainText('1–2 of 6')
+    await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled()
+  })
+}
+
+test('a delayed page cannot steal focus after the user returns to search', async ({ page }) => {
+  await seed(page)
+  let release!: () => void
+  const gate = new Promise<void>(resolve => { release = resolve })
+  await page.route('**/api/web/rigs/rig-1/target-discovery?*', async route => {
+    const url = new URL(route.request().url())
+    if (url.searchParams.get('offset') === '2') await gate
+    await route.fulfill({ json: response(url) }).catch(() => {})
+  })
+  await page.goto('/rigs/rig-1/observe/targets')
+  await page.getByRole('button', { name: 'Next', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Loading…', exact: true })).toBeDisabled()
+  const search = page.getByRole('searchbox', { name: 'Find a target' })
+  await search.focus()
+  release()
+  await expect(page.getByLabel('Target pages')).toContainText('3–4 of 6')
+  await expect(search).toBeFocused()
+  await search.fill('unmatched')
+  await expect(page.locator('.vela-discovery__results')).toContainText('Results for “unmatched”')
+  await expect(search).toBeFocused()
+})
