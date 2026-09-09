@@ -1,0 +1,67 @@
+.vela-nav-demo { container: vela-nav / inline-size; color: var(--vela-text); width: 100%; min-width: 0; }
+.vela-nav-demo__fixture { color: var(--vela-text-muted); margin: 0 0 12px; font-size: .72em; }
+.vela-nav-demo__app { border: 1px solid var(--vela-line); background: var(--vela-canvas); border-radius: var(--vela-radius); overflow: hidden; }
+.vela-nav-demo__bar { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 20px; min-height: 64px; padding: 0 24px; border-bottom: 1px solid var(--vela-line); background: var(--vela-surface); }
+.vela-nav-demo__context { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.vela-nav-demo__brand { color: var(--vela-text); font-weight: 650; text-decoration: none; letter-spacing: -.04em; font-size: 1.2em; }
+.vela-nav-demo__divider { width: 1px; height: 20px; background: var(--vela-line-strong); }
+.vela-nav-demo__rig { min-width: 0; }
+.vela-nav-demo select { font: inherit; color: var(--vela-text); background: var(--vela-surface); border: 1px solid var(--vela-line); border-radius: var(--vela-radius); padding: 8px; max-width: 100%; }
+.vela-nav-demo__rig select { font-size: .85em; border-color: transparent; padding-left: 0; cursor: pointer; }
+.vela-nav-demo__pages { align-self: stretch; display: flex; justify-content: center; gap: 24px; }
+.vela-nav-demo__pages a { display: flex; align-items: center; min-height: 44px; text-decoration: none; color: var(--vela-text-muted); border-bottom: 2px solid transparent; font-size: .85em; }
+.vela-nav-demo__pages a[aria-current] { color: var(--vela-text); border-color: var(--vela-accent); }
+.vela-nav-demo__pages a:hover { color: var(--vela-text); }
+.vela-nav-demo__activity { grid-column: 3; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 8px 10px; min-height: 36px; color: var(--vela-text); background: var(--vela-surface-raised); border: 1px solid var(--vela-line); border-radius: var(--vela-radius); font: inherit; font-size: .75em; cursor: pointer; white-space: nowrap; }
+.vela-nav-demo__activity i { width: 6px; height: 6px; flex-shrink: 0; border-radius: 50%; background: var(--vela-positive); }
+.vela-nav-demo__activity small { font: inherit; color: var(--vela-text-muted); }
+.vela-nav-demo__activity[data-interrupted] i { background: var(--vela-warning); }
+.vela-nav-demo__activity:hover { border-color: var(--vela-line-strong); }
+.vela-nav-demo a:focus-visible, .vela-nav-demo button:focus-visible, .vela-nav-demo select:focus-visible { outline: 2px solid var(--vela-focus); outline-offset: 3px; }
+.vela-nav-demo__content { padding: 36px; min-height: 430px; }
+.vela-nav-demo__heading { margin-bottom: 28px; }
+.vela-nav-demo__heading p { margin: 0 0 8px; color: var(--vela-text-muted); font-size: .75em; }
+.vela-nav-demo h1 { font-size: 1.8em; font-weight: 550; line-height: 1.2; margin: 0 0 10px; letter-spacing: -.025em; }
+.vela-nav-demo__heading > span { font-size: .85em; color: var(--vela-text-muted); }
+.vela-nav-demo h2 { font-size: 1.05em; font-weight: 550; margin: 0 0 10px; }
+.vela-nav-demo__targets, .vela-nav-demo__rig-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.vela-nav-demo__targets article { border: 1px solid var(--vela-line); border-radius: var(--vela-radius); overflow: hidden; background: var(--vela-surface); }
+.vela-nav-demo__targets img { display: block; width: 100%; aspect-ratio: 2; object-fit: cover; }
+.vela-nav-demo__targets article > div { padding: 18px; }
+.vela-nav-demo__targets p { color: var(--vela-text-muted); font-size: .7em; margin: 0 0 6px; }
+.vela-nav-demo__targets a, .vela-nav-demo__secondary a, .vela-nav-demo__content .vela-panel a, .vela-nav-demo__back { font-size: .8em; color: var(--vela-text); text-underline-offset: 4px; }
+.vela-nav-demo__targets small { display: block; font-size: .6em; line-height: 1.45; color: var(--vela-text-muted); margin-top: 18px; }
+.vela-nav-demo__targets small a { font-size: inherit; color: inherit; }
+.vela-nav-demo__target-image { display: block; width: 100%; max-height: 400px; object-fit: cover; margin-top: 20px; }
+.vela-nav-demo__credit { font-size: .65em; color: var(--vela-text-muted); }
+.vela-nav-demo__credit a { color: inherit; }
+.vela-nav-demo__observe { max-width: 640px; }
+.vela-nav-demo__content .vela-panel p { font-size: .85em; line-height: 1.6; color: var(--vela-text-muted); }
+.vela-nav-demo__content .vela-panel strong { display: block; font-size: .85em; font-weight: 550; margin-block: 20px; }
+.vela-nav-demo__secondary { display: flex; gap: 24px; margin-top: 24px; }
+.vela-nav-demo__capture { display: grid; grid-template-columns: 1.4fr 1fr; gap: 20px; }
+.vela-nav-demo__exposure { aspect-ratio: 4 / 3; overflow: hidden; background: #020409; }
+.vela-nav-demo__exposure canvas { display: block; width: 100%; height: 100%; object-fit: contain; }
+.vela-nav-demo__try { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--vela-line); }
+.vela-nav-demo__try label { display: flex; align-items: center; gap: 12px; font-size: .78em; color: var(--vela-text-muted); }
+.vela-nav-demo__try p { margin-bottom: 0; font-size: .72em; color: var(--vela-text-muted); line-height: 1.5; }
+.vela-nav-demo__sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+@container vela-nav (max-width: 850px) {
+  .vela-nav-demo__bar { grid-template-columns: minmax(0, 1fr) auto; gap: 0 12px; padding: 12px 16px 0; }
+  .vela-nav-demo__pages { grid-row: 2; grid-column: 1 / -1; justify-content: flex-start; gap: 28px; padding-top: 8px; }
+  .vela-nav-demo__activity { grid-row: 1; grid-column: 2; }
+  .vela-nav-demo__bar:not(:has(.vela-nav-demo__pages)) { padding-bottom: 12px; }
+  .vela-nav-demo__content { padding: 24px; }
+}
+@container vela-nav (max-width: 500px) {
+  .vela-nav-demo__bar { padding-inline: 12px; gap: 0 8px; }
+  .vela-nav-demo__brand span, .vela-nav-demo__divider { display: none; }
+  .vela-nav-demo__context { gap: 8px; }
+  .vela-nav-demo__rig select { max-width: 130px; font-size: .75em; }
+  .vela-nav-demo__activity { padding-inline: 7px; font-size: .65em; gap: 5px; }
+  .vela-nav-demo__pages { gap: 24px; }
+  .vela-nav-demo__content { padding: 22px 16px; }
+  .vela-nav-demo h1 { font-size: 1.5em; }
+  .vela-nav-demo__targets, .vela-nav-demo__rig-cards, .vela-nav-demo__capture { grid-template-columns: 1fr; }
+  .vela-nav-demo__try label { flex-wrap: wrap; }
+}
