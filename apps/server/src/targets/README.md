@@ -6,8 +6,8 @@ the shared rig operation lease. A capture run, connection change, or another
 framing request cannot take that lease until device work and cleanup finish.
 
 `catalog/` owns the pinned OpenNGC adaptation and its CC BY-SA provenance.
-Search accepts familiar aliases, catalog numbers and object types. The initial
-collection is curated, without an observability score. Sky paths use the
+Search accepts familiar aliases, catalog numbers and object types. Discovery
+ranks the full catalog for photographic interest and remaining observing time. Sky paths use the
 mount's observed site and current UTC time; no saved obstruction map or implicit
 environmental safety policy exists. Darkness means Sun below −18°. The paths
 and displayed windows are sampled at 15-minute intervals and are approximate.
@@ -71,3 +71,23 @@ Set `VELA_ASTAP` to the installed ASTAP CLI and `VELA_STAR_CATALOG` to its local
 star database directory. Framing uses these independently of the simulator-only
 polar-alignment endpoint configuration. Read-only target browsing remains
 available when solving or the camera is unavailable.
+
+## Target discovery
+
+`discovery.ts` calculates remaining astronomical-darkness opportunities above 30°
+from a single site/time observation. Type, apparent extent and a modest set of
+familiar showpieces provide a photographic-interest heuristic, balanced against
+remaining useful time and altitude. This is not a measured image-quality score:
+weather, local obstructions, Moon interference and camera fit are not modeled.
+Explicit search includes objects without a useful window.
+
+`discovery-routes.ts` keeps up to twelve disposable calculations, each identified
+by an opaque snapshot ID. All categories, optical-filter choices and pages reuse
+the same site and instant without rereading the mount. Refresh creates a fresh
+calculation. A missing snapshot returns 410 instead of silently changing order.
+The browser owns the last-page cache; server restart does not restore snapshots.
+
+Filter advice distinguishes Hα/O III emission from broadband starlight. Chris's
+Optolong L-Ultimate has dual 3nm passbands; recommendations never infer that it is
+installed. Mixed or unspecified catalog types receive conservative broadband
+guidance. No filter or device command is issued by browsing.

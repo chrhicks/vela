@@ -45,19 +45,20 @@ test('an untouched target and Reset frame send only the accepted slew fields', a
 test('catalog is paged and search updates use actual server results; missing site and image stay honest on mobile', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   const queries: string[] = []
-  await page.route('**/api/web/rigs/rig-1/targets?*', route => {
+  await page.route('**/api/web/rigs/rig-1/target-discovery?*', route => {
     queries.push(route.request().url())
-    return respond(route, { rigId: 'rig-1', rigName: 'Test rig', targets: [target], total: 25, site: null, siteUnavailableReason: 'Mount site is unavailable.' })
+    const params = new URL(route.request().url()).searchParams
+    return respond(route, { rigId: 'rig-1', rigName: 'Test rig', snapshotId: 'catalog-test', calculatedAt: new Date().toISOString(), status: 'site-unavailable', night: null, query: params.get('q') ?? '', category: params.get('category') ?? 'all', filter: params.get('filter') ?? 'all', offset: Number(params.get('offset')), pageSize: 24, targets: [{ ...target, category: 'galaxy', filterChoice: 'broadband', filterReason: 'Broadband preserves starlight.', opportunity: null }], total: 25, site: null, siteUnavailableReason: 'Mount site is unavailable.' })
   })
   await page.route('**/api/targets/*/thumbnail', route => route.abort())
   await page.goto('/rigs/rig-1/observe/targets')
   await expect(page.getByRole('heading', { name: target.name })).toBeVisible()
   await expect(page.getByText('Reference image unavailable')).toBeVisible()
-  await expect(page.getByText('Mount site is unavailable.')).toBeVisible()
+  await expect(page.getByText('The mount’s site could not be read: Mount site is unavailable.')).toBeVisible()
   await page.getByRole('button', { name: 'Next', exact: true }).click()
   await expect.poll(() => queries.some(q => q.includes('offset=24'))).toBe(true)
   await page.getByLabel('Find a target').fill('M31')
-  await expect.poll(() => queries.some(q => q.includes('q=M31&offset=0'))).toBe(true)
+  await expect.poll(() => queries.some(q => new URL(q).searchParams.get('q') === 'M31' && new URL(q).searchParams.get('offset') === '0')).toBe(true)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
 })
 
@@ -269,9 +270,9 @@ test('quiet polling leaves Check rig state enabled and an explicit check superse
 
 test('Targets breadcrumb preserves search and results page through a detail reload', async ({ page }) => {
   const queries: string[] = []
-  await page.route('**/api/web/rigs/rig-1/targets?*', route => {
+  await page.route('**/api/web/rigs/rig-1/target-discovery?*', route => {
     queries.push(route.request().url())
-    return respond(route, { rigId: 'rig-1', rigName: 'Test rig', targets: [target], total: 49, site: null, siteUnavailableReason: null })
+    return respond(route, { rigId: 'rig-1', rigName: 'Test rig', snapshotId: 'breadcrumb-night', calculatedAt: '2026-09-08T02:00:00.000Z', status: 'site-unavailable', night: null, query: 'galaxy', category: 'all', filter: 'all', offset: 24, pageSize: 12, targets: [{ ...target, category: 'galaxy', filterChoice: 'broadband', filterReason: 'Broadband preserves starlight.', opportunity: null }], total: 49, site: null, siteUnavailableReason: 'Site unavailable' })
   })
   await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
   await page.route('**/api/web/rigs/rig-1/framing', route => respond(route, idle))
@@ -279,14 +280,16 @@ test('Targets breadcrumb preserves search and results page through a detail relo
   await page.route('**/api/survey/**', route => route.abort())
   await page.goto('/rigs/rig-1/observe/targets?q=galaxy&offset=24')
   await expect(page.getByLabel('Find a target')).toHaveValue('galaxy')
-  await page.getByRole('link').filter({ has: page.getByRole('heading', { name: target.name }) }).click()
-  await expect(page).toHaveURL(/targets\/m31\?q=galaxy&offset=24$/)
+  await page.getByRole('link', { name: 'Explore target', exact: true }).click()
+  await expect(page).toHaveURL(/targets\/m31\?/)
   await page.reload()
   await page.getByRole('link', { name: '← Targets', exact: true }).click()
-  await expect(page).toHaveURL(/targets\?q=galaxy&offset=24$/)
+  expect(new URL(page.url()).searchParams.get('q')).toBe('galaxy')
+  expect(new URL(page.url()).searchParams.get('offset')).toBe('24')
   await expect(page.getByLabel('Find a target')).toHaveValue('galaxy')
-  await expect(page.getByText('25–48 of 49')).toBeVisible()
-  expect(queries.at(-1)).toContain('q=galaxy&offset=24')
+  await expect(page.getByText('25–36 of 49')).toBeVisible()
+  expect(new URL(queries.at(-1)!).searchParams.get('q')).toBe('galaxy')
+  expect(new URL(queries.at(-1)!).searchParams.get('offset')).toBe('24')
 })
 
 test('failure recovery preserves local drag, zoom and nudges while device commands remain blocked', async ({ page }) => {
