@@ -46,3 +46,21 @@ is fixed across this short sample night. Its position and phase are illustrative
 not an ephemeris. The component computes target separation on the sphere.
 The upright phase glyph shows illuminated fraction and waxing/waning only,
 not the Moon's apparent rotation or bright-limb position angle.
+
+## Light-window preview
+
+The Light windows specimen supplies an invented noon-to-noon path and five
+light phases. Its boundaries are deliberately aligned with sample times; they
+are visual fixtures, not calculated sunset or twilight events. The existing
+primitive and target-framing specimens retain their original eight-hour data.
+
+`SkyPathSample.light` optionally colors the path from that sample to the next.
+Callers own phase classification. Boundaries follow the equally spaced samples,
+so their precision is limited by the sample spacing; they are not exact event
+timestamps. SkyPath still owns no solar calculations.
+Missing phases inside a colored path remain dashed/unknown; callers that omit
+phases entirely retain the original appearance. The selected phase is named in
+the visible readout and slider accessibility text. Colors are an intentional
+illustration palette with light/dark variants, separate from command status.
+The web app supplies phases from its server-provided solar-altitude samples;
+workshop phase windows remain invented fixtures.

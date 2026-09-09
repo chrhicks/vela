@@ -16,20 +16,20 @@ const sampleTargets: Record<DemoSkyTargetId, { declinationDegrees: number; trans
 const radians = (degrees: number) => degrees * Math.PI / 180
 const degrees = (radians: number) => radians * 180 / Math.PI
 
-export function getSkySamples(targetId: string): SkyPathSample[] {
+export function getSkySamples(targetId: string, startHour = 20, sampleCount = 49, stepMinutes = 10): SkyPathSample[] {
   const target = sampleTargets[Object.hasOwn(sampleTargets, targetId) ? targetId as DemoSkyTargetId : 'andromeda']
   const latitude = radians(sampleLatitudeDegrees)
   const declination = radians(target.declinationDegrees)
 
-  return Array.from({ length: 49 }, (_, index) => {
-    const elapsedMinutes = index * 10
-    const hourAngle = radians((20 + elapsedMinutes / 60 - target.transitHour) * 15)
+  return Array.from({ length: sampleCount }, (_, index) => {
+    const elapsedMinutes = index * stepMinutes
+    const hourAngle = radians((startHour + elapsedMinutes / 60 - target.transitHour) * 15)
     const east = -Math.cos(declination) * Math.sin(hourAngle)
     const north = Math.sin(declination) * Math.cos(latitude)
       - Math.cos(declination) * Math.cos(hourAngle) * Math.sin(latitude)
     const up = Math.sin(declination) * Math.sin(latitude)
       + Math.cos(declination) * Math.cos(hourAngle) * Math.cos(latitude)
-    const clockMinutes = (20 * 60 + elapsedMinutes) % (24 * 60)
+    const clockMinutes = (startHour * 60 + elapsedMinutes) % (24 * 60)
 
     return {
       azimuthDegrees: (degrees(Math.atan2(east, north)) + 360) % 360,
