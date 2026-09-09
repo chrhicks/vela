@@ -51,4 +51,3 @@ export function angularDistance(a: EquatorialPosition, b: EquatorialPosition): n
   const half = Math.sin((dec2 - dec1) / 2) ** 2 + Math.cos(dec1) * Math.cos(dec2) * Math.sin((b.raDegrees - a.raDegrees) * radians / 2) ** 2
   return 2 * Math.asin(Math.sqrt(Math.max(0, Math.min(1, half)))) / radians
 }
-
