@@ -55,8 +55,9 @@ are visual fixtures, not calculated sunset or twilight events. The existing
 primitive and target-framing specimens retain their original eight-hour data.
 
 `SkyPathSample.light` optionally colors the path from that sample to the next.
-Callers own phase classification and must include a sample at each transition
-when precise boundaries are needed. SkyPath still owns no solar calculations.
+Callers own phase classification. Boundaries follow the equally spaced samples,
+so their precision is limited by the sample spacing; they are not exact event
+timestamps. SkyPath still owns no solar calculations.
 Missing phases inside a colored path remain dashed/unknown; callers that omit
 phases entirely retain the original appearance. The selected phase is named in
 the visible readout and slider accessibility text. Colors are an intentional
