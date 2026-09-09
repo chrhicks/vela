@@ -49,6 +49,53 @@ describe('target sky coordinates', () => {
 })
 
 describe('target sky night', () => {
+  it('keeps target azimuth in the same apparent frame, clockwise from north', () => {
+    // ERFA atco13 aob output, with the same inputs as benchmarks above.
+    const azimuths = [5.56350130287918, 74.13530018467179, 174.25467450209425, 285.543875717234]
+    for (const [index, benchmark] of benchmarks.entries()) {
+      const sample = skyPath(benchmark.catalog, site, date).samples.find(sample => sample.at === date.toISOString())!
+      expect(Math.abs(sample.azimuthDegrees - azimuths[index]!) * 3600).toBeLessThan(0.5)
+    }
+  })
+
+  it('matches independent airless topocentric Moon positions and geocentric illumination', () => {
+    // JPL Horizons DE441, Moon (301), UTC, geodetic site -75,40,0 km,
+    // quantities 4 (airless az/el). Quantity 10 from center 500@399 gives
+    // geocentric illumination. https://ssd-api.jpl.nasa.gov/doc/horizons.html
+    // 0.01° allows the shorter lunar model; still rejects missing parallax,
+    // J2000 coordinates fed into Horizon, or refraction near the horizon.
+    const path = skyPath(benchmarks[1]!.catalog, site, date)
+    for (const [at, azimuth, altitude] of [
+      ['2026-09-07T04:00:00.000Z', 34.392562, -17.794425],
+      ['2026-09-07T06:15:00.000Z', 58.190210, -0.122525],
+    ] as const) {
+      const moon = path.samples.find(sample => sample.at === at)!.moon
+      expect(Math.abs(moon.azimuthDegrees - azimuth)).toBeLessThan(0.01)
+      expect(Math.abs(moon.altitudeDegrees - altitude)).toBeLessThan(0.01)
+    }
+    const moon = path.samples.find(sample => sample.at === date.toISOString())!.moon
+    expect(Math.abs(moon.illuminationFraction - 0.1948491)).toBeLessThan(0.0001)
+    expect(path.samples.some(sample => sample.moon.altitudeDegrees > 0)).toBe(true)
+    expect(path.samples.some(sample => sample.moon.altitudeDegrees < 0)).toBe(true)
+  })
+
+  it.each([
+    ['2026-09-07T04:00:00Z', false],
+    ['2026-09-18T04:00:00Z', true],
+  ] as const)('moves lunar illumination consistently with waxing or waning on %s', (at, waxing) => {
+    const samples = skyPath(benchmarks[1]!.catalog, site, new Date(at)).samples
+    for (const [index, sample] of samples.entries()) {
+      expect(sample.moon.waxing).toBe(waxing)
+      expect(sample.moon.illuminationFraction).toBeGreaterThan(0)
+      expect(sample.moon.illuminationFraction).toBeLessThan(1)
+      if (index > 0) {
+        const previous = samples[index - 1]!
+        expect(Date.parse(sample.at) - Date.parse(previous.at)).toBe(900_000)
+        expect(sample.moon.illuminationFraction > previous.moon.illuminationFraction).toBe(waxing)
+      }
+    }
+  })
+
   it('spans the active observing night in observatory solar time and reports sampled dark visibility', () => {
     const path = skyPath(benchmarks[1]!.catalog, site, date)
     expect(path.observedAt).toBe(date.toISOString())

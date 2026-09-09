@@ -117,3 +117,7 @@
 .vela-target-nudges .vela-button { min-width: 40px; min-height: 40px; }
 
 .vela-target-shade { fill: color-mix(in srgb, var(--vela-canvas) 45%, transparent); }
+
+.vela-target-sky-dialog { width: min(100%, 34rem); }
+.vela-target-expand-sky { margin-block: calc(var(--vela-space) * 3); min-height: 44px; }
+.vela-target-sky-time { margin-top: calc(var(--vela-space) * 2); color: var(--vela-text-muted); font-size: .78em; line-height: 1.5; }
