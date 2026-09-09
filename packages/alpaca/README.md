@@ -171,6 +171,18 @@ site latitude, east-positive longitude, and elevation are omitted only when the
 driver explicitly reports them unsupported. Unsupported frame metadata becomes
 `unknown`; ASCOM `equOther` remains `other`. Neither is treated as J2000.
 
+Alignment callers can opt into additional reads with
+`telescopeStatus(telescopeId, signal, { includeAlignmentObservations: true })`.
+`trackingRate` names the ASCOM drive mode (`sidereal`, `lunar`, `solar`, `king`).
+`rightAscensionRateSecondsPerSiderealSecond` is the RA offset from sidereal in
+seconds of RA per sidereal second; `declinationRateArcsecondsPerSecond` is the
+DEC offset from zero in arcseconds per SI second. Neither is a mechanical axis
+speed. `pierSide` preserves ASCOM's pointing state: `east` is normal, `west` is
+through the pole, and `unknown` is the driver's indeterminate value. It does not
+infer the telescope's physical position. Unsupported properties (ASCOM 1024)
+are omitted; malformed values and other failures reject. Ordinary framing does
+not request these extra observations or impose alignment preconditions.
+
 `setTracking(telescopeId, boolean, signal)` confirms the requested state by reading
 it, including after a lost setter response. Confirmation polls read-only for up
 to the request timeout (5 seconds by default), never replaying the setter. It

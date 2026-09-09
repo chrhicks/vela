@@ -1,0 +1,113 @@
+import type { AlpacaAcquisition, AlpacaCameraGeometry, AlpacaFrame, AlpacaFraming, AlpacaTelescopeStatus } from '@vela/alpaca'
+import { fromMount, type Site } from '../astronomy/coordinates.js'
+import { physicalAlignmentSample, projectPhysicalAlignmentTarget } from './physical-coordinates.js'
+
+export interface PhysicalAlignmentSettings {
+  cameraId: string
+  cameraName: string
+  telescopeId: string
+  focalLengthMm: number
+}
+
+const difference = (a: number, b: number) => ((a - b + 540) % 360) - 180
+
+/** One explicitly prepared physical RA sweep. Never use coordinate slews here:
+ * a pointing model may move DEC even when the requested declination is fixed. */
+export function createPhysicalAlignment(settings: PhysicalAlignmentSettings, acquisition: AlpacaAcquisition, device: AlpacaFraming) {
+  let reference: AlpacaTelescopeStatus | undefined
+  let geometry: AlpacaCameraGeometry | undefined
+  let site: Site | undefined
+  let westRate: number | undefined
+
+  async function status(signal: AbortSignal, allowMovement = false) {
+    const current = await device.telescopeStatus(settings.telescopeId, signal, { includeAlignmentObservations: true })
+    if (current.parked || current.slewing || !current.tracking) throw new Error('Polar alignment requires an idle, unparked mount with tracking enabled')
+    if (current.coordinateSystem !== 'topocentric') throw new Error('This physical alignment trial requires topocentric mount coordinates')
+    if (current.trackingRate !== 'sidereal' || current.rightAscensionRateSecondsPerSiderealSecond !== 0 || current.declinationRateArcsecondsPerSecond !== 0) {
+      throw new Error('Confirm sidereal tracking with zero RA and DEC rate offsets before alignment')
+    }
+    if (current.pierSide !== 'east' && current.pierSide !== 'west') throw new Error('The mount must report a known pointing side before alignment')
+    if (current.latitudeDegrees === undefined || current.longitudeDegrees === undefined || current.latitudeDegrees <= 0 || current.latitudeDegrees > 85) {
+      throw new Error('Physical alignment requires the mount’s northern observing location')
+    }
+    if (reference) {
+      if (current.pierSide !== reference.pierSide || current.latitudeDegrees !== reference.latitudeDegrees
+        || current.longitudeDegrees !== reference.longitudeDegrees || current.elevationMeters !== reference.elevationMeters) {
+        throw new Error('The mount pointing side or observing location changed. Measure a new baseline.')
+      }
+      if (!allowMovement && (Math.abs(difference(current.rightAscensionDegrees, reference.rightAscensionDegrees)) > 0.02
+        || Math.abs(current.declinationDegrees - reference.declinationDegrees) > 0.02)) {
+        throw new Error('The mount moved outside the alignment sweep. Stop and measure a new baseline.')
+      }
+    }
+    return current
+  }
+
+  async function prepare(signal: AbortSignal) {
+    reference = undefined
+    westRate = undefined
+    const current = await status(signal)
+    const observed = await device.cameraGeometry({ cameraId: settings.cameraId, expectedCameraName: settings.cameraName }, signal)
+    if (!Number.isFinite(settings.focalLengthMm) || settings.focalLengthMm <= 0) throw new Error('Set the effective focal length before alignment')
+    reference = current
+    geometry = observed
+    site = { latitudeDegrees: current.latitudeDegrees!, longitudeDegrees: current.longitudeDegrees!,
+      ...(current.elevationMeters === undefined ? {} : { elevationMeters: current.elevationMeters }) }
+    return { fieldHeightDegrees: 2 * Math.atan(observed.height * observed.pixelHeightMicrons * observed.binY / 2000 / settings.focalLengthMm) * 180 / Math.PI }
+  }
+
+  async function pointing(signal: AbortSignal) {
+    const current = await status(signal)
+    const observed = await device.cameraGeometry({ cameraId: settings.cameraId, expectedCameraName: settings.cameraName }, signal)
+    if (JSON.stringify(observed) !== JSON.stringify(geometry)) throw new Error('Camera geometry changed. Measure a new baseline.')
+    return { hint: fromMount({ raDegrees: current.rightAscensionDegrees, decDegrees: current.declinationDegrees },
+      current.coordinateSystem, new Date(current.observedAt), site!), latitude: site!.latitudeDegrees }
+  }
+
+  async function move(signal: AbortSignal) {
+    const start = await status(signal)
+    let current = start
+    if (westRate === undefined) {
+      // ASCOM leaves MoveAxis sign to the driver. Observe a half-degree probe
+      // before choosing the sign for the westward sweep.
+      await acquisition.move(settings.telescopeId, 0.5, 1, signal)
+      current = await status(signal, true)
+      const observed = difference(current.rightAscensionDegrees, start.rightAscensionDegrees)
+      if (Math.abs(observed) < 0.1 || Math.abs(observed) > 1) throw new Error('The RA direction probe did not produce the expected small movement')
+      if (Math.abs(current.declinationDegrees - start.declinationDegrees) > 0.1) throw new Error('The mount did not follow the expected RA-only sweep')
+      westRate = -Math.sign(observed) * 1.5
+    }
+    // Observe every bounded increment. No uncertain movement is replayed and
+    // an unexpected direction or driver limit ends the measurement.
+    for (let step = 0; step < 10; step++) {
+      const travelled = -difference(current.rightAscensionDegrees, start.rightAscensionDegrees)
+      const remaining = 18 - travelled
+      if (Math.abs(remaining) <= 0.2) { reference = current; return }
+      if (remaining < 0 || remaining > 20) throw new Error('The RA sweep moved beyond its expected position')
+      const degrees = Math.min(3, remaining)
+      const before = current
+      await acquisition.move(settings.telescopeId, westRate, degrees / 1.5, signal)
+      current = await status(signal, true)
+      const progress = -difference(current.rightAscensionDegrees, before.rightAscensionDegrees)
+      if (progress < degrees * 0.5 || progress > degrees * 1.5
+        || Math.abs(current.declinationDegrees - start.declinationDegrees) > 0.1) {
+        throw new Error('The mount did not follow the expected RA-only sweep')
+      }
+    }
+    throw new Error('The RA sweep did not reach its next measurement position')
+  }
+
+  return {
+    prepare, pointing, move,
+    validate: async (signal: AbortSignal, frame?: Pick<AlpacaFrame, 'width' | 'height'>) => {
+      const current = await status(signal)
+      if (frame && (frame.width !== geometry?.width || frame.height !== geometry.height)) throw new Error('Captured image dimensions changed. Measure a new baseline.')
+      return current
+    },
+    sample: (solved: Parameters<typeof physicalAlignmentSample>[0], frame: Parameters<typeof physicalAlignmentSample>[1]) => physicalAlignmentSample(solved, frame, site!),
+    project: (wcs: Parameters<typeof projectPhysicalAlignmentTarget>[0], target: Parameters<typeof projectPhysicalAlignmentTarget>[1], sample: Parameters<typeof projectPhysicalAlignmentTarget>[2]) => projectPhysicalAlignmentTarget(wcs, target, sample, site!),
+    cameraName: settings.cameraName,
+  }
+}
+
+export type PhysicalAlignment = ReturnType<typeof createPhysicalAlignment>
