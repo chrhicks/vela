@@ -9,6 +9,7 @@ import { createAstapSolver, type PlateSolver } from '../plate-solving/solver.js'
 import { createFramingController, mountSite, type FramingHardware } from './framing.js'
 import { getTarget, listTargets, type CatalogTarget } from './catalog/index.js'
 import { skyPath, type Site } from './sky.js'
+import { registerTargetDiscovery } from './discovery-routes.js'
 
 export interface TargetOptions {
   solver?: { executable: string, catalogPath: string }
@@ -93,13 +94,15 @@ export function registerTargets(app: FastifyInstance, catalog: RigCatalog, opera
       return { site: null, siteUnavailableReason: message(error) }
     }
   }
-  function targetView(target: CatalogTarget, site: Site | null): TargetView {
+  function targetView(target: CatalogTarget, site: Site | null, at = now()): TargetView {
     const fov = Math.max(0.5, Math.min(5, (target.majorAxisArcminutes ?? 45) / 60 * 1.8))
     return { id: target.id, name: target.commonName ?? target.catalogName, catalog: target.catalogName, kind: target.type,
       raDegrees: target.raDegrees, decDegrees: target.decDegrees, sizeArcminutes: target.majorAxisArcminutes,
       thumbnailUrl: `/api/survey/thumbnail?ra=${target.raDegrees}&dec=${target.decDegrees}&fov=${fov}`,
-      sky: site ? skyPath(target, site, now()) : null }
+      sky: site ? skyPath(target, site, at) : null }
   }
+
+  registerTargetDiscovery(app, catalog, { now, siteView, targetView })
 
   app.get<{ Params: { rigId: string }, Querystring: { q?: string, offset?: string } }>('/api/web/rigs/:rigId/targets', async (request, reply) => {
     const rig = await catalog.get(request.params.rigId)

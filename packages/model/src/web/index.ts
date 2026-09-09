@@ -34,4 +34,5 @@ export type { CaptureImage, CaptureImageStatistics, CapturePhase, CaptureView, S
 
 export type { ImagingCameraView } from './imaging-camera.js'
 export type { TargetPosition, TargetView, TargetSkyPath, TargetsView, FramingView } from './targets.js'
+export type { TargetCategory, TargetFilterChoice, TargetOpportunity, TargetDiscoveryItem, TargetDiscoveryView } from './targets.js'
 export type { NavigationCapture, NavigationView } from './navigation.js'

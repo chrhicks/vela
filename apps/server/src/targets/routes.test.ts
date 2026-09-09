@@ -234,3 +234,46 @@ describe('target and framing HTTP boundary', () => {
     }
   })
 })
+
+describe('frozen target discovery HTTP boundary', () => {
+  it('keeps site, ranking and calculation time across pages and filters without inspecting hardware again', async () => {
+    const subject = setup()
+    const firstResponse = await subject.app.inject('/api/web/rigs/rig/target-discovery')
+    expect(firstResponse.statusCode).toBe(200)
+    const first = firstResponse.json()
+    expect(first.total).toBeGreaterThan(first.pageSize)
+    expect(first.targets).toHaveLength(first.pageSize)
+    expect(first.targets.every((target: { opportunity: unknown }) => target.opportunity)).toBe(true)
+    expect(first.calculatedAt).toBe(stamp)
+    subject.mount.latitudeDegrees = -40
+    const next = (await subject.app.inject(`/api/web/rigs/rig/target-discovery?snapshot=${first.snapshotId}&offset=${first.pageSize}`)).json()
+    expect(next.snapshotId).toBe(first.snapshotId)
+    expect(next.site).toEqual(first.site)
+    expect(next.targets.every((target: { id: string }) => !first.targets.some((previous: { id: string }) => previous.id === target.id))).toBe(true)
+    const galaxies = (await subject.app.inject(`/api/web/rigs/rig/target-discovery?snapshot=${first.snapshotId}&category=galaxy&filter=broadband`)).json()
+    expect(galaxies.targets.length).toBeGreaterThan(0)
+    expect(galaxies.targets.every((target: { category: string, filterChoice: string }) => target.category === 'galaxy' && target.filterChoice === 'broadband')).toBe(true)
+    expect(subject.adapter.telescopeStatus).toHaveBeenCalledTimes(1)
+    const refreshed = (await subject.app.inject('/api/web/rigs/rig/target-discovery')).json()
+    expect(refreshed.snapshotId).not.toBe(first.snapshotId)
+    expect(refreshed.site.latitudeDegrees).toBe(-40)
+    expect(subject.hardware.slew).not.toHaveBeenCalled()
+    expect(subject.hardware.capture).not.toHaveBeenCalled()
+  })
+
+  it('retains catalog search without a usable site and never silently replaces a missing snapshot', async () => {
+    const subject = setup()
+    delete subject.mount.latitudeDegrees
+    const view = (await subject.app.inject('/api/web/rigs/rig/target-discovery?q=M31')).json()
+    expect(view.status).toBe('site-unavailable')
+    expect(view.site).toBeNull()
+    expect(view.targets.some((target: { name: string }) => target.name === 'Andromeda Galaxy')).toBe(true)
+    expect(view.targets.every((target: { opportunity: unknown }) => target.opportunity === null)).toBe(true)
+    const calls = vi.mocked(subject.adapter.telescopeStatus).mock.calls.length
+    expect((await subject.app.inject('/api/web/rigs/rig/target-discovery?snapshot=00000000-0000-0000-0000-000000000000')).statusCode).toBe(410)
+    expect(subject.adapter.telescopeStatus).toHaveBeenCalledTimes(calls)
+    for (const query of ['category=potato', 'filter=red', 'offset=-1', 'offset=0.1', 'q=a&q=b', 'snapshot=no']) {
+      expect((await subject.app.inject(`/api/web/rigs/rig/target-discovery?${query}`)).statusCode).toBe(400)
+    }
+  })
+})

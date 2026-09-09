@@ -60,3 +60,18 @@ a refracted upper-limb sunrise/sunset prediction. Light colors, legend and
 selected-phase text come from the approved Light windows specimen. Phase
 changes follow the existing 15-minute samples and are explicitly approximate.
 Both compact and expanded views share the same phases and selected time.
+
+## Discovery browsing
+
+`TargetBrowser` adopts the Target discovery workshop specimen. `use-discovery`
+restores the last validated page from localStorage per rig, immediately and
+without a background recalculation. Type, optical preference, search and page
+requests share the server snapshot. Refresh deliberately replaces that snapshot
+from the current time. The saved calculation timestamp remains visible; card
+altitudes describe that instant, not live telemetry.
+
+Failures retain the last displayed result and identify a pending selection that
+could not load. Expired server snapshots require explicit Refresh. Storage
+failures do not prevent browsing. Search/filter/page choices travel in the detail
+link so returning from framing preserves the discovery context. The cache owns
+no rig control state.

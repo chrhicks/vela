@@ -1,4 +1,4 @@
-import type { FramingView, TargetPosition, TargetSkyPath, TargetView, TargetsView } from '@vela/model/web'
+import type { FramingView, TargetDiscoveryView, TargetPosition, TargetSkyPath, TargetView, TargetsView } from '@vela/model/web'
 
 const record = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object'
 const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
@@ -36,6 +36,23 @@ export function isTargets(v: unknown, rigId: string): v is TargetsView {
   return record(v) && v.rigId === rigId && typeof v.rigName === 'string' && Array.isArray(v.targets) && v.targets.every(isTarget)
     && finite(v.total) && v.total >= 0 && optionalText(v.siteUnavailableReason)
     && (v.site === null || record(v.site) && finite(v.site.latitudeDegrees) && finite(v.site.longitudeDegrees))
+}
+export function isTargetDiscovery(v: unknown, rigId: string): v is TargetDiscoveryView {
+  const categories = ['all', 'emission', 'reflection-dark', 'galaxy', 'cluster', 'planetary', 'other']
+  const filters = ['all', 'dual-band', 'broadband', 'uncertain']
+  if (!isTargets(v, rigId) || !record(v)) return false
+  return typeof v.snapshotId === 'string' && date(v.calculatedAt)
+    && ['available', 'site-unavailable', 'no-darkness'].includes(String(v.status))
+    && typeof v.query === 'string' && categories.includes(String(v.category)) && filters.includes(String(v.filter))
+    && Number.isInteger(v.offset) && Number(v.offset) >= 0 && Number.isInteger(v.pageSize) && Number(v.pageSize) > 0
+    && (v.night === null || record(v.night) && date(v.night.startsAt) && date(v.night.endsAt))
+    && v.targets.every(target => {
+      if (!record(target) || !categories.slice(1).includes(String(target.category)) || !filters.slice(1).includes(String(target.filterChoice)) || typeof target.filterReason !== 'string') return false
+      const opportunity = target.opportunity
+      return opportunity === null || record(opportunity) && date(opportunity.startsAt) && date(opportunity.endsAt)
+        && date(opportunity.bestAt) && finite(opportunity.usefulMinutes) && opportunity.usefulMinutes > 0
+        && finite(opportunity.bestAltitudeDegrees) && finite(opportunity.currentAltitudeDegrees)
+    })
 }
 export function isFramingView(v: unknown, rigId: string): v is FramingView {
   if (!record(v) || v.rigId !== rigId || typeof v.rigName !== 'string' || typeof v.enabled !== 'boolean' || typeof v.active !== 'boolean' || typeof v.canCenter !== 'boolean' || typeof v.checkCurrent !== 'boolean'
