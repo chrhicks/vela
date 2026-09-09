@@ -13,9 +13,7 @@
 .vela-nav-demo__pages a[aria-current] { color: var(--vela-text); border-color: var(--vela-accent); }
 .vela-nav-demo__pages a:hover { color: var(--vela-text); }
 .vela-nav-demo__activity { grid-column: 3; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 8px 10px; min-height: 36px; color: var(--vela-text); background: var(--vela-surface-raised); border: 1px solid var(--vela-line); border-radius: var(--vela-radius); font: inherit; font-size: .75em; cursor: pointer; white-space: nowrap; }
-.vela-nav-demo__activity i { width: 6px; height: 6px; flex-shrink: 0; border-radius: 50%; background: var(--vela-positive); }
 .vela-nav-demo__activity small { font: inherit; color: var(--vela-text-muted); }
-.vela-nav-demo__activity[data-interrupted] i { background: var(--vela-warning); }
 .vela-nav-demo__activity:hover { border-color: var(--vela-line-strong); }
 .vela-nav-demo a:focus-visible, .vela-nav-demo button:focus-visible, .vela-nav-demo select:focus-visible { outline: 2px solid var(--vela-focus); outline-offset: 3px; }
 .vela-nav-demo__content { padding: 36px; min-height: 430px; }
@@ -64,4 +62,20 @@
   .vela-nav-demo h1 { font-size: 1.5em; }
   .vela-nav-demo__targets, .vela-nav-demo__rig-cards, .vela-nav-demo__capture { grid-template-columns: 1fr; }
   .vela-nav-demo__try label { flex-wrap: wrap; }
+}
+
+.vela-nav-demo__activity { display: grid; gap: 6px; min-width: 166px; text-align: left; }
+.vela-nav-demo__capture-summary { display: flex; justify-content: space-between; gap: 14px; }
+.vela-nav-demo__capture-summary > small { color: var(--vela-text-muted); font-size: .9em; font-variant-numeric: tabular-nums; }
+.vela-nav-demo__activity progress { display: block; appearance: none; width: 100%; height: 3px; border: 0; background: var(--vela-line-strong); border-radius: 2px; overflow: hidden; }
+.vela-nav-demo__activity progress::-webkit-progress-bar { background: var(--vela-line-strong); }
+.vela-nav-demo__activity progress::-webkit-progress-value { background: var(--vela-positive); }
+.vela-nav-demo__activity progress::-moz-progress-bar { background: var(--vela-positive); }
+.vela-nav-demo__capture-note { color: var(--vela-text-muted); font-size: .85em; }
+.vela-nav-demo__activity[data-interrupted] .vela-nav-demo__capture-summary > small { color: var(--vela-warning); }
+.vela-nav-demo__try label + label { margin-top: 12px; }
+.vela-nav-demo__try input[type="range"] { accent-color: var(--vela-accent); max-width: 160px; }
+@container vela-nav (max-width: 500px) {
+  .vela-nav-demo__activity { min-width: 0; }
+  .vela-nav-demo__capture-summary { gap: 8px; }
 }
