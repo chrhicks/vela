@@ -47,7 +47,7 @@ function Comparison({ props, onPropsChange }: { props: Props; onPropsChange?: (p
     })}</div>
     <p className="vela-target-compare__legend"><span />Useful above 30° · the line marks your selected time</p>
     <Panel className="vela-target-compare__decision" title={selected ? selected.name : 'Choose a photograph to inspect the tradeoff'} description={selectedTradeoff}>
-      {selected ? <><p>{selected.advice === 'L-Ultimate' ? 'Its emission lines suit L-Ultimate. Choose this if you want to keep the dual-band filter fitted.' : 'Broadband suits this subject’s starlight. Consider the filter change if L-Ultimate is fitted.'}</p><small>This choice stays in the experiment. It does not start a capture or save a plan.</small></> : <p>M13 is ready now but sets soon. Andromeda asks you to wait. Crescent offers the middle ground.</p>}
+      {selected ? <><p>{selected.advice === 'L-Ultimate' ? 'Its emission lines suit L-Ultimate. Choose this if you want to keep the dual-band filter fitted.' : 'Broadband suits this subject’s starlight. Consider the filter change if L-Ultimate is fitted.'}</p><small>This choice stays in the experiment. It does not start a capture or save a plan.</small></> : <p>Follow the shared time marker to see which opportunities remain, then select a subject for its filter advice.</p>}
     </Panel>
     <details className="vela-target-compare__credits"><summary>Reference photograph credits</summary>{subjects.map(subject => <p key={subject.id}><a href={subject.source} target="_blank" rel="noreferrer">{subject.name}</a> · {subject.credit} · CC BY 4.0</p>)}</details>
   </section>
