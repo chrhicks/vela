@@ -21,7 +21,7 @@ Open `http://127.0.0.1:5174` for the focused workbench or `http://127.0.0.1:5174
 - An imaging-camera setup sketch on Observe with explicit remembered choice and missing, changed, offline and busy states; local fixtures only.
 - A stable Dialog with both primitive anatomy and a fixture-backed Rig discovery product example
 - A simulator-control product sketch with coarse/fine mount nudges, exact offset setup, clear/obscured camera and preset reset; local interactive fixtures only, with no simulator service connected
-- A draft visual target-selection and framing sketch with locally bundled reference photographs, instant sample search, illustrative sky paths, a movable fixed-orientation camera frame, and simulated slew/check/adjust states. It does not calculate real visibility or control devices.
+- A draft visual target-selection and framing sketch with locally bundled reference photographs, instant sample search, illustrative sky paths, a movable fixed-orientation camera frame, and simulated slew/check/adjust states. Its Through the night sidebar expands into an overhead sky view with shared time and elevation-margin controls. Optional synthetic horizon profiles demonstrate complete, incomplete and provisional coverage. A sample Moon phase marker follows the selected time with illumination, spherical target separation and a below-horizon state. It does not calculate real visibility or control devices.
 - Auto-discovered colocated specimens
 - One primitive-focused specimen per component, with additional product examples only for concrete compositions that prop controls cannot express
 - A searchable gallery with paired light and dark previews
@@ -67,6 +67,6 @@ apps/workshop/designs/        named tracked profiles
 apps/workshop/.local/         ignored recovery state
 ```
 
-All current components, including Dialog, are exported from the `@vela/ui` root. The currently empty `@vela/ui/drafts` boundary remains available for future experimental components without exposing them from the stable package root.
+All current components, including Dialog, are exported from the `@vela/ui` root. `@vela/ui/drafts` exports the experimental `SkyPath` component and its input types without exposing them from the stable package root. Its primitive specimen and the target-framing example share invented sample paths and optional horizon states; no private observing-site data is bundled.
 
 See the [operations guide](../../docs/component-workshop-operations.md) for adding drafts, authoring interactive specimens, persistence, targeted browser proof, manual promotion, and later one-at-a-time Vela adoption.
