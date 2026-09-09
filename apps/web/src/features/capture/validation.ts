@@ -25,6 +25,7 @@ function isCaptureImage(value: unknown, rigId: string, retained = false): value 
     && finite(value.height) && Number.isInteger(value.height) && value.height > 0
     && finite(value.exposureSeconds) && value.exposureSeconds >= 0.1 && value.exposureSeconds <= 600
     && isStatistics(value.statistics)
+    && (value.capturedAtSource === undefined || value.capturedAtSource === 'camera' || value.capturedAtSource === 'server-estimate')
     && timestamp(value.capturedAt) && timestamp(value.receivedAt)
     && Date.parse(value.receivedAt) >= Date.parse(value.capturedAt)
 }

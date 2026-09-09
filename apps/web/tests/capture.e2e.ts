@@ -368,3 +368,22 @@ test('keeps a manual save outcome and retry attached to its image after newer pi
   await expect(page.getByText(/Image from .+ saved\./)).toBeVisible()
   await expect(page.getByRole('button', { name: 'Keep this image' })).toBeEnabled()
 })
+
+test('labels estimated starts on the loaded capture and saved image detail', async ({ page }) => {
+  let estimated = true
+  await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, { ...idle, phase: 'complete', latestImage: { ...firstImage, ...(estimated ? { capturedAtSource: 'server-estimate' } : {}) } }))
+  await page.route(`**${firstImage.imageUrl}`, route => route.fulfill({ contentType: 'image/png', body: preview }))
+  await page.goto('/rigs/rig-1/observe/capture')
+  await expect(page.getByText('Start time estimated', { exact: true })).toBeVisible()
+  estimated = false
+  await page.reload()
+  await expect(page.getByAltText('2 second exposure from Simulator Camera')).toBeVisible()
+  await expect(page.getByText('Start time estimated', { exact: true })).toHaveCount(0)
+
+  const image = { ...firstImage, capturedAtSource: 'server-estimate', saved: true, rigId: 'rig-1', savedAt: '2026-09-05T18:00:04.000Z',
+    imageUrl: '/api/rigs/rig-1/saved-images/frame-1/preview', fitsUrl: '/api/rigs/rig-1/saved-images/frame-1/fits', previewDownloadUrl: '/api/rigs/rig-1/saved-images/frame-1/download-preview' }
+  await page.route('**/api/web/rigs/rig-1/saved-images/frame-1', route => respond(route, { rigId: 'rig-1', rigName: 'Offline rig', image }))
+  await page.route(`**${image.imageUrl}`, route => route.fulfill({ contentType: 'image/png', body: preview }))
+  await page.goto('/rigs/rig-1/observe/saved-images/frame-1')
+  await expect(page.getByRole('region', { name: 'Saved preview' }).getByText('Start time estimated', { exact: true })).toBeVisible()
+})

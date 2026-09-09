@@ -63,7 +63,10 @@ remain on the server.
 The Capture view describes one ephemeral capture run, its readiness and phase,
 its repeat setting and count of published images in that run,
 and the latest completed image with its own duration, camera, dimensions and
-start/receipt timestamps and optional star measurements. Null measurements mean
+start/receipt timestamps and optional star measurements. `capturedAtSource`
+distinguishes camera-reported starts from `server-estimate` values recorded on the
+host before requesting exposure; an absent source preserves the camera-reported
+meaning of legacy images. Null measurements mean
 analysis unavailable; zero detected stars with null HFR is a valid measured
 result. HFR is the median half-flux radius in native image pixels. It is shared by the Observe thumbnail and Capture
 page. The count resets on start, while the latest image remains until a new image is

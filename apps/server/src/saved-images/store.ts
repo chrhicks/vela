@@ -141,6 +141,7 @@ async function readMetadata(directory: string, rigId: string, imageId?: string):
   const image = JSON.parse(text) as SavedImage
   if (!image || image.rigId !== rigId || typeof image.id !== 'string' || (imageId !== undefined && image.id !== imageId)
     || image.saved !== true || !Number.isFinite(Date.parse(image.savedAt)) || !Number.isFinite(Date.parse(image.capturedAt))
+    || (image.capturedAtSource !== undefined && image.capturedAtSource !== 'camera' && image.capturedAtSource !== 'server-estimate')
     || !Number.isFinite(Date.parse(image.receivedAt)) || !Number.isSafeInteger(image.width) || image.width < 1
     || !Number.isSafeInteger(image.height) || image.height < 1 || typeof image.cameraName !== 'string'
     || !Number.isFinite(image.exposureSeconds) || image.exposureSeconds < 0 || !['mono', 'color'].includes(image.color)

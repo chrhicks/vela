@@ -92,6 +92,14 @@ coordinate frames its workflow supports.
 - `capture({ cameraId, exposureSeconds, signal, onProgress })` starts one light
   exposure, observes `ImageReady`, and returns `{ width, height, pixels,
   capturedAt, color }`. Pixels are row-major `Float64Array`; the timestamp is UTC.
+  `LastExposureStartTime` is optional in ASCOM. A blank value (observed on the
+  FRA's ASI driver) or PropertyNotImplemented permits a server command-start
+  estimate only after a post-write `ImageReady=false` followed by `true`.
+  Such frames carry `capturedAtSource: 'server-estimate'`; consumers must retain
+  that provenance when displaying or exporting the timestamp. It is not a
+  camera-measured shutter time. Other errors and malformed nonblank timestamps
+  still reject. A fast exposure whose false state was missed cannot use this
+  fallback, even if it appears to have had enough time to finish.
   The boundary requests ImageBytes with JSON fallback on the same ImageArray
   GET, using the response Content-Type to choose decoding. It accepts rank-2
   Int32 source images and transposes Alpaca's `[x][y]` layout without changing
