@@ -38,3 +38,11 @@ not a reconstruction of any actual landscape. `calibrated` describes the
 component state being demonstrated only; no real calibration has occurred.
 Consumers must visibly identify these tracks and horizons as sample/demo data.
 Fixtures remain specimen-owned and are not exported from the UI package API.
+
+`getMoonSamples(phase)` provides an invented evening Moon moving westward and
+setting after 01:40. Samples align with the target time indices. The phase
+control covers waxing/waning, new/full and missing-data states; illumination
+is fixed across this short sample night. Its position and phase are illustrative,
+not an ephemeris. The component computes target separation on the sphere.
+The upright phase glyph shows illuminated fraction and waxing/waning only,
+not the Moon's apparent rotation or bright-limb position angle.

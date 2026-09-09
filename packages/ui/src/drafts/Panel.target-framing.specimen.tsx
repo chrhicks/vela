@@ -5,7 +5,7 @@ import { Badge } from '../components/Badge'
 import { Button } from '../components/Button'
 import { Dialog } from '../components/Dialog'
 import { SkyPath as OverheadSkyPath } from './SkyPath'
-import { getSkySamples, getDemoHorizon } from './sky-path/fixtures'
+import { getSkySamples, getDemoHorizon, getMoonSamples } from './sky-path/fixtures'
 import { Input } from '../components/Input'
 import { Panel } from '../components/Panel'
 import { targets } from './target-framing/fixtures'
@@ -58,6 +58,7 @@ function TargetFramingPreview({ props, onPropsChange }: { props: Props, onPropsC
   const horizon = getDemoHorizon(String(values.horizon ?? 'none'))
   const skyProps = {
     samples: skySamples,
+    moonSamples: getMoonSamples()!,
     targetName: target.name,
     selectedIndex: Number(values.skyIndex ?? 18),
     onSelectedIndexChange: (index: number) => update({ skyIndex: index }),

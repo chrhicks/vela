@@ -1,4 +1,4 @@
-import type { SkyPathHorizon, SkyPathSample } from '../SkyPath'
+import type { SkyPathHorizon, SkyPathMoonSample, SkyPathSample } from '../SkyPath'
 
 export type DemoHorizonState = 'none' | 'local' | 'incomplete' | 'uncalibrated'
 export type DemoSkyTargetId = 'andromeda' | 'm13' | 'crescent' | 'low-target'
@@ -72,4 +72,16 @@ export function getDemoHorizon(profileState: string): SkyPathHorizon | undefined
       }
     })],
   }
+}
+
+// Invented evening Moon setting late in this sample night. No real ephemeris.
+export function getMoonSamples(phase = 'gibbous'): (SkyPathMoonSample | null)[] | undefined {
+  if (phase === 'none') return undefined
+  const illuminationFraction = phase === 'crescent' ? .22 : phase === 'full' ? 1 : phase === 'new' ? 0 : .68
+  return Array.from({ length: 49 }, (_, index) => phase === 'unavailable' ? null : ({
+    azimuthDegrees: 180 + index * 2.5,
+    altitudeDegrees: 48 - index * 1.4,
+    illuminationFraction,
+    waxing: phase !== 'waning',
+  }))
 }
