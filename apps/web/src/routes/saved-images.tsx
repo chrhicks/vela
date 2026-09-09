@@ -58,7 +58,7 @@ function SavedImagesPage({ rigId, imageId }: { rigId: string, imageId?: string }
     {loading ? <p role="status">Loading saved {imageId ? 'image' : 'images'}…</p> : error ? <div role="status"><p>{error}</p><Button onClick={() => setAttempt(value => value + 1)}>Try again</Button></div> : image ? <div className="capture-page__layout">
       <LatestImage image={image} busy={false} interrupted={false} savedDetail />
       <Panel title="Image details"><dl className="vela-saved-details">
-        <div><dt>Captured</dt><dd>{new Date(image.capturedAt).toLocaleString()}</dd></div>
+        <div><dt>Captured</dt><dd>{new Date(image.capturedAt).toLocaleString()}{image.capturedAtSource === 'server-estimate' && ' · Start time estimated'}</dd></div>
         <div><dt>Camera</dt><dd>{image.cameraName}</dd></div>
         <div><dt>Exposure</dt><dd>{image.exposureSeconds} s · {image.color === 'color' ? 'Color' : 'Mono'}</dd></div>
         <div><dt>Dimensions</dt><dd>{image.width} × {image.height}</dd></div>

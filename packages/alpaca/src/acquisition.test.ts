@@ -20,6 +20,9 @@ function observatory() {
     imageBinary: null as ArrayBuffer | null,
     image: { Type: 2, Rank: 2, Value: [[1, 3], [2, 4]] } as Record<string, unknown>,
     stamp: '2026-09-05T01:00:00',
+    stampError: 0,
+    imageReads: 0,
+    pendingReadyReads: 0,
     stale: false,
     starts: 0,
     moves: [] as number[],
@@ -50,9 +53,15 @@ function observatory() {
     else if (operation === 'starty') Value = state.startY
     else if (operation === 'numx' || operation === 'numy') Value = 2
     else if (operation === 'camerastate') Value = state.exposing ? 2 : 0
-    else if (operation === 'imageready') Value = state.ready
+    else if (operation === 'imageready') {
+      Value = state.ready
+      if (state.starts > 0 && !state.ready) state.pendingReadyReads++
+    }
     else if (operation === 'slewing') Value = state.rate !== 0
-    else if (operation === 'lastexposurestarttime') Value = state.stamp
+    else if (operation === 'lastexposurestarttime') {
+      if (state.stampError) return Response.json({ ClientTransactionID: 0, ServerTransactionID: 1, ErrorNumber: state.stampError, ErrorMessage: 'Timestamp unavailable' })
+      Value = state.stamp
+    }
     else if (operation === 'rightascension') Value = 2
     else if (operation === 'declination') Value = 60
     else if (operation === 'sitelatitude') Value = 35
@@ -74,6 +83,7 @@ function observatory() {
       state.rate = rate
       if (rate !== 0 && state.lostMove) throw new TypeError('Response lost after motion began')
     } else if (operation === 'imagearray') {
+      state.imageReads++
       if (state.imageBinary) return new Response(state.imageBinary, { headers: { 'content-type': 'application/imagebytes' } })
       return Response.json({ ClientTransactionID: 0, ServerTransactionID: 1, ErrorNumber: 0, ErrorMessage: '', ...state.image })
     } else throw new Error(`Unexpected request ${url.pathname}`)
@@ -106,6 +116,7 @@ describe('normalized Alpaca acquisition', () => {
     expect(Array.from(frame.pixels)).toEqual([1, 2, 3, 4])
     expect(frame.color).toEqual({ kind: 'mono' })
     expect(frame.capturedAt).toBe('2026-09-05T01:00:02Z')
+    expect(frame.capturedAtSource).toBeUndefined()
     expect(rig.state.aborts).toBe(0)
   })
 
@@ -196,6 +207,54 @@ describe('normalized Alpaca acquisition', () => {
     const rig = observatory()
     rig.state.stale = true
     await expect(rig.acquisition.capture({ cameraId: 'camera-id', exposureSeconds: 1 })).rejects.toThrow('freshness is unconfirmed')
+  })
+
+  it.each([0, 1024])('estimates start time only after a fresh ready transition when the timestamp is blank or unsupported (%i)', async stampError => {
+    const rig = observatory()
+    Object.assign(rig.state, { stamp: '', stampError })
+    const before = Date.now()
+    const result = rig.acquisition.capture({ cameraId: 'camera-id', exposureSeconds: 1 })
+    await vi.waitFor(() => expect(rig.state.pendingReadyReads).toBeGreaterThan(0))
+    const afterStart = Date.now()
+    rig.complete()
+    rig.state.stamp = ''
+    const frame = await result
+    expect(frame.capturedAtSource).toBe('server-estimate')
+    expect(Date.parse(frame.capturedAt)).toBeGreaterThanOrEqual(before)
+    expect(Date.parse(frame.capturedAt)).toBeLessThanOrEqual(afterStart)
+    expect(rig.state.imageReads).toBe(1)
+    expect(rig.state.starts).toBe(1)
+    expect(rig.state.aborts).toBe(0)
+  })
+
+  it.each([0, 1024])('rejects retained-ready images without a usable timestamp (%i)', async stampError => {
+    const rig = observatory()
+    Object.assign(rig.state, { stamp: '', stampError, stale: true })
+    await expect(rig.acquisition.capture({ cameraId: 'camera-id', exposureSeconds: 1 })).rejects.toThrow('freshness is unconfirmed')
+    expect(rig.state.imageReads).toBe(0)
+    expect(rig.state.starts).toBe(1)
+    expect(rig.state.aborts).toBe(1)
+  })
+
+  it.each([{ stamp: 'not a timestamp', stampError: 0 }, { stamp: '', stampError: 1035 }])('does not hide malformed timestamps or other driver errors: %j', async timestamp => {
+    const rig = observatory()
+    const result = rig.acquisition.capture({ cameraId: 'camera-id', exposureSeconds: 1 })
+    const rejection = expect(result).rejects.toThrow()
+    await vi.waitFor(() => expect(rig.state.pendingReadyReads).toBeGreaterThan(0))
+    rig.complete()
+    Object.assign(rig.state, timestamp)
+    await rejection
+    expect(rig.state.imageReads).toBe(0)
+    expect(rig.state.starts).toBe(1)
+  })
+
+  it('does not use a missing timestamp to accept a lost exposure command response', async () => {
+    const rig = observatory()
+    Object.assign(rig.state, { stamp: '', lostStart: true })
+    await expect(rig.acquisition.capture({ cameraId: 'camera-id', exposureSeconds: 1 })).rejects.toThrow()
+    expect(rig.state.starts).toBe(1)
+    expect(rig.state.imageReads).toBe(0)
+    expect(rig.state.aborts).toBe(1)
   })
 
   it('confirms cancellation before starting without aborting someone else’s exposure', async () => {
