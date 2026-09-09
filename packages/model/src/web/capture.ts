@@ -44,6 +44,8 @@ export interface SavedImageView {
   image: SavedImage
 }
 
+export type CapturePhase = 'idle' | 'exposing' | 'reading' | 'saving' | 'stopping' | 'complete' | 'stopped' | 'failed'
+
 /** Server-owned ephemeral capture run and the most recent retained image. */
 export interface CaptureView {
   rigId: string
@@ -51,7 +53,7 @@ export interface CaptureView {
   camera: { name: string } | null
   enabled: boolean
   unavailableReason: string | null
-  phase: 'idle' | 'exposing' | 'reading' | 'saving' | 'stopping' | 'complete' | 'stopped' | 'failed'
+  phase: CapturePhase
   active: boolean
   repeat: boolean
   saveFrames: boolean

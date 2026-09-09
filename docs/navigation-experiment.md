@@ -1,10 +1,11 @@
 # Observatory navigation experiment
 
-This workshop proposal gives the app bar three jobs: identify the rig being
+The approved navigation design gives the app bar three jobs: identify the rig being
 viewed, reach Observe/Targets/Capture, and return to a running capture. Vela
 returns to all rigs. Rig details and saved images remain contextual links in
-the page. No app route, device command, connection state, or production shell
-is changed by this experiment.
+the page. The stable `NavigationBar` component now owns this rendering in both
+the workshop and application shell. The app supplies real routes, catalog rig
+identities, and capture-controller snapshots through its navigation feature.
 
 Open the Panel / Card specimen **Observatory navigation · Experiment**. Switch
 pages and rigs, follow a target detail and return, then use the activity link
@@ -15,7 +16,7 @@ the rig-specific page links. Phone widths use two rows instead of an overflow
 menu. Keyboard/native select navigation and the inspector share specimen state.
 
 The example models one capture on Askar. This is a bounded design fixture, not
-a policy limiting Vela to one operating rig. A real adoption needs a current,
+a policy limiting Vela to one operating rig. App adoption supplies a current,
 rig-identified activity summary. Chris expects to operate one rig at a time
 for now, so multiple simultaneous activities are outside this experiment. Viewing a rig must remain navigation, never a
 connection or command. Preserve target search context when leaving/returning.

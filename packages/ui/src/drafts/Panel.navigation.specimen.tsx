@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { MouseEvent } from 'react'
-import { Button, Panel } from '../components'
+import { Button, NavigationBar, Panel } from '../components'
 import type { ComponentSpecimen } from '../themes'
 import { CaptureRunExposure } from './CaptureRunExposure'
 import { targets } from './target-framing/fixtures'
@@ -30,26 +30,29 @@ function NavigationPreview({ props, onPropsChange }: { props: Props; onPropsChan
     event.preventDefault()
     navigate(next, nextRig)
   }
-  const returnToCapture = () => navigate('capture', 'askar')
   const currentCapture = rig === 'askar' && activity
 
   return <section className="vela-nav-demo" aria-label="Navigation experiment">
     <p className="vela-nav-demo__fixture">Interactive workshop example · sample rig states</p>
     <div className="vela-nav-demo__app">
-      <header className="vela-nav-demo__bar">
-        <div className="vela-nav-demo__context">
-          <a className="vela-nav-demo__brand" href="#rigs" aria-label="Vela · all rigs" onClick={event => link(event, 'observe', 'all')}>V<span>ela</span></a>
-          <span className="vela-nav-demo__divider" aria-hidden="true" />
-          <label className="vela-nav-demo__rig"><span className="vela-nav-demo__sr-only">Viewing rig</span><select value={rig} onChange={event => navigate('observe', event.target.value as typeof rig)}><option value="all">All rigs</option>{Object.entries(rigs).map(([id, name]) => <option value={id} key={id}>{name}</option>)}</select></label>
-        </div>
-        {rig !== 'all' && <nav aria-label="Observing pages" className="vela-nav-demo__pages">{destinations.map(([id, label]) => <a key={id} href={`#${id}`} aria-current={activePage === id ? 'page' : undefined} onClick={event => link(event, id)}>{label}</a>)}</nav>}
-        {activity && <button className="vela-nav-demo__activity" data-interrupted={interrupted || undefined} onClick={returnToCapture} aria-label={`${interrupted ? 'Capture updates lost' : 'Capture running'} on Askar FRA 400. ${completed} captured. ${interrupted ? 'Last known count. Current outcome unknown.' : reading ? 'Reading image.' : `Current exposure ${elapsed} of 60 seconds.`} Open capture.`}>
-          <span className="vela-nav-demo__capture-summary"><span>{rig !== 'askar' && <small>Askar · </small>}{completed} captured</span><small>{interrupted ? 'Updates lost' : reading ? 'Reading image' : `${elapsed} / 60s`}</small></span>
-          {!interrupted && !reading && <progress value={elapsed} max={60} aria-hidden="true" />}
-          {interrupted && <span className="vela-nav-demo__capture-note">Last known · open Capture →</span>}
-          {reading && <span className="vela-nav-demo__capture-note">Waiting for image →</span>}
-        </button>}
-      </header>
+      <NavigationBar
+        home={{ href: '#rigs', onClick: event => link(event, 'observe', 'all') }}
+        rigs={[{ id: 'all', name: 'All rigs' }, ...Object.entries(rigs).map(([id, name]) => ({ id, name }))]}
+        currentRigId={rig}
+        onRigChange={id => navigate('observe', id as typeof rig)}
+        links={rig === 'all' ? [] : destinations.map(([id, label]) => ({ href: `#${id}`, label, current: activePage === id, onClick: event => link(event, id) }))}
+        {...(activity ? { activity: {
+          href: '#capture',
+          onClick: (event: MouseEvent<HTMLAnchorElement>) => link(event, 'capture', 'askar'),
+          label: `${interrupted ? 'Capture updates lost' : 'Capture running'} on Askar FRA 400. ${completed} captured. ${interrupted ? 'Last known count. Current outcome unknown.' : reading ? 'Reading image.' : `Current exposure ${elapsed} of 60 seconds.`} Open capture.`,
+          ...(rig !== 'askar' ? { rigName: 'Askar' } : {}),
+          completedCount: completed,
+          status: interrupted ? 'Updates lost' : reading ? 'Reading image' : `${elapsed} / 60s`,
+          interrupted,
+          ...(!interrupted && !reading ? { progress: { value: elapsed, max: 60 } } : {}),
+          ...(interrupted ? { note: 'Last known · open Capture →' } : reading ? { note: 'Waiting for image →' } : {}),
+        } } : {})}
+      />
 
       <main className="vela-nav-demo__content">
         {rig === 'all' ? <>
@@ -75,7 +78,7 @@ function NavigationPreview({ props, onPropsChange }: { props: Props; onPropsChan
 
 export const specimen: ComponentSpecimen = {
   componentId: 'panel', componentName: 'Panel / Card', id: 'panel-navigation', name: 'Observatory navigation · Experiment',
-  description: 'A quiet bar for rig context, three observing destinations and a return path to active capture. Sample states only; no device commands or application adoption.',
+  description: 'A quiet bar for rig context, three observing destinations and a return path to active capture. Uses the stable NavigationBar with sample states only; no device commands.',
   controls: {
     rig: { type: 'select', label: 'Viewing rig', options: ['askar', 'seestar', 'all'] },
     page: { type: 'select', label: 'Page', options: ['observe', 'targets', 'target', 'capture', 'saved', 'devices'] },

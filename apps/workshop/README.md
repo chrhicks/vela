@@ -12,7 +12,8 @@ Open `http://127.0.0.1:5174` for the focused workbench or `http://127.0.0.1:5174
 
 ## Current workshop
 
-- Stable Button, IconButton, Input, Select, Checkbox, Badge, Tabs, and Panel/Card components
+- Stable Button, IconButton, Input, Select, Checkbox, Badge, Tabs, NavigationBar, and Panel/Card components
+- A stable NavigationBar anatomy specimen and fixture-backed observatory navigation example, sharing rig context, page links, and capture activity rendering
 - A fixture-backed Rig overview product example for evaluating clickable Rig summaries and kind-specific live device cards
 - A fixture-backed observation-readiness product example for evaluating the Start Observing transition, Rig-level connection preparation, and honest partial or uncertain outcomes
 - A polar-alignment adjustment product sketch with phone/desktop layouts, illustrative large-error and near-aligned fixtures, a three-position starting/measurement preview, a fixed-scale reticle, activity/freshness and solve-retry snapshots, and manual stop/finish states; it does not control hardware or measure alignment
