@@ -78,3 +78,8 @@ thumbnail. Stop aborts the pending exposure; it does not discard the last
 completed image. Fit displays the whole frame, while 100% provides native-pixel
 scrolling. Preview age measures time since receipt; metadata also retains the
 camera's exposure-start timestamp.
+
+The navigation projection reads catalog identities and synchronous snapshots of
+known capture controllers. It never inspects devices or saved-image storage.
+Terminal controllers remain visible so a browser can distinguish a confirmed end
+from a controller lost after a server restart. Forgotten rigs are excluded.

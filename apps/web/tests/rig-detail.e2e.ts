@@ -177,7 +177,7 @@ test('navigates through the complete Rig card and renders ordered responsive det
   await rigLink.click()
 
   await expect(page).toHaveURL(/\/rigs\/rig-1$/)
-  await expect(page.getByRole('link', { name: 'Rigs' })).toHaveAttribute('aria-current', 'page')
+  await expect(page.locator('.vela-navigation').getByRole('link', { name: 'Observe', exact: true })).toHaveAttribute('aria-current', 'page')
   await expect(page.getByRole('heading', { level: 1, name: 'Backyard rig' })).toBeVisible()
   await expect(page.locator('.vela-rig-device .vela-panel__title')).toHaveText([
     'Mount',
