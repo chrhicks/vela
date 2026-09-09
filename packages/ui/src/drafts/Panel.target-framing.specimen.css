@@ -98,3 +98,9 @@
 
 .vela-target-time line { stroke: var(--vela-text-muted); stroke-width: 1; stroke-dasharray: 3 4; opacity: .65; }
 .vela-target-time text { font-size: 10px; }
+
+.vela-target-example { position: relative; width: 100%; max-width: 76rem; container-type: inline-size; }
+.vela-target-example[data-expanded="true"] { height: 52rem; overflow: hidden; }
+.vela-target-example .vela-dialog-layer { position: absolute; }
+.vela-target-example .vela-target-sky-dialog { width: min(100%, 34rem); }
+.vela-target-example .vela-target-expand-sky { margin-top: calc(var(--vela-space) * 3); min-height: 44px; }

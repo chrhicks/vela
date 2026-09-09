@@ -71,5 +71,5 @@ test('unavailable reference still permits target selection in light mode', async
   await expect(demo.getByText('Reference image unavailable', { exact: true })).toHaveCount(3)
   await demo.getByRole('button', { name: /Andromeda Galaxy/ }).click()
   await expect(demo.getByRole('heading', { name: 'Andromeda Galaxy', exact: true })).toBeVisible()
-  await expect(demo.getByText('Obstructions unknown', { exact: true })).toBeVisible()
+  await expect(demo.getByText('Local obstructions not included', { exact: true })).toBeVisible()
 })
