@@ -43,6 +43,45 @@ export interface TargetsView {
   siteUnavailableReason: string | null
 }
 
+export type TargetCategory = 'emission' | 'reflection-dark' | 'galaxy' | 'cluster' | 'planetary' | 'other'
+export type TargetFilterChoice = 'dual-band' | 'broadband' | 'uncertain'
+
+export interface TargetOpportunity {
+  /** Approximate remaining astronomical-darkness window above 30 degrees. */
+  startsAt: string
+  endsAt: string
+  usefulMinutes: number
+  bestAt: string
+  bestAltitudeDegrees: number
+  currentAltitudeDegrees: number
+}
+
+export interface TargetDiscoveryItem extends TargetView {
+  category: TargetCategory
+  filterChoice: TargetFilterChoice
+  filterReason: string
+  opportunity: TargetOpportunity | null
+}
+
+/** A frozen calculation shared by every page and filter until explicit refresh. */
+export interface TargetDiscoveryView {
+  rigId: string
+  rigName: string
+  snapshotId: string
+  calculatedAt: string
+  status: 'available' | 'site-unavailable' | 'no-darkness'
+  night: { startsAt: string, endsAt: string, kind: 'current-night' | 'upcoming-night' | 'polar-night' } | null
+  site: { latitudeDegrees: number, longitudeDegrees: number } | null
+  siteUnavailableReason: string | null
+  query: string
+  category: TargetCategory | 'all'
+  filter: TargetFilterChoice | 'all'
+  offset: number
+  pageSize: number
+  total: number
+  targets: TargetDiscoveryItem[]
+}
+
 export interface FramingView {
   rigId: string
   rigName: string

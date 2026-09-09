@@ -1,20 +1,14 @@
-import type { TargetPosition, TargetView, TargetsView } from '@vela/model/web'
+import type { TargetPosition, TargetView } from '@vela/model/web'
 import { Badge, Button, Input, Panel } from '@vela/ui'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { api } from '../lib/api'
-import { isTarget, isTargets } from '../features/targets/validation'
-import { SkyPath, skyWindow } from '../features/targets/SkyPath'
+import { isTarget } from '../features/targets/validation'
 import { SkyInspection } from '../features/targets/SkyInspection'
 import { SurveyField } from '../features/targets/SurveyField'
 import { useFraming } from '../features/targets/use-framing'
+import { TargetBrowser } from '../features/targets/TargetBrowser'
 import './targets.css'
-
-function ReferenceImage({ target }: { target: TargetView }) {
-  const [failed, setFailed] = useState(false)
-  return failed ? <div className="vela-target-no-image"><span aria-hidden="true">◇</span><strong>Reference image unavailable</strong><span>{target.name}</span></div>
-    : <img loading="lazy" src={target.thumbnailUrl} alt={`${target.name} reference survey`} onError={() => setFailed(true)} draggable={false} />
-}
 
 export function Targets() {
   const { rigId = '', targetId } = useParams()
@@ -24,52 +18,6 @@ export function Targets() {
     </main></article>
   </section>
 }
-function TargetBrowser({ rigId }: { rigId: string }) {
-  const [params, setParams] = useSearchParams()
-  const query = params.get('q') ?? ''
-  const offset = Math.max(0, Number(params.get('offset')) || 0)
-  const [input, setInput] = useState(query)
-  const [view, setView] = useState<TargetsView | null>(null)
-  const [error, setError] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [retry, setRetry] = useState(0)
-  const [skyStale, setSkyStale] = useState(false)
-  useEffect(() => { setInput(query) }, [query])
-  useEffect(() => {
-    const timer = setTimeout(() => { if (input !== query) setParams(input ? { q: input } : {}) }, 250)
-    return () => clearTimeout(timer)
-  }, [input, query, setParams])
-  useEffect(() => {
-    const controller = new AbortController()
-    setLoading(true); setError(false); setView(null)
-    const fetchTargets = () => api<unknown>(`web/rigs/${encodeURIComponent(rigId)}/targets?q=${encodeURIComponent(query)}&offset=${offset}`, { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]) }).then(next => {
-      if (!isTargets(next, rigId)) throw new Error('Invalid targets response')
-      if (!controller.signal.aborted) { setView(next); setSkyStale(false) }
-    }).catch(() => { if (!controller.signal.aborted) { setError(true); setSkyStale(true) } }).finally(() => { if (!controller.signal.aborted) setLoading(false) })
-    void fetchTargets()
-    const timer = setInterval(() => void fetchTargets(), 60000)
-    return () => { controller.abort(); clearInterval(timer) }
-  }, [rigId, query, offset, retry])
-  return <>
-    <header className="vela-target-heading"><div><p>{view?.rigName ?? 'Observe'} / Targets</p><h1>What would you like to see?</h1></div></header>
-    <p className="vela-target-intro">Find something familiar, or let a picture catch your eye.</p>
-    <Input label="Find a target" type="search" placeholder="Name, catalog number, or object type" value={input} onChange={event => setInput(event.target.value)} />
-    <div className="vela-target-section-heading"><h2>{query ? 'Search results' : 'Explore tonight'}</h2><span role="status">{loading ? 'Finding targets…' : view ? `${view.total} targets${view.site ? '' : ' · site unavailable'}` : 'Catalog unavailable'}</span></div>
-    {skyStale && view && <p role="status">Sky updates interrupted · paths show the last calculation.</p>}
-    {error && !view && <Panel><p>Could not load the target catalog.</p><Button onClick={() => setRetry(r => r + 1)}>Try again</Button></Panel>}
-    {view?.siteUnavailableReason && <p role="status">{view.siteUnavailableReason}</p>}
-    <div className="vela-target-grid">{view?.targets.map(target => <Link key={target.id} className="vela-target-card" to={{ pathname: `/rigs/${encodeURIComponent(rigId)}/observe/targets/${encodeURIComponent(target.id)}`, search: params.toString() }}>
-      <div className="vela-target-thumbnail"><ReferenceImage target={target} /><span>{target.kind}</span></div>
-      <div className="vela-target-card-copy"><span>{target.catalog}</span><h2>{target.name}</h2><p>{target.kind}{target.sizeArcminutes !== null ? ` · ${target.sizeArcminutes}′ across` : ''}</p><SkyPath sky={target.sky} compact stale={skyStale} /><div className="vela-target-card-bottom"><span>{target.sky ? skyWindow(target.sky) : 'Sky path unavailable'}</span><strong>Frame it →</strong></div></div>
-    </Link>)}</div>
-    {view?.total === 0 && <Panel><div className="vela-target-empty"><h2>No matching targets</h2><p>Try a name, catalog number, or object type.</p><Button onClick={() => { setInput(''); setParams({}) }}>Clear search</Button></div></Panel>}
-    {view && view.total > 24 && <nav className="vela-target-pagination" aria-label="Target pages"><Button disabled={loading || offset === 0} onClick={() => setParams({ ...(query ? { q: query } : {}), offset: String(Math.max(0, offset - 24)) })}>Previous</Button><span>{offset + 1}–{Math.min(offset + 24, view.total)} of {view.total}</span><Button disabled={loading || offset + 24 >= view.total} onClick={() => setParams({ ...(query ? { q: query } : {}), offset: String(offset + 24) })}>Next</Button></nav>}
-    <p className="vela-target-footnote">A curated collection to explore. Shading marks astronomical darkness. Obstructions haven’t been mapped; paths don’t account for trees, houses, or pylons.</p>
-    <p className="vela-target-footnote">Reference imagery: DSS2 color / CDS. <a href="https://archive.stsci.edu/dss/acknowledging.html" target="_blank" rel="noreferrer">Survey credits ↗</a></p>
-    <p className="vela-target-footnote">Catalog adapted from <a href="https://github.com/mattiaverga/OpenNGC/tree/da90466031b0372c896588b85be6016c617e205b" target="_blank" rel="noreferrer">OpenNGC</a> by Mattia Verga and <a href="/third-party/openngc-authors.txt" target="_blank" rel="noreferrer">contributors</a> · <a href="/third-party/openngc-license.txt" target="_blank" rel="noreferrer">CC BY-SA 4.0</a>. Coordinates normalized and selected aliases corrected.</p>
-  </>
-}
-
 function TargetComposition({ rigId, targetId }: { rigId: string, targetId: string }) {
   const [params] = useSearchParams()
   const [target, setTarget] = useState<TargetView | null>(null)
