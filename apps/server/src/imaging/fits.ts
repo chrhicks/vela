@@ -1,9 +1,10 @@
 import { setImmediate } from 'node:timers/promises'
+import type { CaptureImage } from '@vela/model/web'
 import type { ImageColor } from './preview.js'
 
 /** Export acquisition samples without stretching, calibration, or row reversal. */
 export async function encodeCaptureFits(
-  frame: { width: number, height: number, pixels: ArrayLike<number>, capturedAt: string, color?: ImageColor },
+  frame: { width: number, height: number, pixels: ArrayLike<number>, capturedAt: string, capturedAtSource?: CaptureImage['capturedAtSource'], color?: ImageColor },
   metadata: { exposureSeconds: number, cameraName: string },
 ): Promise<Buffer> {
   const { width, height, pixels } = frame
@@ -20,6 +21,10 @@ export async function encodeCaptureFits(
     card('DATE-OBS', start.toISOString()), card('EXPTIME', metadata.exposureSeconds),
     card('INSTRUME', metadata.cameraName), card('ROWORDER', 'TOP-DOWN'),
   ]
+  if (frame.capturedAtSource === 'server-estimate') {
+    cards.push(card('TIMESRC', 'SERVER-ESTIMATE'))
+    cards.push('COMMENT DATE-OBS estimated from server UTC before StartExposure.'.padEnd(80))
+  }
   // The acquisition adapter already shifts this pattern to the image origin.
   if (frame.color?.kind === 'bayer') cards.push(card('BAYERPAT', frame.color.pattern.toUpperCase()))
   cards.push('END'.padEnd(80))

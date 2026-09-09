@@ -63,3 +63,11 @@ it('validates confirmed retention and exact same-origin download resources', () 
     expect(isCaptureView({ ...view, ...patch }, 'rig-1')).toBe(false)
   }
 })
+
+it('accepts legacy and known start sources and rejects unknown sources for live and saved images', () => {
+  for (const capturedAtSource of [undefined, 'camera', 'server-estimate', 'unknown', null, 1]) {
+    const accepted = capturedAtSource === undefined || capturedAtSource === 'camera' || capturedAtSource === 'server-estimate'
+    expect(isCaptureView({ ...view, latestImage: { ...view.latestImage, capturedAtSource } }, 'rig-1')).toBe(accepted)
+    expect(isSavedImage({ ...savedImage, capturedAtSource }, 'rig-1')).toBe(accepted)
+  }
+})
