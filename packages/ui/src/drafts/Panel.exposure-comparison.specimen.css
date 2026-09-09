@@ -6,7 +6,7 @@
 .vela-comparison-demo__synthetic { color: var(--vela-text-muted); font-size: .7em; padding-top: 14px; }
 .vela-comparison-demo__identities { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 16px 0; color: var(--vela-text-muted); font-size: .8em; }
 .vela-comparison-demo__identities strong { color: var(--vela-text); font-weight: 550; margin-left: 8px; }
-.vela-comparison-demo__field { position: relative; aspect-ratio: 4/3; overflow: hidden; border: 1px solid var(--vela-line); cursor: crosshair; }
+.vela-comparison-demo__field { position: relative; aspect-ratio: 4/3; overflow: hidden; border: 1px solid var(--vela-line); cursor: crosshair; touch-action: none; user-select: none; }
 .vela-comparison-demo__field canvas { display: block; width: 100%; height: auto; }
 .vela-comparison-demo__image-label { position: absolute; top: 12px; left: 12px; color: var(--vela-text); background: var(--vela-surface); padding: 5px 8px; font-size: .75em; }
 .vela-comparison-demo__crop-box { position: absolute; left: var(--compare-x); top: var(--compare-y); width: 25%; height: 25%; transform: translate(-50%, -50%); border: 1px solid var(--vela-accent); pointer-events: none; }
