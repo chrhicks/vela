@@ -43,7 +43,7 @@ test('type, light preference and page preserve the calculation; Refresh resets t
   await page.route('**/api/web/rigs/rig-1/target-discovery?*', route => {
     const url = new URL(route.request().url())
     requests.push(url)
-    const next = response(url, url.searchParams.has('snapshot') ? 'night-original' : 'night-refreshed')
+    const next = response(url, url.searchParams.get('snapshot') ?? 'night-refreshed')
     return route.fulfill({ json: next })
   })
   await page.goto('/rigs/rig-1/observe/targets')
@@ -59,9 +59,15 @@ test('type, light preference and page preserve the calculation; Refresh resets t
   expect(requests[2]!.searchParams.get('offset')).toBe('2')
   await page.getByRole('button', { name: 'Refresh', exact: true }).click()
   await expect(page.getByLabel('Target pages')).toContainText('1–2 of 6')
-  expect(requests.at(-1)!.searchParams.has('snapshot')).toBe(false)
-  expect(requests.at(-1)!.searchParams.get('offset')).toBe('0')
+  const refresh = requests.find(url => !url.searchParams.has('snapshot'))
+  expect(refresh).toBeDefined()
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('vela:target-discovery:v1:rig-1')!).snapshotId)).toBe('night-refreshed')
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('vela:target-discovery:v1:rig-1')!).offset)).toBe(0)
+  await expect(page.getByRole('button', { name: 'Next', exact: true })).toBeEnabled()
+  await page.getByRole('button', { name: 'Next', exact: true }).click()
+  await expect(page.getByLabel('Target pages')).toContainText('3–4 of 6')
+  expect(requests.at(-1)!.searchParams.get('snapshot')).toBe('night-refreshed')
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('vela:target-discovery:v1:rig-1')!).offset)).toBe(2)
 })
 
 for (const status of [503, 410]) {
