@@ -1,6 +1,6 @@
-# Offline polar alignment
+# Polar alignment
 
-This first integration connects the approved alignment interface to the local
+The default offline integration connects the approved alignment interface to the local
 simulated rig through ordinary Alpaca acquisition and real ASTAP image solves.
 It is an explicitly configured synthetic-clock workflow, not yet a physical-rig
 polar-alignment implementation. No generator state or true offsets enter the
@@ -21,7 +21,51 @@ operation. The last solved preview, measurement and timestamp remain together.
 Restart takes a completely new baseline. Server restart interrupts the operation;
 there is no durable execution or recovery.
 
-## Configuration and local review
+## Explicit physical trial
+
+`VELA_ALIGNMENT_MODE=physical`, together with the existing endpoint, camera ID,
+telescope ID and ASTAP configuration, enables the bounded physical path for that
+rig. The saved imaging camera must match the configured ID, and its operational
+name is checked before each exposure. The saved effective focal length and
+observed pixel size, binning and subframe determine the ASTAP field. Color Bayer
+pixels remain intact for solving; the preview is debayered for display.
+
+Prepare a clear sky patch and movement corridor before Start. The first image
+is taken at the current pointing. A small primary-axis probe establishes the
+driver's mechanical sign; the subsequent two positions are approximately 18°
+and 36° westward in RA. Allow 1° on either side for the direction check. Motion
+uses primary-axis `MoveAxis` only, in bounded increments with observed progress;
+coordinate slews could move DEC to compensate a pointing model and are unsuitable
+for this baseline. A rejected, ambiguous or unexpected move ends the measurement
+without replay. Stop waits for the acquisition adapter's stop confirmation.
+The mount remains at the last observed position, with its original tracking mode;
+Vela does not return it to the starting field or switch tracking on/off.
+
+This trial requires topocentric mount coordinates, a northern site (0–85°),
+known pointing side, an idle unparked mount, and sidereal tracking with zero RA
+and DEC rate offsets. Unsupported observations are not treated as success.
+Tracking, pointing side, site and unexpected pointing changes are checked around
+capture/motion and again before publishing a result. Camera geometry changes
+require a fresh baseline. Do not move the mount through another controller
+during measurement. Only the altitude and azimuth adjustments belong in the
+adjustment phase.
+
+ASTAP's J2000 sightline is converted to the apparent equator/equinox of date at
+exposure midpoint, paired with actual local apparent sidereal time. The fitted
+correction target is converted back to J2000 before WCS projection. The interface
+continues to show exposure *start* and its camera/server-estimate provenance,
+not midpoint or solve completion. One second of timing uncertainty corresponds
+to about 15 arcseconds of Earth rotation; server-estimated exposure starts do
+not establish precision at that scale.
+
+Use a high, clear field for the first outdoor trial. Independent ERFA fixtures
+validate coordinate conversion, ideal pole recovery and image projection, and
+device-boundary tests validate both mechanical signs and interrupted state.
+They do not establish outdoor accuracy, atmospheric refraction, flexure, or the
+actual mount's motion response. Direction and repeatability require a prepared
+physical-rig trial. The configured offline path remains available separately.
+
+## Offline configuration and local review
 
 Configure the endpoint and stable device IDs deliberately. The first model uses
 northern latitude, the simulator's fixed catalog frame (`EquatorialSystem=J2000`, synthetic sidereal clock),

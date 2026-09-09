@@ -28,8 +28,9 @@ const measurementSteps: Record<string, { point: number; solved: number; label: s
   'point-3': { point: 3, solved: 2, label: 'Taking and solving the final image…', next: 'adjusting' },
 }
 
-function BaselinePreview({ phase, onStart, onStop }: {
+function BaselinePreview({ phase, physical, onStart, onStop }: {
   readonly phase: string
+  readonly physical: boolean
   readonly onStart: () => void
   readonly onStop: () => void
 }) {
@@ -55,13 +56,13 @@ function BaselinePreview({ phase, onStart, onStop }: {
             <p>{step.solved} of 3 positions solved · Alignment error not yet available</p>
           </div>
         ) : (
-          <dl className="vela-polar-setup-facts"><div><dt>Camera</dt><dd>Main imaging camera</dd></div><div><dt>Exposure</dt><dd>30 seconds</dd></div><div><dt>Starting point</dt><dd>Current position</dd></div></dl>
+          <dl className="vela-polar-setup-facts"><div><dt>Camera</dt><dd>{physical ? 'ASI2600MC Pro' : 'Main imaging camera'}</dd></div><div><dt>Exposure</dt><dd>30 seconds</dd></div><div><dt>Starting point</dt><dd>{physical ? 'Current prepared sky patch' : 'Current position'}</dd></div></dl>
         )}
       </Panel>
       <div className="vela-polar-baseline__next">
         <h3>{step ? 'What happens next' : 'Before you start'}</h3>
-        <p>{step ? 'After the third solve, the adjustment view will show your alignment error and the target reticle.' : 'Point toward a clear patch of sky. Starting measurement will move the telescope through three positions along its rotation axis.'}</p>
-        <p>{step ? 'You can stop the measurement at any time.' : 'Leave room for the movement, and keep the adjustment knobs still until measurement finishes.'}</p>
+        <p>{step ? 'After the third solve, the adjustment view will show your alignment error and the target reticle.' : physical ? 'Prepare a clear sky patch and a clear movement corridor: Vela checks RA direction within 1° on either side, then rotates RA westward in two 18° steps (36° total).' : 'Point toward a clear patch of sky. Starting measurement will move the telescope through three positions along its rotation axis.'}</p>
+        <p>{step ? 'You can stop the measurement at any time.' : physical ? 'Use sidereal tracking. Keep the mount’s adjustment knobs still until all three positions are measured. You can stop at any time.' : 'Leave room for the movement, and keep the adjustment knobs still until measurement finishes.'}</p>
         <Button size="large" tone={step ? 'neutral' : 'accent'} onClick={step ? onStop : onStart}>{step ? 'Stop measurement' : stopped ? 'Start again' : 'Start measurement'}</Button>
       </div>
     </div>
@@ -114,7 +115,7 @@ function AlignmentPreview({ props, onPropsChange }: {
           <strong>Plate-solving failed</strong>
           <p>Trying another image. Showing the last successful solve.</p>
         </div>}
-        {baseline ? <BaselinePreview phase={phase} onStart={() => changePhase('point-1', true)} onStop={() => changePhase('baseline-stopped')} /> : (
+        {baseline ? <BaselinePreview phase={phase} physical={props.mode === 'physical'} onStart={() => changePhase('point-1', true)} onStop={() => changePhase('baseline-stopped')} /> : (
         <div className="vela-polar-layout">
           <Panel className="vela-polar-readings">
             <div className="vela-polar-total"><span>{inactive || busy ? 'Last measured error' : 'Total alignment error'}</span><strong>{near ? '14″' : '8′ 23″'}</strong></div>
@@ -179,9 +180,10 @@ export const specimen: ComponentSpecimen = {
   name: 'Polar alignment · Product example',
   description: 'Phone-first adjustment exploration with directional corrections, total error and a fixed-scale target overlay. Activity, elapsed times and measurement ages are fixed snapshots for design review. Illustrative fixtures only; no camera, plate solver or hardware commands. Start plays an accelerated three-position measurement preview; stop abandons it and restart takes a fresh baseline. Setup values are illustrative, not a final hardware configuration.',
   controls: {
+    mode: { type: 'select', label: 'Rig mode', options: ['offline', 'physical'] },
     example: { type: 'select', label: 'Alignment example', options: examples },
     phase: { type: 'select', label: 'Activity', options: phases },
   },
-  defaultProps: { example: 'near-aligned', phase: 'setup' },
+  defaultProps: { mode: 'offline', example: 'near-aligned', phase: 'setup' },
   render: (props, onPropsChange) => <AlignmentPreview props={props} {...(onPropsChange ? { onPropsChange } : {})} />,
 }

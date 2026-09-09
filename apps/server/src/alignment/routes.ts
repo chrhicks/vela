@@ -1,13 +1,14 @@
 import type { FastifyInstance } from 'fastify'
-import { createAlpacaAcquisition } from '@vela/alpaca'
+import { createAlpacaAcquisition, createAlpacaFraming } from '@vela/alpaca'
 import type { AlignmentView } from '@vela/model/web'
 import { createRigOperations, type RigOperations } from '../rig/operations.js'
 import type { RigCatalog } from '../rig/catalog.js'
 import { createAlignmentController, type AlignmentSettings } from './controller.js'
 import { createAstapSolver } from './solver.js'
+import { createPhysicalAlignment } from './physical.js'
 
 export function registerAlignment(app: FastifyInstance, catalog: RigCatalog, settings?: AlignmentSettings, operations: RigOperations = createRigOperations()) {
-  const alignment = settings ? createAlignmentController(settings,
+  let alignment = settings && settings.mode !== 'physical' ? createAlignmentController(settings,
     createAlpacaAcquisition({ baseUrl: settings.endpoint }),
     createAstapSolver({ executable: settings.executable, catalogPath: settings.catalogPath, fieldHeightDegrees: settings.fieldHeightDegrees })) : undefined
 
@@ -15,20 +16,22 @@ export function registerAlignment(app: FastifyInstance, catalog: RigCatalog, set
     const rig = await catalog.get(rigId)
     if (!rig) return undefined
     const endpoint = `http://${rig.endpoint.host}:${rig.endpoint.port}`
-    const enabled = !!settings && endpoint === settings.endpoint
+    const configured = !!settings && endpoint === settings.endpoint
       && rig.lastObservedInventory.devices.some(device => device.uniqueId === settings.cameraId && device.kind === 'camera')
       && rig.lastObservedInventory.devices.some(device => device.uniqueId === settings.telescopeId && device.kind === 'telescope')
-    const state = alignment?.snapshot()
-    if (state && (enabled || state.active && state.rigId === rigId)) {
-      const owner = operations.owner(rigId)
-      const available = !owner || owner === 'alignment'
-      return { ...state, rigId, rigName: rig.name, enabled: available,
-        unavailableReason: available ? null : 'Another Rig operation is in progress.' }
-    }
-    return { rigId, rigName: rig.name, enabled: false, unavailableReason: 'Polar alignment is not configured for this Rig.',
+    const owner = operations.owner(rigId)
+    const reason = !configured ? 'Polar alignment is not configured for this Rig.'
+      : owner && owner !== 'alignment' ? 'Another Rig operation is in progress.'
+      : settings?.mode === 'physical' && rig.imagingCamera?.uniqueId !== settings.cameraId ? 'Select the configured imaging camera on Observe before alignment.'
+      : settings?.mode === 'physical' && !rig.focalLengthMm ? 'Set the effective focal length before alignment.' : null
+    const empty: AlignmentView = { rigId, rigName: rig.name, enabled: !reason, unavailableReason: reason,
       phase: 'setup', activity: 'idle', active: false, position: 0, solvedPositions: 0,
       exposureSeconds: settings?.exposureSeconds ?? 2, exposureStartedAt: null, measuredAt: null,
       warning: null, error: null, measurement: null }
+    const state = alignment?.snapshot()
+    return { ...empty, ...(state && (!state.rigId || state.rigId === rigId) ? state : {}),
+      rigId, rigName: rig.name, enabled: !reason, unavailableReason: reason,
+      ...(settings?.mode === 'physical' ? { mode: 'physical', ...(rig.imagingCamera ? { cameraName: rig.imagingCamera.name } : {}) } : {}) }
   }
   app.get<{ Params: { rigId: string } }>('/api/web/rigs/:rigId/alignment', async (request, reply) => {
     const view = await rigView(request.params.rigId)
@@ -43,14 +46,30 @@ export function registerAlignment(app: FastifyInstance, catalog: RigCatalog, set
     try {
       const view = await rigView(request.params.rigId)
       if (!view) return reply.code(404).send({ error: 'Rig not found' })
-      if (!view.enabled || !alignment) return reply.code(409).send({ error: view.unavailableReason })
+      // Stop remains available to the operation's rig even if saved settings
+      // change while it is running.
+      if ((request.params.command === 'stop' || request.params.command === 'finish') && alignment?.snapshot().rigId === view.rigId) {
+        return await alignment.stop(request.params.command === 'finish')
+      }
+      if (!view.enabled || !settings) return reply.code(409).send({ error: view.unavailableReason })
       if (request.params.command === 'start') {
+        if (settings.mode === 'physical') {
+          if (alignment?.active()) throw new Error('A measurement is already running')
+          const rig = (await catalog.get(view.rigId))!
+          const acquisition = createAlpacaAcquisition({ baseUrl: settings.endpoint })
+          const physical = createPhysicalAlignment({ cameraId: settings.cameraId, telescopeId: settings.telescopeId,
+            cameraName: rig.imagingCamera!.name, focalLengthMm: rig.focalLengthMm! }, acquisition, createAlpacaFraming({ baseUrl: settings.endpoint }))
+          alignment = createAlignmentController(settings, acquisition,
+            fieldHeightDegrees => createAstapSolver({ executable: settings.executable, catalogPath: settings.catalogPath, fieldHeightDegrees }), Date.now, physical)
+        }
+        if (!alignment) throw new Error('Polar alignment is not configured')
         const result = await alignment.start(view.rigId, view.rigName, release)
         started = true
         return result
       }
-      if (request.params.command === 'stop') return await alignment.stop()
-      if (request.params.command === 'finish') return await alignment.stop(true)
+      if (request.params.command === 'stop' || request.params.command === 'finish') {
+        return reply.code(409).send({ error: 'There is no alignment measurement for this Rig.' })
+      }
       return reply.code(404).send({ error: 'Unknown alignment command' })
     } catch (error) {
       return reply.code(409).send({ error: error instanceof Error ? error.message : 'Alignment command failed' })
@@ -73,6 +92,8 @@ export function alignmentSettings(env: NodeJS.ProcessEnv): AlignmentSettings | u
   const endpoint = new URL(env.VELA_ALIGNMENT_ENDPOINT)
   if (endpoint.protocol !== 'http:' || endpoint.pathname !== '/' || endpoint.search || endpoint.hash || endpoint.username || endpoint.password) throw new Error('Invalid VELA_ALIGNMENT_ENDPOINT')
   if (!env.VELA_ASTAP || !env.VELA_STAR_CATALOG || !env.VELA_ALIGNMENT_CAMERA_ID || !env.VELA_ALIGNMENT_TELESCOPE_ID) throw new Error('Alignment requires solver, catalog and configured device IDs')
+  if (env.VELA_ALIGNMENT_MODE !== undefined && !['offline', 'physical'].includes(env.VELA_ALIGNMENT_MODE)) throw new Error('Invalid VELA_ALIGNMENT_MODE')
   return { endpoint: endpoint.origin, cameraId: env.VELA_ALIGNMENT_CAMERA_ID, telescopeId: env.VELA_ALIGNMENT_TELESCOPE_ID,
+    ...(env.VELA_ALIGNMENT_MODE === 'physical' ? { mode: 'physical' } : {}),
     executable: env.VELA_ASTAP, catalogPath: env.VELA_STAR_CATALOG, exposureSeconds: 2, fieldHeightDegrees: 3 }
 }

@@ -1,5 +1,7 @@
 /** Server-owned, ephemeral polar-alignment state. Pixels and readings share a solve. */
 export interface AlignmentView {
+  mode?: 'offline' | 'physical'
+  cameraName?: string
   rigId: string
   rigName: string
   enabled: boolean
@@ -15,6 +17,7 @@ export interface AlignmentView {
   warning: string | null
   error: string | null
   measurement: null | {
+    capturedAtSource?: 'camera' | 'server-estimate'
     altitudeArcsec: number
     azimuthArcsec: number
     totalArcsec: number
