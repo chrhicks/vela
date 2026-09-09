@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { api } from '../lib/api'
 import { isTarget, isTargets } from '../features/targets/validation'
-import { SkyPath, skyTime, skyWindow } from '../features/targets/SkyPath'
+import { SkyPath, skyWindow } from '../features/targets/SkyPath'
+import { SkyInspection } from '../features/targets/SkyInspection'
 import { SurveyField } from '../features/targets/SurveyField'
 import { useFraming } from '../features/targets/use-framing'
 import './targets.css'
@@ -122,10 +123,7 @@ function TargetComposition({ rigId, targetId }: { rigId: string, targetId: strin
         <SurveyField target={target} desired={position} camera={view?.camera ?? null} actual={actual} locked={locked} onChange={setDesired} />
       </section>
       <aside className="vela-target-sidebar">
-        <Panel title="Through the night" description={target.sky ? `Local time · ${skyStale ? "last update" : "now"} ${skyTime(target.sky.observedAt)}` : 'Site unavailable'}><SkyPath sky={target.sky} stale={skyStale} />{skyStale && <p role="status">Sky updates interrupted · last calculation shown.</p>}
-          {target.sky && <div className="vela-target-sky-facts"><strong>{skyWindow(target.sky)}</strong><span>{target.sky.highestAltitudeDegrees.toFixed(0)}° highest altitude</span><span>Shading: astronomical darkness</span></div>}
-          <p className="vela-target-obstructions">Obstructions unknown</p>
-        </Panel>
+        <SkyInspection sky={target.sky} targetName={target.name} stale={skyStale} />
         <Panel title="Your composition">
           <p className="vela-target-description">{target.kind}{target.sizeArcminutes !== null ? ` · ${target.sizeArcminutes}′ across` : ''}</p>
           <dl className="vela-target-details"><div><dt>Camera</dt><dd>{view?.camera?.name ?? 'Unavailable'}</dd></div><div><dt>Orientation</dt><dd>{actual ? `${actual.rotationDegrees.toFixed(1)}° last measured` : 'Assumed north-up · not measured'}</dd></div><div><dt>Center (J2000)</dt><dd>{position.raDegrees.toFixed(4)}°, {position.decDegrees.toFixed(4)}°</dd></div>{view?.camera && <div><dt>Field of view</dt><dd>{view.camera.fieldWidthDegrees.toFixed(2)}° × {view.camera.fieldHeightDegrees.toFixed(2)}°</dd></div>}</dl>

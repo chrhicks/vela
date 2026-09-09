@@ -9,7 +9,12 @@ describe('@vela/ui export boundaries', () => {
     }
   })
 
+  it('exports the promoted SkyPath primitive from the stable root', () => {
+    expect(stable).toHaveProperty('SkyPath')
+  })
+
   it('removes promoted components from the draft boundary', () => {
     expect(drafts).not.toHaveProperty('Dialog')
+    expect(drafts).not.toHaveProperty('SkyPath')
   })
 })
