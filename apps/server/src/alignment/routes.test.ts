@@ -121,9 +121,9 @@ describe('alignment routes', () => {
     await catalog.setFocalLength('rig', 320)
     expect((await command('start')).statusCode).toBe(200)
     expect(mocks.physical).toHaveBeenCalledWith({ cameraId: 'camera', telescopeId: 'telescope', cameraName: 'Updated imager', focalLengthMm: 320 }, { acquisition: true }, { framing: true })
-    const [, acquisition, solverFactory, clock, physical] = mocks.controller.mock.calls[0]!
+    const [{ mode, hardware: acquisition, createSolver: solverFactory, physical }] = mocks.controller.mock.calls[0]!
     expect(acquisition).toEqual({ acquisition: true })
-    expect(clock).toBe(Date.now)
+    expect(mode).toBe('physical')
     expect(physical).toEqual({ physical: true })
     solverFactory(1.75)
     expect(mocks.solver).toHaveBeenCalledWith({ executable: '/bin/astap', catalogPath: '/stars', fieldHeightDegrees: 1.75 })

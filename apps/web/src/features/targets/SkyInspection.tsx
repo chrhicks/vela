@@ -2,7 +2,7 @@ import type { TargetSkyPath } from '@vela/model/web'
 import { Button, Dialog, Panel, SkyPath, type SkyLightPhase } from '@vela/ui'
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { skyTime, skyWindow } from './SkyPath'
+import { skyTime, skyWindow } from './sky-time'
 
 // Geometric solar-altitude bands; the server supplies the Sun's position.
 function lightPhase(sunAltitude: number): SkyLightPhase {

@@ -9,9 +9,11 @@ import { createAstapSolver } from './solver.js'
 import { createPhysicalAlignment } from './physical.js'
 
 export function registerAlignment(app: FastifyInstance, catalog: RigCatalog, settings?: AlignmentSettings, operations: RigOperations = createRigOperations()) {
-  let alignment = settings && settings.mode !== 'physical' ? createAlignmentController(settings,
-    createAlpacaAcquisition({ baseUrl: settings.endpoint }),
-    createAstapSolver({ executable: settings.executable, catalogPath: settings.catalogPath, fieldHeightDegrees: settings.fieldHeightDegrees })) : undefined
+  let alignment = settings && settings.mode !== 'physical' ? createAlignmentController({
+    mode: 'offline', settings,
+    hardware: createAlpacaAcquisition({ baseUrl: settings.endpoint }),
+    solver: createAstapSolver({ executable: settings.executable, catalogPath: settings.catalogPath, fieldHeightDegrees: settings.fieldHeightDegrees }),
+  }) : undefined
 
   async function rigView(rigId: string): Promise<AlignmentView | undefined> {
     const rig = await catalog.get(rigId)
@@ -63,8 +65,10 @@ export function registerAlignment(app: FastifyInstance, catalog: RigCatalog, set
             const acquisition = createAlpacaAcquisition({ baseUrl: settings.endpoint })
             const physical = createPhysicalAlignment({ cameraId: settings.cameraId, telescopeId: settings.telescopeId,
               cameraName: rig.imagingCamera!.name, focalLengthMm: rig.focalLengthMm! }, acquisition, createAlpacaFraming({ baseUrl: settings.endpoint }))
-            alignment = createAlignmentController(settings, acquisition,
-              fieldHeightDegrees => createAstapSolver({ executable: settings.executable, catalogPath: settings.catalogPath, fieldHeightDegrees }), Date.now, physical)
+            alignment = createAlignmentController({
+              mode: 'physical', settings, hardware: acquisition, physical,
+              createSolver: fieldHeightDegrees => createAstapSolver({ executable: settings.executable, catalogPath: settings.catalogPath, fieldHeightDegrees }),
+            })
           }
           if (!alignment) throw new Error('Polar alignment is not configured')
           const result = await alignment.start(view.rigId, view.rigName, release)

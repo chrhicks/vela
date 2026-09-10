@@ -15,11 +15,18 @@ export function registerImagingCamera(app: FastifyInstance, catalog: RigCatalog,
       .map(device => ({ id: device.providerDeviceId, name: device.name?.trim() || null, configuredName: device.configuredName })) : []
     const selected = rig.imagingCamera
     const match = cameras.find(camera => camera.id === selected?.uniqueId)
+    function selectionState(): ImagingCameraView['state'] {
+      if (detail.state !== 'current') return 'unavailable'
+      if (!selected) return 'unselected'
+      if (!match) return 'missing'
+      if (!match.name) return 'unavailable'
+      if (match.name !== selected.name) return 'changed'
+      return 'ready'
+    }
     return {
       rigId, cameras,
       selected: selected ? { id: selected.uniqueId, name: selected.name } : null,
-      state: detail.state !== 'current' ? 'unavailable' : !selected ? 'unselected'
-        : !match ? 'missing' : !match.name ? 'unavailable' : match.name !== selected.name ? 'changed' : 'ready',
+      state: selectionState(),
       editable: detail.state === 'current' && !operations.owner(rigId),
     }
   }

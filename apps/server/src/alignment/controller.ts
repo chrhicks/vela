@@ -21,9 +21,19 @@ export interface AlignmentSettings {
 }
 
 type Solver = ReturnType<typeof createAstapSolver>
-export function createAlignmentController(settings: AlignmentSettings, hardware: AlpacaAcquisition, solver: Solver | ((fieldHeightDegrees: number) => Solver), now = Date.now, physical?: PhysicalAlignment) {
+export type AlignmentControllerOptions = {
+  settings: Pick<AlignmentSettings, 'cameraId' | 'telescopeId' | 'exposureSeconds' | 'fieldHeightDegrees'>
+  hardware: AlpacaAcquisition
+  now?: () => number
+} & (
+  | { mode: 'offline'; solver: Solver }
+  | { mode: 'physical'; physical: PhysicalAlignment; createSolver: (fieldHeightDegrees: number) => Solver }
+)
+
+export function createAlignmentController(options: AlignmentControllerOptions) {
+  const { settings, hardware, now = Date.now } = options
+  const physical = options.mode === 'physical' ? options.physical : undefined
   let fieldHeightDegrees = settings.fieldHeightDegrees
-  let activeSolver = typeof solver === 'function' ? undefined : solver
   let view: AlignmentView = {
     rigId: '', rigName: '', enabled: true, unavailableReason: null,
     phase: 'setup', activity: 'idle', active: false, position: 0, solvedPositions: 0,
@@ -87,7 +97,7 @@ export function createAlignmentController(settings: AlignmentSettings, hardware:
     return view
   }
 
-  async function acquire(signal: AbortSignal) {
+  async function acquire(solver: Solver, signal: AbortSignal) {
     const actual = physical ? await physical.pointing(signal) : undefined
     const pointing = actual ? undefined : await hardware.pointing(settings.telescopeId, signal)
     const pointingObservedAt = now()
@@ -99,7 +109,7 @@ export function createAlignmentController(settings: AlignmentSettings, hardware:
     signal.throwIfAborted()
     if (physical) await physical.validate(signal, frame)
     patch({ activity: 'solving', exposureStartedAt: null })
-    const solved = await step('alignment.solve', () => activeSolver!.solve(frame, actual?.hint ?? { raDegrees: pointing!.rightAscensionDegrees, decDegrees: pointing!.declinationDegrees }, signal), { 'alignment.position': view.position })
+    const solved = await step('alignment.solve', () => solver.solve(frame, actual?.hint ?? { raDegrees: pointing!.rightAscensionDegrees, decDegrees: pointing!.declinationDegrees }, signal), { 'alignment.position': view.position })
     signal.throwIfAborted()
     if (solved.status === 'no-solution') {
       patch({ warning: 'Plate-solving failed. Trying a new image.' })
@@ -119,9 +129,9 @@ export function createAlignmentController(settings: AlignmentSettings, hardware:
     return { frame, solved, sample, latitude: actual?.latitude ?? pointing!.latitudeDegrees }
   }
 
-  async function solvedFrame(signal: AbortSignal) {
+  async function solvedFrame(solver: Solver, signal: AbortSignal) {
     while (true) {
-      const result = await acquire(signal)
+      const result = await acquire(solver, signal)
       if (result) return result
       patch({ activity: 'waiting' })
       await delay(3000, undefined, { signal })
@@ -129,12 +139,14 @@ export function createAlignmentController(settings: AlignmentSettings, hardware:
   }
 
   async function run(signal: AbortSignal) {
-    if (physical) {
+    let solver: Solver
+    if (options.mode === 'physical') {
       patch({ activity: 'homing' })
-      fieldHeightDegrees = (await step('alignment.prepare', () => physical.prepare(signal))).fieldHeightDegrees
-      activeSolver = typeof solver === 'function' ? solver(fieldHeightDegrees) : solver
+      fieldHeightDegrees = (await step('alignment.prepare', () => options.physical.prepare(signal))).fieldHeightDegrees
+      solver = options.createSolver(fieldHeightDegrees)
       patch({ activity: 'waiting' })
     } else {
+      solver = options.solver
       const initial = await hardware.pointing(settings.telescopeId, signal)
       if (initial.coordinateSystem !== 'j2000' || !initial.tracking) throw new Error('The configured simulator’s J2000 frame and tracking are required')
       if (initial.rightAscensionDegrees < 8 || initial.rightAscensionDegrees > 52 || Math.abs(initial.declinationDegrees - 60) > 0.01) throw new Error('Reset the simulator to its northern alignment position before measuring')
@@ -146,14 +158,14 @@ export function createAlignmentController(settings: AlignmentSettings, hardware:
         await hardware.move(settings.telescopeId, Math.sign(preparationDegrees) * 1.5, Math.abs(preparationDegrees) / 1.5, signal)
       }
     }
-    const first = await solvedFrame(signal)
+    const first = await solvedFrame(solver, signal)
     const samples: AlignmentSample[] = [first.sample]
     let current = first
     for (let position = 2; position <= 3; position++) {
       patch({ activity: 'moving', position, solvedPositions: position - 1 })
       if (physical) await step('alignment.move', () => physical.move(signal), { 'alignment.position': position })
       else await hardware.move(settings.telescopeId, 1.5, 12, signal)
-      current = await solvedFrame(signal)
+      current = await solvedFrame(solver, signal)
       samples.push(current.sample)
     }
     const baseline = createAlignmentBaseline(samples as [AlignmentSample, AlignmentSample, AlignmentSample], first.latitude)
@@ -177,7 +189,7 @@ export function createAlignmentController(settings: AlignmentSettings, hardware:
       } })
       // A calm adjustment window between exposures; never infer solver progress from elapsed time.
       await delay(3000, undefined, { signal })
-      current = await solvedFrame(signal)
+      current = await solvedFrame(solver, signal)
     }
   }
 

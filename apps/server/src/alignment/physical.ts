@@ -88,7 +88,7 @@ export function createPhysicalAlignment(settings: PhysicalAlignmentSettings, acq
     await settle(signal)
     const current = await status(signal)
     const observed = await device.cameraGeometry({ cameraId: settings.cameraId, expectedCameraName: settings.cameraName }, signal)
-    if (JSON.stringify(observed) !== JSON.stringify(geometry)) throw new Error('Camera geometry changed. Measure a new baseline.')
+    if (!sameCameraGeometry(observed, geometry)) throw new Error('Camera geometry changed. Measure a new baseline.')
     return { hint: fromMount({ raDegrees: current.rightAscensionDegrees, decDegrees: current.declinationDegrees },
       current.coordinateSystem, new Date(current.observedAt), site!), latitude: site!.latitudeDegrees }
   }
@@ -135,3 +135,18 @@ export function createPhysicalAlignment(settings: PhysicalAlignmentSettings, acq
 }
 
 export type PhysicalAlignment = ReturnType<typeof createPhysicalAlignment>
+
+function sameCameraGeometry(observed: AlpacaCameraGeometry, reference: AlpacaCameraGeometry | undefined): boolean {
+  return !!reference
+    && observed.cameraName === reference.cameraName
+    && observed.sensorWidthPixels === reference.sensorWidthPixels
+    && observed.sensorHeightPixels === reference.sensorHeightPixels
+    && observed.pixelWidthMicrons === reference.pixelWidthMicrons
+    && observed.pixelHeightMicrons === reference.pixelHeightMicrons
+    && observed.binX === reference.binX
+    && observed.binY === reference.binY
+    && observed.width === reference.width
+    && observed.height === reference.height
+    && observed.startX === reference.startX
+    && observed.startY === reference.startY
+}

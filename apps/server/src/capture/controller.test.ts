@@ -1,7 +1,7 @@
 import * as statistics from '../imaging/statistics.js'
 import { expect, it, vi } from 'vitest'
 import { inflateSync } from 'node:zlib'
-import { CaptureStoppedError, createCaptureController, type CaptureCamera, type CaptureFrame } from './controller.js'
+import { CaptureStoppedError, createCaptureController, type CaptureCamera, type CaptureFrame, type CaptureRunOptions } from './controller.js'
 import { createMemorySavedImageStore, type SavedImageStore } from '../saved-images/store.js'
 
 function deferred<T>() {
@@ -21,7 +21,7 @@ function setup(savedImages: SavedImageStore = createMemorySavedImageStore()) {
     },
   }
   const actual = createCaptureController({ rigId: 'fra 400', rigName: 'FRA 400' }, () => Date.parse('2026-09-05T16:00:10Z'), savedImages)
-  const controller = { ...actual, start: (seconds: number, settled?: () => void, repeat = false, saveFrames = false) => actual.start(seconds, camera, 'Main camera', settled, repeat, saveFrames) }
+  const controller = { ...actual, start: (seconds: number, options: CaptureRunOptions = {}) => actual.start(seconds, camera, 'Main camera', options) }
   const frame: CaptureFrame = { width: 4, height: 2, pixels: [0, 100, 500, 1000, 500, 0, 200, 100], capturedAt: '2026-09-05T16:00:00Z' }
   async function complete(seconds = 10) {
     await controller.start(seconds)
@@ -35,7 +35,7 @@ function setup(savedImages: SavedImageStore = createMemorySavedImageStore()) {
 it('owns one pending exposure, publishes a native PNG only after acquisition, and releases its lease', async () => {
   const { controller, requests, frame } = setup()
   const settled = vi.fn(() => expect(controller.active()).toBe(false))
-  expect(await controller.start(10, settled)).toMatchObject({ active: true, phase: 'exposing', latestImage: null })
+  expect(await controller.start(10, { onSettled: settled })).toMatchObject({ active: true, phase: 'exposing', latestImage: null })
   expect(settled).not.toHaveBeenCalled()
   await expect(controller.start(20)).rejects.toThrow('already running')
   expect(requests).toHaveLength(1)
@@ -126,7 +126,7 @@ it('repeats completed exposures under one lease and keeps the last frame and cou
   const { controller, requests, frame } = setup()
   const settled = vi.fn()
   expect(controller.snapshot()).toMatchObject({ repeat: true, completedCount: 0 })
-  await controller.start(10, settled, true)
+  await controller.start(10, { onSettled: settled, repeat: true })
   requests[0]!.resolve(frame)
   await vi.waitFor(() => expect(requests).toHaveLength(2))
   const previous = controller.snapshot().latestImage!
@@ -146,7 +146,7 @@ it('repeats completed exposures under one lease and keeps the last frame and cou
 it.each(['readout', 'preview'] as const)('stops during %s without another exposure and publishes a frame that wins the race', async phase => {
   const { controller, requests, frame } = setup()
   const settled = vi.fn()
-  await controller.start(10, settled, true)
+  await controller.start(10, { onSettled: settled, repeat: true })
   requests[0]!.onProgress({ phase: 'reading', elapsedSeconds: 10 })
   if (phase === 'preview') {
     requests[0]!.resolve(frame)
@@ -201,7 +201,7 @@ it('saves every repeated frame before exposing again, including a completed fram
   const save = vi.spyOn(store, 'save')
   save.mockImplementationOnce(async (...args) => { await gate.promise; return original(...args) })
   const { controller, requests, frame } = setup(store)
-  await controller.start(10, undefined, true, true)
+  await controller.start(10, { repeat: true, saveFrames: true })
   requests[0]!.resolve(frame)
   await vi.waitFor(() => expect(save).toHaveBeenCalledOnce())
   expect(requests).toHaveLength(1)
@@ -219,7 +219,7 @@ it('stops on an automatic save failure and retains that frame for an explicit re
   const store = createMemorySavedImageStore()
   vi.spyOn(store, 'save').mockRejectedValueOnce(new Error('Disk full'))
   const { controller, requests, frame } = setup(store)
-  await controller.start(10, undefined, true, true)
+  await controller.start(10, { repeat: true, saveFrames: true })
   requests[0]!.resolve(frame)
   await vi.waitFor(() => expect(controller.active()).toBe(false))
   expect(requests).toHaveLength(1)
@@ -245,7 +245,7 @@ it('bounds unsaved frame availability but keeps saved frames idempotent after ev
 
 it('preserves an estimated start in the published image, retained metadata and original FITS', async () => {
   const { controller, requests, frame, savedImages } = setup()
-  await controller.start(10, undefined, false, true)
+  await controller.start(10, { saveFrames: true })
   requests[0]!.resolve({ ...frame, capturedAtSource: 'server-estimate' })
   await vi.waitFor(() => expect(controller.active()).toBe(false))
   const image = controller.snapshot().latestImage!

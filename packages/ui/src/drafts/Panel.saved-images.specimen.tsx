@@ -44,7 +44,18 @@ function SavedImagesPreview({ props, onPropsChange }: { props: Props, onPropsCha
     const timer = window.setTimeout(() => {
       const next = frame + 1
       const failed = Boolean(values.saveFrames) && Boolean(values.saveFailure)
-      update({ frame: next, hasImage: true, imageSeconds: seconds, exposures: Object.entries({ ...exposures, [frame]: exposureFor(frame), [next]: String(seconds) }).map(([id, duration]) => `${id}:${duration}`).join(','), saved: values.saveFrames && !failed ? saveList(next) : String(values.saved), state: failed ? 'save-error' : values.repeat ? 'capturing' : 'idle' })
+      update({
+        frame: next,
+        hasImage: true,
+        imageSeconds: seconds,
+        exposures: Object.entries({
+          ...exposures,
+          [frame]: exposureFor(frame),
+          [next]: String(seconds),
+        }).map(([id, duration]) => `${id}:${duration}`).join(','),
+        saved: values.saveFrames && !failed ? saveList(next) : String(values.saved),
+        state: failed ? 'save-error' : values.repeat ? 'capturing' : 'idle',
+      })
       if (failed || !values.repeat) setPlaying(false)
     }, 3000)
     return () => window.clearTimeout(timer)
@@ -63,7 +74,26 @@ function SavedImagesPreview({ props, onPropsChange }: { props: Props, onPropsCha
     viewport.scrollTop = (1200 - viewport.clientHeight) / 2
   }, [zoomed, screen])
 
-  const scaleControls = <div className="vela-capture-zoom" aria-label="Image scale"><Button size="small" tone={zoomed ? 'quiet' : 'neutral'} aria-pressed={!zoomed} onClick={() => setZoomed(false)}>Fit</Button><Button size="small" tone={zoomed ? 'neutral' : 'quiet'} aria-pressed={zoomed} onClick={() => setZoomed(true)}>100%</Button></div>
+  const scaleControls = (
+    <div className="vela-capture-zoom" aria-label="Image scale">
+      <Button
+        size="small"
+        tone={zoomed ? 'quiet' : 'neutral'}
+        aria-pressed={!zoomed}
+        onClick={() => setZoomed(false)}
+      >
+        Fit
+      </Button>
+      <Button
+        size="small"
+        tone={zoomed ? 'neutral' : 'quiet'}
+        aria-pressed={zoomed}
+        onClick={() => setZoomed(true)}
+      >
+        100%
+      </Button>
+    </div>
+  )
 
   function keepImage() {
     if (!hasImage || isSaved) return
@@ -89,13 +119,30 @@ function SavedImagesPreview({ props, onPropsChange }: { props: Props, onPropsCha
   }
 
   const image = (id: number) => <CaptureRunExposure frame={id} conditions="clear" />
-  const imageDetails = (id: number) => <dl className="vela-saved-details">
-    <div><dt>Captured</dt><dd>{details(id)} · {time(id)}</dd></div>
-    <div><dt>Camera</dt><dd>Simulator Color Camera</dd></div>
-    <div><dt>Exposure</dt><dd>{exposureFor(id)} s · Color</dd></div>
-    <div><dt>Dimensions</dt><dd>1600 × 1200</dd></div>
-    <div><dt>Image quality</dt><dd>146 stars · HFR 2.24 px</dd></div>
-  </dl>
+  const imageDetails = (id: number) => (
+    <dl className="vela-saved-details">
+      <div>
+        <dt>Captured</dt>
+        <dd>{details(id)} · {time(id)}</dd>
+      </div>
+      <div>
+        <dt>Camera</dt>
+        <dd>Simulator Color Camera</dd>
+      </div>
+      <div>
+        <dt>Exposure</dt>
+        <dd>{exposureFor(id)} s · Color</dd>
+      </div>
+      <div>
+        <dt>Dimensions</dt>
+        <dd>1600 × 1200</dd>
+      </div>
+      <div>
+        <dt>Image quality</dt>
+        <dd>146 stars · HFR 2.24 px</dd>
+      </div>
+    </dl>
+  )
 
   return <article className="vela-capture-demo vela-capture-run-demo vela-saved-demo">
     <header className="vela-capture-shell"><strong>Vela</strong><span>Offline rig</span><span>Observe</span></header>
@@ -130,12 +177,76 @@ function SavedImagesPreview({ props, onPropsChange }: { props: Props, onPropsCha
       </>}
       {screen === 'saved' && <>
         <p className="vela-capture-intro">Original data and the preview you inspected, kept on your Vela server.</p>
-        {saved.length === 0 ? <Panel><div className="vela-saved-empty"><h2>No saved images yet</h2><p>Turn on Save frames before capturing, or keep an individual image when you see one worth saving.</p><Button onClick={() => update({ screen: 'capture' })}>Open capture →</Button></div></Panel> : ['September 5, 2026', 'September 4, 2026'].map(date => {
+        {saved.length === 0 ? (
+          <Panel>
+            <div className="vela-saved-empty">
+              <h2>No saved images yet</h2>
+              <p>Turn on Save frames before capturing, or keep an individual image when you see one worth saving.</p>
+              <Button onClick={() => update({ screen: 'capture' })}>Open capture →</Button>
+            </div>
+          </Panel>
+        ) : ['September 5, 2026', 'September 4, 2026'].map(date => {
           const group = saved.filter(id => details(id) === date).sort((a, b) => b - a)
-          return group.length > 0 && <section className="vela-saved-group" key={date}><h2>{date}<span>{group.length} {group.length === 1 ? 'image' : 'images'}</span></h2><div className="vela-saved-grid">{group.map(id => <button className="vela-saved-card" key={id} onClick={() => update({ screen: 'detail', selected: id })}><div className="vela-saved-thumbnail">{image(id)}</div><div className="vela-saved-card-copy"><strong>{time(id)}</strong><span>{exposureFor(id)} s · Color</span><small>FITS + preview <span aria-hidden="true">→</span></small></div></button>)}</div></section>
+          return group.length > 0 && (
+            <section className="vela-saved-group" key={date}>
+              <h2>
+                {date}<span>{group.length} {group.length === 1 ? 'image' : 'images'}</span>
+              </h2>
+              <div className="vela-saved-grid">
+                {group.map(id => (
+                  <button
+                    className="vela-saved-card"
+                    key={id}
+                    onClick={() => update({ screen: 'detail', selected: id })}
+                  >
+                    <div className="vela-saved-thumbnail">{image(id)}</div>
+                    <div className="vela-saved-card-copy">
+                      <strong>{time(id)}</strong>
+                      <span>{exposureFor(id)} s · Color</span>
+                      <small>FITS + preview <span aria-hidden="true">→</span></small>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )
         })}
       </>}
-      {screen === 'detail' && <div className="vela-capture-layout"><section className="vela-capture-image" aria-label="Saved preview"><header><div><h2>{time(selected)}</h2><span>{details(selected)}</span></div><div className="vela-saved-image-actions">{scaleControls}<Badge tone="positive">Saved</Badge></div></header><div className="vela-capture-image__window" ref={imageWindow} data-zoomed={zoomed || undefined} tabIndex={zoomed ? 0 : undefined} role={zoomed ? 'region' : undefined} aria-label={zoomed ? 'Image at 100 percent. Scroll to inspect.' : undefined}>{image(selected)}</div><footer>Display-stretched preview · Original data retained separately</footer></section><Panel title="Image details">{imageDetails(selected)}<div className="vela-saved-downloads"><Button tone="accent" onClick={() => download('Original FITS')}>Download FITS</Button><Button onClick={() => download('Preview PNG')}>Download preview</Button></div><p className="vela-saved-help">Use the original FITS in Siril or your preferred processing tool.</p></Panel></div>}
+      {screen === 'detail' && (
+        <div className="vela-capture-layout">
+          <section className="vela-capture-image" aria-label="Saved preview">
+            <header>
+              <div>
+                <h2>{time(selected)}</h2>
+                <span>{details(selected)}</span>
+              </div>
+              <div className="vela-saved-image-actions">
+                {scaleControls}
+                <Badge tone="positive">Saved</Badge>
+              </div>
+            </header>
+            <div
+              className="vela-capture-image__window"
+              ref={imageWindow}
+              data-zoomed={zoomed || undefined}
+              tabIndex={zoomed ? 0 : undefined}
+              role={zoomed ? 'region' : undefined}
+              aria-label={zoomed ? 'Image at 100 percent. Scroll to inspect.' : undefined}
+            >
+              {image(selected)}
+            </div>
+            <footer>Display-stretched preview · Original data retained separately</footer>
+          </section>
+          <Panel title="Image details">
+            {imageDetails(selected)}
+            <div className="vela-saved-downloads">
+              <Button tone="accent" onClick={() => download('Original FITS')}>Download FITS</Button>
+              <Button onClick={() => download('Preview PNG')}>Download preview</Button>
+            </div>
+            <p className="vela-saved-help">Use the original FITS in Siril or your preferred processing tool.</p>
+          </Panel>
+        </div>
+      )}
       <div className="vela-saved-notice" role="status">{notice}</div>
     </main>
     <footer className="vela-capture-prototype">Workshop only · Local image fixtures · 3 seconds per example exposure · No files saved or downloaded</footer>

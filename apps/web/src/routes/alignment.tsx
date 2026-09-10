@@ -103,6 +103,20 @@ function angle(value: number) {
   return seconds < 60 ? `${seconds}″` : `${Math.floor(seconds / 60)}′ ${seconds % 60}″`
 }
 
+function alignmentActivity(view: AlignmentView, offline: boolean) {
+  if (offline) return 'Connection interrupted'
+  if (view.activity === 'exposing') return 'Exposing image'
+  if (view.activity === 'solving') return 'Plate-solving…'
+  if (view.activity === 'homing') return 'Preparing starting field…'
+  if (view.activity === 'moving') return `Moving to position ${view.position}…`
+  if (view.activity === 'stopping') return 'Stopping…'
+  if (view.phase === 'finished') return 'Alignment ended by you'
+  if (!view.active) return 'Measurements stopped'
+  if (view.activity === 'waiting') return 'Waiting for the next image'
+  if (view.measurement) return 'Alignment updated'
+  return 'Preparing measurement…'
+}
+
 export function Alignment() {
   const { rigId = '' } = useParams()
   return <AlignmentPage key={rigId} rigId={rigId} />
@@ -121,33 +135,152 @@ function AlignmentPage({ rigId }: { rigId: string }) {
   const baseline = !measurement || view.phase === 'baseline'
   const elapsed = view.exposureStartedAt ? Math.min(view.exposureSeconds, Math.max(0, (now - Date.parse(view.exposureStartedAt)) / 1000)) : 0
   const age = solved?.measuredAt ? `${Math.max(0, Math.floor((now - Date.parse(solved.measuredAt)) / 1000))} s ago` : 'Not measured'
-  const activity = offline ? 'Connection interrupted' : view.activity === 'exposing' ? 'Exposing image' : view.activity === 'solving' ? 'Plate-solving…' : view.activity === 'homing' ? 'Preparing starting field…' : view.activity === 'moving' ? `Moving to position ${view.position}…` : view.activity === 'stopping' ? 'Stopping…' : view.phase === 'finished' ? 'Alignment ended by you' : !view.active ? 'Measurements stopped' : view.activity === 'waiting' ? 'Waiting for the next image' : view.measurement ? 'Alignment updated' : 'Preparing measurement…'
+  const activity = alignmentActivity(view, offline)
+  const nextInstruction = view.active
+    ? 'After the third solve, the adjustment view will show your alignment error and the target reticle.'
+    : physical
+      ? 'Each attempt homes, then moves to a consistent starting field at Dec +80°. Prepare a clear movement corridor: after a small direction check, Vela makes two continuous westward RA rotations of roughly 54° at 1° per second. Allow up to 120° total westward travel and 1° on either side for the direction check.'
+      : 'Start with the simulator’s large-error preset and clear camera. Keep its offsets unchanged until all three positions are measured.'
+  const preparationInstruction = physical && !view.active
+    ? 'Use sidereal tracking. Keep the mount’s adjustment knobs still until all three positions are measured. You can stop at any time.'
+    : 'You can stop the measurement at any time.'
+  const adjustmentInstruction = view.active
+    ? physical
+      ? 'Adjust the mount’s altitude and azimuth knobs. Use the reticle and remaining error to decide when you’re done.'
+      : 'Adjust the simulator’s offsets. Use the reticle and remaining error to decide when you’re done.'
+    : view.phase === 'finished'
+      ? 'Your final measurement is kept here for reference.'
+      : physical
+        ? 'Prepare the rig and clear movement corridor again, then measure a fresh baseline.'
+        : 'Reset or reposition the simulator, then measure a fresh baseline.'
   const activityArea = <div className="vela-polar-activity">
-    <div className="vela-polar-activity__line" role="status"><span className="vela-polar-activity__spinner" style={{ visibility: view.active && !offline ? 'visible' : 'hidden' }} aria-hidden="true" /><strong>{activity}</strong>{view.activity === 'exposing' && !offline && <span className="vela-polar-activity__time">{elapsed.toFixed(1)} / {view.exposureSeconds} s</span>}</div>
-    <progress style={{ visibility: view.activity === 'exposing' && !offline ? 'visible' : 'hidden' }} value={elapsed} max={view.exposureSeconds} aria-label="Exposure progress in seconds" />
-    <div className="vela-polar-activity__age"><span>Last alignment update</span><span>{age}{measurement?.capturedAtSource === 'server-estimate' ? ' · Estimated exposure start' : ''}</span></div>
+    <div className="vela-polar-activity__line" role="status">
+      <span
+        className="vela-polar-activity__spinner"
+        style={{ visibility: view.active && !offline ? 'visible' : 'hidden' }}
+        aria-hidden="true"
+      />
+      <strong>{activity}</strong>
+      {view.activity === 'exposing' && !offline && (
+        <span className="vela-polar-activity__time">{elapsed.toFixed(1)} / {view.exposureSeconds} s</span>
+      )}
+    </div>
+    <progress
+      style={{ visibility: view.activity === 'exposing' && !offline ? 'visible' : 'hidden' }}
+      value={elapsed}
+      max={view.exposureSeconds}
+      aria-label="Exposure progress in seconds"
+    />
+    <div className="vela-polar-activity__age">
+      <span>Last alignment update</span>
+      <span>{age}{measurement?.capturedAtSource === 'server-estimate' ? ' · Estimated exposure start' : ''}</span>
+    </div>
     <p>{offline ? 'Readings and overlay are last known. Reconnecting…' : view.active ? 'Wait for a fresh alignment update after each adjustment.' : 'Readings and overlay are from the last successful solve.'}</p>
   </div>
-  return <section className="vela-rig-page vela-alignment" data-pending={pending || undefined}>{back}
-    <header className="vela-polar-heading"><div><p>{view.rigName} · Rig preparation</p><h1>Polar alignment</h1></div><Badge tone={offline || view.phase === 'failed' ? 'warning' : view.active ? 'accent' : 'neutral'}>{offline ? 'Disconnected' : view.phase === 'setup' ? 'Not started' : view.phase === 'baseline' ? 'Measuring' : view.phase}</Badge></header>
+  return <section className="vela-rig-page vela-alignment" data-pending={pending || undefined}>
+    {back}
+    <header className="vela-polar-heading">
+      <div><p>{view.rigName} · Rig preparation</p><h1>Polar alignment</h1></div>
+      <Badge tone={offline || view.phase === 'failed' ? 'warning' : view.active ? 'accent' : 'neutral'}>
+        {offline ? 'Disconnected' : view.phase === 'setup' ? 'Not started' : view.phase === 'baseline' ? 'Measuring' : view.phase}
+      </Badge>
+    </header>
     {view.warning && <div className="vela-polar-solve-warning" role="alert">
       <strong>Plate-solving failed</strong>
       <p>{view.active && !offline && view.activity !== 'stopping' ? 'Trying another image. ' : ''}{measurement ? 'Showing the last successful solve.' : 'No alignment result yet.'}</p>
     </div>}
     {imageError && <p className="vela-polar-notice" role="status">The latest solved image could not be loaded. Previous readings and overlay remain together.</p>}
     {(error || view.error || !view.enabled) && <p className="vela-polar-notice" role="status">{error || view.error || view.unavailableReason}</p>}
-    {baseline ? <div className="vela-polar-baseline">
-      <Panel className="vela-polar-baseline__summary"><h2>{view.active ? 'Measuring your alignment' : view.phase === 'setup' ? 'Find your starting alignment' : 'Measurement stopped'}</h2><p>{view.active ? 'Keep the mount’s adjustment knobs still while Vela measures three positions.' : 'Vela will take and solve images at three positions, then show you how to adjust the mount.'}</p>
-        <ol className="vela-polar-points" aria-label="Three measurement positions">{[1, 2, 3].map(point => <li key={point} data-state={point <= view.solvedPositions ? 'done' : view.active && point === view.position ? 'current' : 'pending'}><span>{point <= view.solvedPositions ? '✓' : point}</span><strong>Position {point}</strong><small>{point <= view.solvedPositions ? 'Solved' : view.active && point === view.position ? view.activity === 'homing' ? 'Preparing starting field…' : view.activity === 'moving' ? 'Moving' : 'Measuring' : 'Not measured'}</small></li>)}</ol>
-        {view.active ? activityArea : <dl className="vela-polar-setup-facts"><div><dt>Camera</dt><dd>{physical ? view.cameraName ?? 'No imaging camera configured' : 'Configured imaging camera'}</dd></div><div><dt>Exposure</dt><dd>{view.exposureSeconds} seconds</dd></div><div><dt>Starting point</dt><dd>{physical ? 'Dec +80° · consistent starting field' : 'Configured sky patch'}</dd></div></dl>}
-      </Panel><div className="vela-polar-baseline__next"><h3>{view.active ? 'What happens next' : 'Before you start'}</h3><p>{view.active ? 'After the third solve, the adjustment view will show your alignment error and the target reticle.' : physical ? 'Each attempt homes, then moves to a consistent starting field at Dec +80°. Prepare a clear movement corridor: after a small direction check, Vela makes two continuous westward RA rotations of roughly 54° at 1° per second. Allow up to 120° total westward travel and 1° on either side for the direction check.' : 'Start with the simulator’s large-error preset and clear camera. Keep its offsets unchanged until all three positions are measured.'}</p><p>{physical && !view.active ? 'Use sidereal tracking. Keep the mount’s adjustment knobs still until all three positions are measured. You can stop at any time.' : 'You can stop the measurement at any time.'}</p><Button size="large" tone={view.active ? 'neutral' : 'accent'} disabled={disabled || (!view.active && !view.enabled)} onClick={() => void command(view.active ? 'stop' : 'start')}>{view.active ? 'Stop measurement' : view.phase === 'setup' ? 'Start measurement' : 'Start again'}</Button></div>
-    </div> : <div className="vela-polar-layout">
-      <Panel className="vela-polar-readings"><div className="vela-polar-total"><span>Last measured error</span><strong>{angle(measurement.totalArcsec)}</strong></div><div className="vela-polar-directions" aria-label="Mount adjustment directions">
-        <div><span>Azimuth · horizontal</span><strong>{measurement.azimuthArcsec >= 0 ? '←' : '→'} {angle(measurement.azimuthArcsec)}</strong><span>{!view.active || offline ? 'Last correction: ' : 'Move '}{measurement.azimuthArcsec >= 0 ? 'left' : 'right'}</span></div><div><span>Altitude · vertical</span><strong>{measurement.altitudeArcsec >= 0 ? '↓' : '↑'} {angle(measurement.altitudeArcsec)}</strong><span>{!view.active || offline ? 'Last correction: ' : 'Move '}{measurement.altitudeArcsec >= 0 ? 'down' : 'up'}</span></div>
-      </div>{activityArea}</Panel>
-      <SolvedFrame measurement={measurement} />
-      <div className="vela-polar-actions"><p>{view.active ? physical ? 'Adjust the mount’s altitude and azimuth knobs. Use the reticle and remaining error to decide when you’re done.' : 'Adjust the simulator’s offsets. Use the reticle and remaining error to decide when you’re done.' : view.phase === 'finished' ? 'Your final measurement is kept here for reference.' : physical ? 'Prepare the rig and clear movement corridor again, then measure a fresh baseline.' : 'Reset or reposition the simulator, then measure a fresh baseline.'}</p>{view.active ? <div><Button size="large" disabled={disabled} onClick={() => void command('stop')}>Stop to reposition</Button><Button size="large" tone="accent" disabled={disabled} onClick={() => void command('finish')}>Finish alignment</Button></div> : <Button size="large" disabled={disabled || !view.enabled} onClick={() => void command('start')}>Measure again</Button>}</div>
-    </div>}
+    {baseline ? (
+      <div className="vela-polar-baseline">
+        <Panel className="vela-polar-baseline__summary">
+          <h2>{view.active ? 'Measuring your alignment' : view.phase === 'setup' ? 'Find your starting alignment' : 'Measurement stopped'}</h2>
+          <p>{view.active ? 'Keep the mount’s adjustment knobs still while Vela measures three positions.' : 'Vela will take and solve images at three positions, then show you how to adjust the mount.'}</p>
+          <ol className="vela-polar-points" aria-label="Three measurement positions">
+            {[1, 2, 3].map(point => {
+              const solved = point <= view.solvedPositions
+              const current = view.active && point === view.position
+              const state = solved ? 'done' : current ? 'current' : 'pending'
+              const status = solved ? 'Solved'
+                : !current ? 'Not measured'
+                : view.activity === 'homing' ? 'Preparing starting field…'
+                : view.activity === 'moving' ? 'Moving' : 'Measuring'
+              return <li key={point} data-state={state}>
+                <span>{solved ? '✓' : point}</span>
+                <strong>Position {point}</strong>
+                <small>{status}</small>
+              </li>
+            })}
+          </ol>
+          {view.active ? activityArea : (
+            <dl className="vela-polar-setup-facts">
+              <div>
+                <dt>Camera</dt>
+                <dd>{physical ? view.cameraName ?? 'No imaging camera configured' : 'Configured imaging camera'}</dd>
+              </div>
+              <div><dt>Exposure</dt><dd>{view.exposureSeconds} seconds</dd></div>
+              <div>
+                <dt>Starting point</dt>
+                <dd>{physical ? 'Dec +80° · consistent starting field' : 'Configured sky patch'}</dd>
+              </div>
+            </dl>
+          )}
+        </Panel>
+        <div className="vela-polar-baseline__next">
+          <h3>{view.active ? 'What happens next' : 'Before you start'}</h3>
+          <p>{nextInstruction}</p>
+          <p>{preparationInstruction}</p>
+          <Button
+            size="large"
+            tone={view.active ? 'neutral' : 'accent'}
+            disabled={disabled || (!view.active && !view.enabled)}
+            onClick={() => void command(view.active ? 'stop' : 'start')}
+          >
+            {view.active ? 'Stop measurement' : view.phase === 'setup' ? 'Start measurement' : 'Start again'}
+          </Button>
+        </div>
+      </div>
+    ) : (
+      <div className="vela-polar-layout">
+        <Panel className="vela-polar-readings">
+          <div className="vela-polar-total">
+            <span>Last measured error</span>
+            <strong>{angle(measurement.totalArcsec)}</strong>
+          </div>
+          <div className="vela-polar-directions" aria-label="Mount adjustment directions">
+            <div>
+              <span>Azimuth · horizontal</span>
+              <strong>{measurement.azimuthArcsec >= 0 ? '←' : '→'} {angle(measurement.azimuthArcsec)}</strong>
+              <span>{!view.active || offline ? 'Last correction: ' : 'Move '}{measurement.azimuthArcsec >= 0 ? 'left' : 'right'}</span>
+            </div>
+            <div>
+              <span>Altitude · vertical</span>
+              <strong>{measurement.altitudeArcsec >= 0 ? '↓' : '↑'} {angle(measurement.altitudeArcsec)}</strong>
+              <span>{!view.active || offline ? 'Last correction: ' : 'Move '}{measurement.altitudeArcsec >= 0 ? 'down' : 'up'}</span>
+            </div>
+          </div>
+          {activityArea}
+        </Panel>
+        <SolvedFrame measurement={measurement} />
+        <div className="vela-polar-actions">
+          <p>{adjustmentInstruction}</p>
+          {view.active ? (
+            <div>
+              <Button size="large" disabled={disabled} onClick={() => void command('stop')}>
+                Stop to reposition
+              </Button>
+              <Button size="large" tone="accent" disabled={disabled} onClick={() => void command('finish')}>
+                Finish alignment
+              </Button>
+            </div>
+          ) : (
+            <Button size="large" disabled={disabled || !view.enabled} onClick={() => void command('start')}>
+              Measure again
+            </Button>
+          )}
+        </div>
+      </div>
+    )}
     <footer className="vela-polar-prototype">{physical ? 'Physical-rig alignment trial · Camera images and plate solves' : 'Configured offline alignment model · Generated sky images, real plate solves · Physical-rig alignment is not yet validated.'}</footer>
   </section>
 }

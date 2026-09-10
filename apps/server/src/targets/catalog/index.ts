@@ -3,7 +3,7 @@ import type { CatalogTarget } from './types.js'
 export type { CatalogTarget } from './types.js'
 
 // Normalize catalog spacing and zero padding without conflating unrelated names.
-function searchKey(value: string): string {
+export function normalizeCatalogName(value: string): string {
   return value.toLowerCase().replace(/\s+/g, '').replace(/^(ngc|ic|m|b)0+(?=\d)/, '$1')
 }
 
@@ -16,7 +16,7 @@ const targets: readonly CatalogTarget[] = Object.freeze(catalogRows.map((row) =>
 const byId = new Map(targets.map((target) => [target.id, target]))
 const searchEntries = targets.map((target) => ({
   target,
-  keys: target.aliases.map(searchKey),
+  keys: target.aliases.map(normalizeCatalogName),
 }))
 
 export function listTargets(): readonly CatalogTarget[] {
@@ -32,7 +32,7 @@ export function searchTargets(query: string, limit = 50): readonly CatalogTarget
   if (!Number.isInteger(limit) || limit < 1 || limit > 200) {
     throw new RangeError('Target search limit must be an integer from 1 to 200')
   }
-  const key = searchKey(query)
+  const key = normalizeCatalogName(query)
   if (!key) return targets.slice(0, limit)
   const exact: CatalogTarget[] = []
   const partial: CatalogTarget[] = []

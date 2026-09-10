@@ -344,10 +344,18 @@
 .vela-navigation__pages a { display: flex; align-items: center; min-height: 44px; text-decoration: none; color: var(--vela-text-muted); border-bottom: 2px solid transparent; font-size: .85em; }
 .vela-navigation__pages a[aria-current] { color: var(--vela-text); border-color: var(--vela-accent); }
 .vela-navigation__pages a:hover { color: var(--vela-text); }
-.vela-navigation__activity { grid-column: 3; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 8px 10px; min-height: 36px; color: var(--vela-text); background: var(--vela-surface-raised); border: 1px solid var(--vela-line); border-radius: var(--vela-radius); font: inherit; font-size: .75em; cursor: pointer; white-space: nowrap; }
+.vela-navigation__activity { grid-column: 3; display: grid; align-items: center; justify-content: center; gap: 6px; min-width: 166px; text-align: left; text-decoration: none; padding: 8px 10px; min-height: 36px; color: var(--vela-text); background: var(--vela-surface-raised); border: 1px solid var(--vela-line); border-radius: var(--vela-radius); font: inherit; font-size: .75em; cursor: pointer; white-space: nowrap; }
 .vela-navigation__activity small { font: inherit; color: var(--vela-text-muted); }
 .vela-navigation__activity:hover { border-color: var(--vela-line-strong); }
 .vela-navigation__sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.vela-navigation__capture-summary { display: flex; justify-content: space-between; gap: 14px; }
+.vela-navigation__capture-summary > small { color: var(--vela-text-muted); font-size: .9em; font-variant-numeric: tabular-nums; }
+.vela-navigation__activity progress { display: block; appearance: none; width: 100%; height: 3px; border: 0; background: var(--vela-line-strong); border-radius: 2px; overflow: hidden; }
+.vela-navigation__activity progress::-webkit-progress-bar { background: var(--vela-line-strong); }
+.vela-navigation__activity progress::-webkit-progress-value { background: var(--vela-positive); }
+.vela-navigation__activity progress::-moz-progress-bar { background: var(--vela-positive); }
+.vela-navigation__capture-note { color: var(--vela-text-muted); font-size: .85em; }
+.vela-navigation__activity[data-interrupted] .vela-navigation__capture-summary > small { color: var(--vela-warning); }
 @container vela-navigation (max-width: 850px) {
   .vela-navigation__bar { grid-template-columns: minmax(0, 1fr) auto; gap: 0 12px; padding: 12px 16px 0; }
   .vela-navigation__pages { grid-row: 2; grid-column: 1 / -1; justify-content: flex-start; gap: 28px; padding-top: 8px; }
@@ -359,21 +367,8 @@
   .vela-navigation__brand span, .vela-navigation__divider { display: none; }
   .vela-navigation__context { gap: 8px; }
   .vela-navigation__rig select { max-width: 130px; font-size: .75em; }
-  .vela-navigation__activity { padding-inline: 7px; font-size: .65em; gap: 5px; }
+  .vela-navigation__activity { padding-inline: 7px; font-size: .65em; min-width: 0; }
   .vela-navigation__pages { gap: 24px; }
-}
-.vela-navigation__activity { display: grid; gap: 6px; min-width: 166px; text-align: left; }
-.vela-navigation__capture-summary { display: flex; justify-content: space-between; gap: 14px; }
-.vela-navigation__capture-summary > small { color: var(--vela-text-muted); font-size: .9em; font-variant-numeric: tabular-nums; }
-.vela-navigation__activity progress { display: block; appearance: none; width: 100%; height: 3px; border: 0; background: var(--vela-line-strong); border-radius: 2px; overflow: hidden; }
-.vela-navigation__activity progress::-webkit-progress-bar { background: var(--vela-line-strong); }
-.vela-navigation__activity progress::-webkit-progress-value { background: var(--vela-positive); }
-.vela-navigation__activity progress::-moz-progress-bar { background: var(--vela-positive); }
-.vela-navigation__capture-note { color: var(--vela-text-muted); font-size: .85em; }
-.vela-navigation__activity[data-interrupted] .vela-navigation__capture-summary > small { color: var(--vela-warning); }
-@container vela-navigation (max-width: 500px) {
-  .vela-navigation__activity { min-width: 0; }
   .vela-navigation__capture-summary { gap: 8px; }
 }
-.vela-navigation__activity { text-decoration: none; }
 .vela-navigation a:focus-visible, .vela-navigation select:focus-visible { outline: 2px solid var(--vela-focus); outline-offset: 3px; }

@@ -223,6 +223,15 @@ describe('physical alignment sweep', () => {
     await expect(fake.alignment.pointing(signal)).rejects.toThrow('geometry changed')
   })
 
+  it('accepts unchanged camera geometry regardless of property order', async () => {
+    const fake = observatory()
+    await fake.alignment.prepare(signal)
+    vi.mocked(fake.device.cameraGeometry).mockResolvedValue(
+      Object.fromEntries(Object.entries(fake.camera).reverse()) as typeof fake.camera,
+    )
+    await expect(fake.alignment.pointing(signal)).resolves.toBeDefined()
+  })
+
   it('rejects a delivered frame that differs from the calibrated camera geometry', async () => {
     const fake = observatory()
     await fake.alignment.prepare(signal)

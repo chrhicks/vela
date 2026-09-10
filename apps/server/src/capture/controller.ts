@@ -35,6 +35,12 @@ export class CaptureStoppedError extends Error {
   }
 }
 
+export interface CaptureRunOptions {
+  onSettled?: () => void
+  repeat?: boolean
+  saveFrames?: boolean
+}
+
 export function createCaptureController(
   settings: { rigId: string, rigName: string },
   now = Date.now,
@@ -113,7 +119,7 @@ export function createCaptureController(
     }
   }
 
-  async function start(exposureSeconds: number, camera: CaptureCamera, cameraName: string, onSettled?: () => void, repeat = false, saveFrames = false) {
+  async function start(exposureSeconds: number, camera: CaptureCamera, cameraName: string, { onSettled, repeat = false, saveFrames = false }: CaptureRunOptions = {}) {
     if (running) throw new Error('An exposure is already running')
     if (!Number.isFinite(exposureSeconds) || exposureSeconds <= 0) throw new Error('Exposure duration must be positive')
     cancellation = new AbortController()

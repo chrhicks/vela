@@ -19,9 +19,12 @@ it('exports correlated steps while a detached alignment is active and records ca
     }),
     move: async () => {}, rotateRightAscension: async () => {}, abort: async () => {},
   }
-  const alignment = createAlignmentController({ endpoint: 'http://simulator', cameraId: 'camera', telescopeId: 'mount',
-    executable: '/unused', catalogPath: '/unused', exposureSeconds: 1, fieldHeightDegrees: 3 }, hardware,
-    { solve: async () => { throw new Error('Capture is still pending') } })
+  const alignment = createAlignmentController({
+    mode: 'offline',
+    settings: { cameraId: 'camera', telescopeId: 'mount', exposureSeconds: 1, fieldHeightDegrees: 3 },
+    hardware,
+    solver: { solve: async () => { throw new Error('Capture is still pending') } },
+  })
   try {
     await trace.getTracer('test').startActiveSpan('command', async span => {
       await alignment.start('rig', 'Rig')
