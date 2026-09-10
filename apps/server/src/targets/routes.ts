@@ -7,7 +7,7 @@ import type { RigOperations } from '../rig/operations.js'
 import { inspectRigDetail, type RigDetailOptions } from '../rig/detail.js'
 import { createAstapSolver, type PlateSolver } from '../plate-solving/solver.js'
 import { createFramingController, mountSite, type FramingHardware } from './framing.js'
-import { getTarget, listTargets, type CatalogTarget } from './catalog/index.js'
+import { getTarget, listTargets, normalizeCatalogName, type CatalogTarget } from './catalog/index.js'
 import { skyPath, type Site } from './sky.js'
 import { registerTargetDiscovery } from './discovery-routes.js'
 
@@ -112,8 +112,8 @@ export function registerTargets(app: FastifyInstance, catalog: RigCatalog, opera
     const query = request.query.q ?? ''
     const offset = Number(request.query.offset ?? 0)
     if (query.length > 100 || !Number.isInteger(offset) || offset < 0 || offset > 15000) return reply.code(400).send({ error: 'Invalid target search' })
-    const key = query.toLowerCase().replace(/\s+/g, '').replace(/^(ngc|ic|m|b)0+(?=\d)/, '$1')
-    const matches = key ? listTargets().filter(target => [...target.aliases, target.type].some(value => value.toLowerCase().replace(/\s+/g, '').replace(/^(ngc|ic|m|b)0+(?=\d)/, '$1').includes(key)))
+    const key = normalizeCatalogName(query)
+    const matches = key ? listTargets().filter(target => [...target.aliases, target.type].some(value => normalizeCatalogName(value).includes(key)))
       : ['ngc6205', 'ngc6888', 'ngc0224', 'ngc7000', 'ic1805', 'ic1848', 'ngc2024', 'b033', 'ngc1976', 'ngc6992', 'ngc7293', 'ngc0869'].flatMap(id => getTarget(id) ?? [])
     const location = await siteView(rig)
     const view: TargetsView = { rigId: rig.id, rigName: rig.name, total: matches.length,

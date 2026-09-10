@@ -33,6 +33,25 @@ function fixedPointing(mount: FramingMount) {
   return fromMount({ raDegrees: mount.rightAscensionDegrees, decDegrees: mount.declinationDegrees }, mount.coordinateSystem, new Date(mount.observedAt), mountSite(mount))
 }
 
+interface FramingCheck {
+  actual: FramingView['actual']
+  pointing: TargetPosition | undefined
+  configuration: string | undefined
+}
+
+function isCheckCurrent(check: FramingCheck, mount: FramingMount, configuration: string, at: Date): boolean {
+  return !!check.actual && !!check.pointing
+    && check.configuration === configuration
+    && mount.tracking && !mount.slewing && !mount.parked
+    && at.getTime() - Date.parse(check.actual.capturedAt) < 15 * 60_000
+    && angularDistance(fixedPointing(mount), check.pointing) < 0.02
+}
+
+function isCenteringEligible(check: FramingCheck, mount: FramingMount, configuration: string, at: Date): boolean {
+  return isCheckCurrent(check, mount, configuration, at)
+    && !!check.actual && check.actual.offsetArcminutes > 0.5 && check.actual.offsetArcminutes <= 120
+}
+
 /** A single user-requested movement/exposure/solve. No durable run or retry loop. */
 export function createFramingController(now = () => new Date()) {
   let state: Pick<FramingView, 'phase' | 'active' | 'desired' | 'targetId' | 'actual' | 'error' | 'exposureSeconds'> = {
@@ -43,20 +62,23 @@ export function createFramingController(now = () => new Date()) {
   let checkedPointing: TargetPosition | undefined
   let checkedConfiguration: string | undefined
 
+  function checkSnapshot(): FramingCheck {
+    return { actual: state.actual, pointing: checkedPointing, configuration: checkedConfiguration }
+  }
+
   function checkCurrent(mount: FramingMount, configuration: string): boolean {
-    return !state.active && state.phase === 'checked' && !!state.actual && !!checkedPointing
-      && checkedConfiguration === configuration && mount.tracking && !mount.slewing && !mount.parked
-      && now().getTime() - Date.parse(state.actual.capturedAt) < 15 * 60_000
-      && angularDistance(fixedPointing(mount), checkedPointing) < 0.02
+    return !state.active && state.phase === 'checked'
+      && isCheckCurrent(checkSnapshot(), mount, configuration, now())
   }
 
   function canCenter(mount: FramingMount, configuration: string): boolean {
-    return checkCurrent(mount, configuration) && state.actual!.offsetArcminutes > 0.5 && state.actual!.offsetArcminutes <= 120
+    return !state.active && state.phase === 'checked'
+      && isCenteringEligible(checkSnapshot(), mount, configuration, now())
   }
 
   function start(input: { desired: TargetPosition, targetId: string, exposureSeconds: number, configuration: string, center?: boolean }, hardware: FramingHardware, solver: PlateSolver, release: () => void) {
     if (state.active) throw new Error('Framing is already active')
-    const previousActual = state.actual
+    const previousCheck = checkSnapshot()
     abort = new AbortController()
     const signal = abort.signal
     state = { ...state, actual: input.targetId === state.targetId ? state.actual : null,
@@ -69,11 +91,10 @@ export function createFramingController(now = () => new Date()) {
         let destination = input.desired
         if (input.center) {
           // Evaluate against the check snapshot before this operation became active.
-          if (!previousActual || !checkedPointing || checkedConfiguration !== input.configuration
-            || !mount.tracking || now().getTime() - Date.parse(previousActual.capturedAt) >= 15 * 60_000
-            || previousActual.offsetArcminutes <= 0.5 || previousActual.offsetArcminutes > 120
-            || angularDistance(fixedPointing(mount), checkedPointing) >= 0.02) throw new Error('The framing check is no longer current. Slew and check again before centering.')
-          destination = correctedPointing(fixedPointing(mount), previousActual, input.desired)
+          if (!isCenteringEligible(previousCheck, mount, input.configuration, now())) {
+            throw new Error('The framing check is no longer current. Slew and check again before centering.')
+          }
+          destination = correctedPointing(fixedPointing(mount), previousCheck.actual!, input.desired)
         }
         const driverPosition = toMount(destination, mount.coordinateSystem, now(), site)
         if (!mount.tracking) await hardware.tracking(true, signal)

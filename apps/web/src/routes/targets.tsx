@@ -64,6 +64,25 @@ function TargetComposition({ rigId, targetId }: { rigId: string, targetId: strin
     idle: 'Ready to frame', slewing: 'Slewing to composition', exposing: 'Taking test exposure', solving: 'Solving test exposure', checked: checked ? 'Framing checked' : 'Composition not checked', stopping: 'Stopping framing', stopped: 'Framing stopped', failed: 'Framing not confirmed',
   }[view.phase]
   const exposure = Number(seconds), focal = Number(focalLength)
+  async function startFraming() {
+    const accepted = await framing.start({ targetId, ...position, exposureSeconds: exposure })
+    if (accepted?.targetId === targetId
+      && accepted.desired?.raDegrees === position.raDegrees
+      && accepted.desired.decDegrees === position.decDegrees
+      && (accepted.active || accepted.phase === 'checked' && accepted.checkCurrent)) {
+      setAdjusting(false)
+    }
+  }
+
+  async function refreshFraming() {
+    const current = await framing.refresh()
+    if (current?.targetId === targetId
+      && current.desired?.raDegrees === position.raDegrees
+      && current.desired.decDegrees === position.decDegrees
+      && (current.active || current.phase === 'checked' && current.checkCurrent)) {
+      setAdjusting(false)
+    }
+  }
   return <>{back}
     <header className="vela-target-heading"><div><p>{view?.rigName ?? 'Observe'} / Targets</p><div className="vela-target-identity"><h1 ref={heading} tabIndex={-1}>{target.name}</h1><Badge>{target.catalog}</Badge></div></div></header>
     <div className="vela-target-layout">
@@ -75,7 +94,24 @@ function TargetComposition({ rigId, targetId }: { rigId: string, targetId: strin
         <Panel title="Your composition">
           <p className="vela-target-description">{target.kind}{target.sizeArcminutes !== null ? ` · ${target.sizeArcminutes}′ across` : ''}</p>
           <dl className="vela-target-details"><div><dt>Camera</dt><dd>{view?.camera?.name ?? 'Unavailable'}</dd></div><div><dt>Orientation</dt><dd>{actual ? `${actual.rotationDegrees.toFixed(1)}° last measured` : 'Assumed north-up · not measured'}</dd></div><div><dt>Center (J2000)</dt><dd>{position.raDegrees.toFixed(4)}°, {position.decDegrees.toFixed(4)}°</dd></div>{view?.camera && <div><dt>Field of view</dt><dd>{view.camera.fieldWidthDegrees.toFixed(2)}° × {view.camera.fieldHeightDegrees.toFixed(2)}°</dd></div>}</dl>
-          <details className="vela-target-settings" open={!view?.focalLengthMm}><summary>Optics settings</summary><Input label="Effective focal length (mm)" type="number" min="10" max="20000" value={focalLength} disabled={settingsLocked} onChange={e => setFocalLength(e.target.value)} /><Button disabled={settingsLocked || !view || !Number.isFinite(focal) || focal < 10 || focal > 20000} onClick={() => void framing.settings(focal)}>Save focal length</Button></details>
+          <details className="vela-target-settings" open={!view?.focalLengthMm}>
+            <summary>Optics settings</summary>
+            <Input
+              label="Effective focal length (mm)"
+              type="number"
+              min="10"
+              max="20000"
+              value={focalLength}
+              disabled={settingsLocked}
+              onChange={e => setFocalLength(e.target.value)}
+            />
+            <Button
+              disabled={settingsLocked || !view || !Number.isFinite(focal) || focal < 10 || focal > 20000}
+              onClick={() => void framing.settings(focal)}
+            >
+              Save focal length
+            </Button>
+          </details>
           <div className="vela-target-command">
             <strong role="status">{status}</strong>
             {view && <p>State checked {new Date(view.observedAt).toLocaleTimeString()}</p>}
@@ -85,19 +121,53 @@ function TargetComposition({ rigId, targetId }: { rigId: string, targetId: strin
             {view?.active && !matching && <p>A framing check for another target is active on this rig.</p>}
             {actual && !checked && <p>This is the last solved exposure. Run a new framing check before continuing to capture.</p>}
             {actual && <p>Last check offset: {actual.offsetArcminutes.toFixed(2)}′. Test exposure {new Date(actual.capturedAt).toLocaleTimeString()}.</p>}
-            {view?.active ? <Button disabled={!framing.canStop} onClick={() => void framing.stop()}>Stop framing</Button> : checked ? <>
-              <Button tone="accent" disabled={!framing.canStart || !view.canCenter} onClick={() => void framing.center()}>Center & recheck</Button><p>One measured pointing correction, followed by another test exposure.</p>
-              <Button disabled={pending} onClick={() => setAdjusting(true)}>Adjust composition</Button>
-              {!offline && !pending && !commandUnconfirmed && <Link className="vela-button vela-button--accent" to={`/rigs/${encodeURIComponent(rigId)}/observe/capture`}>Continue to capture →</Link>}
-            </> : <><Input label="Test exposure (seconds)" type="number" min="0.1" max="60" step="0.1" value={seconds} disabled={locked} onChange={e => setSeconds(e.target.value)} /><Button tone="accent" disabled={!framing.canStart || !Number.isFinite(exposure) || exposure < .1 || exposure > 60} onClick={async () => {
-              const accepted = await framing.start({ targetId, ...position, exposureSeconds: exposure })
-              if (accepted?.targetId === targetId && accepted.desired?.raDegrees === position.raDegrees && accepted.desired.decDegrees === position.decDegrees && (accepted.active || accepted.phase === 'checked' && accepted.checkCurrent)) setAdjusting(false)
-            }}>Slew & check</Button></>}
-            <Button tone="quiet" disabled={pending || framing.refreshing} onClick={async () => {
-              const current = await framing.refresh()
-              if (current?.targetId === targetId && current.desired?.raDegrees === position.raDegrees && current.desired.decDegrees === position.decDegrees
-                && (current.active || current.phase === 'checked' && current.checkCurrent)) setAdjusting(false)
-            }}>Check rig state</Button>
+            {view?.active ? (
+              <Button disabled={!framing.canStop} onClick={() => void framing.stop()}>
+                Stop framing
+              </Button>
+            ) : checked ? (
+              <>
+                <Button
+                  tone="accent"
+                  disabled={!framing.canStart || !view.canCenter}
+                  onClick={() => void framing.center()}
+                >
+                  Center & recheck
+                </Button>
+                <p>One measured pointing correction, followed by another test exposure.</p>
+                <Button disabled={pending} onClick={() => setAdjusting(true)}>
+                  Adjust composition
+                </Button>
+                {!offline && !pending && !commandUnconfirmed && (
+                  <Link className="vela-button vela-button--accent" to={`/rigs/${encodeURIComponent(rigId)}/observe/capture`}>
+                    Continue to capture →
+                  </Link>
+                )}
+              </>
+            ) : (
+              <>
+                <Input
+                  label="Test exposure (seconds)"
+                  type="number"
+                  min="0.1"
+                  max="60"
+                  step="0.1"
+                  value={seconds}
+                  disabled={locked}
+                  onChange={e => setSeconds(e.target.value)}
+                />
+                <Button
+                  tone="accent"
+                  disabled={!framing.canStart || !Number.isFinite(exposure) || exposure < .1 || exposure > 60}
+                  onClick={startFraming}
+                >
+                  Slew & check
+                </Button>
+              </>
+            )}
+            <Button tone="quiet" disabled={pending || framing.refreshing} onClick={refreshFraming}>
+              Check rig state
+            </Button>
           </div>
         </Panel>
       </aside>
