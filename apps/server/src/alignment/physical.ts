@@ -14,7 +14,8 @@ const difference = (a: number, b: number) => ((a - b + 540) % 360) - 180
 
 /** One explicitly prepared physical RA sweep. Never use coordinate slews here:
  * a pointing model may move DEC even when the requested declination is fixed. */
-export function createPhysicalAlignment(settings: PhysicalAlignmentSettings, acquisition: AlpacaAcquisition, device: AlpacaFraming) {
+export function createPhysicalAlignment(settings: PhysicalAlignmentSettings, acquisition: AlpacaAcquisition, device: AlpacaFraming,
+  settle: (signal: AbortSignal) => Promise<void> = signal => delay(2_000, undefined, { signal })) {
   let reference: AlpacaTelescopeStatus | undefined
   let geometry: AlpacaCameraGeometry | undefined
   let site: Site | undefined
@@ -39,7 +40,7 @@ export function createPhysicalAlignment(settings: PhysicalAlignmentSettings, acq
       }
       if (!allowMovement && (Math.abs(difference(current.rightAscensionDegrees, reference.rightAscensionDegrees)) > 0.02
         || Math.abs(current.declinationDegrees - reference.declinationDegrees) > 0.02)) {
-        throw new Error('The mount moved outside the alignment sweep. Stop and measure a new baseline.')
+        throw new Error(`Mount position changed after settling: RA ${difference(current.rightAscensionDegrees, reference.rightAscensionDegrees).toFixed(4)}°, DEC ${(current.declinationDegrees - reference.declinationDegrees).toFixed(4)}°. Measure a new baseline.`)
       }
     }
     return current
@@ -54,7 +55,16 @@ export function createPhysicalAlignment(settings: PhysicalAlignmentSettings, acq
     await device.home(settings.telescopeId, signal)
     const homed = await device.telescopeStatus(settings.telescopeId, signal)
     if (!homed.tracking) await device.setTracking(settings.telescopeId, true, signal)
+    // Home is a repeatable reset, but lies on the rotation axis. Establish an
+    // off-axis field before the RA-only baseline so the images have separation.
+    await device.slew({ telescopeId: settings.telescopeId, rightAscensionDegrees: homed.rightAscensionDegrees,
+      declinationDegrees: 80, coordinateSystem: homed.coordinateSystem }, signal)
+    await settle(signal)
     const current = await status(signal)
+    if (Math.abs(current.declinationDegrees - 80) > 1
+      || Math.abs(difference(current.rightAscensionDegrees, homed.rightAscensionDegrees)) > 1) {
+      throw new Error('The mount did not reach the off-pole alignment starting field')
+    }
     reference = current
     geometry = observed
     site = { latitudeDegrees: current.latitudeDegrees!, longitudeDegrees: current.longitudeDegrees!,
@@ -65,7 +75,7 @@ export function createPhysicalAlignment(settings: PhysicalAlignmentSettings, acq
   async function pointing(signal: AbortSignal) {
     await status(signal)
     // Stopped telemetry does not establish that vibration has settled.
-    await delay(2_000, undefined, { signal })
+    await settle(signal)
     const current = await status(signal)
     const observed = await device.cameraGeometry({ cameraId: settings.cameraId, expectedCameraName: settings.cameraName }, signal)
     if (JSON.stringify(observed) !== JSON.stringify(geometry)) throw new Error('Camera geometry changed. Measure a new baseline.')
@@ -80,6 +90,7 @@ export function createPhysicalAlignment(settings: PhysicalAlignmentSettings, acq
       // ASCOM leaves MoveAxis sign to the driver. Observe a half-degree probe
       // before choosing the sign for the westward sweep.
       await acquisition.move(settings.telescopeId, 0.5, 1, signal)
+      await settle(signal)
       current = await status(signal, true)
       const observed = difference(current.rightAscensionDegrees, start.rightAscensionDegrees)
       if (Math.abs(observed) < 0.1 || Math.abs(observed) > 1) throw new Error(`RA direction check expected 0.1–1° of movement; the mount reported ${observed.toFixed(3)}°`)
@@ -97,6 +108,7 @@ export function createPhysicalAlignment(settings: PhysicalAlignmentSettings, acq
       const degrees = Math.min(3, remaining)
       const before = current
       await acquisition.move(settings.telescopeId, westRate, degrees / 1.5, signal)
+      await settle(signal)
       current = await status(signal, true)
       const progress = -difference(current.rightAscensionDegrees, before.rightAscensionDegrees)
       console.info('Alignment RA step', { requestedDegrees: degrees, observedDegrees: progress,
