@@ -10,6 +10,7 @@ it('exports correlated steps while a detached alignment is active and records ca
   provider.register()
   let capturing!: () => void
   const pending = new Promise<void>(resolve => { capturing = resolve })
+
   const hardware: AlpacaAcquisition = {
     pointing: async () => ({ rightAscensionDegrees: 12, declinationDegrees: 60, siderealTimeDegrees: 0,
       latitudeDegrees: 40, tracking: true, coordinateSystem: 'j2000' }),
@@ -19,12 +20,14 @@ it('exports correlated steps while a detached alignment is active and records ca
     }),
     move: async () => {}, rotateRightAscension: async () => {}, abort: async () => {},
   }
+
   const alignment = createAlignmentController({
     mode: 'offline',
     settings: { cameraId: 'camera', telescopeId: 'mount', exposureSeconds: 1, fieldHeightDegrees: 3 },
     hardware,
     solver: { solve: async () => { throw new Error('Capture is still pending') } },
   })
+
   try {
     await trace.getTracer('test').startActiveSpan('command', async span => {
       await alignment.start('rig', 'Rig')

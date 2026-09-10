@@ -22,6 +22,7 @@ export function createTraceFileExporter(path: string, {
   if (![maxFileBytes, retainedFiles, maxPendingBytes].every(value => Number.isSafeInteger(value) && value > 0)) {
     throw new Error('Trace file limits must be positive integers')
   }
+
   const file = resolve(path)
   let pending = Promise.resolve()
   let pendingBytes = 0
@@ -34,6 +35,7 @@ export function createTraceFileExporter(path: string, {
   function report(error: Error) {
     if (reported) return
     reported = true
+
     // Diagnostics must never turn into a device-operation failure.
     try { onError(error) } catch {}
   }
@@ -47,31 +49,40 @@ export function createTraceFileExporter(path: string, {
       })
       initialized = true
     }
+
     let chunk = ''
+
     async function flushChunk() {
       if (!chunk) return
       await appendFile(file, chunk, { mode: 0o600 })
       chunk = ''
     }
+
     for (const line of lines) {
       const size = Buffer.byteLength(line)
+
       if (fileBytes + size > maxFileBytes) {
         await flushChunk()
+
         for (let index = retainedFiles - 1; index >= 1; index--) {
           if (index === retainedFiles - 1) await rm(`${file}.${index}`, { force: true })
+
           if (index > 1) await rename(`${file}.${index - 1}`, `${file}.${index}`).catch(error => {
             if (error.code !== 'ENOENT') throw error
           })
         }
+
         if (retainedFiles > 1) await rename(file, `${file}.1`).catch(error => {
           if (error.code !== 'ENOENT') throw error
         })
         else await rm(file, { force: true })
         fileBytes = 0
       }
+
       chunk += line
       fileBytes += size
     }
+
     await flushChunk()
   }
 
@@ -81,18 +92,25 @@ export function createTraceFileExporter(path: string, {
         report(error)
         callback({ code: ExportResultCode.FAILED, error })
       }
+
       if (closed || failed) return reject(failed ?? new Error('Trace exporter is closed'))
       let lines: string[]
+
       try { lines = spans.map(span => JSON.stringify(traceRecord(span)) + '\n') }
       catch (cause) { return reject(asError(cause)) }
+
       const bytes = lines.reduce((sum, line) => sum + Buffer.byteLength(line), 0)
+
       if (lines.some(line => Buffer.byteLength(line) > maxFileBytes)) return reject(new Error('Trace record exceeds file size limit'))
+
       if (pendingBytes + bytes > maxPendingBytes) return reject(new Error('Trace writer queue is full; spans were dropped'))
       pendingBytes += bytes
+
       const task = pending.then(async () => {
         if (failed) throw failed
         await write(lines)
       })
+
       pending = task.then(() => undefined, cause => {
         failed = asError(cause)
         report(failed)
@@ -101,6 +119,7 @@ export function createTraceFileExporter(path: string, {
         () => finish({ code: ExportResultCode.SUCCESS }),
         cause => finish({ code: ExportResultCode.FAILED, error: asError(cause) }),
       )
+
       function finish(result: ExportResult) {
         pendingBytes -= bytes
         callback(result)
@@ -114,11 +133,15 @@ export function createTraceFileExporter(path: string, {
   }
 }
 
-function asError(value: unknown): Error { return value instanceof Error ? value : new Error(String(value)) }
+function asError(cause: unknown): Error { return cause instanceof Error ? cause : new Error(String(cause)) }
+
 function unixNanoseconds(time: readonly [number, number]) { return (BigInt(time[0]) * 1_000_000_000n + BigInt(time[1])).toString() }
+
 function isoTime(time: readonly [number, number]) { return new Date(time[0] * 1000 + time[1] / 1e6).toISOString() }
+
 function traceRecord(span: ReadableSpan) {
   const identity = span.spanContext()
+
   return {
     type: 'span', name: span.name, traceId: identity.traceId, spanId: identity.spanId,
     parentSpanId: span.parentSpanContext?.spanId,
@@ -139,6 +162,7 @@ function traceRecord(span: ReadableSpan) {
 export function startTelemetry(path: string | undefined) {
   if (!path?.trim()) return { shutdown: async () => {}, forceFlush: async () => {} }
   const exporter = createTraceFileExporter(path)
+
   const provider = new NodeTracerProvider({
     resource: resourceFromAttributes({ 'service.name': 'vela-server', 'process.pid': process.pid }),
     spanLimits: { attributeCountLimit: 64, attributeValueLengthLimit: 1024, eventCountLimit: 64 },
@@ -146,11 +170,14 @@ export function startTelemetry(path: string | undefined) {
       scheduledDelayMillis: 1000, maxQueueSize: 2048, maxExportBatchSize: 128, exportTimeoutMillis: 2000,
     })],
   })
+
   provider.register()
+
   return {
     forceFlush: () => provider.forceFlush(),
     async shutdown() {
       let timeout: ReturnType<typeof setTimeout> | undefined
+
       try {
         await Promise.race([
           provider.shutdown(),

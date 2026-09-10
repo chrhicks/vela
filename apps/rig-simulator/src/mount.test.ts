@@ -5,6 +5,7 @@ const position: MountPosition = {
   latitudeDegrees: 40, altitudeErrorDegrees: 0, azimuthErrorDegrees: 0,
   raAxisDegrees: 30, declinationDegrees: 60, elapsedSeconds: 0, tracking: true,
 }
+
 const dot = (a: Vector, b: Vector) => a.reduce((sum, value, i) => sum + value * b[i]!, 0)
 
 function expectVector(actual: Vector, expected: Vector) {
@@ -25,6 +26,7 @@ describe('rig geometry', () => {
   it('preserves the rigid camera and its cone around a misaligned RA axis', () => {
     const setup = { ...position, altitudeErrorDegrees: 1, azimuthErrorDegrees: -2 }
     const axis = polarAxis(setup)
+
     for (const raAxisDegrees of [0, 20, 40]) {
       const pose = cameraPose({ ...setup, raAxisDegrees })
       expect(dot(pose.direction, axis)).toBeCloseTo(Math.sin(Math.PI / 3), 12)
@@ -33,6 +35,7 @@ describe('rig geometry', () => {
       expect(dot(pose.right, pose.up)).toBeCloseTo(0, 12)
       expect(dot(pose.right, pose.right)).toBeCloseTo(1, 12)
     }
+
     expect(cameraPose({ ...setup, raAxisDegrees: 40 }).up)
       .not.toEqual(cameraPose({ ...setup, raAxisDegrees: 0 }).up)
   })

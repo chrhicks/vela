@@ -27,21 +27,27 @@ export async function loadHomeView(
   }: HomeViewOptions = {},
 ): Promise<HomeView> {
   const records = await catalog.list()
+
   const rigs = await Promise.all(records.map(async (record) => {
     let devices: ReadonlyArray<ObservedRigDevice>
+
     try {
       devices = await createInventory(record).listDevices()
     } catch (error) {
       onUnavailable(record, error)
+
       return lastKnownRig(record, 'unreachable')
     }
 
     const inventory = observedInventory(devices, now)
     const match = await catalog.observe(record.endpoint, inventory)
+
     if (match.state !== 'known' || match.rigId !== record.id) {
       onConflict(record)
+
       return lastKnownRig(record, 'unknown')
     }
+
     return reachableRig(record, devices, inventory.observedAt)
   }))
 

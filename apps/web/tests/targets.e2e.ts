@@ -1,16 +1,23 @@
+import { z } from 'zod'
 import { expect, test } from '@playwright/test'
 import type { Route } from '@playwright/test'
 import type { FramingView, TargetView } from '@vela/model/web'
 import { readFileSync } from 'node:fs'
-const respond = (route: Route, body: unknown) => {
+
+const respond = <Body>(route: Route, body: Body) => {
   // Healthy framing fixtures represent a fresh observation on every response.
-  const response = body && typeof body === 'object' && 'phase' in body && 'observedAt' in body
+  const response = z.object({ phase: z.string(), observedAt: z.string() }).safeParse(body).success
     ? { ...body, observedAt: new Date().toISOString() } : body
+
   return route.fulfill({ contentType: 'application/json', body: JSON.stringify(response) })
 }
+
 const target: TargetView = { id: 'm31', name: 'Andromeda Galaxy', catalog: 'M31', kind: 'Galaxy', raDegrees: 10.6847, decDegrees: 41.269, sizeArcminutes: 178, thumbnailUrl: '/api/targets/m31/thumbnail', sky: null }
+
 const idle: FramingView = { rigId: 'rig-1', rigName: 'Test rig', enabled: true, unavailableReason: null, observedAt: new Date().toISOString(), focalLengthMm: 400, camera: { name: 'Test camera', width: 3000, height: 2000, fieldWidthDegrees: 3, fieldHeightDegrees: 2 }, phase: 'idle', active: false, desired: null, targetId: null, actual: null, error: null, exposureSeconds: 2, canCenter: false, checkCurrent: false }
+
 const allsky = readFileSync(new URL('./fixtures/survey-allsky.jpg', import.meta.url))
+
 const tile = readFileSync(new URL('./fixtures/survey-tile.jpg', import.meta.url))
 
 test('an untouched target and Reset frame send only the accepted slew fields', async ({ page }) => {
@@ -22,13 +29,16 @@ test('an untouched target and Reset frame send only the accepted slew fields', a
   await page.route('**/api/rigs/rig-1/framing/start', route => {
     const body = route.request().postDataJSON()
     submissions.push(body)
+
     if (Object.keys(body).sort().join(',') !== 'decDegrees,exposureSeconds,raDegrees,targetId') {
       return route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ error: 'Invalid framing command body' }) })
     }
+
     state = { ...state, targetId: body.targetId, desired: { raDegrees: body.raDegrees, decDegrees: body.decDegrees },
       phase: 'checked', checkCurrent: true, actual: { raDegrees: body.raDegrees, decDegrees: body.decDegrees,
         checkId: `check-${submissions.length}`, capturedAt: new Date().toISOString(), rotationDegrees: 0, offsetArcminutes: 0,
         corners: [{ raDegrees: 9, decDegrees: 40 }, { raDegrees: 11, decDegrees: 40 }, { raDegrees: 11, decDegrees: 42 }, { raDegrees: 9, decDegrees: 42 }] } }
+
     return respond(route, state)
   })
   await page.goto('/rigs/rig-1/observe/targets/m31')
@@ -48,6 +58,7 @@ test('catalog is paged and search updates use actual server results; missing sit
   await page.route('**/api/web/rigs/rig-1/target-discovery?*', route => {
     queries.push(route.request().url())
     const params = new URL(route.request().url()).searchParams
+
     return respond(route, { rigId: 'rig-1', rigName: 'Test rig', snapshotId: 'catalog-test', calculatedAt: new Date().toISOString(), status: 'site-unavailable', night: null, query: params.get('q') ?? '', category: params.get('category') ?? 'all', filter: params.get('filter') ?? 'all', offset: Number(params.get('offset')), pageSize: 24, targets: [{ ...target, category: 'galaxy', filterChoice: 'broadband', filterReason: 'Broadband preserves starlight.', opportunity: null }], total: 25, site: null, siteUnavailableReason: 'Mount site is unavailable.' })
   })
   await page.route('**/api/targets/*/thumbnail', route => route.abort())
@@ -67,7 +78,11 @@ test('ambiguous command is not repeated and requires explicit current state chec
   await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
   await page.route('**/api/web/rigs/rig-1/framing', route => respond(route, idle))
   await page.route('**/api/survey/**', route => route.abort())
-  await page.route('**/api/rigs/rig-1/framing/start', route => { commands++; return route.abort() })
+  await page.route('**/api/rigs/rig-1/framing/start', route => {
+    commands++
+
+    return route.abort()
+  })
   await page.goto('/rigs/rig-1/observe/targets/m31')
   await expect(page.getByRole('button', { name: 'Slew & check' })).toBeEnabled()
   await page.getByRole('button', { name: 'Slew & check' }).click()
@@ -133,8 +148,19 @@ test('checked framing offers one correction, active operations lock edits, and s
   await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
   await page.route('**/api/web/rigs/rig-1/framing', route => offline ? route.abort() : respond(route, state))
   await page.route('**/api/survey/**', route => route.abort())
-  await page.route('**/api/rigs/rig-1/framing/center', route => { expect(route.request().postDataJSON()).toEqual({ checkId: 'displayed-check' }); corrections++; state = { ...state, phase: 'slewing', active: true, canCenter: false, checkCurrent: false }; return respond(route, state) })
-  await page.route('**/api/rigs/rig-1/framing/stop', route => { stops++; state = { ...state, phase: 'stopped', active: false }; return respond(route, state) })
+  await page.route('**/api/rigs/rig-1/framing/center', route => {
+    expect(route.request().postDataJSON()).toEqual({ checkId: 'displayed-check' })
+    corrections++
+    state = { ...state, phase: 'slewing', active: true, canCenter: false, checkCurrent: false }
+
+    return respond(route, state)
+  })
+  await page.route('**/api/rigs/rig-1/framing/stop', route => {
+    stops++
+    state = { ...state, phase: 'stopped', active: false }
+
+    return respond(route, state)
+  })
   await page.goto('/rigs/rig-1/observe/targets/m31')
   await expect(page.getByRole('link', { name: 'Continue to capture' })).toBeVisible()
   await page.getByRole('button', { name: 'Center & recheck' }).click()
@@ -163,8 +189,10 @@ test('a rejected adjusted composition cannot inherit the prior framing check aft
   await page.route('**/api/rigs/rig-1/framing/start', route => {
     commands++
     submitted = route.request().postDataJSON()
+
     if (rejectStart) return route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ error: 'Camera identity changed before framing.' }) })
     state = { ...state, desired: submitted, phase: 'slewing', active: true, checkCurrent: false, observedAt: new Date().toISOString() }
+
     return respond(route, state)
   })
   await page.goto('/rigs/rig-1/observe/targets/m31')
@@ -203,6 +231,7 @@ test('an explicit read recovers a completed adjusted check after its command res
     commands++
     const input = route.request().postDataJSON()
     state = { ...state, desired: { raDegrees: input.raDegrees, decDegrees: input.decDegrees } }
+
     return route.abort()
   })
   await page.goto('/rigs/rig-1/observe/targets/m31')
@@ -225,9 +254,14 @@ for (const failureSource of ['command', 'poll'] as const) {
     await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
     await page.route('**/api/web/rigs/rig-1/framing', route => respond(route, { ...state, observedAt: new Date().toISOString() }))
     await page.route('**/api/survey/**', route => route.abort())
-    await page.route('**/api/rigs/rig-1/framing/stop', route => { state = failed; return respond(route, { ...state, observedAt: new Date().toISOString() }) })
+    await page.route('**/api/rigs/rig-1/framing/stop', route => {
+      state = failed
+
+      return respond(route, { ...state, observedAt: new Date().toISOString() })
+    })
     await page.goto('/rigs/rig-1/observe/targets/m31')
     await expect(page.getByRole('button', { name: 'Stop framing' })).toBeEnabled()
+
     if (failureSource === 'command') await page.getByRole('button', { name: 'Stop framing' }).click()
     else state = failed
     await expect(page.getByRole('alert').filter({ hasText: 'Telescope stop could not be confirmed' })).toBeVisible()
@@ -249,7 +283,9 @@ test('quiet polling leaves Check rig state enabled and an explicit check superse
   await page.route('**/api/survey/**', route => route.abort())
   await page.route('**/api/web/rigs/rig-1/framing', async route => {
     const read = armed ? ++reads : 0
+
     if (read === 1) await pollHeld
+
     if (read === 2) await checkHeld
     await respond(route, { ...idle, observedAt: new Date().toISOString() })
   })
@@ -272,6 +308,7 @@ test('Targets breadcrumb preserves search and results page through a detail relo
   const queries: string[] = []
   await page.route('**/api/web/rigs/rig-1/target-discovery?*', route => {
     queries.push(route.request().url())
+
     return respond(route, { rigId: 'rig-1', rigName: 'Test rig', snapshotId: 'breadcrumb-night', calculatedAt: '2026-09-08T02:00:00.000Z', status: 'site-unavailable', night: null, query: 'galaxy', category: 'all', filter: 'all', offset: 24, pageSize: 12, targets: [{ ...target, category: 'galaxy', filterChoice: 'broadband', filterReason: 'Broadband preserves starlight.', opportunity: null }], total: 49, site: null, siteUnavailableReason: 'Site unavailable' })
   })
   await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
@@ -298,7 +335,11 @@ test('failure recovery preserves local drag, zoom and nudges while device comman
   let offline = false
   await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
   await page.route('**/api/web/rigs/rig-1/framing', route => offline ? route.abort() : respond(route, state))
-  await page.route('**/api/rigs/rig-1/framing/*', route => { commands++; return route.abort() })
+  await page.route('**/api/rigs/rig-1/framing/*', route => {
+    commands++
+
+    return route.abort()
+  })
   await page.route('**/api/survey/dss2/**', route => route.request().url().endsWith('/properties') ? route.fulfill({ contentType: 'text/plain', body: 'dataproduct_type=image\nhips_order=9\nhips_tile_width=512\nhips_frame=equatorial\nhips_tile_format=jpeg\n' }) : route.fulfill({ contentType: 'image/jpeg', body: route.request().url().endsWith('Allsky.jpg') ? allsky : tile }))
   await page.goto('/rigs/rig-1/observe/targets/m31')
   const frame = page.getByRole('slider', { name: 'Camera frame position' })

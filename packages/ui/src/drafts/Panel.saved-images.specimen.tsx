@@ -13,12 +13,38 @@ import './Panel.saved-images.specimen.css'
 type Props = Record<string, string | number | boolean>
 
 function SavedImagesPreview({ props, onPropsChange }: { props: Props, onPropsChange?: (patch: Props) => void }) {
+  function pageTitle() {
+    switch (screen) {
+      case 'observe':
+        return 'Observe'
+      case 'capture':
+        return 'Capture'
+      case 'detail':
+        return 'Saved image'
+      default:
+        return 'Saved images'
+    }
+  }
+
+  function renderPageAction() {
+    switch (screen) {
+      case 'capture':
+        return <Button onClick={() => update({ screen: 'saved' })}>Saved images ({saved.length}) →</Button>
+      case 'observe':
+        return <Badge tone="positive">Connected</Badge>
+      default:
+        return <span className="vela-saved-count">{saved.length} {saved.length === 1 ? 'image' : 'images'}</span>
+    }
+  }
+
   const [local, setLocal] = useState(props)
   const values = onPropsChange ? props : local
+
   const update = useCallback((patch: Props) => {
     if (onPropsChange) onPropsChange(patch)
     else setLocal(current => ({ ...current, ...patch }))
   }, [onPropsChange])
+
   const screen = String(values.screen)
   const state = String(values.state)
   const busy = state === 'capturing'
@@ -41,6 +67,7 @@ function SavedImagesPreview({ props, onPropsChange }: { props: Props, onPropsCha
 
   useEffect(() => {
     if (!playing || !busy) return
+
     const timer = window.setTimeout(() => {
       const next = frame + 1
       const failed = Boolean(values.saveFrames) && Boolean(values.saveFailure)
@@ -56,8 +83,10 @@ function SavedImagesPreview({ props, onPropsChange }: { props: Props, onPropsCha
         saved: values.saveFrames && !failed ? saveList(next) : String(values.saved),
         state: failed ? 'save-error' : values.repeat ? 'capturing' : 'idle',
       })
+
       if (failed || !values.repeat) setPlaying(false)
     }, 3000)
+
     return () => window.clearTimeout(timer)
   }, [playing, busy, frame, seconds, values.saveFrames, values.saveFailure, values.repeat, values.saved, values.exposures, update])
 
@@ -69,6 +98,7 @@ function SavedImagesPreview({ props, onPropsChange }: { props: Props, onPropsCha
 
   useEffect(() => {
     const viewport = imageWindow.current
+
     if (!viewport || !zoomed) return
     viewport.scrollLeft = (1600 - viewport.clientWidth) / 2
     viewport.scrollTop = (1200 - viewport.clientHeight) / 2
@@ -97,11 +127,14 @@ function SavedImagesPreview({ props, onPropsChange }: { props: Props, onPropsCha
 
   function keepImage() {
     if (!hasImage || isSaved) return
+
     if (values.saveFailure) {
       setPlaying(false)
       update({ state: 'save-error' })
+
       return
     }
+
     update({ saved: saveList(frame), state: state === 'save-error' ? 'idle' : state })
     setNotice('Image saved with its original data and preview.')
   }
@@ -119,6 +152,7 @@ function SavedImagesPreview({ props, onPropsChange }: { props: Props, onPropsCha
   }
 
   const image = (id: number) => <CaptureRunExposure frame={id} conditions="clear" />
+
   const imageDetails = (id: number) => (
     <dl className="vela-saved-details">
       <div>
@@ -148,8 +182,8 @@ function SavedImagesPreview({ props, onPropsChange }: { props: Props, onPropsCha
     <header className="vela-capture-shell"><strong>Vela</strong><span>Offline rig</span><span>Observe</span></header>
     <main className="vela-capture-main">
       {screen !== 'observe' && <Button className="vela-capture-back" tone="quiet" size="small" onClick={() => update({ screen: screen === 'detail' ? 'saved' : 'observe' })}>← {screen === 'detail' ? 'Saved images' : 'Observe'}</Button>}
-      <header className="vela-capture-heading"><div><p>Offline rig</p><h1 ref={heading} tabIndex={-1}>{screen === 'observe' ? 'Observe' : screen === 'capture' ? 'Capture' : screen === 'detail' ? 'Saved image' : 'Saved images'}</h1></div>
-        {screen === 'capture' ? <Button onClick={() => update({ screen: 'saved' })}>Saved images ({saved.length}) →</Button> : screen === 'observe' ? <Badge tone="positive">Connected</Badge> : <span className="vela-saved-count">{saved.length} {saved.length === 1 ? 'image' : 'images'}</span>}
+      <header className="vela-capture-heading"><div><p>Offline rig</p><h1 ref={heading} tabIndex={-1}>{pageTitle()}</h1></div>
+        {renderPageAction()}
       </header>
       {screen === 'observe' && <>
         <p className="vela-capture-intro">{busy ? 'Your capture is running. You can browse saved images while it continues.' : 'Your rig is connected. What would you like to do?'}</p>
@@ -187,6 +221,7 @@ function SavedImagesPreview({ props, onPropsChange }: { props: Props, onPropsCha
           </Panel>
         ) : ['September 5, 2026', 'September 4, 2026'].map(date => {
           const group = saved.filter(id => details(id) === date).sort((a, b) => b - a)
+
           return group.length > 0 && (
             <section className="vela-saved-group" key={date}>
               <h2>

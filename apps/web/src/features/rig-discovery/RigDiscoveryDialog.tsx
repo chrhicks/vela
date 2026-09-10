@@ -66,6 +66,7 @@ export default function RigDiscoveryDialog({ open, onAdded, onDismiss }: Props) 
 
     try {
       const result = await discoverRigs(request, controller.signal)
+
       if (requestController.current === controller) {
         setDiscoveryState({ view: 'results', request, result, selected: null })
       }
@@ -109,6 +110,7 @@ export default function RigDiscoveryDialog({ open, onAdded, onDismiss }: Props) 
 
     const host = discoveryState.host.trim()
     const port = Number(discoveryState.port)
+
     if (!host || !Number.isInteger(port) || port < 1 || port > 65535) return
 
     void runDiscovery({ mode: 'manual', host, port })
@@ -178,6 +180,7 @@ export default function RigDiscoveryDialog({ open, onAdded, onDismiss }: Props) 
 
     try {
       await addRig(review.rigName.trim(), review.candidate.endpoint, controller.signal)
+
       if (requestController.current !== controller) return
 
       requestController.current = null
@@ -187,7 +190,7 @@ export default function RigDiscoveryDialog({ open, onAdded, onDismiss }: Props) 
         setDiscoveryState({
           ...review,
           adding: false,
-          error: addRigFailureMessage(error),
+          error: addRigFailureMessage(error instanceof AddRigError ? error : null),
         })
       }
     } finally {
@@ -341,7 +344,7 @@ function RequestFailure() {
   )
 }
 
-function addRigFailureMessage(error: unknown): string {
+function addRigFailureMessage(error: AddRigError | null): string {
   if (!(error instanceof AddRigError)) {
     return 'Vela could not reach the server to add this rig. Try again.'
   }

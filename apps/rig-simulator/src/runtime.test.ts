@@ -106,10 +106,12 @@ describe('coordinate slews and all-sky exposure snapshots', () => {
   it('prevents either camera exposing during motion and either exposure blocking motion', () => {
     const runtime = new SimulatorRuntime([], () => 0)
     runtime.slewTo(6, 0)
+
     for (const number of [0, 1]) expect(() => runtime.startExposure(1, true, number)).toThrow('Stop mount movement')
     expect(() => runtime.move(1)).toThrow('Stop coordinate slew')
     expect(() => runtime.slewTo(7, 0)).toThrow('Stop mount movement')
     runtime.stop()
+
     for (const number of [0, 1]) {
       runtime.startExposure(10, true, number)
       expect(() => runtime.slewTo(6, 0)).toThrow('exposure is in progress')
@@ -120,7 +122,13 @@ describe('coordinate slews and all-sky exposure snapshots', () => {
   it('loads stars at the actual snapshotted pose while reporting nominal coordinates', async () => {
     let time = 0
     const fields: { raDegrees: number; decDegrees: number; radiusDegrees: number }[] = []
-    const runtime = new SimulatorRuntime(async field => { fields.push(field); return [] }, () => time)
+
+    const runtime = new SimulatorRuntime(async field => {
+      fields.push(field)
+
+      return []
+    }, () => time)
+
     runtime.slewTo(18.3, -13.8)
     time = 10000
     runtime.startExposure(0, true)
@@ -147,10 +155,13 @@ describe('coordinate slews and all-sky exposure snapshots', () => {
   it('aborts a held catalog load and rejects the discarded frame even if the source ignores abort', async () => {
     let release!: (stars: readonly []) => void
     let signal: AbortSignal | undefined
+
     const runtime = new SimulatorRuntime((_field, inputSignal) => {
       signal = inputSignal
+
       return new Promise(resolve => { release = resolve })
     }, () => 0)
+
     runtime.startExposure(0, true)
     const pending = runtime.frame()
     runtime.reset('aligned')

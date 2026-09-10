@@ -4,12 +4,14 @@ import type { AlignmentView } from '@vela/model/web'
 for (const width of [1100, 390]) {
   test(`physical alignment preserves preparation and image provenance at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 1100 })
+
     const view: AlignmentView = {
       mode: 'physical', cameraName: 'ASI2600MC Pro', rigId: 'rig-1', rigName: 'Askar FRA 400',
       enabled: true, unavailableReason: null, phase: 'setup', activity: 'idle', active: false,
       position: 0, solvedPositions: 0, exposureSeconds: 3, exposureStartedAt: null,
       measuredAt: null, warning: null, error: null, measurement: null,
     }
+
     await page.route('**/api/web/rigs/rig-1/alignment', route => route.fulfill({ json: view }))
     await page.goto('/rigs/rig-1/observe/alignment')
     await expect(page.getByText('ASI2600MC Pro')).toBeVisible()
@@ -22,11 +24,14 @@ for (const width of [1100, 390]) {
     await page.evaluate(() => document.fonts.ready)
     const preparation = page.locator('.vela-polar-baseline__next p').last()
     await expect(preparation).toContainText('You can stop at any time.')
+
     const textBounds = await preparation.evaluate(element => {
       const range = document.createRange()
       range.selectNodeContents(element)
+
       return { textBottom: range.getBoundingClientRect().bottom, paragraphBottom: element.getBoundingClientRect().bottom }
     })
+
     expect(textBounds.textBottom).toBeLessThanOrEqual(textBounds.paragraphBottom)
     await page.screenshot({ path: `/tmp/alignment-app-setup-${width}.png`, fullPage: true })
 

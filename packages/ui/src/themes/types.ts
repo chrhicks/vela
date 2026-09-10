@@ -1,9 +1,13 @@
 export const RAMP_STEPS = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950] as const
 
 export type RampStep = (typeof RAMP_STEPS)[number]
+
 export type ThemeMode = 'light' | 'dark'
+
 export type FontStack = 'sans' | 'serif' | 'mono'
+
 export const RAMP_NAMES = ['neutral', 'accent', 'positive', 'warning', 'danger'] as const
+
 export type RampName = (typeof RAMP_NAMES)[number]
 
 export const SEMANTIC_TOKEN_KEYS = [
@@ -24,7 +28,9 @@ export const SEMANTIC_TOKEN_KEYS = [
 ] as const
 
 export type SemanticTokenKey = (typeof SEMANTIC_TOKEN_KEYS)[number]
+
 export type ReferenceToken = `${RampName}-${RampStep}`
+
 export type SemanticMapping = Record<SemanticTokenKey, ReferenceToken>
 
 export interface ThemeParameters {
@@ -100,4 +106,5 @@ export interface ComponentSpecimen {
     onPropsChange?: (patch: Record<string, string | number | boolean>) => void,
   ) => ReactNode
 }
+
 import type { ReactNode } from 'react'

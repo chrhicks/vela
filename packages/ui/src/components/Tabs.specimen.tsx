@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import type { ComponentSpecimen } from '../themes'
 import { Badge } from './Badge'
 import { Tabs } from './Tabs'
@@ -21,7 +22,7 @@ export const specimen: ComponentSpecimen = {
           { id: 'settings', label: 'Settings', content: <div className="vela-specimen-copy"><strong>Gain 100 · Offset 50</strong><p>Applied to the next exposure.</p></div> },
           { id: 'history', label: 'History', content: <div className="vela-specimen-copy"><strong>42 completed exposures</strong><p>Last frame completed 18 seconds ago.</p></div> },
         ]}
-        size={String(props.size) as 'small' | 'medium'}
+        size={z.enum(['small', 'medium']).parse(props.size)}
         onValueChange={(selected) => onPropsChange?.({ selected })}
         value={String(props.selected)}
       />

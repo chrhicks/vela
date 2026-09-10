@@ -1,4 +1,4 @@
-import Fastify from 'fastify'
+import Fastify, { type InjectOptions } from 'fastify'
 import { afterEach, expect, it, vi } from 'vitest'
 import type { AlpacaDeviceInspection } from '@vela/alpaca'
 import { createMemoryRigCatalog } from '../rig/catalog.js'
@@ -17,21 +17,25 @@ const record = {
     devices: [{ uniqueId: 'camera', kind: 'camera' as const, name: 'Simulator camera' }],
   },
 }
+
 const frame: CaptureFrame = { width: 2, height: 2, pixels: [0, 100, 400, 1000], capturedAt: '2026-09-05T16:00:00Z' }
-const cleanups: Array<() => Promise<unknown>> = []
+
+const cleanups: Array<() => Promise<void>> = []
+
 afterEach(async () => { await Promise.all(cleanups.splice(0).map(cleanup => cleanup())) })
 
 function deferred<T>() {
   let resolve!: (value: T) => void
-  let reject!: (error: unknown) => void
+  let reject!: (error: Error) => void
   const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no })
+
   return { promise, resolve, reject }
 }
 
 function setup(selection: { uniqueId: string, name: string } | null = record.imagingCamera) {
   const app = Fastify()
   const { imagingCamera: _, ...unselected } = record
-  const catalog = createMemoryRigCatalog([{ ...unselected, ...(selection ? { imagingCamera: selection } : {}) }])
+  const catalog = createMemoryRigCatalog([selection ? { ...unselected, imagingCamera: selection } : unselected])
   const operations = createRigOperations()
   const savedImages = createMemorySavedImageStore()
   let cameraId = 'camera'
@@ -42,11 +46,13 @@ function setup(selection: { uniqueId: string, name: string } | null = record.ima
   let inspectionGate: Promise<void> | undefined
   let inspections = 0
   const captures: Array<Parameters<CaptureCamera['capture']>[0] & ReturnType<typeof deferred<CaptureFrame>>> = []
+
   const capture = registerCapture(app, catalog, operations, {
     savedImages,
     createInspector: () => ({ async inspectDevices(): Promise<ReadonlyArray<AlpacaDeviceInspection>> {
       inspections++
       await inspectionGate
+
       return [{ providerDeviceId: cameraId, kind: 'camera', configuredName: 'Simulator camera', name: cameraName,
         connection: connected ? 'connected' : 'disconnected',
         telemetry: { availability: 'complete', values: { kind: 'camera', activity } },
@@ -54,21 +60,25 @@ function setup(selection: { uniqueId: string, name: string } | null = record.ima
     } }),
     createCamera: settings => {
       bindings.push(settings)
+
       return { capture(input) {
       const result = deferred<CaptureFrame>()
       captures.push({ ...input, ...result })
+
       return result.promise
     } }
     },
   })
+
   registerNavigation(app, catalog, capture)
   registerSavedImages(app, catalog, savedImages)
   cleanups.push(async () => {
     for (const capture of captures) capture.reject(new CaptureStoppedError())
     await app.close()
   })
-  const start = (body: unknown = { exposureSeconds: 10 }) => app.inject({ method: 'POST', url: '/api/rigs/sim/capture/start', payload: body as object })
+  const start = (body: InjectOptions['payload'] = { exposureSeconds: 10 }) => app.inject({ method: 'POST', url: '/api/rigs/sim/capture/start', payload: body })
   const get = () => app.inject({ method: 'GET', url: '/api/web/rigs/sim/capture' })
+
   return { app, catalog, operations, captures, start, get, bindings, savedImages,
     replaceCamera: (id: string, name: string) => {
       cameraId = id
@@ -83,9 +93,11 @@ function setup(selection: { uniqueId: string, name: string } | null = record.ima
 
 it('rejects malformed input before acquiring or operating a camera', async () => {
   const subject = setup()
+
   for (const body of [{}, { exposureSeconds: '10' }, { exposureSeconds: 0.09 }, { exposureSeconds: 601 }, { exposureSeconds: 1, gain: 0 }, { exposureSeconds: 1, repeat: 'true' }, { exposureSeconds: 1, repeat: null }, { exposureSeconds: 1, saveFrames: 'true' }, { exposureSeconds: 1, saveFrames: null }, []]) {
     expect((await subject.start(body)).statusCode).toBe(400)
   }
+
   expect(subject.inspections()).toBe(0)
   expect(subject.captures).toHaveLength(0)
   expect(subject.operations.owner('sim')).toBeUndefined()

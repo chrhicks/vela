@@ -1,3 +1,4 @@
+import type { ResponseFixture } from './internal/test-fixtures.js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   AlpacaProviderError,
@@ -5,9 +6,9 @@ import {
   type AlpacaDevice,
 } from './index.js'
 
-type RouteResult = unknown | Error
+type RouteResult = ResponseFixture | Error | Response
 
-function envelope(Value: unknown, ErrorNumber = 0, ErrorMessage = '') {
+function envelope(Value: ResponseFixture, ErrorNumber = 0, ErrorMessage = '') {
   return {
     Value,
     ClientTransactionID: 0,
@@ -21,7 +22,7 @@ function fakeFetch(
   routes: Record<string, RouteResult>,
   requests: string[] = [],
 ): typeof globalThis.fetch {
-  return (async (input) => {
+  return async (input) => {
     const url = new URL(String(input))
     requests.push(url.pathname)
     const result = routes[url.pathname]
@@ -39,7 +40,7 @@ function fakeFetch(
     }
 
     return Response.json(result)
-  }) as typeof globalThis.fetch
+  }
 }
 
 const configuredCamera = {
@@ -56,6 +57,7 @@ afterEach(() => {
 describe('createAlpacaProvider', () => {
   it('returns normalized devices without exposing wire fields', async () => {
     const requests: string[] = []
+
     const provider = createAlpacaProvider({
       baseUrl: 'http://alpaca.test/',
       fetch: fakeFetch({
@@ -184,23 +186,27 @@ describe('createAlpacaProvider', () => {
 
   it('times out a stalled management request', async () => {
     vi.useFakeTimers()
+
     const fetch = vi.fn((_input: RequestInfo | URL, init?: RequestInit) =>
       new Promise<Response>((_resolve, reject) => {
         init?.signal?.addEventListener('abort', () => reject(init.signal?.reason), {
           once: true,
         })
       }),
-    ) as typeof globalThis.fetch
+    )
+
     const provider = createAlpacaProvider({
       baseUrl: 'http://alpaca.test',
       fetch,
     })
 
     const request = provider.listDevices()
+
     const rejection = expect(request).rejects.toMatchObject({
       name: 'AlpacaProviderError',
       reason: 'transport',
     })
+
     await vi.advanceTimersByTimeAsync(3_000)
 
     await rejection

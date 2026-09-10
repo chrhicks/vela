@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import type { ComponentSpecimen } from '../themes'
 import { Button } from './Button'
 
@@ -15,7 +16,7 @@ export const specimen: ComponentSpecimen = {
   },
   defaultProps: { label: 'Start capture', tone: 'accent', size: 'medium', disabled: false },
   render: (props) => (
-    <Button disabled={Boolean(props.disabled)} size={String(props.size) as 'small' | 'medium' | 'large'} tone={String(props.tone) as 'neutral' | 'accent' | 'quiet'}>
+    <Button disabled={Boolean(props.disabled)} size={z.enum(['small', 'medium', 'large']).parse(props.size)} tone={z.enum(['neutral', 'accent', 'quiet']).parse(props.tone)}>
       {String(props.label)}
     </Button>
   ),

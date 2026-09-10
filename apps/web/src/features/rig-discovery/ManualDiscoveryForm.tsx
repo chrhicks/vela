@@ -1,6 +1,7 @@
 import { Input } from '@vela/ui'
 
 export const manualDiscoveryFormId = 'rig-discovery-manual-form'
+
 const manualDiscoveryHostErrorId = 'rig-discovery-manual-host-error'
 
 interface Props {

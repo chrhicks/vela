@@ -7,6 +7,7 @@ describe('observation response validation', () => {
     for (const state of ['available', 'complete', 'unavailable', 'in-progress'] as const) {
       expect(isRigObservationView(observation(state))).toBe(true)
     }
+
     expect(isRigObservationView({ ...observation(), connectionPreparation: { state: 'complete', capabilities: ['connect-devices'] } })).toBe(false)
     expect(isRigObservationView({ ...observation(), connectionPreparation: { state: 'available', capabilities: [] } })).toBe(false)
     expect(isRigObservationView({ ...observation(), rig: {} })).toBe(false)
@@ -14,6 +15,7 @@ describe('observation response validation', () => {
 
   it('accepts complete, failed, partial, reconciled and uncertain outcomes', () => {
     const base = { view: observation(), confirmedConnected: [device(0)], notAttempted: [device(2)] }
+
     for (const result of [
       { outcome: 'complete', command: 'completed', confirmedConnected: [device(0)], view: observation('complete') },
       { outcome: 'complete', command: 'not-needed', confirmedConnected: [], view: observation('complete') },
@@ -36,6 +38,7 @@ describe('observation response validation', () => {
 
   it('rejects conflicting variant fields even when they are null', () => {
     const base = { outcome: 'uncertain', view: observation(), confirmedConnected: [], notAttempted: [], uncertain: { ...device(1), reason: 'write-outcome-unknown' } }
+
     for (const field of ['failed', 'stoppedAfter']) {
       for (const value of [null, undefined, device(0)]) {
         expect(isConnectRigDevicesResult({ ...base, [field]: value })).toBe(false)
@@ -45,6 +48,7 @@ describe('observation response validation', () => {
 
   it('rejects malformed and contradictory operation evidence', () => {
     const valid = { outcome: 'partial', view: observation(), confirmedConnected: [device(0)], failed: { ...device(1), reason: 'rejected' }, notAttempted: [device(2)] }
+
     for (const patch of [
       { confirmedConnected: [] },
       { confirmedConnected: [device(0), device(0)] },

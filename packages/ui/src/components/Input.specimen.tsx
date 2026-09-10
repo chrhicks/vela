@@ -20,7 +20,7 @@ export const specimen: ComponentSpecimen = {
         disabled={Boolean(props.disabled)}
         invalid={Boolean(props.invalid)}
         label={String(props.label)}
-        message={Boolean(props.invalid) ? 'Enter a valid coordinate.' : 'J2000 equatorial coordinate'}
+        message={props.invalid ? 'Enter a valid coordinate.' : 'J2000 equatorial coordinate'}
         placeholder={String(props.placeholder)}
       />
     </div>

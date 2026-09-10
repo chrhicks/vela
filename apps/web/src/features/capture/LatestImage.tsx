@@ -16,6 +16,7 @@ export function useLoadedImage(image: CaptureImage | null, native = false) {
   const url = native ? image?.imageUrl : image?.fitImageUrl ?? image?.imageUrl
 
   type Request = { image: CaptureImage, url: string, native: boolean }
+
   const latest = useRef<Request | null>(null)
   const inFlight = useRef<{ cancel: () => void } | null>(null)
   const scope = useRef<string | undefined>(undefined)
@@ -29,6 +30,7 @@ export function useLoadedImage(image: CaptureImage | null, native = false) {
   useEffect(() => {
     // Native image URLs share a Rig-specific directory. Never keep a different Rig's image.
     const nextScope = image?.imageUrl.slice(0, image.imageUrl.lastIndexOf('/'))
+
     if (!image || nextScope !== scope.current) {
       inFlight.current?.cancel()
       inFlight.current = null
@@ -36,8 +38,10 @@ export function useLoadedImage(image: CaptureImage | null, native = false) {
       setLoading(false)
       setFailed(false)
     }
+
     scope.current = nextScope
     latest.current = image ? { image, url: url!, native } : null
+
     if (!latest.current || inFlight.current) return
 
     function load(frame: Request) {
@@ -46,13 +50,16 @@ export function useLoadedImage(image: CaptureImage | null, native = false) {
       let timer: number | undefined
       let timeout: number | undefined
       let candidate: HTMLImageElement | undefined
+
       function detach() {
         window.clearTimeout(timeout)
+
         if (candidate) {
           candidate.onload = null
           candidate.onerror = null
         }
       }
+
       inFlight.current = { cancel() {
         cancelled = true
         window.clearTimeout(timer)
@@ -65,8 +72,10 @@ export function useLoadedImage(image: CaptureImage | null, native = false) {
         if (cancelled) return
         detach()
         inFlight.current = null
+
         if (success) setLoaded({ image: frame.image, url: frame.url })
         const next = latest.current
+
         if (next && (next.image.id !== frame.image.id || next.url !== frame.url)) {
           // Complete useful work, then skip intermediate arrivals and load the newest.
           load(next)
@@ -75,22 +84,29 @@ export function useLoadedImage(image: CaptureImage | null, native = false) {
           setFailed(!success)
         }
       }
+
       function attemptLoad() {
         candidate = new Image()
         const current = candidate
+
         function failedAttempt() {
           detach()
+
           if (cancelled) return
+
           if (attempt < 2) timer = window.setTimeout(attemptLoad, ++attempt * 1500)
           else settled(false)
         }
+
         current.onload = () => settled(true)
         current.onerror = failedAttempt
         timeout = window.setTimeout(failedAttempt, frame.native ? 60_000 : 15_000)
         current.src = frame.url
       }
+
       attemptLoad()
     }
+
     load(latest.current)
     // Immutable IDs and URLs prevent telemetry polls restarting a request.
   }, [id, url, native])
@@ -128,11 +144,13 @@ export function LatestImage({ image, busy, interrupted, rigId, savedDetail = fal
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000)
+
     return () => window.clearInterval(timer)
   }, [])
 
   useLayoutEffect(() => {
     const viewport = imageWindow.current
+
     if (!viewport) return
     viewport.scrollLeft = nativeVisible && frame ? Math.max(0, (frame.width - viewport.clientWidth) / 2) : 0
     viewport.scrollTop = nativeVisible && frame ? Math.max(0, (frame.height - viewport.clientHeight) / 2) : 0
@@ -141,6 +159,7 @@ export function LatestImage({ image, busy, interrupted, rigId, savedDetail = fal
   const seconds = frame ? Math.max(0, Math.floor((now - Date.parse(frame.receivedAt)) / 1000)) : 0
   const age = seconds < 60 ? `${seconds} s ago` : seconds < 3600 ? `${Math.floor(seconds / 60)} min ago` : `${Math.floor(seconds / 3600)} h ago`
   const previous = busy || interrupted || (!!frame && frame.id !== image?.id)
+
   const frameSaved = !!frame && (frame.saved || (image?.id === frame.id && image.saved)
     || (retention.result?.image.id === frame.id && retention.result.status === 'saved'))
 
@@ -153,10 +172,7 @@ export function LatestImage({ image, busy, interrupted, rigId, savedDetail = fal
       </div>{savedDetail || frameSaved ? <Badge tone="positive">Saved</Badge> : rigId && <Button size="small" disabled={retention.pending} onClick={() => void retention.keep(frame)}>{retention.pending && retention.result?.image.id === frame.id ? 'Saving…' : 'Keep this image'}</Button>}</div>}
     </header>
     {retention.result && (retention.result.image.id !== frame?.id || retention.result.status === 'failed') && <div className="capture-image__retention" data-failed={retention.result.status === 'failed' || undefined} role="status">
-      {retention.result.status === 'saving' ? `Saving image from ${new Date(retention.result.image.capturedAt).toLocaleTimeString()}…`
-        : retention.result.status === 'saved' ? `Image from ${new Date(retention.result.image.capturedAt).toLocaleTimeString()} saved.`
-        : <><p>Image from {new Date(retention.result.image.capturedAt).toLocaleTimeString()}: {retention.result.error}</p>
-          {retention.result.retryable && <Button size="small" onClick={() => void retention.keep(retention.result!.image)}>Retry saving image</Button>}</>}
+      {retentionMessage(retention.result, retention.keep)}
     </div>}
     {loadingNative && <p className="capture-image__error" role="status">Loading full-resolution image… The fitted preview stays visible.</p>}
     {failed && <p className="capture-image__error" role="status">{zoomed && frame?.id === image?.id ? 'The full-resolution image could not be loaded. The fitted preview is kept below.' : `The latest image could not be loaded.${frame ? ' The previous exposure is kept below.' : ' No image is available to display.'}`}</p>}
@@ -189,24 +205,42 @@ export function LatestImage({ image, busy, interrupted, rigId, savedDetail = fal
 }
 
 type KeptFrame = Pick<CaptureImage, 'id' | 'capturedAt'>
+
 type KeepResult = { image: KeptFrame } & (
   | { status: 'saving' }
   | { status: 'saved' }
   | { status: 'failed', error: string, retryable: boolean }
 )
 
+function retentionMessage(result: KeepResult, keep: (image: KeptFrame) => Promise<void>) {
+  const time = new Date(result.image.capturedAt).toLocaleTimeString()
+
+  switch (result.status) {
+    case 'saving':
+      return `Saving image from ${time}…`
+    case 'saved':
+      return `Image from ${time} saved.`
+    case 'failed':
+      return <><p>Image from {time}: {result.error}</p>
+        {result.retryable && <Button size="small" onClick={() => void keep(result.image)}>Retry saving image</Button>}</>
+  }
+}
+
 // A save belongs to the selected image, not to the lifetime of its displayed pixels.
 function useImageRetention(rigId: string | undefined) {
   const [result, setResult] = useState<KeepResult | null>(null)
   const writing = useRef(false)
+
   async function keep(image: KeptFrame) {
     if (!rigId || writing.current) return
     writing.current = true
     setResult({ image, status: 'saving' })
+
     try {
-      const response = await api<unknown>(`rigs/${encodeURIComponent(rigId)}/capture/images/${encodeURIComponent(image.id)}/keep`, {
+      const response = await api(`rigs/${encodeURIComponent(rigId)}/capture/images/${encodeURIComponent(image.id)}/keep`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(30_000),
       })
+
       if (!isSavedImage(response, rigId) || response.id !== image.id) throw new Error('Invalid saved image response')
       setResult({ image, status: 'saved' })
     } catch (cause) {
@@ -219,5 +253,6 @@ function useImageRetention(rigId: string | undefined) {
       writing.current = false
     }
   }
+
   return { result, pending: result?.status === 'saving', keep }
 }

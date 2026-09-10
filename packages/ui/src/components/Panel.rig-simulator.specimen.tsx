@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import { useEffect, useState } from 'react'
 import type { ComponentSpecimen } from '../themes'
 import { Panel } from './Panel'
@@ -7,8 +8,10 @@ import { Input } from './Input'
 import './Panel.rig-simulator.specimen.css'
 
 const presets = { 'large-error': [480, -360], 'near-aligned': [12, -9], aligned: [0, 0] } as const
+
 function offset(value: number) {
   const absolute = Math.abs(value)
+
   return `${Math.floor(absolute / 60) ? `${Math.floor(absolute / 60)}′ ` : ''}${absolute % 60}″`
 }
 
@@ -16,7 +19,7 @@ function SimulatorPreview({ props, onPropsChange }: {
   props: Record<string, string | number | boolean>
   onPropsChange?: (patch: Record<string, string | number | boolean>) => void
 }) {
-  const initial = String(props.example ?? 'large-error') as keyof typeof presets
+  const initial = z.enum(['large-error', 'near-aligned', 'aligned']).catch('large-error').parse(props.example)
   const [example, setExample] = useState(initial)
   const [altitude, setAltitude] = useState<number>(presets[initial]?.[0] ?? 480)
   const [azimuth, setAzimuth] = useState<number>(presets[initial]?.[1] ?? -360)
@@ -43,13 +46,16 @@ function SimulatorPreview({ props, onPropsChange }: {
     setNotice('Starting position restored · camera clear')
     onPropsChange?.({ example, camera: 'clear' })
   }
+
   const nudge = (axis: 'altitude' | 'azimuth', sign: number) => {
     const change = Number(step) * sign
     const update = (value: number) => Math.max(-18000, Math.min(18000, value + change))
+
     if (axis === 'altitude') setAltitude(update)
     else setAzimuth(update)
     setNotice(`${axis === 'altitude' ? 'Altitude' : 'Azimuth'} adjusted · next exposure uses this position`)
   }
+
   const valid = [draftAltitude, draftAzimuth].every(value => value.trim() !== '' && Number.isInteger(Number(value)) && Math.abs(Number(value)) <= 18000)
 
   return (
@@ -82,6 +88,7 @@ function SimulatorPreview({ props, onPropsChange }: {
               const fields = new FormData(event.currentTarget)
               const alt = Number(fields.get('altitude'))
               const az = Number(fields.get('azimuth'))
+
               if (![alt, az].every(value => Number.isInteger(value) && Math.abs(value) <= 18000)) return
               setAltitude(alt)
               setAzimuth(az)
@@ -102,7 +109,7 @@ function SimulatorPreview({ props, onPropsChange }: {
             }}>{covered ? 'Clear the camera' : 'Obscure the camera'}</Button>
           </Panel>
           <Panel title="Start again" description="Return to a known setup for another attempt.">
-            <Select label="Starting position" value={example} onChange={event => setExample(event.target.value as keyof typeof presets)} options={[
+            <Select label="Starting position" value={example} onChange={event => setExample(z.enum(['large-error', 'near-aligned', 'aligned']).parse(event.target.value))} options={[
               { value: 'large-error', label: 'Large error' }, { value: 'near-aligned', label: 'Nearly aligned' }, { value: 'aligned', label: 'Aligned' },
             ]} />
             <p className="vela-sim-note">Reset restores these offsets and clears the camera. Start a fresh alignment measurement in Vela afterward.</p>

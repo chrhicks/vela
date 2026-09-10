@@ -61,6 +61,7 @@ export function createRigDeviceInventory(
   options: RigDeviceInventoryOptions = {},
 ): RigDeviceInventory {
   const now = options.now ?? (() => new Date())
+
   const provider = options.provider ?? createAlpacaProvider({
     baseUrl: `http://${rig.endpoint.host}:${rig.endpoint.port}`,
   })
@@ -69,6 +70,7 @@ export function createRigDeviceInventory(
     async listDevices() {
       const devices = await provider.listDevices()
       const observedAt = now()
+
       return devices.map((device) => toObservedRigDevice(rig, device, observedAt))
     },
   }

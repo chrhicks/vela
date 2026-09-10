@@ -7,9 +7,11 @@ export const configuredDevice = Schema.Struct({
   DeviceNumber: Schema.Number,
   UniqueID: Schema.optionalKey(Schema.String),
 })
+
 export type ConfiguredDevice = typeof configuredDevice.Type
 
 export const configuredDevicesResponse = alpacaResponse(Schema.Array(configuredDevice))
+
 export type ConfiguredDevicesResponse = typeof configuredDevicesResponse.Type
 
 export const serverDescription = Schema.Struct({
@@ -18,4 +20,5 @@ export const serverDescription = Schema.Struct({
   ManufacturerVersion: Schema.optionalKey(Schema.String),
   Location: Schema.optionalKey(Schema.String),
 })
+
 export type ServerDescription = typeof serverDescription.Type

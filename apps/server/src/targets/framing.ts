@@ -25,8 +25,10 @@ export interface FramingHardware {
 
 export function mountSite(mount: FramingMount): Site {
   if (mount.latitudeDegrees === undefined || mount.longitudeDegrees === undefined) throw new Error('The mount has not supplied an observing location.')
-  return { latitudeDegrees: mount.latitudeDegrees, longitudeDegrees: mount.longitudeDegrees,
-    ...(mount.elevationMeters === undefined ? {} : { elevationMeters: mount.elevationMeters }) }
+
+  const site = { latitudeDegrees: mount.latitudeDegrees, longitudeDegrees: mount.longitudeDegrees }
+
+  return mount.elevationMeters === undefined ? site : { ...site, elevationMeters: mount.elevationMeters }
 }
 
 function fixedPointing(mount: FramingMount) {
@@ -57,6 +59,7 @@ export function createFramingController(now = () => new Date()) {
   let state: Pick<FramingView, 'phase' | 'active' | 'desired' | 'targetId' | 'actual' | 'error' | 'exposureSeconds'> = {
     phase: 'idle', active: false, desired: null, targetId: null, actual: null, error: null, exposureSeconds: 2,
   }
+
   let abort: AbortController | undefined
   let pending: Promise<void> | undefined
   let checkedPointing: TargetPosition | undefined
@@ -86,21 +89,27 @@ export function createFramingController(now = () => new Date()) {
     pending = (async () => {
       try {
         const mount = await hardware.status(signal)
+
         if (mount.parked || mount.slewing) throw new Error(mount.parked ? 'Unpark the mount before framing.' : 'The mount is already moving.')
         const site = mountSite(mount)
         let destination = input.desired
+
         if (input.center) {
           // Evaluate against the check snapshot before this operation became active.
           if (!isCenteringEligible(previousCheck, mount, input.configuration, now())) {
             throw new Error('The framing check is no longer current. Slew and check again before centering.')
           }
+
           destination = correctedPointing(fixedPointing(mount), previousCheck.actual!, input.desired)
         }
+
         const driverPosition = toMount(destination, mount.coordinateSystem, now(), site)
+
         if (!mount.tracking) await hardware.tracking(true, signal)
         await hardware.slew(driverPosition, mount.coordinateSystem, signal)
         signal.throwIfAborted()
         const landed = await hardware.status(signal)
+
         if (landed.slewing || !landed.tracking) throw new Error('The mount has not confirmed stopped movement with tracking enabled.')
         state = { ...state, phase: 'exposing' }
         const frame = await hardware.capture(input.exposureSeconds, signal)
@@ -108,8 +117,10 @@ export function createFramingController(now = () => new Date()) {
         state = { ...state, phase: 'solving' }
         const solved = await solver.solve(frame, input.desired, signal)
         signal.throwIfAborted()
+
         if (solved.status !== 'solved') throw new Error('The test exposure could not be plate solved. Check the image, focus, exposure and sky conditions before trying again.')
         const finalMount = await hardware.status(signal)
+
         if (finalMount.slewing || !finalMount.tracking || angularDistance(fixedPointing(finalMount), fixedPointing(landed)) >= 0.02) throw new Error('The mount changed during the framing check. Its current frame is unconfirmed.')
         checkedPointing = fixedPointing(finalMount)
         checkedConfiguration = input.configuration
@@ -127,6 +138,7 @@ export function createFramingController(now = () => new Date()) {
         release()
       }
     })()
+
     return structuredClone(state)
   }
 
@@ -137,6 +149,7 @@ export function createFramingController(now = () => new Date()) {
         state = { ...state, phase: 'stopping' }
         abort?.abort(new DOMException('Framing stopped', 'AbortError'))
       }
+
       await pending
     },
   }
@@ -149,15 +162,19 @@ export function correctedPointing(mount: TargetPosition, actual: TargetPosition,
   const toVector = (p: TargetPosition) => {
     const ra = p.raDegrees * Math.PI / 180
     const dec = p.decDegrees * Math.PI / 180
+
     return [Math.cos(dec) * Math.cos(ra), Math.cos(dec) * Math.sin(ra), Math.sin(dec)]
   }
+
   const cross = (a: number[], b: number[]) => [a[1]! * b[2]! - a[2]! * b[1]!, a[2]! * b[0]! - a[0]! * b[2]!, a[0]! * b[1]! - a[1]! * b[0]!]
   const a = toVector(actual), b = toVector(desired), point = toVector(mount)
   const axis = cross(a, b)
   const cosine = a.reduce((sum, v, i) => sum + v * b[i]!, 0)
+
   if (cosine < 0.99) throw new Error('The measured pointing offset is too large for a centering correction.')
   const first = cross(axis, point), second = cross(axis, first)
   const corrected = point.map((v, i) => v + first[i]! + second[i]! / (1 + cosine))
+
   return { raDegrees: (Math.atan2(corrected[1]!, corrected[0]!) * 180 / Math.PI + 360) % 360,
     decDegrees: Math.atan2(corrected[2]!, Math.hypot(corrected[0]!, corrected[1]!)) * 180 / Math.PI }
 }

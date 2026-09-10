@@ -4,6 +4,7 @@ import { api, ApiError } from '../../lib/api'
 import { isImagingCameraView } from './validation'
 
 type Choice = NonNullable<ImagingCameraView['selected']>
+
 export function useImagingCamera(rigId: string) {
   const [view, setView] = useState<ImagingCameraView | null>(null)
   const [offline, setOffline] = useState(false)
@@ -21,6 +22,7 @@ export function useImagingCamera(rigId: string) {
     setView(next)
     setOffline(false)
     const choice = uncertainChoice.current
+
     if (choice && next.selected?.id === choice.id && next.selected.name === choice.name) {
       uncertainChoice.current = null
       setUnconfirmed(false)
@@ -39,15 +41,19 @@ export function useImagingCamera(rigId: string) {
       request.current = null
       generation.current++
     }
+
     if (!alive.current || request.current) return
     const controller = new AbortController()
     const current = generation.current
     request.current = controller
+
     try {
-      const next = await api<unknown>(`web/rigs/${encodeURIComponent(rigId)}/imaging-camera`, {
+      const next = await api(`web/rigs/${encodeURIComponent(rigId)}/imaging-camera`, {
         signal: AbortSignal.any([controller.signal, AbortSignal.timeout(5000)]),
       })
+
       if (!isImagingCameraView(next, rigId)) throw new Error('Invalid camera response')
+
       if (alive.current && generation.current === current) accept(next, checked)
     } catch {
       if (alive.current && generation.current === current) setOffline(true)
@@ -60,13 +66,18 @@ export function useImagingCamera(rigId: string) {
     alive.current = true
     let disposed = false
     let timer: ReturnType<typeof setTimeout>
+
     async function poll() {
       if (!document.hidden) await read()
+
       if (!disposed) timer = setTimeout(poll, 2000)
     }
+
     const visible = () => { if (!document.hidden) void read() }
+
     document.addEventListener('visibilitychange', visible)
     void poll()
+
     return () => {
       disposed = true
       alive.current = false
@@ -81,6 +92,7 @@ export function useImagingCamera(rigId: string) {
 
   async function save(choice: Choice) {
     if (!alive.current || writing.current || uncertainChoice.current || offline || !view?.editable) return
+
     if (!view.cameras.some(camera => camera.id === choice.id && camera.name === choice.name)) return
     request.current?.abort()
     const controller = new AbortController()
@@ -89,17 +101,21 @@ export function useImagingCamera(rigId: string) {
     writing.current = true
     setPending(true)
     setError(null)
+
     try {
-      const next = await api<unknown>(`rigs/${encodeURIComponent(rigId)}/imaging-camera`, {
+      const next = await api(`rigs/${encodeURIComponent(rigId)}/imaging-camera`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(choice),
         signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]),
       })
+
       if (!isImagingCameraView(next, rigId) || next.selected?.id !== choice.id || next.selected.name !== choice.name) throw new Error('Unconfirmed selection')
+
       if (!alive.current || generation.current !== current) return
       accept(next)
       setConfirmedSaves(count => count + 1)
     } catch (cause) {
       if (!alive.current || generation.current !== current) return
+
       if (cause instanceof ApiError && [400, 404, 409].includes(cause.status)) {
         setError('The camera choice was not saved. Check current camera state and select it again.')
       } else {
@@ -111,6 +127,7 @@ export function useImagingCamera(rigId: string) {
       if (request.current === controller) {
         request.current = null
         writing.current = false
+
         if (alive.current && generation.current === current) {
           setPending(false)
           void read()
@@ -118,5 +135,6 @@ export function useImagingCamera(rigId: string) {
       }
     }
   }
+
   return { view, offline, pending, error, unconfirmed, confirmedSaves, save, refresh: () => read(true) }
 }

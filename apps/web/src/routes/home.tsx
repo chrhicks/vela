@@ -72,6 +72,7 @@ export function Home() {
 
 function RigCard({ rig }: { readonly rig: RigView }) {
   const reachability = reachabilityBadge[rig.reachability]
+
   const connectionState = rig.connections.connected === rig.connections.total
     ? 'complete'
     : 'attention'
@@ -102,11 +103,15 @@ function RigCard({ rig }: { readonly rig: RigView }) {
 
 function rigDescription(rig: RigView): string {
   const { disconnected, total, unavailable } = rig.connections
+
   if (rig.reachability !== 'reachable' && rig.lastSeenAt) {
     return `${total} ${total === 1 ? 'device' : 'devices'} · Last seen ${formatDateTime(rig.lastSeenAt)}`
   }
+
   if (disconnected > 0) return `${disconnected} disconnected`
+
   if (unavailable > 0) return `${unavailable} unavailable`
+
   return `${total} ${total === 1 ? 'device' : 'devices'} ready to inspect`
 }
 

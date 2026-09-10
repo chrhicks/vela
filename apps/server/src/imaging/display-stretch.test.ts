@@ -6,6 +6,7 @@ import { createDisplayStretch } from './display-stretch.js'
 // quantization or interpolation before the final rounding to a display byte.
 function originalStretch(sample: number, blackPoint: number, ceiling: number) {
   const value = Math.max(0, (sample - blackPoint) / (ceiling - blackPoint))
+
   return Math.min(255, Math.round(255 * Math.asinh(value * 10) / Math.asinh(10)))
 }
 
@@ -24,12 +25,14 @@ describe('display stretch', () => {
   it('preserves fractional border averages, arbitrary fractions, clipping, and signed acquisition extremes', async () => {
     const blackPoint = -3.13, ceiling = 2048.19
     const stretch = await createDisplayStretch(blackPoint, ceiling)
+
     const samples = [
       -2147483648, -70001, -4, blackPoint - 0.001, blackPoint, blackPoint + 0.001,
       0.01, 0.1, 0.3, 0.7, 1 / 3, 2 / 3, 11 / 3, 6553 / 3,
       10.123456789, 1023.999999, ceiling - 0.001, ceiling, ceiling + 0.001,
       65536, 70003, 2147483647,
     ]
+
     // Every third-step border average in the visible range, including values
     // between table entries, must retain the original calculation.
     for (let numerator = -12; numerator < 6145; numerator++) samples.push(numerator / 3)
@@ -48,10 +51,13 @@ describe('display stretch', () => {
 
   it('allows other work to run while preparing a full sensor range', async () => {
     let finished = false
+
     const preparation = createDisplayStretch(0, 65535).then(stretch => {
       finished = true
+
       return stretch
     })
+
     await setImmediate()
     const finishedBeforeOtherWork = finished
     const stretch = await preparation

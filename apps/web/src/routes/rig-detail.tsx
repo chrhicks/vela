@@ -32,6 +32,7 @@ export function RigDetail() {
 
     setForgetting(true)
     setForgetError(undefined)
+
     try {
       await forgetRig(view.id)
       setForgetOpen(false)
@@ -246,24 +247,32 @@ function Notice({
 
 function rigStatePresentation(view: RigDetailView, interrupted: boolean) {
   if (interrupted) return { label: 'Updates interrupted', tone: 'warning' as const }
+
   if (view.state === 'offline') return { label: 'Offline', tone: 'danger' as const }
+
   if (view.state === 'needs-attention') {
     return { label: 'Needs attention', tone: 'warning' as const }
   }
+
   return { label: 'Reachable', tone: 'positive' as const }
 }
 
 function connectionSummary(view: RigDetailView): string {
   const { connected, disconnected, total, unavailable } = view.connections
   const parts = [`${connected} of ${total} ${total === 1 ? 'device' : 'devices'} connected`]
+
   if (disconnected > 0) parts.push(`${disconnected} disconnected`)
+
   if (unavailable > 0) parts.push(`${unavailable} unavailable`)
+
   return parts.join(' · ')
 }
 
 function freshnessLabel(view: RigDetailView, interrupted: boolean): string {
   const age = formatAge(view.refreshedAt)
+
   if (interrupted) return `Last updated ${age}`
+
   return `Updated ${age}`
 }
 
@@ -271,11 +280,14 @@ function orderDevices(
   devices: ReadonlyArray<RigDeviceDetailView>,
 ): ReadonlyArray<RigDeviceDetailView> {
   const ordered: RigDeviceDetailView[] = []
+
   for (const kind of kindOrder) {
     ordered.push(...devices.filter((device) => device.kind === kind))
   }
+
   ordered.push(...devices.filter((device) =>
     !kindOrder.some((kind) => kind === device.kind)))
+
   return ordered
 }
 
@@ -300,11 +312,16 @@ function formatDateTime(value: string): string {
 
 function formatAge(value: string): string {
   const seconds = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 1_000))
+
   if (seconds < 5) return 'just now'
+
   if (seconds < 60) return `${seconds} seconds ago`
   const minutes = Math.floor(seconds / 60)
+
   if (minutes < 60) return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'} ago`
   const hours = Math.floor(minutes / 60)
+
   if (hours < 24) return `${hours} ${hours === 1 ? 'hour' : 'hours'} ago`
+
   return formatDateTime(value)
 }

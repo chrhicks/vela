@@ -7,12 +7,28 @@ import { Select } from './Select'
 import './Panel.imaging-camera.specimen.css'
 
 type Props = Record<string, string | number | boolean>
+
 const cameras = [
   { value: 'main', label: 'ZWO ASI2600MC Pro · ASI Camera (1)' },
   { value: 'guide', label: 'ZWO ASI220MM Mini · ASI Camera (2)' },
 ]
 
 function ImagingCameraPreview({ props, onPropsChange }: { props: Props, onPropsChange?: (patch: Props) => void }) {
+  function cameraNotice() {
+    switch (state) {
+      case 'offline':
+        return 'Rig updates are interrupted. The saved camera is remembered; reconnect to check or change it.'
+      case 'missing':
+        return 'The saved camera is not in the rig’s current device list. Choose a camera or check its connection to the server.'
+      case 'changed':
+        return `${slot} now reports a different camera. Check the driver setup, then confirm which camera to use.`
+      case 'busy':
+        return 'An exposure is in progress. You can change the imaging camera when it finishes.'
+      default:
+        return ''
+    }
+  }
+
   const [local, setLocal] = useState(props)
   const values = onPropsChange ? props : local
   const update = (patch: Props) => onPropsChange ? onPropsChange(patch) : setLocal(current => ({ ...current, ...patch }))
@@ -26,10 +42,8 @@ function ImagingCameraPreview({ props, onPropsChange }: { props: Props, onPropsC
   const slot = saved === 'guide' ? 'ASI Camera (2)' : 'ASI Camera (1)'
   const selected = choice || (saved === 'none' ? '' : saved)
   const choices = state === 'missing' ? cameras.filter(camera => camera.value !== saved) : cameras
-  const notice = state === 'offline' ? 'Rig updates are interrupted. The saved camera is remembered; reconnect to check or change it.'
-    : state === 'missing' ? 'The saved camera is not in the rig’s current device list. Choose a camera or check its connection to the server.'
-    : state === 'changed' ? `${slot} now reports a different camera. Check the driver setup, then confirm which camera to use.`
-    : state === 'busy' ? 'An exposure is in progress. You can change the imaging camera when it finishes.' : ''
+
+  const notice = cameraNotice()
 
   return <article className="vela-imaging-demo">
     <header className="vela-imaging-shell"><strong>Vela</strong><span>Askar FRA 400</span></header>
@@ -42,7 +56,14 @@ function ImagingCameraPreview({ props, onPropsChange }: { props: Props, onPropsC
           {!editing && <Button tone="quiet" size="small" disabled={locked} onClick={() => { setChoice(saved); update({ editing: true }) }}>Change</Button>}
         </div>
         {notice && <p className="vela-imaging-notice" role="status">{notice}</p>}
-        {editing && <form className="vela-imaging-form" onSubmit={event => { event.preventDefault(); if (choices.some(camera => camera.value === selected) && !locked) { update({ camera: selected, editing: false, state: 'ready' }); setChoice('') } }}>
+        {editing && <form className="vela-imaging-form" onSubmit={event => {
+          event.preventDefault()
+
+          if (choices.some(camera => camera.value === selected) && !locked) {
+            update({ camera: selected, editing: false, state: 'ready' })
+            setChoice('')
+          }
+        }}>
           <Select label="Camera" value={choices.some(camera => camera.value === selected) ? selected : ''} disabled={locked} options={[{ value: '', label: 'Choose a camera', disabled: true }, ...choices]} onChange={event => setChoice(event.target.value)} />
           <p>Remembered for this rig. You can return here when your setup changes.</p>
           <div><Button tone="accent" type="submit" disabled={!choices.some(camera => camera.value === selected) || locked}>Use this camera</Button>{saved !== 'none' && <Button tone="quiet" type="button" onClick={() => { setChoice(''); update({ editing: false }) }}>Cancel</Button>}</div>

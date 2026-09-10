@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import './Dialog.discovery.specimen.css'
 import { Badge } from './Badge'
@@ -7,9 +8,11 @@ import type { ComponentSpecimen } from '../themes'
 import { Dialog } from './Dialog'
 
 const views = ['start', 'manual', 'scanning', 'results', 'review', 'dismissed', 'complete'] as const
+
 const scenarios = ['mixed', 'single', 'empty', 'scan-failed'] as const
 
 type DiscoveryView = (typeof views)[number]
+
 type ResultScenario = (typeof scenarios)[number]
 
 const devices = [
@@ -22,11 +25,11 @@ const devices = [
 ]
 
 function isView(value: unknown): value is DiscoveryView {
-  return views.includes(value as DiscoveryView)
+  return views.some(option => option === value)
 }
 
 function isScenario(value: unknown): value is ResultScenario {
-  return scenarios.includes(value as ResultScenario)
+  return scenarios.some(option => option === value)
 }
 
 function ScanIcon() {
@@ -54,11 +57,67 @@ interface PreviewProps {
 }
 
 function DiscoveryDialogPreview({ props, onPropsChange }: PreviewProps) {
+  function renderDiscoveryResults() {
+    switch (scenario) {
+      case 'scan-failed':
+        return (
+              <div className="vela-discovery-message" data-tone="danger">
+                <strong>Network scan could not start</strong>
+                <p>Vela could not use this computer’s network interfaces. You can retry or enter the server address manually.</p>
+                <Button onClick={() => update({ view: 'manual' })} size="small">Enter address</Button>
+              </div>
+            )
+      case 'empty':
+        return (
+              <div className="vela-discovery-message">
+                <strong>No Alpaca servers found</strong>
+                <p>Confirm the server is running and that this device is on the same network, then scan again.</p>
+                <Button onClick={() => update({ view: 'manual' })} size="small">Enter address</Button>
+              </div>
+            )
+      default:
+        return (
+              <>
+                <div className="vela-discovery-results__summary"><span>{scenario === 'single' ? '1 server found' : '2 servers found'}</span><small>Select one to continue</small></div>
+                <button
+                  aria-pressed={selected}
+                  className="vela-discovery-candidate"
+                  data-selected={selected}
+                  onClick={() => update({ selected: !selected })}
+                  type="button"
+                >
+                  <span className="vela-discovery-candidate__mark"><TelescopeMark /></span>
+                  <span className="vela-discovery-candidate__copy">
+                    <span><strong>ASCOM Remote</strong><Badge size="small" tone="positive">Eligible</Badge></span>
+                    <small>192.168.4.104:11111 · 6 devices</small>
+                    <span className="vela-discovery-candidate__kinds"><i>Mount</i><i>2 cameras</i><i>Focuser</i><i>+2</i></span>
+                  </span>
+                  <span className="vela-discovery-candidate__select">{selected ? 'Selected' : 'Select'}</span>
+                </button>
+
+                {scenario === 'mixed' ? (
+                  <>
+                    <article className="vela-discovery-candidate" data-disabled="true">
+                      <span className="vela-discovery-candidate__mark"><TelescopeMark /></span>
+                      <span className="vela-discovery-candidate__copy">
+                        <span><strong>Legacy Alpaca</strong><Badge size="small" tone="warning">Unavailable</Badge></span>
+                        <small>192.168.4.120:32323 · 1 device</small>
+                        <p>This server did not provide a stable device ID, so Vela cannot add it safely.</p>
+                      </span>
+                    </article>
+                    <div className="vela-discovery-partial"><span>!</span><p><strong>One server could not be inspected</strong><small>192.168.4.121:11111 did not respond.</small></p></div>
+                  </>
+                ) : null}
+              </>
+            )
+    }
+  }
+
   const view = isView(props.view) ? props.view : 'start'
   const scenario = isScenario(props.scenario) ? props.scenario : 'mixed'
   const selected = Boolean(props.selected)
   const canReview = selected && (scenario === 'mixed' || scenario === 'single')
-  const rigName = typeof props.rigName === 'string' ? props.rigName : 'ASCOM Remote'
+  const rigName = z.string().catch('ASCOM Remote').parse(props.rigName)
   const canAdd = rigName.trim().length > 0
   const [host, setHost] = useState('ascom-remote.local')
   const [port, setPort] = useState('11111')
@@ -71,6 +130,7 @@ function DiscoveryDialogPreview({ props, onPropsChange }: PreviewProps) {
 
   useLayoutEffect(() => {
     currentView.current = view
+
     if (view !== 'scanning') {
       scanGeneration.current += 1
       window.clearTimeout(scanTimer.current)
@@ -122,6 +182,7 @@ function DiscoveryDialogPreview({ props, onPropsChange }: PreviewProps) {
   }[open ? view : 'start']
 
   let footer
+
   if (view === 'manual') {
     footer = (
       <>
@@ -230,52 +291,7 @@ function DiscoveryDialogPreview({ props, onPropsChange }: PreviewProps) {
 
         {view === 'results' ? (
           <div className="vela-discovery-results">
-            {scenario === 'scan-failed' ? (
-              <div className="vela-discovery-message" data-tone="danger">
-                <strong>Network scan could not start</strong>
-                <p>Vela could not use this computer’s network interfaces. You can retry or enter the server address manually.</p>
-                <Button onClick={() => update({ view: 'manual' })} size="small">Enter address</Button>
-              </div>
-            ) : scenario === 'empty' ? (
-              <div className="vela-discovery-message">
-                <strong>No Alpaca servers found</strong>
-                <p>Confirm the server is running and that this device is on the same network, then scan again.</p>
-                <Button onClick={() => update({ view: 'manual' })} size="small">Enter address</Button>
-              </div>
-            ) : (
-              <>
-                <div className="vela-discovery-results__summary"><span>{scenario === 'single' ? '1 server found' : '2 servers found'}</span><small>Select one to continue</small></div>
-                <button
-                  aria-pressed={selected}
-                  className="vela-discovery-candidate"
-                  data-selected={selected}
-                  onClick={() => update({ selected: !selected })}
-                  type="button"
-                >
-                  <span className="vela-discovery-candidate__mark"><TelescopeMark /></span>
-                  <span className="vela-discovery-candidate__copy">
-                    <span><strong>ASCOM Remote</strong><Badge size="small" tone="positive">Eligible</Badge></span>
-                    <small>192.168.4.104:11111 · 6 devices</small>
-                    <span className="vela-discovery-candidate__kinds"><i>Mount</i><i>2 cameras</i><i>Focuser</i><i>+2</i></span>
-                  </span>
-                  <span className="vela-discovery-candidate__select">{selected ? 'Selected' : 'Select'}</span>
-                </button>
-
-                {scenario === 'mixed' ? (
-                  <>
-                    <article className="vela-discovery-candidate" data-disabled="true">
-                      <span className="vela-discovery-candidate__mark"><TelescopeMark /></span>
-                      <span className="vela-discovery-candidate__copy">
-                        <span><strong>Legacy Alpaca</strong><Badge size="small" tone="warning">Unavailable</Badge></span>
-                        <small>192.168.4.120:32323 · 1 device</small>
-                        <p>This server did not provide a stable device ID, so Vela cannot add it safely.</p>
-                      </span>
-                    </article>
-                    <div className="vela-discovery-partial"><span>!</span><p><strong>One server could not be inspected</strong><small>192.168.4.121:11111 did not respond.</small></p></div>
-                  </>
-                ) : null}
-              </>
-            )}
+            {renderDiscoveryResults()}
           </div>
         ) : null}
 

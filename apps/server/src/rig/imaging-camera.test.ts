@@ -14,6 +14,7 @@ const rig = {
 
 it('persists selected identity separately from replaceable inventory', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'vela-camera-'))
+
   try {
     const path = join(directory, 'rigs.yaml')
     const catalog = await openFileRigCatalog(path, { createId: () => 'rig' })
@@ -37,6 +38,7 @@ it('requires explicit current identity and excludes selection changes during rig
   } }) })
   const get = () => app.inject('/api/web/rigs/rig/imaging-camera')
   const put = (cameraName = name) => app.inject({ method: 'PUT', url: '/api/rigs/rig/imaging-camera', payload: { id: 'slot', name: cameraName } })
+
   try {
     expect((await get()).json()).toMatchObject({ selected: null, state: 'unselected', editable: true })
     expect((await put()).statusCode).toBe(200)

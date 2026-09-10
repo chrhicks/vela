@@ -29,6 +29,7 @@ function RangeField({ label, min, max, step, value, onChange, suffix = '' }: Ran
 
 export function ThemeEditor({ mode, theme, onEdit }: ThemeEditorProps) {
   const palette = referencePalette(theme)
+  // SAFETY: referencePalette constructs only ReferenceToken keys from the fixed ramps.
   const referenceTokens = Object.keys(palette) as ReferenceToken[]
 
   function editLightness(ramp: RampName, index: number, value: number) {
@@ -115,7 +116,11 @@ export function ThemeEditor({ mode, theme, onEdit }: ThemeEditorProps) {
               <span>{key.replace(/[A-Z]/g, (value) => ` ${value.toLowerCase()}`)}</span>
               <div className="select-with-swatch">
                 <i style={{ background: palette[theme.semantic[mode][key]] }} />
-                <select onChange={(event) => editSemantic(key, event.target.value as ReferenceToken)} value={theme.semantic[mode][key]}>
+                <select onChange={(event) => {
+                  const token = referenceTokens.find(token => token === event.target.value)
+
+                  if (token) editSemantic(key, token)
+                }} value={theme.semantic[mode][key]}>
                   {referenceTokens.map((token) => <option key={token}>{token}</option>)}
                 </select>
               </div>
@@ -129,7 +134,11 @@ export function ThemeEditor({ mode, theme, onEdit }: ThemeEditorProps) {
         <div className="inspector-section">
           <label className="control-field">
             <span>Font stack</span>
-            <select onChange={(event) => onEdit({ fontStack: event.target.value as ThemeParameters['fontStack'] })} value={theme.fontStack}>
+            <select onChange={(event) => {
+              const fontStack = event.target.value
+
+              if (fontStack === 'sans' || fontStack === 'serif' || fontStack === 'mono') onEdit({ fontStack })
+            }} value={theme.fontStack}>
               <option value="sans">System sans</option>
               <option value="serif">System serif</option>
               <option value="mono">System mono</option>

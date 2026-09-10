@@ -1,12 +1,18 @@
+import { z } from 'zod'
 import type { ImagingCameraView } from '@vela/model/web'
 
+const text = z.string().refine(value => value.trim().length > 0)
+
+const imagingCamera = z.object({
+  rigId: z.string(),
+  editable: z.boolean(),
+  state: z.enum(['unselected', 'ready', 'missing', 'changed', 'unavailable']),
+  selected: z.object({ id: text, name: text }).nullable(),
+  cameras: z.array(z.object({ id: text, configuredName: text, name: text.nullable() })),
+}).refine(value => new Set(value.cameras.map(camera => camera.id)).size === value.cameras.length)
+
 export function isImagingCameraView(value: unknown, rigId: string): value is ImagingCameraView {
-  if (!record(value) || value.rigId !== rigId || typeof value.editable !== 'boolean') return false
-  if (!['unselected', 'ready', 'missing', 'changed', 'unavailable'].includes(String(value.state))) return false
-  if (value.selected !== null && (!record(value.selected) || !text(value.selected.id) || !text(value.selected.name))) return false
-  if (!Array.isArray(value.cameras) || !value.cameras.every(camera => record(camera)
-    && text(camera.id) && text(camera.configuredName) && (camera.name === null || text(camera.name)))) return false
-  return new Set(value.cameras.map(camera => camera.id)).size === value.cameras.length
+  const result = imagingCamera.safeParse(value)
+
+  return result.success && result.data.rigId === rigId
 }
-function record(value: unknown): value is Record<string, unknown> { return value !== null && typeof value === 'object' && !Array.isArray(value) }
-function text(value: unknown): value is string { return typeof value === 'string' && value.trim().length > 0 }

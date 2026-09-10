@@ -232,6 +232,7 @@ describe('Rig device detail mapping', () => {
       kind: 'switch',
       telemetry: { availability: 'partial', values: { kind: 'switch' } },
     }), observedAt)
+
     const empty = currentDeviceView('rig-1', inspection({
       kind: 'switch',
       telemetry: { availability: 'complete', values: { kind: 'switch', channels: [] } },
@@ -246,6 +247,7 @@ describe('Rig device detail mapping', () => {
       kind: 'dome',
       telemetry: { availability: 'unavailable' },
     }), observedAt)
+
     const disconnectedCamera = currentDeviceView('rig-1', {
       ...inspection({ kind: 'camera', telemetry: { availability: 'unavailable' } }),
       connection: 'disconnected',

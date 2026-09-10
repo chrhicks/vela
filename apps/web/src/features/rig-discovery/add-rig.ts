@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import type { RigEndpoint, RigId } from '@vela/model/rig'
 import { api, ApiError } from '../../lib/api'
 
@@ -21,7 +22,7 @@ export async function addRig(
   signal: AbortSignal,
 ): Promise<RigId> {
   try {
-    const response = await api<{ rigId: RigId }>('rigs', {
+    const response = await api('rigs', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -29,7 +30,8 @@ export async function addRig(
       body: JSON.stringify({ name, endpoint }),
       signal,
     })
-    return response.rigId
+
+    return z.object({ rigId: z.string().min(1) }).parse(response).rigId
   } catch (error) {
     if (!(error instanceof ApiError)) throw error
 

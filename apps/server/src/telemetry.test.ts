@@ -8,6 +8,7 @@ import { InMemorySpanExporter, NodeTracerProvider, SimpleSpanProcessor, type Rea
 import { createTraceFileExporter, startTelemetry } from './telemetry.js'
 
 const directories: string[] = []
+
 afterEach(async () => {
   vi.useRealTimers()
   trace.disable()
@@ -15,11 +16,14 @@ afterEach(async () => {
   propagation.disable()
   await Promise.all(directories.splice(0).map(directory => rm(directory, { recursive: true, force: true })))
 })
+
 async function directory() {
   const path = await mkdtemp(join(tmpdir(), 'vela-trace-test-'))
   directories.push(path)
+
   return path
 }
+
 async function span(name = 'alpaca.request'): Promise<ReadableSpan> {
   const memory = new InMemorySpanExporter()
   const provider = new NodeTracerProvider({ spanProcessors: [new SimpleSpanProcessor(memory)] })
@@ -29,9 +33,12 @@ async function span(name = 'alpaca.request'): Promise<ReadableSpan> {
   await provider.forceFlush()
   const result = memory.getFinishedSpans()[0]!
   await provider.shutdown()
+
   return result
 }
+
 const exportSpans = (exporter: SpanExporter, spans: ReadableSpan[]) => new Promise<ExportResult>(resolve => exporter.export(spans, resolve))
+
 const records = async (path: string) => (await readFile(path, 'utf8')).trim().split('\n').map(line => JSON.parse(line))
 
 describe('local tracing', () => {
@@ -42,6 +49,7 @@ describe('local tracing', () => {
     let release!: () => void
     const gate = new Promise<void>(resolve => { release = resolve })
     let rootId = ''
+
     const running = tracer.startActiveSpan('alignment.run', async root => {
       rootId = root.spanContext().spanId
       await gate
@@ -51,10 +59,13 @@ describe('local tracing', () => {
         child.addEvent('headers.received')
         child.end()
       })
+
       return root
     })
+
     release()
     const root = await running
+
     try {
       // No explicit forceFlush: the one-second batch timer makes children live.
       await vi.waitFor(async () => expect(await records(file)).toHaveLength(1), { timeout: 2500, interval: 50 })
@@ -76,13 +87,16 @@ describe('local tracing', () => {
     const dir = await directory()
     const file = join(dir, 'trace.jsonl')
     const exporter = createTraceFileExporter(file, { maxFileBytes: 1700, retainedFiles: 3 })
+
     for (let index = 0; index < 12; index++) expect((await exportSpans(exporter, [await span(`request-${index}`)])).code).toBe(ExportResultCode.SUCCESS)
     await exporter.shutdown()
     expect((await readdir(dir)).sort()).toEqual(['trace.jsonl', 'trace.jsonl.1', 'trace.jsonl.2'])
+
     for (const name of await readdir(dir)) {
       expect((await readFile(join(dir, name))).byteLength).toBeLessThanOrEqual(1700)
       expect((await records(join(dir, name))).every(record => record.type === 'span')).toBe(true)
     }
+
     expect((await records(file)).at(-1).name).toBe('request-11')
   })
 

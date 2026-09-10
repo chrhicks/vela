@@ -49,6 +49,7 @@ describe('local persistence boundary', () => {
         dark: { ...DEFAULT_THEME_PARAMETERS.semantic.dark, focus: 'accent-500' },
       },
     }
+
     expect(parseProfile({ ...profile, overrides }).overrides).toEqual(overrides)
     expect(parseSession({ ...session, unsavedOverrides: overrides }).unsavedOverrides).toEqual(overrides)
 

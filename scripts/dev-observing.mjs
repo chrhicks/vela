@@ -9,6 +9,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 try {
   process.loadEnvFile(resolve(root, '.env.observing.local'))
+
   const env = {
     ...process.env,
     HOST: '127.0.0.1',
@@ -18,16 +19,19 @@ try {
     VELA_RIG_CATALOG_PATH: resolve(root, process.env.VELA_RIG_CATALOG_PATH || 'data/rigs.yaml'),
     VELA_SAVED_IMAGES_PATH: resolve(root, process.env.VELA_SAVED_IMAGES_PATH || 'data/saved-images'),
   }
+
   for (const key of ['VELA_ASTAP', 'VELA_STAR_CATALOG']) {
     if (!env[key]) throw new Error(`Set ${key} in .env.observing.local`)
     env[key] = resolve(root, env[key])
     await access(env[key], key === 'VELA_ASTAP' ? constants.X_OK : constants.R_OK)
   }
+
   await available(3001, '127.0.0.1')
   await available(5173, '0.0.0.0')
   console.log(`Starting Vela for http://${env.VELA_LAN_HOST}:5173 — Ctrl+C stops this run.`)
   // A separate process group lets this command stop pnpm and all its watchers.
   const child = spawn('pnpm', ['dev'], { cwd: root, env, stdio: 'inherit', detached: true })
+
   const stop = signal => {
     try {
       process.kill(-child.pid, signal)
@@ -35,6 +39,7 @@ try {
       if (error.code !== 'ESRCH') throw error
     }
   }
+
   process.on('SIGINT', () => stop('SIGINT'))
   process.on('SIGTERM', () => stop('SIGTERM'))
   child.on('error', error => {

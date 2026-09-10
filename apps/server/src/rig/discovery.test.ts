@@ -11,7 +11,9 @@ import { createMemoryRigCatalog } from './catalog.js'
 import { discoverRigs, parseDiscoverRigsInput } from './discovery.js'
 
 const endpointA: AlpacaEndpoint = { host: '192.168.4.104', port: 11111 }
+
 const endpointB: AlpacaEndpoint = { host: 'ascom-remote.local', port: 11111 }
+
 const endpointC: AlpacaEndpoint = { host: '192.168.4.120', port: 32323 }
 
 function inspection(
@@ -34,10 +36,12 @@ describe('discoverRigs', () => {
   it('inspects scanned endpoints serially and returns candidates with partial failures', async () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-08-26T20:00:00.000Z'))
+
     const providerError = new AlpacaProviderError('Unable to inspect endpoint', {
       reason: 'transport',
       endpoint: '/management/apiversions',
     })
+
     const inspected: AlpacaEndpoint[] = []
     let activeInspections = 0
     let maximumActiveInspections = 0
@@ -54,9 +58,11 @@ describe('discoverRigs', () => {
         activeInspections -= 1
 
         if (endpoint === endpointB) throw providerError
+
         if (endpoint === endpointC) {
           return inspection(endpoint, [{ kind: 'switch', name: 'Legacy Switch' }])
         }
+
         return inspection(endpoint, [{
           providerDeviceId: 'camera-1',
           kind: 'camera',
@@ -106,6 +112,7 @@ describe('discoverRigs', () => {
         devices: [{ uniqueId: 'camera-1', kind: 'camera', name: 'Old camera name' }],
       },
     }])
+
     const alpaca: AlpacaDiscovery = {
       async scan() {
         return [endpointA]
@@ -143,6 +150,7 @@ describe('discoverRigs', () => {
 
   it('turns a known UDP scan failure into a sanitized failure while retaining its cause', async () => {
     const scanError = new AlpacaDiscoveryError('Every interface failed')
+
     const alpaca: AlpacaDiscovery = {
       async scan() {
         throw scanError
@@ -161,6 +169,7 @@ describe('discoverRigs', () => {
   it('propagates caller cancellation', async () => {
     const controller = new AbortController()
     const cancellation = new Error('request disconnected')
+
     const alpaca: AlpacaDiscovery = {
       scan({ signal } = {}) {
         return new Promise((_resolve, reject) => {
@@ -176,6 +185,7 @@ describe('discoverRigs', () => {
       { mode: 'scan' },
       { alpaca, signal: controller.signal },
     )
+
     const rejection = expect(discovery).rejects.toBe(cancellation)
     controller.abort(cancellation)
 
@@ -219,6 +229,7 @@ describe('POST /api/rigs/discovery', () => {
       endpoint: '/management/apiversions',
       cause: new Error('socket details'),
     })
+
     const alpaca: AlpacaDiscovery = {
       async scan() {
         throw new Error('scan should not run')
@@ -228,6 +239,7 @@ describe('POST /api/rigs/discovery', () => {
         throw providerError
       },
     }
+
     const app = buildApp({ alpacaDiscovery: alpaca })
 
     try {

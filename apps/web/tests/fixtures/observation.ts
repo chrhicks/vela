@@ -3,6 +3,7 @@ import type { RigConnectionDeviceView, RigObservationView } from '@vela/model/we
 export function observation(state: 'available' | 'complete' | 'unavailable' | 'in-progress' = 'available', id = 'rig-1'): RigObservationView {
   const now = '2026-09-04T20:00:00.000Z'
   const connected = state === 'complete'
+
   return {
     rig: {
       id, name: id === 'rig-2' ? 'Askar FRA 400' : 'Seestar S30', state: 'reachable',
@@ -10,9 +11,9 @@ export function observation(state: 'available' | 'complete' | 'unavailable' | 'i
       addedAt: now, lastInventoryAt: now, refreshedAt: now,
       connections: { total: 3, connected: connected ? 3 : 0, disconnected: connected ? 0 : 3, unavailable: 0 },
       capabilities: ['forget'],
-      devices: ['camera', 'focuser', 'telescope'].map((kind, index) => ({
+      devices: (['camera', 'focuser', 'telescope'] as const).map((kind, index) => ({
         id: `${id}-${index}`, name: ['Main camera', 'Focuser', 'Mount'][index]!, configuredName: kind,
-        kind: kind as 'camera' | 'focuser' | 'telescope',
+        kind,
         observedAt: now,
         ...(connected
           ? { connection: 'connected' as const, status: { availability: 'unsupported' as const } }
@@ -27,11 +28,13 @@ export function observation(state: 'available' | 'complete' | 'unavailable' | 'i
 
 export function device(index: number): RigConnectionDeviceView {
   const { id, kind, name } = observation().rig.devices[index]!
+
   return { id, kind, name }
 }
 
 export function offlineObservation() {
   const view = observation('unavailable')
+
   return {
     ...view,
     rig: {
