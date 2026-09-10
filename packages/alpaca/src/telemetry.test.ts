@@ -1,3 +1,4 @@
+import type { ResponseFixture } from './internal/test-fixtures.js'
 import { afterEach, expect, it } from 'vitest'
 import { context, SpanKind, SpanStatusCode, trace } from '@opentelemetry/api'
 import { InMemorySpanExporter, NodeTracerProvider, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-node'
@@ -5,10 +6,12 @@ import { createAlpacaAcquisition } from './acquisition.js'
 import { createAlpacaClient } from './internal/client.js'
 
 let provider: NodeTracerProvider | undefined
+
 function recording() {
   const exporter = new InMemorySpanExporter()
   provider = new NodeTracerProvider({ spanProcessors: [new SimpleSpanProcessor(exporter)] })
   provider.register()
+
   return exporter
 }
 
@@ -20,7 +23,8 @@ afterEach(async () => {
 })
 
 const telescope = { DeviceName: 'Mount', DeviceType: 'Telescope', DeviceNumber: 0, UniqueID: 'mount' }
-const envelope = (Value: unknown, ErrorNumber = 0) => ({ ClientTransactionID: 7, ServerTransactionID: 23, ErrorNumber, ErrorMessage: ErrorNumber ? 'Device rejected command' : '', Value })
+
+const envelope = (Value: ResponseFixture, ErrorNumber = 0) => ({ ClientTransactionID: 7, ServerTransactionID: 23, ErrorNumber, ErrorMessage: ErrorNumber ? 'Device rejected command' : '', Value })
 
 it('keeps tracing optional when no SDK provider is registered', async () => {
   const client = createAlpacaClient({ baseUrl: 'http://fake', fetch: async () => Response.json(envelope(12)) })
@@ -31,7 +35,7 @@ it('keeps tracing optional when no SDK provider is registered', async () => {
 it('keeps the ALPACA span open through headers, body and value validation', async () => {
   const exporter = recording()
   let sendHeaders!: (response: Response) => void
-  let sendBody!: (body: unknown) => void
+  let sendBody!: (body: ResponseFixture) => void
   let readingBody!: () => void
   const bodyStarted = new Promise<void>(resolve => { readingBody = resolve })
   const client = createAlpacaClient({ baseUrl: 'http://fake', fetch: async () => new Promise<Response>(resolve => { sendHeaders = resolve }) })
@@ -83,12 +87,15 @@ it('marks HTTP 200 protocol errors and malformed values as errors, including bin
   await expect(image.image(telescope)).rejects.toMatchObject({ errorNumber: 1025 })
   const spans = exporter.getFinishedSpans()
   expect(spans).toHaveLength(3)
+
   for (const span of spans) {
     expect(span.status.code).toBe(SpanStatusCode.ERROR)
     expect(span.attributes['http.response.status_code']).toBe(200)
     expect(span.events.some(event => event.name === 'exception')).toBe(true)
+
     for (const key of ['body', 'pixels', 'Value']) expect(span.attributes).not.toHaveProperty(key)
   }
+
   expect(spans[0]!.attributes).toMatchObject({ 'alpaca.error_number': 1025, 'alpaca.command.rate': '0', 'alpaca.command.axis': '0' })
   expect(spans[1]!.attributes['alpaca.failure.reason']).toBe('invalid-response')
   expect(spans[2]!.attributes).toMatchObject({ 'alpaca.error_number': 1025, 'alpaca.client_transaction_id': 0xffffffff, 'alpaca.server_transaction_id': 42 })
@@ -101,14 +108,20 @@ it.each([false, true])('correlates rotation requests and independent confirmed c
   const pendingRead = new Promise<void>(resolve => { reading = resolve })
   const controller = new AbortController()
   const writes: string[] = []
+
   const fetch: typeof globalThis.fetch = async (input, init) => {
     const operation = new URL(String(input)).pathname.split('/').at(-1)
-    let value: unknown = true
+    let value: ResponseFixture = true
+
     if (operation === 'configureddevices') value = [telescope]
+
     if (operation === 'axisrates') value = [{ Minimum: 0, Maximum: 3 }]
+
     if (operation === 'slewing') value = moving
+
     if (operation === 'rightascension') {
       value = moving ? 11.99 : 12
+
       if (moving && cancel) {
         return new Promise<Response>((_, reject) => {
           init!.signal!.addEventListener('abort', () => reject(init!.signal!.reason), { once: true })
@@ -116,19 +129,24 @@ it.each([false, true])('correlates rotation requests and independent confirmed c
         })
       }
     }
+
     if (operation === 'moveaxis') {
       const rate = new URLSearchParams(String(init?.body)).get('Rate')!
       writes.push(rate)
       moving = rate !== '0'
       expect(init?.signal?.aborted).toBe(false)
     }
+
     return Response.json(envelope(value))
   }
+
   const acquisition = createAlpacaAcquisition({ baseUrl: 'http://fake', fetch })
+
   const result = trace.getTracer('test').startActiveSpan('alignment.move', async span => {
     try { await acquisition.rotateRightAscension('mount', 3, -0.1, controller.signal) }
     finally { span.end() }
   })
+
   if (cancel) {
     const reason = new Error('Operator cancelled alignment')
     const rejected = expect(result).rejects.toBe(reason)

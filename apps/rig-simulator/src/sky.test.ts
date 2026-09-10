@@ -4,11 +4,14 @@ import { renderSky, renderSkyAsync } from './sky.js'
 import { writeFits } from './fits.js'
 
 const pose: CameraPose = { direction: [1, 0, 0], right: [0, 1, 0], up: [0, 0, 1] }
+
 const options = { width: 101, height: 101, fieldHeightDegrees: 10, seed: 42 }
 
 function brightest(image: Uint16Array) {
   let maximum = 0
+
   for (let index = 1; index < image.length; index++) if (image[index]! > image[maximum]!) maximum = index
+
   return [maximum % options.width, Math.floor(maximum / options.width)]
 }
 
@@ -59,18 +62,22 @@ it('samples synthetic warm starlight in RGGB phase at the full sensor origin', (
 
 it('scales star signal with exposure and saturates at each sensor limit', () => {
   const star = { raDegrees: 0, decDegrees: 0, magnitude: 10 }
+
   for (const sensor of ['monochrome', 'rggb'] as const) {
     const signalAt = (exposureSeconds: number) => {
       const settings = { ...options, sensor, exposureSeconds }
       const image = renderSky([star], pose, settings)
       const background = renderSky([], pose, settings)
+
       return image[5100]! - background[5100]!
     }
+
     expect(signalAt(4) / signalAt(2)).toBeCloseTo(2, 2)
     expect(signalAt(0)).toBe(0)
     expect(renderSky([star], pose, { ...options, sensor, exposureSeconds: 1000 })[5100])
       .toBe(sensor === 'rggb' ? 65535 : 32767)
   }
+
   expect(renderSky([star], pose, options)).toEqual(renderSky([star], pose, { ...options, exposureSeconds: 2 }))
 })
 
@@ -79,6 +86,7 @@ it('produces identical sync and async pixels across stripe boundaries', async ()
     { raDegrees: 0, decDegrees: 0, magnitude: 8 },
     { raDegrees: 1, decDegrees: -0.35, magnitude: 9 },
   ]
+
   for (const sensor of ['monochrome', 'rggb'] as const) {
     const settings = { ...options, width: 600, height: 600, sensor, exposureSeconds: 3 }
     expect(await renderSkyAsync(stars, pose, settings)).toEqual(renderSky(stars, pose, settings))

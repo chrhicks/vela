@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import type { ComponentSpecimen } from '../themes'
 import { Badge } from './Badge'
 
@@ -15,7 +16,7 @@ export const specimen: ComponentSpecimen = {
   },
   defaultProps: { label: 'Guiding', tone: 'positive', size: 'medium', marker: true },
   render: (props) => (
-    <Badge marker={Boolean(props.marker) ? <i /> : undefined} size={String(props.size) as 'small' | 'medium'} tone={String(props.tone) as 'neutral' | 'accent' | 'positive' | 'warning' | 'danger'}>
+    <Badge marker={props.marker ? <i /> : undefined} size={z.enum(['small', 'medium']).parse(props.size)} tone={z.enum(['neutral', 'accent', 'positive', 'warning', 'danger']).parse(props.tone)}>
       {String(props.label)}
     </Badge>
   ),

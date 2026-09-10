@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { RigDeviceInventory } from '../device/inventory.js'
 import type { ObservedRigDevice } from '../device/model.js'
 import { createMemoryRigCatalog } from './catalog.js'
-import type { ObservedRigInventory, RigCatalogRecord } from './contracts.js'
+import type { RigCatalogRecord } from './contracts.js'
 import { loadHomeView } from './home.js'
 
 function rig(id: string, uniqueId: string): RigCatalogRecord {
@@ -24,6 +24,7 @@ describe('Home Rig projection', () => {
     const offline = rig('offline', 'camera-2')
     const catalog = createMemoryRigCatalog([online, offline])
     const observedAt = new Date('2026-09-02T20:00:00.000Z')
+
     const currentDevice: ObservedRigDevice = {
       id: 'online-camera-1',
       rigId: 'online',
@@ -35,6 +36,7 @@ describe('Home Rig projection', () => {
       status: { state: 'unknown' },
       observedAt,
     }
+
     const unavailable = new Error('provider unavailable')
     const onUnavailable = vi.fn()
 
@@ -43,6 +45,7 @@ describe('Home Rig projection', () => {
         return {
           async listDevices() {
             if (source.id === offline.id) throw unavailable
+
             return [currentDevice]
           },
         }
@@ -96,6 +99,7 @@ describe('Home Rig projection', () => {
         return {
           async listDevices() {
             if (source.id === rigB.id) throw new Error('offline')
+
             return [{
               id: 'rig-a-camera-b',
               rigId: 'rig-a',

@@ -1,3 +1,8 @@
+import type { AlignmentView } from '@vela/model/web'
+import { createAlpacaAcquisition, createAlpacaFraming } from '@vela/alpaca'
+import { createAlignmentController } from './controller.js'
+import { createPhysicalAlignment } from './physical.js'
+import { createAstapSolver } from './solver.js'
 import Fastify from 'fastify'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryRigCatalog } from '../rig/catalog.js'
@@ -5,18 +10,23 @@ import type { RigCatalogRecord } from '../rig/contracts.js'
 import { createRigOperations } from '../rig/operations.js'
 import { alignmentSettings, registerAlignment } from './routes.js'
 
-const mocks = vi.hoisted(() => ({
-  acquisition: vi.fn(), framing: vi.fn(), physical: vi.fn(), solver: vi.fn(), controller: vi.fn(),
-  start: vi.fn(), stop: vi.fn(),
-  state: { rigId: '', active: false },
-}))
-vi.mock('@vela/alpaca', () => ({ createAlpacaAcquisition: mocks.acquisition, createAlpacaFraming: mocks.framing }))
-vi.mock('./physical.js', () => ({ createPhysicalAlignment: mocks.physical }))
-vi.mock('./solver.js', () => ({ createAstapSolver: mocks.solver }))
-vi.mock('./controller.js', () => ({ createAlignmentController: mocks.controller }))
+const initialState: AlignmentView = {
+  rigId: '', rigName: '', active: false, enabled: true, unavailableReason: null,
+  phase: 'setup', activity: 'idle', position: 0, solvedPositions: 0, exposureSeconds: 2,
+  exposureStartedAt: null, measuredAt: null, warning: null, error: null, measurement: null,
+}
+
+const mocks = {
+  acquisition: vi.fn(createAlpacaAcquisition), framing: vi.fn(createAlpacaFraming),
+  physical: vi.fn(createPhysicalAlignment), solver: vi.fn(createAstapSolver), controller: vi.fn(createAlignmentController),
+  start: vi.fn<ReturnType<typeof createAlignmentController>['start']>(),
+  stop: vi.fn<ReturnType<typeof createAlignmentController>['stop']>(),
+  state: initialState,
+}
 
 const env = { VELA_ALIGNMENT_ENDPOINT: 'http://mount:11111', VELA_ALIGNMENT_CAMERA_ID: 'camera',
   VELA_ALIGNMENT_TELESCOPE_ID: 'telescope', VELA_ASTAP: '/bin/astap', VELA_STAR_CATALOG: '/stars' }
+
 const rig: RigCatalogRecord = {
   id: 'rig', name: 'FRA', endpoint: { host: 'mount', port: 11111 },
   imagingCamera: { uniqueId: 'camera', name: 'Current imager' }, focalLengthMm: 400,
@@ -25,33 +35,41 @@ const rig: RigCatalogRecord = {
     { uniqueId: 'telescope', kind: 'telescope', name: 'Mount' },
   ] },
 }
+
 const { imagingCamera: _camera, ...withoutCamera } = rig
+
 const { focalLengthMm: _focalLength, ...withoutFocalLength } = rig
+
 const { focalLengthMm: _offlineFocalLength, ...offlineRig } = withoutCamera
+
 const apps: ReturnType<typeof Fastify>[] = []
+
 let release: (() => void) | undefined
 
 beforeEach(() => {
   vi.resetAllMocks()
-  mocks.state = { rigId: '', active: false }
+  mocks.state = { ...initialState }
   release = undefined
-  mocks.acquisition.mockReturnValue({ acquisition: true })
-  mocks.framing.mockReturnValue({ framing: true })
-  mocks.physical.mockReturnValue({ physical: true })
-  mocks.solver.mockReturnValue({ solver: true })
-  mocks.start.mockImplementation(async (rigId: string, _name: string, onSettled: () => void) => {
-    mocks.state = { rigId, active: true }
+  mocks.acquisition.mockImplementation(createAlpacaAcquisition)
+  mocks.framing.mockImplementation(createAlpacaFraming)
+  mocks.physical.mockImplementation(createPhysicalAlignment)
+  mocks.solver.mockImplementation(createAstapSolver)
+  mocks.start.mockImplementation(async (rigId: string, _name: string, onSettled?: () => void) => {
+    mocks.state = { ...mocks.state, rigId, active: true }
     release = onSettled
+
     return mocks.state
   })
   mocks.stop.mockImplementation(async () => {
     mocks.state.active = false
     release?.()
+
     return mocks.state
   })
   mocks.controller.mockImplementation(() => ({ snapshot: () => ({ ...mocks.state }), active: () => mocks.state.active,
     start: mocks.start, stop: mocks.stop, image: () => undefined }))
 })
+
 afterEach(async () => { await Promise.all(apps.splice(0).map(app => app.close())) })
 
 function setup(records = [rig], configured = true, mode: 'physical' | 'offline' = 'physical') {
@@ -59,9 +77,11 @@ function setup(records = [rig], configured = true, mode: 'physical' | 'offline' 
   apps.push(app)
   const catalog = createMemoryRigCatalog(records)
   const operations = createRigOperations()
-  registerAlignment(app, catalog, configured ? alignmentSettings({ ...env, VELA_ALIGNMENT_MODE: mode }) : undefined, operations)
-  const command = (name: string, rigId = 'rig', payload: unknown = {}) => app.inject({ method: 'POST',
+  registerAlignment(app, catalog, configured ? alignmentSettings({ ...env, VELA_ALIGNMENT_MODE: mode }) : undefined, operations, mocks)
+
+  const command = (name: string, rigId = 'rig', payload: null | string | readonly string[] | { exposureSeconds?: number } = {}) => app.inject({ method: 'POST',
     url: `/api/rigs/${rigId}/alignment/${name}`, headers: { 'content-type': 'application/json' }, payload: JSON.stringify(payload) })
+
   return { app, catalog, operations, command }
 }
 
@@ -120,11 +140,14 @@ describe('alignment routes', () => {
     await catalog.setImagingCamera('rig', { uniqueId: 'camera', name: 'Updated imager' })
     await catalog.setFocalLength('rig', 320)
     expect((await command('start')).statusCode).toBe(200)
-    expect(mocks.physical).toHaveBeenCalledWith({ cameraId: 'camera', telescopeId: 'telescope', cameraName: 'Updated imager', focalLengthMm: 320 }, { acquisition: true }, { framing: true })
-    const [{ mode, hardware: acquisition, createSolver: solverFactory, physical }] = mocks.controller.mock.calls[0]!
-    expect(acquisition).toEqual({ acquisition: true })
+    expect(mocks.physical).toHaveBeenCalledWith({ cameraId: 'camera', telescopeId: 'telescope', cameraName: 'Updated imager', focalLengthMm: 320 }, mocks.acquisition.mock.results[0]!.value, mocks.framing.mock.results[0]!.value)
+    const [composition] = mocks.controller.mock.calls[0]!
+
+    if (composition.mode !== 'physical') throw new Error('Expected physical composition')
+    const { mode, hardware: acquisition, createSolver: solverFactory, physical } = composition
+    expect(acquisition).toBe(mocks.acquisition.mock.results[0]!.value)
     expect(mode).toBe('physical')
-    expect(physical).toEqual({ physical: true })
+    expect(physical).toBe(mocks.physical.mock.results[0]!.value)
     solverFactory(1.75)
     expect(mocks.solver).toHaveBeenCalledWith({ executable: '/bin/astap', catalogPath: '/stars', fieldHeightDegrees: 1.75 })
     expect(operations.owner('rig')).toBe('alignment')
@@ -155,6 +178,7 @@ describe('alignment routes', () => {
   it('rejects unknown and malformed commands without constructing hardware', async () => {
     const { command, operations } = setup()
     expect((await command('warp')).statusCode).toBe(404)
+
     for (const body of [null, [], { exposureSeconds: 5 }, 'start']) expect((await command('start', 'rig', body)).statusCode).toBe(400)
     expect(mocks.acquisition).not.toHaveBeenCalled()
     expect(operations.owner('rig')).toBeUndefined()

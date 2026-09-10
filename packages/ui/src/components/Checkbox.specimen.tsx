@@ -17,7 +17,7 @@ export const specimen: ComponentSpecimen = {
   render: (props, onPropsChange) => (
     <Checkbox
       checked={Boolean(props.checked)}
-      description={Boolean(props.description) ? 'Returns the sensor to ambient temperature safely.' : undefined}
+      description={props.description ? 'Returns the sensor to ambient temperature safely.' : undefined}
       disabled={Boolean(props.disabled)}
       label={String(props.label)}
       onChange={(event) => onPropsChange?.({ checked: event.target.checked })}

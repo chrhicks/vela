@@ -20,7 +20,9 @@ describe('Rig device inventory', () => {
         }]
       },
     } satisfies Pick<AlpacaProvider, 'listDevices'>
+
     const observedAt = new Date('2026-08-21T12:00:00.000Z')
+
     const inventory = createRigDeviceInventory(rig, {
       provider,
       now: () => observedAt,

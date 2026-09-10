@@ -9,13 +9,19 @@ import { Panel } from './Panel'
 import './Panel.rig-detail.specimen.css'
 
 const screens = ['rig', 'home'] as const
+
 const rigs = ['askar', 'seestar'] as const
+
 const scenarios = ['live', 'disconnected', 'mixed', 'stale', 'offline'] as const
 
 type Screen = (typeof screens)[number]
+
 type RigId = (typeof rigs)[number]
+
 type Scenario = (typeof scenarios)[number]
+
 type DeviceKind = 'telescope' | 'camera' | 'focuser' | 'filter-wheel' | 'conditions' | 'switch'
+
 type Connection = 'connected' | 'disconnected' | 'unavailable' | 'last-known'
 
 interface Metric {
@@ -219,15 +225,15 @@ const seestar: RigFixture = {
 }
 
 function isScreen(value: unknown): value is Screen {
-  return screens.includes(value as Screen)
+  return screens.some(option => option === value)
 }
 
 function isRig(value: unknown): value is RigId {
-  return rigs.includes(value as RigId)
+  return rigs.some(option => option === value)
 }
 
 function isScenario(value: unknown): value is Scenario {
-  return scenarios.includes(value as Scenario)
+  return scenarios.some(option => option === value)
 }
 
 function RefreshIcon() {
@@ -271,8 +277,11 @@ function ShellHeader() {
 
 function connectionPresentation(connection: Connection) {
   if (connection === 'connected') return { label: 'Connected', tone: 'positive' as const }
+
   if (connection === 'disconnected') return { label: 'Disconnected', tone: 'warning' as const }
+
   if (connection === 'last-known') return { label: 'Last known', tone: 'warning' as const }
+
   return { label: 'Unavailable', tone: 'danger' as const }
 }
 
@@ -296,34 +305,10 @@ function scenarioDevices(rig: RigFixture, scenario: Scenario): ReadonlyArray<Dev
     return rig.devices.map((device) => ({ ...device, connection: 'last-known' }))
   }
 
-  if (scenario === 'disconnected') {
-    return rig.devices.map((device) => ({
-      id: device.id,
-      kind: device.kind,
-      kindLabel: device.kindLabel,
-      name: device.name,
-      ...(device.configuredName === undefined ? {} : { configuredName: device.configuredName }),
-      activity: 'Disconnected',
-      activityNote: 'Connect this device in its driver to see live status',
-      connection: 'disconnected',
-      metrics: [],
-    }))
-  }
+  if (scenario === 'disconnected') return rig.devices.map(disconnectedDevice)
 
   return rig.devices.map((device, index) => {
-    if (index === 2) {
-      return {
-        id: device.id,
-        kind: device.kind,
-        kindLabel: device.kindLabel,
-        name: device.name,
-        ...(device.configuredName === undefined ? {} : { configuredName: device.configuredName }),
-        activity: 'Disconnected',
-        activityNote: 'Connect this device in its driver to see live status',
-        connection: 'disconnected',
-        metrics: [],
-      }
-    }
+    if (index === 2) return disconnectedDevice(device)
 
     if (index === rig.devices.length - 2) {
       return {
@@ -336,6 +321,21 @@ function scenarioDevices(rig: RigFixture, scenario: Scenario): ReadonlyArray<Dev
 
     return device
   })
+}
+
+function disconnectedDevice(device: DeviceFixture): DeviceFixture {
+  const disconnected: DeviceFixture = {
+    id: device.id,
+    kind: device.kind,
+    kindLabel: device.kindLabel,
+    name: device.name,
+    activity: 'Disconnected',
+    activityNote: 'Connect this device in its driver to see live status',
+    connection: 'disconnected',
+    metrics: [],
+  }
+
+  return device.configuredName === undefined ? disconnected : { ...disconnected, configuredName: device.configuredName }
 }
 
 function DeviceCard({ device }: { device: DeviceFixture }) {
@@ -384,20 +384,26 @@ function DeviceCard({ device }: { device: DeviceFixture }) {
 
 function countSummary(devices: ReadonlyArray<DeviceFixture>, scenario: Scenario): string {
   if (scenario === 'offline') return `${devices.length} devices · status unavailable`
+
   if (scenario === 'stale') return `${devices.length} devices · last update 42 seconds ago`
 
   const connected = devices.filter((device) => device.connection === 'connected').length
   const disconnected = devices.filter((device) => device.connection === 'disconnected').length
   const unavailable = devices.length - connected - disconnected
   const parts = [`${connected} of ${devices.length} devices connected`]
+
   if (disconnected > 0) parts.push(`${disconnected} disconnected`)
+
   if (unavailable > 0) parts.push(`${unavailable} unavailable`)
+
   return parts.join(' · ')
 }
 
 function reachability(scenario: Scenario) {
   if (scenario === 'offline') return { label: 'Offline', tone: 'danger' as const }
+
   if (scenario === 'stale') return { label: 'Updates interrupted', tone: 'warning' as const }
+
   return { label: 'Reachable', tone: 'positive' as const }
 }
 
@@ -482,6 +488,17 @@ function RigView({
   readonly rig: RigFixture
   readonly scenario: Scenario
 }) {
+  function updateAge() {
+    switch (scenario) {
+      case 'offline':
+        return 'Last seen yesterday at 10:09 PM'
+      case 'stale':
+        return 'Last updated 42 seconds ago'
+      default:
+        return 'Updated just now'
+    }
+  }
+
   const devices = scenarioDevices(rig, scenario)
   const status = reachability(scenario)
 
@@ -497,7 +514,7 @@ function RigView({
         </div>
         <div className="vela-rig-hero__status">
           <Badge marker={<i />} tone={status.tone}>{status.label}</Badge>
-          <span>{scenario === 'offline' ? 'Last seen yesterday at 10:09 PM' : scenario === 'stale' ? 'Last updated 42 seconds ago' : 'Updated just now'}</span>
+          <span>{updateAge()}</span>
           <IconButton icon={<RefreshIcon />} label="Refresh Rig" onClick={onRefresh} size="small" tone="quiet" />
         </div>
       </header>

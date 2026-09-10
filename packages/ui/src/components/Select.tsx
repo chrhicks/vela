@@ -17,6 +17,7 @@ export interface SelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement
 export function Select({ label, message, invalid = false, options, className = '', id, ...props }: SelectProps) {
   const generatedId = useId()
   const selectId = id ?? `vela-select-${generatedId.replace(/:/g, '')}`
+
   return (
     <label className="vela-field" htmlFor={selectId}>
       {label ? <span className="vela-field__label">{label}</span> : null}

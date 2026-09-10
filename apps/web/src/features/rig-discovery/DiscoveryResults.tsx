@@ -56,6 +56,7 @@ function DiscoveryCandidate({
   const presentation = candidateDisposition(candidate)
   const visibleDevices = candidate.devices.slice(0, 4)
   const remainingDevices = candidate.devices.length - visibleDevices.length
+
   const content = (
     <>
       <div className="rig-discovery-candidate__heading">

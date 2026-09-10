@@ -5,6 +5,7 @@ import { targets } from './target-framing/fixtures'
 import './Panel.target-discovery.specimen.css'
 
 type Props = Record<string, string | number | boolean>
+
 const suggestions = [
   { ...targets[1]!, family: 'Emission', window: '4h 20m remaining', altitude: '72° now · near its highest', reason: 'High now, with a long stretch of useful sky ahead.', filter: 'L-Ultimate suits this emission nebula', detail: 'Its Hα and O III light passes through your dual-band filter.' },
   { ...targets[2]!, family: 'Galaxies', window: '5h 10m remaining', altitude: '48° now · rising', reason: 'Climbing into clearer sky for the rest of the night.', filter: 'Broadband is the better fit', detail: 'L-Ultimate blocks much of this galaxy’s starlight.' },
@@ -12,21 +13,35 @@ const suggestions = [
 ]
 
 function Discovery({ props, onPropsChange }: { props: Props; onPropsChange?: (patch: Props) => void }) {
+  function suggestionStatus() {
+    switch (values.state) {
+      case 'cached':
+        return 'Saved suggestions · updated 21:40'
+      case 'fresh':
+        return 'Suggestions refreshed · updated 22:00'
+      default:
+        return 'Updating tonight’s suggestions…'
+    }
+  }
+
   const [local, setLocal] = useState(props)
   const values = onPropsChange ? props : local
   const update = (patch: Props) => onPropsChange ? onPropsChange(patch) : setLocal(current => ({ ...current, ...patch }))
   const filter = String(values.filter)
   const query = String(values.query ?? '').toLowerCase()
   const light = String(values.light ?? 'All light')
+
   const matches = suggestions.filter(target => (filter === 'All objects' || target.family === filter)
     && `${target.name} ${target.catalog}`.toLowerCase().includes(query)
     && (light === 'All light' || (light === 'L-Ultimate subjects' ? target.family === 'Emission' : target.family !== 'Emission')))
+
   const page = Math.min(Number(values.page) || 0, Math.max(0, Math.ceil(matches.length / 2) - 1))
   const shown = matches.slice(page * 2, page * 2 + 2)
   const refreshing = values.state === 'refreshing'
+
   return <section className="vela-discovery-demo" aria-label="Target discovery">
     <header className="vela-discovery-demo__header"><div><p className="vela-discovery-demo__eyebrow">Explore tonight</p><h1>Find your next subject</h1><p>Good opportunities from now until dawn.</p></div><Button size="small" tone="quiet" disabled={refreshing} onClick={() => update({ state: 'fresh', page: 0 })}>{refreshing ? 'Refreshing…' : 'Refresh'}</Button></header>
-    <div className="vela-discovery-demo__snapshot"><span>{values.state === 'cached' ? 'Saved suggestions · updated 21:40' : values.state === 'fresh' ? 'Suggestions refreshed · updated 22:00' : 'Updating tonight’s suggestions…'}</span><span>Sample night · illustrative ranking</span></div>
+    <div className="vela-discovery-demo__snapshot"><span>{suggestionStatus()}</span><span>Sample night · illustrative ranking</span></div>
     <div className="vela-discovery-demo__search"><Input aria-label="Search targets" placeholder="Search by name or catalog number" value={String(values.query ?? '')} onChange={event => update({ query: event.target.value, page: 0 })} /><label>Light preference<select value={light} onChange={event => update({ light: event.target.value, page: 0 })}>{['All light', 'L-Ultimate subjects', 'Broadband subjects'].map(option => <option key={option}>{option}</option>)}</select></label></div>
     <nav className="vela-discovery-demo__filters" aria-label="Object type">{['All objects', 'Emission', 'Reflection & dark', 'Galaxies', 'Clusters', 'Planetary'].map(kind => <button key={kind} type="button" aria-pressed={filter === kind} onClick={() => update({ filter: kind, page: 0 })}>{kind}</button>)}</nav>
     <p className="vela-discovery-demo__filter-note">Your filter: <strong>Optolong L-Ultimate · dual 3nm Hα / O III</strong><span>Advice assumes you choose to fit it.</span></p>

@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import type { AlignmentView } from '@vela/model/web'
 import { Badge, Button, Panel } from '@vela/ui'
 import { useEffect, useRef, useState } from 'react'
@@ -13,64 +14,86 @@ function useAlignment(rigId: string) {
   const generation = useRef(0)
   const writing = useRef(false)
   const alive = useRef(false)
+
   async function read() {
     const current = generation.current
+
     try {
-      const next = await api<AlignmentView>(`web/rigs/${encodeURIComponent(rigId)}/alignment`, { signal: AbortSignal.timeout(5000) })
+      const next = await api(`web/rigs/${encodeURIComponent(rigId)}/alignment`, { signal: AbortSignal.timeout(5000) })
       validateView(next, rigId)
+
       if (alive.current && current === generation.current) { setView(next); setOffline(false) }
     } catch {
       if (alive.current && current === generation.current) setOffline(true)
     }
   }
+
   useEffect(() => {
     alive.current = true
     let disposed = false
     let timer: ReturnType<typeof setTimeout>
+
     async function poll() {
       if (!writing.current) await read()
+
       if (!disposed) timer = setTimeout(poll, 750)
     }
+
     void poll()
+
     return () => { disposed = true; alive.current = false; generation.current++; clearTimeout(timer) }
   }, [rigId])
+
   async function command(action: 'start' | 'stop' | 'finish') {
     if (writing.current || offline) return
     writing.current = true
     generation.current++
     setPending(true)
     setError(null)
+
     try {
-      const result = await api<AlignmentView>(`rigs/${encodeURIComponent(rigId)}/alignment/${action}`, {
+      const result = await api(`rigs/${encodeURIComponent(rigId)}/alignment/${action}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(15000),
       })
+
       validateView(result, rigId)
+
       if (alive.current) { setView(result); setOffline(false) }
     } catch (cause) {
       if (alive.current) setError(`${cause instanceof Error ? cause.message : 'Command response unavailable'}. The command was not repeated; check the current state before trying again.`)
       await read()
     } finally {
       writing.current = false
+
       if (alive.current) setPending(false)
     }
   }
+
   return { view, offline, pending, error, command }
 }
 
+const measurementSchema = z.object({
+  altitudeArcsec: z.number(), azimuthArcsec: z.number(), totalArcsec: z.number(), targetX: z.number(), targetY: z.number(),
+  imageWidth: z.number().positive(), imageHeight: z.number().positive(), fieldHeightDegrees: z.number().positive(),
+  capturedAtSource: z.enum(['camera', 'server-estimate']).optional(), imageUrl: z.string().startsWith('/api/'),
+})
+
+const alignmentSchema = z.object({
+  rigId: z.string(), rigName: z.string(), enabled: z.boolean(), error: z.string().nullable(), warning: z.string().nullable(), unavailableReason: z.string().nullable(),
+  mode: z.enum(['physical', 'offline']).optional(), cameraName: z.string().optional(), active: z.boolean(),
+  phase: z.enum(['setup', 'baseline', 'adjusting', 'stopped', 'finished', 'failed']),
+  activity: z.enum(['idle', 'exposing', 'solving', 'homing', 'moving', 'waiting', 'stopping']),
+  position: z.number(), solvedPositions: z.number(), exposureSeconds: z.number().positive(),
+  measuredAt: z.string().refine(time => Number.isFinite(Date.parse(time))).nullable(),
+  exposureStartedAt: z.string().refine(time => Number.isFinite(Date.parse(time))).nullable(),
+  measurement: measurementSchema.nullable(),
+})
+
 /** Reject malformed state before it can be shown as a confirmed observation. */
-function validateView(value: AlignmentView, rigId: string) {
-  if (!value || value.rigId !== rigId || typeof value.rigName !== 'string' || typeof value.enabled !== 'boolean'
-    || ![value.error, value.warning, value.unavailableReason].every(text => text === null || typeof text === 'string')
-    || (value.mode !== undefined && !['physical', 'offline'].includes(value.mode))
-    || (value.cameraName !== undefined && typeof value.cameraName !== 'string')
-    || typeof value.active !== 'boolean' || !['setup', 'baseline', 'adjusting', 'stopped', 'finished', 'failed'].includes(value.phase)
-    || !['idle', 'exposing', 'solving', 'homing', 'moving', 'waiting', 'stopping'].includes(value.activity)
-    || !Number.isFinite(value.position) || !Number.isFinite(value.solvedPositions) || !Number.isFinite(value.exposureSeconds)
-    || value.exposureSeconds <= 0 || ![value.measuredAt, value.exposureStartedAt].every(time => time === null || (typeof time === 'string' && Number.isFinite(Date.parse(time))))) throw new Error('Invalid alignment response')
-  const m = value.measurement
-  if (m !== null && (!m || ![m.altitudeArcsec, m.azimuthArcsec, m.totalArcsec, m.targetX, m.targetY, m.imageWidth, m.imageHeight, m.fieldHeightDegrees].every(Number.isFinite)
-    || (m.capturedAtSource !== undefined && !['camera', 'server-estimate'].includes(m.capturedAtSource))
-    || m.imageWidth <= 0 || m.imageHeight <= 0 || m.fieldHeightDegrees <= 0 || typeof m.imageUrl !== 'string' || !m.imageUrl.startsWith('/api/'))) throw new Error('Invalid alignment measurement')
+function validateView(value: unknown, rigId: string): asserts value is AlignmentView {
+  const result = alignmentSchema.safeParse(value)
+
+  if (!result.success || result.data.rigId !== rigId) throw new Error('Invalid alignment response')
 }
 
 function useSolvedMeasurement(view: AlignmentView | null) {
@@ -78,47 +101,72 @@ function useSolvedMeasurement(view: AlignmentView | null) {
   const [imageError, setImageError] = useState(false)
   useEffect(() => {
     const measurement = view?.measurement
-    if (!measurement) { setSolved(null); setImageError(false); return }
+
+    if (!measurement) {
+      setSolved(null)
+      setImageError(false)
+
+      return
+    }
+
     const next = { measurement, measuredAt: view.measuredAt }
     let current = true
     let retry: ReturnType<typeof setTimeout> | undefined
+
     function load() {
       const image = new Image()
       image.onload = () => { if (current) { setSolved(next); setImageError(false) } }
+
       image.onerror = () => {
         if (!current) return
         setImageError(true)
         retry = setTimeout(load, 1500)
       }
+
       image.src = next.measurement.imageUrl
     }
+
     load()
+
     return () => { current = false; clearTimeout(retry) }
   }, [view?.measurement?.imageUrl])
+
   return { solved, imageError }
 }
 
 function angle(value: number) {
   const seconds = Math.round(Math.abs(value))
+
   return seconds < 60 ? `${seconds}″` : `${Math.floor(seconds / 60)}′ ${seconds % 60}″`
 }
 
 function alignmentActivity(view: AlignmentView, offline: boolean) {
   if (offline) return 'Connection interrupted'
+
   if (view.activity === 'exposing') return 'Exposing image'
+
   if (view.activity === 'solving') return 'Plate-solving…'
+
   if (view.activity === 'homing') return 'Preparing starting field…'
+
   if (view.activity === 'moving') return `Moving to position ${view.position}…`
+
   if (view.activity === 'stopping') return 'Stopping…'
+
   if (view.phase === 'finished') return 'Alignment ended by you'
+
   if (!view.active) return 'Measurements stopped'
+
   if (view.activity === 'waiting') return 'Waiting for the next image'
+
   if (view.measurement) return 'Alignment updated'
+
   return 'Preparing measurement…'
 }
 
 export function Alignment() {
   const { rigId = '' } = useParams()
+
   return <AlignmentPage key={rigId} rigId={rigId} />
 }
 
@@ -126,8 +174,13 @@ function AlignmentPage({ rigId }: { rigId: string }) {
   const { view, offline, pending, error, command } = useAlignment(rigId)
   const { solved, imageError } = useSolvedMeasurement(view)
   const [now, setNow] = useState(Date.now())
-  useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 500); return () => clearInterval(timer) }, [])
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 500)
+
+    return () => clearInterval(timer)
+  }, [])
   const back = <Link className="vela-rig-page__back" to={`/rigs/${encodeURIComponent(rigId)}/observe`}>← Observe</Link>
+
   if (!view) return <section className="vela-rig-page">{back}<h1>Polar alignment</h1><p role="status">{offline ? 'Alignment state unavailable. Reconnecting…' : 'Loading alignment…'}</p></section>
   const physical = view.mode === 'physical'
   const disabled = pending || offline
@@ -136,14 +189,17 @@ function AlignmentPage({ rigId }: { rigId: string }) {
   const elapsed = view.exposureStartedAt ? Math.min(view.exposureSeconds, Math.max(0, (now - Date.parse(view.exposureStartedAt)) / 1000)) : 0
   const age = solved?.measuredAt ? `${Math.max(0, Math.floor((now - Date.parse(solved.measuredAt)) / 1000))} s ago` : 'Not measured'
   const activity = alignmentActivity(view, offline)
+
   const nextInstruction = view.active
     ? 'After the third solve, the adjustment view will show your alignment error and the target reticle.'
     : physical
       ? 'Each attempt homes, then moves to a consistent starting field at Dec +80°. Prepare a clear movement corridor: after a small direction check, Vela makes two continuous westward RA rotations of roughly 54° at 1° per second. Allow up to 120° total westward travel and 1° on either side for the direction check.'
       : 'Start with the simulator’s large-error preset and clear camera. Keep its offsets unchanged until all three positions are measured.'
+
   const preparationInstruction = physical && !view.active
     ? 'Use sidereal tracking. Keep the mount’s adjustment knobs still until all three positions are measured. You can stop at any time.'
     : 'You can stop the measurement at any time.'
+
   const adjustmentInstruction = view.active
     ? physical
       ? 'Adjust the mount’s altitude and azimuth knobs. Use the reticle and remaining error to decide when you’re done.'
@@ -153,6 +209,7 @@ function AlignmentPage({ rigId }: { rigId: string }) {
       : physical
         ? 'Prepare the rig and clear movement corridor again, then measure a fresh baseline.'
         : 'Reset or reposition the simulator, then measure a fresh baseline.'
+
   const activityArea = <div className="vela-polar-activity">
     <div className="vela-polar-activity__line" role="status">
       <span
@@ -177,6 +234,7 @@ function AlignmentPage({ rigId }: { rigId: string }) {
     </div>
     <p>{offline ? 'Readings and overlay are last known. Reconnecting…' : view.active ? 'Wait for a fresh alignment update after each adjustment.' : 'Readings and overlay are from the last successful solve.'}</p>
   </div>
+
   return <section className="vela-rig-page vela-alignment" data-pending={pending || undefined}>
     {back}
     <header className="vela-polar-heading">
@@ -201,10 +259,12 @@ function AlignmentPage({ rigId }: { rigId: string }) {
               const solved = point <= view.solvedPositions
               const current = view.active && point === view.position
               const state = solved ? 'done' : current ? 'current' : 'pending'
+
               const status = solved ? 'Solved'
                 : !current ? 'Not measured'
                 : view.activity === 'homing' ? 'Preparing starting field…'
                 : view.activity === 'moving' ? 'Moving' : 'Measuring'
+
               return <li key={point} data-state={state}>
                 <span>{solved ? '✓' : point}</span>
                 <strong>Position {point}</strong>
@@ -293,6 +353,7 @@ function SolvedFrame({ measurement: m }: { measurement: NonNullable<AlignmentVie
   const scale = fieldHeight / 400
   const barX = x - fieldWidth / 2 + 24 * scale
   const barY = y + fieldHeight / 2 - 24 * scale
+
   return <figure className="vela-polar-image"><div className="vela-polar-image-heading"><span>Last solved frame</span><span>20′ field · fixed scale</span></div>
     <svg viewBox={`${x - fieldWidth / 2} ${y - fieldHeight / 2} ${fieldWidth} ${fieldHeight}`} role="img" aria-label="Solved camera image with frame reference and alignment target"><image href={m.imageUrl} width={m.imageWidth} height={m.imageHeight} />
       <g fill="none" stroke="var(--vela-polar-target)" strokeWidth={1.4 * scale}><circle cx={m.targetX} cy={m.targetY} r={16 * scale} /><circle cx={m.targetX} cy={m.targetY} r={32 * scale} opacity=".55" /><path d={`M${m.targetX - 48 * scale} ${m.targetY}h${36 * scale}m${24 * scale} 0h${36 * scale}M${m.targetX} ${m.targetY - 48 * scale}v${36 * scale}m0 ${24 * scale}v${36 * scale}`} /></g>

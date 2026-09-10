@@ -9,15 +9,18 @@ import type {
 } from '../discovery-model.js'
 
 const discoveryMessage = new TextEncoder().encode('alpacadiscovery1')
+
 const discoveryPort = 32227
+
 const retryIntervalMs = 250
+
 const discoveryResponse = Schema.Struct({
   AlpacaPort: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 65535 })),
 })
 
 const jsonObjectFromString = Schema.String.pipe(
   Schema.decodeTo(Schema.Unknown, SchemaTransformation.fromJsonString()),
-  Schema.decodeTo(Schema.Record(Schema.String, Schema.Unknown)),
+  Schema.decodeTo(Schema.Record(Schema.String, Schema.Json)),
 )
 
 interface Ipv4Interface {
@@ -45,20 +48,20 @@ export interface UdpScannerDependencies {
   readonly createSocket: () => UdpSocket
 }
 
-function signalReason(signal: AbortSignal): unknown {
-  return signal.reason ?? new DOMException('The operation was aborted', 'AbortError')
-}
-
 function parseIpv4(address: string): number | undefined {
   const parts = address.split('.')
+
   if (parts.length !== 4) return undefined
 
   let value = 0
+
   for (const part of parts) {
     const octet = Number(part)
+
     if (!Number.isInteger(octet) || octet < 0 || octet > 255) return undefined
     value = ((value << 8) | octet) >>> 0
   }
+
   return value
 }
 
@@ -71,12 +74,14 @@ function formatIpv4(value: number): string {
 function broadcastAddress(networkInterface: Ipv4Interface): string | undefined {
   const address = parseIpv4(networkInterface.address)
   const netmask = parseIpv4(networkInterface.netmask)
+
   if (address === undefined || netmask === undefined) return undefined
+
   return formatIpv4(((address & netmask) | (~netmask >>> 0)) >>> 0)
 }
 
 function parseDiscoveryResponse(message: Uint8Array): number | undefined {
-  let record: Readonly<Record<string, unknown>>
+  let record: typeof jsonObjectFromString.Type
 
   try {
     record = Schema.decodeUnknownSync(jsonObjectFromString)(
@@ -87,12 +92,14 @@ function parseDiscoveryResponse(message: Uint8Array): number | undefined {
   }
 
   const portEntry = Object.entries(record).find(([name]) => name.toLowerCase() === 'alpacaport')
+
   if (portEntry === undefined) return undefined
 
   try {
     const response = Schema.decodeUnknownSync(discoveryResponse)({
       AlpacaPort: portEntry[1],
     })
+
     return response.AlpacaPort
   } catch {
     return undefined
@@ -106,17 +113,22 @@ function scanInterface(
 ): Promise<ReadonlyArray<AlpacaEndpoint>> {
   return new Promise((resolve, reject) => {
     const broadcast = broadcastAddress(networkInterface)
+
     if (broadcast === undefined) {
       reject(new Error(`Invalid IPv4 interface ${networkInterface.address}`))
+
       return
     }
+
     const broadcastTarget = broadcast
 
     let socket: UdpSocket
+
     try {
       socket = createSocket()
     } catch (error) {
       reject(error)
+
       return
     }
 
@@ -145,15 +157,15 @@ function scanInterface(
       resolve([...endpoints.values()])
     }
 
-    function fail(error: unknown) {
+    function fail(cause: unknown) {
       if (settled) return
       settled = true
       cleanUp()
-      reject(error)
+      reject(cause)
     }
 
     function onAbort() {
-      fail(options.signal === undefined ? undefined : signalReason(options.signal))
+      fail(options.signal === undefined ? undefined : (options.signal.reason ?? new DOMException('The operation was aborted', 'AbortError')))
     }
 
     function sendDiscovery() {
@@ -165,6 +177,7 @@ function scanInterface(
 
     socket.onMessage((message, sourceAddress) => {
       const port = parseDiscoveryResponse(message)
+
       if (port === undefined) return
       const endpoint = { host: sourceAddress, port }
       endpoints.set(`${endpoint.host}:${endpoint.port}`, endpoint)
@@ -175,18 +188,22 @@ function scanInterface(
         socket.setBroadcast(true)
       } catch (error) {
         fail(error)
+
         return
       }
 
       sendDiscovery()
+
       for (let attempt = 1; attempt < options.attempts; attempt += 1) {
         timers.push(setTimeout(sendDiscovery, retryIntervalMs * attempt))
       }
+
       timers.push(setTimeout(succeed, options.durationMs))
     })
 
     if (options.signal?.aborted) {
       onAbort()
+
       return
     }
 
@@ -217,6 +234,7 @@ export function createUdpScanner({
       const selectedAddresses = options.interfaceAddresses === undefined
         ? undefined
         : new Set(options.interfaceAddresses)
+
       const selectedInterfaces = availableInterfaces.filter((networkInterface) =>
         selectedAddresses === undefined || selectedAddresses.has(networkInterface.address),
       )
@@ -232,13 +250,14 @@ export function createUdpScanner({
       )
 
       if (options.signal?.aborted) {
-        throw signalReason(options.signal)
+        throw (options.signal.reason ?? new DOMException('The operation was aborted', 'AbortError'))
       }
 
       const successful = results.filter(
         (result): result is PromiseFulfilledResult<ReadonlyArray<AlpacaEndpoint>> =>
           result.status === 'fulfilled',
       )
+
       if (successful.length === 0) {
         throw new AlpacaDiscoveryError('Alpaca discovery failed on every IPv4 interface', {
           cause: new AggregateError(
@@ -248,11 +267,13 @@ export function createUdpScanner({
       }
 
       const endpoints = new Map<string, AlpacaEndpoint>()
+
       for (const result of successful) {
         for (const endpoint of result.value) {
           endpoints.set(`${endpoint.host}:${endpoint.port}`, endpoint)
         }
       }
+
       return [...endpoints.values()]
     },
   }

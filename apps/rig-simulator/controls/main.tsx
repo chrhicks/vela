@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import { createRoot } from 'react-dom/client'
 import { Button, Input, Panel, Select, VELA_CURRENT_PROFILE, resolveTheme, themeStyle } from '@vela/ui'
 import { useSimulator } from './useSimulator'
@@ -7,6 +7,7 @@ import './styles.css'
 
 function angularOffset(value: number) {
   const seconds = Math.round(Math.abs(value))
+
   return `${seconds >= 60 ? `${Math.floor(seconds / 60)}′ ` : ''}${seconds % 60}″`
 }
 
@@ -15,6 +16,7 @@ function Axis({ axis, value, step, disabled, adjust }: {
   adjust: (delta: number) => void,
 }) {
   const vertical = axis === 'altitude'
+
   return <section aria-label={`${vertical ? 'Altitude' : 'Azimuth'} adjustment`}>
     <div className="sim-axis-heading">
       <h2>{vertical ? 'Altitude' : 'Azimuth'}</h2>
@@ -39,6 +41,7 @@ function Controls() {
   const exposing = state?.cameras.some(camera => camera.activity === 'exposing') ?? false
   const mountBusy = exposing || !!state?.slewing
   let statusMessage = notice
+
   if (exposing) {
     statusMessage = 'Exposing image · wait before adjusting the mount'
   } else if (state?.slewing) {
@@ -75,14 +78,16 @@ function Controls() {
     const fields = new FormData(event.currentTarget)
     const altitude = Number(fields.get('altitude'))
     const azimuth = Number(fields.get('azimuth'))
+
     if ([altitude, azimuth].every(value => Number.isInteger(value) && Math.abs(value) <= 18000)) {
       void adjust(altitude, azimuth)
     }
   }
+
   return <main
     className="vela-theme sim-page"
     data-mode="dark"
-    style={themeStyle(resolveTheme(VELA_CURRENT_PROFILE), 'dark') as CSSProperties}
+    style={themeStyle(resolveTheme(VELA_CURRENT_PROFILE), 'dark')}
   >
     <article className="sim-controls" data-pending={pending}>
       <header className="sim-heading">

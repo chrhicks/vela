@@ -10,6 +10,7 @@ import './saved-images.css'
 
 export function SavedImages() {
   const { rigId = '', imageId } = useParams()
+
   return <SavedImagesPage key={`${rigId}/${imageId ?? ''}`} rigId={rigId} imageId={imageId} />
 }
 
@@ -25,10 +26,13 @@ function SavedImagesPage({ rigId, imageId }: { rigId: string, imageId?: string }
     const controller = new AbortController()
     setLoading(true)
     setError(null)
+
     async function load() {
       try {
-        const result = await api<unknown>(`web/rigs/${encodeURIComponent(rigId)}/saved-images${imageId ? `/${encodeURIComponent(imageId)}` : ''}`, { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)]) })
+        const result = await api(`web/rigs/${encodeURIComponent(rigId)}/saved-images${imageId ? `/${encodeURIComponent(imageId)}` : ''}`, { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)]) })
+
         if (controller.signal.aborted) return
+
         if (imageId) {
           if (!isSavedImageView(result, rigId) || result.image.id !== imageId) throw new Error('Invalid saved image')
           setImage(result.image)
@@ -44,14 +48,18 @@ function SavedImagesPage({ rigId, imageId }: { rigId: string, imageId?: string }
         if (!controller.signal.aborted) setLoading(false)
       }
     }
+
     void load()
+
     return () => controller.abort()
   }, [rigId, imageId, attempt])
   const groups = new Map<string, SavedImage[]>()
+
   for (const frame of [...(view?.images ?? [])].sort((a, b) => Date.parse(b.capturedAt) - Date.parse(a.capturedAt))) {
     const day = new Date(frame.capturedAt).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })
     groups.set(day, [...(groups.get(day) ?? []), frame])
   }
+
   return <section className="vela-rig-page capture-page saved-images-page">
     <Link className="vela-rig-page__back" to={imageId ? `${base}/saved-images` : base}>← {imageId ? 'Saved images' : 'Observe'}</Link>
     <header className="capture-page__heading"><div>{rigName && <p>{rigName}</p>}<h1>{imageId ? 'Saved image' : 'Saved images'}</h1></div>{view && <span className="vela-saved-count">{view.images.length} {view.images.length === 1 ? 'image' : 'images'}</span>}</header>

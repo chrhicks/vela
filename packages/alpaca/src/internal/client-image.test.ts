@@ -5,15 +5,20 @@ afterEach(() => vi.useRealTimers())
 
 it.each(['application/json', 'application/imagebytes'])('bounds %s image transfer independently of ordinary reads', async contentType => {
   vi.useFakeTimers()
+
   const fetch: typeof globalThis.fetch = async (_input, init) => {
     const response = Response.json({}, { headers: { 'content-type': contentType } })
+
     const pending = () => new Promise<never>((_resolve, reject) => {
       init!.signal!.addEventListener('abort', () => reject(init!.signal!.reason), { once: true })
     })
+
     response.json = pending
     response.arrayBuffer = pending
+
     return response
   }
+
   const client = createAlpacaClient({ baseUrl: 'http://fake', fetch, requestTimeoutMs: 5_000, imageTimeoutMs: 60_000 })
   const camera = { DeviceName: 'Camera', DeviceType: 'Camera', DeviceNumber: 0, UniqueID: 'camera' }
   let imageSettled = false
@@ -35,18 +40,22 @@ it('negotiates ImageBytes and uses the actual response Content-Type for JSON fal
   const fields = [1, 0, 0, 1, 44, 2, 8, 2, 1, 1, 0]
   fields.forEach((value, index) => metadata.setInt32(index * 4, value, true))
   metadata.setUint16(44, 7, true)
+
   for (const binary of [true, false]) {
     let requests = 0
+
     const fetch: typeof globalThis.fetch = async (_input, init) => {
       requests++
       expect(new Headers(init?.headers).get('accept')).toBe('application/imagebytes, application/json;q=0.9')
+
       return binary
         ? new Response(bytes, { headers: { 'content-type': 'Application/ImageBytes; version=1' } })
         : Response.json(json)
     }
+
     const client = createAlpacaClient({ baseUrl: 'http://fake', fetch })
     const result = await client.image(camera)
-    expect(binary ? Array.from(new Uint8Array(result as ArrayBuffer)) : result).toEqual(binary ? Array.from(new Uint8Array(bytes)) : json)
+    expect(result instanceof ArrayBuffer ? Array.from(new Uint8Array(result)) : result).toEqual(binary ? Array.from(new Uint8Array(bytes)) : json)
     expect(requests).toBe(1)
   }
 })

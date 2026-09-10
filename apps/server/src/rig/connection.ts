@@ -93,13 +93,15 @@ export function createRigConnectionCoordinator({
     options: RigConnectionRequestOptions,
     signal: AbortSignal | null = options.signal ?? null,
   ): Promise<InspectRigDetailResult> {
-    return inspectRigDetail(catalog, rigId, {
-      createInspector,
-      now,
-      ...(options.onConflict === undefined ? {} : { onConflict: options.onConflict }),
-      ...(options.onUnavailable === undefined ? {} : { onUnavailable: options.onUnavailable }),
-      ...(signal === null ? {} : { signal }),
-    })
+    let inspectionOptions: RigDetailOptions = { createInspector, now }
+
+    if (options.onConflict !== undefined) inspectionOptions = { ...inspectionOptions, onConflict: options.onConflict }
+
+    if (options.onUnavailable !== undefined) inspectionOptions = { ...inspectionOptions, onUnavailable: options.onUnavailable }
+
+    if (signal !== null) inspectionOptions = { ...inspectionOptions, signal: signal }
+
+    return inspectRigDetail(catalog, rigId, inspectionOptions)
   }
 
   async function loadObservation(
@@ -107,6 +109,7 @@ export function createRigConnectionCoordinator({
     options: RigConnectionRequestOptions = {},
   ): Promise<LoadRigObservationResult> {
     const detail = await inspect(rigId, options)
+
     return detail.state === 'not-found'
       ? detail
       : {
@@ -125,7 +128,9 @@ export function createRigConnectionCoordinator({
 
     try {
       const detail = await inspect(rigId, options)
+
       if (detail.state === 'not-found') return detail
+
       if (detail.state !== 'current') {
         return {
           state: 'finished',
@@ -134,8 +139,10 @@ export function createRigConnectionCoordinator({
       }
 
       const candidates = connectionCandidates(detail)
+
       const unavailableDevice = detail.inspections.find((device) =>
         isConnectableDeviceKind(device.kind) && device.connection === 'unavailable')
+
       if (unavailableDevice !== undefined) {
         return {
           state: 'finished',
@@ -146,6 +153,7 @@ export function createRigConnectionCoordinator({
           },
         }
       }
+
       if (candidates.length === 0) {
         return {
           state: 'finished',
@@ -162,6 +170,7 @@ export function createRigConnectionCoordinator({
         id: detail.view.id,
         endpoint: detail.view.endpoint,
       })
+
       const confirmedConnected: RigConnectionDeviceView[] = []
 
       for (let index = 0; index < candidates.length; index += 1) {
@@ -176,10 +185,12 @@ export function createRigConnectionCoordinator({
           )
         } catch (error) {
           if (options.signal?.aborted) throw error
+
           if (!(error instanceof AlpacaProviderError)) throw error
 
           options.onProviderResult?.(candidate.providerDeviceId, error)
           const view = await refreshObservation(rigId, options)
+
           return {
             state: 'finished',
             result: connectionFailureResult(
@@ -193,6 +204,7 @@ export function createRigConnectionCoordinator({
         }
 
         options.onProviderResult?.(candidate.providerDeviceId, result)
+
         if (result.outcome === 'connected') {
           confirmedConnected.push(candidate.device)
           continue
@@ -200,6 +212,7 @@ export function createRigConnectionCoordinator({
 
         const notAttempted = candidates.slice(index + 1).map(({ device }) => device)
         const view = await refreshObservation(rigId, options)
+
         if (result.outcome === 'failed') {
           return {
             state: 'finished',
@@ -212,6 +225,7 @@ export function createRigConnectionCoordinator({
             ),
           }
         }
+
         return {
           state: 'finished',
           result: resolvedUncertainResult(
@@ -257,9 +271,11 @@ export function createRigConnectionCoordinator({
     options: RigConnectionRequestOptions,
   ): Promise<RigObservationView> {
     const refreshed = await inspect(rigId, options, null)
+
     if (refreshed.state === 'not-found') {
       throw new Error(`Rig ${rigId} disappeared during its connection operation`)
     }
+
     return rigObservationView(refreshed.view)
   }
 
@@ -270,15 +286,18 @@ function connectionCandidates(
   detail: Extract<InspectRigDetailResult, { readonly state: 'current' }>,
 ): ReadonlyArray<ConnectionCandidate> {
   const devicesById = new Map(detail.view.devices.map((device) => [device.id, device]))
+
   return detail.inspections.flatMap((inspection) => {
     if (!isConnectableDeviceKind(inspection.kind) || inspection.connection !== 'disconnected') {
       return []
     }
 
     const device = devicesById.get(`${detail.view.id}-${inspection.providerDeviceId}`)
+
     if (device === undefined) {
       throw new Error(`Missing Rig device projection for ${inspection.providerDeviceId}`)
     }
+
     return [{
       providerDeviceId: inspection.providerDeviceId,
       device: connectionDeviceView(device),
@@ -302,6 +321,7 @@ function connectionFailureResult(
       view,
     }
   }
+
   return {
     outcome: 'partial',
     confirmedConnected: [confirmedConnected[0]!, ...confirmedConnected.slice(1)],
@@ -319,6 +339,7 @@ function resolvedUncertainResult(
   view: RigObservationView,
 ): ConnectRigDevicesResult {
   const refreshedDevice = view.rig.devices.find(({ id }) => id === uncertain.id)
+
   if (refreshedDevice?.connection === 'disconnected') {
     return connectionFailureResult(
       confirmedConnected,
@@ -328,6 +349,7 @@ function resolvedUncertainResult(
       view,
     )
   }
+
   if (refreshedDevice?.connection === 'connected') {
     const resolvedConnections: readonly [
       RigConnectionDeviceView,
@@ -335,6 +357,7 @@ function resolvedUncertainResult(
     ] = confirmedConnected.length === 0
       ? [uncertain]
       : [confirmedConnected[0]!, ...confirmedConnected.slice(1), uncertain]
+
     return notAttempted.length === 0
       ? {
           outcome: 'complete',
@@ -350,6 +373,7 @@ function resolvedUncertainResult(
           view,
         }
   }
+
   return {
     outcome: 'uncertain',
     confirmedConnected,

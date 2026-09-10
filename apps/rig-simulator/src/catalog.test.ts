@@ -13,6 +13,7 @@ function tile(raDegrees: number, decDegrees: number, magnitude: number) {
   data[114] = Math.round(magnitude * 10 + 16)
   data.writeUIntLE(Math.round(raDegrees / 360 * 0xffffff), 115, 3)
   data.writeUInt16LE(decRaw & 0xffff, 118)
+
   return data
 }
 
@@ -39,6 +40,7 @@ it('rejects unsupported record widths, partial records, missing block headers an
 
 it('loads only D05 tiles and applies the configured sky bounds', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'vela-d05-'))
+
   try {
     await writeFile(join(directory, 'd05_0001.1476'), tile(23, 60, 12.3))
     await writeFile(join(directory, 'd05_0002.1476'), tile(100, 60, 10))
@@ -54,6 +56,7 @@ it('loads only D05 tiles and applies the configured sky bounds', async () => {
 
 async function withCatalog(run: (directory: string) => Promise<void>) {
   const directory = await mkdtemp(join(tmpdir(), 'vela-d05-field-'))
+
   try {
     await run(directory)
   } finally {
@@ -127,6 +130,7 @@ it('reports absent or malformed catalog data and retries after a failed load', a
 it('rejects malformed field coordinates before accessing the catalog', async () => {
   const source = createStarSource('/unused')
   const field = { raDegrees: 20, decDegrees: 0, radiusDegrees: 1 }
+
   for (const invalid of [
     { raDegrees: NaN }, { raDegrees: -1 }, { raDegrees: 360 },
     { decDegrees: 91 }, { decDegrees: -91 }, { decDegrees: Infinity },

@@ -38,6 +38,7 @@ export function RigDeviceCard({
 }) {
   const connection = connectionPresentation(device, stale)
   const presentation = devicePresentation(device)
+
   const noDetails = presentation.metrics.length === 0
     && (presentation.channels === undefined || presentation.channels.length === 0)
 
@@ -97,10 +98,13 @@ export function RigDeviceCard({
 
 function connectionPresentation(device: RigDeviceDetailView, stale: boolean) {
   if (stale) return { label: 'Last known', tone: 'warning' as const }
+
   if (device.connection === 'connected') return { label: 'Connected', tone: 'positive' as const }
+
   if (device.connection === 'disconnected') {
     return { label: 'Disconnected', tone: 'warning' as const }
   }
+
   return { label: 'Unavailable', tone: 'danger' as const }
 }
 
@@ -114,6 +118,7 @@ function devicePresentation(device: RigDeviceDetailView): DevicePresentation {
       metrics: [],
     }
   }
+
   if (device.status.availability === 'unsupported') {
     return {
       activity: 'Limited status',
@@ -194,15 +199,20 @@ function devicePresentation(device: RigDeviceDetailView): DevicePresentation {
           optionalMetric('Dew point', device.status.dewPointC, formatTemperature),
         ].filter(isMetric),
       }
-    case 'switch':
-      return {
+    case 'switch': {
+      const presentation: DevicePresentation = {
         activity: titleCase(device.status.activity),
         note: device.status.availability === 'partial'
           ? 'Some channels could not be read'
           : 'Generic channel values',
         metrics: [],
-        ...(device.status.channels === undefined ? {} : { channels: device.status.channels }),
       }
+
+      if (device.status.channels === undefined) return presentation
+
+      return { ...presentation, channels: device.status.channels }
+    }
+
     default:
       return { activity: 'Limited status', note: 'Detailed status is not available', metrics: [] }
   }
@@ -227,13 +237,10 @@ function cameraNote(activity: string): string {
   }
 }
 
-function telescopeNote(tracking: string, home: string): string {
-  const trackingLabel = tracking === 'on'
-    ? 'Tracking'
-    : tracking === 'off' ? 'Not tracking' : 'Tracking unknown'
-  const homeLabel = home === 'at-home'
-    ? 'At home'
-    : home === 'away' ? 'Away from home' : 'Home unknown'
+function telescopeNote(tracking: 'on' | 'off' | 'unknown', home: 'at-home' | 'away' | 'unknown'): string {
+  const trackingLabel = { on: 'Tracking', off: 'Not tracking', unknown: 'Tracking unknown' }[tracking]
+  const homeLabel = { 'at-home': 'At home', away: 'Away from home', unknown: 'Home unknown' }[home]
+
   return `${trackingLabel} · ${homeLabel}`
 }
 
@@ -243,6 +250,7 @@ function stateMetric(
   labels: Readonly<Record<string, string>>,
 ): Metric {
   const value = labels[state] ?? 'Unknown'
+
   return {
     label,
     value,

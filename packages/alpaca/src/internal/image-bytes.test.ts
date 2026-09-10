@@ -1,19 +1,22 @@
+import { Match } from 'effect'
 import { describe, expect, it } from 'vitest'
 import { imageBytesPixels } from './image-bytes.js'
 
 function imageBytes(type = 8, samples = [1, 256, 65535, 2, 40000, 3], dataStart = 44) {
-  const size = type === 6 ? 1 : type === 2 ? 4 : 2
+  const size = Match.value(type).pipe(Match.when(6, () => 1), Match.when(2, () => 4), Match.orElse(() => 2))
   const bytes = new ArrayBuffer(dataStart + samples.length * size)
   const view = new DataView(bytes)
   const header = [1, 0, 0, 0, dataStart, 2, type, 2, 2, 3, 0]
   header.forEach((value, index) => view.setInt32(index * 4, value, true))
   samples.forEach((value, index) => {
     const offset = dataStart + index * size
+
     if (type === 6) view.setUint8(offset, value)
     else if (type === 2) view.setInt32(offset, value, true)
     else if (type === 1) view.setInt16(offset, value, true)
     else view.setUint16(offset, value, true)
   })
+
   return bytes
 }
 
@@ -47,6 +50,7 @@ describe('ImageBytes rank-2 Int32 source images', () => {
 
   it('rejects truncated metadata, truncated pixels, and unexpected trailing pixels', () => {
     const bytes = imageBytes()
+
     for (const malformed of [bytes.slice(0, 43), bytes.slice(0, -1), imageBytes(8, [1, 2, 3, 4, 5, 6, 7])]) {
       expect(() => imageBytesPixels(malformed, 2, 3)).toThrow()
     }
@@ -61,9 +65,11 @@ describe('ImageBytes rank-2 Int32 source images', () => {
     view.setInt32(16, 44, true)
     new Uint8Array(bytes, 44).set(message)
     expect(() => imageBytesPixels(bytes, 2, 3)).toThrow('Caméra indisponible')
+
     try { imageBytesPixels(bytes, 2, 3) } catch (error) {
       expect(error).toMatchObject({ reason: 'protocol-error', errorNumber: 1025 })
     }
+
     new Uint8Array(bytes)[44] = 0xff
     expect(() => imageBytesPixels(bytes, 2, 3)).toThrow('UTF-8')
   })

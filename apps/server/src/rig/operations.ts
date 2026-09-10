@@ -6,6 +6,7 @@ export function createRigOperations() {
     if (owners.has(rigId)) return undefined
     owners.set(rigId, owner)
     let released = false
+
     return () => {
       if (released) return
       released = true

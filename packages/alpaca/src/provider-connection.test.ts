@@ -1,3 +1,4 @@
+import type { ResponseFixture } from './internal/test-fixtures.js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   AlpacaProviderError,
@@ -13,9 +14,10 @@ interface RecordedRequest {
 }
 
 type ResponseFactory = (signal: AbortSignal | null) => Promise<Response>
-type RouteResult = unknown | Error | Response | ResponseFactory
 
-function envelope(Value: unknown, ErrorNumber = 0, ErrorMessage = '') {
+type RouteResult = ResponseFixture | Error | Response | ResponseFactory
+
+function envelope(Value: ResponseFixture, ErrorNumber = 0, ErrorMessage = '') {
   return { Value, ClientTransactionID: 0, ServerTransactionID: 1, ErrorNumber, ErrorMessage }
 }
 
@@ -27,8 +29,10 @@ function stalledRequest(signal: AbortSignal | null): Promise<Response> {
   return new Promise((_resolve, reject) => {
     if (signal?.aborted) {
       reject(signal.reason)
+
       return
     }
+
     signal?.addEventListener('abort', () => reject(signal.reason), { once: true })
   })
 }
@@ -39,7 +43,7 @@ function scriptedFetch(
 ): typeof globalThis.fetch {
   let index = 0
 
-  return (async (input, init) => {
+  return async (input, init) => {
     const url = new URL(String(input))
     requests.push({
       path: url.pathname,
@@ -50,12 +54,17 @@ function scriptedFetch(
 
     const result = results[index]
     index += 1
+
     if (result instanceof Error) throw result
+
     if (result instanceof Response) return result
-    if (typeof result === 'function') return result(init?.signal ?? null)
+
+    if (result instanceof Function) return result(init?.signal ?? null)
+
     if (result === undefined) return new Response('Not found', { status: 404 })
+
     return Response.json(result)
-  }) as typeof globalThis.fetch
+  }
 }
 
 const configuredCamera = {
@@ -64,7 +73,9 @@ const configuredCamera = {
   DeviceNumber: 0,
   UniqueID: 'camera-1',
 }
+
 const inventory = envelope([configuredCamera])
+
 const unsupportedConnecting = methodEnvelope(1024, 'Connecting is not implemented')
 
 function provider(results: ReadonlyArray<RouteResult>, requests: RecordedRequest[] = []) {
@@ -79,25 +90,34 @@ function provider(results: ReadonlyArray<RouteResult>, requests: RecordedRequest
 
 function connectingProvider(connectionDurationMs: number) {
   let requestedAt: number | undefined
+
   const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const path = new URL(String(input)).pathname
     const method = init?.method ?? 'GET'
+
     if (method === 'GET' && path === '/management/v1/configureddevices') {
       return Response.json(inventory)
     }
+
     if (method === 'PUT' && path === '/api/v1/camera/0/connected') {
       requestedAt = Date.now()
+
       return Response.json(methodEnvelope())
     }
+
     const connected = requestedAt !== undefined && Date.now() - requestedAt >= connectionDurationMs
+
     if (method === 'GET' && path === '/api/v1/camera/0/connected') {
       return Response.json(envelope(connected))
     }
+
     if (method === 'GET' && path === '/api/v1/camera/0/connecting') {
       return Response.json(envelope(requestedAt !== undefined && !connected))
     }
+
     throw new Error(`Unexpected request: ${method} ${path}`)
   })
+
   const alpaca = createAlpacaProvider({
     baseUrl: 'http://alpaca.test',
     fetch,
@@ -105,6 +125,7 @@ function connectingProvider(connectionDurationMs: number) {
     connectionPollIntervalMs: 10,
     connectionVerificationTimeoutMs: 30,
   })
+
   return { alpaca, fetch }
 }
 
@@ -115,6 +136,7 @@ afterEach(() => {
 describe('Alpaca device connection', () => {
   it('connects a Seestar-like device with the documented form-encoded setter and verifies it', async () => {
     const requests: RecordedRequest[] = []
+
     const alpaca = provider([
       inventory,
       envelope(false),
@@ -201,10 +223,13 @@ describe('Alpaca device connection', () => {
 
   it('preserves a decoded protocol rejection when cancellation races with the response', async () => {
     const controller = new AbortController()
+
     const rejectThenCancel: ResponseFactory = async () => {
       queueMicrotask(() => controller.abort(new DOMException('Cancelled', 'AbortError')))
+
       return Response.json(methodEnvelope(1025, 'Invalid connection request'))
     }
+
     const alpaca = provider([
       inventory,
       envelope(false),
@@ -305,6 +330,7 @@ describe('Alpaca device connection', () => {
   it('does not replay a response-less write and reports the unresolved outcome', async () => {
     vi.useFakeTimers()
     const requests: RecordedRequest[] = []
+
     const alpaca = provider([
       inventory,
       envelope(false),
@@ -325,6 +351,7 @@ describe('Alpaca device connection', () => {
 
   it('reports unavailable verification when the post-write read receives no response', async () => {
     vi.useFakeTimers()
+
     const alpaca = provider([
       inventory,
       envelope(false),
@@ -355,11 +382,14 @@ describe('Alpaca device connection', () => {
 
   it('reports uncertainty when cancellation occurs after a confirmed write', async () => {
     const controller = new AbortController()
+
     const cancelDuringVerification: ResponseFactory = (signal) => {
       const request = stalledRequest(signal)
       queueMicrotask(() => controller.abort(new DOMException('Cancelled', 'AbortError')))
+
       return request
     }
+
     const alpaca = provider([
       inventory,
       envelope(false),
@@ -376,11 +406,14 @@ describe('Alpaca device connection', () => {
   it('reports uncertainty when cancellation occurs during the write', async () => {
     const controller = new AbortController()
     const requests: RecordedRequest[] = []
+
     const cancelDuringWrite: ResponseFactory = (signal) => {
       const request = stalledRequest(signal)
       queueMicrotask(() => controller.abort(new DOMException('Cancelled', 'AbortError')))
+
       return request
     }
+
     const alpaca = provider([
       inventory,
       envelope(false),

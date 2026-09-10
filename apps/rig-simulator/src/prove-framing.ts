@@ -17,13 +17,21 @@ import { focalLengthMm } from './optics.js'
 import { buildSimulator } from './service.js'
 
 const catalogPath = process.env.VELA_STAR_CATALOG
+
 const executable = process.env.VELA_ASTAP
+
 if (!catalogPath || !executable) throw new Error('Set VELA_STAR_CATALOG and VELA_ASTAP; see README.md')
+
 const output = resolve(process.env.VELA_SIM_OUTPUT ?? '.local/framing-proof')
+
 await mkdir(output, { recursive: true })
+
 let clockOffset = 0
+
 const simulator = buildSimulator({ stars: createStarSource(catalogPath), now: () => performance.now() + clockOffset })
+
 const vela = Fastify()
+
 const reports: object[] = []
 
 try {
@@ -32,10 +40,13 @@ try {
   const mount = createAlpacaFraming({ baseUrl })
   const cameraId = 'vela-simulator-camera'
   const telescopeId = 'vela-simulator-telescope'
+
   for (const id of [cameraId, telescopeId]) {
     assert.equal((await provider.connectDevice(id)).outcome, 'connected')
   }
+
   const devices = await provider.inspectDevices()
+
   const catalog = createMemoryRigCatalog([{
     id: 'proof', name: 'Framing proof',
     endpoint: { host: '127.0.0.1', port: Number(new URL(baseUrl).port) },
@@ -46,43 +57,58 @@ try {
       uniqueId: device.providerDeviceId, kind: device.kind, name: device.configuredName,
     })) },
   }])
+
   const operations = createRigOperations()
   registerTargets(vela, catalog, operations, { solver: { executable, catalogPath } })
   const eagle = getTarget('ic4703')!
   assert.ok(eagle)
+
   async function view() {
     const response = await vela.inject('/api/web/rigs/proof/framing')
     assert.equal(response.statusCode, 200, response.body)
+
     return response.json<FramingView>()
   }
-  async function command(command: string, payload: object = {}) {
+
+  async function command(command: string, payload: { targetId?: string; raDegrees?: number; decDegrees?: number; exposureSeconds?: number; checkId?: string } = {}) {
     const response = await vela.inject({ method: 'POST', url: `/api/rigs/proof/framing/${command}`, payload })
     assert.equal(response.statusCode, 200, response.body)
+
     return response.json<FramingView>()
   }
-  async function control(path: string, payload: object, method: 'PUT' | 'POST' = 'PUT') {
+
+  async function control(path: string, payload: { preset?: string; obscured?: boolean; cameraNumber?: number; resolution?: string }, method: 'PUT' | 'POST' = 'PUT') {
     const response = await simulator.inject({ method, url: `/simulator/${path}`, payload })
     assert.equal(response.statusCode, 200, response.body)
   }
+
   async function waitFor(predicate: (state: FramingView) => boolean) {
     const deadline = Date.now() + 60_000
+
     while (Date.now() < deadline) {
       const state = await view()
+
       if (predicate(state)) return state
+
       if (!state.active) throw new Error(`Framing ended unexpectedly: ${state.phase}: ${state.error}`)
       await delay(50)
     }
+
     throw new Error('Framing proof timed out')
   }
+
   const start = (exposureSeconds = 2, position = { raDegrees: eagle.raDegrees, decDegrees: eagle.decDegrees }) => command('start', {
     targetId: eagle.id, raDegrees: position.raDegrees, decDegrees: position.decDegrees, exposureSeconds,
   })
+
   const finish = () => waitFor(state => !state.active)
+
   function checked(state: FramingView) {
     assert.equal(state.phase, 'checked', state.error ?? 'Expected a solved check')
     assert.equal(state.checkCurrent, true)
     assert.ok(state.actual)
     assert.equal(operations.owner('proof'), undefined)
+
     return state.actual
   }
 
@@ -110,10 +136,12 @@ try {
   await waitFor(state => state.phase === 'slewing' && state.active)
   // Observe actual device movement before testing Stop.
   const movementDeadline = Date.now() + 5000
+
   while (!(await mount.telescopeStatus(telescopeId)).slewing) {
     assert.ok(Date.now() < movementDeadline, 'Slew did not begin')
     await delay(10)
   }
+
   const stopped = await command('stop')
   assert.equal(stopped.phase, 'stopped', stopped.error ?? '')
   assert.equal(stopped.active, false)
@@ -123,10 +151,12 @@ try {
   await start(20)
   await waitFor(state => state.phase === 'exposing')
   const exposureDeadline = Date.now() + 5000
+
   while ((await simulator.inject('/simulator/state')).json().cameras[0].activity !== 'exposing') {
     assert.ok(Date.now() < exposureDeadline, 'Exposure did not begin')
     await delay(10)
   }
+
   assert.equal((await command('stop')).phase, 'stopped')
   assert.equal((await simulator.inject('/simulator/state')).json().cameras[0].imageReady, false)
   await start()
@@ -169,6 +199,7 @@ try {
   // Browser regression: the crowded Crescent field failed at five seconds
   // in the old low-resolution renderer despite abundant image stars.
   const crescent = { raDegrees: 303.02729167, decDegrees: 38.34497497555 }
+
   for (const seconds of [2, 5]) {
     await start(seconds, crescent)
     const before = checked(await finish())
@@ -191,11 +222,13 @@ try {
 
   await catalog.setImagingCamera('proof', { uniqueId: cameraId, name: 'Simulator Camera' })
   await control('camera', { cameraNumber: 0, resolution: 'full' })
+
   for (const position of [{ raDegrees: 359.9, decDegrees: 0 }, { raDegrees: 45, decDegrees: 89 }]) {
     await start(2, position)
     const result = checked(await finish())
     reports.push({ scenario: 'all-sky-field', desired: position, offsetArcminutes: result.offsetArcminutes })
   }
+
   await writeFile(join(output, 'results.json'), JSON.stringify(reports, null, 2) + '\n')
   console.log(JSON.stringify(reports, null, 2))
 } finally {
