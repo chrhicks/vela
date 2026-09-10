@@ -183,11 +183,19 @@ execution does not check `expectTypeOf` assertions. Use
 `pnpm --filter @vela/model test:types` for type contracts alone. The root test
 command also includes this check and excludes generated `dist` tests.
 
-When a change crosses several workspace boundaries, the full available checks are:
+Run `pnpm lint` as part of code verification. It reports findings without modifying
+files; apply available fixes explicitly with `pnpm lint --fix` and review the diff.
+
+When a change crosses several workspace boundaries, run the full check:
 
 ```sh
-pnpm test
-pnpm build
+pnpm check
 ```
+
+This runs lint, tests (including model type contracts), then the workspace build
+and its TypeScript checks, stopping on the first failure. Existing lint errors
+currently block the full check; report them explicitly rather than suppressing
+them or claiming the check passed. `pnpm test` and `pnpm build` remain available
+individually for focused validation.
 
 A documentation-only change normally needs link, path, and content review rather than a code build.

@@ -15,7 +15,8 @@
     "dev:server": "pnpm --filter @vela/server dev",
     "test": "pnpm --filter @vela/model test:types && vitest run",
     "start": "pnpm --filter @vela/server start",
-    "lint": "oxlint"
+    "lint": "oxlint",
+    "check": "pnpm lint && pnpm test && pnpm build"
   },
   "devDependencies": {
     "@oxlint/plugins": "1.82.0",
