@@ -38,7 +38,10 @@ it('keeps the ALPACA span open through headers, body and value validation', asyn
   const read = client.readNumber(telescope, 'rightascension')
   expect(exporter.getFinishedSpans()).toHaveLength(0)
   const response = Response.json({})
-  response.json = () => new Promise(resolve => { sendBody = resolve; readingBody() })
+  response.json = () => new Promise(resolve => {
+    sendBody = resolve
+    readingBody()
+  })
   sendHeaders(response)
   await bodyStarted
   expect(exporter.getFinishedSpans()).toHaveLength(0)
