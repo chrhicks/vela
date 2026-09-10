@@ -33,7 +33,9 @@ pixels remain intact for solving; the preview is debayered for display.
 Prepare a clear sky patch and movement corridor before Start. The first image
 is taken at the current pointing. A small primary-axis probe establishes the
 driver's mechanical sign; the subsequent two positions are approximately 18°
-and 36° westward in RA. Allow 1° on either side for the direction check. Motion
+and 36° westward in RA. Each step accepts 16–20° of observed travel rather than
+requiring a precise motor endpoint, so allow up to 40° total westward travel.
+Allow 1° on either side for the direction check. Motion
 uses primary-axis `MoveAxis` only, in bounded increments with observed progress;
 coordinate slews could move DEC to compensate a pointing model and are unsuitable
 for this baseline. A rejected, ambiguous or unexpected move ends the measurement
