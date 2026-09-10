@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { trace, SpanStatusCode, type Attributes } from '@opentelemetry/api'
 import { setTimeout as delay } from 'node:timers/promises'
 import type { AlignmentView } from '@vela/model/web'
 import type { AlpacaAcquisition } from '@vela/alpaca'
@@ -30,6 +31,24 @@ export function createAlignmentController(settings: AlignmentSettings, hardware:
     warning: null, error: null, measurement: null,
     ...(physical ? { mode: 'physical' as const, cameraName: physical.cameraName } : {}),
   }
+  const tracer = trace.getTracer('vela.alignment')
+  let runId = ''
+  async function step<T>(name: string, work: () => Promise<T>, attributes: Attributes = {}): Promise<T> {
+    return tracer.startActiveSpan(name, { attributes: { 'alignment.run.id': runId, 'rig.id': view.rigId, ...attributes } }, async span => {
+      try {
+        return await work()
+      } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') span.setAttribute('operation.cancelled', true)
+        else {
+          span.setStatus({ code: SpanStatusCode.ERROR, message: error instanceof Error ? error.message : 'Alignment failed' })
+          if (error instanceof Error) span.recordException(error)
+        }
+        throw error
+      } finally {
+        span.end()
+      }
+    })
+  }
   let running: Promise<void> | undefined
   let controller: AbortController | undefined
   let previousSample: AlignmentSample | undefined
@@ -42,7 +61,13 @@ export function createAlignmentController(settings: AlignmentSettings, hardware:
     previousSample = undefined
     patch({ rigId, rigName, active: true, phase: 'baseline', activity: 'idle', position: 1,
       solvedPositions: 0, measurement: null, measuredAt: null, error: null, warning: null })
-    running = run(controller.signal).catch(error => {
+    runId = randomUUID()
+    const signal = controller.signal
+    running = step('alignment.run', async () => {
+      // An ended marker makes a new run visible before its long root span ends.
+      tracer.startSpan('alignment.started', { attributes: { 'alignment.run.id': runId, 'rig.id': rigId } }).end()
+      await run(signal)
+    }).catch(error => {
       if (!(error instanceof Error && error.name === 'AbortError')) patch({ phase: 'failed', error: error instanceof Error ? error.message : 'Alignment failed' })
     }).finally(() => {
       patch({ active: false, activity: 'idle', exposureStartedAt: null })
@@ -55,7 +80,7 @@ export function createAlignmentController(settings: AlignmentSettings, hardware:
   async function stop(finished = false) {
     if (running) {
       patch({ activity: 'stopping' })
-      controller?.abort()
+      await step('alignment.stop.requested', async () => { controller?.abort() })
       await running
     }
     if (view.phase !== 'failed') patch({ phase: finished && view.measurement ? 'finished' : 'stopped' })
@@ -69,12 +94,12 @@ export function createAlignmentController(settings: AlignmentSettings, hardware:
     if (pointing && pointing.coordinateSystem !== 'j2000') throw new Error('This configured alignment model requires the simulator’s J2000 coordinate frame')
     if (pointing && !pointing.tracking) throw new Error('Tracking must be enabled before measuring alignment')
     patch({ activity: 'exposing', exposureStartedAt: new Date().toISOString() })
-    const frame = await hardware.capture({ cameraId: settings.cameraId, exposureSeconds: settings.exposureSeconds, signal,
-      ...(physical ? { expectedCameraName: physical.cameraName } : { monochromeOnly: true }) })
+    const frame = await step('alignment.capture', () => hardware.capture({ cameraId: settings.cameraId, exposureSeconds: settings.exposureSeconds, signal,
+      ...(physical ? { expectedCameraName: physical.cameraName } : { monochromeOnly: true }) }), { 'alignment.position': view.position })
     signal.throwIfAborted()
     if (physical) await physical.validate(signal, frame)
     patch({ activity: 'solving', exposureStartedAt: null })
-    const solved = await activeSolver!.solve(frame, actual?.hint ?? { raDegrees: pointing!.rightAscensionDegrees, decDegrees: pointing!.declinationDegrees }, signal)
+    const solved = await step('alignment.solve', () => activeSolver!.solve(frame, actual?.hint ?? { raDegrees: pointing!.rightAscensionDegrees, decDegrees: pointing!.declinationDegrees }, signal), { 'alignment.position': view.position })
     signal.throwIfAborted()
     if (solved.status === 'no-solution') {
       patch({ warning: 'Plate-solving failed. Trying a new image.' })
@@ -105,8 +130,10 @@ export function createAlignmentController(settings: AlignmentSettings, hardware:
 
   async function run(signal: AbortSignal) {
     if (physical) {
-      fieldHeightDegrees = (await physical.prepare(signal)).fieldHeightDegrees
+      patch({ activity: 'homing' })
+      fieldHeightDegrees = (await step('alignment.prepare', () => physical.prepare(signal))).fieldHeightDegrees
       activeSolver = typeof solver === 'function' ? solver(fieldHeightDegrees) : solver
+      patch({ activity: 'waiting' })
     } else {
       const initial = await hardware.pointing(settings.telescopeId, signal)
       if (initial.coordinateSystem !== 'j2000' || !initial.tracking) throw new Error('The configured simulator’s J2000 frame and tracking are required')
@@ -124,7 +151,7 @@ export function createAlignmentController(settings: AlignmentSettings, hardware:
     let current = first
     for (let position = 2; position <= 3; position++) {
       patch({ activity: 'moving', position, solvedPositions: position - 1 })
-      if (physical) await physical.move(signal)
+      if (physical) await step('alignment.move', () => physical.move(signal), { 'alignment.position': position })
       else await hardware.move(settings.telescopeId, 1.5, 12, signal)
       current = await solvedFrame(signal)
       samples.push(current.sample)
@@ -134,7 +161,7 @@ export function createAlignmentController(settings: AlignmentSettings, hardware:
     while (true) {
       const measured = measureAlignment(baseline, current.sample, true)
       const imageId = randomUUID()
-      const preview = await previewPng(current.frame.width, current.frame.height, current.frame.pixels, current.frame.color)
+      const preview = await step('alignment.preview', () => previewPng(current.frame.width, current.frame.height, current.frame.pixels, current.frame.color))
       signal.throwIfAborted()
       if (physical) await physical.validate(signal)
       images.set(imageId, preview)
