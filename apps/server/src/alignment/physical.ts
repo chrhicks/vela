@@ -86,8 +86,9 @@ export function createPhysicalAlignment(settings: PhysicalAlignmentSettings, acq
     for (let step = 0; step < 10; step++) {
       const travelled = -difference(current.rightAscensionDegrees, start.rightAscensionDegrees)
       const remaining = 18 - travelled
-      if (Math.abs(remaining) <= 0.2) { reference = current; return }
-      if (remaining < 0 || remaining > 20) throw new Error('The RA sweep moved beyond its expected position')
+      // Solved sightlines supply the geometry; the motor need not land at exactly 18°.
+      if (travelled >= 16 && travelled <= 20) { reference = current; return }
+      if (travelled > 20 || travelled < -2) throw new Error(`RA sweep reached ${travelled.toFixed(3)}° westward; expected 16–20°`)
       const degrees = Math.min(3, remaining)
       const before = current
       await acquisition.move(settings.telescopeId, westRate, degrees / 1.5, signal)

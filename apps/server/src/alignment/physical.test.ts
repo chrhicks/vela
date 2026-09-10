@@ -76,10 +76,14 @@ describe('physical alignment sweep', () => {
     const fake = observatory(sign)
     await fake.alignment.prepare(signal)
     await fake.alignment.move(signal)
-    expect(fake.mount.rightAscensionDegrees).toBeCloseTo(352, 8)
+    const firstTravel = (10 - fake.mount.rightAscensionDegrees + 360) % 360
+    expect(firstTravel).toBeGreaterThanOrEqual(16)
+    expect(firstTravel).toBeLessThanOrEqual(20)
     await fake.alignment.validate(signal)
     await fake.alignment.move(signal)
-    expect(fake.mount.rightAscensionDegrees).toBeCloseTo(334, 8)
+    const secondTravel = (10 - firstTravel - fake.mount.rightAscensionDegrees + 360) % 360
+    expect(secondTravel).toBeGreaterThanOrEqual(16)
+    expect(secondTravel).toBeLessThanOrEqual(20)
     expect(fake.mount.declinationDegrees).toBe(60)
     const moves = vi.mocked(fake.acquisition.move).mock.calls
     expect(moves[0]).toEqual(['mount', 0.5, 1, signal])
@@ -88,6 +92,16 @@ describe('physical alignment sweep', () => {
       expect(Math.abs(rate * duration)).toBeLessThanOrEqual(3)
     }
     expect(moves.filter(([, rate]) => rate === 0.5)).toHaveLength(1)
+    await fake.alignment.validate(signal)
+  })
+
+  it('accepts modest motor overshoot without a corrective movement', async () => {
+    const fake = observatory(-1.2)
+    await fake.alignment.prepare(signal)
+    await fake.alignment.move(signal)
+    const travel = (10 - fake.mount.rightAscensionDegrees + 360) % 360
+    expect(travel).toBeGreaterThan(18.2)
+    expect(travel).toBeLessThanOrEqual(20)
     await fake.alignment.validate(signal)
   })
 
