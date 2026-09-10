@@ -66,7 +66,10 @@ describe('local tracing', () => {
       root.end()
       await telemetry.shutdown()
       expect((await records(file)).map(record => record.name)).toEqual(['alpaca.request', 'alignment.run'])
-    } finally { root.end(); await telemetry.shutdown() }
+    } finally {
+      root.end()
+      await telemetry.shutdown()
+    }
   })
 
   it('rotates complete JSON lines and retains only the configured files', async () => {

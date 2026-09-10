@@ -106,7 +106,10 @@ export function createTraceFileExporter(path: string, {
         callback(result)
       }
     },
-    async shutdown() { closed = true; await pending },
+    async shutdown() {
+      closed = true
+      await pending
+    },
     async forceFlush() { await pending },
   }
 }
