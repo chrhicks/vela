@@ -2,21 +2,26 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { angularSeparationDegrees, horizonAt, horizonSectors, projectSky, visibleSkyPath, type HorizonPoint, type SkyCoordinate } from './sky-path-geometry'
 
 export type SkyLightPhase = 'daylight' | 'civil' | 'nautical' | 'astronomical' | 'night'
+
 const skyLightLabels: Record<SkyLightPhase, string> = {
   daylight: 'Daylight', civil: 'Civil twilight', nautical: 'Nautical twilight',
   astronomical: 'Astronomical twilight', night: 'Astronomical darkness',
 }
+
 export type SkyPathSample = SkyCoordinate & {
   label: string
   /** Optional caller-supplied phase. Applies from this sample to the next. */
   light?: SkyLightPhase
 }
+
 export type SkyPathMoonSample = SkyCoordinate & { illuminationFraction: number; waxing: boolean }
+
 export type SkyPathHorizon = {
   state: 'calibrated' | 'uncalibrated'
   points: readonly HorizonPoint[]
   wires?: readonly (readonly SkyCoordinate[])[]
 }
+
 export type SkyPathProps = {
   /** Samples are ordered at equal time intervals. No astronomy is calculated here. */
   samples: readonly SkyPathSample[]
@@ -40,12 +45,17 @@ export function SkyPath({ samples, moonSamples, targetName, selectedIndex, onSel
   const id = useId()
   useEffect(() => {
     const element = root.current
+
     if (!element) return
+
     const observer = new ResizeObserver(entries => {
       const measured = entries[0]?.contentRect.width
+
       if (measured) setWidth(measured)
     })
+
     observer.observe(element)
+
     return () => observer.disconnect()
   }, [])
 
@@ -58,14 +68,17 @@ export function SkyPath({ samples, moonSamples, targetName, selectedIndex, onSel
   const hasLight = samples.some(sample => sample.light !== undefined)
   const lightStatus = hasLight ? selected?.light ? skyLightLabels[selected.light] : 'Light phase unavailable' : undefined
   const moon = selected ? moonSamples?.[index] : undefined
+
   const moonStatus = moonSamples === undefined ? undefined
     : !moon ? 'Moon position unavailable'
     : moon.altitudeDegrees < 0 ? 'Moon below horizon'
     : `Moon · ${Math.round(Math.max(0, Math.min(1, moon.illuminationFraction)) * 100)}% illuminated · ${Math.round(angularSeparationDegrees(selected!, moon))}° from target`
+
   const now = nowIndex === undefined ? undefined : samples[nowIndex]
   const margin = Number.isFinite(marginDegrees) ? Math.max(0, Math.min(30, marginDegrees)) : 5
   const sectors = horizon ? horizonSectors(horizon.points, margin, center, radius) : []
   const localAltitude = selected && horizon ? horizonAt(horizon.points, selected.azimuthDegrees) : null
+
   const selectedStatus = !selected ? 'No path samples available'
     : selected.altitudeDegrees < 0 ? 'Below the geometric horizon'
     : !horizon ? 'Local obstructions not included'
@@ -73,6 +86,7 @@ export function SkyPath({ samples, moonSamples, targetName, selectedIndex, onSel
     : selected.altitudeDegrees < localAltitude ? 'Below the local silhouette'
     : selected.altitudeDegrees < localAltitude + margin ? 'Within the elevation margin'
     : 'Above the silhouette and elevation margin'
+
   const point = (sample: SkyCoordinate) => projectSky(sample, center, radius)
   const labels = skyLabels(samples, now, nowLabel, selected, moon, size, compact)
 
@@ -133,6 +147,7 @@ export function SkyPath({ samples, moonSamples, targetName, selectedIndex, onSel
 
 
 type MapLabel = { text: string; x: number; y: number }
+
 type LabelBox = { left: number; right: number; top: number; bottom: number }
 
 // Text stays at a fixed pixel size as the dome resizes. Reserve each label's
@@ -142,45 +157,61 @@ function skyLabels(samples: readonly SkyPathSample[], now: SkyPathSample | undef
   const radius = center - 27
   const occupied: LabelBox[] = []
   const overlaps = (box: LabelBox) => occupied.some(other => box.left < other.right && box.right > other.left && box.top < other.bottom && box.bottom > other.top)
+
   for (const sample of [now, selected, moon]) {
     if (!sample || sample.altitudeDegrees < 0) continue
     const { x, y } = projectSky(sample, center, radius)
     occupied.push({ left: x - 11, right: x + 11, top: y - 11, bottom: y + 11 })
   }
+
   function place(text: string, positions: { x: number; y: number }[]) {
     const halfWidth = text.length * 3.5 + 4
+
     for (const position of positions) {
       const box = { left: position.x - halfWidth, right: position.x + halfWidth, top: position.y - 13, bottom: position.y + 4 }
+
       if (box.left < 24 || box.right > size - 24 || box.top < 24 || box.bottom > size - 24 || overlaps(box)) continue
       occupied.push(box)
+
       return { text, ...position }
     }
+
     return undefined
   }
+
   function near(text: string, sample: SkyCoordinate, belowFirst = false) {
     const { x, y } = projectSky(sample, center, radius)
     const vertical = [{ x, y: y - 16 }, { x, y: y + 26 }]
+
     if (belowFirst) vertical.reverse()
+
     return place(text, [...vertical, { x: x - text.length * 3.5 - 16, y: y + 4 }, { x: x + text.length * 3.5 + 16, y: y + 4 }])
   }
+
   const nowLabel = now && now.altitudeDegrees >= 0 ? near(referenceLabel, now, true) : undefined
   const moonLabel = moon && moon.altitudeDegrees >= 0 ? near('Moon', moon) : undefined
+
   const altitudes = [30, 60].flatMap(altitude => {
     const y = center + radius * (90 - altitude) / 90 - 5
     const label = place(`${altitude}°`, [{ x: center + 16, y }])
+
     return label ? [label] : []
   })
+
   const visible = samples.map((sample, sampleIndex) => ({ sample, sampleIndex })).filter(({ sample }) => sample.altitudeDegrees >= 0)
   const wholeHours = visible.filter(({ sample }) => /(?:^|\s)\d{1,2}:00(?:\s|$)/.test(sample.label))
   const candidates = wholeHours.length ? wholeHours : visible
   const maximum = size < 340 || compact ? 3 : 7
   const count = Math.min(maximum, candidates.length)
   const times: (MapLabel & { sampleIndex: number })[] = []
+
   for (let index = 0; index < count; index += 1) {
     const candidate = candidates[count === 1 ? 0 : Math.round(index * (candidates.length - 1) / (count - 1))]!
     const label = near(candidate.sample.label, candidate.sample)
+
     if (label) times.push({ ...label, sampleIndex: candidate.sampleIndex })
   }
+
   return { now: nowLabel, moon: moonLabel, altitudes, times }
 }
 
@@ -190,5 +221,6 @@ function moonPhasePath(illuminationFraction: number) {
   const fraction = Math.max(0, Math.min(1, illuminationFraction))
   const terminatorRadius = Math.abs(1 - 2 * fraction) * 8
   const terminator = terminatorRadius < .001 ? 'L0,-8' : `A${terminatorRadius},8 0 0 ${fraction < .5 ? 0 : 1} 0,-8`
+
   return `M0,-8 A8,8 0 0 1 0,8 ${terminator} Z`
 }

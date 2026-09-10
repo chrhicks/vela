@@ -4,7 +4,9 @@ import { join } from 'node:path'
 import type { CaptureImage, SavedImage } from '@vela/model/web'
 
 type Files = { fits: Buffer, native: Buffer, fit?: Buffer }
+
 type FileKind = keyof Files
+
 const filenames = { fits: 'original.fits', native: 'preview.png', fit: 'fit.png' }
 
 export interface SavedImageStore {
@@ -18,6 +20,7 @@ export interface SavedImageStore {
 function metadata(rigId: string, image: CaptureImage, files: Files): SavedImage {
   const url = `/api/rigs/${encodeURIComponent(rigId)}/saved-images/${encodeURIComponent(image.id)}`
   const { fitImageUrl: _fitImageUrl, ...original } = image
+
   return {
     ...original, rigId, saved: true, savedAt: new Date().toISOString(),
     imageUrl: `${url}/preview`, ...(files.fit ? { fitImageUrl: `${url}/fit` } : {}),
@@ -31,17 +34,22 @@ function newest(images: SavedImage[]) {
 
 export function createMemorySavedImageStore(): SavedImageStore {
   const rigs = new Map<string, Map<string, { image: SavedImage, files: Files }>>()
+
   return {
     async save(rigId, image, files) {
       let rig = rigs.get(rigId)
+
       if (!rig) {
         rig = new Map()
         rigs.set(rigId, rig)
       }
+
       const existing = rig.get(image.id)
+
       if (existing) return structuredClone(existing.image)
       const saved = metadata(rigId, image, files)
       rig.set(image.id, { image: saved, files: { fits: Buffer.from(files.fits), native: Buffer.from(files.native), ...(files.fit ? { fit: Buffer.from(files.fit) } : {}) } })
+
       return structuredClone(saved)
     },
     async list(rigId) { return newest(Array.from(rigs.get(rigId)?.values() ?? [], item => structuredClone(item.image))) },
@@ -49,6 +57,7 @@ export function createMemorySavedImageStore(): SavedImageStore {
     async get(rigId, imageId) { return structuredClone(rigs.get(rigId)?.get(imageId)?.image) },
     async file(rigId, imageId, kind) {
       const file = rigs.get(rigId)?.get(imageId)?.files[kind]
+
       return file && Buffer.from(file)
     },
   }
@@ -60,61 +69,82 @@ export async function openFileSavedImageStore(path: string): Promise<SavedImageS
   const rigPath = (rigId: string) => join(path, digest(rigId))
   const imagePath = (rigId: string, imageId: string) => join(rigPath(rigId), digest(imageId))
   const get = async (rigId: string, imageId: string) => readMetadata(imagePath(rigId, imageId), rigId, imageId)
+
   const completedDirectories = async (rigId: string) => {
     const entries = await readdir(rigPath(rigId), { withFileTypes: true }).catch(error => {
       if (missing(error)) return []
       throw error
     })
+
     return entries.filter(entry => entry.isDirectory() && /^[a-f0-9]{64}$/.test(entry.name))
   }
+
   const list = async (rigId: string) => {
     const entries = await completedDirectories(rigId)
     const images: SavedImage[] = []
+
     for (const entry of entries) {
       const image = await readMetadata(join(rigPath(rigId), entry.name), rigId)
+
       if (!image || digest(image.id) !== entry.name) throw new Error('Saved image metadata does not match its directory')
       images.push(image)
     }
+
     return newest(images)
   }
+
   const save = async (rigId: string, image: CaptureImage, files: Files) => {
     const existing = await get(rigId, image.id)
+
     if (existing) return existing
     const directory = rigPath(rigId)
     await mkdir(directory, { recursive: true })
     await syncDirectory(path)
     const temporary = await mkdtemp(join(directory, '.pending-'))
+
     try {
       const saved = metadata(rigId, image, files)
+
       for (const kind of ['fits', 'native', 'fit'] as const) {
         if (files[kind]) await writeDurable(join(temporary, filenames[kind]), files[kind]!)
       }
+
       await writeDurable(join(temporary, 'metadata.json'), JSON.stringify(saved))
       await syncDirectory(temporary)
+
       try {
         await rename(temporary, imagePath(rigId, image.id))
       } catch (error) {
         // A second store instance may have completed the same frame first.
         if (!['EEXIST', 'ENOTEMPTY'].includes((error as NodeJS.ErrnoException).code ?? '')) throw error
         const winner = await get(rigId, image.id)
+
         if (!winner) throw error
+
         return winner
       }
+
       await syncDirectory(directory)
+
       return saved
     } finally {
       await rm(temporary, { recursive: true, force: true })
     }
   }
+
   return {
     save(rigId, image, files) {
       const key = `${digest(rigId)}/${digest(image.id)}`
       const current = pending.get(key)
+
       if (current) return current
+
       const operation = save(rigId, image, files).catch(error => {
         throw new Error(`Could not save image ${image.id}: ${error instanceof Error ? error.message : String(error)}`, { cause: error })
       }).finally(() => pending.delete(key))
+
       pending.set(key, operation)
+
       return operation
     },
     list,
@@ -122,23 +152,29 @@ export async function openFileSavedImageStore(path: string): Promise<SavedImageS
     get,
     async file(rigId, imageId, kind) {
       const image = await get(rigId, imageId)
+
       if (!image || (kind === 'fit' && !image.fitImageUrl)) return undefined
+
       return readFile(join(imagePath(rigId, imageId), filenames[kind]))
     },
   }
 }
 
 function digest(id: string) { return createHash('sha256').update(id).digest('hex') }
+
 function missing(error: unknown) { return (error as NodeJS.ErrnoException).code === 'ENOENT' }
 
 async function readMetadata(directory: string, rigId: string, imageId?: string): Promise<SavedImage | undefined> {
   let text: string
+
   try { text = await readFile(join(directory, 'metadata.json'), 'utf8') }
   catch (error) {
     if (missing(error)) return undefined
     throw error
   }
+
   const image = JSON.parse(text) as SavedImage
+
   if (!image || image.rigId !== rigId || typeof image.id !== 'string' || (imageId !== undefined && image.id !== imageId)
     || image.saved !== true || !Number.isFinite(Date.parse(image.savedAt)) || !Number.isFinite(Date.parse(image.capturedAt))
     || (image.capturedAtSource !== undefined && image.capturedAtSource !== 'camera' && image.capturedAtSource !== 'server-estimate')
@@ -150,17 +186,21 @@ async function readMetadata(directory: string, rigId: string, imageId?: string):
         && (!Number.isFinite(image.statistics.medianHfrPixels) || image.statistics.medianHfrPixels < 0))))) {
     throw new Error(`Invalid saved image metadata in ${directory}`)
   }
+
   for (const filename of [filenames.fits, filenames.native, ...(image.fitImageUrl ? [filenames.fit] : [])]) {
     if (!(await stat(join(directory, filename))).isFile()) throw new Error(`Missing saved image file ${filename}`)
   }
+
   // Reconstruct URLs rather than trusting persisted URLs as navigation targets.
   const url = `/api/rigs/${encodeURIComponent(rigId)}/saved-images/${encodeURIComponent(image.id)}`
   const { fitImageUrl, ...original } = image
+
   return { ...original, imageUrl: `${url}/preview`, ...(fitImageUrl ? { fitImageUrl: `${url}/fit` } : {}), fitsUrl: `${url}/fits`, previewDownloadUrl: `${url}/download-preview` }
 }
 
 async function writeDurable(path: string, data: Buffer | string) {
   const file = await open(path, 'wx')
+
   try {
     await file.writeFile(data)
     await file.sync()
@@ -170,6 +210,7 @@ async function writeDurable(path: string, data: Buffer | string) {
 
 async function syncDirectory(path: string) {
   const directory = await open(path, 'r')
+
   try { await directory.sync() }
   finally { await directory.close() }
 }

@@ -4,6 +4,7 @@ import { angularDistance, fromMount, plateCorners, skyAtPixel, skyPath, toMount 
 
 // Deliberately synthetic geographic site; this is not observatory configuration.
 const site = { latitudeDegrees: 40, longitudeDegrees: -75, elevationMeters: 0 }
+
 const date = new Date('2026-09-07T04:00:00Z')
 
 // Independent reference: ERFA 2.0.1.5 atco13, derived from IAU SOFA.
@@ -40,10 +41,12 @@ describe('target sky coordinates', () => {
     const catalog = benchmarks[0]!.catalog
     expect(toMount(catalog, 'j2000', date, site)).toEqual(catalog)
     expect(fromMount(catalog, 'j2000', date, site)).toEqual(catalog)
+
     for (const frame of ['other', 'unknown', 'j2050', 'b1950']) {
       expect(() => toMount(catalog, frame, date, site)).toThrow('not supported')
       expect(() => fromMount(catalog, frame, date, site)).toThrow('not supported')
     }
+
     expect(angularDistance({ raDegrees: 359, decDegrees: 0 }, { raDegrees: 1, decDegrees: 0 })).toBeCloseTo(2, 10)
   })
 })
@@ -52,6 +55,7 @@ describe('target sky night', () => {
   it('keeps target azimuth in the same apparent frame, clockwise from north', () => {
     // ERFA atco13 aob output, with the same inputs as benchmarks above.
     const azimuths = [5.56350130287918, 74.13530018467179, 174.25467450209425, 285.543875717234]
+
     for (const [index, benchmark] of benchmarks.entries()) {
       const sample = skyPath(benchmark.catalog, site, date).samples.find(sample => sample.at === date.toISOString())!
       expect(Math.abs(sample.azimuthDegrees - azimuths[index]!) * 3600).toBeLessThan(0.5)
@@ -65,6 +69,7 @@ describe('target sky night', () => {
     // 0.01° allows the shorter lunar model; still rejects missing parallax,
     // J2000 coordinates fed into Horizon, or refraction near the horizon.
     const path = skyPath(benchmarks[1]!.catalog, site, date)
+
     for (const [at, azimuth, altitude] of [
       ['2026-09-07T04:00:00.000Z', 34.392562, -17.794425],
       ['2026-09-07T06:15:00.000Z', 58.190210, -0.122525],
@@ -73,6 +78,7 @@ describe('target sky night', () => {
       expect(Math.abs(moon.azimuthDegrees - azimuth)).toBeLessThan(0.01)
       expect(Math.abs(moon.altitudeDegrees - altitude)).toBeLessThan(0.01)
     }
+
     const moon = path.samples.find(sample => sample.at === date.toISOString())!.moon
     expect(Math.abs(moon.illuminationFraction - 0.1948491)).toBeLessThan(0.0001)
     expect(path.samples.some(sample => sample.moon.altitudeDegrees > 0)).toBe(true)
@@ -84,10 +90,12 @@ describe('target sky night', () => {
     ['2026-09-18T04:00:00Z', true],
   ] as const)('moves lunar illumination consistently with waxing or waning on %s', (at, waxing) => {
     const samples = skyPath(benchmarks[1]!.catalog, site, new Date(at)).samples
+
     for (const [index, sample] of samples.entries()) {
       expect(sample.moon.waxing).toBe(waxing)
       expect(sample.moon.illuminationFraction).toBeGreaterThan(0)
       expect(sample.moon.illuminationFraction).toBeLessThan(1)
+
       if (index > 0) {
         const previous = samples[index - 1]!
         expect(Date.parse(sample.at) - Date.parse(previous.at)).toBe(900_000)
@@ -117,6 +125,7 @@ describe('target sky night', () => {
     const beforeDawn = skyPath(target, site, new Date('2026-09-07T08:00:00Z'))
     expect(beforeDawn.startsAt).toBe('2026-09-06T17:00:00.000Z')
     expect(beforeDawn.aboveHorizonDuringDarkness[0]!.endsAt < '2026-09-07T12:00:00Z').toBe(true)
+
     for (const time of ['2026-09-07T10:00:00Z', '2026-09-07T14:00:00Z']) {
       const morning = skyPath(target, site, new Date(time))
       expect(morning.startsAt).toBe('2026-09-07T17:00:00.000Z')
@@ -141,6 +150,7 @@ describe('inverse plate projection', () => {
   it.each([[-0.001, 0.0003, 0.0002, 0.001], [0.001, 0.0003, -0.0002, 0.001]] as const)('round trips rotated TAN plates for both parities: %j', (...cd) => {
     const wcs: PlateWcs = { width: 1000, height: 800, referenceX: 500.5, referenceY: 400.5, raDegrees: 359.95, decDegrees: 82, cd }
     expect(angularDistance(skyAtPixel(wcs, 499.5, 399.5), { raDegrees: 359.95, decDegrees: 82 })).toBeLessThan(1e-10)
+
     for (const [x, y] of [[0, 0], [999, 799], [500, 100], [100, 700], [-0.5, 799.5]]) {
       const sky = skyAtPixel(wcs, x!, y!)
       expect(sky.raDegrees).toBeGreaterThanOrEqual(0)
@@ -150,8 +160,10 @@ describe('inverse plate projection', () => {
       expect(pixel!.x).toBeCloseTo(x!, 7)
       expect(pixel!.y).toBeCloseTo(y!, 7)
     }
+
     const corners = plateCorners(wcs)
     expect(corners).toHaveLength(4)
+
     for (const [index, [x, y]] of [[-0.5, -0.5], [999.5, -0.5], [999.5, 799.5], [-0.5, 799.5]].entries()) {
       const pixel = projectSky(wcs, corners[index]!)!
       expect(pixel.x).toBeCloseTo(x!, 7)

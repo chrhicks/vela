@@ -9,15 +9,19 @@ export interface DiscoverySelection {
   filter: TargetFilterChoice | 'all'
   offset: number
 }
+
 const key = (rigId: string) => `vela:target-discovery:v1:${rigId}`
+
 export function savedDiscovery(rigId: string): TargetDiscoveryView | null {
   try {
     const value: unknown = JSON.parse(localStorage.getItem(key(rigId)) ?? 'null')
+
     return isTargetDiscovery(value, rigId) ? value : null
   } catch {
     return null
   }
 }
+
 export function selectionOf(view: TargetDiscoveryView): DiscoverySelection {
   return { query: view.query, category: view.category, filter: view.filter, offset: view.offset }
 }
@@ -37,14 +41,18 @@ export function useDiscovery(rigId: string, selection: DiscoverySelection) {
   useEffect(() => {
     const refreshed = needsRefresh.current
     const existing = current.current
+
     if (!refreshed && existing && existing.query === query && existing.category === category && existing.filter === filter && existing.offset === offset) {
       setLoading(false)
       setError(null)
+
       return
     }
+
     const controller = new AbortController()
     const version = ++requestVersion.current
     const params = new URLSearchParams({ q: query, category, filter, offset: String(offset) })
+
     if (!refreshed && snapshot.current) params.set('snapshot', snapshot.current)
     setLoading(true)
     setError(null)
@@ -52,12 +60,14 @@ export function useDiscovery(rigId: string, selection: DiscoverySelection) {
       signal: AbortSignal.any([controller.signal, AbortSignal.timeout(30000)]),
     }).then(next => {
       if (!isTargetDiscovery(next, rigId)) throw new Error('Invalid discovery response')
+
       if (controller.signal.aborted || version !== requestVersion.current) return
       snapshot.current = next.snapshotId
       needsRefresh.current = false
       current.current = next
       setView(next)
       setSaved(false)
+
       try { localStorage.setItem(key(rigId), JSON.stringify(next)) } catch { /* Browsing remains available when storage is full or disabled. */ }
     }).catch(cause => {
       if (controller.signal.aborted || version !== requestVersion.current) return
@@ -69,11 +79,14 @@ export function useDiscovery(rigId: string, selection: DiscoverySelection) {
     }).finally(() => {
       if (!controller.signal.aborted && version === requestVersion.current) setLoading(false)
     })
+
     return () => controller.abort()
   }, [rigId, query, category, filter, offset, refreshVersion])
+
   const refresh = useCallback(() => {
     needsRefresh.current = true
     setRefreshVersion(value => value + 1)
   }, [])
+
   return { view, loading, error, saved, refresh }
 }

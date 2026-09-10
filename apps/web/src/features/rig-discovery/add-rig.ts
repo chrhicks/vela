@@ -29,6 +29,7 @@ export async function addRig(
       body: JSON.stringify({ name, endpoint }),
       signal,
     })
+
     return response.rigId
   } catch (error) {
     if (!(error instanceof ApiError)) throw error

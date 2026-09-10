@@ -6,7 +6,9 @@ import { imageWidth, imageHeight } from './optics.js'
 import { renderSky } from './sky.js'
 
 const apps: ReturnType<typeof buildSimulator>[] = []
+
 afterEach(async () => { await Promise.all(apps.splice(0).map(app => app.close())) })
+
 async function setup() {
   let time = 0
   const stars = [{ raDegrees: 30, decDegrees: 60, magnitude: 7 }]
@@ -14,8 +16,10 @@ async function setup() {
   apps.push(app)
   await app.inject({ method: 'PUT', url: '/simulator/camera', payload: { resolution: 'fast' } })
   const get = async (device: string, member: string) => (await app.inject(`/api/v1/${device}/0/${member}`)).json()
+
   const put = async (device: string, member: string, params: Record<string, string>) => (await app.inject({ method: 'PUT', url: `/api/v1/${device}/0/${member}`,
     headers: { 'content-type': 'application/x-www-form-urlencoded' }, payload: new URLSearchParams(params).toString() })).json()
+
   return { app, stars, get, put, advance: (ms: number) => { time += ms } }
 }
 
@@ -54,12 +58,15 @@ describe('simulator Alpaca boundary', () => {
     expect(image).toMatchObject({ Type: 2, Rank: 2, ErrorNumber: 0 })
     expect(image.Value.length).toBe(imageWidth)
     expect(image.Value[0].length).toBe(imageHeight)
+
     const expected = renderSky(stars, cameraPose({ latitudeDegrees: 40, altitudeErrorDegrees: 0,
       azimuthErrorDegrees: 0, raAxisDegrees: 30, declinationDegrees: 60, elapsedSeconds: 0, tracking: true }),
     { width: imageWidth, height: imageHeight, fieldHeightDegrees: 3, seed: 1 })
+
     for (const [x, y] of [[0, 0], [781, 522], [899, 1000], [1561, 1043]]) {
       expect(image.Value[x!][y!]).toBe(expected[y! * imageWidth + x!]!)
     }
+
     expect(image.Value[781][522]).toBeGreaterThan(1000)
     await put('camera', 'startexposure', { Duration: '100', Light: 'true' })
     expect((await get('camera', 'imageready')).Value).toBe(false)
@@ -178,9 +185,11 @@ it('declares J2000 and handles asynchronous slews, invalid coordinates and cance
   expect((await put('telescope', 'slewtocoordinatesasync', { RightAscension: '6', Declination: '0' })).ErrorNumber).toBe(0x40b)
   expect((await get('telescope', 'slewing')).Value).toBe(false)
   await put('telescope', 'tracking', { Tracking: 'true' })
+
   for (const [ra, dec] of [['24', '0'], ['-1', '0'], ['1', '91'], ['1', 'NaN']]) {
     expect((await put('telescope', 'slewtocoordinatesasync', { RightAscension: ra!, Declination: dec! })).ErrorNumber).toBe(0x401)
   }
+
   expect((await put('telescope', 'slewtocoordinatesasync', { RightAscension: '6', Declination: '0' })).ErrorNumber).toBe(0)
   expect((await get('telescope', 'slewing')).Value).toBe(true)
   expect((await get('telescope', 'tracking')).Value).toBe(true)
@@ -209,6 +218,7 @@ it('starts both cameras at full resolution and reports native pixel geometry', a
   const state = (await app.inject('/simulator/state')).json()
   expect(state.cameras.map((camera: { resolution: string, width: number, height: number }) => [camera.resolution, camera.width, camera.height]))
     .toEqual([['full', 6248, 4176], ['full', 6248, 4176]])
+
   for (const number of [0, 1]) {
     await app.inject({ method: 'PUT', url: `/api/v1/camera/${number}/connected`, payload: { Connected: true } })
     expect((await app.inject(`/api/v1/camera/${number}/pixelsizex`)).json().Value).toBe(3.76)

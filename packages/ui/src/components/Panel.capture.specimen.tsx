@@ -7,7 +7,9 @@ import { Panel } from './Panel'
 import './Panel.capture.specimen.css'
 
 const sampleImage = new URL('./fixtures/capture-star-field.png', import.meta.url).href
+
 const phases = ['idle', 'exposing', 'reading', 'complete', 'stopped', 'failed', 'disconnected'] as const
+
 type Props = Record<string, string | number | boolean>
 
 function CameraMark() {
@@ -24,10 +26,12 @@ function CapturePreview({ props, onPropsChange }: {
 }) {
   const [localProps, setLocalProps] = useState(props)
   const values = onPropsChange ? props : localProps
+
   const update = useCallback((patch: Props) => {
     if (onPropsChange) onPropsChange(patch)
     else setLocalProps(current => ({ ...current, ...patch }))
   }, [onPropsChange])
+
   const screen = String(values.screen)
   const phase = String(values.phase)
   const hasImage = phase === 'complete' || Boolean(values.hasImage)
@@ -49,21 +53,27 @@ function CapturePreview({ props, onPropsChange }: {
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000)
+
     return () => window.clearInterval(timer)
   }, [])
 
   // Only pressing Take exposure plays the accelerated fixture. Inspector states stay inspectable.
   useEffect(() => {
     if (!playing) return
+
     if (phase === 'exposing') {
       const started = performance.now()
+
       const timer = window.setInterval(() => {
         const progress = Math.min(1, (performance.now() - started) / 4000)
         setFraction(progress)
+
         if (progress === 1) update({ phase: 'reading' })
       }, 100)
+
       return () => window.clearInterval(timer)
     }
+
     if (phase === 'reading') {
       const timer = window.setTimeout(() => {
         setCapturedAt(Date.now())
@@ -71,8 +81,10 @@ function CapturePreview({ props, onPropsChange }: {
         setPlaying(false)
         update({ phase: 'complete', hasImage: true, imageSeconds: seconds })
       }, 800)
+
       return () => window.clearTimeout(timer)
     }
+
     setPlaying(false)
   }, [phase, playing, seconds, update])
 
@@ -83,6 +95,7 @@ function CapturePreview({ props, onPropsChange }: {
 
   useEffect(() => {
     const viewport = imageWindow.current
+
     if (!viewport || !zoomed) return
     viewport.scrollLeft = (1600 - viewport.clientWidth) / 2
     viewport.scrollTop = (1200 - viewport.clientHeight) / 2

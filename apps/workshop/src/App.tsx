@@ -23,6 +23,7 @@ export function App() {
   useEffect(() => {
     const updatePath = () => setPathname(window.location.pathname)
     window.addEventListener('popstate', updatePath)
+
     return () => window.removeEventListener('popstate', updatePath)
   }, [])
 
@@ -60,6 +61,7 @@ export function App() {
       props: workshop.session.props,
       unsavedOverrides: workshop.session.unsavedOverrides,
     }
+
     await navigator.clipboard.writeText(`Vela workshop context\n${JSON.stringify(context, null, 2)}`)
     setCopyLabel('Copied')
     window.setTimeout(() => setCopyLabel('Copy context'), 1400)
@@ -67,7 +69,9 @@ export function App() {
 
   async function saveAs() {
     const name = window.prompt('Name this design profile', 'Field Draft')?.trim()
+
     if (!name) return
+
     try {
       await workshop.saveAs(name)
     } catch (error) {
@@ -184,9 +188,11 @@ export function App() {
           <div className="inspector-section">
             {Object.entries(workshop.specimen.controls).map(([key, control]) => {
               const value = workshop.session.props[key] ?? workshop.specimen.defaultProps[key] ?? ''
+
               if (control.type === 'boolean') {
                 return <label className="toggle toggle--wide" key={key}><input checked={Boolean(value)} onChange={(event) => workshop.patchProps({ [key]: event.target.checked })} type="checkbox" /><span /> {control.label}</label>
               }
+
               return (
                 <label className="control-field" key={key}>
                   <span>{control.label}</span>

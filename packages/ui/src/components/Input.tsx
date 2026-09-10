@@ -10,6 +10,7 @@ export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 
 export function Input({ label, message, invalid = false, className = '', id, ...props }: InputProps) {
   const generatedId = useId()
   const inputId = id ?? `vela-input-${generatedId.replace(/:/g, '')}`
+
   return (
     <label className="vela-field" htmlFor={inputId}>
       {label ? <span className="vela-field__label">{label}</span> : null}

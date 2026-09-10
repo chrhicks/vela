@@ -26,10 +26,12 @@ describe('Rig management API', () => {
         kind: 'camera',
         name: 'Main camera',
       }]))
+
     const catalog = createMemoryRigCatalog([], {
       createId: () => 'rig-1',
       now: () => new Date('2026-09-02T20:00:00.000Z'),
     })
+
     const app = buildApp({
       alpacaDiscovery: {
         async scan() {
@@ -47,6 +49,7 @@ describe('Rig management API', () => {
         url: '/api/rigs',
         payload: { name: ' Backyard rig ', endpoint },
       })
+
       expect(added.statusCode).toBe(201)
       expect(added.json()).toEqual({ rigId: 'rig-1' })
       await expect(catalog.list()).resolves.toEqual([{
@@ -65,6 +68,7 @@ describe('Rig management API', () => {
         url: '/api/rigs',
         payload: { name: 'Duplicate', endpoint },
       })
+
       expect(duplicate.statusCode).toBe(409)
       expect(duplicate.json()).toEqual({ error: 'rig-already-added', rigId: 'rig-1' })
       expect(inspect).toHaveBeenCalledTimes(2)
@@ -80,6 +84,7 @@ describe('Rig management API', () => {
   it('rejects invalid additions and candidates without a stable device ID', async () => {
     const inspect = vi.fn<AlpacaDiscovery['inspect']>()
       .mockResolvedValue(inspection([{ kind: 'camera', name: 'Legacy camera' }]))
+
     const app = buildApp({
       alpacaDiscovery: {
         async scan() {
@@ -95,6 +100,7 @@ describe('Rig management API', () => {
         url: '/api/rigs',
         payload: { name: '', endpoint },
       })
+
       expect(invalid.statusCode).toBe(400)
       expect(inspect).not.toHaveBeenCalled()
 
@@ -103,6 +109,7 @@ describe('Rig management API', () => {
         url: '/api/rigs',
         payload: { name: 'Legacy rig', endpoint },
       })
+
       expect(ineligible.statusCode).toBe(422)
       expect(ineligible.json()).toEqual({ error: 'no-stable-device-id' })
     } finally {
@@ -112,6 +119,7 @@ describe('Rig management API', () => {
 
   it('reports an inspection failure without changing the catalog', async () => {
     const catalog = createMemoryRigCatalog()
+
     const app = buildApp({
       alpacaDiscovery: {
         async scan() {
@@ -133,6 +141,7 @@ describe('Rig management API', () => {
         url: '/api/rigs',
         payload: { name: 'Backyard rig', endpoint },
       })
+
       expect(response.statusCode).toBe(502)
       expect(response.json()).toEqual({ error: 'rig-inspection-failed' })
       await expect(catalog.list()).resolves.toEqual([])

@@ -8,10 +8,12 @@ declare module 'aladin-lite' {
     on(event: string, callback: () => void): void
     remove(): void
   }
+
   const A: {
     init: Promise<void>
     aladin(element: HTMLElement, options: Record<string, unknown>): Viewer
     imageHiPS(url: string, options: Record<string, unknown>): unknown
   }
+
   export default A
 }

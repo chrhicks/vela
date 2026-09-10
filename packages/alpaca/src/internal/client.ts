@@ -72,30 +72,38 @@ export function createAlpacaClient({
   function tracedRequest<T>(endpoint: string, method: 'GET' | 'PUT', operation: (span: Span) => Promise<T>): Promise<T> {
     const path = endpoint.split('?')[0]!
     const parts = path.split('/')
+
     const attributes: Record<string, string | number> = {
       'http.request.method': method,
       'url.path': path,
       'alpaca.operation': parts.at(-1)!,
     }
+
     if (address !== undefined) {
       attributes['server.address'] = address.hostname
       attributes['url.scheme'] = address.protocol.slice(0, -1)
+
       if (address.port) attributes['server.port'] = Number(address.port)
     }
+
     if (parts[1] === 'api') {
       attributes['alpaca.device.type'] = parts[3]!
       attributes['alpaca.device.number'] = Number(parts[4])
     }
+
     return trace.getTracer('@vela/alpaca').startActiveSpan(`alpaca.${method.toLowerCase()} ${path}`, { kind: SpanKind.CLIENT, attributes }, async span => {
       try {
         const result = await operation(span)
         span.setStatus({ code: SpanStatusCode.OK })
+
         return result
       } catch (error) {
         if (error instanceof AlpacaProviderError) {
           span.setAttribute('alpaca.failure.reason', error.reason)
+
           if (error.errorNumber !== undefined) span.setAttribute('alpaca.error_number', error.errorNumber)
         }
+
         span.recordException(error instanceof Error ? error : String(error))
         span.setStatus({ code: SpanStatusCode.ERROR })
         throw error
@@ -118,6 +126,7 @@ export function createAlpacaClient({
     let timedOut = false
 
     const onAbort = () => controller.abort(operationSignal === undefined ? undefined : signalReason(operationSignal))
+
     if (operationSignal?.aborted) {
       onAbort()
     } else {
@@ -205,6 +214,7 @@ export function createAlpacaClient({
       if (timeout !== undefined) {
         clearTimeout(timeout)
       }
+
       operationSignal?.removeEventListener('abort', onAbort)
     }
   }
@@ -215,6 +225,7 @@ export function createAlpacaClient({
       'alpaca.server_transaction_id': response.ServerTransactionID,
       'alpaca.error_number': response.ErrorNumber,
     })
+
     if (response.ErrorNumber === 0) return
 
     throw new AlpacaProviderError(
@@ -233,6 +244,7 @@ export function createAlpacaClient({
     value: unknown,
   ): S['Type'] {
     const startedAt = performance.now()
+
     try {
       return Schema.decodeUnknownSync(schema)(value)
     } catch (cause) {
@@ -255,15 +267,18 @@ export function createAlpacaClient({
       const value = await request(endpoint, Schema.Unknown, operationSignal)
       const result = decodeResponse(endpoint, alpacaMethodResponse, value) as AlpacaResult
       rejectProtocolError(endpoint, result)
+
       const response = decodeResponse(
         endpoint,
         alpacaResponse(valueSchema),
         value,
       ) as unknown as AlpacaEnvelope<S['Type']>
+
       if (['rightascension', 'declination', 'slewing', 'tracking'].includes(endpoint.split('/').at(-1)!)
         && (typeof response.Value === 'number' || typeof response.Value === 'boolean')) {
         trace.getActiveSpan()?.setAttribute('alpaca.response.value', response.Value)
       }
+
       return response.Value
     })
   }
@@ -279,9 +294,11 @@ export function createAlpacaClient({
       if (endpoint.endsWith('/moveaxis')) {
         for (const key of ['Axis', 'Rate']) {
           const value = body.get(key)
+
           if (value !== null) span.setAttribute(`alpaca.command.${key.toLowerCase()}`, value)
         }
       }
+
       const response = await request(
         endpoint,
         alpacaMethodResponse,
@@ -310,28 +327,38 @@ export function createAlpacaClient({
 
     image: async (device, operationSignal) => {
       const endpoint = deviceEndpoint(device, 'imagearray')
+
       return tracedRequest(endpoint, 'GET', async span => {
         const value = await request(endpoint, Schema.Unknown, operationSignal,
           { headers: { accept: 'application/imagebytes, application/json;q=0.9' } }, imageTimeoutMs,
           response => {
             const contentType = response.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase()
+
             if (contentType === 'application/imagebytes') return response.arrayBuffer()
+
             if (contentType === 'application/json') return response.json()
             throw new AlpacaProviderError('Unsupported camera image Content-Type', { reason: 'invalid-response', endpoint })
           })
+
         if (value instanceof ArrayBuffer) {
           if (value.byteLength >= 16) {
             const metadata = new DataView(value)
             span.setAttributes({ 'alpaca.client_transaction_id': metadata.getUint32(8, true), 'alpaca.server_transaction_id': metadata.getUint32(12, true) })
           }
+
           const decodeStartedAt = performance.now()
+
           try { imageBytesMetadata(value) }
           finally { span.addEvent('alpaca.response.decode', { 'alpaca.decode.duration_ms': performance.now() - decodeStartedAt }) }
+
           span.setAttribute('alpaca.error_number', 0)
+
           return value
         }
+
         const result = decodeResponse(endpoint, alpacaMethodResponse, value) as AlpacaResult
         rejectProtocolError(endpoint, result)
+
         return value
       })
     },

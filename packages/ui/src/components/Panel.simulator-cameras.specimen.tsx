@@ -6,6 +6,7 @@ import { Select } from './Select'
 import './Panel.simulator-cameras.specimen.css'
 
 type Resolution = 'fast' | 'full'
+
 type Camera = {
   number: number
   connected: boolean
@@ -16,6 +17,7 @@ type Camera = {
   sensor: 'mono' | 'rggb'
   resolution: Resolution
 }
+
 const dimensions = { fast: [1562, 1044], full: [6248, 4176] } as const
 
 function CamerasPreview({ props, onPropsChange }: {
@@ -29,6 +31,7 @@ function CamerasPreview({ props, onPropsChange }: {
   useEffect(() => setColor(props.color === 'fast' ? 'fast' : 'full'), [props.color])
   useEffect(() => setObscured(props.sky === 'obscured'), [props.sky])
   const available = props.state !== 'unavailable'
+
   const cameras: Camera[] = [mono, color].map((resolution, number) => ({
     number,
     connected: props.state !== 'disconnected',
@@ -39,6 +42,7 @@ function CamerasPreview({ props, onPropsChange }: {
     sensor: number === 0 ? 'mono' : 'rggb',
     resolution,
   }))
+
   const exposing = cameras.some(camera => camera.activity === 'exposing')
 
   return <article className="vela-sim-cameras">
@@ -55,6 +59,7 @@ function CamerasPreview({ props, onPropsChange }: {
             { value: 'full', label: 'Full · 6248 × 4176' },
           ]} onChange={event => {
             const value = event.target.value as Resolution
+
             if (camera.number === 0) setMono(value)
             else setColor(value)
             onPropsChange?.({ [camera.number === 0 ? 'mono' : 'color']: value })

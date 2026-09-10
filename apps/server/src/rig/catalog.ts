@@ -86,6 +86,7 @@ export async function openFileRigCatalog(
   options: RigCatalogOptions = {},
 ): Promise<RigCatalog> {
   const initialRecords = await readCatalogFile(path)
+
   return createRigCatalog(
     initialRecords,
     (records) => writeCatalogFile(path, records),
@@ -107,6 +108,7 @@ function createRigCatalog(
   function change<T>(operation: () => Promise<T>): Promise<T> {
     const result = pendingChange.then(operation, operation)
     pendingChange = result.then(() => undefined, () => undefined)
+
     return result
   }
 
@@ -118,12 +120,14 @@ function createRigCatalog(
   return {
     async list() {
       await pendingChange
+
       return copyRecords(records)
     },
 
     async get(rigId) {
       await pendingChange
       const record = records.find((candidate) => candidate.id === rigId)
+
       return record === undefined ? undefined : copyRecord(record)
     },
 
@@ -131,6 +135,7 @@ function createRigCatalog(
       return change(async () => {
         const checkedInventory = validateObservedInventory(inventory)
         const match = matchRigCandidate(records, endpoint, checkedInventory)
+
         if (match.state !== 'known') return match
 
         const nextRecords = records.map((record) => record.id === match.rigId
@@ -140,7 +145,9 @@ function createRigCatalog(
               lastObservedInventory: checkedInventory,
             }
           : record)
+
         await replace(nextRecords)
+
         return match
       })
     },
@@ -149,6 +156,7 @@ function createRigCatalog(
       return change(async () => {
         const checkedInventory = validateObservedInventory(input.inventory)
         const match = matchRigCandidate(records, input.endpoint, checkedInventory)
+
         if (match.state === 'known') {
           const nextRecords = records.map((record) => record.id === match.rigId
             ? {
@@ -157,9 +165,12 @@ function createRigCatalog(
                 lastObservedInventory: checkedInventory,
               }
             : record)
+
           await replace(nextRecords)
+
           return { state: 'known', rigId: match.rigId }
         }
+
         if (match.state === 'conflict') return match
 
         const rig: RigCatalogRecord = {
@@ -169,7 +180,9 @@ function createRigCatalog(
           addedAt: now().toISOString(),
           lastObservedInventory: checkedInventory,
         }
+
         await replace([...records, rig])
+
         return { state: 'added', rig: copyRecord(rig) }
       })
     },
@@ -177,8 +190,10 @@ function createRigCatalog(
     setImagingCamera(rigId, camera) {
       return change(async () => {
         if (!isCanonicalNonEmptyString(camera.uniqueId) || !isNonEmptyString(camera.name)) throw new Error('Invalid imaging camera')
+
         if (!records.some(record => record.id === rigId)) return false
         await replace(records.map(record => record.id === rigId ? { ...record, imagingCamera: { ...camera } } : record))
+
         return true
       })
     },
@@ -186,8 +201,10 @@ function createRigCatalog(
     setFocalLength(rigId, focalLengthMm) {
       return change(async () => {
         if (!Number.isFinite(focalLengthMm) || focalLengthMm < 10 || focalLengthMm > 20000) throw new Error('Invalid focal length')
+
         if (!records.some(record => record.id === rigId)) return false
         await replace(records.map(record => record.id === rigId ? { ...record, focalLengthMm } : record))
+
         return true
       })
     },
@@ -195,9 +212,11 @@ function createRigCatalog(
     forget(rigId) {
       return change(async () => {
         const nextRecords = records.filter((record) => record.id !== rigId)
+
         if (nextRecords.length === records.length) return false
 
         await replace(nextRecords)
+
         return true
       })
     },
@@ -212,6 +231,7 @@ export function matchRigCandidate(
   const candidateDeviceIds = new Set(
     inventory.devices.map((device) => device.uniqueId),
   )
+
   const matchingRigs = records.filter((record) =>
     endpointsEqual(record.endpoint, endpoint)
       || record.lastObservedInventory.devices.some((device) =>
@@ -220,6 +240,7 @@ export function matchRigCandidate(
   )
 
   if (matchingRigs.length === 0) return { state: 'new' }
+
   if (matchingRigs.length > 1) {
     return {
       state: 'conflict',
@@ -228,6 +249,7 @@ export function matchRigCandidate(
   }
 
   const rig = matchingRigs[0]!
+
   return {
     state: 'known',
     rigId: rig.id,
@@ -249,14 +271,17 @@ function inventoriesEqual(
   const rightDevices = new Map(
     right.devices.map((device) => [device.uniqueId, device]),
   )
+
   return left.devices.every((device) => {
     const other = rightDevices.get(device.uniqueId)
+
     return other?.kind === device.kind && other.name === device.name
   })
 }
 
 async function readCatalogFile(path: string): Promise<ReadonlyArray<RigCatalogRecord>> {
   let contents: string
+
   try {
     contents = await readFile(path, 'utf8')
   } catch (error) {
@@ -297,9 +322,11 @@ function parseCatalog(value: unknown): ReadonlyArray<RigCatalogRecord> {
   }
 
   const records = value.rigs.map(parseRigRecord)
+
   if (new Set(records.map((record) => record.id)).size !== records.length) {
     throw new Error('Rig IDs must be unique')
   }
+
   return records
 }
 
@@ -319,7 +346,9 @@ function parseRigRecord(value: unknown): RigCatalogRecord {
   if (!isCanonicalNonEmptyString(value.id) || !isNonEmptyString(value.name)) {
     throw new Error('Rig id and name are required')
   }
+
   if (!isIsoDateTime(value.addedAt)) throw new Error('Invalid addedAt timestamp')
+
   if (value.focalLengthMm !== undefined && (typeof value.focalLengthMm !== 'number' || !Number.isFinite(value.focalLengthMm) || value.focalLengthMm < 10 || value.focalLengthMm > 20000)) throw new Error('Invalid focal length')
 
   if (value.imagingCamera !== undefined && (!isRecord(value.imagingCamera)
@@ -349,6 +378,7 @@ function parseEndpoint(value: unknown): RigEndpoint {
   ) {
     throw new Error('Invalid Rig endpoint')
   }
+
   return { host: value.host, port: Number(value.port) }
 }
 
@@ -371,9 +401,11 @@ function parseInventory(value: unknown): ObservedRigInventory {
   }
 
   const devices = value.devices.map(parseDevice)
+
   if (new Set(devices.map((device) => device.uniqueId)).size !== devices.length) {
     throw new Error('Device IDs must be unique within a Rig')
   }
+
   return { observedAt: value.observedAt, devices }
 }
 
@@ -423,6 +455,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function hasOnlyKeys(value: Record<string, unknown>, keys: ReadonlyArray<string>): boolean {
   const expected = new Set(keys)
+
   return Object.keys(value).every((key) => expected.has(key))
 }
 
@@ -438,6 +471,7 @@ function isIsoDateTime(value: unknown): value is string {
   if (typeof value !== 'string') return false
 
   const date = new Date(value)
+
   return !Number.isNaN(date.getTime()) && date.toISOString() === value
 }
 

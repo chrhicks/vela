@@ -16,11 +16,14 @@ import type { PlateWcs, SkyPosition } from '../plate-solving/solver.js'
 // https://github.com/liberfa/erfa/blob/master/src/gst06a.c
 // Each recorded capture start is one second before its 2-second midpoint.
 type CaptureFixture = { solved: SkyPosition, capturedAt: string, sidereal?: number }
+
 const fixture = JSON.parse(readFileSync(new URL('./physical-coordinates.fixture.json', import.meta.url), 'utf8')) as {
   site: { latitudeDegrees: number, longitudeDegrees: number, elevationMeters: number }
   cases: { altitude: number, azimuth: number, samples: CaptureFixture[], adjusted: CaptureFixture, target: SkyPosition }[]
 }
+
 const { site } = fixture
+
 const sample = (frame: CaptureFixture) => physicalAlignmentSample(frame.solved, { capturedAt: frame.capturedAt, exposureSeconds: 2 }, site)
 
 describe('physical alignment coordinate boundary', () => {
@@ -28,10 +31,12 @@ describe('physical alignment coordinate boundary', () => {
     const samples = reference.samples.map(sample) as [AlignmentSample, AlignmentSample, AlignmentSample]
     expect(samples[0].siderealTimeDegrees).toBeGreaterThan(359)
     expect(samples[1].siderealTimeDegrees).toBeLessThan(1)
+
     for (const [index, value] of samples.entries()) {
       expect(Math.abs(value.siderealTimeDegrees - reference.samples[index]!.sidereal!) * 3600).toBeLessThan(0.5)
       expect(Date.parse(value.capturedAt) - Date.parse(reference.samples[index]!.capturedAt)).toBe(1000)
     }
+
     const baseline = createAlignmentBaseline(samples, site.latitudeDegrees)
     // Allows the shorter Astronomy Engine nutation/aberration model versus ERFA,
     // including amplification from fitting a pole to a finite three-point arc.
@@ -46,6 +51,7 @@ describe('physical alignment coordinate boundary', () => {
     // of a rotated, parity-flipped CD matrix, rather than production projectSky.
     const wcs: PlateWcs = { width: 6248, height: 4176, referenceX: 3124.5, referenceY: 2088.5,
       ...reference.adjusted.solved, cd: [0.00043, 0.00032, 0.00032, -0.00043] }
+
     const target = projectPhysicalAlignmentTarget(wcs, measurement.correctionTarget, current, site)!
     const expected = tangentPixel(wcs, reference.target)
     expect(Math.hypot(target.x - expected.x, target.y - expected.y)).toBeLessThan(0.6)
@@ -53,9 +59,11 @@ describe('physical alignment coordinate boundary', () => {
 
   it('rejects invalid timing/site rather than manufacturing sidereal angles', () => {
     const frame = fixture.cases[0]!.samples[0]!
+
     for (const exposureSeconds of [0, -1, NaN]) {
       expect(() => physicalAlignmentSample(frame.solved, { capturedAt: frame.capturedAt, exposureSeconds }, site)).toThrow(/duration/)
     }
+
     expect(() => physicalAlignmentSample(frame.solved, { capturedAt: 'invalid', exposureSeconds: 2 }, site)).toThrow(/start/)
     expect(() => localSiderealDegrees(new Date(frame.capturedAt), { ...site, longitudeDegrees: NaN })).toThrow(/site/)
   })
@@ -72,6 +80,7 @@ function tangentPixel(wcs: PlateWcs, point: SkyPosition) {
   const dot = (basis: number[]) => basis.reduce((sum, value, index) => sum + value * vector[index]!, 0)
   const x = dot(east) / dot(center) / r, y = dot(north) / dot(center) / r
   const [a, b, c, d] = wcs.cd
+
   return { x: wcs.referenceX - 1 + (d * x - b * y) / (a * d - b * c),
     y: wcs.referenceY - 1 + (a * y - c * x) / (a * d - b * c) }
 }

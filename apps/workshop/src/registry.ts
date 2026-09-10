@@ -24,8 +24,10 @@ export const specimens = discoveredSpecimens.map((entry) => entry.specimen)
 const groupedSpecimens = discoveredSpecimens.reduce<Record<string, { stability: 'stable' | 'draft'; specimens: ComponentSpecimen[] }>>((groups, entry) => {
   const group = groups[entry.specimen.componentId] ?? { stability: entry.stability, specimens: [] }
   group.specimens.push(entry.specimen)
+
   if (entry.stability === 'stable') group.stability = 'stable'
   groups[entry.specimen.componentId] = group
+
   return groups
 }, {})
 

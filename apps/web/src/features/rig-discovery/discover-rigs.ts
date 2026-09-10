@@ -34,12 +34,15 @@ export async function discoverRigs(
       body: JSON.stringify(request),
       signal,
     })
+
     if (!isDiscoveryResult(response)) throw new Error('Invalid discovery response')
+
     return response
   } catch (error) {
     if (error instanceof ApiError && error.status === 400) {
       throw new DiscoverRigsError('invalid-request')
     }
+
     throw error
   }
 }
@@ -135,6 +138,7 @@ function isIsoDateTime(value: unknown): value is string {
   if (typeof value !== 'string') return false
 
   const date = new Date(value)
+
   return !Number.isNaN(date.getTime()) && date.toISOString() === value
 }
 

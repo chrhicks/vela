@@ -18,25 +18,32 @@ import { toDeviceKind } from './internal/device-kind.js'
 import { createNodeUdpScanner } from './internal/udp-scanner.js'
 
 const defaultScanDurationMs = 1_000
+
 const defaultScanAttempts = 2
+
 const defaultRequestTimeoutMs = 3_000
 
 function positiveInteger(value: number, name: string): number {
   if (!Number.isInteger(value) || value <= 0) {
     throw new RangeError(`${name} must be a positive integer`)
   }
+
   return value
 }
 
 function endpointBaseUrl(endpoint: AlpacaEndpoint): string {
   const host = endpoint.host.trim()
+
   if (host.length === 0) {
     throw new RangeError('Alpaca endpoint host must not be empty')
   }
+
   positiveInteger(endpoint.port, 'Alpaca endpoint port')
+
   if (endpoint.port > 65535) {
     throw new RangeError('Alpaca endpoint port must not exceed 65535')
   }
+
   return `http://${host}:${endpoint.port}`
 }
 
@@ -49,6 +56,7 @@ export function createAlpacaDiscovery({
       options.durationMs ?? defaultScanDurationMs,
       'Scan duration',
     )
+
     const attempts = positiveInteger(options.attempts ?? defaultScanAttempts, 'Scan attempts')
 
     return udpScanner.scan({
@@ -69,6 +77,7 @@ export function createAlpacaDiscovery({
       options.requestTimeoutMs ?? defaultRequestTimeoutMs,
       'Inspection request timeout',
     )
+
     const client = createAlpacaClient({
       baseUrl: endpointBaseUrl(endpoint),
       fetch,
@@ -79,13 +88,16 @@ export function createAlpacaDiscovery({
     // Management operations remain serial for compatibility with finicky servers.
     const apiVersions = await client.apiVersions()
     const description = await client.serverDescription()
+
     const configuredDevices = normalizeConfiguredDevices(
       await client.configuredDevices(),
     )
+
     rejectDuplicateDeviceIds(configuredDevices)
 
     const devices: AlpacaInspectionDevice[] = configuredDevices.map((device) => {
       const providerDeviceId = stableDeviceId(device)
+
       return {
         kind: toDeviceKind(device.DeviceType),
         name: device.DeviceName,

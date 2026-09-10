@@ -12,6 +12,7 @@ import { createRigConnectionCoordinator } from './connection.js'
 import type { RigCatalogRecord } from './contracts.js'
 
 const endpoint = { host: 'alpaca.test', port: 11111 }
+
 const now = () => new Date('2026-09-04T20:00:00.000Z')
 
 function inspection(
@@ -54,12 +55,16 @@ function inspectorSequence(
   ...results: ReadonlyArray<ReadonlyArray<AlpacaDeviceInspection> | Error>
 ) {
   let index = 0
+
   const inspectDevices = vi.fn(async () => {
     const result = results[Math.min(index, results.length - 1)]
     index += 1
+
     if (result instanceof Error) throw result
+
     return result ?? []
   })
+
   return {
     createInspector: () => ({ inspectDevices }) satisfies RigDeviceInspector,
     inspectDevices,
@@ -71,6 +76,7 @@ function connector(
 ) {
   const connectDevice = vi.fn((providerDeviceId: string, options?: { readonly signal?: AbortSignal }) =>
     operation(providerDeviceId, options?.signal))
+
   return {
     createConnector: () => ({ connectDevice }) satisfies RigDeviceConnector,
     connectDevice,
@@ -83,6 +89,7 @@ describe('Rig device connection coordinator', () => {
   it('returns unknown without inspecting or connecting devices', async () => {
     const inspector = inspectorSequence([])
     const deviceConnector = connector(async () => connected)
+
     const coordinator = createRigConnectionCoordinator({
       catalog: createMemoryRigCatalog(),
       createInspector: inspector.createInspector,
@@ -97,11 +104,14 @@ describe('Rig device connection coordinator', () => {
 
   it('does not write when the Rig is offline or current identity conflicts', async () => {
     const camera = inspection('camera-0', 'camera', 'disconnected')
+
     const offlineInspector = inspectorSequence(new AlpacaProviderError('Offline', {
       reason: 'transport',
       endpoint: '/management/v1/configureddevices',
     }))
+
     const deviceConnector = connector(async () => connected)
+
     const offlineCoordinator = createRigConnectionCoordinator({
       catalog: createMemoryRigCatalog([record('rig-1', [camera])]),
       createInspector: offlineInspector.createInspector,
@@ -119,6 +129,7 @@ describe('Rig device connection coordinator', () => {
     })
 
     const conflictInspector = inspectorSequence([camera])
+
     const conflictCoordinator = createRigConnectionCoordinator({
       catalog: createMemoryRigCatalog([
         record('rig-a', [camera]),
@@ -128,6 +139,7 @@ describe('Rig device connection coordinator', () => {
       createConnector: deviceConnector.createConnector,
       now,
     })
+
     await expect(conflictCoordinator.connectDevices('rig-a')).resolves.toMatchObject({
       state: 'finished',
       result: { outcome: 'unavailable', reason: 'identity-conflict' },
@@ -139,6 +151,7 @@ describe('Rig device connection coordinator', () => {
     const camera = inspection('camera-0', 'camera', 'unavailable')
     const inspector = inspectorSequence([camera])
     const deviceConnector = connector(async () => connected)
+
     const coordinator = createRigConnectionCoordinator({
       catalog: createMemoryRigCatalog([record('rig-1', [camera])]),
       createInspector: inspector.createInspector,
@@ -159,8 +172,10 @@ describe('Rig device connection coordinator', () => {
       inspection('dome-0', 'dome', 'disconnected'),
       inspection('unknown-0', 'unknown', 'disconnected'),
     ]
+
     const inspector = inspectorSequence(devices)
     const deviceConnector = connector(async () => connected)
+
     const coordinator = createRigConnectionCoordinator({
       catalog: createMemoryRigCatalog([record('rig-1', devices)]),
       createInspector: inspector.createInspector,
@@ -187,14 +202,18 @@ describe('Rig device connection coordinator', () => {
       inspection('dome-0', 'dome', 'disconnected'),
       inspection('switch-0', 'switch', 'disconnected'),
     ]
+
     let devices = initial
     const createInspector = () => ({ inspectDevices: async () => devices })
+
     const deviceConnector = connector(async (id) => {
       devices = devices.map((device) => device.providerDeviceId === id
         ? { ...device, connection: 'connected' as const }
         : device)
+
       return connected
     })
+
     const coordinator = createRigConnectionCoordinator({
       catalog: createMemoryRigCatalog([record('rig-1', initial)]),
       createInspector,
@@ -226,15 +245,19 @@ describe('Rig device connection coordinator', () => {
       inspection('telescope-0', 'telescope', 'disconnected'),
       inspection('switch-0', 'switch', 'disconnected'),
     ]
+
     const afterFailure = [
       { ...initial[0]!, connection: 'connected' as const },
       initial[1]!,
       initial[2]!,
     ]
+
     const inspector = inspectorSequence(initial, afterFailure)
+
     const deviceConnector = connector(async (id) => id === 'camera-0'
       ? connected
       : { outcome: 'failed', reason: 'rejected' })
+
     const coordinator = createRigConnectionCoordinator({
       catalog: createMemoryRigCatalog([record('rig-1', initial)]),
       createInspector: inspector.createInspector,
@@ -265,6 +288,7 @@ describe('Rig device connection coordinator', () => {
     const devices = [inspection('camera-0', 'camera', 'disconnected')]
     const inspector = inspectorSequence(devices, devices)
     const deviceConnector = connector(async () => ({ outcome: 'failed', reason: 'remained-disconnected' }))
+
     const coordinator = createRigConnectionCoordinator({
       catalog: createMemoryRigCatalog([record('rig-1', devices)]),
       createInspector: inspector.createInspector,
@@ -288,15 +312,19 @@ describe('Rig device connection coordinator', () => {
       inspection('telescope-0', 'telescope', 'disconnected'),
       inspection('switch-0', 'switch', 'disconnected'),
     ]
+
     const refreshed = [
       { ...initial[0]!, connection: 'connected' as const },
       { ...initial[1]!, connection: 'unavailable' as const },
       initial[2]!,
     ]
+
     const inspector = inspectorSequence(initial, refreshed)
+
     const deviceConnector = connector(async (id) => id === 'camera-0'
       ? connected
       : { outcome: 'uncertain', reason: 'write-outcome-unknown' })
+
     const coordinator = createRigConnectionCoordinator({
       catalog: createMemoryRigCatalog([record('rig-1', initial)]),
       createInspector: inspector.createInspector,
@@ -324,15 +352,19 @@ describe('Rig device connection coordinator', () => {
       inspection('camera-0', 'camera', 'disconnected'),
       inspection('telescope-0', 'telescope', 'disconnected'),
     ]
+
     const refreshed = [
       { ...initial[0]!, connection: 'connected' as const },
       initial[1]!,
     ]
+
     const inspector = inspectorSequence(initial, refreshed)
+
     const deviceConnector = connector(async () => ({
       outcome: 'uncertain',
       reason: 'verification-unavailable',
     }))
+
     const coordinator = createRigConnectionCoordinator({
       catalog: createMemoryRigCatalog([record('rig-1', initial)]),
       createInspector: inspector.createInspector,
@@ -356,10 +388,12 @@ describe('Rig device connection coordinator', () => {
   it('turns uncertainty into confirmed failure when refreshed state is disconnected', async () => {
     const devices = [inspection('camera-0', 'camera', 'disconnected')]
     const inspector = inspectorSequence(devices, devices)
+
     const deviceConnector = connector(async () => ({
       outcome: 'uncertain',
       reason: 'verification-timeout',
     }))
+
     const coordinator = createRigConnectionCoordinator({
       catalog: createMemoryRigCatalog([record('rig-1', devices)]),
       createInspector: inspector.createInspector,
@@ -382,18 +416,23 @@ describe('Rig device connection coordinator', () => {
       inspection('camera-0', 'camera', 'disconnected'),
       inspection('telescope-0', 'telescope', 'disconnected'),
     ]
+
     let devices = disconnected
     const createInspector = () => ({ inspectDevices: async () => devices })
     const controller = new AbortController()
     const calls: string[] = []
+
     const deviceConnector = connector(async (id) => {
       calls.push(id)
       devices = devices.map((device) => device.providerDeviceId === id
         ? { ...device, connection: 'connected' as const }
         : device)
+
       if (id === 'camera-0') controller.abort(new DOMException('Cancelled', 'AbortError'))
+
       return connected
     })
+
     const coordinator = createRigConnectionCoordinator({
       catalog: createMemoryRigCatalog([record('rig-1', disconnected)]),
       createInspector,
@@ -419,12 +458,14 @@ describe('Rig device connection coordinator', () => {
     let devices = initial
     const createInspector = () => ({ inspectDevices: async () => devices })
     let finishConnection: ((value: AlpacaDeviceConnectionResult) => void) | undefined
+
     const deviceConnector = connector(() => new Promise((resolve) => {
       finishConnection = (result) => {
         devices = final
         resolve(result)
       }
     }))
+
     const coordinator = createRigConnectionCoordinator({
       catalog: createMemoryRigCatalog([record('rig-1', initial)]),
       createInspector,
@@ -463,12 +504,14 @@ describe('Rig device connection coordinator', () => {
     let devices = initial
     const createInspector = () => ({ inspectDevices: async () => devices })
     let finishConnection: ((value: AlpacaDeviceConnectionResult) => void) | undefined
+
     const deviceConnector = connector(() => new Promise((resolve) => {
       finishConnection = (result) => {
         devices = final
         resolve(result)
       }
     }))
+
     const coordinator = createRigConnectionCoordinator({
       catalog,
       createInspector,
@@ -492,6 +535,7 @@ describe('Rig device connection coordinator', () => {
     const secondCamera = inspection('camera-b', 'camera', 'disconnected')
     const connectionState = new Map([['rig-a', false], ['rig-b', false]])
     let finishFirst: (() => void) | undefined
+
     const createConnector = vi.fn((rig: { readonly id: string }) => ({
       async connectDevice() {
         if (rig.id === 'rig-a') {
@@ -504,9 +548,11 @@ describe('Rig device connection coordinator', () => {
         } else {
           connectionState.set(rig.id, true)
         }
+
         return connected
       },
     }))
+
     const coordinator = createRigConnectionCoordinator({
       catalog: createMemoryRigCatalog([
         record('rig-a', [firstCamera], { host: 'first.test', port: 11111 }),
@@ -515,6 +561,7 @@ describe('Rig device connection coordinator', () => {
       createInspector: (rig) => ({
         async inspectDevices() {
           const source = rig.id === 'rig-a' ? firstCamera : secondCamera
+
           return [{
             ...source,
             connection: connectionState.get(rig.id) ? 'connected' as const : 'disconnected' as const,
@@ -542,12 +589,15 @@ describe('Rig device connection coordinator', () => {
   it('maps a pre-write provider failure without exposing protocol details', async () => {
     const devices = [inspection('camera-0', 'camera', 'disconnected')]
     const inspector = inspectorSequence(devices, devices)
+
     const cause = new AlpacaProviderError('Private endpoint details', {
       reason: 'transport',
       endpoint: '/management/v1/configureddevices',
     })
+
     const deviceConnector = connector(async () => { throw cause })
     const onProviderResult = vi.fn()
+
     const coordinator = createRigConnectionCoordinator({
       catalog: createMemoryRigCatalog([record('rig-1', devices)]),
       createInspector: inspector.createInspector,

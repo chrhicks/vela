@@ -4,9 +4,11 @@ import { isConnectRigDevicesResult, isRigObservationView } from './validation'
 
 export async function loadObservation(rigId: string, signal: AbortSignal): Promise<RigObservationView> {
   const value = await api<unknown>(`web/rigs/${encodeURIComponent(rigId)}/observe`, { signal })
+
   if (!isRigObservationView(value) || value.rig.id !== rigId) {
     throw new Error('Invalid observation response')
   }
+
   return value
 }
 
@@ -15,8 +17,10 @@ export async function connectDevices(rigId: string, signal: AbortSignal): Promis
     method: 'POST',
     signal,
   })
+
   if (!isConnectRigDevicesResult(value) || value.view.rig.id !== rigId) {
     throw new Error('Invalid connection response')
   }
+
   return value
 }

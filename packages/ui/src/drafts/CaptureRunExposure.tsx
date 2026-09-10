@@ -9,12 +9,15 @@ type CaptureRunExposureProps = {
 }
 
 const width = 1600
+
 const height = 1200
 
 function randomSequence(seed: number) {
   let state = seed >>> 0
+
   return () => {
     state = (Math.imul(state, 1664525) + 1013904223) >>> 0
+
     return state / 4294967296
   }
 }
@@ -23,6 +26,7 @@ function randomSequence(seed: number) {
 // Keep the same field between exposures so small changes are inspectable at 100%.
 const field = (() => {
   const random = randomSequence(93417)
+
   return Array.from({ length: 1800 }, () => ({
     x: random() * width,
     y: random() * height,
@@ -36,9 +40,13 @@ const field = (() => {
 function frameCondition(frame: number, conditions: CaptureRunConditions) {
   if (conditions !== 'changing') return conditions
   const phase = ((frame % 12) + 12) % 12
+
   if (phase === 7) return 'streak'
+
   if (phase === 3 || phase === 4) return 'haze'
+
   if (phase === 9 || phase === 10) return 'soft'
+
   return 'clear'
 }
 
@@ -48,6 +56,7 @@ function drawExposure(context: CanvasRenderingContext2D, frame: number, conditio
   const image = context.createImageData(width, height)
   const pixels = image.data
   const cloudCenter = width * (0.35 + 0.18 * Math.sin(frame * 0.6))
+
   const hazeAt = (x: number, y: number) => condition === 'haze'
     ? Math.exp(-Math.pow((x + y * 0.4 - cloudCenter) / 600, 2)) * 0.32
     : 0
@@ -74,6 +83,7 @@ function drawExposure(context: CanvasRenderingContext2D, frame: number, conditio
     const brightness = star.brightness * (1 + variation * 0.04) * (1 - hazeAt(x, y)) / (softness * softness)
     const radius = Math.ceil(sigma * 5)
     const color = star.warmth > 0.55 ? [1, 0.86, 0.68] : [0.72, 0.84, 1]
+
     for (let py = Math.max(0, Math.floor(y) - radius); py <= Math.min(height - 1, Math.ceil(y) + radius); py += 1) {
       for (let px = Math.max(0, Math.floor(x) - radius); px <= Math.min(width - 1, Math.ceil(x) + radius); px += 1) {
         const distance = (px - x) ** 2 + (py - y) ** 2
@@ -85,6 +95,7 @@ function drawExposure(context: CanvasRenderingContext2D, frame: number, conditio
       }
     }
   }
+
   context.putImageData(image, 0, 0)
 
   if (condition === 'streak') {
@@ -113,6 +124,7 @@ export function CaptureRunExposure({ frame, conditions, className }: CaptureRunE
   const canvas = useRef<HTMLCanvasElement>(null)
   useEffect(() => {
     const context = canvas.current?.getContext('2d')
+
     if (context) drawExposure(context, frame, conditions)
   }, [frame, conditions])
 

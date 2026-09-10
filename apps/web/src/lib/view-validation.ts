@@ -58,6 +58,7 @@ function connectionsMatchDevices(
   const connected = devices.filter((device) => device.connection === 'connected').length
   const disconnected = devices.filter((device) => device.connection === 'disconnected').length
   const unavailable = devices.filter((device) => device.connection === 'unavailable').length
+
   return summary.total === devices.length
     && summary.connected === connected
     && summary.disconnected === disconnected
@@ -90,13 +91,18 @@ function isRigDetailDevice(value: unknown): value is RigDeviceDetailView {
     return isIsoDateTime(value.observedAt)
       && value.status.availability === 'unavailable'
   }
+
   if (value.connection === 'unavailable') {
     return (value.observedAt === undefined || isIsoDateTime(value.observedAt))
       && value.status.availability === 'unavailable'
   }
+
   if (value.connection !== 'connected' || !isIsoDateTime(value.observedAt)) return false
+
   if (value.status.availability === 'unsupported') return true
+
   if (!supportedDeviceKinds.has(value.kind as DeviceKind)) return false
+
   if (!isOneOf(value.status.availability, ['complete', 'partial'])) return false
 
   switch (value.kind) {
@@ -189,6 +195,7 @@ function isEndpoint(value: unknown): boolean {
 function isConnectionSummary(value: unknown): value is RigDeviceConnectionSummary {
   if (!isRecord(value)) return false
   const counts = [value.total, value.connected, value.disconnected, value.unavailable]
+
   return counts.every((count) => Number.isInteger(count) && Number(count) >= 0)
     && value.total === Number(value.connected) + Number(value.disconnected) + Number(value.unavailable)
 }
@@ -219,6 +226,7 @@ function isOptionalPercentage(value: unknown): boolean {
 function isIsoDateTime(value: unknown): value is string {
   if (typeof value !== 'string') return false
   const date = new Date(value)
+
   return !Number.isNaN(date.getTime()) && date.toISOString() === value
 }
 

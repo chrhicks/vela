@@ -4,6 +4,7 @@ import { createAlpacaAcquisition, AlpacaCaptureStoppedError } from './acquisitio
 function observatory() {
   const camera = { DeviceName: 'Camera', DeviceType: 'Camera', DeviceNumber: 7, UniqueID: 'camera-id' }
   const telescope = { DeviceName: 'Mount', DeviceType: 'Telescope', DeviceNumber: 3, UniqueID: 'mount-id' }
+
   const state = {
     cameraName: ' Camera ',
     sensorType: 0,
@@ -37,16 +38,19 @@ function observatory() {
     stopping: false,
     cameraStopFails: false,
   }
+
   const fetch: typeof globalThis.fetch = async (input, init) => {
     init?.signal?.throwIfAborted()
     const url = new URL(String(input))
     const operation = url.pathname.split('/').at(-1)
     const parameters = new URLSearchParams(String(init?.body ?? ''))
     let Value: unknown
+
     if (operation === 'configureddevices') Value = [camera, telescope]
     else if (operation === 'connected' || operation === 'canabortexposure' || operation === 'canmoveaxis' || operation === 'tracking') Value = true
     else if (operation === 'rightascension') {
       if (state.raReadFails && state.rate !== 0) throw new TypeError('RA read failed')
+
       if (state.rate !== 0) state.raDegrees = (state.raDegrees + Math.sign(state.rate) * state.raStep + 360) % 360
       Value = state.raDegrees / 15
     }
@@ -65,6 +69,7 @@ function observatory() {
     else if (operation === 'camerastate') Value = state.exposing ? 2 : 0
     else if (operation === 'imageready') {
       Value = state.ready
+
       if (state.starts > 0 && !state.ready) state.pendingReadyReads++
     }
     else if (operation === 'slewing') {
@@ -80,27 +85,36 @@ function observatory() {
     else if (operation === 'equatorialsystem') Value = 0
     else if (operation === 'startexposure') {
       state.starts++
+
       if (!state.stale) { state.ready = false; state.exposing = true }
+
       if (state.lostStart) throw new TypeError('Response lost after accepting exposure')
     } else if (operation === 'abortexposure') {
       state.aborts++
+
       if (state.cameraStopFails) throw new TypeError('Cannot reach camera to stop it')
       state.exposing = false
       state.ready = false
     } else if (operation === 'moveaxis') {
       const rate = Number(parameters.get('Rate'))
       state.moves.push(rate)
+
       if (rate === 0 && state.stopFails) throw new TypeError('Cannot reach mount to stop it')
       state.rate = rate
       state.stopping = rate === 0
+
       if (rate !== 0 && state.lostMove) throw new TypeError('Response lost after motion began')
     } else if (operation === 'imagearray') {
       state.imageReads++
+
       if (state.imageBinary) return new Response(state.imageBinary, { headers: { 'content-type': 'application/imagebytes' } })
+
       return Response.json({ ClientTransactionID: 0, ServerTransactionID: 1, ErrorNumber: 0, ErrorMessage: '', ...state.image })
     } else throw new Error(`Unexpected request ${url.pathname}`)
+
     return Response.json({ ClientTransactionID: 0, ServerTransactionID: 1, ErrorNumber: 0, ErrorMessage: '', Value })
   }
+
   return {
     state,
     fetch,
@@ -121,7 +135,11 @@ describe('normalized Alpaca acquisition', () => {
   it('waits for a new completed exposure and transposes x/y wire pixels into row-major pixels', async () => {
     const rig = observatory()
     let resolved = false
-    const result = rig.acquisition.capture({ cameraId: 'camera-id', expectedCameraName: 'Camera', exposureSeconds: 1 }).then(frame => { resolved = true; return frame })
+
+    const result = rig.acquisition.capture({ cameraId: 'camera-id', expectedCameraName: 'Camera', exposureSeconds: 1 }).then(frame => { resolved = true;
+
+ return frame })
+
     await started(rig)
     expect(resolved).toBe(false)
     rig.complete()
@@ -375,13 +393,16 @@ describe('observed primary-axis rotation', () => {
     let reachedPending!: () => void
     const pending = new Promise<void>(resolve => { reachedPending = resolve })
     let pendingSignal: AbortSignal | undefined
+
     const fetch: typeof globalThis.fetch = async (input, init) => {
       const response = await rig.fetch(input, init)
       const operation = new URL(String(input)).pathname.split('/').at(-1)
       const shouldHold = rig.state.rate !== 0 && (phase === 'start' ? operation === 'moveaxis' : operation === 'rightascension')
+
       if (!shouldHold) return response
       const signal = init!.signal!
       pendingSignal = signal
+
       if (phase === 'body') {
         // Headers arrived, but the fetch-owned body is still in flight.
         return new Response(new ReadableStream({
@@ -391,17 +412,20 @@ describe('observed primary-axis rotation', () => {
           },
         }))
       }
+
       return new Promise<Response>((_, reject) => {
         signal.addEventListener('abort', () => reject(signal.reason), { once: true })
         reachedPending()
       })
     }
+
     return { ...rig, pending, pendingSignal: () => pendingSignal,
       acquisition: createAlpacaAcquisition({ baseUrl: 'http://fake', fetch }) }
   }
 
   it.each(['start', 'read', 'body'] as const)('aborts a pending %s response at the movement deadline and confirms one stop', async phase => {
     vi.useFakeTimers()
+
     try {
       const rig = pendingMotionResponse(phase)
       const result = rig.acquisition.rotateRightAscension('mount-id', 1.5, 0.15)
@@ -435,6 +459,7 @@ describe('observed primary-axis rotation', () => {
 
   it('surfaces stop failure ahead of the movement deadline error', async () => {
     vi.useFakeTimers()
+
     try {
       const rig = pendingMotionResponse('read')
       const result = rig.acquisition.rotateRightAscension('mount-id', 1.5, 0.15)
@@ -452,21 +477,27 @@ describe('observed primary-axis rotation', () => {
 
   it.each(['elapsed', 'wall'] as const)('uses elapsed time rather than wall-clock time when accepting a threshold response (%s clock jumps)', async clock => {
     vi.useFakeTimers()
+
     try {
       const rig = observatory()
       const monotonic = vi.spyOn(performance, 'now').mockReturnValue(0)
+
       const fetch: typeof globalThis.fetch = async (input, init) => {
         const response = await rig.fetch(input, init)
+
         if (rig.state.rate !== 0 && String(input).endsWith('/rightascension')) {
           // The sample exceeds the target. Model a late callback before its
           // expired timer has run, or an unrelated wall-clock correction.
           if (clock === 'elapsed') monotonic.mockReturnValue(3000)
           else vi.setSystemTime(Date.now() + 60_000)
         }
+
         return response
       }
+
       const acquisition = createAlpacaAcquisition({ baseUrl: 'http://fake', fetch })
       const result = acquisition.rotateRightAscension('mount-id', 1.5, 0.15)
+
       if (clock === 'elapsed') await expect(result).rejects.toThrow('before timeout')
       else await expect(result).resolves.toBeUndefined()
       expect(rig.state.moves).toEqual([1.5, 0])
@@ -522,6 +553,7 @@ describe('observed primary-axis rotation', () => {
 
   it('bounds a rotation with no progress and stops it', async () => {
     vi.useFakeTimers()
+
     try {
       const rig = observatory()
       rig.state.raStep = 0

@@ -18,6 +18,7 @@ export function ImagingCamera({ rigId, interrupted, connecting }: { rigId: strin
   const selectedSlot = view?.cameras.find(item => item.id === selected?.id)
   const draft = choice ?? selected
   const validChoice = view?.cameras.find(item => item.id === draft?.id && item.name !== null && item.name === draft?.name)
+
   const notice = offline ? 'Rig updates are interrupted. The saved camera is remembered; reconnect to check or change it.'
     : view?.state === 'missing' ? 'The saved camera is not in the rig’s current device list. Choose a camera or check its connection to the server.'
     : view?.state === 'changed' ? `${selectedSlot?.configuredName ?? 'The saved camera slot'} now reports a different camera. Check the driver setup, then confirm which camera to use.`
@@ -34,6 +35,7 @@ export function ImagingCamera({ rigId, interrupted, connecting }: { rigId: strin
     {camera.error && <p className="vela-imaging-camera__notice" role="status">{camera.error}</p>}
     {expanded && view && <form className="vela-imaging-camera__form" onSubmit={event => {
       event.preventDefault()
+
       if (!locked && validChoice?.name) void camera.save({ id: validChoice.id, name: validChoice.name })
     }}>
       <Select label="Camera" value={validChoice?.id ?? ''} disabled={locked} options={[
@@ -41,6 +43,7 @@ export function ImagingCamera({ rigId, interrupted, connecting }: { rigId: strin
         ...view.cameras.map(item => ({ value: item.id, label: item.name ? `${item.name} · ${item.configuredName}` : `${item.configuredName} · Identity unavailable`, disabled: item.name === null })),
       ]} onChange={event => {
         const next = view.cameras.find(item => item.id === event.target.value)
+
         if (next?.name) setChoice({ id: next.id, name: next.name })
       }} />
       <p>Remembered for this rig. You can return here when your setup changes.</p>

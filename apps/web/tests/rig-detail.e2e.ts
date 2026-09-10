@@ -3,6 +3,7 @@ import type { Page, Route } from '@playwright/test'
 import type { HomeView, RigDetailView } from '@vela/model/web'
 
 const now = new Date().toISOString()
+
 const endpoint = { host: '192.168.4.104', port: 11111 }
 
 function homeWithRig(): HomeView {
@@ -210,11 +211,14 @@ test('shows active refresh, retains stale values, and resumes non-overlapping po
   let requests = 0
   await page.route('**/api/web/rigs/rig-1', async (route) => {
     requests += 1
+
     if (requests === 2) {
       await new Promise((resolve) => setTimeout(resolve, 5_500))
       await fulfillJson(route, { error: 'temporary' }, 503)
+
       return
     }
+
     await fulfillJson(route, liveDetail(requests >= 3 ? -4 : -5))
   })
 
@@ -269,6 +273,7 @@ test('pauses polling while hidden and refreshes immediately when visible', async
 test('distinguishes offline, unknown, and malformed fresh loads', async ({ page }) => {
   await page.route('**/api/web/rigs/*', async (route) => {
     const path = new URL(route.request().url()).pathname
+
     if (path.endsWith('/offline')) {
       await fulfillJson(route, offlineDetail())
     } else if (path.endsWith('/missing')) {

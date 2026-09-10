@@ -27,16 +27,20 @@ function fakeFetch(
     const result = routes[url.pathname]
 
     if (result instanceof Error) throw result
+
     if (result === undefined) return new Response('Not found', { status: 404 })
+
     return Response.json(result)
   }) as typeof globalThis.fetch
 }
 
 function deferred() {
   let resolve!: () => void
+
   const promise = new Promise<void>((resolvePromise) => {
     resolve = resolvePromise
   })
+
   return { promise, resolve }
 }
 
@@ -75,6 +79,7 @@ describe('createAlpacaDiscovery', () => {
 
   it('inspects Management API endpoints serially and normalizes the result', async () => {
     const requests: string[] = []
+
     const fixtureFetch = fakeFetch({
       '/management/apiversions': envelope([1]),
       '/management/v1/description': envelope({
@@ -97,22 +102,27 @@ describe('createAlpacaDiscovery', () => {
         },
       ]),
     }, requests)
+
     const stages = Array.from({ length: 3 }, () => ({
       started: deferred(),
       release: deferred(),
     }))
+
     let stageIndex = 0
+
     const discovery = createAlpacaDiscovery({
       fetch: async (input, init) => {
         const stage = stages[stageIndex++]!
         const response = await fixtureFetch(input, init)
         stage.started.resolve()
         await stage.release.promise
+
         return response
       },
     })
 
     const inspection = discovery.inspect(endpoint)
+
     try {
       for (let index = 0; index < stages.length; index += 1) {
         await stages[index]!.started.promise
@@ -184,6 +194,7 @@ describe('createAlpacaDiscovery', () => {
       status: 200,
       headers: { 'content-type': 'application/json' },
     })) as typeof globalThis.fetch
+
     const discovery = createAlpacaDiscovery({ fetch })
 
     await expect(discovery.inspect(endpoint)).rejects.toMatchObject({
@@ -209,6 +220,7 @@ describe('createAlpacaDiscovery', () => {
 
   it('times out stalled Management API requests', async () => {
     vi.useFakeTimers()
+
     const fetch = vi.fn((_input: RequestInfo | URL, init?: RequestInit) =>
       new Promise<Response>((_resolve, reject) => {
         init?.signal?.addEventListener('abort', () => reject(init.signal?.reason), {
@@ -216,13 +228,16 @@ describe('createAlpacaDiscovery', () => {
         })
       }),
     ) as typeof globalThis.fetch
+
     const discovery = createAlpacaDiscovery({ fetch })
 
     const inspection = discovery.inspect(endpoint, { requestTimeoutMs: 3_000 })
+
     const rejection = expect(inspection).rejects.toMatchObject({
       name: 'AlpacaProviderError',
       reason: 'transport',
     })
+
     await vi.advanceTimersByTimeAsync(3_000)
 
     await rejection
@@ -231,6 +246,7 @@ describe('createAlpacaDiscovery', () => {
   it('propagates caller cancellation without wrapping it as a provider failure', async () => {
     const cancellation = new Error('request cancelled')
     const controller = new AbortController()
+
     const fetch = vi.fn((_input: RequestInfo | URL, init?: RequestInit) =>
       new Promise<Response>((_resolve, reject) => {
         init?.signal?.addEventListener('abort', () => reject(init.signal?.reason), {
@@ -238,6 +254,7 @@ describe('createAlpacaDiscovery', () => {
         })
       }),
     ) as typeof globalThis.fetch
+
     const discovery = createAlpacaDiscovery({ fetch })
 
     const inspection = discovery.inspect(endpoint, { signal: controller.signal })

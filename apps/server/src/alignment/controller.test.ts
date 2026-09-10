@@ -4,16 +4,21 @@ import { createAlignmentController } from './controller.js'
 import type { MonoFrame, PlateSolver, SkyPosition, SolveResult } from './solver.js'
 
 const cadence = vi.hoisted(() => ({ waits: [] as Array<() => void> }))
+
 vi.mock('node:timers/promises', async importOriginal => ({
   ...await importOriginal<typeof import('node:timers/promises')>(),
   setTimeout: (_ms: number, _value: unknown, options: { signal: AbortSignal }) => new Promise<void>((resolve, reject) => {
     const finish = () => { options.signal.removeEventListener('abort', abort); resolve() }
+
     const abort = () => {
       const index = cadence.waits.indexOf(finish)
+
       if (index >= 0) cadence.waits.splice(index, 1)
       reject(new DOMException('Stopped', 'AbortError'))
     }
+
     options.signal.addEventListener('abort', abort, { once: true })
+
     if (options.signal.aborted) abort()
     else cadence.waits.push(finish)
   }),
@@ -23,12 +28,17 @@ function deferred<T>() {
   let resolve!: (value: T) => void
   let reject!: (error: unknown) => void
   const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no })
+
   return { promise, resolve, reject }
 }
+
 const settings = { endpoint: 'http://simulator', cameraId: 'camera', telescopeId: 'mount',
   executable: '/unused', catalogPath: '/unused', exposureSeconds: 1, fieldHeightDegrees: 3 }
+
 const stops: Array<() => Promise<unknown>> = []
+
 beforeEach(() => { cadence.waits = [] })
+
 afterEach(async () => { await Promise.all(stops.splice(0).map(stop => stop())); expect(cadence.waits).toHaveLength(0) })
 
 function setup() {
@@ -40,13 +50,16 @@ function setup() {
   let siderealOffset = 0
   let captureOverride: ((signal: AbortSignal) => Promise<AlpacaFrame>) | undefined
   const requests: Array<{ frame: MonoFrame, hint: SkyPosition, result: ReturnType<typeof deferred<SolveResult>> }> = []
+
   const hardware: AlpacaAcquisition = {
     rotateRightAscension: async () => { throw new Error('Unexpected physical rotation') },
     async pointing() { return { rightAscensionDegrees: ra, declinationDegrees: dec,
       siderealTimeDegrees: ((exposures + 1) * 360 / 86164.0905 + siderealOffset + 360) % 360, latitudeDegrees: 40, tracking: true, coordinateSystem } },
     async capture({ signal }) {
       exposures++
+
       if (captureOverride) return captureOverride(signal!)
+
       return { width: 4, height: 4, pixels: new Float64Array([0, 500, 300, 100, ...Array(12).fill(0)]),
         capturedAt: new Date(1_700_000_000_000 + exposures * 1000).toISOString(), color: { kind: 'mono' } }
     },
@@ -56,32 +69,41 @@ function setup() {
     },
     async abort() {},
   }
+
   const solver: PlateSolver = {
     solve(frame, hint, signal) {
       const result = deferred<SolveResult>()
       const abort = () => result.reject(new DOMException('Stopped', 'AbortError'))
       signal.addEventListener('abort', abort, { once: true })
       requests.push({ frame, hint, result })
+
       return result.promise.finally(() => signal.removeEventListener('abort', abort))
     },
   }
+
   const controller = createAlignmentController({ mode: 'offline', settings, hardware, solver, now: () => 1_700_000_000_000 + (exposures + 1) * 1000 })
   stops.push(() => controller.stop())
+
   async function nextSolve() {
     await vi.waitFor(() => expect(requests.length).toBeGreaterThan(0))
+
     return requests.shift()!
   }
+
   function solve(request: Awaited<ReturnType<typeof nextSolve>>, decDegrees = 60) {
     request.result.resolve({ status: 'solved', capturedAt: request.frame.capturedAt,
       raDegrees: request.hint.raDegrees, decDegrees,
       wcs: { width: 4, height: 4, referenceX: 2.5, referenceY: 2.5,
         raDegrees: request.hint.raDegrees, decDegrees, cd: [0.01, 0, 0, -0.01] } })
   }
+
   async function baseline() {
     await controller.start('sim', 'Simulator')
+
     for (let position = 0; position < 3; position++) solve(await nextSolve())
     await vi.waitFor(() => expect(controller.snapshot().measurement).not.toBeNull())
   }
+
   return { controller, nextSolve, solve, baseline, exposures: () => exposures, moves: () => moves,
     setPointing: (position: { ra: number, dec: number, frame: typeof coordinateSystem }) => {
       ra = position.ra
@@ -107,6 +129,7 @@ it.each([false, true])('waits for exposure cleanup before stopping and preserves
   let aborted = false
   subject.setCapture(signal => {
     signal.addEventListener('abort', () => { aborted = true }, { once: true })
+
     return cleanup.promise
   })
   await subject.controller.start('sim', 'Simulator')

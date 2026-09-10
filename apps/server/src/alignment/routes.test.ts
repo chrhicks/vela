@@ -10,13 +10,18 @@ const mocks = vi.hoisted(() => ({
   start: vi.fn(), stop: vi.fn(),
   state: { rigId: '', active: false },
 }))
+
 vi.mock('@vela/alpaca', () => ({ createAlpacaAcquisition: mocks.acquisition, createAlpacaFraming: mocks.framing }))
+
 vi.mock('./physical.js', () => ({ createPhysicalAlignment: mocks.physical }))
+
 vi.mock('./solver.js', () => ({ createAstapSolver: mocks.solver }))
+
 vi.mock('./controller.js', () => ({ createAlignmentController: mocks.controller }))
 
 const env = { VELA_ALIGNMENT_ENDPOINT: 'http://mount:11111', VELA_ALIGNMENT_CAMERA_ID: 'camera',
   VELA_ALIGNMENT_TELESCOPE_ID: 'telescope', VELA_ASTAP: '/bin/astap', VELA_STAR_CATALOG: '/stars' }
+
 const rig: RigCatalogRecord = {
   id: 'rig', name: 'FRA', endpoint: { host: 'mount', port: 11111 },
   imagingCamera: { uniqueId: 'camera', name: 'Current imager' }, focalLengthMm: 400,
@@ -25,10 +30,15 @@ const rig: RigCatalogRecord = {
     { uniqueId: 'telescope', kind: 'telescope', name: 'Mount' },
   ] },
 }
+
 const { imagingCamera: _camera, ...withoutCamera } = rig
+
 const { focalLengthMm: _focalLength, ...withoutFocalLength } = rig
+
 const { focalLengthMm: _offlineFocalLength, ...offlineRig } = withoutCamera
+
 const apps: ReturnType<typeof Fastify>[] = []
+
 let release: (() => void) | undefined
 
 beforeEach(() => {
@@ -42,16 +52,19 @@ beforeEach(() => {
   mocks.start.mockImplementation(async (rigId: string, _name: string, onSettled: () => void) => {
     mocks.state = { rigId, active: true }
     release = onSettled
+
     return mocks.state
   })
   mocks.stop.mockImplementation(async () => {
     mocks.state.active = false
     release?.()
+
     return mocks.state
   })
   mocks.controller.mockImplementation(() => ({ snapshot: () => ({ ...mocks.state }), active: () => mocks.state.active,
     start: mocks.start, stop: mocks.stop, image: () => undefined }))
 })
+
 afterEach(async () => { await Promise.all(apps.splice(0).map(app => app.close())) })
 
 function setup(records = [rig], configured = true, mode: 'physical' | 'offline' = 'physical') {
@@ -60,8 +73,10 @@ function setup(records = [rig], configured = true, mode: 'physical' | 'offline' 
   const catalog = createMemoryRigCatalog(records)
   const operations = createRigOperations()
   registerAlignment(app, catalog, configured ? alignmentSettings({ ...env, VELA_ALIGNMENT_MODE: mode }) : undefined, operations)
+
   const command = (name: string, rigId = 'rig', payload: unknown = {}) => app.inject({ method: 'POST',
     url: `/api/rigs/${rigId}/alignment/${name}`, headers: { 'content-type': 'application/json' }, payload: JSON.stringify(payload) })
+
   return { app, catalog, operations, command }
 }
 
@@ -155,6 +170,7 @@ describe('alignment routes', () => {
   it('rejects unknown and malformed commands without constructing hardware', async () => {
     const { command, operations } = setup()
     expect((await command('warp')).statusCode).toBe(404)
+
     for (const body of [null, [], { exposureSeconds: 5 }, 'start']) expect((await command('start', 'rig', body)).statusCode).toBe(400)
     expect(mocks.acquisition).not.toHaveBeenCalled()
     expect(operations.owner('rig')).toBeUndefined()

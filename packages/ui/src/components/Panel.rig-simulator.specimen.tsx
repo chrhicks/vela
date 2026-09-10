@@ -7,8 +7,10 @@ import { Input } from './Input'
 import './Panel.rig-simulator.specimen.css'
 
 const presets = { 'large-error': [480, -360], 'near-aligned': [12, -9], aligned: [0, 0] } as const
+
 function offset(value: number) {
   const absolute = Math.abs(value)
+
   return `${Math.floor(absolute / 60) ? `${Math.floor(absolute / 60)}′ ` : ''}${absolute % 60}″`
 }
 
@@ -43,13 +45,16 @@ function SimulatorPreview({ props, onPropsChange }: {
     setNotice('Starting position restored · camera clear')
     onPropsChange?.({ example, camera: 'clear' })
   }
+
   const nudge = (axis: 'altitude' | 'azimuth', sign: number) => {
     const change = Number(step) * sign
     const update = (value: number) => Math.max(-18000, Math.min(18000, value + change))
+
     if (axis === 'altitude') setAltitude(update)
     else setAzimuth(update)
     setNotice(`${axis === 'altitude' ? 'Altitude' : 'Azimuth'} adjusted · next exposure uses this position`)
   }
+
   const valid = [draftAltitude, draftAzimuth].every(value => value.trim() !== '' && Number.isInteger(Number(value)) && Math.abs(Number(value)) <= 18000)
 
   return (
@@ -82,6 +87,7 @@ function SimulatorPreview({ props, onPropsChange }: {
               const fields = new FormData(event.currentTarget)
               const alt = Number(fields.get('altitude'))
               const az = Number(fields.get('azimuth'))
+
               if (![alt, az].every(value => Number.isInteger(value) && Math.abs(value) <= 18000)) return
               setAltitude(alt)
               setAzimuth(az)

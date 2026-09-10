@@ -12,13 +12,16 @@ import { targets } from './target-framing/fixtures'
 import './Panel.target-framing.specimen.css'
 
 type Props = Record<string, string | number | boolean>
+
 const clamp = (value: number) => Math.max(27, Math.min(73, value))
+
 const position = (value: unknown) => clamp(Number.isFinite(Number(value)) ? Number(value) : 50)
 
 function CompactSkyPath({ targetId, nowIndex }: { targetId: string, nowIndex: number }) {
   const samples = getSkySamples(targetId)
   const x = (index: number) => 28 + index / (samples.length - 1) * 272
   const y = (altitude: number) => Math.max(24, Math.min(116, 106 - altitude * .9))
+
   return <svg className="vela-target-path" viewBox="0 0 320 140" role="img" aria-label="Sample altitude through the night. Local obstructions not included.">
     <path className="vela-target-horizon" d="M28 106H300" />
     <polyline className="vela-target-arc" points={samples.map((sample, index) => `${x(index)},${y(sample.altitudeDegrees)}`).join(' ')} />
@@ -30,6 +33,7 @@ function CompactSkyPath({ targetId, nowIndex }: { targetId: string, nowIndex: nu
 function ReferenceImage({ source, name, unavailable }: { source: string, name: string, unavailable: boolean }) {
   const [failed, setFailed] = useState(false)
   useEffect(() => setFailed(false), [source])
+
   return unavailable || failed
     ? <div className="vela-target-no-image"><span aria-hidden="true">◇</span><strong>Reference image unavailable</strong><span>{name}</span></div>
     : <img src={source} alt={`${name} reference photograph`} onError={() => setFailed(true)} draggable={false} />
@@ -38,10 +42,12 @@ function ReferenceImage({ source, name, unavailable }: { source: string, name: s
 function TargetFramingPreview({ props, onPropsChange }: { props: Props, onPropsChange?: (patch: Props) => void }) {
   const [local, setLocal] = useState(props)
   const values = onPropsChange ? props : local
+
   const update = useCallback((patch: Props) => {
     if (onPropsChange) onPropsChange(patch)
     else setLocal(current => ({ ...current, ...patch }))
   }, [onPropsChange])
+
   const target = targets.find(item => item.id === values.target) ?? targets[0]!
   const composing = values.screen === 'compose'
   const phase = String(values.phase)
@@ -56,6 +62,7 @@ function TargetFramingPreview({ props, onPropsChange }: { props: Props, onPropsC
   const skyExpanded = composing && Boolean(values.skyExpanded)
   const skySamples = getSkySamples(target.id)
   const horizon = getDemoHorizon(String(values.horizon ?? 'none'))
+
   const skyProps = {
     samples: skySamples,
     moonSamples: getMoonSamples()!,
@@ -67,15 +74,19 @@ function TargetFramingPreview({ props, onPropsChange }: { props: Props, onPropsC
     marginDegrees: Number(values.skyMargin ?? 3),
     onMarginDegreesChange: (margin: number) => update({ skyMargin: margin }),
   }
+
   const example = useRef<HTMLDivElement>(null)
+
   function expandSky() {
     update({ skyExpanded: true })
     requestAnimationFrame(() => example.current?.scrollIntoView({ block: 'start' }))
   }
+
   function dismissSky() {
     update({ skyExpanded: false })
     requestAnimationFrame(() => example.current?.querySelector('[data-expand-sky]')?.scrollIntoView({ block: 'nearest' }))
   }
+
   const [running, setRunning] = useState(false)
   const heading = useRef<HTMLHeadingElement>(null)
   const previousScreen = useRef(composing)
@@ -88,10 +99,12 @@ function TargetFramingPreview({ props, onPropsChange }: { props: Props, onPropsC
 
   useEffect(() => {
     if (!running || !busy) return
+
     const timer = window.setTimeout(() => {
       update({ phase: values.failSlew ? 'failed' : 'check' })
       setRunning(false)
     }, 1600)
+
     return () => window.clearTimeout(timer)
   }, [running, busy, values.failSlew, update])
 
@@ -102,6 +115,7 @@ function TargetFramingPreview({ props, onPropsChange }: { props: Props, onPropsC
   }
 
   const status = busy ? 'Slewing · preview simulation' : checking ? 'Framing check · example offset' : phase === 'failed' ? 'Slew not confirmed' : phase === 'stopped' ? 'Preview stopped' : 'Ready to frame'
+
   return <div className="vela-target-example" data-expanded={skyExpanded} ref={example}><article className="vela-target-demo" inert={skyExpanded}>
     <header className="vela-target-shell"><strong>Vela</strong><span>Askar FRA 400</span><Badge>Workshop preview</Badge></header>
     <main className="vela-target-main">

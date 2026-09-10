@@ -8,7 +8,9 @@ const numericThemeKeys = new Set([
   'lineHeight', 'letterSpacing', 'spacingUnit', 'radius', 'borderWidth', 'controlHeight',
   'panelPadding', 'density',
 ])
+
 const lightnessKeys = RAMP_NAMES.map((ramp) => `${ramp}Lightness`)
+
 const themeKeys = new Set([...numericThemeKeys, ...lightnessKeys, 'fontStack', 'semantic'])
 
 const fontStacks = {
@@ -37,14 +39,17 @@ function oklch(lightness: number, chroma: number, hue: number): string {
 
 export function referencePalette(theme: ThemeParameters): Record<ReferenceToken, string> {
   const entries: [ReferenceToken, string][] = []
+
   for (const ramp of RAMP_NAMES) {
     const lightness = theme[`${ramp}Lightness`]
     const chroma = theme[`${ramp}Chroma`]
     const hue = theme[`${ramp}Hue`]
+
     for (const [index, step] of RAMP_STEPS.entries()) {
       entries.push([`${ramp}-${step}`, oklch(lightness[index] ?? 0.5, chroma, hue)])
     }
   }
+
   return Object.fromEntries(entries) as Record<ReferenceToken, string>
 }
 
@@ -52,6 +57,7 @@ export function themeStyle(theme: ThemeParameters, mode: ThemeMode): Record<stri
   const palette = referencePalette(theme)
   const semantic = theme.semantic[mode]
   const density = theme.density
+
   const style: Record<string, string> = {
     '--vela-font': fontStacks[theme.fontStack],
     '--vela-font-size': `${theme.fontSize}px`,
@@ -64,10 +70,12 @@ export function themeStyle(theme: ThemeParameters, mode: ThemeMode): Record<stri
     '--vela-control-height': `${theme.controlHeight * density}px`,
     '--vela-panel-padding': `${theme.panelPadding * density}px`,
   }
+
   for (const key of SEMANTIC_TOKEN_KEYS) {
     const cssKey = key.replace(/[A-Z]/g, (value) => `-${value.toLowerCase()}`)
     style[`--vela-${cssKey}`] = palette[semantic[key]]
   }
+
   return style
 }
 
@@ -84,6 +92,7 @@ export function makeProfile(id: string, name: string, overrides: Partial<ThemePa
 
 export function isDesignProfile(value: unknown): value is DesignProfile {
   if (!isRecord(value)) return false
+
   return value.schemaVersion === 1
     && typeof value.id === 'string'
     && /^[a-z0-9][a-z0-9-]*$/.test(value.id)
@@ -95,6 +104,7 @@ export function isDesignProfile(value: unknown): value is DesignProfile {
 
 export function isWorkingSession(value: unknown): value is WorkingSession {
   if (!isRecord(value)) return false
+
   return value.schemaVersion === 1
     && typeof value.componentId === 'string'
     && typeof value.specimenId === 'string'
@@ -117,12 +127,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isThemeOverrides(value: unknown): value is Partial<ThemeParameters> {
   if (!isRecord(value) || Object.keys(value).some((key) => !themeKeys.has(key))) return false
+
   for (const [key, entry] of Object.entries(value)) {
     if (numericThemeKeys.has(key) && (typeof entry !== 'number' || !Number.isFinite(entry))) return false
+
     if (lightnessKeys.includes(key) && !isLightnessRamp(entry)) return false
+
     if (key === 'fontStack' && !['sans', 'serif', 'mono'].includes(String(entry))) return false
+
     if (key === 'semantic' && !isSemanticPair(entry)) return false
   }
+
   return true
 }
 
@@ -133,8 +148,10 @@ function isLightnessRamp(value: unknown): boolean {
 
 function isSemanticPair(value: unknown): value is Record<ThemeMode, SemanticMapping> {
   if (!isRecord(value)) return false
+
   return ['light', 'dark'].every((mode) => {
     const mapping = value[mode]
+
     return isRecord(mapping) && SEMANTIC_TOKEN_KEYS.every((key) => typeof mapping[key] === 'string' && /^(neutral|accent|positive|warning|danger)-(50|100|200|300|400|500|600|700|800|900|950)$/.test(mapping[key]))
   })
 }

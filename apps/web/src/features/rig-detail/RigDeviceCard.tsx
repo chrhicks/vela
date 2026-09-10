@@ -38,6 +38,7 @@ export function RigDeviceCard({
 }) {
   const connection = connectionPresentation(device, stale)
   const presentation = devicePresentation(device)
+
   const noDetails = presentation.metrics.length === 0
     && (presentation.channels === undefined || presentation.channels.length === 0)
 
@@ -97,10 +98,13 @@ export function RigDeviceCard({
 
 function connectionPresentation(device: RigDeviceDetailView, stale: boolean) {
   if (stale) return { label: 'Last known', tone: 'warning' as const }
+
   if (device.connection === 'connected') return { label: 'Connected', tone: 'positive' as const }
+
   if (device.connection === 'disconnected') {
     return { label: 'Disconnected', tone: 'warning' as const }
   }
+
   return { label: 'Unavailable', tone: 'danger' as const }
 }
 
@@ -114,6 +118,7 @@ function devicePresentation(device: RigDeviceDetailView): DevicePresentation {
       metrics: [],
     }
   }
+
   if (device.status.availability === 'unsupported') {
     return {
       activity: 'Limited status',
@@ -231,9 +236,11 @@ function telescopeNote(tracking: string, home: string): string {
   const trackingLabel = tracking === 'on'
     ? 'Tracking'
     : tracking === 'off' ? 'Not tracking' : 'Tracking unknown'
+
   const homeLabel = home === 'at-home'
     ? 'At home'
     : home === 'away' ? 'Away from home' : 'Home unknown'
+
   return `${trackingLabel} · ${homeLabel}`
 }
 
@@ -243,6 +250,7 @@ function stateMetric(
   labels: Readonly<Record<string, string>>,
 ): Metric {
   const value = labels[state] ?? 'Unknown'
+
   return {
     label,
     value,

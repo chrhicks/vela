@@ -9,9 +9,11 @@ describe('local target catalog', () => {
       ['Soul', 'ic1848'], ['Horsehead', 'b033'], ['Barnard 33', 'b033'],
       ['Flame', 'ngc2024'], ['NGC 0224', 'ngc0224'], ['B33', 'b033'],
     ]
+
     for (const [query, id] of identities) {
       expect(searchTargets(query!)[0]?.id, query).toBe(id)
     }
+
     expect(searchTargets('Flame').map((target) => target.id)).not.toContain('ic0434')
     expect(getTarget('ic0434')?.catalogName).toBe('IC 434')
   })
@@ -33,6 +35,7 @@ describe('local target catalog', () => {
     expect(searchTargets('not a known object')).toEqual([])
     expect(searchTargets('   ', 2)).toEqual(listTargets().slice(0, 2))
     expect(getTarget('unknown')).toBeUndefined()
+
     for (const limit of [0, -1, 201, 1.5, NaN]) {
       expect(() => searchTargets('M13', limit)).toThrow(RangeError)
     }
@@ -42,12 +45,14 @@ describe('local target catalog', () => {
     const targets = listTargets()
     expect(targets.length).toBeGreaterThan(13000)
     expect(new Set(targets.map((target) => target.id)).size).toBe(targets.length)
+
     for (const target of targets) {
       expect(target.raDegrees).toBeGreaterThanOrEqual(0)
       expect(target.raDegrees).toBeLessThan(360)
       expect(target.decDegrees).toBeGreaterThanOrEqual(-90)
       expect(target.decDegrees).toBeLessThanOrEqual(90)
     }
+
     expect(Object.isFrozen(targets)).toBe(true)
     expect(Object.isFrozen(targets[0])).toBe(true)
     expect(Object.isFrozen(targets[0]?.aliases)).toBe(true)

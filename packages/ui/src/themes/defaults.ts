@@ -65,6 +65,7 @@ export const DEFAULT_THEME_PARAMETERS: ThemeParameters = {
 }
 
 export const BASELINE_ID = 'vela-ui-default'
+
 export const BASELINE_FINGERPRINT = 'vela-ui-default-v2-2026-08-19'
 
 export const DEFAULT_PROFILE: DesignProfile = {

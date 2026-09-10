@@ -4,6 +4,8 @@ import { isHomeView } from '../../lib/view-validation'
 
 export async function loadHome(): Promise<HomeView> {
   const response = await api<unknown>('web/home')
+
   if (!isHomeView(response)) throw new Error('Invalid Home response')
+
   return response
 }

@@ -18,12 +18,15 @@ export function AppNavigation() {
   }, [rigId, inTargets, search])
   const targetSearch = inTargets ? search : targets.current.get(rigId) ?? ''
   const currentPage = inTargets ? 'Targets' : pathname.startsWith(`${base}/observe/capture`) ? 'Capture' : 'Observe'
+
   const routeLink = (href: string) => ({ href, onClick: (event: MouseEvent<HTMLAnchorElement>) => {
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
     event.preventDefault()
     navigate(href)
   } })
+
   const rigs = [{ id: '', name: 'All rigs' }, ...(view?.rigs ?? [])]
+
   if (rigId && !rigs.some(rig => rig.id === rigId)) rigs.push({ id: rigId, name: 'Current rig' })
   const presentation = activity ? activityPresentation(activity, offline, missing) : null
 
@@ -56,18 +59,21 @@ function activityPresentation(activity: NavigationCapture, offline: boolean, mis
   progress?: { value: number; max: number }
 } {
   if (missing) return { status: 'Tracking lost', note: 'Last known · open Capture →', interrupted: true }
+
   if (offline) return { status: 'Updates lost', note: 'Last known · open Capture →', interrupted: true }
 
   switch (activity.phase) {
     case 'exposing': {
       const elapsed = Math.min(activity.elapsedSeconds, activity.exposureSeconds)
       const seconds = (value: number) => Number(value.toFixed(1)).toString()
+
       return {
         status: `${seconds(elapsed)} / ${seconds(activity.exposureSeconds)}s`,
         interrupted: false,
         progress: { value: elapsed, max: activity.exposureSeconds },
       }
     }
+
     case 'reading':
       return { status: 'Reading image', note: 'Open Capture →', interrupted: false }
     case 'saving':

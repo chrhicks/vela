@@ -13,6 +13,7 @@ it('serializes the same pixels as Int32-source UInt16 ImageBytes and JSON in X/Y
   expect(Array.from({ length: 6 }, (_, index) => bytes.readUInt16LE(44 + index * 2)))
     .toEqual([0, 10, 1, 11, 65535, 60000])
   let json = ''
+
   for await (const chunk of imageJsonChunks(frame, envelope)) json += chunk
   expect(JSON.parse(json)).toEqual({ ...envelope, Type: 2, Rank: 2, Value: [[0, 10], [1, 11], [65535, 60000]] })
 })
@@ -20,6 +21,7 @@ it('serializes the same pixels as Int32-source UInt16 ImageBytes and JSON in X/Y
 it('requires explicit nonzero ImageBytes acceptance', () => {
   expect(acceptsImageBytes('application/imagebytes, application/json;q=0.9')).toBe(true)
   expect(acceptsImageBytes('Application/ImageBytes; q=0.5')).toBe(true)
+
   for (const value of [undefined, '*/*', 'application/json', 'application/imagebytes;q=0', 'application/imagebytes;q=invalid']) {
     expect(acceptsImageBytes(value)).toBe(false)
   }
@@ -29,6 +31,7 @@ it('yields while serializing and rejects an invalidated frame', async () => {
   const frame = { width: 100, height: 2, pixels: new Uint16Array(200) }
   let current = true
   const check = () => { if (!current) throw new Error('Discarded frame') }
+
   const pending = encodeImageBytes(frame, envelope, check)
   current = false
   await expect(pending).rejects.toThrow('Discarded frame')
@@ -40,17 +43,21 @@ it('yields while serializing and rejects an invalidated frame', async () => {
 })
 
 const apps: ReturnType<typeof buildSimulator>[] = []
+
 afterEach(async () => { await Promise.all(apps.splice(0).map(app => app.close())) })
 
 it('negotiates both cameras and preserves a completed frame across binary and JSON reads', async () => {
   const app = buildSimulator({ stars: [] })
+
   for (const cameraNumber of [0, 1]) await app.inject({ method: 'PUT', url: '/simulator/camera', payload: { cameraNumber, resolution: 'fast' } })
   apps.push(app)
+
   for (const number of [0, 1]) {
     const path = `/api/v1/camera/${number}`
     const put = (member: string, payload: object) => app.inject({ method: 'PUT', url: `${path}/${member}`, payload })
     expect((await put('connected', { Connected: true })).json().ErrorNumber).toBe(0)
     expect((await app.inject(`${path}/sensortype`)).json().Value).toBe(number === 0 ? 0 : 2)
+
     if (number === 1) expect((await app.inject(`${path}/bayeroffsetx`)).json().Value).toBe(0)
     expect((await put('startexposure', { Duration: 0, Light: true })).json().ErrorNumber).toBe(0)
     const binary = await app.inject({ url: `${path}/imagearray?ClientTransactionID=12`, headers: { accept: 'application/imagebytes' } })
@@ -58,6 +65,7 @@ it('negotiates both cameras and preserves a completed frame across binary and JS
     expect(binary.rawPayload.readUInt32LE(8)).toBe(12)
     const json = (await app.inject(`${path}/imagearray`)).json()
     expect(json).toMatchObject({ Type: 2, Rank: 2, ErrorNumber: 0 })
+
     for (const [x, y] of [[0, 0], [Math.floor(imageWidth / 2), Math.floor(imageHeight / 2)], [imageWidth - 1, imageHeight - 1]]) {
       expect(binary.rawPayload.readUInt16LE(44 + (x! * imageHeight + y!) * 2)).toBe(json.Value[x!][y!])
     }

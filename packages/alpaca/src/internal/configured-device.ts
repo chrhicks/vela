@@ -8,6 +8,7 @@ export function normalizeConfiguredDevices(
 ): ReadonlyArray<ConfiguredDevice> {
   return devices.map((device) => {
     const name = device.DeviceName.trim()
+
     if (name.length === 0) {
       throw new AlpacaProviderError(
         'Alpaca returned a configured device without a usable name',
@@ -17,12 +18,14 @@ export function normalizeConfiguredDevices(
         },
       )
     }
+
     return name === device.DeviceName ? device : { ...device, DeviceName: name }
   })
 }
 
 export function stableDeviceId(device: ConfiguredDevice): string | undefined {
   const id = device.UniqueID?.trim()
+
   return id === undefined || id.length === 0 ? undefined : id
 }
 
@@ -47,7 +50,9 @@ export function rejectDuplicateDeviceIds(
 
   for (const device of devices) {
     const id = stableDeviceId(device)
+
     if (id === undefined) continue
+
     if (seen.has(id)) {
       throw new AlpacaProviderError(
         `Alpaca returned duplicate device UniqueID ${id}`,
@@ -57,6 +62,7 @@ export function rejectDuplicateDeviceIds(
         },
       )
     }
+
     seen.add(id)
   }
 }

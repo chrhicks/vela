@@ -88,6 +88,7 @@ export function buildApp({
   registerImagingCamera(app, rigCatalog, operations, { createInspector })
   registerTargets(app, rigCatalog, operations, { ...targets, createInspector, now })
   registerSurvey(app, surveyCache ?? createSurveyCache())
+
   const rigConnections = createRigConnectionCoordinator({
     catalog: rigCatalog,
     createConnector,
@@ -99,6 +100,7 @@ export function buildApp({
 
   app.post('/api/rigs/discovery', async (request, reply) => {
     const input = parseDiscoverRigsInput(request.body)
+
     if (input === undefined) {
       return reply.code(400).send({ error: 'invalid-discovery-request' })
     }
@@ -131,6 +133,7 @@ export function buildApp({
         candidates: result.candidates,
         failures: result.failures.map((failure) => failure.view),
       }
+
       return response
     } finally {
       request.raw.removeListener('aborted', cancel)
@@ -140,22 +143,27 @@ export function buildApp({
 
   app.post('/api/rigs', async (request, reply) => {
     const input = parseAddRigRequest(request.body)
+
     if (input === undefined) {
       return reply.code(400).send({ error: 'invalid-rig' })
     }
 
     let inspection
+
     try {
       inspection = await alpacaDiscovery.inspect(input.endpoint)
     } catch (error) {
       if (error instanceof AlpacaProviderError) {
         request.log.warn({ err: error, endpoint: input.endpoint }, 'Rig inspection failed before addition')
+
         return reply.code(502).send({ error: 'rig-inspection-failed' })
       }
+
       throw error
     }
 
     const inventory = toObservedRigInventory(inspection, now().toISOString())
+
     if (inventory.devices.length === 0) {
       return reply.code(422).send({ error: 'no-stable-device-id' })
     }
@@ -165,6 +173,7 @@ export function buildApp({
       endpoint: input.endpoint,
       inventory,
     })
+
     switch (result.state) {
       case 'added':
         return reply.code(201).send({ rigId: result.rig.id })
@@ -177,15 +186,20 @@ export function buildApp({
 
   app.delete<{ Params: { rigId: string } }>('/api/rigs/:rigId', async (request, reply) => {
     const release = operations.acquire(request.params.rigId, 'rig-management')
+
     if (!release) return reply.code(409).send({ error: 'rig-operation-in-progress' })
+
     try {
       const operation = await rigConnections.forgetRig(request.params.rigId)
+
       if (operation.state === 'in-progress') {
         return reply.code(409).send({ error: 'rig-operation-in-progress' })
       }
+
       if (operation.state === 'not-found') {
         return reply.code(404).send({ error: 'rig-not-found' })
       }
+
       return reply.code(204).send()
     } finally {
       release()
@@ -214,9 +228,11 @@ export function buildApp({
         ...rigConnectionLogging(request),
         signal: controller.signal,
       })
+
       if (result.state === 'not-found') {
         return reply.code(404).send({ error: 'rig-not-found' })
       }
+
       return result.view
     } finally {
       request.raw.removeListener('aborted', cancel)
@@ -226,6 +242,7 @@ export function buildApp({
 
   app.post<{ Params: { rigId: string } }>('/api/rigs/:rigId/connections', async (request, reply) => {
     const release = operations.acquire(request.params.rigId, 'connection')
+
     if (!release) return reply.code(409).send({ error: 'rig-operation-in-progress' })
     const controller = new AbortController()
     const cancel = () => controller.abort(new Error('Connection requester disconnected'))
@@ -237,12 +254,15 @@ export function buildApp({
         ...rigConnectionLogging(request),
         signal: controller.signal,
       })
+
       if (operation.state === 'not-found') {
         return reply.code(404).send({ error: 'rig-not-found' })
       }
+
       if (operation.state === 'in-progress') {
         return reply.code(409).send({ error: 'rig-operation-in-progress' })
       }
+
       return operation.result
     } finally {
       release()
@@ -269,9 +289,11 @@ export function buildApp({
           request.log.warn({ err: cause, rigId: rig.id, state }, 'Known Rig detail is unavailable')
         },
       })
+
       if (result.state === 'not-found') {
         return reply.code(404).send({ error: 'rig-not-found' })
       }
+
       return result.view
     } finally {
       request.raw.removeListener('aborted', cancel)
@@ -314,6 +336,7 @@ function parseAddRigRequest(value: unknown): AddRigRequest | undefined {
     ...value.endpoint,
     mode: 'manual',
   })
+
   if (discoveryInput?.mode !== 'manual') return undefined
 
   return {
