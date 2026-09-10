@@ -7,7 +7,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CaptureImage } from '@vela/model/web'
 import { createMemorySavedImageStore, openFileSavedImageStore } from './store.js'
 
-vi.mock('node:fs/promises', async importOriginal => ({ ...await importOriginal<typeof import('node:fs/promises')>() }))
 
 const image: CaptureImage = {
   id: 'frame-1', imageUrl: '/temporary.png', fitImageUrl: '/temporary-fit.png', width: 3, height: 2,
@@ -80,13 +79,13 @@ describe('saved image store', () => {
 
   it('never exposes partially written files when a later file sync fails', async () => {
     const root = await temporary()
-    const store = await openFileSavedImageStore(root)
     const realOpen = fs.open
     let announce!: () => void
     let fail!: (reason: Error) => void
     const writing = new Promise<void>(resolve => { announce = resolve })
     const sync = new Promise<void>((_, reject) => { fail = reject })
-    vi.spyOn(fs, 'open').mockImplementation(async (...args) => {
+
+    const openFile: typeof fs.open = async (...args) => {
       const handle = await realOpen(...args)
 
       if (String(args[0]).endsWith('/preview.png')) {
@@ -98,7 +97,9 @@ describe('saved image store', () => {
       }
 
       return handle
-    })
+    }
+
+    const store = await openFileSavedImageStore(root, openFile)
     const pending = store.save('rig', image, files)
     const rejection = expect(pending).rejects.toThrow('simulated disk failure')
     await writing
@@ -122,7 +123,7 @@ it('preserves estimated starts on disk and rejects unknown provenance without re
   const metadataPath = join(root, createHash('sha256').update('rig').digest('hex'), createHash('sha256').update(image.id).digest('hex'), 'metadata.json')
   await writeFile(metadataPath, JSON.stringify({ ...saved, capturedAtSource: 'unknown' }))
   await expect(reopened.get('rig', image.id)).rejects.toThrow('Invalid saved image metadata')
-  const { capturedAtSource, ...legacy } = saved
+  const { capturedAtSource: _capturedAtSource, ...legacy } = saved
   const legacyText = JSON.stringify(legacy)
   await writeFile(metadataPath, legacyText)
   expect((await reopened.get('rig', image.id))?.capturedAtSource).toBeUndefined()

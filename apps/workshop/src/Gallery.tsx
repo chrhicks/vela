@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react'
-import type { CSSProperties } from 'react'
 import { themeStyle } from '@vela/ui/themes'
 import type { ThemeParameters, WorkingSession } from '@vela/ui/themes'
 import { CompositionPreview, compositions } from './Compositions'
@@ -54,7 +53,7 @@ export function Gallery({ theme, profileName, density, baselineDrift, onOpenSpec
               <article className="gallery-card" key={group.id}>
                 <div className="gallery-card__heading"><div><span>{group.name.slice(0, 1)}</span><div><strong>{group.name} <b className="stability-label" data-stability={group.stability}>{group.stability}</b></strong><small>{specimen.name}</small></div></div><button onClick={() => onOpenSpecimen(group.id, specimen.id)}>{group.specimens.length} specimen{group.specimens.length === 1 ? '' : 's'} · Open ↗</button></div>
                 <div className="paired-preview">
-                  {(['light', 'dark'] as const).map((mode) => <div className="vela-theme gallery-surface" data-mode={mode} key={mode} style={themeStyle(theme, mode) as CSSProperties}><small>{mode}</small><div>{specimen.render(specimen.defaultProps)}</div></div>)}
+                  {(['light', 'dark'] as const).map((mode) => <div className="vela-theme gallery-surface" data-mode={mode} key={mode} style={themeStyle(theme, mode)}><small>{mode}</small><div>{specimen.render(specimen.defaultProps)}</div></div>)}
                 </div>
                 <p>{specimen.description}</p>
               </article>

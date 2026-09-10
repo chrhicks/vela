@@ -1,5 +1,4 @@
 import { VELA_CURRENT_PROFILE, resolveTheme, themeStyle } from '@vela/ui'
-import type { CSSProperties } from 'react'
 import { Outlet } from 'react-router'
 import { AppNavigation } from '../../features/navigation/AppNavigation'
 
@@ -11,7 +10,7 @@ export default function Shell() {
     <div
       className="vela-theme min-h-screen"
       data-mode="dark"
-      style={themeStyle(theme, 'dark') as CSSProperties}
+      style={themeStyle(theme, 'dark')}
     >
       <AppNavigation />
       <main><Outlet /></main>

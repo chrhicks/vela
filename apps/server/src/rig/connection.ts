@@ -93,13 +93,15 @@ export function createRigConnectionCoordinator({
     options: RigConnectionRequestOptions,
     signal: AbortSignal | null = options.signal ?? null,
   ): Promise<InspectRigDetailResult> {
-    return inspectRigDetail(catalog, rigId, {
-      createInspector,
-      now,
-      ...(options.onConflict === undefined ? {} : { onConflict: options.onConflict }),
-      ...(options.onUnavailable === undefined ? {} : { onUnavailable: options.onUnavailable }),
-      ...(signal === null ? {} : { signal }),
-    })
+    let inspectionOptions: RigDetailOptions = { createInspector, now }
+
+    if (options.onConflict !== undefined) inspectionOptions = { ...inspectionOptions, onConflict: options.onConflict }
+
+    if (options.onUnavailable !== undefined) inspectionOptions = { ...inspectionOptions, onUnavailable: options.onUnavailable }
+
+    if (signal !== null) inspectionOptions = { ...inspectionOptions, signal: signal }
+
+    return inspectRigDetail(catalog, rigId, inspectionOptions)
   }
 
   async function loadObservation(

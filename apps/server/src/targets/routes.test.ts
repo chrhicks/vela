@@ -1,4 +1,4 @@
-import Fastify from 'fastify'
+import Fastify, { type InjectOptions } from 'fastify'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AlpacaDeviceInspection, AlpacaFraming, AlpacaTelescopeStatus } from '@vela/alpaca'
 import { createMemoryRigCatalog } from '../rig/catalog.js'
@@ -6,7 +6,7 @@ import type { RigCatalogRecord } from '../rig/contracts.js'
 import { createRigOperations } from '../rig/operations.js'
 import type { MonoFrame, PlateSolver } from '../plate-solving/solver.js'
 import type { FramingHardware } from './framing.js'
-import { registerTargets } from './routes.js'
+import { registerTargets, type TargetOptions } from './routes.js'
 
 const stamp = '2026-09-07T22:00:00.000Z'
 
@@ -69,11 +69,13 @@ function setup(settings: { record?: RigCatalogRecord, solver?: boolean, offsetDe
       raDegrees: start.raDegrees, decDegrees: start.decDegrees, cd: [-0.001, 0, 0, 0.001] },
   })) }
 
-  const options = {
+  const options: TargetOptions = {
     createAdapter: () => adapter, createHardware: () => hardware,
     createInspector: () => ({ inspectDevices: async () => inspections }),
-    ...(settings.solver === false ? {} : { createSolver: () => solver }), now: () => new Date(stamp),
+    now: () => new Date(stamp),
   }
+
+  if (settings.solver !== false) options.createSolver = () => solver
 
   function createApp() {
     const app = Fastify()
@@ -87,7 +89,7 @@ function setup(settings: { record?: RigCatalogRecord, solver?: boolean, offsetDe
     complete: () => completeCapture({ width: 1000, height: 800, pixels: [], capturedAt: stamp }) }
 }
 
-function command(app: ReturnType<typeof Fastify>, body: unknown = start, name = 'start') {
+function command(app: ReturnType<typeof Fastify>, body: InjectOptions['payload'] | null = start, name = 'start') {
   return app.inject({ method: 'POST', url: `/api/rigs/rig/framing/${name}`, payload: JSON.stringify(body),
     headers: { 'content-type': 'application/json' } })
 }
@@ -134,7 +136,7 @@ describe('target and framing HTTP boundary', () => {
   it.each(['unselected', 'renamed', 'disconnected', 'busy', 'site', 'solver'] as const)(
     'rejects commands when readiness is missing: %s', async (failure) => {
       const { imagingCamera: _camera, ...unselected } = record
-      const subject = setup({ ...(failure === 'unselected' ? { record: unselected } : {}), solver: failure !== 'solver' })
+      const subject = setup({ record: failure === 'unselected' ? unselected : record, solver: failure !== 'solver' })
 
       if (failure === 'renamed') subject.inspections[0] = { ...subject.inspections[0]!, name: 'Different camera' }
 

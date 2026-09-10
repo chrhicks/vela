@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ComponentSpecimen } from '../themes'
 import { Badge } from '../components/Badge'
@@ -43,7 +44,7 @@ function CaptureRunPreview({ props, onPropsChange }: {
   const repeat = Boolean(values.repeat)
   const completed = Math.max(0, Math.floor(Number(values.completed) || 0))
   const frame = Math.max(0, Math.floor(Number(values.frame) || 0))
-  const conditions = String(values.conditions ?? 'changing') as 'changing' | 'clear' | 'haze' | 'soft' | 'streak'
+  const conditions = z.enum(['changing', 'clear', 'haze', 'soft', 'streak']).default('changing').parse(values.conditions)
   const statistics = String(values.statistics ?? 'measured')
   const starCount = statistics === 'no-stars' ? 0 : conditions === 'haze' ? 78 : 128 + (frame % 7) * 3
   const hfr = conditions === 'soft' ? 3.42 : 2.18 + (frame % 5) * 0.06

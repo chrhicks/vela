@@ -1,31 +1,24 @@
+import { z } from 'zod'
 import type { NavigationView } from '@vela/model/web'
 
-const record = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value)
+const text = z.string().refine(value => value.trim().length > 0)
 
-const text = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0
+const capture = z.object({
+  rigId: text, rigName: text,
+  phase: z.enum(['idle', 'exposing', 'reading', 'saving', 'stopping', 'complete', 'stopped', 'failed']),
+  active: z.boolean(),
+  completedCount: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+  elapsedSeconds: z.number().nonnegative(),
+  exposureSeconds: z.number().min(0).max(600),
+  error: text.nullable(),
+}).refine(value => value.active === ['exposing', 'reading', 'saving', 'stopping'].includes(value.phase)
+  && (!value.active || value.exposureSeconds >= 0.1))
 
-const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value)
+const navigation = z.object({ rigs: z.array(z.object({ id: text, name: text })), captures: z.array(capture) })
+  .refine(value => new Set(value.rigs.map(rig => rig.id)).size === value.rigs.length
+    && new Set(value.captures.map(item => item.rigId)).size === value.captures.length
+    && value.captures.every(item => value.rigs.some(rig => rig.id === item.rigId && rig.name === item.rigName)))
 
 export function isNavigationView(value: unknown): value is NavigationView {
-  if (!record(value) || !Array.isArray(value.rigs) || !Array.isArray(value.captures)) return false
-  const rigs = value.rigs
-
-  if (!rigs.every(rig => record(rig) && text(rig.id) && text(rig.name))) return false
-
-  if (new Set(rigs.map(rig => rig.id)).size !== rigs.length) return false
-
-  if (new Set(value.captures.map(capture => record(capture) ? capture.rigId : null)).size !== value.captures.length) return false
-
-  return value.captures.every(capture => {
-    if (!record(capture) || !rigs.some((rig: { id: string; name: string }) => rig.id === capture.rigId && rig.name === capture.rigName)) return false
-
-    if (!['idle', 'exposing', 'reading', 'saving', 'stopping', 'complete', 'stopped', 'failed'].includes(String(capture.phase))) return false
-
-    if (capture.active !== ['exposing', 'reading', 'saving', 'stopping'].includes(String(capture.phase))) return false
-
-    return Number.isSafeInteger(capture.completedCount) && Number(capture.completedCount) >= 0
-      && finite(capture.elapsedSeconds) && capture.elapsedSeconds >= 0
-      && finite(capture.exposureSeconds) && capture.exposureSeconds >= (capture.active ? .1 : 0) && capture.exposureSeconds <= 600
-      && (capture.error === null || text(capture.error))
-  })
+  return navigation.safeParse(value).success
 }

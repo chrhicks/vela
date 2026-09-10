@@ -1,82 +1,93 @@
-import type { FramingView, TargetDiscoveryView, TargetPosition, TargetSkyPath, TargetView, TargetsView } from '@vela/model/web'
+import { z } from 'zod'
+import type { FramingView, TargetDiscoveryView, TargetPosition, TargetView, TargetsView } from '@vela/model/web'
 
-const record = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object'
+const date = z.string().refine(value => Number.isFinite(Date.parse(value)))
 
-const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
+const position = z.object({ raDegrees: z.number().min(0).lt(360), decDegrees: z.number().min(-90).max(90) })
 
-const date = (v: unknown): v is string => typeof v === 'string' && Number.isFinite(Date.parse(v))
+const horizontal = z.object({ azimuthDegrees: z.number().min(0).lt(360), altitudeDegrees: z.number().min(-90).max(90) })
 
-const optionalText = (v: unknown) => v === null || typeof v === 'string'
+const moon = horizontal.extend({ illuminationFraction: z.number().min(0).max(1), waxing: z.boolean() })
 
-export function isPosition(v: unknown): v is TargetPosition {
-  return record(v) && finite(v.raDegrees) && v.raDegrees >= 0 && v.raDegrees < 360 && finite(v.decDegrees) && Math.abs(v.decDegrees) <= 90
+const window = z.object({ startsAt: date, endsAt: date })
+
+const sky = z.object({
+  observedAt: date,
+  startsAt: date,
+  endsAt: date,
+  currentAltitudeDegrees: z.number(),
+  highestAltitudeDegrees: z.number(),
+  samples: z.array(horizontal.extend({ at: date, moon, sunAltitudeDegrees: z.number() })).min(2),
+  aboveHorizonDuringDarkness: z.array(window),
+}).refine(value => {
+  const start = Date.parse(value.startsAt)
+  const duration = Date.parse(value.endsAt) - start
+  const interval = duration / (value.samples.length - 1)
+
+  return duration > 0 && value.samples.every((sample, index) => Math.abs(Date.parse(sample.at) - (start + index * interval)) < 1)
+})
+
+const target = position.extend({
+  id: z.string(), name: z.string(), catalog: z.string(), kind: z.string(),
+  sizeArcminutes: z.number().nullable(),
+  thumbnailUrl: z.string().startsWith('/api/'),
+  sky: sky.nullable(),
+})
+
+const targets = z.object({
+  rigId: z.string(), rigName: z.string(), targets: z.array(target), total: z.number().nonnegative(),
+  siteUnavailableReason: z.string().nullable(),
+  site: z.object({ latitudeDegrees: z.number(), longitudeDegrees: z.number() }).nullable(),
+})
+
+const category = z.enum(['emission', 'reflection-dark', 'galaxy', 'cluster', 'planetary', 'other'])
+
+const filter = z.enum(['dual-band', 'broadband', 'uncertain'])
+
+const discovery = targets.extend({
+  snapshotId: z.string(), calculatedAt: date,
+  status: z.enum(['available', 'site-unavailable', 'no-darkness']),
+  query: z.string(), category: z.union([z.literal('all'), category]), filter: z.union([z.literal('all'), filter]),
+  offset: z.number().refine(Number.isInteger).nonnegative(), pageSize: z.number().refine(Number.isInteger).positive(), night: window.nullable(),
+  targets: z.array(target.extend({
+    category, filterChoice: filter, filterReason: z.string(),
+    opportunity: window.extend({
+      bestAt: date, usefulMinutes: z.number().positive(), bestAltitudeDegrees: z.number(), currentAltitudeDegrees: z.number(),
+    }).nullable(),
+  })),
+})
+
+const framing = z.object({
+  rigId: z.string(), rigName: z.string(), enabled: z.boolean(), active: z.boolean(), canCenter: z.boolean(), checkCurrent: z.boolean(),
+  observedAt: date, error: z.string().nullable(), unavailableReason: z.string().nullable(), targetId: z.string().nullable(), exposureSeconds: z.number(),
+  phase: z.enum(['idle', 'slewing', 'exposing', 'solving', 'checked', 'stopping', 'stopped', 'failed']),
+  focalLengthMm: z.number().positive().nullable(), desired: position.nullable(),
+  camera: z.object({ name: z.string(), width: z.number().positive(), height: z.number().positive(), fieldWidthDegrees: z.number().positive(), fieldHeightDegrees: z.number().positive() }).nullable(),
+  actual: position.extend({ checkId: z.string().min(1), capturedAt: date, rotationDegrees: z.number(), offsetArcminutes: z.number(), corners: z.array(position).length(4) }).nullable(),
+})
+
+export function isPosition(value: unknown): value is TargetPosition {
+  return position.safeParse(value).success
 }
 
-function isHorizontal(v: unknown): boolean {
-  return record(v) && finite(v.azimuthDegrees) && v.azimuthDegrees >= 0 && v.azimuthDegrees < 360
-    && finite(v.altitudeDegrees) && Math.abs(v.altitudeDegrees) <= 90
+export function isTarget(value: unknown): value is TargetView {
+  return target.safeParse(value).success
 }
 
-function isMoon(v: unknown): boolean {
-  return record(v) && isHorizontal(v) && finite(v.illuminationFraction) && v.illuminationFraction >= 0 && v.illuminationFraction <= 1 && typeof v.waxing === 'boolean'
+export function isTargets(value: unknown, rigId: string): value is TargetsView {
+  const result = targets.safeParse(value)
+
+  return result.success && result.data.rigId === rigId
 }
 
-function isSky(v: unknown): v is TargetSkyPath {
-  if (!record(v) || !date(v.observedAt) || !date(v.startsAt) || !date(v.endsAt)
-    || !finite(v.currentAltitudeDegrees) || !finite(v.highestAltitudeDegrees)
-    || !Array.isArray(v.samples) || v.samples.length < 2) return false
-  const start = Date.parse(v.startsAt)
-  const duration = Date.parse(v.endsAt) - start
-  const interval = duration / (v.samples.length - 1)
+export function isTargetDiscovery(value: unknown, rigId: string): value is TargetDiscoveryView {
+  const result = discovery.safeParse(value)
 
-  if (duration <= 0) return false
-
-  return v.samples.every((sample, index) => record(sample) && date(sample.at)
-    && isHorizontal(sample) && isMoon(sample.moon) && finite(sample.sunAltitudeDegrees)
-    && Math.abs(Date.parse(sample.at) - (start + index * interval)) < 1)
-    && Array.isArray(v.aboveHorizonDuringDarkness)
-    && v.aboveHorizonDuringDarkness.every(window => record(window) && date(window.startsAt) && date(window.endsAt))
+  return result.success && result.data.rigId === rigId
 }
 
-export function isTarget(v: unknown): v is TargetView {
-  return record(v) && isPosition(v) && ['id', 'name', 'catalog', 'kind'].every(k => typeof (v as unknown as Record<string, unknown>)[k] === 'string')
-    && record(v) && (v.sizeArcminutes === null || finite(v.sizeArcminutes)) && typeof v.thumbnailUrl === 'string' && v.thumbnailUrl.startsWith('/api/') && (v.sky === null || isSky(v.sky))
-}
+export function isFramingView(value: unknown, rigId: string): value is FramingView {
+  const result = framing.safeParse(value)
 
-export function isTargets(v: unknown, rigId: string): v is TargetsView {
-  return record(v) && v.rigId === rigId && typeof v.rigName === 'string' && Array.isArray(v.targets) && v.targets.every(isTarget)
-    && finite(v.total) && v.total >= 0 && optionalText(v.siteUnavailableReason)
-    && (v.site === null || record(v.site) && finite(v.site.latitudeDegrees) && finite(v.site.longitudeDegrees))
-}
-
-export function isTargetDiscovery(v: unknown, rigId: string): v is TargetDiscoveryView {
-  const categories = ['all', 'emission', 'reflection-dark', 'galaxy', 'cluster', 'planetary', 'other']
-  const filters = ['all', 'dual-band', 'broadband', 'uncertain']
-
-  if (!isTargets(v, rigId) || !record(v)) return false
-
-  return typeof v.snapshotId === 'string' && date(v.calculatedAt)
-    && ['available', 'site-unavailable', 'no-darkness'].includes(String(v.status))
-    && typeof v.query === 'string' && categories.includes(String(v.category)) && filters.includes(String(v.filter))
-    && Number.isInteger(v.offset) && Number(v.offset) >= 0 && Number.isInteger(v.pageSize) && Number(v.pageSize) > 0
-    && (v.night === null || record(v.night) && date(v.night.startsAt) && date(v.night.endsAt))
-    && v.targets.every(target => {
-      if (!record(target) || !categories.slice(1).includes(String(target.category)) || !filters.slice(1).includes(String(target.filterChoice)) || typeof target.filterReason !== 'string') return false
-      const opportunity = target.opportunity
-
-      return opportunity === null || record(opportunity) && date(opportunity.startsAt) && date(opportunity.endsAt)
-        && date(opportunity.bestAt) && finite(opportunity.usefulMinutes) && opportunity.usefulMinutes > 0
-        && finite(opportunity.bestAltitudeDegrees) && finite(opportunity.currentAltitudeDegrees)
-    })
-}
-
-export function isFramingView(v: unknown, rigId: string): v is FramingView {
-  if (!record(v) || v.rigId !== rigId || typeof v.rigName !== 'string' || typeof v.enabled !== 'boolean' || typeof v.active !== 'boolean' || typeof v.canCenter !== 'boolean' || typeof v.checkCurrent !== 'boolean'
-    || !date(v.observedAt) || !optionalText(v.error) || !optionalText(v.unavailableReason) || !optionalText(v.targetId) || !finite(v.exposureSeconds)
-    || !['idle','slewing','exposing','solving','checked','stopping','stopped','failed'].includes(String(v.phase))) return false
-
-  return (v.focalLengthMm === null || finite(v.focalLengthMm) && v.focalLengthMm > 0)
-    && (v.desired === null || isPosition(v.desired))
-    && (v.camera === null || record(v.camera) && typeof v.camera.name === 'string' && ['width','height','fieldWidthDegrees','fieldHeightDegrees'].every(k => finite((v.camera as Record<string, unknown>)[k]) && Number((v.camera as Record<string, unknown>)[k]) > 0))
-    && (v.actual === null || record(v.actual) && isPosition(v.actual) && record(v.actual) && typeof v.actual.checkId === 'string' && v.actual.checkId.length > 0 && date(v.actual.capturedAt) && finite(v.actual.rotationDegrees) && finite(v.actual.offsetArcminutes) && Array.isArray(v.actual.corners) && v.actual.corners.length === 4 && v.actual.corners.every(isPosition))
+  return result.success && result.data.rigId === rigId
 }

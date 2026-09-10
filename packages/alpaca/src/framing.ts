@@ -1,3 +1,4 @@
+import { Schema } from 'effect'
 import { setTimeout as delay } from 'node:timers/promises'
 import { AlpacaProviderError } from './error.js'
 import { createAlpacaClient } from './internal/client.js'
@@ -90,7 +91,7 @@ function validateNumber(value: number, minimum: number, maximum: number, endpoin
   return value
 }
 
-function unsupported(error: unknown) {
+function unsupported(error: unknown): error is AlpacaProviderError {
   return error instanceof AlpacaProviderError && error.reason === 'protocol-error' && error.errorNumber === 1024
 }
 
@@ -118,7 +119,10 @@ export function createAlpacaFraming({ baseUrl, fetch = globalThis.fetch, request
     let value: number
 
     try { value = await client.readNumber(telescope, 'equatorialsystem', signal) }
-    catch (error) { if (unsupported(error)) return 'unknown'; throw error }
+    catch (error) {
+      if (unsupported(error)) return 'unknown'
+      throw error
+    }
 
     const result = coordinateSystems[value]
 
@@ -129,7 +133,10 @@ export function createAlpacaFraming({ baseUrl, fetch = globalThis.fetch, request
 
   async function optionalNumber(telescope: ConfiguredDevice, property: string, minimum: number, maximum: number, signal?: AbortSignal) {
     try { return validateNumber(await client.readNumber(telescope, property, signal), minimum, maximum, property) }
-    catch (error) { if (unsupported(error)) return undefined; throw error }
+    catch (error) {
+      if (unsupported(error)) return undefined
+      throw error
+    }
   }
 
   async function waitStopped(telescope: ConfiguredDevice, signal: AbortSignal) {
@@ -219,14 +226,17 @@ export function createAlpacaFraming({ baseUrl, fetch = globalThis.fetch, request
         }
       }
 
+      if (latitudeDegrees !== undefined) alignment.latitudeDegrees = latitudeDegrees
+
+      if (longitudeDegrees !== undefined) alignment.longitudeDegrees = longitudeDegrees
+
+      if (elevationMeters !== undefined) alignment.elevationMeters = elevationMeters
+
       return {
         ...alignment,
         rightAscensionDegrees: ra * 15,
         declinationDegrees,
         coordinateSystem,
-        ...(latitudeDegrees === undefined ? {} : { latitudeDegrees }),
-        ...(longitudeDegrees === undefined ? {} : { longitudeDegrees }),
-        ...(elevationMeters === undefined ? {} : { elevationMeters }),
         tracking,
         slewing,
         parked,
@@ -235,7 +245,7 @@ export function createAlpacaFraming({ baseUrl, fetch = globalThis.fetch, request
     },
 
     async setTracking(telescopeId, tracking, signal) {
-      if (typeof tracking !== 'boolean') throw new RangeError('Tracking must be boolean')
+      if (!Schema.is(Schema.Boolean)(tracking)) throw new RangeError('Tracking must be boolean')
       const telescope = await device(telescopeId, 'telescope', signal)
 
       if (await client.readBoolean(telescope, 'tracking', signal) === tracking) return
@@ -282,7 +292,7 @@ export function createAlpacaFraming({ baseUrl, fetch = globalThis.fetch, request
     async slew({ telescopeId, rightAscensionDegrees, declinationDegrees, coordinateSystem }, signal) {
       if (!Number.isFinite(rightAscensionDegrees) || rightAscensionDegrees < 0 || rightAscensionDegrees >= 360 || !Number.isFinite(declinationDegrees) || Math.abs(declinationDegrees) > 90) throw new RangeError('Invalid slew coordinates')
 
-      if (!coordinateSystems.includes(coordinateSystem as typeof coordinateSystems[number]) || coordinateSystem === 'other') throw new Error('Slew requires a supported, explicit coordinate frame')
+      if (!coordinateSystems.some(system => system === coordinateSystem) || coordinateSystem === 'other') throw new Error('Slew requires a supported, explicit coordinate frame')
       const telescope = await device(telescopeId, 'telescope', signal)
 
       if (await frame(telescope, signal) !== coordinateSystem) throw new Error('Slew coordinates do not match the telescope coordinate frame')

@@ -26,13 +26,18 @@ export type AlignmentControllerOptions = {
   settings: Pick<AlignmentSettings, 'cameraId' | 'telescopeId' | 'exposureSeconds' | 'fieldHeightDegrees'>
   hardware: AlpacaAcquisition
   now?: () => number
+  waitForNextExposure?: (signal: AbortSignal) => Promise<void>
+  renderPreview?: typeof previewPng
 } & (
   | { mode: 'offline'; solver: Solver }
   | { mode: 'physical'; physical: PhysicalAlignment; createSolver: (fieldHeightDegrees: number) => Solver }
 )
 
 export function createAlignmentController(options: AlignmentControllerOptions) {
-  const { settings, hardware, now = Date.now } = options
+  const { settings, hardware, now = Date.now,
+    waitForNextExposure = (signal: AbortSignal) => delay(3000, undefined, { signal }),
+    renderPreview = previewPng } = options
+
   const physical = options.mode === 'physical' ? options.physical : undefined
   let fieldHeightDegrees = settings.fieldHeightDegrees
 
@@ -41,7 +46,11 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
     phase: 'setup', activity: 'idle', active: false, position: 0, solvedPositions: 0,
     exposureSeconds: settings.exposureSeconds, exposureStartedAt: null, measuredAt: null,
     warning: null, error: null, measurement: null,
-    ...(physical ? { mode: 'physical' as const, cameraName: physical.cameraName } : {}),
+  }
+
+  if (physical) {
+    view.mode = 'physical'
+    view.cameraName = physical.cameraName
   }
 
   const tracer = trace.getTracer('vela.alignment')
@@ -159,7 +168,7 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
 
       if (result) return result
       patch({ activity: 'waiting' })
-      await delay(3000, undefined, { signal })
+      await waitForNextExposure(signal)
     }
   }
 
@@ -201,13 +210,14 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
       samples.push(current.sample)
     }
 
+    // SAFETY: the initial sample and the two completed loop iterations supply exactly three solved positions.
     const baseline = createAlignmentBaseline(samples as [AlignmentSample, AlignmentSample, AlignmentSample], first.latitude)
     patch({ phase: 'adjusting', solvedPositions: 3 })
 
     while (true) {
       const measured = measureAlignment(baseline, current.sample, true)
       const imageId = randomUUID()
-      const preview = await step('alignment.preview', () => previewPng(current.frame.width, current.frame.height, current.frame.pixels, current.frame.color))
+      const preview = await step('alignment.preview', () => renderPreview(current.frame.width, current.frame.height, current.frame.pixels, current.frame.color))
       signal.throwIfAborted()
 
       if (physical) await physical.validate(signal)
@@ -217,15 +227,18 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
       const target = physical ? physical.project(current.solved.wcs, measured.correctionTarget, current.sample) : projectSky(current.solved.wcs, measured.correctionTarget)
 
       if (!target) throw new Error('Alignment target is outside the solvable camera projection')
-      patch({ measuredAt: current.frame.capturedAt, activity: 'waiting', measurement: {
+
+      const measurement: NonNullable<AlignmentView['measurement']> = {
         altitudeArcsec: measured.altitudeArcsec, azimuthArcsec: measured.azimuthArcsec,
         totalArcsec: measured.totalArcsec, imageUrl: `/api/rigs/${encodeURIComponent(view.rigId)}/alignment/images/${imageId}`,
         imageWidth: current.frame.width, imageHeight: current.frame.height,
         targetX: target.x, targetY: target.y, fieldHeightDegrees,
-        ...(current.frame.capturedAtSource ? { capturedAtSource: current.frame.capturedAtSource } : {}),
-      } })
+      }
+
+      if (current.frame.capturedAtSource) measurement.capturedAtSource = current.frame.capturedAtSource
+      patch({ measuredAt: current.frame.capturedAt, activity: 'waiting', measurement })
       // A calm adjustment window between exposures; never infer solver progress from elapsed time.
-      await delay(3000, undefined, { signal })
+      await waitForNextExposure(signal)
       current = await solvedFrame(solver, signal)
     }
   }

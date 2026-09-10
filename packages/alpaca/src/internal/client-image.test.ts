@@ -55,7 +55,7 @@ it('negotiates ImageBytes and uses the actual response Content-Type for JSON fal
 
     const client = createAlpacaClient({ baseUrl: 'http://fake', fetch })
     const result = await client.image(camera)
-    expect(binary ? Array.from(new Uint8Array(result as ArrayBuffer)) : result).toEqual(binary ? Array.from(new Uint8Array(bytes)) : json)
+    expect(result instanceof ArrayBuffer ? Array.from(new Uint8Array(result)) : result).toEqual(binary ? Array.from(new Uint8Array(bytes)) : json)
     expect(requests).toBe(1)
   }
 })

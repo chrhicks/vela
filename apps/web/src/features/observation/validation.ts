@@ -1,79 +1,53 @@
+import { z } from 'zod'
 import type { ConnectRigDevicesResult, RigObservationView } from '@vela/model/web'
-import { isRigDetailView } from '../../lib/view-validation'
+import { deviceKindSchema, rigDetailSchema } from '../../lib/view-validation'
+
+const observation = z.object({
+  rig: rigDetailSchema,
+  connectionPreparation: z.discriminatedUnion('state', [
+    z.object({ state: z.literal('available'), capabilities: z.tuple([z.literal('connect-devices')]) }),
+    z.object({ state: z.enum(['complete', 'in-progress', 'unavailable']), capabilities: z.tuple([]) }),
+  ]),
+}).refine(value => value.rig.state !== 'offline' || !['available', 'complete'].includes(value.connectionPreparation.state))
 
 export function isRigObservationView(value: unknown): value is RigObservationView {
-  if (!record(value) || !isRigDetailView(value.rig) || !record(value.connectionPreparation)) return false
-  const { state, capabilities } = value.connectionPreparation
-
-  if (!Array.isArray(capabilities)) return false
-
-  return state === 'available'
-    ? capabilities.length === 1 && capabilities[0] === 'connect-devices' && value.rig.state !== 'offline'
-    : ['complete', 'in-progress', 'unavailable'].includes(String(state)) && capabilities.length === 0
-      && (value.rig.state !== 'offline' || state !== 'complete')
+  return observation.safeParse(value).success
 }
 
-export function isConnectRigDevicesResult(value: unknown): value is ConnectRigDevicesResult {
-  if (!record(value) || !isRigObservationView(value.view)) return false
+const canonicalText = z.string().refine(value => value.trim().length > 0 && value === value.trim())
 
-  if (value.outcome === 'unavailable') {
-    return ['device-state-unavailable', 'identity-conflict', 'offline'].includes(String(value.reason))
-  }
+const device = z.object({ id: canonicalText, name: canonicalText, kind: deviceKindSchema })
 
-  const { confirmedConnected, notAttempted } = value
+const devices = z.array(device).refine(value => new Set(value.map(item => item.id)).size === value.length)
 
-  if (!devices(confirmedConnected)) return false
+const failedDevice = device.extend({ reason: z.enum(['connection-check-failed', 'device-not-found', 'rejected', 'remained-disconnected']) })
 
-  if (value.outcome === 'complete') {
-    return value.command === 'not-needed' ? confirmedConnected.length === 0
-      : value.command === 'completed' && confirmedConnected.length > 0
-  }
+const uncertainDevice = device.extend({ reason: z.enum(['cancelled', 'verification-timeout', 'verification-unavailable', 'write-outcome-unknown']) })
 
-  if (!devices(notAttempted)) return false
-  const confirmedIds = confirmedConnected.map((item) => item.id)
-  const remainingIds = notAttempted.map((item) => item.id)
+const resultSchema = z.union([
+  z.object({ outcome: z.literal('unavailable'), reason: z.enum(['device-state-unavailable', 'identity-conflict', 'offline']), view: observation }),
+  z.object({ outcome: z.literal('complete'), command: z.literal('not-needed'), confirmedConnected: devices.length(0), view: observation }),
+  z.object({ outcome: z.literal('complete'), command: z.literal('completed'), confirmedConnected: devices.min(1), view: observation }),
+  z.object({ outcome: z.literal('failed'), confirmedConnected: devices.length(0), notAttempted: devices, failed: failedDevice, uncertain: z.never().optional(), stoppedAfter: z.never().optional(), view: observation }),
+  z.object({ outcome: z.literal('partial'), confirmedConnected: devices.min(1), notAttempted: devices, failed: failedDevice, uncertain: z.never().optional(), stoppedAfter: z.never().optional(), view: observation }),
+  z.object({ outcome: z.literal('partial'), confirmedConnected: devices.min(1), notAttempted: devices.min(1), stoppedAfter: device, failed: z.never().optional(), uncertain: z.never().optional(), view: observation }),
+  z.object({ outcome: z.literal('uncertain'), confirmedConnected: devices, notAttempted: devices, uncertain: uncertainDevice, failed: z.never().optional(), stoppedAfter: z.never().optional(), view: observation }),
+]).refine(value => {
+  if (value.outcome === 'complete' || value.outcome === 'unavailable') return true
+  const confirmedIds = value.confirmedConnected.map(item => item.id)
+  const remainingIds = value.notAttempted.map(item => item.id)
 
-  if (remainingIds.some((id) => confirmedIds.includes(id))) return false
+  if (remainingIds.some(id => confirmedIds.includes(id))) return false
 
-  if (value.outcome === 'uncertain') {
-    return !('failed' in value) && !('stoppedAfter' in value)
-      && device(value.uncertain)
-      && ['cancelled', 'verification-timeout', 'verification-unavailable', 'write-outcome-unknown'].includes(String(value.uncertain.reason))
-      && ![...confirmedIds, ...remainingIds].includes(value.uncertain.id)
-  }
-
-  if (value.outcome !== 'failed' && value.outcome !== 'partial') return false
+  if (value.outcome === 'uncertain') return !('failed' in value) && !('stoppedAfter' in value) && ![...confirmedIds, ...remainingIds].includes(value.uncertain.id)
 
   if ('uncertain' in value) return false
 
-  if ((value.outcome === 'failed') !== (confirmedConnected.length === 0)) return false
+  if (value.failed) return !('stoppedAfter' in value) && ![...confirmedIds, ...remainingIds].includes(value.failed.id)
 
-  if (device(value.failed)) {
-    return !('stoppedAfter' in value)
-      && ['connection-check-failed', 'device-not-found', 'rejected', 'remained-disconnected'].includes(String(value.failed.reason))
-      && ![...confirmedIds, ...remainingIds].includes(value.failed.id)
-  }
+  return !('failed' in value) && value.stoppedAfter !== undefined && confirmedIds.includes(value.stoppedAfter.id)
+})
 
-  return value.outcome === 'partial' && !('failed' in value)
-    && device(value.stoppedAfter) && confirmedIds.includes(value.stoppedAfter.id)
-    && notAttempted.length > 0
-}
-
-function devices(value: unknown): value is Array<Record<string, unknown> & { id: string }> {
-  return Array.isArray(value) && value.every(device)
-    && new Set(value.map((item) => item.id)).size === value.length
-}
-
-function device(value: unknown): value is Record<string, unknown> & { id: string } {
-  return record(value) && text(value.id) && text(value.name)
-    && ['camera', 'cover-calibrator', 'dome', 'filter-wheel', 'focuser', 'observing-conditions',
-      'rotator', 'safety-monitor', 'switch', 'telescope', 'unknown'].includes(String(value.kind))
-}
-
-function text(value: unknown): value is string {
-  return typeof value === 'string' && value.trim().length > 0 && value === value.trim()
-}
-
-function record(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value)
+export function isConnectRigDevicesResult(value: unknown): value is ConnectRigDevicesResult {
+  return resultSchema.safeParse(value).success
 }

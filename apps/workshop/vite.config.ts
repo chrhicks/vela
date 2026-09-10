@@ -1,3 +1,5 @@
+import { z } from 'zod'
+import type { DesignProfile, WorkingSession } from '@vela/ui/themes'
 import { mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promises'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { dirname, resolve } from 'node:path'
@@ -5,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { defineConfig, type Plugin } from 'vite'
+import { designProfileSchema, workingSessionSchema } from '../../packages/ui/src/themes/index'
 import { isSafeProfileId, parseProfile, parseSession } from './shared/persistence.ts'
 
 const workshopRoot = dirname(fileURLToPath(import.meta.url))
@@ -15,23 +18,25 @@ const designsPath = resolve(workshopRoot, 'designs')
 
 const maxBodyBytes = 256 * 1024
 
-async function readJson(path: string): Promise<unknown | null> {
+type PersistenceResponse = { session: WorkingSession | null } | { profiles: DesignProfile[] } | { profile: DesignProfile } | { error: string }
+
+async function readJson<T>(path: string, schema: z.ZodType<T>): Promise<T | null> {
   try {
-    return JSON.parse(await readFile(path, 'utf8')) as unknown
+    return schema.parse(JSON.parse(await readFile(path, 'utf8')))
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return null
     throw error
   }
 }
 
-async function writeJsonAtomic(path: string, value: unknown): Promise<void> {
+async function writeJsonAtomic(path: string, value: WorkingSession | DesignProfile): Promise<void> {
   await mkdir(dirname(path), { recursive: true })
   const temporaryPath = `${path}.tmp`
   await writeFile(temporaryPath, `${JSON.stringify(value, null, 2)}\n`, 'utf8')
   await rename(temporaryPath, path)
 }
 
-async function readBody(request: IncomingMessage): Promise<unknown> {
+async function readBody(request: IncomingMessage): Promise<string> {
   const chunks: Buffer[] = []
   let size = 0
 
@@ -43,10 +48,10 @@ async function readBody(request: IncomingMessage): Promise<unknown> {
     chunks.push(buffer)
   }
 
-  return JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown
+  return Buffer.concat(chunks).toString('utf8')
 }
 
-function json(response: ServerResponse, status: number, value: unknown): void {
+function json(response: ServerResponse, status: number, value: PersistenceResponse): void {
   response.statusCode = status
   response.setHeader('content-type', 'application/json; charset=utf-8')
   response.end(JSON.stringify(value))
@@ -63,11 +68,11 @@ function localPersistencePlugin(): Plugin {
 
         try {
           if (url.pathname === '/__workshop/session' && request.method === 'GET') {
-            return json(response, 200, { session: await readJson(sessionPath) })
+            return json(response, 200, { session: await readJson(sessionPath, workingSessionSchema) })
           }
 
           if (url.pathname === '/__workshop/session' && request.method === 'PUT') {
-            const session = parseSession(await readBody(request))
+            const session = parseSession(JSON.parse(await readBody(request)))
             await writeJsonAtomic(sessionPath, session)
 
             return json(response, 200, { session })
@@ -79,7 +84,7 @@ function localPersistencePlugin(): Plugin {
             const profiles = []
 
             for (const name of names) {
-              const value = await readJson(resolve(designsPath, name))
+              const value = await readJson(resolve(designsPath, name), designProfileSchema)
               profiles.push(parseProfile(value))
             }
 
@@ -92,7 +97,7 @@ function localPersistencePlugin(): Plugin {
             const id = profileMatch[1] ?? ''
 
             if (!isSafeProfileId(id)) throw new Error('Invalid profile id')
-            const profile = parseProfile(await readBody(request))
+            const profile = parseProfile(JSON.parse(await readBody(request)))
 
             if (profile.id !== id) throw new Error('Profile id does not match URL')
             await writeJsonAtomic(resolve(designsPath, `${id}.json`), profile)

@@ -1,17 +1,8 @@
+import { z } from 'zod'
+import type { CSSProperties } from 'react'
 import { DEFAULT_THEME_PARAMETERS, BASELINE_FINGERPRINT } from './defaults'
 import { RAMP_NAMES, RAMP_STEPS, SEMANTIC_TOKEN_KEYS } from './types'
-import type { DesignProfile, ReferenceToken, SemanticMapping, ThemeMode, ThemeParameters, WorkingSession } from './types'
-
-const numericThemeKeys = new Set([
-  'neutralHue', 'neutralChroma', 'accentHue', 'accentChroma', 'positiveHue', 'positiveChroma',
-  'warningHue', 'warningChroma', 'dangerHue', 'dangerChroma', 'fontSize', 'fontWeight',
-  'lineHeight', 'letterSpacing', 'spacingUnit', 'radius', 'borderWidth', 'controlHeight',
-  'panelPadding', 'density',
-])
-
-const lightnessKeys = RAMP_NAMES.map((ramp) => `${ramp}Lightness`)
-
-const themeKeys = new Set([...numericThemeKeys, ...lightnessKeys, 'fontStack', 'semantic'])
+import type { DesignProfile, ReferenceToken, ThemeMode, ThemeParameters, WorkingSession } from './types'
 
 const fontStacks = {
   sans: 'Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
@@ -50,15 +41,18 @@ export function referencePalette(theme: ThemeParameters): Record<ReferenceToken,
     }
   }
 
+  // SAFETY: the nested loops enumerate every ramp and step in ReferenceToken.
   return Object.fromEntries(entries) as Record<ReferenceToken, string>
 }
 
-export function themeStyle(theme: ThemeParameters, mode: ThemeMode): Record<string, string> {
+type ThemeStyle = CSSProperties & Record<`--vela-${string}`, string>
+
+export function themeStyle(theme: ThemeParameters, mode: ThemeMode): ThemeStyle {
   const palette = referencePalette(theme)
   const semantic = theme.semantic[mode]
   const density = theme.density
 
-  const style: Record<string, string> = {
+  const style: ThemeStyle = {
     '--vela-font': fontStacks[theme.fontStack],
     '--vela-font-size': `${theme.fontSize}px`,
     '--vela-font-weight': `${theme.fontWeight}`,
@@ -90,72 +84,86 @@ export function makeProfile(id: string, name: string, overrides: Partial<ThemePa
   }
 }
 
-export function isDesignProfile(value: unknown): value is DesignProfile {
-  if (!isRecord(value)) return false
+const referenceTokenSchema = z.templateLiteral([z.enum(RAMP_NAMES), '-', z.enum(['50', '100', '200', '300', '400', '500', '600', '700', '800', '900', '950'])])
 
-  return value.schemaVersion === 1
-    && typeof value.id === 'string'
-    && /^[a-z0-9][a-z0-9-]*$/.test(value.id)
-    && typeof value.name === 'string'
-    && typeof value.baselineId === 'string'
-    && typeof value.baselineFingerprint === 'string'
-    && isThemeOverrides(value.overrides)
+const semanticMappingSchema = z.object({
+  canvas: referenceTokenSchema,
+  surface: referenceTokenSchema,
+  surfaceRaised: referenceTokenSchema,
+  line: referenceTokenSchema,
+  lineStrong: referenceTokenSchema,
+  text: referenceTokenSchema,
+  textMuted: referenceTokenSchema,
+  accent: referenceTokenSchema,
+  accentText: referenceTokenSchema,
+  accentSurface: referenceTokenSchema,
+  positive: referenceTokenSchema,
+  warning: referenceTokenSchema,
+  danger: referenceTokenSchema,
+  focus: referenceTokenSchema,
+})
+
+const lightnessRampSchema = z.array(z.number().min(0).max(1)).length(RAMP_STEPS.length)
+
+export const themeOverridesSchema = z.strictObject({
+  neutralHue: z.number().optional(),
+  neutralChroma: z.number().optional(),
+  accentHue: z.number().optional(),
+  accentChroma: z.number().optional(),
+  positiveHue: z.number().optional(),
+  positiveChroma: z.number().optional(),
+  warningHue: z.number().optional(),
+  warningChroma: z.number().optional(),
+  dangerHue: z.number().optional(),
+  dangerChroma: z.number().optional(),
+  fontSize: z.number().optional(),
+  fontWeight: z.number().optional(),
+  lineHeight: z.number().optional(),
+  letterSpacing: z.number().optional(),
+  spacingUnit: z.number().optional(),
+  radius: z.number().optional(),
+  borderWidth: z.number().optional(),
+  controlHeight: z.number().optional(),
+  panelPadding: z.number().optional(),
+  density: z.number().optional(),
+  neutralLightness: lightnessRampSchema.optional(),
+  accentLightness: lightnessRampSchema.optional(),
+  positiveLightness: lightnessRampSchema.optional(),
+  warningLightness: lightnessRampSchema.optional(),
+  dangerLightness: lightnessRampSchema.optional(),
+  fontStack: z.enum(['sans', 'serif', 'mono']).optional(),
+  semantic: z.object({ light: semanticMappingSchema, dark: semanticMappingSchema }).optional(),
+}).refine(value => Object.values(value).every(entry => entry !== undefined))
+
+export const designProfileSchema = z.object({
+  schemaVersion: z.literal(1),
+  id: z.string().regex(/^[a-z0-9][a-z0-9-]*$/),
+  name: z.string(),
+  readonly: z.boolean().optional(),
+  baselineId: z.string(),
+  baselineFingerprint: z.string(),
+  overrides: themeOverridesSchema,
+})
+
+export const workingSessionSchema = z.object({
+  schemaVersion: z.literal(1),
+  componentId: z.string(),
+  specimenId: z.string(),
+  profileId: z.string(),
+  mode: z.enum(['light', 'dark']),
+  context: z.enum(['isolated', 'form', 'toolbar', 'card']),
+  viewport: z.number().min(320).max(1600),
+  density: z.number(),
+  compareBaseline: z.boolean(),
+  props: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])),
+  unsavedOverrides: themeOverridesSchema,
+  updatedAt: z.string(),
+})
+
+export function isDesignProfile(value: unknown): value is DesignProfile {
+  return designProfileSchema.safeParse(value).success
 }
 
 export function isWorkingSession(value: unknown): value is WorkingSession {
-  if (!isRecord(value)) return false
-
-  return value.schemaVersion === 1
-    && typeof value.componentId === 'string'
-    && typeof value.specimenId === 'string'
-    && typeof value.profileId === 'string'
-    && (value.mode === 'light' || value.mode === 'dark')
-    && ['isolated', 'form', 'toolbar', 'card'].includes(String(value.context))
-    && typeof value.viewport === 'number'
-    && value.viewport >= 320
-    && value.viewport <= 1600
-    && typeof value.density === 'number'
-    && typeof value.compareBaseline === 'boolean'
-    && isPrimitiveRecord(value.props)
-    && isThemeOverrides(value.unsavedOverrides)
-    && typeof value.updatedAt === 'string'
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-function isThemeOverrides(value: unknown): value is Partial<ThemeParameters> {
-  if (!isRecord(value) || Object.keys(value).some((key) => !themeKeys.has(key))) return false
-
-  for (const [key, entry] of Object.entries(value)) {
-    if (numericThemeKeys.has(key) && (typeof entry !== 'number' || !Number.isFinite(entry))) return false
-
-    if (lightnessKeys.includes(key) && !isLightnessRamp(entry)) return false
-
-    if (key === 'fontStack' && !['sans', 'serif', 'mono'].includes(String(entry))) return false
-
-    if (key === 'semantic' && !isSemanticPair(entry)) return false
-  }
-
-  return true
-}
-
-function isLightnessRamp(value: unknown): boolean {
-  return Array.isArray(value) && value.length === RAMP_STEPS.length
-    && value.every((entry) => typeof entry === 'number' && entry >= 0 && entry <= 1)
-}
-
-function isSemanticPair(value: unknown): value is Record<ThemeMode, SemanticMapping> {
-  if (!isRecord(value)) return false
-
-  return ['light', 'dark'].every((mode) => {
-    const mapping = value[mode]
-
-    return isRecord(mapping) && SEMANTIC_TOKEN_KEYS.every((key) => typeof mapping[key] === 'string' && /^(neutral|accent|positive|warning|danger)-(50|100|200|300|400|500|600|700|800|900|950)$/.test(mapping[key]))
-  })
-}
-
-function isPrimitiveRecord(value: unknown): value is Record<string, string | number | boolean> {
-  return isRecord(value) && Object.values(value).every((entry) => ['string', 'number', 'boolean'].includes(typeof entry))
+  return workingSessionSchema.safeParse(value).success
 }

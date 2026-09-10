@@ -15,7 +15,7 @@ type Props = Record<string, string | number | boolean>
 
 const clamp = (value: number) => Math.max(27, Math.min(73, value))
 
-const position = (value: unknown) => clamp(Number.isFinite(Number(value)) ? Number(value) : 50)
+const position = (value: Props[string] | undefined) => clamp(Number.isFinite(Number(value)) ? Number(value) : 50)
 
 function CompactSkyPath({ targetId, nowIndex }: { targetId: string, nowIndex: number }) {
   const samples = getSkySamples(targetId)
@@ -70,11 +70,11 @@ function TargetFramingPreview({ props, onPropsChange }: { props: Props, onPropsC
     selectedIndex: Number(values.skyIndex ?? 18),
     onSelectedIndexChange: (index: number) => update({ skyIndex: index }),
     nowIndex,
-    ...(horizon ? { horizon } : {}),
     marginDegrees: Number(values.skyMargin ?? 3),
     onMarginDegreesChange: (margin: number) => update({ skyMargin: margin }),
   }
 
+  const displaySky = horizon ? { ...skyProps, horizon } : skyProps
   const example = useRef<HTMLDivElement>(null)
 
   function expandSky() {
@@ -155,7 +155,7 @@ function TargetFramingPreview({ props, onPropsChange }: { props: Props, onPropsC
         </section>
         <aside className="vela-target-sidebar">
           <Panel title="Through the night" description={`Sample night · now ${sampleTime}`}>
-            <OverheadSkyPath {...skyProps} compact />
+            <OverheadSkyPath {...displaySky} compact />
             <Button className="vela-target-expand-sky" size="small" tone="quiet" data-expand-sky onClick={expandSky}>Expand sky view</Button>
           </Panel>
           <Panel title="Your composition">
@@ -175,7 +175,7 @@ function TargetFramingPreview({ props, onPropsChange }: { props: Props, onPropsC
     <footer className="vela-target-disclaimer">Design sketch · Sample sky and camera geometry · Reference photos, not your exposures · No hardware commands</footer>
   </article>
     <Dialog open={skyExpanded} onDismiss={dismissSky} title={`${target.name} · Through the night`} description="Sample night · imaginary observing site" className="vela-target-sky-dialog" dismissLabel="Close sky view">
-      <OverheadSkyPath {...skyProps} />
+      <OverheadSkyPath {...displaySky} />
     </Dialog>
   </div>
 }

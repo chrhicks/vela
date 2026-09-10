@@ -172,10 +172,7 @@ export function LatestImage({ image, busy, interrupted, rigId, savedDetail = fal
       </div>{savedDetail || frameSaved ? <Badge tone="positive">Saved</Badge> : rigId && <Button size="small" disabled={retention.pending} onClick={() => void retention.keep(frame)}>{retention.pending && retention.result?.image.id === frame.id ? 'Saving…' : 'Keep this image'}</Button>}</div>}
     </header>
     {retention.result && (retention.result.image.id !== frame?.id || retention.result.status === 'failed') && <div className="capture-image__retention" data-failed={retention.result.status === 'failed' || undefined} role="status">
-      {retention.result.status === 'saving' ? `Saving image from ${new Date(retention.result.image.capturedAt).toLocaleTimeString()}…`
-        : retention.result.status === 'saved' ? `Image from ${new Date(retention.result.image.capturedAt).toLocaleTimeString()} saved.`
-        : <><p>Image from {new Date(retention.result.image.capturedAt).toLocaleTimeString()}: {retention.result.error}</p>
-          {retention.result.retryable && <Button size="small" onClick={() => void retention.keep(retention.result!.image)}>Retry saving image</Button>}</>}
+      {retentionMessage(retention.result, retention.keep)}
     </div>}
     {loadingNative && <p className="capture-image__error" role="status">Loading full-resolution image… The fitted preview stays visible.</p>}
     {failed && <p className="capture-image__error" role="status">{zoomed && frame?.id === image?.id ? 'The full-resolution image could not be loaded. The fitted preview is kept below.' : `The latest image could not be loaded.${frame ? ' The previous exposure is kept below.' : ' No image is available to display.'}`}</p>}
@@ -215,6 +212,20 @@ type KeepResult = { image: KeptFrame } & (
   | { status: 'failed', error: string, retryable: boolean }
 )
 
+function retentionMessage(result: KeepResult, keep: (image: KeptFrame) => Promise<void>) {
+  const time = new Date(result.image.capturedAt).toLocaleTimeString()
+
+  switch (result.status) {
+    case 'saving':
+      return `Saving image from ${time}…`
+    case 'saved':
+      return `Image from ${time} saved.`
+    case 'failed':
+      return <><p>Image from {time}: {result.error}</p>
+        {result.retryable && <Button size="small" onClick={() => void keep(result.image)}>Retry saving image</Button>}</>
+  }
+}
+
 // A save belongs to the selected image, not to the lifetime of its displayed pixels.
 function useImageRetention(rigId: string | undefined) {
   const [result, setResult] = useState<KeepResult | null>(null)
@@ -226,7 +237,7 @@ function useImageRetention(rigId: string | undefined) {
     setResult({ image, status: 'saving' })
 
     try {
-      const response = await api<unknown>(`rigs/${encodeURIComponent(rigId)}/capture/images/${encodeURIComponent(image.id)}/keep`, {
+      const response = await api(`rigs/${encodeURIComponent(rigId)}/capture/images/${encodeURIComponent(image.id)}/keep`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(30_000),
       })
 

@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import { useEffect, useState } from 'react'
 import type { ComponentSpecimen } from '../themes'
 import { Panel } from './Panel'
@@ -18,7 +19,7 @@ function SimulatorPreview({ props, onPropsChange }: {
   props: Record<string, string | number | boolean>
   onPropsChange?: (patch: Record<string, string | number | boolean>) => void
 }) {
-  const initial = String(props.example ?? 'large-error') as keyof typeof presets
+  const initial = z.enum(['large-error', 'near-aligned', 'aligned']).catch('large-error').parse(props.example)
   const [example, setExample] = useState(initial)
   const [altitude, setAltitude] = useState<number>(presets[initial]?.[0] ?? 480)
   const [azimuth, setAzimuth] = useState<number>(presets[initial]?.[1] ?? -360)
@@ -108,7 +109,7 @@ function SimulatorPreview({ props, onPropsChange }: {
             }}>{covered ? 'Clear the camera' : 'Obscure the camera'}</Button>
           </Panel>
           <Panel title="Start again" description="Return to a known setup for another attempt.">
-            <Select label="Starting position" value={example} onChange={event => setExample(event.target.value as keyof typeof presets)} options={[
+            <Select label="Starting position" value={example} onChange={event => setExample(z.enum(['large-error', 'near-aligned', 'aligned']).parse(event.target.value))} options={[
               { value: 'large-error', label: 'Large error' }, { value: 'near-aligned', label: 'Nearly aligned' }, { value: 'aligned', label: 'Aligned' },
             ]} />
             <p className="vela-sim-note">Reset restores these offsets and clears the camera. Start a fresh alignment measurement in Vela afterward.</p>

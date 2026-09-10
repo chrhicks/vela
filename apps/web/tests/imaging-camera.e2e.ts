@@ -2,7 +2,7 @@ import { expect, test, type Page, type Route } from '@playwright/test'
 import type { ImagingCameraView } from '@vela/model/web'
 import { observation } from './fixtures/observation'
 
-const respond = (route: Route, body: unknown) => route.fulfill({ contentType: 'application/json', body: JSON.stringify(body) })
+const respond = <Body>(route: Route, body: Body) => route.fulfill({ contentType: 'application/json', body: JSON.stringify(body) })
 
 const cameras = [
   { id: 'main', name: 'ZWO ASI2600MC Pro', configuredName: 'ASI Camera (1)' },

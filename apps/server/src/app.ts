@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import Fastify from 'fastify'
 import {
   AlpacaProviderError,
@@ -27,6 +28,7 @@ import {
 import {
   discoverRigs,
   parseDiscoverRigsInput,
+  manualDiscoverySchema,
   toObservedRigInventory,
 } from './rig/discovery.js'
 import {
@@ -305,7 +307,7 @@ export function buildApp({
 }
 
 function rigConnectionLogging(
-  request: { readonly log: { warn(value: object, message: string): void } },
+  request: Pick<import('fastify').FastifyRequest, 'log'>,
 ): Pick<RigConnectionRequestOptions, 'onConflict' | 'onProviderResult' | 'onUnavailable'> {
   return {
     onConflict(rig) {
@@ -321,30 +323,19 @@ function rigConnectionLogging(
   }
 }
 
-function parseAddRigRequest(value: unknown): AddRigRequest | undefined {
-  if (
-    !isRecord(value)
-    || Object.keys(value).some((key) => key !== 'name' && key !== 'endpoint')
-    || typeof value.name !== 'string'
-    || value.name.trim().length === 0
-    || !isRecord(value.endpoint)
-  ) {
-    return undefined
+const addRigRequestSchema = z.strictObject({
+  name: z.string().trim().min(1),
+  endpoint: manualDiscoverySchema.omit({ mode: true }),
+}).transform((value, context): AddRigRequest | typeof z.NEVER => {
+  const discoveryInput = parseDiscoverRigsInput({ ...value.endpoint, mode: 'manual' })
+
+  if (discoveryInput?.mode !== 'manual') {
+    context.addIssue({ code: 'custom', message: 'Invalid Rig endpoint' })
+
+    return z.NEVER
   }
 
-  const discoveryInput = parseDiscoverRigsInput({
-    ...value.endpoint,
-    mode: 'manual',
-  })
+  return { name: value.name, endpoint: discoveryInput.endpoint }
+})
 
-  if (discoveryInput?.mode !== 'manual') return undefined
-
-  return {
-    name: value.name.trim(),
-    endpoint: discoveryInput.endpoint,
-  }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value)
-}
+const parseAddRigRequest = addRigRequestSchema.optional().catch(undefined).parse

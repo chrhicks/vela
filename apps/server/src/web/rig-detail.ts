@@ -121,23 +121,19 @@ function cameraStatus(
       || telemetry.cooling.setpointControl === true
       || telemetry.cooling.powerReporting === true)
 
-  return {
-    availability,
-    activity: telemetry.activity ?? 'unknown',
-    ...(telemetry.sensorTemperatureC === undefined
-      ? {}
-      : { sensorTemperatureC: telemetry.sensorTemperatureC }),
-    ...(!usefulCooling || telemetry.cooling === undefined
-      ? {}
-      : {
-          cooling: {
-            state: telemetry.cooling.state,
-            ...(telemetry.cooling.powerPercent === undefined
-              ? {}
-              : { powerPercent: telemetry.cooling.powerPercent }),
-          },
-        }),
+  let status: RigCameraStatus = { availability, activity: telemetry.activity ?? 'unknown' }
+
+  if (telemetry.sensorTemperatureC !== undefined) status = { ...status, sensorTemperatureC: telemetry.sensorTemperatureC }
+
+  if (usefulCooling && telemetry.cooling !== undefined) {
+    const cooling = telemetry.cooling.powerPercent === undefined
+      ? { state: telemetry.cooling.state }
+      : { state: telemetry.cooling.state, powerPercent: telemetry.cooling.powerPercent }
+
+    status = { ...status, cooling }
   }
+
+  return status
 }
 
 function telescopeStatus(
@@ -193,12 +189,13 @@ function focuserStatus(
       : { availability: 'partial', activity: 'unknown' }
   }
 
-  return {
-    availability,
-    activity: telemetry.moving === undefined ? 'unknown' : telemetry.moving ? 'moving' : 'idle',
-    ...(telemetry.position === undefined ? {} : { position: telemetry.position }),
-    ...(telemetry.temperatureC === undefined ? {} : { temperatureC: telemetry.temperatureC }),
-  }
+  let status: RigFocuserStatus = { availability, activity: telemetry.moving === undefined ? 'unknown' : telemetry.moving ? 'moving' : 'idle' }
+
+  if (telemetry.position !== undefined) status = { ...status, position: telemetry.position }
+
+  if (telemetry.temperatureC !== undefined) status = { ...status, temperatureC: telemetry.temperatureC }
+
+  return status
 }
 
 function filterWheelStatus(
@@ -211,12 +208,13 @@ function filterWheelStatus(
       : { availability: 'partial', activity: 'unknown' }
   }
 
-  return {
-    availability,
-    activity: telemetry.moving === undefined ? 'unknown' : telemetry.moving ? 'moving' : 'idle',
-    ...(telemetry.position === undefined ? {} : { position: telemetry.position }),
-    ...(telemetry.filterName === undefined ? {} : { filterName: telemetry.filterName }),
-  }
+  let status: RigFilterWheelStatus = { availability, activity: telemetry.moving === undefined ? 'unknown' : telemetry.moving ? 'moving' : 'idle' }
+
+  if (telemetry.position !== undefined) status = { ...status, position: telemetry.position }
+
+  if (telemetry.filterName !== undefined) status = { ...status, filterName: telemetry.filterName }
+
+  return status
 }
 
 function conditionsStatus(
@@ -235,15 +233,15 @@ function conditionsStatus(
 
   if (!reporting && availability === 'complete') return { availability: 'unsupported' }
 
-  return {
-    availability,
-    activity: reporting ? 'reporting' : 'unknown',
-    ...(telemetry.temperatureC === undefined ? {} : { temperatureC: telemetry.temperatureC }),
-    ...(telemetry.humidityPercent === undefined
-      ? {}
-      : { humidityPercent: telemetry.humidityPercent }),
-    ...(telemetry.dewPointC === undefined ? {} : { dewPointC: telemetry.dewPointC }),
-  }
+  let status: RigObservingConditionsStatus = { availability, activity: reporting ? 'reporting' : 'unknown' }
+
+  if (telemetry.temperatureC !== undefined) status = { ...status, temperatureC: telemetry.temperatureC }
+
+  if (telemetry.humidityPercent !== undefined) status = { ...status, humidityPercent: telemetry.humidityPercent }
+
+  if (telemetry.dewPointC !== undefined) status = { ...status, dewPointC: telemetry.dewPointC }
+
+  return status
 }
 
 function switchStatus(
@@ -260,20 +258,24 @@ function switchStatus(
     return { availability: 'unsupported' }
   }
 
-  return {
+  const status: RigSwitchStatus = {
     availability,
     activity: telemetry.channels === undefined ? 'unknown' : 'reporting',
-    ...(telemetry.channels === undefined
-      ? {}
-      : {
-          channels: telemetry.channels.map((channel) => ({
-            id: channel.id,
-            name: channel.name,
-            ...(channel.on === undefined ? {} : { on: channel.on }),
-            ...(channel.value === undefined ? {} : { value: channel.value }),
-          })),
-        }),
   }
+
+  if (telemetry.channels === undefined) return status
+
+  const channels = telemetry.channels.map(channel => {
+    let view: NonNullable<RigSwitchStatus['channels']>[number] = { id: channel.id, name: channel.name }
+
+    if (channel.on !== undefined) view = { ...view, on: channel.on }
+
+    if (channel.value !== undefined) view = { ...view, value: channel.value }
+
+    return view
+  })
+
+  return { ...status, channels }
 }
 
 function supportsRigDetail(kind: DeviceKind): boolean {

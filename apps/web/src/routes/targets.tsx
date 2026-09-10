@@ -38,7 +38,7 @@ function TargetComposition({ rigId, targetId }: { rigId: string, targetId: strin
     const controller = new AbortController()
     setLoadError(false)
 
-    const fetchTarget = () => api<unknown>(`web/rigs/${encodeURIComponent(rigId)}/targets/${encodeURIComponent(targetId)}`, { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]) }).then(next => {
+    const fetchTarget = () => api(`web/rigs/${encodeURIComponent(rigId)}/targets/${encodeURIComponent(targetId)}`, { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]) }).then(next => {
       if (!isTarget(next) || next.id !== targetId) throw new Error('Invalid target response')
 
       if (!controller.signal.aborted) { setTarget(next); setSkyStale(false) }

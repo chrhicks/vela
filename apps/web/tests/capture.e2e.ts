@@ -3,7 +3,7 @@ import type { Route } from '@playwright/test'
 import type { CaptureView } from '@vela/model/web'
 import { readFileSync } from 'node:fs'
 
-const respond = (route: Route, body: unknown) => route.fulfill({ contentType: 'application/json', body: JSON.stringify(body) })
+const respond = <Body>(route: Route, body: Body) => route.fulfill({ contentType: 'application/json', body: JSON.stringify(body) })
 
 const idle: CaptureView = {
   rigId: 'rig-1', rigName: 'Offline rig', camera: { name: 'Simulator Camera' }, enabled: true,
@@ -157,12 +157,16 @@ test('retains the image during interrupted updates and shows the server exposure
 test('an ambiguous command is never replayed and requires an explicit state check', async ({ page }) => {
   let commands = 0
   let reads = 0
-  await page.route('**/api/web/rigs/rig-1/capture', route => { reads++;
+  await page.route('**/api/web/rigs/rig-1/capture', route => {
+    reads++
 
- return respond(route, idle) })
-  await page.route('**/api/rigs/rig-1/capture/start', route => { commands++;
+    return respond(route, idle)
+  })
+  await page.route('**/api/rigs/rig-1/capture/start', route => {
+    commands++
 
- return route.abort() })
+    return route.abort()
+  })
   await page.goto('/rigs/rig-1/observe/capture')
   await page.getByRole('button', { name: 'Take exposure' }).click()
   await expect(page.getByText('Command outcome unknown')).toBeVisible()
@@ -179,9 +183,11 @@ test('an ambiguous command is never replayed and requires an explicit state chec
 test('an active exposure disappearing after restart stays unconfirmed until an explicit check', async ({ page }) => {
   let current: CaptureView = { ...idle, phase: 'exposing', active: true, exposureSeconds: 30, elapsedSeconds: 8 }
   let reads = 0
-  await page.route('**/api/web/rigs/rig-1/capture', route => { reads++;
+  await page.route('**/api/web/rigs/rig-1/capture', route => {
+    reads++
 
- return respond(route, current) })
+    return respond(route, current)
+  })
   await page.goto('/rigs/rig-1/observe/capture')
   await expect(page.getByRole('button', { name: 'Stop exposure' })).toBeEnabled()
   current = idle
@@ -293,7 +299,7 @@ test('displays completed downloads during faster frame arrivals and coalesces pe
 
 
 test('distinguishes unavailable star measurements from an image with no measurable stars', async ({ page }) => {
-  let current = { ...idle, phase: 'complete', latestImage: { ...firstImage, statistics: null as { detectedStars: number, medianHfrPixels: number | null } | null } }
+  let current: CaptureView = { ...idle, phase: 'complete', latestImage: { ...firstImage, statistics: null } }
   await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, current))
   await page.route('**/api/rigs/rig-1/capture/images/*', route => route.fulfill({ contentType: 'image/png', body: preview }))
   await page.goto('/rigs/rig-1/observe/capture')
@@ -344,9 +350,11 @@ test('saved collection opens a retained image and original downloads without cam
     previewDownloadUrl: '/api/rigs/rig-1/saved-images/frame-1/download-preview' }
 
   let deviceReads = 0
-  await page.route('**/api/web/rigs/rig-1/capture', route => { deviceReads++;
+  await page.route('**/api/web/rigs/rig-1/capture', route => {
+    deviceReads++
 
- return route.abort() })
+    return route.abort()
+  })
   await page.route('**/api/web/rigs/rig-1/saved-images', route => respond(route, { rigId: 'rig-1', rigName: 'Offline rig', images: [saved] }))
   await page.route('**/api/web/rigs/rig-1/saved-images/frame-1', route => respond(route, { rigId: 'rig-1', rigName: 'Offline rig', image: saved }))
   await page.route('**/api/rigs/rig-1/saved-images/frame-1/preview', route => route.fulfill({ contentType: 'image/png', body: preview }))
@@ -395,7 +403,13 @@ test('keeps a manual save outcome and retry attached to its image after newer pi
 
 test('labels estimated starts on the loaded capture and saved image detail', async ({ page }) => {
   let estimated = true
-  await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, { ...idle, phase: 'complete', latestImage: { ...firstImage, ...(estimated ? { capturedAtSource: 'server-estimate' } : {}) } }))
+  await page.route('**/api/web/rigs/rig-1/capture', route => {
+    const latestImage = { ...firstImage, capturedAtSource: 'server-estimate' as const }
+
+    if (!estimated) return respond(route, { ...idle, phase: 'complete', latestImage: firstImage })
+
+    return respond(route, { ...idle, phase: 'complete', latestImage })
+  })
   await page.route(`**${firstImage.imageUrl}`, route => route.fulfill({ contentType: 'image/png', body: preview }))
   await page.goto('/rigs/rig-1/observe/capture')
   await expect(page.getByText('Start time estimated', { exact: true })).toBeVisible()

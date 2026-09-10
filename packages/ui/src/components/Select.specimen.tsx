@@ -26,7 +26,7 @@ export const specimen: ComponentSpecimen = {
         disabled={Boolean(props.disabled)}
         invalid={Boolean(props.invalid)}
         label={String(props.label)}
-        message={Boolean(props.invalid) ? 'Choose an available device.' : 'Used for the next capture sequence'}
+        message={props.invalid ? 'Choose an available device.' : 'Used for the next capture sequence'}
         options={cameras}
         onChange={(event) => onPropsChange?.({ value: event.target.value })}
         value={String(props.value)}

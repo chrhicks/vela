@@ -120,14 +120,16 @@ export function TargetBrowser({ rigId }: { rigId: string }) {
     <div className="vela-discovery__results" role="status" ref={resultsHeading} tabIndex={-1}><strong>{search ? `Results for “${search}”` : noSite ? 'Explore the catalog' : view?.night?.kind === 'upcoming-night' ? 'The coming night' : 'Explore tonight'}</strong><span>{pending ? 'Loading selection…' : view ? `${view.total.toLocaleString()} ${search ? 'matches' : 'subjects'}` : ''}</span></div>
     <div className="vela-discovery__grid" aria-busy={loading}>{view?.targets.map((target, index) => {
       const opportunity = target.opportunity
-      const linkParams = new URLSearchParams({ category: displayed.category, filter: displayed.filter, offset: String(displayed.offset), ...(displayed.query ? { q: displayed.query } : {}) })
+      const linkParams = new URLSearchParams({ category: displayed.category, filter: displayed.filter, offset: String(displayed.offset) })
+
+      if (displayed.query) linkParams.set('q', displayed.query)
 
       return <article className="vela-discovery__card" key={target.id}>
         <Link className="vela-discovery__image" tabIndex={-1} aria-hidden="true" to={{ pathname: `/rigs/${encodeURIComponent(rigId)}/observe/targets/${encodeURIComponent(target.id)}`, search: linkParams.toString() }}><ReferenceImage target={target} /><span>{target.kind}</span></Link>
         <div className="vela-discovery__body"><p className="vela-discovery__catalog"><span>{target.catalog}{target.sizeArcminutes !== null ? ` · ${target.sizeArcminutes}′ across` : ''}</span>{!noSite && !search && <span>#{view.offset + index + 1}</span>}</p><h2>{target.name}</h2>
           <div className="vela-discovery__window"><strong>{opportunity ? `${duration(opportunity.usefulMinutes)} of useful dark sky` : noSite ? 'Observing window unavailable' : 'No useful window this night'}</strong><span>{opportunity ? `${clock(opportunity.startsAt)} – ${clock(opportunity.endsAt)} · above 30°` : 'Explore the target to inspect its sky path.'}</span></div>
           <p className="vela-discovery__reason">{opportunity ? `Best remaining altitude ${Math.round(opportunity.bestAltitudeDegrees)}° at ${clock(opportunity.bestAt)}. ${Math.round(opportunity.currentAltitudeDegrees)}° at calculation time.` : target.sky ? 'Below the useful altitude during remaining darkness.' : 'Refresh with an available observing site for tonight’s context.'}</p>
-          <div className="vela-discovery__advice"><strong>{target.filterChoice === 'dual-band' ? 'L-Ultimate suits this subject' : target.filterChoice === 'broadband' ? 'Broadband is the better fit' : 'Start with broadband'}</strong><p>{target.filterReason}</p></div>
+          <div className="vela-discovery__advice"><strong>{{ 'dual-band': 'L-Ultimate suits this subject', broadband: 'Broadband is the better fit', uncertain: 'Start with broadband' }[target.filterChoice]}</strong><p>{target.filterReason}</p></div>
           <Link className="vela-button vela-button--quiet" to={{ pathname: `/rigs/${encodeURIComponent(rigId)}/observe/targets/${encodeURIComponent(target.id)}`, search: linkParams.toString() }}>Explore target <span aria-hidden="true">→</span></Link>
           <small>Reference survey · DSS2 / CDS</small>
         </div>

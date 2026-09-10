@@ -1,3 +1,4 @@
+import type { ResponseFixture } from './internal/test-fixtures.js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   createAlpacaDiscovery,
@@ -5,9 +6,9 @@ import {
   type AlpacaUdpScanner,
 } from './index.js'
 
-type RouteResult = unknown | Error
+type RouteResult = ResponseFixture | Error
 
-function envelope(Value: unknown, ErrorNumber = 0, ErrorMessage = '') {
+function envelope(Value: ResponseFixture, ErrorNumber = 0, ErrorMessage = '') {
   return {
     Value,
     ClientTransactionID: 0,
@@ -21,7 +22,7 @@ function fakeFetch(
   routes: Record<string, RouteResult>,
   requests: string[] = [],
 ): typeof globalThis.fetch {
-  return (async (input) => {
+  return async (input) => {
     const url = new URL(String(input))
     requests.push(url.pathname)
     const result = routes[url.pathname]
@@ -31,7 +32,7 @@ function fakeFetch(
     if (result === undefined) return new Response('Not found', { status: 404 })
 
     return Response.json(result)
-  }) as typeof globalThis.fetch
+  }
 }
 
 function deferred() {
@@ -193,7 +194,7 @@ describe('createAlpacaDiscovery', () => {
     const fetch = vi.fn(async () => new Response('{not json', {
       status: 200,
       headers: { 'content-type': 'application/json' },
-    })) as typeof globalThis.fetch
+    }))
 
     const discovery = createAlpacaDiscovery({ fetch })
 
@@ -227,7 +228,7 @@ describe('createAlpacaDiscovery', () => {
           once: true,
         })
       }),
-    ) as typeof globalThis.fetch
+    )
 
     const discovery = createAlpacaDiscovery({ fetch })
 
@@ -253,7 +254,7 @@ describe('createAlpacaDiscovery', () => {
           once: true,
         })
       }),
-    ) as typeof globalThis.fetch
+    )
 
     const discovery = createAlpacaDiscovery({ fetch })
 

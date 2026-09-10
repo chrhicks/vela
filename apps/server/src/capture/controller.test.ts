@@ -6,7 +6,7 @@ import { createMemorySavedImageStore, type SavedImageStore } from '../saved-imag
 
 function deferred<T>() {
   let resolve!: (value: T) => void
-  let reject!: (error: unknown) => void
+  let reject!: (error: Error) => void
   const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no })
 
   return { promise, resolve, reject }
@@ -209,9 +209,11 @@ it('saves every repeated frame before exposing again, including a completed fram
   const gate = deferred<void>()
   const original = store.save.bind(store)
   const save = vi.spyOn(store, 'save')
-  save.mockImplementationOnce(async (...args) => { await gate.promise;
+  save.mockImplementationOnce(async (...args) => {
+    await gate.promise
 
- return original(...args) })
+    return original(...args)
+  })
   const { controller, requests, frame } = setup(store)
   await controller.start(10, { repeat: true, saveFrames: true })
   requests[0]!.resolve(frame)

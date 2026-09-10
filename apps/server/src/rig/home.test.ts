@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { RigDeviceInventory } from '../device/inventory.js'
 import type { ObservedRigDevice } from '../device/model.js'
 import { createMemoryRigCatalog } from './catalog.js'
-import type { ObservedRigInventory, RigCatalogRecord } from './contracts.js'
+import type { RigCatalogRecord } from './contracts.js'
 import { loadHomeView } from './home.js'
 
 function rig(id: string, uniqueId: string): RigCatalogRecord {

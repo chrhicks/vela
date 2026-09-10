@@ -56,7 +56,7 @@ export function useDiscovery(rigId: string, selection: DiscoverySelection) {
     if (!refreshed && snapshot.current) params.set('snapshot', snapshot.current)
     setLoading(true)
     setError(null)
-    void api<unknown>(`web/rigs/${encodeURIComponent(rigId)}/target-discovery?${params}`, {
+    void api(`web/rigs/${encodeURIComponent(rigId)}/target-discovery?${params}`, {
       signal: AbortSignal.any([controller.signal, AbortSignal.timeout(30000)]),
     }).then(next => {
       if (!isTargetDiscovery(next, rigId)) throw new Error('Invalid discovery response')

@@ -13,6 +13,30 @@ import './Panel.saved-images.specimen.css'
 type Props = Record<string, string | number | boolean>
 
 function SavedImagesPreview({ props, onPropsChange }: { props: Props, onPropsChange?: (patch: Props) => void }) {
+  function pageTitle() {
+    switch (screen) {
+      case 'observe':
+        return 'Observe'
+      case 'capture':
+        return 'Capture'
+      case 'detail':
+        return 'Saved image'
+      default:
+        return 'Saved images'
+    }
+  }
+
+  function renderPageAction() {
+    switch (screen) {
+      case 'capture':
+        return <Button onClick={() => update({ screen: 'saved' })}>Saved images ({saved.length}) →</Button>
+      case 'observe':
+        return <Badge tone="positive">Connected</Badge>
+      default:
+        return <span className="vela-saved-count">{saved.length} {saved.length === 1 ? 'image' : 'images'}</span>
+    }
+  }
+
   const [local, setLocal] = useState(props)
   const values = onPropsChange ? props : local
 
@@ -158,8 +182,8 @@ function SavedImagesPreview({ props, onPropsChange }: { props: Props, onPropsCha
     <header className="vela-capture-shell"><strong>Vela</strong><span>Offline rig</span><span>Observe</span></header>
     <main className="vela-capture-main">
       {screen !== 'observe' && <Button className="vela-capture-back" tone="quiet" size="small" onClick={() => update({ screen: screen === 'detail' ? 'saved' : 'observe' })}>← {screen === 'detail' ? 'Saved images' : 'Observe'}</Button>}
-      <header className="vela-capture-heading"><div><p>Offline rig</p><h1 ref={heading} tabIndex={-1}>{screen === 'observe' ? 'Observe' : screen === 'capture' ? 'Capture' : screen === 'detail' ? 'Saved image' : 'Saved images'}</h1></div>
-        {screen === 'capture' ? <Button onClick={() => update({ screen: 'saved' })}>Saved images ({saved.length}) →</Button> : screen === 'observe' ? <Badge tone="positive">Connected</Badge> : <span className="vela-saved-count">{saved.length} {saved.length === 1 ? 'image' : 'images'}</span>}
+      <header className="vela-capture-heading"><div><p>Offline rig</p><h1 ref={heading} tabIndex={-1}>{pageTitle()}</h1></div>
+        {renderPageAction()}
       </header>
       {screen === 'observe' && <>
         <p className="vela-capture-intro">{busy ? 'Your capture is running. You can browse saved images while it continues.' : 'Your rig is connected. What would you like to do?'}</p>

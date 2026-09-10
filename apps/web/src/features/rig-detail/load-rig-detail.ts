@@ -6,7 +6,7 @@ export async function loadRigDetail(
   rigId: string,
   signal?: AbortSignal,
 ): Promise<RigDetailView> {
-  const response = await api<unknown>(`web/rigs/${encodeURIComponent(rigId)}`, { signal })
+  const response = await api(`web/rigs/${encodeURIComponent(rigId)}`, { signal })
 
   if (!isRigDetailView(response)) throw new Error('Invalid Rig detail response')
 

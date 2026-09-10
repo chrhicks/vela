@@ -26,8 +26,9 @@ export interface FramingHardware {
 export function mountSite(mount: FramingMount): Site {
   if (mount.latitudeDegrees === undefined || mount.longitudeDegrees === undefined) throw new Error('The mount has not supplied an observing location.')
 
-  return { latitudeDegrees: mount.latitudeDegrees, longitudeDegrees: mount.longitudeDegrees,
-    ...(mount.elevationMeters === undefined ? {} : { elevationMeters: mount.elevationMeters }) }
+  const site = { latitudeDegrees: mount.latitudeDegrees, longitudeDegrees: mount.longitudeDegrees }
+
+  return mount.elevationMeters === undefined ? site : { ...site, elevationMeters: mount.elevationMeters }
 }
 
 function fixedPointing(mount: FramingMount) {

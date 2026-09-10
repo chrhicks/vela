@@ -73,7 +73,7 @@ function validatePosition(position: MountPosition) {
 
   if (Math.abs(position.latitudeDegrees) > 90 || Math.abs(position.declinationDegrees) > 90
     || Math.abs(position.altitudeErrorDegrees) > 5 || Math.abs(position.azimuthErrorDegrees) > 5
-    || position.elapsedSeconds < 0 || typeof position.tracking !== 'boolean') {
+    || position.elapsedSeconds < 0 || (position.tracking !== true && position.tracking !== false)) {
     throw new Error('Mount position is outside the supported simulation range')
   }
 }

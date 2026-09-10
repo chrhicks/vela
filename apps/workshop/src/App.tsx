@@ -145,7 +145,11 @@ export function App() {
             <p>{workshop.specimen.description}</p>
           </div>
           <div className="stage-toolbar__actions">
-            <label>Context<select onChange={(event) => workshop.patchSession({ context: event.target.value as typeof workshop.session.context })} value={workshop.session.context}><option value="isolated">Isolated</option><option value="form">Form / settings</option><option value="toolbar">Toolbar / action row</option><option value="card">Card / data list</option></select></label>
+            <label>Context<select onChange={(event) => {
+              const context = event.target.value
+
+              if (context === 'isolated' || context === 'form' || context === 'toolbar' || context === 'card') workshop.patchSession({ context })
+            }} value={workshop.session.context}><option value="isolated">Isolated</option><option value="form">Form / settings</option><option value="toolbar">Toolbar / action row</option><option value="card">Card / data list</option></select></label>
             <label className="toggle"><input checked={workshop.session.compareBaseline} onChange={(event) => workshop.patchSession({ compareBaseline: event.target.checked })} type="checkbox" /><span /> Compare baseline</label>
           </div>
         </div>

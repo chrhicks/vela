@@ -1,5 +1,5 @@
 import type { TargetSkyPath } from '@vela/model/web'
-import { Button, Dialog, Panel, SkyPath, type SkyLightPhase } from '@vela/ui'
+import { Button, Dialog, Panel, SkyPath, type SkyPathProps, type SkyLightPhase } from '@vela/ui'
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { skyTime, skyWindow } from './sky-time'
@@ -50,15 +50,16 @@ function AvailableSky({ sky, targetName, stale }: { sky: TargetSkyPath, targetNa
   const selectedIndex = nearest(selectedAt ?? sky.observedAt)
   const nowInSpan = Date.parse(sky.observedAt) >= start && Date.parse(sky.observedAt) <= end
 
-  const skyProps = {
+  const skyProps: SkyPathProps = {
     targetName,
     samples: sky.samples.map(sample => ({ ...sample, label: skyTime(sample.at), light: lightPhase(sample.sunAltitudeDegrees) })),
     moonSamples: sky.samples.map(sample => sample.moon),
     selectedIndex,
     onSelectedIndexChange: (index: number) => setSelectedAt(sky.samples[index]!.at),
-    ...(nowInSpan ? { nowIndex: nearest(sky.observedAt) } : {}),
     nowLabel: stale ? 'Last' : 'Now',
   }
+
+  if (nowInSpan) skyProps.nowIndex = nearest(sky.observedAt)
 
   const selectedDate = new Date(sky.samples[selectedIndex]!.at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 

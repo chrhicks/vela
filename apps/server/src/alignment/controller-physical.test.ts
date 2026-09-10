@@ -1,49 +1,14 @@
-import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { afterEach, expect, it, vi } from 'vitest'
+import { createTestCadence } from './test-cadence.js'
+import { fixture } from './physical-fixture.js'
+import { previewPng } from '../imaging/preview.js'
 import type { AlpacaAcquisition, AlpacaCaptureOptions } from '@vela/alpaca'
 import { createAlignmentController } from './controller.js'
 import type { PhysicalAlignment } from './physical.js'
 import { physicalAlignmentSample, projectPhysicalAlignmentTarget } from './physical-coordinates.js'
 import type { PlateSolver, SkyPosition, SolveResult } from './solver.js'
 
-const control = vi.hoisted(() => ({ waits: [] as Array<() => void>, afterPreview: undefined as undefined | (() => void) }))
-
-vi.mock('node:timers/promises', async importOriginal => ({
-  ...await importOriginal<typeof import('node:timers/promises')>(),
-  setTimeout: (_ms: number, _value: unknown, options: { signal: AbortSignal }) => new Promise<void>((resolve, reject) => {
-    const finish = () => { options.signal.removeEventListener('abort', abort); resolve() }
-
-    const abort = () => {
-      const index = control.waits.indexOf(finish)
-
-      if (index >= 0) control.waits.splice(index, 1)
-      reject(new DOMException('Stopped', 'AbortError'))
-    }
-
-    options.signal.addEventListener('abort', abort, { once: true })
-
-    if (options.signal.aborted) abort()
-    else control.waits.push(finish)
-  }),
-}))
-
-vi.mock('../imaging/preview.js', async importOriginal => {
-  const original = await importOriginal<typeof import('../imaging/preview.js')>()
-
-  return { ...original, previewPng: async (...args: Parameters<typeof original.previewPng>) => {
-    const png = await original.previewPng(...args)
-    control.afterPreview?.()
-
-    return png
-  } }
-})
-
-type FrameFixture = { capturedAt: string, solved: SkyPosition }
-
-const fixture = JSON.parse(readFileSync(new URL('./physical-coordinates.fixture.json', import.meta.url), 'utf8')) as {
-  site: { latitudeDegrees: number, longitudeDegrees: number, elevationMeters: number }
-  cases: Array<{ samples: FrameFixture[], adjusted: FrameFixture }>
-}
+const control: { waits: Array<() => void>, wait: (signal: AbortSignal) => Promise<void>, afterPreview?: (() => void) | undefined } = createTestCadence()
 
 const frames = [...fixture.cases[0]!.samples, fixture.cases[0]!.adjusted]
 
@@ -52,9 +17,7 @@ const settings = { mode: 'physical' as const, endpoint: 'http://physical.test', 
 
 const fieldHeightDegrees = 2 * Math.atan(4176 * 3.76 / 2000 / 400) * 180 / Math.PI
 
-const stops: Array<() => Promise<unknown>> = []
-
-beforeEach(() => { control.waits = []; control.afterPreview = undefined })
+const stops: Array<ReturnType<typeof createAlignmentController>['stop']> = []
 
 afterEach(async () => {
   control.afterPreview = undefined
@@ -114,7 +77,15 @@ function setup() {
   }
 
   const solverFactory = vi.fn((_height: number) => solver)
-  const controller = createAlignmentController({ mode: 'physical', settings, hardware, physical, createSolver: solverFactory })
+
+  const controller = createAlignmentController({ mode: 'physical', settings, hardware, physical, createSolver: solverFactory, waitForNextExposure: control.wait,
+    renderPreview: async (...args) => {
+      const png = await previewPng(...args)
+      control.afterPreview?.()
+
+      return png
+    } })
+
   stops.push(() => controller.stop())
 
   async function nextSolve() {

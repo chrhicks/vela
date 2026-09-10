@@ -48,7 +48,7 @@ export function useImagingCamera(rigId: string) {
     request.current = controller
 
     try {
-      const next = await api<unknown>(`web/rigs/${encodeURIComponent(rigId)}/imaging-camera`, {
+      const next = await api(`web/rigs/${encodeURIComponent(rigId)}/imaging-camera`, {
         signal: AbortSignal.any([controller.signal, AbortSignal.timeout(5000)]),
       })
 
@@ -103,7 +103,7 @@ export function useImagingCamera(rigId: string) {
     setError(null)
 
     try {
-      const next = await api<unknown>(`rigs/${encodeURIComponent(rigId)}/imaging-camera`, {
+      const next = await api(`rigs/${encodeURIComponent(rigId)}/imaging-camera`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(choice),
         signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]),
       })

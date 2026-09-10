@@ -65,8 +65,9 @@ export function createPhysicalAlignment(settings: PhysicalAlignmentSettings, acq
     reference = undefined
     westRate = undefined
     const initial = await status(signal, { allowTrackingOff: true })
-    site = { latitudeDegrees: initial.latitudeDegrees!, longitudeDegrees: initial.longitudeDegrees!,
-      ...(initial.elevationMeters === undefined ? {} : { elevationMeters: initial.elevationMeters }) }
+    site = { latitudeDegrees: initial.latitudeDegrees!, longitudeDegrees: initial.longitudeDegrees! }
+
+    if (initial.elevationMeters !== undefined) site.elevationMeters = initial.elevationMeters
     const observed = await device.cameraGeometry({ cameraId: settings.cameraId, expectedCameraName: settings.cameraName }, signal)
 
     if (!Number.isFinite(settings.focalLengthMm) || settings.focalLengthMm <= 0) throw new Error('Set the effective focal length before alignment')
@@ -91,8 +92,9 @@ export function createPhysicalAlignment(settings: PhysicalAlignmentSettings, acq
 
     reference = current
     geometry = observed
-    site = { latitudeDegrees: current.latitudeDegrees!, longitudeDegrees: current.longitudeDegrees!,
-      ...(current.elevationMeters === undefined ? {} : { elevationMeters: current.elevationMeters }) }
+    site = { latitudeDegrees: current.latitudeDegrees!, longitudeDegrees: current.longitudeDegrees! }
+
+    if (current.elevationMeters !== undefined) site.elevationMeters = current.elevationMeters
 
     return { fieldHeightDegrees: 2 * Math.atan(observed.height * observed.pixelHeightMicrons * observed.binY / 2000 / settings.focalLengthMm) * 180 / Math.PI }
   }

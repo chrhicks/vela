@@ -1,3 +1,9 @@
+import { z } from 'zod'
+
+const json = z.json()
+
+const apiFailure = z.object({ error: z.string() })
+
 const apiBaseUrl = import.meta.env.VITE_API_URL ?? '/api'
 
 export class ApiError extends Error {
@@ -12,7 +18,7 @@ export class ApiError extends Error {
 }
 
 /** Fetch JSON from the application's API. Never put secrets in VITE_* variables. */
-export async function api<T>(path: string, init?: RequestInit): Promise<T> {
+export async function api(path: string, init?: RequestInit) {
   const response = await fetch(`${apiBaseUrl.replace(/\/$/, '')}/${path.replace(/^\//, '')}`, {
     ...init,
     headers: {
@@ -25,9 +31,9 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     let code: string | undefined
 
     try {
-      const body: unknown = await response.json()
+      const result = apiFailure.safeParse(await response.json())
 
-      if (isRecord(body) && typeof body.error === 'string') code = body.error
+      if (result.success) code = result.data.error
     } catch {
       // An error response may have no JSON body.
     }
@@ -35,11 +41,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     throw new ApiError(`Request failed with ${response.status}`, response.status, code)
   }
 
-  if (response.status === 204) return undefined as T
+  if (response.status === 204) return undefined
 
-  return response.json() as Promise<T>
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value)
+  return json.parse(await response.json())
 }

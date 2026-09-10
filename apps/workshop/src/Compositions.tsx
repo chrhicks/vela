@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { Badge, Button, Checkbox, IconButton, Input, Panel, Select, Tabs } from '@vela/ui'
 import { themeStyle } from '@vela/ui/themes'
 import type { ThemeMode, ThemeParameters, WorkingSession } from '@vela/ui/themes'
@@ -62,5 +62,5 @@ export const compositions: CompositionDefinition[] = [
 ]
 
 export function CompositionPreview({ composition, mode, theme }: { composition: CompositionDefinition; mode: ThemeMode; theme: ThemeParameters }) {
-  return <div className="vela-theme composition-preview" data-mode={mode} style={themeStyle(theme, mode) as CSSProperties}>{composition.render()}</div>
+  return <div className="vela-theme composition-preview" data-mode={mode} style={themeStyle(theme, mode)}>{composition.render()}</div>
 }

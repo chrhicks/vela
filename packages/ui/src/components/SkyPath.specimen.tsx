@@ -7,13 +7,26 @@ import './SkyPath.specimen.css'
 type Props = Record<string, string | number | boolean>
 
 function SkyPathPreview({ props, onPropsChange }: { props: Props, onPropsChange?: (patch: Props) => void }) {
+  function targetLabel() {
+    switch (targetId) {
+      case 'low-target':
+        return 'Low target'
+      case 'andromeda':
+        return 'Andromeda'
+      case 'm13':
+        return 'Hercules Cluster'
+      default:
+        return 'Crescent Nebula'
+    }
+  }
+
   const [local, setLocal] = useState(props)
   const values = onPropsChange ? props : local
   const update = (patch: Props) => onPropsChange ? onPropsChange(patch) : setLocal(current => ({ ...current, ...patch }))
   const horizon = getDemoHorizon(String(values.horizon))
   const moonSamples = getMoonSamples(String(values.moon ?? 'gibbous'))
   const targetId = String(values.target)
-  const targetName = targetId === 'low-target' ? 'Low target' : targetId === 'andromeda' ? 'Andromeda' : targetId === 'm13' ? 'Hercules Cluster' : 'Crescent Nebula'
+  const targetName = targetLabel()
 
   return <div className="vela-sky-path-specimen">
     <p className="vela-sky-path-specimen__caption">Sample night · imaginary observing site</p>

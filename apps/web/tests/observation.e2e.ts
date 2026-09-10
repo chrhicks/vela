@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 import type { Route } from '@playwright/test'
 import { device, observation, offlineObservation } from './fixtures/observation'
 
-const respond = (route: Route, body: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
+const respond = <Body>(route: Route, body: Body, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
 
 // Keep adjacent Observe features deterministic; these tests own readiness only.
 test.beforeEach(async ({ page }) => {
@@ -37,9 +37,11 @@ test('connects once, shows neutral progress, and focuses the confirmed result', 
   let reads = 0
   let finish!: () => void
   const pending = new Promise<void>((resolve) => { finish = resolve })
-  await page.route('**/api/web/rigs/rig-1/observe', (route) => { reads++;
+  await page.route('**/api/web/rigs/rig-1/observe', (route) => {
+    reads++
 
- return respond(route, observation(commands ? 'complete' : 'available')) })
+    return respond(route, observation(commands ? 'complete' : 'available'))
+  })
   await page.route('**/api/rigs/rig-1/connections', async (route) => {
     commands++
     await pending
@@ -99,9 +101,11 @@ for (const failure of ['transport', 'malformed', 'conflicting-fields']) {
   test(`reconciles a ${failure} command response without replaying it`, async ({ page }) => {
     let commands = 0
     let reads = 0
-    await page.route('**/api/web/rigs/rig-1/observe', (route) => { reads++;
+    await page.route('**/api/web/rigs/rig-1/observe', (route) => {
+      reads++
 
- return respond(route, observation(commands ? 'complete' : 'available')) })
+      return respond(route, observation(commands ? 'complete' : 'available'))
+    })
     await page.route('**/api/rigs/rig-1/connections', (route) => {
       commands++
 
@@ -120,9 +124,9 @@ for (const failure of ['transport', 'malformed', 'conflicting-fields']) {
 }
 
 test('handles already prepared, offline, missing and malformed observations', async ({ page }) => {
-  let response: unknown = observation('complete')
+  let response: ReturnType<typeof observation> | null = observation('complete')
   let status = 200
-  await page.route('**/api/web/rigs/rig-1/observe', (route) => respond(route, response, status))
+  await page.route('**/api/web/rigs/rig-1/observe', (route) => respond(route, response ?? {}, status))
   await page.goto('/rigs/rig-1/observe')
   await expect(page.locator('.vela-capture-rig > summary')).toContainText('Connection preparation complete')
   await page.locator('.vela-capture-rig > summary').click()
@@ -131,7 +135,7 @@ test('handles already prepared, offline, missing and malformed observations', as
   response = offlineObservation()
   await page.reload()
   await expect(page.getByRole('heading', { name: 'This Rig is offline' })).toBeVisible()
-  response = {}; status = 404
+  response = null; status = 404
   await page.reload()
   await expect(page.getByRole('heading', { name: 'Rig not found' })).toBeVisible()
   status = 200

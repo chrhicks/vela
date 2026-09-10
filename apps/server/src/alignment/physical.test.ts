@@ -236,6 +236,7 @@ describe('physical alignment sweep', () => {
     const fake = observatory()
     await fake.alignment.prepare(signal)
     vi.mocked(fake.device.cameraGeometry).mockResolvedValue(
+      // SAFETY: reversing the entries preserves every key and value of the typed camera geometry.
       Object.fromEntries(Object.entries(fake.camera).reverse()) as typeof fake.camera,
     )
     await expect(fake.alignment.pointing(signal)).resolves.toBeDefined()

@@ -155,7 +155,7 @@ function offlineDetail(): RigDetailView {
   }
 }
 
-async function fulfillJson(route: Route, body: unknown, status = 200) {
+async function fulfillJson<Body>(route: Route, body: Body, status = 200) {
   await route.fulfill({
     status,
     contentType: 'application/json',

@@ -190,7 +190,7 @@ export default function RigDiscoveryDialog({ open, onAdded, onDismiss }: Props) 
         setDiscoveryState({
           ...review,
           adding: false,
-          error: addRigFailureMessage(error),
+          error: addRigFailureMessage(error instanceof AddRigError ? error : null),
         })
       }
     } finally {
@@ -344,7 +344,7 @@ function RequestFailure() {
   )
 }
 
-function addRigFailureMessage(error: unknown): string {
+function addRigFailureMessage(error: AddRigError | null): string {
   if (!(error instanceof AddRigError)) {
     return 'Vela could not reach the server to add this rig. Try again.'
   }

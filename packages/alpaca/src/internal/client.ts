@@ -1,10 +1,9 @@
 import { Schema } from 'effect'
-import { SpanKind, SpanStatusCode, trace, type Span } from '@opentelemetry/api'
+import { SpanKind, SpanStatusCode, trace, type Span, type Attributes } from '@opentelemetry/api'
 import { AlpacaProviderError } from '../error.js'
 import { imageBytesMetadata } from './image-bytes.js'
 import {
   alpacaMethodResponse,
-  alpacaResponse,
   connectedResponse,
   driverInfoResponse,
   driverVersionResponse,
@@ -18,8 +17,8 @@ import {
 
 export interface AlpacaClient {
   command(device: ConfiguredDevice, operation: string, parameters: Record<string, string>, signal?: AbortSignal): Promise<void>
-  readValue(device: ConfiguredDevice, operation: string, signal?: AbortSignal): Promise<unknown>
-  image(device: ConfiguredDevice, signal?: AbortSignal): Promise<unknown>
+  readValue<S extends Schema.ConstraintDecoder<unknown>>(device: ConfiguredDevice, operation: string, schema: S, signal?: AbortSignal): Promise<S['Type']>
+  image(device: ConfiguredDevice, signal?: AbortSignal): Promise<CameraImage>
   apiVersions(signal?: AbortSignal): Promise<ReadonlyArray<number>>
   serverDescription(signal?: AbortSignal): Promise<ServerDescription>
   configuredDevices(signal?: AbortSignal): Promise<ReadonlyArray<ConfiguredDevice>>
@@ -49,13 +48,13 @@ interface AlpacaResult {
   ErrorMessage: string
 }
 
-interface AlpacaEnvelope<Value> extends AlpacaResult {
-  Value: Value
-}
+export const cameraImage = Schema.Struct({
+  Rank: Schema.Literal(2),
+  Type: Schema.Literal(2),
+  Value: Schema.Array(Schema.Array(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })))),
+})
 
-function signalReason(signal: AbortSignal): unknown {
-  return signal.reason ?? new DOMException('The operation was aborted', 'AbortError')
-}
+export type CameraImage = typeof cameraImage.Type | ArrayBuffer
 
 export function createAlpacaClient({
   baseUrl,
@@ -73,7 +72,7 @@ export function createAlpacaClient({
     const path = endpoint.split('?')[0]!
     const parts = path.split('/')
 
-    const attributes: Record<string, string | number> = {
+    const attributes: Attributes = {
       'http.request.method': method,
       'url.path': path,
       'alpaca.operation': parts.at(-1)!,
@@ -119,13 +118,13 @@ export function createAlpacaClient({
     operationSignal = signal,
     init?: Omit<RequestInit, 'signal'>,
     timeoutMs = requestTimeoutMs,
-    readBody: (response: Response) => Promise<unknown> = response => response.json(),
+    readBody: (response: Response) => Promise<S['Encoded']> = response => response.json(),
   ): Promise<S['Type']> {
     const controller = new AbortController()
     const span = trace.getActiveSpan()
     let timedOut = false
 
-    const onAbort = () => controller.abort(operationSignal === undefined ? undefined : signalReason(operationSignal))
+    const onAbort = () => controller.abort(operationSignal === undefined ? undefined : (operationSignal.reason ?? new DOMException('The operation was aborted', 'AbortError')))
 
     if (operationSignal?.aborted) {
       onAbort()
@@ -142,7 +141,7 @@ export function createAlpacaClient({
 
     function throwTransportError(cause: unknown): never {
       if (operationSignal?.aborted) {
-        throw signalReason(operationSignal)
+        throw (operationSignal.reason ?? new DOMException('The operation was aborted', 'AbortError'))
       }
 
       if (timedOut) {
@@ -209,7 +208,7 @@ export function createAlpacaClient({
         })
       }
 
-      return decodeResponse(endpoint, schema, json)
+      return decodeResponse(endpoint, schema)(json)
     } finally {
       if (timeout !== undefined) {
         clearTimeout(timeout)
@@ -241,20 +240,21 @@ export function createAlpacaClient({
   function decodeResponse<S extends Schema.ConstraintDecoder<unknown>>(
     endpoint: string,
     schema: S,
-    value: unknown,
-  ): S['Type'] {
-    const startedAt = performance.now()
+  ): ReturnType<typeof Schema.decodeUnknownSync<S>> {
+    return value => {
+      const startedAt = performance.now()
 
-    try {
-      return Schema.decodeUnknownSync(schema)(value)
-    } catch (cause) {
-      throw new AlpacaProviderError(`Alpaca endpoint ${endpoint} returned an invalid response`, {
-        reason: 'invalid-response',
-        endpoint,
-        cause,
-      })
-    } finally {
-      trace.getActiveSpan()?.addEvent('alpaca.response.decode', { 'alpaca.decode.duration_ms': performance.now() - startedAt })
+      try {
+        return Schema.decodeUnknownSync(schema)(value)
+      } catch (cause) {
+        throw new AlpacaProviderError(`Alpaca endpoint ${endpoint} returned an invalid response`, {
+          reason: 'invalid-response',
+          endpoint,
+          cause,
+        })
+      } finally {
+        trace.getActiveSpan()?.addEvent('alpaca.response.decode', { 'alpaca.decode.duration_ms': performance.now() - startedAt })
+      }
     }
   }
 
@@ -265,21 +265,18 @@ export function createAlpacaClient({
   ): Promise<S['Type']> {
     return tracedRequest(endpoint, 'GET', async () => {
       const value = await request(endpoint, Schema.Unknown, operationSignal)
-      const result = decodeResponse(endpoint, alpacaMethodResponse, value) as AlpacaResult
+      const result = decodeResponse(endpoint, alpacaMethodResponse)(value)
       rejectProtocolError(endpoint, result)
 
-      const response = decodeResponse(
-        endpoint,
-        alpacaResponse(valueSchema),
-        value,
-      ) as unknown as AlpacaEnvelope<S['Type']>
+      const envelope = decodeResponse(endpoint, Schema.Struct({ Value: Schema.Unknown }))(value)
+      const decoded = decodeResponse(endpoint, valueSchema)(envelope.Value)
 
       if (['rightascension', 'declination', 'slewing', 'tracking'].includes(endpoint.split('/').at(-1)!)
-        && (typeof response.Value === 'number' || typeof response.Value === 'boolean')) {
-        trace.getActiveSpan()?.setAttribute('alpaca.response.value', response.Value)
+        && Schema.is(Schema.Union([Schema.Number, Schema.Boolean]))(decoded)) {
+        trace.getActiveSpan()?.setAttribute('alpaca.response.value', decoded)
       }
 
-      return response.Value
+      return decoded
     })
   }
 
@@ -308,7 +305,7 @@ export function createAlpacaClient({
           headers: { 'content-type': 'application/x-www-form-urlencoded' },
           body,
         },
-      ) as AlpacaResult
+      )
 
       rejectProtocolError(endpoint, response)
     })
@@ -322,8 +319,8 @@ export function createAlpacaClient({
     command: (device, operation, parameters, operationSignal) =>
       requestCommand(deviceEndpoint(device, operation), new URLSearchParams(parameters), operationSignal),
 
-    readValue: (device, operation, operationSignal) =>
-      requestValue(deviceEndpoint(device, operation), Schema.Unknown, operationSignal),
+    readValue: (device, operation, schema, operationSignal) =>
+      requestValue(deviceEndpoint(device, operation), schema, operationSignal),
 
     image: async (device, operationSignal) => {
       const endpoint = deviceEndpoint(device, 'imagearray')
@@ -356,8 +353,12 @@ export function createAlpacaClient({
           return value
         }
 
-        const result = decodeResponse(endpoint, alpacaMethodResponse, value) as AlpacaResult
+        const result = decodeResponse(endpoint, alpacaMethodResponse)(value)
         rejectProtocolError(endpoint, result)
+
+        if (!Schema.is(cameraImage)(value)) {
+          throw new AlpacaProviderError('Only rank-2 Int32 camera images are supported', { reason: 'invalid-response', endpoint })
+        }
 
         return value
       })

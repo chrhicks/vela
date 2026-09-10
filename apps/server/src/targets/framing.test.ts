@@ -7,7 +7,7 @@ import { angularDistance } from './sky.js'
 
 function deferred<T>() {
   let resolve!: (value: T) => void
-  let reject!: (error: unknown) => void
+  let reject!: (error: Error) => void
   const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no })
 
   return { promise, resolve, reject }
@@ -35,9 +35,11 @@ function workshop() {
   const frame: MonoFrame = { width: 100, height: 80, pixels: new Float64Array(8000), capturedAt: at }
 
   const hardware: FramingHardware = {
-    status: vi.fn(async signal => { signal?.throwIfAborted();
+    status: vi.fn(async signal => {
+      signal?.throwIfAborted()
 
- return { ...mount } }),
+      return { ...mount }
+    }),
     tracking: vi.fn(async (enabled, signal) => { signal.throwIfAborted(); mount.tracking = enabled }),
     slew: vi.fn(async (position, _frame, signal) => {
       signal.throwIfAborted()
@@ -45,9 +47,11 @@ function workshop() {
       mount.rightAscensionDegrees = position.raDegrees
       mount.declinationDegrees = position.decDegrees
     }),
-    capture: vi.fn(async (_seconds, signal) => { signal.throwIfAborted();
+    capture: vi.fn(async (_seconds, signal) => {
+      signal.throwIfAborted()
 
- return frame }),
+      return frame
+    }),
   }
 
   const solver: PlateSolver = { solve: vi.fn(async () => solution()) }
@@ -55,7 +59,7 @@ function workshop() {
   const start = (input: { center?: boolean, configuration?: string } = {}) => {
     const finished = deferred<void>()
     const release = vi.fn(() => finished.resolve())
-    const initial = controller.start({ desired, targetId: 'target', exposureSeconds: 2, configuration: input.configuration ?? 'camera+mount+focal-length', ...(input.center ? { center: true } : {}) }, hardware, solver, release)
+    const initial = controller.start({ desired, targetId: 'target', exposureSeconds: 2, configuration: input.configuration ?? 'camera+mount+focal-length', center: input.center === true }, hardware, solver, release)
 
     return { initial, release, finished: finished.promise }
   }
@@ -71,12 +75,16 @@ describe('framing controller', () => {
     const exposing = deferred<void>()
     const solve = deferred<SolveResult>()
     const solving = deferred<void>()
-    fake.hardware.capture = vi.fn(async () => { exposing.resolve();
+    fake.hardware.capture = vi.fn(async () => {
+      exposing.resolve()
 
- return exposure.promise })
-    fake.solver.solve = vi.fn(async () => { solving.resolve();
+      return exposure.promise
+    })
+    fake.solver.solve = vi.fn(async () => {
+      solving.resolve()
 
- return solve.promise })
+      return solve.promise
+    })
     const run = fake.start()
     await exposing.promise
     expect(fake.controller.snapshot()).toMatchObject({ phase: 'exposing', active: true, actual: null })

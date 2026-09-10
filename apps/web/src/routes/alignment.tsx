@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import type { AlignmentView } from '@vela/model/web'
 import { Badge, Button, Panel } from '@vela/ui'
 import { useEffect, useRef, useState } from 'react'
@@ -18,7 +19,7 @@ function useAlignment(rigId: string) {
     const current = generation.current
 
     try {
-      const next = await api<AlignmentView>(`web/rigs/${encodeURIComponent(rigId)}/alignment`, { signal: AbortSignal.timeout(5000) })
+      const next = await api(`web/rigs/${encodeURIComponent(rigId)}/alignment`, { signal: AbortSignal.timeout(5000) })
       validateView(next, rigId)
 
       if (alive.current && current === generation.current) { setView(next); setOffline(false) }
@@ -51,7 +52,7 @@ function useAlignment(rigId: string) {
     setError(null)
 
     try {
-      const result = await api<AlignmentView>(`rigs/${encodeURIComponent(rigId)}/alignment/${action}`, {
+      const result = await api(`rigs/${encodeURIComponent(rigId)}/alignment/${action}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(15000),
       })
 
@@ -71,21 +72,28 @@ function useAlignment(rigId: string) {
   return { view, offline, pending, error, command }
 }
 
-/** Reject malformed state before it can be shown as a confirmed observation. */
-function validateView(value: AlignmentView, rigId: string) {
-  if (!value || value.rigId !== rigId || typeof value.rigName !== 'string' || typeof value.enabled !== 'boolean'
-    || ![value.error, value.warning, value.unavailableReason].every(text => text === null || typeof text === 'string')
-    || (value.mode !== undefined && !['physical', 'offline'].includes(value.mode))
-    || (value.cameraName !== undefined && typeof value.cameraName !== 'string')
-    || typeof value.active !== 'boolean' || !['setup', 'baseline', 'adjusting', 'stopped', 'finished', 'failed'].includes(value.phase)
-    || !['idle', 'exposing', 'solving', 'homing', 'moving', 'waiting', 'stopping'].includes(value.activity)
-    || !Number.isFinite(value.position) || !Number.isFinite(value.solvedPositions) || !Number.isFinite(value.exposureSeconds)
-    || value.exposureSeconds <= 0 || ![value.measuredAt, value.exposureStartedAt].every(time => time === null || (typeof time === 'string' && Number.isFinite(Date.parse(time))))) throw new Error('Invalid alignment response')
-  const m = value.measurement
+const measurementSchema = z.object({
+  altitudeArcsec: z.number(), azimuthArcsec: z.number(), totalArcsec: z.number(), targetX: z.number(), targetY: z.number(),
+  imageWidth: z.number().positive(), imageHeight: z.number().positive(), fieldHeightDegrees: z.number().positive(),
+  capturedAtSource: z.enum(['camera', 'server-estimate']).optional(), imageUrl: z.string().startsWith('/api/'),
+})
 
-  if (m !== null && (!m || ![m.altitudeArcsec, m.azimuthArcsec, m.totalArcsec, m.targetX, m.targetY, m.imageWidth, m.imageHeight, m.fieldHeightDegrees].every(Number.isFinite)
-    || (m.capturedAtSource !== undefined && !['camera', 'server-estimate'].includes(m.capturedAtSource))
-    || m.imageWidth <= 0 || m.imageHeight <= 0 || m.fieldHeightDegrees <= 0 || typeof m.imageUrl !== 'string' || !m.imageUrl.startsWith('/api/'))) throw new Error('Invalid alignment measurement')
+const alignmentSchema = z.object({
+  rigId: z.string(), rigName: z.string(), enabled: z.boolean(), error: z.string().nullable(), warning: z.string().nullable(), unavailableReason: z.string().nullable(),
+  mode: z.enum(['physical', 'offline']).optional(), cameraName: z.string().optional(), active: z.boolean(),
+  phase: z.enum(['setup', 'baseline', 'adjusting', 'stopped', 'finished', 'failed']),
+  activity: z.enum(['idle', 'exposing', 'solving', 'homing', 'moving', 'waiting', 'stopping']),
+  position: z.number(), solvedPositions: z.number(), exposureSeconds: z.number().positive(),
+  measuredAt: z.string().refine(time => Number.isFinite(Date.parse(time))).nullable(),
+  exposureStartedAt: z.string().refine(time => Number.isFinite(Date.parse(time))).nullable(),
+  measurement: measurementSchema.nullable(),
+})
+
+/** Reject malformed state before it can be shown as a confirmed observation. */
+function validateView(value: unknown, rigId: string): asserts value is AlignmentView {
+  const result = alignmentSchema.safeParse(value)
+
+  if (!result.success || result.data.rigId !== rigId) throw new Error('Invalid alignment response')
 }
 
 function useSolvedMeasurement(view: AlignmentView | null) {
@@ -94,9 +102,12 @@ function useSolvedMeasurement(view: AlignmentView | null) {
   useEffect(() => {
     const measurement = view?.measurement
 
-    if (!measurement) { setSolved(null); setImageError(false);
+    if (!measurement) {
+      setSolved(null)
+      setImageError(false)
 
- return }
+      return
+    }
 
     const next = { measurement, measuredAt: view.measuredAt }
     let current = true
@@ -163,9 +174,11 @@ function AlignmentPage({ rigId }: { rigId: string }) {
   const { view, offline, pending, error, command } = useAlignment(rigId)
   const { solved, imageError } = useSolvedMeasurement(view)
   const [now, setNow] = useState(Date.now())
-  useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 500);
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 500)
 
- return () => clearInterval(timer) }, [])
+    return () => clearInterval(timer)
+  }, [])
   const back = <Link className="vela-rig-page__back" to={`/rigs/${encodeURIComponent(rigId)}/observe`}>← Observe</Link>
 
   if (!view) return <section className="vela-rig-page">{back}<h1>Polar alignment</h1><p role="status">{offline ? 'Alignment state unavailable. Reconnecting…' : 'Loading alignment…'}</p></section>

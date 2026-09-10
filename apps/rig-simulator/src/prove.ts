@@ -1,3 +1,4 @@
+import { z } from 'zod'
 /** Opt-in numerical evidence, not part of the default test suite. */
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
@@ -136,9 +137,10 @@ async function invokeSolver(path: string, hint: Vector) {
 
     return { code: 0, stdout: result.stdout }
   } catch (error) {
-    const failure = error as { code?: number | string, stdout?: string, stderr?: string }
+    const result = z.object({ code: z.number(), stdout: z.string().optional(), stderr: z.string().optional() }).safeParse(error)
 
-    if (typeof failure.code !== 'number') throw error
+    if (!result.success) throw error
+    const failure = result.data
     await writeFile(path.replace(/\.fits$/, '.log'), (failure.stdout ?? '') + (failure.stderr ?? ''))
 
     return { code: failure.code, stdout: failure.stdout ?? '' }

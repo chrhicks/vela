@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import { execFile } from 'node:child_process'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -97,7 +98,9 @@ function runAstap(executable: string, args: string[], signal: AbortSignal, timeo
 
       if (!error) return resolveCode(0)
 
-      if (!error.killed && typeof error.code === 'number') return resolveCode(error.code)
+      const exitCode = z.number().safeParse(error.code)
+
+      if (!error.killed && exitCode.success) return resolveCode(exitCode.data)
       reject(new Error(error.killed ? 'ASTAP timed out' : `ASTAP could not run: ${error.message}`, { cause: error }))
     })
 

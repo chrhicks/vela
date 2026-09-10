@@ -11,9 +11,9 @@ export function observation(state: 'available' | 'complete' | 'unavailable' | 'i
       addedAt: now, lastInventoryAt: now, refreshedAt: now,
       connections: { total: 3, connected: connected ? 3 : 0, disconnected: connected ? 0 : 3, unavailable: 0 },
       capabilities: ['forget'],
-      devices: ['camera', 'focuser', 'telescope'].map((kind, index) => ({
+      devices: (['camera', 'focuser', 'telescope'] as const).map((kind, index) => ({
         id: `${id}-${index}`, name: ['Main camera', 'Focuser', 'Mount'][index]!, configuredName: kind,
-        kind: kind as 'camera' | 'focuser' | 'telescope',
+        kind,
         observedAt: now,
         ...(connected
           ? { connection: 'connected' as const, status: { availability: 'unsupported' as const } }

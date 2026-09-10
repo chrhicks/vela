@@ -1,33 +1,19 @@
-import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { createTestCadence } from './test-cadence.js'
+import { afterEach, expect, it, vi } from 'vitest'
 import type { AlpacaAcquisition, AlpacaFrame } from '@vela/alpaca'
 import { createAlignmentController } from './controller.js'
 import type { MonoFrame, PlateSolver, SkyPosition, SolveResult } from './solver.js'
 
-const cadence = vi.hoisted(() => ({ waits: [] as Array<() => void> }))
-
-vi.mock('node:timers/promises', async importOriginal => ({
-  ...await importOriginal<typeof import('node:timers/promises')>(),
-  setTimeout: (_ms: number, _value: unknown, options: { signal: AbortSignal }) => new Promise<void>((resolve, reject) => {
-    const finish = () => { options.signal.removeEventListener('abort', abort); resolve() }
-
-    const abort = () => {
-      const index = cadence.waits.indexOf(finish)
-
-      if (index >= 0) cadence.waits.splice(index, 1)
-      reject(new DOMException('Stopped', 'AbortError'))
-    }
-
-    options.signal.addEventListener('abort', abort, { once: true })
-
-    if (options.signal.aborted) abort()
-    else cadence.waits.push(finish)
-  }),
-}))
+const cadence = createTestCadence()
 
 function deferred<T>() {
   let resolve!: (value: T) => void
-  let reject!: (error: unknown) => void
-  const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no })
+  let reject!: (cause: unknown) => void
+
+  const promise = new Promise<T>((yes, no) => {
+    resolve = yes
+    reject = no
+  })
 
   return { promise, resolve, reject }
 }
@@ -35,11 +21,12 @@ function deferred<T>() {
 const settings = { endpoint: 'http://simulator', cameraId: 'camera', telescopeId: 'mount',
   executable: '/unused', catalogPath: '/unused', exposureSeconds: 1, fieldHeightDegrees: 3 }
 
-const stops: Array<() => Promise<unknown>> = []
+const stops: Array<ReturnType<typeof createAlignmentController>['stop']> = []
 
-beforeEach(() => { cadence.waits = [] })
-
-afterEach(async () => { await Promise.all(stops.splice(0).map(stop => stop())); expect(cadence.waits).toHaveLength(0) })
+afterEach(async () => {
+  await Promise.all(stops.splice(0).map(stop => stop()))
+  expect(cadence.waits).toHaveLength(0)
+})
 
 function setup() {
   let ra = 10
@@ -81,7 +68,7 @@ function setup() {
     },
   }
 
-  const controller = createAlignmentController({ mode: 'offline', settings, hardware, solver, now: () => 1_700_000_000_000 + (exposures + 1) * 1000 })
+  const controller = createAlignmentController({ mode: 'offline', settings, hardware, solver, waitForNextExposure: cadence.wait, now: () => 1_700_000_000_000 + (exposures + 1) * 1000 })
   stops.push(() => controller.stop())
 
   async function nextSolve() {

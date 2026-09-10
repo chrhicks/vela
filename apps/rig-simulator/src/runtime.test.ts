@@ -123,9 +123,11 @@ describe('coordinate slews and all-sky exposure snapshots', () => {
     let time = 0
     const fields: { raDegrees: number; decDegrees: number; radiusDegrees: number }[] = []
 
-    const runtime = new SimulatorRuntime(async field => { fields.push(field);
+    const runtime = new SimulatorRuntime(async field => {
+      fields.push(field)
 
- return [] }, () => time)
+      return []
+    }, () => time)
 
     runtime.slewTo(18.3, -13.8)
     time = 10000

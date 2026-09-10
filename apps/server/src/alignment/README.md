@@ -136,6 +136,11 @@ not the time a cached preview finished loading.
 
 ## Validation limits
 
+Route tests inject the acquisition, framing, physical alignment, solver and controller
+factories at composition. Controller tests inject the next-exposure pause and preview
+renderer, retaining real cancellation and image rendering without replacing modules.
+Independent coordinate fixtures are parsed as exactly three baseline samples before use.
+
 Default tests use deterministic device/process boundaries and independent
 analytic geometry. The opt-in simulator HTTP proof uses external catalog and
 ASTAP assets. The renderer and solver share a catalog; this verifies integration
