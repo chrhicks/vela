@@ -30,6 +30,8 @@ function observatory() {
     lostStart: false,
     lostMove: false,
     stopFails: false,
+    pendingStopReads: 0,
+    stopping: false,
     cameraStopFails: false,
   }
   const fetch: typeof globalThis.fetch = async (input, init) => {
@@ -57,7 +59,9 @@ function observatory() {
       Value = state.ready
       if (state.starts > 0 && !state.ready) state.pendingReadyReads++
     }
-    else if (operation === 'slewing') Value = state.rate !== 0
+    else if (operation === 'slewing') {
+      Value = state.rate !== 0 || (state.stopping && state.pendingStopReads-- > 0)
+    }
     else if (operation === 'lastexposurestarttime') {
       if (state.stampError) return Response.json({ ClientTransactionID: 0, ServerTransactionID: 1, ErrorNumber: state.stampError, ErrorMessage: 'Timestamp unavailable' })
       Value = state.stamp
@@ -81,6 +85,7 @@ function observatory() {
       state.moves.push(rate)
       if (rate === 0 && state.stopFails) throw new TypeError('Cannot reach mount to stop it')
       state.rate = rate
+      state.stopping = rate === 0
       if (rate !== 0 && state.lostMove) throw new TypeError('Response lost after motion began')
     } else if (operation === 'imagearray') {
       state.imageReads++
@@ -301,6 +306,29 @@ describe('normalized Alpaca acquisition', () => {
     expect(rig.state.aborts).toBe(1)
     expect(rig.state.exposing).toBe(false)
   })
+
+  it('waits for delayed stop telemetry without repeating the stop command', async () => {
+    const rig = observatory()
+    rig.state.pendingStopReads = 3
+    await rig.acquisition.move('mount-id', 1, 0)
+    expect(rig.state.moves).toEqual([1, 0])
+    expect(rig.state.pendingStopReads).toBe(-1)
+  })
+
+  it('waits for delayed stop telemetry during explicit abort', async () => {
+    const rig = observatory()
+    rig.state.pendingStopReads = 2
+    await rig.acquisition.abort('camera-id', 'mount-id')
+    expect(rig.state.moves).toEqual([0])
+    expect(rig.state.pendingStopReads).toBe(-1)
+  })
+
+  it('ends confirmation when the mount keeps reporting movement', async () => {
+    const rig = observatory()
+    rig.state.pendingStopReads = Infinity
+    await expect(rig.acquisition.move('mount-id', 1, 0)).rejects.toThrow('within 5 seconds')
+    expect(rig.state.moves).toEqual([1, 0])
+  }, 8_000)
 
   it('stops motion after a lost start response without replaying movement', async () => {
     const rig = observatory()

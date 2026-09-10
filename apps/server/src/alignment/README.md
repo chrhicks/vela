@@ -38,6 +38,10 @@ uses primary-axis `MoveAxis` only, in bounded increments with observed progress;
 coordinate slews could move DEC to compensate a pointing model and are unsuitable
 for this baseline. A rejected, ambiguous or unexpected move ends the measurement
 without replay. Stop waits for the acquisition adapter's stop confirmation.
+The acquisition adapter allows up to five seconds after an accepted stop command
+for the driver to report motion stopped. Before each physical exposure, alignment
+waits two seconds for settling and rechecks mount state; this initial settling
+allowance does not claim to measure vibration. Cancellation interrupts that pause.
 The mount remains at the last observed position, with its original tracking mode;
 Vela does not return it to the starting field or switch tracking on/off.
 

@@ -1,3 +1,4 @@
+import { setTimeout as delay } from 'node:timers/promises'
 import type { AlpacaAcquisition, AlpacaCameraGeometry, AlpacaFrame, AlpacaFraming, AlpacaTelescopeStatus } from '@vela/alpaca'
 import { fromMount, type Site } from '../astronomy/coordinates.js'
 import { physicalAlignmentSample, projectPhysicalAlignmentTarget } from './physical-coordinates.js'
@@ -57,6 +58,9 @@ export function createPhysicalAlignment(settings: PhysicalAlignmentSettings, acq
   }
 
   async function pointing(signal: AbortSignal) {
+    await status(signal)
+    // Stopped telemetry does not establish that vibration has settled.
+    await delay(2_000, undefined, { signal })
     const current = await status(signal)
     const observed = await device.cameraGeometry({ cameraId: settings.cameraId, expectedCameraName: settings.cameraName }, signal)
     if (JSON.stringify(observed) !== JSON.stringify(geometry)) throw new Error('Camera geometry changed. Measure a new baseline.')
