@@ -30,18 +30,23 @@ it.each(['application/json', 'application/imagebytes'])('bounds %s image transfe
 it('negotiates ImageBytes and uses the actual response Content-Type for JSON fallback', async () => {
   const camera = { DeviceName: 'Camera', DeviceType: 'Camera', DeviceNumber: 0, UniqueID: 'camera' }
   const json = { ErrorNumber: 0, ErrorMessage: '', ClientTransactionID: 0, ServerTransactionID: 1, Type: 2, Rank: 2, Value: [[7]] }
+  const bytes = new ArrayBuffer(46)
+  const metadata = new DataView(bytes)
+  const fields = [1, 0, 0, 1, 44, 2, 8, 2, 1, 1, 0]
+  fields.forEach((value, index) => metadata.setInt32(index * 4, value, true))
+  metadata.setUint16(44, 7, true)
   for (const binary of [true, false]) {
     let requests = 0
     const fetch: typeof globalThis.fetch = async (_input, init) => {
       requests++
       expect(new Headers(init?.headers).get('accept')).toBe('application/imagebytes, application/json;q=0.9')
       return binary
-        ? new Response(new Uint8Array([1, 2, 3]), { headers: { 'content-type': 'Application/ImageBytes; version=1' } })
+        ? new Response(bytes, { headers: { 'content-type': 'Application/ImageBytes; version=1' } })
         : Response.json(json)
     }
     const client = createAlpacaClient({ baseUrl: 'http://fake', fetch })
     const result = await client.image(camera)
-    expect(binary ? Array.from(new Uint8Array(result as ArrayBuffer)) : result).toEqual(binary ? [1, 2, 3] : json)
+    expect(binary ? Array.from(new Uint8Array(result as ArrayBuffer)) : result).toEqual(binary ? Array.from(new Uint8Array(bytes)) : json)
     expect(requests).toBe(1)
   }
 })
