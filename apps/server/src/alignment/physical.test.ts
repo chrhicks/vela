@@ -135,7 +135,7 @@ describe('physical alignment sweep', () => {
   it.each([0, 4])('rejects absent or excessive probe response (motor multiplier %s)', async sign => {
     const fake = observatory(sign)
     await fake.alignment.prepare(signal)
-    await expect(fake.alignment.move(signal)).rejects.toThrow('direction probe')
+    await expect(fake.alignment.move(signal)).rejects.toThrow('RA direction check expected')
     expect(fake.acquisition.move).toHaveBeenCalledTimes(1)
   })
 
@@ -149,7 +149,7 @@ describe('physical alignment sweep', () => {
       if (moves === 2 && fault === 'declination') fake.mount.declinationDegrees += 0.2
     }
     await fake.alignment.prepare(signal)
-    await expect(fake.alignment.move(signal)).rejects.toThrow('RA-only sweep')
+    await expect(fake.alignment.move(signal)).rejects.toThrow('RA sweep expected')
     expect(fake.acquisition.move).toHaveBeenCalledTimes(2)
   })
 
