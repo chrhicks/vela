@@ -199,6 +199,12 @@ completion; it does not substitute for plate-solved pointing accuracy.
 A failed or cancelled slew independently sends `AbortSlew` and confirms stopping,
 with a cleanup deadline of at most 15 seconds. No command is blindly retried.
 A lost slew response remains an error even after stopping is confirmed.
+`home(telescopeId, signal)` requires a connected, unparked, idle telescope with
+`CanFindHome=true`. It sends `FindHome` once and waits for both `Slewing=false`
+and `AtHome=true` within the same slew deadline. Passing through home during
+motion is not completion. Failed or cancelled homing uses the same independent
+abort and stop confirmation; a lost response is never replayed. Tracking
+restoration belongs to the calling workflow, not this capability.
 `AlpacaFramingStoppedError` identifies cancellation only after successful cleanup;
 an unconfirmed stop remains a failure. `abortTelescope(telescopeId)` provides the
 same independent stop without touching a camera. Factory options expose request,

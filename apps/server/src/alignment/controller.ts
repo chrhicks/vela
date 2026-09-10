@@ -105,8 +105,10 @@ export function createAlignmentController(settings: AlignmentSettings, hardware:
 
   async function run(signal: AbortSignal) {
     if (physical) {
+      patch({ activity: 'homing' })
       fieldHeightDegrees = (await physical.prepare(signal)).fieldHeightDegrees
       activeSolver = typeof solver === 'function' ? solver(fieldHeightDegrees) : solver
+      patch({ activity: 'waiting' })
     } else {
       const initial = await hardware.pointing(settings.telescopeId, signal)
       if (initial.coordinateSystem !== 'j2000' || !initial.tracking) throw new Error('The configured simulator’s J2000 frame and tracking are required')

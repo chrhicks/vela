@@ -56,12 +56,12 @@ function BaselinePreview({ phase, physical, onStart, onStop }: {
             <p>{step.solved} of 3 positions solved · Alignment error not yet available</p>
           </div>
         ) : (
-          <dl className="vela-polar-setup-facts"><div><dt>Camera</dt><dd>{physical ? 'ASI2600MC Pro' : 'Main imaging camera'}</dd></div><div><dt>Exposure</dt><dd>30 seconds</dd></div><div><dt>Starting point</dt><dd>{physical ? 'Current prepared sky patch' : 'Current position'}</dd></div></dl>
+          <dl className="vela-polar-setup-facts"><div><dt>Camera</dt><dd>{physical ? 'ASI2600MC Pro' : 'Main imaging camera'}</dd></div><div><dt>Exposure</dt><dd>30 seconds</dd></div><div><dt>Starting point</dt><dd>{physical ? 'Mount home position' : 'Current position'}</dd></div></dl>
         )}
       </Panel>
       <div className="vela-polar-baseline__next">
         <h3>{step ? 'What happens next' : 'Before you start'}</h3>
-        <p>{step ? 'After the third solve, the adjustment view will show your alignment error and the target reticle.' : physical ? 'Prepare a clear sky patch and a clear movement corridor: Vela checks RA direction within 1° on either side, then rotates RA westward in two roughly 18° steps. Allow up to 40° total westward movement.' : 'Point toward a clear patch of sky. Starting measurement will move the telescope through three positions along its rotation axis.'}</p>
+        <p>{step ? 'After the third solve, the adjustment view will show your alignment error and the target reticle.' : physical ? 'Each attempt returns the mount home before taking images. Prepare a clear movement corridor: Vela checks RA direction within 1° on either side, then rotates RA westward in two roughly 18° steps. Allow up to 40° total westward movement.' : 'Point toward a clear patch of sky. Starting measurement will move the telescope through three positions along its rotation axis.'}</p>
         <p>{step ? 'You can stop the measurement at any time.' : physical ? 'Use sidereal tracking. Keep the mount’s adjustment knobs still until all three positions are measured. You can stop at any time.' : 'Leave room for the movement, and keep the adjustment knobs still until measurement finishes.'}</p>
         <Button size="large" tone={step ? 'neutral' : 'accent'} onClick={step ? onStop : onStart}>{step ? 'Stop measurement' : stopped ? 'Start again' : 'Start measurement'}</Button>
       </div>
