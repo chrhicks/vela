@@ -9,6 +9,10 @@
     "start": "node dist/server.js"
   },
   "dependencies": {
+    "@opentelemetry/api": "1.9.1",
+    "@opentelemetry/core": "2.11.0",
+    "@opentelemetry/resources": "2.11.0",
+    "@opentelemetry/sdk-trace-node": "2.11.0",
     "@vela/alpaca": "workspace:*",
     "@vela/model": "workspace:*",
     "astronomy-engine": "2.1.19",

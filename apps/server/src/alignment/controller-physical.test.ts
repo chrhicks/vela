@@ -53,6 +53,7 @@ function setup() {
   const captures: AlpacaCaptureOptions[] = []
   const requests: Array<{ index: number, complete: () => void }> = []
   const hardware: AlpacaAcquisition = {
+    rotateRightAscension: async () => { throw new Error('Unexpected physical rotation') },
     capture: vi.fn(async options => {
       captures.push(options)
       const frame = frames[exposures++]!
@@ -159,4 +160,17 @@ it('retains the previous solved image and timestamp when external movement inval
   await vi.waitFor(() => expect(subject.controller.active()).toBe(false))
   expect(subject.controller.snapshot()).toMatchObject({ phase: 'failed', measuredAt: previous.measuredAt, measurement: previous.measurement })
   expect(subject.controller.image(previousImageId)).toBe(previousImage)
+})
+
+it('shows homing and permits Stop before any exposure begins', async () => {
+  const subject = setup()
+  vi.mocked(subject.physical.prepare).mockImplementation(signal => new Promise((_resolve, reject) => {
+    signal.addEventListener('abort', () => reject(new DOMException('Stopped', 'AbortError')), { once: true })
+  }))
+  await subject.controller.start('physical', 'Physical rig')
+  expect(subject.controller.snapshot()).toMatchObject({ active: true, activity: 'homing' })
+  expect(subject.hardware.capture).not.toHaveBeenCalled()
+  await subject.controller.stop()
+  expect(subject.controller.snapshot()).toMatchObject({ active: false, phase: 'stopped' })
+  expect(subject.hardware.capture).not.toHaveBeenCalled()
 })

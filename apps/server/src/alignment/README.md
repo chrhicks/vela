@@ -30,21 +30,46 @@ name is checked before each exposure. The saved effective focal length and
 observed pixel size, binning and subframe determine the ASTAP field. Color Bayer
 pixels remain intact for solving; the preview is debayered for display.
 
-Prepare a clear sky patch and movement corridor before Start. The first image
-is taken at the current pointing. A small primary-axis probe establishes the
-driver's mechanical sign; the subsequent two positions are approximately 18°
-and 36° westward in RA. Allow 1° on either side for the direction check. Motion
-uses primary-axis `MoveAxis` only, in bounded increments with observed progress;
-coordinate slews could move DEC to compensate a pointing model and are unsuitable
-for this baseline. A rejected, ambiguous or unexpected move ends the measurement
-without replay. Stop waits for the acquisition adapter's stop confirmation.
-The mount remains at the last observed position, with its original tracking mode;
-Vela does not return it to the starting field or switch tracking on/off.
+Prepare a clear view around home, the starting field and the movement corridor
+before Start. Every physical attempt first homes the mount, confirms completion,
+and restores tracking, then slews to Dec +80° and RA equal to local sidereal time
+plus 130°. This consistent starting field is outside the baseline; preparation
+does not change the mount's altitude or azimuth knob adjustments. A view along
+the mechanical pole cannot establish a rotation baseline. The preparation endpoint
+is checked before the reference is set. Stop and failures leave the mount where
+it stopped; only a new attempt homes again.
+
+A nominal 0.25° primary-axis probe establishes the driver's mechanical sign. The two
+baseline legs each target roughly 54° westward in RA, accepting 54–60° of observed
+final travel per leg, including the probe's displacement. Allow up to 120° total
+westward travel and 1° on either side for the direction check. The starting field
+leaves a nominal margin of at least 10° before the meridian after that travel at
+preparation time; this margin shrinks as time passes while tracking.
+
+Each leg uses one continuous primary-axis `MoveAxis` rotation at 1° per second,
+with a feedback stop based on observed RA travel and a bounded timeout. The
+slower rate leaves room for delayed position reads and stopping travel within
+the same endpoint corridor; two nominal legs take about two minutes plus imaging
+and settling. A deadline covers in-flight requests, not just the gap between
+polls. It bounds the software operation but does not guarantee instantaneous
+physical stopping. Coordinate
+slews could move DEC to compensate a pointing model and are unsuitable for this
+baseline. A rejected, ambiguous or unexpected move ends the measurement without
+replay. Stop waits for the acquisition adapter's stop confirmation. The acquisition
+adapter allows up to five seconds after an accepted stop command for the driver
+to report motion stopped. Before each 2-second physical exposure, alignment waits
+three seconds for settling and rechecks mount state; this settling allowance does
+not claim to measure vibration. Cancellation interrupts that pause. The mount
+remains at the last observed position, with tracking enabled after successful
+preparation. An interrupted or failed homing may leave tracking off; Vela does not
+claim it was restored.
 
 This trial requires topocentric mount coordinates, a northern site (0–85°),
-known pointing side, an idle unparked mount, and sidereal tracking with zero RA
-and DEC rate offsets. Unsupported observations are not treated as success.
-Tracking, pointing side, site and unexpected pointing changes are checked around
+an idle unparked mount, and sidereal mode with zero RA
+and DEC rate offsets. Tracking may be off when preparation begins because Home
+can turn it off and preparation restores it. Tracking must be confirmed enabled
+after preparation and throughout measurement. Unsupported observations are not treated as success.
+Tracking, changes between known pointing sides, site and unexpected pointing changes are checked around
 capture/motion and again before publishing a result. Camera geometry changes
 require a fresh baseline. Do not move the mount through another controller
 during measurement. Only the altitude and azimuth adjustments belong in the

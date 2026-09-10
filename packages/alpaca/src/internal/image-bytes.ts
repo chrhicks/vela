@@ -1,7 +1,7 @@
 import { AlpacaProviderError } from '../error.js'
 
-/** Decode ImageBytes v1 without expanding the binary payload into nested JS arrays. */
-export function imageBytesPixels(bytes: ArrayBuffer, width: number, height: number): Float64Array {
+/** Validate the envelope before treating an HTTP 200 image transfer as successful. */
+export function imageBytesMetadata(bytes: ArrayBuffer): DataView {
   function invalid(message: string): never {
     throw new AlpacaProviderError(message, { reason: 'invalid-response', endpoint: 'imagearray' })
   }
@@ -28,6 +28,16 @@ export function imageBytesPixels(bytes: ArrayBuffer, width: number, height: numb
       errorNumber,
     })
   }
+  return view
+}
+
+/** Decode ImageBytes v1 without expanding the binary payload into nested JS arrays. */
+export function imageBytesPixels(bytes: ArrayBuffer, width: number, height: number): Float64Array {
+  function invalid(message: string): never {
+    throw new AlpacaProviderError(message, { reason: 'invalid-response', endpoint: 'imagearray' })
+  }
+  const view = imageBytesMetadata(bytes)
+  const dataStart = view.getInt32(16, true)
   if (view.getInt32(20, true) !== 2 || view.getInt32(28, true) !== 2 || view.getInt32(40, true) !== 0) {
     invalid('Only rank-2 Int32 ImageBytes images are supported')
   }

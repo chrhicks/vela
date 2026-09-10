@@ -1,4 +1,5 @@
 import { setTimeout as delay } from 'node:timers/promises'
+import { SpanStatusCode, trace } from '@opentelemetry/api'
 import { AlpacaProviderError } from './error.js'
 import { imageBytesPixels } from './internal/image-bytes.js'
 import { createAlpacaClient } from './internal/client.js'
@@ -61,6 +62,8 @@ export interface AlpacaAcquisition {
   capture(options: AlpacaCaptureOptions): Promise<AlpacaFrame>
   pointing(telescopeId: string, signal?: AbortSignal): Promise<AlpacaPointing>
   move(telescopeId: string, rateDegreesPerSecond: number, durationSeconds: number, signal?: AbortSignal): Promise<void>
+  /** Rotate the primary axis until observed RA reaches the signed angular travel. */
+  rotateRightAscension(telescopeId: string, rateDegreesPerSecond: number, distanceDegrees: number, signal?: AbortSignal): Promise<void>
   abort(cameraId: string, telescopeId: string): Promise<void>
 }
 
@@ -107,9 +110,45 @@ export function createAlpacaAcquisition({ baseUrl, fetch = globalThis.fetch, req
     return found
   }
 
+  async function stopTelescope(telescope: ConfiguredDevice) {
+    // Cleanup is independent of the caller's cancellation. Never replay motion.
+    const span = trace.getActiveSpan()
+    span?.addEvent('alpaca.stop.requested')
+    await client.command(telescope, 'moveaxis', { Axis: '0', Rate: '0' })
+    span?.addEvent('alpaca.stop.acknowledged')
+    const confirmation = AbortSignal.timeout(5_000)
+    try {
+      while (await client.readBoolean(telescope, 'slewing', confirmation)) {
+        await delay(100, undefined, { signal: confirmation })
+      }
+      span?.addEvent('alpaca.stop.confirmed')
+    } catch (error) {
+      if (confirmation.aborted) throw new Error('Telescope did not confirm movement stopped within 5 seconds')
+      throw error
+    }
+  }
+
   async function stopCamera(camera: ConfiguredDevice) {
     await client.command(camera, 'abortexposure', {})
     if (await client.readNumber(camera, 'camerastate') !== 0) throw new Error('Camera did not confirm exposure stopped')
+  }
+
+  async function primaryAxis(telescopeId: string, rate: number, signal?: AbortSignal) {
+    bounded(rate, -10, 10, 'axis rate')
+    const telescope = await device(telescopeId, 'telescope', signal)
+    if (!(await client.connected(telescope, signal))) throw new Error('Telescope is disconnected')
+    if (!(await client.readBoolean(telescope, 'canmoveaxis?Axis=0', signal))) throw new Error('Telescope cannot move its primary axis')
+    if (await client.readBoolean(telescope, 'slewing', signal)) throw new Error('Telescope is already moving')
+    const ranges = await client.readValue(telescope, 'axisrates?Axis=0', signal)
+    if (!Array.isArray(ranges) || ranges.some(range => typeof range !== 'object' || range === null || !Number.isFinite(range.Minimum) || !Number.isFinite(range.Maximum) || range.Minimum < 0 || range.Maximum < range.Minimum)) invalid('Invalid axis rate ranges', 'axisrates')
+    if (rate !== 0 && !ranges.some(range => Math.abs(rate) >= range.Minimum && Math.abs(rate) <= range.Maximum)) throw new Error('Requested rate is not supported by telescope')
+    return telescope
+  }
+
+  async function rightAscension(telescope: ConfiguredDevice, signal?: AbortSignal) {
+    const hours = bounded(await client.readNumber(telescope, 'rightascension', signal), 0, 24, 'right ascension')
+    if (hours === 24) invalid('Hours must be less than 24', 'rightascension')
+    return hours * 15
   }
 
   async function frameColor(camera: ConfiguredDevice, monochromeOnly: boolean, signal?: AbortSignal): Promise<AlpacaFrameColor> {
@@ -220,33 +259,81 @@ export function createAlpacaAcquisition({ baseUrl, fetch = globalThis.fetch, req
     },
 
     async move(telescopeId, rateDegreesPerSecond, durationSeconds, signal) {
-      bounded(rateDegreesPerSecond, -10, 10, 'axis rate')
       bounded(durationSeconds, 0, 120, 'movement duration')
-      const telescope = await device(telescopeId, 'telescope', signal)
-      if (!(await client.connected(telescope, signal))) throw new Error('Telescope is disconnected')
-      if (!(await client.readBoolean(telescope, 'canmoveaxis?Axis=0', signal))) throw new Error('Telescope cannot move its primary axis')
-      if (await client.readBoolean(telescope, 'slewing', signal)) throw new Error('Telescope is already moving')
-      const ranges = await client.readValue(telescope, 'axisrates?Axis=0', signal)
-      if (!Array.isArray(ranges) || ranges.some(range => typeof range !== 'object' || range === null || !Number.isFinite(range.Minimum) || !Number.isFinite(range.Maximum) || range.Minimum < 0 || range.Maximum < range.Minimum)) invalid('Invalid axis rate ranges', 'axisrates')
-      if (rateDegreesPerSecond !== 0 && !ranges.some(range => Math.abs(rateDegreesPerSecond) >= range.Minimum && Math.abs(rateDegreesPerSecond) <= range.Maximum)) throw new Error('Requested rate is not supported by telescope')
+      const telescope = await primaryAxis(telescopeId, rateDegreesPerSecond, signal)
       signal?.throwIfAborted()
       try {
         await client.command(telescope, 'moveaxis', { Axis: '0', Rate: String(rateDegreesPerSecond) }, signal)
         await delay(durationSeconds * 1000, undefined, signal === undefined ? {} : { signal })
       } finally {
         // The user's cancellation must not cancel the stop command.
-        await client.command(telescope, 'moveaxis', { Axis: '0', Rate: '0' })
-        if (await client.readBoolean(telescope, 'slewing')) throw new Error('Telescope did not confirm movement stopped')
+        await stopTelescope(telescope)
       }
+    },
+
+    async rotateRightAscension(telescopeId, rateDegreesPerSecond, distanceDegrees, signal) {
+      return trace.getTracer('@vela/alpaca').startActiveSpan('alpaca.rotate_right_ascension', { attributes: {
+        'alpaca.device.id': telescopeId,
+        'alpaca.motion.rate_degrees_per_second': rateDegreesPerSecond,
+        'alpaca.motion.distance_degrees': distanceDegrees,
+      } }, async span => {
+        try {
+          bounded(distanceDegrees, -120, 120, 'RA travel')
+          if (distanceDegrees === 0 || rateDegreesPerSecond === 0) throw new RangeError('RA travel and rate must be nonzero')
+          const telescope = await primaryAxis(telescopeId, rateDegreesPerSecond, signal)
+          const start = await rightAscension(telescope, signal)
+          const duration = Math.min(120_000, Math.abs(distanceDegrees / rateDegreesPerSecond) * 2000 + 2000)
+          signal?.throwIfAborted()
+          span.setAttributes({ 'alpaca.ra.start_degrees': start, 'alpaca.motion.timeout_ms': duration })
+          const deadline = performance.now() + duration
+          const timeoutError = new Error('Telescope did not reach the requested RA travel before timeout')
+          const timeout = new AbortController()
+          const motionSignal = signal === undefined ? timeout.signal : AbortSignal.any([signal, timeout.signal])
+          const timer = setTimeout(() => timeout.abort(timeoutError), Math.ceil(duration))
+          function requireActiveMotion() {
+            // Also check elapsed time after a response: a delayed event loop may
+            // deliver the response before the expired timer callback runs.
+            if (performance.now() >= deadline) timeout.abort(timeoutError)
+            motionSignal.throwIfAborted()
+          }
+          try {
+            requireActiveMotion()
+            await client.command(telescope, 'moveaxis', { Axis: '0', Rate: String(rateDegreesPerSecond) }, motionSignal)
+            requireActiveMotion()
+            while (true) {
+              await delay(100, undefined, { signal: motionSignal })
+              requireActiveMotion()
+              const current = await rightAscension(telescope, motionSignal)
+              requireActiveMotion()
+              const travelled = (((current - start + 540) % 360) - 180) * Math.sign(distanceDegrees)
+              if (travelled < -1) throw new Error('Telescope RA moved in the opposite direction')
+              if (travelled >= Math.abs(distanceDegrees)) {
+                span.addEvent('alpaca.rotation.threshold', { 'alpaca.ra.degrees': current, 'alpaca.ra.travelled_degrees': travelled })
+                break
+              }
+            }
+          } catch (error) {
+            if (motionSignal.aborted) throw motionSignal.reason
+            throw error
+          } finally {
+            clearTimeout(timer)
+            await stopTelescope(telescope)
+          }
+          span.setStatus({ code: SpanStatusCode.OK })
+        } catch (error) {
+          span.recordException(error instanceof Error ? error : String(error))
+          span.setStatus({ code: SpanStatusCode.ERROR })
+          throw error
+        } finally {
+          span.end()
+        }
+      })
     },
 
     async abort(cameraId, telescopeId) {
       const results = await Promise.allSettled([
         device(cameraId, 'camera').then(stopCamera),
-        device(telescopeId, 'telescope').then(async telescope => {
-          await client.command(telescope, 'moveaxis', { Axis: '0', Rate: '0' })
-          if (await client.readBoolean(telescope, 'slewing')) throw new Error('Telescope did not confirm movement stopped')
-        }),
+        device(telescopeId, 'telescope').then(stopTelescope),
       ])
       const errors = results.filter(result => result.status === 'rejected').map(result => result.reason as unknown)
       if (errors.length > 0) throw new AggregateError(errors, 'Could not confirm acquisition stopped')

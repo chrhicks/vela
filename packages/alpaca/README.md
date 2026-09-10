@@ -142,6 +142,17 @@ coordinate frames its workflow supports.
   `Slewing=false`. Mechanical rate sign is mount-dependent, not a promise of
   increasing/decreasing sky RA. This narrow operation allows at most 120
   seconds and rates up to 10 degrees/second.
+- `rotateRightAscension(telescopeId, rateDegreesPerSecond, signedDistanceDegrees,
+  signal)` uses one continuous primary-axis rotation and stops when observed RA
+  travel reaches the requested signed distance. The mechanical rate and sky RA
+  distance have separate signs; the caller establishes the mount's direction.
+  A monotonic deadline independently cancels pending start/RA requests and body
+  reads. A response arriving after the deadline cannot satisfy the threshold.
+  Cleanup uses its own request budget to send rate zero and confirm stopping;
+  its failure takes precedence over cancellation or deadline errors. JavaScript
+  scheduling and remote command handling still limit physical stop latency. Rejected, ambiguous, failed or cancelled motion is never replayed.
+  The physical alignment trial uses this capability for its long rotations;
+  timed `move` remains available for the direction probe and offline simulator.
 - `abort(cameraId, telescopeId)` attempts both stop operations independently
   and reports failures rather than claiming that both devices stopped.
 
@@ -199,6 +210,12 @@ completion; it does not substitute for plate-solved pointing accuracy.
 A failed or cancelled slew independently sends `AbortSlew` and confirms stopping,
 with a cleanup deadline of at most 15 seconds. No command is blindly retried.
 A lost slew response remains an error even after stopping is confirmed.
+`home(telescopeId, signal)` requires a connected, unparked, idle telescope with
+`CanFindHome=true`. It sends `FindHome` once and waits for both `Slewing=false`
+and `AtHome=true` within the same slew deadline. Passing through home during
+motion is not completion. Failed or cancelled homing uses the same independent
+abort and stop confirmation; a lost response is never replayed. Tracking
+restoration belongs to the calling workflow, not this capability.
 `AlpacaFramingStoppedError` identifies cancellation only after successful cleanup;
 an unconfirmed stop remains a failure. `abortTelescope(telescopeId)` provides the
 same independent stop without touching a camera. Factory options expose request,
@@ -206,3 +223,12 @@ slew, and polling intervals for deterministic boundary tests.
 
 Protocol contracts are the [ASCOM telescope interface](https://ascom-standards.org/newdocs/telescope.html)
 and [ASCOM camera interface](https://ascom-standards.org/newdocs/camera.html).
+
+## Request tracing
+
+The adapter emits manual OpenTelemetry spans through the API only; the hosting
+server owns provider/export configuration. Without a registered provider this is
+a no-op. Request spans include transport stage timings, device/command identity
+and protocol outcomes, including ALPACA errors returned with HTTP 200. Image
+payloads are excluded. See [local tracing](../../docs/local-tracing.md) for the
+server configuration and incremental inspection workflow.
