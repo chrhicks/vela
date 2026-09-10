@@ -107,6 +107,20 @@ export function createAlpacaAcquisition({ baseUrl, fetch = globalThis.fetch, req
     return found
   }
 
+  async function stopTelescope(telescope: ConfiguredDevice) {
+    // Cleanup is independent of the caller's cancellation. Never replay motion.
+    await client.command(telescope, 'moveaxis', { Axis: '0', Rate: '0' })
+    const confirmation = AbortSignal.timeout(5_000)
+    try {
+      while (await client.readBoolean(telescope, 'slewing', confirmation)) {
+        await delay(100, undefined, { signal: confirmation })
+      }
+    } catch (error) {
+      if (confirmation.aborted) throw new Error('Telescope did not confirm movement stopped within 5 seconds')
+      throw error
+    }
+  }
+
   async function stopCamera(camera: ConfiguredDevice) {
     await client.command(camera, 'abortexposure', {})
     if (await client.readNumber(camera, 'camerastate') !== 0) throw new Error('Camera did not confirm exposure stopped')
@@ -235,18 +249,14 @@ export function createAlpacaAcquisition({ baseUrl, fetch = globalThis.fetch, req
         await delay(durationSeconds * 1000, undefined, signal === undefined ? {} : { signal })
       } finally {
         // The user's cancellation must not cancel the stop command.
-        await client.command(telescope, 'moveaxis', { Axis: '0', Rate: '0' })
-        if (await client.readBoolean(telescope, 'slewing')) throw new Error('Telescope did not confirm movement stopped')
+        await stopTelescope(telescope)
       }
     },
 
     async abort(cameraId, telescopeId) {
       const results = await Promise.allSettled([
         device(cameraId, 'camera').then(stopCamera),
-        device(telescopeId, 'telescope').then(async telescope => {
-          await client.command(telescope, 'moveaxis', { Axis: '0', Rate: '0' })
-          if (await client.readBoolean(telescope, 'slewing')) throw new Error('Telescope did not confirm movement stopped')
-        }),
+        device(telescopeId, 'telescope').then(stopTelescope),
       ])
       const errors = results.filter(result => result.status === 'rejected').map(result => result.reason as unknown)
       if (errors.length > 0) throw new AggregateError(errors, 'Could not confirm acquisition stopped')

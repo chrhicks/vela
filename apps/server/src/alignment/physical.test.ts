@@ -50,6 +50,28 @@ describe('physical alignment sweep', () => {
     await expect(fake.alignment.pointing(signal)).resolves.toMatchObject({ latitude: 39 })
   })
 
+  it('allows cancellation during settling before reading exposure pointing', async () => {
+    const fake = observatory()
+    await fake.alignment.prepare(signal)
+    const controller = new AbortController()
+    const pending = fake.alignment.pointing(controller.signal)
+    const rejection = expect(pending).rejects.toThrow()
+    await vi.waitFor(() => expect(fake.device.telescopeStatus).toHaveBeenCalledTimes(2))
+    controller.abort()
+    await rejection
+    expect(fake.device.cameraGeometry).toHaveBeenCalledTimes(1)
+  })
+
+  it('rechecks mount state after settling', async () => {
+    const fake = observatory()
+    await fake.alignment.prepare(signal)
+    const pending = fake.alignment.pointing(signal)
+    const rejection = expect(pending).rejects.toThrow('tracking enabled')
+    await vi.waitFor(() => expect(fake.device.telescopeStatus).toHaveBeenCalledTimes(2))
+    fake.mount.tracking = false
+    await rejection
+  })
+
   it.each([-1, 1])('observes mechanical sign %s and completes two westward 18-degree steps through RA wrap', async sign => {
     const fake = observatory(sign)
     await fake.alignment.prepare(signal)
