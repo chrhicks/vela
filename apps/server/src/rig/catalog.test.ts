@@ -13,7 +13,9 @@ import {
 } from './catalog.js'
 
 const endpointA: RigEndpoint = { host: '192.168.4.104', port: 11111 }
+
 const endpointB: RigEndpoint = { host: 'ascom-remote.local', port: 11111 }
+
 const validCatalog = `rigs:
   - id: rig-1
     name: Backyard rig
@@ -59,12 +61,14 @@ function record(
 
 async function catalogPath() {
   const directory = await mkdtemp(join(tmpdir(), 'vela-rig-catalog-'))
+
   return join(directory, 'rigs.yaml')
 }
 
 describe('file Rig catalog', () => {
   it('keeps effective focal length across restart and rejects malformed saved optics', async () => {
     const path = await catalogPath()
+
     try {
       await writeFile(path, validCatalog)
       const catalog = await openFileRigCatalog(path)
@@ -79,6 +83,7 @@ describe('file Rig catalog', () => {
   it('starts empty when the file is missing and survives a restart after the first add', async () => {
     const path = await catalogPath()
     const observed = inventory('2026-09-02T20:00:00.000Z', { uniqueId: 'camera-1' })
+
     const catalog = await openFileRigCatalog(path, {
       createId: () => 'rig-1',
       now: () => new Date('2026-09-02T20:01:00.000Z'),
@@ -145,10 +150,12 @@ describe('file Rig catalog', () => {
 
   it('rejects invalid observed inventory without corrupting the file', async () => {
     const path = await catalogPath()
+
     const originalInventory = inventory(
       '2026-09-02T20:00:00.000Z',
       { uniqueId: 'camera-1' },
     )
+
     const catalog = await openFileRigCatalog(path, { createId: () => 'rig-1' })
     await catalog.add({
       name: 'Backyard rig',
@@ -207,6 +214,7 @@ describe('file Rig catalog', () => {
   it('serializes concurrent additions without losing either Rig', async () => {
     const path = await catalogPath()
     let nextId = 0
+
     const catalog = await openFileRigCatalog(path, {
       createId: () => `rig-${++nextId}`,
     })
@@ -271,8 +279,10 @@ describe('Rig catalog reconciliation', () => {
       endpointA,
       inventory('2026-09-01T20:00:00.000Z', { uniqueId: 'camera-a', name: 'Old name' }),
     )
+
     const catalog = createMemoryRigCatalog([original])
     const nextEndpoint = { host: '192.168.4.120', port: 32323 }
+
     const nextInventory = inventory(
       '2026-09-02T20:00:00.000Z',
       { uniqueId: 'camera-a', name: 'Main camera' },
@@ -312,6 +322,7 @@ describe('Rig catalog reconciliation', () => {
       record('rig-a', endpointA, inventory('2026-09-01T20:00:00.000Z', { uniqueId: 'camera-a' })),
       record('rig-b', endpointB, inventory('2026-09-01T20:00:00.000Z', { uniqueId: 'camera-b' })),
     ]
+
     const catalog = createMemoryRigCatalog(records)
 
     await expect(catalog.observe(

@@ -7,9 +7,11 @@ import type { ComponentSpecimen } from '../themes'
 import { Dialog } from './Dialog'
 
 const views = ['start', 'manual', 'scanning', 'results', 'review', 'dismissed', 'complete'] as const
+
 const scenarios = ['mixed', 'single', 'empty', 'scan-failed'] as const
 
 type DiscoveryView = (typeof views)[number]
+
 type ResultScenario = (typeof scenarios)[number]
 
 const devices = [
@@ -71,6 +73,7 @@ function DiscoveryDialogPreview({ props, onPropsChange }: PreviewProps) {
 
   useLayoutEffect(() => {
     currentView.current = view
+
     if (view !== 'scanning') {
       scanGeneration.current += 1
       window.clearTimeout(scanTimer.current)
@@ -122,6 +125,7 @@ function DiscoveryDialogPreview({ props, onPropsChange }: PreviewProps) {
   }[open ? view : 'start']
 
   let footer
+
   if (view === 'manual') {
     footer = (
       <>

@@ -56,6 +56,7 @@ afterEach(() => {
 describe('createAlpacaProvider', () => {
   it('returns normalized devices without exposing wire fields', async () => {
     const requests: string[] = []
+
     const provider = createAlpacaProvider({
       baseUrl: 'http://alpaca.test/',
       fetch: fakeFetch({
@@ -184,6 +185,7 @@ describe('createAlpacaProvider', () => {
 
   it('times out a stalled management request', async () => {
     vi.useFakeTimers()
+
     const fetch = vi.fn((_input: RequestInfo | URL, init?: RequestInit) =>
       new Promise<Response>((_resolve, reject) => {
         init?.signal?.addEventListener('abort', () => reject(init.signal?.reason), {
@@ -191,16 +193,19 @@ describe('createAlpacaProvider', () => {
         })
       }),
     ) as typeof globalThis.fetch
+
     const provider = createAlpacaProvider({
       baseUrl: 'http://alpaca.test',
       fetch,
     })
 
     const request = provider.listDevices()
+
     const rejection = expect(request).rejects.toMatchObject({
       name: 'AlpacaProviderError',
       reason: 'transport',
     })
+
     await vi.advanceTimersByTimeAsync(3_000)
 
     await rejection

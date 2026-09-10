@@ -11,10 +11,12 @@ export function CaptureHub({ rigId }: { rigId: string }) {
   const [now, setNow] = useState(Date.now)
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000)
+
     return () => clearInterval(timer)
   }, [])
   const base = `/rigs/${encodeURIComponent(rigId)}/observe`
   const age = image ? Math.max(0, Math.floor((now - Date.parse(image.receivedAt)) / 1000)) : 0
+
   return <div className="vela-capture-hub">
     <Panel className="vela-capture-entry" elevation="raised">
       <div className="vela-capture-entry__preview">

@@ -44,6 +44,7 @@ export interface TargetsView {
 }
 
 export type TargetCategory = 'emission' | 'reflection-dark' | 'galaxy' | 'cluster' | 'planetary' | 'other'
+
 export type TargetFilterChoice = 'dual-band' | 'broadband' | 'uncertain'
 
 export interface TargetOpportunity {

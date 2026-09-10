@@ -5,6 +5,7 @@ import { frameCorners, offsetPosition } from './geometry'
 import { isPosition } from './validation'
 
 type Viewer = ReturnType<(typeof import('aladin-lite'))['default']['aladin']>
+
 export function SurveyField({ target, desired, camera, actual, locked, onChange }: {
   target: TargetPosition, desired: TargetPosition, camera: FramingView['camera'], actual: FramingView['actual'], locked: boolean, onChange: (position: TargetPosition) => void
 }) {
@@ -27,29 +28,36 @@ export function SurveyField({ target, desired, camera, actual, locked, onChange 
     setFailed(false)
     geometryInitialized.current = false
     const controller = new AbortController()
+
     async function open() {
       try {
         // Probe the survey before displaying an empty field as if it were sky.
         const response = await fetch('/api/survey/dss2/Norder3/Allsky.jpg', { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]) })
+
         if (!response.ok) throw new Error('Survey unavailable')
         const bitmap = await createImageBitmap(await response.blob())
         bitmap.close()
         const { default: A } = await import('aladin-lite')
         await A.init
+
         if (disposed || !host.current) return
         const survey = A.imageHiPS(`${location.origin}/api/survey/dss2`, { name: 'DSS2 color', cooFrame: 'equatorial', maxOrder: 9, imgFormat: 'jpeg', requestMode: 'same-origin', errorCallback: () => { if (!disposed) { setReady(false); setFailed(true) } } })
         instance = A.aladin(host.current, { survey, log: false, hipsList: [], target: `${target.raDegrees} ${target.decDegrees}`, fov: Math.min(90, initialWidth * 2.2), projection: 'TAN', cooFrame: 'ICRS',
           showLayersControl: false, showFullscreenControl: false, showZoomControl: false, showGotoControl: false, showShareControl: false, showSettingsControl: false, showSimbadPointerControl: false, showStatusBar: false, showFov: false, showCooLocation: false, showFrame: false, showReticle: false, showCooGridControl: false, showProjectionControl: false })
         viewer.current = instance
         const redraw = () => { if (!disposed) setRevision(r => r + 1) }
+
         instance.on('positionChanged', redraw)
         instance.on('zoomChanged', redraw)
         setReady(true)
       } catch { if (!disposed) setFailed(true) }
     }
+
     void open()
     const resize = new ResizeObserver(() => setRevision(r => r + 1))
+
     if (host.current) resize.observe(host.current)
+
     return () => { disposed = true; controller.abort(); resize.disconnect(); instance?.remove(); viewer.current = null }
     // Camera geometry updates the overlay without resetting a user's survey pan.
   }, [target.raDegrees, target.decDegrees, attempt])
@@ -64,7 +72,9 @@ export function SurveyField({ target, desired, camera, actual, locked, onChange 
   useEffect(() => {
     const element = overlay.current
     const canvas = host.current?.querySelector('.aladin-catalogCanvas')
+
     if (!ready || !element || !canvas) return
+
     // The draggable footprint sits above Aladin's interaction canvas. Forward
     // wheel input so its native zoom behavior is identical on both surfaces.
     const zoom = (event: WheelEvent) => {
@@ -76,32 +86,42 @@ export function SurveyField({ target, desired, camera, actual, locked, onChange 
         ctrlKey: event.ctrlKey, shiftKey: event.shiftKey, altKey: event.altKey, metaKey: event.metaKey,
       }))
     }
+
     element.addEventListener('wheel', zoom, { passive: false })
+
     return () => element.removeEventListener('wheel', zoom)
   }, [ready])
 
   const project = (points: TargetPosition[]) => {
     if (!ready || !viewer.current) return ''
+
     try {
       const pixels = points.map(p => viewer.current!.world2pix(p.raDegrees, p.decDegrees))
+
       return pixels.every(p => p && p.every(Number.isFinite)) ? pixels.map(p => p!.join(',')).join(' ') : ''
     } catch { return '' }
   }
+
   void revision
   const points = camera ? project(frameCorners(desired, camera.fieldWidthDegrees, camera.fieldHeightDegrees, actual?.rotationDegrees ?? 0)) : ''
   const actualPoints = actual ? project(actual.corners) : ''
   const center = ready ? viewer.current?.world2pix(desired.raDegrees, desired.decDegrees) : undefined
+
   const move = (x: number, y: number) => {
     if (locked || !ready) return
     const position = viewer.current?.pix2world(x, y)
+
     if (position) {
       const next = { raDegrees: (position[0] + 360) % 360, decDegrees: position[1] }
+
       if (isPosition(next)) onChange(next)
     }
   }
+
   const nudge = (east: number, north: number) => {
     if (!locked && camera) onChange(offsetPosition(desired, east * camera.fieldWidthDegrees / 100, north * camera.fieldHeightDegrees / 100))
   }
+
   return <>
     <div className="vela-target-field" data-disabled={locked}>
       <div className="vela-target-survey" ref={host} aria-label="Interactive DSS2 sky survey" />
@@ -119,6 +139,7 @@ export function SurveyField({ target, desired, camera, actual, locked, onChange 
           onPointerUp={() => { drag.current = null }} onPointerCancel={() => { drag.current = null }} onLostPointerCapture={() => { drag.current = null }}
           onKeyDown={event => {
             const delta = { ArrowLeft: [1, 0], ArrowRight: [-1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] }[event.key]
+
             if (delta) { event.preventDefault(); nudge(delta[0]!, delta[1]!) }
           }} />}
         {center && points && <text className="vela-target-cross" x={center[0]} y={center[1]} textAnchor="middle" dominantBaseline="middle">+</text>}

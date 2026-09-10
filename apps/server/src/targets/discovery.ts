@@ -39,9 +39,13 @@ export interface TargetDiscovery {
 }
 
 const radians = Math.PI / 180
+
 const turn = Math.PI * 2
+
 const day = 86_400_000
+
 const minimumAltitude = 30
+
 const clamp = (value: number) => Math.max(-1, Math.min(1, value))
 
 // These refine broad/mixed catalog labels only; positions and extents remain untouched.
@@ -64,6 +68,7 @@ const showpieces = new Set([
 
 function description(target: CatalogTarget) {
   let category: TargetCategory = categoryOverrides[target.id] ?? 'other'
+
   if (!categoryOverrides[target.id]) {
     if (['H II region', 'Emission nebula', 'Supernova remnant'].includes(target.type)) category = 'emission'
     else if (['Reflection nebula', 'Dark nebula'].includes(target.type)) category = 'reflection-dark'
@@ -71,20 +76,26 @@ function description(target: CatalogTarget) {
     else if (['Open cluster', 'Globular cluster', 'Association of stars', 'Star cluster and nebula'].includes(target.type)) category = 'cluster'
     else if (target.type === 'Planetary nebula') category = 'planetary'
   }
+
   // L-Ultimate passes H-alpha/OIII, not general continuum. Mixed/unknown labels
   // do not establish emission-line suitability. https://www.optolong.com/cms/document/detail/id/250.html
   const mixed = target.type === 'Star cluster and nebula' && !categoryOverrides[target.id]
+
   const filter: TargetFilterChoice = mixed || category === 'other' ? 'uncertain'
     : category === 'emission' || category === 'planetary' ? 'dual-band' : 'broadband'
+
   const filterReason: DiscoveryCandidate['filterReason'] = filter === 'dual-band' ? 'emission-lines'
     : filter === 'broadband' ? 'continuum' : 'mixed-or-unknown'
+
   const typeAppeal: Record<TargetCategory, number> = {
     emission: 0.6, 'reflection-dark': 0.55, galaxy: 0.45, cluster: 0.4, planetary: 0.5, other: 0.15,
   }
+
   // Catalog angular extent is only a visual-interest hint: never inferred sensor fit.
   const size = target.majorAxisArcminutes ?? 0
   const extentAppeal = 0.25 * Math.min(1, Math.log1p(Math.max(0, size)) / Math.log(121))
   const appeal = typeAppeal[category] + extentAppeal + (showpieces.has(target.id) ? 0.1 : 0)
+
   return { category, filter, filterReason, appeal }
 }
 
@@ -99,8 +110,10 @@ function darkWindow(site: Site, now: Date): DiscoveryWindow | null {
   const sun = Equator(Body.Sun, now, observer, true, true)
   const darkNow = Horizon(now, observer, sun.ra, sun.dec).altitude < -18
   const dusk = darkNow ? now : SearchAltitude(Body.Sun, observer, -1, now, 1, -18)?.date
+
   if (!dusk) return null
   const dawn = SearchAltitude(Body.Sun, observer, 1, dusk, 1, -18)?.date
+
   return {
     startsAt: dusk.toISOString(),
     endsAt: (dawn ?? new Date(dusk.getTime() + day)).toISOString(),
@@ -114,13 +127,17 @@ function siderealSamples(window: DiscoveryWindow, longitude: number): SiderealSa
   const start = Date.parse(window.startsAt)
   const end = Date.parse(window.endsAt)
   const samples: SiderealSample[] = []
+
   for (let at = start; ; at = Math.min(end, at + 900_000)) {
     let angle = (SiderealTime(new Date(at)) * 15 + longitude) * radians
     const previous = samples.at(-1)
+
     if (previous) while (angle < previous.angle) angle += turn
     samples.push({ at, angle })
+
     if (at === end) break
   }
+
   return samples
 }
 
@@ -128,13 +145,17 @@ function siderealSamples(window: DiscoveryWindow, longitude: number): SiderealSa
 function timeAtAngle(samples: readonly SiderealSample[], angle: number): number {
   let low = 0
   let high = samples.length - 1
+
   while (high - low > 1) {
     const middle = Math.floor((low + high) / 2)
+
     if (samples[middle]!.angle < angle) low = middle
     else high = middle
   }
+
   const a = samples[low]!
   const b = samples[high]!
+
   return a.at + (b.at - a.at) * Math.max(0, Math.min(1, (angle - a.angle) / (b.angle - a.angle)))
 }
 
@@ -149,14 +170,18 @@ function opportunity(
   const base = sinLatitude * z
   const amplitude = cosLatitude * Math.hypot(x, y)
   const threshold = Math.sin(minimumAltitude * radians)
+
   if (base + amplitude <= threshold + 1e-12) return null
+
   const halfArc = amplitude < 1e-12 || base - amplitude >= threshold ? Math.PI
     : Math.acos(clamp((threshold - base) / amplitude))
+
   const first = samples[0]!
   const last = samples.at(-1)!
   const ra = Math.atan2(y, x)
   const currentAltitudeDegrees = altitude(x, y, z, sinLatitude, cosLatitude, currentAngle)
   const intervals: Array<{ start: number, end: number, transit: number }> = []
+
   if (halfArc === Math.PI) {
     const transit = ra + Math.ceil((first.angle - ra) / turn) * turn
     intervals.push({ start: first.angle, end: last.angle, transit })
@@ -165,11 +190,14 @@ function opportunity(
       const transit = ra + cycle * turn
       const start = Math.max(first.angle, transit - halfArc)
       const end = Math.min(last.angle, transit + halfArc)
+
       if (end > start) intervals.push({ start, end, transit })
     }
   }
+
   let best: TargetOpportunity | null = null
   let bestValue = -1
+
   for (const interval of intervals) {
     const startsAt = timeAtAngle(samples, interval.start)
     const endsAt = timeAtAngle(samples, interval.end)
@@ -180,8 +208,10 @@ function opportunity(
     const bestAngle = peakOptions[0]!
     const bestAltitudeDegrees = altitude(x, y, z, sinLatitude, cosLatitude, bestAngle)
     const usefulMinutes = (endsAt - startsAt) / 60_000
+
     if (usefulMinutes <= 0) continue
     const value = usefulMinutes * Math.sin(bestAltitudeDegrees * radians)
+
     if (value > bestValue) {
       bestValue = value
       best = {
@@ -190,6 +220,7 @@ function opportunity(
       }
     }
   }
+
   return best
 }
 
@@ -209,25 +240,31 @@ export function discoverTargets({ targets, site, now }: DiscoveryInput): TargetD
   const rotation = samples ? Rotation_EQJ_EQD(epoch) : null
   const latitude = (validSite?.latitudeDegrees ?? 0) * radians
   const currentAngle = samples && validSite ? (SiderealTime(now) * 15 + validSite.longitudeDegrees) * radians : 0
+
   const candidates = targets.map((target): DiscoveryCandidate => {
     const details = description(target)
     let available: TargetOpportunity | null = null
+
     if (samples && rotation) {
       const ra = target.raDegrees * radians
       const dec = target.decDegrees * radians
       const position = RotateVector(rotation, new Vector(Math.cos(dec) * Math.cos(ra), Math.cos(dec) * Math.sin(ra), Math.sin(dec), epoch))
       available = opportunity(position, samples, Math.sin(latitude), Math.cos(latitude), currentAngle)
     }
+
     // Duration remains decisive: a nearly-set showpiece cannot outrank a long useful session
     // solely on its name. Four hours saturates this preference; size is not equipment fit.
     const timeWeight = available ? Math.sqrt(Math.min(1, available.usefulMinutes / 240)) : 1
     const altitudeWeight = available ? 0.5 + 0.5 * Math.sin(available.bestAltitudeDegrees * radians) : 1
+
     return {
       target, category: details.category, filter: details.filter, filterReason: details.filterReason,
       eligible: available !== null, opportunity: available, score: 100 * details.appeal * timeWeight * altitudeWeight,
     }
   })
+
   candidates.sort((a, b) => Number(b.eligible) - Number(a.eligible) || b.score - a.score
     || (a.target.id < b.target.id ? -1 : a.target.id > b.target.id ? 1 : 0))
+
   return { observedAt: now.toISOString(), status: !validSite ? 'site-unavailable' : !window ? 'no-darkness' : 'available', window, candidates }
 }

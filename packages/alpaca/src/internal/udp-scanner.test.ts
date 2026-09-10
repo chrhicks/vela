@@ -28,6 +28,7 @@ class FakeSocket {
 
   bind(address: string) {
     this.boundAddress = address
+
     if (this.failBind) throw new Error(`Cannot bind ${address}`)
     queueMicrotask(() => this.listeningListener())
   }
@@ -72,6 +73,7 @@ describe('IPv4 UDP scanner', () => {
   it('scans every interface, retries, ignores malformed packets, and de-duplicates endpoints', async () => {
     vi.useFakeTimers()
     const sockets = [new FakeSocket(), new FakeSocket()]
+
     for (const socket of sockets) {
       socket.onSend = (activeSocket) => {
         activeSocket.emitMessage('not json', '192.168.4.104')
@@ -81,7 +83,9 @@ describe('IPv4 UDP scanner', () => {
         activeSocket.emitMessage('{"alpacaport":11111}', '192.168.4.104')
       }
     }
+
     let socketIndex = 0
+
     const scanner = createUdpScanner({
       networkInterfaces: () => [
         { address: '192.168.4.2', netmask: '255.255.255.0' },
@@ -113,6 +117,7 @@ describe('IPv4 UDP scanner', () => {
     const goodSocket = new FakeSocket()
     const sockets = [failedSocket, goodSocket]
     let socketIndex = 0
+
     const scanner = createUdpScanner({
       networkInterfaces: () => [
         { address: '192.168.4.2', netmask: '255.255.255.0' },
@@ -132,6 +137,7 @@ describe('IPv4 UDP scanner', () => {
   it('throws a structured error when every interface fails', async () => {
     const socket = new FakeSocket()
     socket.failBind = true
+
     const scanner = createUdpScanner({
       networkInterfaces: () => [
         { address: '192.168.4.2', netmask: '255.255.255.0' },
@@ -147,6 +153,7 @@ describe('IPv4 UDP scanner', () => {
   it('supports selecting interfaces explicitly', async () => {
     vi.useFakeTimers()
     const socket = new FakeSocket()
+
     const scanner = createUdpScanner({
       networkInterfaces: () => [
         { address: '192.168.4.2', netmask: '255.255.255.0' },
@@ -160,6 +167,7 @@ describe('IPv4 UDP scanner', () => {
       attempts: 1,
       interfaceAddresses: ['10.0.0.2'],
     })
+
     await vi.advanceTimersByTimeAsync(1_000)
 
     await expect(scan).resolves.toEqual([])
@@ -170,6 +178,7 @@ describe('IPv4 UDP scanner', () => {
     const socket = new FakeSocket()
     const controller = new AbortController()
     const cancellation = new Error('scan cancelled')
+
     const scanner = createUdpScanner({
       networkInterfaces: () => [
         { address: '192.168.4.2', netmask: '255.255.255.0' },
@@ -182,6 +191,7 @@ describe('IPv4 UDP scanner', () => {
       attempts: 2,
       signal: controller.signal,
     })
+
     await Promise.resolve()
     controller.abort(cancellation)
 

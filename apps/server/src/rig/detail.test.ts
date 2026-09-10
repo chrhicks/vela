@@ -9,6 +9,7 @@ import type { RigCatalogRecord } from './contracts.js'
 import { loadRigDetailView } from './detail.js'
 
 const endpoint = { host: 'ascom-remote.local', port: 11111 }
+
 const refreshedAt = new Date('2026-09-03T20:00:00.000Z')
 
 function rig(
@@ -34,6 +35,7 @@ function inspector(
   return {
     async inspectDevices() {
       if (result instanceof Error) throw result
+
       return result
     },
   }
@@ -42,6 +44,7 @@ function inspector(
 describe('Rig detail projection', () => {
   it('maps current provider observations into Vela status and persists identities only', async () => {
     const catalog = createMemoryRigCatalog([rig()])
+
     const inspections: ReadonlyArray<AlpacaDeviceInspection> = [
       {
         providerDeviceId: 'camera-0',
@@ -168,10 +171,12 @@ describe('Rig detail projection', () => {
   ] as const)('projects %s inventory failure as %s identity-only state', async (reason, state) => {
     const record = rig()
     const catalog = createMemoryRigCatalog([record])
+
     const cause = new AlpacaProviderError('Inspection failed', {
       reason,
       endpoint: '/management/v1/configureddevices',
     })
+
     const onUnavailable = vi.fn()
 
     const result = await loadRigDetailView(catalog, record.id, {

@@ -16,6 +16,7 @@ describe('capture response validation', () => {
   it('accepts a previous image with its own exposure metadata while another exposure runs', () => {
     expect(isCaptureView(view, 'rig-1')).toBe(true)
     expect(isCaptureView({ ...view, latestImage: null }, 'rig-1')).toBe(true)
+
     for (const statistics of [null, { detectedStars: 0, medianHfrPixels: null }]) {
       expect(isCaptureView({ ...view, latestImage: { ...view.latestImage, statistics } }, 'rig-1')).toBe(true)
     }
@@ -27,6 +28,7 @@ describe('capture response validation', () => {
     expect(isCaptureView({ ...view, phase: 'invented' }, 'rig-1')).toBe(false)
     expect(isCaptureView({ ...view, elapsedSeconds: Number.NaN }, 'rig-1')).toBe(false)
     expect(isCaptureView({ ...view, exposureSeconds: 0 }, 'rig-1')).toBe(false)
+
     for (const patch of [{ repeat: 'true' }, { completedCount: -1 }, { completedCount: 1.5 }, { completedCount: undefined }]) {
       expect(isCaptureView({ ...view, ...patch }, 'rig-1')).toBe(false)
     }
@@ -52,13 +54,16 @@ const savedImage = { ...view.latestImage!, saved: true, rigId: 'rig-1', savedAt:
 
 it('validates confirmed retention and exact same-origin download resources', () => {
   expect(isSavedImage(savedImage, 'rig-1')).toBe(true)
+
   for (const patch of [{ saved: false }, { rigId: 'other' }, { fitsUrl: 'https://example.com/file.fits' }, { previewDownloadUrl: '/api/rigs/other/saved-images/frame-1/download-preview' }, { savedAt: 'invalid' }]) {
     expect(isSavedImage({ ...savedImage, ...patch }, 'rig-1')).toBe(false)
   }
+
   expect(isSavedImagesView({ rigId: 'rig-1', rigName: 'Rig', images: [savedImage] }, 'rig-1')).toBe(true)
   expect(isSavedImagesView({ rigId: 'rig-1', rigName: 'Rig', images: [savedImage, savedImage] }, 'rig-1')).toBe(false)
   expect(isCaptureView({ ...view, savedImageCount: null }, 'rig-1')).toBe(true)
   expect(isCaptureView({ ...view, phase: 'saving', saveFrames: true }, 'rig-1')).toBe(true)
+
   for (const patch of [{ saveFrames: undefined }, { savedImageCount: -1 }, { savedImageCount: undefined }, { savedImageCount: 0.5 }]) {
     expect(isCaptureView({ ...view, ...patch }, 'rig-1')).toBe(false)
   }

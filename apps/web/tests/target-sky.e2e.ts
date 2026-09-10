@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test'
 import type { TargetSkyPath, TargetView } from '@vela/model/web'
 
 const start = Date.UTC(2026, 8, 8, 16)
+
 const samples: TargetSkyPath['samples'] = Array.from({ length: 97 }, (_, index) => ({
   at: new Date(start + index * 900_000).toISOString(),
   azimuthDegrees: (50 + index * 3) % 360,
@@ -9,7 +10,9 @@ const samples: TargetSkyPath['samples'] = Array.from({ length: 97 }, (_, index) 
   sunAltitudeDegrees: index < 4 ? 10 : index < 8 ? -3 : index < 12 ? -6 : index < 16 ? -12 : index < 50 ? -18 : 10,
   moon: { azimuthDegrees: (170 + index * 2) % 360, altitudeDegrees: 50 * Math.cos(index * Math.PI / 48), illuminationFraction: .68, waxing: true },
 }))
+
 const sky: TargetSkyPath = { observedAt: samples[18]!.at, startsAt: samples[0]!.at, endsAt: samples.at(-1)!.at, samples, currentAltitudeDegrees: samples[18]!.altitudeDegrees, highestAltitudeDegrees: 55, aboveHorizonDuringDarkness: [{ startsAt: samples[13]!.at, endsAt: samples[50]!.at }] }
+
 const target: TargetView = { id: 'm31', name: 'Andromeda Galaxy', catalog: 'M31', kind: 'Galaxy', raDegrees: 10.6847, decDegrees: 41.269, sizeArcminutes: 178, thumbnailUrl: '/api/targets/m31/thumbnail', sky }
 
 for (const width of [1440, 390]) {
@@ -25,11 +28,13 @@ for (const width of [1440, 390]) {
     const time = sidebar.getByRole('slider', { name: 'Preview time for Andromeda Galaxy' })
     await expect(sidebar.getByText('Local obstructions not included', { exact: true })).toBeVisible()
     await expect(sidebar.locator('.vela-sky-path__moon-status')).toContainText('68% illuminated')
+
     for (const [index, phase] of [[0, 'Daylight'], [4, 'Civil twilight'], [8, 'Nautical twilight'], [12, 'Astronomical twilight'], [16, 'Astronomical darkness']] as const) {
       await time.fill(String(index))
       await expect(sidebar.locator('.vela-sky-path__light-status')).toHaveText(phase)
       await expect(time).toHaveAttribute('aria-valuetext', new RegExp(phase))
     }
+
     const colors = await sidebar.locator('.vela-sky-path__light-track').evaluateAll(paths => [...new Set(paths.map(path => getComputedStyle(path).stroke))])
     expect(colors).toHaveLength(5)
     await expect(sidebar.locator('.vela-sky-path__light-track[data-light="night"]').first()).toHaveCSS('stroke', 'rgb(99, 214, 239)')

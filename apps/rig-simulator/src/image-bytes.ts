@@ -5,6 +5,7 @@ interface Frame {
   width: number
   height: number
 }
+
 interface Envelope {
   ClientTransactionID: number
   ServerTransactionID: number
@@ -17,6 +18,7 @@ export function acceptsImageBytes(accept: string | undefined) {
   return accept?.split(',').some(item => {
     const [type, ...parameters] = item.trim().toLowerCase().split(';')
     const quality = parameters.find(value => value.trim().startsWith('q='))?.trim().slice(2)
+
     return type?.trim() === 'application/imagebytes' && (quality === undefined || Number(quality) > 0)
   }) ?? false
 }
@@ -29,17 +31,21 @@ export async function encodeImageBytes(frame: Frame, envelope: Envelope, assertC
   const metadata = [1, 0, envelope.ClientTransactionID, envelope.ServerTransactionID, 44, 2, 8, 2, width, height, 0]
   metadata.forEach((value, index) => bytes.writeUInt32LE(value, index * 4))
   let offset = 44
+
   for (let x = 0; x < width; x++) {
     for (let y = 0; y < height; y++) {
       bytes.writeUInt16LE(pixels[y * width + x]!, offset)
       offset += 2
     }
+
     if (x % 32 === 31) {
       await setImmediate()
       assertCurrent()
     }
   }
+
   assertCurrent()
+
   return bytes
 }
 
@@ -50,12 +56,16 @@ export async function* imageJsonChunks(frame: Frame, envelope: Envelope, assertC
   assertCurrent()
   yield `${JSON.stringify({ ...envelope, Type: 2, Rank: 2 }).slice(0, -1)},"Value":[`
   const column = new Array<number>(frame.height)
+
   for (let x = 0; x < frame.width; x++) {
     assertCurrent()
+
     for (let y = 0; y < frame.height; y++) column[y] = frame.pixels[y * frame.width + x]!
     yield `${x === 0 ? '' : ','}${JSON.stringify(column)}`
+
     if (x % 16 === 15) await setImmediate()
   }
+
   assertCurrent()
   yield ']}'
 }
@@ -66,5 +76,6 @@ export function imageBytesError(envelope: Envelope) {
   const metadata = [1, envelope.ErrorNumber, envelope.ClientTransactionID, envelope.ServerTransactionID, 44, 0, 0, 0, 0, 0, 0]
   metadata.forEach((value, index) => bytes.writeUInt32LE(value, index * 4))
   message.copy(bytes, 44)
+
   return bytes
 }

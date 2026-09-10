@@ -25,6 +25,7 @@ export function HomeProvider({ children }: { children: React.ReactNode }) {
 
     try {
       const response = await loadHome()
+
       if (requestGeneration.current === generation) setHomeView(response)
     } catch {
       if (requestGeneration.current !== generation) return

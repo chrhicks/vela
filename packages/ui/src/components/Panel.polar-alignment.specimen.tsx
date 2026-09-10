@@ -6,6 +6,7 @@ import { Panel } from './Panel'
 import './Panel.polar-alignment.specimen.css'
 
 const examples = ['large-error', 'near-aligned'] as const
+
 const phases = ['setup', 'point-1', 'moving-2', 'point-2', 'moving-3', 'point-3', 'baseline-stopped', 'adjusting', 'exposing', 'debayering', 'stretching', 'solving', 'retrying', 'stopped', 'finished'] as const
 
 const activityFrames: Record<string, { label: string; age: string }> = {
@@ -36,6 +37,7 @@ function BaselinePreview({ phase, physical, onStart, onStop }: {
 }) {
   const step = measurementSteps[phase]
   const stopped = phase === 'baseline-stopped'
+
   return (
     <div className="vela-polar-baseline">
       <Panel className="vela-polar-baseline__summary">
@@ -86,20 +88,26 @@ function AlignmentPreview({ props, onPropsChange }: {
 
   const x = near ? 394 : 165
   const y = near ? 175 : 300
+
   function changePhase(value: string, play = false) {
     setPlaying(play)
+
     if (onPropsChange) onPropsChange({ phase: value })
     else setLocalPhase(value)
   }
 
   useEffect(() => {
     const step = measurementSteps[phase]
+
     if (!playing || !step) return
+
     const timer = window.setTimeout(() => {
       if (step.next === 'adjusting') setPlaying(false)
+
       if (onPropsChange) onPropsChange({ phase: step.next })
       else setLocalPhase(step.next)
     }, 1_600)
+
     return () => window.clearTimeout(timer)
   }, [phase, playing, onPropsChange])
 

@@ -14,6 +14,7 @@ function SkyPathPreview({ props, onPropsChange }: { props: Props, onPropsChange?
   const moonSamples = getMoonSamples(String(values.moon ?? 'gibbous'))
   const targetId = String(values.target)
   const targetName = targetId === 'low-target' ? 'Low target' : targetId === 'andromeda' ? 'Andromeda' : targetId === 'm13' ? 'Hercules Cluster' : 'Crescent Nebula'
+
   return <div className="vela-sky-path-specimen">
     <p className="vela-sky-path-specimen__caption">Sample night · imaginary observing site</p>
     <SkyPath

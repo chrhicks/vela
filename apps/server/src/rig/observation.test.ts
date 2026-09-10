@@ -8,6 +8,7 @@ function device(
   connection: 'connected' | 'disconnected' | 'unavailable',
 ): RigDeviceDetailView {
   const identity = { id: `rig-1-${id}`, kind, name: id, configuredName: id }
+
   if (connection === 'connected') {
     return {
       ...identity,
@@ -16,6 +17,7 @@ function device(
       status: { availability: 'unsupported' },
     } as RigDeviceDetailView
   }
+
   return {
     ...identity,
     connection,

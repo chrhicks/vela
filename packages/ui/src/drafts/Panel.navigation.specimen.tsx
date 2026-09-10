@@ -7,7 +7,9 @@ import { targets } from './target-framing/fixtures'
 import './Panel.navigation.specimen.css'
 
 type Props = Record<string, string | number | boolean>
+
 const rigs = { askar: 'Askar FRA 400', seestar: 'Seestar S30' } as const
+
 const destinations = [['observe', 'Observe'], ['targets', 'Targets'], ['capture', 'Capture']] as const
 
 function NavigationPreview({ props, onPropsChange }: { props: Props; onPropsChange?: (patch: Props) => void }) {
@@ -26,10 +28,12 @@ function NavigationPreview({ props, onPropsChange }: { props: Props; onPropsChan
   const elapsed = Math.max(0, Math.min(60, Number(values.elapsed) || 0))
   const captureStatus = interrupted ? `Last seen exposing #${completed + 1}` : reading ? `Reading exposure #${completed + 1}` : `Exposing #${completed + 1} · ${60 - elapsed} seconds remaining`
   const navigate = (next: string, nextRig = rig) => update({ page: next, rig: nextRig })
+
   const link = (event: MouseEvent<HTMLAnchorElement>, next: string, nextRig = rig) => {
     event.preventDefault()
     navigate(next, nextRig)
   }
+
   const currentCapture = rig === 'askar' && activity
 
   return <section className="vela-nav-demo" aria-label="Navigation experiment">

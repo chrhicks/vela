@@ -44,10 +44,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isHostname(host: string): boolean {
   if (host.length === 0 || host.length > 253 || host !== host.trim()) return false
+
   if (isIPv4(host)) return true
+
   if (host.includes('.') && /^[0-9.]+$/.test(host)) return false
 
   const withoutTrailingDot = host.endsWith('.') ? host.slice(0, -1) : host
+
   if (withoutTrailingDot.length === 0) return false
 
   return withoutTrailingDot.split('.').every((label) =>
@@ -71,11 +74,13 @@ export function parseDiscoverRigsInput(value: unknown): DiscoverRigsInput | unde
   }
 
   const keys = Object.keys(value)
+
   if (keys.some((key) => key !== 'mode' && key !== 'host' && key !== 'port')) {
     return undefined
   }
 
   const port = value.port ?? defaultAlpacaPort
+
   if (!isPort(port)) return undefined
 
   return {
@@ -131,9 +136,11 @@ async function candidateDisposition(
   if (inventory.devices.length === 0) {
     return { state: 'ineligible', reason: 'no-stable-device-id' }
   }
+
   if (catalog === undefined) return { state: 'new' }
 
   const match = await catalog.observe(inspection.endpoint, inventory)
+
   switch (match.state) {
     case 'new':
       return { state: 'new' }
@@ -183,12 +190,14 @@ export async function discoverRigs(
       endpoints = await alpaca.scan(signal === undefined ? {} : { signal })
     } catch (error) {
       throwIfCancelled(signal)
+
       if (error instanceof AlpacaDiscoveryError) {
         return {
           candidates: [],
           failures: [{ view: { reason: 'scan-failed' }, cause: error }],
         }
       }
+
       throw error
     }
   }
@@ -198,15 +207,18 @@ export async function discoverRigs(
 
   for (const endpoint of endpoints) {
     throwIfCancelled(signal)
+
     try {
       const inspection = await alpaca.inspect(
         endpoint,
         signal === undefined ? {} : { signal },
       )
+
       throwIfCancelled(signal)
       candidates.push(await candidateView(inspection, catalog, now))
     } catch (error) {
       throwIfCancelled(signal)
+
       if (error instanceof AlpacaProviderError) {
         failures.push({
           view: { endpoint, reason: failureReason(error) },
@@ -214,6 +226,7 @@ export async function discoverRigs(
         })
         continue
       }
+
       throw error
     }
   }

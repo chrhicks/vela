@@ -9,35 +9,44 @@ function observatory(requestTimeoutMs = 100) {
     sitelatitude: 35, sitelongitude: -80, siteelevation: 200,
     tracking: true, slewing: false, atpark: false, canslewasync: true, cansettracking: true, canfindhome: true, athome: false,
   }
+
   const writes: { operation: string; parameters: URLSearchParams }[] = []
   const unsupported = new Set<string>()
   const errors = new Map<string, number>()
   let started!: () => void
   const whenStarted = new Promise<void>(resolve => { started = resolve })
+
   const state = { loseSlew: false, loseTracking: false, stopFails: false, onSlew: () => {}, onHome: () => {}, onTracking: () => {},
     trackingDelayReads: 0, rejectTracking: false, trackingReadFails: false }
+
   let requestedTracking: boolean | undefined
+
   const fetch: typeof globalThis.fetch = async (input, init) => {
     init?.signal?.throwIfAborted()
     const operation = new URL(String(input)).pathname.split('/').at(-1)!
     const envelope = (Value?: unknown, ErrorNumber = 0) => Response.json({ ClientTransactionID: 0, ServerTransactionID: 1, ErrorNumber, ErrorMessage: '', Value })
+
     if (operation === 'configureddevices') return envelope([
       { DeviceName: 'Camera', DeviceType: 'Camera', DeviceNumber: 7, UniqueID: 'camera-id' },
       { DeviceName: 'Mount', DeviceType: 'Telescope', DeviceNumber: 3, UniqueID: 'mount-id' },
     ])
+
     if (init?.method === 'PUT') {
       const parameters = new URLSearchParams(String(init.body))
       writes.push({ operation, parameters })
+
       if (operation === 'findhome') {
         values.slewing = true
         values.athome = false
         started()
         state.onHome()
+
         if (state.loseSlew) throw new TypeError('Response lost after homing started')
       } else if (operation === 'slewtocoordinatesasync') {
         values.slewing = true
         started()
         state.onSlew()
+
         if (state.loseSlew) throw new TypeError('Response lost after slew started')
       } else if (operation === 'abortslew') {
         if (state.stopFails) throw new TypeError('Abort unreachable')
@@ -45,27 +54,40 @@ function observatory(requestTimeoutMs = 100) {
       } else if (operation === 'tracking') {
         if (state.rejectTracking) return Response.json({ ClientTransactionID: 0, ServerTransactionID: 1, ErrorNumber: 1280, ErrorMessage: 'Mount rejected tracking mode' })
         requestedTracking = parameters.get('Tracking') === 'true'
+
         if (!state.trackingDelayReads) values.tracking = requestedTracking
         state.onTracking()
+
         if (state.loseTracking) throw new TypeError('Setter response lost')
       } else throw new Error(`Unexpected write ${operation}`)
+
       return envelope()
     }
+
     if (operation === 'tracking') {
       if (state.trackingReadFails) throw new TypeError('Tracking state unavailable')
+
       if (requestedTracking !== undefined && state.trackingDelayReads > 0) {
         state.trackingDelayReads -= 1
+
         if (!state.trackingDelayReads) values.tracking = requestedTracking
       }
     }
+
     if (errors.has(operation)) return envelope(undefined, errors.get(operation))
+
     if (unsupported.has(operation)) return envelope(undefined, 1024)
+
     if (!(operation in values)) throw new Error(`Unexpected read ${operation}`)
+
     return envelope(values[operation])
   }
+
   const framing = createAlpacaFraming({ baseUrl: 'http://fake', fetch, requestTimeoutMs, pollIntervalMs: 1, slewTimeoutMs: 100 })
+
   return { framing, values, writes, unsupported, errors, state, whenStarted }
 }
+
 const target = { telescopeId: 'mount-id', rightAscensionDegrees: 45, declinationDegrees: 25, coordinateSystem: 'topocentric' as const }
 
 describe('framing boundary', () => {
@@ -128,6 +150,7 @@ describe('framing boundary', () => {
   it.each([false, 'true'])('bounds missing or malformed home confirmation %j and independently stops', async athome => {
     const fake = observatory()
     fake.state.onHome = () => { Object.assign(fake.values, { slewing: false, athome }) }
+
     await expect(fake.framing.home('mount-id')).rejects.toThrow()
     expect(fake.writes.map(write => write.operation)).toEqual(['findhome', 'abortslew'])
   })
@@ -187,8 +210,10 @@ describe('framing boundary', () => {
 
   it('omits unsupported alignment observations without inventing sidereal or zero rates', async () => {
     const fake = observatory()
+
     for (const property of ['trackingrate', 'rightascensionrate', 'declinationrate', 'sideofpier']) fake.unsupported.add(property)
     const status = await fake.framing.telescopeStatus('mount-id', undefined, { includeAlignmentObservations: true })
+
     for (const property of ['trackingRate', 'rightAscensionRateSecondsPerSiderealSecond', 'declinationRateArcsecondsPerSecond', 'pierSide']) expect(status).not.toHaveProperty(property)
   })
 
@@ -303,6 +328,7 @@ describe('framing boundary', () => {
   it('reports disconnection during confirmation and never repeats the setter', async () => {
     const fake = observatory()
     fake.state.onTracking = () => { fake.values.connected = false }
+
     await expect(fake.framing.setTracking('mount-id', false)).rejects.toThrow('Telescope disconnected during tracking confirmation')
     expect(fake.writes.map(write => write.operation)).toEqual(['tracking'])
   })
@@ -311,6 +337,7 @@ describe('framing boundary', () => {
     const fake = observatory()
     fake.state.loseTracking = true
     fake.state.onTracking = () => { fake.state.trackingReadFails = true }
+
     await expect(fake.framing.setTracking('mount-id', false)).rejects.toThrow('Unable to reach Alpaca endpoint /api/v1/telescope/3/tracking. Setter reported: Unable to reach Alpaca endpoint /api/v1/telescope/3/tracking')
     expect(fake.writes.map(write => write.operation)).toEqual(['tracking'])
   })
@@ -320,6 +347,7 @@ describe('framing boundary', () => {
     const controller = new AbortController()
     fake.state.trackingDelayReads = Infinity
     fake.state.onTracking = () => { controller.abort() }
+
     await expect(fake.framing.setTracking('mount-id', false, controller.signal)).rejects.toThrow('Requested tracking state was not observed before the confirmation deadline')
     expect(fake.values.tracking).toBe(true)
     expect(fake.writes.map(write => write.operation)).toEqual(['tracking'])
@@ -330,6 +358,7 @@ describe('framing boundary', () => {
     const controller = new AbortController()
     fake.state.trackingDelayReads = 3
     fake.state.onTracking = () => { controller.abort() }
+
     await expect(fake.framing.setTracking('mount-id', false, controller.signal)).rejects.toMatchObject({ name: 'AbortError' })
     expect(fake.values.tracking).toBe(false)
     expect(fake.state.trackingDelayReads).toBe(0)

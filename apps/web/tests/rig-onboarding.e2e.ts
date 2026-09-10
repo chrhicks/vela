@@ -3,6 +3,7 @@ import type { Page, Route } from '@playwright/test'
 import type { HomeView } from '@vela/model/web'
 
 const endpoint = { host: '192.168.4.104', port: 11111 }
+
 const inspectedAt = '2026-09-02T20:00:00.000Z'
 
 function emptyHome(): HomeView {
@@ -77,8 +78,10 @@ test('adds an explicitly selected new Rig from mixed discovery results', async (
   await page.route('**/api/rigs', async (route) => {
     addAttempts += 1
     addPayload = route.request().postDataJSON()
+
     if (addAttempts === 1) {
       await fulfillJson(route, { error: 'rig-conflict' }, 409)
+
       return
     }
 
@@ -120,6 +123,7 @@ test('cancels stale scans and keeps useful discovery failures', async ({ page })
   await useHome(page, emptyHome)
   await page.route('**/api/rigs/discovery', async (route) => {
     const request = route.request().postDataJSON()
+
     if (request.mode === 'scan') {
       await new Promise((resolve) => setTimeout(resolve, 300))
       await fulfillJson(route, {
@@ -131,16 +135,22 @@ test('cancels stale scans and keeps useful discovery failures', async ({ page })
         }],
         failures: [],
       }).catch(() => {})
+
       return
     }
+
     if (request.host === 'http://bad') {
       await fulfillJson(route, { error: 'invalid-discovery-request' }, 400)
+
       return
     }
+
     if (request.host === 'malformed.local') {
       await fulfillJson(route, {})
+
       return
     }
+
     await fulfillJson(route, {
       candidates: [],
       failures: [{ endpoint: request, reason: 'unreachable' }],
@@ -246,10 +256,13 @@ test('validates Home responses and retries an initial failure', async ({ page })
   await page.route('**/api/web/home', async (route) => {
     homeRequests += 1
     await new Promise((resolve) => setTimeout(resolve, 75))
+
     if (homeRequests === 1) {
       await fulfillJson(route, { rigs: 'not-an-array', refreshedAt: inspectedAt })
+
       return
     }
+
     await fulfillJson(route, homeWithRig('unreachable'))
   })
 

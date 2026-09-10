@@ -14,13 +14,18 @@ const image: CaptureImage = {
   exposureSeconds: 10, capturedAt: '2026-09-05T23:00:00.000Z', receivedAt: '2026-09-05T23:00:10.000Z',
   cameraName: 'Camera', color: 'mono', statistics: null, saved: false,
 }
+
 const files = { fits: Buffer.from('original'), native: Buffer.from('preview'), fit: Buffer.from('small') }
+
 const directories: string[] = []
+
 async function temporary() {
   const path = await mkdtemp(join(tmpdir(), 'vela-saved-test-'))
   directories.push(path)
+
   return path
 }
+
 afterEach(async () => {
   vi.restoreAllMocks()
   await Promise.all(directories.splice(0).map(path => rm(path, { recursive: true, force: true })))
@@ -83,12 +88,15 @@ describe('saved image store', () => {
     const sync = new Promise<void>((_, reject) => { fail = reject })
     vi.spyOn(fs, 'open').mockImplementation(async (...args) => {
       const handle = await realOpen(...args)
+
       if (String(args[0]).endsWith('/preview.png')) {
         vi.spyOn(handle, 'sync').mockImplementation(() => {
           announce()
+
           return sync
         })
       }
+
       return handle
     })
     const pending = store.save('rig', image, files)

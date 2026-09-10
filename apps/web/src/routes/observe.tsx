@@ -12,6 +12,7 @@ import './observe.css'
 
 export function Observe() {
   const { rigId = '' } = useParams()
+
   return <ObservationPage key={rigId} rigId={rigId} />
 }
 
@@ -29,6 +30,7 @@ function ObservationPage({ rigId }: { rigId: string }) {
   }, [completedCommands])
 
   const back = <Link className="vela-rig-page__back" to={`/rigs/${encodeURIComponent(rigId)}`}>← Rig details</Link>
+
   if (!view) return <section className="vela-rig-page">
     {back}
     {observation.error ? <div className="vela-rig-route-state" role="status">
@@ -96,7 +98,9 @@ function ObservationPage({ rigId }: { rigId: string }) {
 
 function ConnectionResult({ result }: { result: ConnectRigDevicesResult }) {
   if (result.outcome === 'unavailable') return <p className="vela-observe-warning">Connection was unavailable: {result.reason === 'identity-conflict' ? 'the Rig identity changed.' : result.reason === 'offline' ? 'the Rig was offline.' : 'device state could not be confirmed.'}</p>
+
   if (result.outcome === 'complete') return <p>Last connection attempt: {result.command === 'not-needed' ? 'no connection commands were needed.' : `${result.confirmedConnected.length} device connections confirmed.`}</p>
+
   return <section className="vela-observe-result" aria-label="Last connection attempt">
     <h4>Last connection attempt</h4>
     <dl>

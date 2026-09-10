@@ -30,11 +30,13 @@ export function Dialog({
   useEffect(() => {
     const layer = layerRef.current
     const dialog = dialogRef.current
+
     if (!open || !layer || !dialog) return
 
     const returnFocus = document.activeElement instanceof HTMLElement
       ? document.activeElement
       : document.body
+
     const focusTrap = createFocusTrap(dialog, {
       allowOutsideClick: (event) => event.target === layer,
       delayInitialFocus: false,
@@ -44,6 +46,7 @@ export function Dialog({
       preventScroll: true,
       setReturnFocus: returnFocus,
     })
+
     focusTrap.activate()
 
     return () => {
@@ -59,6 +62,7 @@ export function Dialog({
 
   function handleKeyDown(event: KeyboardEvent<HTMLElement>) {
     props.onKeyDown?.(event)
+
     if (event.defaultPrevented || event.key !== 'Escape') return
 
     event.preventDefault()

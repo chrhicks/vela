@@ -3,12 +3,16 @@ import type { ImagingCameraView } from '@vela/model/web'
 import { observation } from './fixtures/observation'
 
 const respond = (route: Route, body: unknown) => route.fulfill({ contentType: 'application/json', body: JSON.stringify(body) })
+
 const cameras = [
   { id: 'main', name: 'ZWO ASI2600MC Pro', configuredName: 'ASI Camera (1)' },
   { id: 'guide', name: 'ZWO ASI220MM Mini', configuredName: 'ASI Camera (2)' },
 ]
+
 const empty: ImagingCameraView = { rigId: 'rig-1', selected: null, cameras, state: 'unselected', editable: true }
+
 const saved: ImagingCameraView = { ...empty, selected: { id: 'main', name: cameras[0]!.name }, state: 'ready' }
+
 async function observe(page: Page) {
   await page.route('**/api/web/rigs/rig-1/observe', route => respond(route, observation('complete')))
   await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, {
@@ -36,8 +40,11 @@ test('remembers the server-confirmed choice after reload and rejects a late pre-
   await page.route('**/api/web/rigs/rig-1/imaging-camera', async route => {
     const snapshot = current
     const delayed = hold && !held
+
     if (delayed) { held = true; await waiting }
+
     await respond(route, snapshot)
+
     if (delayed) released = true
   })
   let finish!: () => void
@@ -96,6 +103,7 @@ test('reconciles a lost save response from persisted selection without replaying
   const waiting = new Promise<void>(resolve => { release = resolve })
   await page.route('**/api/web/rigs/rig-1/imaging-camera', async route => {
     if (writes) { check = true; await waiting }
+
     await respond(route, current)
   })
   await page.route('**/api/rigs/rig-1/imaging-camera', async route => {
@@ -122,6 +130,7 @@ test('an explicit check unlocks an unsaved uncertain choice without replaying it
   await page.route('**/api/web/rigs/rig-1/imaging-camera', route => respond(route, current))
   await page.route('**/api/rigs/rig-1/imaging-camera', async route => {
     writes++
+
     if (writes === 1) await route.abort()
     else { current = saved; await respond(route, current) }
   })

@@ -11,10 +11,13 @@ export function physicalAlignmentSample(
   site: Site,
 ): AlignmentSample {
   const startedAt = Date.parse(capture.capturedAt)
+
   if (!Number.isFinite(startedAt) || !Number.isFinite(capture.exposureSeconds) || capture.exposureSeconds <= 0) {
     throw new Error('Physical alignment requires a valid exposure start and duration')
   }
+
   const midpoint = new Date(startedAt + capture.exposureSeconds * 500)
+
   return {
     ...toMount(solved, 'topocentric', midpoint, site),
     capturedAt: midpoint.toISOString(),
@@ -28,6 +31,7 @@ export function localSiderealDegrees(at: Date, site: Site): number {
     || (site.elevationMeters !== undefined && !Number.isFinite(site.elevationMeters))) {
     throw new Error('Physical alignment requires a valid observing time and site')
   }
+
   return ((SiderealTime(at) * 15 + site.longitudeDegrees) % 360 + 360) % 360
 }
 

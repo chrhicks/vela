@@ -11,10 +11,12 @@ const saved: TargetDiscoveryView = {
     category: 'galaxy', filterChoice: 'broadband', filterReason: 'Broadband preserves the galaxy’s starlight.',
     opportunity: { startsAt: '2026-09-08T02:00:00.000Z', endsAt: '2026-09-08T07:00:00.000Z', usefulMinutes: 300, bestAt: '2026-09-08T05:00:00.000Z', bestAltitudeDegrees: 80, currentAltitudeDegrees: 48 } }],
 }
+
 async function seed(page: Page) {
   await page.addInitScript(value => localStorage.setItem('vela:target-discovery:v1:rig-1', JSON.stringify(value)), saved)
   await page.route('**/api/survey/**', route => route.abort())
 }
+
 function response(url: URL, snapshotId = saved.snapshotId): TargetDiscoveryView {
   return { ...saved, snapshotId, query: url.searchParams.get('q') ?? '', category: (url.searchParams.get('category') ?? 'all') as TargetDiscoveryView['category'], filter: (url.searchParams.get('filter') ?? 'all') as TargetDiscoveryView['filter'], offset: Number(url.searchParams.get('offset') ?? 0) }
 }
@@ -25,6 +27,7 @@ test('saved suggestions paint on reload without recalculating, including on a ph
   let requests = 0
   await page.route('**/api/web/rigs/rig-1/target-discovery?*', route => {
     requests++
+
     return route.abort()
   })
   await page.goto('/rigs/rig-1/observe/targets')
@@ -44,6 +47,7 @@ test('type, light preference and page preserve the calculation; Refresh resets t
     const url = new URL(route.request().url())
     requests.push(url)
     const next = response(url, url.searchParams.get('snapshot') ?? 'night-refreshed')
+
     return route.fulfill({ json: next })
   })
   await page.goto('/rigs/rig-1/observe/targets')
@@ -141,6 +145,7 @@ for (const width of [1280, 390]) {
       await expect(results).not.toBeFocused()
       await expect(control).toBeInViewport()
     }
+
     await next.click()
     await expect(page.getByLabel('Target pages')).toContainText('3–4 of 6')
     await page.goBack()
@@ -155,6 +160,7 @@ test('a delayed page cannot steal focus after the user returns to search', async
   const gate = new Promise<void>(resolve => { release = resolve })
   await page.route('**/api/web/rigs/rig-1/target-discovery?*', async route => {
     const url = new URL(route.request().url())
+
     if (url.searchParams.get('offset') === '2') await gate
     await route.fulfill({ json: response(url) }).catch(() => {})
   })

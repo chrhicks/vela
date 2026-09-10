@@ -10,6 +10,7 @@ export interface WorkshopPersistence {
 
 export function parseSession(value: unknown): WorkingSession {
   if (!isWorkingSession(value)) throw new Error('Invalid workshop session payload')
+
   return value
 }
 
@@ -17,7 +18,9 @@ export function parseProfile(value: unknown): DesignProfile {
   if (!isDesignProfile(value) || !isSafeProfileId(value.id)) {
     throw new Error('Invalid design profile payload')
   }
+
   if (value.readonly) throw new Error('Read-only profiles cannot be persisted')
+
   return value
 }
 

@@ -40,6 +40,7 @@ export function currentDeviceView(
     name: inspection.name,
     configuredName: inspection.configuredName,
   }
+
   if (inspection.connection !== 'connected') {
     return unavailableDeviceForKind(inspection.kind, {
       ...identity,
@@ -53,6 +54,7 @@ export function currentDeviceView(
     connection: 'connected',
     observedAt,
   } satisfies ConnectedDeviceViewBase
+
   if (
     !supportsRigDetail(inspection.kind)
     || inspection.telemetry.availability === 'unavailable'
@@ -61,6 +63,7 @@ export function currentDeviceView(
   }
 
   const values = inspection.telemetry.values
+
   switch (inspection.kind) {
     case 'camera':
       return {
@@ -112,10 +115,12 @@ function cameraStatus(
       ? { availability: 'unsupported' }
       : { availability: 'partial', activity: 'unknown' }
   }
+
   const usefulCooling = telemetry.cooling !== undefined
     && (telemetry.cooling.state === 'on'
       || telemetry.cooling.setpointControl === true
       || telemetry.cooling.powerReporting === true)
+
   return {
     availability,
     activity: telemetry.activity ?? 'unknown',
@@ -150,6 +155,7 @@ function telescopeStatus(
           home: 'unknown',
         }
   }
+
   return {
     availability,
     activity: telescopeActivity(telemetry),
@@ -163,13 +169,17 @@ function telescopeActivity(
   telemetry: Extract<AlpacaDeviceTelemetry, { readonly kind: 'telescope' }>,
 ): RigTelescopeStatus['activity'] {
   if (telemetry.parked === true) return 'parked'
+
   if (telemetry.slewing === true) return 'slewing'
+
   if (telemetry.tracking === true) return 'tracking'
+
   if (
     telemetry.parked === false
     && telemetry.slewing === false
     && telemetry.tracking === false
   ) return 'idle'
+
   return 'unknown'
 }
 
@@ -182,6 +192,7 @@ function focuserStatus(
       ? { availability: 'unsupported' }
       : { availability: 'partial', activity: 'unknown' }
   }
+
   return {
     availability,
     activity: telemetry.moving === undefined ? 'unknown' : telemetry.moving ? 'moving' : 'idle',
@@ -199,6 +210,7 @@ function filterWheelStatus(
       ? { availability: 'unsupported' }
       : { availability: 'partial', activity: 'unknown' }
   }
+
   return {
     availability,
     activity: telemetry.moving === undefined ? 'unknown' : telemetry.moving ? 'moving' : 'idle',
@@ -216,10 +228,13 @@ function conditionsStatus(
       ? { availability: 'unsupported' }
       : { availability: 'partial', activity: 'unknown' }
   }
+
   const reporting = telemetry.temperatureC !== undefined
     || telemetry.humidityPercent !== undefined
     || telemetry.dewPointC !== undefined
+
   if (!reporting && availability === 'complete') return { availability: 'unsupported' }
+
   return {
     availability,
     activity: reporting ? 'reporting' : 'unknown',
@@ -240,9 +255,11 @@ function switchStatus(
       ? { availability: 'unsupported' }
       : { availability: 'partial', activity: 'unknown' }
   }
+
   if (telemetry.channels === undefined && availability === 'complete') {
     return { availability: 'unsupported' }
   }
+
   return {
     availability,
     activity: telemetry.channels === undefined ? 'unknown' : 'reporting',
@@ -285,6 +302,7 @@ function unavailableDeviceForKind(
   base: UnavailableDeviceViewBase,
 ): RigDeviceDetailView {
   const status = { availability: 'unavailable' } as const
+
   switch (kind) {
     case 'camera':
       return { ...base, kind, status }
@@ -308,6 +326,7 @@ function unsupportedDeviceForKind(
   base: ConnectedDeviceViewBase,
 ): RigDeviceDetailView {
   const status = { availability: 'unsupported' } as const
+
   switch (kind) {
     case 'camera':
       return { ...base, kind, status }

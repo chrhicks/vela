@@ -1,11 +1,13 @@
 import type { SkyPathHorizon, SkyPathMoonSample, SkyPathSample } from '../SkyPath'
 
 export type DemoHorizonState = 'none' | 'local' | 'incomplete' | 'uncalibrated'
+
 export type DemoSkyTargetId = 'andromeda' | 'm13' | 'crescent' | 'low-target'
 
 // Entirely invented workshop geometry. These are not catalog ephemerides or
 // an observer's real location; see README.md for the specimen assumptions.
 const sampleLatitudeDegrees = 40
+
 const sampleTargets: Record<DemoSkyTargetId, { declinationDegrees: number; transitHour: number }> = {
   andromeda: { declinationDegrees: 42, transitHour: 25 },
   m13: { declinationDegrees: 25, transitHour: 18 },
@@ -14,6 +16,7 @@ const sampleTargets: Record<DemoSkyTargetId, { declinationDegrees: number; trans
 }
 
 const radians = (degrees: number) => degrees * Math.PI / 180
+
 const degrees = (radians: number) => radians * 180 / Math.PI
 
 export function getSkySamples(targetId: string, startHour = 20, sampleCount = 49, stepMinutes = 10): SkyPathSample[] {
@@ -25,10 +28,13 @@ export function getSkySamples(targetId: string, startHour = 20, sampleCount = 49
     const elapsedMinutes = index * stepMinutes
     const hourAngle = radians((startHour + elapsedMinutes / 60 - target.transitHour) * 15)
     const east = -Math.cos(declination) * Math.sin(hourAngle)
+
     const north = Math.sin(declination) * Math.cos(latitude)
       - Math.cos(declination) * Math.cos(hourAngle) * Math.sin(latitude)
+
     const up = Math.sin(declination) * Math.sin(latitude)
       + Math.cos(declination) * Math.cos(hourAngle) * Math.cos(latitude)
+
     const clockMinutes = (startHour * 60 + elapsedMinutes) % (24 * 60)
 
     return {
@@ -47,6 +53,7 @@ function demoSkylineAltitude(azimuth: number): number {
   const hill = 14 * Math.exp(-((angularDistance(azimuth, 80) / 44) ** 2))
   const roof = 10 * Math.exp(-((angularDistance(azimuth, 190) / 30) ** 4))
   const trees = 20 * Math.exp(-((angularDistance(azimuth, 305) / 22) ** 2))
+
   return 3 + hill + roof + trees
 }
 
@@ -59,6 +66,7 @@ export function getDemoHorizon(profileState: string): SkyPathHorizon | undefined
     points: Array.from({ length: 73 }, (_, index) => {
       const azimuthDegrees = index * 5
       const unknown = profileState === 'incomplete' && azimuthDegrees >= 20 && azimuthDegrees <= 65
+
       return {
         azimuthDegrees,
         altitudeDegrees: unknown ? null : demoSkylineAltitude(azimuthDegrees),
@@ -66,6 +74,7 @@ export function getDemoHorizon(profileState: string): SkyPathHorizon | undefined
     }),
     wires: [Array.from({ length: 13 }, (_, index) => {
       const fraction = index / 12
+
       return {
         azimuthDegrees: 90 + fraction * 60,
         altitudeDegrees: 27 - 4 * Math.sin(fraction * Math.PI),
@@ -78,6 +87,7 @@ export function getDemoHorizon(profileState: string): SkyPathHorizon | undefined
 export function getMoonSamples(phase = 'gibbous'): (SkyPathMoonSample | null)[] | undefined {
   if (phase === 'none') return undefined
   const illuminationFraction = phase === 'crescent' ? .22 : phase === 'full' ? 1 : phase === 'new' ? 0 : .68
+
   return Array.from({ length: 49 }, (_, index) => phase === 'unavailable' ? null : ({
     azimuthDegrees: 180 + index * 2.5,
     altitudeDegrees: 48 - index * 1.4,

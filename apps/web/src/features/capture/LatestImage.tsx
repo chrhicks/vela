@@ -16,6 +16,7 @@ export function useLoadedImage(image: CaptureImage | null, native = false) {
   const url = native ? image?.imageUrl : image?.fitImageUrl ?? image?.imageUrl
 
   type Request = { image: CaptureImage, url: string, native: boolean }
+
   const latest = useRef<Request | null>(null)
   const inFlight = useRef<{ cancel: () => void } | null>(null)
   const scope = useRef<string | undefined>(undefined)
@@ -29,6 +30,7 @@ export function useLoadedImage(image: CaptureImage | null, native = false) {
   useEffect(() => {
     // Native image URLs share a Rig-specific directory. Never keep a different Rig's image.
     const nextScope = image?.imageUrl.slice(0, image.imageUrl.lastIndexOf('/'))
+
     if (!image || nextScope !== scope.current) {
       inFlight.current?.cancel()
       inFlight.current = null
@@ -36,8 +38,10 @@ export function useLoadedImage(image: CaptureImage | null, native = false) {
       setLoading(false)
       setFailed(false)
     }
+
     scope.current = nextScope
     latest.current = image ? { image, url: url!, native } : null
+
     if (!latest.current || inFlight.current) return
 
     function load(frame: Request) {
@@ -46,13 +50,16 @@ export function useLoadedImage(image: CaptureImage | null, native = false) {
       let timer: number | undefined
       let timeout: number | undefined
       let candidate: HTMLImageElement | undefined
+
       function detach() {
         window.clearTimeout(timeout)
+
         if (candidate) {
           candidate.onload = null
           candidate.onerror = null
         }
       }
+
       inFlight.current = { cancel() {
         cancelled = true
         window.clearTimeout(timer)
@@ -65,8 +72,10 @@ export function useLoadedImage(image: CaptureImage | null, native = false) {
         if (cancelled) return
         detach()
         inFlight.current = null
+
         if (success) setLoaded({ image: frame.image, url: frame.url })
         const next = latest.current
+
         if (next && (next.image.id !== frame.image.id || next.url !== frame.url)) {
           // Complete useful work, then skip intermediate arrivals and load the newest.
           load(next)
@@ -75,22 +84,29 @@ export function useLoadedImage(image: CaptureImage | null, native = false) {
           setFailed(!success)
         }
       }
+
       function attemptLoad() {
         candidate = new Image()
         const current = candidate
+
         function failedAttempt() {
           detach()
+
           if (cancelled) return
+
           if (attempt < 2) timer = window.setTimeout(attemptLoad, ++attempt * 1500)
           else settled(false)
         }
+
         current.onload = () => settled(true)
         current.onerror = failedAttempt
         timeout = window.setTimeout(failedAttempt, frame.native ? 60_000 : 15_000)
         current.src = frame.url
       }
+
       attemptLoad()
     }
+
     load(latest.current)
     // Immutable IDs and URLs prevent telemetry polls restarting a request.
   }, [id, url, native])
@@ -128,11 +144,13 @@ export function LatestImage({ image, busy, interrupted, rigId, savedDetail = fal
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000)
+
     return () => window.clearInterval(timer)
   }, [])
 
   useLayoutEffect(() => {
     const viewport = imageWindow.current
+
     if (!viewport) return
     viewport.scrollLeft = nativeVisible && frame ? Math.max(0, (frame.width - viewport.clientWidth) / 2) : 0
     viewport.scrollTop = nativeVisible && frame ? Math.max(0, (frame.height - viewport.clientHeight) / 2) : 0
@@ -141,6 +159,7 @@ export function LatestImage({ image, busy, interrupted, rigId, savedDetail = fal
   const seconds = frame ? Math.max(0, Math.floor((now - Date.parse(frame.receivedAt)) / 1000)) : 0
   const age = seconds < 60 ? `${seconds} s ago` : seconds < 3600 ? `${Math.floor(seconds / 60)} min ago` : `${Math.floor(seconds / 3600)} h ago`
   const previous = busy || interrupted || (!!frame && frame.id !== image?.id)
+
   const frameSaved = !!frame && (frame.saved || (image?.id === frame.id && image.saved)
     || (retention.result?.image.id === frame.id && retention.result.status === 'saved'))
 
@@ -189,6 +208,7 @@ export function LatestImage({ image, busy, interrupted, rigId, savedDetail = fal
 }
 
 type KeptFrame = Pick<CaptureImage, 'id' | 'capturedAt'>
+
 type KeepResult = { image: KeptFrame } & (
   | { status: 'saving' }
   | { status: 'saved' }
@@ -199,14 +219,17 @@ type KeepResult = { image: KeptFrame } & (
 function useImageRetention(rigId: string | undefined) {
   const [result, setResult] = useState<KeepResult | null>(null)
   const writing = useRef(false)
+
   async function keep(image: KeptFrame) {
     if (!rigId || writing.current) return
     writing.current = true
     setResult({ image, status: 'saving' })
+
     try {
       const response = await api<unknown>(`rigs/${encodeURIComponent(rigId)}/capture/images/${encodeURIComponent(image.id)}/keep`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(30_000),
       })
+
       if (!isSavedImage(response, rigId) || response.id !== image.id) throw new Error('Invalid saved image response')
       setResult({ image, status: 'saved' })
     } catch (cause) {
@@ -219,5 +242,6 @@ function useImageRetention(rigId: string | undefined) {
       writing.current = false
     }
   }
+
   return { result, pending: result?.status === 'saving', keep }
 }

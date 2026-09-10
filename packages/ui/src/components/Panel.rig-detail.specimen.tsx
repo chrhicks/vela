@@ -9,13 +9,19 @@ import { Panel } from './Panel'
 import './Panel.rig-detail.specimen.css'
 
 const screens = ['rig', 'home'] as const
+
 const rigs = ['askar', 'seestar'] as const
+
 const scenarios = ['live', 'disconnected', 'mixed', 'stale', 'offline'] as const
 
 type Screen = (typeof screens)[number]
+
 type RigId = (typeof rigs)[number]
+
 type Scenario = (typeof scenarios)[number]
+
 type DeviceKind = 'telescope' | 'camera' | 'focuser' | 'filter-wheel' | 'conditions' | 'switch'
+
 type Connection = 'connected' | 'disconnected' | 'unavailable' | 'last-known'
 
 interface Metric {
@@ -271,8 +277,11 @@ function ShellHeader() {
 
 function connectionPresentation(connection: Connection) {
   if (connection === 'connected') return { label: 'Connected', tone: 'positive' as const }
+
   if (connection === 'disconnected') return { label: 'Disconnected', tone: 'warning' as const }
+
   if (connection === 'last-known') return { label: 'Last known', tone: 'warning' as const }
+
   return { label: 'Unavailable', tone: 'danger' as const }
 }
 
@@ -384,20 +393,26 @@ function DeviceCard({ device }: { device: DeviceFixture }) {
 
 function countSummary(devices: ReadonlyArray<DeviceFixture>, scenario: Scenario): string {
   if (scenario === 'offline') return `${devices.length} devices · status unavailable`
+
   if (scenario === 'stale') return `${devices.length} devices · last update 42 seconds ago`
 
   const connected = devices.filter((device) => device.connection === 'connected').length
   const disconnected = devices.filter((device) => device.connection === 'disconnected').length
   const unavailable = devices.length - connected - disconnected
   const parts = [`${connected} of ${devices.length} devices connected`]
+
   if (disconnected > 0) parts.push(`${disconnected} disconnected`)
+
   if (unavailable > 0) parts.push(`${unavailable} unavailable`)
+
   return parts.join(' · ')
 }
 
 function reachability(scenario: Scenario) {
   if (scenario === 'offline') return { label: 'Offline', tone: 'danger' as const }
+
   if (scenario === 'stale') return { label: 'Updates interrupted', tone: 'warning' as const }
+
   return { label: 'Reachable', tone: 'positive' as const }
 }
 

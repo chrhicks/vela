@@ -7,6 +7,7 @@ import { Select } from './Select'
 import './Panel.imaging-camera.specimen.css'
 
 type Props = Record<string, string | number | boolean>
+
 const cameras = [
   { value: 'main', label: 'ZWO ASI2600MC Pro · ASI Camera (1)' },
   { value: 'guide', label: 'ZWO ASI220MM Mini · ASI Camera (2)' },
@@ -26,6 +27,7 @@ function ImagingCameraPreview({ props, onPropsChange }: { props: Props, onPropsC
   const slot = saved === 'guide' ? 'ASI Camera (2)' : 'ASI Camera (1)'
   const selected = choice || (saved === 'none' ? '' : saved)
   const choices = state === 'missing' ? cameras.filter(camera => camera.value !== saved) : cameras
+
   const notice = state === 'offline' ? 'Rig updates are interrupted. The saved camera is remembered; reconnect to check or change it.'
     : state === 'missing' ? 'The saved camera is not in the rig’s current device list. Choose a camera or check its connection to the server.'
     : state === 'changed' ? `${slot} now reports a different camera. Check the driver setup, then confirm which camera to use.`
@@ -42,7 +44,9 @@ function ImagingCameraPreview({ props, onPropsChange }: { props: Props, onPropsC
           {!editing && <Button tone="quiet" size="small" disabled={locked} onClick={() => { setChoice(saved); update({ editing: true }) }}>Change</Button>}
         </div>
         {notice && <p className="vela-imaging-notice" role="status">{notice}</p>}
-        {editing && <form className="vela-imaging-form" onSubmit={event => { event.preventDefault(); if (choices.some(camera => camera.value === selected) && !locked) { update({ camera: selected, editing: false, state: 'ready' }); setChoice('') } }}>
+        {editing && <form className="vela-imaging-form" onSubmit={event => { event.preventDefault();
+
+ if (choices.some(camera => camera.value === selected) && !locked) { update({ camera: selected, editing: false, state: 'ready' }); setChoice('') } }}>
           <Select label="Camera" value={choices.some(camera => camera.value === selected) ? selected : ''} disabled={locked} options={[{ value: '', label: 'Choose a camera', disabled: true }, ...choices]} onChange={event => setChoice(event.target.value)} />
           <p>Remembered for this rig. You can return here when your setup changes.</p>
           <div><Button tone="accent" type="submit" disabled={!choices.some(camera => camera.value === selected) || locked}>Use this camera</Button>{saved !== 'none' && <Button tone="quiet" type="button" onClick={() => { setChoice(''); update({ editing: false }) }}>Cancel</Button>}</div>

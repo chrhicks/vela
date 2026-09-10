@@ -3,7 +3,9 @@ import type { DesignProfile, WorkingSession } from '@vela/ui/themes'
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init)
   const value = await response.json() as T & { error?: string }
+
   if (!response.ok) throw new Error(value.error ?? `Request failed: ${response.status}`)
+
   return value
 }
 

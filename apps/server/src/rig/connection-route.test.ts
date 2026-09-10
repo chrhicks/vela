@@ -12,10 +12,12 @@ const disconnectedCamera: AlpacaDeviceInspection = {
   connection: 'disconnected',
   telemetry: { availability: 'unavailable' },
 }
+
 const connectedCamera: AlpacaDeviceInspection = {
   ...disconnectedCamera,
   connection: 'connected',
 }
+
 const record = {
   id: 'rig-1',
   name: 'Backyard rig',
@@ -26,15 +28,19 @@ const record = {
     devices: [{ uniqueId: 'camera-0', kind: 'camera' as const, name: 'Camera slot' }],
   },
 }
+
 const now = () => new Date('2026-09-04T20:00:00.000Z')
 
 function createInspector(...results: ReadonlyArray<ReadonlyArray<AlpacaDeviceInspection> | Error>) {
   let index = 0
+
   return () => ({
     async inspectDevices() {
       const result = results[Math.min(index, results.length - 1)]
       index += 1
+
       if (result instanceof Error) throw result
+
       return result ?? []
     },
   })
@@ -69,11 +75,14 @@ describe('Rig connection API', () => {
 
   it('connects through one command and returns a refreshed semantic result', async () => {
     let camera = disconnectedCamera
+
     const connectDevice = vi.fn(async (_id: string, options?: { readonly signal?: AbortSignal }) => {
       expect(options?.signal).toBeInstanceOf(AbortSignal)
       camera = connectedCamera
+
       return { outcome: 'connected', command: 'requested' } as const
     })
+
     const app = buildApp({
       rigCatalog: createMemoryRigCatalog([record]),
       createInspector: () => ({ inspectDevices: async () => [camera] }),
@@ -102,6 +111,7 @@ describe('Rig connection API', () => {
 
   it('returns expected offline and unknown command outcomes without a write', async () => {
     const connectDevice = vi.fn()
+
     const app = buildApp({
       rigCatalog: createMemoryRigCatalog([record]),
       createInspector: createInspector(new AlpacaProviderError('Private network details', {
@@ -139,13 +149,17 @@ describe('Rig connection API', () => {
       configuredName: 'Telescope slot',
       name: 'Mount',
     }
+
     const devices = [disconnectedCamera, telescope]
     const requestSignals: AbortSignal[] = []
+
     const connectDevice = vi.fn((id: string, options?: { readonly signal?: AbortSignal }) => {
       if (id !== 'camera-0' || options?.signal === undefined) {
         return Promise.resolve({ outcome: 'connected', command: 'requested' } as const)
       }
+
       requestSignals.push(options.signal)
+
       return new Promise<{
         readonly outcome: 'uncertain'
         readonly reason: 'cancelled'
@@ -155,6 +169,7 @@ describe('Rig connection API', () => {
         }, { once: true })
       })
     })
+
     const app = buildApp({
       rigCatalog: createMemoryRigCatalog([{
         ...record,
@@ -174,9 +189,11 @@ describe('Rig connection API', () => {
     try {
       await app.listen({ host: '127.0.0.1', port: 0 })
       const address = app.server.address()
+
       if (address === null || typeof address === 'string') throw new Error('Expected TCP server address')
 
       let connectionRequest: ReturnType<typeof httpRequest> | undefined
+
       const requestClosed = new Promise<void>((resolve) => {
         connectionRequest = httpRequest({
           host: '127.0.0.1',
@@ -206,6 +223,7 @@ describe('Rig connection API', () => {
   it('rejects an overlapping command for the same Rig', async () => {
     let camera = disconnectedCamera
     let finish: (() => void) | undefined
+
     const connectDevice = vi.fn(() => new Promise<{
       readonly outcome: 'connected'
       readonly command: 'requested'
@@ -215,6 +233,7 @@ describe('Rig connection API', () => {
         resolve({ outcome: 'connected', command: 'requested' })
       }
     }))
+
     const app = buildApp({
       rigCatalog: createMemoryRigCatalog([record]),
       createInspector: () => ({ inspectDevices: async () => [camera] }),

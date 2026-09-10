@@ -6,11 +6,15 @@ import { Panel } from './Panel'
 import './Panel.observation-readiness.specimen.css'
 
 const screens = ['rig', 'observe'] as const
+
 const rigs = ['askar', 'seestar'] as const
+
 const readinessStates = ['ready', 'disconnected', 'connecting', 'partial', 'uncertain', 'offline'] as const
 
 type Screen = (typeof screens)[number]
+
 type RigId = (typeof rigs)[number]
+
 type ReadinessState = (typeof readinessStates)[number]
 
 interface RigFixture {
@@ -107,8 +111,11 @@ function ObservationMark() {
 
 function ReadinessMark({ state }: { readonly state: ReadinessState }) {
   if (state === 'ready') return <span aria-hidden="true">✓</span>
+
   if (state === 'connecting') return <span aria-hidden="true" className="vela-observation-spinner" />
+
   if (state === 'offline') return <span aria-hidden="true">×</span>
+
   if (state === 'partial' || state === 'uncertain') return <span aria-hidden="true">!</span>
 
   return (
@@ -175,17 +182,25 @@ function statePresentation(rig: RigFixture, state: ReadinessState) {
 
 function connectedCount(rig: RigFixture, state: ReadinessState): number | undefined {
   if (state === 'ready') return rig.deviceCount
+
   if (state === 'partial' || state === 'uncertain') return 2
+
   if (state === 'offline' || state === 'connecting') return undefined
+
   return 0
 }
 
 function entryDeviceState(rig: RigFixture, state: ReadinessState, deviceName: string): string {
   if (state === 'ready') return 'Connected'
+
   if (state === 'offline') return 'Unavailable'
+
   if (state === 'connecting') return 'Status updating'
+
   if ((state === 'partial' || state === 'uncertain') && rig.interruptedConnection.confirmedDevices.includes(deviceName)) return 'Connected'
+
   if (state === 'uncertain' && rig.interruptedConnection.stoppedDevice === deviceName) return 'Not confirmed'
+
   return 'Disconnected'
 }
 
@@ -199,6 +214,7 @@ function RigEntry({
   readonly state: ReadinessState
 }) {
   const connected = connectedCount(rig, state)
+
   const summary = state === 'connecting'
     ? 'Device connection is in progress'
     : state === 'offline'
@@ -206,6 +222,7 @@ function RigEntry({
       : state === 'uncertain'
         ? `${connected ?? 0} confirmed connected`
         : `${connected ?? 0} of ${rig.deviceCount} devices connected`
+
   const reachable = state !== 'offline'
 
   return (
@@ -240,6 +257,7 @@ function RigEntry({
         <div className="vela-observation-equipment__grid">
           {rig.devices.map((device) => {
             const deviceState = entryDeviceState(rig, state, device.name)
+
             return (
               <Panel description={device.kind} elevation="raised" key={device.name} title={device.name}>
                 <div className="vela-observation-equipment__status" data-state={deviceState.toLowerCase().replace(' ', '-')}>
@@ -341,11 +359,13 @@ function ObservationWorkspace({
   const presentation = statePresentation(rig, state)
   const connected = connectedCount(rig, state)
   const serverState = state === 'offline' ? 'Offline' : 'Reachable'
+
   const deviceState = connected === undefined
     ? state === 'connecting' ? 'Connecting' : `${rig.deviceCount} known devices`
     : state === 'uncertain'
       ? `${connected} confirmed connected`
       : `${connected} of ${rig.deviceCount} connected`
+
   const liveState = state === 'ready'
     ? 'Available'
     : state === 'partial' ? 'Partially available'

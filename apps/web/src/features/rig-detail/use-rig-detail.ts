@@ -40,14 +40,18 @@ export function useRigDetail(rigId: string): RigDetailResult {
 
     try {
       const view = await loadRigDetail(rigId, nextController.signal)
+
       if (requestGeneration.current !== generation) return
       setState({ view, refreshing: true, interrupted: false })
     } catch (error) {
       if (nextController.signal.aborted || requestGeneration.current !== generation) return
+
       if (error instanceof ApiError && error.status === 404) {
         setState({ refreshing: true, interrupted: false, initialError: 'not-found' })
+
         return
       }
+
       setState((current) => current.view === undefined
         ? { refreshing: true, interrupted: false, initialError: 'unavailable' }
         : { ...current, refreshing: true, interrupted: true })
@@ -84,12 +88,15 @@ export function useRigDetail(rigId: string): RigDetailResult {
       if (timer !== undefined) clearTimeout(timer)
       timer = undefined
     }
+
     const schedule = () => {
       clearTimer()
+
       if (!state.refreshing && document.visibilityState === 'visible') {
         timer = setTimeout(() => void refresh(), refreshIntervalMs)
       }
     }
+
     const visibilityChanged = () => {
       if (document.visibilityState === 'visible') void refresh()
       else clearTimer()
@@ -97,6 +104,7 @@ export function useRigDetail(rigId: string): RigDetailResult {
 
     document.addEventListener('visibilitychange', visibilityChanged)
     schedule()
+
     return () => {
       clearTimer()
       document.removeEventListener('visibilitychange', visibilityChanged)

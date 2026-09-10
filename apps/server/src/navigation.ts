@@ -9,10 +9,13 @@ export function registerNavigation(
 ) {
   app.get('/api/web/navigation', async (): Promise<NavigationView> => {
     const rigs = (await catalog.list()).map(({ id, name }) => ({ id, name }))
+
     const captures = rigs.flatMap(rig => {
       const current = capture.snapshot(rig.id)
+
       return current ? [{ ...current, rigName: rig.name }] : []
     })
+
     return { rigs, captures }
   })
 }

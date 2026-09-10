@@ -5,6 +5,7 @@ import { isCaptureView } from './validation'
 
 export function captureActivity(view: CaptureView, offline: boolean) {
   if (offline) return 'Connection interrupted'
+
   return {
     idle: 'Ready for an exposure', exposing: 'Exposing', reading: 'Receiving image', saving: 'Saving image', stopping: 'Stopping capture',
     complete: 'Image received', stopped: 'Capture stopped', failed: 'Capture stopped · error',
@@ -30,16 +31,20 @@ export function useCapture(rigId: string) {
     const current = generation.current
     request.current = controller
     setRefreshing(true)
+
     try {
       const next = await api<unknown>(`web/rigs/${encodeURIComponent(rigId)}/capture`, {
         signal: AbortSignal.any([controller.signal, AbortSignal.timeout(5000)]),
       })
+
       if (!isCaptureView(next, rigId)) throw new Error('Invalid capture response')
+
       if (!alive.current || current !== generation.current) return
       const interruptedExposure = lastView.current?.active && next.phase === 'idle'
       lastView.current = next
       setView(next)
       setOffline(false)
+
       if (interruptedExposure) {
         setCommandUnconfirmed(true)
         setError('Vela no longer tracks the exposure that was active. Check capture state before starting another exposure.')
@@ -50,10 +55,12 @@ export function useCapture(rigId: string) {
     } catch (cause) {
       if (!alive.current || current !== generation.current) return
       setOffline(true)
+
       if (cause instanceof ApiError && cause.status === 404) setError('This Rig is no longer available.')
     } finally {
       if (request.current === controller) {
         request.current = null
+
         if (alive.current && current === generation.current) setRefreshing(false)
       }
     }
@@ -63,11 +70,15 @@ export function useCapture(rigId: string) {
     alive.current = true
     let disposed = false
     let timer: ReturnType<typeof setTimeout>
+
     async function poll() {
       await read()
+
       if (!disposed) timer = setTimeout(poll, 1000)
     }
+
     void poll()
+
     return () => {
       disposed = true
       alive.current = false
@@ -84,6 +95,7 @@ export function useCapture(rigId: string) {
 
   async function command(action: 'start' | 'stop', exposureSeconds?: number, repeat = false, saveFrames = false) {
     if (writing.current || !alive.current || (action === 'start' ? !canStart : !canStop)) return
+
     if (action === 'start' && (exposureSeconds === undefined || !Number.isFinite(exposureSeconds) || exposureSeconds < 0.1 || exposureSeconds > 600)) return
     const controller = new AbortController()
     // A deliberate command supersedes a quiet poll. Its late result cannot
@@ -95,13 +107,16 @@ export function useCapture(rigId: string) {
     setRefreshing(false)
     setPending(true)
     setError(null)
+
     try {
       const next = await api<unknown>(`rigs/${encodeURIComponent(rigId)}/capture/${action}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(action === 'start' ? { exposureSeconds, repeat, saveFrames } : {}),
         signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]),
       })
+
       if (!isCaptureView(next, rigId)) throw new Error('Invalid capture response')
+
       if (!alive.current || current !== generation.current) return
       lastView.current = next
       setView(next)
@@ -114,6 +129,7 @@ export function useCapture(rigId: string) {
       if (request.current === controller) {
         request.current = null
         writing.current = false
+
         if (alive.current && current === generation.current) setPending(false)
       }
     }

@@ -12,12 +12,14 @@ import './targets.css'
 
 export function Targets() {
   const { rigId = '', targetId } = useParams()
+
   return <section className="vela-rig-page"><Link className="vela-rig-page__back" to={`/rigs/${encodeURIComponent(rigId)}/observe`}>← Observe</Link>
     <article className="vela-target-demo"><main className="vela-target-main">
       {targetId ? <TargetComposition key={`${rigId}/${targetId}`} rigId={rigId} targetId={targetId} /> : <TargetBrowser key={rigId} rigId={rigId} />}
     </main></article>
   </section>
 }
+
 function TargetComposition({ rigId, targetId }: { rigId: string, targetId: string }) {
   const [params] = useSearchParams()
   const [target, setTarget] = useState<TargetView | null>(null)
@@ -35,12 +37,16 @@ function TargetComposition({ rigId, targetId }: { rigId: string, targetId: strin
   useEffect(() => {
     const controller = new AbortController()
     setLoadError(false)
+
     const fetchTarget = () => api<unknown>(`web/rigs/${encodeURIComponent(rigId)}/targets/${encodeURIComponent(targetId)}`, { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]) }).then(next => {
       if (!isTarget(next) || next.id !== targetId) throw new Error('Invalid target response')
+
       if (!controller.signal.aborted) { setTarget(next); setSkyStale(false) }
     }).catch(() => { if (!controller.signal.aborted) { setLoadError(true); setSkyStale(true) } })
+
     void fetchTarget()
     const timer = setInterval(() => void fetchTarget(), 60000)
+
     return () => { controller.abort(); clearInterval(timer) }
   }, [rigId, targetId, retry])
   useEffect(() => {
@@ -52,6 +58,7 @@ function TargetComposition({ rigId, targetId }: { rigId: string, targetId: strin
     heading.current?.focus()
   }, [view, target, targetId])
   const back = <Link className="vela-target-back vela-button" to={{ pathname: `/rigs/${encodeURIComponent(rigId)}/observe/targets`, search: params.toString() }}>← Targets</Link>
+
   if (!target) return <>{back}<p role="status">{loadError ? 'Could not load this target.' : 'Loading target…'}</p>{loadError && <Button onClick={() => setRetry(r => r + 1)}>Try again</Button>}</>
   const matching = view?.targetId === targetId
   const position = desired ?? target
@@ -60,12 +67,16 @@ function TargetComposition({ rigId, targetId }: { rigId: string, targetId: strin
   const locked = !!view?.active || pending || checked
   const settingsLocked = locked || offline || commandUnconfirmed
   const actual = matching ? view?.actual ?? null : null
+
   const status = offline ? 'Connection interrupted · last known state' : pending ? 'Sending command…' : !view ? 'Loading rig state…' : commandUnconfirmed && !view.active ? 'Check rig state before continuing' : {
     idle: 'Ready to frame', slewing: 'Slewing to composition', exposing: 'Taking test exposure', solving: 'Solving test exposure', checked: checked ? 'Framing checked' : 'Composition not checked', stopping: 'Stopping framing', stopped: 'Framing stopped', failed: 'Framing not confirmed',
   }[view.phase]
+
   const exposure = Number(seconds), focal = Number(focalLength)
+
   async function startFraming() {
     const accepted = await framing.start({ targetId, ...position, exposureSeconds: exposure })
+
     if (accepted?.targetId === targetId
       && accepted.desired?.raDegrees === position.raDegrees
       && accepted.desired.decDegrees === position.decDegrees
@@ -76,6 +87,7 @@ function TargetComposition({ rigId, targetId }: { rigId: string, targetId: strin
 
   async function refreshFraming() {
     const current = await framing.refresh()
+
     if (current?.targetId === targetId
       && current.desired?.raDegrees === position.raDegrees
       && current.desired.decDegrees === position.decDegrees
@@ -83,6 +95,7 @@ function TargetComposition({ rigId, targetId }: { rigId: string, targetId: strin
       setAdjusting(false)
     }
   }
+
   return <>{back}
     <header className="vela-target-heading"><div><p>{view?.rigName ?? 'Observe'} / Targets</p><div className="vela-target-identity"><h1 ref={heading} tabIndex={-1}>{target.name}</h1><Badge>{target.catalog}</Badge></div></div></header>
     <div className="vela-target-layout">

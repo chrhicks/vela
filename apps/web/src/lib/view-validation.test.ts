@@ -107,6 +107,7 @@ describe('web View validation', () => {
       connections: { total: 0, connected: 0, disconnected: 0, unavailable: 0 },
       capabilities: ['forget'],
     }
+
     expect(isHomeView({
       rigs: [validHomeRig, { ...validHomeRig }],
       refreshedAt: observedAt,

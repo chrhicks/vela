@@ -4,6 +4,7 @@ import { observation } from './fixtures/observation'
 import type { CaptureView } from '@vela/model/web'
 
 const theme = resolveTheme(VELA_CURRENT_PROFILE)
+
 const tokens = themeStyle(theme, 'dark')
 
 for (const width of [1040, 390]) {
@@ -21,8 +22,10 @@ for (const width of [1040, 390]) {
     // profile or app CSS replaces inherited theme values with root-sized text.
     const actualTokens = await page.locator('.vela-theme').evaluate((element, names) => {
       const style = getComputedStyle(element)
+
       return Object.fromEntries(names.map(name => [name, style.getPropertyValue(name).trim()]))
     }, Object.keys(tokens))
+
     expect(actualTokens).toEqual(tokens)
     await expect(page.locator('.vela-button').first()).toHaveCSS('border-radius', `${theme.radius}px`)
     await expect(panel).toHaveCSS('border-radius', `${theme.radius * 1.25}px`)
@@ -36,6 +39,7 @@ for (const width of [1040, 390]) {
       unavailableReason: null, phase: 'idle', active: false, exposureSeconds: 2, elapsedSeconds: 0,
       error: null, saveFrames: false, savedImageCount: 0, latestImage: null, repeat: false, completedCount: 0,
     }
+
     await page.route('**/api/web/rigs/rig-1/capture', route => route.fulfill({
       contentType: 'application/json', body: JSON.stringify(capture),
     }))

@@ -23,8 +23,11 @@ function fakeFetch(
     const key = `${url.pathname}${url.search}`
     requests.push(key)
     const result = routes[key] ?? routes[url.pathname]
+
     if (result instanceof Error) throw result
+
     if (result === undefined) return new Response('Not found', { status: 404 })
+
     return Response.json(result)
   }) as typeof globalThis.fetch
 }
@@ -41,6 +44,7 @@ const devices = [
 function commonRoutes() {
   return Object.fromEntries(devices.flatMap((device) => {
     const base = `/api/v1/${device.DeviceType.toLowerCase()}/${device.DeviceNumber}`
+
     return [
       [`${base}/connected`, envelope(true)],
       [`${base}/name`, envelope(`${device.DeviceType} hardware`)],
@@ -151,6 +155,7 @@ describe('Alpaca device inspection', () => {
 
   it('does not request telemetry for disconnected devices and falls back to the configured name', async () => {
     const requests: string[] = []
+
     const provider = createAlpacaProvider({
       baseUrl: 'http://alpaca.test',
       fetch: fakeFetch({
@@ -333,6 +338,7 @@ describe('Alpaca device inspection', () => {
 
   it('reads cooler power while cooling is off when the camera reports it', async () => {
     const requests: string[] = []
+
     const provider = createAlpacaProvider({
       baseUrl: 'http://alpaca.test',
       fetch: fakeFetch({
@@ -387,6 +393,7 @@ describe('Alpaca device inspection', () => {
 
   it('keeps optional telescope slewing separate from mandatory mount state', async () => {
     const telescope = devices[1]
+
     const routes = {
       '/management/v1/configureddevices': envelope([telescope]),
       '/api/v1/telescope/0/connected': envelope(true),
@@ -396,6 +403,7 @@ describe('Alpaca device inspection', () => {
       '/api/v1/telescope/0/slewing': envelope(false, 1024, 'Not implemented'),
       '/api/v1/telescope/0/tracking': envelope(false),
     }
+
     const provider = createAlpacaProvider({ baseUrl: 'http://alpaca.test', fetch: fakeFetch(routes) })
 
     const [inspection] = await provider.inspectDevices()
@@ -411,12 +419,14 @@ describe('Alpaca device inspection', () => {
         '/api/v1/telescope/0/athome': envelope(false, 1024, 'Not implemented'),
       }),
     })
+
     const [invalidInspection] = await invalidProvider.inspectDevices()
     expect(invalidInspection?.telemetry.availability).toBe('partial')
   })
 
   it('omits contradictory parked, home, slewing, and tracking combinations', async () => {
     const telescope = devices[1]
+
     const cases = [
       {
         state: { parked: true, atHome: false, slewing: false, tracking: true },
@@ -460,6 +470,7 @@ describe('Alpaca device inspection', () => {
 
   it('omits invalid absolute focuser positions and requires motion state', async () => {
     const focuser = devices[2]
+
     const routes = {
       '/management/v1/configureddevices': envelope([focuser]),
       '/api/v1/focuser/0/connected': envelope(true),
@@ -470,6 +481,7 @@ describe('Alpaca device inspection', () => {
       '/api/v1/focuser/0/ismoving': envelope(false),
       '/api/v1/focuser/0/temperature': envelope(0, 1024, 'Not implemented'),
     }
+
     const provider = createAlpacaProvider({ baseUrl: 'http://alpaca.test', fetch: fakeFetch(routes) })
 
     const [inspection] = await provider.inspectDevices()
@@ -486,12 +498,14 @@ describe('Alpaca device inspection', () => {
         '/api/v1/focuser/0/ismoving': envelope(false, 1024, 'Not implemented'),
       }),
     })
+
     const [missingMotion] = await missingMotionProvider.inspectDevices()
     expect(missingMotion?.telemetry.availability).toBe('partial')
   })
 
   it('marks one-sided humidity and dew-point support partial', async () => {
     const conditions = devices[4]
+
     const provider = createAlpacaProvider({
       baseUrl: 'http://alpaca.test',
       fetch: fakeFetch({
@@ -513,6 +527,7 @@ describe('Alpaca device inspection', () => {
 
   it('omits humidity outside the protocol range and marks conditions partial', async () => {
     const conditions = devices[4]
+
     const provider = createAlpacaProvider({
       baseUrl: 'http://alpaca.test',
       fetch: fakeFetch({
@@ -544,6 +559,7 @@ describe('Alpaca device inspection', () => {
 
   it('omits invalid filter positions and marks the inspection partial', async () => {
     const filterWheel = devices[3]
+
     const provider = createAlpacaProvider({
       baseUrl: 'http://alpaca.test',
       fetch: fakeFetch({
@@ -673,6 +689,7 @@ describe('Alpaca device inspection', () => {
 
   it('reports connected kinds without an inspector as unavailable telemetry', async () => {
     const dome = configured('Dome', 0)
+
     const provider = createAlpacaProvider({
       baseUrl: 'http://alpaca.test',
       fetch: fakeFetch({
@@ -713,6 +730,7 @@ describe('Alpaca device inspection', () => {
 
   it('bounds malformed switch channel counts before reading individual channels', async () => {
     const requests: string[] = []
+
     const provider = createAlpacaProvider({
       baseUrl: 'http://alpaca.test',
       fetch: fakeFetch({
@@ -739,6 +757,7 @@ describe('Alpaca device inspection', () => {
 
   it('rejects exponent-overflow numbers before they reach normalized telemetry', async () => {
     const conditions = devices[4]
+
     const fallback = fakeFetch({
       '/management/v1/configureddevices': envelope([conditions]),
       '/api/v1/observingconditions/0/connected': envelope(true),
@@ -746,16 +765,20 @@ describe('Alpaca device inspection', () => {
       '/api/v1/observingconditions/0/humidity': envelope(50),
       '/api/v1/observingconditions/0/dewpoint': envelope(12),
     })
+
     const fetch = (async (input, init) => {
       const url = new URL(String(input))
+
       if (url.pathname.endsWith('/temperature')) {
         return new Response(
           '{"Value":1e400,"ClientTransactionID":0,"ServerTransactionID":1,"ErrorNumber":0,"ErrorMessage":""}',
           { headers: { 'content-type': 'application/json' } },
         )
       }
+
       return fallback(input, init)
     }) as typeof globalThis.fetch
+
     const provider = createAlpacaProvider({ baseUrl: 'http://alpaca.test', fetch })
 
     const [inspection] = await provider.inspectDevices()
@@ -771,10 +794,13 @@ describe('Alpaca device inspection', () => {
       const controller = new AbortController()
       const cancellation = new Error('superseded')
       let markReadStarted!: () => void
+
       const readStarted = new Promise<void>((resolve) => {
         markReadStarted = resolve
       })
+
       const requests: string[] = []
+
       const fallback = fakeFetch({
         '/management/v1/configureddevices': envelope([devices[0]]),
         '/api/v1/camera/0/connected': envelope(true),
@@ -784,17 +810,21 @@ describe('Alpaca device inspection', () => {
         '/api/v1/camera/0/cangetcoolerpower': envelope(false),
         '/api/v1/camera/0/cooleron': envelope(false),
       })
+
       const fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
         const path = new URL(String(input)).pathname
         requests.push(path)
+
         if (path === `/api/v1/camera/0/${operation}`) {
           return new Promise<Response>((_resolve, reject) => {
             init?.signal?.addEventListener('abort', () => reject(init.signal?.reason), { once: true })
             markReadStarted()
           })
         }
+
         return fallback(input, init)
       })
+
       const provider = createAlpacaProvider({ baseUrl: 'http://alpaca.test', fetch })
 
       const inspection = provider.inspectDevices({ signal: controller.signal })

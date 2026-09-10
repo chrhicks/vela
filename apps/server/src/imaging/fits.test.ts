@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { encodeCaptureFits } from './fits.js'
 
 const metadata = { exposureSeconds: 1.5, cameraName: "Chris's camera" }
+
 const frame = { width: 3, height: 2, pixels: [-2_147_483_648, -1, 0, 1, 65535, 2_147_483_647], capturedAt: '2026-09-05T19:00:00-04:00' }
+
 function header(buffer: Buffer) { return buffer.subarray(0, 2880).toString('ascii').match(/.{80}/g)! }
 
 describe('original capture FITS', () => {
@@ -32,18 +34,22 @@ describe('original capture FITS', () => {
     const fits = await encodeCaptureFits(frame, { ...metadata, cameraName: "é'".repeat(100) })
     expect(header(fits).find(card => card.startsWith('INSTRUME'))!.trimEnd().endsWith("'")).toBe(true)
     expect(header(fits)).toContain("ROWORDER= 'TOP-DOWN'".padEnd(80))
+
     for (const value of [NaN, 0.1, 2_147_483_648, -2_147_483_649]) {
       await expect(encodeCaptureFits({ ...frame, pixels: [value, 0, 0, 0, 0, 0] }, metadata)).rejects.toThrow('signed 32-bit')
     }
+
     await expect(encodeCaptureFits({ ...frame, width: 4 }, metadata)).rejects.toThrow('dimensions')
   })
 
   it('yields before a large frame is completely encoded', async () => {
     let observed = false
+
     const tick = new Promise<void>(resolve => setImmediate(() => {
       observed = true
       resolve()
     }))
+
     const pending = encodeCaptureFits({ ...frame, width: 1024, height: 1024, pixels: new Int32Array(1024 * 1024) }, metadata)
     await tick
     expect(observed).toBe(true)

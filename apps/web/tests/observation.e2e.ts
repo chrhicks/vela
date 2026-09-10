@@ -37,7 +37,9 @@ test('connects once, shows neutral progress, and focuses the confirmed result', 
   let reads = 0
   let finish!: () => void
   const pending = new Promise<void>((resolve) => { finish = resolve })
-  await page.route('**/api/web/rigs/rig-1/observe', (route) => { reads++; return respond(route, observation(commands ? 'complete' : 'available')) })
+  await page.route('**/api/web/rigs/rig-1/observe', (route) => { reads++;
+
+ return respond(route, observation(commands ? 'complete' : 'available')) })
   await page.route('**/api/rigs/rig-1/connections', async (route) => {
     commands++
     await pending
@@ -63,6 +65,7 @@ test('renders partial rejection and only retries with a new explicit command', a
   await page.route('**/api/web/rigs/rig-1/observe', (route) => respond(route, observation()))
   await page.route('**/api/rigs/rig-1/connections', (route) => {
     commands++
+
     return respond(route, { outcome: 'partial', confirmedConnected: [device(0)], failed: { ...device(1), reason: 'rejected' }, notAttempted: [device(2)], view: observation() })
   })
   await page.goto('/rigs/rig-1/observe')
@@ -80,6 +83,7 @@ test('uncertainty requires a state check before offering another command', async
   await page.route('**/api/web/rigs/rig-1/observe', (route) => respond(route, observation()))
   await page.route('**/api/rigs/rig-1/connections', (route) => {
     commands++
+
     return respond(route, { outcome: 'uncertain', confirmedConnected: [device(0)], uncertain: { ...device(1), reason: 'verification-timeout' }, notAttempted: [device(2)], view: observation('unavailable') })
   })
   await page.goto('/rigs/rig-1/observe')
@@ -95,9 +99,12 @@ for (const failure of ['transport', 'malformed', 'conflicting-fields']) {
   test(`reconciles a ${failure} command response without replaying it`, async ({ page }) => {
     let commands = 0
     let reads = 0
-    await page.route('**/api/web/rigs/rig-1/observe', (route) => { reads++; return respond(route, observation(commands ? 'complete' : 'available')) })
+    await page.route('**/api/web/rigs/rig-1/observe', (route) => { reads++;
+
+ return respond(route, observation(commands ? 'complete' : 'available')) })
     await page.route('**/api/rigs/rig-1/connections', (route) => {
       commands++
+
       return failure === 'transport' ? route.abort() : respond(route, failure === 'malformed' ? { outcome: 'complete' } : {
         outcome: 'uncertain', confirmedConnected: [], notAttempted: [], uncertain: { ...device(0), reason: 'write-outcome-unknown' }, failed: null, view: observation(),
       })
@@ -147,11 +154,13 @@ test('failed reconciliation keeps commands blocked until an explicit successful 
   let failReads = false
   await page.route('**/api/web/rigs/rig-1/observe', (route) => {
     reads++
+
     return failReads ? route.abort() : respond(route, observation())
   })
   await page.route('**/api/rigs/rig-1/connections', (route) => {
     commands++
     failReads = true
+
     return route.abort()
   })
   await page.goto('/rigs/rig-1/observe')
@@ -208,6 +217,7 @@ test('leaving a pending command cannot overwrite another Rig', async ({ page }) 
   await page.route('**/api/web/home', (route) => respond(route, {
     rigs: ['rig-1', 'rig-2'].map((id) => {
       const { name, connections, capabilities, refreshedAt } = observation('available', id).rig
+
       return { id, name, connections, capabilities, reachability: 'reachable', lastSeenAt: refreshedAt }
     }),
     refreshedAt: observation().rig.refreshedAt,

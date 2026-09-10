@@ -63,19 +63,23 @@ export async function inspectRigDetail(
   }: RigDetailOptions = {},
 ): Promise<InspectRigDetailResult> {
   const record = await catalog.get(rigId)
+
   if (record === undefined) return { state: 'not-found' }
 
   let inspections: ReadonlyArray<AlpacaDeviceInspection>
+
   try {
     inspections = await createInspector(record).inspectDevices(
       signal === undefined ? undefined : { signal },
     )
   } catch (error) {
     if (signal?.aborted) throw error
+
     if (!(error instanceof AlpacaProviderError)) throw error
 
     const state = error.reason === 'transport' ? 'offline' : 'needs-attention'
     onUnavailable(record, state, error)
+
     return {
       state: 'unavailable',
       reason: state,
@@ -86,8 +90,10 @@ export async function inspectRigDetail(
   const refreshedAt = now().toISOString()
   const inventory = observedInventory(inspections, refreshedAt)
   const match = await catalog.observe(record.endpoint, inventory)
+
   if (match.state !== 'known' || match.rigId !== record.id) {
     onConflict(record)
+
     return {
       state: 'conflict',
       view: lastKnownRigDetail(record, 'needs-attention', refreshedAt),
@@ -96,6 +102,7 @@ export async function inspectRigDetail(
 
   const devices = inspections.map((inspection) =>
     currentDeviceView(record.id, inspection, refreshedAt))
+
   return {
     state: 'current',
     inspections,
@@ -120,6 +127,7 @@ export async function loadRigDetailView(
   options: RigDetailOptions = {},
 ): Promise<LoadRigDetailResult> {
   const result = await inspectRigDetail(catalog, rigId, options)
+
   return result.state === 'not-found'
     ? result
     : { state: 'found', view: result.view }
@@ -131,6 +139,7 @@ function resolvedRigState(devices: ReadonlyArray<RigDeviceDetailView>): RigState
       && (device.status.availability === 'complete'
         || device.status.availability === 'partial')
       && device.status.activity === 'error')
+
   return hasDeviceError ? 'needs-attention' : 'reachable'
 }
 
@@ -155,6 +164,7 @@ function lastKnownRigDetail(
 ): RigDetailView {
   const devices = record.lastObservedInventory.devices.map((device) =>
     unavailableDeviceView(record.id, device))
+
   return {
     id: record.id,
     name: record.name,

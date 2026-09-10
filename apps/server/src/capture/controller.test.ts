@@ -8,27 +8,34 @@ function deferred<T>() {
   let resolve!: (value: T) => void
   let reject!: (error: unknown) => void
   const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no })
+
   return { promise, resolve, reject }
 }
 
 function setup(savedImages: SavedImageStore = createMemorySavedImageStore()) {
   const requests: Array<Parameters<CaptureCamera['capture']>[0] & ReturnType<typeof deferred<CaptureFrame>>> = []
+
   const camera: CaptureCamera = {
     capture(input) {
       const result = deferred<CaptureFrame>()
       requests.push({ ...input, ...result })
+
       return result.promise
     },
   }
+
   const actual = createCaptureController({ rigId: 'fra 400', rigName: 'FRA 400' }, () => Date.parse('2026-09-05T16:00:10Z'), savedImages)
   const controller = { ...actual, start: (seconds: number, options: CaptureRunOptions = {}) => actual.start(seconds, camera, 'Main camera', options) }
   const frame: CaptureFrame = { width: 4, height: 2, pixels: [0, 100, 500, 1000, 500, 0, 200, 100], capturedAt: '2026-09-05T16:00:00Z' }
+
   async function complete(seconds = 10) {
     await controller.start(seconds)
     requests.at(-1)!.resolve(frame)
     await vi.waitFor(() => expect(controller.active()).toBe(false))
+
     return controller.snapshot().latestImage!
   }
+
   return { controller, requests, frame, complete, savedImages }
 }
 
@@ -148,11 +155,13 @@ it.each(['readout', 'preview'] as const)('stops during %s without another exposu
   const settled = vi.fn()
   await controller.start(10, { onSettled: settled, repeat: true })
   requests[0]!.onProgress({ phase: 'reading', elapsedSeconds: 10 })
+
   if (phase === 'preview') {
     requests[0]!.resolve(frame)
     // Acquisition has completed, while asynchronous PNG compression is pending.
     await Promise.resolve()
   }
+
   expect(controller.snapshot().phase).toBe('reading')
   const stopping = controller.stop()
   expect(controller.snapshot()).toMatchObject({ phase: 'stopping', active: true, completedCount: 0 })
@@ -167,6 +176,7 @@ it.each(['readout', 'preview'] as const)('stops during %s without another exposu
 it('retains an acquired image when optional star analysis is unavailable', async () => {
   const measure = vi.spyOn(statistics, 'measureStars').mockRejectedValueOnce(new Error('Analysis failed'))
   const warning = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
   try {
     const { controller, complete } = setup()
     await complete()
@@ -199,7 +209,9 @@ it('saves every repeated frame before exposing again, including a completed fram
   const gate = deferred<void>()
   const original = store.save.bind(store)
   const save = vi.spyOn(store, 'save')
-  save.mockImplementationOnce(async (...args) => { await gate.promise; return original(...args) })
+  save.mockImplementationOnce(async (...args) => { await gate.promise;
+
+ return original(...args) })
   const { controller, requests, frame } = setup(store)
   await controller.start(10, { repeat: true, saveFrames: true })
   requests[0]!.resolve(frame)

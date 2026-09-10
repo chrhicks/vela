@@ -2,15 +2,19 @@ import type { RigObservationView } from '@vela/model/web'
 
 export function readinessPresentation(view: RigObservationView, connecting: boolean, interrupted: boolean) {
   if (connecting) return connectingPresentation
+
   if (interrupted) return {
     title: 'Live updates are interrupted', badge: 'Last known', tone: 'warning' as const,
     description: 'Showing the most recent state Vela received. Check the Rig again before sending a command.',
   }
+
   if (view.connectionPreparation.state === 'in-progress') return connectingPresentation
+
   if (view.rig.state === 'offline') return {
     title: 'This Rig is offline', badge: 'Offline', tone: 'danger' as const,
     description: 'Vela cannot reach the Rig. Check its power and network connection, then check again.',
   }
+
   switch (view.connectionPreparation.state) {
     case 'available': return {
       title: 'Connect this Rig’s devices', badge: 'Needs connection', tone: 'warning' as const,

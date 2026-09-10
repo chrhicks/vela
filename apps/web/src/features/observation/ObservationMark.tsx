@@ -11,8 +11,11 @@ export function ObservationMark() {
 
 export function ConnectionMark({ busy, tone }: { busy: boolean; tone: string }) {
   if (busy) return <span className="vela-observe-spinner" />
+
   if (tone === 'positive') return <span>✓</span>
+
   if (tone === 'danger') return <span>×</span>
+
   return (
     <svg fill="none" viewBox="0 0 24 24">
       <path d="M8 3v5m8-5v5M6 8h12v3a6 6 0 0 1-12 0V8Z" />
