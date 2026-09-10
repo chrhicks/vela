@@ -29,15 +29,16 @@ function observatory(mechanicalSign = -1) {
   }
   let observation = 0
   const device: AlpacaFraming = {
-    home: vi.fn(async () => { mount.tracking = false }),
+    home: vi.fn(async () => { mount.tracking = false; mount.declinationDegrees = 90 }),
     telescopeStatus: vi.fn(async () => ({ ...mount,
       observedAt: new Date(Date.parse(mount.observedAt) + observation++ * 1000).toISOString() })),
     cameraGeometry: vi.fn(async () => ({ ...camera })),
-    setTracking: vi.fn(async (_id, tracking) => { mount.tracking = tracking }), slew: unexpected, abortTelescope: unexpected,
+    setTracking: vi.fn(async (_id, tracking) => { mount.tracking = tracking }), slew: vi.fn(async target => { mount.rightAscensionDegrees = target.rightAscensionDegrees; mount.declinationDegrees = target.declinationDegrees }), abortTelescope: unexpected,
   }
   const settings = { cameraId: 'camera', cameraName: 'Imager', telescopeId: 'mount', focalLengthMm: 400 }
-  return { mount, camera, mechanics, acquisition, device, settings,
-    alignment: createPhysicalAlignment(settings, acquisition, device) }
+  const settle = vi.fn(async (_signal: AbortSignal) => {})
+  return { mount, camera, mechanics, acquisition, device, settings, settle,
+    alignment: createPhysicalAlignment(settings, acquisition, device, settle) }
 }
 
 describe('physical alignment sweep', () => {
@@ -49,6 +50,8 @@ describe('physical alignment sweep', () => {
     expect(fake.device.home).toHaveBeenCalledTimes(2)
     expect(fake.device.setTracking).toHaveBeenCalledTimes(2)
     expect(fake.mount.tracking).toBe(true)
+    expect(fake.mount.declinationDegrees).toBe(80)
+    expect(fake.device.slew).toHaveBeenCalledTimes(2)
     await fake.alignment.validate(signal)
   })
 
@@ -66,6 +69,10 @@ describe('physical alignment sweep', () => {
     const fake = observatory()
     await fake.alignment.prepare(signal)
     const controller = new AbortController()
+    fake.settle.mockImplementation(next => new Promise((_resolve, reject) => {
+      next.throwIfAborted()
+      next.addEventListener('abort', () => reject(new DOMException('Stopped', 'AbortError')), { once: true })
+    }))
     const pending = fake.alignment.pointing(controller.signal)
     const rejection = expect(pending).rejects.toThrow()
     await vi.waitFor(() => expect(fake.device.telescopeStatus).toHaveBeenCalledTimes(4))
@@ -77,11 +84,8 @@ describe('physical alignment sweep', () => {
   it('rechecks mount state after settling', async () => {
     const fake = observatory()
     await fake.alignment.prepare(signal)
-    const pending = fake.alignment.pointing(signal)
-    const rejection = expect(pending).rejects.toThrow('tracking enabled')
-    await vi.waitFor(() => expect(fake.device.telescopeStatus).toHaveBeenCalledTimes(4))
-    fake.mount.tracking = false
-    await rejection
+    fake.settle.mockImplementation(async () => { fake.mount.tracking = false })
+    await expect(fake.alignment.pointing(signal)).rejects.toThrow('tracking enabled')
   })
 
   it.each([-1, 1])('observes mechanical sign %s and completes two westward 18-degree steps through RA wrap', async sign => {
@@ -96,7 +100,7 @@ describe('physical alignment sweep', () => {
     const secondTravel = (10 - firstTravel - fake.mount.rightAscensionDegrees + 360) % 360
     expect(secondTravel).toBeGreaterThanOrEqual(16)
     expect(secondTravel).toBeLessThanOrEqual(20)
-    expect(fake.mount.declinationDegrees).toBe(60)
+    expect(fake.mount.declinationDegrees).toBe(80)
     const moves = vi.mocked(fake.acquisition.move).mock.calls
     expect(moves[0]).toEqual(['mount', 0.5, 1, signal])
     for (const [, rate, duration] of moves.slice(1)) {
@@ -105,6 +109,23 @@ describe('physical alignment sweep', () => {
     }
     expect(moves.filter(([, rate]) => rate === 0.5)).toHaveLength(1)
     await fake.alignment.validate(signal)
+  })
+
+  it('measures each step after delayed position telemetry settles', async () => {
+    const fake = observatory()
+    await fake.alignment.prepare(signal)
+    fake.settle.mockImplementation(async () => { fake.mount.rightAscensionDegrees -= 0.15 })
+    await fake.alignment.move(signal)
+    // Late telemetry must be included in the reference, not mistaken for a new move.
+    await expect(fake.alignment.validate(signal)).resolves.toBeDefined()
+    expect(fake.settle.mock.calls.length).toBe(1 + vi.mocked(fake.acquisition.move).mock.calls.length)
+  })
+
+  it('rejects a preparation slew that leaves the telescope at the pole', async () => {
+    const fake = observatory()
+    vi.mocked(fake.device.slew).mockImplementation(async () => {})
+    await expect(fake.alignment.prepare(signal)).rejects.toThrow('off-pole')
+    expect(fake.acquisition.move).not.toHaveBeenCalled()
   })
 
   it('accepts modest motor overshoot without a corrective movement', async () => {
@@ -133,7 +154,7 @@ describe('physical alignment sweep', () => {
   it.each([
     { trackingRate: 'solar' }, { pierSide: 'west' }, { latitudeDegrees: 40 },
     { longitudeDegrees: -76 }, { elevationMeters: 151 },
-    { rightAscensionDegrees: 10.1 }, { declinationDegrees: 60.1 },
+    { rightAscensionDegrees: 10.1 }, { declinationDegrees: 80.1 },
   ])('rejects an external change after preparation %j', async changes => {
     const fake = observatory()
     await fake.alignment.prepare(signal)

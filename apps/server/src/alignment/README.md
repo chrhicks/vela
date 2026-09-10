@@ -32,7 +32,10 @@ pixels remain intact for solving; the preview is debayered for display.
 
 Prepare a clear view around the home position and the movement corridor before
 Start. Every physical attempt first homes the mount, confirms completion, and
-restores tracking before settling and taking the first image. Stop and failures
+restores tracking, then slews to Dec +80° at the home RA before settling and taking
+the first image. This preparation is outside the baseline; the measurement itself
+uses RA-only motion. A view along the mechanical pole cannot establish a rotation
+baseline. The reported preparation endpoint is checked before the reference is set. Stop and failures
 leave the mount where it stopped; only a new attempt homes again. A small primary-axis probe establishes the
 driver's mechanical sign; the subsequent two positions are approximately 18°
 and 36° westward in RA. Each step accepts 16–20° of observed travel rather than
