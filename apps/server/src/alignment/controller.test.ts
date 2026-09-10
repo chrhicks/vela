@@ -41,6 +41,7 @@ function setup() {
   let captureOverride: ((signal: AbortSignal) => Promise<AlpacaFrame>) | undefined
   const requests: Array<{ frame: MonoFrame, hint: SkyPosition, result: ReturnType<typeof deferred<SolveResult>> }> = []
   const hardware: AlpacaAcquisition = {
+    rotateRightAscension: async () => { throw new Error('Unexpected physical rotation') },
     async pointing() { return { rightAscensionDegrees: ra, declinationDegrees: dec,
       siderealTimeDegrees: ((exposures + 1) * 360 / 86164.0905 + siderealOffset + 360) % 360, latitudeDegrees: 40, tracking: true, coordinateSystem } },
     async capture({ signal }) {

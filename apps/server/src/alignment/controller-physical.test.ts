@@ -53,6 +53,7 @@ function setup() {
   const captures: AlpacaCaptureOptions[] = []
   const requests: Array<{ index: number, complete: () => void }> = []
   const hardware: AlpacaAcquisition = {
+    rotateRightAscension: async () => { throw new Error('Unexpected physical rotation') },
     capture: vi.fn(async options => {
       captures.push(options)
       const frame = frames[exposures++]!

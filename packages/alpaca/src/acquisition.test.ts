@@ -17,6 +17,9 @@ function observatory() {
     ready: true,
     exposing: false,
     rate: 0,
+    raDegrees: 30,
+    raStep: 2,
+    raReadFails: false,
     imageBinary: null as ArrayBuffer | null,
     image: { Type: 2, Rank: 2, Value: [[1, 3], [2, 4]] } as Record<string, unknown>,
     stamp: '2026-09-05T01:00:00',
@@ -42,6 +45,11 @@ function observatory() {
     let Value: unknown
     if (operation === 'configureddevices') Value = [camera, telescope]
     else if (operation === 'connected' || operation === 'canabortexposure' || operation === 'canmoveaxis' || operation === 'tracking') Value = true
+    else if (operation === 'rightascension') {
+      if (state.raReadFails && state.rate !== 0) throw new TypeError('RA read failed')
+      if (state.rate !== 0) state.raDegrees = (state.raDegrees + Math.sign(state.rate) * state.raStep + 360) % 360
+      Value = state.raDegrees / 15
+    }
     else if (operation === 'name') Value = state.cameraName
     else if (operation === 'axisrates') Value = [{ Minimum: 0, Maximum: 1.5 }]
     else if (operation === 'sensortype') Value = state.sensorType
@@ -66,7 +74,6 @@ function observatory() {
       if (state.stampError) return Response.json({ ClientTransactionID: 0, ServerTransactionID: 1, ErrorNumber: state.stampError, ErrorMessage: 'Timestamp unavailable' })
       Value = state.stamp
     }
-    else if (operation === 'rightascension') Value = 2
     else if (operation === 'declination') Value = 60
     else if (operation === 'sitelatitude') Value = 35
     else if (operation === 'siderealtime') Value = 4
@@ -96,6 +103,7 @@ function observatory() {
   }
   return {
     state,
+    fetch,
     acquisition: createAlpacaAcquisition({ baseUrl: 'http://fake', fetch }),
     complete() {
       state.ready = true
@@ -357,5 +365,173 @@ describe('normalized Alpaca acquisition', () => {
       rightAscensionDegrees: 30, declinationDegrees: 60, siderealTimeDegrees: 60,
       latitudeDegrees: 35, tracking: true, coordinateSystem: 'other',
     })
+  })
+})
+
+
+describe('observed primary-axis rotation', () => {
+  function pendingMotionResponse(phase: 'start' | 'read' | 'body') {
+    const rig = observatory()
+    let reachedPending!: () => void
+    const pending = new Promise<void>(resolve => { reachedPending = resolve })
+    let pendingSignal: AbortSignal | undefined
+    const fetch: typeof globalThis.fetch = async (input, init) => {
+      const response = await rig.fetch(input, init)
+      const operation = new URL(String(input)).pathname.split('/').at(-1)
+      const shouldHold = rig.state.rate !== 0 && (phase === 'start' ? operation === 'moveaxis' : operation === 'rightascension')
+      if (!shouldHold) return response
+      const signal = init!.signal!
+      pendingSignal = signal
+      if (phase === 'body') {
+        // Headers arrived, but the fetch-owned body is still in flight.
+        return new Response(new ReadableStream({
+          start(controller) {
+            signal.addEventListener('abort', () => controller.error(signal.reason), { once: true })
+            reachedPending()
+          },
+        }))
+      }
+      return new Promise<Response>((_, reject) => {
+        signal.addEventListener('abort', () => reject(signal.reason), { once: true })
+        reachedPending()
+      })
+    }
+    return { ...rig, pending, pendingSignal: () => pendingSignal,
+      acquisition: createAlpacaAcquisition({ baseUrl: 'http://fake', fetch }) }
+  }
+
+  it.each(['start', 'read', 'body'] as const)('aborts a pending %s response at the movement deadline and confirms one stop', async phase => {
+    vi.useFakeTimers()
+    try {
+      const rig = pendingMotionResponse(phase)
+      const result = rig.acquisition.rotateRightAscension('mount-id', 1.5, 0.15)
+      const rejection = expect(result).rejects.toThrow('before timeout')
+      await rig.pending
+      expect(rig.state.moves).toEqual([1.5])
+      await vi.advanceTimersByTimeAsync(2200)
+      await rejection
+      expect(rig.pendingSignal()?.aborted).toBe(true)
+      expect(rig.state.moves).toEqual([1.5, 0])
+      expect(rig.state.rate).toBe(0)
+      expect(rig.state.pendingStopReads).toBe(-1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('cancels a pending RA body with the caller reason and confirms one stop', async () => {
+    const rig = pendingMotionResponse('body')
+    const controller = new AbortController()
+    const reason = new Error('Operator cancelled alignment')
+    const result = rig.acquisition.rotateRightAscension('mount-id', 1.5, 5, controller.signal)
+    const rejection = expect(result).rejects.toBe(reason)
+    await rig.pending
+    controller.abort(reason)
+    await rejection
+    expect(rig.pendingSignal()?.aborted).toBe(true)
+    expect(rig.state.moves).toEqual([1.5, 0])
+    expect(rig.state.pendingStopReads).toBe(-1)
+  })
+
+  it('surfaces stop failure ahead of the movement deadline error', async () => {
+    vi.useFakeTimers()
+    try {
+      const rig = pendingMotionResponse('read')
+      const result = rig.acquisition.rotateRightAscension('mount-id', 1.5, 0.15)
+      const rejection = expect(result).rejects.toMatchObject({ reason: 'transport', endpoint: '/api/v1/telescope/3/moveaxis' })
+      await rig.pending
+      rig.state.stopFails = true
+      await vi.advanceTimersByTimeAsync(2200)
+      await rejection
+      expect(rig.state.moves).toEqual([1.5, 0])
+      expect(rig.state.rate).toBe(1.5)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it.each(['elapsed', 'wall'] as const)('uses elapsed time rather than wall-clock time when accepting a threshold response (%s clock jumps)', async clock => {
+    vi.useFakeTimers()
+    try {
+      const rig = observatory()
+      const monotonic = vi.spyOn(performance, 'now').mockReturnValue(0)
+      const fetch: typeof globalThis.fetch = async (input, init) => {
+        const response = await rig.fetch(input, init)
+        if (rig.state.rate !== 0 && String(input).endsWith('/rightascension')) {
+          // The sample exceeds the target. Model a late callback before its
+          // expired timer has run, or an unrelated wall-clock correction.
+          if (clock === 'elapsed') monotonic.mockReturnValue(3000)
+          else vi.setSystemTime(Date.now() + 60_000)
+        }
+        return response
+      }
+      const acquisition = createAlpacaAcquisition({ baseUrl: 'http://fake', fetch })
+      const result = acquisition.rotateRightAscension('mount-id', 1.5, 0.15)
+      if (clock === 'elapsed') await expect(result).rejects.toThrow('before timeout')
+      else await expect(result).resolves.toBeUndefined()
+      expect(rig.state.moves).toEqual([1.5, 0])
+      expect(rig.state.rate).toBe(0)
+      monotonic.mockRestore()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it.each([1, -1])('stops once requested RA travel is observed across wrap (direction %s)', async direction => {
+    const rig = observatory()
+    rig.state.raDegrees = direction > 0 ? 358 : 2
+    await rig.acquisition.rotateRightAscension('mount-id', direction * 1.5, direction * 5)
+    expect(rig.state.moves).toEqual([direction * 1.5, 0])
+    expect(rig.state.rate).toBe(0)
+    expect(rig.state.raDegrees).toBe(direction > 0 ? 4 : 356)
+  })
+
+  it('stops and rejects opposite RA travel', async () => {
+    const rig = observatory()
+    await expect(rig.acquisition.rotateRightAscension('mount-id', 1.5, -5)).rejects.toThrow('opposite direction')
+    expect(rig.state.moves).toEqual([1.5, 0])
+  })
+
+  it('stops when a live RA read fails without replaying movement', async () => {
+    const rig = observatory()
+    rig.state.raReadFails = true
+    await expect(rig.acquisition.rotateRightAscension('mount-id', 1.5, 5)).rejects.toThrow()
+    expect(rig.state.moves).toEqual([1.5, 0])
+  })
+
+  it('stops an accepted move whose response was lost', async () => {
+    const rig = observatory()
+    rig.state.lostMove = true
+    await expect(rig.acquisition.rotateRightAscension('mount-id', 1.5, 5)).rejects.toThrow()
+    expect(rig.state.moves).toEqual([1.5, 0])
+  })
+
+  it('cancels an observed rotation and confirms its stop', async () => {
+    const rig = observatory()
+    rig.state.raStep = 0
+    rig.state.pendingStopReads = 2
+    const controller = new AbortController()
+    const result = rig.acquisition.rotateRightAscension('mount-id', 1.5, 5, controller.signal)
+    const rejection = expect(result).rejects.toThrow()
+    await vi.waitFor(() => expect(rig.state.moves).toEqual([1.5]))
+    controller.abort()
+    await rejection
+    expect(rig.state.moves).toEqual([1.5, 0])
+    expect(rig.state.pendingStopReads).toBeLessThan(0)
+  })
+
+  it('bounds a rotation with no progress and stops it', async () => {
+    vi.useFakeTimers()
+    try {
+      const rig = observatory()
+      rig.state.raStep = 0
+      const result = rig.acquisition.rotateRightAscension('mount-id', 1.5, 0.01)
+      const rejection = expect(result).rejects.toThrow('timeout')
+      await vi.advanceTimersByTimeAsync(3000)
+      await rejection
+      expect(rig.state.moves).toEqual([1.5, 0])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

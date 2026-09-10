@@ -142,6 +142,17 @@ coordinate frames its workflow supports.
   `Slewing=false`. Mechanical rate sign is mount-dependent, not a promise of
   increasing/decreasing sky RA. This narrow operation allows at most 120
   seconds and rates up to 10 degrees/second.
+- `rotateRightAscension(telescopeId, rateDegreesPerSecond, signedDistanceDegrees,
+  signal)` uses one continuous primary-axis rotation and stops when observed RA
+  travel reaches the requested signed distance. The mechanical rate and sky RA
+  distance have separate signs; the caller establishes the mount's direction.
+  A monotonic deadline independently cancels pending start/RA requests and body
+  reads. A response arriving after the deadline cannot satisfy the threshold.
+  Cleanup uses its own request budget to send rate zero and confirm stopping;
+  its failure takes precedence over cancellation or deadline errors. JavaScript
+  scheduling and remote command handling still limit physical stop latency. Rejected, ambiguous, failed or cancelled motion is never replayed.
+  The physical alignment trial uses this capability for its long rotations;
+  timed `move` remains available for the direction probe and offline simulator.
 - `abort(cameraId, telescopeId)` attempts both stop operations independently
   and reports failures rather than claiming that both devices stopped.
 
@@ -212,3 +223,12 @@ slew, and polling intervals for deterministic boundary tests.
 
 Protocol contracts are the [ASCOM telescope interface](https://ascom-standards.org/newdocs/telescope.html)
 and [ASCOM camera interface](https://ascom-standards.org/newdocs/camera.html).
+
+## Request tracing
+
+The adapter emits manual OpenTelemetry spans through the API only; the hosting
+server owns provider/export configuration. Without a registered provider this is
+a no-op. Request spans include transport stage timings, device/command identity
+and protocol outcomes, including ALPACA errors returned with HTTP 200. Image
+payloads are excluded. See [local tracing](../../docs/local-tracing.md) for the
+server configuration and incremental inspection workflow.

@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify'
+import { trace, SpanStatusCode } from '@opentelemetry/api'
 import { createAlpacaAcquisition, createAlpacaFraming } from '@vela/alpaca'
 import type { AlignmentView } from '@vela/model/web'
 import { createRigOperations, type RigOperations } from '../rig/operations.js'
@@ -37,46 +38,55 @@ export function registerAlignment(app: FastifyInstance, catalog: RigCatalog, set
     const view = await rigView(request.params.rigId)
     return view ?? reply.code(404).send({ error: 'Rig not found' })
   })
-  app.post<{ Params: { rigId: string; command: string } }>('/api/rigs/:rigId/alignment/:command', async (request, reply) => {
-    if (!request.headers['content-type']?.startsWith('application/json') || !request.body || typeof request.body !== 'object'
-      || Array.isArray(request.body) || Object.keys(request.body).length > 0) return reply.code(400).send({ error: 'Expected an empty JSON object' })
-    const release = request.params.command === 'start' ? operations.acquire(request.params.rigId, 'alignment') : undefined
-    if (request.params.command === 'start' && !release) return reply.code(409).send({ error: 'Another Rig operation is in progress' })
-    let started = false
+  app.post<{ Params: { rigId: string; command: string } }>('/api/rigs/:rigId/alignment/:command', async (request, reply) => trace.getTracer('vela.alignment').startActiveSpan('alignment.command', { attributes: {
+    'alignment.command': request.params.command, 'rig.id': request.params.rigId, 'http.request.id': request.id,
+  } }, async span => {
     try {
-      const view = await rigView(request.params.rigId)
-      if (!view) return reply.code(404).send({ error: 'Rig not found' })
-      // Stop remains available to the operation's rig even if saved settings
-      // change while it is running.
-      if ((request.params.command === 'stop' || request.params.command === 'finish') && alignment?.snapshot().rigId === view.rigId) {
-        return await alignment.stop(request.params.command === 'finish')
-      }
-      if (!view.enabled || !settings) return reply.code(409).send({ error: view.unavailableReason })
-      if (request.params.command === 'start') {
-        if (settings.mode === 'physical') {
-          if (alignment?.active()) throw new Error('A measurement is already running')
-          const rig = (await catalog.get(view.rigId))!
-          const acquisition = createAlpacaAcquisition({ baseUrl: settings.endpoint })
-          const physical = createPhysicalAlignment({ cameraId: settings.cameraId, telescopeId: settings.telescopeId,
-            cameraName: rig.imagingCamera!.name, focalLengthMm: rig.focalLengthMm! }, acquisition, createAlpacaFraming({ baseUrl: settings.endpoint }))
-          alignment = createAlignmentController(settings, acquisition,
-            fieldHeightDegrees => createAstapSolver({ executable: settings.executable, catalogPath: settings.catalogPath, fieldHeightDegrees }), Date.now, physical)
+      if (!request.headers['content-type']?.startsWith('application/json') || !request.body || typeof request.body !== 'object'
+        || Array.isArray(request.body) || Object.keys(request.body).length > 0) return reply.code(400).send({ error: 'Expected an empty JSON object' })
+      const release = request.params.command === 'start' ? operations.acquire(request.params.rigId, 'alignment') : undefined
+      if (request.params.command === 'start' && !release) return reply.code(409).send({ error: 'Another Rig operation is in progress' })
+      let started = false
+      try {
+        const view = await rigView(request.params.rigId)
+        if (!view) return reply.code(404).send({ error: 'Rig not found' })
+        // Stop remains available to the operation's rig even if saved settings
+        // change while it is running.
+        if ((request.params.command === 'stop' || request.params.command === 'finish') && alignment?.snapshot().rigId === view.rigId) {
+          return await alignment.stop(request.params.command === 'finish')
         }
-        if (!alignment) throw new Error('Polar alignment is not configured')
-        const result = await alignment.start(view.rigId, view.rigName, release)
-        started = true
-        return result
+        if (!view.enabled || !settings) return reply.code(409).send({ error: view.unavailableReason })
+        if (request.params.command === 'start') {
+          if (settings.mode === 'physical') {
+            if (alignment?.active()) throw new Error('A measurement is already running')
+            const rig = (await catalog.get(view.rigId))!
+            const acquisition = createAlpacaAcquisition({ baseUrl: settings.endpoint })
+            const physical = createPhysicalAlignment({ cameraId: settings.cameraId, telescopeId: settings.telescopeId,
+              cameraName: rig.imagingCamera!.name, focalLengthMm: rig.focalLengthMm! }, acquisition, createAlpacaFraming({ baseUrl: settings.endpoint }))
+            alignment = createAlignmentController(settings, acquisition,
+              fieldHeightDegrees => createAstapSolver({ executable: settings.executable, catalogPath: settings.catalogPath, fieldHeightDegrees }), Date.now, physical)
+          }
+          if (!alignment) throw new Error('Polar alignment is not configured')
+          const result = await alignment.start(view.rigId, view.rigName, release)
+          started = true
+          return result
+        }
+        if (request.params.command === 'stop' || request.params.command === 'finish') {
+          return reply.code(409).send({ error: 'There is no alignment measurement for this Rig.' })
+        }
+        return reply.code(404).send({ error: 'Unknown alignment command' })
+      } catch (error) {
+        span.setStatus({ code: SpanStatusCode.ERROR, message: error instanceof Error ? error.message : 'Alignment command failed' })
+        if (error instanceof Error) span.recordException(error)
+        return reply.code(409).send({ error: error instanceof Error ? error.message : 'Alignment command failed' })
+      } finally {
+        if (!started) release?.()
       }
-      if (request.params.command === 'stop' || request.params.command === 'finish') {
-        return reply.code(409).send({ error: 'There is no alignment measurement for this Rig.' })
-      }
-      return reply.code(404).send({ error: 'Unknown alignment command' })
-    } catch (error) {
-      return reply.code(409).send({ error: error instanceof Error ? error.message : 'Alignment command failed' })
     } finally {
-      if (!started) release?.()
+      span.setAttribute('http.response.status_code', reply.statusCode)
+      span.end()
     }
-  })
+  }))
   app.get<{ Params: { rigId: string; imageId: string } }>('/api/rigs/:rigId/alignment/images/:imageId', async (request, reply) => {
     const view = await rigView(request.params.rigId)
     const image = view && alignment?.snapshot().rigId === request.params.rigId ? alignment.image(request.params.imageId) : undefined
