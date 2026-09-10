@@ -97,7 +97,7 @@ function ObservationPage({ rigId }: { rigId: string }) {
 }
 
 function ConnectionResult({ result }: { result: ConnectRigDevicesResult }) {
-  if (result.outcome === 'unavailable') return <p className="vela-observe-warning">Connection was unavailable: {result.reason === 'identity-conflict' ? 'the Rig identity changed.' : result.reason === 'offline' ? 'the Rig was offline.' : 'device state could not be confirmed.'}</p>
+  if (result.outcome === 'unavailable') return <p className="vela-observe-warning">Connection was unavailable: {{ 'identity-conflict': 'the Rig identity changed.', offline: 'the Rig was offline.', 'device-state-unavailable': 'device state could not be confirmed.' }[result.reason]}</p>
 
   if (result.outcome === 'complete') return <p>Last connection attempt: {result.command === 'not-needed' ? 'no connection commands were needed.' : `${result.confirmedConnected.length} device connections confirmed.`}</p>
 
@@ -105,7 +105,7 @@ function ConnectionResult({ result }: { result: ConnectRigDevicesResult }) {
     <h4>Last connection attempt</h4>
     <dl>
       <div><dt>Confirmed connected</dt><dd>{result.confirmedConnected.map((device) => device.name).join(' · ') || 'None confirmed by this attempt'}</dd></div>
-      {'failed' in result && <div><dt>Connection failed</dt><dd>{result.failed.name} — {result.failed.reason === 'rejected' ? 'connection rejected' : result.failed.reason === 'remained-disconnected' ? 'remained disconnected' : result.failed.reason === 'device-not-found' ? 'device not found' : 'connection check failed'}</dd></div>}
+      {'failed' in result && <div><dt>Connection failed</dt><dd>{result.failed.name} — {{ rejected: 'connection rejected', 'remained-disconnected': 'remained disconnected', 'device-not-found': 'device not found', 'connection-check-failed': 'connection check failed' }[result.failed.reason]}</dd></div>}
       {'uncertain' in result && <div><dt>Not confirmed</dt><dd>{result.uncertain.name}</dd></div>}
       {'stoppedAfter' in result && <div><dt>Stopped after</dt><dd>{result.stoppedAfter.name} — confirmed by a later state check; sequencing had already stopped.</dd></div>}
       <div><dt>Not attempted</dt><dd>{result.notAttempted.map((device) => device.name).join(' · ') || 'None'}</dd></div>

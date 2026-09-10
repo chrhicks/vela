@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import type { FastifyInstance } from 'fastify'
 import type { ImagingCameraView } from '@vela/model/web'
 import type { RigCatalog } from './catalog.js'
@@ -46,12 +47,10 @@ export function registerImagingCamera(app: FastifyInstance, catalog: RigCatalog,
     await inspect(request.params.rigId) ?? reply.code(404).send({ error: 'Rig not found' }))
 
   app.put<{ Params: { rigId: string } }>('/api/rigs/:rigId/imaging-camera', async (request, reply) => {
-    const body = request.body
+    const parsed = z.strictObject({ id: z.string(), name: z.string() }).safeParse(request.body)
 
-    if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).length !== 2
-      || !('id' in body) || typeof body.id !== 'string' || !('name' in body) || typeof body.name !== 'string') {
-      return reply.code(400).send({ error: 'Expected camera id and name.' })
-    }
+    if (!parsed.success) return reply.code(400).send({ error: 'Expected camera id and name.' })
+    const body = parsed.data
 
     const release = operations.acquire(request.params.rigId, 'imaging-camera')
 

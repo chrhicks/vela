@@ -34,7 +34,7 @@ export function useFraming(rigId: string) {
     setRefreshing(explicit)
 
     try {
-      const next = await api<unknown>(`web/rigs/${encodeURIComponent(rigId)}/framing`, {
+      const next = await api(`web/rigs/${encodeURIComponent(rigId)}/framing`, {
         signal: AbortSignal.any([controller.signal, AbortSignal.timeout(5000)]),
       })
 
@@ -102,11 +102,13 @@ export function useFraming(rigId: string) {
   const canStart = !!view?.enabled && !view.active && !offline && !pending && !commandUnconfirmed
   const canStop = !!view?.active && view.phase !== 'stopping' && !offline && !pending && !commandUnconfirmed
 
-  async function command(action: 'start' | 'stop' | 'center' | 'settings', body: object = {}) {
-    const allowed = action === 'stop' ? canStop
-      : action === 'center' ? canStart && !!view?.canCenter && !!view.actual
-      : action === 'settings' ? !!view && !pending && !offline && !view.active && !commandUnconfirmed
-      : canStart
+  async function command(action: 'start' | 'stop' | 'center' | 'settings', body: { targetId?: string; raDegrees?: number; decDegrees?: number; exposureSeconds?: number; checkId?: string; focalLengthMm?: number } = {}) {
+    const allowed = {
+      stop: canStop,
+      center: canStart && !!view?.canCenter && !!view.actual,
+      settings: !!view && !pending && !offline && !view.active && !commandUnconfirmed,
+      start: canStart,
+    }[action]
 
     if (writing.current || !alive.current || !allowed) return
     const controller = new AbortController()
@@ -122,7 +124,7 @@ export function useFraming(rigId: string) {
     setError(null)
 
     try {
-      const next = await api<unknown>(`rigs/${encodeURIComponent(rigId)}/framing/${action}`, {
+      const next = await api(`rigs/${encodeURIComponent(rigId)}/framing/${action}`, {
         method: action === 'settings' ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
         signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]),

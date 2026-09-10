@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import { isIPv4 } from 'node:net'
 import {
   AlpacaDiscoveryError,
@@ -38,10 +39,6 @@ interface DiscoverRigsOptions {
   readonly signal?: AbortSignal
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value)
-}
-
 function isHostname(host: string): boolean {
   if (host.length === 0 || host.length > 253 || host !== host.trim()) return false
 
@@ -58,36 +55,20 @@ function isHostname(host: string): boolean {
   )
 }
 
-function isPort(port: unknown): port is number {
-  return Number.isInteger(port) && Number(port) >= 1 && Number(port) <= 65535
-}
+export const manualDiscoverySchema = z.strictObject({
+  mode: z.literal('manual'),
+  host: z.string().refine(isHostname),
+  port: z.number().int().min(1).max(65535).nullish().transform(port => port ?? defaultAlpacaPort),
+})
 
-export function parseDiscoverRigsInput(value: unknown): DiscoverRigsInput | undefined {
-  if (!isRecord(value)) return undefined
+export const discoverRigsSchema = z.union([
+  z.strictObject({ mode: z.literal('scan') }),
+  manualDiscoverySchema,
+]).transform((value): DiscoverRigsInput => value.mode === 'scan'
+  ? value
+  : { mode: 'manual', endpoint: { host: value.host, port: value.port } })
 
-  if (value.mode === 'scan') {
-    return Object.keys(value).length === 1 ? { mode: 'scan' } : undefined
-  }
-
-  if (value.mode !== 'manual' || typeof value.host !== 'string' || !isHostname(value.host)) {
-    return undefined
-  }
-
-  const keys = Object.keys(value)
-
-  if (keys.some((key) => key !== 'mode' && key !== 'host' && key !== 'port')) {
-    return undefined
-  }
-
-  const port = value.port ?? defaultAlpacaPort
-
-  if (!isPort(port)) return undefined
-
-  return {
-    mode: 'manual',
-    endpoint: { host: value.host, port },
-  }
-}
+export const parseDiscoverRigsInput = discoverRigsSchema.optional().catch(undefined).parse
 
 function throwIfCancelled(signal: AbortSignal | undefined): void {
   if (signal?.aborted) {
@@ -159,9 +140,9 @@ async function candidateView(
   const inspectedAt = now().toISOString()
   const inventory = toObservedRigInventory(inspection, inspectedAt)
 
-  return {
+  const candidate: DiscoveryCandidateView = {
     endpoint: inspection.endpoint,
-    ...(hasServerDescription(inspection) ? { server: inspection.server } : {}),
+
     inspectedAt,
     devices: inspection.devices.map((device) => ({
       kind: device.kind,
@@ -169,6 +150,8 @@ async function candidateView(
     })),
     disposition: await candidateDisposition(inspection, inventory, catalog),
   }
+
+  return hasServerDescription(inspection) ? { ...candidate, server: inspection.server } : candidate
 }
 
 export async function discoverRigs(

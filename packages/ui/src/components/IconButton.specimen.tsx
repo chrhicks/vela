@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import type { ReactNode } from 'react'
 import type { ComponentSpecimen } from '../themes'
 import { IconButton } from './IconButton'
@@ -29,8 +30,8 @@ export const specimen: ComponentSpecimen = {
       disabled={Boolean(props.disabled)}
       icon={<CaptureIcon />}
       label={String(props.label)}
-      size={String(props.size) as 'small' | 'medium' | 'large'}
-      tone={String(props.tone) as 'neutral' | 'accent' | 'quiet'}
+      size={z.enum(['small', 'medium', 'large']).parse(props.size)}
+      tone={z.enum(['neutral', 'accent', 'quiet']).parse(props.tone)}
     />
   ),
 }

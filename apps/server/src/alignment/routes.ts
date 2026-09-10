@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import type { FastifyInstance } from 'fastify'
 import { trace, SpanStatusCode } from '@opentelemetry/api'
 import { createAlpacaAcquisition, createAlpacaFraming } from '@vela/alpaca'
@@ -8,11 +9,29 @@ import { createAlignmentController, type AlignmentSettings } from './controller.
 import { createAstapSolver } from './solver.js'
 import { createPhysicalAlignment } from './physical.js'
 
-export function registerAlignment(app: FastifyInstance, catalog: RigCatalog, settings?: AlignmentSettings, operations: RigOperations = createRigOperations()) {
-  let alignment = settings && settings.mode !== 'physical' ? createAlignmentController({
+export interface AlignmentFactories {
+  acquisition: typeof createAlpacaAcquisition
+  framing: typeof createAlpacaFraming
+  physical: typeof createPhysicalAlignment
+  solver: typeof createAstapSolver
+  controller: typeof createAlignmentController
+}
+
+const defaultFactories: AlignmentFactories = {
+  acquisition: createAlpacaAcquisition,
+  framing: createAlpacaFraming,
+  physical: createPhysicalAlignment,
+  solver: createAstapSolver,
+  controller: createAlignmentController,
+}
+
+const emptyCommand = z.object({}).strict()
+
+export function registerAlignment(app: FastifyInstance, catalog: RigCatalog, settings?: AlignmentSettings, operations: RigOperations = createRigOperations(), factories: AlignmentFactories = defaultFactories) {
+  let alignment = settings && settings.mode !== 'physical' ? factories.controller({
     mode: 'offline', settings,
-    hardware: createAlpacaAcquisition({ baseUrl: settings.endpoint }),
-    solver: createAstapSolver({ executable: settings.executable, catalogPath: settings.catalogPath, fieldHeightDegrees: settings.fieldHeightDegrees }),
+    hardware: factories.acquisition({ baseUrl: settings.endpoint }),
+    solver: factories.solver({ executable: settings.executable, catalogPath: settings.catalogPath, fieldHeightDegrees: settings.fieldHeightDegrees }),
   }) : undefined
 
   async function rigView(rigId: string): Promise<AlignmentView | undefined> {
@@ -39,9 +58,19 @@ export function registerAlignment(app: FastifyInstance, catalog: RigCatalog, set
 
     const state = alignment?.snapshot()
 
-    return { ...empty, ...(state && (!state.rigId || state.rigId === rigId) ? state : {}),
-      rigId, rigName: rig.name, enabled: !reason, unavailableReason: reason,
-      ...(settings?.mode === 'physical' ? { mode: 'physical', ...(rig.imagingCamera ? { cameraName: rig.imagingCamera.name } : {}) } : {}) }
+    const view = state && (!state.rigId || state.rigId === rigId) ? { ...empty, ...state } : empty
+    view.rigId = rigId
+    view.rigName = rig.name
+    view.enabled = !reason
+    view.unavailableReason = reason
+
+    if (settings?.mode === 'physical') {
+      view.mode = 'physical'
+
+      if (rig.imagingCamera) view.cameraName = rig.imagingCamera.name
+    }
+
+    return view
   }
 
   app.get<{ Params: { rigId: string } }>('/api/web/rigs/:rigId/alignment', async (request, reply) => {
@@ -53,8 +82,7 @@ export function registerAlignment(app: FastifyInstance, catalog: RigCatalog, set
     'alignment.command': request.params.command, 'rig.id': request.params.rigId, 'http.request.id': request.id,
   } }, async span => {
     try {
-      if (!request.headers['content-type']?.startsWith('application/json') || !request.body || typeof request.body !== 'object'
-        || Array.isArray(request.body) || Object.keys(request.body).length > 0) return reply.code(400).send({ error: 'Expected an empty JSON object' })
+      if (!request.headers['content-type']?.startsWith('application/json') || !emptyCommand.safeParse(request.body).success) return reply.code(400).send({ error: 'Expected an empty JSON object' })
       const release = request.params.command === 'start' ? operations.acquire(request.params.rigId, 'alignment') : undefined
 
       if (request.params.command === 'start' && !release) return reply.code(409).send({ error: 'Another Rig operation is in progress' })
@@ -77,14 +105,14 @@ export function registerAlignment(app: FastifyInstance, catalog: RigCatalog, set
           if (settings.mode === 'physical') {
             if (alignment?.active()) throw new Error('A measurement is already running')
             const rig = (await catalog.get(view.rigId))!
-            const acquisition = createAlpacaAcquisition({ baseUrl: settings.endpoint })
+            const acquisition = factories.acquisition({ baseUrl: settings.endpoint })
 
-            const physical = createPhysicalAlignment({ cameraId: settings.cameraId, telescopeId: settings.telescopeId,
-              cameraName: rig.imagingCamera!.name, focalLengthMm: rig.focalLengthMm! }, acquisition, createAlpacaFraming({ baseUrl: settings.endpoint }))
+            const physical = factories.physical({ cameraId: settings.cameraId, telescopeId: settings.telescopeId,
+              cameraName: rig.imagingCamera!.name, focalLengthMm: rig.focalLengthMm! }, acquisition, factories.framing({ baseUrl: settings.endpoint }))
 
-            alignment = createAlignmentController({
+            alignment = factories.controller({
               mode: 'physical', settings, hardware: acquisition, physical,
-              createSolver: fieldHeightDegrees => createAstapSolver({ executable: settings.executable, catalogPath: settings.catalogPath, fieldHeightDegrees }),
+              createSolver: fieldHeightDegrees => factories.solver({ executable: settings.executable, catalogPath: settings.catalogPath, fieldHeightDegrees }),
             })
           }
 
@@ -137,7 +165,10 @@ export function alignmentSettings(env: NodeJS.ProcessEnv): AlignmentSettings | u
 
   if (env.VELA_ALIGNMENT_MODE !== undefined && !['offline', 'physical'].includes(env.VELA_ALIGNMENT_MODE)) throw new Error('Invalid VELA_ALIGNMENT_MODE')
 
-  return { endpoint: endpoint.origin, cameraId: env.VELA_ALIGNMENT_CAMERA_ID, telescopeId: env.VELA_ALIGNMENT_TELESCOPE_ID,
-    ...(env.VELA_ALIGNMENT_MODE === 'physical' ? { mode: 'physical' } : {}),
+  const settings: AlignmentSettings = { endpoint: endpoint.origin, cameraId: env.VELA_ALIGNMENT_CAMERA_ID, telescopeId: env.VELA_ALIGNMENT_TELESCOPE_ID,
     executable: env.VELA_ASTAP, catalogPath: env.VELA_STAR_CATALOG, exposureSeconds: 2, fieldHeightDegrees: 3 }
+
+  if (env.VELA_ALIGNMENT_MODE === 'physical') settings.mode = 'physical'
+
+  return settings
 }

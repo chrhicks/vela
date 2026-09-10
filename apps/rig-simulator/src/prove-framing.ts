@@ -70,14 +70,14 @@ try {
     return response.json<FramingView>()
   }
 
-  async function command(command: string, payload: object = {}) {
+  async function command(command: string, payload: { targetId?: string; raDegrees?: number; decDegrees?: number; exposureSeconds?: number; checkId?: string } = {}) {
     const response = await vela.inject({ method: 'POST', url: `/api/rigs/proof/framing/${command}`, payload })
     assert.equal(response.statusCode, 200, response.body)
 
     return response.json<FramingView>()
   }
 
-  async function control(path: string, payload: object, method: 'PUT' | 'POST' = 'PUT') {
+  async function control(path: string, payload: { preset?: string; obscured?: boolean; cameraNumber?: number; resolution?: string }, method: 'PUT' | 'POST' = 'PUT') {
     const response = await simulator.inject({ method, url: `/simulator/${path}`, payload })
     assert.equal(response.statusCode, 200, response.body)
   }

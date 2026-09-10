@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import { useEffect, useState } from 'react'
 import type { ComponentSpecimen } from '../themes'
 import { Panel } from './Panel'
@@ -58,7 +59,7 @@ function CamerasPreview({ props, onPropsChange }: {
             { value: 'fast', label: 'Fast · 1562 × 1044' },
             { value: 'full', label: 'Full · 6248 × 4176' },
           ]} onChange={event => {
-            const value = event.target.value as Resolution
+            const value = z.enum(['fast', 'full']).parse(event.target.value)
 
             if (camera.number === 0) setMono(value)
             else setColor(value)

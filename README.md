@@ -44,8 +44,8 @@ pnpm start
 
 Run `pnpm check` for lint, tests, and the workspace build (including TypeScript
 checks), in that order. It stops at the first failure and does not modify source.
-The existing lint backlog currently blocks this command. Use `pnpm lint` to
-inspect findings or `pnpm lint --fix` to apply available fixes for review.
+Use `pnpm lint` to inspect findings or `pnpm lint --fix` to apply available fixes
+for review.
 
 ## Observing from the local network
 

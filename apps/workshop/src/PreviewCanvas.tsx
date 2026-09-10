@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { Badge, Button, Checkbox, IconButton, Input, Panel, Select, Tabs } from '@vela/ui'
 import { DEFAULT_PROFILE, resolveTheme, themeStyle } from '@vela/ui/themes'
 import type { ComponentSpecimen, ThemeMode, ThemeParameters, WorkingSession } from '@vela/ui/themes'
@@ -42,7 +42,7 @@ function Preview({ label, mode, session, specimen, theme, onPropsChange }: { lab
   return (
     <section className="preview-column">
       <div className="preview-label"><span>{label}</span><span>{mode} · {Math.round(theme.density * 100)}%</span></div>
-      <div className="vela-theme preview-surface" data-mode={mode} style={themeStyle(theme, mode) as CSSProperties}>
+      <div className="vela-theme preview-surface" data-mode={mode} style={themeStyle(theme, mode)}>
         <ContextFrame context={session.context}>{specimen.render(session.props, onPropsChange)}</ContextFrame>
       </div>
     </section>

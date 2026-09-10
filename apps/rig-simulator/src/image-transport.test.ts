@@ -54,7 +54,7 @@ it('negotiates both cameras and preserves a completed frame across binary and JS
 
   for (const number of [0, 1]) {
     const path = `/api/v1/camera/${number}`
-    const put = (member: string, payload: object) => app.inject({ method: 'PUT', url: `${path}/${member}`, payload })
+    const put = (member: string, payload: { Connected?: boolean; Duration?: number; Light?: boolean }) => app.inject({ method: 'PUT', url: `${path}/${member}`, payload })
     expect((await put('connected', { Connected: true })).json().ErrorNumber).toBe(0)
     expect((await app.inject(`${path}/sensortype`)).json().Value).toBe(number === 0 ? 0 : 2)
 

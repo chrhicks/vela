@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import { request as httpRequest } from 'node:http'
 import { describe, expect, it, vi } from 'vitest'
 import { AlpacaProviderError, type AlpacaDeviceInspection } from '@vela/alpaca'
@@ -188,9 +189,7 @@ describe('Rig connection API', () => {
 
     try {
       await app.listen({ host: '127.0.0.1', port: 0 })
-      const address = app.server.address()
-
-      if (address === null || typeof address === 'string') throw new Error('Expected TCP server address')
+      const address = z.object({ port: z.number() }).parse(app.server.address())
 
       let connectionRequest: ReturnType<typeof httpRequest> | undefined
 

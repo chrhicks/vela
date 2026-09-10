@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import { createRoot } from 'react-dom/client'
 import { Button, Input, Panel, Select, VELA_CURRENT_PROFILE, resolveTheme, themeStyle } from '@vela/ui'
 import { useSimulator } from './useSimulator'
@@ -87,7 +87,7 @@ function Controls() {
   return <main
     className="vela-theme sim-page"
     data-mode="dark"
-    style={themeStyle(resolveTheme(VELA_CURRENT_PROFILE), 'dark') as CSSProperties}
+    style={themeStyle(resolveTheme(VELA_CURRENT_PROFILE), 'dark')}
   >
     <article className="sim-controls" data-pending={pending}>
       <header className="sim-heading">

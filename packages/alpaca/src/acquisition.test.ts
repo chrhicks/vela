@@ -1,3 +1,4 @@
+import type { ResponseFixture } from './internal/test-fixtures.js'
 import { describe, expect, it, vi } from 'vitest'
 import { createAlpacaAcquisition, AlpacaCaptureStoppedError } from './acquisition.js'
 
@@ -5,7 +6,47 @@ function observatory() {
   const camera = { DeviceName: 'Camera', DeviceType: 'Camera', DeviceNumber: 7, UniqueID: 'camera-id' }
   const telescope = { DeviceName: 'Mount', DeviceType: 'Telescope', DeviceNumber: 3, UniqueID: 'mount-id' }
 
-  const state = {
+  interface CameraFixture {
+    Type: number
+    Rank: number
+    Value: ResponseFixture
+  }
+
+  interface ObservatoryState {
+    cameraName: string
+    sensorType: number
+    binX: number
+    binY: number
+    offsetX: number
+    offsetY: number
+    startX: number
+    startY: number
+    unsupportedOffset: boolean
+    ready: boolean
+    exposing: boolean
+    rate: number
+    raDegrees: number
+    raStep: number
+    raReadFails: boolean
+    imageBinary: ArrayBuffer | null
+    image: CameraFixture
+    stamp: string
+    stampError: number
+    imageReads: number
+    pendingReadyReads: number
+    stale: boolean
+    starts: number
+    moves: number[]
+    aborts: number
+    lostStart: boolean
+    lostMove: boolean
+    stopFails: boolean
+    pendingStopReads: number
+    stopping: boolean
+    cameraStopFails: boolean
+  }
+
+  const state: ObservatoryState = {
     cameraName: ' Camera ',
     sensorType: 0,
     binX: 1,
@@ -21,15 +62,15 @@ function observatory() {
     raDegrees: 30,
     raStep: 2,
     raReadFails: false,
-    imageBinary: null as ArrayBuffer | null,
-    image: { Type: 2, Rank: 2, Value: [[1, 3], [2, 4]] } as Record<string, unknown>,
+    imageBinary: null,
+    image: { Type: 2, Rank: 2, Value: [[1, 3], [2, 4]] },
     stamp: '2026-09-05T01:00:00',
     stampError: 0,
     imageReads: 0,
     pendingReadyReads: 0,
     stale: false,
     starts: 0,
-    moves: [] as number[],
+    moves: [],
     aborts: 0,
     lostStart: false,
     lostMove: false,
@@ -44,7 +85,7 @@ function observatory() {
     const url = new URL(String(input))
     const operation = url.pathname.split('/').at(-1)
     const parameters = new URLSearchParams(String(init?.body ?? ''))
-    let Value: unknown
+    let Value: ResponseFixture
 
     if (operation === 'configureddevices') Value = [camera, telescope]
     else if (operation === 'connected' || operation === 'canabortexposure' || operation === 'canmoveaxis' || operation === 'tracking') Value = true
@@ -86,7 +127,10 @@ function observatory() {
     else if (operation === 'startexposure') {
       state.starts++
 
-      if (!state.stale) { state.ready = false; state.exposing = true }
+      if (!state.stale) {
+        state.ready = false
+        state.exposing = true
+      }
 
       if (state.lostStart) throw new TypeError('Response lost after accepting exposure')
     } else if (operation === 'abortexposure') {
@@ -136,9 +180,11 @@ describe('normalized Alpaca acquisition', () => {
     const rig = observatory()
     let resolved = false
 
-    const result = rig.acquisition.capture({ cameraId: 'camera-id', expectedCameraName: 'Camera', exposureSeconds: 1 }).then(frame => { resolved = true;
+    const result = rig.acquisition.capture({ cameraId: 'camera-id', expectedCameraName: 'Camera', exposureSeconds: 1 }).then(frame => {
+      resolved = true
 
- return frame })
+      return frame
+    })
 
     await started(rig)
     expect(resolved).toBe(false)

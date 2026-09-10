@@ -198,7 +198,7 @@ function skyLabels(samples: readonly SkyPathSample[], now: SkyPathSample | undef
     return label ? [label] : []
   })
 
-  const visible = samples.map((sample, sampleIndex) => ({ sample, sampleIndex })).filter(({ sample }) => sample.altitudeDegrees >= 0)
+  const visible = samples.flatMap((sample, sampleIndex) => sample.altitudeDegrees >= 0 ? [{ sample, sampleIndex }] : [])
   const wholeHours = visible.filter(({ sample }) => /(?:^|\s)\d{1,2}:00(?:\s|$)/.test(sample.label))
   const candidates = wholeHours.length ? wholeHours : visible
   const maximum = size < 340 || compact ? 3 : 7

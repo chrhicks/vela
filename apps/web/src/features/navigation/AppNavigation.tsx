@@ -1,5 +1,5 @@
 import type { NavigationCapture } from '@vela/model/web'
-import { NavigationBar } from '@vela/ui'
+import { NavigationBar, type NavigationActivity, type NavigationBarProps } from '@vela/ui'
 import type { MouseEvent } from 'react'
 import { useEffect, useRef } from 'react'
 import { matchPath, useLocation, useNavigate } from 'react-router'
@@ -30,6 +30,20 @@ export function AppNavigation() {
   if (rigId && !rigs.some(rig => rig.id === rigId)) rigs.push({ id: rigId, name: 'Current rig' })
   const presentation = activity ? activityPresentation(activity, offline, missing) : null
 
+  const activityProps: Pick<NavigationBarProps, 'activity'> = {}
+
+  if (activity && presentation) {
+    const current: NavigationActivity = {
+      ...routeLink(`/rigs/${encodeURIComponent(activity.rigId)}/observe/capture`),
+      label: `${activity.rigName}. ${activity.completedCount} captured. ${presentation.status}. ${presentation.interrupted ? 'Last known count. Current outcome unknown. ' : ''}Open capture.`,
+      completedCount: activity.completedCount,
+      ...presentation,
+    }
+
+    if (activity.rigId !== rigId) current.rigName = activity.rigName
+    activityProps.activity = current
+  }
+
   return <NavigationBar
     home={routeLink('/')}
     rigs={rigs}
@@ -40,24 +54,13 @@ export function AppNavigation() {
       { label: 'Targets', ...routeLink(`${base}/observe/targets${targetSearch}`), current: currentPage === 'Targets' },
       { label: 'Capture', ...routeLink(`${base}/observe/capture`), current: currentPage === 'Capture' },
     ] : []}
-    {...(activity && presentation ? {
-      activity: {
-        ...routeLink(`/rigs/${encodeURIComponent(activity.rigId)}/observe/capture`),
-        label: `${activity.rigName}. ${activity.completedCount} captured. ${presentation.status}. ${presentation.interrupted ? 'Last known count. Current outcome unknown. ' : ''}Open capture.`,
-        ...(activity.rigId !== rigId ? { rigName: activity.rigName } : {}),
-        completedCount: activity.completedCount,
-        ...presentation,
-      },
-    } : {})}
+    {...activityProps}
   />
 }
 
-function activityPresentation(activity: NavigationCapture, offline: boolean, missing: boolean): {
-  status: string
-  note?: string
-  interrupted: boolean
-  progress?: { value: number; max: number }
-} {
+type ActivityPresentation = Pick<NavigationActivity, 'status' | 'note' | 'progress'> & { interrupted: boolean }
+
+function activityPresentation(activity: NavigationCapture, offline: boolean, missing: boolean): ActivityPresentation {
   if (missing) return { status: 'Tracking lost', note: 'Last known · open Capture →', interrupted: true }
 
   if (offline) return { status: 'Updates lost', note: 'Last known · open Capture →', interrupted: true }

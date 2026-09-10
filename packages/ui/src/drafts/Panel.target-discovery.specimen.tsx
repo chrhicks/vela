@@ -13,6 +13,17 @@ const suggestions = [
 ]
 
 function Discovery({ props, onPropsChange }: { props: Props; onPropsChange?: (patch: Props) => void }) {
+  function suggestionStatus() {
+    switch (values.state) {
+      case 'cached':
+        return 'Saved suggestions · updated 21:40'
+      case 'fresh':
+        return 'Suggestions refreshed · updated 22:00'
+      default:
+        return 'Updating tonight’s suggestions…'
+    }
+  }
+
   const [local, setLocal] = useState(props)
   const values = onPropsChange ? props : local
   const update = (patch: Props) => onPropsChange ? onPropsChange(patch) : setLocal(current => ({ ...current, ...patch }))
@@ -30,7 +41,7 @@ function Discovery({ props, onPropsChange }: { props: Props; onPropsChange?: (pa
 
   return <section className="vela-discovery-demo" aria-label="Target discovery">
     <header className="vela-discovery-demo__header"><div><p className="vela-discovery-demo__eyebrow">Explore tonight</p><h1>Find your next subject</h1><p>Good opportunities from now until dawn.</p></div><Button size="small" tone="quiet" disabled={refreshing} onClick={() => update({ state: 'fresh', page: 0 })}>{refreshing ? 'Refreshing…' : 'Refresh'}</Button></header>
-    <div className="vela-discovery-demo__snapshot"><span>{values.state === 'cached' ? 'Saved suggestions · updated 21:40' : values.state === 'fresh' ? 'Suggestions refreshed · updated 22:00' : 'Updating tonight’s suggestions…'}</span><span>Sample night · illustrative ranking</span></div>
+    <div className="vela-discovery-demo__snapshot"><span>{suggestionStatus()}</span><span>Sample night · illustrative ranking</span></div>
     <div className="vela-discovery-demo__search"><Input aria-label="Search targets" placeholder="Search by name or catalog number" value={String(values.query ?? '')} onChange={event => update({ query: event.target.value, page: 0 })} /><label>Light preference<select value={light} onChange={event => update({ light: event.target.value, page: 0 })}>{['All light', 'L-Ultimate subjects', 'Broadband subjects'].map(option => <option key={option}>{option}</option>)}</select></label></div>
     <nav className="vela-discovery-demo__filters" aria-label="Object type">{['All objects', 'Emission', 'Reflection & dark', 'Galaxies', 'Clusters', 'Planetary'].map(kind => <button key={kind} type="button" aria-pressed={filter === kind} onClick={() => update({ filter: kind, page: 0 })}>{kind}</button>)}</nav>
     <p className="vela-discovery-demo__filter-note">Your filter: <strong>Optolong L-Ultimate · dual 3nm Hα / O III</strong><span>Advice assumes you choose to fit it.</span></p>

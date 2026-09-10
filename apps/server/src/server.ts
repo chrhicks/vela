@@ -55,7 +55,8 @@ try {
   const surveyCache = createSurveyCache(process.env.VELA_SURVEY_CACHE_PATH ? { directory: resolve(process.env.VELA_SURVEY_CACHE_PATH) } : {})
 
   if (!shutdownTask) {
-    app = buildApp({ rigCatalog, savedImages, targets, surveyCache, ...(alignment ? { alignment } : {}) })
+    const options = { rigCatalog, savedImages, targets, surveyCache }
+    app = buildApp(alignment ? { ...options, alignment } : options)
     await app.listen({ port, host })
   }
 } catch (error) {

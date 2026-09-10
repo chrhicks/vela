@@ -23,15 +23,26 @@ function sessionFromUrl(base: WorkingSession): WorkingSession {
 
   if (params.get('profile')) next.profileId = params.get('profile') ?? next.profileId
 
-  if (params.get('mode') === 'light' || params.get('mode') === 'dark') next.mode = params.get('mode') as 'light' | 'dark'
+  const mode = params.get('mode')
 
-  if (['isolated', 'form', 'toolbar', 'card'].includes(params.get('context') ?? '')) next.context = params.get('context') as WorkingSession['context']
+  if (mode === 'light' || mode === 'dark') next.mode = mode
+
+  const context = params.get('context')
+
+  if (context === 'isolated' || context === 'form' || context === 'toolbar' || context === 'card') next.context = context
   const viewport = Number(params.get('viewport'))
 
   if (viewport >= 320 && viewport <= 1600) next.viewport = viewport
 
   for (const [key, value] of params) {
-    if (key.startsWith('prop.')) next.props[key.slice(5)] = value === 'true' ? true : value === 'false' ? false : value
+    if (!key.startsWith('prop.')) continue
+
+    let prop: string | boolean = value
+
+    if (value === 'true') prop = true
+    else if (value === 'false') prop = false
+
+    next.props[key.slice(5)] = prop
   }
 
   return next
@@ -66,7 +77,7 @@ export function useWorkshop() {
         setHydrated(true)
         setStatus(storedSession ? 'Session recovered from disk' : 'New local session')
       })
-      .catch((error: unknown) => setStatus(error instanceof Error ? error.message : 'Unable to load workshop state'))
+      .catch((cause: unknown) => setStatus(cause instanceof Error ? cause.message : 'Unable to load workshop state'))
   }, [])
 
   useEffect(() => {
@@ -76,7 +87,7 @@ export function useWorkshop() {
       const persisted = { ...session, updatedAt: new Date().toISOString() }
       persistSession(persisted)
         .then(() => setStatus('Session recovered automatically'))
-        .catch((error: unknown) => setStatus(error instanceof Error ? error.message : 'Session save failed'))
+        .catch((cause: unknown) => setStatus(cause instanceof Error ? cause.message : 'Session save failed'))
     }, 280)
     const params = new URLSearchParams()
     params.set('component', session.componentId)

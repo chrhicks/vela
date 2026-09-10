@@ -55,7 +55,7 @@ export async function encodeImageBytes(frame: Frame, envelope: Envelope, assertC
 export async function* imageJsonChunks(frame: Frame, envelope: Envelope, assertCurrent: () => void = () => {}) {
   assertCurrent()
   yield `${JSON.stringify({ ...envelope, Type: 2, Rank: 2 }).slice(0, -1)},"Value":[`
-  const column = new Array<number>(frame.height)
+  const column = Array.from({ length: frame.height }, () => 0)
 
   for (let x = 0; x < frame.width; x++) {
     assertCurrent()

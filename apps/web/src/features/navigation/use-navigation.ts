@@ -16,7 +16,7 @@ export function useNavigation() {
       request = new AbortController()
 
       try {
-        const view = await api<unknown>('web/navigation', { signal: AbortSignal.any([request.signal, AbortSignal.timeout(5000)]) })
+        const view = await api('web/navigation', { signal: AbortSignal.any([request.signal, AbortSignal.timeout(5000)]) })
 
         if (!isNavigationView(view)) throw new Error('Invalid navigation response')
 

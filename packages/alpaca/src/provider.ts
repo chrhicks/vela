@@ -49,6 +49,8 @@ const defaultConnectionVerificationTimeoutMs = 30_000
 
 const maximumSwitchChannels = 256
 
+type Mutable<Value> = { -readonly [Key in keyof Value]: Value[Key] }
+
 interface TelemetryRead {
   partial: boolean
 }
@@ -103,10 +105,13 @@ export function createAlpacaProvider({
       // Driver metadata is optional and must not hide an otherwise usable device.
     }
 
-    return {
-      ...(info === undefined ? {} : { info }),
-      ...(version === undefined ? {} : { version }),
-    }
+    const metadata: AlpacaDevice['driver'] = {}
+
+    if (info !== undefined) metadata.info = info
+
+    if (version !== undefined) metadata.version = version
+
+    return metadata
   }
 
   async function listDevices(): Promise<ReadonlyArray<AlpacaDevice>> {
@@ -396,7 +401,7 @@ async function requiredRead<Value>(
   }
 }
 
-function isUnsupported(error: unknown): boolean {
+function isUnsupported(error: unknown): error is AlpacaProviderError {
   if (!(error instanceof AlpacaProviderError) || error.reason !== 'protocol-error') return false
 
   if (error.errorNumber === 1024) return true
@@ -484,29 +489,37 @@ async function inspectCamera(
 
   if (reportedPower !== undefined && powerPercent === undefined) read.partial = true
 
-  const cooling = coolerOn === undefined
-    ? undefined
-    : {
-        state: coolerOn ? 'on' as const : 'off' as const,
-        ...(canSetTemperature === undefined ? {} : { setpointControl: canSetTemperature }),
-        ...(canGetCoolerPower === undefined ? {} : { powerReporting: canGetCoolerPower }),
-        ...(powerPercent === undefined ? {} : { powerPercent }),
-      }
+  let cooling: Mutable<NonNullable<Extract<AlpacaDeviceTelemetry, { kind: 'camera' }>['cooling']>> | undefined
+
+  if (coolerOn !== undefined) {
+    cooling = { state: coolerOn ? 'on' : 'off' }
+
+    if (canSetTemperature !== undefined) cooling.setpointControl = canSetTemperature
+
+    if (canGetCoolerPower !== undefined) cooling.powerReporting = canGetCoolerPower
+
+    if (powerPercent !== undefined) cooling.powerPercent = powerPercent
+  }
 
   const activity = cameraActivity(state)
 
   if (state !== undefined && activity === undefined) read.partial = true
 
-  return {
-    kind: 'camera',
-    ...(activity === undefined ? {} : { activity }),
-    ...(sensorTemperatureC === undefined ? {} : { sensorTemperatureC }),
-    ...(cooling === undefined ? {} : { cooling }),
-  }
+  const telemetry: Mutable<Extract<AlpacaDeviceTelemetry, { kind: 'camera' }>> = { kind: 'camera' }
+
+  if (activity !== undefined) telemetry.activity = activity
+
+  if (sensorTemperatureC !== undefined) telemetry.sensorTemperatureC = sensorTemperatureC
+
+  if (cooling !== undefined) telemetry.cooling = cooling
+
+  return telemetry
 }
 
 function cameraActivity(state: number | undefined): AlpacaCameraActivity | undefined {
-  return ['idle', 'waiting', 'exposing', 'reading', 'downloading', 'error'][state ?? -1] as AlpacaCameraActivity | undefined
+  const activities = ['idle', 'waiting', 'exposing', 'reading', 'downloading', 'error'] as const
+
+  return activities[state ?? -1]
 }
 
 async function inspectTelescope(
@@ -543,13 +556,17 @@ async function inspectTelescope(
 
   if (normalized.partial) read.partial = true
 
-  return {
-    kind: 'telescope',
-    ...(normalized.parked === undefined ? {} : { parked: normalized.parked }),
-    ...(normalized.atHome === undefined ? {} : { atHome: normalized.atHome }),
-    ...(normalized.slewing === undefined ? {} : { slewing: normalized.slewing }),
-    ...(normalized.tracking === undefined ? {} : { tracking: normalized.tracking }),
-  }
+  const telemetry: Mutable<Extract<AlpacaDeviceTelemetry, { kind: 'telescope' }>> = { kind: 'telescope' }
+
+  if (normalized.parked !== undefined) telemetry.parked = normalized.parked
+
+  if (normalized.atHome !== undefined) telemetry.atHome = normalized.atHome
+
+  if (normalized.slewing !== undefined) telemetry.slewing = normalized.slewing
+
+  if (normalized.tracking !== undefined) telemetry.tracking = normalized.tracking
+
+  return telemetry
 }
 
 interface TelescopeState {
@@ -635,12 +652,15 @@ async function inspectFocuser(
     signal,
   )
 
-  return {
-    kind: 'focuser',
-    ...(position === undefined ? {} : { position }),
-    ...(moving === undefined ? {} : { moving }),
-    ...(temperatureC === undefined ? {} : { temperatureC }),
-  }
+  const telemetry: Mutable<Extract<AlpacaDeviceTelemetry, { kind: 'focuser' }>> = { kind: 'focuser' }
+
+  if (position !== undefined) telemetry.position = position
+
+  if (moving !== undefined) telemetry.moving = moving
+
+  if (temperatureC !== undefined) telemetry.temperatureC = temperatureC
+
+  return telemetry
 }
 
 async function inspectFilterWheel(
@@ -672,12 +692,15 @@ async function inspectFilterWheel(
 
   const filterName = selectedPosition === undefined ? undefined : names?.[selectedPosition]
 
-  return {
-    kind: 'filter-wheel',
-    ...(selectedPosition === undefined ? {} : { position: selectedPosition }),
-    ...(filterName === undefined ? {} : { filterName }),
-    ...(moving === undefined ? {} : { moving }),
-  }
+  const telemetry: Mutable<Extract<AlpacaDeviceTelemetry, { kind: 'filter-wheel' }>> = { kind: 'filter-wheel' }
+
+  if (selectedPosition !== undefined) telemetry.position = selectedPosition
+
+  if (filterName !== undefined) telemetry.filterName = filterName
+
+  if (moving !== undefined) telemetry.moving = moving
+
+  return telemetry
 }
 
 async function inspectConditions(
@@ -721,12 +744,15 @@ async function inspectConditions(
     read.partial = true
   }
 
-  return {
-    kind: 'observing-conditions',
-    ...(temperatureC === undefined ? {} : { temperatureC }),
-    ...(humidityPercent === undefined ? {} : { humidityPercent }),
-    ...(dewPointC === undefined ? {} : { dewPointC }),
-  }
+  const telemetry: Mutable<Extract<AlpacaDeviceTelemetry, { kind: 'observing-conditions' }>> = { kind: 'observing-conditions' }
+
+  if (temperatureC !== undefined) telemetry.temperatureC = temperatureC
+
+  if (humidityPercent !== undefined) telemetry.humidityPercent = humidityPercent
+
+  if (dewPointC !== undefined) telemetry.dewPointC = dewPointC
+
+  return telemetry
 }
 
 async function inspectSwitch(
@@ -772,21 +798,25 @@ async function inspectSwitch(
 
     if (contradictoryState) read.partial = true
 
-    channels.push({
+    const channel: Mutable<AlpacaSwitchChannel> = {
       id,
       name: name?.trim() || `Switch ${id + 1}`,
-      ...(description === undefined ? {} : { description }),
-      ...(range === undefined
-        ? {}
-        : {
-            minimum: range.minimum,
-            maximum: range.maximum,
-            step: range.step,
-            ...(contradictoryState ? {} : { value: range.value }),
-          }),
-      ...(on === undefined || contradictoryState ? {} : { on }),
-      ...(writable === undefined ? {} : { writable }),
-    })
+    }
+
+    if (description !== undefined) channel.description = description
+
+    if (range !== undefined) {
+      channel.minimum = range.minimum
+      channel.maximum = range.maximum
+      channel.step = range.step
+
+      if (!contradictoryState) channel.value = range.value
+    }
+
+    if (on !== undefined && !contradictoryState) channel.on = on
+
+    if (writable !== undefined) channel.writable = writable
+    channels.push(channel)
   }
 
   return { kind: 'switch', channels }
@@ -797,7 +827,7 @@ function validSwitchRange(
   minimum: number | undefined,
   maximum: number | undefined,
   step: number | undefined,
-): Pick<AlpacaSwitchChannel, 'value' | 'minimum' | 'maximum' | 'step'> | undefined {
+): Required<Pick<AlpacaSwitchChannel, 'value' | 'minimum' | 'maximum' | 'step'>> | undefined {
   if (value === undefined || minimum === undefined || maximum === undefined || step === undefined) return undefined
 
   if (maximum <= minimum || step <= 0 || value < minimum || value > maximum) return undefined

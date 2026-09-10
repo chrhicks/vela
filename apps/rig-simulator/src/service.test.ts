@@ -24,6 +24,37 @@ async function setup() {
 }
 
 describe('simulator Alpaca boundary', () => {
+  it('preserves scalar parsing and rejects ambiguous parameters before changing connection state', async () => {
+    const { app, get, put } = await setup()
+
+    for (const payload of [
+      { Connected: true, connected: false },
+      { Connected: [true] },
+      { Connected: 1 },
+      [true],
+    ]) {
+      const response = await app.inject({ method: 'PUT', url: '/api/v1/camera/0/connected', payload })
+      expect(response.json().ErrorNumber).toBe(0x401)
+      expect((await get('camera', 'connected')).Value).toBe(false)
+    }
+
+    const duplicate = await app.inject({
+      method: 'PUT', url: '/api/v1/camera/0/connected',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      payload: 'Connected=true&connected=false',
+    })
+
+    expect(duplicate.json().ErrorNumber).toBe(0x401)
+    expect((await get('camera', 'connected')).Value).toBe(false)
+    expect((await put('camera', 'connected', { Connected: 'TRUE', ClientTransactionID: '+4.2e1' })).ClientTransactionID).toBe(42)
+    expect((await get('camera', 'connected')).Value).toBe(true)
+
+    for (const duration of ['', ' ', '0x1', 'Infinity', 'true']) {
+      expect((await put('camera', 'startexposure', { Duration: duration, Light: 'true' })).ErrorNumber).toBe(0x401)
+      expect((await get('camera', 'camerastate')).Value).toBe(0)
+    }
+  })
+
   it('discovers its two cameras and shared telescope, validates writes, and reports disconnected state', async () => {
     const { app, get, put } = await setup()
     const devices = (await app.inject('/management/v1/configureddevices')).json().Value

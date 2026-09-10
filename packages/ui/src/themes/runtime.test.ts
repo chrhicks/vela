@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_PROFILE, DEFAULT_SESSION, DEFAULT_THEME_PARAMETERS } from './defaults'
-import { isDesignProfile, isWorkingSession, referencePalette, resolveTheme, themeStyle } from './runtime'
+import { designProfileSchema, isDesignProfile, isWorkingSession, referencePalette, resolveTheme, themeStyle } from './runtime'
 
 describe('theme resolution', () => {
   it('generates all five complete OKLCH reference ramps', () => {
@@ -38,6 +38,10 @@ describe('theme resolution', () => {
 })
 
 describe('shared artifact schemas', () => {
+  it('preserves the reference profile lock when parsing persisted profiles', () => {
+    expect(designProfileSchema.parse({ ...DEFAULT_PROFILE, readonly: true }).readonly).toBe(true)
+  })
+
   it('accepts a named profile with status-ramp overrides', () => {
     expect(isDesignProfile({
       schemaVersion: 1,
@@ -55,6 +59,7 @@ describe('shared artifact schemas', () => {
   it('rejects incomplete ramps and unknown theme properties', () => {
     expect(isDesignProfile({ ...DEFAULT_PROFILE, readonly: false, overrides: { warningLightness: [0.5] } })).toBe(false)
     expect(isDesignProfile({ ...DEFAULT_PROFILE, readonly: false, overrides: { magicColor: '#fff' } })).toBe(false)
+    expect(isDesignProfile({ ...DEFAULT_PROFILE, overrides: { radius: undefined } })).toBe(false)
   })
 
   it('accepts a recoverable working session and rejects invalid state', () => {

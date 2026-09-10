@@ -20,19 +20,19 @@ export async function encodeCaptureFits(
   }
 
   const cards = [
-    card('SIMPLE', true), card('BITPIX', 32), card('NAXIS', 2),
-    card('NAXIS1', width), card('NAXIS2', height),
-    card('DATE-OBS', start.toISOString()), card('EXPTIME', metadata.exposureSeconds),
-    card('INSTRUME', metadata.cameraName), card('ROWORDER', 'TOP-DOWN'),
+    card('SIMPLE', 'T'.padStart(20)), numberCard('BITPIX', 32), numberCard('NAXIS', 2),
+    numberCard('NAXIS1', width), numberCard('NAXIS2', height),
+    textCard('DATE-OBS', start.toISOString()), numberCard('EXPTIME', metadata.exposureSeconds),
+    textCard('INSTRUME', metadata.cameraName), textCard('ROWORDER', 'TOP-DOWN'),
   ]
 
   if (frame.capturedAtSource === 'server-estimate') {
-    cards.push(card('TIMESRC', 'SERVER-ESTIMATE'))
+    cards.push(textCard('TIMESRC', 'SERVER-ESTIMATE'))
     cards.push('COMMENT DATE-OBS estimated from server UTC before StartExposure.'.padEnd(80))
   }
 
   // The acquisition adapter already shifts this pattern to the image origin.
-  if (frame.color?.kind === 'bayer') cards.push(card('BAYERPAT', frame.color.pattern.toUpperCase()))
+  if (frame.color?.kind === 'bayer') cards.push(textCard('BAYERPAT', frame.color.pattern.toUpperCase()))
   cards.push('END'.padEnd(80))
   const header = Buffer.from(cards.join('').padEnd(Math.ceil(cards.length * 80 / 2880) * 2880), 'ascii')
   const result = Buffer.alloc(header.length + Math.ceil(pixels.length * 4 / 2880) * 2880)
@@ -57,22 +57,24 @@ export async function encodeCaptureFits(
   return result
 }
 
-function card(key: string, value: string | number | boolean) {
-  let encoded: string
+function textCard(key: string, value: string) {
+  // FITS headers are ASCII. Escape apostrophes before fitting the value to one card.
+  let text = ''
 
-  if (typeof value === 'string') {
-    // FITS headers are ASCII. Escape apostrophes before fitting the value to one card.
-    let text = ''
+  for (const character of value.replace(/[^\x20-\x7e]/g, '?')) {
+    const next = character === "'" ? "''" : character
 
-    for (const character of value.replace(/[^\x20-\x7e]/g, '?')) {
-      const next = character === "'" ? "''" : character
+    if (text.length + next.length > 68) break
+    text += next
+  }
 
-      if (text.length + next.length > 68) break
-      text += next
-    }
+  return card(key, `'${text}'`)
+}
 
-    encoded = `'${text}'`
-  } else encoded = (typeof value === 'boolean' ? value ? 'T' : 'F' : String(value).toUpperCase()).padStart(20)
+function numberCard(key: string, value: number) {
+  return card(key, String(value).toUpperCase().padStart(20))
+}
 
+function card(key: string, encoded: string) {
   return `${key.padEnd(8)}= ${encoded}`.padEnd(80)
 }

@@ -53,11 +53,11 @@ const clamp = (value: number) => Math.max(-1, Math.min(1, value))
 // IC1396: https://science.nasa.gov/photojournal/dark-globule-in-ic-1396-irac/
 // California: https://www.spitzer.caltech.edu/image/ssc2020-10a-spitzer-california-nebula-mosaic
 // Heart/Soul and Orion/Flame identifications are documented at catalog/README.md.
-const categoryOverrides: Readonly<Record<string, TargetCategory>> = {
+const categoryOverrides = new Map<string, TargetCategory>(Object.entries({
   ic1396: 'emission', ic1805: 'emission', ic1848: 'emission',
   ngc1499: 'emission', ngc1976: 'emission', ngc2024: 'emission',
   ngc1432: 'reflection-dark', ngc1435: 'reflection-dark', ngc7023: 'reflection-dark',
-}
+} satisfies Record<string, TargetCategory>))
 
 // A small editorial nudge, not a whitelist or a brightness/magnitude surrogate.
 const showpieces = new Set([
@@ -67,9 +67,9 @@ const showpieces = new Set([
 ])
 
 function description(target: CatalogTarget) {
-  let category: TargetCategory = categoryOverrides[target.id] ?? 'other'
+  let category: TargetCategory = categoryOverrides.get(target.id) ?? 'other'
 
-  if (!categoryOverrides[target.id]) {
+  if (!categoryOverrides.get(target.id)) {
     if (['H II region', 'Emission nebula', 'Supernova remnant'].includes(target.type)) category = 'emission'
     else if (['Reflection nebula', 'Dark nebula'].includes(target.type)) category = 'reflection-dark'
     else if (target.type.startsWith('Galaxy')) category = 'galaxy'
@@ -79,13 +79,13 @@ function description(target: CatalogTarget) {
 
   // L-Ultimate passes H-alpha/OIII, not general continuum. Mixed/unknown labels
   // do not establish emission-line suitability. https://www.optolong.com/cms/document/detail/id/250.html
-  const mixed = target.type === 'Star cluster and nebula' && !categoryOverrides[target.id]
+  const mixed = target.type === 'Star cluster and nebula' && !categoryOverrides.get(target.id)
 
   const filter: TargetFilterChoice = mixed || category === 'other' ? 'uncertain'
     : category === 'emission' || category === 'planetary' ? 'dual-band' : 'broadband'
 
-  const filterReason: DiscoveryCandidate['filterReason'] = filter === 'dual-band' ? 'emission-lines'
-    : filter === 'broadband' ? 'continuum' : 'mixed-or-unknown'
+  const filterReasons = { 'dual-band': 'emission-lines', broadband: 'continuum', uncertain: 'mixed-or-unknown' } as const
+  const filterReason = filterReasons[filter]
 
   const typeAppeal: Record<TargetCategory, number> = {
     emission: 0.6, 'reflection-dark': 0.55, galaxy: 0.45, cluster: 0.4, planetary: 0.5, other: 0.15,

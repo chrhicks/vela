@@ -1,8 +1,9 @@
+import { Schema } from 'effect'
 import { setTimeout as delay } from 'node:timers/promises'
 import { SpanStatusCode, trace } from '@opentelemetry/api'
 import { AlpacaProviderError } from './error.js'
 import { imageBytesPixels } from './internal/image-bytes.js'
-import { createAlpacaClient } from './internal/client.js'
+import { createAlpacaClient, type CameraImage } from './internal/client.js'
 import type { ConfiguredDevice } from './internal/types/management.js'
 import { rejectDuplicateDeviceIds, stableDeviceId } from './internal/configured-device.js'
 
@@ -78,28 +79,24 @@ function bounded(value: number, minimum: number, maximum: number, label: string)
   return value
 }
 
-function decodeFrame(raw: unknown, width: number, height: number, capturedAt: string, color: AlpacaFrameColor): AlpacaFrame {
+function decodeFrame(raw: CameraImage, width: number, height: number, capturedAt: string, color: AlpacaFrameColor): AlpacaFrame {
   const endpoint = 'imagearray'
 
   if (raw instanceof ArrayBuffer) return { width, height, pixels: imageBytesPixels(raw, width, height), capturedAt, color }
 
-  if (typeof raw !== 'object' || raw === null) invalid('Invalid image response', endpoint)
-  const image = raw as Record<string, unknown>
-
-  if (image.Rank !== 2 || image.Type !== 2) invalid('Only rank-2 Int32 camera images are supported', endpoint)
+  const image = raw
 
   if (!Array.isArray(image.Value) || image.Value.length !== width) invalid('Image width differs from exposure dimensions', endpoint)
   const pixels = new Float64Array(width * height)
 
   for (let x = 0; x < width; x++) {
-    const column: unknown = image.Value[x]
+    const column = image.Value[x]
 
     if (!Array.isArray(column) || column.length !== height) invalid('Image has inconsistent column dimensions', endpoint)
 
     for (let y = 0; y < height; y++) {
-      const value: unknown = column[y]
+      const value = column[y]!
 
-      if (typeof value !== 'number' || !Number.isInteger(value) || value < -2147483648 || value > 2147483647) invalid('Image has an invalid Int32 pixel', endpoint)
       pixels[y * width + x] = value
     }
   }
@@ -159,9 +156,9 @@ export function createAlpacaAcquisition({ baseUrl, fetch = globalThis.fetch, req
     if (!(await client.readBoolean(telescope, 'canmoveaxis?Axis=0', signal))) throw new Error('Telescope cannot move its primary axis')
 
     if (await client.readBoolean(telescope, 'slewing', signal)) throw new Error('Telescope is already moving')
-    const ranges = await client.readValue(telescope, 'axisrates?Axis=0', signal)
+    const ranges = await client.readValue(telescope, 'axisrates?Axis=0', Schema.Array(Schema.Struct({ Minimum: Schema.Finite, Maximum: Schema.Finite })), signal)
 
-    if (!Array.isArray(ranges) || ranges.some(range => typeof range !== 'object' || range === null || !Number.isFinite(range.Minimum) || !Number.isFinite(range.Maximum) || range.Minimum < 0 || range.Maximum < range.Minimum)) invalid('Invalid axis rate ranges', 'axisrates')
+    if (ranges.some(range => range.Minimum < 0 || range.Maximum < range.Minimum)) invalid('Invalid axis rate ranges', 'axisrates')
 
     if (rate !== 0 && !ranges.some(range => Math.abs(rate) >= range.Minimum && Math.abs(rate) <= range.Maximum)) throw new Error('Requested rate is not supported by telescope')
 
@@ -281,7 +278,7 @@ export function createAlpacaAcquisition({ baseUrl, fetch = globalThis.fetch, req
         if (stamp === undefined && !observedNotReady) invalid('Camera exposure freshness is unconfirmed without a timestamp or image-ready transition', 'imageready')
 
         if (stamp !== undefined && stamp === previousStart) invalid('Camera returned the previous exposure; freshness is unconfirmed', 'lastexposurestarttime')
-        const capturedAt = stamp === undefined ? requestedAt : /Z$/.test(stamp) ? stamp : `${stamp}Z`
+        const capturedAt = stamp === undefined ? requestedAt : stamp.endsWith('Z') ? stamp : `${stamp}Z`
 
         if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/.test(capturedAt) || !Number.isFinite(Date.parse(capturedAt))) invalid('Invalid exposure UTC timestamp', 'lastexposurestarttime')
         onReadout?.()
@@ -404,7 +401,7 @@ export function createAlpacaAcquisition({ baseUrl, fetch = globalThis.fetch, req
         device(telescopeId, 'telescope').then(stopTelescope),
       ])
 
-      const errors = results.filter(result => result.status === 'rejected').map(result => result.reason as unknown)
+      const errors = results.flatMap(result => result.status === 'rejected' ? [result.reason] : [])
 
       if (errors.length > 0) throw new AggregateError(errors, 'Could not confirm acquisition stopped')
     },

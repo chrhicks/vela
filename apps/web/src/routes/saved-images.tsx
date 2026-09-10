@@ -29,7 +29,7 @@ function SavedImagesPage({ rigId, imageId }: { rigId: string, imageId?: string }
 
     async function load() {
       try {
-        const result = await api<unknown>(`web/rigs/${encodeURIComponent(rigId)}/saved-images${imageId ? `/${encodeURIComponent(imageId)}` : ''}`, { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)]) })
+        const result = await api(`web/rigs/${encodeURIComponent(rigId)}/saved-images${imageId ? `/${encodeURIComponent(imageId)}` : ''}`, { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)]) })
 
         if (controller.signal.aborted) return
 

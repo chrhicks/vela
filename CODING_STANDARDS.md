@@ -193,9 +193,8 @@ pnpm check
 ```
 
 This runs lint, tests (including model type contracts), then the workspace build
-and its TypeScript checks, stopping on the first failure. Existing lint errors
-currently block the full check; report them explicitly rather than suppressing
-them or claiming the check passed. `pnpm test` and `pnpm build` remain available
-individually for focused validation.
+and its TypeScript checks, stopping on the first failure. Report failures
+explicitly rather than suppressing them or claiming the check passed.
+`pnpm test` and `pnpm build` remain available individually for focused validation.
 
 A documentation-only change normally needs link, path, and content review rather than a code build.

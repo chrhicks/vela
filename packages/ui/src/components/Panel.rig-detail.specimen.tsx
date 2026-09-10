@@ -225,15 +225,15 @@ const seestar: RigFixture = {
 }
 
 function isScreen(value: unknown): value is Screen {
-  return screens.includes(value as Screen)
+  return screens.some(option => option === value)
 }
 
 function isRig(value: unknown): value is RigId {
-  return rigs.includes(value as RigId)
+  return rigs.some(option => option === value)
 }
 
 function isScenario(value: unknown): value is Scenario {
-  return scenarios.includes(value as Scenario)
+  return scenarios.some(option => option === value)
 }
 
 function RefreshIcon() {
@@ -305,34 +305,10 @@ function scenarioDevices(rig: RigFixture, scenario: Scenario): ReadonlyArray<Dev
     return rig.devices.map((device) => ({ ...device, connection: 'last-known' }))
   }
 
-  if (scenario === 'disconnected') {
-    return rig.devices.map((device) => ({
-      id: device.id,
-      kind: device.kind,
-      kindLabel: device.kindLabel,
-      name: device.name,
-      ...(device.configuredName === undefined ? {} : { configuredName: device.configuredName }),
-      activity: 'Disconnected',
-      activityNote: 'Connect this device in its driver to see live status',
-      connection: 'disconnected',
-      metrics: [],
-    }))
-  }
+  if (scenario === 'disconnected') return rig.devices.map(disconnectedDevice)
 
   return rig.devices.map((device, index) => {
-    if (index === 2) {
-      return {
-        id: device.id,
-        kind: device.kind,
-        kindLabel: device.kindLabel,
-        name: device.name,
-        ...(device.configuredName === undefined ? {} : { configuredName: device.configuredName }),
-        activity: 'Disconnected',
-        activityNote: 'Connect this device in its driver to see live status',
-        connection: 'disconnected',
-        metrics: [],
-      }
-    }
+    if (index === 2) return disconnectedDevice(device)
 
     if (index === rig.devices.length - 2) {
       return {
@@ -345,6 +321,21 @@ function scenarioDevices(rig: RigFixture, scenario: Scenario): ReadonlyArray<Dev
 
     return device
   })
+}
+
+function disconnectedDevice(device: DeviceFixture): DeviceFixture {
+  const disconnected: DeviceFixture = {
+    id: device.id,
+    kind: device.kind,
+    kindLabel: device.kindLabel,
+    name: device.name,
+    activity: 'Disconnected',
+    activityNote: 'Connect this device in its driver to see live status',
+    connection: 'disconnected',
+    metrics: [],
+  }
+
+  return device.configuredName === undefined ? disconnected : { ...disconnected, configuredName: device.configuredName }
 }
 
 function DeviceCard({ device }: { device: DeviceFixture }) {
@@ -497,6 +488,17 @@ function RigView({
   readonly rig: RigFixture
   readonly scenario: Scenario
 }) {
+  function updateAge() {
+    switch (scenario) {
+      case 'offline':
+        return 'Last seen yesterday at 10:09 PM'
+      case 'stale':
+        return 'Last updated 42 seconds ago'
+      default:
+        return 'Updated just now'
+    }
+  }
+
   const devices = scenarioDevices(rig, scenario)
   const status = reachability(scenario)
 
@@ -512,7 +514,7 @@ function RigView({
         </div>
         <div className="vela-rig-hero__status">
           <Badge marker={<i />} tone={status.tone}>{status.label}</Badge>
-          <span>{scenario === 'offline' ? 'Last seen yesterday at 10:09 PM' : scenario === 'stale' ? 'Last updated 42 seconds ago' : 'Updated just now'}</span>
+          <span>{updateAge()}</span>
           <IconButton icon={<RefreshIcon />} label="Refresh Rig" onClick={onRefresh} size="small" tone="quiet" />
         </div>
       </header>

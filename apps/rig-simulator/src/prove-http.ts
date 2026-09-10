@@ -1,3 +1,4 @@
+import { z } from 'zod'
 /** Opt-in end-to-end proof. Never imports simulator geometry or supplies truth to the solver. */
 import assert from 'node:assert/strict'
 import Fastify from 'fastify'
@@ -47,7 +48,7 @@ const reports: object[] = []
 
 const toleranceArcsec = 10
 
-async function control(path: string, body: unknown, method = 'PUT') {
+async function control(path: string, body: { altitudeArcsec?: number; azimuthArcsec?: number; preset?: string; obscured?: boolean; cameraNumber?: number; resolution?: string }, method: 'PUT' | 'POST' = 'PUT') {
   const response = await fetch(`${baseUrl}/simulator/${path}`, {
     method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
   })
@@ -206,8 +207,8 @@ async function proveCapture() {
     assert.match(raw.headers.get('content-type') ?? '', /^application\/imagebytes/)
     const binary = Buffer.from(await raw.arrayBuffer())
 
-    const json = await fetch(`${baseUrl}/api/v1/camera/1/imagearray`, { headers: { accept: 'application/json' } })
-      .then(response => response.json()) as { ErrorNumber: number, Value: number[][] }
+    const json = z.object({ ErrorNumber: z.number(), Value: z.array(z.array(z.number())) }).parse(await fetch(`${baseUrl}/api/v1/camera/1/imagearray`, { headers: { accept: 'application/json' } })
+      .then(response => response.json()))
 
     assert.equal(json.ErrorNumber, 0)
     assert.equal(binary.readInt32LE(16), 44)
@@ -294,7 +295,7 @@ try {
 
   while (true) {
     const response = await fetch(`${baseUrl}/simulator/state`)
-    const state = await response.json() as { cameraActivity: string }
+    const state = z.object({ cameraActivity: z.enum(['idle', 'exposing']) }).parse(await response.json())
 
     if (state.cameraActivity === 'exposing') break
 
@@ -308,7 +309,11 @@ try {
   assert.notEqual(restarted.sample.capturedAt, recovered.sample.capturedAt)
   check('restart-freshness', measureAlignment(baseline, restarted.sample, true), 0, 0)
   await hardware.abort(cameraId, telescopeId)
-  const idle = await fetch(`${baseUrl}/simulator/state`).then(response => response.json()) as { cameraActivity: string, raRateDegreesPerSecond: number }
+
+  const idle = z.object({ cameraActivity: z.enum(['idle', 'exposing']), raRateDegreesPerSecond: z.number() }).parse(
+    await fetch(`${baseUrl}/simulator/state`).then(response => response.json()),
+  )
+
   assert.equal(idle.cameraActivity, 'idle')
   assert.equal(idle.raRateDegreesPerSecond, 0)
   await proveCapture()

@@ -133,7 +133,7 @@ export function createTraceFileExporter(path: string, {
   }
 }
 
-function asError(value: unknown): Error { return value instanceof Error ? value : new Error(String(value)) }
+function asError(cause: unknown): Error { return cause instanceof Error ? cause : new Error(String(cause)) }
 
 function unixNanoseconds(time: readonly [number, number]) { return (BigInt(time[0]) * 1_000_000_000n + BigInt(time[1])).toString() }
 

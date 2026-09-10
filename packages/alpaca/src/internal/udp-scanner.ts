@@ -20,7 +20,7 @@ const discoveryResponse = Schema.Struct({
 
 const jsonObjectFromString = Schema.String.pipe(
   Schema.decodeTo(Schema.Unknown, SchemaTransformation.fromJsonString()),
-  Schema.decodeTo(Schema.Record(Schema.String, Schema.Unknown)),
+  Schema.decodeTo(Schema.Record(Schema.String, Schema.Json)),
 )
 
 interface Ipv4Interface {
@@ -46,10 +46,6 @@ interface UdpSocket {
 export interface UdpScannerDependencies {
   readonly networkInterfaces: () => ReadonlyArray<Ipv4Interface>
   readonly createSocket: () => UdpSocket
-}
-
-function signalReason(signal: AbortSignal): unknown {
-  return signal.reason ?? new DOMException('The operation was aborted', 'AbortError')
 }
 
 function parseIpv4(address: string): number | undefined {
@@ -85,7 +81,7 @@ function broadcastAddress(networkInterface: Ipv4Interface): string | undefined {
 }
 
 function parseDiscoveryResponse(message: Uint8Array): number | undefined {
-  let record: Readonly<Record<string, unknown>>
+  let record: typeof jsonObjectFromString.Type
 
   try {
     record = Schema.decodeUnknownSync(jsonObjectFromString)(
@@ -161,15 +157,15 @@ function scanInterface(
       resolve([...endpoints.values()])
     }
 
-    function fail(error: unknown) {
+    function fail(cause: unknown) {
       if (settled) return
       settled = true
       cleanUp()
-      reject(error)
+      reject(cause)
     }
 
     function onAbort() {
-      fail(options.signal === undefined ? undefined : signalReason(options.signal))
+      fail(options.signal === undefined ? undefined : (options.signal.reason ?? new DOMException('The operation was aborted', 'AbortError')))
     }
 
     function sendDiscovery() {
@@ -254,7 +250,7 @@ export function createUdpScanner({
       )
 
       if (options.signal?.aborted) {
-        throw signalReason(options.signal)
+        throw (options.signal.reason ?? new DOMException('The operation was aborted', 'AbortError'))
       }
 
       const successful = results.filter(

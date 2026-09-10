@@ -33,7 +33,7 @@ export function useCapture(rigId: string) {
     setRefreshing(true)
 
     try {
-      const next = await api<unknown>(`web/rigs/${encodeURIComponent(rigId)}/capture`, {
+      const next = await api(`web/rigs/${encodeURIComponent(rigId)}/capture`, {
         signal: AbortSignal.any([controller.signal, AbortSignal.timeout(5000)]),
       })
 
@@ -109,7 +109,7 @@ export function useCapture(rigId: string) {
     setError(null)
 
     try {
-      const next = await api<unknown>(`rigs/${encodeURIComponent(rigId)}/capture/${action}`, {
+      const next = await api(`rigs/${encodeURIComponent(rigId)}/capture/${action}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(action === 'start' ? { exposureSeconds, repeat, saveFrames } : {}),
         signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]),

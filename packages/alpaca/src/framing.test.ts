@@ -1,8 +1,11 @@
+import type { ResponseFixture } from './internal/test-fixtures.js'
 import { describe, expect, it } from 'vitest'
 import { AlpacaFramingStoppedError, createAlpacaFraming } from './framing.js'
 
 function observatory(requestTimeoutMs = 100) {
-  const values: Record<string, unknown> = {
+  interface PropertyFixtures { [operation: string]: ResponseFixture }
+
+  const values: PropertyFixtures = {
     connected: true, name: ' Camera ', cameraxsize: 6000, cameraysize: 4000,
     pixelsizex: 3.76, pixelsizey: 3.76, binx: 2, biny: 2, numx: 2000, numy: 1500, startx: 50, starty: 100,
     rightascension: 2, declination: -20, equatorialsystem: 1,
@@ -24,7 +27,7 @@ function observatory(requestTimeoutMs = 100) {
   const fetch: typeof globalThis.fetch = async (input, init) => {
     init?.signal?.throwIfAborted()
     const operation = new URL(String(input)).pathname.split('/').at(-1)!
-    const envelope = (Value?: unknown, ErrorNumber = 0) => Response.json({ ClientTransactionID: 0, ServerTransactionID: 1, ErrorNumber, ErrorMessage: '', Value })
+    const envelope = (Value?: ResponseFixture, ErrorNumber = 0) => Response.json({ ClientTransactionID: 0, ServerTransactionID: 1, ErrorNumber, ErrorMessage: '', Value })
 
     if (operation === 'configureddevices') return envelope([
       { DeviceName: 'Camera', DeviceType: 'Camera', DeviceNumber: 7, UniqueID: 'camera-id' },
@@ -224,7 +227,7 @@ describe('framing boundary', () => {
     ['sideofpier', 2], ['sideofpier', 0.5], ['sideofpier', '-1'],
   ])('rejects malformed alignment property %s=%s', async (property, value) => {
     const fake = observatory()
-    Object.assign(fake.values, { trackingrate: 0, rightascensionrate: 0, declinationrate: 0, sideofpier: -1, [property as string]: value })
+    Object.assign(fake.values, { trackingrate: 0, rightascensionrate: 0, declinationrate: 0, sideofpier: -1, [String(property)]: value })
     await expect(fake.framing.telescopeStatus('mount-id', undefined, { includeAlignmentObservations: true })).rejects.toMatchObject({ reason: 'invalid-response' })
   })
 

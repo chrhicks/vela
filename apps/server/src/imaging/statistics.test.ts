@@ -33,6 +33,7 @@ function image(stars: Star[], options: { width?: number, height?: number, backgr
         }
       }
 
+      // SAFETY: Bayer patterns contain four r/g/b characters; parity indexes stay within 0–3.
       const gain = options.color?.kind === 'bayer' ? { r: 1.8, g: 1, b: 0.45 }[options.color.pattern[(y % 2) * 2 + x % 2] as 'r' | 'g' | 'b'] : 1
       const noise = (options.noise ?? 0) * Math.sqrt(-2 * Math.log(random())) * Math.cos(2 * Math.PI * random())
       pixels[y * width + x] = Math.min(options.clip ?? Infinity, (signal + (options.background ?? 100)) * gain + noise)
@@ -102,7 +103,7 @@ describe('measureStars', () => {
   })
 
   it('returns no measurement for blank, noisy, invalid and isolated hot-pixel images', async () => {
-    for (const color of [{ kind: 'mono' }, { kind: 'bayer', pattern: 'rggb' }] as ImageColor[]) {
+    for (const color of [{ kind: 'mono' }, { kind: 'bayer', pattern: 'rggb' }] satisfies ImageColor[]) {
       for (const noise of [0, 10]) {
         const frame = image([], { color, noise })
         expect(await measureStars(frame.width, frame.height, frame.pixels, color)).toEqual({ detectedStars: 0, medianHfrPixels: null })

@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, readdir, readFile, rename, stat, unlink, utimes, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
@@ -89,7 +90,7 @@ function validateBody(body: Buffer, contentType: SurveyImage['contentType']): vo
   }
 }
 
-function missing(error: unknown): boolean {
+function missing(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && 'code' in error && error.code === 'ENOENT'
 }
 
@@ -117,7 +118,7 @@ export function createSurveyCache(options: SurveyCacheOptions = {}) {
   }
 
   async function remove(name: string) {
-    await unlink(join(directory, name)).catch((error: unknown) => {
+    await unlink(join(directory, name)).catch(error => {
       if (!missing(error)) throw error
     })
     totalBytes -= entries.get(name)?.bytes ?? 0
@@ -171,10 +172,9 @@ export function createSurveyCache(options: SurveyCacheOptions = {}) {
         const newline = bytes.indexOf(10)
 
         if (newline < 0 || newline > 2048) throw new Error('Invalid cache metadata')
-        const metadata: unknown = JSON.parse(bytes.subarray(0, newline).toString())
+        const metadata = z.object({ key: z.literal(key) }).safeParse(JSON.parse(bytes.subarray(0, newline).toString()))
 
-        if (!metadata || typeof metadata !== 'object' || !('key' in metadata)
-          || metadata.key !== key) throw new Error('Invalid cache key')
+        if (!metadata.success) throw new Error('Invalid cache key')
         const body = bytes.subarray(newline + 1)
         validateBody(body, contentType)
         const used = Date.now()
@@ -247,7 +247,7 @@ export function createSurveyCache(options: SurveyCacheOptions = {}) {
         await writeFile(temporary, bytes, { flag: 'wx' })
         await rename(temporary, join(directory, name))
       } finally {
-        await unlink(temporary).catch((error: unknown) => { if (!missing(error)) throw error })
+        await unlink(temporary).catch(error => { if (!missing(error)) throw error })
       }
 
       totalBytes -= entries.get(name)?.bytes ?? 0

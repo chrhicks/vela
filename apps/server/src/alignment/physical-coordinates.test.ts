@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { fixture } from './physical-fixture.js'
 import { createAlignmentBaseline, measureAlignment, type AlignmentSample } from './geometry.js'
 import { localSiderealDegrees, physicalAlignmentSample, projectPhysicalAlignmentTarget } from './physical-coordinates.js'
 import type { PlateWcs, SkyPosition } from '../plate-solving/solver.js'
@@ -15,12 +15,7 @@ import type { PlateWcs, SkyPosition } from '../plate-solving/solver.js'
 // https://github.com/liberfa/erfa/blob/master/src/atoc13.c
 // https://github.com/liberfa/erfa/blob/master/src/gst06a.c
 // Each recorded capture start is one second before its 2-second midpoint.
-type CaptureFixture = { solved: SkyPosition, capturedAt: string, sidereal?: number }
-
-const fixture = JSON.parse(readFileSync(new URL('./physical-coordinates.fixture.json', import.meta.url), 'utf8')) as {
-  site: { latitudeDegrees: number, longitudeDegrees: number, elevationMeters: number }
-  cases: { altitude: number, azimuth: number, samples: CaptureFixture[], adjusted: CaptureFixture, target: SkyPosition }[]
-}
+type CaptureFixture = typeof fixture.cases[number]['adjusted']
 
 const { site } = fixture
 
@@ -28,7 +23,7 @@ const sample = (frame: CaptureFixture) => physicalAlignmentSample(frame.solved, 
 
 describe('physical alignment coordinate boundary', () => {
   it.each(fixture.cases)('recovers an independently constructed physical pole ($altitude, $azimuth)', reference => {
-    const samples = reference.samples.map(sample) as [AlignmentSample, AlignmentSample, AlignmentSample]
+    const samples: [AlignmentSample, AlignmentSample, AlignmentSample] = [sample(reference.samples[0]), sample(reference.samples[1]), sample(reference.samples[2])]
     expect(samples[0].siderealTimeDegrees).toBeGreaterThan(359)
     expect(samples[1].siderealTimeDegrees).toBeLessThan(1)
 

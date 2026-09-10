@@ -7,6 +7,10 @@ import { cameraPose, siderealRadiansPerSecond } from './mount.js'
 import type { CameraPose } from './mount.js'
 import { renderSkyAsync } from './sky.js'
 
+function isFixedCatalog(stars: readonly Star[] | StarSource): stars is readonly Star[] {
+  return Array.isArray(stars)
+}
+
 const normalizeDegrees = (value: number) => ((value % 360) + 360) % 360
 
 const slewDegreesPerSecond = 30
@@ -215,8 +219,15 @@ export class SimulatorRuntime {
     this.rate = 0
     this.tracking = true
     this.obscured = false
-    this.altitude = preset === 'large-error' ? 480 : preset === 'near-aligned' ? 12 : 0
-    this.azimuth = preset === 'large-error' ? -360 : preset === 'near-aligned' ? -9 : 0
+
+    const offsets = {
+      'large-error': { altitude: 480, azimuth: -360 },
+      'near-aligned': { altitude: 12, azimuth: -9 },
+      aligned: { altitude: 0, azimuth: 0 },
+    }[preset]
+
+    this.altitude = offsets.altitude
+    this.azimuth = offsets.azimuth
   }
   setTracking(tracking: boolean) {
     this.requireIdle()
@@ -277,7 +288,7 @@ export class SimulatorRuntime {
     const declinationMargin = fieldRadius * 180 / Math.PI
     const raMargin = Math.asin(Math.sin(fieldRadius) / Math.cos(dec * Math.PI / 180)) * 180 / Math.PI
 
-    if (typeof this.stars !== 'function' && (ra - raMargin < 0 || ra + raMargin > 70 || dec - declinationMargin < 50
+    if (isFixedCatalog(this.stars) && (ra - raMargin < 0 || ra + raMargin > 70 || dec - declinationMargin < 50
       || dec + declinationMargin > 70)) {
       throw new SimulatorError(0x40b, 'Camera field is outside the supported catalog patch (RA 0–70°, Dec 50–70°); move back or reset the simulator')
     }
@@ -320,7 +331,7 @@ export class SimulatorRuntime {
           * Math.hypot(exposure.width / exposure.height, 1)) * 180 / Math.PI
           + fieldHeightDegrees / exposure.height * 12
 
-        const stars = typeof this.stars === 'function' ? await this.stars({
+        const stars = !isFixedCatalog(this.stars) ? await this.stars({
           raDegrees: normalizeDegrees(Math.atan2(direction[1], direction[0]) * 180 / Math.PI),
           decDegrees: Math.asin(direction[2]) * 180 / Math.PI,
           radiusDegrees,

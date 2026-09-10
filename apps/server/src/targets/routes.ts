@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import type { FastifyInstance } from 'fastify'
 import { createAlpacaAcquisition, createAlpacaFraming, type AlpacaFraming } from '@vela/alpaca'
 import type { FramingView, TargetView, TargetsView } from '@vela/model/web'
@@ -132,10 +133,11 @@ export function registerTargets(app: FastifyInstance, catalog: RigCatalog, opera
 
     if (!rig) return reply.code(404).send({ error: 'Rig not found' })
 
-    if ((request.query.q !== undefined && typeof request.query.q !== 'string')
-      || (request.query.offset !== undefined && typeof request.query.offset !== 'string')) return reply.code(400).send({ error: 'Invalid target search' })
-    const query = request.query.q ?? ''
-    const offset = Number(request.query.offset ?? 0)
+    const search = z.object({ q: z.string().default(''), offset: z.string().default('0') }).safeParse(request.query)
+
+    if (!search.success) return reply.code(400).send({ error: 'Invalid target search' })
+    const query = search.data.q
+    const offset = Number(search.data.offset)
 
     if (query.length > 100 || !Number.isInteger(offset) || offset < 0 || offset > 15000) return reply.code(400).send({ error: 'Invalid target search' })
     const key = normalizeCatalogName(query)
@@ -164,13 +166,15 @@ export function registerTargets(app: FastifyInstance, catalog: RigCatalog, opera
     return rig ? framingView(rig) : reply.code(404).send({ error: 'Rig not found' })
   })
   app.put<{ Params: { rigId: string } }>('/api/rigs/:rigId/framing/settings', async (request, reply) => {
-    if (!jsonBody(request, ['focalLengthMm']) || !isNumber(request.body.focalLengthMm, 10, 20000)) return reply.code(400).send({ error: 'Expected focalLengthMm between 10 and 20000.' })
+    const settings = z.strictObject({ focalLengthMm: z.number().min(10).max(20000) }).safeParse(request.body)
+
+    if (!request.headers['content-type']?.startsWith('application/json') || !settings.success) return reply.code(400).send({ error: 'Expected focalLengthMm between 10 and 20000.' })
     const release = operations.acquire(request.params.rigId, 'framing-settings')
 
     if (!release) return reply.code(409).send({ error: 'Another rig operation is in progress.' })
 
     try {
-      if (!await catalog.setFocalLength(request.params.rigId, request.body.focalLengthMm)) return reply.code(404).send({ error: 'Rig not found' })
+      if (!await catalog.setFocalLength(request.params.rigId, settings.data.focalLengthMm)) return reply.code(404).send({ error: 'Rig not found' })
 
       return framingView((await catalog.get(request.params.rigId))!)
     } finally { release() }
@@ -178,22 +182,32 @@ export function registerTargets(app: FastifyInstance, catalog: RigCatalog, opera
   app.post<{ Params: { rigId: string, command: string } }>('/api/rigs/:rigId/framing/:command', async (request, reply) => {
     const { rigId, command } = request.params
 
-    if (!['start', 'stop', 'center'].includes(command)) return reply.code(404).send({ error: 'Unknown framing command' })
-    const fields = command === 'start' ? ['targetId', 'raDegrees', 'decDegrees', 'exposureSeconds'] : command === 'center' ? ['checkId'] : []
+    const operation = z.enum(['start', 'stop', 'center']).safeParse(command)
 
-    if (!jsonBody(request, fields)) return reply.code(400).send({ error: 'Invalid framing command body' })
-    const body = request.body
+    if (!operation.success) return reply.code(404).send({ error: 'Unknown framing command' })
+    const commandFields = { start: ['targetId', 'raDegrees', 'decDegrees', 'exposureSeconds'], center: ['checkId'], stop: [] }
+    const expectedKeys = commandFields[operation.data]
+    const bodyEnvelope = z.looseObject({}).safeParse(request.body)
 
-    if (command === 'center' && (typeof body.checkId !== 'string' || !body.checkId.trim())) return reply.code(400).send({ error: 'Expected the solved framing check ID.' })
+    if (!request.headers['content-type']?.startsWith('application/json') || !bodyEnvelope.success
+      || Object.keys(bodyEnvelope.data).length !== expectedKeys.length || Object.keys(bodyEnvelope.data).some(key => !expectedKeys.some(expected => expected === key))) {
+      return reply.code(400).send({ error: 'Invalid framing command body' })
+    }
 
-    if (command === 'start' && (typeof body.targetId !== 'string' || !getTarget(body.targetId)
-      || !isNumber(body.raDegrees, 0, 360) || body.raDegrees === 360 || !isNumber(body.decDegrees, -90, 90)
-      || !isNumber(body.exposureSeconds, 0.1, 60))) return reply.code(400).send({ error: 'Expected a catalog target, J2000 coordinates and 0.1–60 second exposure.' })
+    const parsed = framingCommandSchema.safeParse({ command, body: request.body })
+
+    if (!parsed.success) {
+      const error = command === 'center' ? 'Expected the solved framing check ID.' : 'Expected a catalog target, J2000 coordinates and 0.1–60 second exposure.'
+
+      return reply.code(400).send({ error })
+    }
+
+    const action = parsed.data
     const rig = await catalog.get(rigId)
 
     if (!rig) return reply.code(404).send({ error: 'Rig not found' })
 
-    if (command === 'stop') {
+    if (action.command === 'stop') {
       await controllers.get(rigId)?.stop()
 
       return framingView(rig)
@@ -212,20 +226,20 @@ export function registerTargets(app: FastifyInstance, catalog: RigCatalog, opera
 
       const previous = controller.snapshot()
 
-      if (command === 'center') {
-        if (previous.actual?.checkId !== body.checkId) throw new Error('The framing check has changed. Review the latest check before centering.')
+      if (action.command === 'center') {
+        if (previous.actual?.checkId !== action.body.checkId) throw new Error('The framing check has changed. Review the latest check before centering.')
 
         if (!controller.canCenter(ready.mount, ready.configuration)) throw new Error('A current solved framing check is required before centering.')
       }
 
-      const desired = command === 'center' ? previous.desired! : { raDegrees: body.raDegrees as number, decDegrees: body.decDegrees as number }
+      const desired = action.command === 'center' ? previous.desired! : { raDegrees: action.body.raDegrees, decDegrees: action.body.decDegrees }
       const solver = options.createSolver?.(ready.camera.fieldHeightDegrees) ?? (options.solver ? createAstapSolver({ ...options.solver, fieldHeightDegrees: ready.camera.fieldHeightDegrees }) : undefined)
 
       if (!solver) throw new Error('Plate solving is not configured on the Vela server.')
       const hardware = options.createHardware?.(rig, ready.telescopeId) ?? configuredHardware(rig, ready.telescopeId, adapter(rig))
-      controller.start({ desired, targetId: command === 'center' ? previous.targetId! : body.targetId as string,
-        exposureSeconds: command === 'center' ? previous.exposureSeconds : body.exposureSeconds as number,
-        configuration: ready.configuration, center: command === 'center' }, hardware, solver, release)
+      controller.start({ desired, targetId: action.command === 'center' ? previous.targetId! : action.body.targetId,
+        exposureSeconds: action.command === 'center' ? previous.exposureSeconds : action.body.exposureSeconds,
+        configuration: ready.configuration, center: action.command === 'center' }, hardware, solver, release)
       started = true
 
       return framingView(rig)
@@ -251,11 +265,14 @@ function configuredHardware(rig: RigCatalogRecord, telescopeId: string, adapter:
   }
 }
 
-function message(error: unknown) { return error instanceof Error ? error.message : 'Framing state is unavailable' }
+function message(cause: unknown) { return cause instanceof Error ? cause.message : 'Framing state is unavailable' }
 
-function isNumber(value: unknown, min: number, max: number): value is number { return typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max }
-
-function jsonBody(request: { body: unknown, headers: { 'content-type'?: string | undefined } }, fields: string[]): request is typeof request & { body: Record<string, unknown> } {
-  return !!request.headers['content-type']?.startsWith('application/json') && !!request.body && typeof request.body === 'object' && !Array.isArray(request.body)
-    && Object.keys(request.body).length === fields.length && Object.keys(request.body).every(key => fields.includes(key))
-}
+const framingCommandSchema = z.discriminatedUnion('command', [
+  z.object({ command: z.literal('stop'), body: z.strictObject({}) }),
+  z.object({ command: z.literal('center'), body: z.strictObject({ checkId: z.string().refine(value => value.trim().length > 0) }) }),
+  z.object({ command: z.literal('start'), body: z.strictObject({
+    targetId: z.string().refine(value => getTarget(value) !== undefined),
+    raDegrees: z.number().min(0).lt(360), decDegrees: z.number().min(-90).max(90),
+    exposureSeconds: z.number().min(0.1).max(60),
+  }) }),
+])

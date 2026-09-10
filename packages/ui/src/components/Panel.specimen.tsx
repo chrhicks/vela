@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import { Button } from './Button'
 import { Panel } from './Panel'
 import type { ComponentSpecimen } from '../themes'
@@ -17,9 +18,9 @@ export const specimen: ComponentSpecimen = {
   render: (props) => (
     <div style={{ width: 'min(100%, 30rem)' }}>
       <Panel
-        action={<span style={{ color: Boolean(props.connected) ? 'var(--vela-positive)' : 'var(--vela-text-muted)', fontSize: '.78em', fontWeight: 700 }}>{Boolean(props.connected) ? 'CONNECTED' : 'OFFLINE'}</span>}
+        action={<span style={{ color: props.connected ? 'var(--vela-positive)' : 'var(--vela-text-muted)', fontSize: '.78em', fontWeight: 700 }}>{props.connected ? 'CONNECTED' : 'OFFLINE'}</span>}
         description="ASI2600MC Pro · USB 3.0"
-        elevation={String(props.elevation) as 'flat' | 'raised'}
+        elevation={z.enum(['flat', 'raised']).parse(props.elevation)}
         footer={<><Button size="small" tone="quiet">Details</Button><Button size="small" tone="accent">Cool camera</Button></>}
         title={String(props.title)}
       >

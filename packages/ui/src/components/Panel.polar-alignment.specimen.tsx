@@ -9,7 +9,7 @@ const examples = ['large-error', 'near-aligned'] as const
 
 const phases = ['setup', 'point-1', 'moving-2', 'point-2', 'moving-3', 'point-3', 'baseline-stopped', 'adjusting', 'exposing', 'debayering', 'stretching', 'solving', 'retrying', 'stopped', 'finished'] as const
 
-const activityFrames: Record<string, { label: string; age: string }> = {
+const activityFrames = new Map<string, { label: string; age: string }>(Object.entries({
   adjusting: { label: 'Alignment updated', age: 'Just now' },
   exposing: { label: 'Exposing image', age: '7 s ago' },
   waiting: { label: 'Exposing image', age: '7 s ago' },
@@ -19,15 +19,15 @@ const activityFrames: Record<string, { label: string; age: string }> = {
   retrying: { label: 'Exposing another image', age: '1 min 7 s ago' },
   stopped: { label: 'Measurements stopped', age: 'At stop · 35 s old' },
   finished: { label: 'Alignment ended by you', age: 'At finish · 2 s old' },
-}
+}))
 
-const measurementSteps: Record<string, { point: number; solved: number; label: string; next: string }> = {
+const measurementSteps = new Map<string, { point: number; solved: number; label: string; next: string }>(Object.entries({
   'point-1': { point: 1, solved: 0, label: 'Taking and solving the first image…', next: 'moving-2' },
   'moving-2': { point: 2, solved: 1, label: 'Moving to the second position…', next: 'point-2' },
   'point-2': { point: 2, solved: 1, label: 'Taking and solving the second image…', next: 'moving-3' },
   'moving-3': { point: 3, solved: 2, label: 'Moving to the third position…', next: 'point-3' },
   'point-3': { point: 3, solved: 2, label: 'Taking and solving the final image…', next: 'adjusting' },
-}
+}))
 
 function BaselinePreview({ phase, physical, onStart, onStop }: {
   readonly phase: string
@@ -35,7 +35,7 @@ function BaselinePreview({ phase, physical, onStart, onStop }: {
   readonly onStart: () => void
   readonly onStop: () => void
 }) {
-  const step = measurementSteps[phase]
+  const step = measurementSteps.get(phase)
   const stopped = phase === 'baseline-stopped'
 
   return (
@@ -78,13 +78,13 @@ function AlignmentPreview({ props, onPropsChange }: {
   const [localPhase, setLocalPhase] = useState(String(props.phase ?? 'setup'))
   const [playing, setPlaying] = useState(false)
   const phase = onPropsChange ? String(props.phase) : localPhase
-  const baseline = phase === 'setup' || phase === 'baseline-stopped' || phase in measurementSteps
+  const baseline = phase === 'setup' || phase === 'baseline-stopped' || measurementSteps.has(phase)
   const near = props.example === 'near-aligned'
   const inactive = phase === 'stopped' || phase === 'finished'
   const busy = !inactive && phase !== 'adjusting'
   const exposing = phase === 'exposing' || phase === 'waiting' || phase === 'retrying'
   const retrying = phase === 'retrying'
-  const activity = activityFrames[phase] ?? activityFrames.adjusting!
+  const activity = activityFrames.get(phase) ?? activityFrames.get('adjusting')!
 
   const x = near ? 394 : 165
   const y = near ? 175 : 300
@@ -97,7 +97,7 @@ function AlignmentPreview({ props, onPropsChange }: {
   }
 
   useEffect(() => {
-    const step = measurementSteps[phase]
+    const step = measurementSteps.get(phase)
 
     if (!playing || !step) return
 
@@ -117,7 +117,7 @@ function AlignmentPreview({ props, onPropsChange }: {
       <main className="vela-polar-main">
         <header className="vela-polar-heading">
           <div><p>Rig preparation</p><h1>Polar alignment</h1></div>
-          <Badge tone={inactive ? 'neutral' : 'accent'}>{baseline ? measurementSteps[phase] ? 'Measuring' : phase === 'baseline-stopped' ? 'Stopped' : 'Not started' : phase === 'finished' ? 'Finished' : phase === 'stopped' ? 'Stopped' : busy ? 'Measuring' : 'Adjusting'}</Badge>
+          <Badge tone={inactive ? 'neutral' : 'accent'}>{baseline ? measurementSteps.get(phase) ? 'Measuring' : phase === 'baseline-stopped' ? 'Stopped' : 'Not started' : phase === 'finished' ? 'Finished' : phase === 'stopped' ? 'Stopped' : busy ? 'Measuring' : 'Adjusting'}</Badge>
         </header>
         {retrying && <div className="vela-polar-solve-warning" role="alert">
           <strong>Plate-solving failed</strong>

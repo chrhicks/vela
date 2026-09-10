@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import type { FastifyInstance } from 'fastify'
 import { AlpacaCaptureStoppedError, createAlpacaAcquisition } from '@vela/alpaca'
 import type { CaptureView, NavigationCapture } from '@vela/model/web'
@@ -106,16 +107,17 @@ export function registerCapture(
   })
 
   app.post<{ Params: { rigId: string } }>('/api/rigs/:rigId/capture/start', async (request, reply) => {
-    const body = request.body
+    const parsed = z.strictObject({
+      exposureSeconds: z.number().min(0.1).max(600),
+      repeat: z.boolean().optional(),
+      saveFrames: z.boolean().optional(),
+    }).safeParse(request.body)
 
-    if (!request.headers['content-type']?.startsWith('application/json') || !isObject(body)
-      || Object.keys(body).some(key => key !== 'exposureSeconds' && key !== 'repeat' && key !== 'saveFrames')
-      || ('saveFrames' in body && typeof body.saveFrames !== 'boolean')
-      || ('repeat' in body && typeof body.repeat !== 'boolean') || typeof body.exposureSeconds !== 'number'
-      || !Number.isFinite(body.exposureSeconds) || body.exposureSeconds < 0.1 || body.exposureSeconds > 600) {
+    if (!request.headers['content-type']?.startsWith('application/json') || !parsed.success) {
       return reply.code(400).send({ error: 'Expected exposureSeconds between 0.1 and 600 and optional boolean repeat and saveFrames.' })
     }
 
+    const body = parsed.data
     const release = operations.acquire(request.params.rigId, 'capture')
 
     if (!release) return reply.code(409).send({ error: 'Another Rig operation is in progress.' })
@@ -154,7 +156,7 @@ export function registerCapture(
   })
 
   app.post<{ Params: { rigId: string } }>('/api/rigs/:rigId/capture/stop', async (request, reply) => {
-    if (!request.headers['content-type']?.startsWith('application/json') || !isObject(request.body) || Object.keys(request.body).length !== 0) {
+    if (!request.headers['content-type']?.startsWith('application/json') || !z.strictObject({}).safeParse(request.body).success) {
       return reply.code(400).send({ error: 'Expected an empty JSON object' })
     }
 
@@ -186,7 +188,7 @@ export function registerCapture(
   })
 
   app.post<{ Params: { rigId: string, imageId: string } }>('/api/rigs/:rigId/capture/images/:imageId/keep', async (request, reply) => {
-    if (!request.headers['content-type']?.startsWith('application/json') || !isObject(request.body) || Object.keys(request.body).length !== 0) {
+    if (!request.headers['content-type']?.startsWith('application/json') || !z.strictObject({}).safeParse(request.body).success) {
       return reply.code(400).send({ error: 'Expected an empty JSON object' })
     }
 
@@ -219,8 +221,4 @@ export function registerCapture(
       return { rigId, rigName, phase, active, completedCount, elapsedSeconds, exposureSeconds, error }
     },
   }
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value)
 }

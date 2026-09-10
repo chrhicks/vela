@@ -1,3 +1,4 @@
+import type { ResponseFixture } from './internal/test-fixtures.js'
 import { afterEach, expect, it } from 'vitest'
 import { context, SpanKind, SpanStatusCode, trace } from '@opentelemetry/api'
 import { InMemorySpanExporter, NodeTracerProvider, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-node'
@@ -23,7 +24,7 @@ afterEach(async () => {
 
 const telescope = { DeviceName: 'Mount', DeviceType: 'Telescope', DeviceNumber: 0, UniqueID: 'mount' }
 
-const envelope = (Value: unknown, ErrorNumber = 0) => ({ ClientTransactionID: 7, ServerTransactionID: 23, ErrorNumber, ErrorMessage: ErrorNumber ? 'Device rejected command' : '', Value })
+const envelope = (Value: ResponseFixture, ErrorNumber = 0) => ({ ClientTransactionID: 7, ServerTransactionID: 23, ErrorNumber, ErrorMessage: ErrorNumber ? 'Device rejected command' : '', Value })
 
 it('keeps tracing optional when no SDK provider is registered', async () => {
   const client = createAlpacaClient({ baseUrl: 'http://fake', fetch: async () => Response.json(envelope(12)) })
@@ -34,7 +35,7 @@ it('keeps tracing optional when no SDK provider is registered', async () => {
 it('keeps the ALPACA span open through headers, body and value validation', async () => {
   const exporter = recording()
   let sendHeaders!: (response: Response) => void
-  let sendBody!: (body: unknown) => void
+  let sendBody!: (body: ResponseFixture) => void
   let readingBody!: () => void
   const bodyStarted = new Promise<void>(resolve => { readingBody = resolve })
   const client = createAlpacaClient({ baseUrl: 'http://fake', fetch: async () => new Promise<Response>(resolve => { sendHeaders = resolve }) })
@@ -110,7 +111,7 @@ it.each([false, true])('correlates rotation requests and independent confirmed c
 
   const fetch: typeof globalThis.fetch = async (input, init) => {
     const operation = new URL(String(input)).pathname.split('/').at(-1)
-    let value: unknown = true
+    let value: ResponseFixture = true
 
     if (operation === 'configureddevices') value = [telescope]
 

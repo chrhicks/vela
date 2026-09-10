@@ -1,7 +1,8 @@
+import type { ResponseFixture } from './internal/test-fixtures.js'
 import { describe, expect, it, vi } from 'vitest'
 import { createAlpacaProvider } from './index.js'
 
-function envelope(Value: unknown, ErrorNumber = 0, ErrorMessage = '') {
+function envelope(Value: ResponseFixture, ErrorNumber = 0, ErrorMessage = '') {
   return { Value, ClientTransactionID: 0, ServerTransactionID: 1, ErrorNumber, ErrorMessage }
 }
 
@@ -15,10 +16,10 @@ function configured(DeviceType: string, DeviceNumber: number) {
 }
 
 function fakeFetch(
-  routes: Record<string, unknown | Error>,
+  routes: Record<string, ResponseFixture | Error>,
   requests: string[] = [],
 ): typeof globalThis.fetch {
-  return (async (input) => {
+  return async (input) => {
     const url = new URL(String(input))
     const key = `${url.pathname}${url.search}`
     requests.push(key)
@@ -29,7 +30,7 @@ function fakeFetch(
     if (result === undefined) return new Response('Not found', { status: 404 })
 
     return Response.json(result)
-  }) as typeof globalThis.fetch
+  }
 }
 
 const devices = [
@@ -766,7 +767,7 @@ describe('Alpaca device inspection', () => {
       '/api/v1/observingconditions/0/dewpoint': envelope(12),
     })
 
-    const fetch = (async (input, init) => {
+    const fetch: typeof globalThis.fetch = async (input, init) => {
       const url = new URL(String(input))
 
       if (url.pathname.endsWith('/temperature')) {
@@ -777,7 +778,7 @@ describe('Alpaca device inspection', () => {
       }
 
       return fallback(input, init)
-    }) as typeof globalThis.fetch
+    }
 
     const provider = createAlpacaProvider({ baseUrl: 'http://alpaca.test', fetch })
 

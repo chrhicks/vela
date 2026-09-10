@@ -50,9 +50,11 @@ function CapturePage({ rigId }: { rigId: string }) {
       <LatestImage rigId={rigId} image={view.latestImage} busy={busy} interrupted={offline || commandUnconfirmed || !view.enabled} />
       <Panel className="capture-page__controls" title="Capture images">
         <div className="capture-page__camera"><CameraMark /><div><strong>{view.camera?.name ?? 'No camera available'}</strong>{view.camera && <span>Imaging camera</span>}</div></div>
-        <form onSubmit={event => { event.preventDefault();
+        <form onSubmit={event => {
+          event.preventDefault()
 
- if (validExposure) void capture.start(seconds, repeating, savingFrames) }}>
+          if (validExposure) void capture.start(seconds, repeating, savingFrames)
+        }}>
           <Input label="Exposure · seconds" type="number" min="0.1" max="600" step="0.1" value={exposureValue}
             disabled={busy || offline} invalid={!validExposure} message={validExposure ? '' : 'Choose 0.1–600 seconds.'}
             onChange={event => setExposure(event.target.value)} />

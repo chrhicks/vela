@@ -1,6 +1,7 @@
+import { z } from 'zod'
 import { randomUUID } from 'node:crypto'
 import type { FastifyInstance } from 'fastify'
-import type { TargetCategory, TargetDiscoveryView, TargetFilterChoice, TargetView } from '@vela/model/web'
+import type { TargetDiscoveryView, TargetView } from '@vela/model/web'
 import type { RigCatalog } from '../rig/catalog.js'
 import type { RigCatalogRecord } from '../rig/contracts.js'
 import { listTargets, normalizeCatalogName, type CatalogTarget } from './catalog/index.js'
@@ -40,19 +41,18 @@ export function registerTargetDiscovery(app: FastifyInstance, catalog: RigCatalo
       const rig = await catalog.get(request.params.rigId)
 
       if (!rig) return reply.code(404).send({ error: 'Rig not found' })
-      const values = request.query
 
-      if (Object.values(values).some(value => typeof value !== 'string')) return reply.code(400).send({ error: 'Invalid discovery request' })
-      const query = (values.q ?? '').trim()
-      const category = values.category ?? 'all'
-      const filter = values.filter ?? 'all'
-      const offset = Number(values.offset ?? 0)
+      const parsed = z.object({
+        q: z.string().trim().max(100).default(''),
+        category: z.enum(categories).default('all'),
+        filter: z.enum(filters).default('all'),
+        offset: z.string().default('0').transform(Number).pipe(z.number().int().min(0).max(15000)),
+        snapshot: z.string().regex(/^[0-9a-f-]{36}$/).optional(),
+      }).catchall(z.string()).safeParse(request.query)
 
-      if (query.length > 100 || !categories.includes(category as typeof categories[number])
-        || !filters.includes(filter as typeof filters[number]) || !Number.isInteger(offset) || offset < 0 || offset > 15000
-        || values.snapshot !== undefined && !/^[0-9a-f-]{36}$/.test(values.snapshot)) {
-        return reply.code(400).send({ error: 'Invalid discovery request' })
-      }
+      if (!parsed.success) return reply.code(400).send({ error: 'Invalid discovery request' })
+      const values = parsed.data
+      const { q: query, category, filter, offset } = values
 
       let snapshotId = values.snapshot
       let snapshot = snapshotId ? snapshots.get(snapshotId) : undefined
@@ -87,7 +87,7 @@ export function registerTargetDiscovery(app: FastifyInstance, catalog: RigCatalo
         rigId: rig.id, rigName: rig.name, snapshotId: snapshotId!, calculatedAt: snapshot.at.toISOString(),
         status: snapshot.calculation.status, night: snapshot.calculation.window,
         site: snapshot.site, siteUnavailableReason: snapshot.siteUnavailableReason,
-        query, category: category as TargetCategory | 'all', filter: filter as TargetFilterChoice | 'all',
+        query, category, filter,
         offset: pageOffset, pageSize, total: matches.length,
         targets: matches.slice(pageOffset, pageOffset + pageSize).map(candidate => ({
           ...boundary.targetView(candidate.target, snapshot.site, snapshot.at), category: candidate.category,

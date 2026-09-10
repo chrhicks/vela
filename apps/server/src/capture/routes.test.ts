@@ -1,4 +1,4 @@
-import Fastify from 'fastify'
+import Fastify, { type InjectOptions } from 'fastify'
 import { afterEach, expect, it, vi } from 'vitest'
 import type { AlpacaDeviceInspection } from '@vela/alpaca'
 import { createMemoryRigCatalog } from '../rig/catalog.js'
@@ -20,13 +20,13 @@ const record = {
 
 const frame: CaptureFrame = { width: 2, height: 2, pixels: [0, 100, 400, 1000], capturedAt: '2026-09-05T16:00:00Z' }
 
-const cleanups: Array<() => Promise<unknown>> = []
+const cleanups: Array<() => Promise<void>> = []
 
 afterEach(async () => { await Promise.all(cleanups.splice(0).map(cleanup => cleanup())) })
 
 function deferred<T>() {
   let resolve!: (value: T) => void
-  let reject!: (error: unknown) => void
+  let reject!: (error: Error) => void
   const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no })
 
   return { promise, resolve, reject }
@@ -35,7 +35,7 @@ function deferred<T>() {
 function setup(selection: { uniqueId: string, name: string } | null = record.imagingCamera) {
   const app = Fastify()
   const { imagingCamera: _, ...unselected } = record
-  const catalog = createMemoryRigCatalog([{ ...unselected, ...(selection ? { imagingCamera: selection } : {}) }])
+  const catalog = createMemoryRigCatalog([selection ? { ...unselected, imagingCamera: selection } : unselected])
   const operations = createRigOperations()
   const savedImages = createMemorySavedImageStore()
   let cameraId = 'camera'
@@ -76,7 +76,7 @@ function setup(selection: { uniqueId: string, name: string } | null = record.ima
     for (const capture of captures) capture.reject(new CaptureStoppedError())
     await app.close()
   })
-  const start = (body: unknown = { exposureSeconds: 10 }) => app.inject({ method: 'POST', url: '/api/rigs/sim/capture/start', payload: body as object })
+  const start = (body: InjectOptions['payload'] = { exposureSeconds: 10 }) => app.inject({ method: 'POST', url: '/api/rigs/sim/capture/start', payload: body })
   const get = () => app.inject({ method: 'GET', url: '/api/web/rigs/sim/capture' })
 
   return { app, catalog, operations, captures, start, get, bindings, savedImages,

@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import type { SkyPathHorizon, SkyPathMoonSample, SkyPathSample } from '../SkyPath'
 
 export type DemoHorizonState = 'none' | 'local' | 'incomplete' | 'uncalibrated'
@@ -20,7 +21,7 @@ const radians = (degrees: number) => degrees * Math.PI / 180
 const degrees = (radians: number) => radians * 180 / Math.PI
 
 export function getSkySamples(targetId: string, startHour = 20, sampleCount = 49, stepMinutes = 10): SkyPathSample[] {
-  const target = sampleTargets[Object.hasOwn(sampleTargets, targetId) ? targetId as DemoSkyTargetId : 'andromeda']
+  const target = sampleTargets[z.enum(['andromeda', 'm13', 'crescent', 'low-target']).catch('andromeda').parse(targetId)]
   const latitude = radians(sampleLatitudeDegrees)
   const declination = radians(target.declinationDegrees)
 
@@ -85,8 +86,21 @@ export function getDemoHorizon(profileState: string): SkyPathHorizon | undefined
 
 // Invented evening Moon setting late in this sample night. No real ephemeris.
 export function getMoonSamples(phase = 'gibbous'): (SkyPathMoonSample | null)[] | undefined {
+  function moonIllumination() {
+    switch (phase) {
+      case 'crescent':
+        return .22
+      case 'full':
+        return 1
+      case 'new':
+        return 0
+      default:
+        return .68
+    }
+  }
+
   if (phase === 'none') return undefined
-  const illuminationFraction = phase === 'crescent' ? .22 : phase === 'full' ? 1 : phase === 'new' ? 0 : .68
+  const illuminationFraction = moonIllumination()
 
   return Array.from({ length: 49 }, (_, index) => phase === 'unavailable' ? null : ({
     azimuthDegrees: 180 + index * 2.5,

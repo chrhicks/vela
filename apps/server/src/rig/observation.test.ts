@@ -10,6 +10,7 @@ function device(
   const identity = { id: `rig-1-${id}`, kind, name: id, configuredName: id }
 
   if (connection === 'connected') {
+    // SAFETY: unsupported status is valid for every device kind in the connected union.
     return {
       ...identity,
       connection,
@@ -18,6 +19,7 @@ function device(
     } as RigDeviceDetailView
   }
 
+  // SAFETY: unavailable status is valid for every device kind when not connected.
   return {
     ...identity,
     connection,

@@ -1,3 +1,4 @@
+import type { ResponseFixture } from './internal/test-fixtures.js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   AlpacaProviderError,
@@ -14,9 +15,9 @@ interface RecordedRequest {
 
 type ResponseFactory = (signal: AbortSignal | null) => Promise<Response>
 
-type RouteResult = unknown | Error | Response | ResponseFactory
+type RouteResult = ResponseFixture | Error | Response | ResponseFactory
 
-function envelope(Value: unknown, ErrorNumber = 0, ErrorMessage = '') {
+function envelope(Value: ResponseFixture, ErrorNumber = 0, ErrorMessage = '') {
   return { Value, ClientTransactionID: 0, ServerTransactionID: 1, ErrorNumber, ErrorMessage }
 }
 
@@ -42,7 +43,7 @@ function scriptedFetch(
 ): typeof globalThis.fetch {
   let index = 0
 
-  return (async (input, init) => {
+  return async (input, init) => {
     const url = new URL(String(input))
     requests.push({
       path: url.pathname,
@@ -58,12 +59,12 @@ function scriptedFetch(
 
     if (result instanceof Response) return result
 
-    if (typeof result === 'function') return result(init?.signal ?? null)
+    if (result instanceof Function) return result(init?.signal ?? null)
 
     if (result === undefined) return new Response('Not found', { status: 404 })
 
     return Response.json(result)
-  }) as typeof globalThis.fetch
+  }
 }
 
 const configuredCamera = {

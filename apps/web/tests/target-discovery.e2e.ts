@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import type { TargetDiscoveryView } from '@vela/model/web'
@@ -18,7 +19,7 @@ async function seed(page: Page) {
 }
 
 function response(url: URL, snapshotId = saved.snapshotId): TargetDiscoveryView {
-  return { ...saved, snapshotId, query: url.searchParams.get('q') ?? '', category: (url.searchParams.get('category') ?? 'all') as TargetDiscoveryView['category'], filter: (url.searchParams.get('filter') ?? 'all') as TargetDiscoveryView['filter'], offset: Number(url.searchParams.get('offset') ?? 0) }
+  return { ...saved, snapshotId, query: url.searchParams.get('q') ?? '', category: z.enum(['all', 'emission', 'reflection-dark', 'galaxy', 'cluster', 'planetary', 'other']).parse(url.searchParams.get('category') ?? 'all'), filter: z.enum(['all', 'dual-band', 'broadband', 'uncertain']).parse(url.searchParams.get('filter') ?? 'all'), offset: Number(url.searchParams.get('offset') ?? 0) }
 }
 
 test('saved suggestions paint on reload without recalculating, including on a phone', async ({ page }) => {
