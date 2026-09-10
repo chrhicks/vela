@@ -65,6 +65,7 @@ export interface AlpacaFraming {
   telescopeStatus(telescopeId: string, signal?: AbortSignal, options?: { includeAlignmentObservations?: boolean }): Promise<AlpacaTelescopeStatus>
   setTracking(telescopeId: string, tracking: boolean, signal?: AbortSignal): Promise<void>
   slew(options: AlpacaSlewOptions, signal?: AbortSignal): Promise<void>
+  home(telescopeId: string, signal?: AbortSignal): Promise<void>
   abortTelescope(telescopeId: string): Promise<void>
 }
 
@@ -245,6 +246,29 @@ export function createAlpacaFraming({ baseUrl, fetch = globalThis.fetch, request
       } catch (error) {
         // Any attempted write can leave physical movement behind, even when
         // HTTP is cancelled. Independently stop and inspect; never replay it.
+        await stop(telescope)
+        if (signal?.aborted) throw new AlpacaFramingStoppedError()
+        throw error
+      }
+    },
+
+    async home(telescopeId, signal) {
+      const telescope = await device(telescopeId, 'telescope', signal)
+      if (await client.readBoolean(telescope, 'atpark', signal)) throw new Error('Telescope is parked')
+      if (await client.readBoolean(telescope, 'slewing', signal)) throw new Error('Telescope is already moving')
+      if (!(await client.readBoolean(telescope, 'canfindhome', signal))) throw new Error('Telescope cannot find home')
+      signal?.throwIfAborted()
+      const deadline = AbortSignal.timeout(slewTimeoutMs)
+      const operationSignal = signal ? AbortSignal.any([signal, deadline]) : deadline
+      try {
+        await client.command(telescope, 'findhome', {}, operationSignal)
+        while (true) {
+          await waitStopped(telescope, operationSignal)
+          if (await client.readBoolean(telescope, 'athome', operationSignal)) return
+          await delay(pollIntervalMs, undefined, { signal: operationSignal })
+        }
+      } catch (error) {
+        // FindHome may have started even if its response was lost.
         await stop(telescope)
         if (signal?.aborted) throw new AlpacaFramingStoppedError()
         throw error

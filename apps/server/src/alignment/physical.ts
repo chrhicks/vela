@@ -27,12 +27,13 @@ export function createPhysicalAlignment(settings: PhysicalAlignmentSettings, acq
     if (current.trackingRate !== 'sidereal' || current.rightAscensionRateSecondsPerSiderealSecond !== 0 || current.declinationRateArcsecondsPerSecond !== 0) {
       throw new Error('Confirm sidereal tracking with zero RA and DEC rate offsets before alignment')
     }
-    if (current.pierSide !== 'east' && current.pierSide !== 'west') throw new Error('The mount must report a known pointing side before alignment')
     if (current.latitudeDegrees === undefined || current.longitudeDegrees === undefined || current.latitudeDegrees <= 0 || current.latitudeDegrees > 85) {
       throw new Error('Physical alignment requires the mount’s northern observing location')
     }
     if (reference) {
-      if (current.pierSide !== reference.pierSide || current.latitudeDegrees !== reference.latitudeDegrees
+      const changedSide = (reference.pierSide === 'east' || reference.pierSide === 'west')
+        && (current.pierSide === 'east' || current.pierSide === 'west') && current.pierSide !== reference.pierSide
+      if (changedSide || current.latitudeDegrees !== reference.latitudeDegrees
         || current.longitudeDegrees !== reference.longitudeDegrees || current.elevationMeters !== reference.elevationMeters) {
         throw new Error('The mount pointing side or observing location changed. Measure a new baseline.')
       }
@@ -47,9 +48,13 @@ export function createPhysicalAlignment(settings: PhysicalAlignmentSettings, acq
   async function prepare(signal: AbortSignal) {
     reference = undefined
     westRate = undefined
-    const current = await status(signal)
+    await status(signal)
     const observed = await device.cameraGeometry({ cameraId: settings.cameraId, expectedCameraName: settings.cameraName }, signal)
     if (!Number.isFinite(settings.focalLengthMm) || settings.focalLengthMm <= 0) throw new Error('Set the effective focal length before alignment')
+    await device.home(settings.telescopeId, signal)
+    const homed = await device.telescopeStatus(settings.telescopeId, signal)
+    if (!homed.tracking) await device.setTracking(settings.telescopeId, true, signal)
+    const current = await status(signal)
     reference = current
     geometry = observed
     site = { latitudeDegrees: current.latitudeDegrees!, longitudeDegrees: current.longitudeDegrees!,

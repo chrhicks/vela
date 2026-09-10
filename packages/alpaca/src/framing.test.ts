@@ -7,14 +7,14 @@ function observatory(requestTimeoutMs = 100) {
     pixelsizex: 3.76, pixelsizey: 3.76, binx: 2, biny: 2, numx: 2000, numy: 1500, startx: 50, starty: 100,
     rightascension: 2, declination: -20, equatorialsystem: 1,
     sitelatitude: 35, sitelongitude: -80, siteelevation: 200,
-    tracking: true, slewing: false, atpark: false, canslewasync: true, cansettracking: true,
+    tracking: true, slewing: false, atpark: false, canslewasync: true, cansettracking: true, canfindhome: true, athome: false,
   }
   const writes: { operation: string; parameters: URLSearchParams }[] = []
   const unsupported = new Set<string>()
   const errors = new Map<string, number>()
   let started!: () => void
   const whenStarted = new Promise<void>(resolve => { started = resolve })
-  const state = { loseSlew: false, loseTracking: false, stopFails: false, onSlew: () => {}, onTracking: () => {},
+  const state = { loseSlew: false, loseTracking: false, stopFails: false, onSlew: () => {}, onHome: () => {}, onTracking: () => {},
     trackingDelayReads: 0, rejectTracking: false, trackingReadFails: false }
   let requestedTracking: boolean | undefined
   const fetch: typeof globalThis.fetch = async (input, init) => {
@@ -28,7 +28,13 @@ function observatory(requestTimeoutMs = 100) {
     if (init?.method === 'PUT') {
       const parameters = new URLSearchParams(String(init.body))
       writes.push({ operation, parameters })
-      if (operation === 'slewtocoordinatesasync') {
+      if (operation === 'findhome') {
+        values.slewing = true
+        values.athome = false
+        started()
+        state.onHome()
+        if (state.loseSlew) throw new TypeError('Response lost after homing started')
+      } else if (operation === 'slewtocoordinatesasync') {
         values.slewing = true
         started()
         state.onSlew()
@@ -63,6 +69,77 @@ function observatory(requestTimeoutMs = 100) {
 const target = { telescopeId: 'mount-id', rightAscensionDegrees: 45, declinationDegrees: 25, coordinateSystem: 'topocentric' as const }
 
 describe('framing boundary', () => {
+  it('confirms home only after both motion ends and home is observed, without restoring tracking', async () => {
+    const fake = observatory()
+    fake.values.tracking = false
+    let completed = false
+    const result = fake.framing.home('mount-id').then(() => { completed = true })
+    await fake.whenStarted
+    fake.values.athome = true
+    await new Promise(resolve => setTimeout(resolve, 5))
+    expect(completed).toBe(false)
+    fake.values.athome = false
+    fake.values.slewing = false
+    await new Promise(resolve => setTimeout(resolve, 5))
+    expect(completed).toBe(false)
+    fake.values.athome = true
+    await result
+    expect(fake.values.tracking).toBe(false)
+    expect(fake.writes.map(write => write.operation)).toEqual(['findhome'])
+  })
+
+  it.each([{ connected: false }, { atpark: true }, { slewing: true }, { canfindhome: false }, { canfindhome: 'true' }])('rejects unavailable homing before writing %j', async changes => {
+    const fake = observatory()
+    Object.assign(fake.values, changes)
+    await expect(fake.framing.home('mount-id')).rejects.toThrow()
+    expect(fake.writes).toEqual([])
+  })
+
+  it('stops a lost homing response without replay or claiming arrival', async () => {
+    const fake = observatory()
+    fake.state.loseSlew = true
+    await expect(fake.framing.home('mount-id')).rejects.toThrow('Unable to reach')
+    expect(fake.values.slewing).toBe(false)
+    expect(fake.writes.map(write => write.operation)).toEqual(['findhome', 'abortslew'])
+  })
+
+  it('cancels homing only after independent stop confirmation', async () => {
+    const fake = observatory()
+    const controller = new AbortController()
+    const assertion = expect(fake.framing.home('mount-id', controller.signal)).rejects.toBeInstanceOf(AlpacaFramingStoppedError)
+    await fake.whenStarted
+    controller.abort()
+    await assertion
+    expect(fake.values.slewing).toBe(false)
+    expect(fake.writes.map(write => write.operation)).toEqual(['findhome', 'abortslew'])
+  })
+
+  it('keeps unconfirmed homing cleanup a failure after cancellation', async () => {
+    const fake = observatory()
+    fake.state.stopFails = true
+    const controller = new AbortController()
+    const assertion = expect(fake.framing.home('mount-id', controller.signal)).rejects.toThrow('stop could not be confirmed')
+    await fake.whenStarted
+    controller.abort()
+    await assertion
+    expect(fake.values.slewing).toBe(true)
+  })
+
+  it.each([false, 'true'])('bounds missing or malformed home confirmation %j and independently stops', async athome => {
+    const fake = observatory()
+    fake.state.onHome = () => { Object.assign(fake.values, { slewing: false, athome }) }
+    await expect(fake.framing.home('mount-id')).rejects.toThrow()
+    expect(fake.writes.map(write => write.operation)).toEqual(['findhome', 'abortslew'])
+  })
+
+  it('does not issue home when already cancelled', async () => {
+    const fake = observatory()
+    const controller = new AbortController()
+    controller.abort()
+    await expect(fake.framing.home('mount-id', controller.signal)).rejects.toMatchObject({ name: 'AbortError' })
+    expect(fake.writes).toEqual([])
+  })
+
   it('reads physical sensor geometry separately from the binned subframe and verifies camera identity', async () => {
     const fake = observatory()
     await expect(fake.framing.cameraGeometry({ cameraId: 'camera-id', expectedCameraName: 'Camera' })).resolves.toEqual({

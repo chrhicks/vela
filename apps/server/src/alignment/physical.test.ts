@@ -29,10 +29,11 @@ function observatory(mechanicalSign = -1) {
   }
   let observation = 0
   const device: AlpacaFraming = {
+    home: vi.fn(async () => { mount.tracking = false }),
     telescopeStatus: vi.fn(async () => ({ ...mount,
       observedAt: new Date(Date.parse(mount.observedAt) + observation++ * 1000).toISOString() })),
     cameraGeometry: vi.fn(async () => ({ ...camera })),
-    setTracking: unexpected, slew: unexpected, abortTelescope: unexpected,
+    setTracking: vi.fn(async (_id, tracking) => { mount.tracking = tracking }), slew: unexpected, abortTelescope: unexpected,
   }
   const settings = { cameraId: 'camera', cameraName: 'Imager', telescopeId: 'mount', focalLengthMm: 400 }
   return { mount, camera, mechanics, acquisition, device, settings,
@@ -40,6 +41,17 @@ function observatory(mechanicalSign = -1) {
 }
 
 describe('physical alignment sweep', () => {
+  it('homes on every attempt and restores tracking before observing', async () => {
+    const fake = observatory()
+    fake.mount.pierSide = 'unknown'
+    await fake.alignment.prepare(signal)
+    await fake.alignment.prepare(signal)
+    expect(fake.device.home).toHaveBeenCalledTimes(2)
+    expect(fake.device.setTracking).toHaveBeenCalledTimes(2)
+    expect(fake.mount.tracking).toBe(true)
+    await fake.alignment.validate(signal)
+  })
+
   it('prepares from observed mount state and binned camera field height', async () => {
     const fake = observatory()
     const prepared = await fake.alignment.prepare(signal)
@@ -56,7 +68,7 @@ describe('physical alignment sweep', () => {
     const controller = new AbortController()
     const pending = fake.alignment.pointing(controller.signal)
     const rejection = expect(pending).rejects.toThrow()
-    await vi.waitFor(() => expect(fake.device.telescopeStatus).toHaveBeenCalledTimes(2))
+    await vi.waitFor(() => expect(fake.device.telescopeStatus).toHaveBeenCalledTimes(4))
     controller.abort()
     await rejection
     expect(fake.device.cameraGeometry).toHaveBeenCalledTimes(1)
@@ -67,7 +79,7 @@ describe('physical alignment sweep', () => {
     await fake.alignment.prepare(signal)
     const pending = fake.alignment.pointing(signal)
     const rejection = expect(pending).rejects.toThrow('tracking enabled')
-    await vi.waitFor(() => expect(fake.device.telescopeStatus).toHaveBeenCalledTimes(2))
+    await vi.waitFor(() => expect(fake.device.telescopeStatus).toHaveBeenCalledTimes(4))
     fake.mount.tracking = false
     await rejection
   })
@@ -110,7 +122,6 @@ describe('physical alignment sweep', () => {
     { trackingRate: 'lunar' }, { trackingRate: undefined },
     { rightAscensionRateSecondsPerSiderealSecond: 0.001 }, { rightAscensionRateSecondsPerSiderealSecond: undefined },
     { declinationRateArcsecondsPerSecond: 0.001 }, { declinationRateArcsecondsPerSecond: undefined },
-    { pierSide: 'unknown' }, { pierSide: undefined },
     { latitudeDegrees: -39 }, { latitudeDegrees: 86 }, { latitudeDegrees: undefined }, { longitudeDegrees: undefined },
   ])('rejects unsuitable starting observations %j without motion', async changes => {
     const fake = observatory()

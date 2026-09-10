@@ -37,6 +37,7 @@ function setup(settings: { record?: RigCatalogRecord, solver?: boolean, offsetDe
       connection: 'connected', telemetry: { availability: 'unavailable' } },
   ]
   const adapter: AlpacaFraming = {
+    home: vi.fn(),
     cameraGeometry: vi.fn(async () => ({ cameraName: 'Imaging camera', sensorWidthPixels: 1000,
       sensorHeightPixels: 800, pixelWidthMicrons: 3.76, pixelHeightMicrons: 3.76,
       binX: 1, binY: 1, width: 1000, height: 800, startX: 0, startY: 0 })),
