@@ -42,9 +42,19 @@ pnpm build
 pnpm start
 ```
 
-## Server safety
+## Observing from the local network
 
-Fastify binds to `127.0.0.1` by default. This intentionally prevents device-control endpoints from being exposed to the LAN. Set `HOST` explicitly only after adding authentication, authorization, and device access controls.
+```sh
+cp .env.observing.example .env.observing.local # first setup only
+# Set the rig endpoint, stable device IDs, and installed ASTAP/catalogue paths.
+pnpm dev:observing
+```
+
+Open `http://polaris.local:5173` on the desktop or a phone on the same trusted network. The machine must advertise `polaris.local` through mDNS (or resolve through local DNS); the command does not configure hostname resolution. Set `VELA_LAN_HOST` for a different hostname.
+
+This command loads the Git-ignored root `.env.observing.local`, checks the solver paths and ports, then starts the normal development watchers. It uses the repository's `data/rigs.yaml` and `data/saved-images` by default, including existing rigs and retained images. Relative paths in this configuration resolve from the repository root. Ctrl+C stops this run and its watchers. Stop other servers on ports 3001 and 5173 before starting it.
+
+Fastify stays on loopback; Vite listens on the network at port 5173 and proxies `/api` to it. This exposes device controls to the trusted local network without authentication. It is intended for Chris's home/observatory network; do not forward this development server to the internet.
 
 ## API integration
 

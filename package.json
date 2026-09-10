@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "pnpm --filter @vela/model build && pnpm --filter @vela/alpaca build && pnpm --parallel --filter @vela/model --filter @vela/alpaca --filter @vela/web --filter @vela/server dev",
     "dev:workshop": "pnpm --filter @vela/workshop dev",
+    "dev:observing": "node scripts/dev-observing.mjs",
     "build": "pnpm -r --if-present run build",
     "dev:web": "pnpm --filter @vela/web dev",
     "dev:server": "pnpm --filter @vela/server dev",

@@ -2,6 +2,7 @@ node_modules
 dist
 .env
 .env.local
+.env.observing.local
 *.tsbuildinfo
 .DS_Store
 .codex/
