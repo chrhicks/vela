@@ -3,7 +3,7 @@ import type { FastifyInstance } from 'fastify'
 import type { TargetCategory, TargetDiscoveryView, TargetFilterChoice, TargetView } from '@vela/model/web'
 import type { RigCatalog } from '../rig/catalog.js'
 import type { RigCatalogRecord } from '../rig/contracts.js'
-import { listTargets, type CatalogTarget } from './catalog/index.js'
+import { listTargets, normalizeCatalogName, type CatalogTarget } from './catalog/index.js'
 import { discoverTargets } from './discovery.js'
 import type { Site } from './sky.js'
 
@@ -14,7 +14,6 @@ interface DiscoveryBoundary {
 }
 const categories = ['all', 'emission', 'reflection-dark', 'galaxy', 'cluster', 'planetary', 'other'] as const
 const filters = ['all', 'dual-band', 'broadband', 'uncertain'] as const
-const normalize = (value: string) => value.toLowerCase().replace(/\s+/g, '').replace(/^(ngc|ic|m|b)0+(?=\d)/, '$1')
 const reasons = {
   'emission-lines': 'Your L-Ultimate isolates Hα and O III emission. Broadband also preserves surrounding stars and other colors.',
   continuum: 'Use broadband, without the L-Ultimate. Its narrow passbands discard much of this object’s starlight.',
@@ -57,10 +56,10 @@ export function registerTargetDiscovery(app: FastifyInstance, catalog: RigCatalo
         // These are disposable browsing calculations, never durable observing plans.
         while (snapshots.size > 12) snapshots.delete(snapshots.keys().next().value!)
       }
-      const key = normalize(query)
+      const key = normalizeCatalogName(query)
       const matches = snapshot.calculation.candidates.filter(candidate => {
         const target = candidate.target
-        const matchesQuery = !key || [...target.aliases, target.catalogName, target.commonName ?? '', target.type].some(value => normalize(value).includes(key))
+        const matchesQuery = !key || [...target.aliases, target.catalogName, target.commonName ?? '', target.type].some(value => normalizeCatalogName(value).includes(key))
         return matchesQuery && (Boolean(key) || snapshot.calculation.status === 'site-unavailable' || candidate.eligible)
           && (category === 'all' || candidate.category === category) && (filter === 'all' || candidate.filter === filter)
       })

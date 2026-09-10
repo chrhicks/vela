@@ -192,7 +192,19 @@ export function createAlpacaFraming({ baseUrl, fetch = globalThis.fetch, request
           alignment.pierSide = side === -1 ? 'unknown' : side === 0 ? 'east' : 'west'
         }
       }
-      return { ...alignment, rightAscensionDegrees: ra * 15, declinationDegrees, coordinateSystem, ...(latitudeDegrees === undefined ? {} : { latitudeDegrees }), ...(longitudeDegrees === undefined ? {} : { longitudeDegrees }), ...(elevationMeters === undefined ? {} : { elevationMeters }), tracking, slewing, parked, observedAt: new Date().toISOString() }
+      return {
+        ...alignment,
+        rightAscensionDegrees: ra * 15,
+        declinationDegrees,
+        coordinateSystem,
+        ...(latitudeDegrees === undefined ? {} : { latitudeDegrees }),
+        ...(longitudeDegrees === undefined ? {} : { longitudeDegrees }),
+        ...(elevationMeters === undefined ? {} : { elevationMeters }),
+        tracking,
+        slewing,
+        parked,
+        observedAt: new Date().toISOString(),
+      }
     },
 
     async setTracking(telescopeId, tracking, signal) {

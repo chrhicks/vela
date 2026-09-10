@@ -65,7 +65,7 @@ function setup() {
       return result.promise.finally(() => signal.removeEventListener('abort', abort))
     },
   }
-  const controller = createAlignmentController(settings, hardware, solver, () => 1_700_000_000_000 + (exposures + 1) * 1000)
+  const controller = createAlignmentController({ mode: 'offline', settings, hardware, solver, now: () => 1_700_000_000_000 + (exposures + 1) * 1000 })
   stops.push(() => controller.stop())
   async function nextSolve() {
     await vi.waitFor(() => expect(requests.length).toBeGreaterThan(0))

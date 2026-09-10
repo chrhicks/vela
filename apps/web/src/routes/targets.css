@@ -26,12 +26,6 @@
 .vela-target-card-bottom { border-top: 1px solid var(--vela-line); padding-top: 12px; display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; font-size: .85em; }
 .vela-target-card-bottom > span { color: var(--vela-text-muted); }
 .vela-target-card-bottom strong { font-weight: 550; }
-.vela-target-path { display: block; width: 100%; height: auto; overflow: visible; }
-.vela-target-path text { fill: var(--vela-text-muted); font: 11px var(--vela-font-sans); }
-.vela-target-horizon { stroke: var(--vela-text-muted); stroke-width: 1; }
-.vela-target-gridline { stroke: var(--vela-line); fill: none; stroke-dasharray: 3 5; }
-.vela-target-arc { stroke: var(--vela-accent); fill: none; stroke-width: 2; }
-.vela-target-now { fill: var(--vela-accent); }
 .vela-target-footnote, .vela-target-disclaimer { color: var(--vela-text-muted); font-size: .85em; line-height: 1.6; }
 .vela-target-footnote { margin: 20px 0 0; }
 .vela-target-disclaimer { padding: 14px 20px; border-top: 1px solid var(--vela-line); }
@@ -83,21 +77,17 @@
   .vela-target-thumbnail > span { display: none; }
   .vela-target-card-copy { padding: 14px; }
   .vela-target-card-copy p { min-height: 0; }
-  .vela-target-card-copy .vela-target-path { max-height: 100px; }
 }
 @container (max-width: 420px) {
   .vela-target-card { display: block; }
   .vela-target-thumbnail { aspect-ratio: 16 / 9; height: auto; border-right: 0; border-bottom: 1px solid var(--vela-line); }
   .vela-target-thumbnail > span { display: block; }
-  .vela-target-card-copy .vela-target-path { max-height: 95px; }
   .vela-target-heading { align-items: start; }
 }
 .vela-target-credits { padding: 0 20px 16px; font-size: .78em; color: var(--vela-text-muted); line-height: 1.6; }
 .vela-target-credits h2 { font-size: 1em; font-weight: 550; margin: 0 0 8px; }
 .vela-target-credits a { color: var(--vela-text); }
 
-.vela-target-time line { stroke: var(--vela-text-muted); stroke-width: 1; stroke-dasharray: 3 4; opacity: .65; }
-.vela-target-time text { font-size: 10px; }
 /* Web-owned adoption of the approved target/framing product composition. */
 .vela-target-card { text-decoration: none; }
 .vela-target-survey { position: absolute; inset: 0; width: 100%; height: 100%; }
@@ -108,7 +98,6 @@
 .vela-target-footprint[aria-disabled="true"] { cursor: default; }
 .vela-target-footprint--actual { fill: none; stroke: var(--vela-warning); stroke-dasharray: 7 5; pointer-events: none; }
 .vela-target-cross { fill: var(--vela-accent); font-size: 20px; }
-.vela-target-darkness { fill: var(--vela-accent); opacity: .09; }
 .vela-target-pagination { display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 24px; }
 .vela-target-settings { margin-top: 18px; font-size: .85em; }
 .vela-target-settings summary { cursor: pointer; padding: 8px 0; }

@@ -92,7 +92,7 @@ function setup() {
     }),
   }
   const solverFactory = vi.fn((_height: number) => solver)
-  const controller = createAlignmentController(settings, hardware, solverFactory, Date.now, physical)
+  const controller = createAlignmentController({ mode: 'physical', settings, hardware, physical, createSolver: solverFactory })
   stops.push(() => controller.stop())
   async function nextSolve() {
     await vi.waitFor(() => expect(requests.length).toBeGreaterThan(0))

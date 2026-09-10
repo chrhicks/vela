@@ -145,6 +145,35 @@ describe('framing controller', () => {
     expect(center.release).toHaveBeenCalledTimes(1)
   })
 
+  it('rechecks fresh hardware before centering even when the displayed check was eligible', async () => {
+    const fake = workshop()
+    await fake.start().finished
+    const configuration = 'camera+mount+focal-length'
+    expect(fake.controller.canCenter(fake.mount, configuration)).toBe(true)
+    const observed = deferred<FramingMount>()
+    fake.hardware.status = vi.fn(() => observed.promise)
+    const center = fake.start({ center: true })
+    expect(fake.controller.snapshot().active).toBe(true)
+    expect(fake.controller.canCenter(fake.mount, configuration)).toBe(false)
+    expect(fake.slews).toHaveLength(1)
+    observed.resolve({ ...fake.mount, tracking: false })
+    await center.finished
+    expect(fake.slews).toHaveLength(1)
+    expect(fake.controller.snapshot()).toMatchObject({ phase: 'failed', error: expect.stringContaining('no longer current') })
+  })
+
+  it.each([desired, { raDegrees: 7, decDegrees: 20 }])('rejects a current check outside the correction offset range: %j', async position => {
+    const fake = workshop()
+    fake.solver.solve = async () => solution(position)
+    await fake.start().finished
+    const configuration = 'camera+mount+focal-length'
+    expect(fake.controller.checkCurrent(fake.mount, configuration)).toBe(true)
+    expect(fake.controller.canCenter(fake.mount, configuration)).toBe(false)
+    await fake.start({ center: true }).finished
+    expect(fake.slews).toHaveLength(1)
+    expect(fake.controller.snapshot()).toMatchObject({ phase: 'failed', error: expect.stringContaining('no longer current') })
+  })
+
   it('rejects a solve when the mount moved during the exposure instead of offering correction', async () => {
     const fake = workshop()
     fake.solver.solve = async () => {

@@ -36,6 +36,32 @@ describe('local persistence boundary', () => {
     expect(() => parseProfile({ ...profile, overrides: { dangerLightness: [0.5] } })).toThrow('Invalid design profile payload')
   })
 
+  it('keeps the filename length limit on otherwise valid profile IDs', () => {
+    expect(parseProfile({ ...profile, id: 'a'.repeat(64) }).id).toHaveLength(64)
+    expect(() => parseProfile({ ...profile, id: 'a'.repeat(65) })).toThrow('Invalid design profile payload')
+  })
+
+  it('validates theme overrides in both profiles and session recovery', () => {
+    const overrides = {
+      ...DEFAULT_THEME_PARAMETERS,
+      semantic: {
+        ...DEFAULT_THEME_PARAMETERS.semantic,
+        dark: { ...DEFAULT_THEME_PARAMETERS.semantic.dark, focus: 'accent-500' },
+      },
+    }
+    expect(parseProfile({ ...profile, overrides }).overrides).toEqual(overrides)
+    expect(parseSession({ ...session, unsavedOverrides: overrides }).unsavedOverrides).toEqual(overrides)
+
+    for (const invalid of [
+      { accentHue: Number.POSITIVE_INFINITY },
+      { unknownToken: 12 },
+      { semantic: { ...overrides.semantic, dark: { ...overrides.semantic.dark, focus: 'red' } } },
+    ]) {
+      expect(() => parseProfile({ ...profile, overrides: invalid })).toThrow('Invalid design profile payload')
+      expect(() => parseSession({ ...session, unsavedOverrides: invalid })).toThrow('Invalid workshop session payload')
+    }
+  })
+
   it('accepts complete working-session recovery state', () => {
     const parsed = parseSession({
       ...session,

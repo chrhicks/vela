@@ -112,7 +112,9 @@ export function registerCapture(
         controller = createCaptureController({ rigId: view.rigId, rigName: view.rigName }, Date.now, savedImages)
         controllers.set(view.rigId, controller)
       }
-      const result = await controller.start(body.exposureSeconds, createCamera(settings), view.camera.name, release, body.repeat === true, body.saveFrames === true)
+      const result = await controller.start(body.exposureSeconds, createCamera(settings), view.camera.name, {
+        onSettled: release, repeat: body.repeat === true, saveFrames: body.saveFrames === true,
+      })
       started = true
       return { ...result, savedImageCount: view.savedImageCount }
     } catch (error) {

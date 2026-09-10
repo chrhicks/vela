@@ -89,12 +89,24 @@ export interface FramingView {
   unavailableReason: string | null
   observedAt: string
   focalLengthMm: number | null
-  camera: { name: string, width: number, height: number, fieldWidthDegrees: number, fieldHeightDegrees: number } | null
+  camera: {
+    name: string
+    width: number
+    height: number
+    fieldWidthDegrees: number
+    fieldHeightDegrees: number
+  } | null
   phase: 'idle' | 'slewing' | 'exposing' | 'solving' | 'checked' | 'stopping' | 'stopped' | 'failed'
   active: boolean
   desired: TargetPosition | null
   targetId: string | null
-  actual: (TargetPosition & { checkId: string, capturedAt: string, corners: TargetPosition[], rotationDegrees: number, offsetArcminutes: number }) | null
+  actual: (TargetPosition & {
+    checkId: string
+    capturedAt: string
+    corners: TargetPosition[]
+    rotationDegrees: number
+    offsetArcminutes: number
+  }) | null
   error: string | null
   exposureSeconds: number
   canCenter: boolean
