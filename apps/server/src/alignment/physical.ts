@@ -77,8 +77,8 @@ export function createPhysicalAlignment(settings: PhysicalAlignmentSettings, acq
       await acquisition.move(settings.telescopeId, 0.5, 1, signal)
       current = await status(signal, true)
       const observed = difference(current.rightAscensionDegrees, start.rightAscensionDegrees)
-      if (Math.abs(observed) < 0.1 || Math.abs(observed) > 1) throw new Error('The RA direction probe did not produce the expected small movement')
-      if (Math.abs(current.declinationDegrees - start.declinationDegrees) > 0.1) throw new Error('The mount did not follow the expected RA-only sweep')
+      if (Math.abs(observed) < 0.1 || Math.abs(observed) > 1) throw new Error(`RA direction check expected 0.1–1° of movement; the mount reported ${observed.toFixed(3)}°`)
+      if (Math.abs(current.declinationDegrees - start.declinationDegrees) > 0.1) throw new Error(`RA direction check changed reported DEC by ${(current.declinationDegrees - start.declinationDegrees).toFixed(3)}°`)
       westRate = -Math.sign(observed) * 1.5
     }
     // Observe every bounded increment. No uncertain movement is replayed and
@@ -93,9 +93,13 @@ export function createPhysicalAlignment(settings: PhysicalAlignmentSettings, acq
       await acquisition.move(settings.telescopeId, westRate, degrees / 1.5, signal)
       current = await status(signal, true)
       const progress = -difference(current.rightAscensionDegrees, before.rightAscensionDegrees)
+      console.info('Alignment RA step', { requestedDegrees: degrees, observedDegrees: progress,
+        rateDegreesPerSecond: westRate, durationSeconds: degrees / 1.5,
+        beforeRaDegrees: before.rightAscensionDegrees, afterRaDegrees: current.rightAscensionDegrees,
+        declinationChangeDegrees: current.declinationDegrees - start.declinationDegrees })
       if (progress < degrees * 0.5 || progress > degrees * 1.5
         || Math.abs(current.declinationDegrees - start.declinationDegrees) > 0.1) {
-        throw new Error('The mount did not follow the expected RA-only sweep')
+        throw new Error(`RA sweep expected ${degrees.toFixed(3)}° westward; mount reported ${progress.toFixed(3)}° westward and ${(current.declinationDegrees - start.declinationDegrees).toFixed(3)}° DEC change`)
       }
     }
     throw new Error('The RA sweep did not reach its next measurement position')
