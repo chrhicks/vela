@@ -21,10 +21,11 @@ async function fixture(body: string, timeoutMs = 3000) {
   directories.push(root)
   const executable = join(root, 'astap')
   const marker = join(root, 'input-path')
-  const script = `#!${process.execPath}\nconst fs = require('node:fs')\nconst path = process.argv[process.argv.indexOf('-f') + 1]\nfs.writeFileSync(${JSON.stringify(marker)}, path)\n${body}\n`
+  const attempts = join(root, 'attempts.jsonl')
+  const script = `#!${process.execPath}\nconst fs = require('node:fs')\nconst path = process.argv[process.argv.indexOf('-f') + 1]\nfs.writeFileSync(${JSON.stringify(marker)}, path)\nfs.appendFileSync(${JSON.stringify(attempts)}, JSON.stringify({ path, args: process.argv.slice(2), hash: require('node:crypto').createHash('sha256').update(fs.readFileSync(path)).digest('hex') }) + '\\n')\n${body}\n`
   await writeFile(executable, script, { mode: 0o755 })
 
-  return { root, marker, solver: createAstapSolver({ executable, catalogPath: root, fieldHeightDegrees: 3, timeoutMs }) }
+  return { root, marker, attempts, solver: createAstapSolver({ executable, catalogPath: root, fieldHeightDegrees: 3, timeoutMs }) }
 }
 
 it('sends raw signed-32 FITS, normalizes a solved center and removes per-exposure artifacts', async () => {
@@ -60,13 +61,14 @@ it('treats only documented no-match exits as retryable, not missing databases or
 })
 
 it('cancels a running solver and removes its scratch directory after process termination', async () => {
-  const { solver, marker } = await fixture('setInterval(() => {}, 1000)')
+  const { solver, marker, attempts } = await fixture('setInterval(() => {}, 1000)')
   const controller = new AbortController()
   const result = solver.solve(frame, hint, controller.signal)
   const rejected = expect(result).rejects.toThrow('operator stopped')
   await vi.waitFor(async () => { expect(await readFile(marker, 'utf8')).toContain('exposure.fits') })
   controller.abort(new Error('operator stopped'))
   await rejected
+  expect(await readAttempts(attempts)).toHaveLength(1)
   await expect(readdir(dirname(await readFile(marker, 'utf8')))).rejects.toThrow()
 })
 
@@ -113,17 +115,24 @@ process.exit(${code})`)
       const diagnostic = spans.find(span => span.name === 'astap.solve')!
       const parent = spans.find(span => span.name === 'alignment.solve')!
       expect(diagnostic.parentSpanContext?.spanId).toBe(parent.spanContext().spanId)
-      expect(diagnostic.attributes).toMatchObject({
+      const attempts = spans.filter(span => span.name === 'astap.attempt')
+      expect(attempts).toHaveLength(code === 1 ? 6 : 1)
+      expect(attempts[0]!.parentSpanContext?.spanId).toBe(diagnostic.spanContext().spanId)
+      expect(attempts[0]!.attributes).toMatchObject({
+        'astap.search_radius_degrees': 10,
         'astap.exit_code': code,
         'astap.outcome': outcome,
         'astap.stdout': 'x'.repeat(4086) + 'stdout end',
         'astap.stdout.truncated': true,
         'astap.stderr': 'stderr detail',
         'astap.stderr.truncated': false,
+      })
+      expect(diagnostic.attributes).toMatchObject({
+        'astap.outcome': outcome,
         'astap.hint.ra_degrees': 30,
         'astap.hint.dec_degrees': 60,
         'astap.field_height_degrees': 3,
-        'astap.search_radius_degrees': 5,
+        'astap.timeout_ms': 3000,
         'image.width': 2,
         'image.height': 2,
         'image.captured_at': frame.capturedAt,
@@ -135,4 +144,39 @@ process.exit(${code})`)
     trace.disable()
     context.disable()
   }
+})
+
+async function readAttempts(path: string): Promise<{ path: string, args: string[], hash: string }[]> {
+  return (await readFile(path, 'utf8')).trim().split('\n').map(line => JSON.parse(line))
+}
+
+it('widens only the radius on the same image and stops at the first solution', async () => {
+  const { solver, attempts } = await fixture(`if (process.argv[process.argv.indexOf('-r') + 1] !== '30') process.exit(1)
+fs.writeFileSync(path.replace('.fits','.ini'), ${JSON.stringify(ini)})`)
+
+  await expect(solver.solve(frame, hint, new AbortController().signal)).resolves.toMatchObject({ status: 'solved' })
+  const calls = await readAttempts(attempts)
+  expect(calls.map(call => call.args[call.args.indexOf('-r') + 1])).toEqual(['10', '15', '30'])
+  expect(new Set(calls.map(call => call.path)).size).toBe(1)
+  expect(new Set(calls.map(call => call.hash)).size).toBe(1)
+  expect(new Set(calls.map(call => JSON.stringify(call.args.map((arg, index, args) => args[index - 1] === '-r' ? 'radius' : arg)))).size).toBe(1)
+})
+
+it('searches through the full sky for no-match but never retries insufficient stars or process errors', async () => {
+  for (const code of [1, 2, 32]) {
+    const { solver, attempts } = await fixture(`process.exit(${code})`)
+    const result = solver.solve(frame, hint, new AbortController().signal)
+
+    if (code === 32) await expect(result).rejects.toThrow('exit code 32')
+    else await expect(result).resolves.toEqual({ status: 'no-solution' })
+    const calls = await readAttempts(attempts)
+    expect(calls.map(call => call.args[call.args.indexOf('-r') + 1])).toEqual(code === 1 ? ['10', '15', '30', '60', '120', '180'] : ['10'])
+  }
+})
+
+it('uses the remaining total deadline for later attempts instead of restarting the timeout', async () => {
+  const { solver, attempts } = await fixture(`setTimeout(() => process.exit(1), 350)`, 600)
+  await expect(solver.solve(frame, hint, new AbortController().signal)).rejects.toThrow('timed out')
+  const calls = await readAttempts(attempts)
+  expect(calls.map(call => call.args[call.args.indexOf('-r') + 1])).toEqual(['10', '15'])
 })

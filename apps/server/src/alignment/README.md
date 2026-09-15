@@ -94,6 +94,23 @@ They do not establish outdoor accuracy, atmospheric refraction, flexure, or the
 actual mount's motion response. Direction and repeatability require a prepared
 physical-rig trial. The configured offline path remains available separately.
 
+## Adjustment geometry
+
+There is no fixed five-degree correction cutoff. Finite-value, usable-baseline,
+local sensitivity and final fit checks determine whether the calculation can
+produce a result. Azimuth rotation preserves a sightline's elevation, so a
+single new sightline can admit two altitude solutions. The iterative update
+must stay on the local inverse branch established by its baseline estimate;
+a numerical jump across that elevation fold is rejected rather than displayed
+as a different physical correction.
+
+This is a local adjustment model, not proof that arbitrary large physical knob
+movements are uniquely recoverable from one image. A new three-position baseline
+is needed when the local model becomes ambiguous. Independent ideal fixtures
+exercise corrections beyond five degrees, including twenty-degree corrections
+at the physical starting declination, and a known alternate-root rejection.
+They do not establish absolute outdoor accuracy.
+
 ## Offline configuration and local review
 
 Configure the endpoint and stable device IDs deliberately. The first model uses

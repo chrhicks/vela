@@ -7,8 +7,8 @@ const latitude = 40 * radians
 
 // Independent horizon-coordinate construction: tilt in the meridian, then turn
 // north/east components about the zenith. No renderer or production math imports.
-function sample(altitude: number, azimuth: number, joint: number, sidereal: number): AlignmentSample {
-  const dec = 60 * radians
+function sample(altitude: number, azimuth: number, joint: number, sidereal: number, declination = 60): AlignmentSample {
+  const dec = declination * radians
   const a = altitude / 3600 * radians
   const z = azimuth / 3600 * radians
   const x = Math.cos(dec) * Math.cos(joint * radians)
@@ -62,6 +62,44 @@ describe('polar measurement from solved directions', () => {
     }
 
     check(measureAlignment(reference, sample(480, -360, 35, 14.2), true), 480, -360)
+  })
+  it.each([60, 80])('recovers large offsets and corrections beyond five degrees at Dec %s', declination => {
+    for (const [altitudeDegrees, azimuthDegrees] of [[6, -8], [-10, 15]]) {
+      const altitude = altitudeDegrees! * 3600
+      const azimuth = azimuthDegrees! * 3600
+
+      const reference = createAlignmentBaseline([
+        sample(altitude, azimuth, -130, 359, declination),
+        sample(altitude, azimuth, -76, 359.1, declination),
+        sample(altitude, azimuth, -22, 359.2, declination),
+      ], 40)
+
+      check(reference.measurement, altitude, azimuth)
+      check(measureAlignment(reference, sample(altitude / 2, azimuth / 2, -25, 2.2, declination), true), altitude / 2, azimuth / 2)
+      check(measureAlignment(reference, sample(0, 0, -25, 2.2, declination), true), 0, 0)
+    }
+  })
+  it('recovers twenty-degree corrections for the physical starting declination', () => {
+    const reference = createAlignmentBaseline([
+      sample(72000, -72000, -130, 359, 80),
+      sample(72000, -72000, -76, 359.1, 80),
+      sample(72000, -72000, -22, 359.2, 80),
+    ], 40)
+
+    check(reference.measurement, 72000, -72000)
+    check(measureAlignment(reference, sample(36000, -36000, -25, 2.2, 80), true), 36000, -36000)
+    check(measureAlignment(reference, sample(0, 0, -25, 2.2, 80), true), 0, 0)
+  })
+  it('rejects a numerical jump to the second altitude solution instead of reporting a false correction', () => {
+    const reference = createAlignmentBaseline([
+      sample(72000, -72000, -130, 359),
+      sample(72000, -72000, -76, 359.1),
+      sample(72000, -72000, -22, 359.2),
+    ], 40)
+
+    // This sightline fits both zero altitude error and an alternative ~44.76° root.
+    // Undamped iteration crosses the elevation fold and would publish the latter.
+    expect(() => measureAlignment(reference, sample(0, 0, -25, 2.2), true)).toThrow(/ambiguous sightline geometry/)
   })
   it('supports fixed joints separately from tracking', () => {
     check(measureAlignment(baseline(480, -360), sample(-100, 150, 50, 2.2), false), -100, 150)
