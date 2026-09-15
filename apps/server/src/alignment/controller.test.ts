@@ -110,6 +110,41 @@ it('rejects another start while acquisition remains active', async () => {
   expect(subject.exposures()).toBe(1)
 })
 
+it('publishes a baseline image before solving and preserves it through no-solution and stop', async () => {
+  const subject = setup()
+  await subject.controller.start('sim', 'Simulator')
+  const request = await subject.nextSolve()
+  const preview = subject.controller.snapshot().preview!
+  expect(preview).toMatchObject({ capturedAt: request.frame.capturedAt, position: 1, imageWidth: 4, imageHeight: 4 })
+  expect(subject.controller.snapshot().measurement).toBeNull()
+  expect(subject.controller.snapshot().measuredAt).toBeNull()
+  const id = preview.imageUrl.split('/').at(-1)!
+  expect(subject.controller.image(id)?.subarray(0, 8)).toEqual(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
+  request.result.resolve({ status: 'no-solution' })
+  await vi.waitFor(() => expect(subject.controller.snapshot().warning).toContain('Plate-solving failed'))
+  expect(subject.controller.snapshot().preview).toBe(preview)
+  await subject.controller.stop()
+  expect(subject.controller.snapshot()).toMatchObject({ phase: 'stopped', preview, measurement: null })
+})
+
+it('keeps the solved image retrievable after repeated failed adjustment images', async () => {
+  const subject = setup()
+  await subject.baseline()
+  const measurement = subject.controller.snapshot().measurement!
+  const id = measurement.imageUrl.split('/').at(-1)!
+  const image = subject.controller.image(id)
+
+  for (let attempt = 0; attempt < 6; attempt++) {
+    cadence.waits.shift()!()
+    const request = await subject.nextSolve()
+    request.result.resolve({ status: 'no-solution' })
+    await vi.waitFor(() => expect(cadence.waits).toHaveLength(1))
+  }
+
+  expect(subject.controller.snapshot().measurement).toBe(measurement)
+  expect(subject.controller.image(id)).toBe(image)
+})
+
 it.each([false, true])('waits for exposure cleanup before stopping and preserves cleanup failure=%s', async failCleanup => {
   const subject = setup()
   const cleanup = deferred<AlpacaFrame>()

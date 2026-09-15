@@ -45,7 +45,7 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
     rigId: '', rigName: '', enabled: true, unavailableReason: null,
     phase: 'setup', activity: 'idle', active: false, position: 0, solvedPositions: 0,
     exposureSeconds: settings.exposureSeconds, exposureStartedAt: null, measuredAt: null,
-    warning: null, error: null, measurement: null,
+    warning: null, error: null, measurement: null, preview: null,
   }
 
   if (physical) {
@@ -87,7 +87,8 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
     controller = new AbortController()
     previousSample = undefined
     patch({ rigId, rigName, active: true, phase: 'baseline', activity: 'idle', position: 1,
-      solvedPositions: 0, measurement: null, measuredAt: null, error: null, warning: null })
+      solvedPositions: 0, measurement: null, preview: null, measuredAt: null, error: null, warning: null })
+    images.clear()
     runId = randomUUID()
     const signal = controller.signal
     running = step('alignment.run', async () => {
@@ -134,7 +135,38 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
 
     if (physical) await physical.validate(signal, frame)
     patch({ activity: 'solving', exposureStartedAt: null })
-    const solved = await step('alignment.solve', () => solver.solve(frame, actual?.hint ?? { raDegrees: pointing!.rightAscensionDegrees, decDegrees: pointing!.declinationDegrees }, signal), { 'alignment.position': view.position })
+    const imageId = randomUUID()
+    const previewBytes = await step('alignment.preview', () => renderPreview(frame.width, frame.height, frame.pixels, frame.color))
+    signal.throwIfAborted()
+
+    if (physical) await physical.validate(signal)
+    images.set(imageId, previewBytes)
+
+    // Keep the last solved image available even through many unsuccessful frames.
+    const measuredImageId = view.measurement?.imageUrl.split('/').at(-1)
+
+    for (const id of images.keys()) {
+      if (images.size <= 4) break
+
+      if (id !== measuredImageId) images.delete(id)
+    }
+
+    const preview: NonNullable<AlignmentView['preview']> = {
+      imageUrl: `/api/rigs/${encodeURIComponent(view.rigId)}/alignment/images/${imageId}`,
+      imageWidth: frame.width, imageHeight: frame.height,
+      capturedAt: frame.capturedAt, position: view.position,
+    }
+
+    if (frame.capturedAtSource) preview.capturedAtSource = frame.capturedAtSource
+    patch({ preview })
+
+    const solved = await step('alignment.solve', async () => {
+      const result = await solver.solve(frame, actual?.hint ?? { raDegrees: pointing!.rightAscensionDegrees, decDegrees: pointing!.declinationDegrees }, signal)
+      trace.getActiveSpan()?.setAttribute('alignment.solve.outcome', result.status)
+
+      return result
+    }, { 'alignment.position': view.position })
+
     signal.throwIfAborted()
 
     if (solved.status === 'no-solution') {
@@ -159,7 +191,7 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
 
     previousSample = sample
 
-    return { frame, solved, sample, latitude: actual?.latitude ?? pointing!.latitudeDegrees }
+    return { frame, preview, solved, sample, latitude: actual?.latitude ?? pointing!.latitudeDegrees }
   }
 
   async function solvedFrame(solver: Solver, signal: AbortSignal) {
@@ -216,21 +248,16 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
 
     while (true) {
       const measured = measureAlignment(baseline, current.sample, true)
-      const imageId = randomUUID()
-      const preview = await step('alignment.preview', () => renderPreview(current.frame.width, current.frame.height, current.frame.pixels, current.frame.color))
       signal.throwIfAborted()
 
       if (physical) await physical.validate(signal)
-      images.set(imageId, preview)
-
-      while (images.size > 4) images.delete(images.keys().next().value!)
       const target = physical ? physical.project(current.solved.wcs, measured.correctionTarget, current.sample) : projectSky(current.solved.wcs, measured.correctionTarget)
 
       if (!target) throw new Error('Alignment target is outside the solvable camera projection')
 
       const measurement: NonNullable<AlignmentView['measurement']> = {
         altitudeArcsec: measured.altitudeArcsec, azimuthArcsec: measured.azimuthArcsec,
-        totalArcsec: measured.totalArcsec, imageUrl: `/api/rigs/${encodeURIComponent(view.rigId)}/alignment/images/${imageId}`,
+        totalArcsec: measured.totalArcsec, imageUrl: current.preview.imageUrl,
         imageWidth: current.frame.width, imageHeight: current.frame.height,
         targetX: target.x, targetY: target.y, fieldHeightDegrees,
       }

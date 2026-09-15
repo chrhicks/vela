@@ -87,6 +87,11 @@ const alignmentSchema = z.object({
   measuredAt: z.string().refine(time => Number.isFinite(Date.parse(time))).nullable(),
   exposureStartedAt: z.string().refine(time => Number.isFinite(Date.parse(time))).nullable(),
   measurement: measurementSchema.nullable(),
+  preview: z.object({
+    imageUrl: z.string().startsWith('/api/'), imageWidth: z.number().positive(), imageHeight: z.number().positive(),
+    capturedAt: z.string().refine(time => Number.isFinite(Date.parse(time))),
+    capturedAtSource: z.enum(['camera', 'server-estimate']).optional(), position: z.number(),
+  }).nullable().optional(),
 })
 
 /** Reject malformed state before it can be shown as a confirmed observation. */
@@ -285,6 +290,7 @@ function AlignmentPage({ rigId }: { rigId: string }) {
               </div>
             </dl>
           )}
+          {view.preview && <BaselineFrame key={view.preview.imageUrl} preview={view.preview} />}
         </Panel>
         <div className="vela-polar-baseline__next">
           <h3>{view.active ? 'What happens next' : 'Before you start'}</h3>
@@ -361,4 +367,21 @@ function SolvedFrame({ measurement: m }: { measurement: NonNullable<AlignmentVie
       <path d={`M${barX} ${barY}h${fieldHeight / 10}m${-fieldHeight / 10} ${-4 * scale}v${8 * scale}m${fieldHeight / 10} ${-8 * scale}v${8 * scale}`} stroke="var(--vela-text-muted)" fill="none" strokeWidth={scale} />
       <text x={barX} y={barY - 12 * scale} fill="var(--vela-text-muted)" fontSize={14 * scale}>2′</text>
     </svg><figcaption><span><i /> Frame reference</span><span><i /> Alignment target</span></figcaption></figure>
+}
+
+function BaselineFrame({ preview }: { preview: NonNullable<AlignmentView['preview']> }) {
+  const [imageError, setImageError] = useState(false)
+
+  return <figure className="vela-polar-image">
+    <div className="vela-polar-image-heading"><span>Latest exposure · Position {preview.position}</span><span>Full frame</span></div>
+    <img src={preview.imageUrl} width={preview.imageWidth} height={preview.imageHeight}
+      alt={`Latest camera exposure at baseline position ${preview.position}`}
+      onError={() => setImageError(true)} onLoad={() => setImageError(false)} />
+    {imageError && <p role="status">The exposure preview could not be loaded.</p>}
+    <figcaption><div>
+      {preview.capturedAtSource === 'server-estimate' ? 'Estimated exposure start' : 'Exposure started'}{' '}
+      <time dateTime={preview.capturedAt}>{new Date(preview.capturedAt).toLocaleTimeString()}</time>
+      {' · No alignment result yet'}
+    </div></figcaption>
+  </figure>
 }
