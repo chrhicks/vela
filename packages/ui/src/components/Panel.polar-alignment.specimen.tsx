@@ -60,6 +60,16 @@ function BaselinePreview({ phase, physical, onStart, onStop }: {
         ) : (
           <dl className="vela-polar-setup-facts"><div><dt>Camera</dt><dd>{physical ? 'ASI2600MC Pro' : 'Main imaging camera'}</dd></div><div><dt>Exposure</dt><dd>{physical ? '2 seconds' : '30 seconds'}</dd></div><div><dt>Starting point</dt><dd>{physical ? 'Dec +80° · consistent starting field' : 'Current position'}</dd></div></dl>
         )}
+        {(step || stopped) && <figure className="vela-polar-image">
+          <div className="vela-polar-image-heading"><span>Latest exposure · Position {step?.point ?? 1}</span><span>Full frame</span></div>
+          <svg viewBox="0 0 640 400" role="img" aria-label="Latest camera exposure at a baseline position">
+            <rect width="640" height="400" fill="#090e18" />
+            {Array.from({ length: 115 }, (_, i) => (
+              <circle key={i} cx={(i * 173 + 31) % 640} cy={(i * i * 29 + 17) % 400} r={i % 13 === 0 ? 1.7 : 0.65} fill="#e1e8f6" opacity={0.25 + (i % 6) * 0.12} />
+            ))}
+          </svg>
+          <figcaption>Exposure started 8:25:49 PM · No alignment result yet</figcaption>
+        </figure>}
       </Panel>
       <div className="vela-polar-baseline__next">
         <h3>{step ? 'What happens next' : 'Before you start'}</h3>

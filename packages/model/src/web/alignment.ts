@@ -1,4 +1,4 @@
-/** Server-owned, ephemeral polar-alignment state. Pixels and readings share a solve. */
+/** Server-owned, ephemeral polar-alignment state. Measurement pixels and readings share a solve. */
 export interface AlignmentView {
   mode?: 'offline' | 'physical'
   cameraName?: string
@@ -16,6 +16,15 @@ export interface AlignmentView {
   measuredAt: string | null
   warning: string | null
   error: string | null
+  /** Latest acquired frame, available even before a successful solve. */
+  preview?: null | {
+    imageUrl: string
+    imageWidth: number
+    imageHeight: number
+    capturedAt: string
+    capturedAtSource?: 'camera' | 'server-estimate'
+    position: number
+  }
   measurement: null | {
     capturedAtSource?: 'camera' | 'server-estimate'
     altitudeArcsec: number

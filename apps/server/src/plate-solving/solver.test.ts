@@ -2,6 +2,8 @@ import { mkdtemp, writeFile, readFile, readdir, rm, access } from 'node:fs/promi
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { afterEach, expect, it, vi } from 'vitest'
+import { trace, context } from '@opentelemetry/api'
+import { InMemorySpanExporter, NodeTracerProvider, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-node'
 import { createAstapSolver, projectSky } from './solver.js'
 
 const directories: string[] = []
@@ -82,4 +84,55 @@ if (image.readInt32BE(2880) !== -40 || !image.subarray(0,2880).toString().includ
 fs.writeFileSync(path.replace('.fits','.ini'), ${JSON.stringify(ini)})`)
 
   await expect(solver.solve({ ...frame, pixels: [-40, 65535, 1, 2], color: { kind: 'bayer', pattern: 'gbrg' } }, hint, new AbortController().signal)).resolves.toMatchObject({ status: 'solved' })
+})
+
+
+it('exports correlated ASTAP diagnostics without merging distinct no-solution causes or retaining unbounded output', async () => {
+  const exporter = new InMemorySpanExporter()
+  const provider = new NodeTracerProvider({ spanProcessors: [new SimpleSpanProcessor(exporter)] })
+  provider.register()
+
+  try {
+    for (const [code, outcome] of [[0, 'solved'], [1, 'no-match'], [2, 'insufficient-stars'], [32, 'error']] as const) {
+      const { solver } = await fixture(`fs.writeFileSync(1, 'x'.repeat(5000) + 'stdout end')
+fs.writeFileSync(2, 'stderr detail')
+fs.writeFileSync(path.replace('.fits','.ini'), ${JSON.stringify(ini)})
+process.exit(${code})`)
+
+      await trace.getTracer('test').startActiveSpan('alignment.solve', async parent => {
+        try {
+          const result = solver.solve(frame, hint, new AbortController().signal)
+
+          if (code === 32) await expect(result).rejects.toThrow('exit code 32')
+          else await expect(result).resolves.toMatchObject({ status: code === 0 ? 'solved' : 'no-solution' })
+        } finally {
+          parent.end()
+        }
+      })
+      const spans = exporter.getFinishedSpans()
+      const diagnostic = spans.find(span => span.name === 'astap.solve')!
+      const parent = spans.find(span => span.name === 'alignment.solve')!
+      expect(diagnostic.parentSpanContext?.spanId).toBe(parent.spanContext().spanId)
+      expect(diagnostic.attributes).toMatchObject({
+        'astap.exit_code': code,
+        'astap.outcome': outcome,
+        'astap.stdout': 'x'.repeat(4086) + 'stdout end',
+        'astap.stdout.truncated': true,
+        'astap.stderr': 'stderr detail',
+        'astap.stderr.truncated': false,
+        'astap.hint.ra_degrees': 30,
+        'astap.hint.dec_degrees': 60,
+        'astap.field_height_degrees': 3,
+        'astap.search_radius_degrees': 5,
+        'image.width': 2,
+        'image.height': 2,
+        'image.captured_at': frame.capturedAt,
+      })
+      exporter.reset()
+    }
+  } finally {
+    await provider.shutdown()
+    trace.disable()
+    context.disable()
+  }
 })

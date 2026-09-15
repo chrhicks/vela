@@ -15,3 +15,10 @@ not this adapter. Alignment's solver module re-exports this boundary for existin
 consumers.
 
 Reference: [ASTAP CLI](https://www.hnsky.org/astap.htm#command_line).
+
+When local tracing is enabled, each `astap.solve` child span retains the exit
+code, checked outcome (`solved`, `no-match`, `insufficient-stars`, `error`, or
+`cancelled`), search hint, configured field height and input image dimensions.
+The final 4096 characters of each stdout/stderr stream are retained, with explicit
+truncation flags. Output is available even on a failed or cancelled process;
+no image pixels are traced. See [local tracing](../../../../docs/local-tracing.md).

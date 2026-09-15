@@ -17,7 +17,11 @@ The operation remains active across browser disconnects. Stop cancels the curren
 acquisition, movement or solver and waits for cleanup. Failed physical commands
 are not replayed. Only a genuine no-solution starts another exposure automatically;
 transport, invalid data, unsupported capabilities and subprocess errors stop the
-operation. The last solved preview, measurement and timestamp remain together.
+operation. The latest acquired full-frame preview is published during baseline
+measurement before solving, including frames that cannot solve. Its exposure
+timestamp and baseline position are separate from the last solved preview,
+measurement and timestamp, which remain together. Image retention is bounded
+and preserves the last solved image through repeated unsuccessful exposures.
 Restart takes a completely new baseline. Server restart interrupts the operation;
 there is no durable execution or recovery.
 

@@ -53,3 +53,17 @@ mesh transit, ASCOM Remote serialization, or driver work without evidence from
 the rig PC. Compare idle and motion-time reads before assigning a cause. Tracing
 also cannot guarantee immediate physical stopping: the event loop, transport and
 remote driver all contribute to the command outcome.
+
+## Plate-solver failures
+
+Inspect `astap.solve` spans beneath the alignment solve step. `astap.exit_code`
+is the process exit code when available; `astap.outcome` distinguishes `no-match`
+(exit 1) from `insufficient-stars` (exit 2), while the workflow still receives
+`no-solution` for both. Exit 0 is only `solved` after WCS validation. Other failures
+are `error`; operator cancellation is `cancelled`.
+
+`astap.stdout` and `astap.stderr` retain the last 4096 characters each, with
+`.truncated` flags. The same span includes the J2000 hint in degrees, configured
+field height and search radius, and image dimensions/capture time. These records
+appear after each solver process ends, even while the alignment run remains
+active. Raw exposure pixels are excluded.

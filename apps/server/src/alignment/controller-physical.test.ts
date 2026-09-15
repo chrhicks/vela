@@ -134,13 +134,20 @@ it.each(['during solve', 'during preview'] as const)('rejects external movement 
   const subject = setup()
   await subject.controller.start('physical', 'Physical rig')
 
-  for (let index = 0; index < 2; index++) (await subject.nextSolve()).complete()
-  const final = await subject.nextSolve()
-  expect(subject.controller.snapshot()).toMatchObject({ activity: 'solving', measurement: null })
+  const first = await subject.nextSolve()
+  first.complete()
+  const second = await subject.nextSolve()
 
-  if (timing === 'during solve') subject.changeMount()
-  else control.afterPreview = subject.changeMount
-  final.complete()
+  if (timing === 'during preview') control.afterPreview = subject.changeMount
+  second.complete()
+
+  if (timing === 'during solve') {
+    const final = await subject.nextSolve()
+    expect(subject.controller.snapshot()).toMatchObject({ activity: 'solving', measurement: null })
+    subject.changeMount()
+    final.complete()
+  }
+
   await vi.waitFor(() => expect(subject.controller.active()).toBe(false))
   expect(subject.controller.snapshot()).toMatchObject({ phase: 'failed', measuredAt: null, measurement: null,
     error: 'The mount pointing side changed. Measure a new baseline.' })
@@ -153,12 +160,8 @@ it('retains the previous solved image and timestamp when external movement inval
   const previous = subject.controller.snapshot()
   const previousImageId = previous.measurement!.imageUrl.split('/').at(-1)!
   const previousImage = subject.controller.image(previousImageId)
-  control.waits.shift()!()
-  const next = await subject.nextSolve()
-  expect(next.index).toBe(3)
-  expect(subject.controller.snapshot().measurement).toBe(previous.measurement)
   control.afterPreview = subject.changeMount
-  next.complete()
+  control.waits.shift()!()
   await vi.waitFor(() => expect(subject.controller.active()).toBe(false))
   expect(subject.controller.snapshot()).toMatchObject({ phase: 'failed', measuredAt: previous.measuredAt, measurement: previous.measurement })
   expect(subject.controller.image(previousImageId)).toBe(previousImage)
