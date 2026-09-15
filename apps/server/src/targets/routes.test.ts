@@ -72,7 +72,7 @@ function setup(settings: { record?: RigCatalogRecord, solver?: boolean, offsetDe
   const options: TargetOptions = {
     createAdapter: () => adapter, createHardware: () => hardware,
     createInspector: () => ({ inspectDevices: async () => inspections }),
-    now: () => new Date(stamp),
+    now: () => new Date(stamp), waitForMountObservation: async signal => { signal.throwIfAborted() },
   }
 
   if (settings.solver !== false) options.createSolver = () => solver
@@ -235,7 +235,7 @@ describe('target and framing HTTP boundary', () => {
     // Captures may share a timestamp; their identities must still be distinct.
     expect(latest.actual.capturedAt).toBe(older.actual.capturedAt)
     expect(latest.canCenter).toBe(true)
-    const rejected = await command(subject.app, { checkId: older.actual.checkId }, 'center')
+    const rejected = await command(subject.app, { checkId: older.actual.checkId, raDegrees: start.raDegrees, decDegrees: start.decDegrees }, 'center')
     expect(rejected.statusCode, rejected.body).toBe(409)
     expect(rejected.json().error).toContain('check has changed')
     expect(subject.hardware.slew).toHaveBeenCalledTimes(2)
@@ -243,13 +243,29 @@ describe('target and framing HTTP boundary', () => {
     expect(subject.operations.owner('rig')).toBeUndefined()
     expect((await subject.app.inject('/api/web/rigs/rig/framing')).json().actual.checkId).toBe(latest.actual.checkId)
 
-    const accepted = await command(subject.app, { checkId: latest.actual.checkId }, 'center')
+    const accepted = await command(subject.app, { checkId: latest.actual.checkId, raDegrees: start.raDegrees + 0.2, decDegrees: start.decDegrees }, 'center')
     expect(accepted.statusCode, accepted.body).toBe(200)
     await vi.waitFor(() => expect(subject.hardware.capture).toHaveBeenCalledTimes(3))
     expect(subject.hardware.slew).toHaveBeenCalledTimes(3)
     subject.complete()
     await vi.waitFor(() => expect(subject.operations.owner('rig')).toBeUndefined())
-    expect((await subject.app.inject('/api/web/rigs/rig/framing')).json().actual.checkId).not.toBe(latest.actual.checkId)
+    const centered = (await subject.app.inject('/api/web/rigs/rig/framing')).json()
+    expect(centered.actual.checkId).not.toBe(latest.actual.checkId)
+    expect(centered.desired).toEqual({ raDegrees: start.raDegrees + 0.2, decDegrees: start.decDegrees })
+  })
+
+  it('checks an edited current composition without a movement command', async () => {
+    const subject = setup()
+    const edited = { ...start, raDegrees: start.raDegrees + 0.3 }
+    expect((await command(subject.app, edited, 'check')).statusCode).toBe(200)
+    await vi.waitFor(() => expect(subject.hardware.capture).toHaveBeenCalledTimes(1))
+    subject.complete()
+    await vi.waitFor(() => expect(subject.operations.owner('rig')).toBeUndefined())
+    expect(subject.hardware.slew).not.toHaveBeenCalled()
+    expect(subject.hardware.tracking).not.toHaveBeenCalled()
+    expect((await subject.app.inject('/api/web/rigs/rig/framing')).json()).toMatchObject({
+      phase: 'checked', desired: { raDegrees: edited.raDegrees, decDegrees: edited.decDegrees }, checkCurrent: true, canCenter: true,
+    })
   })
 
   it('serves real catalog identity without inventing a site and rejects malformed searches', async () => {

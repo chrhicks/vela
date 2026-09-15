@@ -35,16 +35,33 @@ is an assumption until a test exposure measures it; no camera rotation is comman
 
 `framing.ts` depends only on its hardware and plate-solver contracts. The adapter
 is connected visibly in the routes. Starting enables tracking when necessary,
-slews once, takes one fresh exposure and solves it. Tracking remains on for
+slews once, waits for three consistent position observations one second apart,
+then takes a fresh exposure and solves it. A driver's `Slewing=false` alone does
+not establish stable coordinate observations. If the position changes during a
+check, retain the solved footprint, wait for stable observations, and take another
+exposure without repeating the slew. Stop cancels that wait. Tracking remains on for
 capture. Stop cancels the owned operation and waits for boundary cleanup; it
 does not park the mount or turn tracking off. Failed cleanup remains a failure.
 No physical write is automatically replayed.
 
-Centering is a separate user command. It applies one measured sky rotation to
+Centering is a separate user command, bound to the exact solved-check ID and the
+current edited composition coordinates. It applies one measured sky rotation to
 the current mount pointing, then repeats the exposure and check. It never syncs
-the mount model and never loops automatically. A check older than 15 minutes,
-changed optics/camera geometry, changed mount pointing or tracking, or offset
-above 2° cannot authorize a correction. An offset within 0.5′ needs no correction.
+the mount model or automatically repeats a corrective movement. A check older
+than 15 minutes, changed optics/camera geometry, or changed mount pointing or
+tracking cannot authorize a correction. Editing the destination does not invalidate
+an otherwise current measurement. There is no fixed 2° correction cutoff: the
+vector rotation supports large displacements, with the antipodal ambiguity rejected
+explicitly. One observed pointing offset does not guarantee correction accuracy
+elsewhere in the sky; each explicit correction is checked with a fresh exposure.
+An offset within 0.5′ skips movement and just rechecks.
+
+**Check current frame** takes an exposure and solves the current field without a
+slew or tracking change. Use it to establish a fresh measurement after a rejected
+check or to recover centering without resending a raw target slew. A no-solution
+or known unavailable check becomes `needs-check`, retaining the composition and
+last solved footprint with a concrete next action. Unconfirmed physical work still
+reports failure and requires state inspection before another command.
 Last solved coordinates retain their timestamp when they cease to be current.
 Browser reconnection observes server-owned progress; server restart loses the
 ephemeral operation and check, and does not resume either.

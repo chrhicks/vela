@@ -19,6 +19,7 @@ export interface TargetOptions {
   createSolver?: (fieldHeightDegrees: number) => PlateSolver
   createInspector?: RigDetailOptions['createInspector']
   now?: () => Date
+  waitForMountObservation?: (signal: AbortSignal) => Promise<void>
 }
 
 export function registerTargets(app: FastifyInstance, catalog: RigCatalog, operations: RigOperations, options: TargetOptions = {}) {
@@ -182,10 +183,13 @@ export function registerTargets(app: FastifyInstance, catalog: RigCatalog, opera
   app.post<{ Params: { rigId: string, command: string } }>('/api/rigs/:rigId/framing/:command', async (request, reply) => {
     const { rigId, command } = request.params
 
-    const operation = z.enum(['start', 'stop', 'center']).safeParse(command)
+    const operation = z.enum(['start', 'stop', 'center', 'check']).safeParse(command)
 
     if (!operation.success) return reply.code(404).send({ error: 'Unknown framing command' })
-    const commandFields = { start: ['targetId', 'raDegrees', 'decDegrees', 'exposureSeconds'], center: ['checkId'], stop: [] }
+
+    const commandFields = { start: ['targetId', 'raDegrees', 'decDegrees', 'exposureSeconds'],
+      check: ['targetId', 'raDegrees', 'decDegrees', 'exposureSeconds'], center: ['checkId', 'raDegrees', 'decDegrees'], stop: [] }
+
     const expectedKeys = commandFields[operation.data]
     const bodyEnvelope = z.looseObject({}).safeParse(request.body)
 
@@ -197,7 +201,7 @@ export function registerTargets(app: FastifyInstance, catalog: RigCatalog, opera
     const parsed = framingCommandSchema.safeParse({ command, body: request.body })
 
     if (!parsed.success) {
-      const error = command === 'center' ? 'Expected the solved framing check ID.' : 'Expected a catalog target, J2000 coordinates and 0.1–60 second exposure.'
+      const error = command === 'center' ? 'Expected the solved framing check ID and desired J2000 coordinates.' : 'Expected a catalog target, J2000 coordinates and 0.1–60 second exposure.'
 
       return reply.code(400).send({ error })
     }
@@ -222,7 +226,7 @@ export function registerTargets(app: FastifyInstance, catalog: RigCatalog, opera
       const ready = await readiness(rig)
       let controller = controllers.get(rigId)
 
-      if (!controller) { controller = createFramingController(now); controllers.set(rigId, controller) }
+      if (!controller) { controller = createFramingController(now, options.waitForMountObservation); controllers.set(rigId, controller) }
 
       const previous = controller.snapshot()
 
@@ -232,14 +236,14 @@ export function registerTargets(app: FastifyInstance, catalog: RigCatalog, opera
         if (!controller.canCenter(ready.mount, ready.configuration)) throw new Error('A current solved framing check is required before centering.')
       }
 
-      const desired = action.command === 'center' ? previous.desired! : { raDegrees: action.body.raDegrees, decDegrees: action.body.decDegrees }
+      const desired = { raDegrees: action.body.raDegrees, decDegrees: action.body.decDegrees }
       const solver = options.createSolver?.(ready.camera.fieldHeightDegrees) ?? (options.solver ? createAstapSolver({ ...options.solver, fieldHeightDegrees: ready.camera.fieldHeightDegrees }) : undefined)
 
       if (!solver) throw new Error('Plate solving is not configured on the Vela server.')
       const hardware = options.createHardware?.(rig, ready.telescopeId) ?? configuredHardware(rig, ready.telescopeId, adapter(rig))
       controller.start({ desired, targetId: action.command === 'center' ? previous.targetId! : action.body.targetId,
         exposureSeconds: action.command === 'center' ? previous.exposureSeconds : action.body.exposureSeconds,
-        configuration: ready.configuration, center: action.command === 'center' }, hardware, solver, release)
+        configuration: ready.configuration, action: action.command }, hardware, solver, release)
       started = true
 
       return framingView(rig)
@@ -267,12 +271,17 @@ function configuredHardware(rig: RigCatalogRecord, telescopeId: string, adapter:
 
 function message(cause: unknown) { return cause instanceof Error ? cause.message : 'Framing state is unavailable' }
 
+const compositionSchema = z.strictObject({
+  targetId: z.string().refine(value => getTarget(value) !== undefined),
+  raDegrees: z.number().min(0).lt(360), decDegrees: z.number().min(-90).max(90),
+  exposureSeconds: z.number().min(0.1).max(60),
+})
+
 const framingCommandSchema = z.discriminatedUnion('command', [
   z.object({ command: z.literal('stop'), body: z.strictObject({}) }),
-  z.object({ command: z.literal('center'), body: z.strictObject({ checkId: z.string().refine(value => value.trim().length > 0) }) }),
-  z.object({ command: z.literal('start'), body: z.strictObject({
-    targetId: z.string().refine(value => getTarget(value) !== undefined),
+  z.object({ command: z.literal('center'), body: z.strictObject({ checkId: z.string().refine(value => value.trim().length > 0),
     raDegrees: z.number().min(0).lt(360), decDegrees: z.number().min(-90).max(90),
-    exposureSeconds: z.number().min(0.1).max(60),
   }) }),
+  z.object({ command: z.literal('start'), body: compositionSchema }),
+  z.object({ command: z.literal('check'), body: compositionSchema }),
 ])

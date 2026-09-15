@@ -102,12 +102,13 @@ export function useFraming(rigId: string) {
   const canStart = !!view?.enabled && !view.active && !offline && !pending && !commandUnconfirmed
   const canStop = !!view?.active && view.phase !== 'stopping' && !offline && !pending && !commandUnconfirmed
 
-  async function command(action: 'start' | 'stop' | 'center' | 'settings', body: { targetId?: string; raDegrees?: number; decDegrees?: number; exposureSeconds?: number; checkId?: string; focalLengthMm?: number } = {}) {
+  async function command(action: 'start' | 'check' | 'stop' | 'center' | 'settings', body: { targetId?: string; raDegrees?: number; decDegrees?: number; exposureSeconds?: number; checkId?: string; focalLengthMm?: number } = {}) {
     const allowed = {
       stop: canStop,
       center: canStart && !!view?.canCenter && !!view.actual,
       settings: !!view && !pending && !offline && !view.active && !commandUnconfirmed,
       start: canStart,
+      check: canStart,
     }[action]
 
     if (writing.current || !alive.current || !allowed) return
@@ -161,5 +162,7 @@ export function useFraming(rigId: string) {
   return { view, offline, pending, refreshing, error, commandUnconfirmed, canStart, canStop,
     start: ({ targetId, raDegrees, decDegrees, exposureSeconds }: { targetId: string, raDegrees: number, decDegrees: number, exposureSeconds: number }) =>
       command('start', { targetId, raDegrees, decDegrees, exposureSeconds }),
-    center: () => command('center', { checkId: view?.actual?.checkId }), settings: (focalLengthMm: number) => command('settings', { focalLengthMm }), stop: () => command('stop'), refresh: () => read(true) }
+    check: ({ targetId, raDegrees, decDegrees, exposureSeconds }: { targetId: string, raDegrees: number, decDegrees: number, exposureSeconds: number }) =>
+      command('check', { targetId, raDegrees, decDegrees, exposureSeconds }),
+    center: ({ raDegrees, decDegrees }: { raDegrees: number, decDegrees: number }) => command('center', { checkId: view?.actual?.checkId, raDegrees, decDegrees }), settings: (focalLengthMm: number) => command('settings', { focalLengthMm }), stop: () => command('stop'), refresh: () => read(true) }
 }
