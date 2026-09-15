@@ -63,6 +63,15 @@ idempotent artifact command and does not enable saving later frames. Neither
 browsing saved images nor keeping an available frame requires a connected camera.
 See [saved images](../saved-images/README.md) for durable storage and FITS details.
 
+Capture views include confirmed imaging-camera cooling when the camera reports
+CoolerOn. Sensor temperature near a retained setpoint is not CoolerOn. POST
+`/api/rigs/:rigId/capture/cooling` accepts `coolerOn` and/or `setpointC`. Setting
+a temperature does not turn the cooler on. Vela does not enable cooling on its
+own, wait for the sensor to reach the setpoint, or block capture on temperature.
+Each write is confirmed by a matching device read; an uncertain write is never
+replayed. The web Capture page treats cooling as prep and disables it while a run
+is active so Stop stays available.
+
 ## Local review
 
 Choose the simulator imaging camera through the same Rig setup API used for a

@@ -17,7 +17,7 @@ function CapturePage({ rigId }: { rigId: string }) {
   const [exposure, setExposure] = useState<string | null>(null)
   const [saveFrames, setSaveFrames] = useState<boolean | null>(null)
   const [repeat, setRepeat] = useState<boolean | null>(null)
-  const { view, offline, pending, refreshing, error, commandUnconfirmed } = capture
+  const { view, offline, pending, coolingPending, refreshing, error, coolingError, commandUnconfirmed, coolingUnconfirmed } = capture
   const exposureValue = view?.active ? String(view.exposureSeconds) : exposure ?? String(view?.exposureSeconds ?? 2)
   const repeating = view?.active ? view.repeat : repeat ?? view?.repeat ?? true
   const savingFrames = view?.active ? view.saveFrames : saveFrames ?? false
@@ -54,11 +54,12 @@ function CapturePage({ rigId }: { rigId: string }) {
         {view.cooling && <CaptureCooling
           cooling={view.cooling}
           disabled={!capture.canCool}
-          pending={pending}
-          error={error?.includes('cooler') || error?.includes('temperature') || error?.includes('Cooler') ? error : null}
-          unconfirmed={commandUnconfirmed && Boolean(error?.includes('cooler'))}
+          pending={coolingPending}
+          error={coolingError}
+          unconfirmed={coolingUnconfirmed}
           onCooler={coolerOn => void capture.setCooler(coolerOn)}
           onSetpoint={setpointC => void capture.setCoolingTemperature(setpointC)}
+          onCheck={() => void capture.refresh()}
         />}
         <form onSubmit={event => {
           event.preventDefault()
