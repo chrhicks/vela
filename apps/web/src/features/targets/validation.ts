@@ -60,7 +60,7 @@ const discovery = targets.extend({
 const framing = z.object({
   rigId: z.string(), rigName: z.string(), enabled: z.boolean(), active: z.boolean(), canCenter: z.boolean(), checkCurrent: z.boolean(),
   observedAt: date, error: z.string().nullable(), unavailableReason: z.string().nullable(), targetId: z.string().nullable(), exposureSeconds: z.number(),
-  phase: z.enum(['idle', 'slewing', 'exposing', 'solving', 'checked', 'stopping', 'stopped', 'failed']),
+  phase: z.enum(['idle', 'slewing', 'settling', 'needs-check', 'exposing', 'solving', 'checked', 'stopping', 'stopped', 'failed']),
   focalLengthMm: z.number().positive().nullable(), desired: position.nullable(),
   camera: z.object({ name: z.string(), width: z.number().positive(), height: z.number().positive(), fieldWidthDegrees: z.number().positive(), fieldHeightDegrees: z.number().positive() }).nullable(),
   actual: position.extend({ checkId: z.string().min(1), capturedAt: date, rotationDegrees: z.number(), offsetArcminutes: z.number(), corners: z.array(position).length(4) }).nullable(),

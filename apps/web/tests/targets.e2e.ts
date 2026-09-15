@@ -149,7 +149,7 @@ test('checked framing offers one correction, active operations lock edits, and s
   await page.route('**/api/web/rigs/rig-1/framing', route => offline ? route.abort() : respond(route, state))
   await page.route('**/api/survey/**', route => route.abort())
   await page.route('**/api/rigs/rig-1/framing/center', route => {
-    expect(route.request().postDataJSON()).toEqual({ checkId: 'displayed-check' })
+    expect(route.request().postDataJSON()).toEqual({ checkId: 'displayed-check', raDegrees: target.raDegrees, decDegrees: target.decDegrees })
     corrections++
     state = { ...state, phase: 'slewing', active: true, canCenter: false, checkCurrent: false }
 
@@ -384,4 +384,55 @@ test('failure recovery preserves local drag, zoom and nudges while device comman
   await page.getByRole('button', { name: 'Check rig state' }).click()
   await expect(page.getByRole('button', { name: 'Slew & check' })).toBeEnabled()
   expect(commands).toBe(0)
+})
+
+test('an edited composition can center using its current coordinates and the last solved check', async ({ page }) => {
+  let state: FramingView = { ...idle, phase: 'checked', checkCurrent: true, desired: target, targetId: target.id, canCenter: true, actual: { ...target, checkId: 'usable-check', capturedAt: new Date().toISOString(), rotationDegrees: 0, offsetArcminutes: 0.1, corners: [{ raDegrees: 9, decDegrees: 40 }, { raDegrees: 11, decDegrees: 40 }, { raDegrees: 11, decDegrees: 42 }, { raDegrees: 9, decDegrees: 42 }] } }
+  let command: { checkId: string, raDegrees: number, decDegrees: number } | null = null
+  await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
+  await page.route('**/api/web/rigs/rig-1/framing', route => respond(route, state))
+  await page.route('**/api/survey/**', route => route.abort())
+  await page.route('**/api/rigs/rig-1/framing/center', route => {
+    command = z.strictObject({ checkId: z.string(), raDegrees: z.number(), decDegrees: z.number() }).parse(route.request().postDataJSON())
+    state = { ...state, desired: { raDegrees: command.raDegrees, decDegrees: command.decDegrees }, active: true, phase: 'settling', checkCurrent: false, canCenter: false }
+
+    return respond(route, state)
+  })
+  await page.goto('/rigs/rig-1/observe/targets/m31')
+  await page.getByRole('button', { name: 'Adjust composition' }).click()
+  await page.getByRole('button', { name: 'Move frame →' }).click()
+  await expect(page.getByRole('link', { name: 'Continue to capture' })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Center & recheck' }).click()
+  await expect(page.getByText('Waiting for the mount to settle', { exact: true })).toBeVisible()
+  expect(command?.checkId).toBe('usable-check')
+  expect(command?.raDegrees).not.toBe(target.raDegrees)
+  expect(command?.decDegrees).toBeCloseTo(target.decDegrees, 2)
+  state = { ...state, active: false, phase: 'checked', checkCurrent: true, canCenter: true }
+  await expect(page.getByRole('link', { name: 'Continue to capture' })).toBeVisible()
+})
+
+test('a recoverable check keeps the edited destination and offers a fresh exposure without a slew', async ({ page }) => {
+  let state: FramingView = { ...idle, phase: 'needs-check', desired: target, targetId: target.id, error: 'The image could not be solved. Check the current frame again.' }
+  const commands: { action: string, body: { targetId: string, raDegrees: number, decDegrees: number, exposureSeconds: number } }[] = []
+  await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
+  await page.route('**/api/web/rigs/rig-1/framing', route => respond(route, { ...state, observedAt: new Date().toISOString() }))
+  await page.route('**/api/survey/**', route => route.abort())
+  await page.route('**/api/rigs/rig-1/framing/*', route => {
+    commands.push({ action: route.request().url().split('/').at(-1)!, body: z.strictObject({ targetId: z.string(), raDegrees: z.number(), decDegrees: z.number(), exposureSeconds: z.number() }).parse(route.request().postDataJSON()) })
+    state = { ...state, active: false, phase: 'needs-check' }
+
+    return respond(route, state)
+  })
+  await page.goto('/rigs/rig-1/observe/targets/m31')
+  await expect(page.getByRole('button', { name: 'Check current frame', exact: true })).toBeEnabled()
+  await page.getByRole('button', { name: 'Move frame →' }).click()
+  const coordinates = await page.locator('.vela-target-details').textContent()
+  await page.getByRole('button', { name: 'Check current frame', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Check current frame', exact: true })).toBeEnabled()
+  await expect(page.getByText('Check rig state before continuing', { exact: true })).toHaveCount(0)
+  await expect(page.locator('.vela-target-details')).toHaveText(coordinates!)
+  expect(commands).toHaveLength(1)
+  expect(commands[0]!.action).toBe('check')
+  expect(commands[0]!.body.targetId).toBe(target.id)
+  expect(commands[0]!.body.raDegrees).not.toBe(target.raDegrees)
 })

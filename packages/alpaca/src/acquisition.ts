@@ -14,6 +14,15 @@ export class AlpacaCaptureStoppedError extends Error {
   }
 }
 
+/** A fresh capture may be attempted: no exposure started, or an acknowledged
+ * exposure was stopped and the camera confirmed idle. Never an uncertain write. */
+export class AlpacaCaptureRetryableError extends Error {
+  constructor(cause: AlpacaProviderError) {
+    super(cause.message, { cause })
+    this.name = 'AlpacaCaptureRetryableError'
+  }
+}
+
 export type AlpacaFrameColor =
   | { kind: 'mono' }
   | { kind: 'bayer'; pattern: 'rggb' | 'grbg' | 'gbrg' | 'bggr' }
@@ -224,6 +233,7 @@ export function createAlpacaAcquisition({ baseUrl, fetch = globalThis.fetch, req
       if (expectedCameraName !== undefined && expectedCameraName.trim() === '') throw new RangeError('Expected camera name must not be blank')
       let camera: ConfiguredDevice | undefined
       let attempted = false
+      let acknowledged = false
 
       try {
         camera = await device(cameraId, 'camera', signal)
@@ -257,6 +267,7 @@ export function createAlpacaAcquisition({ baseUrl, fetch = globalThis.fetch, req
         attempted = true
         // A lost response can still mean the exposure started. Never replay it.
         await client.command(camera, 'startexposure', { Duration: String(exposureSeconds), Light: 'true' }, signal)
+        acknowledged = true
         let observedNotReady = false
 
         while (!(await client.readBoolean(camera, 'imageready', signal))) {
@@ -292,6 +303,10 @@ export function createAlpacaAcquisition({ baseUrl, fetch = globalThis.fetch, req
 
         if (signal?.aborted && (error === signal.reason || error instanceof Error && error.name === 'AbortError')) {
           throw new AlpacaCaptureStoppedError()
+        }
+
+        if (!signal?.aborted && (!attempted || acknowledged) && error instanceof AlpacaProviderError && error.reason === 'transport') {
+          throw new AlpacaCaptureRetryableError(error)
         }
 
         throw error

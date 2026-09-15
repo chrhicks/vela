@@ -73,7 +73,7 @@ Failures should remain useful and honest.
 
 - Preserve enough context to identify the operation and boundary that failed.
 - Translate low-level failures into stable boundary errors without discarding their meaningful cause.
-- Retry only known transient operations with an understood limit.
+- Retry known transient reads with bounded individual requests and a paced, cancellable wait. An active interactive session may keep retrying until recovery or the user stops it; preserve its context and show the interruption explicitly. A single read timeout must not force the user to repeat physical preparation.
 - Do not blindly replay a physical command after an uncertain result.
 - Query device state to reconcile ambiguity when the protocol offers a reliable observation.
 - Stop and surface unresolved uncertainty rather than creating broad recovery machinery.

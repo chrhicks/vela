@@ -42,7 +42,7 @@
 
 .vela-polar-image { margin: 0; border: 1px solid var(--vela-line); border-radius: var(--vela-radius); overflow: hidden; background: var(--vela-surface); }
 .vela-polar-image-heading { display: flex; justify-content: space-between; gap: 10px; font-size: 11px; padding: 10px 12px; color: var(--vela-text-muted); }
-.vela-polar-image svg { width: 100%; height: auto; display: block; }
+.vela-polar-image svg, .vela-polar-image img { width: 100%; height: auto; display: block; }
 .vela-polar-image figcaption { display: flex; gap: 20px; padding: 10px 12px; font-size: 11px; color: var(--vela-text-muted); }
 .vela-polar-image figcaption span { display: flex; gap: 6px; align-items: center; }
 .vela-polar-image figcaption i { width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--vela-polar-reference); }

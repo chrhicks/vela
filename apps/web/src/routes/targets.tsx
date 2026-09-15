@@ -69,13 +69,24 @@ function TargetComposition({ rigId, targetId }: { rigId: string, targetId: strin
   const actual = matching ? view?.actual ?? null : null
 
   const status = offline ? 'Connection interrupted · last known state' : pending ? 'Sending command…' : !view ? 'Loading rig state…' : commandUnconfirmed && !view.active ? 'Check rig state before continuing' : {
-    idle: 'Ready to frame', slewing: 'Slewing to composition', exposing: 'Taking test exposure', solving: 'Solving test exposure', checked: checked ? 'Framing checked' : 'Composition not checked', stopping: 'Stopping framing', stopped: 'Framing stopped', failed: 'Framing not confirmed',
+    idle: 'Ready to frame', slewing: 'Slewing to composition', settling: 'Waiting for the mount to settle', 'needs-check': 'Ready to check the current frame', exposing: 'Taking test exposure', solving: 'Solving test exposure', checked: checked ? 'Framing checked' : 'Composition not checked', stopping: 'Stopping framing', stopped: 'Framing stopped', failed: 'Framing not confirmed',
   }[view.phase]
 
   const exposure = Number(seconds), focal = Number(focalLength)
 
-  async function startFraming() {
-    const accepted = await framing.start({ targetId, ...position, exposureSeconds: exposure })
+  async function startFraming(action: 'start' | 'check' = 'start') {
+    const accepted = await framing[action]({ targetId, ...position, exposureSeconds: exposure })
+
+    if (accepted?.targetId === targetId
+      && accepted.desired?.raDegrees === position.raDegrees
+      && accepted.desired.decDegrees === position.decDegrees
+      && (accepted.active || accepted.phase === 'checked' && accepted.checkCurrent)) {
+      setAdjusting(false)
+    }
+  }
+
+  async function centerFraming() {
+    const accepted = await framing.center(position)
 
     if (accepted?.targetId === targetId
       && accepted.desired?.raDegrees === position.raDegrees
@@ -143,7 +154,7 @@ function TargetComposition({ rigId, targetId }: { rigId: string, targetId: strin
                 <Button
                   tone="accent"
                   disabled={!framing.canStart || !view.canCenter}
-                  onClick={() => void framing.center()}
+                  onClick={() => void centerFraming()}
                 >
                   Center & recheck
                 </Button>
@@ -159,6 +170,12 @@ function TargetComposition({ rigId, targetId }: { rigId: string, targetId: strin
               </>
             ) : (
               <>
+                {matching && view?.canCenter && actual && <>
+                  <Button tone="accent" disabled={!framing.canStart} onClick={() => void centerFraming()}>
+                    Center & recheck
+                  </Button>
+                  <p>Move to your edited composition using the last measured pointing correction.</p>
+                </>}
                 <Input
                   label="Test exposure (seconds)"
                   type="number"
@@ -172,12 +189,18 @@ function TargetComposition({ rigId, targetId }: { rigId: string, targetId: strin
                 <Button
                   tone="accent"
                   disabled={!framing.canStart || !Number.isFinite(exposure) || exposure < .1 || exposure > 60}
-                  onClick={startFraming}
+                  onClick={() => void startFraming()}
                 >
                   Slew & check
                 </Button>
               </>
             )}
+            {!view?.active && <>
+              <Button disabled={!framing.canStart || !Number.isFinite(exposure) || exposure < .1 || exposure > 60} onClick={() => void startFraming('check')}>
+                Check current frame
+              </Button>
+              <p>Take a test exposure at the current position without moving the mount.</p>
+            </>}
             <Button tone="quiet" disabled={pending || framing.refreshing} onClick={refreshFraming}>
               Check rig state
             </Button>
