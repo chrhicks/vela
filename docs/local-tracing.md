@@ -56,14 +56,20 @@ remote driver all contribute to the command outcome.
 
 ## Plate-solver failures
 
-Inspect `astap.solve` spans beneath the alignment solve step. `astap.exit_code`
-is the process exit code when available; `astap.outcome` distinguishes `no-match`
-(exit 1) from `insufficient-stars` (exit 2), while the workflow still receives
-`no-solution` for both. Exit 0 is only `solved` after WCS validation. Other failures
-are `error`; operator cancellation is `cancelled`.
+Inspect `astap.solve` spans beneath the alignment solve step for the overall
+outcome, J2000 hint, configured field height, total timeout and image dimensions/
+capture time. Child `astap.attempt` spans include the radius, remaining timeout
+and process diagnostics for each search. Search expands through 10°, 15°, 30°,
+60°, 120° and 180° on the same image, sharing one total time budget.
 
-`astap.stdout` and `astap.stderr` retain the last 4096 characters each, with
-`.truncated` flags. The same span includes the J2000 hint in degrees, configured
-field height and search radius, and image dimensions/capture time. These records
-appear after each solver process ends, even while the alignment run remains
-active. Raw exposure pixels are excluded.
+`astap.exit_code` is the process exit code when available; `astap.outcome`
+distinguishes `no-match` (exit 1, try wider) from `insufficient-stars` (exit 2,
+stop). The workflow receives `no-solution` when the full search finds no match
+or the exposure has insufficient stars. Exit 0 is only `solved` after WCS
+validation. Other failures, including budget exhaustion, are `error`; operator
+cancellation is `cancelled`.
+
+Each attempt's `astap.stdout` and `astap.stderr` retain the last 4096 characters
+with `.truncated` flags. Attempt spans appear after each solver process ends,
+even while the overall solve and alignment run remain active. Raw exposure
+pixels are excluded.
