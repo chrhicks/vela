@@ -82,7 +82,7 @@ const alignmentSchema = z.object({
   rigId: z.string(), rigName: z.string(), enabled: z.boolean(), error: z.string().nullable(), warning: z.string().nullable(), unavailableReason: z.string().nullable(),
   mode: z.enum(['physical', 'offline']).optional(), cameraName: z.string().optional(), active: z.boolean(),
   phase: z.enum(['setup', 'baseline', 'adjusting', 'stopped', 'finished', 'failed']),
-  activity: z.enum(['idle', 'exposing', 'solving', 'homing', 'moving', 'waiting', 'stopping']),
+  activity: z.enum(['idle', 'exposing', 'solving', 'homing', 'moving', 'waiting', 'retrying', 'stopping']),
   position: z.number(), solvedPositions: z.number(), exposureSeconds: z.number().positive(),
   measuredAt: z.string().refine(time => Number.isFinite(Date.parse(time))).nullable(),
   exposureStartedAt: z.string().refine(time => Number.isFinite(Date.parse(time))).nullable(),
@@ -148,6 +148,8 @@ function angle(value: number) {
 function alignmentActivity(view: AlignmentView, offline: boolean) {
   if (offline) return 'Connection interrupted'
 
+  if (view.activity === 'retrying') return 'Device connection interrupted · Retrying…'
+
   if (view.activity === 'exposing') return 'Exposing image'
 
   if (view.activity === 'solving') return 'Plate-solving…'
@@ -194,6 +196,7 @@ function AlignmentPage({ rigId }: { rigId: string }) {
   const elapsed = view.exposureStartedAt ? Math.min(view.exposureSeconds, Math.max(0, (now - Date.parse(view.exposureStartedAt)) / 1000)) : 0
   const age = solved?.measuredAt ? `${Math.max(0, Math.floor((now - Date.parse(solved.measuredAt)) / 1000))} s ago` : 'Not measured'
   const activity = alignmentActivity(view, offline)
+  const retrying = view.activity === 'retrying'
 
   const nextInstruction = view.active
     ? 'After the third solve, the adjustment view will show your alignment error and the target reticle.'
@@ -205,7 +208,9 @@ function AlignmentPage({ rigId }: { rigId: string }) {
     ? 'Use sidereal tracking. Keep the mount’s adjustment knobs still until all three positions are measured. You can stop at any time.'
     : 'You can stop the measurement at any time.'
 
-  const adjustmentInstruction = view.active
+  const adjustmentInstruction = retrying
+    ? 'Pause adjustments until a fresh measurement arrives. Vela is keeping your baseline and retrying automatically.'
+    : view.active
     ? physical
       ? 'Adjust the mount’s altitude and azimuth knobs. Use the reticle and remaining error to decide when you’re done.'
       : 'Adjust the simulator’s offsets. Use the reticle and remaining error to decide when you’re done.'
@@ -237,20 +242,20 @@ function AlignmentPage({ rigId }: { rigId: string }) {
       <span>Last alignment update</span>
       <span>{age}{measurement?.capturedAtSource === 'server-estimate' ? ' · Estimated exposure start' : ''}</span>
     </div>
-    <p>{offline ? 'Readings and overlay are last known. Reconnecting…' : view.active ? 'Wait for a fresh alignment update after each adjustment.' : 'Readings and overlay are from the last successful solve.'}</p>
+    <p>{offline || retrying ? 'Readings and overlay are last known. Reconnecting…' : view.active ? 'Wait for a fresh alignment update after each adjustment.' : 'Readings and overlay are from the last successful solve.'}</p>
   </div>
 
   return <section className="vela-rig-page vela-alignment" data-pending={pending || undefined}>
     {back}
     <header className="vela-polar-heading">
       <div><p>{view.rigName} · Rig preparation</p><h1>Polar alignment</h1></div>
-      <Badge tone={offline || view.phase === 'failed' ? 'warning' : view.active ? 'accent' : 'neutral'}>
-        {offline ? 'Disconnected' : view.phase === 'setup' ? 'Not started' : view.phase === 'baseline' ? 'Measuring' : view.phase}
+      <Badge tone={offline || retrying || view.phase === 'failed' ? 'warning' : view.active ? 'accent' : 'neutral'}>
+        {offline ? 'Disconnected' : retrying ? 'Reconnecting' : view.phase === 'setup' ? 'Not started' : view.phase === 'baseline' ? 'Measuring' : view.phase}
       </Badge>
     </header>
     {view.warning && <div className="vela-polar-solve-warning" role="alert">
-      <strong>Plate-solving failed</strong>
-      <p>{view.active && !offline && view.activity !== 'stopping' ? 'Trying another image. ' : ''}{measurement ? 'Showing the last successful solve.' : 'No alignment result yet.'}</p>
+      <strong>{retrying ? 'Device connection interrupted' : 'Plate-solving failed'}</strong>
+      <p>{retrying ? 'Retrying automatically. ' : view.active && !offline && view.activity !== 'stopping' ? 'Trying another image. ' : ''}{measurement ? 'Showing the last successful solve.' : 'No alignment result yet.'}</p>
     </div>}
     {imageError && <p className="vela-polar-notice" role="status">The latest solved image could not be loaded. Previous readings and overlay remain together.</p>}
     {(error || view.error || !view.enabled) && <p className="vela-polar-notice" role="status">{error || view.error || view.unavailableReason}</p>}
@@ -317,12 +322,12 @@ function AlignmentPage({ rigId }: { rigId: string }) {
             <div>
               <span>Azimuth · horizontal</span>
               <strong>{measurement.azimuthArcsec >= 0 ? '←' : '→'} {angle(measurement.azimuthArcsec)}</strong>
-              <span>{!view.active || offline ? 'Last correction: ' : 'Move '}{measurement.azimuthArcsec >= 0 ? 'left' : 'right'}</span>
+              <span>{!view.active || offline || retrying ? 'Last correction: ' : 'Move '}{measurement.azimuthArcsec >= 0 ? 'left' : 'right'}</span>
             </div>
             <div>
               <span>Altitude · vertical</span>
               <strong>{measurement.altitudeArcsec >= 0 ? '↓' : '↑'} {angle(measurement.altitudeArcsec)}</strong>
-              <span>{!view.active || offline ? 'Last correction: ' : 'Move '}{measurement.altitudeArcsec >= 0 ? 'down' : 'up'}</span>
+              <span>{!view.active || offline || retrying ? 'Last correction: ' : 'Move '}{measurement.altitudeArcsec >= 0 ? 'down' : 'up'}</span>
             </div>
           </div>
           {activityArea}

@@ -144,7 +144,7 @@ Persist durable user-created facts and valuable artifacts: rig configuration, pr
 
 Keep recovery narrow and evidence-based:
 
-- A boundary may retry a known transient transport failure.
+- During an interactive observing workflow, a transient read failure should preserve the session and useful context, clearly mark measurements as interrupted, and retry at a paced, cancellable interval. Do not force Chris to repeat preparation or leave the rig to restart a workflow merely because a read timed out. For polar alignment, retain the baseline and retry until reads recover or Chris stops the session; revalidate observed device state before publishing another measurement.
 - A substantive or uncertain operation should stop rather than enter a generic retry engine.
 - After an ambiguous physical write, inspect the device when its adapter exposes a clear and reliable state query.
 - Never blindly replay a command whose outcome is unknown.

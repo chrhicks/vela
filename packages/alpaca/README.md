@@ -131,6 +131,13 @@ coordinate frames its workflow supports.
   Completion is bounded by exposure duration plus 60 seconds. Failed or
   cancelled captures attempt an independent, bounded abort. A lost start
   response never causes a second exposure command.
+- A transport failure is exposed as `AlpacaCaptureRetryableError` only before
+  any exposure write, or after an acknowledged start followed by a successful
+  abort and confirmed idle camera. The original provider error is its `cause`.
+  A caller may pace and cancel fresh capture attempts using this classification.
+  Uncertain start responses, failed cleanup, cancellation, malformed data, and
+  device rejections are never classified as retryable captures. The adapter
+  itself still attempts only one exposure.
 - `pointing(telescopeId, signal)` returns right ascension, declination, local
   sidereal time, and site latitude in degrees, plus tracking and the named
   equatorial coordinate system. It does not convert epochs or treat `other`

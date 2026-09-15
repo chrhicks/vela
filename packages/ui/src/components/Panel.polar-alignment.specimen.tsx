@@ -7,7 +7,7 @@ import './Panel.polar-alignment.specimen.css'
 
 const examples = ['large-error', 'near-aligned'] as const
 
-const phases = ['setup', 'point-1', 'moving-2', 'point-2', 'moving-3', 'point-3', 'baseline-stopped', 'adjusting', 'exposing', 'debayering', 'stretching', 'solving', 'retrying', 'stopped', 'finished'] as const
+const phases = ['setup', 'point-1', 'moving-2', 'point-2', 'moving-3', 'point-3', 'baseline-stopped', 'adjusting', 'exposing', 'debayering', 'stretching', 'solving', 'retrying', 'reconnecting', 'stopped', 'finished'] as const
 
 const activityFrames = new Map<string, { label: string; age: string }>(Object.entries({
   adjusting: { label: 'Alignment updated', age: 'Just now' },
@@ -17,6 +17,7 @@ const activityFrames = new Map<string, { label: string; age: string }>(Object.en
   stretching: { label: 'Stretching image…', age: '33 s ago' },
   solving: { label: 'Plate-solving…', age: '35 s ago' },
   retrying: { label: 'Exposing another image', age: '1 min 7 s ago' },
+  reconnecting: { label: 'Device connection interrupted · Retrying…', age: '1 min 7 s ago' },
   stopped: { label: 'Measurements stopped', age: 'At stop · 35 s old' },
   finished: { label: 'Alignment ended by you', age: 'At finish · 2 s old' },
 }))
@@ -94,6 +95,7 @@ function AlignmentPreview({ props, onPropsChange }: {
   const busy = !inactive && phase !== 'adjusting'
   const exposing = phase === 'exposing' || phase === 'waiting' || phase === 'retrying'
   const retrying = phase === 'retrying'
+  const reconnecting = phase === 'reconnecting'
   const activity = activityFrames.get(phase) ?? activityFrames.get('adjusting')!
 
   const x = near ? 394 : 165
@@ -127,11 +129,11 @@ function AlignmentPreview({ props, onPropsChange }: {
       <main className="vela-polar-main">
         <header className="vela-polar-heading">
           <div><p>Rig preparation</p><h1>Polar alignment</h1></div>
-          <Badge tone={inactive ? 'neutral' : 'accent'}>{baseline ? measurementSteps.get(phase) ? 'Measuring' : phase === 'baseline-stopped' ? 'Stopped' : 'Not started' : phase === 'finished' ? 'Finished' : phase === 'stopped' ? 'Stopped' : busy ? 'Measuring' : 'Adjusting'}</Badge>
+          <Badge tone={reconnecting ? 'warning' : inactive ? 'neutral' : 'accent'}>{reconnecting ? 'Reconnecting' : baseline ? measurementSteps.get(phase) ? 'Measuring' : phase === 'baseline-stopped' ? 'Stopped' : 'Not started' : phase === 'finished' ? 'Finished' : phase === 'stopped' ? 'Stopped' : busy ? 'Measuring' : 'Adjusting'}</Badge>
         </header>
-        {retrying && <div className="vela-polar-solve-warning" role="alert">
-          <strong>Plate-solving failed</strong>
-          <p>Trying another image. Showing the last successful solve.</p>
+        {(retrying || reconnecting) && <div className="vela-polar-solve-warning" role="alert">
+          <strong>{reconnecting ? 'Device connection interrupted' : 'Plate-solving failed'}</strong>
+          <p>{reconnecting ? 'Retrying automatically. ' : 'Trying another image. '}Showing the last successful solve.</p>
         </div>}
         {baseline ? <BaselinePreview phase={phase} physical={props.mode === 'physical'} onStart={() => changePhase('point-1', true)} onStop={() => changePhase('baseline-stopped')} /> : (
         <div className="vela-polar-layout">
@@ -149,7 +151,7 @@ function AlignmentPreview({ props, onPropsChange }: {
               </div>
               {exposing ? <progress value={5} max={30} aria-label="Exposure progress in seconds" /> : null}
               <div className="vela-polar-activity__age"><span>Last alignment update</span><span>{activity.age}</span></div>
-              <p>{busy ? 'Wait for the next alignment update before adjusting again.' : inactive ? 'Readings and overlay are from the last successful solve.' : 'The readings and overlay are ready for your next adjustment.'}</p>
+              <p>{reconnecting ? 'Readings and overlay are last known. Reconnecting…' : busy ? 'Wait for the next alignment update before adjusting again.' : inactive ? 'Readings and overlay are from the last successful solve.' : 'The readings and overlay are ready for your next adjustment.'}</p>
             </div>
           </Panel>
 
@@ -176,7 +178,7 @@ function AlignmentPreview({ props, onPropsChange }: {
           </figure>
 
           <div className="vela-polar-actions">
-            <p>{phase === 'finished' ? 'Your final measurement is kept here for reference.' : phase === 'stopped' ? 'Reposition the rig, then measure a fresh baseline before adjusting again.' : busy ? 'Your last readings stay visible while Vela works on the next measurement.' : 'Adjust the mount’s knobs. Use the reticle and remaining error to decide when you’re done.'}</p>
+            <p>{reconnecting ? 'Pause adjustments until a fresh measurement arrives. Vela is keeping your baseline and retrying automatically.' : phase === 'finished' ? 'Your final measurement is kept here for reference.' : phase === 'stopped' ? 'Reposition the rig, then measure a fresh baseline before adjusting again.' : busy ? 'Your last readings stay visible while Vela works on the next measurement.' : 'Adjust the mount’s knobs. Use the reticle and remaining error to decide when you’re done.'}</p>
             {inactive ? (
               <Button tone="neutral" size="large" onClick={() => changePhase('setup')}>Measure again</Button>
             ) : (
