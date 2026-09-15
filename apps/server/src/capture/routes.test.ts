@@ -1,6 +1,6 @@
 import Fastify, { type InjectOptions } from 'fastify'
 import { afterEach, expect, it, vi } from 'vitest'
-import type { AlpacaDeviceInspection } from '@vela/alpaca'
+import type { AlpacaCameraCooling, AlpacaDeviceInspection, AlpacaDeviceTelemetry } from '@vela/alpaca'
 import { createMemoryRigCatalog } from '../rig/catalog.js'
 import { createRigOperations } from '../rig/operations.js'
 import { CaptureStoppedError, type CaptureCamera, type CaptureFrame } from './controller.js'
@@ -32,7 +32,16 @@ function deferred<T>() {
   return { promise, resolve, reject }
 }
 
-function setup(selection: { uniqueId: string, name: string } | null = record.imagingCamera) {
+function setup(selection: { uniqueId: string, name: string } | null = record.imagingCamera, options: {
+  cooling?: {
+    state: 'on' | 'off'
+    setpointControl?: boolean
+    powerPercent?: number
+    setpointC?: number
+  }
+  sensorTemperatureC?: number
+  createCooling?: (settings: { endpoint: string, cameraId: string, expectedCameraName: string }) => AlpacaCameraCooling
+} = {}) {
   const app = Fastify()
   const { imagingCamera: _, ...unselected } = record
   const catalog = createMemoryRigCatalog([selection ? { ...unselected, imagingCamera: selection } : unselected])
@@ -47,15 +56,24 @@ function setup(selection: { uniqueId: string, name: string } | null = record.ima
   let inspections = 0
   const captures: Array<Parameters<CaptureCamera['capture']>[0] & ReturnType<typeof deferred<CaptureFrame>>> = []
 
-  const capture = registerCapture(app, catalog, operations, {
+  const captureOptions: Parameters<typeof registerCapture>[3] = {
     savedImages,
     createInspector: () => ({ async inspectDevices(): Promise<ReadonlyArray<AlpacaDeviceInspection>> {
       inspections++
       await inspectionGate
+      let values: Extract<AlpacaDeviceTelemetry, { kind: 'camera' }> = { kind: 'camera', activity }
+
+      if (options.sensorTemperatureC !== undefined) {
+        values = { ...values, sensorTemperatureC: options.sensorTemperatureC }
+      }
+
+      if (options.cooling) {
+        values = { ...values, cooling: options.cooling }
+      }
 
       return [{ providerDeviceId: cameraId, kind: 'camera', configuredName: 'Simulator camera', name: cameraName,
         connection: connected ? 'connected' : 'disconnected',
-        telemetry: { availability: 'complete', values: { kind: 'camera', activity } },
+        telemetry: { availability: 'complete', values },
       }]
     } }),
     createCamera: settings => {
@@ -68,7 +86,11 @@ function setup(selection: { uniqueId: string, name: string } | null = record.ima
       return result.promise
     } }
     },
-  })
+  }
+
+  if (options.createCooling) captureOptions.createCooling = options.createCooling
+
+  const capture = registerCapture(app, catalog, operations, captureOptions)
 
   registerNavigation(app, catalog, capture)
   registerSavedImages(app, catalog, savedImages)
@@ -290,3 +312,49 @@ it('projects navigation progress and terminal state without inspecting devices o
   await subject.catalog.forget('sim')
   expect(await navigation()).toEqual({ rigs: [], captures: [] })
 })
+
+it('shows confirmed cooler-off even when the sensor is near the retained setpoint', async () => {
+  const subject = setup(record.imagingCamera, {
+    sensorTemperatureC: 4.8,
+    cooling: { state: 'off', setpointControl: true, setpointC: 5, powerPercent: 0 },
+  })
+
+  expect((await subject.get()).json().cooling).toEqual({
+    state: 'off', canSetTemperature: true, sensorTemperatureC: 4.8, setpointC: 5, powerPercent: 0,
+  })
+})
+
+it('turns the cooler on only when requested and does not invent a setpoint write', async () => {
+  const commands: Array<{ coolerOn?: boolean, setpointC?: number }> = []
+
+  const subject = setup(record.imagingCamera, {
+    sensorTemperatureC: 4.8,
+    cooling: { state: 'off', setpointControl: true, setpointC: 5, powerPercent: 0 },
+    createCooling: () => ({
+      observe: async () => undefined,
+      async setCooling(command) {
+        if (command.coolerOn !== undefined) commands.push({ coolerOn: command.coolerOn })
+
+        else if (command.setpointC !== undefined) commands.push({ setpointC: command.setpointC })
+
+        return {
+          outcome: 'confirmed',
+          observation: {
+            state: command.coolerOn ? 'on' : 'off',
+            canSetTemperature: true,
+            canGetPower: true,
+            sensorTemperatureC: command.coolerOn ? 5 : 4.8,
+            setpointC: command.setpointC ?? 5,
+            powerPercent: command.coolerOn ? 18 : 0,
+          },
+        }
+      },
+    }),
+  })
+
+  expect((await subject.app.inject({ method: 'POST', url: '/api/rigs/sim/capture/cooling', payload: { setpointC: -5 } })).statusCode).toBe(200)
+  expect((await subject.app.inject({ method: 'POST', url: '/api/rigs/sim/capture/cooling', payload: { coolerOn: true } })).statusCode).toBe(200)
+  expect(commands).toEqual([{ setpointC: -5 }, { coolerOn: true }])
+  expect((await subject.app.inject({ method: 'POST', url: '/api/rigs/sim/capture/cooling', payload: {} })).statusCode).toBe(400)
+})
+

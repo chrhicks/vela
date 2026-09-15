@@ -65,6 +65,7 @@ describe('Alpaca device inspection', () => {
         '/api/v1/camera/0/cansetccdtemperature': envelope(true),
         '/api/v1/camera/0/cangetcoolerpower': envelope(true),
         '/api/v1/camera/0/cooleron': envelope(true),
+        '/api/v1/camera/0/setccdtemperature': envelope(-5),
         '/api/v1/camera/0/coolerpower': envelope(42.5),
         '/api/v1/telescope/0/atpark': envelope(false),
         '/api/v1/telescope/0/athome': envelope(false),
@@ -117,6 +118,7 @@ describe('Alpaca device inspection', () => {
               state: 'on',
               setpointControl: true,
               powerReporting: true,
+              setpointC: -5,
               powerPercent: 42.5,
             },
           },
@@ -260,6 +262,7 @@ describe('Alpaca device inspection', () => {
         '/api/v1/camera/0/cansetccdtemperature': envelope(true),
         '/api/v1/camera/0/cangetcoolerpower': envelope(true),
         '/api/v1/camera/0/cooleron': envelope(true),
+        '/api/v1/camera/0/setccdtemperature': envelope(-2),
         '/api/v1/camera/0/coolerpower': envelope(150),
       }),
     })
@@ -275,6 +278,7 @@ describe('Alpaca device inspection', () => {
           state: 'on',
           setpointControl: true,
           powerReporting: true,
+          setpointC: -2,
         },
       },
     })
@@ -351,6 +355,7 @@ describe('Alpaca device inspection', () => {
         '/api/v1/camera/0/cansetccdtemperature': envelope(true),
         '/api/v1/camera/0/cangetcoolerpower': envelope(true),
         '/api/v1/camera/0/cooleron': envelope(false),
+        '/api/v1/camera/0/setccdtemperature': envelope(5),
         '/api/v1/camera/0/coolerpower': envelope(0),
       }, requests),
     })
@@ -366,12 +371,38 @@ describe('Alpaca device inspection', () => {
           state: 'off',
           setpointControl: true,
           powerReporting: true,
+          setpointC: 5,
           powerPercent: 0,
         },
       },
     })
     expect(requests).toContain('/api/v1/camera/0/coolerpower')
   })
+
+  it('keeps CoolerOn false when the sensor is near a retained setpoint', async () => {
+    const provider = createAlpacaProvider({
+      baseUrl: 'http://alpaca.test',
+      fetch: fakeFetch({
+        '/management/v1/configureddevices': envelope([devices[0]]),
+        '/api/v1/camera/0/connected': envelope(true),
+        '/api/v1/camera/0/name': envelope('ASI2600MC Pro'),
+        '/api/v1/camera/0/camerastate': envelope(0),
+        '/api/v1/camera/0/ccdtemperature': envelope(4.8),
+        '/api/v1/camera/0/cansetccdtemperature': envelope(true),
+        '/api/v1/camera/0/cangetcoolerpower': envelope(true),
+        '/api/v1/camera/0/cooleron': envelope(false),
+        '/api/v1/camera/0/setccdtemperature': envelope(5),
+        '/api/v1/camera/0/coolerpower': envelope(0),
+      }),
+    })
+
+    const [inspection] = await provider.inspectDevices()
+    expect(inspection?.telemetry.values).toMatchObject({
+      sensorTemperatureC: 4.8,
+      cooling: { state: 'off', setpointC: 5, powerPercent: 0 },
+    })
+  })
+
 
   it('marks missing temperature partial when setpoint control implies temperature support', async () => {
     const provider = createAlpacaProvider({

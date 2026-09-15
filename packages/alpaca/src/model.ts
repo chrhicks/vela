@@ -60,6 +60,8 @@ export type AlpacaDeviceTelemetry =
         readonly setpointControl?: boolean
         readonly powerReporting?: boolean
         readonly powerPercent?: number
+        /** Confirmed SetCCDTemperature. Not a claim that the cooler is running. */
+        readonly setpointC?: number
       }
     }
   | {

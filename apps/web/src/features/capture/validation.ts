@@ -42,6 +42,13 @@ const captureView = z.object({
   elapsedSeconds: z.number().nonnegative(),
   error: text.nullable(),
   latestImage: captureImage.nullable(),
+  cooling: z.object({
+    state: z.enum(['on', 'off']),
+    canSetTemperature: z.boolean(),
+    sensorTemperatureC: z.number().optional(),
+    setpointC: z.number().optional(),
+    powerPercent: z.number().min(0).max(100).optional(),
+  }).nullable(),
 })
 
 export function isCaptureView(value: unknown, rigId: string): value is CaptureView {

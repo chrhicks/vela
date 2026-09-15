@@ -77,6 +77,19 @@ The result distinguishes confirmed connection, confirmed rejection or remaining 
 
 The newer Platform 7 asynchronous `Connect` method is not used by this compatibility capability. Its command-initiation response and `Connecting` completion contract must not be mistaken for the synchronous legacy setter response if Vela adopts that method later.
 
+## Camera cooling command
+
+`createAlpacaCameraCooling({ baseUrl })` is a narrow write-and-verify capability for an imaging camera's cooler. It resolves a stable provider camera ID through management inventory. Device numbers and wire fields stay private.
+
+It never infers CoolerOn from CCDTemperature or SetCCDTemperature. A sensor near a retained setpoint is not a confirmed cooling state.
+
+- `observe(cameraId)` reads CoolerOn, optional sensor temperature, optional setpoint, and optional power.
+- `setCooling({ cameraId, coolerOn, setpointC })` writes only the requested fields. Setting a target temperature does not turn the cooler on. Turning the cooler on does not invent a setpoint.
+- Each write is verified with a matching read. A setpoint write that cannot be confirmed stops before a subsequent CoolerOn write. Writes are never replayed.
+- The result distinguishes confirmed state, known rejection or missing confirmation, and an uncertain outcome after an ambiguous write.
+
+Temperature reaching the setpoint is cooling progress, not command success.
+
 ## Testing
 
 Factory injection supports fake `fetch` and UDP scanner boundaries. Package tests use only deterministic fakes and never touch the real LAN.

@@ -48,6 +48,15 @@ export interface SavedImageView {
 
 export type CapturePhase = 'idle' | 'exposing' | 'reading' | 'saving' | 'stopping' | 'complete' | 'stopped' | 'failed'
 
+/** Confirmed imaging-camera cooling. Sensor temperature near a setpoint does not mean the cooler is on. */
+export interface CaptureCoolingView {
+  readonly state: 'on' | 'off'
+  readonly canSetTemperature: boolean
+  readonly sensorTemperatureC?: number
+  readonly setpointC?: number
+  readonly powerPercent?: number
+}
+
 /** Server-owned ephemeral capture run and the most recent retained image. */
 export interface CaptureView {
   rigId: string
@@ -66,4 +75,6 @@ export interface CaptureView {
   elapsedSeconds: number
   error: string | null
   latestImage: CaptureImage | null
+  /** Null when the imaging camera does not report cooler state. */
+  cooling: CaptureCoolingView | null
 }

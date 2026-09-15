@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { CameraMark, LatestImage } from '../features/capture/LatestImage'
 import { captureActivity, useCapture } from '../features/capture/use-capture'
+import { CaptureCooling } from '../features/capture/CaptureCooling'
 import './capture.css'
 
 export function Capture() {
@@ -50,6 +51,15 @@ function CapturePage({ rigId }: { rigId: string }) {
       <LatestImage rigId={rigId} image={view.latestImage} busy={busy} interrupted={offline || commandUnconfirmed || !view.enabled} />
       <Panel className="capture-page__controls" title="Capture images">
         <div className="capture-page__camera"><CameraMark /><div><strong>{view.camera?.name ?? 'No camera available'}</strong>{view.camera && <span>Imaging camera</span>}</div></div>
+        {view.cooling && <CaptureCooling
+          cooling={view.cooling}
+          disabled={!capture.canCool}
+          pending={pending}
+          error={error?.includes('cooler') || error?.includes('temperature') || error?.includes('Cooler') ? error : null}
+          unconfirmed={commandUnconfirmed && Boolean(error?.includes('cooler'))}
+          onCooler={coolerOn => void capture.setCooler(coolerOn)}
+          onSetpoint={setpointC => void capture.setCoolingTemperature(setpointC)}
+        />}
         <form onSubmit={event => {
           event.preventDefault()
 
