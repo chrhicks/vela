@@ -15,9 +15,21 @@ only the display copy. Solver input retains original integer pixels.
 
 The operation remains active across browser disconnects. Stop cancels the current
 acquisition, movement or solver and waits for cleanup. Failed physical commands
-are not replayed. Only a genuine no-solution starts another exposure automatically;
-transport, invalid data, unsupported capabilities and subprocess errors stop the
-operation. The last solved preview, measurement and timestamp remain together.
+are not replayed. Measurement reads retry transport failures every three seconds
+until recovery or Stop, preserving the baseline, last solved image and its original
+timestamp. The interface marks the device connection interrupted and asks the
+operator to pause adjustments until a fresh measurement arrives. Read-only pointing
+and validation are retried in place; preparation and motion are never replayed.
+A no-solution starts another exposure. A transport failure during capture can
+start a replacement exposure only when the adapter explicitly reports that no
+exposure command was sent, or an acknowledged exposure was cleaned up and the
+camera confirmed idle. Lost command responses, failed cleanup, invalid data,
+unsupported capabilities and subprocess errors still stop the operation.
+The latest acquired full-frame preview is published during baseline
+measurement before solving, including frames that cannot solve. Its exposure
+timestamp and baseline position are separate from the last solved preview,
+measurement and timestamp, which remain together. Image retention is bounded
+and preserves the last solved image through repeated unsuccessful exposures.
 Restart takes a completely new baseline. Server restart interrupts the operation;
 there is no durable execution or recovery.
 
@@ -89,6 +101,23 @@ device-boundary tests validate both mechanical signs and interrupted state.
 They do not establish outdoor accuracy, atmospheric refraction, flexure, or the
 actual mount's motion response. Direction and repeatability require a prepared
 physical-rig trial. The configured offline path remains available separately.
+
+## Adjustment geometry
+
+There is no fixed five-degree correction cutoff. Finite-value, usable-baseline,
+local sensitivity and final fit checks determine whether the calculation can
+produce a result. Azimuth rotation preserves a sightline's elevation, so a
+single new sightline can admit two altitude solutions. The iterative update
+must stay on the local inverse branch established by its baseline estimate;
+a numerical jump across that elevation fold is rejected rather than displayed
+as a different physical correction.
+
+This is a local adjustment model, not proof that arbitrary large physical knob
+movements are uniquely recoverable from one image. A new three-position baseline
+is needed when the local model becomes ambiguous. Independent ideal fixtures
+exercise corrections beyond five degrees, including twenty-degree corrections
+at the physical starting declination, and a known alternate-root rejection.
+They do not establish absolute outdoor accuracy.
 
 ## Offline configuration and local review
 

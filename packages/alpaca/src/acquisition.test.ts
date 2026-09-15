@@ -1,6 +1,7 @@
 import type { ResponseFixture } from './internal/test-fixtures.js'
 import { describe, expect, it, vi } from 'vitest'
-import { createAlpacaAcquisition, AlpacaCaptureStoppedError } from './acquisition.js'
+import { createAlpacaAcquisition, AlpacaCaptureStoppedError, AlpacaCaptureRetryableError } from './acquisition.js'
+import { AlpacaProviderError } from './error.js'
 
 function observatory() {
   const camera = { DeviceName: 'Camera', DeviceType: 'Camera', DeviceNumber: 7, UniqueID: 'camera-id' }
@@ -176,6 +177,82 @@ async function started(rig: ReturnType<typeof observatory>) {
 }
 
 describe('normalized Alpaca acquisition', () => {
+  function readTimeout(operation: string, afterStart = false) {
+    const rig = observatory()
+
+    const fetch: typeof globalThis.fetch = async (input, init) => {
+      const current = new URL(String(input)).pathname.split('/').at(-1)
+
+      if (current === operation && (!afterStart || rig.state.starts > 0)) {
+        const signal = init!.signal!
+
+        return new Promise<Response>((_, reject) => {
+          signal.addEventListener('abort', () => reject(signal.reason), { once: true })
+        })
+      }
+
+      if (afterStart && rig.state.starts > 0 && current === 'imageready') rig.complete()
+
+      return rig.fetch(input, init)
+    }
+
+    return { ...rig, acquisition: createAlpacaAcquisition({ baseUrl: 'http://fake', fetch, requestTimeoutMs: 10, imageTimeoutMs: 10 }) }
+  }
+
+  it('classifies a device-list timeout before any write as a retryable capture', async () => {
+    const rig = readTimeout('configureddevices')
+    const error = await rig.acquisition.capture({ cameraId: 'camera-id', exposureSeconds: 1 }).catch(error => error)
+    expect(error).toBeInstanceOf(AlpacaCaptureRetryableError)
+    expect(error.cause).toBeInstanceOf(AlpacaProviderError)
+    expect(error.cause).toMatchObject({ reason: 'transport', endpoint: '/management/v1/configureddevices' })
+    expect(rig.state.starts).toBe(0)
+    expect(rig.state.aborts).toBe(0)
+  })
+
+  it.each(['imageready', 'lastexposurestarttime', 'imagearray'])('classifies an acknowledged exposure %s timeout as retryable only after confirmed cleanup', async operation => {
+    const rig = readTimeout(operation, true)
+    const error = await rig.acquisition.capture({ cameraId: 'camera-id', exposureSeconds: 1 }).catch(error => error)
+    expect(error).toBeInstanceOf(AlpacaCaptureRetryableError)
+    expect(error.cause).toMatchObject({ reason: 'transport', endpoint: `/api/v1/camera/7/${operation}` })
+    expect(rig.state.starts).toBe(1)
+    expect(rig.state.aborts).toBe(1)
+    expect(rig.state.exposing).toBe(false)
+  })
+
+  it('does not classify a transport failure as retryable when exposure cleanup fails', async () => {
+    const rig = readTimeout('imageready', true)
+    rig.state.cameraStopFails = true
+    const error = await rig.acquisition.capture({ cameraId: 'camera-id', exposureSeconds: 1 }).catch(error => error)
+    expect(error).not.toBeInstanceOf(AlpacaCaptureRetryableError)
+    expect(error).toMatchObject({ reason: 'transport', endpoint: '/api/v1/camera/7/abortexposure' })
+    expect(rig.state.starts).toBe(1)
+    expect(rig.state.aborts).toBe(1)
+    expect(rig.state.exposing).toBe(true)
+  })
+
+  it('requires observed idle after the cleanup command before allowing a fresh capture', async () => {
+    const rig = observatory()
+
+    const fetch: typeof globalThis.fetch = async (input, init) => {
+      const operation = new URL(String(input)).pathname.split('/').at(-1)
+
+      if (operation === 'imageready' && rig.state.starts > 0) throw new TypeError('Read connection lost')
+
+      const response = await rig.fetch(input, init)
+
+      if (operation === 'abortexposure') rig.state.exposing = true
+
+      return response
+    }
+
+    const acquisition = createAlpacaAcquisition({ baseUrl: 'http://fake', fetch })
+    const error = await acquisition.capture({ cameraId: 'camera-id', exposureSeconds: 1 }).catch(error => error)
+    expect(error).not.toBeInstanceOf(AlpacaCaptureRetryableError)
+    expect(error.message).toBe('Camera did not confirm exposure stopped')
+    expect(rig.state.starts).toBe(1)
+    expect(rig.state.aborts).toBe(1)
+  })
+
   it('waits for a new completed exposure and transposes x/y wire pixels into row-major pixels', async () => {
     const rig = observatory()
     let resolved = false
@@ -373,7 +450,9 @@ describe('normalized Alpaca acquisition', () => {
   it('does not replay an exposure whose command response was lost', async () => {
     const rig = observatory()
     rig.state.lostStart = true
-    await expect(rig.acquisition.capture({ cameraId: 'camera-id', exposureSeconds: 1 })).rejects.toThrow()
+    const error = await rig.acquisition.capture({ cameraId: 'camera-id', exposureSeconds: 1 }).catch(error => error)
+    expect(error).not.toBeInstanceOf(AlpacaCaptureRetryableError)
+    expect(error).toMatchObject({ reason: 'transport', endpoint: '/api/v1/camera/7/startexposure' })
     expect(rig.state.starts).toBe(1)
     expect(rig.state.aborts).toBe(1)
     expect(rig.state.exposing).toBe(false)

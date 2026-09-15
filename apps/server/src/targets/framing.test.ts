@@ -22,9 +22,9 @@ function solution(position = { raDegrees: 9, decDegrees: 20 }): SolveResult {
     wcs: { width: 100, height: 80, referenceX: 50.5, referenceY: 40.5, ...position, cd: [-0.01, 0.002, 0.003, 0.01] } }
 }
 
-function workshop() {
+function workshop(wait: (signal: AbortSignal) => Promise<void> = async signal => { signal.throwIfAborted() }) {
   let date = new Date(at)
-  const controller = createFramingController(() => date)
+  const controller = createFramingController(() => date, wait)
 
   const mount: FramingMount = {
     rightAscensionDegrees: 10, declinationDegrees: 20, coordinateSystem: 'j2000', tracking: true,
@@ -56,10 +56,10 @@ function workshop() {
 
   const solver: PlateSolver = { solve: vi.fn(async () => solution()) }
 
-  const start = (input: { center?: boolean, configuration?: string } = {}) => {
+  const start = (input: { center?: boolean, check?: boolean, desired?: TargetPosition, configuration?: string } = {}) => {
     const finished = deferred<void>()
     const release = vi.fn(() => finished.resolve())
-    const initial = controller.start({ desired, targetId: 'target', exposureSeconds: 2, configuration: input.configuration ?? 'camera+mount+focal-length', center: input.center === true }, hardware, solver, release)
+    const initial = controller.start({ desired: input.desired ?? desired, targetId: 'target', exposureSeconds: 2, configuration: input.configuration ?? 'camera+mount+focal-length', action: input.check ? 'check' : input.center ? 'center' : 'start' }, hardware, solver, release)
 
     return { initial, release, finished: finished.promise }
   }
@@ -122,7 +122,7 @@ describe('framing controller', () => {
     expect(fake.slews).toHaveLength(2)
     expect(angularDistance(fake.slews[1]!, correctedPointing(desired, { raDegrees: 9, decDegrees: 20 }, desired))).toBeLessThan(1e-10)
     expect(fake.controller.snapshot()).toMatchObject({ phase: 'checked', actual: { offsetArcminutes: 0 } })
-    expect(fake.controller.canCenter(fake.mount, 'camera+mount+focal-length')).toBe(false)
+    expect(fake.controller.canCenter(fake.mount, 'camera+mount+focal-length')).toBe(true)
   })
 
   it('reports the tangent-plane angle of a rotated non-square solved footprint', async () => {
@@ -156,7 +156,7 @@ describe('framing controller', () => {
 
     const run = fake.start()
     await run.finished
-    expect(fake.controller.snapshot()).toMatchObject({ phase: 'failed', active: false, actual: null, error: expect.any(String) })
+    expect(fake.controller.snapshot()).toMatchObject({ phase: failure === 'no-solution' ? 'needs-check' : 'failed', active: false, actual: null, error: expect.any(String) })
     expect(fake.controller.canCenter(fake.mount, 'camera+mount+focal-length')).toBe(false)
     expect(fake.slews).toHaveLength(1)
     expect(run.release).toHaveBeenCalledTimes(1)
@@ -176,7 +176,7 @@ describe('framing controller', () => {
     const center = fake.start({ center: true, configuration })
     await center.finished
     expect(fake.slews).toHaveLength(1)
-    expect(fake.controller.snapshot()).toMatchObject({ phase: 'failed', active: false, error: expect.stringContaining('no longer current') })
+    expect(fake.controller.snapshot()).toMatchObject({ phase: 'needs-check', active: false, error: expect.stringContaining('no longer matches') })
     expect(center.release).toHaveBeenCalledTimes(1)
   })
 
@@ -194,32 +194,106 @@ describe('framing controller', () => {
     observed.resolve({ ...fake.mount, tracking: false })
     await center.finished
     expect(fake.slews).toHaveLength(1)
-    expect(fake.controller.snapshot()).toMatchObject({ phase: 'failed', error: expect.stringContaining('no longer current') })
+    expect(fake.controller.snapshot()).toMatchObject({ phase: 'needs-check', error: expect.stringContaining('no longer matches') })
   })
 
-  it.each([desired, { raDegrees: 7, decDegrees: 20 }])('rejects a current check outside the correction offset range: %j', async position => {
+  it.each([desired, { raDegrees: 7, decDegrees: 20 }, { raDegrees: 10, decDegrees: 36.2 }])('keeps a current check usable across small and large offsets: %j', async position => {
     const fake = workshop()
     fake.solver.solve = async () => solution(position)
     await fake.start().finished
-    const configuration = 'camera+mount+focal-length'
-    expect(fake.controller.checkCurrent(fake.mount, configuration)).toBe(true)
-    expect(fake.controller.canCenter(fake.mount, configuration)).toBe(false)
+    expect(fake.controller.checkCurrent(fake.mount, 'camera+mount+focal-length')).toBe(true)
+    expect(fake.controller.canCenter(fake.mount, 'camera+mount+focal-length')).toBe(true)
     await fake.start({ center: true }).finished
-    expect(fake.slews).toHaveLength(1)
-    expect(fake.controller.snapshot()).toMatchObject({ phase: 'failed', error: expect.stringContaining('no longer current') })
+    expect(fake.slews).toHaveLength(position === desired ? 1 : 2)
+    expect(fake.controller.snapshot()).toMatchObject({ phase: 'checked', active: false, error: null })
   })
 
-  it('rejects a solve when the mount moved during the exposure instead of offering correction', async () => {
+  it('checks the current frame without issuing a slew or tracking command', async () => {
     const fake = workshop()
-    fake.solver.solve = async () => {
-      fake.mount.rightAscensionDegrees += 0.1
+    const edited = { raDegrees: 12, decDegrees: 23 }
+    await fake.start({ check: true, desired: edited }).finished
+    expect(fake.hardware.slew).not.toHaveBeenCalled()
+    expect(fake.hardware.tracking).not.toHaveBeenCalled()
+    expect(fake.hardware.capture).toHaveBeenCalledTimes(1)
+    expect(fake.controller.snapshot()).toMatchObject({ phase: 'checked', desired: edited })
+  })
+
+  it('applies the current solved correction to the newly edited destination', async () => {
+    const fake = workshop()
+    await fake.start().finished
+    const checked = fake.controller.snapshot().actual!
+    const edited = { raDegrees: 11.5, decDegrees: 19.7 }
+    await fake.start({ center: true, desired: edited }).finished
+    expect(angularDistance(fake.slews[1]!, correctedPointing(desired, checked, edited))).toBeLessThan(1e-10)
+    expect(fake.controller.snapshot().desired).toEqual(edited)
+  })
+
+  it('retains the solved footprint and rechecks after changed mount readings without another slew', async () => {
+    const fake = workshop()
+    const changed = deferred<void>()
+    const nextExposure = deferred<MonoFrame>()
+    let captures = 0
+    fake.hardware.capture = vi.fn(async () => ++captures === 1 ? fake.frame : nextExposure.promise)
+    fake.solver.solve = vi.fn(async () => {
+      if (captures === 1) {
+        fake.mount.rightAscensionDegrees += 0.1
+        changed.resolve()
+      }
 
       return solution()
-    }
+    })
 
+    const run = fake.start()
+    await changed.promise
+    await vi.waitFor(() => expect(fake.hardware.capture).toHaveBeenCalledTimes(2))
+    expect(fake.controller.snapshot()).toMatchObject({ active: true, actual: { raDegrees: 9, decDegrees: 20 } })
+    expect(fake.slews).toHaveLength(1)
+    expect(run.release).not.toHaveBeenCalled()
+    nextExposure.resolve(fake.frame)
+    await run.finished
+    expect(fake.controller.snapshot()).toMatchObject({ phase: 'checked', error: null })
+    expect(fake.slews).toHaveLength(1)
+  })
+
+  it('waits for coordinate observations to settle even when Slewing is already false', async () => {
+    const fake = workshop()
+    let settlingReads = 0
+    fake.hardware.status = vi.fn(async () => {
+      if (fake.slews.length > 0) {
+        settlingReads++
+        // Reproduce a driver that changes DEC after declaring completion.
+        fake.mount.declinationDegrees = settlingReads < 3 ? 50.5283 : 47.7542
+      }
+
+      return { ...fake.mount }
+    })
+    fake.hardware.capture = vi.fn(async () => {
+      expect(settlingReads).toBeGreaterThanOrEqual(6)
+
+      return fake.frame
+    })
     await fake.start().finished
-    expect(fake.controller.snapshot()).toMatchObject({ phase: 'failed', actual: null, error: expect.stringContaining('mount changed') })
-    expect(fake.controller.canCenter(fake.mount, 'camera+mount+focal-length')).toBe(false)
+    expect(fake.hardware.capture).toHaveBeenCalledTimes(1)
+    expect(fake.controller.snapshot().phase).toBe('checked')
+  })
+
+  it('stops a settling wait without taking an exposure or repeating the slew', async () => {
+    const waiting = deferred<void>()
+
+    const fake = workshop(signal => new Promise((_resolve, reject) => {
+      waiting.resolve()
+      signal.addEventListener('abort', () => reject(signal.reason), { once: true })
+    }))
+
+    const run = fake.start()
+    await waiting.promise
+    expect(fake.controller.snapshot()).toMatchObject({ phase: 'settling', active: true })
+    expect(run.release).not.toHaveBeenCalled()
+    await fake.controller.stop()
+    await run.finished
+    expect(fake.controller.snapshot()).toMatchObject({ phase: 'stopped', active: false })
+    expect(fake.hardware.capture).not.toHaveBeenCalled()
+    expect(fake.slews).toHaveLength(1)
   })
 
   it.each([false, true])('holds the lease until cancellation cleanup settles; cleanup failure=%s', async failedCleanup => {
@@ -275,6 +349,7 @@ describe('framing controller', () => {
 
 describe('geometric pointing correction', () => {
   it.each([
+    [{ raDegrees: 312.5867, decDegrees: 47.35 }, { raDegrees: 312.7049, decDegrees: 31.1199 }],
     [{ raDegrees: 359.8, decDegrees: 0 }, { raDegrees: 0.2, decDegrees: 0 }],
     [{ raDegrees: 10, decDegrees: 89.8 }, { raDegrees: 220, decDegrees: 89.8 }],
     [{ raDegrees: 350, decDegrees: -89.8 }, { raDegrees: 140, decDegrees: -89.8 }],
@@ -288,8 +363,8 @@ describe('geometric pointing correction', () => {
     expect(angularDistance(rotatedCompanion, target)).toBeCloseTo(angularDistance(companion, actual), 9)
   })
 
-  it('preserves zero offset and refuses a large correction', () => {
+  it('preserves zero offset and refuses an ambiguous antipodal correction', () => {
     expect(angularDistance(correctedPointing(desired, desired, desired), desired)).toBeLessThan(1e-10)
-    expect(() => correctedPointing(desired, { raDegrees: 0, decDegrees: 0 }, { raDegrees: 90, decDegrees: 0 })).toThrow('too large')
+    expect(() => correctedPointing(desired, { raDegrees: 0, decDegrees: 0 }, { raDegrees: 180, decDegrees: 0 })).toThrow('opposite')
   })
 })

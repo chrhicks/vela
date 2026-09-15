@@ -51,7 +51,7 @@ export function createAlignmentBaseline(
 
   if (axis[2] < 0) axis = scale(axis, -1)
   const errors = axisErrors(axis, latitudeDegrees)
-  assertSupported(errors.altitudeArcsec, errors.azimuthArcsec)
+  assertFiniteAngles(errors.altitudeArcsec, errors.azimuthArcsec)
   const reference = { ...samples[2] }
 
   const nominalDirection = unadjust(points[2]!, errors.altitudeArcsec * rad / 3600,
@@ -71,6 +71,9 @@ export function measureAlignment(baseline: AlignmentBaseline, sample: AlignmentS
   const nominal = rotate(baseline.nominalDirection, pole, angle)
   let altitude = baseline.measurement.altitudeArcsec * rad / 3600
   let azimuth = baseline.measurement.azimuthArcsec * rad / 3600
+  // Azimuth rotation preserves elevation. Its altitude inverse has two branches;
+  // keep the branch connected to the baseline rather than accepting a second root.
+  const initialSensitivity = altitudeSensitivity(nominal, altitude, baseline.latitudeDegrees)
   const step = 1e-6
 
   for (let iteration = 0; iteration < 12; iteration++) {
@@ -90,7 +93,11 @@ export function measureAlignment(baseline: AlignmentBaseline, sample: AlignmentS
     const deltaAzimuth = (br * aa - ar * ab) / determinant
     altitude += deltaAltitude
     azimuth += deltaAzimuth
-    assertSupported(altitude / rad * 3600, azimuth / rad * 3600)
+    assertFiniteAngles(altitude / rad * 3600, azimuth / rad * 3600)
+
+    if (initialSensitivity * altitudeSensitivity(nominal, altitude, baseline.latitudeDegrees) <= 0) {
+      throw new Error('The adjustment calculation crossed an ambiguous sightline geometry; start a new baseline')
+    }
 
     if (Math.hypot(deltaAltitude, deltaAzimuth) < 1e-10) break
   }
@@ -126,10 +133,16 @@ function axisErrors(axis: Vector, latitudeDegrees: number) {
     totalArcsec: Math.atan2(Math.hypot(axis[0], axis[1]), axis[2]) / rad * 3600 }
 }
 
-function assertSupported(altitude: number, azimuth: number) {
-  if (![altitude, azimuth].every(value => Number.isFinite(value) && Math.abs(value) <= 18001)) {
-    throw new Error('Alignment is outside the supported five-degree adjustment range; start a new baseline')
+function assertFiniteAngles(altitude: number, azimuth: number) {
+  if (![altitude, azimuth].every(value => Number.isFinite(value))) {
+    throw new Error('The adjustment calculation produced non-finite angles; start a new baseline')
   }
+}
+
+function altitudeSensitivity(nominal: Vector, altitude: number, latitude: number): number {
+  const tilted = rotate(nominal, east, altitude)
+
+  return dot(cross(east, tilted), zenith(latitude))
 }
 
 function zenith(latitudeDegrees: number): Vector { return [Math.cos(latitudeDegrees * rad), 0, Math.sin(latitudeDegrees * rad)] }

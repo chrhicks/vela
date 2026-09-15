@@ -97,7 +97,7 @@ export interface FramingView {
     fieldWidthDegrees: number
     fieldHeightDegrees: number
   } | null
-  phase: 'idle' | 'slewing' | 'exposing' | 'solving' | 'checked' | 'stopping' | 'stopped' | 'failed'
+  phase: 'idle' | 'slewing' | 'settling' | 'exposing' | 'solving' | 'checked' | 'needs-check' | 'stopping' | 'stopped' | 'failed'
   active: boolean
   desired: TargetPosition | null
   targetId: string | null
@@ -110,6 +110,7 @@ export interface FramingView {
   }) | null
   error: string | null
   exposureSeconds: number
+  /** A current solve can inform a user-requested correction to the edited composition. */
   canCenter: boolean
   /** The last solved exposure still matches the observed rig/configuration. */
   checkCurrent: boolean
