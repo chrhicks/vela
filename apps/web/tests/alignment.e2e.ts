@@ -48,6 +48,18 @@ for (const width of [1100, 390]) {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
     await page.screenshot({ path: `/tmp/alignment-app-adjusting-${width}.png`, fullPage: true })
 
+    Object.assign(view, { activity: 'retrying', warning: 'Device connection interrupted. Retrying automatically.' })
+    await expect(page.getByText('Reconnecting', { exact: true })).toBeVisible()
+    await expect(page.getByRole('alert')).toContainText('Device connection interrupted')
+    await expect(page.getByRole('alert')).not.toContainText('Plate-solving failed')
+    await expect(page.getByText(/Pause adjustments until a fresh measurement arrives/)).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Stop to reposition' })).toBeEnabled()
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    await page.screenshot({ path: `/tmp/alignment-app-reconnecting-${width}.png`, fullPage: true })
+    Object.assign(view, { activity: 'waiting', warning: null })
+    await expect(page.getByRole('alert')).toHaveCount(0)
+    await expect(page.getByText(/Adjust the mount’s altitude and azimuth knobs/)).toBeVisible()
+
     Object.assign(view, { mode: 'offline', phase: 'setup', active: false, measurement: null })
     await expect(page.getByText(/simulator’s large-error preset/)).toBeVisible()
     await expect(page.getByText('Configured sky patch')).toBeVisible()

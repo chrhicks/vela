@@ -2,7 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { createTestCadence } from './test-cadence.js'
 import { fixture } from './physical-fixture.js'
 import { previewPng } from '../imaging/preview.js'
-import type { AlpacaAcquisition, AlpacaCaptureOptions } from '@vela/alpaca'
+import { AlpacaProviderError, AlpacaCaptureRetryableError, type AlpacaAcquisition, type AlpacaCaptureOptions } from '@vela/alpaca'
 import { createAlignmentController } from './controller.js'
 import type { PhysicalAlignment } from './physical.js'
 import { physicalAlignmentSample, projectPhysicalAlignmentTarget } from './physical-coordinates.js'
@@ -178,4 +178,66 @@ it('shows homing and permits Stop before any exposure begins', async () => {
   await subject.controller.stop()
   expect(subject.controller.snapshot()).toMatchObject({ active: false, phase: 'stopped' })
   expect(subject.hardware.capture).not.toHaveBeenCalled()
+})
+
+const readTimeout = () => new AlpacaProviderError('Device read timed out', { reason: 'transport', endpoint: '/management/v1/configureddevices' })
+
+it('keeps the baseline and last measurement through repeated read interruptions and resumes without moving', async () => {
+  const subject = setup()
+  await subject.baseline()
+  await vi.waitFor(() => expect(subject.controller.snapshot().measurement).not.toBeNull())
+  const previous = subject.controller.snapshot()
+  vi.mocked(subject.physical.pointing).mockRejectedValueOnce(readTimeout()).mockRejectedValueOnce(readTimeout())
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    control.waits.shift()!()
+    await vi.waitFor(() => expect(subject.controller.snapshot().activity).toBe('retrying'))
+    await vi.waitFor(() => expect(control.waits).toHaveLength(1))
+    expect(subject.controller.snapshot()).toMatchObject({ active: true, phase: 'adjusting', measurement: previous.measurement, measuredAt: previous.measuredAt })
+    expect(subject.captures).toHaveLength(3)
+  }
+
+  control.waits.shift()!()
+  const solve = await subject.nextSolve()
+  solve.complete()
+  await vi.waitFor(() => expect(subject.controller.snapshot().measuredAt).toBe(frames[3]!.capturedAt))
+  expect(subject.controller.snapshot()).toMatchObject({ active: true, phase: 'adjusting', warning: null })
+  expect(subject.physical.prepare).toHaveBeenCalledTimes(1)
+  expect(subject.physical.move).toHaveBeenCalledTimes(2)
+})
+
+it('stops promptly while a read is waiting to retry', async () => {
+  const subject = setup()
+  await subject.baseline()
+  await vi.waitFor(() => expect(subject.controller.snapshot().measurement).not.toBeNull())
+  vi.mocked(subject.physical.pointing).mockRejectedValue(readTimeout())
+  control.waits.shift()!()
+  await vi.waitFor(() => expect(subject.controller.snapshot().activity).toBe('retrying'))
+  await subject.controller.stop()
+  expect(subject.controller.snapshot()).toMatchObject({ active: false, phase: 'stopped', warning: null })
+  expect(subject.captures).toHaveLength(3)
+})
+
+it('retries validation of the same captured frame without repeating an exposure', async () => {
+  const subject = setup()
+  vi.mocked(subject.physical.validate).mockRejectedValueOnce(readTimeout())
+  await subject.controller.start('physical', 'Physical rig')
+  await vi.waitFor(() => expect(subject.controller.snapshot().activity).toBe('retrying'))
+  expect(subject.captures).toHaveLength(1)
+  control.waits.shift()!()
+  await subject.nextSolve()
+  expect(subject.captures).toHaveLength(1)
+  expect(subject.controller.snapshot()).toMatchObject({ active: true, warning: null, activity: 'solving' })
+})
+
+it('retries an explicitly recoverable capture but stops on an unclassified transport failure', async () => {
+  const subject = setup()
+  vi.mocked(subject.hardware.capture).mockRejectedValueOnce(new AlpacaCaptureRetryableError(readTimeout()))
+  await subject.controller.start('physical', 'Physical rig')
+  await vi.waitFor(() => expect(subject.controller.snapshot().activity).toBe('retrying'))
+  vi.mocked(subject.hardware.capture).mockRejectedValueOnce(readTimeout())
+  control.waits.shift()!()
+  await vi.waitFor(() => expect(subject.controller.active()).toBe(false))
+  expect(subject.hardware.capture).toHaveBeenCalledTimes(2)
+  expect(subject.controller.snapshot()).toMatchObject({ phase: 'failed', error: 'Device read timed out' })
 })
