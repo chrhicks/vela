@@ -371,13 +371,24 @@ function SolvedFrame({ measurement: m }: { measurement: NonNullable<AlignmentVie
 
 function BaselineFrame({ preview }: { preview: NonNullable<AlignmentView['preview']> }) {
   const [imageError, setImageError] = useState(false)
+  const [imageAttempt, setImageAttempt] = useState(0)
+  useEffect(() => {
+    if (!imageError) return
+
+    const retry = setTimeout(() => {
+      setImageError(false)
+      setImageAttempt(attempt => attempt + 1)
+    }, 1500)
+
+    return () => clearTimeout(retry)
+  }, [imageError, imageAttempt])
 
   return <figure className="vela-polar-image">
     <div className="vela-polar-image-heading"><span>Latest exposure · Position {preview.position}</span><span>Full frame</span></div>
-    <img src={preview.imageUrl} width={preview.imageWidth} height={preview.imageHeight}
+    <img key={imageAttempt} src={preview.imageUrl} width={preview.imageWidth} height={preview.imageHeight}
       alt={`Latest camera exposure at baseline position ${preview.position}`}
       onError={() => setImageError(true)} onLoad={() => setImageError(false)} />
-    {imageError && <p role="status">The exposure preview could not be loaded.</p>}
+    {imageError && <p role="status">The exposure preview could not be loaded. Retrying…</p>}
     <figcaption><div>
       {preview.capturedAtSource === 'server-estimate' ? 'Estimated exposure start' : 'Exposure started'}{' '}
       <time dateTime={preview.capturedAt}>{new Date(preview.capturedAt).toLocaleTimeString()}</time>

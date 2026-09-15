@@ -89,3 +89,38 @@ for (const width of [1100, 390]) {
     await page.screenshot({ path: `/tmp/alignment-baseline-failed-${width}.png`, fullPage: true })
   })
 }
+
+test('stopped baseline preview recovers from a failed image request without another capture', async ({ page }) => {
+  const view: AlignmentView = {
+    mode: 'physical', rigId: 'rig-1', rigName: 'Askar FRA 400',
+    enabled: true, unavailableReason: null, phase: 'baseline', activity: 'solving', active: true,
+    position: 1, solvedPositions: 0, exposureSeconds: 3, exposureStartedAt: null,
+    measuredAt: null, warning: null, error: null, measurement: null,
+    preview: { imageUrl: '/api/retry-fixture.png', imageWidth: 640, imageHeight: 400,
+      capturedAt: '2026-09-15T00:25:49Z', capturedAtSource: 'camera', position: 1 },
+  }
+
+  let requests = 0
+
+  await page.route('**/api/web/rigs/rig-1/alignment', route => route.fulfill({ json: view }))
+  await page.route('**/api/retry-fixture.png', async route => {
+    requests++
+
+    if (requests === 1) return route.abort('connectionreset')
+
+    // A slow successful retry must finish rather than being remounted again.
+    await new Promise(resolve => setTimeout(resolve, 2000))
+
+    return route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400"><rect width="640" height="400" fill="#090e18"/></svg>' })
+  })
+  await page.goto('/rigs/rig-1/observe/alignment')
+  await expect(page.getByText('The exposure preview could not be loaded. Retrying…')).toBeVisible()
+  Object.assign(view, { phase: 'stopped', activity: 'idle', active: false, warning: 'No plate-solve solution' })
+  await expect(page.getByRole('button', { name: 'Start again' })).toBeVisible()
+  const image = page.getByRole('img', { name: 'Latest camera exposure at baseline position 1' })
+  await expect.poll(() => image.evaluate(element => element instanceof HTMLImageElement ? element.naturalWidth : 0)).toBe(640)
+  await expect(page.getByText('The exposure preview could not be loaded. Retrying…')).toHaveCount(0)
+  await expect(image).toHaveAttribute('src', '/api/retry-fixture.png')
+  await expect(page.locator('time')).toHaveAttribute('datetime', '2026-09-15T00:25:49Z')
+  expect(requests).toBe(2)
+})
