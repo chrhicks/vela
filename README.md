@@ -71,6 +71,10 @@ The typed browser API client is in `apps/web/src/lib/api.ts`. Browser-safe value
 - [Component Workshop Operations Guide](docs/component-workshop-operations.md)
 - [Component Workshop Usage](apps/workshop/README.md)
 
+## Observing lessons
+
+- [September 14–15 first light: findings and next-session preparation](docs/observing/2026-09-14-first-light.md)
+
 ## Star catalogue
 
 Refresh the public star-name data with:
