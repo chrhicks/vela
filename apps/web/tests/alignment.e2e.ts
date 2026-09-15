@@ -57,6 +57,7 @@ for (const width of [1100, 390]) {
 for (const width of [1100, 390]) {
   test(`baseline exposure stays visible when plate solving fails at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 1100 })
+
     const view: AlignmentView = {
       mode: 'physical', cameraName: 'ASI2600MC Pro', rigId: 'rig-1', rigName: 'Askar FRA 400',
       enabled: true, unavailableReason: null, phase: 'baseline', activity: 'solving', active: true,
@@ -65,6 +66,7 @@ for (const width of [1100, 390]) {
       preview: { imageUrl: '/api/baseline-fixture.png', imageWidth: 640, imageHeight: 400,
         capturedAt: '2026-09-15T00:25:49Z', capturedAtSource: 'server-estimate', position: 1 },
     }
+
     await page.route('**/api/web/rigs/rig-1/alignment', route => route.fulfill({ json: view }))
     await page.route('**/api/baseline-fixture.png', route => route.fulfill({
       contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400"><rect width="640" height="400" fill="#090e18"/><circle cx="100" cy="80" r="2" fill="white"/><circle cx="580" cy="360" r="2" fill="white"/></svg>',
@@ -72,7 +74,7 @@ for (const width of [1100, 390]) {
     await page.goto('/rigs/rig-1/observe/alignment')
     const image = page.getByRole('img', { name: 'Latest camera exposure at baseline position 1' })
     await expect(image).toBeVisible()
-    await expect.poll(() => image.evaluate(element => (element as HTMLImageElement).naturalWidth)).toBeGreaterThan(0)
+    await expect.poll(() => image.evaluate(element => element instanceof HTMLImageElement ? element.naturalWidth : 0)).toBeGreaterThan(0)
     const bounds = await image.boundingBox()
     expect(bounds!.width / bounds!.height).toBeCloseTo(640 / 400, 2)
     await expect(page.getByText('Full frame', { exact: true })).toBeVisible()
