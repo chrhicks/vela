@@ -30,6 +30,7 @@ export function CaptureCooling({
   pending,
   error,
   unconfirmed,
+  runActive,
   onCooler,
   onSetpoint,
   onCheck,
@@ -39,6 +40,7 @@ export function CaptureCooling({
   pending: boolean
   error: string | null
   unconfirmed: boolean
+  runActive?: boolean
   onCooler: (coolerOn: boolean) => void
   onSetpoint: (setpointC: number) => void
   onCheck?: () => void
@@ -104,6 +106,6 @@ export function CaptureCooling({
       <Button type="submit" disabled={disabled || !validTarget}>{pending ? 'Confirming…' : 'Set temperature'}</Button>
     </form>}
     {error && <p role="status">{error}</p>}
-    {unconfirmed && onCheck && <Button type="button" disabled={pending} onClick={onCheck}>Check camera cooling</Button>}
+    {unconfirmed && onCheck && <Button type="button" disabled={pending || runActive} onClick={onCheck}>Check camera cooling</Button>}
   </section>
 }
