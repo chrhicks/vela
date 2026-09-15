@@ -19,6 +19,9 @@ export function useCapture(rigId: string) {
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [commandUnconfirmed, setCommandUnconfirmed] = useState(false)
+  const [coolingPending, setCoolingPending] = useState(false)
+  const [coolingError, setCoolingError] = useState<string | null>(null)
+  const [coolingUnconfirmed, setCoolingUnconfirmed] = useState(false)
   const request = useRef<AbortController | null>(null)
   const lastView = useRef<CaptureView | null>(null)
   const writing = useRef(false)
@@ -51,6 +54,8 @@ export function useCapture(rigId: string) {
       } else if (explicit && !next.active) {
         setCommandUnconfirmed(false)
         setError(null)
+        setCoolingUnconfirmed(false)
+        setCoolingError(null)
       }
     } catch (cause) {
       if (!alive.current || current !== generation.current) return
@@ -90,9 +95,9 @@ export function useCapture(rigId: string) {
     }
   }, [read])
 
-  const canStart = !!view?.enabled && !view.active && !offline && !pending && !commandUnconfirmed
+  const canStart = !!view?.enabled && !view.active && !offline && !pending && !coolingPending && !commandUnconfirmed
   const canStop = !!view?.active && view.phase !== 'stopping' && !offline && !pending
-  const canCool = !!view?.cooling && !offline && !pending && !commandUnconfirmed
+  const canCool = !!view?.cooling && !view.active && !offline && !pending && !coolingPending && !coolingUnconfirmed && !commandUnconfirmed
 
   async function post(
     path: 'start' | 'stop' | 'cooling',
@@ -116,8 +121,14 @@ export function useCapture(rigId: string) {
     const current = ++generation.current
     writing.current = true
     setRefreshing(false)
-    setPending(true)
-    setError(null)
+
+    if (path === 'cooling') {
+      setCoolingPending(true)
+      setCoolingError(null)
+    } else {
+      setPending(true)
+      setError(null)
+    }
 
     try {
       const next = await api(`rigs/${encodeURIComponent(rigId)}/capture/${path}`, {
@@ -134,6 +145,8 @@ export function useCapture(rigId: string) {
       setOffline(false)
       setCommandUnconfirmed(false)
       setError(null)
+      setCoolingUnconfirmed(false)
+      setCoolingError(null)
     } catch (cause) {
       if (!alive.current || current !== generation.current) return
 
@@ -142,9 +155,8 @@ export function useCapture(rigId: string) {
           ? cause.code
           : 'The cooler command could not be confirmed. Check camera cooling before assuming it changed.'
 
-        setError(message)
-
-        if (/could not be confirmed/i.test(message)) setCommandUnconfirmed(true)
+        setCoolingError(message)
+        setCoolingUnconfirmed(/could not be confirmed/i.test(message))
 
         return
       }
@@ -156,12 +168,15 @@ export function useCapture(rigId: string) {
         request.current = null
         writing.current = false
 
-        if (alive.current && current === generation.current) setPending(false)
+        if (alive.current && current === generation.current) {
+          if (path === 'cooling') setCoolingPending(false)
+          else setPending(false)
+        }
       }
     }
   }
 
-  return { view, offline, pending, refreshing, error, commandUnconfirmed, canStart, canStop, canCool,
+  return { view, offline, pending, coolingPending, refreshing, error, coolingError, commandUnconfirmed, coolingUnconfirmed, canStart, canStop, canCool,
     start: (seconds: number, repeat: boolean, saveFrames: boolean) => {
       if (!Number.isFinite(seconds) || seconds < 0.1 || seconds > 600) return Promise.resolve()
 

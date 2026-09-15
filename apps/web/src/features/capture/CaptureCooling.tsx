@@ -32,6 +32,7 @@ export function CaptureCooling({
   unconfirmed,
   onCooler,
   onSetpoint,
+  onCheck,
 }: {
   cooling: CaptureCoolingView
   disabled: boolean
@@ -40,6 +41,7 @@ export function CaptureCooling({
   unconfirmed: boolean
   onCooler: (coolerOn: boolean) => void
   onSetpoint: (setpointC: number) => void
+  onCheck?: () => void
 }) {
   const [target, setTarget] = useState<string | null>(null)
   const requested = target ?? (cooling.setpointC === undefined ? '' : String(cooling.setpointC))
@@ -102,5 +104,6 @@ export function CaptureCooling({
       <Button type="submit" disabled={disabled || !validTarget}>{pending ? 'Confirming…' : 'Set temperature'}</Button>
     </form>}
     {error && <p role="status">{error}</p>}
+    {unconfirmed && onCheck && <Button type="button" disabled={pending} onClick={onCheck}>Check camera cooling</Button>}
   </section>
 }
