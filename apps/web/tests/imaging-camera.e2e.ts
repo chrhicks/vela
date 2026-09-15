@@ -18,7 +18,7 @@ async function observe(page: Page) {
   await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, {
     rigId: 'rig-1', rigName: 'Seestar S30', camera: null, enabled: false,
     unavailableReason: 'Choose an imaging camera.', phase: 'idle', active: false,
-    exposureSeconds: 2, elapsedSeconds: 0, error: null, latestImage: null,
+    exposureSeconds: 2, elapsedSeconds: 0, error: null, latestImage: null, cooling: null,
   }))
   await page.goto('/rigs/rig-1/observe')
 }

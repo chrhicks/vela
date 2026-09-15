@@ -8,7 +8,7 @@ const respond = <Body>(route: Route, body: Body) => route.fulfill({ contentType:
 const idle: CaptureView = {
   rigId: 'rig-1', rigName: 'Offline rig', camera: { name: 'Simulator Camera' }, enabled: true,
   unavailableReason: null, phase: 'idle', active: false, exposureSeconds: 2, elapsedSeconds: 0,
-  error: null, saveFrames: false, savedImageCount: 0, latestImage: null, repeat: false, completedCount: 0,
+  error: null, saveFrames: false, savedImageCount: 0, latestImage: null, repeat: false, completedCount: 0, cooling: null,
 }
 
 test('a command stays responsive during polling and a late read cannot replace its result', async ({ page }) => {
@@ -426,3 +426,27 @@ test('labels estimated starts on the loaded capture and saved image detail', asy
   await page.goto('/rigs/rig-1/observe/saved-images/frame-1')
   await expect(page.getByRole('region', { name: 'Saved preview' }).getByText('Start time estimated', { exact: true })).toBeVisible()
 })
+
+test('shows cooler off when the sensor is near the requested temperature and turns it on only when asked', async ({ page }) => {
+  let cooling = {
+    state: 'off' as const, canSetTemperature: true, sensorTemperatureC: 4.8, setpointC: 5, powerPercent: 0,
+  }
+
+  const commands: unknown[] = []
+  await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, { ...idle, cooling }))
+  await page.route('**/api/rigs/rig-1/capture/cooling', async route => {
+    commands.push(route.request().postDataJSON())
+    cooling = { ...cooling, state: 'on', sensorTemperatureC: 5, powerPercent: 18 }
+    await respond(route, { ...idle, cooling })
+  })
+  await page.goto('/rigs/rig-1/observe/capture')
+  const region = page.getByRole('region', { name: 'Camera cooling' })
+  await expect(region.getByText('Off', { exact: true })).toBeVisible()
+  await expect(region.getByText('4.8 °C')).toBeVisible()
+  await expect(region.getByText('5.0 °C')).toBeVisible()
+  await expect(page.getByText('not confirmation that cooling is running')).toBeVisible()
+  await page.getByRole('checkbox', { name: 'Cooler on' }).click({ force: true })
+  await expect.poll(() => commands).toEqual([{ coolerOn: true }])
+  await expect(region.getByText('On', { exact: true })).toBeVisible()
+})
+

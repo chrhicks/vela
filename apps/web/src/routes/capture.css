@@ -11,6 +11,16 @@
 .capture-page__camera > div { display: grid; gap: 4px; }
 .capture-page__camera strong { font-size: 13px; font-weight: 550; }
 .capture-page__camera span { color: var(--vela-text-muted); font-size: 11px; }
+.capture-page__cooling { margin: 0 0 20px; padding-bottom: 16px; border-bottom: 1px solid var(--vela-line); }
+.capture-page__cooling h3 { margin: 0 0 10px; font-size: 12px; font-weight: 550; letter-spacing: 0.04em; text-transform: uppercase; color: var(--vela-text-muted); }
+.capture-page__cooling dl { margin: 0; display: grid; gap: 6px 12px; grid-template-columns: auto 1fr; font-size: 13px; }
+.capture-page__cooling dt { color: var(--vela-text-muted); }
+.capture-page__cooling dd { margin: 0; font-variant-numeric: tabular-nums; }
+.capture-page__cooling dd[data-state='off'] { color: var(--vela-warning); }
+.capture-page__cooling > p { margin: 10px 0 0; font-size: 12px; line-height: 1.6; color: var(--vela-text-muted); }
+.capture-page__cooling .vela-checkbox { margin-top: 12px; }
+.capture-page__cooling form { margin-top: 12px; display: grid; gap: 10px; }
+.capture-page__cooling form .vela-button { width: 100%; min-height: 40px; }
 .capture-page__command { margin-top: 14px; }
 .capture-page__command .vela-button { width: 100%; min-height: 44px; }
 .capture-page .vela-button:hover:not(:disabled) { transform: none; }

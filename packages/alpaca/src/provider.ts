@@ -476,6 +476,10 @@ async function inspectCamera(
 
   if (coolerOn === undefined && reportsCoolingCapability) read.partial = true
 
+  const setpointC = canSetTemperature === true
+    ? await requiredRead(read, () => client.readNumber(device, 'setccdtemperature', signal), signal)
+    : undefined
+
   const reportedPower = canGetCoolerPower === true
     ? await requiredRead(read, () => client.readNumber(device, 'coolerpower', signal), signal)
     : undefined
@@ -497,6 +501,8 @@ async function inspectCamera(
     if (canSetTemperature !== undefined) cooling.setpointControl = canSetTemperature
 
     if (canGetCoolerPower !== undefined) cooling.powerReporting = canGetCoolerPower
+
+    if (setpointC !== undefined) cooling.setpointC = setpointC
 
     if (powerPercent !== undefined) cooling.powerPercent = powerPercent
   }

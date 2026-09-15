@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { Panel } from '@vela/ui'
 import { useCapture } from './use-capture'
+import { coolingSummary } from './CaptureCooling'
 import { useLoadedImage } from './LatestImage'
 import './capture-hub.css'
 
@@ -28,6 +29,7 @@ export function CaptureHub({ rigId }: { rigId: string }) {
         <div className="vela-capture-entry__status" role="status">
           {offline ? 'Capture updates interrupted · last known state' : view?.active ? view.phase === 'stopping' ? 'Stopping capture…' : view.phase === 'saving' ? 'Saving image…' : view.phase === 'reading' ? 'Receiving image…' : 'Exposing…' : view?.phase === 'failed' ? 'Capture stopped' : view?.phase === 'stopped' ? 'Capture stopped' : !view ? 'Loading capture state…' : !view.enabled ? view.unavailableReason : !image ? loading ? 'Loading latest image…' : 'No image captured yet' : null}
           {view?.active && <span>{view.completedCount} completed{offline ? ' · last known' : ''}</span>}
+          {coolingSummary(view?.cooling) && <span>{coolingSummary(view?.cooling)}{offline ? ' · last known' : ''}</span>}
           {image && <span>{image.exposureSeconds} s · {age} s ago</span>}
           {failed && <span>The latest image could not be loaded.</span>}
         </div>
