@@ -1,0 +1,36 @@
+.vela-comparison-demo { width: 100%; min-width: 0; color: var(--vela-text); container-type: inline-size; }
+.vela-comparison-demo header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.vela-comparison-demo__eyebrow { color: var(--vela-accent); font-size: .75em; }
+.vela-comparison-demo h1 { margin: 0; font-size: 1.7em; font-weight: 600; letter-spacing: -.025em; }
+.vela-comparison-demo header p:last-child { color: var(--vela-text-muted); font-size: .85em; }
+.vela-comparison-demo__synthetic { color: var(--vela-text-muted); font-size: .7em; padding-top: 14px; }
+.vela-comparison-demo__identities { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 16px 0; color: var(--vela-text-muted); font-size: .8em; }
+.vela-comparison-demo__identities strong { color: var(--vela-text); font-weight: 550; margin-left: 8px; }
+.vela-comparison-demo__field { position: relative; aspect-ratio: 4/3; overflow: hidden; border: 1px solid var(--vela-line); cursor: crosshair; touch-action: none; user-select: none; }
+.vela-comparison-demo__field canvas { display: block; width: 100%; height: auto; }
+.vela-comparison-demo__image-label { position: absolute; top: 12px; left: 12px; color: var(--vela-text); background: var(--vela-surface); padding: 5px 8px; font-size: .75em; }
+.vela-comparison-demo__crop-box { position: absolute; left: var(--compare-x); top: var(--compare-y); width: 25%; height: 25%; transform: translate(-50%, -50%); border: 1px solid var(--vela-accent); pointer-events: none; }
+.vela-comparison-demo__actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
+.vela-comparison-demo__actions > button:first-child { touch-action: none; user-select: none; }
+.vela-comparison-demo__hint { color: var(--vela-text-muted); font-size: .75em; line-height: 1.6; }
+.vela-comparison-demo__crop-heading { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
+.vela-comparison-demo h2 { font-size: 1em; font-weight: 550; }
+.vela-comparison-demo__crop-heading span { color: var(--vela-text-muted); font-size: .72em; }
+.vela-comparison-demo__crops { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.vela-comparison-demo figure { margin: 0; min-width: 0; }
+.vela-comparison-demo figure > div { position: relative; aspect-ratio: 4/3; overflow: hidden; border: 1px solid var(--vela-line); }
+.vela-comparison-demo figure canvas { position: absolute; width: 400%; height: 400%; max-width: none; left: 50%; top: 50%; transform: translate(calc(-1 * var(--compare-x)), calc(-1 * var(--compare-y))); }
+.vela-comparison-demo figcaption { padding-top: 8px; font-size: .75em; color: var(--vela-text-muted); }
+.vela-comparison-demo__position { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 16px; }
+.vela-comparison-demo__position label { display: grid; gap: 8px; color: var(--vela-text-muted); font-size: .75em; }
+.vela-comparison-demo input[type=range] { width: 100%; min-width: 0; margin: 0; accent-color: var(--vela-accent); }
+.vela-comparison-demo aside { display: flex; gap: 24px; align-items: center; border-top: 1px solid var(--vela-line); padding-top: 16px; margin-top: 24px; }
+.vela-comparison-demo aside label { display: grid; gap: 8px; font-size: .75em; min-width: 160px; }
+.vela-comparison-demo aside p { color: var(--vela-text-muted); font-size: .75em; line-height: 1.6; }
+.vela-comparison-demo select { color: var(--vela-text); background: var(--vela-surface); border: 1px solid var(--vela-line); padding: 8px; font: inherit; }
+@container (max-width: 500px) {
+  .vela-comparison-demo header, .vela-comparison-demo aside { flex-direction: column; gap: 4px; }
+  .vela-comparison-demo__synthetic { padding-top: 0; }
+  .vela-comparison-demo__actions { gap: 8px; }
+  .vela-comparison-demo__actions > button { flex: 1; }
+}

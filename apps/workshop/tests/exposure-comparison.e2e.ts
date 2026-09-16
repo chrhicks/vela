@@ -1,0 +1,58 @@
+import { expect, test } from '@playwright/test'
+
+const url = '/?component=panel&specimen=panel-exposure-comparison&profile=vela-current&mode=dark&context=isolated&viewport=390'
+
+test.beforeEach(async ({ page }) => {
+  await page.setViewportSize({ width: 1700, height: 1400 })
+  await page.route('**/__workshop/**', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ session: null, profiles: [] }) }))
+  await page.goto(url)
+})
+
+test('dragging keeps the grab offset, clamps outside the image, and releases; sliders remain keyboard accessible', async ({ page }) => {
+  const field = page.locator('.vela-comparison-demo__field')
+  const horizontal = page.getByRole('slider', { name: 'Inspect left / right' })
+  const vertical = page.getByRole('slider', { name: 'Inspect up / down' })
+  const bounds = await field.boundingBox()
+  if (!bounds) throw new Error('Exposure field is missing')
+  await page.mouse.move(bounds.x + bounds.width * .55, bounds.y + bounds.height * .55)
+  await page.mouse.down()
+  await expect(horizontal).toHaveValue('50')
+  await page.mouse.move(bounds.x + bounds.width * .7, bounds.y + bounds.height * .75, { steps: 5 })
+  await expect(horizontal).toHaveValue('65')
+  await expect(vertical).toHaveValue('70')
+  await page.mouse.move(bounds.x + bounds.width + 20, bounds.y - 20)
+  await expect(horizontal).toHaveValue('87.5')
+  await expect(vertical).toHaveValue('12.5')
+  await page.mouse.up()
+  await page.mouse.move(bounds.x + bounds.width * .5, bounds.y + bounds.height * .5)
+  await expect(horizontal).toHaveValue('87.5')
+  await horizontal.focus()
+  await horizontal.press('ArrowLeft')
+  await expect(horizontal).toHaveValue('87')
+  await vertical.focus()
+  await vertical.press('ArrowDown')
+  await expect(vertical).toHaveValue('12.5')
+  await page.mouse.click(bounds.x + bounds.width * .3, bounds.y + bounds.height * .4)
+  await expect(horizontal).toHaveValue('30')
+  await expect(vertical).toHaveValue('40')
+})
+
+test('touch dragging moves both crops and cancellation ends the gesture', async ({ page }) => {
+  const field = page.locator('.vela-comparison-demo__field')
+  const horizontal = page.getByRole('slider', { name: 'Inspect left / right' })
+  const vertical = page.getByRole('slider', { name: 'Inspect up / down' })
+  const bounds = await field.boundingBox()
+  if (!bounds) throw new Error('Exposure field is missing')
+  const cdp = await page.context().newCDPSession(page)
+  const point = (x: number, y: number) => [{ x: bounds.x + bounds.width * x, y: bounds.y + bounds.height * y }]
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: point(.5, .5) })
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: point(.7, .75) })
+  await expect(horizontal).toHaveValue('70')
+  await expect(vertical).toHaveValue('75')
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] })
+  await expect(horizontal).toHaveValue('70')
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: point(.3, .3) })
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+  await expect(horizontal).toHaveValue('30')
+  await expect(vertical).toHaveValue('30')
+})
