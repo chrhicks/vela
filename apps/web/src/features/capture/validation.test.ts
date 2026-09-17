@@ -5,7 +5,7 @@ import { isCaptureView, isSavedImage, isSavedImagesView } from './validation'
 const view: CaptureView = {
   rigId: 'rig-1', rigName: 'Offline rig', camera: { name: 'Simulator Camera' }, enabled: true,
   unavailableReason: null, phase: 'exposing', active: true, exposureSeconds: 10, elapsedSeconds: 2,
-  error: null, saveFrames: false, savedImageCount: 0, repeat: true, completedCount: 1,
+  error: null, saveFrames: false, savedImageCount: 0, repeat: true, completedCount: 1, cooling: null,
   latestImage: {
     id: 'frame-1', saved: false, imageUrl: '/api/rigs/rig-1/capture/images/frame-1', width: 1600, height: 1200,
     exposureSeconds: 2, capturedAt: '2026-09-05T18:00:00.000Z', receivedAt: '2026-09-05T18:00:03.000Z', cameraName: 'Simulator Camera', color: 'mono', statistics: { detectedStars: 12, medianHfrPixels: 2.35 },
@@ -62,9 +62,10 @@ it('validates confirmed retention and exact same-origin download resources', () 
   expect(isSavedImagesView({ rigId: 'rig-1', rigName: 'Rig', images: [savedImage] }, 'rig-1')).toBe(true)
   expect(isSavedImagesView({ rigId: 'rig-1', rigName: 'Rig', images: [savedImage, savedImage] }, 'rig-1')).toBe(false)
   expect(isCaptureView({ ...view, savedImageCount: null }, 'rig-1')).toBe(true)
+  expect(isCaptureView({ ...view, cooling: { state: 'off', canSetTemperature: true, sensorTemperatureC: 4.8, setpointC: 5, powerPercent: 0 } }, 'rig-1')).toBe(true)
   expect(isCaptureView({ ...view, phase: 'saving', saveFrames: true }, 'rig-1')).toBe(true)
 
-  for (const patch of [{ saveFrames: undefined }, { savedImageCount: -1 }, { savedImageCount: undefined }, { savedImageCount: 0.5 }]) {
+    for (const patch of [{ saveFrames: undefined }, { savedImageCount: -1 }, { savedImageCount: undefined }, { savedImageCount: 0.5 }, { cooling: { state: 'off' } }]) {
     expect(isCaptureView({ ...view, ...patch }, 'rig-1')).toBe(false)
   }
 })

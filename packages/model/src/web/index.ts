@@ -34,7 +34,7 @@ export type {
 
 export type { AlignmentView } from './alignment.js'
 
-export type { CaptureImage, CaptureImageStatistics, CapturePhase, CaptureView, SavedImage, SavedImagesView, SavedImageView } from './capture.js'
+export type { CaptureCoolingView, CaptureImage, CaptureImageStatistics, CapturePhase, CaptureView, SavedImage, SavedImagesView, SavedImageView } from './capture.js'
 
 export type { ImagingCameraView } from './imaging-camera.js'
 

@@ -1,7 +1,13 @@
 import { z } from 'zod'
 import type { FastifyInstance } from 'fastify'
-import { AlpacaCaptureStoppedError, createAlpacaAcquisition } from '@vela/alpaca'
-import type { CaptureView, NavigationCapture } from '@vela/model/web'
+import {
+  AlpacaCaptureStoppedError,
+  createAlpacaAcquisition,
+  createAlpacaCameraCooling,
+  type AlpacaCameraCooling,
+  type AlpacaDeviceTelemetry,
+} from '@vela/alpaca'
+import type { CaptureCoolingView, CaptureView, NavigationCapture } from '@vela/model/web'
 import type { RigCatalogRecord } from '../rig/contracts.js'
 import type { RigCatalog } from '../rig/catalog.js'
 import type { RigOperations } from '../rig/operations.js'
@@ -19,6 +25,7 @@ interface CaptureRouteOptions {
   savedImages?: SavedImageStore
   createCamera?: (settings: CaptureSettings) => CaptureCamera
   createInspector?: RigDetailOptions['createInspector']
+  createCooling?: (settings: CaptureSettings) => AlpacaCameraCooling
 }
 
 function configuredCamera(settings: CaptureSettings): CaptureCamera {
@@ -39,11 +46,38 @@ function configuredCamera(settings: CaptureSettings): CaptureCamera {
   }
 }
 
+function configuredCooling(settings: CaptureSettings): AlpacaCameraCooling {
+  return createAlpacaCameraCooling({ baseUrl: settings.endpoint })
+}
+
+function captureCooling(telemetry: AlpacaDeviceTelemetry | undefined): CaptureCoolingView | null {
+  if (telemetry?.kind !== 'camera' || telemetry.cooling === undefined) return null
+
+  let cooling: CaptureCoolingView = {
+    state: telemetry.cooling.state,
+    canSetTemperature: telemetry.cooling.setpointControl === true,
+  }
+
+  if (telemetry.sensorTemperatureC !== undefined) {
+    cooling = { ...cooling, sensorTemperatureC: telemetry.sensorTemperatureC }
+  }
+
+  if (telemetry.cooling.setpointC !== undefined) {
+    cooling = { ...cooling, setpointC: telemetry.cooling.setpointC }
+  }
+
+  if (telemetry.cooling.powerPercent !== undefined) {
+    cooling = { ...cooling, powerPercent: telemetry.cooling.powerPercent }
+  }
+
+  return cooling
+}
+
 export function registerCapture(
   app: FastifyInstance,
   catalog: RigCatalog,
   operations: RigOperations,
-  { createCamera = configuredCamera, createInspector, savedImages = createMemorySavedImageStore() }: CaptureRouteOptions = {},
+  { createCamera = configuredCamera, createInspector, createCooling = configuredCooling, savedImages = createMemorySavedImageStore() }: CaptureRouteOptions = {},
 ) {
   const controllers = new Map<string, ReturnType<typeof createCaptureController>>()
 
@@ -63,7 +97,7 @@ export function registerCapture(
 
     const current = (): CaptureView => ({ ...(controllers.get(rigId)?.snapshot() ?? {
       rigId, rigName: rig.name, camera: null, enabled: false, unavailableReason: null,
-      phase: 'idle', active: false, repeat: true, saveFrames: false, completedCount: 0, exposureSeconds: 2, elapsedSeconds: 0, error: null, latestImage: null,
+      phase: 'idle', active: false, repeat: true, saveFrames: false, completedCount: 0, exposureSeconds: 2, elapsedSeconds: 0, error: null, latestImage: null, cooling: null,
     }), savedImageCount })
 
     const unavailable = (reason: string): CaptureView => ({ ...current(), rigName: rig.name, enabled: false, unavailableReason: reason })
@@ -81,23 +115,25 @@ export function registerCapture(
 
     if (!camera) return unavailable('The configured capture camera was not found.')
     const cameraView = { name: rig.imagingCamera?.name ?? camera.name?.trim() ?? camera.configuredName }
+    const cooling = captureCooling(camera.telemetry.values)
+    const project = (view: CaptureView): CaptureView => ({ ...view, camera: cameraView, cooling })
 
-    if (!camera.name?.trim() || (rig.imagingCamera && camera.name.trim() !== rig.imagingCamera.name)) return { ...unavailable('Camera identity changed or is unavailable. Check the imaging camera configuration.'), camera: cameraView }
+    if (!camera.name?.trim() || (rig.imagingCamera && camera.name.trim() !== rig.imagingCamera.name)) return project({ ...unavailable('Camera identity changed or is unavailable. Check the imaging camera configuration.') })
 
-    if (camera.connection !== 'connected') return { ...unavailable('Connect the camera before taking an exposure.'), camera: cameraView }
+    if (camera.connection !== 'connected') return project({ ...unavailable('Connect the camera before taking an exposure.') })
     const owner = operations.owner(rigId)
 
-    if (owner && owner !== 'capture') return { ...unavailable('Another Rig operation is in progress.'), camera: cameraView }
+    if (owner && owner !== 'capture') return project({ ...unavailable('Another Rig operation is in progress.') })
 
     if (!controllers.get(rigId)?.active()) {
       const telemetry = camera.telemetry.values
 
       if (telemetry?.kind !== 'camera' || telemetry.activity !== 'idle') {
-        return { ...unavailable('The camera has not confirmed it is idle.'), camera: cameraView }
+        return project({ ...unavailable('The camera has not confirmed it is idle.') })
       }
     }
 
-    return { ...current(), rigName: rig.name, camera: cameraView, enabled: true, unavailableReason: null }
+    return project({ ...current(), rigName: rig.name, enabled: true, unavailableReason: null })
   }
 
   app.get<{ Params: { rigId: string } }>('/api/web/rigs/:rigId/capture', async (request, reply) => {
@@ -147,11 +183,71 @@ export function registerCapture(
 
       started = true
 
-      return { ...result, savedImageCount: view.savedImageCount }
+      return { ...result, savedImageCount: view.savedImageCount, cooling: view.cooling }
     } catch (error) {
       return reply.code(409).send({ error: error instanceof Error ? error.message : 'Could not start exposure' })
     } finally {
       if (!started) release()
+    }
+  })
+
+  app.post<{ Params: { rigId: string } }>('/api/rigs/:rigId/capture/cooling', async (request, reply) => {
+    const parsed = z.strictObject({
+      coolerOn: z.boolean().optional(),
+      setpointC: z.number().finite().gte(-80).lte(50).optional(),
+    }).refine(value => value.coolerOn !== undefined || value.setpointC !== undefined).safeParse(request.body)
+
+    if (!request.headers['content-type']?.startsWith('application/json') || !parsed.success) {
+      return reply.code(400).send({ error: 'Expected coolerOn and/or setpointC. Setting a temperature does not turn the cooler on.' })
+    }
+
+    const owner = operations.owner(request.params.rigId)
+
+    if (owner && owner !== 'capture') return reply.code(409).send({ error: 'Another Rig operation is in progress.' })
+    const release = owner === 'capture' ? undefined : operations.acquire(request.params.rigId, 'capture')
+
+    if (!release && owner !== 'capture') return reply.code(409).send({ error: 'Another Rig operation is in progress.' })
+
+    try {
+      const view = await rigView(request.params.rigId)
+
+      if (!view) return reply.code(404).send({ error: 'Rig not found' })
+
+      if (!view.camera) return reply.code(409).send({ error: view.unavailableReason ?? 'Imaging camera is unavailable.' })
+      const rig = await catalog.get(view.rigId)
+      const target = rig && cameraSettings(rig)
+
+      if (!target) return reply.code(409).send({ error: 'Imaging camera selection is unavailable.' })
+
+      const cooling = createCooling(target)
+      const identity = { cameraId: target.cameraId, expectedCameraName: view.camera.name }
+      let result
+
+      if (parsed.data.coolerOn !== undefined && parsed.data.setpointC !== undefined) {
+        result = await cooling.setCooling({ ...identity, coolerOn: parsed.data.coolerOn, setpointC: parsed.data.setpointC })
+      } else if (parsed.data.coolerOn !== undefined) {
+        result = await cooling.setCooling({ ...identity, coolerOn: parsed.data.coolerOn })
+      } else {
+        result = await cooling.setCooling({ ...identity, setpointC: parsed.data.setpointC! })
+      }
+
+      if (result.outcome === 'uncertain') {
+        return reply.code(409).send({
+          error: 'The cooler command could not be confirmed. Check camera cooling before assuming it changed.',
+        })
+      }
+
+      if (result.outcome === 'failed') {
+        const status = result.reason === 'device-not-found' ? 404 : 409
+
+        return reply.code(status).send({ error: result.message ?? 'The camera did not accept the cooling command.' })
+      }
+
+      return await rigView(request.params.rigId) ?? reply.code(404).send({ error: 'Rig not found' })
+    } catch (error) {
+      return reply.code(409).send({ error: error instanceof Error ? error.message : 'Could not change cooling' })
+    } finally {
+      release?.()
     }
   })
 

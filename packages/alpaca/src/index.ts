@@ -43,3 +43,13 @@ export type { AlpacaAcquisition, AlpacaAcquisitionOptions, AlpacaCaptureOptions,
 export { createAlpacaFraming, AlpacaFramingStoppedError } from './framing.js'
 
 export type { AlpacaFraming, AlpacaFramingOptions, AlpacaCameraGeometry, AlpacaTelescopeStatus, AlpacaSlewOptions, AlpacaCoordinateSystem } from './framing.js'
+
+export { createAlpacaCameraCooling } from './cooling.js'
+
+export type {
+  AlpacaCameraCooling,
+  AlpacaCameraCoolingOptions,
+  CameraCoolingCommand,
+  CameraCoolingCommandResult,
+  CameraCoolingObservation,
+} from './cooling.js'
