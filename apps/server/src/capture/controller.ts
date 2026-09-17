@@ -49,7 +49,7 @@ export function createCaptureController(
   let view: CaptureView = {
     rigId: settings.rigId, rigName: settings.rigName, camera: null,
     enabled: true, unavailableReason: null, phase: 'idle', active: false,
-    repeat: true, saveFrames: false, savedImageCount: 0, completedCount: 0, exposureSeconds: 2, elapsedSeconds: 0, error: null, latestImage: null,
+    repeat: true, saveFrames: false, savedImageCount: 0, completedCount: 0, exposureSeconds: 2, elapsedSeconds: 0, error: null, latestImage: null, cooling: null,
   }
 
   let running: Promise<void> | undefined

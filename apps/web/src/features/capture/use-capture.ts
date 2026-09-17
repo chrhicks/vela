@@ -19,6 +19,9 @@ export function useCapture(rigId: string) {
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [commandUnconfirmed, setCommandUnconfirmed] = useState(false)
+  const [coolingPending, setCoolingPending] = useState(false)
+  const [coolingError, setCoolingError] = useState<string | null>(null)
+  const [coolingUnconfirmed, setCoolingUnconfirmed] = useState(false)
   const request = useRef<AbortController | null>(null)
   const lastView = useRef<CaptureView | null>(null)
   const writing = useRef(false)
@@ -51,6 +54,8 @@ export function useCapture(rigId: string) {
       } else if (explicit && !next.active) {
         setCommandUnconfirmed(false)
         setError(null)
+        setCoolingUnconfirmed(false)
+        setCoolingError(null)
       }
     } catch (cause) {
       if (!alive.current || current !== generation.current) return
@@ -90,13 +95,24 @@ export function useCapture(rigId: string) {
     }
   }, [read])
 
-  const canStart = !!view?.enabled && !view.active && !offline && !pending && !commandUnconfirmed
+  const canStart = !!view?.enabled && !view.active && !offline && !pending && !coolingPending && !commandUnconfirmed
   const canStop = !!view?.active && view.phase !== 'stopping' && !offline && !pending
+  const canCool = !!view?.cooling && !view.active && !offline && !pending && !coolingPending && !coolingUnconfirmed && !commandUnconfirmed
 
-  async function command(action: 'start' | 'stop', exposureSeconds?: number, repeat = false, saveFrames = false) {
-    if (writing.current || !alive.current || (action === 'start' ? !canStart : !canStop)) return
+  async function post(
+    path: 'start' | 'stop' | 'cooling',
+    body: { exposureSeconds: number, repeat: boolean, saveFrames: boolean } | { coolerOn: boolean } | { setpointC: number } | Record<string, never>,
+  ) {
+    if (writing.current || !alive.current) return
 
-    if (action === 'start' && (exposureSeconds === undefined || !Number.isFinite(exposureSeconds) || exposureSeconds < 0.1 || exposureSeconds > 600)) return
+    let allowed = canCool
+
+    if (path === 'start') allowed = canStart
+
+    if (path === 'stop') allowed = canStop
+
+    if (!allowed) return
+
     const controller = new AbortController()
     // A deliberate command supersedes a quiet poll. Its late result cannot
     // overwrite the command response, even if transport cancellation loses a race.
@@ -105,13 +121,19 @@ export function useCapture(rigId: string) {
     const current = ++generation.current
     writing.current = true
     setRefreshing(false)
-    setPending(true)
-    setError(null)
+
+    if (path === 'cooling') {
+      setCoolingPending(true)
+      setCoolingError(null)
+    } else {
+      setPending(true)
+      setError(null)
+    }
 
     try {
-      const next = await api(`rigs/${encodeURIComponent(rigId)}/capture/${action}`, {
+      const next = await api(`rigs/${encodeURIComponent(rigId)}/capture/${path}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(action === 'start' ? { exposureSeconds, repeat, saveFrames } : {}),
+        body: JSON.stringify(body),
         signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]),
       })
 
@@ -121,8 +143,24 @@ export function useCapture(rigId: string) {
       lastView.current = next
       setView(next)
       setOffline(false)
-    } catch {
+      setCommandUnconfirmed(false)
+      setError(null)
+      setCoolingUnconfirmed(false)
+      setCoolingError(null)
+    } catch (cause) {
       if (!alive.current || current !== generation.current) return
+
+      if (path === 'cooling') {
+        const message = cause instanceof ApiError && cause.code
+          ? cause.code
+          : 'The cooler command could not be confirmed. Check camera cooling before assuming it changed.'
+
+        setCoolingError(message)
+        setCoolingUnconfirmed(/could not be confirmed/i.test(message))
+
+        return
+      }
+
       setCommandUnconfirmed(true)
       setError('The command response could not be confirmed. Check capture state before starting another exposure.')
     } finally {
@@ -130,11 +168,22 @@ export function useCapture(rigId: string) {
         request.current = null
         writing.current = false
 
-        if (alive.current && current === generation.current) setPending(false)
+        if (alive.current && current === generation.current) {
+          if (path === 'cooling') setCoolingPending(false)
+          else setPending(false)
+        }
       }
     }
   }
 
-  return { view, offline, pending, refreshing, error, commandUnconfirmed, canStart, canStop,
-    start: (seconds: number, repeat: boolean, saveFrames: boolean) => command('start', seconds, repeat, saveFrames), stop: () => command('stop'), refresh: () => read(true) }
+  return { view, offline, pending, coolingPending, refreshing, error, coolingError, commandUnconfirmed, coolingUnconfirmed, canStart, canStop, canCool,
+    start: (seconds: number, repeat: boolean, saveFrames: boolean) => {
+      if (!Number.isFinite(seconds) || seconds < 0.1 || seconds > 600) return Promise.resolve()
+
+      return post('start', { exposureSeconds: seconds, repeat, saveFrames })
+    },
+    stop: () => post('stop', {}),
+    setCooler: (coolerOn: boolean) => post('cooling', { coolerOn }),
+    setCoolingTemperature: (setpointC: number) => post('cooling', { setpointC }),
+    refresh: () => read(true) }
 }

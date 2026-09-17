@@ -73,7 +73,9 @@ page. The count resets on start, while the latest image remains until a new imag
 published. The saveFrames flag is the active run's retention choice; savedImageCount
 is null when storage cannot be inspected. The saving phase remains active while
 the server writes an image. CaptureImage.saved confirms retention of that image's
-original data and preview. SavedImage and SavedImagesView describe durable artifacts
+original data and preview. `cooling` is confirmed CoolerOn plus optional sensor
+temperature, requested setpoint and power; a near-setpoint sensor is not cooler-on.
+Null cooling means the imaging camera does not report cooler state. SavedImage and SavedImagesView describe durable artifacts
 and their download resources separately from the ephemeral capture run. Neither
 contract represents a durable sequence or resumable execution.
 

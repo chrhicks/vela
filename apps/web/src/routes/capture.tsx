@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { CameraMark, LatestImage } from '../features/capture/LatestImage'
 import { captureActivity, useCapture } from '../features/capture/use-capture'
+import { CaptureCooling } from '../features/capture/CaptureCooling'
 import './capture.css'
 
 export function Capture() {
@@ -16,7 +17,7 @@ function CapturePage({ rigId }: { rigId: string }) {
   const [exposure, setExposure] = useState<string | null>(null)
   const [saveFrames, setSaveFrames] = useState<boolean | null>(null)
   const [repeat, setRepeat] = useState<boolean | null>(null)
-  const { view, offline, pending, refreshing, error, commandUnconfirmed } = capture
+  const { view, offline, pending, coolingPending, refreshing, error, coolingError, commandUnconfirmed, coolingUnconfirmed } = capture
   const exposureValue = view?.active ? String(view.exposureSeconds) : exposure ?? String(view?.exposureSeconds ?? 2)
   const repeating = view?.active ? view.repeat : repeat ?? view?.repeat ?? true
   const savingFrames = view?.active ? view.saveFrames : saveFrames ?? false
@@ -50,6 +51,17 @@ function CapturePage({ rigId }: { rigId: string }) {
       <LatestImage rigId={rigId} image={view.latestImage} busy={busy} interrupted={offline || commandUnconfirmed || !view.enabled} />
       <Panel className="capture-page__controls" title="Capture images">
         <div className="capture-page__camera"><CameraMark /><div><strong>{view.camera?.name ?? 'No camera available'}</strong>{view.camera && <span>Imaging camera</span>}</div></div>
+        {view.cooling && <CaptureCooling
+          cooling={view.cooling}
+          disabled={!capture.canCool}
+          pending={coolingPending}
+          error={coolingError}
+          unconfirmed={coolingUnconfirmed}
+          runActive={view.active}
+          onCooler={coolerOn => void capture.setCooler(coolerOn)}
+          onSetpoint={setpointC => void capture.setCoolingTemperature(setpointC)}
+          onCheck={() => void capture.refresh()}
+        />}
         <form onSubmit={event => {
           event.preventDefault()
 

@@ -41,6 +41,13 @@ state, so it never prevents stopping an exposure or claims a camera command fail
 The immutable loaded metadata is supplemented by confirmed save responses and the
 matching current projection's saved flag.
 
+Cooling controls sit with capture prep. Confirmed CoolerOn, sensor temperature,
+requested setpoint and power are server projections. A sensor near the requested
+temperature is not treated as cooling enabled. Cooler on/off and target temperature
+are explicit commands; setting a target does not turn the cooler on. Cooling is
+disabled while a capture run is active so Stop stays available. Cooler command
+failures stay in the cooling region and do not label capture unavailable.
+
 Saved images are available at the per-rig Observe/saved-images route independently
 of camera readiness. The dated collection and detail page validate retained-image
 metadata and exact same-origin download resources. They use the approved workshop
