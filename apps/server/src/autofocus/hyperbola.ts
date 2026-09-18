@@ -43,6 +43,12 @@ export function fitHyperbola(points: HyperbolaPoint[]): HyperbolaFit | null {
   if (!best) return null
   const coarse = best
   search(coarse.p - span / 20, coarse.p + span / 20, coarse.a * 0.85, coarse.a * 1.15, coarse.b * 0.7, coarse.b * 1.3, 15, 11, 11, consider)
+  const refined = best
+  const pLo = refined.p - Math.max(span / 80, 0.5)
+  const pHi = refined.p + Math.max(span / 80, 0.5)
+  const pSteps = 41
+
+  for (let i = 0; i < pSteps; i++) consider(pLo + (i / (pSteps - 1)) * (pHi - pLo), refined.a, refined.b)
 
   return { p: best.p, a: best.a, b: best.b, rSquared: best.rSquared }
 }

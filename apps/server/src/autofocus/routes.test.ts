@@ -23,12 +23,20 @@ const cleanups: Array<() => Promise<void>> = []
 
 afterEach(async () => { await Promise.all(cleanups.splice(0).map(cleanup => cleanup())) })
 
+function deferred() {
+  let resolve!: () => void
+  const promise = new Promise<void>(yes => { resolve = () => yes() })
+
+  return { promise, resolve }
+}
+
 function setup() {
   const app = Fastify()
   const catalog = createMemoryRigCatalog([record])
   const operations = createRigOperations()
   let position = 32842
   const moves: number[] = []
+  const captures: Array<ReturnType<typeof deferred>> = []
 
   const focuser: AutofocusFocuser = {
     async status() { return { absolute: true, position, maxStep: 60000, moving: false } },
@@ -44,6 +52,10 @@ function setup() {
 
   const camera: AutofocusCamera = {
     async capture() {
+      const gate = deferred()
+      captures.push(gate)
+      await gate.promise
+
       return { width: 8, height: 8, pixels: new Float64Array(64), capturedAt: '2026-09-17T00:00:00.000Z', color: { kind: 'mono' } }
     },
   }
@@ -68,6 +80,21 @@ function setup() {
     get: () => app.inject({ method: 'GET', url: '/api/web/rigs/fra/autofocus' }),
     start: (body: object = { stepSize: 50 }) => app.inject({ method: 'POST', url: '/api/rigs/fra/autofocus/start', payload: body }),
     stop: () => app.inject({ method: 'POST', url: '/api/rigs/fra/autofocus/stop', payload: {} }),
+    land: async () => {
+      await vi.waitFor(() => expect(captures.length).toBeGreaterThan(0))
+      captures.shift()!.resolve()
+    },
+    finish: async () => {
+      const deadline = Date.now() + 8000
+
+      while (Date.now() < deadline) {
+        if (!(await app.inject({ method: 'GET', url: '/api/web/rigs/fra/autofocus' })).json().active) return
+        if (captures.length) captures.shift()!.resolve()
+        await new Promise(resolve => setTimeout(resolve, 5))
+      }
+
+      throw new Error('Autofocus walk did not finish')
+    },
     operations, moves,
   }
 }
@@ -87,15 +114,17 @@ it('publishes samples onto the live view as the walk runs', async () => {
   expect((await subject.get()).json()).toMatchObject({ enabled: true, samples: [], startPosition: null, currentPosition: 32842 })
   const started = await subject.start({ stepSize: 50, exposureSeconds: 2 })
   expect(started.statusCode).toBe(200)
-  expect(started.json()).toMatchObject({ active: true, startPosition: 32842, phase: 'walking' })
+  expect(started.json()).toMatchObject({ active: true, startPosition: 32842, phase: 'walking', samples: [] })
+  await subject.land()
   await vi.waitFor(async () => {
     const view = (await subject.get()).json()
-    expect(view.samples.length).toBeGreaterThan(0)
+    expect(view.samples.length).toBe(1)
   })
   const mid = (await subject.get()).json()
   expect(mid.samples[0].position).not.toBe(0)
   expect(mid.startPosition).toBe(32842)
-  await vi.waitFor(async () => expect((await subject.get()).json().active).toBe(false), { timeout: 8000 })
+  expect(mid.fit).toBeNull()
+  await subject.finish()
   const done = (await subject.get()).json()
   expect(done.phase).toBe('complete')
   expect(done.fit.position).not.toBe(0)

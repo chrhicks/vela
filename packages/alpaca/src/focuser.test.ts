@@ -29,8 +29,8 @@ function observatory(requestTimeoutMs = 100) {
       if (operation === 'position') {
         values.ismoving = true
         started()
-        state.onMove()
         values.position = Number(parameters.get('Position'))
+        state.onMove()
 
         if (state.loseMove) throw new TypeError('Response lost after move started')
       } else if (operation === 'halt') {
@@ -86,7 +86,7 @@ describe('focuser write boundary', () => {
     const missed = observatory()
     missed.state.loseMove = true
     missed.state.onMove = () => { missed.values.position = 32842 }
-    await expect(missed.focuser.move({ focuserId: 'eaf-id', position: 33042, window })).rejects.toThrow('Unable to reach')
+    await expect(missed.focuser.move({ focuserId: 'eaf-id', position: 33042, window })).rejects.toThrow(/did not confirm the commanded position/)
     expect(missed.writes.map(write => write.operation)).toEqual(['position', 'halt'])
     expect(missed.writes.filter(write => write.operation === 'position')).toHaveLength(1)
   })
