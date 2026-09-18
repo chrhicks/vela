@@ -13,7 +13,8 @@ const view: AutofocusView = {
 it('labels travel-limit aborts separately from unrestored failures', () => {
   expect(autofocusActivity({
     ...view,
-    startPosition: 80,
+    phase: 'setup',
+    startPosition: null,
     currentPosition: 80,
     error: 'That step-size window would approach 0 or MaxStep. Choose a smaller step or start farther from the ends. Vela will not move.',
   }, false)).toBe('Walk did not start')

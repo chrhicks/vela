@@ -1,6 +1,6 @@
 import type { AutofocusView } from '@vela/model/web'
 import { Badge, Button, Input, Panel } from '@vela/ui'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { AutofocusCurve } from '../features/autofocus/AutofocusCurve'
 import { autofocusActivity, useAutofocus } from '../features/autofocus/use-autofocus'
@@ -16,13 +16,18 @@ export function Autofocus() {
 function AutofocusPage({ rigId }: { rigId: string }) {
   const { view, offline, pending, error, start, stop } = useAutofocus(rigId)
   const [stepSize, setStepSize] = useState('50')
+  const [returnedToSetup, setReturnedToSetup] = useState(false)
   const back = <Link className="vela-rig-page__back" to={`/rigs/${encodeURIComponent(rigId)}/observe`}>← Observe</Link>
+
+  useEffect(() => {
+    if (view?.active) setReturnedToSetup(false)
+  }, [view?.active])
 
   if (!view) return <section className="vela-rig-page">{back}<h1>Autofocus</h1><p role="status">{offline ? 'Autofocus state unavailable. Reconnecting…' : 'Loading autofocus…'}</p></section>
 
   const step = Math.max(1, Math.floor(Number(stepSize) || 50))
   const disabled = pending || offline
-  const setup = view.phase === 'setup' && !view.active
+  const setup = !view.active && (view.phase === 'setup' || returnedToSetup)
   const busy = view.active
   const latest = view.samples.at(-1)
   const lowest = view.samples.reduce<AutofocusView['samples'][number] | undefined>((best, sample) => {
@@ -37,10 +42,11 @@ function AutofocusPage({ rigId }: { rigId: string }) {
   const noticeTitle = travelLimit ? 'Walk would approach a travel limit'
     : view.restoredStart ? 'Start position restored'
     : view.phase === 'failed' && !view.restoredStart ? 'Start position was not restored'
+    : view.error ? 'Walk did not start'
     : 'Autofocus'
   const activity = autofocusActivity(view, offline)
   const badge = offline ? 'Disconnected'
-    : view.phase === 'setup' ? 'Not started'
+    : view.phase === 'setup' ? (view.error || travelBlocked ? 'Blocked' : 'Not started')
     : view.phase === 'walking' ? 'Walking'
     : view.phase === 'fitting' ? 'Fitting'
     : view.phase === 'confirming' ? 'Confirming'
@@ -93,13 +99,13 @@ function AutofocusPage({ rigId }: { rigId: string }) {
         </div>
       </div>
     ) : (
-      <Walk view={view} activity={activity} latest={latest} lowest={lowest} offline={offline} disabled={disabled} busy={busy} onStop={() => void stop()} onAgain={() => void start(step, view.exposureSeconds || 2)} />
+      <Walk view={view} activity={activity} latest={latest} lowest={lowest} offline={offline} disabled={disabled} busy={busy} onStop={() => void stop()} onAgain={() => void start(step, view.exposureSeconds || 2)} onBackToSetup={() => setReturnedToSetup(true)} />
     )}
   </section>
 }
 
 function Walk({
-  view, activity, latest, lowest, offline, disabled, busy, onStop, onAgain,
+  view, activity, latest, lowest, offline, disabled, busy, onStop, onAgain, onBackToSetup,
 }: {
   view: AutofocusView
   activity: string
@@ -110,6 +116,7 @@ function Walk({
   busy: boolean
   onStop: () => void
   onAgain: () => void
+  onBackToSetup: () => void
 }) {
   const expected = view.offsetSteps * 2 + 1
 
@@ -162,12 +169,16 @@ function Walk({
             ? 'The fitted minimum is an integer step inside the sampled window. The lowest sampled HFR is shown only for comparison.'
             : view.restoredStart
               ? 'The focuser is back at the position where this session began.'
-              : 'Points appear as each short lands. Stop restores the start position; Vela will not keep walking toward a limit.'}
+              : view.phase === 'failed'
+                ? 'The start position was not confirmed. Vela did not repeat the move.'
+                : 'Points appear as each short lands. Stop restores the start position; Vela will not keep walking toward a limit.'}
         </p>
         {busy ? (
           <Button size="large" disabled={disabled} onClick={onStop}>Stop and restore start</Button>
-        ) : (
+        ) : view.phase === 'complete' ? (
           <Button size="large" tone="accent" disabled={disabled || !view.enabled} onClick={onAgain}>Focus again</Button>
+        ) : (
+          <Button size="large" tone="accent" disabled={disabled || !view.enabled} onClick={onBackToSetup}>Back to setup</Button>
         )}
       </div>
     </div>

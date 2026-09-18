@@ -13,10 +13,10 @@ const view: AutofocusView = {
 
 const travelLimit: AutofocusView = {
   ...view,
-  phase: 'failed',
+  phase: 'setup',
   activity: 'idle',
   active: false,
-  startPosition: 80,
+  startPosition: null,
   currentPosition: 80,
   samples: [],
   error: 'That step-size window would approach 0 or MaxStep. Choose a smaller step or start farther from the ends. Vela will not move.',
@@ -29,11 +29,10 @@ describe('autofocus response validation', () => {
     expect(isAutofocusView(view, 'other')).toBe(false)
   })
 
-  it('accepts a travel-limit abort, including a reported start of 0', () => {
+  it('accepts a travel-limit abort, including a reported position of 0', () => {
     expect(isAutofocusView(travelLimit, 'fra')).toBe(true)
     expect(isAutofocusView({
       ...travelLimit,
-      startPosition: 0,
       currentPosition: 0,
       error: 'The focuser is already at a mechanical limit. Autofocus starts from the current position and will not command 0 or MaxStep.',
     }, 'fra')).toBe(true)

@@ -42,7 +42,7 @@ export interface AutofocusView {
   exposureStartedAt: string | null
   samples: AutofocusSample[]
   fit: AutofocusFit | null
-  /** True only after a failed or cancelled walk confirmed return to start. */
+  /** True only after a failed or cancelled walk confirmed return to start. False if restore was not attempted or not confirmed. */
   restoredStart: boolean
   error: string | null
 }

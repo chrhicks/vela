@@ -65,7 +65,8 @@ position when the session began — the restore target. It may be 0 if that is t
 reported mechanical position; it is never a request to home to 0. `samples` grow
 as each short lands so the graph can be live. `fit` is the hyperbola minimum
 inside the sampled window; `minSamplePosition` is comparison only. `restoredStart`
-is true only after a failed or cancelled walk confirmed return to start.
+is true only after a failed or cancelled walk confirmed return to start. A walk
+that never left the current position stays in setup with an error.
 
 The Capture view describes one ephemeral capture run, its readiness and phase,
 its repeat setting and count of published images in that run,

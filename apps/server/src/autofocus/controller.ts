@@ -105,25 +105,38 @@ export function createAutofocusController(
     return arrived.position
   }
 
+  function abortStart(message: string, status?: { position: number, maxStep: number }) {
+    patch({
+      phase: 'setup', activity: 'idle', active: false, restoredStart: false,
+      startPosition: null, samples: [], fit: null, error: message, exposureStartedAt: null,
+      currentPosition: status?.position ?? view.currentPosition,
+      maxStep: status?.maxStep ?? view.maxStep,
+    })
+    plannedReady?.resolve()
+    plannedReady = undefined
+  }
+
   async function run(camera: AutofocusCamera, focuser: AutofocusFocuser, stepSize: number, offsetSteps: number, exposureSeconds: number, signal: AbortSignal) {
     let plan: AutofocusWalkPlan
 
     try {
       const status = await focuser.status(signal)
 
-      if (!status.absolute) throw new Error('Autofocus needs an absolute focuser')
+      if (!status.absolute) {
+        abortStart('Autofocus needs an absolute focuser', status)
 
-      if (status.moving) throw new Error('The focuser is already moving')
+        return
+      }
+
+      if (status.moving) {
+        abortStart('The focuser is already moving', status)
+
+        return
+      }
       const planned = planStarHfrWalk(status.position, stepSize, offsetSteps, status.maxStep)
 
       if (!planned.ok) {
-        patch({
-          phase: 'failed', activity: 'idle', active: false,
-          startPosition: status.position, currentPosition: status.position, maxStep: status.maxStep,
-          restoredStart: false, error: planned.message,
-        })
-        plannedReady?.resolve()
-        plannedReady = undefined
+        abortStart(planned.message, status)
 
         return
       }
@@ -136,13 +149,7 @@ export function createAutofocusController(
       plannedReady?.resolve()
       plannedReady = undefined
     } catch (error) {
-      const cause = error instanceof Error ? error : new Error('Autofocus did not start')
-      patch({
-        phase: 'failed', activity: 'idle', active: false, restoredStart: false,
-        error: cause.message, exposureStartedAt: null,
-      })
-      plannedReady?.resolve()
-      plannedReady = undefined
+      abortStart(error instanceof Error ? error.message : 'Autofocus did not start')
 
       return
     }
