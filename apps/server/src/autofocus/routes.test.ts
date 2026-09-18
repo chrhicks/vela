@@ -131,11 +131,11 @@ it('publishes samples onto the live view as the walk runs', async () => {
   expect(subject.moves).not.toContain(0)
 })
 
-it('returns a failed travel-limit view without moving', async () => {
+it('returns to setup for a travel-limit start without moving', async () => {
   const subject = setup(80)
   const started = await subject.start({ stepSize: 50, exposureSeconds: 2 })
   expect(started.statusCode).toBe(200)
-  expect(started.json()).toMatchObject({ phase: 'failed', active: false, startPosition: 80, restoredStart: false })
+  expect(started.json()).toMatchObject({ phase: 'setup', active: false, startPosition: null, currentPosition: 80, restoredStart: false })
   expect(started.json().error).toMatch(/MaxStep|0/)
   expect(subject.moves).toEqual([])
 })

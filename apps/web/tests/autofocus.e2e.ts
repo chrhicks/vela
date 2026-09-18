@@ -71,13 +71,9 @@ test('a window that would approach 0 does not start', async ({ page }) => {
   await expect(page.getByText('Walk would approach a travel limit')).toBeVisible()
 })
 
-test('a travel-limit start result is shown instead of a disconnect', async ({ page }) => {
-  const failed: AutofocusView = {
+test('a travel-limit start result returns to setup instead of a disconnect', async ({ page }) => {
+  const aborted: AutofocusView = {
     ...setup,
-    phase: 'failed',
-    activity: 'idle',
-    active: false,
-    startPosition: 0,
     currentPosition: 0,
     error: 'The focuser is already at a mechanical limit. Autofocus starts from the current position and will not command 0 or MaxStep.',
   }
@@ -85,16 +81,21 @@ test('a travel-limit start result is shown instead of a disconnect', async ({ pa
 
   await page.route('**/api/web/rigs/rig-1/autofocus', route => route.fulfill({ json: current }))
   await page.route('**/api/rigs/rig-1/autofocus/start', route => {
-    current = failed
+    current = aborted
 
-    return route.fulfill({ json: failed })
+    return route.fulfill({ json: aborted })
   })
   await page.goto('/rigs/rig-1/observe/autofocus')
   await page.getByRole('button', { name: 'Start autofocus' }).click()
   await expect(page.getByText('Walk would approach a travel limit')).toBeVisible()
   await expect(page.getByText(/will not command 0 or MaxStep/)).toBeVisible()
   await expect(page.locator('.vela-autofocus')).not.toContainText('Disconnected')
-  await expect(page.locator('.vela-af-readout')).toContainText('0')
+  await expect(page.locator('.vela-autofocus')).not.toContainText('Start position was not restored')
+  await expect(page.locator('.vela-autofocus')).not.toContainText('Focus again')
+  await expect(page.locator('.vela-autofocus')).not.toContainText('Points appear as each short lands')
+  await expect(page.locator('.vela-af-facts')).toContainText('0')
+  await expect(page.getByLabel('Step size')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Window does not fit' })).toBeDisabled()
 })
 
 test('an unrestored failure is not labeled as a travel limit', async ({ page }) => {
@@ -106,6 +107,7 @@ test('an unrestored failure is not labeled as a travel limit', async ({ page }) 
     startPosition: 32842,
     currentPosition: 32992,
     restoredStart: false,
+    samples: [{ position: 32992, detectedStars: 18, hfrPixels: 4.1, capturedAt: '2026-09-17T00:00:02.000Z' }],
     error: 'The focuser did not confirm return to the start position. Vela did not repeat the move.',
   }
 
@@ -113,6 +115,12 @@ test('an unrestored failure is not labeled as a travel limit', async ({ page }) 
   await page.goto('/rigs/rig-1/observe/autofocus')
   await expect(page.getByText('Start position was not restored')).toBeVisible()
   await expect(page.getByText('Walk failed · start was not restored')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Back to setup' })).toBeVisible()
   await expect(page.locator('.vela-autofocus')).not.toContainText('Walk would approach a travel limit')
   await expect(page.locator('.vela-autofocus')).not.toContainText('Disconnected')
+  await expect(page.locator('.vela-autofocus')).not.toContainText('Points appear as each short lands')
+  await page.getByRole('button', { name: 'Back to setup' }).click()
+  await expect(page.getByLabel('Step size')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Start autofocus' })).toBeVisible()
+  await expect(page.getByText('Start position was not restored')).toBeVisible()
 })

@@ -22,6 +22,8 @@ export function autofocusActivity(view: AutofocusView, offline: boolean) {
 
   if (view.phase === 'stopped') return 'Walk stopped · start restored'
 
+  if (view.phase === 'setup' && view.error) return 'Walk did not start'
+
   if (view.phase === 'failed') {
     if (isTravelLimitError(view.error)) return 'Walk did not start'
     if (view.restoredStart) return 'Walk failed · start restored'
