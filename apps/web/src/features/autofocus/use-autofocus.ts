@@ -1,7 +1,7 @@
 import type { AutofocusView } from '@vela/model/web'
 import { useEffect, useRef, useState } from 'react'
-import { api } from '../../lib/api'
-import { isAutofocusView } from './validation'
+import { api, ApiError } from '../../lib/api'
+import { isAutofocusView, isTravelLimitError } from './validation'
 
 export function autofocusActivity(view: AutofocusView, offline: boolean) {
   if (offline) return 'Connection interrupted'
@@ -22,7 +22,12 @@ export function autofocusActivity(view: AutofocusView, offline: boolean) {
 
   if (view.phase === 'stopped') return 'Walk stopped · start restored'
 
-  if (view.phase === 'failed') return view.restoredStart ? 'Walk failed · start restored' : 'Walk did not start'
+  if (view.phase === 'failed') {
+    if (isTravelLimitError(view.error)) return 'Walk did not start'
+    if (view.restoredStart) return 'Walk failed · start restored'
+
+    return 'Walk failed · start was not restored'
+  }
 
   return 'Ready to start from the current position'
 }
@@ -84,7 +89,11 @@ export function useAutofocus(rigId: string) {
 
       if (alive.current) { setView(result); setOffline(false) }
     } catch (cause) {
-      if (alive.current) setError(`${cause instanceof Error ? cause.message : 'Command response unavailable'}. The command was not repeated; check the current state before trying again.`)
+      const message = cause instanceof ApiError && cause.code
+        ? cause.code
+        : cause instanceof Error ? cause.message : 'Command response unavailable'
+
+      if (alive.current) setError(`${message}. The command was not repeated; check the current state before trying again.`)
       await read()
     } finally {
       writing.current = false

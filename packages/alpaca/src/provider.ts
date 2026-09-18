@@ -662,6 +662,8 @@ async function inspectFocuser(
 
   if (position !== undefined) telemetry.position = position
 
+  if (typeof maxStep === 'number' && Number.isSafeInteger(maxStep) && maxStep >= 1) telemetry.maxStep = maxStep
+
   if (moving !== undefined) telemetry.moving = moving
 
   if (temperatureC !== undefined) telemetry.temperatureC = temperatureC

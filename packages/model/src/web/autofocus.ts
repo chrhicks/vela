@@ -31,7 +31,7 @@ export interface AutofocusView {
   phase: AutofocusPhase
   activity: AutofocusActivity
   active: boolean
-  /** EAF position when the session began. Restore target. Never a request to Move(0). */
+  /** EAF position when the session began. Restore target. 0 is a reported mechanical stop, not a request to Move(0). */
   startPosition: number | null
   currentPosition: number | null
   maxStep: number | null

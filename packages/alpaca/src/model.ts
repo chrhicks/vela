@@ -74,6 +74,7 @@ export type AlpacaDeviceTelemetry =
   | {
       readonly kind: 'focuser'
       readonly position?: number
+      readonly maxStep?: number
       readonly moving?: boolean
       readonly temperatureC?: number
     }

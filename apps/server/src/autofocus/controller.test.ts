@@ -132,9 +132,25 @@ it('restores the start position on cancel and never commands 0', async () => {
 
 it('aborts a window that would approach 0 without moving', async () => {
   const { controller, camera, focuser, moves } = setup(80)
-  await controller.start(camera, focuser, { stepSize: 50, offsetSteps: 4 })
-  await vi.waitFor(() => expect(controller.active()).toBe(false))
-  expect(controller.snapshot()).toMatchObject({ phase: 'failed', startPosition: 80, restoredStart: false })
-  expect(controller.snapshot().error).toMatch(/MaxStep|0/)
+  const view = await controller.start(camera, focuser, { stepSize: 50, offsetSteps: 4 })
+  expect(view).toMatchObject({ phase: 'failed', active: false, startPosition: 80, restoredStart: false })
+  expect(view.error).toMatch(/MaxStep|0/)
+  expect(moves).toEqual([])
+})
+
+it('reports a start at position 0 as a failed view and does not command Move(0)', async () => {
+  const { controller, camera, focuser, moves } = setup(0)
+  const view = await controller.start(camera, focuser, { stepSize: 50, offsetSteps: 4 })
+  expect(view).toMatchObject({ phase: 'failed', active: false, startPosition: 0, currentPosition: 0, restoredStart: false })
+  expect(view.error).toMatch(/mechanical limit/)
+  expect(moves).toEqual([])
+})
+
+it('returns a failed view when the focuser is not absolute, instead of leftover walking', async () => {
+  const { controller, camera, focuser, moves } = setup()
+  focuser.status = async () => ({ absolute: false, position: 32842, maxStep: 60000, moving: false })
+  const view = await controller.start(camera, focuser)
+  expect(view).toMatchObject({ phase: 'failed', active: false, restoredStart: false })
+  expect(view.error).toMatch(/absolute/)
   expect(moves).toEqual([])
 })

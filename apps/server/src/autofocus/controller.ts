@@ -118,7 +118,8 @@ export function createAutofocusController(
 
       if (!planned.ok) {
         patch({
-          phase: 'failed', startPosition: status.position, currentPosition: status.position, maxStep: status.maxStep,
+          phase: 'failed', activity: 'idle', active: false,
+          startPosition: status.position, currentPosition: status.position, maxStep: status.maxStep,
           restoredStart: false, error: planned.message,
         })
         plannedReady?.resolve()
@@ -136,9 +137,14 @@ export function createAutofocusController(
       plannedReady = undefined
     } catch (error) {
       const cause = error instanceof Error ? error : new Error('Autofocus did not start')
-      plannedReady?.reject(cause)
+      patch({
+        phase: 'failed', activity: 'idle', active: false, restoredStart: false,
+        error: cause.message, exposureStartedAt: null,
+      })
+      plannedReady?.resolve()
       plannedReady = undefined
-      throw cause
+
+      return
     }
 
     try {
@@ -168,7 +174,7 @@ export function createAutofocusController(
       patch({ phase: 'confirming' })
       await go(focuser, plan, fit.position, signal)
       await sample(camera, fit.position, exposureSeconds, signal)
-      patch({ phase: 'complete', activity: 'idle', restoredStart: false, error: null, exposureStartedAt: null })
+      patch({ phase: 'complete', activity: 'idle', active: false, restoredStart: false, error: null, exposureStartedAt: null })
     } catch (error) {
       const cancelled = signal.aborted || error instanceof AutofocusStoppedError || (error instanceof Error && error.name === 'AbortError')
 
@@ -180,6 +186,7 @@ export function createAutofocusController(
         patch({
           phase: cancelled ? 'stopped' : 'failed',
           activity: 'idle',
+          active: false,
           error: cancelled ? null : error instanceof Error ? error.message : 'Autofocus failed',
           exposureStartedAt: null,
         })
@@ -187,6 +194,7 @@ export function createAutofocusController(
         patch({
           phase: 'failed',
           activity: 'idle',
+          active: false,
           restoredStart: false,
           error: restoreError instanceof Error ? restoreError.message : 'Start position was not restored',
           exposureStartedAt: null,

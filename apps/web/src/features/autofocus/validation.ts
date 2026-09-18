@@ -43,13 +43,16 @@ const autofocus = z.object({
   error: text.nullable(),
 })
 
+export function isTravelLimitError(error: string | null) {
+  return !!error && (error.includes('already at a mechanical limit') || error.includes('would approach 0 or MaxStep'))
+}
+
 export function isAutofocusView(value: unknown, rigId: string): value is AutofocusView {
   const result = autofocus.safeParse(value)
 
   if (!result.success) return false
   const view = result.data
+  const running = view.phase === 'walking' || view.phase === 'fitting' || view.phase === 'confirming'
 
-  return view.rigId === rigId
-    && view.active === ['walking', 'fitting', 'confirming'].includes(view.phase)
-    && (view.startPosition === null || view.startPosition !== 0)
+  return view.rigId === rigId && view.active === running
 }

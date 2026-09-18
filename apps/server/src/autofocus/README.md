@@ -6,7 +6,10 @@ window around the **current** EAF position, and a hyperbola fit.
 
 Start is the focuser position when the session begins. Cancel and failure restore
 that start. Position 0 is a mechanical stop, not a home; the adapter will not
-command it. Backlash compensation is off (0 in / 0 out).
+command it. A window that cannot fit around start, including a reported start of
+0, returns a failed view without moving. Idle setup includes MaxStep from
+focuser inspection so the page can preview that limit. Backlash compensation is
+off (0 in / 0 out).
 
 Each short exposure appends `(position, HFR)` to the view immediately so the
 Observe graph can grow as the walk runs. The fit is the hyperbola minimum inside

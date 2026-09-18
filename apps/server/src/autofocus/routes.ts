@@ -104,6 +104,9 @@ export function registerAutofocus(
     const idlePosition = !snapshot.active && focuserTelemetry?.kind === 'focuser'
       ? focuserTelemetry.position ?? snapshot.currentPosition
       : snapshot.currentPosition
+    const idleMaxStep = !snapshot.active && focuserTelemetry?.kind === 'focuser'
+      ? focuserTelemetry.maxStep ?? snapshot.maxStep
+      : snapshot.maxStep
 
     if (!snapshot.active) {
       const cameraTelemetry = camera.telemetry.values
@@ -122,7 +125,7 @@ export function registerAutofocus(
     }
 
     return {
-      ...snapshot, rigName: rig.name, ...names, currentPosition: idlePosition,
+      ...snapshot, rigName: rig.name, ...names, currentPosition: idlePosition, maxStep: idleMaxStep,
       enabled: true, unavailableReason: null,
     }
   }
