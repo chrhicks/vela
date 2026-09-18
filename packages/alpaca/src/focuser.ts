@@ -165,7 +165,7 @@ export function createAlpacaFocuser({
 
         if (observed?.position === position && !observed.moving) return { position }
 
-        throw error
+        throw new Error('The focuser did not confirm the commanded position. Vela did not repeat the move.', { cause: error })
       }
     },
 

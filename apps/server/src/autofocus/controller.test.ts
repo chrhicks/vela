@@ -16,10 +16,11 @@ afterEach(async () => {
   await Promise.all(stops.splice(0).map(stop => stop()))
 })
 
-function setup(start = 32842, maxStep = 60000) {
+function setup(start = 32842, maxStep = 60000, { holdMoves = false } = {}) {
   let position = start
   const moves: number[] = []
   const captures: Array<ReturnType<typeof deferred<void>> & { position: number }> = []
+  const pendingMoves: Array<ReturnType<typeof deferred<void>> & { target: number }> = []
 
   const focuser: AutofocusFocuser = {
     async status() {
@@ -30,6 +31,13 @@ function setup(start = 32842, maxStep = 60000) {
       expect(target).toBeGreaterThanOrEqual(Math.max(1, window.minPosition))
       expect(target).toBeLessThan(maxStep)
       expect(target).toBeLessThanOrEqual(window.maxPosition)
+
+      if (holdMoves) {
+        const gate = deferred<void>()
+        pendingMoves.push({ target, ...gate })
+        await gate.promise
+      }
+
       position = target
       moves.push(target)
 
@@ -59,32 +67,43 @@ function setup(start = 32842, maxStep = 60000) {
       medianHfrPixels: hyperbola(position, 2.18, 95, 32838),
     }),
   )
-  stops.push(() => controller.stop())
 
   async function land() {
     await vi.waitFor(() => expect(captures.length).toBeGreaterThan(0))
     captures.shift()!.resolve()
   }
 
-  return { controller, focuser, camera, moves, land, captures, position: () => position }
+  async function arrive() {
+    await vi.waitFor(() => expect(pendingMoves.length).toBeGreaterThan(0))
+    pendingMoves.shift()!.resolve()
+  }
+
+  stops.push(async () => {
+    while (pendingMoves.length) pendingMoves.shift()!.resolve()
+    while (captures.length) captures.shift()!.resolve()
+    await controller.stop()
+  })
+
+  return { controller, focuser, camera, moves, land, arrive, captures, position: () => position }
 }
 
 it('lands each (position, HFR) sample on the view before the next move, then fits a hyperbola', async () => {
-  const { controller, camera, focuser, land, moves } = setup()
+  const { controller, camera, focuser, land, arrive, moves } = setup(32842, 60000, { holdMoves: true })
   await controller.start(camera, focuser, { stepSize: 50, offsetSteps: 4, exposureSeconds: 2 })
-  expect(controller.snapshot()).toMatchObject({ active: true, startPosition: 32842, phase: 'walking' })
+  expect(controller.snapshot()).toMatchObject({ active: true, startPosition: 32842, phase: 'walking', samples: [] })
 
-  for (let count = 1; count <= 8; count++) {
+  for (let count = 1; count <= 9; count++) {
+    await arrive()
     await land()
     await vi.waitFor(() => expect(controller.snapshot().samples).toHaveLength(count))
     const view = controller.snapshot()
     expect(view.samples.at(-1)?.position).toBe(view.currentPosition)
     expect(view.samples.at(-1)?.hfrPixels).toBeGreaterThan(0)
-    expect(view.fit).toBeNull()
+    if (count < 9) expect(view.fit).toBeNull()
   }
 
-  await land()
-  await vi.waitFor(() => expect(controller.snapshot().samples).toHaveLength(9))
+  await vi.waitFor(() => expect(controller.snapshot().fit).not.toBeNull())
+  await arrive()
   await land()
   await vi.waitFor(() => expect(controller.active()).toBe(false))
   const view = controller.snapshot()

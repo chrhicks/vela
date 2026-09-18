@@ -40,7 +40,9 @@ function configuredFocuser(settings: { endpoint: string, focuserId: string }): A
 
   return {
     status: signal => focuser.status(settings.focuserId, signal),
-    move: (position, window, signal) => focuser.move({ focuserId: settings.focuserId, position, window, signal }),
+    move: (position, window, signal) => focuser.move({
+      focuserId: settings.focuserId, position, window, ...(signal ? { signal } : {}),
+    }),
     halt: () => focuser.halt(settings.focuserId),
   }
 }
@@ -172,9 +174,9 @@ export function registerAutofocus(
         createCamera({ endpoint, cameraId, expectedCameraName: view.cameraName }),
         createFocuser({ endpoint, focuserId }),
         {
-          stepSize: parsed.data.stepSize,
-          offsetSteps: parsed.data.offsetSteps,
-          exposureSeconds: parsed.data.exposureSeconds,
+          ...(parsed.data.stepSize !== undefined ? { stepSize: parsed.data.stepSize } : {}),
+          ...(parsed.data.offsetSteps !== undefined ? { offsetSteps: parsed.data.offsetSteps } : {}),
+          ...(parsed.data.exposureSeconds !== undefined ? { exposureSeconds: parsed.data.exposureSeconds } : {}),
           onSettled: release,
         },
       )

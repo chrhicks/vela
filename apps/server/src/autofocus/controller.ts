@@ -49,6 +49,7 @@ export function createAutofocusController(
   let view: AutofocusView = emptyView(settings, DEFAULT_STEP_SIZE, DEFAULT_OFFSET_STEPS)
   let running: Promise<void> | undefined
   let cancellation: AbortController | undefined
+  let plannedReady: { resolve: () => void, reject: (error: Error) => void } | undefined
 
   function patch(next: Partial<AutofocusView>) { view = { ...view, ...next } }
 
@@ -105,27 +106,40 @@ export function createAutofocusController(
   }
 
   async function run(camera: AutofocusCamera, focuser: AutofocusFocuser, stepSize: number, offsetSteps: number, exposureSeconds: number, signal: AbortSignal) {
-    const status = await focuser.status(signal)
+    let plan: AutofocusWalkPlan
 
-    if (!status.absolute) throw new Error('Autofocus needs an absolute focuser')
+    try {
+      const status = await focuser.status(signal)
 
-    if (status.moving) throw new Error('The focuser is already moving')
-    const planned = planStarHfrWalk(status.position, stepSize, offsetSteps, status.maxStep)
+      if (!status.absolute) throw new Error('Autofocus needs an absolute focuser')
 
-    if (!planned.ok) {
+      if (status.moving) throw new Error('The focuser is already moving')
+      const planned = planStarHfrWalk(status.position, stepSize, offsetSteps, status.maxStep)
+
+      if (!planned.ok) {
+        patch({
+          phase: 'failed', startPosition: status.position, currentPosition: status.position, maxStep: status.maxStep,
+          restoredStart: false, error: planned.message,
+        })
+        plannedReady?.resolve()
+        plannedReady = undefined
+
+        return
+      }
+
+      plan = planned.plan
       patch({
-        phase: 'failed', startPosition: status.position, currentPosition: status.position, maxStep: status.maxStep,
-        restoredStart: false, error: planned.message,
+        phase: 'walking', startPosition: plan.start, currentPosition: plan.start, maxStep: plan.maxStep,
+        stepSize: plan.stepSize, offsetSteps: plan.offsetSteps, restoredStart: false, samples: [], fit: null, error: null,
       })
-
-      return
+      plannedReady?.resolve()
+      plannedReady = undefined
+    } catch (error) {
+      const cause = error instanceof Error ? error : new Error('Autofocus did not start')
+      plannedReady?.reject(cause)
+      plannedReady = undefined
+      throw cause
     }
-
-    const plan = planned.plan
-    patch({
-      phase: 'walking', startPosition: plan.start, currentPosition: plan.start, maxStep: plan.maxStep,
-      stepSize: plan.stepSize, offsetSteps: plan.offsetSteps, restoredStart: false, samples: [], fit: null, error: null,
-    })
 
     try {
       const targets = [...plan.positions]
@@ -201,11 +215,18 @@ export function createAutofocusController(
       active: true,
       exposureSeconds,
     })
+    const whenPlanned = new Promise<void>((resolve, reject) => { plannedReady = { resolve, reject } })
     running = run(camera, focuser, stepSize, offsetSteps, exposureSeconds, cancellation.signal).finally(() => {
       running = undefined
       patch({ active: false, activity: view.phase === 'complete' ? 'idle' : view.activity === 'stopping' ? 'idle' : view.activity })
       onSettled?.()
     })
+    try {
+      await whenPlanned
+    } catch (error) {
+      await running.catch(() => undefined)
+      throw error
+    }
 
     return view
   }
