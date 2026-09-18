@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { AutofocusCurve } from '../features/autofocus/AutofocusCurve'
 import { autofocusActivity, useAutofocus } from '../features/autofocus/use-autofocus'
+import { isTravelLimitError } from '../features/autofocus/validation'
 import './autofocus.css'
 
 export function Autofocus() {
@@ -32,6 +33,11 @@ function AutofocusPage({ rigId }: { rigId: string }) {
   const windowLow = view.currentPosition == null ? null : view.currentPosition - view.offsetSteps * step
   const windowHigh = view.currentPosition == null ? null : view.currentPosition + view.offsetSteps * step
   const travelBlocked = windowLow != null && (view.currentPosition! < 1 || windowLow < 1 || (view.maxStep != null && windowHigh! > view.maxStep - 1))
+  const travelLimit = (setup && travelBlocked) || isTravelLimitError(view.error)
+  const noticeTitle = travelLimit ? 'Walk would approach a travel limit'
+    : view.restoredStart ? 'Start position restored'
+    : view.phase === 'failed' && !view.restoredStart ? 'Start position was not restored'
+    : 'Autofocus'
   const activity = autofocusActivity(view, offline)
   const badge = offline ? 'Disconnected'
     : view.phase === 'setup' ? 'Not started'
@@ -50,7 +56,7 @@ function AutofocusPage({ rigId }: { rigId: string }) {
     </header>
     {(error || view.error || (!view.enabled && view.unavailableReason) || (setup && travelBlocked)) && (
       <div className="vela-af-notice" role="status">
-        <strong>{(view.phase === 'failed' && !view.restoredStart) || (setup && travelBlocked) ? 'Walk would approach a travel limit' : view.restoredStart ? 'Start position restored' : 'Autofocus'}</strong>
+        <strong>{noticeTitle}</strong>
         <p>{error || view.error || view.unavailableReason || 'Vela stays at the current EAF position. It does not command 0 or MaxStep, and it will not start a window that cannot fit around start.'}</p>
       </div>
     )}
@@ -61,6 +67,7 @@ function AutofocusPage({ rigId }: { rigId: string }) {
           <p>Vela will jump a little outward from the current EAF position, walk back through focus, and plot star size at each stop. Cancel returns here. Position 0 is a mechanical stop, not a home.</p>
           <dl className="vela-af-facts">
             <div><dt>Current position</dt><dd>{view.currentPosition ?? '—'}</dd></div>
+            <div><dt>MaxStep</dt><dd>{view.maxStep ?? '—'}</dd></div>
             <div><dt>Camera</dt><dd>{view.cameraName ?? 'Not selected'}</dd></div>
             <div><dt>Focuser</dt><dd>{view.focuserName ?? 'Not found'}</dd></div>
             <div><dt>Window</dt><dd>{windowLow != null && windowHigh != null ? `${windowLow} → ${windowHigh}` : 'Around the current position'}</dd></div>

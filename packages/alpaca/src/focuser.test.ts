@@ -73,7 +73,7 @@ describe('focuser write boundary', () => {
 
   it('refuses a target outside the walk window before writing', async () => {
     const fake = observatory()
-    await expect(fake.focuser.move({ focuserId: 'eaf-id', position: 30000, window })).rejects.toThrow(/window around the starting position/)
+    await expect(fake.focuser.move({ focuserId: 'eaf-id', position: 30000, window })).rejects.toThrow(/travel window around the starting position/)
     expect(fake.writes).toEqual([])
   })
 

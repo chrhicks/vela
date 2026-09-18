@@ -30,11 +30,11 @@ function deferred() {
   return { promise, resolve }
 }
 
-function setup() {
+function setup(start = 32842) {
   const app = Fastify()
   const catalog = createMemoryRigCatalog([record])
   const operations = createRigOperations()
-  let position = 32842
+  let position = start
   const moves: number[] = []
   const captures: Array<ReturnType<typeof deferred>> = []
 
@@ -66,7 +66,7 @@ function setup() {
         { providerDeviceId: 'camera', kind: 'camera', configuredName: 'Camera', name: 'Main camera', connection: 'connected',
           telemetry: { availability: 'complete', values: { kind: 'camera', activity: 'idle' } } },
         { providerDeviceId: 'eaf', kind: 'focuser', configuredName: 'EAF', name: 'EAF', connection: 'connected',
-          telemetry: { availability: 'complete', values: { kind: 'focuser', position, moving: false } } },
+          telemetry: { availability: 'complete', values: { kind: 'focuser', position, moving: false, maxStep: 60000 } } },
       ]
     } }),
     createCamera: () => camera,
@@ -111,7 +111,7 @@ it('rejects malformed start bodies before acquiring the rig', async () => {
 
 it('publishes samples onto the live view as the walk runs', async () => {
   const subject = setup()
-  expect((await subject.get()).json()).toMatchObject({ enabled: true, samples: [], startPosition: null, currentPosition: 32842 })
+  expect((await subject.get()).json()).toMatchObject({ enabled: true, samples: [], startPosition: null, currentPosition: 32842, maxStep: 60000 })
   const started = await subject.start({ stepSize: 50, exposureSeconds: 2 })
   expect(started.statusCode).toBe(200)
   expect(started.json()).toMatchObject({ active: true, startPosition: 32842, phase: 'walking', samples: [] })
@@ -129,4 +129,13 @@ it('publishes samples onto the live view as the walk runs', async () => {
   expect(done.phase).toBe('complete')
   expect(done.fit.position).not.toBe(0)
   expect(subject.moves).not.toContain(0)
+})
+
+it('returns a failed travel-limit view without moving', async () => {
+  const subject = setup(80)
+  const started = await subject.start({ stepSize: 50, exposureSeconds: 2 })
+  expect(started.statusCode).toBe(200)
+  expect(started.json()).toMatchObject({ phase: 'failed', active: false, startPosition: 80, restoredStart: false })
+  expect(started.json().error).toMatch(/MaxStep|0/)
+  expect(subject.moves).toEqual([])
 })

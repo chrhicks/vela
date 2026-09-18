@@ -97,7 +97,7 @@ export function createAlpacaFocuser({
     }
 
     if (target < window.minPosition || target > window.maxPosition) {
-      throw new Error('That focuser move would leave the autofocus window around the starting position.')
+      throw new Error('That focuser move would leave the travel window around the starting position.')
     }
   }
 
@@ -134,7 +134,7 @@ export function createAlpacaFocuser({
       const focuser = await device(focuserId, signal)
       const before = await readStatus(focuser, signal)
 
-      if (!before.absolute) throw new Error('Autofocus needs an absolute focuser')
+      if (!before.absolute) throw new Error('This focuser is not absolute')
 
       if (before.moving) throw new Error('Focuser is already moving')
       rejectUnsafeTarget(position, before, window)
