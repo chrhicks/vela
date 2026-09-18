@@ -72,7 +72,7 @@ function VCurve({
   const left = 48
   const right = 18
   const top = 16
-  const bottom = 36
+  const bottom = 44
   const plotWidth = width - left - right
   const plotHeight = height - top - bottom
   const pad = Math.max(window.high - window.low, 1) * 0.08
@@ -101,11 +101,11 @@ function VCurve({
       <line className="vela-af-axis" x1={left} y1={top} x2={left} y2={height - bottom} />
       <line className="vela-af-axis" x1={left} y1={height - bottom} x2={width - right} y2={height - bottom} />
       <text x={left} y={12}>HFR · px</text>
-      <text x={width - right} y={height - 8} textAnchor="end">Focuser position</text>
+      <text x={left + plotWidth / 2} y={height - 8} textAnchor="middle">Focuser position</text>
       {ticks.map(tick => (
         <g key={tick}>
           <line className="vela-af-grid" x1={x(tick)} x2={x(tick)} y1={top} y2={height - bottom} />
-          <text x={x(tick)} y={height - 10} textAnchor="middle">{tick}</text>
+          <text x={x(tick)} y={height - 22} textAnchor="middle">{tick}</text>
         </g>
       ))}
       <line className="vela-af-start" x1={x(start)} x2={x(start)} y1={top} y2={height - bottom} />
@@ -164,9 +164,8 @@ function AutofocusPreview({ props, onPropsChange }: {
     if (landed >= plannedCount) {
       setPlaying(false)
       update({ phase: 'fitting' })
-      const finish = window.setTimeout(() => update({ phase: 'complete' }), 700)
 
-      return () => window.clearTimeout(finish)
+      return
     }
 
     setActivity('moving')
@@ -178,6 +177,13 @@ function AutofocusPreview({ props, onPropsChange }: {
       window.clearTimeout(land)
     }
   }, [playing, phase, landed, plannedCount])
+
+  useEffect(() => {
+    if (phase !== 'fitting') return
+    const finish = window.setTimeout(() => update({ phase: 'complete' }), 700)
+
+    return () => window.clearTimeout(finish)
+  }, [phase])
 
   const snapshotCount = phase === 'setup' || phase === 'travel-limit' ? 0
     : playing ? landed
