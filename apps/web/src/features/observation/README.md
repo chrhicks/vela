@@ -21,11 +21,13 @@ and state composed from stable `@vela/ui` primitives. The production wording
 must remain accurate for unsupported devices and partial telemetry as well as
 the specimen's simple fixtures.
 
-Observe is the activity hub. Preparation details collapse when complete; Capture
-and Polar alignment remain prominent entry points. The Capture tile reads the
-same server-owned capture projection as the Capture page, preserving the last
-loaded image with its metadata. Preparation and capture availability remain
-separate facts; completing device connection does not imply capture support.
+Observe is the activity hub. Preparation details collapse when complete; Capture,
+Autofocus, and Polar alignment remain prominent entry points. The Capture tile
+reads the same server-owned capture projection as the Capture page, preserving
+the last loaded image with its metadata. Autofocus opens a one-shot Star-HFR
+walk around the current focuser position. Preparation and capture availability
+remain separate facts; completing device connection does not imply capture
+support.
 
 The imaging-camera setting sits between preparation and activities. Its saved
 identity comes from the rig catalog; see [imaging camera](../imaging-camera/README.md).
