@@ -1,5 +1,6 @@
 import type { ResponseFixture } from './internal/test-fixtures.js'
 import { describe, expect, it } from 'vitest'
+import { AlpacaProviderError } from './error.js'
 import { AlpacaFocuserStoppedError, createAlpacaFocuser } from './focuser.js'
 
 function observatory(requestTimeoutMs = 100) {
@@ -9,13 +10,18 @@ function observatory(requestTimeoutMs = 100) {
   const writes: { operation: string, parameters: URLSearchParams }[] = []
   let started!: () => void
   const whenStarted = new Promise<void>(resolve => { started = resolve })
-  const state = { loseMove: false, stopFails: false, onMove: () => {} }
+  const state = {
+    loseMove: false,
+    stopFails: false,
+    onMove: () => {},
+    rejectMove: undefined as { errorNumber: number, message: string } | undefined,
+  }
 
   const fetch: typeof globalThis.fetch = async (input, init) => {
     init?.signal?.throwIfAborted()
     const operation = new URL(String(input)).pathname.split('/').at(-1)!
-    const envelope = (Value?: ResponseFixture, ErrorNumber = 0) => Response.json({
-      ClientTransactionID: 0, ServerTransactionID: 1, ErrorNumber, ErrorMessage: '', Value,
+    const envelope = (Value?: ResponseFixture, ErrorNumber = 0, ErrorMessage = '') => Response.json({
+      ClientTransactionID: 0, ServerTransactionID: 1, ErrorNumber, ErrorMessage, Value,
     })
 
     if (operation === 'configureddevices') {
@@ -27,6 +33,10 @@ function observatory(requestTimeoutMs = 100) {
       writes.push({ operation, parameters })
 
       if (operation === 'move') {
+        if (state.rejectMove) {
+          return envelope(undefined, state.rejectMove.errorNumber, state.rejectMove.message)
+        }
+
         values.ismoving = true
         started()
         values.position = Number(parameters.get('Position'))
@@ -106,5 +116,70 @@ describe('focuser write boundary', () => {
     const fake = observatory()
     expect(await fake.focuser.move({ focuserId: 'eaf-id', position: 32842, window })).toEqual({ position: 32842 })
     expect(fake.writes).toEqual([])
+  })
+
+  it('does not write move when the focuser is disconnected, relative, or already moving', async () => {
+    const disconnected = observatory()
+    disconnected.values.connected = false
+    await expect(disconnected.focuser.move({ focuserId: 'eaf-id', position: 33042, window })).rejects.toThrow(/disconnected/)
+    expect(disconnected.writes).toEqual([])
+
+    const relative = observatory()
+    relative.values.absolute = false
+    await expect(relative.focuser.move({ focuserId: 'eaf-id', position: 33042, window })).rejects.toThrow(/not absolute/)
+    expect(relative.writes).toEqual([])
+
+    const busy = observatory()
+    busy.values.ismoving = true
+    await expect(busy.focuser.move({ focuserId: 'eaf-id', position: 33042, window })).rejects.toThrow(/already moving/)
+    expect(busy.writes).toEqual([])
+  })
+
+  it('does not write move when position, MaxStep, or IsMoving cannot be read as integers and booleans', async () => {
+    const fractional = observatory()
+    fractional.values.position = 32842.5
+    await expect(fractional.focuser.move({ focuserId: 'eaf-id', position: 33042, window })).rejects.toMatchObject({
+      name: 'AlpacaProviderError', reason: 'invalid-response', endpoint: 'position',
+    })
+    expect(fractional.writes).toEqual([])
+
+    const overRange = observatory()
+    overRange.values.position = 70000
+    await expect(overRange.focuser.move({ focuserId: 'eaf-id', position: 33042, window })).rejects.toMatchObject({
+      name: 'AlpacaProviderError', reason: 'invalid-response', endpoint: 'position',
+    })
+    expect(overRange.writes).toEqual([])
+
+    const zeroMax = observatory()
+    zeroMax.values.maxstep = 0
+    await expect(zeroMax.focuser.move({ focuserId: 'eaf-id', position: 33042, window })).rejects.toMatchObject({
+      name: 'AlpacaProviderError', reason: 'invalid-response', endpoint: 'position',
+    })
+    expect(zeroMax.writes).toEqual([])
+
+    const fractionalMax = observatory()
+    fractionalMax.values.maxstep = 12.5
+    await expect(fractionalMax.focuser.move({ focuserId: 'eaf-id', position: 33042, window })).rejects.toMatchObject({
+      name: 'AlpacaProviderError', reason: 'invalid-response', endpoint: 'position',
+    })
+    expect(fractionalMax.writes).toEqual([])
+
+    const movingFlag = observatory()
+    movingFlag.values.ismoving = 'yes'
+    await expect(movingFlag.focuser.move({ focuserId: 'eaf-id', position: 33042, window })).rejects.toMatchObject({
+      name: 'AlpacaProviderError', reason: 'invalid-response',
+    })
+    expect(movingFlag.writes).toEqual([])
+  })
+
+  it('keeps a rejected move’s driver reason and does not replay', async () => {
+    const fake = observatory()
+    fake.state.rejectMove = { errorNumber: 1035, message: 'Temperature compensation is enabled' }
+    await expect(fake.focuser.move({ focuserId: 'eaf-id', position: 33042, window })).rejects.toThrow(
+      /Temperature compensation is enabled.*did not repeat the move/,
+    )
+    expect(fake.writes.map(write => write.operation)).toEqual(['move', 'halt'])
+    expect(fake.writes.filter(write => write.operation === 'move')).toHaveLength(1)
+    expect(fake.values.position).toBe(32842)
   })
 })

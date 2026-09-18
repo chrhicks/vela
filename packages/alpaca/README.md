@@ -103,6 +103,8 @@ travel window; this adapter only issues Alpaca `PUT /move`, waits until
   also rejected before writing.
 - A lost move response is success only when a later inspection shows the focuser
   stopped at the commanded position. The write is never replayed.
+- A driver rejection of `PUT /move` keeps the protocol error text. The generic
+  unconfirmed-move wording is only for lost or ambiguous writes.
 - Cancellation issues an independent `Halt` and confirms that motion stopped.
 
 ## Testing
