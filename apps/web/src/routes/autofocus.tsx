@@ -5,6 +5,7 @@ import { Link, useParams } from 'react-router'
 import { AutofocusCurve } from '../features/autofocus/AutofocusCurve'
 import { autofocusActivity, useAutofocus } from '../features/autofocus/use-autofocus'
 import { isTravelLimitError } from '../features/autofocus/validation'
+import { previewAutofocusWindow } from '../features/autofocus/window'
 import './autofocus.css'
 
 export function Autofocus() {
@@ -35,18 +36,29 @@ function AutofocusPage({ rigId }: { rigId: string }) {
 
     return !best || best.hfrPixels === null || sample.hfrPixels < best.hfrPixels ? sample : best
   }, undefined)
-  const windowLow = view.currentPosition == null ? null : view.currentPosition - view.offsetSteps * step
-  const windowHigh = view.currentPosition == null ? null : view.currentPosition + view.offsetSteps * step
-  const travelBlocked = windowLow != null && (view.currentPosition! < 1 || windowLow < 1 || (view.maxStep != null && windowHigh! > view.maxStep - 1))
-  const travelLimit = (setup && travelBlocked) || isTravelLimitError(view.error)
-  const noticeTitle = travelLimit ? 'Walk would approach a travel limit'
-    : view.restoredStart ? 'Start position restored'
-    : view.phase === 'failed' && !view.restoredStart ? 'Start position was not restored'
-    : view.error ? 'Walk did not start'
-    : 'Autofocus'
+  const window = previewAutofocusWindow(view.currentPosition, step, view.offsetSteps, view.maxStep)
+  const travelBlocked = setup && view.currentPosition != null && !window.fit
+  const travelLimit = travelBlocked || (setup && isTravelLimitError(view.error))
+  const notice = travelLimit ? {
+    role: 'alert' as const,
+    title: 'Walk would approach a travel limit',
+    body: error || view.error || 'Vela stays at the current EAF position. It does not command 0 or MaxStep, and it will not start a window that cannot fit around start.',
+  } : !setup && view.restoredStart && view.phase === 'stopped' ? {
+    role: 'status' as const,
+    title: 'Start position restored',
+    body: `The walk stopped before a fitted focus. The focuser is back at ${view.startPosition ?? 'the session start'}, the position where this session began.`,
+  } : view.phase === 'failed' && !view.restoredStart ? {
+    role: 'status' as const,
+    title: 'Start position was not restored',
+    body: error || view.error || 'The start position was not confirmed. Vela did not repeat the move.',
+  } : error || view.error || (!view.enabled && view.unavailableReason) ? {
+    role: 'status' as const,
+    title: error || (view.error && !isTravelLimitError(view.error)) ? 'Walk did not start' : 'Autofocus',
+    body: error || view.error || view.unavailableReason,
+  } : null
   const activity = autofocusActivity(view, offline)
   const badge = offline ? 'Disconnected'
-    : view.phase === 'setup' ? (view.error || travelBlocked ? 'Blocked' : 'Not started')
+    : setup ? (view.error || travelBlocked ? 'Blocked' : 'Not started')
     : view.phase === 'walking' ? 'Walking'
     : view.phase === 'fitting' ? 'Fitting'
     : view.phase === 'confirming' ? 'Confirming'
@@ -58,12 +70,12 @@ function AutofocusPage({ rigId }: { rigId: string }) {
     {back}
     <header className="vela-af-heading">
       <div><p>{view.rigName} · Rig preparation</p><h1>Autofocus</h1></div>
-      <Badge tone={offline || view.phase === 'failed' || view.phase === 'stopped' || (setup && travelBlocked) ? 'warning' : busy ? 'accent' : view.phase === 'complete' ? 'positive' : 'neutral'}>{badge}</Badge>
+      <Badge tone={offline || view.phase === 'failed' || (!setup && view.phase === 'stopped') || (setup && travelBlocked) ? 'warning' : busy ? 'accent' : view.phase === 'complete' && !setup ? 'positive' : 'neutral'}>{badge}</Badge>
     </header>
-    {(error || view.error || (!view.enabled && view.unavailableReason) || (setup && travelBlocked)) && (
-      <div className="vela-af-notice" role="status">
-        <strong>{noticeTitle}</strong>
-        <p>{error || view.error || view.unavailableReason || 'Vela stays at the current EAF position. It does not command 0 or MaxStep, and it will not start a window that cannot fit around start.'}</p>
+    {notice && (
+      <div className="vela-af-notice" role={notice.role}>
+        <strong>{notice.title}</strong>
+        <p>{notice.body}</p>
       </div>
     )}
     {setup ? (
@@ -76,7 +88,7 @@ function AutofocusPage({ rigId }: { rigId: string }) {
             <div><dt>MaxStep</dt><dd>{view.maxStep ?? '—'}</dd></div>
             <div><dt>Camera</dt><dd>{view.cameraName ?? 'Not selected'}</dd></div>
             <div><dt>Focuser</dt><dd>{view.focuserName ?? 'Not found'}</dd></div>
-            <div><dt>Window</dt><dd>{windowLow != null && windowHigh != null ? `${windowLow} → ${windowHigh}` : 'Around the current position'}</dd></div>
+            <div><dt>Window</dt><dd>{view.currentPosition == null ? 'Around the current position' : window.fit ? `${window.low} → ${window.high}` : 'Does not fit around start'}</dd></div>
           </dl>
           <Input
             label="Step size"
@@ -98,13 +110,23 @@ function AutofocusPage({ rigId }: { rigId: string }) {
         </div>
       </div>
     ) : (
-      <Walk view={view} activity={activity} latest={latest} lowest={lowest} offline={offline} disabled={disabled} busy={busy} onStop={() => void stop()} onAgain={() => void start(step, view.exposureSeconds || 2)} onBackToSetup={() => setReturnedToSetup(true)} />
+      <Walk
+        view={view}
+        activity={activity}
+        latest={latest}
+        lowest={lowest}
+        offline={offline}
+        disabled={disabled}
+        busy={busy}
+        onStop={() => void stop()}
+        onBackToSetup={() => setReturnedToSetup(true)}
+      />
     )}
   </section>
 }
 
 function Walk({
-  view, activity, latest, lowest, offline, disabled, busy, onStop, onAgain, onBackToSetup,
+  view, activity, latest, lowest, offline, disabled, busy, onStop, onBackToSetup,
 }: {
   view: AutofocusView
   activity: string
@@ -114,10 +136,10 @@ function Walk({
   disabled: boolean
   busy: boolean
   onStop: () => void
-  onAgain: () => void
   onBackToSetup: () => void
 }) {
-  const expected = view.offsetSteps * 2 + 1
+  const planned = view.offsetSteps * 2 + 1
+  const expected = Math.max(planned, view.samples.length)
 
   return (
     <div className="vela-af-layout">
@@ -159,7 +181,7 @@ function Walk({
             {busy && !offline ? <span className="vela-af-activity__spinner" aria-hidden="true" /> : null}
             <strong>{activity}</strong>
           </div>
-          <p>{view.samples.length ? `${view.samples.length} shorts on the curve${view.samples.length < expected ? ` · ${expected} planned` : ''}.` : 'No samples yet. The graph fills as each short exposure lands.'}</p>
+          <p>{view.samples.length ? `${view.samples.length} of ${expected} shorts on the curve.` : 'No samples yet. The graph fills as each short exposure lands.'}</p>
         </div>
       </Panel>
       <div className="vela-af-actions">
@@ -167,20 +189,19 @@ function Walk({
           {view.phase === 'complete'
             ? 'The fitted minimum is an integer step inside the sampled window. The lowest sampled HFR is shown only for comparison.'
             : view.restoredStart
-              ? 'The focuser is back at the position where this session began.'
+              ? 'Start a new walk from the current position when you are ready.'
               : view.phase === 'failed'
                 ? 'The start position was not confirmed. Vela did not repeat the move.'
                 : 'Points appear as each short lands. Stop restores the start position; Vela will not keep walking toward a limit.'}
         </p>
         {busy ? (
           <Button size="large" disabled={disabled} onClick={onStop}>Stop and restore start</Button>
-        ) : view.phase === 'complete' ? (
-          <Button size="large" tone="accent" disabled={disabled || !view.enabled} onClick={onAgain}>Focus again</Button>
         ) : (
-          <Button size="large" tone="accent" disabled={disabled || !view.enabled} onClick={onBackToSetup}>Back to setup</Button>
+          <Button size="large" tone="accent" disabled={disabled || !view.enabled} onClick={onBackToSetup}>
+            {view.phase === 'complete' ? 'Focus again' : 'Back to setup'}
+          </Button>
         )}
       </div>
     </div>
   )
 }
-
