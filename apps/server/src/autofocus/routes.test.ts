@@ -30,12 +30,13 @@ function deferred() {
   return { promise, resolve }
 }
 
-function setup(start = 32842) {
+function setup(start = 32842, inventory = record.lastObservedInventory) {
   const app = Fastify()
-  const catalog = createMemoryRigCatalog([record])
+  const catalog = createMemoryRigCatalog([{ ...record, lastObservedInventory: inventory }])
   const operations = createRigOperations()
   let position = start
   const moves: number[] = []
+  const focuserIds: string[] = []
   const captures: Array<ReturnType<typeof deferred>> = []
 
   const focuser: AutofocusFocuser = {
@@ -70,7 +71,11 @@ function setup(start = 32842) {
       ]
     } }),
     createCamera: () => camera,
-    createFocuser: () => focuser,
+    createFocuser: settings => {
+      focuserIds.push(settings.focuserId)
+
+      return focuser
+    },
     measure: async () => ({ detectedStars: 40, medianHfrPixels: hyperbola(position, 2.18, 95, 32838) }),
   })
 
@@ -95,7 +100,7 @@ function setup(start = 32842) {
 
       throw new Error('Autofocus walk did not finish')
     },
-    operations, moves,
+    operations, moves, focuserIds,
   }
 }
 
@@ -138,4 +143,31 @@ it('returns to setup for a travel-limit start without moving', async () => {
   expect(started.json()).toMatchObject({ phase: 'setup', active: false, startPosition: null, currentPosition: 80, restoredStart: false })
   expect(started.json().error).toMatch(/MaxStep|0/)
   expect(subject.moves).toEqual([])
+})
+
+it('starts the inspected focuser when last-observed inventory does not list it', async () => {
+  const subject = setup(32842, {
+    ...record.lastObservedInventory,
+    devices: [{ uniqueId: 'camera', kind: 'camera', name: 'Main camera' }],
+  })
+  expect((await subject.get()).json()).toMatchObject({ enabled: true, focuserName: 'EAF' })
+  const started = await subject.start({ stepSize: 50, exposureSeconds: 2 })
+  expect(started.statusCode).toBe(200)
+  expect(started.json()).toMatchObject({ active: true, phase: 'walking' })
+  expect(subject.focuserIds).toEqual(['eaf'])
+  await subject.finish()
+})
+
+it('starts the inspected focuser when last-observed inventory lists a different one', async () => {
+  const subject = setup(32842, {
+    ...record.lastObservedInventory,
+    devices: [
+      { uniqueId: 'camera', kind: 'camera', name: 'Main camera' },
+      { uniqueId: 'stale-eaf', kind: 'focuser', name: 'Stale EAF' },
+    ],
+  })
+  expect((await subject.get()).json().enabled).toBe(true)
+  expect((await subject.start({ stepSize: 50, exposureSeconds: 2 })).statusCode).toBe(200)
+  expect(subject.focuserIds).toEqual(['eaf'])
+  await subject.finish()
 })

@@ -4,8 +4,9 @@ One-shot Star-HFR session owned by the server. Capture still uses conservative
 star measurements. This walk uses `measureAutofocusStars`, a bounded focuser
 window around the **current** EAF position, and a hyperbola fit.
 
-Start is the focuser position when the session begins. Cancel and failure restore
-that start. Position 0 is a mechanical stop, not a home; the adapter will not
+Start commands the same inspected focuser that made the idle view enabled, not a
+later inventory lookup. Start is the focuser position when the session begins.
+Cancel and failure restore that start. Position 0 is a mechanical stop, not a home; the adapter will not
 command it. A window that cannot fit around start, including a reported start of
 0, returns to setup without moving and does not claim a restore. Idle setup
 includes MaxStep from focuser inspection so the page can preview that limit.
