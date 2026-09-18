@@ -146,7 +146,7 @@ export function createAlpacaFocuser({
       const operation = signal ? AbortSignal.any([signal, deadline]) : deadline
 
       try {
-        await client.command(focuser, 'position', { Position: String(position) }, operation)
+        await client.command(focuser, 'move', { Position: String(position) }, operation)
         await waitStopped(focuser, operation)
         const after = await readStatus(focuser, operation)
 

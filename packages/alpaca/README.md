@@ -94,8 +94,8 @@ Temperature reaching the setpoint is cooling progress, not command success.
 
 `createAlpacaFocuser({ baseUrl })` is a narrow write-and-verify capability for an
 absolute focuser. Device numbers and wire fields stay private. Callers supply a
-travel window; this adapter only moves, waits until `IsMoving` is false, and
-reads `Position` back.
+travel window; this adapter only issues Alpaca `PUT /move`, waits until
+`IsMoving` is false, and reads `Position` back. It does not PUT `/position`.
 
 - Targets of **0** or **MaxStep** are rejected before any write. Position 0 is a
   mechanical stop, not a home.
