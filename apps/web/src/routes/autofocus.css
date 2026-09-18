@@ -67,3 +67,6 @@
   .vela-af-setup { grid-template-columns: 1.5fr 1fr; gap: 28px; align-items: start; }
   .vela-af-next { padding: 18px 0; }
 }
+.vela-autofocus .vela-button:hover,
+.vela-autofocus .vela-button:disabled { transform: none; }
+.vela-autofocus[data-pending] .vela-button:disabled { opacity: 1; cursor: wait; }
