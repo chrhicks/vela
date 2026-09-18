@@ -16,9 +16,10 @@ test('setup starts from the current EAF position and never offers a home to 0', 
   await expect(page.locator('.vela-af-facts')).toContainText('32842')
   await expect(page.locator('.vela-af-facts')).toContainText('60000')
   await expect(page.locator('.vela-af-facts')).toContainText('32642 → 33042')
-  await expect(page.locator('.vela-af-facts')).toContainText('Off · 0 in / 0 out')
   await expect(page.getByRole('button', { name: 'Start autofocus' })).toBeEnabled()
+  await expect(page.locator('.vela-af-facts')).not.toContainText('0 in / 0 out')
   await expect(page.locator('.vela-autofocus')).not.toContainText('Move(0)')
+  await expect(page.locator('.vela-autofocus')).toContainText('not backlash compensation off')
 })
 
 test('the V-curve grows as each short lands', async ({ page }) => {

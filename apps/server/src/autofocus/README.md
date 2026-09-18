@@ -9,7 +9,9 @@ that start. Position 0 is a mechanical stop, not a home; the adapter will not
 command it. A window that cannot fit around start, including a reported start of
 0, returns to setup without moving and does not claim a restore. Idle setup
 includes MaxStep from focuser inspection so the page can preview that limit.
-Backlash compensation is off (0 in / 0 out).
+This slice does not read or write focuser backlash compensation, so setup does
+not present it as a device fact. “Backlash zero” would mean compensation off,
+not EAF position 0.
 
 Each short exposure appends `(position, HFR)` to the view immediately so the
 Observe graph can grow as the walk runs. The fit is the hyperbola minimum inside

@@ -58,7 +58,7 @@ function AutofocusPage({ rigId }: { rigId: string }) {
     {back}
     <header className="vela-af-heading">
       <div><p>{view.rigName} · Rig preparation</p><h1>Autofocus</h1></div>
-      <Badge tone={offline || view.phase === 'failed' || view.phase === 'stopped' ? 'warning' : busy ? 'accent' : view.phase === 'complete' ? 'positive' : 'neutral'}>{badge}</Badge>
+      <Badge tone={offline || view.phase === 'failed' || view.phase === 'stopped' || (setup && travelBlocked) ? 'warning' : busy ? 'accent' : view.phase === 'complete' ? 'positive' : 'neutral'}>{badge}</Badge>
     </header>
     {(error || view.error || (!view.enabled && view.unavailableReason) || (setup && travelBlocked)) && (
       <div className="vela-af-notice" role="status">
@@ -70,14 +70,13 @@ function AutofocusPage({ rigId }: { rigId: string }) {
       <div className="vela-af-setup">
         <Panel>
           <h2>Focus from where you are</h2>
-          <p>Vela will jump a little outward from the current EAF position, walk back through focus, and plot star size at each stop. Cancel returns here. Position 0 is a mechanical stop, not a home.</p>
+          <p>Vela will jump a little outward from the current EAF position, walk back through focus, and plot star size at each stop. Cancel returns here. Position 0 is a mechanical stop, not a home, and not backlash compensation off.</p>
           <dl className="vela-af-facts">
             <div><dt>Current position</dt><dd>{view.currentPosition ?? '—'}</dd></div>
             <div><dt>MaxStep</dt><dd>{view.maxStep ?? '—'}</dd></div>
             <div><dt>Camera</dt><dd>{view.cameraName ?? 'Not selected'}</dd></div>
             <div><dt>Focuser</dt><dd>{view.focuserName ?? 'Not found'}</dd></div>
             <div><dt>Window</dt><dd>{windowLow != null && windowHigh != null ? `${windowLow} → ${windowHigh}` : 'Around the current position'}</dd></div>
-            <div><dt>Backlash</dt><dd>Off · 0 in / 0 out</dd></div>
           </dl>
           <Input
             label="Step size"
