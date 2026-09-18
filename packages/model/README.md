@@ -60,6 +60,13 @@ last solved measurements and the matching preview reference. It contains no
 Alpaca wire fields or simulator ground truth. Geometry and operation ownership
 remain on the server.
 
+The Autofocus view is one ephemeral Star-HFR walk. `startPosition` is the focuser
+position when the session began — the restore target — never a request to home
+to 0. `samples` grow as each short lands so the graph can be live. `fit` is the
+hyperbola minimum inside the sampled window; `minSamplePosition` is comparison
+only. `restoredStart` is true only after a failed or cancelled walk confirmed
+return to start.
+
 The Capture view describes one ephemeral capture run, its readiness and phase,
 its repeat setting and count of published images in that run,
 and the latest completed image with its own duration, camera, dimensions and

@@ -44,6 +44,10 @@ export { createAlpacaFraming, AlpacaFramingStoppedError } from './framing.js'
 
 export type { AlpacaFraming, AlpacaFramingOptions, AlpacaCameraGeometry, AlpacaTelescopeStatus, AlpacaSlewOptions, AlpacaCoordinateSystem } from './framing.js'
 
+export { createAlpacaFocuser, AlpacaFocuserStoppedError } from './focuser.js'
+
+export type { AlpacaFocuser, AlpacaFocuserMove, AlpacaFocuserOptions, AlpacaFocuserStatus, FocuserTravelWindow } from './focuser.js'
+
 export { createAlpacaCameraCooling } from './cooling.js'
 
 export type {

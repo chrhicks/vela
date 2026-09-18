@@ -90,6 +90,21 @@ It never infers CoolerOn from CCDTemperature or SetCCDTemperature. A sensor near
 
 Temperature reaching the setpoint is cooling progress, not command success.
 
+## Focuser motion command
+
+`createAlpacaFocuser({ baseUrl })` is a narrow write-and-verify capability for an
+absolute focuser. Device numbers and wire fields stay private. Autofocus owns
+the walk window; this adapter only moves, waits until `IsMoving` is false, and
+reads `Position` back.
+
+- Targets of **0** or **MaxStep** are rejected before any write. Position 0 is a
+  mechanical stop, not a home.
+- Targets outside the caller-supplied window around the starting position are
+  also rejected before writing.
+- A lost move response is success only when a later inspection shows the focuser
+  stopped at the commanded position. The write is never replayed.
+- Cancellation issues an independent `Halt` and confirms that motion stopped.
+
 ## Testing
 
 Factory injection supports fake `fetch` and UDP scanner boundaries. Package tests use only deterministic fakes and never touch the real LAN.
