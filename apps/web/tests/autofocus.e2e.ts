@@ -88,7 +88,7 @@ test('a travel-limit start result returns to setup instead of a disconnect', asy
   await page.goto('/rigs/rig-1/observe/autofocus')
   await page.getByRole('button', { name: 'Start autofocus' }).click()
   await expect(page.getByText('Walk would approach a travel limit')).toBeVisible()
-  await expect(page.getByText(/will not command 0 or MaxStep/)).toBeVisible()
+  await expect(page.locator('.vela-af-notice')).toContainText('will not command 0 or MaxStep')
   await expect(page.locator('.vela-autofocus')).not.toContainText('Disconnected')
   await expect(page.locator('.vela-autofocus')).not.toContainText('Start position was not restored')
   await expect(page.locator('.vela-autofocus')).not.toContainText('Focus again')
