@@ -26,7 +26,7 @@ function observatory(requestTimeoutMs = 100) {
       const parameters = new URLSearchParams(String(init.body))
       writes.push({ operation, parameters })
 
-      if (operation === 'position') {
+      if (operation === 'move') {
         values.ismoving = true
         started()
         values.position = Number(parameters.get('Position'))
@@ -60,7 +60,7 @@ describe('focuser write boundary', () => {
     await fake.whenStarted
     fake.values.ismoving = false
     expect(await result).toEqual({ position: 33042 })
-    expect(fake.writes.map(write => write.operation)).toEqual(['position'])
+    expect(fake.writes.map(write => write.operation)).toEqual(['move'])
     expect(fake.writes[0]!.parameters.get('Position')).toBe('33042')
   })
 
@@ -81,14 +81,14 @@ describe('focuser write boundary', () => {
     const arrived = observatory()
     arrived.state.loseMove = true
     expect(await arrived.focuser.move({ focuserId: 'eaf-id', position: 33042, window })).toEqual({ position: 33042 })
-    expect(arrived.writes.filter(write => write.operation === 'position')).toHaveLength(1)
+    expect(arrived.writes.filter(write => write.operation === 'move')).toHaveLength(1)
 
     const missed = observatory()
     missed.state.loseMove = true
     missed.state.onMove = () => { missed.values.position = 32842 }
     await expect(missed.focuser.move({ focuserId: 'eaf-id', position: 33042, window })).rejects.toThrow(/did not confirm the commanded position/)
-    expect(missed.writes.map(write => write.operation)).toEqual(['position', 'halt'])
-    expect(missed.writes.filter(write => write.operation === 'position')).toHaveLength(1)
+    expect(missed.writes.map(write => write.operation)).toEqual(['move', 'halt'])
+    expect(missed.writes.filter(write => write.operation === 'move')).toHaveLength(1)
   })
 
   it('cancels only after independent halt confirmation', async () => {
@@ -99,7 +99,7 @@ describe('focuser write boundary', () => {
     controller.abort()
     await assertion
     expect(fake.values.ismoving).toBe(false)
-    expect(fake.writes.map(write => write.operation)).toEqual(['position', 'halt'])
+    expect(fake.writes.map(write => write.operation)).toEqual(['move', 'halt'])
   })
 
   it('skips a write when the focuser is already at the target', async () => {
