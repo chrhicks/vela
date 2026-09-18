@@ -196,6 +196,7 @@ function AutofocusPreview({ props, onPropsChange }: {
     : phase === 'restored' || phase === 'restoring' || phase === 'setup' || phase === 'travel-limit' ? start
     : samples.at(-1)?.position ?? start
   const travelBlocked = !planned || phase === 'travel-limit' || example === 'near-inward-limit'
+  const setup = phase === 'setup' || phase === 'travel-limit'
   const lowest = minSample(samples)
   const latest = samples.at(-1)
   const busy = phase === 'sampling' || phase === 'fitting' || phase === 'restoring'
@@ -209,23 +210,17 @@ function AutofocusPreview({ props, onPropsChange }: {
     : phase === 'restoring' ? `Restoring start ${start}…`
     : phase === 'complete' ? 'Fitted focus is ready'
     : phase === 'restored' ? 'Walk stopped · start restored'
-    : phase === 'travel-limit' ? 'Walk aborted before any move'
     : 'Ready to start from the current position'
 
-  const badge = phase === 'setup' ? 'Not started'
+  const badge = setup ? (travelBlocked ? 'Blocked' : 'Not started')
     : phase === 'sampling' ? 'Walking'
     : phase === 'fitting' ? 'Fitting'
     : phase === 'complete' ? 'Complete'
     : phase === 'restoring' ? 'Restoring'
-    : phase === 'restored' ? 'Restored'
-    : 'Blocked'
+    : 'Restored'
 
   function startWalk() {
-    if (travelBlocked) {
-      update({ phase: 'travel-limit' })
-
-      return
-    }
+    if (travelBlocked) return
 
     setLanded(0)
     setPlaying(true)
@@ -282,9 +277,9 @@ function AutofocusPreview({ props, onPropsChange }: {
       <main className="vela-af-main">
         <header className="vela-af-heading">
           <div><p>Rig preparation</p><h1>Autofocus</h1></div>
-          <Badge tone={phase === 'travel-limit' || phase === 'restored' ? 'warning' : busy ? 'accent' : phase === 'complete' ? 'positive' : 'neutral'}>{badge}</Badge>
+          <Badge tone={(setup && travelBlocked) || phase === 'restored' ? 'warning' : busy ? 'accent' : phase === 'complete' ? 'positive' : 'neutral'}>{badge}</Badge>
         </header>
-        {(phase === 'travel-limit' || travelBlocked && phase !== 'setup') && (
+        {setup && travelBlocked && (
           <div className="vela-af-notice" role="alert">
             <strong>Walk would approach a travel limit</strong>
             <p>Vela stays at the current EAF position. It does not command 0 or MaxStep, and it will not start a window that cannot fit around start.</p>
@@ -296,16 +291,15 @@ function AutofocusPreview({ props, onPropsChange }: {
             <p>The walk stopped before a fitted focus. The focuser is back at {start}, the position where this session began.</p>
           </div>
         )}
-        {phase === 'setup' ? (
+        {setup ? (
           <div className="vela-af-setup">
             <Panel>
               <h2>Focus from where you are</h2>
-              <p>Vela will jump a little outward from the current EAF position, walk back through focus, and plot star size at each stop. Cancel returns here. Position 0 is a mechanical stop, not a home.</p>
+              <p>Vela will jump a little outward from the current EAF position, walk back through focus, and plot star size at each stop. Cancel returns here. Position 0 is a mechanical stop, not a home, and not backlash compensation off.</p>
               <dl className="vela-af-facts">
                 <div><dt>Current position</dt><dd>{start}</dd></div>
                 <div><dt>MaxStep</dt><dd>{FRA_MAX}</dd></div>
                 <div><dt>Window</dt><dd>{planned ? `${planned.low} → ${planned.high}` : 'Does not fit around start'}</dd></div>
-                <div><dt>Backlash</dt><dd>Off · 0 in / 0 out</dd></div>
               </dl>
               <Input
                 label="Step size"
@@ -320,8 +314,8 @@ function AutofocusPreview({ props, onPropsChange }: {
             <div className="vela-af-next">
               <h3>Before you start</h3>
               <p>Each point on the graph is one short exposure. You will see start, current position, and the fitted minimum once the hyperbola exists.</p>
-              <p>Backlash compensation stays off until a real V shows a flat shelf.</p>
-              <Button size="large" tone="accent" onClick={startWalk}>{travelBlocked ? 'Window does not fit' : 'Start autofocus'}</Button>
+              <p>The walk stays inside a window around the current position. Vela will not command 0 or MaxStep.</p>
+              <Button size="large" tone="accent" disabled={travelBlocked} onClick={startWalk}>{travelBlocked ? 'Window does not fit' : 'Start autofocus'}</Button>
             </div>
           </div>
         ) : (
@@ -334,9 +328,7 @@ function AutofocusPreview({ props, onPropsChange }: {
                   ? 'The fitted minimum is an integer step inside the sampled window. The lowest sampled HFR is shown only for comparison.'
                   : phase === 'restored'
                     ? 'Start a new walk from the current position when you are ready.'
-                    : phase === 'travel-limit'
-                      ? 'Choose a smaller step size, or start from a position with room on both sides.'
-                      : 'Points appear as each short lands. Stop restores the start position; Vela will not keep walking toward a limit.'}
+                    : 'Points appear as each short lands. Stop restores the start position; Vela will not keep walking toward a limit.'}
               </p>
               {busy ? (
                 <Button size="large" onClick={() => { setPlaying(false); update({ phase: 'restored' }) }}>Stop and restore start</Button>
@@ -359,7 +351,7 @@ export const specimen: ComponentSpecimen = {
   componentName: 'Panel / Card',
   id: 'panel-autofocus',
   name: 'Autofocus · Product example',
-  description: 'Observe one-shot Star-HFR walk with a live V-curve. Start plays simulated shorts so each (position, HFR) point appears as it lands, with start, current, and fitted-minimum readout. Illustrative FRA window around the current EAF position; no hardware moves, no Move(0), backlash shown as off.',
+  description: 'Observe one-shot Star-HFR walk with a live V-curve. Start plays simulated shorts so each (position, HFR) point appears as it lands, with start, current, and fitted-minimum readout. Illustrative FRA window around the current EAF position; no hardware moves, no Move(0). A window that cannot fit stays on setup with the command disabled. Backlash compensation is not shown as a device fact.',
   controls: {
     example: { type: 'select', label: 'Starting place', options: examples },
     phase: { type: 'select', label: 'Activity', options: phases },
