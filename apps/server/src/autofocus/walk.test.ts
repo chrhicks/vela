@@ -6,6 +6,7 @@ describe('autofocus walk window', () => {
     const planned = planStarHfrWalk(32842, 50, 4, 60000)
 
     expect(planned.ok).toBe(true)
+
     if (!planned.ok) return
     expect(planned.plan.start).toBe(32842)
     expect(planned.plan.positions[0]).toBe(33042)
@@ -25,6 +26,7 @@ describe('autofocus walk window', () => {
   it('refuses Move(0) even if a caller asks', () => {
     const planned = planStarHfrWalk(32842, 50, 4, 60000)
     expect(planned.ok).toBe(true)
+
     if (!planned.ok) return
     expect(() => assertCommandedPosition(0, planned.plan)).toThrow(/not a home/)
     expect(() => assertCommandedPosition(60000, planned.plan)).toThrow(/mechanical travel limit/)
@@ -34,7 +36,9 @@ describe('autofocus walk window', () => {
   it('offers extra inward samples only while the V minimum is still at the inner edge', () => {
     const planned = planStarHfrWalk(32842, 50, 4, 60000)
     expect(planned.ok).toBe(true)
+
     if (!planned.ok) return
+
     const inner = planned.plan.positions.map(position => ({
       position, hfrPixels: position === 32642 ? 2.1 : 4,
     }))

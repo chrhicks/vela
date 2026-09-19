@@ -51,10 +51,11 @@ function CapturePage({ rigId }: { rigId: string }) {
       <LatestImage rigId={rigId} image={view.latestImage} busy={busy} interrupted={offline || commandUnconfirmed || !view.enabled} />
       <Panel className="capture-page__controls" title="Capture images">
         <div className="capture-page__camera"><CameraMark /><div><strong>{view.camera?.name ?? 'No camera available'}</strong>{view.camera && <span>Imaging camera</span>}</div></div>
-        {view.cooling && <CaptureCooling
+        {(view.cooling || coolingError) && <CaptureCooling
           cooling={view.cooling}
           disabled={!capture.canCool}
           pending={coolingPending}
+          checking={refreshing}
           error={coolingError}
           unconfirmed={coolingUnconfirmed}
           runActive={view.active}
