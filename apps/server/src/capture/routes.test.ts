@@ -358,3 +358,49 @@ it('turns the cooler on only when requested and does not invent a setpoint write
   expect((await subject.app.inject({ method: 'POST', url: '/api/rigs/sim/capture/cooling', payload: {} })).statusCode).toBe(400)
 })
 
+it('holds an exclusive cooling lease through confirmation and rejects other cooling or capture commands', async () => {
+  const confirmation = deferred<Awaited<ReturnType<AlpacaCameraCooling['setCooling']>>>()
+  const commands: Array<Parameters<AlpacaCameraCooling['setCooling']>[0]> = []
+
+  const subject = setup(record.imagingCamera, {
+    cooling: { state: 'off' },
+    createCooling: () => ({
+      observe: async () => undefined,
+      setCooling(command) {
+        commands.push(command)
+
+        return confirmation.promise
+      },
+    }),
+  })
+
+  const cool = (coolerOn: boolean) => subject.app.inject({ method: 'POST', url: '/api/rigs/sim/capture/cooling', payload: { coolerOn } })
+  const first = cool(true)
+  void first.then(() => {})
+  await vi.waitFor(() => expect(commands).toHaveLength(1))
+
+  try {
+    expect(subject.operations.owner('sim')).toBe('capture')
+    let secondSettled = false
+
+    const second = cool(false).then(response => {
+      secondSettled = true
+
+      return response
+    })
+
+    await vi.waitFor(() => expect(secondSettled).toBe(true))
+    expect((await second).statusCode).toBe(409)
+    expect((await subject.start()).statusCode).toBe(409)
+    expect(subject.operations.acquire('sim', 'alignment')).toBeUndefined()
+    expect(commands).toHaveLength(1)
+  } finally {
+    confirmation.resolve({ outcome: 'confirmed', observation: { state: 'on', canSetTemperature: false, canGetPower: false } })
+    await first
+  }
+
+  expect(subject.operations.owner('sim')).toBeUndefined()
+  expect((await subject.start()).statusCode).toBe(200)
+  expect((await cool(false)).statusCode).toBe(409)
+  expect(commands).toHaveLength(1)
+})

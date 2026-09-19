@@ -11,7 +11,7 @@ const sampleImage = new URL('./fixtures/capture-star-field.png', import.meta.url
 
 const phases = ['idle', 'exposing', 'reading', 'complete', 'stopped', 'failed', 'disconnected'] as const
 
-const coolingStates = ['off-near-setpoint', 'on', 'none'] as const
+const coolingStates = ['off-near-setpoint', 'on', 'unconfirmed', 'unavailable', 'none'] as const
 
 type Props = Record<string, string | number | boolean>
 
@@ -49,6 +49,7 @@ function CapturePreview({ props, onPropsChange }: {
   const [setpoint, setSetpoint] = useState('5')
   const cooling = String(values.cooling ?? 'off-near-setpoint')
   const showCooling = cooling !== 'none'
+  const coolingUnconfirmed = cooling === 'unconfirmed' || cooling === 'unavailable'
   const [fraction, setFraction] = useState(0)
   const [capturedAt, setCapturedAt] = useState(() => Date.now() - 18_000)
   const [now, setNow] = useState(Date.now)
@@ -152,7 +153,7 @@ function CapturePreview({ props, onPropsChange }: {
             <div className="vela-capture-entry__body">
               <h2>Capture</h2>
               <p>Take an exposure and inspect the image.</p>
-              <div className="vela-capture-entry__status" role="status">{busy ? `${activity}…` : phase === 'failed' || disconnected || phase === 'stopped' ? activity : hasImage ? `${imageSeconds} s · Mono · ${age} s ago` : 'No image captured yet'}{showCooling && <span>{coolerOn ? `Cooler on · sensor ${Number(setpoint).toFixed(1)} °C` : 'Cooler off · sensor 4.8 °C'}</span>}</div>
+              <div className="vela-capture-entry__status" role="status">{busy ? `${activity}…` : phase === 'failed' || disconnected || phase === 'stopped' ? activity : hasImage ? `${imageSeconds} s · Mono · ${age} s ago` : 'No image captured yet'}{showCooling && <span>{coolingUnconfirmed ? 'Check camera cooling' : coolerOn ? `Cooler on · sensor ${Number(setpoint).toFixed(1)} °C` : 'Cooler off · sensor 4.8 °C'}</span>}</div>
               <Button size="large" tone="accent" onClick={() => update({ screen: 'capture' })}>{busy ? 'View capture' : 'Open capture'} →</Button>
             </div>
           </Panel>
@@ -189,15 +190,18 @@ function CapturePreview({ props, onPropsChange }: {
             <div className="vela-capture-camera"><CameraMark /><div><strong>Simulator Camera</strong><span>Monochrome · 1600 × 1200</span></div></div>
             {showCooling && <section className="vela-capture-cooling" aria-label="Camera cooling">
               <h3>Cooling</h3>
-              <dl>
+              {cooling === 'unavailable' ? <p>Cooling state is unavailable. Waiting for a fresh camera reading.</p> : <dl>
                 <div><dt>Cooler</dt><dd data-state={coolerOn ? 'on' : 'off'}>{coolerOn ? 'On' : 'Off'}</dd></div>
                 <div><dt>Sensor</dt><dd>{coolerOn ? `${Number(setpoint).toFixed(1)} °C` : '4.8 °C'}</dd></div>
                 <div><dt>Requested</dt><dd>{Number(setpoint).toFixed(1)} °C</dd></div>
                 <div><dt>Power</dt><dd>{coolerOn ? '18%' : '0%'}</dd></div>
-              </dl>
-              <p>{coolerOn ? 'Cooler is on. Power shows cooling effort, not a finished temperature.' : 'Cooler is off. A sensor near the requested temperature is not confirmation that cooling is running.'}</p>
-              <Checkbox label="Cooler on" description="The specimen does not turn this on by itself." checked={coolerOn} disabled={busy || disconnected} onChange={event => setCoolerOn(event.target.checked)} />
-              <Input label="Target temperature · °C" type="number" value={setpoint} disabled={busy || disconnected} onChange={event => setSetpoint(event.target.value)} message="Sets the requested temperature only. Turn the cooler on separately." />
+              </dl>}
+              <p>{coolingUnconfirmed ? 'Cooler command outcome unknown. Check the camera before assuming it changed.' : coolerOn ? 'Cooler is on. Power shows cooling effort, not a finished temperature.' : 'Cooler is off. A sensor near the requested temperature is not confirmation that cooling is running.'}</p>
+              {cooling !== 'unavailable' && <><Checkbox label="Cooler on" description="The specimen does not turn this on by itself." checked={coolerOn} disabled={busy || disconnected || coolingUnconfirmed} onChange={event => setCoolerOn(event.target.checked)} />
+              <Input label="Target temperature · °C" type="number" value={setpoint} disabled={busy || disconnected || coolingUnconfirmed} onChange={event => setSetpoint(event.target.value)} message="Sets the requested temperature only. Turn the cooler on separately." /></>}
+              {coolingUnconfirmed && <Button disabled={busy} onClick={() => {
+                if (cooling !== 'unavailable') update({ cooling: 'off-near-setpoint' })
+              }}>Check camera cooling</Button>}
             </section>}
             <Input label="Exposure · seconds" type="number" min="0.1" max="600" step="0.1" value={exposure} disabled={busy || disconnected} invalid={!validExposure} message={validExposure ? '' : 'Choose 0.1–600 seconds.'} onChange={event => update({ exposure: event.target.value })} />
             <div className="vela-capture-command">

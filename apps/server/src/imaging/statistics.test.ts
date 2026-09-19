@@ -28,9 +28,15 @@ function image(stars: Star[], options: { width?: number, height?: number, backgr
           for (let sx = 0; sx < 12; sx++) {
             const r2 = (x + (sx + 0.5) / 12 - 0.5 - star.x) ** 2 + (y + (sy + 0.5) / 12 - 0.5 - star.y) ** 2
             const r = Math.sqrt(r2)
-            const exponent = star.profile === 'exponential' ? -r / star.sigma
-              : star.profile === 'doughnut' ? -((r - star.sigma) ** 2) / (2 * (star.width ?? 3) ** 2)
-              : -r2 / (2 * star.sigma ** 2)
+
+            const exponents = {
+              exponential: -r / star.sigma,
+              doughnut: -((r - star.sigma) ** 2) / (2 * (star.width ?? 3) ** 2),
+              gaussian: -r2 / (2 * star.sigma ** 2),
+            }
+
+            const exponent = exponents[star.profile ?? 'gaussian']
+
             signal += (star.amplitude ?? 1000) * Math.exp(exponent) / 144
           }
         }

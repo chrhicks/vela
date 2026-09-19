@@ -79,6 +79,7 @@ test('a travel-limit start result returns to setup instead of a disconnect', asy
     currentPosition: 0,
     error: 'The focuser is already at a mechanical limit. Autofocus starts from the current position and will not command 0 or MaxStep.',
   }
+
   let current: AutofocusView = setup
 
   await page.route('**/api/web/rigs/rig-1/autofocus', route => route.fulfill({ json: current }))

@@ -201,12 +201,9 @@ export function registerCapture(
       return reply.code(400).send({ error: 'Expected coolerOn and/or setpointC. Setting a temperature does not turn the cooler on.' })
     }
 
-    const owner = operations.owner(request.params.rigId)
+    const release = operations.acquire(request.params.rigId, 'capture')
 
-    if (owner && owner !== 'capture') return reply.code(409).send({ error: 'Another Rig operation is in progress.' })
-    const release = owner === 'capture' ? undefined : operations.acquire(request.params.rigId, 'capture')
-
-    if (!release && owner !== 'capture') return reply.code(409).send({ error: 'Another Rig operation is in progress.' })
+    if (!release) return reply.code(409).send({ error: 'Another Rig operation is in progress.' })
 
     try {
       const view = await rigView(request.params.rigId)
@@ -247,7 +244,7 @@ export function registerCapture(
     } catch (error) {
       return reply.code(409).send({ error: error instanceof Error ? error.message : 'Could not change cooling' })
     } finally {
-      release?.()
+      release()
     }
   })
 

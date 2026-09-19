@@ -80,8 +80,6 @@ export function createAlpacaFocuser({
     const maxStep = await client.readNumber(focuser, 'maxstep', signal)
     const moving = await client.readBoolean(focuser, 'ismoving', signal)
 
-    if (typeof absolute !== 'boolean' || typeof moving !== 'boolean') invalid('Invalid focuser motion state', 'ismoving')
-
     if (!Number.isSafeInteger(position) || !Number.isSafeInteger(maxStep) || maxStep < 1 || position < 0 || position > maxStep) {
       invalid('Invalid focuser position', 'position')
     }

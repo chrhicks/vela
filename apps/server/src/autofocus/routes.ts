@@ -1,12 +1,11 @@
 import { z } from 'zod'
 import type { FastifyInstance } from 'fastify'
-import { AlpacaCaptureStoppedError, createAlpacaAcquisition, createAlpacaFocuser } from '@vela/alpaca'
+import { AlpacaCaptureStoppedError, AlpacaFocuserStoppedError, createAlpacaAcquisition, createAlpacaFocuser, type AlpacaFocuserMove } from '@vela/alpaca'
 import type { AutofocusView } from '@vela/model/web'
 import type { RigCatalog } from '../rig/catalog.js'
 import { inspectRigDetail, type RigDetailOptions } from '../rig/detail.js'
-import { createRigOperations, type RigOperations } from '../rig/operations.js'
-import { CaptureStoppedError } from '../capture/controller.js'
-import { createAutofocusController, type AutofocusCamera, type AutofocusFocuser } from './controller.js'
+import type { RigOperations } from '../rig/operations.js'
+import { AutofocusStoppedError, createAutofocusController, type AutofocusCamera, type AutofocusFocuser, type AutofocusRunOptions } from './controller.js'
 import { measureAutofocusStars } from '../imaging/statistics.js'
 import { DEFAULT_OFFSET_STEPS, DEFAULT_STEP_SIZE } from './walk.js'
 
@@ -28,7 +27,7 @@ function configuredCamera(settings: { endpoint: string, cameraId: string, expect
           onProgress: elapsedSeconds => onProgress(elapsedSeconds),
         })
       } catch (error) {
-        if (error instanceof AlpacaCaptureStoppedError) throw new CaptureStoppedError()
+        if (error instanceof AlpacaCaptureStoppedError) throw new AutofocusStoppedError()
         throw error
       }
     },
@@ -40,9 +39,18 @@ function configuredFocuser(settings: { endpoint: string, focuserId: string }): A
 
   return {
     status: signal => focuser.status(settings.focuserId, signal),
-    move: (position, window, signal) => focuser.move({
-      focuserId: settings.focuserId, position, window, ...(signal ? { signal } : {}),
-    }),
+    async move(position, window, signal) {
+      const command: AlpacaFocuserMove = { focuserId: settings.focuserId, position, window }
+
+      if (signal) command.signal = signal
+
+      try {
+        return await focuser.move(command)
+      } catch (error) {
+        if (error instanceof AlpacaFocuserStoppedError) throw new AutofocusStoppedError()
+        throw error
+      }
+    },
     halt: () => focuser.halt(settings.focuserId),
   }
 }
@@ -62,6 +70,7 @@ export function registerAutofocus(
     const rig = await catalog.get(rigId)
 
     if (!rig) return {}
+
     const current = (): AutofocusView => controllers.get(rigId)?.snapshot() ?? {
       rigId, rigName: rig.name, enabled: false, unavailableReason: null, cameraName: null, focuserName: null,
       phase: 'setup', activity: 'idle', active: false, startPosition: null, currentPosition: null, maxStep: null,
@@ -104,9 +113,11 @@ export function registerAutofocus(
 
     const snapshot = current()
     const focuserTelemetry = focuser.telemetry.values
+
     const idlePosition = !snapshot.active && focuserTelemetry?.kind === 'focuser'
       ? focuserTelemetry.position ?? snapshot.currentPosition
       : snapshot.currentPosition
+
     const idleMaxStep = !snapshot.active && focuserTelemetry?.kind === 'focuser'
       ? focuserTelemetry.maxStep ?? snapshot.maxStep
       : snapshot.maxStep
@@ -170,6 +181,7 @@ export function registerAutofocus(
       if (!view.enabled || !devices || !view.cameraName || !view.focuserName) {
         return reply.code(409).send({ error: view.unavailableReason })
       }
+
       let controller = controllers.get(view.rigId)
 
       if (!controller) {
@@ -179,15 +191,18 @@ export function registerAutofocus(
         controllers.set(view.rigId, controller)
       }
 
+      const options: AutofocusRunOptions = { onSettled: release }
+
+      if (parsed.data.stepSize !== undefined) options.stepSize = parsed.data.stepSize
+
+      if (parsed.data.offsetSteps !== undefined) options.offsetSteps = parsed.data.offsetSteps
+
+      if (parsed.data.exposureSeconds !== undefined) options.exposureSeconds = parsed.data.exposureSeconds
+
       const result = await controller.start(
         createCamera({ endpoint: devices.endpoint, cameraId: devices.cameraId, expectedCameraName: view.cameraName }),
         createFocuser({ endpoint: devices.endpoint, focuserId: devices.focuserId }),
-        {
-          ...(parsed.data.stepSize !== undefined ? { stepSize: parsed.data.stepSize } : {}),
-          ...(parsed.data.offsetSteps !== undefined ? { offsetSteps: parsed.data.offsetSteps } : {}),
-          ...(parsed.data.exposureSeconds !== undefined ? { exposureSeconds: parsed.data.exposureSeconds } : {}),
-          onSettled: release,
-        },
+        options,
       )
 
       started = true

@@ -11,6 +11,7 @@ import {
   type AutofocusWalkPlan,
 } from './walk.js'
 
+// Device boundaries may report cancellation only after confirming cleanup.
 export class AutofocusStoppedError extends Error {
   constructor() {
     super('Autofocus stopped')
@@ -73,6 +74,7 @@ export function createAutofocusController(
 
   async function sample(camera: AutofocusCamera, position: number, exposureSeconds: number, signal: AbortSignal): Promise<AutofocusSample> {
     patch({ activity: 'exposing', exposureStartedAt: new Date(now()).toISOString(), elapsedSeconds: 0, currentPosition: position })
+
     const frame = await camera.capture({
       exposureSeconds,
       signal,
@@ -81,6 +83,9 @@ export function createAutofocusController(
 
     patch({ activity: 'measuring', elapsedSeconds: exposureSeconds })
     const stars = await measure(frame.width, frame.height, frame.pixels, frame.color).catch(() => ({ detectedStars: 0, medianHfrPixels: null }))
+
+    signal.throwIfAborted()
+
     const point: AutofocusSample = {
       position,
       detectedStars: stars.detectedStars,
@@ -96,10 +101,12 @@ export function createAutofocusController(
   async function go(focuser: AutofocusFocuser, plan: AutofocusWalkPlan, position: number, signal: AbortSignal) {
     assertCommandedPosition(position, plan, extraFloor(plan))
     patch({ activity: 'moving', currentPosition: view.currentPosition })
+
     const arrived = await focuser.move(position, {
       minPosition: Math.max(1, extraFloor(plan)),
       maxPosition: plan.maxPosition,
     }, signal)
+
     patch({ currentPosition: arrived.position })
 
     return arrived.position
@@ -133,6 +140,7 @@ export function createAutofocusController(
 
         return
       }
+
       const planned = planStarHfrWalk(status.position, stepSize, offsetSteps, status.maxStep)
 
       if (!planned.ok) {
@@ -181,9 +189,10 @@ export function createAutofocusController(
       patch({ phase: 'confirming' })
       await go(focuser, plan, fit.position, signal)
       await sample(camera, fit.position, exposureSeconds, signal)
+      signal.throwIfAborted()
       patch({ phase: 'complete', activity: 'idle', active: false, restoredStart: false, error: null, exposureStartedAt: null })
     } catch (error) {
-      const cancelled = signal.aborted || error instanceof AutofocusStoppedError || (error instanceof Error && error.name === 'AbortError')
+      const cancelled = error instanceof AutofocusStoppedError
 
       try { await focuser.halt() }
       catch { /* halt is best-effort before restore */ }
@@ -236,6 +245,7 @@ export function createAutofocusController(
       patch({ active: false, activity: view.phase === 'complete' ? 'idle' : view.activity === 'stopping' ? 'idle' : view.activity })
       onSettled?.()
     })
+
     try {
       await whenPlanned
     } catch (error) {
@@ -249,7 +259,7 @@ export function createAutofocusController(
   async function stop() {
     if (running) {
       patch({ activity: 'stopping' })
-      cancellation!.abort()
+      cancellation!.abort(new AutofocusStoppedError())
       await running
     }
 
