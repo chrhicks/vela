@@ -130,7 +130,7 @@ describe('Alpaca device inspection', () => {
       },
       {
         providerDeviceId: 'focuser-0', kind: 'focuser', configuredName: 'Focuser slot', name: 'Focuser hardware', connection: 'connected',
-        telemetry: { availability: 'complete', values: { kind: 'focuser', position: 32888, moving: false, temperatureC: 27 } },
+        telemetry: { availability: 'complete', values: { kind: 'focuser', position: 32888, moving: false, maxStep: 50000, temperatureC: 27 } },
       },
       {
         providerDeviceId: 'filterwheel-0', kind: 'filter-wheel', configuredName: 'FilterWheel slot', name: 'FilterWheel hardware', connection: 'connected',
@@ -519,7 +519,7 @@ describe('Alpaca device inspection', () => {
     const [inspection] = await provider.inspectDevices()
     expect(inspection?.telemetry).toEqual({
       availability: 'partial',
-      values: { kind: 'focuser', moving: false },
+      values: { kind: 'focuser', moving: false, maxStep: 100 },
     })
 
     const missingMotionProvider = createAlpacaProvider({

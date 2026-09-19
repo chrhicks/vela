@@ -7,10 +7,13 @@ describe('@vela/alpaca export boundary', () => {
       'AlpacaCaptureRetryableError',
       'AlpacaCaptureStoppedError',
       'AlpacaDiscoveryError',
+      'AlpacaFocuserStoppedError',
       'AlpacaFramingStoppedError',
       'AlpacaProviderError',
       'createAlpacaAcquisition',
+      'createAlpacaCameraCooling',
       'createAlpacaDiscovery',
+      'createAlpacaFocuser',
       'createAlpacaFraming',
       'createAlpacaProvider',
     ])

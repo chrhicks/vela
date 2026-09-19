@@ -34,6 +34,8 @@ export type {
 
 export type { AlignmentView } from './alignment.js'
 
+export type { AutofocusActivity, AutofocusFit, AutofocusPhase, AutofocusSample, AutofocusView } from './autofocus.js'
+
 export type { CaptureCoolingView, CaptureImage, CaptureImageStatistics, CapturePhase, CaptureView, SavedImage, SavedImagesView, SavedImageView } from './capture.js'
 
 export type { ImagingCameraView } from './imaging-camera.js'

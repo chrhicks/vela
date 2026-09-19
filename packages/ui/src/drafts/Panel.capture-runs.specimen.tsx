@@ -122,6 +122,7 @@ function CaptureRunPreview({ props, onPropsChange }: {
   const progress = playing ? fraction : 0.4
   const activity = phase === 'exposing' ? 'Exposing' : phase === 'reading' ? 'Receiving image' : disconnected ? 'Connection interrupted' : phase === 'failed' ? 'Capture stopped · camera error' : phase === 'stopped' ? 'Capture stopped' : phase === 'complete' ? 'Image received' : 'Ready for an exposure'
   const alignmentHref = '?component=panel&specimen=panel-polar-alignment&prop.phase=setup&prop.example=near-aligned'
+  const autofocusHref = '?component=panel&specimen=panel-autofocus&prop.phase=setup&prop.example=current-focus'
 
   const rigContext = <details className="vela-capture-rig">
     <summary><span><i data-offline={disconnected || undefined} />{disconnected ? 'Rig updates interrupted' : 'Camera and mount connected'}</span><span>Device details</span></summary>
@@ -158,6 +159,12 @@ function CaptureRunPreview({ props, onPropsChange }: {
             <h2>Polar alignment</h2>
             <p>Measure your alignment and adjust the mount when you need to.</p>
             <a href={alignmentHref}>Open polar alignment <span aria-hidden="true">→</span></a>
+          </Panel>
+          <Panel className="vela-capture-alignment">
+            <div className="vela-capture-alignment__mark" aria-hidden="true">V</div>
+            <h2>Autofocus</h2>
+            <p>Walk a small window around the current focuser position and watch the V-curve as shorts land.</p>
+            <a href={autofocusHref}>Open autofocus <span aria-hidden="true">→</span></a>
           </Panel>
         </div>
       </> : <>
