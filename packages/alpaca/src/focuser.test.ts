@@ -1,25 +1,41 @@
 import type { ResponseFixture } from './internal/test-fixtures.js'
 import { describe, expect, it } from 'vitest'
-import { AlpacaProviderError } from './error.js'
 import { AlpacaFocuserStoppedError, createAlpacaFocuser } from './focuser.js'
 
+interface FocuserReadFixtures {
+  connected: ResponseFixture
+  absolute: ResponseFixture
+  position: ResponseFixture
+  maxstep: ResponseFixture
+  ismoving: ResponseFixture
+}
+
+interface FocuserBehavior {
+  loseMove: boolean
+  stopFails: boolean
+  onMove: () => void
+  rejectMove?: { errorNumber: number, message: string }
+}
+
 function observatory(requestTimeoutMs = 100) {
-  const values: Record<string, ResponseFixture> = {
+  const values: FocuserReadFixtures = {
     connected: true, absolute: true, position: 32842, maxstep: 60000, ismoving: false,
   }
+
   const writes: { operation: string, parameters: URLSearchParams }[] = []
   let started!: () => void
   const whenStarted = new Promise<void>(resolve => { started = resolve })
-  const state = {
+
+  const state: FocuserBehavior = {
     loseMove: false,
     stopFails: false,
     onMove: () => {},
-    rejectMove: undefined as { errorNumber: number, message: string } | undefined,
   }
 
   const fetch: typeof globalThis.fetch = async (input, init) => {
     init?.signal?.throwIfAborted()
     const operation = new URL(String(input)).pathname.split('/').at(-1)!
+
     const envelope = (Value?: ResponseFixture, ErrorNumber = 0, ErrorMessage = '') => Response.json({
       ClientTransactionID: 0, ServerTransactionID: 1, ErrorNumber, ErrorMessage, Value,
     })
@@ -51,9 +67,11 @@ function observatory(requestTimeoutMs = 100) {
       return envelope()
     }
 
-    if (!(operation in values)) throw new Error(`Unexpected read ${operation}`)
+    const entry = Object.entries(values).find(([name]) => name === operation)
 
-    return envelope(values[operation])
+    if (!entry) throw new Error(`Unexpected read ${operation}`)
+
+    return envelope(entry[1])
   }
 
   const focuser = createAlpacaFocuser({ baseUrl: 'http://fake', fetch, requestTimeoutMs, pollIntervalMs: 1, moveTimeoutMs: 100 })
@@ -96,6 +114,7 @@ describe('focuser write boundary', () => {
     const missed = observatory()
     missed.state.loseMove = true
     missed.state.onMove = () => { missed.values.position = 32842 }
+
     await expect(missed.focuser.move({ focuserId: 'eaf-id', position: 33042, window })).rejects.toThrow(/did not confirm the commanded position/)
     expect(missed.writes.map(write => write.operation)).toEqual(['move', 'halt'])
     expect(missed.writes.filter(write => write.operation === 'move')).toHaveLength(1)

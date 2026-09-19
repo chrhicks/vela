@@ -39,9 +39,11 @@ export function AutofocusCurve({
   const y = (hfr: number) => top + (1 - hfr / yMax) * plotHeight
   const ticks = [low, start, high]
   const latest = samples.at(-1)
+
   const lowest = hfrs.length
     ? samples.reduce((best, sample) => sample.hfrPixels !== null && (best.hfrPixels === null || sample.hfrPixels < best.hfrPixels) ? sample : best)
     : null
+
   const curve = fit
     ? Array.from({ length: 49 }, (_, index) => {
         const position = xMin + (index / 48) * (xMax - xMin)

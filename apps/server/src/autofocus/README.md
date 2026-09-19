@@ -18,6 +18,11 @@ Each short exposure appends `(position, HFR)` to the view immediately so the
 Observe graph can grow as the walk runs. The fit is the hyperbola minimum inside
 the sampled window. The lowest sampled HFR is comparison only.
 
+Stop during measurement still restores the start, including the final confirmation
+measurement. Only typed cancellation confirmed by a device boundary is reported
+as stopped; camera abort or cleanup failures remain failed even when return to the
+starting focuser position succeeds.
+
 ```sh
 pnpm exec vitest run apps/server/src/autofocus apps/server/src/imaging/statistics.test.ts packages/alpaca/src/focuser.test.ts
 ```

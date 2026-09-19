@@ -28,6 +28,7 @@ export function CaptureCooling({
   cooling,
   disabled,
   pending,
+  checking,
   error,
   unconfirmed,
   runActive,
@@ -35,9 +36,10 @@ export function CaptureCooling({
   onSetpoint,
   onCheck,
 }: {
-  cooling: CaptureCoolingView
+  cooling: CaptureCoolingView | null
   disabled: boolean
   pending: boolean
+  checking?: boolean
   error: string | null
   unconfirmed: boolean
   runActive?: boolean
@@ -46,13 +48,13 @@ export function CaptureCooling({
   onCheck?: () => void
 }) {
   const [target, setTarget] = useState<string | null>(null)
-  const requested = target ?? (cooling.setpointC === undefined ? '' : String(cooling.setpointC))
+  const requested = target ?? (cooling?.setpointC === undefined ? '' : String(cooling.setpointC))
   const setpoint = Number(requested)
   const validTarget = requested.trim() !== '' && Number.isFinite(setpoint) && setpoint >= -80 && setpoint <= 50
 
   return <section className="capture-page__cooling" aria-label="Camera cooling">
     <h3>Cooling</h3>
-    <dl>
+    {cooling ? <dl>
       <div>
         <dt>Cooler</dt>
         <dd data-state={cooling.state}>{cooling.state === 'on' ? 'On' : 'Off'}</dd>
@@ -69,17 +71,18 @@ export function CaptureCooling({
         <dt>Power</dt>
         <dd>{formatPower(cooling.powerPercent)}</dd>
       </div>}
-    </dl>
+    </dl> : <p>Cooling state is unavailable. Waiting for a fresh camera reading.</p>}
     <p>
       {unconfirmed ? 'Cooler command outcome unknown. Check the camera before assuming it changed.'
         : pending ? 'Confirming cooler state…'
+          : !cooling ? 'Check the camera before changing cooling.'
           : cooling.state === 'off'
             ? 'Cooler is off. A sensor near the requested temperature is not confirmation that cooling is running.'
             : cooling.powerPercent !== undefined
               ? 'Cooler is on. Power shows cooling effort, not a finished temperature.'
               : 'Cooler is on. Sensor temperature is live; it is not a substitute for the cooler switch.'}
     </p>
-    <Checkbox
+    {cooling && <><Checkbox
       label="Cooler on"
       description="Vela does not turn this on by itself."
       checked={cooling.state === 'on'}
@@ -104,8 +107,8 @@ export function CaptureCooling({
         onChange={event => setTarget(event.target.value)}
       />
       <Button type="submit" disabled={disabled || !validTarget}>{pending ? 'Confirming…' : 'Set temperature'}</Button>
-    </form>}
+    </form>}</>}
     {error && <p role="status">{error}</p>}
-    {unconfirmed && onCheck && <Button type="button" disabled={pending || runActive} onClick={onCheck}>Check camera cooling</Button>}
+    {unconfirmed && onCheck && <Button type="button" disabled={pending || checking || runActive} onClick={onCheck}>Check camera cooling</Button>}
   </section>
 }

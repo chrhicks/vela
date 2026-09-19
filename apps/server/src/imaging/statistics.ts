@@ -133,6 +133,7 @@ export async function measureStars(width: number, height: number, pixels: ArrayL
         x: cluster.reduce((sum, peak) => sum + peak.x, 0) / cluster.length,
         y: cluster.reduce((sum, peak) => sum + peak.y, 0) / cluster.length,
       }
+
       const hfr = measureStar(width, height, pixels, color, merged, policy)
 
       if (hfr !== null) radii.push(hfr)
