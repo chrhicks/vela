@@ -42,5 +42,10 @@ export function CaptureHub({ rigId }: { rigId: string }) {
       <h2>Polar alignment</h2><p>Measure your alignment and adjust the mount when you need to.</p>
       <Link to={`${base}/alignment`}>Open polar alignment <span aria-hidden="true">→</span></Link>
     </Panel>
+    <Panel className="vela-capture-alignment">
+      <div className="vela-capture-alignment__mark" aria-hidden="true">V</div>
+      <h2>Autofocus</h2><p>Walk a small window around the current focuser position and watch the V-curve as shorts land.</p>
+      <Link to={`${base}/autofocus`}>Open autofocus <span aria-hidden="true">→</span></Link>
+    </Panel>
   </div>
 }

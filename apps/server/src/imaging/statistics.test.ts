@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { measureStars } from './statistics.js'
+import { measureAutofocusStars, measureStars } from './statistics.js'
 import type { ImageColor } from './preview.js'
 
-type Star = { x: number, y: number, sigma: number, amplitude?: number, profile?: 'exponential' }
+type Star = { x: number, y: number, sigma: number, amplitude?: number, profile?: 'exponential' | 'doughnut', width?: number }
 
 function image(stars: Star[], options: { width?: number, height?: number, background?: number, noise?: number, color?: ImageColor, clip?: number } = {}) {
   const width = options.width ?? 96
@@ -27,7 +27,10 @@ function image(stars: Star[], options: { width?: number, height?: number, backgr
         for (let sy = 0; sy < 12; sy++) {
           for (let sx = 0; sx < 12; sx++) {
             const r2 = (x + (sx + 0.5) / 12 - 0.5 - star.x) ** 2 + (y + (sy + 0.5) / 12 - 0.5 - star.y) ** 2
-            const exponent = star.profile === 'exponential' ? -Math.sqrt(r2) / star.sigma : -r2 / (2 * star.sigma ** 2)
+            const r = Math.sqrt(r2)
+            const exponent = star.profile === 'exponential' ? -r / star.sigma
+              : star.profile === 'doughnut' ? -((r - star.sigma) ** 2) / (2 * (star.width ?? 3) ** 2)
+              : -r2 / (2 * star.sigma ** 2)
             signal += (star.amplitude ?? 1000) * Math.exp(exponent) / 144
           }
         }
@@ -149,5 +152,13 @@ describe('measureStars', () => {
     ]
 
     for (const frame of frames) expect(await measureStars(frame.width, frame.height, frame.pixels)).toEqual({ detectedStars: 0, medianHfrPixels: null })
+  })
+
+  it('measures defocused doughnuts that capture star measurements reject', async () => {
+    const frame = image([{ x: 100, y: 100, sigma: 14, profile: 'doughnut', amplitude: 1200, width: 3.5 }], { width: 200, height: 200 })
+    expect(await measureStars(frame.width, frame.height, frame.pixels)).toEqual({ detectedStars: 0, medianHfrPixels: null })
+    const autofocus = await measureAutofocusStars(frame.width, frame.height, frame.pixels)
+    expect(autofocus.detectedStars).toBeGreaterThan(0)
+    expect(autofocus.medianHfrPixels).toBeGreaterThan(6)
   })
 })

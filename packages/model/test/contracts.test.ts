@@ -8,6 +8,7 @@ import type {
   RigDetailView,
   RigDeviceDetailView,
   RigObservationView,
+  AutofocusView,
 } from '../src/web/index.js'
 
 describe('@vela/model boundaries', () => {
@@ -114,5 +115,40 @@ describe('@vela/model boundaries', () => {
     >['uncertain']['reason']>().toEqualTypeOf<
       'cancelled' | 'verification-timeout' | 'verification-unavailable' | 'write-outcome-unknown'
     >()
+  })
+
+  it('keeps autofocus as one ephemeral Star-HFR walk around start, not a home to 0', () => {
+    const view = {
+      rigId: 'fra',
+      rigName: 'Askar FRA 400',
+      enabled: true,
+      unavailableReason: null,
+      cameraName: 'ASI2600MM Pro',
+      focuserName: 'EAF',
+      phase: 'walking',
+      activity: 'exposing',
+      active: true,
+      startPosition: 32842,
+      currentPosition: 33042,
+      maxStep: 60000,
+      stepSize: 50,
+      offsetSteps: 4,
+      exposureSeconds: 2,
+      elapsedSeconds: 0.4,
+      exposureStartedAt: '2026-09-17T00:00:00.000Z',
+      samples: [{ position: 33042, detectedStars: 12, hfrPixels: 5.1, capturedAt: '2026-09-17T00:00:00.000Z' }],
+      fit: null,
+      restoredStart: false,
+      error: null,
+    } as const satisfies AutofocusView
+
+    expectTypeOf(view).toMatchTypeOf<AutofocusView>()
+    expectTypeOf<AutofocusView['startPosition']>().toEqualTypeOf<number | null>()
+    expectTypeOf<AutofocusView['samples']>().toMatchTypeOf<ReadonlyArray<{
+      position: number
+      detectedStars: number
+      hfrPixels: number | null
+      capturedAt: string
+    }>>()
   })
 })

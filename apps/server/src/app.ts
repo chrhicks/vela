@@ -39,6 +39,7 @@ import { loadRigDetailView } from './rig/detail.js'
 import { loadHomeView } from './rig/home.js'
 import { createRigOperations } from './rig/operations.js'
 import { registerCapture } from './capture/routes.js'
+import { registerAutofocus } from './autofocus/routes.js'
 import { registerNavigation } from './navigation.js'
 import { registerImagingCamera } from './rig/imaging-camera.js'
 import { registerAlignment } from './alignment/routes.js'
@@ -85,6 +86,7 @@ export function buildApp({
   const operations = createRigOperations()
   registerAlignment(app, rigCatalog, alignment, operations)
   const capture = registerCapture(app, rigCatalog, operations, { createInspector, savedImages })
+  registerAutofocus(app, rigCatalog, operations, { createInspector })
   registerNavigation(app, rigCatalog, capture)
   registerSavedImages(app, rigCatalog, savedImages)
   registerImagingCamera(app, rigCatalog, operations, { createInspector })
