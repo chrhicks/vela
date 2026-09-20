@@ -126,7 +126,7 @@ test('cancelling a pending request aborts transport and never starts judgment ca
   assert.equal((await readdir(join(root, '.opencode/.local/standards'))).length, 1)
 })
 
-test('source changed during evaluation invalidates the old finding', async t => {
+for (const change of ['edited', 'deleted'] as const) test(`source ${change} during evaluation invalidates the old finding`, async t => {
   const { root } = await fixture(t)
   const judgmentStarted = Promise.withResolvers<void>()
   const finish = Promise.withResolvers<void>()
@@ -140,9 +140,11 @@ test('source changed during evaluation invalidates the old finding', async t => 
   }
   const checking = checkStandards(root, { mode: 'files', paths: ['tracked.ts'] }, new AbortController().signal, send)
   await judgmentStarted.promise
-  await writeFile(join(root, 'tracked.ts'), 'export const editedDuringReview = true\n')
+  if (change === 'edited') await writeFile(join(root, 'tracked.ts'), 'export const editedDuringReview = true\n')
+  else await rm(join(root, 'tracked.ts'))
   finish.resolve()
   const result = await checking
-  assert.match(result, /inconclusive — File changed during review/)
+  assert.match(result, change === 'edited' ? /inconclusive — File changed during review/ : /inconclusive — ENOENT/)
   assert.match(result, /0 flagged/)
+  assert.doesNotMatch(result, /tracked.ts: error_context/)
 })

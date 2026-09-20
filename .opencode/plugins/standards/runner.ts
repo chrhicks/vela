@@ -119,6 +119,8 @@ export async function checkStandards(directory: string, input: CheckInput, signa
         }
       } catch (error) {
         signal.throwIfAborted()
+        result.failed = []
+        result.inconclusive = []
         result.error = errorText(error)
       }
     }
