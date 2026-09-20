@@ -26,6 +26,10 @@ try {
     await access(env[key], key === 'VELA_ASTAP' ? constants.X_OK : constants.R_OK)
   }
 
+  if (env.VELA_ALIGNMENT_DIAGNOSTICS_PATH) {
+    env.VELA_ALIGNMENT_DIAGNOSTICS_PATH = resolve(root, env.VELA_ALIGNMENT_DIAGNOSTICS_PATH)
+  }
+
   await available(3001, '127.0.0.1')
   await available(5173, '0.0.0.0')
   console.log(`Starting Vela for http://${env.VELA_LAN_HOST}:5173 — Ctrl+C stops this run.`)
