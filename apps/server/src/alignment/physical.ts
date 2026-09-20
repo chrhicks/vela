@@ -109,7 +109,8 @@ export function createPhysicalAlignment(settings: PhysicalAlignmentSettings, acq
     if (!sameCameraGeometry(observed, geometry)) throw new Error('Camera geometry changed. Measure a new baseline.')
 
     return { hint: fromMount({ raDegrees: current.rightAscensionDegrees, decDegrees: current.declinationDegrees },
-      current.coordinateSystem, new Date(current.observedAt), site!), latitude: site!.latitudeDegrees }
+      current.coordinateSystem, new Date(current.observedAt), site!), latitude: site!.latitudeDegrees,
+      observation: { site: { ...site! }, camera: observed, mount: current } }
   }
 
   async function move(signal: AbortSignal) {

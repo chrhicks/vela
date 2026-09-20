@@ -72,12 +72,13 @@ beforeEach(() => {
 
 afterEach(async () => { await Promise.all(apps.splice(0).map(app => app.close())) })
 
-function setup(records = [rig], configured = true, mode: 'physical' | 'offline' = 'physical') {
+function setup(records = [rig], configured = true, mode: 'physical' | 'offline' = 'physical', diagnosticsPath?: string) {
   const app = Fastify()
   apps.push(app)
   const catalog = createMemoryRigCatalog(records)
   const operations = createRigOperations()
-  registerAlignment(app, catalog, configured ? alignmentSettings({ ...env, VELA_ALIGNMENT_MODE: mode }) : undefined, operations, mocks)
+  registerAlignment(app, catalog, configured ? alignmentSettings({ ...env, VELA_ALIGNMENT_MODE: mode,
+    VELA_ALIGNMENT_DIAGNOSTICS_PATH: diagnosticsPath }) : undefined, operations, mocks)
 
   const command = (name: string, rigId = 'rig', payload: null | string | readonly string[] | { exposureSeconds?: number } = {}) => app.inject({ method: 'POST',
     url: `/api/rigs/${rigId}/alignment/${name}`, headers: { 'content-type': 'application/json' }, payload: JSON.stringify(payload) })
@@ -98,6 +99,14 @@ describe('alignment environment settings', () => {
   it('rejects unknown mode and incomplete configuration', () => {
     expect(() => alignmentSettings({ ...env, VELA_ALIGNMENT_MODE: 'real' })).toThrow('MODE')
     expect(() => alignmentSettings({ ...env, VELA_ASTAP: undefined })).toThrow('requires')
+  })
+  it('enables diagnostic recording only with an explicit absolute destination', () => {
+    expect(alignmentSettings(env)?.diagnosticsPath).toBeUndefined()
+    expect(alignmentSettings({ ...env, VELA_ALIGNMENT_DIAGNOSTICS_PATH: '/evidence/alignment' })?.diagnosticsPath).toBe('/evidence/alignment')
+
+    for (const diagnosticsPath of ['', 'relative/path']) {
+      expect(() => alignmentSettings({ ...env, VELA_ALIGNMENT_DIAGNOSTICS_PATH: diagnosticsPath })).toThrow('absolute directory')
+    }
   })
 })
 
@@ -134,6 +143,12 @@ describe('alignment routes', () => {
     expect((await app.inject('/api/web/rigs/rig/alignment')).json()).toMatchObject({ enabled: true })
     expect(mocks.controller).toHaveBeenCalledTimes(1)
     expect(mocks.framing).not.toHaveBeenCalled()
+    expect(mocks.controller.mock.calls[0]![0].openDiagnostics).toBeUndefined()
+  })
+  it.each(['offline', 'physical'] as const)('wires explicit diagnostics into %s composition', async mode => {
+    const { command } = setup([rig], true, mode, '/evidence/alignment')
+    await command('start')
+    expect(mocks.controller.mock.calls[0]![0].openDiagnostics).toBeTypeOf('function')
   })
   it('composes physical start from current camera name, focal length, and a solver factory accepting observed field height', async () => {
     const { command, catalog, operations } = setup()
