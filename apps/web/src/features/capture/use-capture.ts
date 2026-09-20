@@ -22,6 +22,7 @@ export function useCapture(rigId: string) {
   const [coolingPending, setCoolingPending] = useState(false)
   const [coolingError, setCoolingError] = useState<string | null>(null)
   const [coolingUnconfirmed, setCoolingUnconfirmed] = useState(false)
+  const unconfirmedCoolingField = useRef<'coolerOn' | 'setpointC' | null>(null)
   const request = useRef<AbortController | null>(null)
   const lastView = useRef<CaptureView | null>(null)
   const writing = useRef(false)
@@ -29,7 +30,14 @@ export function useCapture(rigId: string) {
   const alive = useRef(false)
 
   const read = useCallback(async (explicit = false) => {
-    if (request.current || !alive.current) return
+    if (!alive.current || writing.current) return
+
+    if (request.current) {
+      if (!explicit) return
+      request.current.abort()
+      generation.current++
+    }
+
     const controller = new AbortController()
     const current = generation.current
     request.current = controller
@@ -54,6 +62,11 @@ export function useCapture(rigId: string) {
       } else if (explicit && !next.active) {
         setCommandUnconfirmed(false)
         setError(null)
+      }
+
+      if (explicit && next.cooling && (unconfirmedCoolingField.current === 'coolerOn'
+        || (unconfirmedCoolingField.current === 'setpointC' && next.cooling.setpointC !== undefined))) {
+        unconfirmedCoolingField.current = null
         setCoolingUnconfirmed(false)
         setCoolingError(null)
       }
@@ -145,8 +158,12 @@ export function useCapture(rigId: string) {
       setOffline(false)
       setCommandUnconfirmed(false)
       setError(null)
-      setCoolingUnconfirmed(false)
-      setCoolingError(null)
+
+      if (path === 'cooling') {
+        unconfirmedCoolingField.current = null
+        setCoolingUnconfirmed(false)
+        setCoolingError(null)
+      }
     } catch (cause) {
       if (!alive.current || current !== generation.current) return
 
@@ -156,7 +173,9 @@ export function useCapture(rigId: string) {
           : 'The cooler command could not be confirmed. Check camera cooling before assuming it changed.'
 
         setCoolingError(message)
-        setCoolingUnconfirmed(/could not be confirmed/i.test(message))
+        const uncertain = /could not be confirmed/i.test(message)
+        unconfirmedCoolingField.current = uncertain ? ('coolerOn' in body ? 'coolerOn' : 'setpointC') : null
+        setCoolingUnconfirmed(uncertain)
 
         return
       }

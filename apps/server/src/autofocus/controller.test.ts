@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest'
-import { createAutofocusController, type AutofocusCamera, type AutofocusFocuser } from './controller.js'
+import { AutofocusStoppedError, createAutofocusController, type AutofocusCamera, type AutofocusFocuser } from './controller.js'
 import { hyperbola } from './hyperbola.js'
 
 function deferred<T>() {
@@ -10,17 +10,19 @@ function deferred<T>() {
   return { promise, resolve, reject }
 }
 
-const stops: Array<() => Promise<unknown>> = []
+const stops: Array<() => Promise<void>> = []
 
 afterEach(async () => {
   await Promise.all(stops.splice(0).map(stop => stop()))
 })
 
-function setup(start = 32842, maxStep = 60000, { holdMoves = false } = {}) {
+function setup(start = 32842, maxStep = 60000, { holdMoves = false, holdFinalMeasurement = false } = {}) {
   let position = start
   const moves: number[] = []
   const captures: Array<ReturnType<typeof deferred<void>> & { position: number }> = []
   const pendingMoves: Array<ReturnType<typeof deferred<void>> & { target: number }> = []
+  const finalMeasurement = deferred<void>()
+  const measuringFinal = deferred<void>()
 
   const focuser: AutofocusFocuser = {
     async status() {
@@ -51,7 +53,7 @@ function setup(start = 32842, maxStep = 60000, { holdMoves = false } = {}) {
       onProgress(0.2)
       const gate = deferred<void>()
       captures.push({ position, ...gate })
-      const abort = () => gate.reject(Object.assign(new Error('Exposure stopped'), { name: 'AbortError' }))
+      const abort = () => gate.reject(new AutofocusStoppedError())
       signal.addEventListener('abort', abort, { once: true })
       await gate.promise.finally(() => signal.removeEventListener('abort', abort))
 
@@ -62,10 +64,14 @@ function setup(start = 32842, maxStep = 60000, { holdMoves = false } = {}) {
   const controller = createAutofocusController(
     { rigId: 'fra', rigName: 'FRA 400', cameraName: 'ASI2600', focuserName: 'EAF' },
     () => Date.parse('2026-09-17T00:00:00Z'),
-    async () => ({
-      detectedStars: 40,
-      medianHfrPixels: hyperbola(position, 2.18, 95, 32838),
-    }),
+    async () => {
+      if (holdFinalMeasurement && controller.snapshot().phase === 'confirming') {
+        measuringFinal.resolve()
+        await finalMeasurement.promise
+      }
+
+      return { detectedStars: 40, medianHfrPixels: hyperbola(position, 2.18, 95, 32838) }
+    },
   )
 
   async function land() {
@@ -79,13 +85,61 @@ function setup(start = 32842, maxStep = 60000, { holdMoves = false } = {}) {
   }
 
   stops.push(async () => {
+    finalMeasurement.resolve()
+
     while (pendingMoves.length) pendingMoves.shift()!.resolve()
+
     while (captures.length) captures.shift()!.resolve()
     await controller.stop()
   })
 
-  return { controller, focuser, camera, moves, land, arrive, captures, position: () => position }
+  return { controller, focuser, camera, moves, land, arrive, captures, finalMeasurement, measuringFinal, position: () => position }
 }
+
+it.each([
+  new Error('Camera abort failed; idle could not be confirmed'),
+  Object.assign(new Error('Camera cleanup timed out'), { name: 'AbortError' }),
+])('preserves a camera cleanup failure after Stop: $message', async failure => {
+  const { controller, focuser, moves } = setup()
+  const exposing = deferred<void>()
+  const cleanup = deferred<never>()
+
+  const camera: AutofocusCamera = {
+    async capture() {
+      exposing.resolve()
+
+      return cleanup.promise
+    },
+  }
+
+  await controller.start(camera, focuser)
+  await exposing.promise
+  const stopping = controller.stop()
+  expect(controller.snapshot()).toMatchObject({ active: true, activity: 'stopping' })
+  cleanup.reject(failure)
+  await stopping
+  expect(controller.snapshot()).toMatchObject({
+    phase: 'failed', active: false, currentPosition: 32842, restoredStart: true, error: failure.message,
+  })
+  expect(moves.at(-1)).toBe(32842)
+})
+
+it('restores start when Stop arrives while the final confirmation measurement is pending', async () => {
+  const { controller, camera, focuser, land, moves, finalMeasurement, measuringFinal } = setup(32842, 60000, { holdFinalMeasurement: true })
+  await controller.start(camera, focuser)
+
+  for (let count = 0; count < 10; count++) await land()
+
+  await measuringFinal.promise
+  expect(controller.snapshot()).toMatchObject({ phase: 'confirming', activity: 'measuring', active: true })
+  expect(controller.snapshot().currentPosition).not.toBe(32842)
+  const stopping = controller.stop()
+  expect(controller.snapshot()).toMatchObject({ activity: 'stopping', active: true })
+  finalMeasurement.resolve()
+  await stopping
+  expect(controller.snapshot()).toMatchObject({ phase: 'stopped', active: false, currentPosition: 32842, restoredStart: true, error: null })
+  expect(moves.at(-1)).toBe(32842)
+})
 
 it('lands each (position, HFR) sample on the view before the next move, then fits a hyperbola', async () => {
   const { controller, camera, focuser, land, arrive, moves } = setup(32842, 60000, { holdMoves: true })
@@ -99,6 +153,7 @@ it('lands each (position, HFR) sample on the view before the next move, then fit
     const view = controller.snapshot()
     expect(view.samples.at(-1)?.position).toBe(view.currentPosition)
     expect(view.samples.at(-1)?.hfrPixels).toBeGreaterThan(0)
+
     if (count < 9) expect(view.fit).toBeNull()
   }
 

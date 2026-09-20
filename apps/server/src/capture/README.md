@@ -70,7 +70,9 @@ a temperature does not turn the cooler on. Vela does not enable cooling on its
 own, wait for the sensor to reach the setpoint, or block capture on temperature.
 Each write is confirmed by a matching device read; an uncertain write is never
 replayed. The web Capture page treats cooling as prep and disables it while a run
-is active so Stop stays available.
+is active so Stop stays available. Every cooling command acquires its own exclusive
+Rig lease through readback; an existing capture owner never permits another
+cooling command to join that operation.
 
 ## Local review
 

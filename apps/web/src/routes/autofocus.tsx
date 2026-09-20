@@ -31,14 +31,17 @@ function AutofocusPage({ rigId }: { rigId: string }) {
   const setup = !view.active && (view.phase === 'setup' || returnedToSetup)
   const busy = view.active
   const latest = view.samples.at(-1)
+
   const lowest = view.samples.reduce<AutofocusView['samples'][number] | undefined>((best, sample) => {
     if (sample.hfrPixels === null) return best
 
     return !best || best.hfrPixels === null || sample.hfrPixels < best.hfrPixels ? sample : best
   }, undefined)
+
   const window = previewAutofocusWindow(view.currentPosition, step, view.offsetSteps, view.maxStep)
   const travelBlocked = setup && view.currentPosition != null && !window.fit
   const travelLimit = travelBlocked || (setup && isTravelLimitError(view.error))
+
   const notice = travelLimit ? {
     role: 'alert' as const,
     title: 'Walk would approach a travel limit',
@@ -56,7 +59,9 @@ function AutofocusPage({ rigId }: { rigId: string }) {
     title: error || (view.error && !isTravelLimitError(view.error)) ? 'Walk did not start' : 'Autofocus',
     body: error || view.error || view.unavailableReason,
   } : null
+
   const activity = autofocusActivity(view, offline)
+
   const badge = offline ? 'Disconnected'
     : setup ? (view.error || travelBlocked ? 'Blocked' : 'Not started')
     : view.phase === 'walking' ? 'Walking'
