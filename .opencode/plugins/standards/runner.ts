@@ -138,7 +138,7 @@ export async function checkStandards(directory: string, input: CheckInput, signa
   if (!lines.length) lines.push('No failed standards reported by the selected checks.')
   lines.push(`${results.length - skipped.length - results.filter(result => result.error).length} files evaluated · ${results.filter(result => result.failed.length).length} flagged · ${uncertain.length} inconclusive · ${skipped.length} skipped`)
   lines.push(`Raw judgments and source snapshots: ${artifact}`)
-  return lines.join('\n')
+  return { content: lines.join('\n'), artifact }
 }
 
 function collectFindings(judgments: Readonly<Record<string, Answer>>, result: FileResult) {

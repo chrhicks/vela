@@ -1,6 +1,8 @@
 import { Plugin } from '@opencode/plugin/effect'
 import { Effect, Schema } from 'effect'
 import { checkStandards } from './runner.ts'
+import { StandardsResults } from './rpc.ts'
+import { readReport } from './report.ts'
 
 const input = Schema.Struct({
   paths: Schema.optional(Schema.Array(Schema.String)),
@@ -13,6 +15,14 @@ const input = Schema.Struct({
 export default Plugin.define({
   id: 'vela.standards',
   effect: ctx => Effect.gen(function* () {
+    const results = yield* ctx.rpc.register(StandardsResults, {
+      latest: ({ sessionID }) => Effect.gen(function* () {
+        const artifact = yield* ctx.storage.get(`standards/latest/${sessionID}`)
+        if (typeof artifact !== 'string') return null
+        return yield* Effect.tryPromise(() => readReport(artifact)).pipe(Effect.orDie)
+      }),
+    }).pipe(Effect.orDie)
+
     yield* ctx.tool.transform(editor => {
       editor.add({
         name: 'standards_check',
@@ -22,8 +32,10 @@ export default Plugin.define({
         execute: (input, context) => Effect.gen(function* () {
           const session = yield* ctx.session.get({ sessionID: context.sessionID }).pipe(Effect.orDie)
           yield* context.progress({ status: 'Checking coding standards with Jev' })
-          const content = yield* Effect.tryPromise(signal => checkStandards(session.location.directory, input, signal)).pipe(Effect.orDie)
-          return { content }
+          const result = yield* Effect.tryPromise(signal => checkStandards(session.location.directory, input, signal)).pipe(Effect.orDie)
+          yield* ctx.storage.set(`standards/latest/${context.sessionID}`, result.artifact)
+          yield* results.events.emit('updated', { sessionID: context.sessionID }).pipe(Effect.orDie)
+          return { content: result.content }
         }),
       })
     })

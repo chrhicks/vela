@@ -5,7 +5,12 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { Schema } from 'effect'
-import { checkStandards } from './runner.ts'
+import { checkStandards as runCheck } from './runner.ts'
+import { readReport } from './report.ts'
+
+async function checkStandards(...args: Parameters<typeof runCheck>) {
+  return (await runCheck(...args)).content
+}
 
 const requestSchema = Schema.Struct({
   state: Schema.Struct({ path: Schema.String, code: Schema.String, diff: Schema.optional(Schema.String), coding_standards: Schema.Record(Schema.String, Schema.String), supporting_context: Schema.optional(Schema.Record(Schema.String, Schema.String)) }),
@@ -47,8 +52,15 @@ test('routes strictly above 70%, uses named source standards, and retains eviden
     requests.push(request)
     return reply(request)
   }
-  const result = await checkStandards(root, { mode: 'files', paths: ['tracked.ts'] }, new AbortController().signal, send)
-  assert.match(result, /tracked.ts: error_context/)
+  const result = await runCheck(root, { mode: 'files', paths: ['tracked.ts'] }, new AbortController().signal, send)
+  assert.match(result.content, /tracked.ts: error_context/)
+  const report = await readReport(result.artifact)
+  assert.deepEqual(report.files[0].failed, ['error_context'])
+  assert.equal(report.files[0].applicability.error_context, 0.71)
+  const cause = report.files[0].checks.find(check => check.id === 'error_context.cause')!
+  assert.equal(cause.verdict, 'violated')
+  assert.equal(cause.probability, 0.9)
+  assert.match(cause.question, /cause/)
   assert.equal(requests.length, 2)
   assert.ok(requests[1].questions['error_context.cause'])
   assert.ok(requests[1].questions['error_context.physical_writes'])
@@ -103,6 +115,16 @@ test('missing Jev answers are inconclusive, never reported as a clean evaluation
   assert.match(result, /inconclusive.*Jev omitted or mistyped answer/)
   assert.match(result, /0 files evaluated/)
   assert.doesNotMatch(result, /No failed standards/)
+})
+
+test('a failed API response remains incomplete in the panel projection', async t => {
+  const { root } = await fixture(t)
+  const send: typeof fetch = async () => new Response('Service unavailable', { status: 503 })
+  const result = await runCheck(root, { mode: 'files', paths: ['tracked.ts'] }, new AbortController().signal, send)
+  const report = await readReport(result.artifact)
+  assert.match(report.files[0].error!, /Jev returned HTTP 503/)
+  assert.deepEqual(report.files[0].checks, [])
+  assert.deepEqual(report.files[0].failed, [])
 })
 
 test('ignored source and symlinks outside the checkout are not sent to Jev', async t => {

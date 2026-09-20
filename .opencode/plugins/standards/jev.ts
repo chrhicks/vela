@@ -12,7 +12,7 @@ const answer = Schema.Union([
     probabilities: Schema.Struct({ met: probability, violated: probability, not_applicable: probability, insufficient_context: probability }),
   }),
 ])
-const responseSchema = Schema.Struct({
+export const responseSchema = Schema.Struct({
   model: Schema.String,
   answers: Schema.Record(Schema.String, answer),
   usage: Schema.optional(Schema.Struct({ input_tokens: Schema.Number, output_tokens: Schema.Number })),
