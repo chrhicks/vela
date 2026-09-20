@@ -28,6 +28,29 @@ coherent batch of edits. Nothing runs automatically on each edit. You can reques
 a pass with `/standards`, or `/standards path/to/file.ts`. The command prompts the
 active agent to call the tool and investigate its findings.
 
+### Results panel preview
+
+`/standards-results` opens the native terminal panel for this session's latest
+completed check. A clickable summary above the composer also opens it. New
+results update the summary without opening the panel or taking focus.
+
+- `↑` / `↓` select files and judgments or scroll detail; concerns are listed first.
+- `←` / `→` move between files, judgments, and the scrollable question detail.
+- `A` toggles applicability scores and shows which standards cleared the cutoff.
+- `F` switches between the side panel and full screen; narrow terminals use full screen.
+- `R` reloads the saved result without calling Jev; `Esc` closes the panel.
+
+The panel reads existing evidence through a plugin RPC. It shows the winning
+answer, its probability, model confidence, the exact question, and alternative
+answer probabilities. These are model judgments, not proof. Incomplete files
+retain their error; saved answers from an invalidated evaluation are marked as
+unaccepted. The timestamp identifies the saved evaluation, not current source
+state. Older checks made before this preview do not populate its per-session
+latest-result pointer; run a new check to populate it.
+
+The TUI entrypoint is exported by `plugins/standards/package.json`; OpenCode loads
+it alongside the server plugin. No global terminal configuration is needed.
+
 Tool inputs:
 
 ```js
