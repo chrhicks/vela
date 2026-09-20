@@ -1,10 +1,10 @@
 # Component Workshop Operations Guide
 
-This guide is the repeatable operating procedure for designing, validating, promoting, and eventually adopting components from `@vela/ui`. The accepted product and architecture decisions remain in [Component Workshop Decision Record](component-workshop.md).
+This guide covers designing, validating, promoting, and adopting components from `@vela/ui`. The original product and architecture decisions remain in [Component Workshop Decision Record](component-workshop.md).
 
 The workshop is a local developer tool. None of the procedures below publish a package, change Vela's default theme, apply a named design profile to Vela, or adopt a component into the Vela application automatically.
 
-The current collaboration and delivery policy is in [AGENTS.md](../AGENTS.md#working-with-chris). Chris shapes the design with the agent in the workshop; the agent performs source changes, verification, promotion, and adoption needed for the agreed implementation. Approval of that scope carries through those operations without a separate permission request for each file or component. Material design departures or global-theme changes outside that scope return to alignment. User-facing changes receive Chris's implementation review after an independent **OK** verdict and before merge.
+Follow [AGENTS.md](../AGENTS.md#working-with-chris) for collaboration, authorization, and review. An agreed implementation scope can include authoring, promotion, and adoption without separate permission for each operation; exploratory workshop work alone does not authorize application adoption or changes to global defaults.
 
 ## Application visual authority
 
@@ -124,6 +124,8 @@ render: (props, onPropsChange) => (
 
 Use the callback for interactions that should update the inspector, stable URL, session recovery, and Copy Context. Gallery previews omit the callback, so they remain self-contained and never mutate the active workbench.
 
+For time-based workflows, judge how feedback unfolds at a representative pace, not only the final state. A recording can support review; the running specimen is the reference for interaction timing and feel.
+
 ## Pair primitive anatomy with product examples
 
 A component begins with a primitive-focused specimen that makes its reusable contract understandable without depending on a Vela feature. Name it for what it demonstrates—for example, **Primitive anatomy**—rather than using relative labels such as Basic or Advanced.
@@ -160,26 +162,18 @@ Copy Context adds density, baseline identity and fingerprint, plus unsaved overr
 
 ## Targeted browser checklist
 
-Use the relevant checks below for a meaningful library change and every promotion. Exercise the changed component and affected shared behavior; expand to the whole gallery when shared tokens, discovery, or composition change. Record the evidence in the corresponding Linear issue. Keep browser automation focused on behavior that genuinely depends on a browser rather than turning every visual state into a brittle test.
+Choose from these checks according to the changed behavior. Exercise the component and affected shared behavior; expand to the whole gallery when shared tokens, discovery, or composition warrant it. Promotions also include the discovery, export, and representative rendering proof below. Keep evidence with the PR or corresponding Linear issue, and automate behavior that genuinely depends on a browser rather than every visual state.
 
-1. Start from a fresh browser load of `/gallery` and confirm there are no console errors.
-2. Confirm every expected component is discoverable and labeled Stable or Draft correctly.
-3. Inspect paired light and dark previews under the current default profile.
-4. Search for the changed component and open its primitive-focused specimen; inspect each product example separately.
-5. Exercise every semantic prop control and at least one direct interaction inside the preview.
-6. Confirm direct interactions update the inspector, stable URL, session state, and Copy Context when applicable.
-7. Check isolated and at least one representative composition context. For product examples, also confirm the real workflow remains visually intact and its styles remain specimen-local.
-8. Check wide, compact, and phone preview widths; include the important dark-field mode.
-9. Change density and enable baseline comparison.
-10. Review focused contrast and literal-color diagnostics.
-11. Reload the stable URL and confirm recovery is coherent.
-12. Run focused tests and builds for the affected boundary, the relevant workshop browser tests when browser behavior changed, and `git diff --check`. Stop once the necessary evidence is established unless a new concern requires more checks.
-
-This checklist is targeted evidence, not an exhaustive state generator or accessibility audit.
+- **Discovery:** Load `/gallery` afresh, check console errors, and confirm affected components appear with the correct Stable or Draft label.
+- **Appearance:** Inspect the primitive specimen and relevant product examples in light and dark modes, isolated and in a representative composition. For app comparisons, use the [application visual authority](#application-visual-authority) settings. Keep product-example styles specimen-local.
+- **Interaction:** Exercise the relevant semantic props and direct interactions, including how ongoing work unfolds. Check inspector, stable URL, session state, and Copy Context updates where affected.
+- **Responsive behavior:** Inspect the widths the workflow needs, including phone and dark-field use where relevant. Use density and baseline comparison when they help expose a changed layout or token behavior.
+- **Diagnostics and recovery:** Use contrast and literal-color diagnostics for styling changes; reload the stable URL when session recovery or controlled props change.
+- **Focused proof:** Run the affected tests and builds, relevant workshop browser tests, and `git diff --check`. Stop once the necessary evidence is established unless a new concern requires more checks.
 
 ## Manually promote a component
 
-Promotion is an intentional source operation within an agreed design and implementation scope. The agent may carry it out when that scope includes making the component available to the application; exploratory draft work alone does not authorize promotion. Preserve an inspectable source diff.
+Promotion makes a draft part of the stable API. Carry it out within the agreed implementation scope and preserve an inspectable source diff; exploratory draft work alone does not authorize promotion.
 
 Before promotion, confirm:
 
@@ -197,35 +191,18 @@ Then:
 4. Add the component export to `packages/ui/src/components/index.ts`; the stable root re-exports that boundary.
 5. Confirm workshop discovery labels the component Stable and retains its stable specimen URL.
 6. Add or update an export-boundary test proving the stable root contains the component and the draft surface does not.
-7. Run the targeted browser checklist and non-browser proof.
+7. Run the relevant targeted browser checks and non-browser proof.
 8. Review the final diff for unrelated adoption, profile, or default-theme changes.
 9. Commit the promotion as a meaningful, explicit change.
 
-Button at the CHI-86 fixed point is the first individually proven example of this procedure. After that proof was accepted, the owner explicitly approved the remaining seven components as the initial stable component baseline; they followed the same source, export, test, and browser-proof operation. The draft boundary remains available for experimental work without exposing drafts from the stable package root.
+## Adopt stable components in Vela
 
-## Adopt one stable component in Vela later
+Promotion makes a component available; adoption uses it in the agreed feature. Keep adoption incremental and limited to real use sites that scope needs.
 
-Promotion does not itself adopt a component. Adoption is a deliberate Vela source change within the agreed feature scope. Keep it incremental and limited to real use sites that scope needs. Run and visually inspect the approved product example before implementing it; preserve its intended hierarchy, typography, borders, and artwork while keeping wording honest for real operational states. When a component has a product-example specimen, `apps/web` imports only the promoted primitive. Rebuild the production feature from web-owned state, copy, domain markup, and assets; never import the specimen or treat its TSX as a feature module.
+1. Run and visually inspect the approved product example at the relevant states, pace, and widths before implementation. Use the [application visual authority](#application-visual-authority) settings to compare like with like.
+2. Import stable primitives from `@vela/ui`. Compose the feature from web-owned state, copy, domain markup, and assets, following the [primitive and product-example boundaries](#pair-primitive-anatomy-with-product-examples). Promote a new primitive when concrete reuse establishes a useful contract.
+3. Use the application's adopted Vela Current profile and existing `@vela/ui/styles.css` entry point. Keep shared style loading ahead of feature composition styles; resolve missing tokens at their owning boundary rather than adding a parallel theme adapter.
+4. Compare the implemented feature with the running specimen. Preserve its hierarchy, typography, borders, artwork, and interaction feel while keeping wording honest for real operational states. Verify the changed behavior in the actual application context.
+5. Prepare the running product and concrete acceptance scenarios through the [delivery workflow](../AGENTS.md#verification-browser-review-and-merge).
 
-For a future Button adoption:
-
-1. Choose one existing Vela action and define the behavior and visual acceptance case.
-2. Import `Button` from `@vela/ui`, never from `@vela/ui/drafts`.
-3. Import `@vela/ui/styles.css` once at the appropriate application style boundary.
-4. Add a narrow Vela-owned variable adapter around the adopted surface, mapping required `--vela-*` semantic variables to compatible existing `--ui-*` variables. Do not replace Vela's theme or apply a workshop profile.
-5. Verify behavior and appearance in the actual application context.
-6. Keep the change reversible and do not migrate adjacent components without separate intent.
-
-Any missing variable must be handled deliberately at that adoption boundary. Adoption must not silently change global defaults.
-
-## What remains an explicit operation
-
-- Source edits and specimen authoring
-- Profile Save and Save As
-- Agreeing the design and implementation scope with Chris
-- File movement and export changes
-- Browser checklist execution
-- Vela adoption
-- Default-theme changes
-
-There is no Publish button, package registry workflow, automatic promotion, automatic profile application, or automatic application migration.
+Material design departures or global-theme changes outside the agreed scope return to alignment.
