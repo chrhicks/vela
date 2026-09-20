@@ -2,6 +2,11 @@
 
 [Back to the field review](2026-09-14-first-light.md).
 
+**September 20 follow-up:** [offline replay findings](2026-09-20-alignment-replay.md)
+record recovered Codex outputs, missing baseline inputs, positive-corridor regression
+coverage and the quantitative disagreement with later drift. The physical cause
+remains unresolved. The source audit below remains the September 15 account.
+
 Read-only source/evidence audit, 2026-09-15. Checkout `34a6236` (PR #59 head recorded in the observing findings). No hardware access, application edits, or test runs. Anchors below refer to this checkout. PR merge/acceptance status must be checked separately; an implementation present here is not a new proposed fix.
 
 [Browse the audited source](https://github.com/chrhicks/vela/tree/34a62367f605212d5b317d163109e6047388d2e0). Local `data/` evidence paths are resolved from the original checkout and are not committed.

@@ -3,11 +3,10 @@ import { createAlignmentBaseline, measureAlignment, type AlignmentSample } from 
 
 const radians = Math.PI / 180
 
-const latitude = 40 * radians
-
 // Independent horizon-coordinate construction: tilt in the meridian, then turn
 // north/east components about the zenith. No renderer or production math imports.
-function sample(altitude: number, azimuth: number, joint: number, sidereal: number, declination = 60): AlignmentSample {
+function sample(altitude: number, azimuth: number, joint: number, sidereal: number, declination = 60, latitudeDegrees = 40): AlignmentSample {
+  const latitude = latitudeDegrees * radians
   const dec = declination * radians
   const a = altitude / 3600 * radians
   const z = azimuth / 3600 * radians
@@ -33,7 +32,8 @@ function baseline(altitude: number, azimuth: number) {
     sample(altitude, azimuth, 50, 359.2)], 40)
 }
 
-function check(actual: { altitudeArcsec: number, azimuthArcsec: number, totalArcsec: number }, altitude: number, azimuth: number) {
+function check(actual: { altitudeArcsec: number, azimuthArcsec: number, totalArcsec: number }, altitude: number, azimuth: number, latitudeDegrees = 40) {
+  const latitude = latitudeDegrees * radians
   expect(actual.altitudeArcsec).toBeCloseTo(altitude, 5)
   expect(actual.azimuthArcsec).toBeCloseTo(azimuth, 5)
   const alt = latitude + altitude / 3600 * radians
@@ -89,6 +89,47 @@ describe('polar measurement from solved directions', () => {
     check(reference.measurement, 72000, -72000)
     check(measureAlignment(reference, sample(36000, -36000, -25, 2.2, 80), true), 36000, -36000)
     check(measureAlignment(reference, sample(0, 0, -25, 2.2, 80), true), 0, 0)
+  })
+  it.each([
+    { legDegrees: 54, altitude: 480, azimuth: -360 },
+    { legDegrees: 60, altitude: 21600, azimuth: -28800 },
+    { legDegrees: 54, altitude: 72000, azimuth: -72000 },
+  ])('recovers the positive corridor with $legDegrees-degree legs and offsets ($altitude, $azimuth)', ({ legDegrees, altitude, azimuth }) => {
+    const latitudeDegrees = 39.755
+    const siderealDegreesPerSecond = 360 / 86164.0905
+    const initialSidereal = 359.7
+    const finalElapsedSeconds = 145
+    const finalJoint = 130 - 2 * legDegrees - finalElapsedSeconds * siderealDegreesPerSecond
+    const finalSidereal = initialSidereal + finalElapsedSeconds * siderealDegreesPerSecond
+    const sidereal = (elapsedSeconds: number) => (initialSidereal + elapsedSeconds * siderealDegreesPerSecond) % 360
+
+    // These are ideal mechanical rays, not recorded mount coordinates or sky solves.
+    // A nominal +130,+76,+22 corridor also advances with tracking during each leg.
+    const reference = createAlignmentBaseline([
+      sample(altitude, azimuth, 130, sidereal(0), 80, latitudeDegrees),
+      sample(altitude, azimuth, 130 - legDegrees - 70 * siderealDegreesPerSecond, sidereal(70), 80, latitudeDegrees),
+      sample(altitude, azimuth, finalJoint, sidereal(finalElapsedSeconds), 80, latitudeDegrees),
+    ], latitudeDegrees)
+
+    check(reference.measurement, altitude, azimuth, latitudeDegrees)
+
+    const adjustments = [
+      { elapsedDegrees: 0, remainingAltitude: altitude, remainingAzimuth: azimuth },
+      { elapsedDegrees: 6, remainingAltitude: 19, remainingAzimuth: -77 },
+      { elapsedDegrees: 16, remainingAltitude: 0, remainingAzimuth: 0 },
+    ]
+
+    for (const { elapsedDegrees, remainingAltitude, remainingAzimuth } of adjustments) {
+      const joint = finalJoint - elapsedDegrees
+      const currentSidereal = (finalSidereal + elapsedDegrees) % 360
+      const current = sample(remainingAltitude, remainingAzimuth, joint, currentSidereal, 80, latitudeDegrees)
+      const measured = measureAlignment(reference, current, true)
+      check(measured, remainingAltitude, remainingAzimuth, latitudeDegrees)
+
+      const aligned = sample(0, 0, joint, currentSidereal, 80, latitudeDegrees)
+      expect(measured.correctionTarget.raDegrees).toBeCloseTo(aligned.raDegrees, 7)
+      expect(measured.correctionTarget.decDegrees).toBeCloseTo(aligned.decDegrees, 7)
+    }
   })
   it('rejects a numerical jump to the second altitude solution instead of reporting a false correction', () => {
     const reference = createAlignmentBaseline([
