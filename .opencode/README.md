@@ -89,8 +89,9 @@ explanation or fix. Do not rerun unchanged inputs to obtain a preferred verdict.
   dependency traversal: supply small, relevant `supportingPaths` when needed.
 - HTTP calls time out after 30 seconds. Stopping the OpenCode tool interrupts
   transport through the Effect plugin adapter. There is no automatic retry loop.
-- Source changed during its evaluation is reported as stale. Results are observations
-  of saved inputs, not certificates about later edits.
+- Target source, supplied helpers, and standards are revalidated after each file's
+  evaluation. Changed or unreadable inputs invalidate its findings. Results are
+  observations of saved inputs, not certificates about later edits.
 
 The first live self-check exercised the registered OpenCode tool on its own code.
 A temporary mutation replacing Jev's contextual error/cause with `Error('Request

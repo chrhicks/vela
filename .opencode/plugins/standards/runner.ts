@@ -112,11 +112,11 @@ export async function checkStandards(directory: string, input: CheckInput, signa
           const judgments = await askJev(state, judgmentQuestions(selected), key, signal, calls, send)
           collectFindings(judgments, result)
         }
-        if ((await readSource(path)).code !== source.code) {
-          result.error = 'File changed during review; rerun against its current contents'
-          result.failed = []
-          result.inconclusive = []
+        if ((await readSource(path)).code !== source.code) throw new Error('File changed during review; rerun against its current contents')
+        for (const [supportPath, code] of Object.entries(supporting_code)) {
+          if ((await readSource(supportPath)).code !== code) throw new Error(`Supporting source ${supportPath} changed during review; rerun with current context`)
         }
+        if (await readFile(join(root, 'CODING_STANDARDS.md'), 'utf8') !== document) throw new Error('Coding standards changed during review; rerun against current standards')
       } catch (error) {
         signal.throwIfAborted()
         result.failed = []

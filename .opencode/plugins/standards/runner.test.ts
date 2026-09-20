@@ -126,25 +126,29 @@ test('cancelling a pending request aborts transport and never starts judgment ca
   assert.equal((await readdir(join(root, '.opencode/.local/standards'))).length, 1)
 })
 
-for (const change of ['edited', 'deleted'] as const) test(`source ${change} during evaluation invalidates the old finding`, async t => {
-  const { root } = await fixture(t)
-  const judgmentStarted = Promise.withResolvers<void>()
-  const finish = Promise.withResolvers<void>()
-  const send: typeof fetch = async (_url, init) => {
-    const request = Schema.decodeUnknownSync(requestSchema)(JSON.parse(String(init?.body)))
-    if (Object.values(request.questions).some(question => question.type === 'choice')) {
-      judgmentStarted.resolve()
-      await finish.promise
+for (const subject of ['source', 'support', 'standards'] as const) {
+  for (const change of ['edited', 'deleted'] as const) test(`${subject} ${change} during evaluation invalidates the old finding`, async t => {
+    const { root } = await fixture(t)
+    await writeFile(join(root, 'helper.ts'), 'export const helper = true\n')
+    const judgmentStarted = Promise.withResolvers<void>()
+    const finish = Promise.withResolvers<void>()
+    const send: typeof fetch = async (_url, init) => {
+      const request = Schema.decodeUnknownSync(requestSchema)(JSON.parse(String(init?.body)))
+      if (Object.values(request.questions).some(question => question.type === 'choice')) {
+        judgmentStarted.resolve()
+        await finish.promise
+      }
+      return reply(request)
     }
-    return reply(request)
-  }
-  const checking = checkStandards(root, { mode: 'files', paths: ['tracked.ts'] }, new AbortController().signal, send)
-  await judgmentStarted.promise
-  if (change === 'edited') await writeFile(join(root, 'tracked.ts'), 'export const editedDuringReview = true\n')
-  else await rm(join(root, 'tracked.ts'))
-  finish.resolve()
-  const result = await checking
-  assert.match(result, change === 'edited' ? /inconclusive — File changed during review/ : /inconclusive — ENOENT/)
-  assert.match(result, /0 flagged/)
-  assert.doesNotMatch(result, /tracked.ts: error_context/)
-})
+    const checking = checkStandards(root, { mode: 'files', paths: ['tracked.ts'], supportingPaths: ['helper.ts'] }, new AbortController().signal, send)
+    await judgmentStarted.promise
+    const changedPath = subject === 'source' ? 'tracked.ts' : subject === 'support' ? 'helper.ts' : 'CODING_STANDARDS.md'
+    if (change === 'edited') await writeFile(join(root, changedPath), 'Edited during review\n')
+    else await rm(join(root, changedPath))
+    finish.resolve()
+    const result = await checking
+    assert.match(result, change === 'edited' ? /inconclusive — .*changed during review/ : /inconclusive — ENOENT/)
+    assert.match(result, /0 flagged/)
+    assert.doesNotMatch(result, /tracked.ts: error_context/)
+  })
+}
