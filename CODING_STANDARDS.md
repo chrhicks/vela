@@ -35,7 +35,7 @@ Types should clarify the domain and the critical path.
 - Prefer simple discriminated models over boolean combinations with unclear meaning.
 - Avoid type-level cleverness that is harder to understand than the behavior it protects.
 - Validate untrusted runtime input at HTTP, configuration, file, and device-protocol boundaries.
-- Normalize external values before they enter application workflows.
+- Normalize external values before they enter application workflows, then use the normalized contract directly. Further checks should protect a new domain condition or trust boundary, not repeat validation already earned upstream.
 - Keep raw ALPACA fields, response envelopes, device numbers, transport details, and protocol errors inside `packages/alpaca` or another appropriate adapter boundary.
 - Keep browser/server shared contracts in `packages/model` free of transport, persistence, React, and application behavior.
 - Resolve server-owned application state into intentional, renderable concepts in page-level views. The browser owns visual composition, copy, and formatting, but should not reconstruct domain state or duplicate precedence, reconciliation, or capability logic.
@@ -69,7 +69,7 @@ Keep browser state close to presentation needs. Prefer current server projection
 
 ## Errors, retries, and device commands
 
-Failures should remain useful and honest.
+Prefer state models that let the same event read honestly from the device boundary through the server view to the screen. Requested, attempted, observed, and confirmed are different facts. Give uncertainty and cleanup their own meaning rather than inferring them from a general success flag or an aborted request.
 
 - Preserve enough context to identify the operation and boundary that failed.
 - Translate low-level failures into stable boundary errors without discarding their meaningful cause.
@@ -94,7 +94,7 @@ mutation; do not require a mutation campaign for every change.
 
 ### Adapter tests
 
-Before requesting independent verification for an adapter change, audit each new or changed external value against its governing contract. Check its meaning, valid domain and sentinel values, capability relationships, required-versus-optional support, and how malformed, unsupported, or contradictory responses affect completeness. Capture the important cases with deterministic tests.
+Use the governing protocol and representative external evidence as an independent reference for adapter behavior. Before requesting independent verification, review changed operations as well as values: method, endpoint, parameters, completion meaning, valid domains and sentinels, capability relationships, and required-versus-optional support. Check how malformed, unsupported, or contradictory responses affect completeness. A fake should be able to disagree with the implementation, rather than repeat its assumptions.
 
 Exercise the complexity the adapter exists to contain:
 
@@ -109,6 +109,8 @@ Use deterministic fakes. Tests should not require real observatory hardware or L
 ### Capability and workflow tests
 
 Test observable behavior through the capability's public interface. Substitute simple boundary implementations and avoid asserting internal call choreography unless that choreography is itself the contract.
+
+Follow a few representative outcomes across the boundaries they cross: what the server publishes, what the client accepts, and what Chris is told should describe the same event. Include meaningful no-op, interrupted, and failed outcomes when they expose different behavior; avoid an exhaustive state matrix.
 
 Prefer one focused test that proves an important behavior over broad snapshots, excessive mocking, duplicated permutations, or tests that make harmless refactoring expensive.
 
