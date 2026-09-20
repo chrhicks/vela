@@ -1,0 +1,21 @@
+{
+  "name": "vela-opencode-experiments",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.22.0",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test plugins/standards/*.test.ts"
+  },
+  "dependencies": {
+    "@opencode/plugin": "2.0.8",
+    "effect": "4.0.0-rc.112"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "~5.9.3"
+  }
+}

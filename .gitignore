@@ -6,6 +6,7 @@ dist
 *.tsbuildinfo
 .DS_Store
 .codex/
+.opencode/.local/
 apps/workshop/.local/
 apps/workshop/playwright-report/
 apps/workshop/test-results/
