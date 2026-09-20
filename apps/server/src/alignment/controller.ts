@@ -7,6 +7,7 @@ import { createAlignmentBaseline, measureAlignment, type AlignmentSample } from 
 import { createAstapSolver, projectSky } from './solver.js'
 import { previewPng } from '../imaging/preview.js'
 import type { PhysicalAlignment } from './physical.js'
+import type { AlignmentDiagnosticRun, AlignmentDiagnosticsFactory, AlignmentFrameEvidence } from './diagnostics.js'
 
 /** Explicit server configuration keeps the synthetic clock separate from physical rigs. */
 export interface AlignmentSettings {
@@ -18,6 +19,7 @@ export interface AlignmentSettings {
   catalogPath: string
   exposureSeconds: number
   fieldHeightDegrees: number
+  diagnosticsPath?: string
 }
 
 type Solver = ReturnType<typeof createAstapSolver>
@@ -28,6 +30,7 @@ export type AlignmentControllerOptions = {
   now?: () => number
   waitForNextExposure?: (signal: AbortSignal) => Promise<void>
   renderPreview?: typeof previewPng
+  openDiagnostics?: AlignmentDiagnosticsFactory | undefined
 } & (
   | { mode: 'offline'; solver: Solver }
   | { mode: 'physical'; physical: PhysicalAlignment; createSolver: (fieldHeightDegrees: number) => Solver }
@@ -78,6 +81,8 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
   let running: Promise<void> | undefined
   let controller: AbortController | undefined
   let previousSample: AlignmentSample | undefined
+  let diagnostics: AlignmentDiagnosticRun | undefined
+  let finishRequested = false
   const images = new Map<string, Buffer>()
 
   function patch(next: Partial<AlignmentView>) { view = { ...view, ...next } }
@@ -115,6 +120,8 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
     if (running) throw new Error('A measurement is already running')
     controller = new AbortController()
     previousSample = undefined
+    diagnostics = undefined
+    finishRequested = false
     patch({ rigId, rigName, active: true, phase: 'baseline', activity: 'idle', position: 1,
       solvedPositions: 0, measurement: null, preview: null, measuredAt: null, error: null, warning: null })
     images.clear()
@@ -123,10 +130,16 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
     running = step('alignment.run', async () => {
       // An ended marker makes a new run visible before its long root span ends.
       tracer.startSpan('alignment.started', { attributes: { 'alignment.run.id': runId, 'rig.id': rigId } }).end()
+      diagnostics = await options.openDiagnostics?.({ runId, rigId, rigName, mode: options.mode,
+        cameraId: settings.cameraId, telescopeId: settings.telescopeId,
+        cameraName: physical?.cameraName ?? 'Configured offline camera', exposureSeconds: settings.exposureSeconds })
+      signal.throwIfAborted()
       await run(signal)
     }).catch(error => {
       if (!(error instanceof Error && error.name === 'AbortError')) patch({ phase: 'failed', warning: null, error: error instanceof Error ? error.message : 'Alignment failed' })
-    }).finally(() => {
+    }).finally(async () => {
+      await diagnostics?.finish({ phase: view.phase === 'failed' ? 'failed'
+        : finishRequested && view.measurement ? 'finished' : 'stopped', error: view.error })
       patch({ active: false, activity: 'idle', exposureStartedAt: null })
       running = undefined
       onSettled?.()
@@ -137,6 +150,7 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
 
   async function stop(finished = false) {
     if (running) {
+      finishRequested ||= finished
       patch({ activity: 'stopping', warning: null })
       await step('alignment.stop.requested', async () => { controller?.abort() })
       await running
@@ -165,7 +179,7 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
 
     signal.throwIfAborted()
 
-    if (physical) await retryObservation(() => physical.validate(signal, frame), signal)
+    const afterCapture = physical ? await retryObservation(() => physical.validate(signal, frame), signal) : undefined
     patch({ activity: 'solving', exposureStartedAt: null })
     const imageId = randomUUID()
     const previewBytes = await step('alignment.preview', () => renderPreview(frame.width, frame.height, frame.pixels, frame.color))
@@ -212,6 +226,19 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
     const sample: AlignmentSample = physical ? physical.sample(solved, { capturedAt: frame.capturedAt, exposureSeconds: settings.exposureSeconds }) : { raDegrees: solved.raDegrees, decDegrees: solved.decDegrees,
       capturedAt: frame.capturedAt, siderealTimeDegrees: (pointing!.siderealTimeDegrees
         + (Date.parse(frame.capturedAt) - pointingObservedAt) / 1000 * 360 / 86164.0905 + 360) % 360 }
+
+    const evidence: AlignmentFrameEvidence = {
+      phase: view.phase === 'baseline' ? 'baseline' : 'adjusting', position: view.position,
+      solution: solved, sample, hint: actual?.hint ?? { raDegrees: pointing!.rightAscensionDegrees, decDegrees: pointing!.declinationDegrees },
+      fieldHeightDegrees,
+    }
+
+    if (actual && afterCapture) evidence.physical = { site: actual.observation.site, camera: actual.observation.camera,
+      before: actual.observation.mount, after: afterCapture }
+
+    if (pointing) evidence.offlinePointing = pointing
+    await diagnostics?.recordFrame(frame, evidence)
+    signal.throwIfAborted()
 
     if (previousSample) {
       const elapsed = (Date.parse(sample.capturedAt) - Date.parse(previousSample.capturedAt)) / 1000
@@ -275,14 +302,19 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
     }
 
     // SAFETY: the initial sample and the two completed loop iterations supply exactly three solved positions.
-    const baseline = createAlignmentBaseline(samples as [AlignmentSample, AlignmentSample, AlignmentSample], first.latitude)
+    const baselineSamples = samples as [AlignmentSample, AlignmentSample, AlignmentSample]
+    const baseline = createAlignmentBaseline(baselineSamples, first.latitude)
+    await diagnostics?.recordBaseline(baselineSamples, first.latitude, baseline.measurement)
+    signal.throwIfAborted()
     patch({ phase: 'adjusting', solvedPositions: 3 })
 
     while (true) {
       const measured = measureAlignment(baseline, current.sample, true)
       signal.throwIfAborted()
 
-      if (physical) await retryObservation(() => physical.validate(signal), signal)
+      const measuredMount = physical ? await retryObservation(() => physical.validate(signal), signal) : undefined
+      await diagnostics?.recordMeasurement(current.sample, measured, measuredMount)
+      signal.throwIfAborted()
       const target = physical ? physical.project(current.solved.wcs, measured.correctionTarget, current.sample) : projectSky(current.solved.wcs, measured.correctionTarget)
 
       if (!target) throw new Error('Alignment target is outside the solvable camera projection')

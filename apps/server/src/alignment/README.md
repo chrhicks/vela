@@ -121,6 +121,60 @@ They do not establish absolute outdoor accuracy.
 
 ## Offline configuration and local review
 
+### Opt-in diagnostic evidence
+
+Set `VELA_ALIGNMENT_DIAGNOSTICS_PATH` to an absolute local directory to retain
+replayable evidence for each new alignment trial. It is off by default. With
+`pnpm dev:observing`, the same setting in `.env.observing.local` may be relative
+to the repository root; the launcher resolves it before starting the server.
+
+Each trial has its own directory and retains:
+
+- the three successfully solved baseline exposures as original-sample FITS;
+- the latest successfully solved adjustment exposure as FITS;
+- a bounded numerical journal containing the run identity/mode, exposure start
+  and provenance, geometry midpoint, exact solved centers/full WCS, hints,
+  baseline inputs, calculated corrections and final outcome;
+- for physical trials, the site, camera geometry and existing mount observations
+  before/after capture and before a correction is published. Recording does not
+  introduce another device read or command.
+
+Earlier adjustment originals are replaced as later solved images arrive; their
+numerical records remain. The three baseline originals remain throughout the
+trial. An acquired image is recorded only after it solves, so a failed solver or
+preview does not imply that its original was retained. A recorded calculation
+is distinct from a published reading: later validation/projection or cancellation
+can still end the operation.
+
+The journal is limited to 4 MiB and each FITS to 128 MiB. Successful recording keeps
+at most four retained originals per trial (roughly 400 MiB at FRA resolution);
+replacing an adjustment image needs space for one more, which may remain after an
+interruption or storage failure. A storage or recording
+limit failure is reported in the server log and disables further diagnostics for
+that trial while the observing operation continues. A missing final record means
+the diagnostic record is incomplete, not a successfully finished trial.
+
+Previous trial directories are never pruned automatically. Keep the ones needed
+for comparison and remove them explicitly when finished. Disable the setting
+after the diagnostic session to avoid accumulating new bundles. These files are
+evidence, not resumable operations or a user-facing alignment history.
+
+After building the server, replay a trial without hardware or another solver run:
+
+```sh
+pnpm --filter @vela/server build
+node scripts/replay-alignment.mjs /absolute/path/to/trial-directory
+```
+
+Replay validates the recorded input and retained FITS integrity, reconstructs the
+baseline, recomputes its corrections and reports numerical discrepancies. Physical
+trials also replay J2000-to-midpoint conversion from the recorded site and timing.
+It uses Vela's production mathematics: this establishes reproducibility, not an
+independent physical alignment measurement. A simulator can exercise recording
+and replay indoors; a fresh sky comparison is still required for physical accuracy.
+
+### Simulator setup
+
 Configure the endpoint and stable device IDs deliberately. The first model uses
 northern latitude, the simulator's fixed catalog frame (`EquatorialSystem=J2000`, synthetic sidereal clock),
 2-second mono exposures, a 3-degree camera field, and a prepared baseline near RA 12°, 30° and 48° at nominal Dec 60°. Reset the simulator

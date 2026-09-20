@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { isAbsolute } from 'node:path'
 import type { FastifyInstance } from 'fastify'
 import { trace, SpanStatusCode } from '@opentelemetry/api'
 import { createAlpacaAcquisition, createAlpacaFraming } from '@vela/alpaca'
@@ -8,6 +9,7 @@ import type { RigCatalog } from '../rig/catalog.js'
 import { createAlignmentController, type AlignmentSettings } from './controller.js'
 import { createAstapSolver } from './solver.js'
 import { createPhysicalAlignment } from './physical.js'
+import { createAlignmentDiagnostics } from './diagnostics.js'
 
 export interface AlignmentFactories {
   acquisition: typeof createAlpacaAcquisition
@@ -28,8 +30,12 @@ const defaultFactories: AlignmentFactories = {
 const emptyCommand = z.object({}).strict()
 
 export function registerAlignment(app: FastifyInstance, catalog: RigCatalog, settings?: AlignmentSettings, operations: RigOperations = createRigOperations(), factories: AlignmentFactories = defaultFactories) {
+  const openDiagnostics = settings?.diagnosticsPath ? createAlignmentDiagnostics(settings.diagnosticsPath,
+    error => app.log.error({ err: error }, 'Alignment diagnostic recording stopped; observing operation continues')) : undefined
+
   let alignment = settings && settings.mode !== 'physical' ? factories.controller({
     mode: 'offline', settings,
+    openDiagnostics,
     hardware: factories.acquisition({ baseUrl: settings.endpoint }),
     solver: factories.solver({ executable: settings.executable, catalogPath: settings.catalogPath, fieldHeightDegrees: settings.fieldHeightDegrees }),
   }) : undefined
@@ -112,6 +118,7 @@ export function registerAlignment(app: FastifyInstance, catalog: RigCatalog, set
 
             alignment = factories.controller({
               mode: 'physical', settings, hardware: acquisition, physical,
+              openDiagnostics,
               createSolver: fieldHeightDegrees => factories.solver({ executable: settings.executable, catalogPath: settings.catalogPath, fieldHeightDegrees }),
             })
           }
@@ -169,6 +176,11 @@ export function alignmentSettings(env: NodeJS.ProcessEnv): AlignmentSettings | u
     executable: env.VELA_ASTAP, catalogPath: env.VELA_STAR_CATALOG, exposureSeconds: 2, fieldHeightDegrees: 3 }
 
   if (env.VELA_ALIGNMENT_MODE === 'physical') settings.mode = 'physical'
+
+  if (env.VELA_ALIGNMENT_DIAGNOSTICS_PATH !== undefined) {
+    if (!isAbsolute(env.VELA_ALIGNMENT_DIAGNOSTICS_PATH)) throw new Error('VELA_ALIGNMENT_DIAGNOSTICS_PATH must be an absolute directory path')
+    settings.diagnosticsPath = env.VELA_ALIGNMENT_DIAGNOSTICS_PATH
+  }
 
   return settings
 }

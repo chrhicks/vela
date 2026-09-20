@@ -93,12 +93,19 @@ not independently calibrated truth.
 
 ## Next useful slice
 
-Prepare a narrowly scoped diagnostic capture for the next field comparison:
-retain the three baseline images and exact WCS/geometry inputs together, then a
-short stationary interval and selected adjustment samples with the same timing
-and pointing observations. Retain this evidence explicitly beyond the rotating
-trace journal. The storage/activation choice is still to be scoped; this report
-does not introduce a durable alignment history or change the solver.
+CHI-190 adds explicitly enabled [diagnostic capture and replay](../../apps/server/src/alignment/README.md#opt-in-diagnostic-evidence):
+three solved baseline originals, the latest solved adjustment original, and a
+bounded exact numerical journal per trial. Earlier adjustment numerical records
+remain; previous trial bundles are removed only deliberately. This retains the
+inputs beyond the rotating trace journal without adding a durable alignment
+history or changing the solver.
+
+The indoor integration trial used an isolated HTTP simulator and real ASTAP at
+6248 × 4176. It recorded five solved frames and three measurements, retained four
+104,371,200-byte FITS originals, and replayed with zero numerical discrepancies.
+The physical-controller fixture separately recorded and replayed midpoint/site
+conversion with zero discrepancies. These establish recording and production-math
+reproducibility, not physical accuracy.
 
 Then compare the resulting axis with an independent fresh axis/drift assessment,
 with no intervening knob change. A simulator can exercise capture, cancellation

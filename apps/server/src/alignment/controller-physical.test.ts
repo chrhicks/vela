@@ -1,4 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest'
+import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { createTestCadence } from './test-cadence.js'
 import { fixture } from './physical-fixture.js'
 import { previewPng } from '../imaging/preview.js'
@@ -7,6 +10,8 @@ import { createAlignmentController } from './controller.js'
 import type { PhysicalAlignment } from './physical.js'
 import { physicalAlignmentSample, projectPhysicalAlignmentTarget } from './physical-coordinates.js'
 import type { PlateSolver, SkyPosition, SolveResult } from './solver.js'
+import { createAlignmentDiagnostics, type AlignmentDiagnosticRun, type AlignmentDiagnosticsFactory } from './diagnostics.js'
+import { replayAlignmentDiagnostics } from './diagnostic-replay.js'
 
 const control: { waits: Array<() => void>, wait: (signal: AbortSignal) => Promise<void>, afterPreview?: (() => void) | undefined } = createTestCadence()
 
@@ -25,7 +30,7 @@ afterEach(async () => {
   expect(control.waits).toHaveLength(0)
 })
 
-function setup() {
+function setup(openDiagnostics?: AlignmentDiagnosticsFactory) {
   let exposures = 0
   let externalChange = false
   const captures: AlpacaCaptureOptions[] = []
@@ -47,16 +52,21 @@ function setup() {
 
   const sample = vi.fn((solved: SkyPosition, capture: { capturedAt: string, exposureSeconds: number }) => physicalAlignmentSample(solved, capture, fixture.site))
 
+  const observedMount = () => ({ rightAscensionDegrees: 40, declinationDegrees: 60, coordinateSystem: 'topocentric' as const,
+    ...fixture.site, tracking: true, slewing: false, parked: false, observedAt: frames[Math.max(0, exposures - 1)]!.capturedAt })
+
   const physical: PhysicalAlignment = {
     cameraName: 'Selected RGGB camera',
     prepare: vi.fn(async () => ({ fieldHeightDegrees })),
-    pointing: vi.fn(async () => ({ hint: frames[exposures]!.solved, latitude: fixture.site.latitudeDegrees })),
+    pointing: vi.fn(async () => ({ hint: frames[exposures]!.solved, latitude: fixture.site.latitudeDegrees,
+      observation: { site: fixture.site, mount: observedMount(), camera: { cameraName: 'Selected RGGB camera',
+        sensorWidthPixels: 4, sensorHeightPixels: 4, pixelWidthMicrons: 3.76, pixelHeightMicrons: 3.76,
+        binX: 1, binY: 1, width: 4, height: 4, startX: 0, startY: 0 } } })),
     move: vi.fn(async () => {}),
     validate: vi.fn(async () => {
       if (externalChange) throw new Error('The mount pointing side changed. Measure a new baseline.')
 
-      return { rightAscensionDegrees: 40, declinationDegrees: 60, coordinateSystem: 'topocentric' as const,
-        tracking: true, slewing: false, parked: false, observedAt: frames[Math.max(0, exposures - 1)]!.capturedAt }
+      return observedMount()
     }),
     sample,
     project: (wcs, target, current) => projectPhysicalAlignmentTarget(wcs, target, current, fixture.site),
@@ -79,6 +89,7 @@ function setup() {
   const solverFactory = vi.fn((_height: number) => solver)
 
   const controller = createAlignmentController({ mode: 'physical', settings, hardware, physical, createSolver: solverFactory, waitForNextExposure: control.wait,
+    openDiagnostics,
     renderPreview: async (...args) => {
       const png = await previewPng(...args)
       control.afterPreview?.()
@@ -240,4 +251,106 @@ it('retries an explicitly recoverable capture but stops on an unclassified trans
   await vi.waitFor(() => expect(subject.controller.active()).toBe(false))
   expect(subject.hardware.capture).toHaveBeenCalledTimes(2)
   expect(subject.controller.snapshot()).toMatchObject({ phase: 'failed', error: 'Device read timed out' })
+})
+
+function recording(): AlignmentDiagnosticRun {
+  return { recordFrame: vi.fn(async () => {}), recordBaseline: vi.fn(async () => {}),
+    recordMeasurement: vi.fn(async () => {}), finish: vi.fn(async () => {}) }
+}
+
+it('records the exact solved baseline, midpoint, site and existing mount observations before finishing', async () => {
+  const evidence = recording()
+  const open = vi.fn(async () => evidence)
+  const subject = setup(open)
+  await subject.baseline()
+  await vi.waitFor(() => expect(control.waits).toHaveLength(1))
+  expect(open).toHaveBeenCalledWith(expect.objectContaining({ rigId: 'physical', mode: 'physical',
+    cameraName: 'Selected RGGB camera', exposureSeconds: 2 }))
+  expect(evidence.recordFrame).toHaveBeenCalledTimes(3)
+  const [frame, recorded] = vi.mocked(evidence.recordFrame).mock.calls[0]!
+  expect(frame.capturedAtSource).toBe('server-estimate')
+  expect(recorded).toMatchObject({ phase: 'baseline', position: 1, solution: { ...frames[0]!.solved },
+    physical: { site: fixture.site, before: { observedAt: frame.capturedAt }, after: { observedAt: frame.capturedAt } } })
+  expect(Date.parse(recorded.sample.capturedAt) - Date.parse(frame.capturedAt)).toBe(1000)
+  expect(vi.mocked(evidence.recordBaseline).mock.calls[0]![0]).toEqual(subject.sample.mock.results.map(result => result.value))
+
+  control.waits.shift()!()
+  const adjusted = await subject.nextSolve()
+  adjusted.complete()
+  await vi.waitFor(() => expect(control.waits).toHaveLength(1))
+  expect(evidence.recordFrame).toHaveBeenLastCalledWith(expect.objectContaining({ capturedAt: frames[3]!.capturedAt }),
+    expect.objectContaining({ phase: 'adjusting', position: 3 }))
+  expect(evidence.recordMeasurement).toHaveBeenCalledTimes(2)
+  expect(vi.mocked(evidence.recordMeasurement).mock.calls[1]![1]).toMatchObject({ altitudeArcsec: expect.any(Number), azimuthArcsec: expect.any(Number) })
+  await subject.controller.stop(true)
+  expect(evidence.finish).toHaveBeenCalledExactlyOnceWith({ phase: 'finished', error: null })
+  expect(subject.captures).toHaveLength(4)
+})
+
+it('waits for an in-flight diagnostic write on Stop and starts no further exposure or movement', async () => {
+  const evidence = recording()
+  let completeWrite = () => {}
+
+  vi.mocked(evidence.recordFrame).mockImplementation(() => new Promise<void>(resolve => { completeWrite = resolve }))
+  const subject = setup(async () => evidence)
+  await subject.controller.start('physical', 'Physical rig')
+  const first = await subject.nextSolve()
+  first.complete()
+  await vi.waitFor(() => expect(evidence.recordFrame).toHaveBeenCalledTimes(1))
+
+  let stopped = false
+  const stopping = subject.controller.stop().then(() => { stopped = true })
+  await vi.waitFor(() => expect(subject.controller.snapshot().activity).toBe('stopping'))
+  expect(stopped).toBe(false)
+  completeWrite()
+  await stopping
+  expect(subject.captures).toHaveLength(1)
+  expect(subject.physical.move).not.toHaveBeenCalled()
+  expect(evidence.finish).toHaveBeenCalledExactlyOnceWith({ phase: 'stopped', error: null })
+})
+
+it('reports an unavailable diagnostic destination without losing the alignment or replaying hardware commands', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'vela-alignment-diagnostic-failure-'))
+  const blocked = join(directory, 'not-a-directory')
+  await writeFile(blocked, 'occupied')
+  const errors: Error[] = []
+  const subject = setup(createAlignmentDiagnostics(blocked, error => errors.push(error)))
+
+  try {
+    await subject.baseline()
+    await vi.waitFor(() => expect(control.waits).toHaveLength(1))
+    expect(errors).toHaveLength(1)
+    expect(subject.controller.snapshot()).toMatchObject({ active: true, phase: 'adjusting', error: null })
+    expect(subject.captures).toHaveLength(3)
+    expect(subject.physical.prepare).toHaveBeenCalledTimes(1)
+    expect(subject.physical.move).toHaveBeenCalledTimes(2)
+  } finally {
+    await subject.controller.stop()
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+it('replays a physical controller trial from its actual recorded bundle', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'vela-physical-controller-replay-'))
+  const errors: Error[] = []
+  const subject = setup(createAlignmentDiagnostics(directory, error => errors.push(error)))
+
+  try {
+    await subject.baseline()
+    await vi.waitFor(() => expect(control.waits).toHaveLength(1))
+    control.waits.shift()!()
+    const adjusted = await subject.nextSolve()
+    adjusted.complete()
+    await vi.waitFor(() => expect(control.waits).toHaveLength(1))
+    await subject.controller.stop(true)
+    expect(errors).toEqual([])
+    const report = await replayAlignmentDiagnostics(join(directory, (await readdir(directory))[0]!))
+    expect(report).toMatchObject({ mode: 'physical', outcome: { phase: 'finished', error: null },
+      counts: { frames: 4, measurements: 2, physicalFrames: 4, verifiedOriginals: 4 },
+      maximumDiscrepancies: { measurementArcsec: 0, correctionTargetDegrees: 0, physicalSampleDegrees: 0, physicalSampleTimeMs: 0 } })
+    expect(report.finalMeasurement?.totalArcsec).toBe(subject.controller.snapshot().measurement?.totalArcsec)
+  } finally {
+    await subject.controller.stop()
+    await rm(directory, { recursive: true, force: true })
+  }
 })
