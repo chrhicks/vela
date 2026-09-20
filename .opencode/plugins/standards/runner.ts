@@ -49,11 +49,12 @@ export async function checkStandards(directory: string, input: CheckInput, signa
     ...(await git('ls-files', '--others', '--exclude-standard', '-z')).split('\0'),
   ].filter(Boolean)
 
-  async function readSource(path: string) {
+  async function readSource(path: string, kind: 'target' | 'context' = 'target') {
     const absolute = await realpath(resolve(root, path))
     const local = relative(root, absolute)
     if (local.startsWith('../') || isAbsolute(local)) throw new Error('Source must be inside this checkout')
-    if (!/\.(?:[cm]?[jt]sx?)$/.test(local)) throw new Error('Prototype checks JavaScript and TypeScript source files only')
+    const extension = kind === 'context' ? /\.(?:[cm]?[jt]sx?|md|txt|json|ya?ml)$/ : /\.(?:[cm]?[jt]sx?)$/
+    if (!extension.test(local)) throw new Error('Targets must be JS/TS; supporting context may also be Markdown, text, JSON or YAML')
     const ignored = await exec('git', ['check-ignore', '--', local], { cwd: root, signal }).then(() => true, error => {
       if (error.code === 1) return false
       throw error
@@ -64,10 +65,10 @@ export async function checkStandards(directory: string, input: CheckInput, signa
     return { path: local, code }
   }
 
-  const supporting_code: Record<string, string> = {}
+  const supporting_context: Record<string, string> = {}
   for (const path of input.supportingPaths ?? []) {
-    const source = await readSource(path)
-    supporting_code[source.path] = source.code
+    const source = await readSource(path, 'context')
+    supporting_context[source.path] = source.code
   }
 
   const artifact = join(root, '.opencode/.local/standards', `${randomUUID()}.json`)
@@ -89,7 +90,7 @@ export async function checkStandards(directory: string, input: CheckInput, signa
         const source = await readSource(path)
         result.path = source.path
         result.sha256 = createHash('sha256').update(source.code).digest('hex')
-        const state: State = { ...source, supporting_code, coding_standards }
+        const state: State = { ...source, supporting_context, coding_standards }
         if (mode === 'changes') {
           const diff = await git('diff', '--no-ext-diff', '--no-textconv', '--unified=8', base, '--', source.path)
           const trackedAtBase = await git('ls-tree', '--name-only', base, '--', source.path)
@@ -109,12 +110,13 @@ export async function checkStandards(directory: string, input: CheckInput, signa
           return answer.type === 'noul' && answer.noul > threshold
         }).map(standard => standard.id)
         if (selected.length) {
-          const judgments = await askJev(state, judgmentQuestions(selected), key, signal, calls, send)
+          const focused = { ...state, coding_standards: Object.fromEntries(selected.map(id => [id, coding_standards[id]])) }
+          const judgments = await askJev(focused, judgmentQuestions(selected), key, signal, calls, send)
           collectFindings(judgments, result)
         }
         if ((await readSource(path)).code !== source.code) throw new Error('File changed during review; rerun against its current contents')
-        for (const [supportPath, code] of Object.entries(supporting_code)) {
-          if ((await readSource(supportPath)).code !== code) throw new Error(`Supporting source ${supportPath} changed during review; rerun with current context`)
+        for (const [supportPath, code] of Object.entries(supporting_context)) {
+          if ((await readSource(supportPath, 'context')).code !== code) throw new Error(`Supporting source ${supportPath} changed during review; rerun with current context`)
         }
         if (await readFile(join(root, 'CODING_STANDARDS.md'), 'utf8') !== document) throw new Error('Coding standards changed during review; rerun against current standards')
       } catch (error) {

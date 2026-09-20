@@ -16,7 +16,7 @@ export default Plugin.define({
     yield* ctx.tool.transform(editor => {
       editor.add({
         name: 'standards_check',
-        description: 'Check JavaScript/TypeScript files or Git changes against three experimental Vela standards using Jev. Defaults to tracked and untracked changes against HEAD. Paths are checkout-root-relative. Use mode files for whole files; supportingPaths supplies relevant helper definitions. Returns file: failed standards and a raw evidence path. Investigate findings in the source; this is a probabilistic signal, not a correctness verdict. Sends selected source to TypeSafe.',
+        description: 'Check JavaScript/TypeScript files or Git changes against the experimental Vela coding-standards catalog using Jev. Defaults to tracked and untracked changes against HEAD. Paths are checkout-root-relative. Use mode files for whole files; supportingPaths supplies helper code, contracts, documentation or verification reports (JS/TS, Markdown, text, JSON, YAML). Returns file: failed standards and a raw evidence path. Investigate findings in the source; this is a probabilistic signal, not a correctness verdict. Sends selected source and context to TypeSafe.',
         input,
         options: { codemode: true },
         execute: (input, context) => Effect.gen(function* () {

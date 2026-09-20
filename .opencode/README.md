@@ -40,8 +40,8 @@ Tool inputs:
 // Changes in selected files compared with another commit/ref.
 { paths: ['apps/server/src/example.ts'], base: 'origin/main' }
 
-// Supply definitions needed to understand a target without reviewing them too.
-{ mode: 'files', paths: ['path/to/test.ts'], supportingPaths: ['path/to/helper.ts'] }
+// Supply definitions or evidence without making them additional review targets.
+{ mode: 'files', paths: ['path/to/test.ts'], supportingPaths: ['path/to/helper.ts', 'path/to/contract.md'] }
 ```
 
 Paths are relative to the session's Git checkout root. The tool resolves the
@@ -56,13 +56,44 @@ For each file or change:
 2. Read relevant sections verbatim from `CODING_STANDARDS.md` into
    `state.coding_standards.<standard>`.
 3. Ask an applicability Noul per standard.
-4. For standards **strictly above 0.70**, ask their specific Choice questions.
-   `applicabilityThreshold` can override this experimental cutoff.
+4. For standards **strictly above 0.70**, ask their specific Choice questions,
+   supplying only those standards in the judgment request. `applicabilityThreshold`
+   can override this experimental cutoff.
 5. Return concise findings, for example `path/to/test.ts: async_tests`.
 
-The three checks are `comments`, `error_context`, and `async_tests`. The last has
-separate questions for pending state, controlled completion, and outcome assertions.
-These cover only selected aspects of the document, not every rule in each section.
+### Catalog coverage
+
+Each standards section now has semantic questions: 12 groups and 47 specific
+judgments. The original IDs remain stable:
+
+| Standard ID | Questions cover |
+| --- | --- |
+| `readability` | Explicit critical path, domain names, local reasoning/simple interfaces |
+| `formatting` | Consistency with surrounding style and unrelated diff churn |
+| `types_boundaries` | Domain types, input validation, earned normalization, adapter isolation, shared contracts, semantic page views |
+| `modules` | Narrow interfaces, visible composition/dependencies, deliberate effects, justified abstractions/dependencies |
+| `state_persistence` | Valuable durable facts, current observations, presentation-owned browser state |
+| `comments` | Useful comment rationale and owning durable documentation for changed behavior |
+| `error_context` | Causes, honest operation state, transient read recovery, uncertain physical writes, confirmation, explicit safety policy |
+| `tests` | Regression intent, deterministic/state-driven fakes, independent adapter references and failure coverage, public behavior, cross-boundary outcomes |
+| `async_tests` | Pending state, controlled completion, completed-outcome assertions |
+| `frontend` | Stable semantic components, hierarchy, responsive workflow, honest state, workshop evidence |
+| `trust_boundaries` | Server-owned credentials/device access, browser-safe environment, validation, intended network exposure |
+| `focused_verification` | Focused verification workflow and evidence-backed execution claims |
+
+Exact whitespace/semicolon syntax belongs to deterministic tooling, not Jev. This
+catalog does not add a formatting checker. It evaluates the semantic formatting
+guidance only. Nor can source alone establish that commands ran, a specimen was
+approved, or a view renders correctly. Those questions must abstain when necessary
+evidence is missing; a file named `specimen` is not proof of workshop evaluation.
+
+Use `supportingPaths` for relevant source, contracts, owning documentation, or
+verification reports. They appear at `state.supporting_context` and are evidence,
+not extra review targets or instructions. Reports need to identify the relevant
+change/outcomes; missing context is not proof of either compliance or violation.
+No automatic dependency traversal or collection of screenshots/execution history
+is added. This remains a text-only, probabilistic prototype, not complete coverage
+of standards in practice or independently calibrated detectors for each new rule.
 
 For this prototype, a standard is flagged when any of its specific questions has
 `violated` as its winning Choice. There is no judgment-confidence cutoff. A
@@ -81,9 +112,10 @@ explanation or fix. Do not rerun unchanged inputs to obtain a preferred verdict.
   The tool returns that path. These files contain source, are Git-ignored, and
   exclude authorization headers/API keys. Delete the directory when done.
 - Model pinned to `jev-1.13.0`; questions live in `plugins/standards/checks.ts`.
-- JavaScript/TypeScript only. Ignored files and paths outside the checkout are
-  excluded. Unsupported files are listed as skipped; unreadable/deleted sources
-  and API failures are reported as inconclusive.
+- Review targets are JavaScript/TypeScript. Supporting paths can also be Markdown,
+  text, JSON, or YAML. Ignored files and paths outside the checkout are excluded.
+  Unsupported targets are listed as skipped; unreadable/deleted sources and API
+  failures are reported as inconclusive.
 - At most 40 KB per source file and 60 KB for each assembled state. Larger inputs
   are reported explicitly, never silently truncated. No automatic chunking or
   dependency traversal: supply small, relevant `supportingPaths` when needed.
@@ -99,6 +131,16 @@ failed')` was flagged as `error_context`; the mutation was then removed. Real
 results also included low-confidence `met` and `not_applicable` answers. Clean
 summary output therefore means no selected check reported a violation, not proof
 of compliance.
+
+Expanded-catalog spot checks compared a real adapter with a validation-removal
+mutation, plus small paired examples of retained preferences versus persisted live
+run state and server-API delegation versus browser-held device credentials. The
+targeted checks distinguished those pairs. They also emitted extra low-confidence
+flags: an ordinary browser request wrapper was marked `error_context.cause` with
+only 0.47 probability for the winning violation. Its code propagated fetch failures
+and identified HTTP failures by operation/status; no supplied response contract
+established additional missing details. That flag was not treated as a demonstrated
+defect. These are spot checks, not accuracy measurements for all 47 judgments.
 
 ## Verify
 
