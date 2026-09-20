@@ -48,6 +48,7 @@ export function ResultsPanel(props: {
   const checks = createMemo(() => (file()?.checks ?? []).toSorted((a, b) => rank(a.verdict) - rank(b.verdict)))
   const check = () => checks()[checkIndex()]
   const wide = () => props.width >= 100
+  const detailOnly = () => !wide() && focus() === 'detail'
   const color = (verdict: string) => verdict === 'violated' ? props.theme.text.feedback.error.default
     : verdict === 'insufficient_context' ? props.theme.text.feedback.warning.default : props.theme.text.default
 
@@ -72,25 +73,27 @@ export function ResultsPanel(props: {
     </box>
     <Show when={files().length} fallback={<text fg={props.theme.text.subdued}>This run contained no files to evaluate.</text>}>
       <box flexDirection={wide() ? 'row' : 'column'} flexGrow={1} minHeight={0} gap={1} overflow="hidden">
-        <box flexDirection="column" width={wide() ? '34%' : '100%'} height={wide() ? '100%' : Math.min(files().length + 1, 5)} minHeight={2} flexShrink={wide() ? 0 : 1}>
-          <text fg={focus() === 'files' ? props.theme.text.default : props.theme.text.subdued}>Files</text>
-          <select
-            flexGrow={1} minHeight={0} focused={props.focused && focus() === 'files'}
-            options={files().map(file => ({ name: `${file.failed.length ? '!' : file.error || file.inconclusive.length ? '?' : '·'} ${file.path.split('/').at(-1)}  ${fileStatus(file)}`, description: file.path }))}
-            selectedIndex={fileIndex()} showDescription={false} showScrollIndicator={true}
-            backgroundColor={props.theme.background.default} textColor={props.theme.text.subdued}
-            focusedBackgroundColor={props.theme.background.default} focusedTextColor={props.theme.text.default}
-            selectedBackgroundColor={props.theme.background.raised.high} selectedTextColor={props.theme.text.default}
-            onChange={index => { setFileIndex(index); setCheckIndex(0) }}
-          />
-        </box>
+        <Show when={!detailOnly()}>
+          <box flexDirection="column" width={wide() ? '34%' : '100%'} height={wide() ? '100%' : Math.min(files().length + 1, 5)} minHeight={2} flexShrink={wide() ? 0 : 1}>
+            <text fg={focus() === 'files' ? props.theme.text.default : props.theme.text.subdued}>Files</text>
+            <select
+              flexGrow={1} minHeight={0} focused={props.focused && focus() === 'files'}
+              options={files().map(file => ({ name: `${file.failed.length ? '!' : file.error || file.inconclusive.length ? '?' : '·'} ${file.path.split('/').at(-1)}  ${fileStatus(file)}`, description: file.path }))}
+              selectedIndex={fileIndex()} showDescription={false} showScrollIndicator={true}
+              backgroundColor={props.theme.background.default} textColor={props.theme.text.subdued}
+              focusedBackgroundColor={props.theme.background.default} focusedTextColor={props.theme.text.default}
+              selectedBackgroundColor={props.theme.background.raised.high} selectedTextColor={props.theme.text.default}
+              onChange={index => { setFileIndex(index); setCheckIndex(0) }}
+            />
+          </box>
+        </Show>
         <box flexDirection="column" flexGrow={1} minHeight={0} minWidth={0}>
           <text flexShrink={0} fg={props.theme.text.default}>{file()?.path}</text>
           <Show when={file()?.error || file()?.skipped}>
             <text flexShrink={0} fg={props.theme.text.feedback.warning.default}>{file()?.error ?? file()?.skipped}</text>
             <text flexShrink={0} fg={props.theme.text.subdued}>Saved answers below are not an accepted result for this file.</text>
           </Show>
-          <text flexShrink={0} fg={focus() === 'checks' ? props.theme.text.default : props.theme.text.subdued}>{routing() ? `Applicability · selected only above ${Math.round(props.report.threshold * 100)}%` : 'Judgments · concerns first · P(answer)'}</text>
+          <text flexShrink={0} fg={focus() === 'checks' ? props.theme.text.default : props.theme.text.subdued}>{routing() ? `Applicability · selected only above ${Math.round(props.report.threshold * 100)}%` : detailOnly() ? title(check()?.id ?? '') : 'Judgments · concerns first · P(answer)'}</text>
           <Show when={!routing()} fallback={
             <scrollbox flexGrow={1} minHeight={0} focused={props.focused && focus() === 'checks'}>
               <For each={Object.entries(file()?.applicability ?? {})}>{([id, probability]) =>
@@ -101,15 +104,17 @@ export function ResultsPanel(props: {
             </scrollbox>
           }>
             <Show when={checks().length} fallback={<text fg={props.theme.text.subdued}>No specific judgments were returned for this file.</text>}>
-              <select
-                flexGrow={1} flexBasis={0} minHeight={2} focused={props.focused && focus() === 'checks'}
-                options={checks().map(check => ({ name: `${check.verdict === 'violated' ? '!' : check.verdict === 'insufficient_context' ? '?' : '·'} ${title(check.id)}  ${verdictLabel(check.verdict)} ${Math.round(check.probability * 100)}%`, description: check.question }))}
-                selectedIndex={checkIndex()} showDescription={false} showScrollIndicator={true}
-                backgroundColor={props.theme.background.default} textColor={props.theme.text.subdued}
-                focusedBackgroundColor={props.theme.background.default} focusedTextColor={props.theme.text.default}
-                selectedBackgroundColor={props.theme.background.raised.high} selectedTextColor={props.theme.text.default}
-                onChange={setCheckIndex}
-              />
+              <Show when={!detailOnly()}>
+                <select
+                  flexGrow={1} flexBasis={0} minHeight={2} focused={props.focused && focus() === 'checks'}
+                  options={checks().map(check => ({ name: `${check.verdict === 'violated' ? '!' : check.verdict === 'insufficient_context' ? '?' : '·'} ${title(check.id)}  ${verdictLabel(check.verdict)} ${Math.round(check.probability * 100)}%`, description: check.question }))}
+                  selectedIndex={checkIndex()} showDescription={false} showScrollIndicator={true}
+                  backgroundColor={props.theme.background.default} textColor={props.theme.text.subdued}
+                  focusedBackgroundColor={props.theme.background.default} focusedTextColor={props.theme.text.default}
+                  selectedBackgroundColor={props.theme.background.raised.high} selectedTextColor={props.theme.text.default}
+                  onChange={setCheckIndex}
+                />
+              </Show>
               <box flexDirection="column" flexShrink={0} paddingTop={1}>
                 <text fg={color(check()?.verdict ?? '')}><b>{verdictLabel(check()?.verdict ?? '')}</b> · {Math.round((check()?.probability ?? 0) * 100)}% probability</text>
                 <text fg={props.theme.text.subdued}>Confidence {Math.round((check()?.confidence ?? 0) * 100)}% · model judgment, not proof</text>

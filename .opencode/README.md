@@ -36,6 +36,7 @@ results update the summary without opening the panel or taking focus.
 
 - `↑` / `↓` select files and judgments or scroll detail; concerns are listed first.
 - `←` / `→` move between files, judgments, and the scrollable question detail.
+  In the stacked layout, focusing detail gives it the list space; `←` returns to the judgments.
 - `A` toggles applicability scores and shows which standards cleared the cutoff.
 - `F` switches between the side panel and full screen; narrow terminals use full screen.
 - `R` reloads the saved result without calling Jev; `Esc` closes the panel.
