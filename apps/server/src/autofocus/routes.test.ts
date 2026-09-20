@@ -83,7 +83,7 @@ function setup(start = 32842, inventory = record.lastObservedInventory) {
 
   return {
     get: () => app.inject({ method: 'GET', url: '/api/web/rigs/fra/autofocus' }),
-    start: (body: object = { stepSize: 50 }) => app.inject({ method: 'POST', url: '/api/rigs/fra/autofocus/start', payload: body }),
+    start: (body: { stepSize?: number, exposureSeconds?: number } = { stepSize: 50 }) => app.inject({ method: 'POST', url: '/api/rigs/fra/autofocus/start', payload: body }),
     stop: () => app.inject({ method: 'POST', url: '/api/rigs/fra/autofocus/stop', payload: {} }),
     land: async () => {
       await vi.waitFor(() => expect(captures.length).toBeGreaterThan(0))
@@ -94,6 +94,7 @@ function setup(start = 32842, inventory = record.lastObservedInventory) {
 
       while (Date.now() < deadline) {
         if (!(await app.inject({ method: 'GET', url: '/api/web/rigs/fra/autofocus' })).json().active) return
+
         if (captures.length) captures.shift()!.resolve()
         await new Promise(resolve => setTimeout(resolve, 5))
       }
@@ -150,6 +151,7 @@ it('starts the inspected focuser when last-observed inventory does not list it',
     ...record.lastObservedInventory,
     devices: [{ uniqueId: 'camera', kind: 'camera', name: 'Main camera' }],
   })
+
   expect((await subject.get()).json()).toMatchObject({ enabled: true, focuserName: 'EAF' })
   const started = await subject.start({ stepSize: 50, exposureSeconds: 2 })
   expect(started.statusCode).toBe(200)
@@ -166,6 +168,7 @@ it('starts the inspected focuser when last-observed inventory lists a different 
       { uniqueId: 'stale-eaf', kind: 'focuser', name: 'Stale EAF' },
     ],
   })
+
   expect((await subject.get()).json().enabled).toBe(true)
   expect((await subject.start({ stepSize: 50, exposureSeconds: 2 })).statusCode).toBe(200)
   expect(subject.focuserIds).toEqual(['eaf'])

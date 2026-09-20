@@ -47,6 +47,11 @@ temperature is not treated as cooling enabled. Cooler on/off and target temperat
 are explicit commands; setting a target does not turn the cooler on. Cooling is
 disabled while a capture run is active so Stop stays available. Cooler command
 failures stay in the cooling region and do not label capture unavailable.
+An uncertain command retains the affected setting until an explicit check observes
+it again: CoolerOn for a switch command, requested setpoint for a temperature
+command. Missing telemetry and successful exposure commands do not dismiss that
+warning. A fresh setting resolves uncertainty even if it differs from the requested
+value; the interface shows the observed state rather than claiming the write won.
 
 Saved images are available at the per-rig Observe/saved-images route independently
 of camera readiness. The dated collection and detail page validate retained-image

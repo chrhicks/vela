@@ -7,17 +7,23 @@ import { Panel } from './Panel'
 import './Panel.autofocus.specimen.css'
 
 const phases = ['setup', 'sampling', 'fitting', 'complete', 'restoring', 'restored', 'travel-limit'] as const
+
 const examples = ['current-focus', 'near-inward-limit'] as const
+
 const stepSizes = ['25', '50', '100', '200'] as const
 
 const FRA_START = 32842
+
 const FRA_MAX = 60000
+
 const OFFSET = 4
+
 const FOCUS = 32838
+
 const MIN_HFR = 2.18
+
 const CURVE_B = 95
 
-type Phase = typeof phases[number]
 type Props = Record<string, string | number | boolean>
 
 interface Sample {
@@ -85,6 +91,7 @@ function VCurve({
   const ticks = [window.low, start, window.high]
   const latest = samples.at(-1)
   const lowest = minSample(samples)
+
   const curve = fit
     ? Array.from({ length: 49 }, (_, index) => {
         const position = xMin + (index / 48) * (xMax - xMin)
@@ -145,7 +152,7 @@ function AutofocusPreview({ props, onPropsChange }: {
   const example = String(values.example ?? 'current-focus')
   const start = example === 'near-inward-limit' ? 80 : FRA_START
   const stepSize = Math.max(1, Math.floor(Number(values.stepSize) || 50))
-  const phase = String(values.phase ?? 'setup') as Phase
+  const phase = phases.find(candidate => candidate === values.phase) ?? 'setup'
   const planned = walkPositions(start, stepSize)
   const plannedCount = planned?.positions.length ?? 0
   const allSamples = planned ? samplesFor(planned.positions) : []
@@ -190,11 +197,14 @@ function AutofocusPreview({ props, onPropsChange }: {
     : phase === 'sampling' ? Math.min(4, allSamples.length)
     : phase === 'restoring' || phase === 'restored' ? (landed > 0 ? landed : Math.min(3, allSamples.length))
     : allSamples.length
+
   const samples = allSamples.slice(0, snapshotCount)
   const fit = phase === 'complete' ? { p: FOCUS, a: MIN_HFR, b: CURVE_B } : null
+
   const current = phase === 'complete' && fit ? Math.round(fit.p)
     : phase === 'restored' || phase === 'restoring' || phase === 'setup' || phase === 'travel-limit' ? start
     : samples.at(-1)?.position ?? start
+
   const travelBlocked = !planned || phase === 'travel-limit' || example === 'near-inward-limit'
   const setup = phase === 'setup' || phase === 'travel-limit'
   const lowest = minSample(samples)
@@ -202,15 +212,24 @@ function AutofocusPreview({ props, onPropsChange }: {
   const busy = phase === 'sampling' || phase === 'fitting' || phase === 'restoring'
   const windowRange = planned ?? { low: Math.max(1, start - OFFSET * stepSize), high: start + OFFSET * stepSize }
 
-  const activityLabel = phase === 'sampling'
-    ? activity === 'moving'
+  const activityLabels = {
+    sampling: activity === 'moving'
       ? `Moving to ${planned?.positions[landed] ?? current}…`
-      : `Exposing at ${planned?.positions[landed] ?? current}…`
-    : phase === 'fitting' ? 'Fitting the hyperbola…'
-    : phase === 'restoring' ? `Restoring start ${start}…`
-    : phase === 'complete' ? 'Fitted focus is ready'
-    : phase === 'restored' ? 'Walk stopped · start restored'
-    : 'Ready to start from the current position'
+      : `Exposing at ${planned?.positions[landed] ?? current}…`,
+    fitting: 'Fitting the hyperbola…',
+    restoring: `Restoring start ${start}…`,
+    complete: 'Fitted focus is ready',
+    restored: 'Walk stopped · start restored',
+    setup: 'Ready to start from the current position',
+    'travel-limit': 'Ready to start from the current position',
+  }
+
+  const activityLabel = activityLabels[phase]
+
+  const settledGuidance = {
+    complete: 'The fitted minimum is an integer step inside the sampled window. The lowest sampled HFR is shown only for comparison.',
+    restored: 'Start a new walk from the current position when you are ready.',
+  }
 
   const badge = setup ? (travelBlocked ? 'Blocked' : 'Not started')
     : phase === 'sampling' ? 'Walking'
@@ -324,11 +343,9 @@ function AutofocusPreview({ props, onPropsChange }: {
             {readout}
             <div className="vela-af-actions">
               <p>
-                {phase === 'complete'
-                  ? 'The fitted minimum is an integer step inside the sampled window. The lowest sampled HFR is shown only for comparison.'
-                  : phase === 'restored'
-                    ? 'Start a new walk from the current position when you are ready.'
-                    : 'Points appear as each short lands. Stop restores the start position; Vela will not keep walking toward a limit.'}
+                {phase === 'complete' || phase === 'restored'
+                  ? settledGuidance[phase]
+                  : 'Points appear as each short lands. Stop restores the start position; Vela will not keep walking toward a limit.'}
               </p>
               {busy ? (
                 <Button size="large" onClick={() => { setPlaying(false); update({ phase: 'restored' }) }}>Stop and restore start</Button>
