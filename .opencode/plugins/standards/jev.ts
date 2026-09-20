@@ -23,7 +23,7 @@ export type State = {
   path: string
   code: string
   diff?: string
-  supporting_code?: Record<string, string>
+  supporting_context?: Record<string, string>
   coding_standards: Partial<Record<string, string>>
 }
 export type Call = {

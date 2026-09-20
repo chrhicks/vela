@@ -8,7 +8,7 @@ import { Schema } from 'effect'
 import { checkStandards } from './runner.ts'
 
 const requestSchema = Schema.Struct({
-  state: Schema.Struct({ path: Schema.String, code: Schema.String, diff: Schema.optional(Schema.String), coding_standards: Schema.Record(Schema.String, Schema.String) }),
+  state: Schema.Struct({ path: Schema.String, code: Schema.String, diff: Schema.optional(Schema.String), coding_standards: Schema.Record(Schema.String, Schema.String), supporting_context: Schema.optional(Schema.Record(Schema.String, Schema.String)) }),
   questions: Schema.Record(Schema.String, Schema.Struct({ type: Schema.Literals(['noul', 'choice']) })),
 })
 type Request = typeof requestSchema.Type
@@ -50,7 +50,10 @@ test('routes strictly above 70%, uses named source standards, and retains eviden
   const result = await checkStandards(root, { mode: 'files', paths: ['tracked.ts'] }, new AbortController().signal, send)
   assert.match(result, /tracked.ts: error_context/)
   assert.equal(requests.length, 2)
-  assert.deepEqual(Object.keys(requests[1].questions), ['error_context.cause'])
+  assert.ok(requests[1].questions['error_context.cause'])
+  assert.ok(requests[1].questions['error_context.physical_writes'])
+  assert.ok(Object.keys(requests[1].questions).every(id => id.startsWith('error_context.')))
+  assert.deepEqual(Object.keys(requests[1].state.coding_standards), ['error_context'])
   assert.match(requests[0].state.coding_standards.error_context, /Preserve enough context to identify the operation/)
   assert.equal(requests[0].state.code, 'export const original = true\n')
   const evidenceDirectory = join(root, '.opencode/.local/standards')
@@ -75,6 +78,22 @@ test('changes mode includes staged and untracked source, supplying the tracked d
   const tracked = requests.find(request => request.state.path === 'tracked.ts')!
   assert.match(tracked.state.diff!, /\+export const changed/)
   assert.equal(requests.find(request => request.state.path === 'new.ts')!.state.diff, undefined)
+})
+
+test('supplied documentation is context, not an additional review target', async t => {
+  const { root } = await fixture(t)
+  const document = 'The provider validates external responses before returning normalized values.\n'
+  await writeFile(join(root, 'contract.md'), document)
+  const requests: Request[] = []
+  const send: typeof fetch = async (_url, init) => {
+    const request = Schema.decodeUnknownSync(requestSchema)(JSON.parse(String(init?.body)))
+    requests.push(request)
+    return reply(request)
+  }
+  const result = await checkStandards(root, { mode: 'files', paths: ['tracked.ts'], supportingPaths: ['contract.md'] }, new AbortController().signal, send)
+  assert.match(result, /1 files evaluated/)
+  assert.ok(requests.every(request => request.state.path === 'tracked.ts'))
+  assert.ok(requests.every(request => request.state.supporting_context?.['contract.md'] === document))
 })
 
 test('missing Jev answers are inconclusive, never reported as a clean evaluation', async t => {
@@ -129,7 +148,7 @@ test('cancelling a pending request aborts transport and never starts judgment ca
 for (const subject of ['source', 'support', 'standards'] as const) {
   for (const change of ['edited', 'deleted'] as const) test(`${subject} ${change} during evaluation invalidates the old finding`, async t => {
     const { root } = await fixture(t)
-    await writeFile(join(root, 'helper.ts'), 'export const helper = true\n')
+    await writeFile(join(root, 'contract.md'), 'The helper returns a validated result.\n')
     const judgmentStarted = Promise.withResolvers<void>()
     const finish = Promise.withResolvers<void>()
     const send: typeof fetch = async (_url, init) => {
@@ -140,9 +159,9 @@ for (const subject of ['source', 'support', 'standards'] as const) {
       }
       return reply(request)
     }
-    const checking = checkStandards(root, { mode: 'files', paths: ['tracked.ts'], supportingPaths: ['helper.ts'] }, new AbortController().signal, send)
+    const checking = checkStandards(root, { mode: 'files', paths: ['tracked.ts'], supportingPaths: ['contract.md'] }, new AbortController().signal, send)
     await judgmentStarted.promise
-    const changedPath = subject === 'source' ? 'tracked.ts' : subject === 'support' ? 'helper.ts' : 'CODING_STANDARDS.md'
+    const changedPath = subject === 'source' ? 'tracked.ts' : subject === 'support' ? 'contract.md' : 'CODING_STANDARDS.md'
     if (change === 'edited') await writeFile(join(root, changedPath), 'Edited during review\n')
     else await rm(join(root, changedPath))
     finish.resolve()
