@@ -41,8 +41,8 @@ async function screenshot(page: Page, name: string, width: number) {
   await test.info().attach(name, { path, contentType: 'image/png' })
 }
 
-test('an uncertain autofocus Stop takes precedence over continuing camera-read retries', async ({ page }) => {
-  const state = { ...autofocus, captureReadState: 'retrying' }
+test('an uncertain autofocus Stop retains priority until polling confirms restoration', async ({ page }) => {
+  let state: AutofocusView = { ...autofocus, captureReadState: 'retrying' }
   let commands = 0
   let reads = 0
   let finishStop!: () => void
@@ -72,7 +72,16 @@ test('an uncertain autofocus Stop takes precedence over continuing camera-read r
   await expect.poll(() => reads).toBeGreaterThan(readsAfterCommand)
   await expect(page.locator('.vela-af-activity')).toContainText('Command outcome unknown')
   await expect(page.locator('.vela-af-activity__spinner')).toHaveCount(0)
+  await expect(page.getByText('now', { exact: true })).toHaveCount(0)
   await expect(page.locator('.vela-af-readout time')).toHaveAttribute('datetime', capturedAt)
+  state = { ...state, active: false, phase: 'stopped', activity: 'idle', captureReadState: 'current',
+    currentPosition: state.startPosition, restoredStart: true }
+  await expect(page.locator('.vela-af-notice')).toContainText('Start position restored')
+  await expect(page.locator('.vela-af-heading')).toContainText('Restored')
+  await expect(page.locator('.vela-af-heading')).not.toContainText('Confirmation needed')
+  await expect(page.locator('.vela-af-activity')).toContainText('Walk stopped · start restored')
+  await expect(page.getByText('Command outcome unknown', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('now', { exact: true })).toBeVisible()
   expect(commands).toBe(1)
 })
 

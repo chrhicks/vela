@@ -11,3 +11,6 @@ resume the supplied activity; they do not add a sample or confirm fitted focus.
 
 Offline and unconfirmed command feedback take precedence over camera-read retry
 feedback. A restoration failure remains a failure, with prior samples retained.
+After a lost Stop response, a fresh terminal server projection resolves command
+uncertainty into its observed stopped, failed or completed outcome. Active work
+does not clear that uncertainty, and the browser never repeats the command.
