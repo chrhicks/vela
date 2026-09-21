@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Button } from './Button'
 import { Dialog } from './Dialog'
-import starField from './fixtures/capture-star-field.png'
+
+const starField = new URL('./fixtures/capture-star-field.png', import.meta.url).href
 
 // Illustrative image geometry, not a plate solution for the bundled simulator image.
 const frame = { width: 1600, height: 1200, arcsecPerPixel: 2, x: 800, y: 600 }
@@ -23,7 +24,7 @@ const viewDescriptions: Record<ImageView, string> = {
   full: 'Full frame · 53.3′ × 40′',
 }
 
-function ImageCanvas({ target, view }: { readonly target?: Target; readonly view: ImageView }) {
+function ImageCanvas({ target, view }: { readonly target: Target | undefined; readonly view: ImageView }) {
   if (view === 'native') return <div className="vela-polar-native" tabIndex={0} role="region" aria-label="Native image, scroll to inspect">
     <img src={starField} width={frame.width} height={frame.height} alt="Same illustrative exposure at one image pixel per CSS pixel" />
   </div>
@@ -57,7 +58,7 @@ function ImageCanvas({ target, view }: { readonly target?: Target; readonly view
   </svg><div className="vela-polar-angular-scale" aria-label={`Angular scale ${barLabel}`}><span>{barLabel}</span><i /></div></div>
 }
 
-function InspectionView({ target, status }: { readonly target?: Target; readonly status: string }) {
+function InspectionView({ target, status }: { readonly target: Target | undefined; readonly status: string }) {
   const [view, setView] = useState<ImageView>(target ? 'fit' : 'full')
   const outside = target && (target.x < 0 || target.x > frame.width || target.y < 0 || target.y > frame.height)
   const fineClips = target && (Math.abs(target.x - frame.x) > 40 || Math.abs(target.y - frame.y) > 22)

@@ -93,13 +93,13 @@ for (const width of [390, 1040]) {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   })
 
-  test(`unsolved baseline enlargement has no invented scale or new capture at ${width}px`, async ({ page }) => {
+  test(`baseline enlargement survives completion without changing exposure, viewport or focus at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 1100 })
     await page.clock.setFixedTime(new Date('2026-09-21T01:00:08Z'))
     const state = initialView()
-    Object.assign(state, { phase: 'baseline', measurement: null, measuredAt: null, position: 1,
-      solvedPositions: 0, warning: 'No plate-solve solution', activity: 'exposing',
-      preview: { imageUrl, imageWidth: 1600, imageHeight: 1200, capturedAt, capturedAtSource: 'camera', position: 1 } })
+    Object.assign(state, { phase: 'baseline', measurement: null, measuredAt: null, position: 3,
+      solvedPositions: 2, warning: 'No plate-solve solution', activity: 'exposing',
+      preview: { imageUrl, imageWidth: 1600, imageHeight: 1200, capturedAt, capturedAtSource: 'camera', position: 3 } })
     const writes: string[] = []
     await page.route('**/api/**', route => {
       if (route.request().method() !== 'GET') writes.push(route.request().url())
@@ -107,7 +107,7 @@ for (const width of [390, 1040]) {
       return route.fulfill({ json: {} })
     })
     await page.route('**/api/web/rigs/rig-1/alignment', route => route.fulfill({ json: state }))
-    await page.route(`**${imageUrl}`, route => route.fulfill({ path: imagePath }))
+    await page.route('**/api/alignment-inspection-*.png', route => route.fulfill({ path: imagePath }))
     await page.goto('/rigs/rig-1/observe/alignment')
     await page.getByRole('button', { name: 'Enlarge image' }).click()
     const dialog = page.getByRole('dialog')
@@ -119,6 +119,19 @@ for (const width of [390, 1040]) {
     await dialog.getByRole('button', { name: '100%', exact: true }).click()
     await expect(dialog.getByRole('img')).toHaveAttribute('src', imageUrl)
     await expect(dialog.locator('time')).toHaveAttribute('datetime', capturedAt)
+    await dialog.getByRole('region').evaluate(element => { element.scrollLeft = 400 })
+    Object.assign(state, initialView(), { measuredAt: '2026-09-21T01:00:07Z' })
+    state.measurement = { ...state.measurement!, imageUrl: '/api/alignment-inspection-adjustment.png' }
+    await expect(page.locator('.vela-polar-readings')).toBeVisible()
+    await expect(page.locator('.vela-polar-image svg image')).toHaveAttribute('href', state.measurement.imageUrl)
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByRole('img')).toHaveAttribute('src', imageUrl)
+    await expect(dialog.locator('time')).toHaveAttribute('datetime', capturedAt)
+    await expect(dialog.getByRole('button', { name: '100%', exact: true })).toBeFocused()
+    expect(await dialog.getByRole('region').evaluate(element => element.scrollLeft)).toBe(400)
+    await page.keyboard.press('Escape')
+    await expect(dialog).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Enlarge image' })).toBeFocused()
     expect(writes).toEqual([])
   })
 }

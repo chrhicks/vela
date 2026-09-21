@@ -1,6 +1,6 @@
 # Field-test follow-ups — current status
 
-**Last reconciled: September 21, 2026.** Delivery baseline: PR #76 (`03fed88`).
+**Last reconciled: September 21, 2026.** Delivery baseline: PR #79 (`ac7934a`).
 Chris selected the recommended sequence and then authorized parallel Rift agents.
 The implementation/design tracks below are active; integration and acceptance stay separate.
 
@@ -20,7 +20,7 @@ have not been selected for implementation merely by appearing on this list.
 
 | Follow-up | Current status and next bounded step | Detailed plan |
 | --- | --- | --- |
-| Preserve prepared stages; improve transport classification | **Transport classification in progress — [CHI-195](https://linear.app/chicks/issue/CHI-195).** Distinguish body-stream transport failures from invalid data. Prepared Home/probe/sweep-stage recovery remains open; retain bounded motion feedback and confirmation deadlines. | [Recovery stage 2](recovery-and-guiding.md#stage-2-transport-classification-and-prepared-stage-reads) |
+| Preserve prepared stages | **Open.** Prepared Home/probe/sweep-stage recovery remains separate from delivered exposure recovery and transport classification. Retain completed preparation through transient reads without weakening bounded motion feedback or confirmation deadlines. | [Recovery stage 2](recovery-and-guiding.md#stage-2-transport-classification-and-prepared-stage-reads) |
 | Preserve raw captures and measurements when presentation fails | **Open.** Preview failure can still prevent capture publication/saving; alignment preview or target-projection failure can end useful measurement. Represent unavailable presentation separately from retained originals/results. | [Recovery stage 3](recovery-and-guiding.md#stage-3-display-artifacts-should-not-own-acquisitionmeasurement-success) |
 | Individual alignment-frame failures | **Open.** Distinguish solve-budget expiry from configuration failure and cancellation; retain a valid baseline when a later image can recover. Geometry rejection needs evidence-based classification, not catch-all retry. | [Solver and individual-frame failure](recovery-and-guiding.md#solver-and-individual-frame-failure) |
 | Alignment image inspection | **Design approved; production verification pending — [CHI-194](https://linear.app/chicks/issue/CHI-194).** Chris selected Fit both with a 4′ context floor, deliberate Fine · 1′, and same-exposure full-frame/native enlargement. Current production candidate uses approximate camera-field scale with server-projected WCS target pixels. | [Imagery workshop](alignment-and-framing.md#p2-imagery-and-command-feedback-in-the-workshop) |
@@ -73,6 +73,7 @@ clear session need not wait for the whole backlog.
 | Replayable alignment evidence | [#71](https://github.com/chrhicks/vela/pull/71), [CHI-190](https://linear.app/chicks/issue/CHI-190). Opt-in bounded originals/journal and replay; reproducibility is not independent accuracy. |
 | Automatic centering, measured outcomes, pointing-side observation, Working indicator and numerical tracing | [#73](https://github.com/chrhicks/vela/pull/73), [CHI-192](https://linear.app/chicks/issue/CHI-192). Accepted and merged September 21. ≤0.5′, at most four corrections, stop after two consecutive worsening results. Supersedes the original one-correction-first proposal. |
 | Same-exposure read recovery across Capture, Alignment, Framing and Autofocus | [#76](https://github.com/chrhicks/vela/pull/76), [CHI-193](https://linear.app/chicks/issue/CHI-193). Independent **OK**, browser accepted and merged September 21. Paced cancellable reads preserve acknowledged exposure and prior work; StartExposure is never replayed. Confirmed Stop and uncertain cleanup remain distinct. Simulator/HTTP evidence, not physical hardware validation. |
+| Interrupted response-body transport classification | [#79](https://github.com/chrhicks/vela/pull/79), [CHI-195](https://linear.app/chicks/issue/CHI-195). Independent **OK**, merged September 21. JSON/ImageBytes stream termination permits same-exposure read recovery; completed malformed data remains invalid. Uncertain StartExposure acknowledgement is never replayed. |
 
 ## Deferred unless separately chosen
 

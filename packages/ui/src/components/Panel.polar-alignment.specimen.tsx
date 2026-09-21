@@ -169,7 +169,7 @@ export const specimen: ComponentSpecimen = {
   componentName: 'Panel / Card',
   id: 'panel-polar-alignment',
   name: 'Polar alignment · Product example',
-  description: 'Proposed alignment image inspection: initial fit-both, deliberate fine view, full frame and expanded/native inspection of the same exposure. Illustrative geometry on a bundled simulator image; not a real plate solution or independent accuracy evidence. Ages and retry states are fixed snapshots. Fit-both is pending design review, not approved production appearance. Start plays an accelerated three-position preview; no hardware commands.',
+  description: 'Approved alignment inspection design (September 21): initial fit-both, deliberate fine view, full frame and expanded/native inspection of the same exposure. Illustrative geometry on a bundled simulator image; not a real plate solution or independent accuracy evidence. Ages and retry states are fixed snapshots. Start plays an accelerated three-position preview; no hardware commands.',
   controls: {
     mode: { type: 'select', label: 'Rig mode', options: ['offline', 'physical'] },
     example: { type: 'select', label: 'Alignment example', options: examples },

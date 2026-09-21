@@ -1,10 +1,10 @@
 import { z } from 'zod'
 import type { AlignmentView } from '@vela/model/web'
 import { Badge, Button, Panel } from '@vela/ui'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { api } from '../lib/api'
-import { AlignmentImage } from '../features/alignment/AlignmentImage'
+import { AlignmentImage, AlignmentImageDialog, type ExpandedAlignmentImage } from '../features/alignment/AlignmentImage'
 import './alignment.css'
 
 function useAlignment(rigId: string) {
@@ -182,6 +182,8 @@ function AlignmentPage({ rigId }: { rigId: string }) {
   const { view, offline, pending, error, command } = useAlignment(rigId)
   const { solved, imageError } = useSolvedMeasurement(view)
   const [now, setNow] = useState(Date.now())
+  const [expandedImage, setExpandedImage] = useState<ExpandedAlignmentImage | null>(null)
+  const imageOpenerId = useId()
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 500)
 
@@ -302,7 +304,7 @@ function AlignmentPage({ rigId }: { rigId: string }) {
           {view.preview && <AlignmentImage frame={{ ...view.preview, solution: null,
             title: `Latest exposure · Position ${view.preview.position}`,
             alt: `Latest camera exposure at baseline position ${view.preview.position}`,
-          }} readState={imageReadState} now={now} retained={!view.active} noSolution={!!view.warning && !retrying} />}
+          }} readState={imageReadState} now={now} retained={!view.active} noSolution={!!view.warning && !retrying} openerId={imageOpenerId} onEnlarge={setExpandedImage} />}
         </Panel>
         <div className="vela-polar-baseline__next">
           <h3>{view.active ? 'What happens next' : 'Before you start'}</h3>
@@ -341,7 +343,7 @@ function AlignmentPage({ rigId }: { rigId: string }) {
         </Panel>
         <AlignmentImage frame={{ ...measurement, solution: measurement, capturedAt: solved?.measuredAt ?? null,
           title: 'Last solved frame', alt: 'Solved camera image with frame reference and alignment target',
-        }} readState={imageReadState} now={now} retained={!view.active || imageError || view.activity !== 'waiting' || view.measurement?.imageUrl !== measurement.imageUrl} />
+        }} readState={imageReadState} now={now} retained={!view.active || imageError || view.activity !== 'waiting' || view.measurement?.imageUrl !== measurement.imageUrl} openerId={imageOpenerId} onEnlarge={setExpandedImage} />
         <div className="vela-polar-actions">
           <p>{adjustmentInstruction}</p>
           {view.active ? (
@@ -361,6 +363,7 @@ function AlignmentPage({ rigId }: { rigId: string }) {
         </div>
       </div>
     )}
+    <AlignmentImageDialog image={expandedImage} readState={imageReadState} now={now} openerId={imageOpenerId} onDismiss={() => setExpandedImage(null)} />
     <footer className="vela-polar-prototype">{physical ? 'Physical-rig alignment trial · Camera images and plate solves' : 'Configured offline alignment model · Generated sky images, real plate solves · Physical-rig alignment is not yet validated.'}</footer>
   </section>
 }

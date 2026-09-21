@@ -2,8 +2,10 @@
 
 The route owns polling, commands and the pairing of each loaded solved image with
 its measurements and exposure timestamp. `AlignmentImage` only changes its display
-viewport. Enlargement pins that exposure while polling may publish a newer image
-behind it; closing and reopening selects the current displayed exposure. Image-load
+viewport. The route keeps enlargement mounted across baseline completion, pinning
+the exposure and inspection viewport while polling may publish a newer image
+behind it. Dismissal focuses the current enlargement button even if the layout
+replaced its element; closing and reopening selects the current displayed exposure. Image-load
 retries fetch the same URL and never request acquisition or solving.
 
 The approved polar-alignment workshop defines Fit both with padding and a 4′ context

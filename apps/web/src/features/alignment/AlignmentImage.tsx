@@ -14,6 +14,11 @@ export interface AlignmentImageFrame {
   solution: AlignmentMeasurement | null
 }
 
+export interface ExpandedAlignmentImage {
+  frame: AlignmentImageFrame
+  noSolution: boolean
+}
+
 type ReadState = 'current' | 'offline' | 'retrying'
 
 const readMessages: Record<ReadState, string> = {
@@ -110,24 +115,33 @@ function InspectionView({ frame, readState, now, retained, noSolution }: {
   </div>
 }
 
-export function AlignmentImage({ frame, readState, now, retained, noSolution = false }: {
+export function AlignmentImage({ frame, readState, now, retained, noSolution = false, openerId, onEnlarge }: {
   readonly frame: AlignmentImageFrame
   readonly readState: ReadState
   readonly now: number
   readonly retained: boolean
   readonly noSolution?: boolean
+  readonly openerId: string
+  readonly onEnlarge: (image: ExpandedAlignmentImage) => void
 }) {
-  const [expanded, setExpanded] = useState<{ frame: AlignmentImageFrame; noSolution: boolean } | null>(null)
-
   return <figure className="vela-polar-image">
-    <div className="vela-polar-image-heading"><span>{frame.title}</span><Button size="small" onClick={() => setExpanded({ frame, noSolution })}>Enlarge image</Button></div>
+    <div className="vela-polar-image-heading"><span>{frame.title}</span><Button id={openerId} size="small" onClick={() => onEnlarge({ frame, noSolution })}>Enlarge image</Button></div>
     <InspectionView frame={frame} readState={readState} now={now} retained={retained} noSolution={noSolution} />
     <figcaption><ExposureTime frame={frame} /></figcaption>
-    <Dialog open={expanded !== null} title={expanded?.frame.title ?? frame.title} description="Same exposure · Inspection takes no new image." onDismiss={() => setExpanded(null)} className="vela-polar-inspection-dialog">
-      {expanded && <>
-        <p className="vela-polar-inspection-time"><ExposureTime frame={expanded.frame} /> · Retained for inspection</p>
-        <InspectionView frame={expanded.frame} readState={readState} now={now} retained noSolution={expanded.noSolution} />
-      </>}
-    </Dialog>
   </figure>
+}
+
+export function AlignmentImageDialog({ image, readState, now, openerId, onDismiss }: {
+  readonly image: ExpandedAlignmentImage | null
+  readonly readState: ReadState
+  readonly now: number
+  readonly openerId: string
+  readonly onDismiss: () => void
+}) {
+  return <Dialog open={image !== null} title={image?.frame.title ?? 'Exposure inspection'} description="Same exposure · Inspection takes no new image." returnFocusId={openerId} onDismiss={onDismiss} className="vela-polar-inspection-dialog">
+    {image && <>
+      <p className="vela-polar-inspection-time"><ExposureTime frame={image.frame} /> · Retained for inspection</p>
+      <InspectionView frame={image.frame} readState={readState} now={now} retained noSolution={image.noSolution} />
+    </>}
+  </Dialog>
 }
