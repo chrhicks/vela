@@ -1,10 +1,10 @@
 # Field-test follow-ups — current status
 
-**Last reconciled: September 21, 2026.** Delivery baseline: PR #77 (`e7ad9ee`),
-including FITS #78 and transport classification #79.
+**Last reconciled: September 21, 2026.** Delivery baseline: PR #81 (`63c4013`).
 Chris selected the recommended sequence and then authorized parallel Rift agents.
-Preview-color adoption remains active; recovery, image inspection, FITS compatibility
-and transport classification have shipped with the evidence recorded below.
+The selected recovery, image-inspection, FITS and preview-color follow-ups are
+delivered, along with transport classification. Remaining work below is separate
+from that completed sequence.
 
 Start here to see what remains from the September 14–15 FRA/Veil field test.
 This is the maintained status rollup; the linked investigations preserve dated
@@ -25,7 +25,6 @@ have not been selected for implementation merely by appearing on this list.
 | Preserve prepared stages | **Open.** Prepared Home/probe/sweep-stage recovery remains separate from delivered exposure recovery and transport classification. Retain completed preparation through transient reads without weakening bounded motion feedback or confirmation deadlines. | [Recovery stage 2](recovery-and-guiding.md#stage-2-transport-classification-and-prepared-stage-reads) |
 | Preserve raw captures and measurements when presentation fails | **Open.** Preview failure can still prevent capture publication/saving; alignment preview or target-projection failure can end useful measurement. Represent unavailable presentation separately from retained originals/results. | [Recovery stage 3](recovery-and-guiding.md#stage-3-display-artifacts-should-not-own-acquisitionmeasurement-success) |
 | Individual alignment-frame failures | **Open.** Distinguish solve-budget expiry from configuration failure and cancellation; retain a valid baseline when a later image can recover. Geometry rejection needs evidence-based classification, not catch-all retry. | [Solver and individual-frame failure](recovery-and-guiding.md#solver-and-individual-frame-failure) |
-| Green preview treatment, including saved images | **Treatment approved; production adoption in progress — [CHI-197](https://linear.app/chicks/issue/CHI-197).** Chris selected capped background-channel correction plus the existing linked stretch. Refreshed default PNG downloads will match the displayed versioned preview; original FITS and first PNG remain preserved. | [Preview tint](imaging-and-processing.md#1-preview-tint-fix-one-renderer-and-its-retained-derivatives) |
 | Control-service outage presentation | **Open.** Clarify interrupted/unconfirmed outcome and last completed artifact; inspect fresh device state on return. This does not restore a crashed run or automatically reapply physical settings. | [Service outage boundary](recovery-and-guiding.md#control-service-outage-recovery-boundary-not-restart-automation) |
 | Working feedback beyond centering | **Open — separate adoption task.** Reusable Working + shimmer exists; choose the next long-running flows and preserve stale/uncertain and reduced-motion behavior. | [WorkingIndicator](../../packages/ui/src/components/WorkingIndicator.tsx), [centering delivery #73](https://github.com/chrhicks/vela/pull/73) |
 | Explain image-quality metrics | **Open — small presentation follow-up.** Make measured-star population and HFR limits accessible on phones; a low HFR among a few surviving stars is not a focus/quality certificate. | [Image-quality metrics](imaging-and-processing.md#5-image-quality-metrics-and-selection-expose-limits-avoid-false-certainty) |
@@ -35,6 +34,9 @@ alignment-inspection workshop → FITS compatibility → preview-color workshop.
 Parallel preparation is authorized; this order remains the integration/review preference.
 Keep transport and artifact-contract changes reviewable separately. The next
 clear session need not wait for the whole backlog.
+
+**Sequence completed September 21.** Both workshops were approved and adopted
+into production, independently verified, accepted in the browser, and merged.
 
 ## Remaining field validation and investigation
 
@@ -76,6 +78,7 @@ clear session need not wait for the whole backlog.
 | Interrupted response-body transport classification | [#79](https://github.com/chrhicks/vela/pull/79), [CHI-195](https://linear.app/chicks/issue/CHI-195). Independent **OK**, merged September 21. JSON/ImageBytes stream termination permits same-exposure read recovery; completed malformed data remains invalid. Uncertain StartExposure acknowledgement is never replayed. |
 | Fit-to-context and same-exposure alignment inspection | [#77](https://github.com/chrhicks/vela/pull/77), [CHI-194](https://linear.app/chicks/issue/CHI-194). Independent **OK**, browser accepted and merged September 21. Fit both with 4′ context floor, Fine · 1′, full frame and native enlargement; pinned exposure/viewport survive baseline completion. Angular scale is approximate, using camera-field dimensions with server-projected target pixels. Fixture verification does not establish physical alignment accuracy. |
 | Lossless unsigned-16 FITS with signed-32 fallback | [#78](https://github.com/chrhicks/vela/pull/78), [CHI-196](https://linear.app/chicks/issue/CHI-196). Independent **OK**, download handoff completed and merged September 21. Chris confirmed the expected 52.2 MB download; Siril was unavailable on his current machine. Executed Siril import/registration and raw round-trip evidence, independent Astropy pixel equality and ASTAP replay are recorded in [the interchange report](2026-09-21-fits-interchange.md). Diagnostic replay supports both encodings; retained originals stay unchanged. |
+| Bounded preview-color correction and refreshed saved previews | [#81](https://github.com/chrhicks/vela/pull/81), [CHI-197](https://linear.app/chicks/issue/CHI-197). Independent **OK**, browser accepted and merged September 21. Approved treatment B uses capped background offsets and the existing linked stretch. Saved detail lazily publishes versioned native/fit derivatives; default PNG downloads match the display, while original FITS, first PNGs and capture metadata remain unchanged. Unsupported originals retain an explicitly labeled legacy fallback. Pixel/hash and rendered-browser checks cover retained frames and device-free capture replay; this is display treatment, not scientific color calibration. |
 
 ## Deferred unless separately chosen
 
