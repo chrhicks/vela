@@ -9,6 +9,7 @@ import tailwindcss from '@tailwindcss/vite'
 import { defineConfig, type Plugin } from 'vite'
 import { designProfileSchema, workingSessionSchema } from '../../packages/ui/src/themes/index'
 import { isSafeProfileId, parseProfile, parseSession } from './shared/persistence.ts'
+import { previewColorFixtures } from './preview-color/fixture-server.ts'
 
 const workshopRoot = dirname(fileURLToPath(import.meta.url))
 
@@ -115,7 +116,7 @@ function localPersistencePlugin(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [react(), tailwindcss(), localPersistencePlugin()],
+  plugins: [react(), tailwindcss(), localPersistencePlugin(), previewColorFixtures(workshopRoot)],
   server: {
     host: '127.0.0.1',
     fs: { allow: [resolve(workshopRoot, '../..')] },
