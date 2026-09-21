@@ -123,7 +123,7 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
     diagnostics = undefined
     finishRequested = false
     patch({ rigId, rigName, active: true, phase: 'baseline', activity: 'idle', position: 1,
-      solvedPositions: 0, measurement: null, preview: null, measuredAt: null, error: null, warning: null })
+      solvedPositions: 0, measurement: null, preview: null, measuredAt: null, exposureStartedAt: null, error: null, warning: null })
     images.clear()
     runId = randomUUID()
     const signal = controller.signal
@@ -151,7 +151,7 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
   async function stop(finished = false) {
     if (running) {
       finishRequested ||= finished
-      patch({ activity: 'stopping', warning: null })
+      patch({ activity: 'stopping', exposureStartedAt: null, warning: null })
       await step('alignment.stop.requested', async () => { controller?.abort() })
       await running
     }
@@ -161,22 +161,36 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
     return view
   }
 
-  async function acquire(solver: Solver, signal: AbortSignal) {
-    const actual = physical ? await retryObservation(() => physical.pointing(signal), signal) : undefined
-    const pointing = actual ? undefined : await retryObservation(() => hardware.pointing(settings.telescopeId, signal), signal)
-    const pointingObservedAt = now()
+  async function acquireFrame(signal: AbortSignal) {
+    return retryObservation(async () => {
+      // A safe pre-start retry still needs a fresh mount observation and solve hint.
+      const actual = physical ? await retryObservation(() => physical.pointing(signal), signal) : undefined
+      const pointing = actual ? undefined : await retryObservation(() => hardware.pointing(settings.telescopeId, signal), signal)
+      const pointingObservedAt = now()
 
-    if (pointing && pointing.coordinateSystem !== 'j2000') throw new Error('This configured alignment model requires the simulator’s J2000 coordinate frame')
+      if (pointing && pointing.coordinateSystem !== 'j2000') throw new Error('This configured alignment model requires the simulator’s J2000 coordinate frame')
 
-    if (pointing && !pointing.tracking) throw new Error('Tracking must be enabled before measuring alignment')
+      if (pointing && !pointing.tracking) throw new Error('Tracking must be enabled before measuring alignment')
+      const exposureStartedAt = new Date(now()).toISOString()
+      patch({ activity: 'exposing', exposureStartedAt, warning: null })
+      let capturePending = true
 
-    const frame = await retryObservation(() => {
-      patch({ activity: 'exposing', exposureStartedAt: new Date().toISOString(), warning: null })
+      const frame = await step('alignment.capture', () => hardware.capture({ cameraId: settings.cameraId, exposureSeconds: settings.exposureSeconds, signal,
+        ...(physical ? { expectedCameraName: physical.cameraName } : { monochromeOnly: true }),
+        onReadState(state) {
+          if (!capturePending || signal.aborted) return
+          patch(state === 'retrying'
+            ? { activity: 'retrying', exposureStartedAt: null, warning: 'Device connection interrupted. Retrying automatically.' }
+            : { activity: 'exposing', exposureStartedAt, warning: null })
+        },
+      }), { 'alignment.position': view.position }).finally(() => { capturePending = false })
 
-      return step('alignment.capture', () => hardware.capture({ cameraId: settings.cameraId, exposureSeconds: settings.exposureSeconds, signal,
-        ...(physical ? { expectedCameraName: physical.cameraName } : { monochromeOnly: true }) }), { 'alignment.position': view.position })
+      return { frame, actual, pointing, pointingObservedAt }
     }, signal, error => error instanceof AlpacaCaptureRetryableError)
+  }
 
+  async function acquire(solver: Solver, signal: AbortSignal) {
+    const { frame, actual, pointing, pointingObservedAt } = await acquireFrame(signal)
     signal.throwIfAborted()
 
     const afterCapture = physical ? await retryObservation(() => physical.validate(signal, frame), signal) : undefined

@@ -179,11 +179,13 @@ async function started(rig: ReturnType<typeof observatory>) {
 describe('normalized Alpaca acquisition', () => {
   function readTimeout(operation: string, afterStart = false) {
     const rig = observatory()
+    const reads = { unavailable: true, attempts: 0 }
 
     const fetch: typeof globalThis.fetch = async (input, init) => {
       const current = new URL(String(input)).pathname.split('/').at(-1)
 
-      if (current === operation && (!afterStart || rig.state.starts > 0)) {
+      if (reads.unavailable && current === operation && (!afterStart || rig.state.starts > 0)) {
+        reads.attempts++
         const signal = init!.signal!
 
         return new Promise<Response>((_, reject) => {
@@ -196,7 +198,7 @@ describe('normalized Alpaca acquisition', () => {
       return rig.fetch(input, init)
     }
 
-    return { ...rig, acquisition: createAlpacaAcquisition({ baseUrl: 'http://fake', fetch, requestTimeoutMs: 10, imageTimeoutMs: 10 }) }
+    return { ...rig, reads, acquisition: createAlpacaAcquisition({ baseUrl: 'http://fake', fetch, requestTimeoutMs: 10, imageTimeoutMs: 10, readRetryIntervalMs: 10 }) }
   }
 
   it('classifies a device-list timeout before any write as a retryable capture', async () => {
@@ -209,20 +211,44 @@ describe('normalized Alpaca acquisition', () => {
     expect(rig.state.aborts).toBe(0)
   })
 
-  it.each(['imageready', 'lastexposurestarttime', 'imagearray'])('classifies an acknowledged exposure %s timeout as retryable only after confirmed cleanup', async operation => {
+  it.each(['imageready', 'lastexposurestarttime', 'imagearray'])('recovers the same acknowledged exposure after repeated %s timeouts beyond the old cleanup budget', async operation => {
     const rig = readTimeout(operation, true)
-    const error = await rig.acquisition.capture({ cameraId: 'camera-id', exposureSeconds: 1 }).catch(error => error)
-    expect(error).toBeInstanceOf(AlpacaCaptureRetryableError)
-    expect(error.cause).toMatchObject({ reason: 'transport', endpoint: `/api/v1/camera/7/${operation}` })
-    expect(rig.state.starts).toBe(1)
-    expect(rig.state.aborts).toBe(1)
-    expect(rig.state.exposing).toBe(false)
+    const monotonic = vi.spyOn(performance, 'now').mockReturnValue(0)
+    const readStates: string[] = []
+    const controller = new AbortController()
+
+    const result = rig.acquisition.capture({ cameraId: 'camera-id', exposureSeconds: 1, signal: controller.signal,
+      onReadState: state => readStates.push(state) })
+
+    try {
+      await vi.waitFor(() => expect(readStates).toEqual(['retrying']))
+      monotonic.mockReturnValue(70_000)
+      await vi.waitFor(() => expect(rig.reads.attempts).toBeGreaterThanOrEqual(3))
+      expect(rig.state.starts).toBe(1)
+      expect(rig.state.aborts).toBe(0)
+      rig.reads.unavailable = false
+      const frame = await result
+      expect(readStates).toEqual(['retrying', 'current'])
+      expect(frame.capturedAt).toBe('2026-09-05T01:00:02Z')
+      expect(Array.from(frame.pixels)).toEqual([1, 2, 3, 4])
+      expect(rig.state.starts).toBe(1)
+      expect(rig.state.aborts).toBe(0)
+    } finally {
+      controller.abort()
+      await result.catch(() => {})
+      monotonic.mockRestore()
+    }
   })
 
-  it('does not classify a transport failure as retryable when exposure cleanup fails', async () => {
+  it('keeps cleanup failure uncertain when Stop interrupts repeated exposure-read timeouts', async () => {
     const rig = readTimeout('imageready', true)
     rig.state.cameraStopFails = true
-    const error = await rig.acquisition.capture({ cameraId: 'camera-id', exposureSeconds: 1 }).catch(error => error)
+    const controller = new AbortController()
+    const onReadState = vi.fn()
+    const result = rig.acquisition.capture({ cameraId: 'camera-id', exposureSeconds: 1, signal: controller.signal, onReadState }).catch(error => error)
+    await vi.waitFor(() => expect(onReadState).toHaveBeenCalledWith('retrying'))
+    controller.abort()
+    const error = await result
     expect(error).not.toBeInstanceOf(AlpacaCaptureRetryableError)
     expect(error).toMatchObject({ reason: 'transport', endpoint: '/api/v1/camera/7/abortexposure' })
     expect(rig.state.starts).toBe(1)
@@ -246,11 +272,170 @@ describe('normalized Alpaca acquisition', () => {
     }
 
     const acquisition = createAlpacaAcquisition({ baseUrl: 'http://fake', fetch })
-    const error = await acquisition.capture({ cameraId: 'camera-id', exposureSeconds: 1 }).catch(error => error)
+    const controller = new AbortController()
+    const onReadState = vi.fn()
+    const result = acquisition.capture({ cameraId: 'camera-id', exposureSeconds: 1, signal: controller.signal, onReadState }).catch(error => error)
+    await vi.waitFor(() => expect(onReadState).toHaveBeenCalledWith('retrying'))
+    controller.abort()
+    const error = await result
     expect(error).not.toBeInstanceOf(AlpacaCaptureRetryableError)
     expect(error.message).toBe('Camera did not confirm exposure stopped')
     expect(rig.state.starts).toBe(1)
     expect(rig.state.aborts).toBe(1)
+  })
+
+  it.each(['request', 'wait'])('Stop cancels a pending read %s and independently confirms the single abort', async stage => {
+    const rig = observatory()
+    const controller = new AbortController()
+    let pending = false
+    let readSignal: AbortSignal | undefined
+    let cleanupSignal: AbortSignal | undefined
+    const onReadState = vi.fn()
+
+    const fetch: typeof globalThis.fetch = async (input, init) => {
+      const operation = new URL(String(input)).pathname.split('/').at(-1)
+
+      if (operation === 'imageready' && rig.state.starts > 0) {
+        if (stage === 'wait') throw new TypeError('Connection unavailable')
+        readSignal = init!.signal!
+        pending = true
+
+        return new Promise<Response>((_, reject) => readSignal!.addEventListener('abort', () => reject(readSignal!.reason), { once: true }))
+      }
+
+      if (operation === 'abortexposure') cleanupSignal = init!.signal!
+
+      return rig.fetch(input, init)
+    }
+
+    const acquisition = createAlpacaAcquisition({ baseUrl: 'http://fake', fetch, readRetryIntervalMs: 60_000 })
+    const result = acquisition.capture({ cameraId: 'camera-id', exposureSeconds: 20, signal: controller.signal, onReadState })
+    const rejection = expect(result).rejects.toBeInstanceOf(AlpacaCaptureStoppedError)
+    await vi.waitFor(() => expect(stage === 'request' ? pending : onReadState.mock.calls.length === 1).toBe(true))
+    controller.abort()
+    await rejection
+    expect(rig.state.starts).toBe(1)
+    expect(rig.state.aborts).toBe(1)
+    expect(rig.state.exposing).toBe(false)
+    expect(cleanupSignal?.aborted).toBe(false)
+    expect(onReadState).not.toHaveBeenCalledWith('current')
+
+    if (stage === 'request') expect(readSignal?.aborted).toBe(true)
+  })
+
+  it.each([2, 5])('does not restart a recovered camera that reports incomplete/error state %i', async cameraState => {
+    const rig = observatory()
+    const monotonic = vi.spyOn(performance, 'now').mockReturnValue(0)
+    let unavailable = true
+    const onReadState = vi.fn()
+
+    const fetch: typeof globalThis.fetch = async (input, init) => {
+      const operation = new URL(String(input)).pathname.split('/').at(-1)
+
+      if (operation === 'imageready' && rig.state.starts > 0 && unavailable) throw new TypeError('Connection unavailable')
+
+      if (operation === 'camerastate' && rig.state.starts > 0 && rig.state.aborts === 0) {
+        return Response.json({ ClientTransactionID: 0, ServerTransactionID: 1, ErrorNumber: 0, ErrorMessage: '', Value: cameraState })
+      }
+
+      return rig.fetch(input, init)
+    }
+
+    const acquisition = createAlpacaAcquisition({ baseUrl: 'http://fake', fetch, readRetryIntervalMs: 10 })
+    const result = acquisition.capture({ cameraId: 'camera-id', exposureSeconds: 1, onReadState })
+    const rejection = expect(result).rejects.toThrow(cameraState === 5 ? 'Camera reported an exposure error' : 'Camera exposure did not complete in time')
+
+    try {
+      await vi.waitFor(() => expect(onReadState).toHaveBeenCalledWith('retrying'))
+      monotonic.mockReturnValue(70_000)
+      unavailable = false
+      await rejection
+      expect(rig.state.starts).toBe(1)
+      expect(rig.state.aborts).toBe(1)
+      expect(rig.state.imageReads).toBe(0)
+      expect(onReadState).not.toHaveBeenCalledWith('current')
+    } finally { monotonic.mockRestore() }
+  })
+
+  it('does not abort a replacement camera found after an interruption', async () => {
+    const rig = readTimeout('imageready', true)
+    const onReadState = vi.fn()
+    const result = rig.acquisition.capture({ cameraId: 'camera-id', exposureSeconds: 1, onReadState })
+    const rejection = expect(result).rejects.toThrow('original exposure outcome is unconfirmed')
+    await vi.waitFor(() => expect(onReadState).toHaveBeenCalledWith('retrying'))
+    rig.state.cameraName = 'Replacement camera'
+    rig.reads.unavailable = false
+    await rejection
+    expect(rig.state.starts).toBe(1)
+    expect(rig.state.aborts).toBe(0)
+    expect(rig.state.imageReads).toBe(0)
+  })
+
+  it.each([false, true])('retries an image-body timeout and checks the recovered image identity (replaced: %s)', async replaced => {
+    const rig = observatory()
+    let unavailable = true
+    const onReadState = vi.fn()
+
+    const fetch: typeof globalThis.fetch = async (input, init) => {
+      const operation = new URL(String(input)).pathname.split('/').at(-1)
+
+      if (operation === 'imagearray' && unavailable) {
+        const signal = init!.signal!
+
+        return new Response(new ReadableStream({ start(stream) {
+          signal.addEventListener('abort', () => stream.error(signal.reason), { once: true })
+        } }), { headers: { 'content-type': 'application/imagebytes' } })
+      }
+
+      return rig.fetch(input, init)
+    }
+
+    const acquisition = createAlpacaAcquisition({ baseUrl: 'http://fake', fetch, imageTimeoutMs: 10, readRetryIntervalMs: 10 })
+    const result = acquisition.capture({ cameraId: 'camera-id', exposureSeconds: 1, onReadState })
+
+    const settled = replaced ? expect(result).rejects.toThrow('Exposure changed before image transfer')
+      : expect(result).resolves.toMatchObject({ capturedAt: '2026-09-05T01:00:02Z', pixels: new Float64Array([1, 2, 3, 4]) })
+
+    await started(rig)
+    rig.complete()
+    await vi.waitFor(() => expect(onReadState).toHaveBeenCalledWith('retrying'))
+    expect(rig.state.aborts).toBe(0)
+
+    if (replaced) rig.state.stamp = '2026-09-05T01:00:04'
+    unavailable = false
+    await settled
+    expect(rig.state.starts).toBe(1)
+    expect(rig.state.aborts).toBe(replaced ? 1 : 0)
+    expect(onReadState.mock.calls.map(([state]) => state)).toEqual(replaced ? ['retrying'] : ['retrying', 'current'])
+  })
+
+  it('retains the original server-estimated timestamp through image-read recovery', async () => {
+    const rig = observatory()
+    rig.state.stamp = ''
+    let unavailable = true
+    const onReadState = vi.fn()
+
+    const fetch: typeof globalThis.fetch = async (input, init) => {
+      if (String(input).endsWith('/imagearray') && unavailable) throw new TypeError('Transfer unavailable')
+
+      return rig.fetch(input, init)
+    }
+
+    const acquisition = createAlpacaAcquisition({ baseUrl: 'http://fake', fetch, readRetryIntervalMs: 10 })
+    const before = Date.now()
+    const result = acquisition.capture({ cameraId: 'camera-id', exposureSeconds: 1, onReadState })
+    await vi.waitFor(() => expect(rig.state.pendingReadyReads).toBeGreaterThan(0))
+    const afterStart = Date.now()
+    rig.complete()
+    rig.state.stamp = ''
+    await vi.waitFor(() => expect(onReadState).toHaveBeenCalledWith('retrying'))
+    unavailable = false
+    const frame = await result
+    expect(frame.capturedAtSource).toBe('server-estimate')
+    expect(Date.parse(frame.capturedAt)).toBeGreaterThanOrEqual(before)
+    expect(Date.parse(frame.capturedAt)).toBeLessThanOrEqual(afterStart)
+    expect(rig.state.starts).toBe(1)
+    expect(rig.state.aborts).toBe(0)
   })
 
   it('waits for a new completed exposure and transposes x/y wire pixels into row-major pixels', async () => {

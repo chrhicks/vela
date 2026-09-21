@@ -57,7 +57,7 @@ function setup(settings: { record?: RigCatalogRecord, solver?: boolean, offsetDe
   const hardware: FramingHardware = {
     status: vi.fn(async () => ({ ...mount })),
     tracking: vi.fn(async () => {}), slew: vi.fn(async () => {}),
-    capture: vi.fn<FramingHardware['capture']>((_seconds, signal) => new Promise<MonoFrame>((resolve, reject) => {
+    capture: vi.fn<FramingHardware['capture']>(({ signal }) => new Promise<MonoFrame>((resolve, reject) => {
       completeCapture = resolve
       signal.addEventListener('abort', () => reject(signal.reason), { once: true })
     })),
