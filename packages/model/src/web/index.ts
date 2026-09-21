@@ -40,7 +40,7 @@ export type { CaptureCoolingView, CaptureImage, CaptureImageStatistics, CaptureP
 
 export type { ImagingCameraView } from './imaging-camera.js'
 
-export type { TargetPosition, TargetView, TargetSkyPath, TargetsView, FramingView } from './targets.js'
+export type { TargetPosition, TargetView, TargetSkyPath, TargetsView, FramingView, FramingCentering, FramingPointingSide } from './targets.js'
 
 export type { TargetCategory, TargetFilterChoice, TargetOpportunity, TargetDiscoveryItem, TargetDiscoveryView } from './targets.js'
 

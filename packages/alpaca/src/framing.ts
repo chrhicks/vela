@@ -65,7 +65,7 @@ export interface AlpacaFramingOptions {
 
 export interface AlpacaFraming {
   cameraGeometry(options: { cameraId: string; expectedCameraName?: string }, signal?: AbortSignal): Promise<AlpacaCameraGeometry>
-  telescopeStatus(telescopeId: string, signal?: AbortSignal, options?: { includeAlignmentObservations?: boolean }): Promise<AlpacaTelescopeStatus>
+  telescopeStatus(telescopeId: string, signal?: AbortSignal, options?: { includeAlignmentObservations?: boolean; includePointingSide?: boolean }): Promise<AlpacaTelescopeStatus>
   setTracking(telescopeId: string, tracking: boolean, signal?: AbortSignal): Promise<void>
   slew(options: AlpacaSlewOptions, signal?: AbortSignal): Promise<void>
   home(telescopeId: string, signal?: AbortSignal): Promise<void>
@@ -202,38 +202,41 @@ export function createAlpacaFraming({ baseUrl, fetch = globalThis.fetch, request
       const tracking = await client.readBoolean(telescope, 'tracking', signal)
       const slewing = await client.readBoolean(telescope, 'slewing', signal)
       const parked = await client.readBoolean(telescope, 'atpark', signal)
-      const alignment: Partial<AlpacaTelescopeStatus> = {}
+      const observations: Partial<AlpacaTelescopeStatus> = {}
 
       if (options?.includeAlignmentObservations) {
         const rate = await optionalNumber(telescope, 'trackingrate', 0, 3, signal)
 
         if (rate !== undefined) {
           if (!Number.isInteger(rate)) invalid('Invalid trackingrate', 'trackingrate')
-          alignment.trackingRate = trackingRates[rate]!
+          observations.trackingRate = trackingRates[rate]!
         }
 
         const raRate = await optionalNumber(telescope, 'rightascensionrate', -Infinity, Infinity, signal)
 
-        if (raRate !== undefined) alignment.rightAscensionRateSecondsPerSiderealSecond = raRate
+        if (raRate !== undefined) observations.rightAscensionRateSecondsPerSiderealSecond = raRate
         const decRate = await optionalNumber(telescope, 'declinationrate', -Infinity, Infinity, signal)
 
-        if (decRate !== undefined) alignment.declinationRateArcsecondsPerSecond = decRate
+        if (decRate !== undefined) observations.declinationRateArcsecondsPerSecond = decRate
+      }
+
+      if (options?.includeAlignmentObservations || options?.includePointingSide) {
         const side = await optionalNumber(telescope, 'sideofpier', -1, 1, signal)
 
         if (side !== undefined) {
           if (!Number.isInteger(side)) invalid('Invalid sideofpier', 'sideofpier')
-          alignment.pierSide = side === -1 ? 'unknown' : side === 0 ? 'east' : 'west'
+          observations.pierSide = side === -1 ? 'unknown' : side === 0 ? 'east' : 'west'
         }
       }
 
-      if (latitudeDegrees !== undefined) alignment.latitudeDegrees = latitudeDegrees
+      if (latitudeDegrees !== undefined) observations.latitudeDegrees = latitudeDegrees
 
-      if (longitudeDegrees !== undefined) alignment.longitudeDegrees = longitudeDegrees
+      if (longitudeDegrees !== undefined) observations.longitudeDegrees = longitudeDegrees
 
-      if (elevationMeters !== undefined) alignment.elevationMeters = elevationMeters
+      if (elevationMeters !== undefined) observations.elevationMeters = elevationMeters
 
       return {
-        ...alignment,
+        ...observations,
         rightAscensionDegrees: ra * 15,
         declinationDegrees,
         coordinateSystem,

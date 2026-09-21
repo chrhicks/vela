@@ -22,4 +22,9 @@ describe('@vela/ui export boundaries', () => {
     expect(drafts).not.toHaveProperty('Dialog')
     expect(drafts).not.toHaveProperty('SkyPath')
   })
+
+  it('exports WorkingIndicator only from the stable root', () => {
+    expect(stable).toHaveProperty('WorkingIndicator')
+    expect(drafts).not.toHaveProperty('WorkingIndicator')
+  })
 })

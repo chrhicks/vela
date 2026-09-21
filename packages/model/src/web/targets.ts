@@ -83,6 +83,26 @@ export interface TargetDiscoveryView {
   targets: TargetDiscoveryItem[]
 }
 
+export type FramingPointingSide = 'east' | 'west' | 'unknown'
+
+/** Bounded measurements from one centering request, all against its fixed desired center. */
+export interface FramingCentering {
+  toleranceArcminutes: number
+  maxCorrections: number
+  correction: number
+  outcome: 'working' | 'centered' | 'not-converging' | 'limit-reached' | 'interrupted'
+  measurements: Array<{
+    correction: number
+    checkId: string
+    capturedAt: string
+    offsetArcminutes: number
+    rotationDegrees: number
+    pointingSide: FramingPointingSide
+    pointingSideChanged: boolean
+    trend: 'starting' | 'improved' | 'worsened' | 'unchanged' | 'within-tolerance'
+  }>
+}
+
 export interface FramingView {
   rigId: string
   rigName: string
@@ -97,8 +117,11 @@ export interface FramingView {
     fieldWidthDegrees: number
     fieldHeightDegrees: number
   } | null
-  phase: 'idle' | 'slewing' | 'settling' | 'exposing' | 'solving' | 'checked' | 'needs-check' | 'stopping' | 'stopped' | 'failed'
+  phase: 'idle' | 'slewing' | 'settling' | 'exposing' | 'downloading' | 'solving' | 'checked' | 'needs-check' | 'stopping' | 'stopped' | 'failed'
   active: boolean
+  pointingSide: FramingPointingSide
+  /** Present only with desired and targetId; measurements belong to that fixed composition. */
+  centering: FramingCentering | null
   desired: TargetPosition | null
   targetId: string | null
   actual: (TargetPosition & {
