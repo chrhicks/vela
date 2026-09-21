@@ -3,7 +3,9 @@ import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 import { test } from 'node:test'
+import { Effect } from 'effect'
 import { checkStandards } from './runner.ts'
 import { formatReport, readReport } from './report.ts'
 
@@ -38,7 +40,7 @@ function hash(text: string) {
 }
 
 async function fixture(t: { after: (fn: () => Promise<void>) => void }) {
-  const root = await mkdtemp('/tmp/opencode/standards-runner-test-')
+  const root = await mkdtemp(join(tmpdir(), 'standards-runner-test-'))
   t.after(() => rm(root, { recursive: true, force: true }))
   const git = (...args: string[]) => execFileSync('git', args, { cwd: root, encoding: 'utf8' })
   git('init', '--quiet')
@@ -52,6 +54,33 @@ async function fixture(t: { after: (fn: () => Promise<void>) => void }) {
   git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', 'commit', '--quiet', '-m', 'Fixture')
   return { root, git, standards }
 }
+
+test('a real message-less Effect timeout remains incomplete through persistence and projection', async t => {
+  const { root } = await fixture(t)
+  const result = await checkStandards(root, { mode: 'files', paths: ['tracked.ts'] }, new AbortController().signal, {
+    model: 'test-reviewer',
+    generate: (_prompt, signal) => Effect.runPromise(Effect.never.pipe(Effect.timeout('5 millis')), { signal }),
+  })
+  assert.match(result.content, /Standards review · incomplete/)
+  assert.match(result.content, /TimeoutError/)
+  assert.doesNotMatch(result.content, /No diagnostics reported/)
+  const saved = JSON.parse(await readFile(result.artifact, 'utf8'))
+  assert.equal(saved.review.status, 'incomplete')
+  assert.equal(saved.review.error, 'TimeoutError')
+  assert.equal(saved.review.response, undefined)
+  assert.equal((await readReport(result.artifact)).status, 'incomplete')
+
+  // Reopening a pre-fix artifact must not perpetuate the false-complete result.
+  saved.report.status = 'complete'
+  delete saved.report.error
+  delete saved.review.status
+  delete saved.review.error
+  await writeFile(result.artifact, JSON.stringify(saved))
+  const projected = await readReport(result.artifact)
+  assert.equal(projected.status, 'incomplete')
+  assert.deepEqual(projected.diagnostics, [])
+  assert.match(projected.error!, /no model response/)
+})
 
 test('a multi-file batch makes one direct call with numbered source, docs context, and project standards', async t => {
   const { root, standards } = await fixture(t)

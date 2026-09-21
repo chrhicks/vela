@@ -130,21 +130,53 @@ one isolated Luna review call.
   covers mixed batches. The next call additionally supplied `index.ts` and the
   owning README as context. These were materially changed inputs, not an
   unchanged retry to seek a different judgment.
-- At **2026-09-21 00:01:49 UTC**, the registered tool returned **complete**, covering
-  all three targets with **zero diagnostics and zero unresolved code questions**.
-  This is evidence of the integration and mixed-target contract, not proof that
-  the plugin is defect-free.
+- At **2026-09-21 00:01:49 UTC**, the registered tool falsely returned **complete**.
+  Independent verification found that its saved review took **90,005 ms**, had no
+  model response, and lost the timeout error because Effect's `TimeoutError` has
+  no `message`. The earlier claim of complete three-target coverage is withdrawn:
+  this run established neither target coverage nor an empty diagnostic result.
+- A separate shared-Desktop call reviewing `index.ts` and `panel.tsx` at
+  **00:08:24 UTC** did retain an actual model response after **17,870 ms**, covering
+  both targets with zero diagnostics. This distinguishes genuine generation
+  from the false-complete timeout; it does not excuse that failure path.
 
 Saved artifacts:
 
 ```text
 .opencode/.local/standards/a4a0a2bd-abdf-4a3e-bf4e-c52f2a7cadba.json  # rejected omission
-.opencode/.local/standards/b30187e3-6bad-4a2c-b91e-1bea0db8469c.json  # complete mixed batch
+.opencode/.local/standards/b30187e3-6bad-4a2c-b91e-1bea0db8469c.json  # falsely complete timeout
+.opencode/.local/standards/cc2b1ba4-f842-4806-9fd2-3043869ee5d0.json  # actual two-target response
 ```
 
-OpenCode review session: `ses_f3ebb3b89ffeBMkqx5zIPJ1Fi8`, titled
-“Direct standards diagnostics — mixed-scope check”. The CLI transcripts are kept
+The false-complete run's OpenCode session is `ses_f3ebb3b89ffeBMkqx5zIPJ1Fi8`, titled
+“Direct standards diagnostics — mixed-scope check”. Its transcript is historical
+evidence of the bug, not a successful review. The CLI transcripts are kept
 at `/tmp/opencode/standards-direct-integration.jsonl` and
-`/tmp/opencode/standards-mixed-integration.jsonl`. These two registered checks add
-two review generations to the fixture experiment's one successful generation;
-the outer CLI agent also makes its own orchestration requests.
+`/tmp/opencode/standards-mixed-integration.jsonl`. The three registered checks add
+three attempted review calls to the fixture experiment: two retained model
+responses and one timed-out call. Outer CLI agents also make their own
+orchestration requests.
+
+The correction tracks completion explicitly, sets it only after successful
+output/coverage/citation validation, and retains a nonempty description for
+message-less failures. A full-runner regression uses the installed Effect
+timeout type. Loading an older falsely complete artifact without a model response
+now yields an incomplete report instead of perpetuating that claim.
+
+### Post-correction registered check
+
+At **2026-09-21 00:12:13 UTC**, the actual `standards_check` tool in the existing
+Desktop conversation reviewed the changed `runner.ts`, with `reviewer.ts`,
+`report.ts`, `rpc.ts` and `evidence.ts` as supporting context. The saved raw
+response is:
+
+```json
+{"reviewedPaths":[".opencode/plugins/standards/runner.ts"],"diagnostics":[],"missingEvidence":[]}
+```
+
+Artifact `.opencode/.local/standards/806a37df-0cbd-49ed-9bbf-859963fb3668.json`
+records **7,261 ms**, an actual response, explicit review status `complete`, and
+report status `complete`. This verifies successful registered-plugin generation
+after the correction on one focused target, not successful coverage of the prior
+three-target batch. The deterministic suite additionally verifies a real Effect
+timeout through the full runner and reopening the pre-fix artifact shape.

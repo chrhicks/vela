@@ -6,6 +6,7 @@ import { reportSchema, type Report } from './rpc.ts'
 const artifactSchema = Schema.Struct({
   schemaVersion: Schema.Literal(3), root: Schema.String, report: reportSchema,
   sources: Schema.Array(Schema.Struct({ path: Schema.String, sha256: Schema.String })),
+  review: Schema.optional(Schema.Struct({ response: Schema.optional(Schema.String) })),
 })
 
 export async function readReport(artifact: string): Promise<Report> {
@@ -16,6 +17,11 @@ export async function readReport(artifact: string): Promise<Report> {
     error: 'Legacy detector report. Its original JSON is retained at the artifact path; run /standards for direct-review diagnostics.',
   }
   const saved = Schema.decodeUnknownSync(artifactSchema)(json)
+  // Older reports could lose a message-less timeout and falsely claim completion.
+  if (saved.report.status === 'complete' && saved.report.files.some(file => !file.skipped && !file.error) && !saved.review?.response) {
+    return { ...saved.report, artifact, status: 'incomplete', diagnostics: [],
+      error: 'Saved review has no model response and cannot be accepted; run /standards again.' }
+  }
   try {
     const reader = await createEvidenceReader(saved.root, AbortSignal.timeout(10_000))
     for (const source of saved.sources) {

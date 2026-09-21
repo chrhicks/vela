@@ -7,6 +7,7 @@ export type Target = Source & { diff?: string }
 export type ReviewInput = { targets: Target[], context: Source[], standards: Source, guidance?: Source }
 export type GenerateReview = (prompt: string, signal: AbortSignal) => Promise<string>
 export type Review = {
+  status: 'complete' | 'incomplete'
   diagnostics: Diagnostic[]
   missingEvidence: Report['missingEvidence']
   prompt: string
@@ -43,7 +44,7 @@ function numbered(source: Source) {
 
 /** One isolated model call. Invalid output never becomes accepted diagnostics. */
 export async function reviewStandards(input: ReviewInput, generate: GenerateReview, signal: AbortSignal): Promise<Review> {
-  const review: Review = { diagnostics: [], missingEvidence: [], prompt: '', milliseconds: 0 }
+  const review: Review = { status: 'incomplete', diagnostics: [], missingEvidence: [], prompt: '', milliseconds: 0 }
   const started = performance.now()
   try {
     signal.throwIfAborted()
@@ -75,9 +76,10 @@ export async function reviewStandards(input: ReviewInput, generate: GenerateRevi
     }
     review.diagnostics = diagnostics
     review.missingEvidence = answer.missingEvidence
+    review.status = answer.missingEvidence.length ? 'incomplete' : 'complete'
   } catch (error) {
     signal.throwIfAborted()
-    review.error = error instanceof Error ? error.message : String(error)
+    review.error = (error instanceof Error && error.message) || String(error) || 'Unknown review failure'
   } finally { review.milliseconds = Math.round(performance.now() - started) }
   return review
 }
