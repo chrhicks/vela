@@ -4,7 +4,12 @@ import type { Source } from './evidence.ts'
 import type { Citation, Diagnostic, Report } from './rpc.ts'
 
 export type Target = Source & { diff?: string }
-export type ReviewInput = { targets: Target[], context: Source[], standards: Source, guidance?: Source }
+export type ReviewInput = {
+  targets: Target[]
+  context: Source[]
+  standards: Source
+  guidance?: Source
+}
 export type GenerateReview = (prompt: string, signal: AbortSignal) => Promise<string>
 export type Review = {
   status: 'complete' | 'incomplete'
@@ -22,9 +27,13 @@ const citationSchema = Schema.Struct({ path: text, startLine: line, endLine: lin
 const responseSchema = Schema.Struct({
   reviewedPaths: Schema.Array(text),
   diagnostics: Schema.Array(Schema.Struct({
-    rule: text, severity: Schema.Literals(['error', 'warning', 'information']),
-    message: text, explanation: text, suggestion: text,
-    location: citationSchema, related: Schema.Array(citationSchema),
+    rule: text,
+    severity: Schema.Literals(['error', 'warning', 'information']),
+    message: text,
+    explanation: text,
+    suggestion: text,
+    location: citationSchema,
+    related: Schema.Array(citationSchema),
   })),
   missingEvidence: Schema.Array(Schema.Struct({ path: text, reason: text, nextAction: text })),
 })
@@ -39,29 +48,53 @@ Return ONE JSON object, no markdown, with this shape:
 Account for every supplied target in reviewedPaths exactly once, even when no diagnostics are warranted. Return empty arrays when appropriate. Do not invent a diagnostic just to fill the shape.`
 
 function numbered(source: Source) {
-  return { path: source.path, text: source.code.split('\n').map((text, index) => `${index + 1}: ${text}`).join('\n') }
+  return {
+    path: source.path,
+    text: source.code.split('\n').map((text, index) => `${index + 1}: ${text}`).join('\n'),
+  }
 }
 
 /** One isolated model call. Invalid output never becomes accepted diagnostics. */
-export async function reviewStandards(input: ReviewInput, generate: GenerateReview, signal: AbortSignal): Promise<Review> {
-  const review: Review = { status: 'incomplete', diagnostics: [], missingEvidence: [], prompt: '', milliseconds: 0 }
+export async function reviewStandards(
+  input: ReviewInput,
+  generate: GenerateReview,
+  signal: AbortSignal,
+): Promise<Review> {
+  const review: Review = {
+    status: 'incomplete',
+    diagnostics: [],
+    missingEvidence: [],
+    prompt: '',
+    milliseconds: 0,
+  }
   const started = performance.now()
   try {
     signal.throwIfAborted()
     review.prompt = `${instructions}\n\nINPUT\n${JSON.stringify({
-      ruleIds: standards, codingStandards: input.standards.code, projectGuidance: input.guidance?.code,
+      ruleIds: standards,
+      codingStandards: input.standards.code,
+      projectGuidance: input.guidance?.code,
       requiredReviewedPaths: input.targets.map(target => target.path),
-      targets: input.targets.map(target => ({ ...numbered(target), scope: target.diff ? 'changed_lines' : 'whole_file', diff: target.diff })), context: input.context.map(numbered),
+      targets: input.targets.map(target => ({
+        ...numbered(target),
+        scope: target.diff ? 'changed_lines' : 'whole_file',
+        diff: target.diff,
+      })),
+      context: input.context.map(numbered),
     })}`
-    if (Buffer.byteLength(review.prompt) > 180_000) throw new Error('Review input exceeds 180 KB; select a smaller batch or less supporting context')
+    if (Buffer.byteLength(review.prompt) > 180_000)
+      throw new Error('Review input exceeds 180 KB; select a smaller batch or less supporting context')
+
     const response = await generate(review.prompt, signal)
     signal.throwIfAborted()
     if (Buffer.byteLength(response) > 48_000) throw new Error('Review response exceeds 48 KB')
     review.response = response
     const answer = Schema.decodeUnknownSync(responseSchema)(JSON.parse(response))
     const remaining = new Set(input.targets.map(target => target.path))
-    for (const path of answer.reviewedPaths) if (!remaining.delete(path)) throw new Error(`Unknown or repeated reviewed target: ${path}`)
+    for (const path of answer.reviewedPaths)
+      if (!remaining.delete(path)) throw new Error(`Unknown or repeated reviewed target: ${path}`)
     if (remaining.size) throw new Error(`Review omitted targets: ${[...remaining].join(', ')}`)
+
     const sources = [...input.targets, ...input.context, input.standards, ...(input.guidance ? [input.guidance] : [])]
     const diagnostics = answer.diagnostics.map(diagnostic => {
       if (!Object.hasOwn(standards, diagnostic.rule)) throw new Error(`Unknown standards rule: ${diagnostic.rule}`)
@@ -69,10 +102,15 @@ export async function reviewStandards(input: ReviewInput, generate: GenerateRevi
       if (!target) throw new Error('Diagnostic location is not a reviewed target')
       const location = validateCitation(diagnostic.location, sources)
       if (!touchesChange(location, target.diff)) throw new Error('Diagnostic does not cite the reviewed change')
-      return { ...diagnostic, location, related: diagnostic.related.map(citation => validateCitation(citation, sources)) }
+      return {
+        ...diagnostic,
+        location,
+        related: diagnostic.related.map(citation => validateCitation(citation, sources)),
+      }
     })
     for (const missing of answer.missingEvidence) {
-      if (!input.targets.some(target => target.path === missing.path)) throw new Error(`Missing evidence refers to an unknown target: ${missing.path}`)
+      if (!input.targets.some(target => target.path === missing.path))
+        throw new Error(`Missing evidence refers to an unknown target: ${missing.path}`)
     }
     review.diagnostics = diagnostics
     review.missingEvidence = answer.missingEvidence
@@ -80,15 +118,22 @@ export async function reviewStandards(input: ReviewInput, generate: GenerateRevi
   } catch (error) {
     signal.throwIfAborted()
     review.error = (error instanceof Error && error.message) || String(error) || 'Unknown review failure'
-  } finally { review.milliseconds = Math.round(performance.now() - started) }
+  } finally {
+    review.milliseconds = Math.round(performance.now() - started)
+  }
   return review
 }
 
 function validateCitation(citation: typeof citationSchema.Type, sources: Source[]): Citation {
   const source = sources.find(source => source.path === citation.path)
   const lines = source?.code.split('\n') ?? []
-  if (!source || citation.endLine < citation.startLine || citation.endLine > lines.length || !citation.quote.trim()
-    || lines.slice(citation.startLine - 1, citation.endLine).join('\n').trim() !== citation.quote.trim()) {
+  if (
+    !source
+    || citation.endLine < citation.startLine
+    || citation.endLine > lines.length
+    || !citation.quote.trim()
+    || lines.slice(citation.startLine - 1, citation.endLine).join('\n').trim() !== citation.quote.trim()
+  ) {
     throw new Error(`Unverified source citation: ${citation.path}:${citation.startLine}-${citation.endLine}`)
   }
   return { ...citation, sha256: source.sha256 }
@@ -99,7 +144,8 @@ function touchesChange(citation: { startLine: number, endLine: number }, diff?: 
   let line = 0
   let deletionBoundary: number | undefined
   const includes = (line: number) => line >= citation.startLine && line <= citation.endLine
-  const citesDeletion = () => deletionBoundary !== undefined && (includes(deletionBoundary) || includes(deletionBoundary - 1))
+  const citesDeletion = () =>
+    deletionBoundary !== undefined && (includes(deletionBoundary) || includes(deletionBoundary - 1))
   for (const text of diff.split('\n')) {
     const hunk = /^@@ -\d+(?:,\d+)? \+(\d+)/.exec(text)
     if (hunk) {

@@ -14,7 +14,9 @@ const input = Schema.Struct({
 export default Plugin.define({
   id: 'vela.standards',
   effect: ctx => Effect.gen(function* () {
-    const options = Schema.decodeUnknownSync(Schema.Struct({ reviewerModel: Schema.optional(Schema.String) }))(ctx.options)
+    const options = Schema.decodeUnknownSync(Schema.Struct({
+      reviewerModel: Schema.optional(Schema.String),
+    }))(ctx.options)
     const reviewerModel = options.reviewerModel ?? 'openai/gpt-5.6-luna#medium'
     const model = Model.Ref.parse(reviewerModel)
     const results = yield* ctx.rpc.register(StandardsResults, {
@@ -34,11 +36,19 @@ export default Plugin.define({
         execute: (input, context) => Effect.gen(function* () {
           const session = yield* ctx.session.get({ sessionID: context.sessionID }).pipe(Effect.orDie)
           yield* context.progress({ status: `Reviewing standards with ${reviewerModel}` })
-          const result = yield* Effect.tryPromise(signal => checkStandards(session.location.directory, input, signal, {
-            model: reviewerModel,
-            // The Promise runner's abort signal explicitly owns this model fiber too.
-            generate: (prompt, signal) => Effect.runPromise(ctx.generate.text({ model, prompt }).pipe(Effect.timeout('90 seconds')), { signal }).then(result => result.text),
-          })).pipe(Effect.orDie)
+          const result = yield* Effect.tryPromise(signal => checkStandards(
+            session.location.directory,
+            input,
+            signal,
+            {
+              model: reviewerModel,
+              // The Promise runner's abort signal explicitly owns this model fiber too.
+              generate: (prompt, signal) => Effect.runPromise(
+                ctx.generate.text({ model, prompt }).pipe(Effect.timeout('90 seconds')),
+                { signal },
+              ).then(result => result.text),
+            },
+          )).pipe(Effect.orDie)
           yield* ctx.storage.set(`standards/latest/${context.sessionID}`, result.artifact)
           yield* results.events.emit('updated', { sessionID: context.sessionID }).pipe(Effect.orDie)
           return { content: result.content }
@@ -51,14 +61,19 @@ export default Plugin.define({
         name: 'standards',
         description: 'Review standards with evidence-backed findings',
         execute: ({ sessionID, prompt, delivery }) => ctx.session.prompt({
-          ...prompt, sessionID, delivery,
+          ...prompt,
+          sessionID,
+          delivery,
           text: `Use standards_check to review ${prompt.text.trim() ? `these files or changes: ${prompt.text}` : 'current working-tree changes against HEAD'}. For explicit file paths use mode files. Include relevant helper contracts in supportingPaths. Present diagnostics and unresolved code evidence, checking citations before correcting code. These diagnostics do not replace independent delivery verification.`,
         }).pipe(Effect.asVoid),
       })
     })
 
     yield* ctx.session.hook('context', event => Effect.sync(() => {
-      event.system.push({ type: 'text', text: 'After a coherent batch of Vela code edits, use standards_check on a focused set of affected files or changes with relevant supportingPaths before reporting completion. It performs one isolated reasoning-model review and returns source-backed diagnostics. Resolve concrete concerns; disclose missing evidence, incomplete, stale and skipped results. Do not rerun unchanged inputs to obtain a preferred verdict. This tool does not replace or need to be invoked by the independent repository verifier.' })
+      event.system.push({
+        type: 'text',
+        text: 'After a coherent batch of Vela code edits, use standards_check on a focused set of affected files or changes with relevant supportingPaths before reporting completion. It performs one isolated reasoning-model review and returns source-backed diagnostics. Resolve concrete concerns; disclose missing evidence, incomplete, stale and skipped results. Do not rerun unchanged inputs to obtain a preferred verdict. This tool does not replace or need to be invoked by the independent repository verifier.',
+      })
     }))
   }),
 })
