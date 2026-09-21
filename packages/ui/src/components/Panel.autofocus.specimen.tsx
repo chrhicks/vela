@@ -343,23 +343,19 @@ function AutofocusPreview({ props, onPropsChange }: {
       <div className="vela-af-legend">
         <span>
           <i data-kind="start" />
-          {' '}
-          Start
+          {' Start'}
         </span>
         <span>
           <i data-kind="sample" />
-          {' '}
-          Sample
+          {' Sample'}
         </span>
         <span>
           <i data-kind="curve" />
-          {' '}
-          Hyperbola
+          {' Hyperbola'}
         </span>
         <span>
           <i data-kind="fit" />
-          {' '}
-          Fitted minimum
+          {' Fitted minimum'}
         </span>
       </div>
     </Panel>

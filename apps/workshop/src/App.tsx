@@ -146,8 +146,7 @@ export function App() {
           {!isGallery ? (
             <>
               <button className="button button--quiet" disabled={!workshop.undoCount} onClick={workshop.undo}>
-                Undo
-                {' '}
+                {'Undo '}
                 <kbd>⌘Z</kbd>
               </button>
               <button className="button button--quiet" disabled={!workshop.redoCount} onClick={workshop.redo}>Redo</button>
@@ -186,12 +185,9 @@ export function App() {
                       <strong>{group.name}</strong>
                       <small>
                         <b data-stability={group.stability}>{group.stability}</b>
-                        {' '}
-                        ·
-                        {' '}
+                        {' · '}
                         {group.specimens.length}
-                        {' '}
-                        specimen
+                        {' specimen'}
                         {group.specimens.length === 1 ? '' : 's'}
                       </small>
                     </span>
@@ -250,8 +246,7 @@ export function App() {
                     type="checkbox"
                   />
                   <span />
-                  {' '}
-                  Compare baseline
+                  {' Compare baseline'}
                 </label>
               </div>
             </div>

@@ -230,8 +230,7 @@ function TargetFramingPreview({ props, onPropsChange }: { props: Props, onPropsC
                       <div className="vela-target-card-bottom">
                         <span>{item.window}</span>
                         <strong>
-                          Frame it
-                          {' '}
+                          {'Frame it '}
                           <span aria-hidden="true">→</span>
                         </strong>
                       </div>
@@ -427,15 +426,11 @@ function TargetFramingPreview({ props, onPropsChange }: { props: Props, onPropsC
           {targets.map(item => (
             <p key={item.id}>
               <a href={item.source} target="_blank" rel="noreferrer">{item.name}</a>
-              {' '}
-              —
-              {' '}
+              {' — '}
               {item.credit}
-              .
-              {' '}
+              {'. '}
               <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a>
-              {' '}
-              · Cropped for display.
+              {' · Cropped for display.'}
             </p>
           ))}
         </section>

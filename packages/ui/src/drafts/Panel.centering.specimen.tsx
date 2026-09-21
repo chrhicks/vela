@@ -212,8 +212,7 @@ function CenteringExample({ scenario }: { scenario: Scenario }) {
               </span>
             </div>
             <footer>
-              Reference photograph with illustrative footprints, not calibrated sky geometry.
-              {' '}
+              {'Reference photograph with illustrative footprints, not calibrated sky geometry. '}
               <a href={reference.source} target="_blank" rel="noreferrer">Image credit ↗</a>
             </footer>
           </section>
@@ -284,11 +283,9 @@ function CenteringExample({ scenario }: { scenario: Scenario }) {
             <p>For discussion: finish within 0.5′ (30″), at most four corrections, stop after two consecutive worsening results. A flip uses a fresh post-move solve before another correction. These are example choices, not adopted operating limits.</p>
             <p>The reference stays fixed while the marked sensor corner changes with the solved pointing side. No raw exposure is rotated or modified. The flip scenario borrows 42.4′ → 86.4′ → 8.95′ → 2.38′ from the Veil field notes; the Crescent photograph and final 0.35′ result are illustrative.</p>
             <p>
-              Photo:
-              {' '}
+              {'Photo: '}
               {reference.credit}
-              .
-              {' '}
+              {'. '}
               <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a>
               . Displayed cropped.
             </p>

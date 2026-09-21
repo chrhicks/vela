@@ -140,8 +140,7 @@ export function SkyPath({
       >
         <title id={`${id}-title`}>{targetName} through the night</title>
         <desc id={`${id}-description`}>
-          Overhead sky dome. North is up, east is left. Outer ring is altitude zero; center is altitude 90 degrees.
-          {' '}
+          {'Overhead sky dome. North is up, east is left. Outer ring is altitude zero; center is altitude 90 degrees. '}
           {selected
             ? `${selected.label}, altitude ${selected.altitudeDegrees.toFixed(0)} degrees. ${selectedStatus}.`
             : selectedStatus}
@@ -336,8 +335,7 @@ export function SkyPath({
             )}
           </div>
           <label className="vela-sky-path__margin-label" htmlFor={`${id}-margin`}>
-            Elevation margin
-            {' '}
+            {'Elevation margin '}
             <strong>{margin}°</strong>
           </label>
           {onMarginDegreesChange && (

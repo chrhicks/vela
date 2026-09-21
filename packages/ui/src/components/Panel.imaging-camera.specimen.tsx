@@ -140,8 +140,7 @@ function ImagingCameraPreview({ props, onPropsChange }: { props: Props, onPropsC
               onClick={() => update({ state: state === 'busy' ? 'ready' : 'busy' })}
             >
               {state === 'busy' ? 'Finish sample exposure' : 'Try capture state'}
-              {' '}
-              →
+              {' →'}
             </Button>
           </Panel>
           <Panel title="Polar alignment">
