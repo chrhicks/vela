@@ -26,7 +26,7 @@ function Panel(props: { panel: PanelInput }) {
     <text fg={context.theme.text.feedback.error.default}>Could not load standards results: {String(report.error)}</text>
     <text fg={context.theme.text.subdued}>R retry · Esc close</text>
   </box>}>
-    <Show when={report()} fallback={<box padding={1}><text fg={context.theme.text.subdued}>{report.loading ? 'Loading standards results…' : 'No completed standards check in this session yet. Run /standards first.'}</text></box>}>
+    <Show when={report()} fallback={<box padding={1}><text fg={context.theme.text.subdued}>{report.loading ? 'Loading standards results…' : 'No saved standards review in this session yet. Run /standards first.'}</text></box>}>
       {value => <ResultsPanel report={value()} width={props.panel.width} focused={props.panel.focused} theme={context.theme} keymap={context.keymap} />}
     </Show>
   </Show>
@@ -37,7 +37,7 @@ function Indicator(props: { sessionID: string }) {
   const { report } = useReport(() => props.sessionID)
   return <Show when={!report.error && report()}>{value =>
     <box paddingX={1} onMouseDown={() => context.ui.panel.open('vela.standards.results')}>
-      <text fg={context.theme.text.subdued}>Standards · {reportSummary(value())} · <b>inspect /standards-results</b></text>
+      <text fg={context.theme.text.subdued}>Saved standards · {reportSummary(value())} · <b>inspect /standards-results</b></text>
     </box>
   }</Show>
 }
