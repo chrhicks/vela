@@ -19,3 +19,5 @@ export * from './Tabs'
 export * from './SkyPath'
 
 export * from './NavigationBar'
+
+export * from './WorkingIndicator'

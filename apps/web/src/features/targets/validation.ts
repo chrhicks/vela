@@ -48,7 +48,8 @@ const discovery = targets.extend({
   snapshotId: z.string(), calculatedAt: date,
   status: z.enum(['available', 'site-unavailable', 'no-darkness']),
   query: z.string(), category: z.union([z.literal('all'), category]), filter: z.union([z.literal('all'), filter]),
-  offset: z.number().refine(Number.isInteger).nonnegative(), pageSize: z.number().refine(Number.isInteger).positive(), night: window.nullable(),
+  offset: z.number().refine(Number.isInteger).nonnegative(), pageSize: z.number().refine(Number.isInteger).positive(),
+  night: window.nullable(),
   targets: z.array(target.extend({
     category, filterChoice: filter, filterReason: z.string(),
     opportunity: window.extend({
@@ -57,14 +58,32 @@ const discovery = targets.extend({
   })),
 })
 
+const pointingSide = z.enum(['east', 'west', 'unknown'])
+
+const centering = z.object({
+  toleranceArcminutes: z.number().positive(),
+  maxCorrections: z.number().int().positive(),
+  correction: z.number().int().nonnegative(),
+  outcome: z.enum(['working', 'centered', 'not-converging', 'limit-reached', 'interrupted']),
+  measurements: z.array(z.object({
+    correction: z.number().int().nonnegative(), checkId: z.string().min(1), capturedAt: date,
+    offsetArcminutes: z.number().nonnegative(), rotationDegrees: z.number(),
+    pointingSide, pointingSideChanged: z.boolean(),
+    trend: z.enum(['starting', 'improved', 'worsened', 'unchanged', 'within-tolerance']),
+  })),
+}).refine(value => value.correction <= value.maxCorrections
+  && value.measurements.length <= value.maxCorrections + 2
+  && value.measurements.every(sample => sample.correction <= value.correction))
+
 const framing = z.object({
   rigId: z.string(), rigName: z.string(), enabled: z.boolean(), active: z.boolean(), canCenter: z.boolean(), checkCurrent: z.boolean(),
   observedAt: date, error: z.string().nullable(), unavailableReason: z.string().nullable(), targetId: z.string().nullable(), exposureSeconds: z.number(),
-  phase: z.enum(['idle', 'slewing', 'settling', 'needs-check', 'exposing', 'solving', 'checked', 'stopping', 'stopped', 'failed']),
+  phase: z.enum(['idle', 'slewing', 'settling', 'needs-check', 'exposing', 'downloading', 'solving', 'checked', 'stopping', 'stopped', 'failed']),
+  pointingSide, centering: centering.nullable(),
   focalLengthMm: z.number().positive().nullable(), desired: position.nullable(),
   camera: z.object({ name: z.string(), width: z.number().positive(), height: z.number().positive(), fieldWidthDegrees: z.number().positive(), fieldHeightDegrees: z.number().positive() }).nullable(),
   actual: position.extend({ checkId: z.string().min(1), capturedAt: date, rotationDegrees: z.number(), offsetArcminutes: z.number(), corners: z.array(position).length(4) }).nullable(),
-})
+}).refine(value => value.centering === null || value.desired !== null && !!value.targetId)
 
 export function isPosition(value: unknown): value is TargetPosition {
   return position.safeParse(value).success
