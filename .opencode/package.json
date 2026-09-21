@@ -1,5 +1,5 @@
 {
-  "name": "vela-opencode-experiments",
+  "name": "vela-opencode-tooling",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.22.0",
@@ -8,7 +8,8 @@
   },
   "scripts": {
     "check": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test plugins/standards/*.test.ts"
+    "test": "node --experimental-strip-types --test plugins/standards/*.test.ts",
+    "test:render": "bun --preload @opentui/solid/preload plugins/standards/panel.render.tsx"
   },
   "dependencies": {
     "@opencode/plugin": "2.0.8",
