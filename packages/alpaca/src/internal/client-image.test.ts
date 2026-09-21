@@ -7,16 +7,11 @@ it.each(['application/json', 'application/imagebytes'])('bounds %s image transfe
   vi.useFakeTimers()
 
   const fetch: typeof globalThis.fetch = async (_input, init) => {
-    const response = Response.json({}, { headers: { 'content-type': contentType } })
-
-    const pending = () => new Promise<never>((_resolve, reject) => {
-      init!.signal!.addEventListener('abort', () => reject(init!.signal!.reason), { once: true })
-    })
-
-    response.json = pending
-    response.arrayBuffer = pending
-
-    return response
+    return new Response(new ReadableStream({
+      start(controller) {
+        init!.signal!.addEventListener('abort', () => controller.error(init!.signal!.reason), { once: true })
+      },
+    }), { headers: { 'content-type': contentType } })
   }
 
   const client = createAlpacaClient({ baseUrl: 'http://fake', fetch, requestTimeoutMs: 5_000, imageTimeoutMs: 60_000 })

@@ -41,11 +41,17 @@ it('keeps the ALPACA span open through headers, body and value validation', asyn
   const client = createAlpacaClient({ baseUrl: 'http://fake', fetch: async () => new Promise<Response>(resolve => { sendHeaders = resolve }) })
   const read = client.readNumber(telescope, 'rightascension')
   expect(exporter.getFinishedSpans()).toHaveLength(0)
-  const response = Response.json({})
-  response.json = () => new Promise(resolve => {
-    sendBody = resolve
-    readingBody()
-  })
+
+  const response = new Response(new ReadableStream({
+    start(controller) {
+      sendBody = body => {
+        controller.enqueue(new TextEncoder().encode(JSON.stringify(body)))
+        controller.close()
+      }
+    },
+    pull() { readingBody() },
+  }, { highWaterMark: 0 }))
+
   sendHeaders(response)
   await bodyStarted
   expect(exporter.getFinishedSpans()).toHaveLength(0)

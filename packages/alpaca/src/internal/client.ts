@@ -118,7 +118,7 @@ export function createAlpacaClient({
     operationSignal = signal,
     init?: Omit<RequestInit, 'signal'>,
     timeoutMs = requestTimeoutMs,
-    readBody: (response: Response) => Promise<S['Encoded']> = response => response.json(),
+    bodyFormat: 'json' | 'image' = 'json',
   ): Promise<S['Type']> {
     const controller = new AbortController()
     const span = trace.getActiveSpan()
@@ -188,25 +188,49 @@ export function createAlpacaClient({
         )
       }
 
+      let binary = false
+
+      if (bodyFormat === 'image') {
+        const contentType = response.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase()
+        binary = contentType === 'application/imagebytes'
+
+        if (!binary && contentType !== 'application/json') {
+          throw new AlpacaProviderError('Unsupported camera image Content-Type', { reason: 'invalid-response', endpoint })
+        }
+      }
+
+      const bodyStartedAt = performance.now()
       let json: unknown
 
-      try {
-        const bodyStartedAt = performance.now()
-        json = await readBody(response)
-        span?.setAttribute('alpaca.response.body_ms', performance.now() - bodyStartedAt)
-        span?.addEvent('alpaca.response.body')
-      } catch (cause) {
-        if (controller.signal.aborted) {
+      if (binary) {
+        try {
+          json = await response.arrayBuffer()
+        } catch (cause) {
+          throwTransportError(cause)
+        }
+      } else {
+        let text: string
+
+        try {
+          text = await response.text()
+        } catch (cause) {
           throwTransportError(cause)
         }
 
-        if (cause instanceof AlpacaProviderError) throw cause
-        throw new AlpacaProviderError(`Alpaca endpoint ${endpoint} returned an invalid response body`, {
-          reason: 'invalid-response',
-          endpoint,
-          cause,
-        })
+        try {
+          json = JSON.parse(text)
+        } catch (cause) {
+          throw new AlpacaProviderError(`Alpaca endpoint ${endpoint} returned an invalid response body`, {
+            reason: 'invalid-response',
+            endpoint,
+            cause,
+          })
+        }
       }
+
+      // Keep body timing inclusive of JSON parsing, as with Response.json().
+      span?.setAttribute('alpaca.response.body_ms', performance.now() - bodyStartedAt)
+      span?.addEvent('alpaca.response.body')
 
       return decodeResponse(endpoint, schema)(json)
     } finally {
@@ -327,15 +351,7 @@ export function createAlpacaClient({
 
       return tracedRequest(endpoint, 'GET', async span => {
         const value = await request(endpoint, Schema.Unknown, operationSignal,
-          { headers: { accept: 'application/imagebytes, application/json;q=0.9' } }, imageTimeoutMs,
-          response => {
-            const contentType = response.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase()
-
-            if (contentType === 'application/imagebytes') return response.arrayBuffer()
-
-            if (contentType === 'application/json') return response.json()
-            throw new AlpacaProviderError('Unsupported camera image Content-Type', { reason: 'invalid-response', endpoint })
-          })
+          { headers: { accept: 'application/imagebytes, application/json;q=0.9' } }, imageTimeoutMs, 'image')
 
         if (value instanceof ArrayBuffer) {
           if (value.byteLength >= 16) {
