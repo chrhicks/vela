@@ -312,7 +312,7 @@ function Walk({
           </p>
           {latest && (
             <p>
-              Last sample{' '}
+              {'Last sample '}
               <time dateTime={latest.capturedAt}>{new Date(latest.capturedAt).toLocaleTimeString()}</time>
             </p>
           )}
