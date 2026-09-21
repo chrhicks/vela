@@ -43,7 +43,7 @@ for (const width of [1100, 390]) {
       imageUrl: '/api/alignment-fixture.png', imageWidth: 640, imageHeight: 400,
       targetX: 310, targetY: 190, fieldHeightDegrees: 1,
     } })
-    await expect(page.getByText(/Estimated exposure start/)).toBeVisible()
+    await expect(page.locator('.vela-polar-activity__age')).toContainText('Estimated exposure start')
     await expect(page.getByText(/Adjust the mount’s altitude and azimuth knobs/)).toBeVisible()
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
     await page.screenshot({ path: `/tmp/alignment-app-adjusting-${width}.png`, fullPage: true })
@@ -89,7 +89,7 @@ for (const width of [1100, 390]) {
     await expect.poll(() => image.evaluate(element => element instanceof HTMLImageElement ? element.naturalWidth : 0)).toBeGreaterThan(0)
     const bounds = await image.boundingBox()
     expect(bounds!.width / bounds!.height).toBeCloseTo(640 / 400, 2)
-    await expect(page.getByText('Full frame', { exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Full frame', exact: true })).toBeVisible()
     await expect(page.locator('time')).toHaveAttribute('datetime', view.preview!.capturedAt)
     await expect(page.locator('figcaption')).toContainText('Estimated exposure start')
     await expect(page.getByRole('img', { name: /alignment target/ })).toHaveCount(0)

@@ -3,11 +3,12 @@ import type { ComponentSpecimen } from '../themes'
 import { Badge } from './Badge'
 import { Button } from './Button'
 import { Panel } from './Panel'
+import { AlignmentImageInspection, alignmentInspectionFixtures } from './Panel.polar-alignment-inspection'
 import './Panel.polar-alignment.specimen.css'
 
-const examples = ['large-error', 'near-aligned'] as const
+const examples = ['large-error', 'near-aligned', 'outside-image'] as const
 
-const phases = ['setup', 'point-1', 'moving-2', 'point-2', 'moving-3', 'point-3', 'baseline-stopped', 'adjusting', 'exposing', 'debayering', 'stretching', 'solving', 'retrying', 'reconnecting', 'stopped', 'finished'] as const
+const phases = ['setup', 'point-1', 'moving-2', 'point-2', 'moving-3', 'point-3', 'baseline-no-solution', 'baseline-stopped', 'adjusting', 'exposing', 'debayering', 'stretching', 'solving', 'retrying', 'reconnecting', 'stopped', 'finished'] as const
 
 const activityFrames = new Map<string, { label: string; age: string }>(Object.entries({
   adjusting: { label: 'Alignment updated', age: 'Just now' },
@@ -28,6 +29,7 @@ const measurementSteps = new Map<string, { point: number; solved: number; label:
   'point-2': { point: 2, solved: 1, label: 'Taking and solving the second image…', next: 'moving-3' },
   'moving-3': { point: 3, solved: 2, label: 'Moving to the third position…', next: 'point-3' },
   'point-3': { point: 3, solved: 2, label: 'Taking and solving the final image…', next: 'adjusting' },
+  'baseline-no-solution': { point: 1, solved: 0, label: 'No solution for this exposure · Trying another image', next: 'point-1' },
 }))
 
 function BaselinePreview({ phase, physical, onStart, onStop }: {
@@ -61,16 +63,7 @@ function BaselinePreview({ phase, physical, onStart, onStop }: {
         ) : (
           <dl className="vela-polar-setup-facts"><div><dt>Camera</dt><dd>{physical ? 'ASI2600MC Pro' : 'Main imaging camera'}</dd></div><div><dt>Exposure</dt><dd>{physical ? '2 seconds' : '30 seconds'}</dd></div><div><dt>Starting point</dt><dd>{physical ? 'Dec +80° · consistent starting field' : 'Current position'}</dd></div></dl>
         )}
-        {(step || stopped) && <figure className="vela-polar-image">
-          <div className="vela-polar-image-heading"><span>Latest exposure · Position {step?.point ?? 1}</span><span>Full frame</span></div>
-          <svg viewBox="0 0 640 400" role="img" aria-label="Latest camera exposure at a baseline position">
-            <rect width="640" height="400" fill="#090e18" />
-            {Array.from({ length: 115 }, (_, i) => (
-              <circle key={i} cx={(i * 173 + 31) % 640} cy={(i * i * 29 + 17) % 400} r={i % 13 === 0 ? 1.7 : 0.65} fill="#e1e8f6" opacity={0.25 + (i % 6) * 0.12} />
-            ))}
-          </svg>
-          <figcaption>Exposure started 8:25:49 PM · No alignment result yet</figcaption>
-        </figure>}
+        {(step || stopped) && <AlignmentImageInspection title={`Latest exposure · Position ${step?.point ?? 1}`} status={phase === 'baseline-no-solution' ? 'No solution · Exposure retained for inspection. No alignment result yet.' : 'No alignment result yet'} />}
       </Panel>
       <div className="vela-polar-baseline__next">
         <h3>{step ? 'What happens next' : 'Before you start'}</h3>
@@ -90,16 +83,14 @@ function AlignmentPreview({ props, onPropsChange }: {
   const [playing, setPlaying] = useState(false)
   const phase = onPropsChange ? String(props.phase) : localPhase
   const baseline = phase === 'setup' || phase === 'baseline-stopped' || measurementSteps.has(phase)
-  const near = props.example === 'near-aligned'
+  const example = examples.find(value => value === props.example) ?? 'near-aligned'
+  const fixture = alignmentInspectionFixtures[example]
   const inactive = phase === 'stopped' || phase === 'finished'
   const busy = !inactive && phase !== 'adjusting'
   const exposing = phase === 'exposing' || phase === 'waiting' || phase === 'retrying'
   const retrying = phase === 'retrying'
   const reconnecting = phase === 'reconnecting'
   const activity = activityFrames.get(phase) ?? activityFrames.get('adjusting')!
-
-  const x = near ? 394 : 165
-  const y = near ? 175 : 300
 
   function changePhase(value: string, play = false) {
     setPlaying(play)
@@ -138,10 +129,10 @@ function AlignmentPreview({ props, onPropsChange }: {
         {baseline ? <BaselinePreview phase={phase} physical={props.mode === 'physical'} onStart={() => changePhase('point-1', true)} onStop={() => changePhase('baseline-stopped')} /> : (
         <div className="vela-polar-layout">
           <Panel className="vela-polar-readings">
-            <div className="vela-polar-total"><span>{inactive || busy ? 'Last measured error' : 'Total alignment error'}</span><strong>{near ? '14″' : '8′ 23″'}</strong></div>
+            <div className="vela-polar-total"><span>{inactive || busy ? 'Last measured error' : 'Total alignment error'}</span><strong>{fixture.total}</strong></div>
             <div className="vela-polar-directions" aria-label="Mount adjustment directions">
-              <div><span>Azimuth · horizontal</span><strong>→ {near ? '11″' : '7′ 20″'}</strong><span>{inactive || busy ? 'Last correction: right' : 'Move right'}</span></div>
-              <div><span>Altitude · vertical</span><strong>↑ {near ? '9″' : '4′ 04″'}</strong><span>{inactive || busy ? 'Last correction: up' : 'Move up'}</span></div>
+              <div><span>Azimuth · horizontal</span><strong>→ {fixture.azimuth}</strong><span>{inactive || busy ? 'Last correction: right' : 'Move right'}</span></div>
+              <div><span>Altitude · vertical</span><strong>↑ {fixture.altitude}</strong><span>{inactive || busy ? 'Last correction: up' : 'Move up'}</span></div>
             </div>
             <div className="vela-polar-activity" data-warning={retrying || undefined}>
               <div className="vela-polar-activity__line" role="status">
@@ -155,27 +146,7 @@ function AlignmentPreview({ props, onPropsChange }: {
             </div>
           </Panel>
 
-          <figure className="vela-polar-image">
-            <div className="vela-polar-image-heading"><span>{inactive || busy ? 'Last solved frame' : 'Alignment view'}</span><span>20′ field · fixed scale</span></div>
-            <svg viewBox="0 0 640 400" role="img" aria-label={near ? 'Reference star almost centered in the target reticle' : 'Reference star far below and left of the target reticle'}>
-              <rect width="640" height="400" fill="#090e18" />
-              {Array.from({ length: 115 }, (_, i) => (
-                <circle key={i} cx={(i * 173 + 31) % 640} cy={(i * i * 29 + 17) % 400} r={i % 13 === 0 ? 1.7 : 0.65} fill="#e1e8f6" opacity={0.25 + (i % 6) * 0.12} />
-              ))}
-              <g fill="none" stroke="var(--vela-polar-target)" strokeWidth="1.4">
-                <circle cx="400" cy="170" r="32" opacity="0.55" />
-                <circle cx="400" cy="170" r="16" />
-                <path d="M352 170h36m24 0h36M400 122v36m0 24v36" />
-              </g>
-              <path d={`M${x} ${y}H400V170`} fill="none" stroke="var(--vela-polar-reference)" strokeWidth="1.4" strokeDasharray="5 5" opacity="0.8" />
-              <line x1={x} y1={y} x2="400" y2="170" stroke="var(--vela-polar-reference)" strokeWidth="1.6" />
-              <circle cx={x} cy={y} r="10" fill="none" stroke="var(--vela-polar-reference)" strokeWidth="1.5" />
-              <circle cx={x} cy={y} r="3" fill="#fff4da" />
-              <path d="M24 369h64m-64-4v8m64-8v8" stroke="#c2ccdc" fill="none" />
-              <text x="24" y="354" fill="#c2ccdc" fontSize="14">2′</text>
-            </svg>
-            <figcaption><span><i /> Reference star</span><span><i /> Alignment target</span></figcaption>
-          </figure>
+          <AlignmentImageInspection key={example} target={fixture} title={inactive || busy ? 'Last solved frame' : 'Alignment view'} status={`${inactive || busy ? 'Last known solve' : 'Latest solve'} · ${activity.age}${retrying || reconnecting ? ' · Retrying; pause adjustments' : ''}`} />
 
           <div className="vela-polar-actions">
             <p>{reconnecting ? 'Pause adjustments until a fresh measurement arrives. Vela is keeping your baseline and retrying automatically.' : phase === 'finished' ? 'Your final measurement is kept here for reference.' : phase === 'stopped' ? 'Reposition the rig, then measure a fresh baseline before adjusting again.' : busy ? 'Your last readings stay visible while Vela works on the next measurement.' : 'Adjust the mount’s knobs. Use the reticle and remaining error to decide when you’re done.'}</p>
@@ -198,7 +169,7 @@ export const specimen: ComponentSpecimen = {
   componentName: 'Panel / Card',
   id: 'panel-polar-alignment',
   name: 'Polar alignment · Product example',
-  description: 'Phone-first adjustment exploration with directional corrections, total error and a fixed-scale target overlay. Activity, elapsed times and measurement ages are fixed snapshots for design review. Illustrative fixtures only; no camera, plate solver or hardware commands. Start plays an accelerated three-position measurement preview; stop abandons it and restart takes a fresh baseline. Setup values are illustrative, not a final hardware configuration.',
+  description: 'Approved alignment inspection design (September 21): initial fit-both, deliberate fine view, full frame and expanded/native inspection of the same exposure. Illustrative geometry on a bundled simulator image; not a real plate solution or independent accuracy evidence. Ages and retry states are fixed snapshots. Start plays an accelerated three-position preview; no hardware commands.',
   controls: {
     mode: { type: 'select', label: 'Rig mode', options: ['offline', 'physical'] },
     example: { type: 'select', label: 'Alignment example', options: examples },

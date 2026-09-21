@@ -1,4 +1,5 @@
 .vela-polar-demo {
+  position: relative;
   --vela-polar-target: #a6cbd5;
   --vela-polar-reference: #e6b86a;
   width: 100%;
@@ -56,12 +57,28 @@
 @media (prefers-reduced-motion: reduce) { .vela-polar-activity__spinner { animation: none; } }
 
 .vela-polar-image { margin: 0; border: 1px solid var(--vela-line); border-radius: var(--vela-radius); overflow: hidden; background: var(--vela-surface); }
-.vela-polar-image-heading { display: flex; justify-content: space-between; gap: 10px; font-size: 11px; padding: 10px 12px; color: var(--vela-text-muted); }
+.vela-polar-image-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 11px; padding: 10px 12px; color: var(--vela-text-muted); }
+.vela-polar-inspection-tools { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 12px 10px; }
+.vela-polar-inspection-tools .vela-button { min-height: 38px; }
+.vela-polar-inspection-tools .vela-button[aria-pressed="true"] { border-color: var(--vela-accent); color: var(--vela-accent); }
+.vela-polar-inspection p { margin: 0; padding: 0 12px 10px; font-size: 11px; line-height: 1.5; }
+.vela-polar-inspection-status { color: var(--vela-text-muted); }
+.vela-polar-inspection-note { color: var(--vela-warning); }
+.vela-polar-inspection .vela-polar-inspection-meta { padding-top: 10px; color: var(--vela-text-muted); }
+.vela-polar-image-canvas { background: var(--vela-surface-raised); padding-bottom: 10px; }
+.vela-polar-angular-scale { width: 20%; margin: 10px 12px 0; font-size: 11px; color: var(--vela-text); }
+.vela-polar-angular-scale i { display: block; margin-top: 5px; height: 5px; border: 1px solid currentColor; border-top: 0; }
+.vela-polar-inspection-legend { display: flex; flex-wrap: wrap; gap: 8px 18px; padding: 0 12px 10px; font-size: 11px; color: var(--vela-text-muted); }
+.vela-polar-inspection-legend span { display: flex; align-items: center; gap: 6px; }
+.vela-polar-inspection-legend i { width: 8px; height: 8px; border: 1px solid var(--vela-polar-reference); border-radius: 50%; }
+.vela-polar-inspection-legend span + span i { border-color: var(--vela-polar-target); }
+.vela-polar-native { overflow: auto; max-height: 420px; background: var(--vela-canvas); }
+.vela-polar-native img { display: block; width: 1600px; height: 1200px; max-width: none; }
+.vela-polar-image .vela-dialog-layer { position: absolute; }
+.vela-polar-inspection-dialog { width: min(960px, 100%); align-self: center; max-height: min(90vh, 100%); }
+.vela-polar-inspection-dialog .vela-polar-native { max-height: 60vh; }
 .vela-polar-image svg { width: 100%; height: auto; display: block; }
-.vela-polar-image figcaption { display: flex; gap: 20px; padding: 10px 12px; font-size: 11px; color: var(--vela-text-muted); }
-.vela-polar-image figcaption span { display: flex; gap: 6px; align-items: center; }
-.vela-polar-image figcaption i { width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--vela-polar-reference); }
-.vela-polar-image figcaption span + span i { border-color: var(--vela-polar-target); }
+.vela-polar-image figcaption { padding: 10px 12px; font-size: 11px; color: var(--vela-text-muted); }
 .vela-polar-actions > p { color: var(--vela-text-muted); font-size: 12px; line-height: 1.5; margin: 0 0 14px; }
 .vela-polar-actions > div { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .vela-polar-actions .vela-button { min-height: 44px; padding-inline: 10px; font-size: 12px; width: 100%; }
