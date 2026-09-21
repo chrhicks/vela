@@ -64,16 +64,16 @@ export function isCaptureView(value: unknown, rigId: string): value is CaptureVi
     && (view.latestImage === null || isCaptureImage(view.latestImage, rigId))
 }
 
-function isCaptureImage(value: unknown, rigId: string, retained = false): value is CaptureImage {
+function isCaptureImage(value: unknown, rigId: string): value is CaptureImage {
   const result = captureImage.safeParse(value)
 
   if (!result.success) return false
   const image = result.data
   // Preview URLs belong to this rig and immutable image ID.
-  const expected = retained ? `/api/rigs/${encodeURIComponent(rigId)}/saved-images/${encodeURIComponent(image.id)}/preview` : `/api/rigs/${encodeURIComponent(rigId)}/capture/images/${encodeURIComponent(image.id)}`
+  const expected = `/api/rigs/${encodeURIComponent(rigId)}/capture/images/${encodeURIComponent(image.id)}`
 
   return image.imageUrl === expected
-    && (image.fitImageUrl === undefined || image.fitImageUrl === (retained ? expected.replace(/\/preview$/, '/fit') : `${expected}/fit`))
+    && (image.fitImageUrl === undefined || image.fitImageUrl === `${expected}/fit`)
 }
 
 const savedImage = captureImage.safeExtend({
@@ -82,15 +82,25 @@ const savedImage = captureImage.safeExtend({
   savedAt: timestamp,
   fitsUrl: z.string(),
   previewDownloadUrl: z.string(),
+  previewRendering: z.discriminatedUnion('status', [
+    z.object({ status: z.literal('current'), version: z.literal('background-v1') }),
+    z.object({ status: z.literal('legacy') }),
+    z.object({ status: z.literal('unavailable') }),
+  ]).optional(),
 })
 
 export function isSavedImage(value: unknown, rigId: string): value is SavedImage {
   const result = savedImage.safeParse(value)
 
-  if (!result.success || result.data.rigId !== rigId || !isCaptureImage(value, rigId, true)) return false
+  if (!result.success || result.data.rigId !== rigId) return false
   const expected = `/api/rigs/${encodeURIComponent(rigId)}/saved-images/${encodeURIComponent(result.data.id)}`
+  const rendering = result.data.previewRendering
+  const preview = rendering?.status === 'current' ? `${expected}/previews/${rendering.version}` : expected
 
-  return result.data.fitsUrl === `${expected}/fits` && result.data.previewDownloadUrl === `${expected}/download-preview`
+  return result.data.fitsUrl === `${expected}/fits`
+    && result.data.previewDownloadUrl === `${preview}/download-preview`
+    && result.data.imageUrl === `${preview}/preview`
+    && (result.data.fitImageUrl === undefined || result.data.fitImageUrl === `${preview}/fit`)
 }
 
 const savedImagesView = z.object({ rigId: z.string(), rigName: text, images: z.array(savedImage) })

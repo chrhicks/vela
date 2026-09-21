@@ -1,9 +1,12 @@
 # Retained-preview color experiment
 
-**Workshop prototype, September 21, 2026. Not adopted in Capture, Observe,
-alignment or Saved images.** Start from `59fa6da`; no production imaging code is
-changed. This experiment compares a display treatment, not scientific color
-calibration, denoising or optical improvement.
+**September 21: Chris selected B and Match display.** Production adoption now
+uses the same treatment at the imaging boundary and versioned saved previews;
+see [saved-image ownership and review](../../server/src/saved-images/README.md).
+The account below preserves the initial workshop experiment at `59fa6da`.
+A is frozen in `legacy-preview.ts`; B delegates to the one production renderer.
+This remains a display treatment, not scientific color calibration, denoising
+or optical improvement. Original workshop image bytes are unchanged.
 
 ## Open and reproduce
 
@@ -100,7 +103,7 @@ the algorithm's target or evidence of color accuracy. On the polar field,
 `[128, 161, 111]` becomes `[115, 131, 111]`, showing the intentionally incomplete
 correction. On the dark, `[62, 61, 64]` becomes `[61, 61, 62]`.
 
-## Later retained-preview decision — no migration implemented
+## Retained-preview decision — selected, now adopted at the saved-image boundary
 
 Keep the original FITS **and original PNG bytes** as provenance. If Chris
 chooses a treatment, generate an explicit renderer-versioned native/fit pair
@@ -109,11 +112,61 @@ version-specific URLs to respect today's immutable caches. Refresh in a bounded
 maintenance operation; never regenerate the whole archive on a GET. Unsupported
 originals should keep a clearly identified legacy preview.
 
-**Question for later adoption:** should the default preview download match the
-refreshed displayed image, while the first PNG remains physically preserved?
-Recommend yes, with revised “preview you inspected” copy. That changes an
-archival promise and needs Chris's explicit choice. No archive migration,
-download behavior, saved-image route, solver or statistics code changes here.
+Chris chose **Match display**: the default preview download matches the refreshed
+displayed treatment, while the first PNG remains physically preserved. The
+production owning boundary implements bounded per-image lazy publication rather
+than whole-archive migration. Solver and statistics behavior remain unchanged.
+
+## Production adoption evidence — September 21, 2026
+
+The adoption was built on the dependency merge `2a6862c` (root recovery head
+`23b6b07`), retaining workshop commit `1f08014`. The separate FITS-compatibility
+workstream's owning README supplied the dual-encoding contract; its implementation
+and tests were not copied. No hardware or original-checkout writes were involved.
+
+- Full lint: zero findings. Full model type contracts and Vitest: **806 tests in
+  82 files passed**. `pnpm check` then exposed the specimen's optional callback
+  incompatibility under strict optional-property checking. After that type-only
+  fix, `pnpm build` passed all workspaces. Existing Vite config-loader / chunk-size
+  warnings remain.
+- Prototype typecheck passed with
+  `pnpm --filter @vela/server exec tsc -p ../workshop/preview-color/tsconfig.json`.
+  The review script also passed strict checking with the server's `tsc
+  --ignoreConfig --noEmit --target ES2023 --module NodeNext --moduleResolution
+  NodeNext --strict --noUncheckedIndexedAccess --exactOptionalPropertyTypes
+  --skipLibCheck scripts/preview-review.ts`.
+- Production native and fit PNGs match the approved B files **byte for byte for
+  all six real frames**, including the ordinary polar starfield. Five retained
+  frames were opened through actual production saved-image routes and rendered at
+  Fit and 100%. Browser-clicked downloads matched their current native PNG bytes.
+- An accelerated device-free capture through production capture routes/controller
+  replayed the cooled frame, saved it with the current version and rendered it in
+  Capture. It matched approved B exactly; statistics also remained exactly
+  539 stars / 4.505360069191548 HFR pixels. This is replay evidence, not a new
+  physical exposure. Result ID: `30d39e02-bbaa-4921-afed-4415f4e18aee`.
+- Original FITS, first native/fit PNG and metadata hashes stayed unchanged for all
+  five retained sources and their review copies. Tests additionally cover
+  independent signed32 / offset16 construction, cache URL pinning, descriptor
+  restart reuse, concurrent refresh coalescing, hidden partial publication,
+  simulated derivative disk failure and retry, unsupported-original fallback,
+  and new captures reusing their already-correct first PNG.
+- Playwright inspected the production collection thumbnails, unavailable-refresh
+  state, fresh capture and a 390px saved-image detail. No page errors or mobile
+  horizontal overflow. Representative desktop, phone-width, collection and fallback
+  screenshots were visually inspected. Evidence is local under
+  `apps/workshop/.local/preview-adoption/evidence/`, notably
+  `production-results.json` and `preserved-originals.json`.
+- Focused `standards_check` batches remain **incomplete**, not clean reviews:
+  imaging `72549358…` timed out; storage `d2a7003a…` returned an unverified source
+  citation; routes/web `2657297f…` returned a malformed report (missing
+  `missingEvidence`). Evidence files are in `.opencode/.local/standards/`.
+  No unchanged batch was retried to obtain a preferred verdict.
+
+The parent owns sequential integration, independent repository verification and
+Chris's production browser acceptance. Neither an independent **OK** verdict nor
+production acceptance is claimed here. The phone evidence is Chromium at 390px,
+not physical-phone validation. Runtime instructions and URLs are maintained in
+the saved-image README linked above; the original comparison stays on port 5185.
 
 ## Focused evidence
 

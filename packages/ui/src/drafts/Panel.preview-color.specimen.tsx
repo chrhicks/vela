@@ -74,7 +74,7 @@ function PreviewPair({ fixture, scale }: { fixture: Fixture, scale: string }) {
   </>
 }
 
-function PreviewColor({ props, onPropsChange }: { props: Props, onPropsChange?: (patch: Props) => void }) {
+function PreviewColor({ props, onPropsChange }: { props: Props, onPropsChange?: ((patch: Props) => void) | undefined }) {
   const [local, setLocal] = useState(props)
   const values = onPropsChange ? props : local
   const [corpus, setCorpus] = useState<Corpus | null>(null)

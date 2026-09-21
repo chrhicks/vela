@@ -81,6 +81,9 @@ describe('workshop-only background treatment', () => {
 
   it('reads signed32 samples without flipping or rescaling, rejecting other formats and truncation', async () => {
     const input = frame('bggr')
+    const signedPixels = Int32Array.from(input.pixels)
+    signedPixels[0] = -1
+    input.pixels = signedPixels
     const fits = await encodeCaptureFits({ ...input, capturedAt: '2026-09-15T03:00:00Z' }, { exposureSeconds: 180, cameraName: 'fixture' })
     const decoded = readFrame(fits)
     expect(decoded).toEqual(input)
