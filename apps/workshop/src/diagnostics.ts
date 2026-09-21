@@ -26,9 +26,24 @@ export const sourceFindings: SourceFinding[] = Object.entries(sourceModules).fla
 })
 
 const pairs = [
-  { id: 'body', label: 'Text / surface', foreground: 'text', background: 'surface' },
-  { id: 'muted', label: 'Muted text / surface', foreground: 'textMuted', background: 'surface' },
-  { id: 'accent', label: 'Accent text / accent', foreground: 'accentText', background: 'accent' },
+  {
+    id: 'body',
+    label: 'Text / surface',
+    foreground: 'text',
+    background: 'surface'
+  },
+  {
+    id: 'muted',
+    label: 'Muted text / surface',
+    foreground: 'textMuted',
+    background: 'surface'
+  },
+  {
+    id: 'accent',
+    label: 'Accent text / accent',
+    foreground: 'accentText',
+    background: 'accent'
+  },
 ] as const
 
 export function contrastFindings(theme: ThemeParameters): ContrastFinding[] {
@@ -39,7 +54,13 @@ export function contrastFindings(theme: ThemeParameters): ContrastFinding[] {
     const background = palette[theme.semantic[mode][pair.background]]
     const ratio = contrastRatio(foreground, background)
 
-    return { id: `${mode}-${pair.id}`, label: pair.label, mode, ratio, passes: ratio >= 4.5 }
+    return {
+      id: `${mode}-${pair.id}`,
+      label: pair.label,
+      mode,
+      ratio,
+      passes: ratio >= 4.5
+    }
   }))
 }
 

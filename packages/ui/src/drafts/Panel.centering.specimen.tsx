@@ -159,50 +159,145 @@ function CenteringExample({ scenario }: { scenario: Scenario }) {
     setChecked(false)
   }
 
-  return <article className="vela-centering-demo">
-    <header className="vela-centering-shell"><strong>Vela</strong><span>Askar FRA 400</span><Badge>Workshop preview</Badge></header>
-    <main className="vela-centering-main">
-      <header className="vela-centering-heading"><p>Observe / Targets</p><h1>Crescent Nebula</h1><span>NGC 6888 · Center your composition</span></header>
-      <div className="vela-centering-layout">
-        <section className="vela-centering-field-panel" aria-label="Composition comparison">
-          <header><strong>Your chosen composition</strong><span>Fixed sky reference</span></header>
-          <div className="vela-centering-field">
-            <img src={reference.image} alt="Crescent Nebula reference photograph" draggable={false} />
-            <svg viewBox="0 0 600 450" role="img" aria-label={`Illustrative footprint comparison. Last solved offset ${arcminutes(latest)}. Desired center remains fixed.`}>
-              <g className="vela-centering-desired"><rect x="150" y="125" width="300" height="200" /><path d="M290 225h20M300 215v20" /></g>
-              <g className="vela-centering-measured" data-current={latestStillMatches} transform={`translate(${latest * 1.2} ${-latest * .65}) rotate(${measuredFlipped ? 180 : 0} 300 225)`}>
-                <rect x="150" y="125" width="300" height="200" /><path d="M150 150v-25h25" /><circle cx="300" cy="225" r="3" />
-              </g>
-            </svg>
-          </div>
-          <div className="vela-centering-legend"><span><i />Desired frame</span><span><i />Last solved frame{!latestStillMatches ? ' · previous position' : ''}</span></div>
-          <footer>Reference photograph with illustrative footprints, not calibrated sky geometry. <a href={reference.source} target="_blank" rel="noreferrer">Image credit ↗</a></footer>
+  return (
+    <article className="vela-centering-demo">
+      <header className="vela-centering-shell">
+        <strong>Vela</strong>
+        <span>Askar FRA 400</span>
+        <Badge>Workshop preview</Badge>
+      </header>
+      <main className="vela-centering-main">
+        <header className="vela-centering-heading">
+          <p>Observe / Targets</p>
+          <h1>Crescent Nebula</h1>
+          <span>NGC 6888 · Center your composition</span>
+        </header>
+        <div className="vela-centering-layout">
+          <section className="vela-centering-field-panel" aria-label="Composition comparison">
+            <header>
+              <strong>Your chosen composition</strong>
+              <span>Fixed sky reference</span>
+            </header>
+            <div className="vela-centering-field">
+              <img src={reference.image} alt="Crescent Nebula reference photograph" draggable={false} />
+              <svg
+                viewBox="0 0 600 450"
+                role="img"
+                aria-label={`Illustrative footprint comparison. Last solved offset ${arcminutes(latest)}. Desired center remains fixed.`}
+              >
+                <g className="vela-centering-desired">
+                  <rect x="150" y="125" width="300" height="200" />
+                  <path d="M290 225h20M300 215v20" />
+                </g>
+                <g
+                  className="vela-centering-measured"
+                  data-current={latestStillMatches}
+                  transform={`translate(${latest * 1.2} ${-latest * .65}) rotate(${measuredFlipped ? 180 : 0} 300 225)`}
+                >
+                  <rect x="150" y="125" width="300" height="200" />
+                  <path d="M150 150v-25h25" />
+                  <circle cx="300" cy="225" r="3" />
+                </g>
+              </svg>
+            </div>
+            <div className="vela-centering-legend">
+              <span>
+                <i />
+                Desired frame
+              </span>
+              <span>
+                <i />
+                Last solved frame
+                {!latestStillMatches ? ' · previous position' : ''}
+              </span>
+            </div>
+            <footer>
+              Reference photograph with illustrative footprints, not calibrated sky geometry.
+              {' '}
+              <a href={reference.source} target="_blank" rel="noreferrer">Image credit ↗</a>
+            </footer>
+          </section>
+          <Panel title="Your composition" className="vela-centering-controls">
+            <div className="vela-centering-status" role="status" aria-live="polite">
+              <WorkingIndicator active={busy} />
+              <strong>{title}</strong>
+              <p>{detail}</p>
+            </div>
+            <div className="vela-centering-offset">
+              <span>{latestStillMatches ? 'Measured distance from center' : 'Last solved distance · current framing unmeasured'}</span>
+              <strong>{arcminutes(latest)}</strong>
+              <span>Started at {arcminutes(measurements[0]!)} · goal ≤ 0.5′</span>
+            </div>
+            <dl className="vela-centering-facts">
+              <div>
+                <dt>Exposure</dt>
+                <dd>20 s · real-time wait</dd>
+              </div>
+              <div>
+                <dt>Mount pointing side</dt>
+                <dd>{scenario === 'flip' ? (flipped ? 'East · changed' : 'West · flip expected') : 'East'}</dd>
+              </div>
+            </dl>
+            {busy ? <Button onClick={stop}>Stop</Button> : (
+              <>
+                {!centered && !blocked && !stopped && <Button tone="accent" onClick={start}>Center composition</Button>}
+                <Button
+                  onClick={() => {
+                    setChecked(false)
+                    setCheckStep(0)
+                    setChecking(true)
+                  }}
+                >
+                  Check current frame
+                </Button>
+              </>
+            )}
+            {stopped && !finished && <p className="vela-centering-note">Use Reset example to replay centering. This sketch does not resume an interrupted movement.</p>}
+          </Panel>
+        </div>
+        <section className="vela-centering-results" aria-label="Centering measurements">
+          <header>
+            <h2>Measured progress</h2>
+            <span>{completed} {completed === 1 ? 'correction' : 'corrections'} measured</span>
+          </header>
+          <ol>
+            {measurements.slice(0, completed + 1).map((offset, index) => (
+              <li key={index} data-latest={checkMeasurement === null && index === completed}>
+                <span>{index === 0 ? 'Before centering' : `Correction ${index}`}</span>
+                <strong>{arcminutes(offset)}</strong>
+                <span>
+                  {index === 0
+                    ? 'Starting frame'
+                    : offset <= .5
+                      ? 'Within tolerance'
+                      : offset < measurements[index - 1]!
+                        ? 'Improved'
+                        : scenario === 'flip' && index === 1 ? 'Farther · side changed' : 'Worsened'}
+                </span>
+              </li>
+            ))}
+          </ol>
         </section>
-        <Panel title="Your composition" className="vela-centering-controls">
-          <div className="vela-centering-status" role="status" aria-live="polite">
-            <WorkingIndicator active={busy} />
-            <strong>{title}</strong><p>{detail}</p>
+        <Button tone="quiet" size="small" aria-expanded={expanded} onClick={() => setExpanded(value => !value)}>Prototype behavior &amp; image source</Button>
+        {expanded && (
+          <div className="vela-centering-notes">
+            <p>For discussion: finish within 0.5′ (30″), at most four corrections, stop after two consecutive worsening results. A flip uses a fresh post-move solve before another correction. These are example choices, not adopted operating limits.</p>
+            <p>The reference stays fixed while the marked sensor corner changes with the solved pointing side. No raw exposure is rotated or modified. The flip scenario borrows 42.4′ → 86.4′ → 8.95′ → 2.38′ from the Veil field notes; the Crescent photograph and final 0.35′ result are illustrative.</p>
+            <p>
+              Photo:
+              {' '}
+              {reference.credit}
+              .
+              {' '}
+              <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a>
+              . Displayed cropped.
+            </p>
           </div>
-          <div className="vela-centering-offset"><span>{latestStillMatches ? 'Measured distance from center' : 'Last solved distance · current framing unmeasured'}</span><strong>{arcminutes(latest)}</strong><span>Started at {arcminutes(measurements[0]!)} · goal ≤ 0.5′</span></div>
-          <dl className="vela-centering-facts"><div><dt>Exposure</dt><dd>20 s · real-time wait</dd></div><div><dt>Mount pointing side</dt><dd>{scenario === 'flip' ? (flipped ? 'East · changed' : 'West · flip expected') : 'East'}</dd></div></dl>
-          {busy ? <Button onClick={stop}>Stop</Button> : <>
-            {!centered && !blocked && !stopped && <Button tone="accent" onClick={start}>Center composition</Button>}
-            <Button onClick={() => { setChecked(false); setCheckStep(0); setChecking(true) }}>Check current frame</Button>
-          </>}
-          {stopped && !finished && <p className="vela-centering-note">Use Reset example to replay centering. This sketch does not resume an interrupted movement.</p>}
-        </Panel>
-      </div>
-      <section className="vela-centering-results" aria-label="Centering measurements">
-        <header><h2>Measured progress</h2><span>{completed} {completed === 1 ? 'correction' : 'corrections'} measured</span></header>
-        <ol>{measurements.slice(0, completed + 1).map((offset, index) => <li key={index} data-latest={checkMeasurement === null && index === completed}>
-          <span>{index === 0 ? 'Before centering' : `Correction ${index}`}</span><strong>{arcminutes(offset)}</strong><span>{index === 0 ? 'Starting frame' : offset <= .5 ? 'Within tolerance' : offset < measurements[index - 1]! ? 'Improved' : scenario === 'flip' && index === 1 ? 'Farther · side changed' : 'Worsened'}</span>
-        </li>)}</ol>
-      </section>
-      <Button tone="quiet" size="small" aria-expanded={expanded} onClick={() => setExpanded(value => !value)}>Prototype behavior &amp; image source</Button>
-      {expanded && <div className="vela-centering-notes"><p>For discussion: finish within 0.5′ (30″), at most four corrections, stop after two consecutive worsening results. A flip uses a fresh post-move solve before another correction. These are example choices, not adopted operating limits.</p><p>The reference stays fixed while the marked sensor corner changes with the solved pointing side. No raw exposure is rotated or modified. The flip scenario borrows 42.4′ → 86.4′ → 8.95′ → 2.38′ from the Veil field notes; the Crescent photograph and final 0.35′ result are illustrative.</p><p>Photo: {reference.credit}. <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a>. Displayed cropped.</p></div>}
-    </main>
-    <footer className="vela-centering-disclaimer">Design sketch · Invented measurements · 20-second exposures; other stages accelerated · No device commands</footer>
-  </article>
+        )}
+      </main>
+      <footer className="vela-centering-disclaimer">Design sketch · Invented measurements · 20-second exposures; other stages accelerated · No device commands</footer>
+    </article>
+  )
 }
 
 function CenteringPreview({ scenario, onScenarioChange }: { scenario: Scenario, onScenarioChange?: ((scenario: string) => void) | undefined }) {
@@ -210,21 +305,39 @@ function CenteringPreview({ scenario, onScenarioChange }: { scenario: Scenario, 
   const [revision, setRevision] = useState(0)
   const selected = onScenarioChange ? scenario : localScenario
 
-  return <div className="vela-centering-example">
-    <div className="vela-centering-workshop-controls"><Select label="Workshop scenario" value={selected} options={scenarios} onChange={event => {
-      const value = scenarioValue(event.target.value)
+  return (
+    <div className="vela-centering-example">
+      <div className="vela-centering-workshop-controls">
+        <Select
+          label="Workshop scenario"
+          value={selected}
+          options={scenarios}
+          onChange={event => {
+            const value = scenarioValue(event.target.value)
 
-      if (onScenarioChange) onScenarioChange(value)
-      else setLocalScenario(value)
-    }} /><Button tone="quiet" onClick={() => setRevision(value => value + 1)}>Reset example</Button></div>
-    <CenteringExample key={`${selected}-${revision}`} scenario={selected} />
-  </div>
+            if (onScenarioChange) onScenarioChange(value)
+            else setLocalScenario(value)
+          }}
+        />
+        <Button tone="quiet" onClick={() => setRevision(value => value + 1)}>Reset example</Button>
+      </div>
+      <CenteringExample key={`${selected}-${revision}`} scenario={selected} />
+    </div>
+  )
 }
 
 export const specimen: ComponentSpecimen = {
-  componentId: 'panel', componentName: 'Panel / Card', id: 'panel-centering', name: 'Automatic centering · Draft product example',
+  componentId: 'panel',
+  componentName: 'Panel / Card',
+  id: 'panel-centering',
+  name: 'Automatic centering · Draft product example',
   description: 'Automatic centering with a persistent working shimmer, real-time 20-second exposure waits, flip recovery and Stop. Fixture-only workshop exploration; illustrative tolerance and limits, no device commands.',
   controls: { scenario: { type: 'select', label: 'Centering scenario', options: scenarios.map(scenario => scenario.value) } },
   defaultProps: { scenario: 'flip' },
-  render: (props, onPropsChange) => <CenteringPreview scenario={scenarioValue(props.scenario)} onScenarioChange={onPropsChange ? scenario => onPropsChange({ scenario }) : undefined} />,
+  render: (props, onPropsChange) => (
+    <CenteringPreview
+      scenario={scenarioValue(props.scenario)}
+      onScenarioChange={onPropsChange ? scenario => onPropsChange({ scenario }) : undefined}
+    />
+  ),
 }

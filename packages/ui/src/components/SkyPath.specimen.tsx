@@ -28,35 +28,52 @@ function SkyPathPreview({ props, onPropsChange }: { props: Props, onPropsChange?
   const targetId = String(values.target)
   const targetName = targetLabel()
 
-  return <div className="vela-sky-path-specimen">
-    <p className="vela-sky-path-specimen__caption">Sample night · imaginary observing site</p>
-    <SkyPath
-      samples={values.empty ? [] : getSkySamples(targetId)}
-      targetName={targetName}
-      {...(moonSamples ? { moonSamples } : {})}
-      selectedIndex={Number(values.selectedIndex)}
-      onSelectedIndexChange={selectedIndex => update({ selectedIndex })}
-      nowIndex={18}
-      {...(horizon ? { horizon } : {})}
-      marginDegrees={Number(values.marginDegrees)}
-      onMarginDegreesChange={marginDegrees => update({ marginDegrees })}
-      compact={Boolean(values.compact)}
-    />
-  </div>
+  return (
+    <div className="vela-sky-path-specimen">
+      <p className="vela-sky-path-specimen__caption">Sample night · imaginary observing site</p>
+      <SkyPath
+        samples={values.empty ? [] : getSkySamples(targetId)}
+        targetName={targetName}
+        {...(moonSamples ? { moonSamples } : {})}
+        selectedIndex={Number(values.selectedIndex)}
+        onSelectedIndexChange={selectedIndex => update({ selectedIndex })}
+        nowIndex={18}
+        {...(horizon ? { horizon } : {})}
+        marginDegrees={Number(values.marginDegrees)}
+        onMarginDegreesChange={marginDegrees => update({ marginDegrees })}
+        compact={Boolean(values.compact)}
+      />
+    </div>
+  )
 }
 
 export const specimen: ComponentSpecimen = {
-  componentId: 'sky-path', componentName: 'Sky path', id: 'sky-path-primitive', name: 'Primitive anatomy',
+  componentId: 'sky-path',
+  componentName: 'Sky path',
+  id: 'sky-path-primitive',
+  name: 'Primitive anatomy',
   description: 'Overhead target path, linked time selection and an optional horizon. Generated sample geometry contains no private observing-site data.',
   controls: {
     target: { type: 'select', label: 'Target', options: ['andromeda', 'm13', 'crescent', 'low-target'] },
-    moon: { type: 'select', label: 'Sample Moon', options: ['gibbous', 'crescent', 'waning', 'full', 'new', 'unavailable', 'none'] },
+    moon: {
+      type: 'select',
+      label: 'Sample Moon',
+      options: ['gibbous', 'crescent', 'waning', 'full', 'new', 'unavailable', 'none']
+    },
     horizon: { type: 'select', label: 'Horizon profile', options: ['none', 'local', 'incomplete', 'uncalibrated'] },
     selectedIndex: { type: 'text', label: 'Time sample (0–48)' },
     marginDegrees: { type: 'text', label: 'Silhouette margin (degrees)' },
     compact: { type: 'boolean', label: 'Compact presentation' },
     empty: { type: 'boolean', label: 'Path unavailable' },
   },
-  defaultProps: { target: 'andromeda', moon: 'gibbous', horizon: 'none', selectedIndex: 18, marginDegrees: 3, compact: false, empty: false },
+  defaultProps: {
+    target: 'andromeda',
+    moon: 'gibbous',
+    horizon: 'none',
+    selectedIndex: 18,
+    marginDegrees: 3,
+    compact: false,
+    empty: false
+  },
   render: (props, onPropsChange) => <SkyPathPreview props={props} {...(onPropsChange ? { onPropsChange } : {})} />,
 }

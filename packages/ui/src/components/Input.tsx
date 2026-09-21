@@ -7,7 +7,14 @@ export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 
   invalid?: boolean
 }
 
-export function Input({ label, message, invalid = false, className = '', id, ...props }: InputProps) {
+export function Input({
+  label,
+  message,
+  invalid = false,
+  className = '',
+  id,
+  ...props
+}: InputProps) {
   const generatedId = useId()
   const inputId = id ?? `vela-input-${generatedId.replace(/:/g, '')}`
 

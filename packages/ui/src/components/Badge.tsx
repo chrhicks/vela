@@ -6,7 +6,14 @@ export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
   marker?: ReactNode
 }
 
-export function Badge({ tone = 'neutral', size = 'medium', marker, children, className = '', ...props }: BadgeProps) {
+export function Badge({
+  tone = 'neutral',
+  size = 'medium',
+  marker,
+  children,
+  className = '',
+  ...props
+}: BadgeProps) {
   return (
     <span className={`vela-badge ${className}`.trim()} data-size={size} data-tone={tone} {...props}>
       {marker ? <span className="vela-badge__marker">{marker}</span> : null}

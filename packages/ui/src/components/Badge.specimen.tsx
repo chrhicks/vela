@@ -14,9 +14,18 @@ export const specimen: ComponentSpecimen = {
     size: { type: 'select', label: 'Size', options: ['small', 'medium'] },
     marker: { type: 'boolean', label: 'Marker' },
   },
-  defaultProps: { label: 'Guiding', tone: 'positive', size: 'medium', marker: true },
+  defaultProps: {
+    label: 'Guiding',
+    tone: 'positive',
+    size: 'medium',
+    marker: true
+  },
   render: (props) => (
-    <Badge marker={props.marker ? <i /> : undefined} size={z.enum(['small', 'medium']).parse(props.size)} tone={z.enum(['neutral', 'accent', 'positive', 'warning', 'danger']).parse(props.tone)}>
+    <Badge
+      marker={props.marker ? <i /> : undefined}
+      size={z.enum(['small', 'medium']).parse(props.size)}
+      tone={z.enum(['neutral', 'accent', 'positive', 'warning', 'danger']).parse(props.tone)}
+    >
       {String(props.label)}
     </Badge>
   ),
