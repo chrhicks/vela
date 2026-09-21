@@ -33,7 +33,7 @@ it('persists exact centering inputs and correlated evidence before and after com
       mount.declinationDegrees = position.decDegrees
       mount.pierSide = 'east'
     },
-    capture: async (_seconds, _signal, onReadout) => {
+    capture: async ({ onReadout }) => {
       onReadout?.()
 
       return { width: 100, height: 80, pixels: new Float64Array(8000), capturedAt: at, capturedAtSource: 'server-estimate' }

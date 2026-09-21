@@ -35,6 +35,11 @@ server-confirmed activity is reachable; offline or uncertain commands retain
 measurements without implying current hardware activity. A nonconverging result
 remains a valid checked frame, but needs an explicit new Check before centering.
 
+Camera-read interruption (`captureReadState: 'retrying'`) keeps the active framing
+operation, solved footprint, measurement timestamp and centering history. It hides
+Working feedback and names retries of the same exposure. Stop remains available
+while the server is reachable; existing uncertain-command precedence still applies.
+
 Aladin attribution: retain the renderer’s linked CDS logo and the footer credit.
 The npm manifest lists GPL-3; the distributed LICENSE is LGPL-3.0 and incorporates
 GPL-3.0. Both texts ship under `apps/web/public/third-party/`. Upstream source for

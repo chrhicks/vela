@@ -18,6 +18,10 @@ is server-reported elapsed time, never a client clock or total-run percentage.
 Only exposing shows timed progress. Reading/saving/stopping name their phase;
 failed state links to Capture for the outcome.
 
+Interrupted camera reads keep the run and count visible as Awaiting camera, with
+no timed progress. This is distinct from lost server updates or tracking lost;
+`captureReadState: 'current'` returns to the supplied phase, not completion.
+
 Failed or malformed navigation reads preserve the last count and hide progress.
 If an active controller disappears or returns idle, the bar reports tracking
 lost instead of claiming completion. A confirmed stopped/complete snapshot

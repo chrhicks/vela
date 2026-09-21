@@ -30,6 +30,7 @@ export interface AutofocusCamera {
     exposureSeconds: number
     signal: AbortSignal
     onProgress: (elapsedSeconds: number) => void
+    onReadState: (state: AutofocusView['captureReadState']) => void
   }): Promise<CaptureFrame>
 }
 
@@ -73,12 +74,17 @@ export function createAutofocusController(
   }
 
   async function sample(camera: AutofocusCamera, position: number, exposureSeconds: number, signal: AbortSignal): Promise<AutofocusSample> {
-    patch({ activity: 'exposing', exposureStartedAt: new Date(now()).toISOString(), elapsedSeconds: 0, currentPosition: position })
+    patch({ activity: 'exposing', exposureStartedAt: new Date(now()).toISOString(), elapsedSeconds: 0, currentPosition: position, captureReadState: 'current' })
+    let capturePending = true
 
     const frame = await camera.capture({
       exposureSeconds,
       signal,
-      onProgress(elapsedSeconds) { if (!signal.aborted) patch({ elapsedSeconds }) },
+      onProgress(elapsedSeconds) { if (capturePending && !signal.aborted) patch({ elapsedSeconds }) },
+      onReadState(captureReadState) { if (capturePending && !signal.aborted) patch({ captureReadState }) },
+    }).finally(() => {
+      capturePending = false
+      patch({ captureReadState: 'current' })
     })
 
     patch({ activity: 'measuring', elapsedSeconds: exposureSeconds })
@@ -242,7 +248,7 @@ export function createAutofocusController(
     const whenPlanned = new Promise<void>((resolve, reject) => { plannedReady = { resolve, reject } })
     running = run(camera, focuser, stepSize, offsetSteps, exposureSeconds, cancellation.signal).finally(() => {
       running = undefined
-      patch({ active: false, activity: view.phase === 'complete' ? 'idle' : view.activity === 'stopping' ? 'idle' : view.activity })
+      patch({ active: false, captureReadState: 'current', activity: view.phase === 'complete' ? 'idle' : view.activity === 'stopping' ? 'idle' : view.activity })
       onSettled?.()
     })
 
@@ -258,7 +264,7 @@ export function createAutofocusController(
 
   async function stop() {
     if (running) {
-      patch({ activity: 'stopping' })
+      patch({ activity: 'stopping', captureReadState: 'current' })
       cancellation!.abort(new AutofocusStoppedError())
       await running
     }
@@ -274,6 +280,7 @@ function emptyView(settings: { rigId: string, rigName: string, cameraName: strin
     rigId: settings.rigId, rigName: settings.rigName, enabled: true, unavailableReason: null,
     cameraName: settings.cameraName, focuserName: settings.focuserName,
     phase: 'setup', activity: 'idle', active: false,
+    captureReadState: 'current',
     startPosition: null, currentPosition: null, maxStep: null,
     stepSize, offsetSteps, exposureSeconds: 2, elapsedSeconds: 0, exposureStartedAt: null,
     samples: [], fit: null, restoredStart: false, error: null,

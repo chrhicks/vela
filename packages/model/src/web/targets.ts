@@ -118,6 +118,8 @@ export interface FramingView {
     fieldHeightDegrees: number
   } | null
   phase: 'idle' | 'slewing' | 'settling' | 'exposing' | 'downloading' | 'solving' | 'checked' | 'needs-check' | 'stopping' | 'stopped' | 'failed'
+  /** Interrupted reads of the same exposure; current does not imply image completion. */
+  captureReadState: 'current' | 'retrying'
   active: boolean
   /** Current readiness observation; unknown if inspection failed. Historical sides stay in measurements. */
   pointingSide: FramingPointingSide
