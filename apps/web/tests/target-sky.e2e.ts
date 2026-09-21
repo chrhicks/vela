@@ -60,7 +60,7 @@ for (const width of [1440, 390]) {
     await page.route('**/api/web/rigs/rig-1/framing', route => route.abort())
     await page.route('**/api/survey/**', route => route.abort())
     await page.goto('/rigs/rig-1/observe/targets/m31')
-    const sidebar = page.locator('.vela-target-sidebar')
+    const sidebar = page.locator('.vela-target-sky-context')
     const time = sidebar.getByRole('slider', { name: 'Preview time for Andromeda Galaxy' })
     await expect(sidebar.getByText('Local obstructions not included', { exact: true })).toBeVisible()
     await expect(sidebar.locator('.vela-sky-path__moon-status')).toContainText('68% illuminated')
