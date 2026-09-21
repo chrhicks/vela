@@ -2,8 +2,9 @@ import { randomUUID } from 'node:crypto'
 import type { CaptureImage, CaptureView } from '@vela/model/web'
 import { capturePreviews, type ImageColor } from '../imaging/preview.js'
 import { measureStars } from '../imaging/statistics.js'
+import { PREVIEW_VERSION } from '../imaging/background.js'
 import { encodeCaptureFits } from '../imaging/fits.js'
-import { createMemorySavedImageStore, type SavedImageStore } from '../saved-images/store.js'
+import { createMemorySavedImageStore, type SavedImageStore, type SavedImageFiles } from '../saved-images/store.js'
 
 export interface CaptureFrame {
   width: number
@@ -68,7 +69,7 @@ export function createCaptureController(
 
     if (!saved) {
       if (!image?.fits) return savedImages.get(settings.rigId, imageId)
-      const files = { fits: image.fits, native: image.native }
+      const files: SavedImageFiles = { fits: image.fits, native: image.native, previewVersion: PREVIEW_VERSION }
       saved = await savedImages.save(settings.rigId, image.metadata, image.fit ? { ...files, fit: image.fit } : files)
     }
 

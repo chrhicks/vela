@@ -12,6 +12,7 @@ Open `http://127.0.0.1:5174` for the focused workbench or `http://127.0.0.1:5174
 
 ## Current workshop
 
+- A [local retained-image preview-color comparison](preview-color/README.md): current rendering versus bounded display-only background subtraction, with fit/native/thumbnail scales and explicit source hashes. Workshop only; generated private fixtures stay ignored, with no production rendering or archive changes.
 - Stable Button, IconButton, Input, Select, Checkbox, Badge, Tabs, NavigationBar, and Panel/Card components
 - A stable NavigationBar anatomy specimen and fixture-backed observatory navigation example, sharing rig context, page links, and capture activity rendering
 - A fixture-backed Rig overview product example for evaluating clickable Rig summaries and kind-specific live device cards

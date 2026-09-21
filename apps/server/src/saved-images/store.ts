@@ -3,22 +3,27 @@ import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp, open, readFile, readdir, rename, rm, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { CaptureImage, SavedImage } from '@vela/model/web'
+import { PREVIEW_VERSION } from '../imaging/background.js'
+import { createRetainedPreviews, currentPreview, markCurrentPreview } from './previews.js'
+import { syncDirectory, writeDurable } from './durable-files.js'
 
-type Files = { fits: Buffer, native: Buffer, fit?: Buffer }
+export type SavedImageFiles = { fits: Buffer, native: Buffer, fit?: Buffer, previewVersion?: typeof PREVIEW_VERSION }
 
-type FileKind = keyof Files
+type FileKind = 'fits' | 'native' | 'fit'
 
 const filenames = { fits: 'original.fits', native: 'preview.png', fit: 'fit.png' }
 
 export interface SavedImageStore {
-  save(rigId: string, image: CaptureImage, files: Files): Promise<SavedImage>
+  save(rigId: string, image: CaptureImage, files: SavedImageFiles): Promise<SavedImage>
   list(rigId: string): Promise<SavedImage[]>
   count(rigId: string): Promise<number>
   get(rigId: string, imageId: string): Promise<SavedImage | undefined>
   file(rigId: string, imageId: string, kind: FileKind): Promise<Buffer | undefined>
+  refreshPreview(rigId: string, imageId: string): Promise<SavedImage | undefined>
+  previewFile(rigId: string, imageId: string, kind: 'native' | 'fit'): Promise<Buffer | undefined>
 }
 
-function metadata(rigId: string, image: CaptureImage, files: Files): SavedImage {
+function metadata(rigId: string, image: CaptureImage, files: SavedImageFiles): SavedImage {
   const url = `/api/rigs/${encodeURIComponent(rigId)}/saved-images/${encodeURIComponent(image.id)}`
   const { fitImageUrl: _fitImageUrl, ...original } = image
 
@@ -36,7 +41,7 @@ function newest(images: SavedImage[]) {
 }
 
 export function createMemorySavedImageStore(): SavedImageStore {
-  const rigs = new Map<string, Map<string, { image: SavedImage, files: Files }>>()
+  const rigs = new Map<string, Map<string, { image: SavedImage, files: SavedImageFiles }>>()
 
   return {
     async save(rigId, image, files) {
@@ -50,8 +55,9 @@ export function createMemorySavedImageStore(): SavedImageStore {
       const existing = rig.get(image.id)
 
       if (existing) return structuredClone(existing.image)
-      const saved = metadata(rigId, image, files)
-      const copied: Files = { fits: Buffer.from(files.fits), native: Buffer.from(files.native) }
+      const original = metadata(rigId, image, files)
+      const saved = files.previewVersion === PREVIEW_VERSION ? currentPreview(original, !!files.fit) : original
+      const copied: SavedImageFiles = { fits: Buffer.from(files.fits), native: Buffer.from(files.native) }
 
       if (files.fit) copied.fit = Buffer.from(files.fit)
       rig.set(image.id, { image: saved, files: copied })
@@ -61,6 +67,14 @@ export function createMemorySavedImageStore(): SavedImageStore {
     async list(rigId) { return newest(Array.from(rigs.get(rigId)?.values() ?? [], item => structuredClone(item.image))) },
     async count(rigId) { return rigs.get(rigId)?.size ?? 0 },
     async get(rigId, imageId) { return structuredClone(rigs.get(rigId)?.get(imageId)?.image) },
+    async refreshPreview(rigId, imageId) { return this.get(rigId, imageId) },
+    async previewFile(rigId, imageId, kind) {
+      const entry = rigs.get(rigId)?.get(imageId)
+
+      if (entry?.image.previewRendering?.status !== 'current') return undefined
+
+      return this.file(rigId, imageId, kind)
+    },
     async file(rigId, imageId, kind) {
       const file = rigs.get(rigId)?.get(imageId)?.files[kind]
 
@@ -72,9 +86,16 @@ export function createMemorySavedImageStore(): SavedImageStore {
 export async function openFileSavedImageStore(path: string, openFile: typeof open = open): Promise<SavedImageStore> {
   await mkdir(path, { recursive: true })
   const pending = new Map<string, Promise<SavedImage>>()
+  const previews = createRetainedPreviews(openFile)
   const rigPath = (rigId: string) => join(path, digest(rigId))
   const imagePath = (rigId: string, imageId: string) => join(rigPath(rigId), digest(imageId))
-  const get = async (rigId: string, imageId: string) => readMetadata(imagePath(rigId, imageId), rigId, imageId)
+
+  const get = async (rigId: string, imageId: string) => {
+    const directory = imagePath(rigId, imageId)
+    const image = await readMetadata(directory, rigId, imageId)
+
+    return image && previews.describe(directory, image)
+  }
 
   const completedDirectories = async (rigId: string) => {
     const entries = await readdir(rigPath(rigId), { withFileTypes: true }).catch(error => {
@@ -93,13 +114,13 @@ export async function openFileSavedImageStore(path: string, openFile: typeof ope
       const image = await readMetadata(join(rigPath(rigId), entry.name), rigId)
 
       if (!image || digest(image.id) !== entry.name) throw new Error('Saved image metadata does not match its directory')
-      images.push(image)
+      images.push(await previews.describe(join(rigPath(rigId), entry.name), image))
     }
 
     return newest(images)
   }
 
-  const save = async (rigId: string, image: CaptureImage, files: Files) => {
+  const save = async (rigId: string, image: CaptureImage, files: SavedImageFiles) => {
     const existing = await get(rigId, image.id)
 
     if (existing) return existing
@@ -116,6 +137,8 @@ export async function openFileSavedImageStore(path: string, openFile: typeof ope
       }
 
       await writeDurable(join(temporary, 'metadata.json'), JSON.stringify(saved), openFile)
+
+      if (files.previewVersion === PREVIEW_VERSION) await markCurrentPreview(temporary, files.fits, !!files.fit, openFile)
       await syncDirectory(temporary)
 
       try {
@@ -132,7 +155,7 @@ export async function openFileSavedImageStore(path: string, openFile: typeof ope
 
       await syncDirectory(directory)
 
-      return saved
+      return previews.describe(imagePath(rigId, image.id), saved)
     } finally {
       await rm(temporary, { recursive: true, force: true })
     }
@@ -156,8 +179,19 @@ export async function openFileSavedImageStore(path: string, openFile: typeof ope
     list,
     async count(rigId) { return (await completedDirectories(rigId)).length },
     get,
+    async refreshPreview(rigId, imageId) {
+      const directory = imagePath(rigId, imageId)
+      const image = await readMetadata(directory, rigId, imageId)
+
+      return image && previews.refresh(directory, image)
+    },
+    async previewFile(rigId, imageId, kind) {
+      if (!await get(rigId, imageId)) return undefined
+
+      return previews.file(imagePath(rigId, imageId), kind)
+    },
     async file(rigId, imageId, kind) {
-      const image = await get(rigId, imageId)
+      const image = await readMetadata(imagePath(rigId, imageId), rigId, imageId)
 
       if (!image || (kind === 'fit' && !image.fitImageUrl)) return undefined
 
@@ -200,23 +234,6 @@ async function readMetadata(directory: string, rigId: string, imageId?: string):
   const saved = { ...original, imageUrl: `${url}/preview`, fitsUrl: `${url}/fits`, previewDownloadUrl: `${url}/download-preview` }
 
   return fitImageUrl ? { ...saved, fitImageUrl: `${url}/fit` } : saved
-}
-
-async function writeDurable(path: string, data: Buffer | string, openFile: typeof open) {
-  const file = await openFile(path, 'wx')
-
-  try {
-    await file.writeFile(data)
-    await file.sync()
-  }
-  finally { await file.close() }
-}
-
-async function syncDirectory(path: string) {
-  const directory = await open(path, 'r')
-
-  try { await directory.sync() }
-  finally { await directory.close() }
 }
 
 const timestamp = z.string().refine(value => Number.isFinite(Date.parse(value)))

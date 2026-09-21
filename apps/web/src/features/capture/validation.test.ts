@@ -85,3 +85,19 @@ it('accepts legacy and known start sources and rejects unknown sources for live 
     expect(isSavedImage({ ...savedImage, capturedAtSource }, 'rig-1')).toBe(accepted)
   }
 })
+
+it('pins native, fit and download to one declared renderer version and rejects mixed or foreign resources', () => {
+  const base = '/api/rigs/rig-1/saved-images/frame-1/previews/background-v1'
+  const current = { ...savedImage, imageUrl: `${base}/preview`, fitImageUrl: `${base}/fit`, previewDownloadUrl: `${base}/download-preview`, previewRendering: { status: 'current', version: 'background-v1' } }
+  expect(isSavedImage(current, 'rig-1')).toBe(true)
+  expect(isSavedImagesView({ rigId: 'rig-1', rigName: 'Rig', images: [current] }, 'rig-1')).toBe(true)
+
+  for (const patch of [
+    { previewRendering: { status: 'current', version: '../preview' } },
+    { previewRendering: { status: 'legacy' } },
+    { fitImageUrl: savedImage.fitImageUrl },
+    { previewDownloadUrl: savedImage.previewDownloadUrl },
+    { imageUrl: 'https://elsewhere.example/preview' },
+  ]) expect(isSavedImage({ ...current, ...patch }, 'rig-1')).toBe(false)
+  expect(isSavedImage({ ...savedImage, previewRendering: { status: 'unavailable' } }, 'rig-1')).toBe(true)
+})

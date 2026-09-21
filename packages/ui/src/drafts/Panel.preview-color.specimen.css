@@ -1,0 +1,38 @@
+.vela-preview-color {
+  width: 100%;
+  min-width: 0;
+  padding: 24px;
+  color: var(--vela-text);
+  background: var(--vela-surface);
+  container-type: inline-size;
+}
+
+.vela-preview-color h1 { margin: 4px 0 8px; font-size: 24px; }
+.vela-preview-color p { margin: 8px 0; }
+.vela-preview-color header > p, .vela-preview-color__note, .vela-preview-color__estimate { color: var(--vela-text-muted); }
+.vela-preview-color__controls, .vela-preview-color__scale, .vela-preview-color__native-tools { display: flex; align-items: end; gap: 12px; flex-wrap: wrap; }
+.vela-preview-color__controls { margin: 20px 0 12px; justify-content: space-between; }
+.vela-preview-color__controls > label { min-width: 0; flex: 1 1 260px; max-width: 420px; }
+.vela-preview-color__native-tools { justify-content: space-between; align-items: center; margin: 12px 0; color: var(--vela-text-muted); font-size: 12px; }
+.vela-preview-color__pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }
+.vela-preview-color figure { min-width: 0; margin: 0; }
+.vela-preview-color figcaption { display: grid; gap: 4px; margin-bottom: 10px; }
+.vela-preview-color figcaption span { color: var(--vela-text-muted); font-size: 12px; }
+.vela-preview-color__window { overflow: auto; border: 1px solid var(--vela-line); border-radius: var(--vela-radius); background: var(--vela-surface); }
+.vela-preview-color__window img { display: block; width: 100%; height: auto; }
+.vela-preview-color__pair[data-scale="native"] .vela-preview-color__window { height: 420px; }
+.vela-preview-color__pair[data-scale="native"] img { width: auto; max-width: none; }
+.vela-preview-color__pair[data-scale="thumbnail"] .vela-preview-color__window { max-width: 240px; }
+.vela-preview-color__estimate { font-size: 12px; padding: 12px 0; }
+.vela-preview-color details { border-top: 1px solid var(--vela-line); padding-top: 12px; font-size: 13px; }
+.vela-preview-color summary { cursor: pointer; }
+.vela-preview-color dl { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 8px 16px; }
+.vela-preview-color dt { color: var(--vela-text-muted); }
+.vela-preview-color dd { margin: 0; overflow-wrap: anywhere; }
+
+@container (max-width: 700px) {
+  .vela-preview-color__pair { grid-template-columns: minmax(0, 1fr); }
+  .vela-preview-color__pair[data-scale="native"] .vela-preview-color__window { height: 260px; }
+  .vela-preview-color dl { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .vela-preview-color dd { margin-bottom: 8px; }
+}

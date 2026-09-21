@@ -67,7 +67,30 @@ quarter-step sensor values in a lookup table capped at 256 KiB, with the origina
 asinh calculation for other values and larger ranges. Table construction yields
 in batches. `png.ts` owns lossless compression and PNG framing, including a
 byte-table CRC-32 and bounded checksum batches.
-These optimizations preserve the prior native and fitted image bytes; they do
-not change stretching, resolution or acquisition data. Equivalence tests cover
-all Bayer patterns and borders, and an independent bitwise checksum reference
-checks PNG framing across multiple batches.
+The Bayer, stretch-lookup and PNG optimizations preserve their numerical behavior.
+Equivalence tests cover all Bayer patterns and borders, and an independent
+bitwise checksum reference checks PNG framing across multiple batches.
+
+## Display-only background treatment
+
+`background.ts` owns renderer version `background-v1`, selected in the retained
+image workshop. It estimates RGB background medians from the same dimmest quarter
+of an 8 × 8 spatial grid, subtracts each channel's excess over the lowest channel,
+and caps each offset at 10% of the existing linked display range. The original
+shared raw-sample 1% black point, 99.9% ceiling (minimum 100 ADU range), and linked
+asinh strength 10 remain unchanged. There are no channel gains or separate channel
+stretches. Field-filling emission can bias the estimate; a cap is not a color
+calibration. Mono and insufficient/invalid background estimates remain unchanged.
+
+`previewPng` and `capturePreviews` use the same transform. Native pixels and the
+fitted displayed-pixel averages therefore agree; thumbnails use the fitted
+derivative. This affects display only: acquisition samples, statistics and solver
+inputs remain independent. Rendering and compression retain cooperative yields.
+
+`read-retained-fits.ts` is a bounded reader for Vela's exact original encodings:
+signed `BITPIX=32` without scaling, or `BITPIX=16` with `BZERO=32768` and `BSCALE=1`.
+It applies that unsigned offset once, preserves row order and the declared Bayer
+origin, and checks header shape, allowed cards, dimensions, exact payload/padding
+and a 30-million-sample bound. It rejects other encodings rather than approximating
+them. It is not a universal FITS import library. Saved-image refresh owns file
+selection and publication; the reader and renderer do not know about the archive.

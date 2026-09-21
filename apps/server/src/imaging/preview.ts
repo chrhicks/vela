@@ -2,6 +2,7 @@ import { createDisplayStretch } from './display-stretch.js'
 import { encodePng } from './png.js'
 import { bayerPixel, type BayerPattern } from './bayer.js'
 import { setImmediate } from 'node:timers/promises'
+import { backgroundOffsets, linkedRange } from './background.js'
 
 /** A display stretch at native dimensions; acquisition pixels remain unchanged. */
 export type ImageColor = { kind: 'mono' } | { kind: 'bayer', pattern: BayerPattern }
@@ -48,12 +49,9 @@ export async function capturePreviews(width: number, height: number, pixels: Arr
 }
 
 async function stretch(width: number, height: number, pixels: ArrayLike<number>, color: ImageColor) {
-  // An odd stride samples every Bayer phase rather than just one sensor color.
-  const sampleStride = Math.max(1, Math.floor(pixels.length / 200_000) | 1)
-  const sample = Array.from({ length: Math.ceil(pixels.length / sampleStride) }, (_, i) => pixels[i * sampleStride]!).sort((a, b) => a - b)
-  const blackPoint = sample[Math.floor(sample.length * 0.01)] ?? 0
-  const ceiling = Math.max(blackPoint + 100, sample[Math.floor(sample.length * 0.999)] ?? 1000)
-  const display = await createDisplayStretch(blackPoint, ceiling)
+  const range = linkedRange(pixels)
+  const { offsets } = backgroundOffsets({ width, height, pixels, color }, range)
+  const display = await createDisplayStretch(range.black, range.ceiling)
   const channels = color.kind === 'bayer' ? 3 : 1
   const stride = width * channels + 1
   const data = Buffer.alloc(stride * height)
@@ -66,7 +64,7 @@ async function stretch(width: number, height: number, pixels: ArrayLike<number>,
       const rgb = color.kind === 'bayer' ? bayerPixel(width, height, pixels, color.pattern, x, y) : [pixels[y * width + x]!]
 
       for (let channel = 0; channel < channels; channel++) {
-        data[y * stride + x * channels + channel + 1] = display(rgb[channel]!)
+        data[y * stride + x * channels + channel + 1] = display(rgb[channel]! - offsets[channel]!)
       }
     }
   }

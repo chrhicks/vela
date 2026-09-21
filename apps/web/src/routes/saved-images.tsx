@@ -8,6 +8,14 @@ import { LatestImage } from '../features/capture/LatestImage'
 import './capture.css'
 import './saved-images.css'
 
+function previewLabel(image: SavedImage) {
+  switch (image.previewRendering?.status) {
+    case 'legacy': return 'Original preview · open to refresh'
+    case 'unavailable': return 'Original preview · refresh unavailable'
+    default: return 'FITS + preview'
+  }
+}
+
 export function SavedImages() {
   const { rigId = '', imageId } = useParams()
 
@@ -29,7 +37,7 @@ function SavedImagesPage({ rigId, imageId }: { rigId: string, imageId?: string }
 
     async function load() {
       try {
-        const result = await api(`web/rigs/${encodeURIComponent(rigId)}/saved-images${imageId ? `/${encodeURIComponent(imageId)}` : ''}`, { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)]) })
+        const result = await api(`web/rigs/${encodeURIComponent(rigId)}/saved-images${imageId ? `/${encodeURIComponent(imageId)}` : ''}`, { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(imageId ? 120_000 : 10_000)]) })
 
         if (controller.signal.aborted) return
 
@@ -63,6 +71,8 @@ function SavedImagesPage({ rigId, imageId }: { rigId: string, imageId?: string }
   return <section className="vela-rig-page capture-page saved-images-page">
     <Link className="vela-rig-page__back" to={imageId ? `${base}/saved-images` : base}>← {imageId ? 'Saved images' : 'Observe'}</Link>
     <header className="capture-page__heading"><div>{rigName && <p>{rigName}</p>}<h1>{imageId ? 'Saved image' : 'Saved images'}</h1></div>{view && <span className="vela-saved-count">{view.images.length} {view.images.length === 1 ? 'image' : 'images'}</span>}</header>
+    {loading && imageId && <p className="vela-saved-help">Preparing the display preview from the retained original may take a moment.</p>}
+    {image?.previewRendering?.status === 'unavailable' && <p role="status">Preview refresh is unavailable. Showing the original preview; the original FITS is unchanged.</p>}
     {loading ? <p role="status">Loading saved {imageId ? 'image' : 'images'}…</p> : error ? <div role="status"><p>{error}</p><Button onClick={() => setAttempt(value => value + 1)}>Try again</Button></div> : image ? <div className="capture-page__layout">
       <LatestImage image={image} busy={false} interrupted={false} savedDetail />
       <Panel title="Image details"><dl className="vela-saved-details">
@@ -71,10 +81,24 @@ function SavedImagesPage({ rigId, imageId }: { rigId: string, imageId?: string }
         <div><dt>Exposure</dt><dd>{image.exposureSeconds} s · {image.color === 'color' ? 'Color' : 'Mono'}</dd></div>
         <div><dt>Dimensions</dt><dd>{image.width} × {image.height}</dd></div>
         <div><dt>Stars · HFR</dt><dd>{image.statistics ? `${image.statistics.detectedStars} stars · ${image.statistics.medianHfrPixels?.toFixed(2) ?? '—'} px` : 'Measurements unavailable'}</dd></div>
-      </dl><div className="vela-saved-downloads"><a className="vela-button" data-tone="accent" data-size="medium" href={image.fitsUrl} download>Download FITS</a><a className="vela-button" data-tone="neutral" data-size="medium" href={image.previewDownloadUrl} download>Download preview</a></div><p className="vela-saved-help">Use the original FITS in Siril or your preferred processing tool.</p></Panel>
+      </dl><div className="vela-saved-downloads"><a className="vela-button" data-tone="accent" data-size="medium" href={image.fitsUrl} download>Download FITS</a><a className="vela-button" data-tone="neutral" data-size="medium" href={image.previewDownloadUrl} download>Download preview</a></div><p className="vela-saved-help">The PNG download matches this display treatment at native resolution. Original FITS and the first saved PNG are preserved. Display color is not scientifically calibrated.</p></Panel>
     </div> : view && <>
-      <p className="vela-capture-intro">Original data and the preview you inspected, kept on your Vela server.</p>
-      {view.images.length === 0 ? <Panel><div className="vela-saved-empty"><h2>No saved images yet</h2><p>Turn on Save frames before capturing, or keep an individual image when you see one worth saving.</p><Link className="vela-button" data-tone="neutral" data-size="medium" to={`${base}/capture`}>Open capture →</Link></div></Panel> : [...groups].map(([day, frames]) => <section className="vela-saved-group" key={day}><h2>{day}<span>{frames.length} {frames.length === 1 ? 'image' : 'images'}</span></h2><div className="vela-saved-grid">{frames.map(frame => <Link className="vela-saved-card" key={frame.id} to={`${base}/saved-images/${encodeURIComponent(frame.id)}`}><div className="vela-saved-thumbnail"><img loading="lazy" src={frame.fitImageUrl ?? frame.imageUrl} alt={`${frame.exposureSeconds} second exposure from ${frame.cameraName}`} /></div><div className="vela-saved-card-copy"><strong>{new Date(frame.capturedAt).toLocaleTimeString()}</strong><span>{frame.exposureSeconds} s · {frame.color === 'color' ? 'Color' : 'Mono'}</span><small>FITS + preview <span aria-hidden="true">→</span></small></div></Link>)}</div></section>)}
+      <p className="vela-capture-intro">Original data is preserved. Preview downloads match the displayed treatment. Open older images to refresh their previews.</p>
+      {view.images.length === 0 ? <Panel><div className="vela-saved-empty"><h2>No saved images yet</h2><p>Turn on Save frames before capturing, or keep an individual image when you see one worth saving.</p><Link className="vela-button" data-tone="neutral" data-size="medium" to={`${base}/capture`}>Open capture →</Link></div></Panel> : [...groups].map(([day, frames]) => (
+        <section className="vela-saved-group" key={day}>
+          <h2>{day}<span>{frames.length} {frames.length === 1 ? 'image' : 'images'}</span></h2>
+          <div className="vela-saved-grid">{frames.map(frame => (
+            <Link className="vela-saved-card" key={frame.id} to={`${base}/saved-images/${encodeURIComponent(frame.id)}`}>
+              <div className="vela-saved-thumbnail"><img loading="lazy" src={frame.fitImageUrl ?? frame.imageUrl} alt={`${frame.exposureSeconds} second exposure from ${frame.cameraName}`} /></div>
+              <div className="vela-saved-card-copy">
+                <strong>{new Date(frame.capturedAt).toLocaleTimeString()}</strong>
+                <span>{frame.exposureSeconds} s · {frame.color === 'color' ? 'Color' : 'Mono'}</span>
+                <small>{previewLabel(frame)} <span aria-hidden="true">→</span></small>
+              </div>
+            </Link>
+          ))}</div>
+        </section>
+      ))}
     </>}
   </section>
 }

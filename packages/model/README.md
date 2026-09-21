@@ -110,3 +110,11 @@ means no capture-read interruption is pending, not that an image completed. Star
 Stop and settlement clear this state; prior images, solved checks and autofocus
 samples retain their own timestamps until a fresh result is published. Alignment
 uses its existing `activity: 'retrying'`, warning and exposure timer instead.
+## Saved-preview rendering identity
+
+`SavedImage.previewRendering` describes current renderer identity or a legacy /
+unavailable derivative independently of durable capture facts. A current preview
+pins native, fitted and PNG-download resources to one version; original FITS
+identity and measurement metadata do not change. The field is optional for older
+API fixtures, which retain the original-preview URL contract. The server owns
+refresh policy and file publication; the model owns no rendering or migration.
