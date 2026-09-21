@@ -6,6 +6,63 @@ Implementation evidence for the scoped unsigned-16 encoder change, based on
 This is executed local evidence, not the independent verifier's verdict or
 Chris's browser acceptance. Those remain the integration parent's gates.
 
+## Follow-up: alignment diagnostic replay
+
+The parent's fresh independent verifier blocked `be535da`: alignment diagnostic
+recording also calls the shared encoder, but replay still required a padded
+four-byte sample payload. Earlier diagnostic fixtures used negative/out-of-range
+unsigned values, so they only exercised signed-32 output and missed this consumer.
+
+The incremental correction accepts journal sizes matching either emitted format.
+For retained originals, replay additionally checks the exact Vela primary-image
+layout: SIMPLE, BITPIX, NAXIS and both dimensions, unique structural cards, END
+and blank header padding, unsigned-16 BZERO=32768/BSCALE=1 or signed-32 without
+scaling cards, and the format-specific padded file length. The existing file
+size/hash, bounded reads, symlink rejection and evidence checks remain in place.
+This is a local layout validator, not a general FITS decoder. Rotated-out older
+adjustment originals can only have their journal metadata checked.
+
+The recorder's signed-32 size calculation remains a conservative allocation cap
+before sample scanning; its comment/name now makes that intent explicit. It
+continues journaling the actual encoded file length. This preserves the existing
+maximum input-size policy rather than admitting larger images speculatively.
+
+Production recorder-to-replay fixtures now exercise full physical baseline and
+adjustment trials with **32×32 mono** data: all `1` uses **5760-byte unsigned-16**
+files; all `-1` uses **8640-byte signed-32** files. Both replay with four verified
+originals and zero mathematical discrepancies. Tests also reject unsupported
+BITPIX, changed header/journal dimensions (including changes that leave padded
+size unchanged), missing/duplicate/incorrect scaling cards, duplicate structural
+cards, missing END, short/nonconforming lengths, and scaling on signed-32 files,
+even when tampered files receive matching journal hashes. Damaged, missing,
+symlinked and oversized retained originals are checked for both encodings.
+
+Incremental checks:
+
+```sh
+pnpm exec vitest run apps/server/src/imaging/fits.test.ts apps/server/src/alignment/diagnostics.test.ts apps/server/src/alignment/diagnostic-replay.test.ts
+pnpm --filter @vela/server build
+pnpm lint
+git diff --check
+```
+
+**33 tests passed in 3 files**; server build and lint passed. Standards review
+initially raised a possible null regex result for a short FITS header. The
+metadata-size check already rejects that input before retained-file validation;
+fixed-width card extraction now also avoids the non-null assertion, and matching
+hash/short-file tests preserve explicit boundary errors. Updated standards review
+completed with zero diagnostics; evidence is
+`.opencode/.local/standards/acbd01c7-3e4c-4390-91b8-ed282200b8fe.json`.
+
+The repository consumer audit found three production `encodeCaptureFits` call
+sites: capture controller, plate solver, and alignment diagnostics. Capture
+retention/download routes and the solver do not make further sample-width
+assumptions. The simulator has a separate signed-16 encoder and is not a consumer
+of this function. Source searches also covered tracked scripts and packages.
+The prior Astropy/Siril/ASTAP evidence below remains evidence for the unchanged
+encoder; it was not rerun for this replay-only correction. The parent must rerun
+fresh independent verification before acceptance or integration.
+
 ## Automated checks
 
 From the `fits-compatibility` Rift:

@@ -146,8 +146,11 @@ preview does not imply that its original was retained. A recorded calculation
 is distinct from a published reading: later validation/projection or cancellation
 can still end the operation.
 
-The journal is limited to 4 MiB and each FITS to 128 MiB. Successful recording keeps
-at most four retained originals per trial (roughly 400 MiB at FRA resolution);
+The journal is limited to 4 MiB and each FITS to 128 MiB. The recorder bounds input
+size before encoding using worst-case signed-32 storage; representable samples
+use the shared encoder's smaller unsigned-16 layout. Successful recording keeps
+at most four retained originals per trial (roughly 200 MiB for unsigned-16 or
+400 MiB for signed-32 at FRA resolution);
 replacing an adjustment image needs space for one more, which may remain after an
 interruption or storage failure. A storage or recording
 limit failure is reported in the server log and disables further diagnostics for
@@ -169,6 +172,11 @@ node scripts/replay-alignment.mjs /absolute/path/to/trial-directory
 Replay validates the recorded input and retained FITS integrity, reconstructs the
 baseline, recomputes its corrections and reports numerical discrepancies. Physical
 trials also replay J2000-to-midpoint conversion from the recorded site and timing.
+Both [Vela FITS encodings](../imaging/README.md#lossless-fits-interchange) are
+supported. Retained files must match journal byte counts and SHA-256 hashes,
+their header dimensions must match the recorded capture, and their primary-image
+layout, scaling cards and padded size must agree. Older adjustment originals may
+have rotated out; their journal sizes must still fit one of the two encodings.
 It uses Vela's production mathematics: this establishes reproducibility, not an
 independent physical alignment measurement. A simulator can exercise recording
 and replay indoors; a fresh sky comparison is still required for physical accuracy.

@@ -2,7 +2,8 @@
 
 ## Lossless FITS interchange
 
-`fits.ts` is the shared encoder for captured originals and plate-solver inputs.
+`fits.ts` is the shared encoder for captured originals, plate-solver inputs and
+retained alignment diagnostics.
 It validates every sample as a signed 32-bit integer. If all samples are in
 0–65535, it writes `BITPIX=16`, `BZERO=32768`, `BSCALE=1`, with big-endian signed
 storage of `sample - 32768`. Otherwise it writes `BITPIX=32` signed big-endian

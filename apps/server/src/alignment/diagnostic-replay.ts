@@ -141,6 +141,7 @@ export async function replayAlignmentDiagnostics(directory: string): Promise<Ali
       throw new Error(`Alignment diagnostic original integrity failure: ${frame.original.filename}`)
     }
 
+    validateOriginalFits(original, frame)
     report.counts.verifiedOriginals++
   }
 
@@ -155,7 +156,7 @@ function validateFrame(frame: DiagnosticFrameEntry, mode: 'physical' | 'offline'
 
   if (wcs.width !== capture.width || wcs.height !== capture.height || evidence.solution.capturedAt !== capture.capturedAt
     || !frame.original.filename.startsWith(`${evidence.phase}-`)
-    || 2880 + Math.ceil(capture.width * capture.height * 4 / 2880) * 2880 !== frame.original.bytes) {
+    || ![2, 4].some(bytesPerSample => fitsBytes(capture, bytesPerSample) === frame.original.bytes)) {
     throw new Error('Alignment diagnostic frame dimensions, timing or original metadata disagree')
   }
 
@@ -165,6 +166,39 @@ function validateFrame(frame: DiagnosticFrameEntry, mode: 'physical' | 'offline'
 
   if (mode === 'offline' && (evidence.physical || !evidence.offlinePointing)) {
     throw new Error('Offline alignment diagnostic frame is missing pointing or mixes modes')
+  }
+}
+
+function fitsBytes(capture: DiagnosticFrameEntry['capture'], bytesPerSample: number) {
+  return 2880 + Math.ceil(capture.width * capture.height * bytesPerSample / 2880) * 2880
+}
+
+/** Check only Vela's two emitted primary-image layouts, not arbitrary FITS input.
+ * Older adjustment files may have rotated out; retained files must agree with
+ * their journal dimensions and exact encoding, as well as their size and hash. */
+function validateOriginalFits(original: Buffer, frame: DiagnosticFrameEntry) {
+  const cards = Array.from({ length: 36 }, (_, index) => original.toString('latin1', index * 80, (index + 1) * 80))
+  const numberCard = (key: string, value: number) => `${key.padEnd(8)}= ${String(value).padStart(20)}`.padEnd(80)
+  const unsigned16 = cards[1] === numberCard('BITPIX', 16)
+  const bytesPerSample = unsigned16 ? 2 : 4
+
+  const required = ['SIMPLE  =                    T'.padEnd(80), numberCard('BITPIX', unsigned16 ? 16 : 32),
+    numberCard('NAXIS', 2), numberCard('NAXIS1', frame.capture.width), numberCard('NAXIS2', frame.capture.height)]
+
+  const end = cards.indexOf('END'.padEnd(80))
+
+  if (required.some((card, index) => cards[index] !== card || cards.filter(other => other.slice(0, 8) === card.slice(0, 8)).length !== 1)
+    || end < required.length || cards.slice(end + 1).some(card => card !== ' '.repeat(80))
+    || fitsBytes(frame.capture, bytesPerSample) !== original.length) {
+    throw new Error('Alignment diagnostic FITS layout or dimensions disagree with its journal')
+  }
+
+  for (const [key, value] of [['BZERO', 32_768], ['BSCALE', 1]] as const) {
+    const scaling = cards.filter(card => card.slice(0, 8).trim() === key)
+
+    if (unsigned16 ? scaling.length !== 1 || scaling[0] !== numberCard(key, value) : scaling.length !== 0) {
+      throw new Error('Alignment diagnostic FITS has unsupported sample scaling')
+    }
   }
 }
 
