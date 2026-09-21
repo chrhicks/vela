@@ -7,7 +7,11 @@ import { createMemorySavedImageStore, type SavedImageStore } from '../saved-imag
 function deferred<T>() {
   let resolve!: (value: T) => void
   let reject!: (error: Error) => void
-  const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no })
+
+  const promise = new Promise<T>((yes, no) => {
+    resolve = yes
+    reject = no
+  })
 
   return { promise, resolve, reject }
 }
@@ -24,9 +28,23 @@ function setup(savedImages: SavedImageStore = createMemorySavedImageStore()) {
     },
   }
 
-  const actual = createCaptureController({ rigId: 'fra 400', rigName: 'FRA 400' }, () => Date.parse('2026-09-05T16:00:10Z'), savedImages)
-  const controller = { ...actual, start: (seconds: number, options: CaptureRunOptions = {}) => actual.start(seconds, camera, 'Main camera', options) }
-  const frame: CaptureFrame = { width: 4, height: 2, pixels: [0, 100, 500, 1000, 500, 0, 200, 100], capturedAt: '2026-09-05T16:00:00Z' }
+  const actual = createCaptureController(
+    { rigId: 'fra 400', rigName: 'FRA 400' },
+    () => Date.parse('2026-09-05T16:00:10Z'),
+    savedImages,
+  )
+
+  const controller = {
+    ...actual,
+    start: (seconds: number, options: CaptureRunOptions = {}) => actual.start(seconds, camera, 'Main camera', options),
+  }
+
+  const frame: CaptureFrame = {
+    width: 4,
+    height: 2,
+    pixels: [0, 100, 500, 1000, 500, 0, 200, 100],
+    capturedAt: '2026-09-05T16:00:00Z',
+  }
 
   async function complete(seconds = 10) {
     await controller.start(seconds)
@@ -54,10 +72,19 @@ it('owns one pending exposure, publishes a native PNG only after acquisition, an
   await vi.waitFor(() => expect(controller.active()).toBe(false))
   expect(settled).toHaveBeenCalledOnce()
   const view = controller.snapshot()
-  expect(view).toMatchObject({ phase: 'complete', active: false, error: null, latestImage: {
-    width: 4, height: 2, exposureSeconds: 10, capturedAt: frame.capturedAt,
-    receivedAt: '2026-09-05T16:00:10.000Z', cameraName: 'Main camera',
-  } })
+  expect(view).toMatchObject({
+    phase: 'complete',
+    active: false,
+    error: null,
+    latestImage: {
+      width: 4,
+      height: 2,
+      exposureSeconds: 10,
+      capturedAt: frame.capturedAt,
+      receivedAt: '2026-09-05T16:00:10.000Z',
+      cameraName: 'Main camera',
+    },
+  })
   const png = controller.image(view.latestImage!.id)!
   expect(view.latestImage!.imageUrl).toBe(`/api/rigs/fra%20400/capture/images/${view.latestImage!.id}`)
   expect(png.subarray(0, 8)).toEqual(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
@@ -88,17 +115,34 @@ it('keeps the same pending exposure, previous image and run lease through interr
   const pending = requests[1]!
   pending.onProgress({ phase: 'reading', elapsedSeconds: 10 })
   pending.onReadState('retrying')
-  expect(controller.snapshot()).toMatchObject({ active: true, phase: 'reading', captureReadState: 'retrying', completedCount: 1, latestImage: previous })
+  expect(controller.snapshot()).toMatchObject({
+    active: true,
+    phase: 'reading',
+    captureReadState: 'retrying',
+    completedCount: 1,
+    latestImage: previous,
+  })
   expect(settled).not.toHaveBeenCalled()
   pending.onReadState('current')
-  expect(controller.snapshot()).toMatchObject({ active: true, phase: 'reading', captureReadState: 'current', completedCount: 1, latestImage: previous })
+  expect(controller.snapshot()).toMatchObject({
+    active: true,
+    phase: 'reading',
+    captureReadState: 'current',
+    completedCount: 1,
+    latestImage: previous,
+  })
   expect(requests).toHaveLength(2)
   pending.resolve({ ...frame, capturedAt: '2026-09-05T16:01:00Z' })
   await vi.waitFor(() => expect(requests).toHaveLength(3))
   pending.onReadState('retrying')
   pending.onProgress({ phase: 'reading', elapsedSeconds: 10 })
-  expect(controller.snapshot()).toMatchObject({ phase: 'exposing', captureReadState: 'current', elapsedSeconds: 0, completedCount: 2,
-    latestImage: { capturedAt: '2026-09-05T16:01:00Z' } })
+  expect(controller.snapshot()).toMatchObject({
+    phase: 'exposing',
+    captureReadState: 'current',
+    elapsedSeconds: 0,
+    completedCount: 2,
+    latestImage: { capturedAt: '2026-09-05T16:01:00Z' },
+  })
   const stopping = controller.stop()
   requests[2]!.reject(new CaptureStoppedError())
   await stopping
@@ -171,7 +215,13 @@ it('repeats completed exposures under one lease and keeps the last frame and cou
   requests[0]!.resolve(frame)
   await vi.waitFor(() => expect(requests).toHaveLength(2))
   const previous = controller.snapshot().latestImage!
-  expect(controller.snapshot()).toMatchObject({ active: true, phase: 'exposing', repeat: true, completedCount: 1, elapsedSeconds: 0 })
+  expect(controller.snapshot()).toMatchObject({
+    active: true,
+    phase: 'exposing',
+    repeat: true,
+    completedCount: 1,
+    elapsedSeconds: 0,
+  })
   expect(settled).not.toHaveBeenCalled()
   requests[1]!.reject(new Error('Readout failed'))
   await vi.waitFor(() => expect(controller.active()).toBe(false))
@@ -201,7 +251,12 @@ it.each(['readout', 'preview'] as const)('stops during %s without another exposu
   expect(controller.snapshot()).toMatchObject({ phase: 'stopping', active: true, completedCount: 0 })
   expect(settled).not.toHaveBeenCalled()
   requests[0]!.resolve(frame)
-  expect(await stopping).toMatchObject({ phase: 'complete', active: false, completedCount: 1, latestImage: { capturedAt: frame.capturedAt } })
+  expect(await stopping).toMatchObject({
+    phase: 'complete',
+    active: false,
+    completedCount: 1,
+    latestImage: { capturedAt: frame.capturedAt },
+  })
   expect(requests).toHaveLength(1)
   expect(settled).toHaveBeenCalledOnce()
 })

@@ -10,15 +10,23 @@ import { createMemorySavedImageStore } from '../saved-images/store.js'
 import { registerSavedImages } from '../saved-images/routes.js'
 
 const record = {
-  id: 'sim', name: 'Simulator', endpoint: { host: '127.0.0.1', port: 11111 },
+  id: 'sim',
+  name: 'Simulator',
+  endpoint: { host: '127.0.0.1', port: 11111 },
   imagingCamera: { uniqueId: 'camera', name: 'Main camera' },
   addedAt: '2026-09-01T20:00:00.000Z',
-  lastObservedInventory: { observedAt: '2026-09-01T20:00:00.000Z',
+  lastObservedInventory: {
+    observedAt: '2026-09-01T20:00:00.000Z',
     devices: [{ uniqueId: 'camera', kind: 'camera' as const, name: 'Simulator camera' }],
   },
 }
 
-const frame: CaptureFrame = { width: 2, height: 2, pixels: [0, 100, 400, 1000], capturedAt: '2026-09-05T16:00:00Z' }
+const frame: CaptureFrame = {
+  width: 2,
+  height: 2,
+  pixels: [0, 100, 400, 1000],
+  capturedAt: '2026-09-05T16:00:00Z',
+}
 
 const cleanups: Array<() => Promise<void>> = []
 
@@ -27,7 +35,11 @@ afterEach(async () => { await Promise.all(cleanups.splice(0).map(cleanup => clea
 function deferred<T>() {
   let resolve!: (value: T) => void
   let reject!: (error: Error) => void
-  const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no })
+
+  const promise = new Promise<T>((yes, no) => {
+    resolve = yes
+    reject = no
+  })
 
   return { promise, resolve, reject }
 }
@@ -58,33 +70,41 @@ function setup(selection: { uniqueId: string, name: string } | null = record.ima
 
   const captureOptions: Parameters<typeof registerCapture>[3] = {
     savedImages,
-    createInspector: () => ({ async inspectDevices(): Promise<ReadonlyArray<AlpacaDeviceInspection>> {
-      inspections++
-      await inspectionGate
-      let values: Extract<AlpacaDeviceTelemetry, { kind: 'camera' }> = { kind: 'camera', activity }
+    createInspector: () => ({
+      async inspectDevices(): Promise<ReadonlyArray<AlpacaDeviceInspection>> {
+        inspections++
+        await inspectionGate
+        let values: Extract<AlpacaDeviceTelemetry, { kind: 'camera' }> = { kind: 'camera', activity }
 
-      if (options.sensorTemperatureC !== undefined) {
-        values = { ...values, sensorTemperatureC: options.sensorTemperatureC }
-      }
+        if (options.sensorTemperatureC !== undefined) {
+          values = { ...values, sensorTemperatureC: options.sensorTemperatureC }
+        }
 
-      if (options.cooling) {
-        values = { ...values, cooling: options.cooling }
-      }
+        if (options.cooling) {
+          values = { ...values, cooling: options.cooling }
+        }
 
-      return [{ providerDeviceId: cameraId, kind: 'camera', configuredName: 'Simulator camera', name: cameraName,
-        connection: connected ? 'connected' : 'disconnected',
-        telemetry: { availability: 'complete', values },
-      }]
-    } }),
+        return [{
+          providerDeviceId: cameraId,
+          kind: 'camera',
+          configuredName: 'Simulator camera',
+          name: cameraName,
+          connection: connected ? 'connected' : 'disconnected',
+          telemetry: { availability: 'complete', values },
+        }]
+      },
+    }),
     createCamera: settings => {
       bindings.push(settings)
 
-      return { capture(input) {
-      const result = deferred<CaptureFrame>()
-      captures.push({ ...input, ...result })
+      return {
+        capture(input) {
+          const result = deferred<CaptureFrame>()
+          captures.push({ ...input, ...result })
 
-      return result.promise
-    } }
+          return result.promise
+        },
+      }
     },
   }
 
@@ -98,10 +118,24 @@ function setup(selection: { uniqueId: string, name: string } | null = record.ima
     for (const capture of captures) capture.reject(new CaptureStoppedError())
     await app.close()
   })
-  const start = (body: InjectOptions['payload'] = { exposureSeconds: 10 }) => app.inject({ method: 'POST', url: '/api/rigs/sim/capture/start', payload: body })
+
+  const start = (body: InjectOptions['payload'] = { exposureSeconds: 10 }) => app.inject({
+    method: 'POST',
+    url: '/api/rigs/sim/capture/start',
+    payload: body,
+  })
+
   const get = () => app.inject({ method: 'GET', url: '/api/web/rigs/sim/capture' })
 
-  return { app, catalog, operations, captures, start, get, bindings, savedImages,
+  return {
+    app,
+    catalog,
+    operations,
+    captures,
+    start,
+    get,
+    bindings,
+    savedImages,
     replaceCamera: (id: string, name: string) => {
       cameraId = id
       cameraName = name
@@ -116,7 +150,18 @@ function setup(selection: { uniqueId: string, name: string } | null = record.ima
 it('rejects malformed input before acquiring or operating a camera', async () => {
   const subject = setup()
 
-  for (const body of [{}, { exposureSeconds: '10' }, { exposureSeconds: 0.09 }, { exposureSeconds: 601 }, { exposureSeconds: 1, gain: 0 }, { exposureSeconds: 1, repeat: 'true' }, { exposureSeconds: 1, repeat: null }, { exposureSeconds: 1, saveFrames: 'true' }, { exposureSeconds: 1, saveFrames: null }, []]) {
+  for (const body of [
+    {},
+    { exposureSeconds: '10' },
+    { exposureSeconds: 0.09 },
+    { exposureSeconds: 601 },
+    { exposureSeconds: 1, gain: 0 },
+    { exposureSeconds: 1, repeat: 'true' },
+    { exposureSeconds: 1, repeat: null },
+    { exposureSeconds: 1, saveFrames: 'true' },
+    { exposureSeconds: 1, saveFrames: null },
+    [],
+  ]) {
     expect((await subject.start(body)).statusCode).toBe(400)
   }
 
@@ -126,7 +171,11 @@ it('rejects malformed input before acquiring or operating a camera', async () =>
 })
 
 it('never captures without a matching explicitly selected identity', async () => {
-  for (const selection of [null, { uniqueId: 'different', name: 'Main camera' }, { uniqueId: 'camera', name: 'Replaced camera' }]) {
+  for (const selection of [
+    null,
+    { uniqueId: 'different', name: 'Main camera' },
+    { uniqueId: 'camera', name: 'Replaced camera' },
+  ]) {
     const subject = setup(selection)
     expect((await subject.get()).json().enabled).toBe(false)
     expect((await subject.start()).statusCode).toBe(409)
@@ -291,18 +340,30 @@ it('projects navigation progress and terminal state without inspecting devices o
   const list = vi.spyOn(subject.savedImages, 'list')
   subject.captures[0]!.onProgress({ phase: 'exposing', elapsedSeconds: 4 })
   expect((await navigation()).captures).toEqual([{
-    rigId: 'sim', rigName: 'Simulator', active: true, phase: 'exposing',
+    rigId: 'sim',
+    rigName: 'Simulator',
+    active: true,
+    phase: 'exposing',
     captureReadState: 'current',
-    completedCount: 0, elapsedSeconds: 4, exposureSeconds: 10, error: null,
+    completedCount: 0,
+    elapsedSeconds: 4,
+    exposureSeconds: 10,
+    error: null,
   }])
   subject.captures[0]!.resolve(frame)
   await vi.waitFor(() => expect(subject.captures).toHaveLength(2))
   subject.captures[1]!.onProgress({ phase: 'reading', elapsedSeconds: 10 })
   subject.captures[1]!.onReadState('retrying')
   expect((await navigation()).captures).toEqual([{
-    rigId: 'sim', rigName: 'Simulator', active: true, phase: 'reading',
+    rigId: 'sim',
+    rigName: 'Simulator',
+    active: true,
+    phase: 'reading',
     captureReadState: 'retrying',
-    completedCount: 1, elapsedSeconds: 10, exposureSeconds: 10, error: null,
+    completedCount: 1,
+    elapsedSeconds: 10,
+    exposureSeconds: 10,
+    error: null,
   }])
   expect(subject.operations.owner('sim')).toBe('capture')
   subject.captures[1]!.onReadState('current')
@@ -312,7 +373,12 @@ it('projects navigation progress and terminal state without inspecting devices o
   subject.captures[1]!.reject(new Error('Readout failed'))
   await vi.waitFor(() => expect(subject.operations.owner('sim')).toBeUndefined())
   expect((await navigation()).captures[0]).toMatchObject({
-    rigId: 'sim', rigName: 'Simulator', phase: 'failed', active: false, completedCount: 1, error: 'Readout failed',
+    rigId: 'sim',
+    rigName: 'Simulator',
+    phase: 'failed',
+    active: false,
+    completedCount: 1,
+    error: 'Readout failed',
     captureReadState: 'current',
   })
   expect(subject.inspections()).toBe(inspectionsAtStart)
@@ -330,7 +396,11 @@ it('shows confirmed cooler-off even when the sensor is near the retained setpoin
   })
 
   expect((await subject.get()).json().cooling).toEqual({
-    state: 'off', canSetTemperature: true, sensorTemperatureC: 4.8, setpointC: 5, powerPercent: 0,
+    state: 'off',
+    canSetTemperature: true,
+    sensorTemperatureC: 4.8,
+    setpointC: 5,
+    powerPercent: 0,
   })
 })
 
@@ -384,7 +454,12 @@ it('holds an exclusive cooling lease through confirmation and rejects other cool
     }),
   })
 
-  const cool = (coolerOn: boolean) => subject.app.inject({ method: 'POST', url: '/api/rigs/sim/capture/cooling', payload: { coolerOn } })
+  const cool = (coolerOn: boolean) => subject.app.inject({
+    method: 'POST',
+    url: '/api/rigs/sim/capture/cooling',
+    payload: { coolerOn },
+  })
+
   const first = cool(true)
   void first.then(() => {})
   await vi.waitFor(() => expect(commands).toHaveLength(1))

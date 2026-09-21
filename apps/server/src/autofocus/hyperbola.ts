@@ -22,7 +22,13 @@ export function fitHyperbola(points: HyperbolaPoint[]): HyperbolaFit | null {
   const yMin = Math.min(...ys)
   const span = Math.max(xMax - xMin, 1)
 
-  let best: { p: number, a: number, b: number, rSquared: number, rms: number } | undefined
+  let best: {
+    p: number
+    a: number
+    b: number
+    rSquared: number
+    rms: number
+  } | undefined
 
   function consider(p: number, a: number, b: number) {
     if (!(a > 0) || !(b > 0)) return
@@ -38,11 +44,33 @@ export function fitHyperbola(points: HyperbolaPoint[]): HyperbolaFit | null {
     if (!best || rms < best.rms) best = { p, a, b, rSquared: rSquared(data, a, b, p), rms }
   }
 
-  search(xMin, xMax, yMin * 0.4, yMin * 1.15, Math.max(span / 40, 0.5), Math.max(span / 2, 1), 21, 13, 13, consider)
+  search(
+    xMin,
+    xMax,
+    yMin * 0.4,
+    yMin * 1.15,
+    Math.max(span / 40, 0.5),
+    Math.max(span / 2, 1),
+    21,
+    13,
+    13,
+    consider,
+  )
 
   if (!best) return null
   const coarse = best
-  search(coarse.p - span / 20, coarse.p + span / 20, coarse.a * 0.85, coarse.a * 1.15, coarse.b * 0.7, coarse.b * 1.3, 15, 11, 11, consider)
+  search(
+    coarse.p - span / 20,
+    coarse.p + span / 20,
+    coarse.a * 0.85,
+    coarse.a * 1.15,
+    coarse.b * 0.7,
+    coarse.b * 1.3,
+    15,
+    11,
+    11,
+    consider,
+  )
   const refined = best
   const pLo = refined.p - Math.max(span / 80, 0.5)
   const pHi = refined.p + Math.max(span / 80, 0.5)

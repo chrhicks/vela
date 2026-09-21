@@ -55,9 +55,16 @@ describe('DSS2 persistent survey cache', () => {
     const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async () => response())
     const cache = createSurveyCache({ directory: await directory(), fetch })
 
-    for (const path of ['../secret', 'properties?url=https://example.org', 'Norder10/Dir0/Npix0.jpg',
-      'Norder0/Dir0/Npix12.jpg', 'Norder9/Dir0/Npix10000.jpg', 'Norder3/Allsky.png',
-      'Norder9/Dir0/Npix01.jpg', 'https://example.org/image.jpg']) {
+    for (const path of [
+      '../secret',
+      'properties?url=https://example.org',
+      'Norder10/Dir0/Npix0.jpg',
+      'Norder0/Dir0/Npix12.jpg',
+      'Norder9/Dir0/Npix10000.jpg',
+      'Norder3/Allsky.png',
+      'Norder9/Dir0/Npix01.jpg',
+      'https://example.org/image.jpg',
+    ]) {
       expect(() => cache.get(path), path).toThrow(RangeError)
     }
 
@@ -69,8 +76,10 @@ describe('DSS2 persistent survey cache', () => {
   it('preserves survey properties and their full copyright text', async () => {
     const text = 'creator_did = ivo://CDS/P/DSS2/color\nobs_copyright = Original attribution\n'
 
-    const cache = createSurveyCache({ directory: await directory(),
-      fetch: async () => new Response(text, { headers: { 'content-type': 'text/plain; charset=utf-8' } }) })
+    const cache = createSurveyCache({
+      directory: await directory(),
+      fetch: async () => new Response(text, { headers: { 'content-type': 'text/plain; charset=utf-8' } }),
+    })
 
     const result = await cache.get('properties')
     expect(result.body.toString()).toBe(text)
@@ -141,8 +150,15 @@ describe('DSS2 persistent survey cache', () => {
     const url = new URL(String(fetch.mock.calls[0]?.[0]))
     expect(url.origin + url.pathname).toBe('https://alasky.cds.unistra.fr/hips-image-services/hips2fits')
     expect(Object.fromEntries(url.searchParams)).toMatchObject({
-      hips: 'CDS/P/DSS2/color', ra: '12', dec: '-2', fov: '0.5',
-      width: '400', height: '300', coordsys: 'icrs', projection: 'TAN', format: 'jpg',
+      hips: 'CDS/P/DSS2/color',
+      ra: '12',
+      dec: '-2',
+      fov: '0.5',
+      width: '400',
+      height: '300',
+      coordsys: 'icrs',
+      projection: 'TAN',
+      format: 'jpg',
     })
     await cache.thumbnail({ raDegrees: 12, decDegrees: -2, majorAxisArcminutes: 1000 })
     expect(new URL(String(fetch.mock.calls[1]?.[0])).searchParams.get('fov')).toBe('5')
@@ -156,11 +172,13 @@ describe('DSS2 persistent survey cache', () => {
     registerSurvey(app, createSurveyCache({ directory: await directory(), fetch }))
 
     try {
-      for (const url of ['/api/survey/dss2/Norder0/Dir0/Npix12.jpg',
+      for (const url of [
+        '/api/survey/dss2/Norder0/Dir0/Npix12.jpg',
         '/api/survey/dss2/properties?url=https://example.org',
         '/api/survey/thumbnail?ra=0&dec=91&fov=1',
         '/api/survey/thumbnail?ra=0&dec=0&fov=1&url=https://example.org',
-        '/api/survey/thumbnail?ra=0&ra=1&dec=0&fov=1']) {
+        '/api/survey/thumbnail?ra=0&ra=1&dec=0&fov=1',
+      ]) {
         expect((await app.inject(url)).statusCode, url).toBe(400)
       }
 

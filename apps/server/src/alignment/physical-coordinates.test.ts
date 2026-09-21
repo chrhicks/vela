@@ -19,11 +19,20 @@ type CaptureFixture = typeof fixture.cases[number]['adjusted']
 
 const { site } = fixture
 
-const sample = (frame: CaptureFixture) => physicalAlignmentSample(frame.solved, { capturedAt: frame.capturedAt, exposureSeconds: 2 }, site)
+const sample = (frame: CaptureFixture) => physicalAlignmentSample(
+  frame.solved,
+  { capturedAt: frame.capturedAt, exposureSeconds: 2 },
+  site,
+)
 
 describe('physical alignment coordinate boundary', () => {
   it.each(fixture.cases)('recovers an independently constructed physical pole ($altitude, $azimuth)', reference => {
-    const samples: [AlignmentSample, AlignmentSample, AlignmentSample] = [sample(reference.samples[0]), sample(reference.samples[1]), sample(reference.samples[2])]
+    const samples: [AlignmentSample, AlignmentSample, AlignmentSample] = [
+      sample(reference.samples[0]),
+      sample(reference.samples[1]),
+      sample(reference.samples[2]),
+    ]
+
     expect(samples[0].siderealTimeDegrees).toBeGreaterThan(359)
     expect(samples[1].siderealTimeDegrees).toBeLessThan(1)
 
@@ -44,8 +53,14 @@ describe('physical alignment coordinate boundary', () => {
 
     // Independently project the ERFA target using a TAN basis and inversion
     // of a rotated, parity-flipped CD matrix, rather than production projectSky.
-    const wcs: PlateWcs = { width: 6248, height: 4176, referenceX: 3124.5, referenceY: 2088.5,
-      ...reference.adjusted.solved, cd: [0.00043, 0.00032, 0.00032, -0.00043] }
+    const wcs: PlateWcs = {
+      width: 6248,
+      height: 4176,
+      referenceX: 3124.5,
+      referenceY: 2088.5,
+      ...reference.adjusted.solved,
+      cd: [0.00043, 0.00032, 0.00032, -0.00043],
+    }
 
     const target = projectPhysicalAlignmentTarget(wcs, measurement.correctionTarget, current, site)!
     const expected = tangentPixel(wcs, reference.target)
@@ -66,16 +81,21 @@ describe('physical alignment coordinate boundary', () => {
 
 function tangentPixel(wcs: PlateWcs, point: SkyPosition) {
   const r = Math.PI / 180
-  const ra = point.raDegrees * r, dec = point.decDegrees * r
-  const centerRa = wcs.raDegrees * r, centerDec = wcs.decDegrees * r
+  const ra = point.raDegrees * r
+  const dec = point.decDegrees * r
+  const centerRa = wcs.raDegrees * r
+  const centerDec = wcs.decDegrees * r
   const vector = [Math.cos(dec) * Math.cos(ra), Math.cos(dec) * Math.sin(ra), Math.sin(dec)]
   const east = [-Math.sin(centerRa), Math.cos(centerRa), 0]
   const north = [-Math.sin(centerDec) * Math.cos(centerRa), -Math.sin(centerDec) * Math.sin(centerRa), Math.cos(centerDec)]
   const center = [Math.cos(centerDec) * Math.cos(centerRa), Math.cos(centerDec) * Math.sin(centerRa), Math.sin(centerDec)]
   const dot = (basis: number[]) => basis.reduce((sum, value, index) => sum + value * vector[index]!, 0)
-  const x = dot(east) / dot(center) / r, y = dot(north) / dot(center) / r
+  const x = dot(east) / dot(center) / r
+  const y = dot(north) / dot(center) / r
   const [a, b, c, d] = wcs.cd
 
-  return { x: wcs.referenceX - 1 + (d * x - b * y) / (a * d - b * c),
-    y: wcs.referenceY - 1 + (a * y - c * x) / (a * d - b * c) }
+  return {
+    x: wcs.referenceX - 1 + (d * x - b * y) / (a * d - b * c),
+    y: wcs.referenceY - 1 + (a * y - c * x) / (a * d - b * c),
+  }
 }

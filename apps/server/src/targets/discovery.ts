@@ -54,9 +54,15 @@ const clamp = (value: number) => Math.max(-1, Math.min(1, value))
 // California: https://www.spitzer.caltech.edu/image/ssc2020-10a-spitzer-california-nebula-mosaic
 // Heart/Soul and Orion/Flame identifications are documented at catalog/README.md.
 const categoryOverrides = new Map<string, TargetCategory>(Object.entries({
-  ic1396: 'emission', ic1805: 'emission', ic1848: 'emission',
-  ngc1499: 'emission', ngc1976: 'emission', ngc2024: 'emission',
-  ngc1432: 'reflection-dark', ngc1435: 'reflection-dark', ngc7023: 'reflection-dark',
+  ic1396: 'emission',
+  ic1805: 'emission',
+  ic1848: 'emission',
+  ngc1499: 'emission',
+  ngc1976: 'emission',
+  ngc2024: 'emission',
+  ngc1432: 'reflection-dark',
+  ngc1435: 'reflection-dark',
+  ngc7023: 'reflection-dark',
 } satisfies Record<string, TargetCategory>))
 
 // A small editorial nudge, not a whitelist or a brightness/magnitude surrogate.
@@ -81,14 +87,27 @@ function description(target: CatalogTarget) {
   // do not establish emission-line suitability. https://www.optolong.com/cms/document/detail/id/250.html
   const mixed = target.type === 'Star cluster and nebula' && !categoryOverrides.get(target.id)
 
-  const filter: TargetFilterChoice = mixed || category === 'other' ? 'uncertain'
-    : category === 'emission' || category === 'planetary' ? 'dual-band' : 'broadband'
+  const filter: TargetFilterChoice = mixed || category === 'other'
+    ? 'uncertain'
+    : category === 'emission' || category === 'planetary'
+      ? 'dual-band'
+      : 'broadband'
 
-  const filterReasons = { 'dual-band': 'emission-lines', broadband: 'continuum', uncertain: 'mixed-or-unknown' } as const
+  const filterReasons = {
+    'dual-band': 'emission-lines',
+    broadband: 'continuum',
+    uncertain: 'mixed-or-unknown',
+  } as const
+
   const filterReason = filterReasons[filter]
 
   const typeAppeal: Record<TargetCategory, number> = {
-    emission: 0.6, 'reflection-dark': 0.55, galaxy: 0.45, cluster: 0.4, planetary: 0.5, other: 0.15,
+    emission: 0.6,
+    'reflection-dark': 0.55,
+    galaxy: 0.45,
+    cluster: 0.4,
+    planetary: 0.5,
+    other: 0.15,
   }
 
   // Catalog angular extent is only a visual-interest hint: never inferred sensor fit.
@@ -117,7 +136,11 @@ function darkWindow(site: Site, now: Date): DiscoveryWindow | null {
   return {
     startsAt: dusk.toISOString(),
     endsAt: (dawn ?? new Date(dusk.getTime() + day)).toISOString(),
-    kind: !dawn ? 'polar-night' : darkNow ? 'current-night' : 'upcoming-night',
+    kind: !dawn
+      ? 'polar-night'
+      : darkNow
+        ? 'current-night'
+        : 'upcoming-night',
   }
 }
 
@@ -159,12 +182,23 @@ function timeAtAngle(samples: readonly SiderealSample[], angle: number): number 
   return a.at + (b.at - a.at) * Math.max(0, Math.min(1, (angle - a.angle) / (b.angle - a.angle)))
 }
 
-function altitude(x: number, y: number, z: number, sinLatitude: number, cosLatitude: number, angle: number) {
+function altitude(
+  x: number,
+  y: number,
+  z: number,
+  sinLatitude: number,
+  cosLatitude: number,
+  angle: number,
+) {
   return Math.asin(clamp(sinLatitude * z + cosLatitude * (x * Math.cos(angle) + y * Math.sin(angle)))) / radians
 }
 
 function opportunity(
-  position: Vector, samples: readonly SiderealSample[], sinLatitude: number, cosLatitude: number, currentAngle: number,
+  position: Vector,
+  samples: readonly SiderealSample[],
+  sinLatitude: number,
+  cosLatitude: number,
+  currentAngle: number,
 ): TargetOpportunity | null {
   const { x, y, z } = position
   const base = sinLatitude * z
@@ -173,7 +207,8 @@ function opportunity(
 
   if (base + amplitude <= threshold + 1e-12) return null
 
-  const halfArc = amplitude < 1e-12 || base - amplitude >= threshold ? Math.PI
+  const halfArc = amplitude < 1e-12 || base - amplitude >= threshold
+    ? Math.PI
     : Math.acos(clamp((threshold - base) / amplitude))
 
   const first = samples[0]!
@@ -204,7 +239,10 @@ function opportunity(
     const peakAngle = Math.max(interval.start, Math.min(interval.end, interval.transit))
     // A circumpolar interval may end before the next transit: compare both edges too.
     const peakOptions = [peakAngle, interval.start, interval.end]
-    peakOptions.sort((a, b) => altitude(x, y, z, sinLatitude, cosLatitude, b) - altitude(x, y, z, sinLatitude, cosLatitude, a) || a - b)
+    peakOptions.sort((a, b) =>
+      altitude(x, y, z, sinLatitude, cosLatitude, b)
+      - altitude(x, y, z, sinLatitude, cosLatitude, a) || a - b,
+    )
     const bestAngle = peakOptions[0]!
     const bestAltitudeDegrees = altitude(x, y, z, sinLatitude, cosLatitude, bestAngle)
     const usefulMinutes = (endsAt - startsAt) / 60_000
@@ -215,8 +253,12 @@ function opportunity(
     if (value > bestValue) {
       bestValue = value
       best = {
-        startsAt: new Date(startsAt).toISOString(), endsAt: new Date(endsAt).toISOString(), usefulMinutes,
-        bestAt: new Date(timeAtAngle(samples, bestAngle)).toISOString(), bestAltitudeDegrees, currentAltitudeDegrees,
+        startsAt: new Date(startsAt).toISOString(),
+        endsAt: new Date(endsAt).toISOString(),
+        usefulMinutes,
+        bestAt: new Date(timeAtAngle(samples, bestAngle)).toISOString(),
+        bestAltitudeDegrees,
+        currentAltitudeDegrees,
       }
     }
   }
@@ -236,10 +278,17 @@ export function discoverTargets({ targets, site, now }: DiscoveryInput): TargetD
   const validSite = usableSite(site) ? site : null
   const window = validSite ? darkWindow(validSite, now) : null
   const samples = window && validSite ? siderealSamples(window, validSite.longitudeDegrees) : null
-  const epoch = MakeTime(window ? new Date((Date.parse(window.startsAt) + Date.parse(window.endsAt)) / 2) : now)
+
+  const epoch = MakeTime(window
+    ? new Date((Date.parse(window.startsAt) + Date.parse(window.endsAt)) / 2)
+    : now)
+
   const rotation = samples ? Rotation_EQJ_EQD(epoch) : null
   const latitude = (validSite?.latitudeDegrees ?? 0) * radians
-  const currentAngle = samples && validSite ? (SiderealTime(now) * 15 + validSite.longitudeDegrees) * radians : 0
+
+  const currentAngle = samples && validSite
+    ? (SiderealTime(now) * 15 + validSite.longitudeDegrees) * radians
+    : 0
 
   const candidates = targets.map((target): DiscoveryCandidate => {
     const details = description(target)
@@ -248,7 +297,14 @@ export function discoverTargets({ targets, site, now }: DiscoveryInput): TargetD
     if (samples && rotation) {
       const ra = target.raDegrees * radians
       const dec = target.decDegrees * radians
-      const position = RotateVector(rotation, new Vector(Math.cos(dec) * Math.cos(ra), Math.cos(dec) * Math.sin(ra), Math.sin(dec), epoch))
+
+      const position = RotateVector(rotation, new Vector(
+        Math.cos(dec) * Math.cos(ra),
+        Math.cos(dec) * Math.sin(ra),
+        Math.sin(dec),
+        epoch,
+      ))
+
       available = opportunity(position, samples, Math.sin(latitude), Math.cos(latitude), currentAngle)
     }
 
@@ -258,13 +314,27 @@ export function discoverTargets({ targets, site, now }: DiscoveryInput): TargetD
     const altitudeWeight = available ? 0.5 + 0.5 * Math.sin(available.bestAltitudeDegrees * radians) : 1
 
     return {
-      target, category: details.category, filter: details.filter, filterReason: details.filterReason,
-      eligible: available !== null, opportunity: available, score: 100 * details.appeal * timeWeight * altitudeWeight,
+      target,
+      category: details.category,
+      filter: details.filter,
+      filterReason: details.filterReason,
+      eligible: available !== null,
+      opportunity: available,
+      score: 100 * details.appeal * timeWeight * altitudeWeight,
     }
   })
 
   candidates.sort((a, b) => Number(b.eligible) - Number(a.eligible) || b.score - a.score
     || (a.target.id < b.target.id ? -1 : a.target.id > b.target.id ? 1 : 0))
 
-  return { observedAt: now.toISOString(), status: !validSite ? 'site-unavailable' : !window ? 'no-darkness' : 'available', window, candidates }
+  return {
+    observedAt: now.toISOString(),
+    status: !validSite
+      ? 'site-unavailable'
+      : !window
+        ? 'no-darkness'
+        : 'available',
+    window,
+    candidates,
+  }
 }

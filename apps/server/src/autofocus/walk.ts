@@ -17,7 +17,11 @@ export interface AutofocusWalkPlan {
 
 export type AutofocusWalkPlanning =
   | { ok: true, plan: AutofocusWalkPlan }
-  | { ok: false, reason: 'start-at-limit' | 'window-hits-limit' | 'invalid', message: string }
+  | {
+    ok: false
+    reason: 'start-at-limit' | 'window-hits-limit' | 'invalid'
+    message: string
+  }
 
 export function planStarHfrWalk(
   start: number,
@@ -26,11 +30,19 @@ export function planStarHfrWalk(
   maxStep: number,
 ): AutofocusWalkPlanning {
   if (!Number.isSafeInteger(start) || !Number.isSafeInteger(stepSize) || !Number.isSafeInteger(offsetSteps) || !Number.isSafeInteger(maxStep)) {
-    return { ok: false, reason: 'invalid', message: 'Autofocus needs integer start, step size, offset and MaxStep.' }
+    return {
+      ok: false,
+      reason: 'invalid',
+      message: 'Autofocus needs integer start, step size, offset and MaxStep.',
+    }
   }
 
   if (stepSize < 1 || offsetSteps < 1 || offsetSteps > 10 || maxStep < 2) {
-    return { ok: false, reason: 'invalid', message: 'Step size and offset must fit a small window around the current focuser position.' }
+    return {
+      ok: false,
+      reason: 'invalid',
+      message: 'Step size and offset must fit a small window around the current focuser position.',
+    }
   }
 
   const mechanicalMin = MECHANICAL_END_MARGIN
@@ -59,7 +71,10 @@ export function planStarHfrWalk(
 
   for (let position = maxPosition; position >= minPosition; position -= stepSize) positions.push(position)
 
-  return { ok: true, plan: { start, stepSize, offsetSteps, maxStep, minPosition, maxPosition, positions } }
+  return {
+    ok: true,
+    plan: { start, stepSize, offsetSteps, maxStep, minPosition, maxPosition, positions },
+  }
 }
 
 export function assertCommandedPosition(position: number, plan: AutofocusWalkPlan, extraMin?: number) {
@@ -79,7 +94,10 @@ export function assertCommandedPosition(position: number, plan: AutofocusWalkPla
 }
 
 /** One or two extra inward samples to close a V whose minimum is still at the inner edge. */
-export function extraInwardPosition(plan: AutofocusWalkPlan, samples: { position: number, hfrPixels: number | null }[]): number | undefined {
+export function extraInwardPosition(
+  plan: AutofocusWalkPlan,
+  samples: { position: number, hfrPixels: number | null }[],
+): number | undefined {
   if (samples.length >= plan.positions.length + 2) return undefined
   const measured = samples.filter(sample => sample.hfrPixels !== null)
 

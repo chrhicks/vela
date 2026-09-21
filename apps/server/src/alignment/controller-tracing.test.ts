@@ -12,18 +12,31 @@ it('exports correlated steps while a detached alignment is active and records ca
   const pending = new Promise<void>(resolve => { capturing = resolve })
 
   const hardware: AlpacaAcquisition = {
-    pointing: async () => ({ rightAscensionDegrees: 12, declinationDegrees: 60, siderealTimeDegrees: 0,
-      latitudeDegrees: 40, tracking: true, coordinateSystem: 'j2000' }),
+    pointing: async () => ({
+      rightAscensionDegrees: 12,
+      declinationDegrees: 60,
+      siderealTimeDegrees: 0,
+      latitudeDegrees: 40,
+      tracking: true,
+      coordinateSystem: 'j2000',
+    }),
     capture: async ({ signal }) => new Promise((_resolve, reject) => {
       capturing()
       signal!.addEventListener('abort', () => reject(signal!.reason), { once: true })
     }),
-    move: async () => {}, rotateRightAscension: async () => {}, abort: async () => {},
+    move: async () => {},
+    rotateRightAscension: async () => {},
+    abort: async () => {},
   }
 
   const alignment = createAlignmentController({
     mode: 'offline',
-    settings: { cameraId: 'camera', telescopeId: 'mount', exposureSeconds: 1, fieldHeightDegrees: 3 },
+    settings: {
+      cameraId: 'camera',
+      telescopeId: 'mount',
+      exposureSeconds: 1,
+      fieldHeightDegrees: 3,
+    },
     hardware,
     solver: { solve: async () => { throw new Error('Capture is still pending') } },
   })

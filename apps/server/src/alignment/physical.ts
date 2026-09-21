@@ -14,8 +14,12 @@ const difference = (a: number, b: number) => ((a - b + 540) % 360) - 180
 
 /** One explicitly prepared physical RA sweep. Never use coordinate slews here:
  * a pointing model may move DEC even when the requested declination is fixed. */
-export function createPhysicalAlignment(settings: PhysicalAlignmentSettings, acquisition: AlpacaAcquisition, device: AlpacaFraming,
-  settle: (signal: AbortSignal) => Promise<void> = signal => delay(3_000, undefined, { signal })) {
+export function createPhysicalAlignment(
+  settings: PhysicalAlignmentSettings,
+  acquisition: AlpacaAcquisition,
+  device: AlpacaFraming,
+  settle: (signal: AbortSignal) => Promise<void> = signal => delay(3_000, undefined, { signal }),
+) {
   let reference: AlpacaTelescopeStatus | undefined
   let geometry: AlpacaCameraGeometry | undefined
   let site: Site | undefined
@@ -24,9 +28,11 @@ export function createPhysicalAlignment(settings: PhysicalAlignmentSettings, acq
   async function status(signal: AbortSignal, { allowMovement = false, allowTrackingOff = false } = {}) {
     const current = await device.telescopeStatus(settings.telescopeId, signal, { includeAlignmentObservations: true })
 
-    if (current.parked || current.slewing || (!current.tracking && !allowTrackingOff)) throw new Error('Polar alignment requires an idle, unparked mount with tracking enabled')
+    if (current.parked || current.slewing || (!current.tracking && !allowTrackingOff))
+      throw new Error('Polar alignment requires an idle, unparked mount with tracking enabled')
 
-    if (current.coordinateSystem !== 'topocentric') throw new Error('This physical alignment trial requires topocentric mount coordinates')
+    if (current.coordinateSystem !== 'topocentric')
+      throw new Error('This physical alignment trial requires topocentric mount coordinates')
 
     if (current.trackingRate !== 'sidereal' || current.rightAscensionRateSecondsPerSiderealSecond !== 0 || current.declinationRateArcsecondsPerSecond !== 0) {
       throw new Error('Confirm sidereal tracking with zero RA and DEC rate offsets before alignment')
@@ -37,8 +43,10 @@ export function createPhysicalAlignment(settings: PhysicalAlignmentSettings, acq
     }
 
     if (reference) {
-      const fieldFromMeridian = difference(current.rightAscensionDegrees,
-        localSiderealDegrees(new Date(current.observedAt), site!))
+      const fieldFromMeridian = difference(
+        current.rightAscensionDegrees,
+        localSiderealDegrees(new Date(current.observedAt), site!),
+      )
 
       if (fieldFromMeridian < 5 || fieldFromMeridian > 170) {
         throw new Error('The alignment field is approaching the meridian boundary. Measure a new baseline.')
@@ -68,9 +76,14 @@ export function createPhysicalAlignment(settings: PhysicalAlignmentSettings, acq
     site = { latitudeDegrees: initial.latitudeDegrees!, longitudeDegrees: initial.longitudeDegrees! }
 
     if (initial.elevationMeters !== undefined) site.elevationMeters = initial.elevationMeters
-    const observed = await device.cameraGeometry({ cameraId: settings.cameraId, expectedCameraName: settings.cameraName }, signal)
 
-    if (!Number.isFinite(settings.focalLengthMm) || settings.focalLengthMm <= 0) throw new Error('Set the effective focal length before alignment')
+    const observed = await device.cameraGeometry(
+      { cameraId: settings.cameraId, expectedCameraName: settings.cameraName },
+      signal,
+    )
+
+    if (!Number.isFinite(settings.focalLengthMm) || settings.focalLengthMm <= 0)
+      throw new Error('Set the effective focal length before alignment')
     await device.home(settings.telescopeId, signal)
     const homed = await device.telescopeStatus(settings.telescopeId, signal)
 
@@ -80,8 +93,12 @@ export function createPhysicalAlignment(settings: PhysicalAlignmentSettings, acq
     // A fixed hour angle avoids the ambiguous RA reported at Home and keeps
     // the entire westward sweep east of the meridian.
     const startingRa = (localSiderealDegrees(new Date(homed.observedAt), site) + 130) % 360
-    await device.slew({ telescopeId: settings.telescopeId, rightAscensionDegrees: startingRa,
-      declinationDegrees: 80, coordinateSystem: homed.coordinateSystem }, signal)
+    await device.slew({
+      telescopeId: settings.telescopeId,
+      rightAscensionDegrees: startingRa,
+      declinationDegrees: 80,
+      coordinateSystem: homed.coordinateSystem,
+    }, signal)
     await settle(signal)
     const current = await status(signal)
 
@@ -96,7 +113,9 @@ export function createPhysicalAlignment(settings: PhysicalAlignmentSettings, acq
 
     if (current.elevationMeters !== undefined) site.elevationMeters = current.elevationMeters
 
-    return { fieldHeightDegrees: 2 * Math.atan(observed.height * observed.pixelHeightMicrons * observed.binY / 2000 / settings.focalLengthMm) * 180 / Math.PI }
+    return {
+      fieldHeightDegrees: 2 * Math.atan(observed.height * observed.pixelHeightMicrons * observed.binY / 2000 / settings.focalLengthMm) * 180 / Math.PI,
+    }
   }
 
   async function pointing(signal: AbortSignal) {
@@ -104,13 +123,24 @@ export function createPhysicalAlignment(settings: PhysicalAlignmentSettings, acq
     // Stopped telemetry does not establish that vibration has settled.
     await settle(signal)
     const current = await status(signal)
-    const observed = await device.cameraGeometry({ cameraId: settings.cameraId, expectedCameraName: settings.cameraName }, signal)
+
+    const observed = await device.cameraGeometry(
+      { cameraId: settings.cameraId, expectedCameraName: settings.cameraName },
+      signal,
+    )
 
     if (!sameCameraGeometry(observed, geometry)) throw new Error('Camera geometry changed. Measure a new baseline.')
 
-    return { hint: fromMount({ raDegrees: current.rightAscensionDegrees, decDegrees: current.declinationDegrees },
-      current.coordinateSystem, new Date(current.observedAt), site!), latitude: site!.latitudeDegrees,
-      observation: { site: { ...site! }, camera: observed, mount: current } }
+    return {
+      hint: fromMount(
+        { raDegrees: current.rightAscensionDegrees, decDegrees: current.declinationDegrees },
+        current.coordinateSystem,
+        new Date(current.observedAt),
+        site!,
+      ),
+      latitude: site!.latitudeDegrees,
+      observation: { site: { ...site! }, camera: observed, mount: current },
+    }
   }
 
   async function move(signal: AbortSignal) {
@@ -125,9 +155,11 @@ export function createPhysicalAlignment(settings: PhysicalAlignmentSettings, acq
       current = await status(signal, { allowMovement: true })
       const observed = difference(current.rightAscensionDegrees, start.rightAscensionDegrees)
 
-      if (Math.abs(observed) < 0.1 || Math.abs(observed) > 1) throw new Error(`RA direction check expected 0.1–1° of movement; the mount reported ${observed.toFixed(3)}°`)
+      if (Math.abs(observed) < 0.1 || Math.abs(observed) > 1)
+        throw new Error(`RA direction check expected 0.1–1° of movement; the mount reported ${observed.toFixed(3)}°`)
 
-      if (Math.abs(current.declinationDegrees - start.declinationDegrees) > 0.1) throw new Error(`RA direction check changed reported DEC by ${(current.declinationDegrees - start.declinationDegrees).toFixed(3)}°`)
+      if (Math.abs(current.declinationDegrees - start.declinationDegrees) > 0.1)
+        throw new Error(`RA direction check changed reported DEC by ${(current.declinationDegrees - start.declinationDegrees).toFixed(3)}°`)
       // Slower travel leaves room for delayed RA feedback and motor stopping
       // within the existing 54–60° endpoint corridor.
       westRate = -Math.sign(observed)
@@ -148,16 +180,26 @@ export function createPhysicalAlignment(settings: PhysicalAlignmentSettings, acq
   }
 
   return {
-    prepare, pointing, move,
+    prepare,
+    pointing,
+    move,
     validate: async (signal: AbortSignal, frame?: Pick<AlpacaFrame, 'width' | 'height'>) => {
       const current = await status(signal)
 
-      if (frame && (frame.width !== geometry?.width || frame.height !== geometry.height)) throw new Error('Captured image dimensions changed. Measure a new baseline.')
+      if (frame && (frame.width !== geometry?.width || frame.height !== geometry.height))
+        throw new Error('Captured image dimensions changed. Measure a new baseline.')
 
       return current
     },
-    sample: (solved: Parameters<typeof physicalAlignmentSample>[0], frame: Parameters<typeof physicalAlignmentSample>[1]) => physicalAlignmentSample(solved, frame, site!),
-    project: (wcs: Parameters<typeof projectPhysicalAlignmentTarget>[0], target: Parameters<typeof projectPhysicalAlignmentTarget>[1], sample: Parameters<typeof projectPhysicalAlignmentTarget>[2]) => projectPhysicalAlignmentTarget(wcs, target, sample, site!),
+    sample: (
+      solved: Parameters<typeof physicalAlignmentSample>[0],
+      frame: Parameters<typeof physicalAlignmentSample>[1],
+    ) => physicalAlignmentSample(solved, frame, site!),
+    project: (
+      wcs: Parameters<typeof projectPhysicalAlignmentTarget>[0],
+      target: Parameters<typeof projectPhysicalAlignmentTarget>[1],
+      sample: Parameters<typeof projectPhysicalAlignmentTarget>[2],
+    ) => projectPhysicalAlignmentTarget(wcs, target, sample, site!),
     cameraName: settings.cameraName,
   }
 }
