@@ -34,7 +34,7 @@ export interface SavedImage extends CaptureImage {
   previewDownloadUrl: string
   /** Rendering state is separate from immutable capture facts; absent on older API fixtures. */
   previewRendering?:
-    | { status: 'current', version: 'background-v1' }
+    | { status: 'current'; version: 'background-v1' }
     | { status: 'legacy' }
     | { status: 'unavailable' }
 }

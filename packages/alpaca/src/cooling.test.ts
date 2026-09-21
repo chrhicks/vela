@@ -33,7 +33,7 @@ interface CameraState {
 
 function scriptedCamera(
   state: CameraState,
-  requests: Array<{ method: string, path: string, body?: string }> = [],
+  requests: Array<{ method: string; path: string; body?: string }> = [],
 ): typeof globalThis.fetch {
   return async (input, init) => {
     const url = new URL(String(input))
@@ -59,7 +59,8 @@ function scriptedCamera(
 
     if (path.endsWith('/ccdtemperature')) return json(envelope(state.sensorC))
 
-    if (path.endsWith('/setccdtemperature') && method === 'GET') return json(envelope(state.setpointC))
+    if (path.endsWith('/setccdtemperature') && method === 'GET')
+      return json(envelope(state.setpointC))
 
     if (path.endsWith('/coolerpower')) return json(envelope(state.powerPercent))
 
@@ -79,7 +80,8 @@ function scriptedCamera(
     }
 
     if (path.endsWith('/cooleron') && method === 'PUT') {
-      if (state.rejectCoolerOn !== undefined) return json(methodEnvelope(state.rejectCoolerOn, 'Device rejected CoolerOn'))
+      if (state.rejectCoolerOn !== undefined)
+        return json(methodEnvelope(state.rejectCoolerOn, 'Device rejected CoolerOn'))
 
       state.coolerOn = new URLSearchParams(body).get('CoolerOn') === 'true'
 
@@ -97,8 +99,14 @@ function scriptedCamera(
   }
 }
 
-function cooling(state: CameraState, requests: Array<{ method: string, path: string, body?: string }> = []) {
-  return createAlpacaCameraCooling({ baseUrl: 'http://alpaca.test', fetch: scriptedCamera(state, requests) })
+function cooling(
+  state: CameraState,
+  requests: Array<{ method: string; path: string; body?: string }> = [],
+) {
+  return createAlpacaCameraCooling({
+    baseUrl: 'http://alpaca.test',
+    fetch: scriptedCamera(state, requests),
+  })
 }
 
 const cooled = (): CameraState => ({
@@ -128,9 +136,13 @@ describe('camera cooling commands', () => {
   })
 
   it('turns the cooler on only when requested and confirms CoolerOn before reporting success', async () => {
-    const requests: Array<{ method: string, path: string, body?: string }> = []
+    const requests: Array<{ method: string; path: string; body?: string }> = []
     const state = cooled()
-    const result = await cooling(state, requests).setCooling({ cameraId: 'camera-0', coolerOn: true })
+
+    const result = await cooling(state, requests).setCooling({
+      cameraId: 'camera-0',
+      coolerOn: true,
+    })
 
     expect(result).toMatchObject({
       outcome: 'confirmed',
@@ -139,17 +151,26 @@ describe('camera cooling commands', () => {
     const coolerWrites: Array<string | undefined> = []
 
     for (const request of requests) {
-      if (request.method === 'PUT' && request.path.endsWith('/cooleron')) coolerWrites.push(request.body)
+      if (request.method === 'PUT' && request.path.endsWith('/cooleron'))
+        coolerWrites.push(request.body)
     }
 
     expect(coolerWrites).toEqual(['CoolerOn=true'])
-    expect(requests.some(request => request.path.endsWith('/setccdtemperature') && request.method === 'PUT')).toBe(false)
+    expect(
+      requests.some(
+        request => request.path.endsWith('/setccdtemperature') && request.method === 'PUT',
+      ),
+    ).toBe(false)
   })
 
   it('sets a target temperature without enabling the cooler', async () => {
-    const requests: Array<{ method: string, path: string, body?: string }> = []
+    const requests: Array<{ method: string; path: string; body?: string }> = []
     const state = cooled()
-    const result = await cooling(state, requests).setCooling({ cameraId: 'camera-0', setpointC: -5 })
+
+    const result = await cooling(state, requests).setCooling({
+      cameraId: 'camera-0',
+      setpointC: -5,
+    })
 
     expect(result).toEqual({
       outcome: 'confirmed',
@@ -172,12 +193,19 @@ describe('camera cooling commands', () => {
   })
 
   it('does not write CoolerOn when a setpoint write cannot be confirmed', async () => {
-    const requests: Array<{ method: string, path: string, body?: string }> = []
+    const requests: Array<{ method: string; path: string; body?: string }> = []
     const state = { ...cooled(), dropSetpointWrite: true }
-    const result = await cooling(state, requests).setCooling({ cameraId: 'camera-0', coolerOn: true, setpointC: -5 })
+
+    const result = await cooling(state, requests).setCooling({
+      cameraId: 'camera-0',
+      coolerOn: true,
+      setpointC: -5,
+    })
 
     expect(result).toEqual({ outcome: 'uncertain', reason: 'write-outcome-unknown' })
-    expect(requests.some(request => request.path.endsWith('/cooleron') && request.method === 'PUT')).toBe(false)
+    expect(
+      requests.some(request => request.path.endsWith('/cooleron') && request.method === 'PUT'),
+    ).toBe(false)
   })
 
   it('reports a rejected CoolerOn write without treating sensor temperature as success', async () => {
@@ -189,7 +217,7 @@ describe('camera cooling commands', () => {
   })
 
   it('refuses a temperature write when the camera has no setpoint control', async () => {
-    const requests: Array<{ method: string, path: string, body?: string }> = []
+    const requests: Array<{ method: string; path: string; body?: string }> = []
 
     const result = await cooling({ ...cooled(), canSetTemperature: false }, requests).setCooling({
       cameraId: 'camera-0',

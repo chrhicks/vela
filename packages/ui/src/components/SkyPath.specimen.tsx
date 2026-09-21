@@ -6,7 +6,13 @@ import './SkyPath.specimen.css'
 
 type Props = Record<string, string | number | boolean>
 
-function SkyPathPreview({ props, onPropsChange }: { props: Props, onPropsChange?: (patch: Props) => void }) {
+function SkyPathPreview({
+  props,
+  onPropsChange,
+}: {
+  props: Props
+  onPropsChange?: (patch: Props) => void
+}) {
   function targetLabel() {
     switch (targetId) {
       case 'low-target':
@@ -22,7 +28,10 @@ function SkyPathPreview({ props, onPropsChange }: { props: Props, onPropsChange?
 
   const [local, setLocal] = useState(props)
   const values = onPropsChange ? props : local
-  const update = (patch: Props) => onPropsChange ? onPropsChange(patch) : setLocal(current => ({ ...current, ...patch }))
+
+  const update = (patch: Props) =>
+    onPropsChange ? onPropsChange(patch) : setLocal(current => ({ ...current, ...patch }))
+
   const horizon = getDemoHorizon(String(values.horizon))
   const moonSamples = getMoonSamples(String(values.moon ?? 'gibbous'))
   const targetId = String(values.target)
@@ -52,15 +61,24 @@ export const specimen: ComponentSpecimen = {
   componentName: 'Sky path',
   id: 'sky-path-primitive',
   name: 'Primitive anatomy',
-  description: 'Overhead target path, linked time selection and an optional horizon. Generated sample geometry contains no private observing-site data.',
+  description:
+    'Overhead target path, linked time selection and an optional horizon. Generated sample geometry contains no private observing-site data.',
   controls: {
-    target: { type: 'select', label: 'Target', options: ['andromeda', 'm13', 'crescent', 'low-target'] },
+    target: {
+      type: 'select',
+      label: 'Target',
+      options: ['andromeda', 'm13', 'crescent', 'low-target'],
+    },
     moon: {
       type: 'select',
       label: 'Sample Moon',
-      options: ['gibbous', 'crescent', 'waning', 'full', 'new', 'unavailable', 'none']
+      options: ['gibbous', 'crescent', 'waning', 'full', 'new', 'unavailable', 'none'],
     },
-    horizon: { type: 'select', label: 'Horizon profile', options: ['none', 'local', 'incomplete', 'uncalibrated'] },
+    horizon: {
+      type: 'select',
+      label: 'Horizon profile',
+      options: ['none', 'local', 'incomplete', 'uncalibrated'],
+    },
     selectedIndex: { type: 'text', label: 'Time sample (0–48)' },
     marginDegrees: { type: 'text', label: 'Silhouette margin (degrees)' },
     compact: { type: 'boolean', label: 'Compact presentation' },
@@ -73,7 +91,9 @@ export const specimen: ComponentSpecimen = {
     selectedIndex: 18,
     marginDegrees: 3,
     compact: false,
-    empty: false
+    empty: false,
   },
-  render: (props, onPropsChange) => <SkyPathPreview props={props} {...(onPropsChange ? { onPropsChange } : {})} />,
+  render: (props, onPropsChange) => (
+    <SkyPathPreview props={props} {...(onPropsChange ? { onPropsChange } : {})} />
+  ),
 }

@@ -2,9 +2,7 @@ import { z } from 'zod'
 import type { DiscoveryResultView } from '@vela/model/rig'
 import { api, ApiError } from '../../lib/api'
 
-export type DiscoverRigsRequest =
-  | { mode: 'scan' }
-  | { mode: 'manual'; host: string; port: number }
+export type DiscoverRigsRequest = { mode: 'scan' } | { mode: 'manual'; host: string; port: number }
 
 export class DiscoverRigsError extends Error {
   constructor(readonly reason: 'invalid-request') {
@@ -51,45 +49,53 @@ const isoDate = z.string().refine(value => {
 })
 
 const discoveryResult = z.object({
-  candidates: z.array(z.object({
-    endpoint,
-    server: z.object({
-      name: z.string().optional(),
-      manufacturer: z.string().optional(),
-      manufacturerVersion: z.string().optional(),
-      location: z.string().optional(),
-    }).optional(),
-    inspectedAt: isoDate,
-    devices: z.array(z.object({
-      kind: z.enum([
-        'camera',
-        'cover-calibrator',
-        'dome',
-        'filter-wheel',
-        'focuser',
-        'observing-conditions',
-        'rotator',
-        'safety-monitor',
-        'switch',
-        'telescope',
-        'unknown',
+  candidates: z.array(
+    z.object({
+      endpoint,
+      server: z
+        .object({
+          name: z.string().optional(),
+          manufacturer: z.string().optional(),
+          manufacturerVersion: z.string().optional(),
+          location: z.string().optional(),
+        })
+        .optional(),
+      inspectedAt: isoDate,
+      devices: z.array(
+        z.object({
+          kind: z.enum([
+            'camera',
+            'cover-calibrator',
+            'dome',
+            'filter-wheel',
+            'focuser',
+            'observing-conditions',
+            'rotator',
+            'safety-monitor',
+            'switch',
+            'telescope',
+            'unknown',
+          ]),
+          name: z.string(),
+        }),
+      ),
+      disposition: z.discriminatedUnion('state', [
+        z.object({ state: z.literal('new') }),
+        z.object({ state: z.literal('conflict') }),
+        z.object({ state: z.literal('ineligible'), reason: z.literal('no-stable-device-id') }),
+        z.object({
+          state: z.literal('already-added'),
+          rigId: z.string().refine(value => value.trim().length > 0),
+        }),
       ]),
-      name: z.string(),
-    })),
-    disposition: z.discriminatedUnion('state', [
-      z.object({ state: z.literal('new') }),
-      z.object({ state: z.literal('conflict') }),
-      z.object({ state: z.literal('ineligible'), reason: z.literal('no-stable-device-id') }),
-      z.object({
-        state: z.literal('already-added'),
-        rigId: z.string().refine(value => value.trim().length > 0),
-      }),
-    ]),
-  })),
-  failures: z.array(z.object({
-    endpoint: endpoint.optional(),
-    reason: z.enum(['scan-failed', 'unreachable', 'invalid-response', 'protocol-error']),
-  })),
+    }),
+  ),
+  failures: z.array(
+    z.object({
+      endpoint: endpoint.optional(),
+      reason: z.enum(['scan-failed', 'unreachable', 'invalid-response', 'protocol-error']),
+    }),
+  ),
 })
 
 function isDiscoveryResult(value: unknown): value is DiscoveryResultView {

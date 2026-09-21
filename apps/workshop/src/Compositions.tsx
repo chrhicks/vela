@@ -43,7 +43,9 @@ export const compositions: CompositionDefinition[] = [
         <Input label="Target" placeholder="NGC 7000" />
         <Select defaultValue="main" label="Camera" options={deviceOptions} />
         <Checkbox defaultChecked label="Dither between frames" />
-        <Badge marker={<i />} tone="positive">Ready</Badge>
+        <Badge marker={<i />} tone="positive">
+          Ready
+        </Badge>
       </div>
     ),
   },
@@ -57,12 +59,16 @@ export const compositions: CompositionDefinition[] = [
     render: () => (
       <Panel
         description="Configure how the next sequence should begin."
-        footer={(
+        footer={
           <>
-            <Button size="small" tone="quiet">Cancel</Button>
-            <Button size="small" tone="accent">Apply</Button>
+            <Button size="small" tone="quiet">
+              Cancel
+            </Button>
+            <Button size="small" tone="accent">
+              Apply
+            </Button>
           </>
-        )}
+        }
         title="Sequence settings"
       >
         <Input label="Target" placeholder="NGC 7000" />
@@ -88,8 +94,12 @@ export const compositions: CompositionDefinition[] = [
           <strong>Capture</strong>
           <span>03:42 remaining</span>
         </div>
-        <Badge marker={<i />} size="small" tone="positive">Guiding</Badge>
-        <Button size="small" tone="quiet">Pause</Button>
+        <Badge marker={<i />} size="small" tone="positive">
+          Guiding
+        </Badge>
+        <Button size="small" tone="quiet">
+          Pause
+        </Button>
         <IconButton icon={<MoreIcon />} label="More actions" size="small" />
       </div>
     ),
@@ -103,7 +113,11 @@ export const compositions: CompositionDefinition[] = [
     specimenId: 'panel-device',
     render: () => (
       <Panel
-        action={<Badge marker={<i />} size="small" tone="positive">Connected</Badge>}
+        action={
+          <Badge marker={<i />} size="small" tone="positive">
+            Connected
+          </Badge>
+        }
         description="ASI2600MC Pro · USB 3.0"
         elevation="raised"
         title="Main camera"
@@ -121,7 +135,7 @@ export const compositions: CompositionDefinition[] = [
                   <span>Cooler</span>
                   <strong>42%</strong>
                 </div>
-              )
+              ),
             },
             {
               id: 'settings',
@@ -133,8 +147,8 @@ export const compositions: CompositionDefinition[] = [
                   <span>Offset</span>
                   <strong>50</strong>
                 </div>
-              )
-            }
+              ),
+            },
           ]}
           size="small"
         />
@@ -143,6 +157,22 @@ export const compositions: CompositionDefinition[] = [
   },
 ]
 
-export function CompositionPreview({ composition, mode, theme }: { composition: CompositionDefinition; mode: ThemeMode; theme: ThemeParameters }) {
-  return <div className="vela-theme composition-preview" data-mode={mode} style={themeStyle(theme, mode)}>{composition.render()}</div>
+export function CompositionPreview({
+  composition,
+  mode,
+  theme,
+}: {
+  composition: CompositionDefinition
+  mode: ThemeMode
+  theme: ThemeParameters
+}) {
+  return (
+    <div
+      className="vela-theme composition-preview"
+      data-mode={mode}
+      style={themeStyle(theme, mode)}
+    >
+      {composition.render()}
+    </div>
+  )
 }

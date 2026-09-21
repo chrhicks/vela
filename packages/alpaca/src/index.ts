@@ -36,7 +36,11 @@ export type {
   AlpacaTelemetryAvailability,
 } from './model.js'
 
-export { createAlpacaAcquisition, AlpacaCaptureStoppedError, AlpacaCaptureRetryableError } from './acquisition.js'
+export {
+  createAlpacaAcquisition,
+  AlpacaCaptureStoppedError,
+  AlpacaCaptureRetryableError,
+} from './acquisition.js'
 
 export type {
   AlpacaAcquisition,

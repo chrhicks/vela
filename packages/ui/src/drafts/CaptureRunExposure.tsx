@@ -50,16 +50,19 @@ function frameCondition(frame: number, conditions: CaptureRunConditions) {
   return 'clear'
 }
 
-function drawExposure(context: CanvasRenderingContext2D, frame: number, conditions: CaptureRunConditions) {
+function drawExposure(
+  context: CanvasRenderingContext2D,
+  frame: number,
+  conditions: CaptureRunConditions,
+) {
   const condition = frameCondition(frame, conditions)
   const random = randomSequence(491 + frame * 8191)
   const image = context.createImageData(width, height)
   const pixels = image.data
   const cloudCenter = width * (0.35 + 0.18 * Math.sin(frame * 0.6))
 
-  const hazeAt = (x: number, y: number) => condition === 'haze'
-    ? Math.exp(-Math.pow((x + y * 0.4 - cloudCenter) / 600, 2)) * 0.32
-    : 0
+  const hazeAt = (x: number, y: number) =>
+    condition === 'haze' ? Math.exp(-Math.pow((x + y * 0.4 - cloudCenter) / 600, 2)) * 0.32 : 0
 
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
@@ -80,14 +83,29 @@ function drawExposure(context: CanvasRenderingContext2D, frame: number, conditio
     const y = star.y + Math.cos(frame * 0.73 + star.phase) * 0.32
     const softness = condition === 'soft' ? 1.55 : 1
     const sigma = star.size * softness * (1 + variation * 0.08)
-    const brightness = star.brightness * (1 + variation * 0.04) * (1 - hazeAt(x, y)) / (softness * softness)
+
+    const brightness =
+      (star.brightness * (1 + variation * 0.04) * (1 - hazeAt(x, y))) / (softness * softness)
+
     const radius = Math.ceil(sigma * 5)
     const color = star.warmth > 0.55 ? [1, 0.86, 0.68] : [0.72, 0.84, 1]
 
-    for (let py = Math.max(0, Math.floor(y) - radius); py <= Math.min(height - 1, Math.ceil(y) + radius); py += 1) {
-      for (let px = Math.max(0, Math.floor(x) - radius); px <= Math.min(width - 1, Math.ceil(x) + radius); px += 1) {
+    for (
+      let py = Math.max(0, Math.floor(y) - radius);
+      py <= Math.min(height - 1, Math.ceil(y) + radius);
+      py += 1
+    ) {
+      for (
+        let px = Math.max(0, Math.floor(x) - radius);
+        px <= Math.min(width - 1, Math.ceil(x) + radius);
+        px += 1
+      ) {
         const distance = (px - x) ** 2 + (py - y) ** 2
-        const light = brightness * (Math.exp(-distance / (2 * sigma ** 2)) + 0.025 * Math.exp(-distance / (8 * sigma ** 2)))
+
+        const light =
+          brightness *
+          (Math.exp(-distance / (2 * sigma ** 2)) + 0.025 * Math.exp(-distance / (8 * sigma ** 2)))
+
         const index = (py * width + px) * 4
         pixels[index] = pixels[index]! + light * color[0]!
         pixels[index + 1] = pixels[index + 1]! + light * color[1]!

@@ -18,7 +18,7 @@ export function AppNavigation() {
     if (rigId && inTargets) targets.current.set(rigId, search)
   }, [rigId, inTargets, search])
 
-  const targetSearch = inTargets ? search : targets.current.get(rigId) ?? ''
+  const targetSearch = inTargets ? search : (targets.current.get(rigId) ?? '')
 
   const currentPage = inTargets
     ? 'Targets'
@@ -29,7 +29,8 @@ export function AppNavigation() {
   const routeLink = (href: string) => ({
     href,
     onClick: (event: MouseEvent<HTMLAnchorElement>) => {
-      if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+      if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+        return
       event.preventDefault()
       navigate(href)
     },
@@ -60,44 +61,53 @@ export function AppNavigation() {
       rigs={rigs}
       currentRigId={rigId}
       onRigChange={id => navigate(id ? `/rigs/${encodeURIComponent(id)}/observe` : '/')}
-      links={rigId ? [
-        {
-          label: 'Observe',
-          ...routeLink(`${base}/observe`),
-          current: currentPage === 'Observe',
-        },
-        {
-          label: 'Targets',
-          ...routeLink(`${base}/observe/targets${targetSearch}`),
-          current: currentPage === 'Targets',
-        },
-        {
-          label: 'Capture',
-          ...routeLink(`${base}/observe/capture`),
-          current: currentPage === 'Capture',
-        },
-      ] : []}
+      links={
+        rigId
+          ? [
+              {
+                label: 'Observe',
+                ...routeLink(`${base}/observe`),
+                current: currentPage === 'Observe',
+              },
+              {
+                label: 'Targets',
+                ...routeLink(`${base}/observe/targets${targetSearch}`),
+                current: currentPage === 'Targets',
+              },
+              {
+                label: 'Capture',
+                ...routeLink(`${base}/observe/capture`),
+                current: currentPage === 'Capture',
+              },
+            ]
+          : []
+      }
       {...activityProps}
     />
   )
 }
 
-type ActivityPresentation = Pick<NavigationActivity, 'status' | 'note' | 'progress'> & { interrupted: boolean }
+type ActivityPresentation = Pick<NavigationActivity, 'status' | 'note' | 'progress'> & {
+  interrupted: boolean
+}
 
 function activityPresentation(
   activity: NavigationCapture,
   offline: boolean,
   missing: boolean,
 ): ActivityPresentation {
-  if (missing) return { status: 'Tracking lost', note: 'Last known · open Capture →', interrupted: true }
+  if (missing)
+    return { status: 'Tracking lost', note: 'Last known · open Capture →', interrupted: true }
 
-  if (offline) return { status: 'Updates lost', note: 'Last known · open Capture →', interrupted: true }
+  if (offline)
+    return { status: 'Updates lost', note: 'Last known · open Capture →', interrupted: true }
 
-  if (activity.captureReadState === 'retrying') return {
-    status: 'Awaiting camera',
-    note: 'Retrying same exposure · open Capture →',
-    interrupted: true,
-  }
+  if (activity.captureReadState === 'retrying')
+    return {
+      status: 'Awaiting camera',
+      note: 'Retrying same exposure · open Capture →',
+      interrupted: true,
+    }
 
   switch (activity.phase) {
     case 'exposing': {

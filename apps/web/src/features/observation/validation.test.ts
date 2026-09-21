@@ -8,14 +8,18 @@ describe('observation response validation', () => {
       expect(isRigObservationView(observation(state))).toBe(true)
     }
 
-    expect(isRigObservationView({
-      ...observation(),
-      connectionPreparation: { state: 'complete', capabilities: ['connect-devices'] },
-    })).toBe(false)
-    expect(isRigObservationView({
-      ...observation(),
-      connectionPreparation: { state: 'available', capabilities: [] },
-    })).toBe(false)
+    expect(
+      isRigObservationView({
+        ...observation(),
+        connectionPreparation: { state: 'complete', capabilities: ['connect-devices'] },
+      }),
+    ).toBe(false)
+    expect(
+      isRigObservationView({
+        ...observation(),
+        connectionPreparation: { state: 'available', capabilities: [] },
+      }),
+    ).toBe(false)
     expect(isRigObservationView({ ...observation(), rig: {} })).toBe(false)
   })
 
@@ -43,7 +47,11 @@ describe('observation response validation', () => {
       },
       { ...base, outcome: 'partial', failed: { ...device(1), reason: 'remained-disconnected' } },
       { ...base, outcome: 'partial', stoppedAfter: device(0) },
-      { ...base, outcome: 'uncertain', uncertain: { ...device(1), reason: 'write-outcome-unknown' } },
+      {
+        ...base,
+        outcome: 'uncertain',
+        uncertain: { ...device(1), reason: 'write-outcome-unknown' },
+      },
       { outcome: 'unavailable', reason: 'identity-conflict', view: observation('unavailable') },
     ])
       expect(isConnectRigDevicesResult(result)).toBe(true)
@@ -51,12 +59,14 @@ describe('observation response validation', () => {
 
   it('preserves completed command evidence independently of the subsequent observation', () => {
     for (const state of ['complete', 'available', 'unavailable'] as const) {
-      expect(isConnectRigDevicesResult({
-        outcome: 'complete',
-        command: 'completed',
-        confirmedConnected: [device(0)],
-        view: observation(state),
-      })).toBe(true)
+      expect(
+        isConnectRigDevicesResult({
+          outcome: 'complete',
+          command: 'completed',
+          confirmedConnected: [device(0)],
+          view: observation(state),
+        }),
+      ).toBe(true)
     }
   })
 
@@ -95,11 +105,13 @@ describe('observation response validation', () => {
       { view: { ...observation(), rig: { id: 'rig-1' } } },
     ])
       expect(isConnectRigDevicesResult({ ...valid, ...patch })).toBe(false)
-    expect(isConnectRigDevicesResult({
-      outcome: 'complete',
-      command: 'completed',
-      confirmedConnected: [],
-      view: observation('complete'),
-    })).toBe(false)
+    expect(
+      isConnectRigDevicesResult({
+        outcome: 'complete',
+        command: 'completed',
+        confirmedConnected: [],
+        view: observation('complete'),
+      }),
+    ).toBe(false)
   })
 })

@@ -1,5 +1,11 @@
 import { expect, test, type Page } from '@playwright/test'
-import type { AlignmentView, AutofocusView, CaptureView, FramingView, TargetView } from '@vela/model/web'
+import type {
+  AlignmentView,
+  AutofocusView,
+  CaptureView,
+  FramingView,
+  TargetView,
+} from '@vela/model/web'
 import { readFileSync } from 'node:fs'
 import { observation } from './fixtures/observation'
 
@@ -7,10 +13,9 @@ const capturedAt = '2026-09-21T01:00:00.000Z'
 
 const imageUrl = '/api/rigs/rig-1/capture/images/retained'
 
-const preview = readFileSync(new URL(
-  '../../../packages/ui/src/components/fixtures/capture-star-field.png',
-  import.meta.url,
-))
+const preview = readFileSync(
+  new URL('../../../packages/ui/src/components/fixtures/capture-star-field.png', import.meta.url),
+)
 
 const capture: CaptureView = {
   rigId: 'rig-1',
@@ -61,7 +66,7 @@ const autofocus: AutofocusView = {
   stepSize: 50,
   offsetSteps: 4,
   exposureSeconds: 2,
-  elapsedSeconds: .4,
+  elapsedSeconds: 0.4,
   exposureStartedAt: capturedAt,
   samples: [{ position: 33042, detectedStars: 12, hfrPixels: 5.1, capturedAt }],
   fit: null,
@@ -71,9 +76,15 @@ const autofocus: AutofocusView = {
 
 test.beforeEach(async ({ page }) => {
   // Every API request stays in this explicit fixture boundary, including shell reads.
-  await page.route('**/api/**', route => route.fulfill({ status: 503, json: { error: 'No fixture for this request' } }))
-  await page.route('**/api/web/navigation', route => route.fulfill({ json: { rigs: [], captures: [] } }))
-  await page.route(`**${imageUrl}`, route => route.fulfill({ contentType: 'image/png', body: preview }))
+  await page.route('**/api/**', route =>
+    route.fulfill({ status: 503, json: { error: 'No fixture for this request' } }),
+  )
+  await page.route('**/api/web/navigation', route =>
+    route.fulfill({ json: { rigs: [], captures: [] } }),
+  )
+  await page.route(`**${imageUrl}`, route =>
+    route.fulfill({ contentType: 'image/png', body: preview }),
+  )
 })
 
 async function screenshot(page: Page, name: string, width: number) {
@@ -83,12 +94,18 @@ async function screenshot(page: Page, name: string, width: number) {
   await test.info().attach(name, { path, contentType: 'image/png' })
 }
 
-test('an uncertain autofocus Stop retains priority until polling confirms restoration', async ({ page }) => {
+test('an uncertain autofocus Stop retains priority until polling confirms restoration', async ({
+  page,
+}) => {
   let state: AutofocusView = { ...autofocus, captureReadState: 'retrying' }
   let commands = 0
   let reads = 0
   let finishStop!: () => void
-  const stopResponse = new Promise<void>(resolve => { finishStop = resolve })
+
+  const stopResponse = new Promise<void>(resolve => {
+    finishStop = resolve
+  })
+
   await page.route('**/api/web/rigs/rig-1/autofocus', route => {
     reads++
 
@@ -135,20 +152,30 @@ test('an uncertain autofocus Stop retains priority until polling confirms restor
 })
 
 for (const width of [1280, 390]) {
-  test(`capture read recovery retains image/count across navigation and Stop uncertainty at ${width}px`, async ({ page }) => {
+  test(`capture read recovery retains image/count across navigation and Stop uncertainty at ${width}px`, async ({
+    page,
+  }) => {
     await page.setViewportSize({ width, height: 1000 })
     await page.clock.setFixedTime(new Date('2026-09-21T01:01:03.000Z'))
     let state = structuredClone(capture)
     let offline = false
     const commands: string[] = []
-    await page.route('**/api/web/rigs/rig-1/capture', route => offline ? route.abort() : route.fulfill({ json: state }))
-    await page.route('**/api/web/navigation', route => offline ? route.abort() : route.fulfill({
-      json: {
-        rigs: [{ id: state.rigId, name: state.rigName }],
-        captures: [state],
-      },
-    }))
-    await page.route('**/api/web/rigs/rig-1/observe', route => route.fulfill({ json: observation('complete') }))
+    await page.route('**/api/web/rigs/rig-1/capture', route =>
+      offline ? route.abort() : route.fulfill({ json: state }),
+    )
+    await page.route('**/api/web/navigation', route =>
+      offline
+        ? route.abort()
+        : route.fulfill({
+            json: {
+              rigs: [{ id: state.rigId, name: state.rigName }],
+              captures: [state],
+            },
+          }),
+    )
+    await page.route('**/api/web/rigs/rig-1/observe', route =>
+      route.fulfill({ json: observation('complete') }),
+    )
     await page.route('**/api/rigs/rig-1/capture/*', route => {
       commands.push(route.request().url().split('/').at(-1)!)
 
@@ -160,8 +187,12 @@ for (const width of [1280, 390]) {
     await expect(progress.getByRole('progressbar')).toBeVisible()
     await expect(image.getByRole('img')).toHaveAttribute('src', imageUrl)
     state = { ...state, captureReadState: 'retrying' }
-    await expect(page.locator('.capture-page__warning')).toContainText('Camera observation interrupted')
-    await expect(page.locator('.capture-page__warning')).toContainText('Retrying reads for exposure 8')
+    await expect(page.locator('.capture-page__warning')).toContainText(
+      'Camera observation interrupted',
+    )
+    await expect(page.locator('.capture-page__warning')).toContainText(
+      'Retrying reads for exposure 8',
+    )
     await expect(page.locator('.capture-page__heading')).toContainText('Awaiting camera')
     await expect(progress.getByRole('progressbar')).toHaveCount(0)
     await expect(progress).not.toContainText('8.0 / 30')
@@ -210,11 +241,15 @@ for (const width of [1280, 390]) {
     await expect(page.getByRole('button', { name: 'Start run', exact: true })).toBeDisabled()
     await expect(image.getByRole('img')).toHaveAttribute('src', imageUrl)
     await page.getByRole('button', { name: 'Check capture state', exact: true }).click()
-    await expect(page.locator('.capture-page__warning')).toContainText('Camera stop could not be confirmed')
+    await expect(page.locator('.capture-page__warning')).toContainText(
+      'Camera stop could not be confirmed',
+    )
     expect(commands).toEqual(['stop'])
   })
 
-  test(`framing retries keep the solved footprint/history and resume without claiming centered at ${width}px`, async ({ page }) => {
+  test(`framing retries keep the solved footprint/history and resume without claiming centered at ${width}px`, async ({
+    page,
+  }) => {
     await page.setViewportSize({ width, height: 1000 })
     await page.clock.setFixedTime(new Date(capturedAt))
 
@@ -270,7 +305,7 @@ for (const width of [1280, 390]) {
       centering: {
         correction: 1,
         maxCorrections: 4,
-        toleranceArcminutes: .5,
+        toleranceArcminutes: 0.5,
         outcome: 'working',
         measurements: [
           {
@@ -290,21 +325,27 @@ for (const width of [1280, 390]) {
     let offline = false
     const commands: string[] = []
     await page.route('**/api/web/rigs/rig-1/targets/m31', route => route.fulfill({ json: target }))
-    await page.route('**/api/survey/dss2/**', route => route.request().url().endsWith('/properties')
-      ? route.fulfill({
-        contentType: 'text/plain',
-        body: 'dataproduct_type=image\nhips_order=9\nhips_tile_width=512\nhips_frame=equatorial\nhips_tile_format=jpeg\n',
-      })
-      : route.fulfill({
-        contentType: 'image/jpeg',
-        body: readFileSync(new URL(
-          route.request().url().endsWith('Allsky.jpg')
-            ? './fixtures/survey-allsky.jpg'
-            : './fixtures/survey-tile.jpg',
-          import.meta.url,
-        )),
-      }))
-    await page.route('**/api/web/rigs/rig-1/framing', route => offline ? route.abort() : route.fulfill({ json: state }))
+    await page.route('**/api/survey/dss2/**', route =>
+      route.request().url().endsWith('/properties')
+        ? route.fulfill({
+            contentType: 'text/plain',
+            body: 'dataproduct_type=image\nhips_order=9\nhips_tile_width=512\nhips_frame=equatorial\nhips_tile_format=jpeg\n',
+          })
+        : route.fulfill({
+            contentType: 'image/jpeg',
+            body: readFileSync(
+              new URL(
+                route.request().url().endsWith('Allsky.jpg')
+                  ? './fixtures/survey-allsky.jpg'
+                  : './fixtures/survey-tile.jpg',
+                import.meta.url,
+              ),
+            ),
+          }),
+    )
+    await page.route('**/api/web/rigs/rig-1/framing', route =>
+      offline ? route.abort() : route.fulfill({ json: state }),
+    )
     await page.route('**/api/rigs/rig-1/framing/*', route => {
       commands.push(route.request().url().split('/').at(-1)!)
 
@@ -316,14 +357,19 @@ for (const width of [1280, 390]) {
     const footprint = page.locator('.vela-target-footprint--actual')
     await expect(footprint).toBeVisible({ timeout: 30000 })
     // Aladin publishes its initial projection before fitting the actual content width.
-    await expect.poll(() => footprint.evaluate(element => {
-      if (!(element instanceof SVGPolygonElement) || !element.ownerSVGElement) return false
-      const bounds = element.ownerSVGElement.getBoundingClientRect()
+    await expect
+      .poll(() =>
+        footprint.evaluate(element => {
+          if (!(element instanceof SVGPolygonElement) || !element.ownerSVGElement) return false
+          const bounds = element.ownerSVGElement.getBoundingClientRect()
 
-      return Array.from(element.points).every(point =>
-        point.x >= 0 && point.x <= bounds.width && point.y >= 0 && point.y <= bounds.height,
+          return Array.from(element.points).every(
+            point =>
+              point.x >= 0 && point.x <= bounds.width && point.y >= 0 && point.y <= bounds.height,
+          )
+        }),
       )
-    })).toBe(true)
+      .toBe(true)
     const corners = await footprint.getAttribute('points')
     const measurementTime = page.getByText(/^Test exposure /)
     const timeText = await measurementTime.textContent()
@@ -338,7 +384,9 @@ for (const width of [1280, 390]) {
     await expect(footprint).toHaveAttribute('points', corners!)
     await expect(page.getByRole('button', { name: 'Stop framing' })).toBeEnabled()
     await expect(page.getByRole('button', { name: 'Slew & check' })).toHaveCount(0)
-    await expect(page.getByRole('button', { name: 'Check current frame', exact: true })).toHaveCount(0)
+    await expect(
+      page.getByRole('button', { name: 'Check current frame', exact: true }),
+    ).toHaveCount(0)
     await screenshot(page, 'framing', width)
     offline = true
     await expect(status).toContainText('Connection interrupted')
@@ -359,12 +407,16 @@ for (const width of [1280, 390]) {
     expect(commands).toEqual(['stop'])
   })
 
-  test(`autofocus keeps samples and their timestamp during read retry and uncertain cleanup at ${width}px`, async ({ page }) => {
+  test(`autofocus keeps samples and their timestamp during read retry and uncertain cleanup at ${width}px`, async ({
+    page,
+  }) => {
     await page.setViewportSize({ width, height: 1000 })
     let state = structuredClone(autofocus)
     const commands: string[] = []
     let offline = false
-    await page.route('**/api/web/rigs/rig-1/autofocus', route => offline ? route.abort() : route.fulfill({ json: state }))
+    await page.route('**/api/web/rigs/rig-1/autofocus', route =>
+      offline ? route.abort() : route.fulfill({ json: state }),
+    )
     await page.route('**/api/rigs/rig-1/autofocus/*', route => {
       commands.push(route.request().url().split('/').at(-1)!)
       state = { ...state, captureReadState: 'current', activity: 'restoring' }
@@ -376,7 +428,9 @@ for (const width of [1280, 390]) {
     const sample = page.locator('.vela-af-point')
     const position = await sample.getAttribute('cx')
     state = { ...state, captureReadState: 'retrying' }
-    await expect(page.locator('.vela-af-notice')).toContainText('Retrying reads for the same exposure')
+    await expect(page.locator('.vela-af-notice')).toContainText(
+      'Retrying reads for the same exposure',
+    )
     await expect(page.locator('.vela-af-heading')).toContainText('Awaiting camera')
     await expect(page.locator('.vela-af-activity__spinner')).toHaveCount(0)
     await expect(sample).toHaveCount(1)
@@ -403,7 +457,8 @@ for (const width of [1280, 390]) {
       phase: 'failed',
       active: false,
       activity: 'idle',
-      error: 'The focuser did not confirm return to the start position. Vela did not repeat the move.',
+      error:
+        'The focuser did not confirm return to the start position. Vela did not repeat the move.',
     }
     await expect(page.locator('.vela-af-notice')).toContainText('Start position was not restored')
     await expect(sample).toHaveCount(1)
@@ -411,7 +466,9 @@ for (const width of [1280, 390]) {
     expect(commands).toEqual(['stop'])
   })
 
-  test(`alignment pauses live feedback while retaining baseline and solved measurements at ${width}px`, async ({ page }) => {
+  test(`alignment pauses live feedback while retaining baseline and solved measurements at ${width}px`, async ({
+    page,
+  }) => {
     await page.setViewportSize({ width, height: 1000 })
     await page.clock.setFixedTime(new Date('2026-09-21T01:00:08.000Z'))
 
@@ -458,7 +515,11 @@ for (const width of [1280, 390]) {
     })
     await page.goto('/rigs/rig-1/observe/alignment')
     await expect(page.getByRole('progressbar')).toBeVisible()
-    const baseline = page.getByRole('img', { name: 'Latest camera exposure at baseline position 1' })
+
+    const baseline = page.getByRole('img', {
+      name: 'Latest camera exposure at baseline position 1',
+    })
+
     await expect(baseline).toBeVisible()
     state = {
       ...state,
@@ -466,13 +527,17 @@ for (const width of [1280, 390]) {
       exposureStartedAt: null,
       warning: 'Device connection interrupted. Retrying automatically.',
     }
-    await expect(page.getByRole('alert')).toContainText('Any pending exposure is kept; it is not restarted while reads retry')
+    await expect(page.getByRole('alert')).toContainText(
+      'Any pending exposure is kept; it is not restarted while reads retry',
+    )
     await expect(page.getByRole('progressbar')).toBeHidden()
     await expect(page.locator('.vela-polar-activity__spinner')).toBeHidden()
     await expect(page.locator('.vela-polar-activity__time')).toHaveCount(0)
     await expect(baseline).toHaveAttribute('src', imageUrl)
     await expect(page.locator('time')).toHaveAttribute('datetime', capturedAt)
-    await expect(page.getByRole('list', { name: 'Three measurement positions' })).toContainText('Position 1Solved')
+    await expect(page.getByRole('list', { name: 'Three measurement positions' })).toContainText(
+      'Position 1Solved',
+    )
     await expect(page.getByRole('button', { name: 'Stop measurement' })).toBeEnabled()
     await screenshot(page, 'alignment-baseline', width)
     state = { ...state, activity: 'solving', warning: null }
@@ -498,13 +563,17 @@ for (const width of [1280, 390]) {
       },
     }
     await expect(page.locator('.vela-polar-total')).toContainText('14″')
-    await expect(page.getByText(/Pause adjustments until a fresh measurement arrives/)).toBeVisible()
+    await expect(
+      page.getByText(/Pause adjustments until a fresh measurement arrives/),
+    ).toBeVisible()
     await expect(page.getByRole('img', { name: /alignment target/ })).toBeVisible()
     await expect(page.locator('.vela-polar-activity__spinner')).toBeHidden()
     await expect(page.getByRole('button', { name: 'Start measurement' })).toHaveCount(0)
     await screenshot(page, 'alignment-adjustment', width)
     await page.getByRole('button', { name: 'Stop to reposition' }).click()
-    await expect(page.locator('.vela-polar-notice')).toContainText('Camera stop could not be confirmed')
+    await expect(page.locator('.vela-polar-notice')).toContainText(
+      'Camera stop could not be confirmed',
+    )
     await expect(page.locator('.vela-polar-total')).toContainText('14″')
     expect(commands).toEqual(['stop'])
   })

@@ -33,20 +33,35 @@ describe('ImageBytes rank-2 Int32 source images', () => {
     { type: 8, samples: [0, 65535, 1, 40000, 256, 2] },
   ])('decodes little-endian type $type into unchanged row-major samples', ({ type, samples }) => {
     const pixels = imageBytesPixels(imageBytes(type, samples), 2, 3)
-    expect(Array.from(pixels)).toEqual([samples[0], samples[3], samples[1], samples[4], samples[2], samples[5]])
+    expect(Array.from(pixels)).toEqual([
+      samples[0],
+      samples[3],
+      samples[1],
+      samples[4],
+      samples[2],
+      samples[5],
+    ])
   })
 
   it('honors DataStart, including an unaligned offset after extended metadata', () => {
-    expect(Array.from(imageBytesPixels(imageBytes(8, undefined, 49), 2, 3))).toEqual([1, 2, 256, 40000, 65535, 3])
+    expect(Array.from(imageBytesPixels(imageBytes(8, undefined, 49), 2, 3))).toEqual([
+      1, 2, 256, 40000, 65535, 3,
+    ])
   })
 
   it.each([
-    { field: 0, value: 2 }, { field: 0, value: 0x01000000 },
+    { field: 0, value: 2 },
+    { field: 0, value: 0x01000000 },
     { field: 4, value: -1 },
-    { field: 16, value: 43 }, { field: 16, value: 1000 },
-    { field: 20, value: 3 }, { field: 24, value: 9 }, { field: 24, value: 0 },
-    { field: 28, value: 3 }, { field: 32, value: 3 },
-    { field: 36, value: -1 }, { field: 40, value: 1 },
+    { field: 16, value: 43 },
+    { field: 16, value: 1000 },
+    { field: 20, value: 3 },
+    { field: 24, value: 9 },
+    { field: 24, value: 0 },
+    { field: 28, value: 3 },
+    { field: 32, value: 3 },
+    { field: 36, value: -1 },
+    { field: 40, value: 1 },
   ])('rejects incompatible or malformed metadata: %j', ({ field, value }) => {
     const bytes = imageBytes()
     new DataView(bytes).setInt32(field, value, true)
@@ -56,7 +71,11 @@ describe('ImageBytes rank-2 Int32 source images', () => {
   it('rejects truncated metadata, truncated pixels, and unexpected trailing pixels', () => {
     const bytes = imageBytes()
 
-    for (const malformed of [bytes.slice(0, 43), bytes.slice(0, -1), imageBytes(8, [1, 2, 3, 4, 5, 6, 7])]) {
+    for (const malformed of [
+      bytes.slice(0, 43),
+      bytes.slice(0, -1),
+      imageBytes(8, [1, 2, 3, 4, 5, 6, 7]),
+    ]) {
       expect(() => imageBytesPixels(malformed, 2, 3)).toThrow()
     }
   })

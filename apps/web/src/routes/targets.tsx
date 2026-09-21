@@ -32,7 +32,7 @@ export function Targets() {
   )
 }
 
-function TargetComposition({ rigId, targetId }: { rigId: string, targetId: string }) {
+function TargetComposition({ rigId, targetId }: { rigId: string; targetId: string }) {
   const [params] = useSearchParams()
   const [target, setTarget] = useState<TargetView | null>(null)
   const [skyStale, setSkyStale] = useState(false)
@@ -50,22 +50,24 @@ function TargetComposition({ rigId, targetId }: { rigId: string, targetId: strin
     const controller = new AbortController()
     setLoadError(false)
 
-    const fetchTarget = () => api(
-      `web/rigs/${encodeURIComponent(rigId)}/targets/${encodeURIComponent(targetId)}`,
-      { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]) },
-    ).then(next => {
-      if (!isTarget(next) || next.id !== targetId) throw new Error('Invalid target response')
+    const fetchTarget = () =>
+      api(`web/rigs/${encodeURIComponent(rigId)}/targets/${encodeURIComponent(targetId)}`, {
+        signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]),
+      })
+        .then(next => {
+          if (!isTarget(next) || next.id !== targetId) throw new Error('Invalid target response')
 
-      if (!controller.signal.aborted) {
-        setTarget(next)
-        setSkyStale(false)
-      }
-    }).catch(() => {
-      if (!controller.signal.aborted) {
-        setLoadError(true)
-        setSkyStale(true)
-      }
-    })
+          if (!controller.signal.aborted) {
+            setTarget(next)
+            setSkyStale(false)
+          }
+        })
+        .catch(() => {
+          if (!controller.signal.aborted) {
+            setLoadError(true)
+            setSkyStale(true)
+          }
+        })
 
     void fetchTarget()
     const timer = setInterval(() => void fetchTarget(), 60000)
@@ -96,21 +98,27 @@ function TargetComposition({ rigId, targetId }: { rigId: string, targetId: strin
     </Link>
   )
 
-  if (!target) return (
-    <>
-      {back}
-      <p role="status">{loadError ? 'Could not load this target.' : 'Loading target…'}</p>
-      {loadError && <Button onClick={() => setRetry(r => r + 1)}>Try again</Button>}
-    </>
-  )
+  if (!target)
+    return (
+      <>
+        {back}
+        <p role="status">{loadError ? 'Could not load this target.' : 'Loading target…'}</p>
+        {loadError && <Button onClick={() => setRetry(r => r + 1)}>Try again</Button>}
+      </>
+    )
   const matching = view?.targetId === targetId
   const position = desired ?? target
-  const sameComposition = matching && view?.desired?.raDegrees === position.raDegrees && view.desired.decDegrees === position.decDegrees
+
+  const sameComposition =
+    matching &&
+    view?.desired?.raDegrees === position.raDegrees &&
+    view.desired.decDegrees === position.decDegrees
+
   const checked = sameComposition && view?.phase === 'checked' && view.checkCurrent && !adjusting
   const locked = !!view?.active || pending || checked
   const settingsLocked = locked || offline || commandUnconfirmed
-  const actual = matching ? view?.actual ?? null : null
-  const centering = sameComposition && !adjusting ? view?.centering ?? null : null
+  const actual = matching ? (view?.actual ?? null) : null
+  const centering = sameComposition && !adjusting ? (view?.centering ?? null) : null
   const currentMeasurement = checked && !offline && !commandUnconfirmed && !pending
 
   const exposure = Number(seconds)
@@ -119,10 +127,12 @@ function TargetComposition({ rigId, targetId }: { rigId: string, targetId: strin
   async function startFraming(action: 'start' | 'check' = 'start') {
     const accepted = await framing[action]({ targetId, ...position, exposureSeconds: exposure })
 
-    if (accepted?.targetId === targetId
-      && accepted.desired?.raDegrees === position.raDegrees
-      && accepted.desired.decDegrees === position.decDegrees
-      && (accepted.active || accepted.phase === 'checked' && accepted.checkCurrent)) {
+    if (
+      accepted?.targetId === targetId &&
+      accepted.desired?.raDegrees === position.raDegrees &&
+      accepted.desired.decDegrees === position.decDegrees &&
+      (accepted.active || (accepted.phase === 'checked' && accepted.checkCurrent))
+    ) {
       setAdjusting(false)
     }
   }
@@ -130,10 +140,12 @@ function TargetComposition({ rigId, targetId }: { rigId: string, targetId: strin
   async function centerFraming() {
     const accepted = await framing.center(position)
 
-    if (accepted?.targetId === targetId
-      && accepted.desired?.raDegrees === position.raDegrees
-      && accepted.desired.decDegrees === position.decDegrees
-      && (accepted.active || accepted.phase === 'checked' && accepted.checkCurrent)) {
+    if (
+      accepted?.targetId === targetId &&
+      accepted.desired?.raDegrees === position.raDegrees &&
+      accepted.desired.decDegrees === position.decDegrees &&
+      (accepted.active || (accepted.phase === 'checked' && accepted.checkCurrent))
+    ) {
       setAdjusting(false)
     }
   }
@@ -141,10 +153,12 @@ function TargetComposition({ rigId, targetId }: { rigId: string, targetId: strin
   async function refreshFraming() {
     const current = await framing.refresh()
 
-    if (current?.targetId === targetId
-      && current.desired?.raDegrees === position.raDegrees
-      && current.desired.decDegrees === position.decDegrees
-      && (current.active || current.phase === 'checked' && current.checkCurrent)) {
+    if (
+      current?.targetId === targetId &&
+      current.desired?.raDegrees === position.raDegrees &&
+      current.desired.decDegrees === position.decDegrees &&
+      (current.active || (current.phase === 'checked' && current.checkCurrent))
+    ) {
       setAdjusting(false)
     }
   }
@@ -156,7 +170,9 @@ function TargetComposition({ rigId, targetId }: { rigId: string, targetId: strin
         <div>
           <p>{view?.rigName ?? 'Observe'} / Targets</p>
           <div className="vela-target-identity">
-            <h1 ref={heading} tabIndex={-1}>{target.name}</h1>
+            <h1 ref={heading} tabIndex={-1}>
+              {target.name}
+            </h1>
             <Badge>{target.catalog}</Badge>
           </div>
         </div>
@@ -166,9 +182,13 @@ function TargetComposition({ rigId, targetId }: { rigId: string, targetId: strin
           <header>
             <strong>{checked ? 'Check the framing' : 'Compose your image'}</strong>
             <span>
-              {view?.active || pending ? 'Framing in progress · editing paused'
-                : checked ? 'Choose Adjust composition to edit'
-                  : actual ? 'Solid: desired · dashed: last solved exposure' : 'Drag the frame to reposition'}
+              {view?.active || pending
+                ? 'Framing in progress · editing paused'
+                : checked
+                  ? 'Choose Adjust composition to edit'
+                  : actual
+                    ? 'Solid: desired · dashed: last solved exposure'
+                    : 'Drag the frame to reposition'}
             </span>
           </header>
           <SurveyField
@@ -200,7 +220,9 @@ function TargetComposition({ rigId, targetId }: { rigId: string, targetId: strin
                 <strong>{arcminutes(actual.offsetArcminutes)}</strong>
                 {centering && (
                   <span>
-                    {centering.measurements[0] && `Started at ${arcminutes(centering.measurements[0].offsetArcminutes)} · `}goal ≤ {arcminutes(centering.toleranceArcminutes)}
+                    {centering.measurements[0] &&
+                      `Started at ${arcminutes(centering.measurements[0].offsetArcminutes)} · `}
+                    goal ≤ {arcminutes(centering.toleranceArcminutes)}
                   </span>
                 )}
               </div>
@@ -214,7 +236,11 @@ function TargetComposition({ rigId, targetId }: { rigId: string, targetId: strin
                 <dt>Mount pointing side</dt>
                 <dd>
                   {offline ? 'Last known: ' : ''}
-                  {{ east: 'East', west: 'West', unknown: 'Unknown' }[view?.pointingSide ?? 'unknown']}
+                  {
+                    { east: 'East', west: 'West', unknown: 'Unknown' }[
+                      view?.pointingSide ?? 'unknown'
+                    ]
+                  }
                 </dd>
               </div>
             </dl>
@@ -222,7 +248,9 @@ function TargetComposition({ rigId, targetId }: { rigId: string, targetId: strin
               {view?.error && <p role="alert">{view.error}</p>}
               {error && <p role="alert">{error}</p>}
               {view?.unavailableReason && <p>{view.unavailableReason}</p>}
-              {view?.active && !matching && <p>A framing check for another target is active on this rig.</p>}
+              {view?.active && !matching && (
+                <p>A framing check for another target is active on this rig.</p>
+              )}
               {view?.active ? (
                 <Button disabled={!framing.canStop} onClick={() => void framing.stop()}>
                   Stop framing
@@ -236,7 +264,10 @@ function TargetComposition({ rigId, targetId }: { rigId: string, targetId: strin
                   >
                     Center composition
                   </Button>
-                  <p>Automatically refine to within 0.5′, using a fresh solve after each correction. At most four corrections; stop after two worsening results.</p>
+                  <p>
+                    Automatically refine to within 0.5′, using a fresh solve after each correction.
+                    At most four corrections; stop after two worsening results.
+                  </p>
                   <Button disabled={pending} onClick={() => setAdjusting(true)}>
                     Adjust composition
                   </Button>
@@ -253,10 +284,17 @@ function TargetComposition({ rigId, targetId }: { rigId: string, targetId: strin
                 <>
                   {matching && view?.canCenter && actual && (
                     <>
-                      <Button tone="accent" disabled={!framing.canStart} onClick={() => void centerFraming()}>
+                      <Button
+                        tone="accent"
+                        disabled={!framing.canStart}
+                        onClick={() => void centerFraming()}
+                      >
                         Center composition
                       </Button>
-                      <p>Automatically center your edited composition, measuring after every correction.</p>
+                      <p>
+                        Automatically center your edited composition, measuring after every
+                        correction.
+                      </p>
                     </>
                   )}
                   <Input
@@ -271,7 +309,12 @@ function TargetComposition({ rigId, targetId }: { rigId: string, targetId: strin
                   />
                   <Button
                     tone="accent"
-                    disabled={!framing.canStart || !Number.isFinite(exposure) || exposure < .1 || exposure > 60}
+                    disabled={
+                      !framing.canStart ||
+                      !Number.isFinite(exposure) ||
+                      exposure < 0.1 ||
+                      exposure > 60
+                    }
                     onClick={() => void startFraming()}
                   >
                     Slew & check
@@ -281,7 +324,12 @@ function TargetComposition({ rigId, targetId }: { rigId: string, targetId: strin
               {!view?.active && (
                 <>
                   <Button
-                    disabled={!framing.canStart || !Number.isFinite(exposure) || exposure < .1 || exposure > 60}
+                    disabled={
+                      !framing.canStart ||
+                      !Number.isFinite(exposure) ||
+                      exposure < 0.1 ||
+                      exposure > 60
+                    }
                     onClick={() => void startFraming('check')}
                   >
                     Check current frame
@@ -291,20 +339,30 @@ function TargetComposition({ rigId, targetId }: { rigId: string, targetId: strin
               )}
               {view && <p>State checked {new Date(view.observedAt).toLocaleTimeString()}</p>}
               {actual && !checked && !view?.active && (
-                <p>This is the last solved exposure. Run a new framing check before continuing to capture.</p>
+                <p>
+                  This is the last solved exposure. Run a new framing check before continuing to
+                  capture.
+                </p>
               )}
               {actual && (
                 <p>
                   Test exposure {new Date(actual.capturedAt).toLocaleTimeString()}.
-                  {!sameComposition || adjusting ? ' Measured against the previous composition.' : ''}
+                  {!sameComposition || adjusting
+                    ? ' Measured against the previous composition.'
+                    : ''}
                 </p>
               )}
-              <Button tone="quiet" disabled={pending || framing.refreshing} onClick={refreshFraming}>
+              <Button
+                tone="quiet"
+                disabled={pending || framing.refreshing}
+                onClick={refreshFraming}
+              >
                 Check rig state
               </Button>
             </div>
             <p className="vela-target-description">
-              {target.kind}{target.sizeArcminutes !== null ? ` · ${target.sizeArcminutes}′ across` : ''}
+              {target.kind}
+              {target.sizeArcminutes !== null ? ` · ${target.sizeArcminutes}′ across` : ''}
             </p>
             <dl className="vela-target-details">
               <div>
@@ -321,12 +379,17 @@ function TargetComposition({ rigId, targetId }: { rigId: string, targetId: strin
               </div>
               <div>
                 <dt>Center (J2000)</dt>
-                <dd>{position.raDegrees.toFixed(4)}°, {position.decDegrees.toFixed(4)}°</dd>
+                <dd>
+                  {position.raDegrees.toFixed(4)}°, {position.decDegrees.toFixed(4)}°
+                </dd>
               </div>
               {view?.camera && (
                 <div>
                   <dt>Field of view</dt>
-                  <dd>{view.camera.fieldWidthDegrees.toFixed(2)}° × {view.camera.fieldHeightDegrees.toFixed(2)}°</dd>
+                  <dd>
+                    {view.camera.fieldWidthDegrees.toFixed(2)}° ×{' '}
+                    {view.camera.fieldHeightDegrees.toFixed(2)}°
+                  </dd>
                 </div>
               )}
             </dl>
@@ -342,7 +405,9 @@ function TargetComposition({ rigId, targetId }: { rigId: string, targetId: strin
                 onChange={e => setFocalLength(e.target.value)}
               />
               <Button
-                disabled={settingsLocked || !view || !Number.isFinite(focal) || focal < 10 || focal > 20000}
+                disabled={
+                  settingsLocked || !view || !Number.isFinite(focal) || focal < 10 || focal > 20000
+                }
                 onClick={() => void framing.settings(focal)}
               >
                 Save focal length

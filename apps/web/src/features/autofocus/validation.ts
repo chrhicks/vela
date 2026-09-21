@@ -3,12 +3,16 @@ import type { AutofocusView } from '@vela/model/web'
 
 const text = z.string().refine(value => value.trim().length > 0)
 
-const sample = z.object({
-  position: z.number().int(),
-  detectedStars: z.number().int().nonnegative(),
-  hfrPixels: z.number().positive().nullable(),
-  capturedAt: z.string().refine(value => Number.isFinite(Date.parse(value))),
-}).refine(value => value.detectedStars === 0 ? value.hfrPixels === null : value.hfrPixels !== null)
+const sample = z
+  .object({
+    position: z.number().int(),
+    detectedStars: z.number().int().nonnegative(),
+    hfrPixels: z.number().positive().nullable(),
+    capturedAt: z.string().refine(value => Number.isFinite(Date.parse(value))),
+  })
+  .refine(value =>
+    value.detectedStars === 0 ? value.hfrPixels === null : value.hfrPixels !== null,
+  )
 
 const fit = z.object({
   position: z.number().int(),
@@ -37,7 +41,10 @@ const autofocus = z.object({
   offsetSteps: z.number().int().positive(),
   exposureSeconds: z.number().min(0).max(30),
   elapsedSeconds: z.number().nonnegative(),
-  exposureStartedAt: z.string().refine(value => Number.isFinite(Date.parse(value))).nullable(),
+  exposureStartedAt: z
+    .string()
+    .refine(value => Number.isFinite(Date.parse(value)))
+    .nullable(),
   samples: z.array(sample),
   fit: fit.nullable(),
   restoredStart: z.boolean(),
@@ -45,7 +52,11 @@ const autofocus = z.object({
 })
 
 export function isTravelLimitError(error: string | null) {
-  return !!error && (error.includes('already at a mechanical limit') || error.includes('would approach 0 or MaxStep'))
+  return (
+    !!error &&
+    (error.includes('already at a mechanical limit') ||
+      error.includes('would approach 0 or MaxStep'))
+  )
 }
 
 export function isAutofocusView(value: unknown, rigId: string): value is AutofocusView {
@@ -53,7 +64,9 @@ export function isAutofocusView(value: unknown, rigId: string): value is Autofoc
 
   if (!result.success) return false
   const view = result.data
-  const running = view.phase === 'walking' || view.phase === 'fitting' || view.phase === 'confirming'
+
+  const running =
+    view.phase === 'walking' || view.phase === 'fitting' || view.phase === 'confirming'
 
   return view.rigId === rigId && view.active === running
 }

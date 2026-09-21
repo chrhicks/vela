@@ -9,13 +9,7 @@ interface Props {
   onRigNameChange(name: string): void
 }
 
-export function RigReview({
-  adding,
-  candidate,
-  error,
-  rigName,
-  onRigNameChange,
-}: Props) {
+export function RigReview({ adding, candidate, error, rigName, onRigNameChange }: Props) {
   const reportedName = candidate.server?.name ?? candidate.endpoint.host
 
   return (
@@ -24,21 +18,27 @@ export function RigReview({
         <div>
           <small>ALPACA SERVER</small>
           <strong>{reportedName}</strong>
-          <span>{candidate.endpoint.host}:{candidate.endpoint.port}</span>
+          <span>
+            {candidate.endpoint.host}:{candidate.endpoint.port}
+          </span>
         </div>
-        <Badge size="small" tone="positive">Eligible</Badge>
+        <Badge size="small" tone="positive">
+          Eligible
+        </Badge>
       </section>
 
       <Input
         disabled={adding}
         label="Rig name"
         message={`Reported as ${reportedName}. Keep this name or choose one that means more to you.`}
-        onChange={(event) => onRigNameChange(event.target.value)}
+        onChange={event => onRigNameChange(event.target.value)}
         value={rigName}
       />
 
       {error ? (
-        <div className="rig-discovery-review__error" role="alert">{error}</div>
+        <div className="rig-discovery-review__error" role="alert">
+          {error}
+        </div>
       ) : null}
 
       <section>
@@ -62,7 +62,9 @@ export function RigReview({
       {!error ? (
         <div className="rig-discovery-review__notice">
           <strong>Ready to add</strong>
-          <p>Adding saves this Rig in Vela. It does not connect devices or change the Alpaca server.</p>
+          <p>
+            Adding saves this Rig in Vela. It does not connect devices or change the Alpaca server.
+          </p>
         </div>
       ) : null}
     </div>
@@ -72,6 +74,6 @@ export function RigReview({
 function deviceKindLabel(kind: DiscoveryCandidateView['devices'][number]['kind']) {
   return kind
     .split('-')
-    .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`)
+    .map(part => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`)
     .join(' ')
 }

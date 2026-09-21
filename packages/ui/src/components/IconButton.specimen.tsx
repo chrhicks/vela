@@ -28,9 +28,9 @@ export const specimen: ComponentSpecimen = {
     label: 'Start exposure',
     tone: 'neutral',
     size: 'medium',
-    disabled: false
+    disabled: false,
   },
-  render: (props) => (
+  render: props => (
     <IconButton
       disabled={Boolean(props.disabled)}
       icon={<CaptureIcon />}

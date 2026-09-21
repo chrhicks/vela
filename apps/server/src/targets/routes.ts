@@ -8,12 +8,17 @@ import type { RigOperations } from '../rig/operations.js'
 import { inspectRigDetail, type RigDetailOptions } from '../rig/detail.js'
 import { createAstapSolver, type PlateSolver } from '../plate-solving/solver.js'
 import { createFramingController, mountSite, type FramingHardware } from './framing.js'
-import { getTarget, listTargets, normalizeCatalogName, type CatalogTarget } from './catalog/index.js'
+import {
+  getTarget,
+  listTargets,
+  normalizeCatalogName,
+  type CatalogTarget,
+} from './catalog/index.js'
 import { skyPath, type Site } from './sky.js'
 import { registerTargetDiscovery } from './discovery-routes.js'
 
 export interface TargetOptions {
-  solver?: { executable: string, catalogPath: string }
+  solver?: { executable: string; catalogPath: string }
   createAdapter?: (endpoint: string) => AlpacaFraming
   createHardware?: (rig: RigCatalogRecord, telescopeId: string) => FramingHardware
   createSolver?: (fieldHeightDegrees: number) => PlateSolver
@@ -47,7 +52,8 @@ export function registerTargets(
   function mountId(rig: RigCatalogRecord) {
     const mounts = rig.lastObservedInventory.devices.filter(device => device.kind === 'telescope')
 
-    if (mounts.length !== 1) throw new Error('Framing requires one unambiguous telescope in this rig.')
+    if (mounts.length !== 1)
+      throw new Error('Framing requires one unambiguous telescope in this rig.')
 
     return mounts[0]!.uniqueId
   }
@@ -61,17 +67,24 @@ export function registerTargets(
       options.createInspector ? { createInspector: options.createInspector } : {},
     )
 
-    if (detail.state !== 'current') throw new Error('Rig identity or connection needs attention before framing.')
+    if (detail.state !== 'current')
+      throw new Error('Rig identity or connection needs attention before framing.')
 
-    const camera = detail.inspections.find(item =>
-      item.providerDeviceId === rig.imagingCamera!.uniqueId && item.kind === 'camera',
+    const camera = detail.inspections.find(
+      item => item.providerDeviceId === rig.imagingCamera!.uniqueId && item.kind === 'camera',
     )
 
-    if (!camera || camera.connection !== 'connected' || camera.name?.trim() !== rig.imagingCamera.name)
+    if (
+      !camera ||
+      camera.connection !== 'connected' ||
+      camera.name?.trim() !== rig.imagingCamera.name
+    )
       throw new Error('The selected imaging camera is disconnected or its identity changed.')
 
-    if (!controllers.get(rig.id)?.snapshot().active
-      && (camera.telemetry.values?.kind !== 'camera' || camera.telemetry.values.activity !== 'idle')) {
+    if (
+      !controllers.get(rig.id)?.snapshot().active &&
+      (camera.telemetry.values?.kind !== 'camera' || camera.telemetry.values.activity !== 'idle')
+    ) {
       throw new Error('The camera has not confirmed it is idle.')
     }
 
@@ -79,19 +92,25 @@ export function registerTargets(
     const device = adapter(rig)
 
     const [geometry, mount] = await Promise.all([
-      device.cameraGeometry({ cameraId: rig.imagingCamera.uniqueId, expectedCameraName: rig.imagingCamera.name }),
+      device.cameraGeometry({
+        cameraId: rig.imagingCamera.uniqueId,
+        expectedCameraName: rig.imagingCamera.name,
+      }),
       device.telescopeStatus(telescopeId, undefined, { includePointingSide: true }),
     ])
 
     const site = mountSite(mount)
 
     if (mount.coordinateSystem !== 'j2000' && mount.coordinateSystem !== 'topocentric')
-      throw new Error(`Mount coordinate frame ${mount.coordinateSystem} is not supported for framing.`)
+      throw new Error(
+        `Mount coordinate frame ${mount.coordinateSystem} is not supported for framing.`,
+      )
 
-    if (!rig.focalLengthMm) throw new Error('Set the effective focal length to calibrate your camera frame.')
+    if (!rig.focalLengthMm)
+      throw new Error('Set the effective focal length to calibrate your camera frame.')
 
     const field = (pixels: number, microns: number, bin: number) =>
-      2 * Math.atan(pixels * microns * bin / 2000 / rig.focalLengthMm!) * 180 / Math.PI
+      (2 * Math.atan((pixels * microns * bin) / 2000 / rig.focalLengthMm!) * 180) / Math.PI
 
     const cameraView = {
       name: geometry.cameraName,
@@ -101,7 +120,13 @@ export function registerTargets(
       fieldHeightDegrees: field(geometry.height, geometry.pixelHeightMicrons, geometry.binY),
     }
 
-    const configuration = JSON.stringify([rig.endpoint, rig.imagingCamera, rig.focalLengthMm, geometry, telescopeId])
+    const configuration = JSON.stringify([
+      rig.endpoint,
+      rig.imagingCamera,
+      rig.focalLengthMm,
+      geometry,
+      telescopeId,
+    ])
 
     return { mount, site, camera: cameraView, configuration, telescopeId }
   }
@@ -156,21 +181,27 @@ export function registerTargets(
       enabled: !reason,
       unavailableReason: reason,
       pointingSide: ready.mount.pierSide ?? 'unknown',
-      checkCurrent: !reason && (controller?.checkCurrent(ready.mount, ready.configuration) ?? false),
+      checkCurrent:
+        !reason && (controller?.checkCurrent(ready.mount, ready.configuration) ?? false),
       canCenter: !reason && (controller?.canCenter(ready.mount, ready.configuration) ?? false),
     }
   }
 
-  async function siteView(rig: RigCatalogRecord): Promise<{ site: Site | null, siteUnavailableReason: string | null }> {
+  async function siteView(
+    rig: RigCatalogRecord,
+  ): Promise<{ site: Site | null; siteUnavailableReason: string | null }> {
     try {
-      return { site: mountSite(await adapter(rig).telescopeStatus(mountId(rig))), siteUnavailableReason: null }
+      return {
+        site: mountSite(await adapter(rig).telescopeStatus(mountId(rig))),
+        siteUnavailableReason: null,
+      }
     } catch (error) {
       return { site: null, siteUnavailableReason: message(error) }
     }
   }
 
   function targetView(target: CatalogTarget, site: Site | null, at = now()): TargetView {
-    const fov = Math.max(0.5, Math.min(5, (target.majorAxisArcminutes ?? 45) / 60 * 1.8))
+    const fov = Math.max(0.5, Math.min(5, ((target.majorAxisArcminutes ?? 45) / 60) * 1.8))
 
     return {
       id: target.id,
@@ -187,164 +218,218 @@ export function registerTargets(
 
   registerTargetDiscovery(app, catalog, { now, siteView, targetView })
 
-  app.get<{ Params: { rigId: string }, Querystring: { q?: string, offset?: string } }>('/api/web/rigs/:rigId/targets', async (request, reply) => {
-    const rig = await catalog.get(request.params.rigId)
+  app.get<{ Params: { rigId: string }; Querystring: { q?: string; offset?: string } }>(
+    '/api/web/rigs/:rigId/targets',
+    async (request, reply) => {
+      const rig = await catalog.get(request.params.rigId)
 
-    if (!rig) return reply.code(404).send({ error: 'Rig not found' })
+      if (!rig) return reply.code(404).send({ error: 'Rig not found' })
 
-    const search = z.object({ q: z.string().default(''), offset: z.string().default('0') }).safeParse(request.query)
+      const search = z
+        .object({ q: z.string().default(''), offset: z.string().default('0') })
+        .safeParse(request.query)
 
-    if (!search.success) return reply.code(400).send({ error: 'Invalid target search' })
-    const query = search.data.q
-    const offset = Number(search.data.offset)
+      if (!search.success) return reply.code(400).send({ error: 'Invalid target search' })
+      const query = search.data.q
+      const offset = Number(search.data.offset)
 
-    if (query.length > 100 || !Number.isInteger(offset) || offset < 0 || offset > 15000) return reply.code(400).send({ error: 'Invalid target search' })
-    const key = normalizeCatalogName(query)
+      if (query.length > 100 || !Number.isInteger(offset) || offset < 0 || offset > 15000)
+        return reply.code(400).send({ error: 'Invalid target search' })
+      const key = normalizeCatalogName(query)
 
-    const matches = key
-      ? listTargets().filter(target =>
-        [...target.aliases, target.type].some(value => normalizeCatalogName(value).includes(key)),
-      )
-      : ['ngc6205', 'ngc6888', 'ngc0224', 'ngc7000', 'ic1805', 'ic1848', 'ngc2024', 'b033', 'ngc1976', 'ngc6992', 'ngc7293', 'ngc0869'].flatMap(id => getTarget(id) ?? [])
+      const matches = key
+        ? listTargets().filter(target =>
+            [...target.aliases, target.type].some(value =>
+              normalizeCatalogName(value).includes(key),
+            ),
+          )
+        : [
+            'ngc6205',
+            'ngc6888',
+            'ngc0224',
+            'ngc7000',
+            'ic1805',
+            'ic1848',
+            'ngc2024',
+            'b033',
+            'ngc1976',
+            'ngc6992',
+            'ngc7293',
+            'ngc0869',
+          ].flatMap(id => getTarget(id) ?? [])
 
-    const location = await siteView(rig)
+      const location = await siteView(rig)
 
-    const view: TargetsView = {
-      rigId: rig.id,
-      rigName: rig.name,
-      total: matches.length,
-      targets: matches.slice(offset, offset + 24).map(target => targetView(target, location.site)),
-      ...location,
-    }
+      const view: TargetsView = {
+        rigId: rig.id,
+        rigName: rig.name,
+        total: matches.length,
+        targets: matches
+          .slice(offset, offset + 24)
+          .map(target => targetView(target, location.site)),
+        ...location,
+      }
 
-    return view
-  })
-  app.get<{ Params: { rigId: string, targetId: string } }>('/api/web/rigs/:rigId/targets/:targetId', async (request, reply) => {
-    const rig = await catalog.get(request.params.rigId)
-    const target = getTarget(request.params.targetId)
+      return view
+    },
+  )
+  app.get<{ Params: { rigId: string; targetId: string } }>(
+    '/api/web/rigs/:rigId/targets/:targetId',
+    async (request, reply) => {
+      const rig = await catalog.get(request.params.rigId)
+      const target = getTarget(request.params.targetId)
 
-    if (!rig || !target) return reply.code(404).send({ error: 'Target or rig not found' })
+      if (!rig || !target) return reply.code(404).send({ error: 'Target or rig not found' })
 
-    return targetView(target, (await siteView(rig)).site)
-  })
+      return targetView(target, (await siteView(rig)).site)
+    },
+  )
   app.get<{ Params: { rigId: string } }>('/api/web/rigs/:rigId/framing', async (request, reply) => {
     const rig = await catalog.get(request.params.rigId)
 
     return rig ? framingView(rig) : reply.code(404).send({ error: 'Rig not found' })
   })
-  app.put<{ Params: { rigId: string } }>('/api/rigs/:rigId/framing/settings', async (request, reply) => {
-    const settings = z.strictObject({ focalLengthMm: z.number().min(10).max(20000) }).safeParse(request.body)
+  app.put<{ Params: { rigId: string } }>(
+    '/api/rigs/:rigId/framing/settings',
+    async (request, reply) => {
+      const settings = z
+        .strictObject({ focalLengthMm: z.number().min(10).max(20000) })
+        .safeParse(request.body)
 
-    if (!request.headers['content-type']?.startsWith('application/json') || !settings.success) return reply.code(400).send({ error: 'Expected focalLengthMm between 10 and 20000.' })
-    const release = operations.acquire(request.params.rigId, 'framing-settings')
+      if (!request.headers['content-type']?.startsWith('application/json') || !settings.success)
+        return reply.code(400).send({ error: 'Expected focalLengthMm between 10 and 20000.' })
+      const release = operations.acquire(request.params.rigId, 'framing-settings')
 
-    if (!release) return reply.code(409).send({ error: 'Another rig operation is in progress.' })
+      if (!release) return reply.code(409).send({ error: 'Another rig operation is in progress.' })
 
-    try {
-      if (!await catalog.setFocalLength(request.params.rigId, settings.data.focalLengthMm)) return reply.code(404).send({ error: 'Rig not found' })
+      try {
+        if (!(await catalog.setFocalLength(request.params.rigId, settings.data.focalLengthMm)))
+          return reply.code(404).send({ error: 'Rig not found' })
 
-      return framingView((await catalog.get(request.params.rigId))!)
-    } finally {
-      release()
-    }
-  })
-  app.post<{ Params: { rigId: string, command: string } }>('/api/rigs/:rigId/framing/:command', async (request, reply) => {
-    const { rigId, command } = request.params
+        return framingView((await catalog.get(request.params.rigId))!)
+      } finally {
+        release()
+      }
+    },
+  )
+  app.post<{ Params: { rigId: string; command: string } }>(
+    '/api/rigs/:rigId/framing/:command',
+    async (request, reply) => {
+      const { rigId, command } = request.params
 
-    const operation = z.enum(['start', 'stop', 'center', 'check']).safeParse(command)
+      const operation = z.enum(['start', 'stop', 'center', 'check']).safeParse(command)
 
-    if (!operation.success) return reply.code(404).send({ error: 'Unknown framing command' })
+      if (!operation.success) return reply.code(404).send({ error: 'Unknown framing command' })
 
-    const commandFields = {
-      start: ['targetId', 'raDegrees', 'decDegrees', 'exposureSeconds'],
-      check: ['targetId', 'raDegrees', 'decDegrees', 'exposureSeconds'],
-      center: ['checkId', 'raDegrees', 'decDegrees'],
-      stop: [],
-    }
-
-    const expectedKeys = commandFields[operation.data]
-    const bodyEnvelope = z.looseObject({}).safeParse(request.body)
-
-    if (!request.headers['content-type']?.startsWith('application/json') || !bodyEnvelope.success
-      || Object.keys(bodyEnvelope.data).length !== expectedKeys.length || Object.keys(bodyEnvelope.data).some(key => !expectedKeys.some(expected => expected === key))) {
-      return reply.code(400).send({ error: 'Invalid framing command body' })
-    }
-
-    const parsed = framingCommandSchema.safeParse({ command, body: request.body })
-
-    if (!parsed.success) {
-      const error = command === 'center'
-        ? 'Expected the solved framing check ID and desired J2000 coordinates.'
-        : 'Expected a catalog target, J2000 coordinates and 0.1–60 second exposure.'
-
-      return reply.code(400).send({ error })
-    }
-
-    const action = parsed.data
-    const rig = await catalog.get(rigId)
-
-    if (!rig) return reply.code(404).send({ error: 'Rig not found' })
-
-    if (action.command === 'stop') {
-      await controllers.get(rigId)?.stop()
-
-      return framingView(rig)
-    }
-
-    const release = operations.acquire(rigId, 'framing')
-
-    if (!release) return reply.code(409).send({ error: 'Another rig operation is in progress.' })
-    let started = false
-
-    try {
-      const ready = await readiness(rig)
-      let controller = controllers.get(rigId)
-
-      if (!controller) {
-        controller = createFramingController(now, options.waitForMountObservation)
-        controllers.set(rigId, controller)
+      const commandFields = {
+        start: ['targetId', 'raDegrees', 'decDegrees', 'exposureSeconds'],
+        check: ['targetId', 'raDegrees', 'decDegrees', 'exposureSeconds'],
+        center: ['checkId', 'raDegrees', 'decDegrees'],
+        stop: [],
       }
 
-      const previous = controller.snapshot()
+      const expectedKeys = commandFields[operation.data]
+      const bodyEnvelope = z.looseObject({}).safeParse(request.body)
 
-      if (action.command === 'center') {
-        if (previous.actual?.checkId !== action.body.checkId) throw new Error('The framing check has changed. Review the latest check before centering.')
-
-        if (!controller.canCenter(ready.mount, ready.configuration)) throw new Error('A current solved framing check is required before centering.')
+      if (
+        !request.headers['content-type']?.startsWith('application/json') ||
+        !bodyEnvelope.success ||
+        Object.keys(bodyEnvelope.data).length !== expectedKeys.length ||
+        Object.keys(bodyEnvelope.data).some(key => !expectedKeys.some(expected => expected === key))
+      ) {
+        return reply.code(400).send({ error: 'Invalid framing command body' })
       }
 
-      const desired = { raDegrees: action.body.raDegrees, decDegrees: action.body.decDegrees }
+      const parsed = framingCommandSchema.safeParse({ command, body: request.body })
 
-      const solver = options.createSolver?.(ready.camera.fieldHeightDegrees)
-        ?? (options.solver
-          ? createAstapSolver({ ...options.solver, fieldHeightDegrees: ready.camera.fieldHeightDegrees })
-          : undefined)
+      if (!parsed.success) {
+        const error =
+          command === 'center'
+            ? 'Expected the solved framing check ID and desired J2000 coordinates.'
+            : 'Expected a catalog target, J2000 coordinates and 0.1–60 second exposure.'
 
-      if (!solver) throw new Error('Plate solving is not configured on the Vela server.')
-      const hardware = options.createHardware?.(rig, ready.telescopeId) ?? configuredHardware(rig, ready.telescopeId, adapter(rig))
-      controller.start(
-        {
-          desired,
-          targetId: action.command === 'center' ? previous.targetId! : action.body.targetId,
-          exposureSeconds: action.command === 'center' ? previous.exposureSeconds : action.body.exposureSeconds,
-          configuration: ready.configuration,
-          action: action.command,
-          rigId,
-          requestId: request.id,
-        },
-        hardware,
-        solver,
-        release,
-      )
-      started = true
+        return reply.code(400).send({ error })
+      }
 
-      return framingView(rig)
-    } catch (error) {
-      return reply.code(409).send({ error: message(error) })
-    } finally {
-      if (!started) release()
-    }
-  })
+      const action = parsed.data
+      const rig = await catalog.get(rigId)
+
+      if (!rig) return reply.code(404).send({ error: 'Rig not found' })
+
+      if (action.command === 'stop') {
+        await controllers.get(rigId)?.stop()
+
+        return framingView(rig)
+      }
+
+      const release = operations.acquire(rigId, 'framing')
+
+      if (!release) return reply.code(409).send({ error: 'Another rig operation is in progress.' })
+      let started = false
+
+      try {
+        const ready = await readiness(rig)
+        let controller = controllers.get(rigId)
+
+        if (!controller) {
+          controller = createFramingController(now, options.waitForMountObservation)
+          controllers.set(rigId, controller)
+        }
+
+        const previous = controller.snapshot()
+
+        if (action.command === 'center') {
+          if (previous.actual?.checkId !== action.body.checkId)
+            throw new Error(
+              'The framing check has changed. Review the latest check before centering.',
+            )
+
+          if (!controller.canCenter(ready.mount, ready.configuration))
+            throw new Error('A current solved framing check is required before centering.')
+        }
+
+        const desired = { raDegrees: action.body.raDegrees, decDegrees: action.body.decDegrees }
+
+        const solver =
+          options.createSolver?.(ready.camera.fieldHeightDegrees) ??
+          (options.solver
+            ? createAstapSolver({
+                ...options.solver,
+                fieldHeightDegrees: ready.camera.fieldHeightDegrees,
+              })
+            : undefined)
+
+        if (!solver) throw new Error('Plate solving is not configured on the Vela server.')
+
+        const hardware =
+          options.createHardware?.(rig, ready.telescopeId) ??
+          configuredHardware(rig, ready.telescopeId, adapter(rig))
+
+        controller.start(
+          {
+            desired,
+            targetId: action.command === 'center' ? previous.targetId! : action.body.targetId,
+            exposureSeconds:
+              action.command === 'center' ? previous.exposureSeconds : action.body.exposureSeconds,
+            configuration: ready.configuration,
+            action: action.command,
+            rigId,
+            requestId: request.id,
+          },
+          hardware,
+          solver,
+          release,
+        )
+        started = true
+
+        return framingView(rig)
+      } catch (error) {
+        return reply.code(409).send({ error: message(error) })
+      } finally {
+        if (!started) release()
+      }
+    },
+  )
   app.addHook('onClose', async () => {
     await Promise.all([...controllers.values()].map(controller => controller.stop()))
   })
@@ -355,33 +440,42 @@ function configuredHardware(
   telescopeId: string,
   adapter: AlpacaFraming,
 ): FramingHardware {
-  const acquisition = createAlpacaAcquisition({ baseUrl: `http://${rig.endpoint.host}:${rig.endpoint.port}` })
+  const acquisition = createAlpacaAcquisition({
+    baseUrl: `http://${rig.endpoint.host}:${rig.endpoint.port}`,
+  })
 
   return {
     status: signal => adapter.telescopeStatus(telescopeId, signal, { includePointingSide: true }),
     tracking: (enabled, signal) => adapter.setTracking(telescopeId, enabled, signal),
     slew: (position, frame, signal) => {
-      if (frame !== 'j2000' && frame !== 'topocentric') throw new Error('Unsupported mount coordinate frame')
+      if (frame !== 'j2000' && frame !== 'topocentric')
+        throw new Error('Unsupported mount coordinate frame')
 
-      return adapter.slew({
-        telescopeId,
-        rightAscensionDegrees: position.raDegrees,
-        declinationDegrees: position.decDegrees,
-        coordinateSystem: frame,
-      }, signal)
+      return adapter.slew(
+        {
+          telescopeId,
+          rightAscensionDegrees: position.raDegrees,
+          declinationDegrees: position.decDegrees,
+          coordinateSystem: frame,
+        },
+        signal,
+      )
     },
-    capture: ({ exposureSeconds, signal, onReadout, onReadState }) => acquisition.capture({
-      cameraId: rig.imagingCamera!.uniqueId,
-      expectedCameraName: rig.imagingCamera!.name,
-      exposureSeconds,
-      signal,
-      onReadout: () => onReadout(),
-      onReadState,
-    }),
+    capture: ({ exposureSeconds, signal, onReadout, onReadState }) =>
+      acquisition.capture({
+        cameraId: rig.imagingCamera!.uniqueId,
+        expectedCameraName: rig.imagingCamera!.name,
+        exposureSeconds,
+        signal,
+        onReadout: () => onReadout(),
+        onReadState,
+      }),
   }
 }
 
-function message(cause: unknown) { return cause instanceof Error ? cause.message : 'Framing state is unavailable' }
+function message(cause: unknown) {
+  return cause instanceof Error ? cause.message : 'Framing state is unavailable'
+}
 
 const compositionSchema = z.strictObject({
   targetId: z.string().refine(value => getTarget(value) !== undefined),

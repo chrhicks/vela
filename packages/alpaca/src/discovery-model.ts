@@ -54,8 +54,5 @@ export interface AlpacaDiscoveryOptions {
 
 export interface AlpacaDiscovery {
   scan(options?: AlpacaScanOptions): Promise<ReadonlyArray<AlpacaEndpoint>>
-  inspect(
-    endpoint: AlpacaEndpoint,
-    options?: AlpacaInspectOptions,
-  ): Promise<AlpacaInspection>
+  inspect(endpoint: AlpacaEndpoint, options?: AlpacaInspectOptions): Promise<AlpacaInspection>
 }

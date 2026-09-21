@@ -36,10 +36,7 @@ export type RigConnectionUncertaintyReason =
   | 'verification-unavailable'
   | 'write-outcome-unknown'
 
-type NonEmptyRigConnectionDevices = readonly [
-  RigConnectionDeviceView,
-  ...RigConnectionDeviceView[],
-]
+type NonEmptyRigConnectionDevices = readonly [RigConnectionDeviceView, ...RigConnectionDeviceView[]]
 
 export type ConnectRigDevicesResult =
   | {

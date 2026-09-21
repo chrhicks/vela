@@ -31,14 +31,22 @@ describe('local persistence boundary', () => {
   })
 
   it('rejects unsafe, read-only, or malformed profiles', () => {
-    expect(() => parseProfile({ ...profile, id: '../outside' })).toThrow('Invalid design profile payload')
-    expect(() => parseProfile({ ...profile, readonly: true })).toThrow('Read-only profiles cannot be persisted')
-    expect(() => parseProfile({ ...profile, overrides: { dangerLightness: [0.5] } })).toThrow('Invalid design profile payload')
+    expect(() => parseProfile({ ...profile, id: '../outside' })).toThrow(
+      'Invalid design profile payload',
+    )
+    expect(() => parseProfile({ ...profile, readonly: true })).toThrow(
+      'Read-only profiles cannot be persisted',
+    )
+    expect(() => parseProfile({ ...profile, overrides: { dangerLightness: [0.5] } })).toThrow(
+      'Invalid design profile payload',
+    )
   })
 
   it('keeps the filename length limit on otherwise valid profile IDs', () => {
     expect(parseProfile({ ...profile, id: 'a'.repeat(64) }).id).toHaveLength(64)
-    expect(() => parseProfile({ ...profile, id: 'a'.repeat(65) })).toThrow('Invalid design profile payload')
+    expect(() => parseProfile({ ...profile, id: 'a'.repeat(65) })).toThrow(
+      'Invalid design profile payload',
+    )
   })
 
   it('validates theme overrides in both profiles and session recovery', () => {
@@ -51,15 +59,21 @@ describe('local persistence boundary', () => {
     }
 
     expect(parseProfile({ ...profile, overrides }).overrides).toEqual(overrides)
-    expect(parseSession({ ...session, unsavedOverrides: overrides }).unsavedOverrides).toEqual(overrides)
+    expect(parseSession({ ...session, unsavedOverrides: overrides }).unsavedOverrides).toEqual(
+      overrides,
+    )
 
     for (const invalid of [
       { accentHue: Number.POSITIVE_INFINITY },
       { unknownToken: 12 },
       { semantic: { ...overrides.semantic, dark: { ...overrides.semantic.dark, focus: 'red' } } },
     ]) {
-      expect(() => parseProfile({ ...profile, overrides: invalid })).toThrow('Invalid design profile payload')
-      expect(() => parseSession({ ...session, unsavedOverrides: invalid })).toThrow('Invalid workshop session payload')
+      expect(() => parseProfile({ ...profile, overrides: invalid })).toThrow(
+        'Invalid design profile payload',
+      )
+      expect(() => parseSession({ ...session, unsavedOverrides: invalid })).toThrow(
+        'Invalid workshop session payload',
+      )
     }
   })
 
@@ -77,8 +91,14 @@ describe('local persistence boundary', () => {
   })
 
   it('rejects arbitrary paths, nested props, and malformed recovery state', () => {
-    expect(() => parseSession({ ...session, context: 'arbitrary' })).toThrow('Invalid workshop session payload')
-    expect(() => parseSession({ ...session, props: { nested: {} } })).toThrow('Invalid workshop session payload')
-    expect(() => parseSession({ ...session, unsavedOverrides: { positiveLightness: [0.5] } })).toThrow('Invalid workshop session payload')
+    expect(() => parseSession({ ...session, context: 'arbitrary' })).toThrow(
+      'Invalid workshop session payload',
+    )
+    expect(() => parseSession({ ...session, props: { nested: {} } })).toThrow(
+      'Invalid workshop session payload',
+    )
+    expect(() =>
+      parseSession({ ...session, unsavedOverrides: { positiveLightness: [0.5] } }),
+    ).toThrow('Invalid workshop session payload')
   })
 })

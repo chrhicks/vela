@@ -43,7 +43,9 @@ function image(
 
         for (let sy = 0; sy < 12; sy++) {
           for (let sx = 0; sx < 12; sx++) {
-            const r2 = (x + (sx + 0.5) / 12 - 0.5 - star.x) ** 2 + (y + (sy + 0.5) / 12 - 0.5 - star.y) ** 2
+            const r2 =
+              (x + (sx + 0.5) / 12 - 0.5 - star.x) ** 2 + (y + (sy + 0.5) / 12 - 0.5 - star.y) ** 2
+
             const r = Math.sqrt(r2)
 
             const exponents = {
@@ -54,18 +56,26 @@ function image(
 
             const exponent = exponents[star.profile ?? 'gaussian']
 
-            signal += (star.amplitude ?? 1000) * Math.exp(exponent) / 144
+            signal += ((star.amplitude ?? 1000) * Math.exp(exponent)) / 144
           }
         }
       }
 
       // SAFETY: Bayer patterns contain four r/g/b characters; parity indexes stay within 0–3.
-      const gain = options.color?.kind === 'bayer'
-        ? { r: 1.8, g: 1, b: 0.45 }[options.color.pattern[(y % 2) * 2 + x % 2] as 'r' | 'g' | 'b']
-        : 1
+      const gain =
+        options.color?.kind === 'bayer'
+          ? { r: 1.8, g: 1, b: 0.45 }[
+              options.color.pattern[(y % 2) * 2 + (x % 2)] as 'r' | 'g' | 'b'
+            ]
+          : 1
 
-      const noise = (options.noise ?? 0) * Math.sqrt(-2 * Math.log(random())) * Math.cos(2 * Math.PI * random())
-      pixels[y * width + x] = Math.min(options.clip ?? Infinity, (signal + (options.background ?? 100)) * gain + noise)
+      const noise =
+        (options.noise ?? 0) * Math.sqrt(-2 * Math.log(random())) * Math.cos(2 * Math.PI * random())
+
+      pixels[y * width + x] = Math.min(
+        options.clip ?? Infinity,
+        (signal + (options.background ?? 100)) * gain + noise,
+      )
     }
   }
 
@@ -79,7 +89,11 @@ describe('measureStars', () => {
     for (const sigma of [1.5, 2, 3]) {
       for (const offset of [0, 0.23, 0.5]) {
         for (const amplitude of [200, 20000]) {
-          const frame = image([{ x: 46 + offset, y: 47 + offset, sigma, amplitude }], { background: -130, noise: 1 })
+          const frame = image([{ x: 46 + offset, y: 47 + offset, sigma, amplitude }], {
+            background: -130,
+            noise: 1,
+          })
+
           const result = await measureStars(frame.width, frame.height, frame.pixels)
           expect(result.detectedStars).toBe(1)
           expect(Math.abs(result.medianHfrPixels! - expected(sigma))).toBeLessThan(0.11)
@@ -102,12 +116,21 @@ describe('measureStars', () => {
     for (const value of [NaN, Infinity, -Infinity]) {
       const pixels = new Float64Array(33 * 33)
       pixels[pixels.length - 1] = value
-      await expect(measureStars(33, 33, pixels, { kind: 'bayer', pattern: 'rggb' })).rejects.toThrow('nonfinite')
+      await expect(
+        measureStars(33, 33, pixels, { kind: 'bayer', pattern: 'rggb' }),
+      ).rejects.toThrow('nonfinite')
     }
 
-    await expect(measureStars(32, 32, new Float64Array(1024).fill(NaN))).rejects.toThrow('nonfinite')
+    await expect(measureStars(32, 32, new Float64Array(1024).fill(NaN))).rejects.toThrow(
+      'nonfinite',
+    )
 
-    for (const [width, height, length] of [[0, 1, 0], [1.5, 2, 3], [2, 2, 3], [50000001, 1, 50000001]]) {
+    for (const [width, height, length] of [
+      [0, 1, 0],
+      [1.5, 2, 3],
+      [2, 2, 3],
+      [50000001, 1, 50000001],
+    ]) {
       await expect(measureStars(width!, height!, { length: length! })).rejects.toThrow('dimensions')
     }
   })
@@ -137,15 +160,23 @@ describe('measureStars', () => {
   })
 
   it('returns no measurement for blank, noisy, invalid and isolated hot-pixel images', async () => {
-    for (const color of [{ kind: 'mono' }, { kind: 'bayer', pattern: 'rggb' }] satisfies ImageColor[]) {
+    for (const color of [
+      { kind: 'mono' },
+      { kind: 'bayer', pattern: 'rggb' },
+    ] satisfies ImageColor[]) {
       for (const noise of [0, 10]) {
         const frame = image([], { color, noise })
-        expect(await measureStars(frame.width, frame.height, frame.pixels, color)).toEqual({ detectedStars: 0, medianHfrPixels: null })
+        expect(await measureStars(frame.width, frame.height, frame.pixels, color)).toEqual({
+          detectedStars: 0,
+          medianHfrPixels: null,
+        })
         frame.pixels[47 * frame.width + 46] = 50000
-        expect(await measureStars(frame.width, frame.height, frame.pixels, color)).toEqual({ detectedStars: 0, medianHfrPixels: null })
+        expect(await measureStars(frame.width, frame.height, frame.pixels, color)).toEqual({
+          detectedStars: 0,
+          medianHfrPixels: null,
+        })
       }
     }
-
   })
 
   it('rejects nonfinite star patches and clipping in Bayer data without assuming a sensor ceiling', async () => {
@@ -156,7 +187,10 @@ describe('measureStars', () => {
     for (const pattern of ['rggb', 'grbg', 'gbrg', 'bggr'] as const) {
       const color: ImageColor = { kind: 'bayer', pattern }
       const clipped = image([{ x: 45, y: 45, sigma: 3, amplitude: 10000 }], { color, clip: 500 })
-      expect(await measureStars(clipped.width, clipped.height, clipped.pixels, color)).toEqual({ detectedStars: 0, medianHfrPixels: null })
+      expect(await measureStars(clipped.width, clipped.height, clipped.pixels, color)).toEqual({
+        detectedStars: 0,
+        medianHfrPixels: null,
+      })
     }
   })
 
@@ -177,14 +211,19 @@ describe('measureStars', () => {
   it('rejects incomplete edge apertures, close blends, flat clipped cores and unconverged broad profiles', async () => {
     const frames = [
       image([{ x: 10, y: 45, sigma: 2 }]),
-      image([{ x: 42, y: 45, sigma: 2 }, { x: 50, y: 45, sigma: 2 }]),
+      image([
+        { x: 42, y: 45, sigma: 2 },
+        { x: 50, y: 45, sigma: 2 },
+      ]),
       image([{ x: 45, y: 45, sigma: 2 }], { clip: 400 }),
       image([{ x: 45, y: 45, sigma: 8 }]),
     ]
 
     for (const frame of frames) {
-      expect(await measureStars(frame.width, frame.height, frame.pixels))
-        .toEqual({ detectedStars: 0, medianHfrPixels: null })
+      expect(await measureStars(frame.width, frame.height, frame.pixels)).toEqual({
+        detectedStars: 0,
+        medianHfrPixels: null,
+      })
     }
   })
 
@@ -194,7 +233,10 @@ describe('measureStars', () => {
       { width: 200, height: 200 },
     )
 
-    expect(await measureStars(frame.width, frame.height, frame.pixels)).toEqual({ detectedStars: 0, medianHfrPixels: null })
+    expect(await measureStars(frame.width, frame.height, frame.pixels)).toEqual({
+      detectedStars: 0,
+      medianHfrPixels: null,
+    })
     const autofocus = await measureAutofocusStars(frame.width, frame.height, frame.pixels)
     expect(autofocus.detectedStars).toBeGreaterThan(0)
     expect(autofocus.medianHfrPixels).toBeGreaterThan(6)

@@ -2,7 +2,12 @@ import { appendFile, mkdir, rename, rm, stat } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { ExportResultCode, type ExportResult } from '@opentelemetry/core'
 import { resourceFromAttributes } from '@opentelemetry/resources'
-import { BatchSpanProcessor, NodeTracerProvider, type ReadableSpan, type SpanExporter } from '@opentelemetry/sdk-trace-node'
+import {
+  BatchSpanProcessor,
+  NodeTracerProvider,
+  type ReadableSpan,
+  type SpanExporter,
+} from '@opentelemetry/sdk-trace-node'
 
 interface TraceFileOptions {
   maxFileBytes?: number
@@ -22,7 +27,11 @@ export function createTraceFileExporter(
     onError = error => console.error('Vela tracing:', error.message),
   }: TraceFileOptions = {},
 ): SpanExporter {
-  if (![maxFileBytes, retainedFiles, maxPendingBytes].every(value => Number.isSafeInteger(value) && value > 0)) {
+  if (
+    ![maxFileBytes, retainedFiles, maxPendingBytes].every(
+      value => Number.isSafeInteger(value) && value > 0,
+    )
+  ) {
     throw new Error('Trace file limits must be positive integers')
   }
 
@@ -48,10 +57,13 @@ export function createTraceFileExporter(
   async function write(lines: string[]) {
     if (!initialized) {
       await mkdir(dirname(file), { recursive: true })
-      fileBytes = await stat(file).then(info => info.size, error => {
-        if (error.code === 'ENOENT') return 0
-        throw error
-      })
+      fileBytes = await stat(file).then(
+        info => info.size,
+        error => {
+          if (error.code === 'ENOENT') return 0
+          throw error
+        },
+      )
       initialized = true
     }
 
@@ -127,10 +139,13 @@ export function createTraceFileExporter(
         await write(lines)
       })
 
-      pending = task.then(() => undefined, cause => {
-        failed = asError(cause)
-        report(failed)
-      })
+      pending = task.then(
+        () => undefined,
+        cause => {
+          failed = asError(cause)
+          report(failed)
+        },
+      )
       void task.then(
         () => finish({ code: ExportResultCode.SUCCESS }),
         cause => finish({ code: ExportResultCode.FAILED, error: asError(cause) }),
@@ -199,12 +214,14 @@ export function startTelemetry(path: string | undefined) {
   const provider = new NodeTracerProvider({
     resource: resourceFromAttributes({ 'service.name': 'vela-server', 'process.pid': process.pid }),
     spanLimits: { attributeCountLimit: 64, attributeValueLengthLimit: 1024, eventCountLimit: 64 },
-    spanProcessors: [new BatchSpanProcessor(exporter, {
-      scheduledDelayMillis: 1000,
-      maxQueueSize: 2048,
-      maxExportBatchSize: 128,
-      exportTimeoutMillis: 2000,
-    })],
+    spanProcessors: [
+      new BatchSpanProcessor(exporter, {
+        scheduledDelayMillis: 1000,
+        maxQueueSize: 2048,
+        maxExportBatchSize: 128,
+        exportTimeoutMillis: 2000,
+      }),
+    ],
   })
 
   provider.register()

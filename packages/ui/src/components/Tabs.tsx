@@ -27,7 +27,7 @@ export function Tabs({
   const fallback = defaultValue ?? items[0]?.id ?? ''
   const [internalValue, setInternalValue] = useState(fallback)
   const selectedValue = value ?? internalValue
-  const selected = items.find((item) => item.id === selectedValue) ?? items[0]
+  const selected = items.find(item => item.id === selectedValue) ?? items[0]
 
   function select(next: string) {
     if (value === undefined) setInternalValue(next)
@@ -37,8 +37,13 @@ export function Tabs({
   return (
     <div className={`vela-tabs ${className}`.trim()} data-size={size} {...props}>
       <div className="vela-tabs__list">
-        {items.map((item) => (
-          <button data-active={item.id === selected?.id} key={item.id} onClick={() => select(item.id)} type="button">
+        {items.map(item => (
+          <button
+            data-active={item.id === selected?.id}
+            key={item.id}
+            onClick={() => select(item.id)}
+            type="button"
+          >
             {item.label}
           </button>
         ))}

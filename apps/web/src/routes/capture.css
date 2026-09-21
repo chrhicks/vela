@@ -1,4 +1,6 @@
-.capture-page { container-type: inline-size; }
+.capture-page {
+  container-type: inline-size;
+}
 .capture-page__heading {
   display: flex;
   align-items: center;
@@ -17,10 +19,21 @@
   line-height: 1.2;
   font-weight: 600;
 }
-.capture-page__layout { display: grid; gap: 16px; }
-.capture-page__controls { align-self: start; min-width: 0; }
-.capture-page__controls .vela-panel__header { padding: 16px 16px 0; border-bottom: 0; }
-.capture-page__controls .vela-panel__body { padding: 16px; }
+.capture-page__layout {
+  display: grid;
+  gap: 16px;
+}
+.capture-page__controls {
+  align-self: start;
+  min-width: 0;
+}
+.capture-page__controls .vela-panel__header {
+  padding: 16px 16px 0;
+  border-bottom: 0;
+}
+.capture-page__controls .vela-panel__body {
+  padding: 16px;
+}
 .capture-page__camera {
   display: flex;
   align-items: center;
@@ -33,9 +46,18 @@
   flex-shrink: 0;
   color: var(--vela-text-muted);
 }
-.capture-page__camera > div { display: grid; gap: 4px; }
-.capture-page__camera strong { font-size: 13px; font-weight: 550; }
-.capture-page__camera span { color: var(--vela-text-muted); font-size: 11px; }
+.capture-page__camera > div {
+  display: grid;
+  gap: 4px;
+}
+.capture-page__camera strong {
+  font-size: 13px;
+  font-weight: 550;
+}
+.capture-page__camera span {
+  color: var(--vela-text-muted);
+  font-size: 11px;
+}
 .capture-page__cooling {
   margin: 0 0 20px;
   padding-bottom: 16px;
@@ -56,25 +78,44 @@
   grid-template-columns: auto 1fr;
   font-size: 13px;
 }
-.capture-page__cooling dt { color: var(--vela-text-muted); }
-.capture-page__cooling dd { margin: 0; font-variant-numeric: tabular-nums; }
-.capture-page__cooling dd[data-state='off'] { color: var(--vela-warning); }
+.capture-page__cooling dt {
+  color: var(--vela-text-muted);
+}
+.capture-page__cooling dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.capture-page__cooling dd[data-state='off'] {
+  color: var(--vela-warning);
+}
 .capture-page__cooling > p {
   margin: 10px 0 0;
   font-size: 12px;
   line-height: 1.6;
   color: var(--vela-text-muted);
 }
-.capture-page__cooling .vela-checkbox { margin-top: 12px; }
+.capture-page__cooling .vela-checkbox {
+  margin-top: 12px;
+}
 .capture-page__cooling form {
   margin-top: 12px;
   display: grid;
   gap: 10px;
 }
-.capture-page__cooling form .vela-button { width: 100%; min-height: 40px; }
-.capture-page__command { margin-top: 14px; }
-.capture-page__command .vela-button { width: 100%; min-height: 44px; }
-.capture-page .vela-button:hover:not(:disabled) { transform: none; }
+.capture-page__cooling form .vela-button {
+  width: 100%;
+  min-height: 40px;
+}
+.capture-page__command {
+  margin-top: 14px;
+}
+.capture-page__command .vela-button {
+  width: 100%;
+  min-height: 44px;
+}
+.capture-page .vela-button:hover:not(:disabled) {
+  transform: none;
+}
 .capture-page__progress {
   border-top: 1px solid var(--vela-line);
   padding-top: 14px;
@@ -88,8 +129,14 @@
   gap: 6px;
   justify-content: space-between;
 }
-.capture-page__progress strong { font-size: 12px; font-weight: 550; }
-.capture-page__progress span { color: var(--vela-text-muted); font-variant-numeric: tabular-nums; }
+.capture-page__progress strong {
+  font-size: 12px;
+  font-weight: 550;
+}
+.capture-page__progress span {
+  color: var(--vela-text-muted);
+  font-variant-numeric: tabular-nums;
+}
 .capture-page__progress progress {
   display: block;
   width: 100%;
@@ -112,9 +159,17 @@
   margin-bottom: 18px;
   line-height: 1.5;
 }
-.capture-page__warning strong { font-size: 15px; font-weight: 600; }
-.capture-page__warning p { font-size: 13px; margin: 5px 0 0; }
-.capture-page__warning .vela-button { margin-top: 12px; }
+.capture-page__warning strong {
+  font-size: 15px;
+  font-weight: 600;
+}
+.capture-page__warning p {
+  font-size: 13px;
+  margin: 5px 0 0;
+}
+.capture-page__warning .vela-button {
+  margin-top: 12px;
+}
 .capture-page__rig {
   padding: 13px 0;
   border-top: 1px solid var(--vela-line);
@@ -137,24 +192,45 @@
   align-items: center;
   color: var(--vela-text);
 }
-.capture-page__rig summary > span:last-child::after { content: ' +'; }
-.capture-page__rig[open] summary > span:last-child::after { content: ' −'; }
+.capture-page__rig summary > span:last-child::after {
+  content: ' +';
+}
+.capture-page__rig[open] summary > span:last-child::after {
+  content: ' −';
+}
 .capture-page__rig i {
   width: 6px;
   height: 6px;
   border-radius: 50%;
   background: var(--vela-positive);
 }
-.capture-page__rig i[data-offline] { background: var(--vela-warning); }
-.capture-page__rig a { color: var(--vela-text); }
-.capture-page__rig summary:focus-visible, .capture-page__rig a:focus-visible { outline: 2px solid var(--vela-accent); outline-offset: 4px; }
+.capture-page__rig i[data-offline] {
+  background: var(--vela-warning);
+}
+.capture-page__rig a {
+  color: var(--vela-text);
+}
+.capture-page__rig summary:focus-visible,
+.capture-page__rig a:focus-visible {
+  outline: 2px solid var(--vela-accent);
+  outline-offset: 4px;
+}
 @container (min-width: 680px) {
-  .capture-page__heading h1 { font-size: 30px; }
-  .capture-page__heading { margin-bottom: 20px; }
-  .capture-page__layout { grid-template-columns: minmax(0, 1.75fr) minmax(240px, .75fr); gap: 20px; }
+  .capture-page__heading h1 {
+    font-size: 30px;
+  }
+  .capture-page__heading {
+    margin-bottom: 20px;
+  }
+  .capture-page__layout {
+    grid-template-columns: minmax(0, 1.75fr) minmax(240px, 0.75fr);
+    gap: 20px;
+  }
 }
 
-.capture-page__controls .vela-checkbox { margin-top: 14px; }
+.capture-page__controls .vela-checkbox {
+  margin-top: 14px;
+}
 .capture-page__count {
   display: flex;
   align-items: baseline;
@@ -162,12 +238,22 @@
   margin-top: 18px;
   font-variant-numeric: tabular-nums;
 }
-.capture-page__count strong { font-size: 22px; font-weight: 550; }
-.capture-page__count span { font-size: 12px; color: var(--vela-text-muted); }
+.capture-page__count strong {
+  font-size: 22px;
+  font-weight: 550;
+}
+.capture-page__count span {
+  font-size: 12px;
+  color: var(--vela-text-muted);
+}
 
 @container (max-width: 520px) {
-  .capture-page__heading { flex-wrap: wrap; }
-  .capture-page__heading > div { flex: 1 1 100%; }
+  .capture-page__heading {
+    flex-wrap: wrap;
+  }
+  .capture-page__heading > div {
+    flex: 1 1 100%;
+  }
 }
 .capture-page__heading-actions {
   display: flex;

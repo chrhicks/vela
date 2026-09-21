@@ -36,7 +36,7 @@ export function useRigDetail(rigId: string): RigDetailResult {
     const generation = ++requestGeneration.current
     const nextController = new AbortController()
     controller.current = nextController
-    setState((current) => ({ ...current, refreshing: true }))
+    setState(current => ({ ...current, refreshing: true }))
 
     try {
       const view = await loadRigDetail(rigId, nextController.signal)
@@ -52,7 +52,7 @@ export function useRigDetail(rigId: string): RigDetailResult {
         return
       }
 
-      setState((current) =>
+      setState(current =>
         current.view === undefined
           ? { refreshing: true, interrupted: false, initialError: 'unavailable' }
           : { ...current, refreshing: true, interrupted: true },
@@ -61,7 +61,7 @@ export function useRigDetail(rigId: string): RigDetailResult {
       if (requestGeneration.current === generation) {
         inFlight.current = false
         controller.current = undefined
-        setState((current) => ({ ...current, refreshing: false }))
+        setState(current => ({ ...current, refreshing: false }))
       }
     }
   }, [rigId])

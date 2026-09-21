@@ -37,7 +37,11 @@ export function App() {
     navigate('/')
   }
 
-  function openComposition(componentId: string, specimenId: string, context: typeof workshop.session.context) {
+  function openComposition(
+    componentId: string,
+    specimenId: string,
+    context: typeof workshop.session.context,
+  ) {
     workshop.selectSpecimen(componentId, specimenId)
     workshop.patchSession({ context })
     navigate('/')
@@ -62,7 +66,9 @@ export function App() {
       unsavedOverrides: workshop.session.unsavedOverrides,
     }
 
-    await navigator.clipboard.writeText(`Vela workshop context\n${JSON.stringify(context, null, 2)}`)
+    await navigator.clipboard.writeText(
+      `Vela workshop context\n${JSON.stringify(context, null, 2)}`,
+    )
     setCopyLabel('Copied')
     window.setTimeout(() => setCopyLabel('Copy context'), 1400)
   }
@@ -100,27 +106,32 @@ export function App() {
             </div>
           </div>
           <nav className="view-switch" aria-label="Workshop view">
-            <button className={!isGallery ? 'active' : ''} onClick={() => navigate('/')}>Workbench</button>
-            <button className={isGallery ? 'active' : ''} onClick={() => navigate('/gallery')}>Gallery</button>
+            <button className={!isGallery ? 'active' : ''} onClick={() => navigate('/')}>
+              Workbench
+            </button>
+            <button className={isGallery ? 'active' : ''} onClick={() => navigate('/gallery')}>
+              Gallery
+            </button>
           </nav>
         </div>
         <div className="topbar__controls">
           {isGallery ? (
             <select
               className="gallery-profile"
-              onChange={(event) => workshop.selectProfile(event.target.value)}
+              onChange={event => workshop.selectProfile(event.target.value)}
               value={workshop.activeProfile.id}
             >
-              {workshop.profiles.map((profile) => (
+              {workshop.profiles.map(profile => (
                 <option key={profile.id} value={profile.id}>
-                  {profile.name}{profile.readonly ? ' · reference' : ''}
+                  {profile.name}
+                  {profile.readonly ? ' · reference' : ''}
                 </option>
               ))}
             </select>
           ) : null}
           {!isGallery ? (
             <div className="segmented" title="Preview mode">
-              {(['dark', 'light'] as const).map((mode) => (
+              {(['dark', 'light'] as const).map(mode => (
                 <button
                   className={workshop.session.mode === mode ? 'active' : ''}
                   key={mode}
@@ -136,7 +147,7 @@ export function App() {
             <input
               max={1.25}
               min={0.75}
-              onChange={(event) => workshop.patchSession({ density: Number(event.target.value) })}
+              onChange={event => workshop.patchSession({ density: Number(event.target.value) })}
               step={0.01}
               type="range"
               value={workshop.session.density}
@@ -145,12 +156,24 @@ export function App() {
           </label>
           {!isGallery ? (
             <>
-              <button className="button button--quiet" disabled={!workshop.undoCount} onClick={workshop.undo}>
+              <button
+                className="button button--quiet"
+                disabled={!workshop.undoCount}
+                onClick={workshop.undo}
+              >
                 {'Undo '}
                 <kbd>⌘Z</kbd>
               </button>
-              <button className="button button--quiet" disabled={!workshop.redoCount} onClick={workshop.redo}>Redo</button>
-              <button className="button" onClick={() => void copyContext()}>{copyLabel}</button>
+              <button
+                className="button button--quiet"
+                disabled={!workshop.redoCount}
+                onClick={workshop.redo}
+              >
+                Redo
+              </button>
+              <button className="button" onClick={() => void copyContext()}>
+                {copyLabel}
+              </button>
             </>
           ) : null}
         </div>
@@ -167,14 +190,13 @@ export function App() {
         />
       ) : (
         <>
-
           <aside className="library-panel">
             <div className="panel-heading">
               <span>Component library</span>
               <em>{componentGroups.length}</em>
             </div>
             <div className="component-list">
-              {componentGroups.map((group) => (
+              {componentGroups.map(group => (
                 <div key={group.id}>
                   <button
                     className={`component-item ${workshop.session.componentId === group.id ? 'active' : ''}`}
@@ -193,7 +215,7 @@ export function App() {
                     </span>
                   </button>
                   {workshop.session.componentId === group.id && group.specimens.length > 1
-                    ? group.specimens.map((entry) => (
+                    ? group.specimens.map(entry => (
                         <button
                           className="specimen-item"
                           key={entry.id}
@@ -217,7 +239,9 @@ export function App() {
           <main className="stage">
             <div className="stage-toolbar">
               <div>
-                <div className="eyebrow">{workshop.specimen.componentName} / {workshop.specimen.id}</div>
+                <div className="eyebrow">
+                  {workshop.specimen.componentName} / {workshop.specimen.id}
+                </div>
                 <h1>{workshop.specimen.name}</h1>
                 <p>{workshop.specimen.description}</p>
               </div>
@@ -225,10 +249,15 @@ export function App() {
                 <label>
                   Context
                   <select
-                    onChange={(event) => {
+                    onChange={event => {
                       const context = event.target.value
 
-                      if (context === 'isolated' || context === 'form' || context === 'toolbar' || context === 'card')
+                      if (
+                        context === 'isolated' ||
+                        context === 'form' ||
+                        context === 'toolbar' ||
+                        context === 'card'
+                      )
                         workshop.patchSession({ context })
                     }}
                     value={workshop.session.context}
@@ -242,7 +271,9 @@ export function App() {
                 <label className="toggle">
                   <input
                     checked={workshop.session.compareBaseline}
-                    onChange={(event) => workshop.patchSession({ compareBaseline: event.target.checked })}
+                    onChange={event =>
+                      workshop.patchSession({ compareBaseline: event.target.checked })
+                    }
                     type="checkbox"
                   />
                   <span />
@@ -253,7 +284,7 @@ export function App() {
 
             <div className="viewport-toolbar">
               <div className="segmented">
-                {viewportPresets.map((preset) => (
+                {viewportPresets.map(preset => (
                   <button
                     className={workshop.session.viewport === preset.value ? 'active' : ''}
                     key={preset.value}
@@ -267,7 +298,7 @@ export function App() {
                 aria-label="Preview width"
                 max={1280}
                 min={320}
-                onChange={(event) => workshop.patchSession({ viewport: Number(event.target.value) })}
+                onChange={event => workshop.patchSession({ viewport: Number(event.target.value) })}
                 step={1}
                 type="range"
                 value={workshop.session.viewport}
@@ -297,12 +328,22 @@ export function App() {
             <section className="profile-bar">
               <div className="panel-heading">
                 <span>Design profile</span>
-                {unsavedCount ? <em>{unsavedCount} unsaved</em> : baselineDrift ? <em className="warning-text">baseline drift</em> : <em>saved</em>}
+                {unsavedCount ? (
+                  <em>{unsavedCount} unsaved</em>
+                ) : baselineDrift ? (
+                  <em className="warning-text">baseline drift</em>
+                ) : (
+                  <em>saved</em>
+                )}
               </div>
-              <select onChange={(event) => workshop.selectProfile(event.target.value)} value={workshop.activeProfile.id}>
-                {workshop.profiles.map((profile) => (
+              <select
+                onChange={event => workshop.selectProfile(event.target.value)}
+                value={workshop.activeProfile.id}
+              >
+                {workshop.profiles.map(profile => (
                   <option key={profile.id} value={profile.id}>
-                    {profile.name}{profile.readonly ? ' · reference' : ''}
+                    {profile.name}
+                    {profile.readonly ? ' · reference' : ''}
                   </option>
                 ))}
               </select>
@@ -314,7 +355,9 @@ export function App() {
                 >
                   Save
                 </button>
-                <button className="button" onClick={() => void saveAs()}>Save as…</button>
+                <button className="button" onClick={() => void saveAs()}>
+                  Save as…
+                </button>
               </div>
             </section>
 
@@ -324,19 +367,18 @@ export function App() {
               </div>
               <div className="inspector-section">
                 {Object.entries(workshop.specimen.controls).map(([key, control]) => {
-                  const value = workshop.session.props[key] ?? workshop.specimen.defaultProps[key] ?? ''
+                  const value =
+                    workshop.session.props[key] ?? workshop.specimen.defaultProps[key] ?? ''
 
                   if (control.type === 'boolean') {
                     return (
                       <label className="toggle toggle--wide" key={key}>
                         <input
                           checked={Boolean(value)}
-                          onChange={(event) => workshop.patchProps({ [key]: event.target.checked })}
+                          onChange={event => workshop.patchProps({ [key]: event.target.checked })}
                           type="checkbox"
                         />
-                        <span />
-                        {' '}
-                        {control.label}
+                        <span /> {control.label}
                       </label>
                     )
                   }
@@ -346,14 +388,16 @@ export function App() {
                       <span>{control.label}</span>
                       {control.type === 'select' ? (
                         <select
-                          onChange={(event) => workshop.patchProps({ [key]: event.target.value })}
+                          onChange={event => workshop.patchProps({ [key]: event.target.value })}
                           value={String(value)}
                         >
-                          {control.options.map((option) => <option key={option}>{option}</option>)}
+                          {control.options.map(option => (
+                            <option key={option}>{option}</option>
+                          ))}
                         </select>
                       ) : (
                         <input
-                          onChange={(event) => workshop.patchProps({ [key]: event.target.value })}
+                          onChange={event => workshop.patchProps({ [key]: event.target.value })}
                           type="text"
                           value={String(value)}
                         />
@@ -369,7 +413,11 @@ export function App() {
                 <span>Theme system</span>
                 <em>OKLCH</em>
               </div>
-              <ThemeEditor mode={workshop.session.mode} onEdit={workshop.editTheme} theme={workshop.theme} />
+              <ThemeEditor
+                mode={workshop.session.mode}
+                onEdit={workshop.editTheme}
+                theme={workshop.theme}
+              />
             </section>
           </aside>
         </>

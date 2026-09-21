@@ -1,6 +1,10 @@
 import { expect, it } from 'vitest'
 import { trace, context } from '@opentelemetry/api'
-import { InMemorySpanExporter, NodeTracerProvider, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-node'
+import {
+  InMemorySpanExporter,
+  NodeTracerProvider,
+  SimpleSpanProcessor,
+} from '@opentelemetry/sdk-trace-node'
 import type { AlpacaAcquisition } from '@vela/alpaca'
 import { createAlignmentController } from './controller.js'
 
@@ -9,7 +13,10 @@ it('exports correlated steps while a detached alignment is active and records ca
   const provider = new NodeTracerProvider({ spanProcessors: [new SimpleSpanProcessor(exporter)] })
   provider.register()
   let capturing!: () => void
-  const pending = new Promise<void>(resolve => { capturing = resolve })
+
+  const pending = new Promise<void>(resolve => {
+    capturing = resolve
+  })
 
   const hardware: AlpacaAcquisition = {
     pointing: async () => ({
@@ -20,10 +27,11 @@ it('exports correlated steps while a detached alignment is active and records ca
       tracking: true,
       coordinateSystem: 'j2000',
     }),
-    capture: async ({ signal }) => new Promise((_resolve, reject) => {
-      capturing()
-      signal!.addEventListener('abort', () => reject(signal!.reason), { once: true })
-    }),
+    capture: async ({ signal }) =>
+      new Promise((_resolve, reject) => {
+        capturing()
+        signal!.addEventListener('abort', () => reject(signal!.reason), { once: true })
+      }),
     move: async () => {},
     rotateRightAscension: async () => {},
     abort: async () => {},
@@ -38,7 +46,11 @@ it('exports correlated steps while a detached alignment is active and records ca
       fieldHeightDegrees: 3,
     },
     hardware,
-    solver: { solve: async () => { throw new Error('Capture is still pending') } },
+    solver: {
+      solve: async () => {
+        throw new Error('Capture is still pending')
+      },
+    },
   })
 
   try {

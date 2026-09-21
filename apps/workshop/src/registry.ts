@@ -12,16 +12,19 @@ const modules = import.meta.glob<SpecimenModule>(
 const discoveredSpecimens = Object.entries(modules)
   .map(([path, module]) => ({
     specimen: module.specimen,
-    stability: path.includes('/components/') ? 'stable' as const : 'draft' as const,
+    stability: path.includes('/components/') ? ('stable' as const) : ('draft' as const),
   }))
-  .sort((left, right) =>
-    left.specimen.componentName.localeCompare(right.specimen.componentName)
-      || left.specimen.id.localeCompare(right.specimen.id),
+  .sort(
+    (left, right) =>
+      left.specimen.componentName.localeCompare(right.specimen.componentName) ||
+      left.specimen.id.localeCompare(right.specimen.id),
   )
 
-export const specimens = discoveredSpecimens.map((entry) => entry.specimen)
+export const specimens = discoveredSpecimens.map(entry => entry.specimen)
 
-const groupedSpecimens = discoveredSpecimens.reduce<Record<string, { stability: 'stable' | 'draft'; specimens: ComponentSpecimen[] }>>((groups, entry) => {
+const groupedSpecimens = discoveredSpecimens.reduce<
+  Record<string, { stability: 'stable' | 'draft'; specimens: ComponentSpecimen[] }>
+>((groups, entry) => {
   const group = groups[entry.specimen.componentId] ?? { stability: entry.stability, specimens: [] }
   group.specimens.push(entry.specimen)
 
@@ -39,9 +42,11 @@ export const componentGroups = Object.entries(groupedSpecimens).map(([id, group]
 }))
 
 export function findSpecimen(componentId: string, specimenId: string): ComponentSpecimen {
-  return specimens.find((entry) => entry.componentId === componentId && entry.id === specimenId)
-    ?? specimens[0]
-    ?? failMissingSpecimen()
+  return (
+    specimens.find(entry => entry.componentId === componentId && entry.id === specimenId) ??
+    specimens[0] ??
+    failMissingSpecimen()
+  )
 }
 
 function failMissingSpecimen(): never {

@@ -37,27 +37,36 @@ export function FramingStatus({
     }[view.phase]
 
     if (centering?.outcome === 'working' && view.active) {
-      detail = centering.correction === 0
-        ? 'Checking the current frame before any correction. A fresh solved exposure must confirm the framing.'
-        : `Correction ${centering.correction} of at most ${centering.maxCorrections}. Each next move uses a fresh solved exposure.`
-    } else if (centering?.outcome === 'centered' && checked && view.actual && view.actual.checkId === centering.measurements.at(-1)?.checkId) {
+      detail =
+        centering.correction === 0
+          ? 'Checking the current frame before any correction. A fresh solved exposure must confirm the framing.'
+          : `Correction ${centering.correction} of at most ${centering.maxCorrections}. Each next move uses a fresh solved exposure.`
+    } else if (
+      centering?.outcome === 'centered' &&
+      checked &&
+      view.actual &&
+      view.actual.checkId === centering.measurements.at(-1)?.checkId
+    ) {
       title = 'Composition centered'
       detail = `The latest solved frame is within ${arcminutes(centering.toleranceArcminutes)} of your chosen center.`
     } else if (centering?.outcome === 'not-converging' && checked) {
       title = 'Centering is not converging'
-      detail = 'Two corrections increased the error. Movement has stopped; inspect the result and check the current frame before trying again.'
+      detail =
+        'Two corrections increased the error. Movement has stopped; inspect the result and check the current frame before trying again.'
     } else if (centering?.outcome === 'limit-reached' && checked) {
       title = 'Centering correction limit reached'
       detail = `${centering.correction} corrections measured. Movement has stopped outside the chosen tolerance; check the current frame before trying again.`
     } else if (centering?.outcome === 'interrupted') {
       title = view.phase === 'stopped' ? 'Centering stopped' : 'Centering interrupted'
-      detail = 'No further correction is scheduled. Check the current frame before deciding what to do next.'
+      detail =
+        'No further correction is scheduled. Check the current frame before deciding what to do next.'
     }
   }
 
   if (offline) {
     title = 'Connection interrupted · last known state'
-    detail = 'Current activity cannot be confirmed. Measurements below are last known; reconnect before sending another command.'
+    detail =
+      'Current activity cannot be confirmed. Measurements below are last known; reconnect before sending another command.'
   } else if (commandUnconfirmed) {
     title = 'Check rig state before continuing'
     detail = 'The command outcome is uncertain. Inspect the rig state before another command.'
@@ -66,13 +75,20 @@ export function FramingStatus({
     detail = 'Waiting for the server to confirm the request.'
   } else if (view?.captureReadState === 'retrying') {
     title = 'Camera observation interrupted'
-    detail = 'The server is connected. Retrying reads for the same exposure; no new exposure or correction will start while waiting. The last solved framing is kept. You can stop while reads retry.'
+    detail =
+      'The server is connected. Retrying reads for the same exposure; no new exposure or correction will start while waiting. The last solved framing is kept. You can stop while reads retry.'
   }
 
   return (
     <div className="vela-target-status" role="status" aria-live="polite">
       <WorkingIndicator
-        active={!!view?.active && view.captureReadState === 'current' && !offline && !commandUnconfirmed && !pending}
+        active={
+          !!view?.active &&
+          view.captureReadState === 'current' &&
+          !offline &&
+          !commandUnconfirmed &&
+          !pending
+        }
       />
       <strong>{title}</strong>
       {detail && <p>{detail}</p>}
@@ -86,27 +102,44 @@ function measurementLabel(correction: number, index: number) {
   return correction === 0 ? 'Recheck' : `Correction ${correction}`
 }
 
-export function CenteringProgress({ centering, current }: { centering: FramingCentering, current: boolean }) {
+export function CenteringProgress({
+  centering,
+  current,
+}: {
+  centering: FramingCentering
+  current: boolean
+}) {
   const measured = centering.measurements.filter(sample => sample.correction > 0).length
 
   return (
     <section className="vela-target-progress" aria-label="Centering measurements">
       <header>
         <h2>Measured progress</h2>
-        <span>{measured} {measured === 1 ? 'correction' : 'corrections'} measured{!current ? ' · last known' : ''}</span>
+        <span>
+          {measured} {measured === 1 ? 'correction' : 'corrections'} measured
+          {!current ? ' · last known' : ''}
+        </span>
       </header>
       <ol>
         {centering.measurements.map((sample, index) => (
-          <li key={sample.checkId} data-latest={current && index === centering.measurements.length - 1}>
+          <li
+            key={sample.checkId}
+            data-latest={current && index === centering.measurements.length - 1}
+          >
             <span>{measurementLabel(sample.correction, index)}</span>
             <strong>{arcminutes(sample.offsetArcminutes)}</strong>
-            <span>{{
-              starting: 'Starting frame',
-              improved: 'Improved',
-              worsened: 'Worsened',
-              unchanged: 'Unchanged',
-              'within-tolerance': 'Within tolerance',
-            }[sample.trend]}{sample.pointingSideChanged ? ' · side changed' : ''}</span>
+            <span>
+              {
+                {
+                  starting: 'Starting frame',
+                  improved: 'Improved',
+                  worsened: 'Worsened',
+                  unchanged: 'Unchanged',
+                  'within-tolerance': 'Within tolerance',
+                }[sample.trend]
+              }
+              {sample.pointingSideChanged ? ' · side changed' : ''}
+            </span>
           </li>
         ))}
       </ol>

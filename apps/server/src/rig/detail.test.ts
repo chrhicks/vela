@@ -1,8 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import {
-  AlpacaProviderError,
-  type AlpacaDeviceInspection,
-} from '@vela/alpaca'
+import { AlpacaProviderError, type AlpacaDeviceInspection } from '@vela/alpaca'
 import type { RigDeviceInspector } from '../device/inspection.js'
 import { createMemoryRigCatalog } from './catalog.js'
 import type { RigCatalogRecord } from './contracts.js'
@@ -12,11 +9,7 @@ const endpoint = { host: 'ascom-remote.local', port: 11111 }
 
 const refreshedAt = new Date('2026-09-03T20:00:00.000Z')
 
-function rig(
-  id = 'rig-1',
-  uniqueId = 'camera-0',
-  name = 'Camera slot',
-): RigCatalogRecord {
+function rig(id = 'rig-1', uniqueId = 'camera-0', name = 'Camera slot'): RigCatalogRecord {
   return {
     id,
     name: 'Backyard rig',
@@ -29,9 +22,7 @@ function rig(
   }
 }
 
-function inspector(
-  result: ReadonlyArray<AlpacaDeviceInspection> | Error,
-): RigDeviceInspector {
+function inspector(result: ReadonlyArray<AlpacaDeviceInspection> | Error): RigDeviceInspector {
   return {
     async inspectDevices() {
       if (result instanceof Error) throw result
@@ -196,14 +187,16 @@ describe('Rig detail projection', () => {
         lastInventoryAt: record.lastObservedInventory.observedAt,
         refreshedAt: '2026-09-03T20:00:00.000Z',
         connections: { total: 1, connected: 0, disconnected: 0, unavailable: 1 },
-        devices: [{
-          id: 'rig-1-camera-0',
-          kind: 'camera',
-          name: 'Camera slot',
-          configuredName: 'Camera slot',
-          connection: 'unavailable',
-          status: { availability: 'unavailable' },
-        }],
+        devices: [
+          {
+            id: 'rig-1-camera-0',
+            kind: 'camera',
+            name: 'Camera slot',
+            configuredName: 'Camera slot',
+            connection: 'unavailable',
+            status: { availability: 'unavailable' },
+          },
+        ],
         capabilities: ['forget'],
       },
     })
@@ -215,17 +208,20 @@ describe('Rig detail projection', () => {
     const catalog = createMemoryRigCatalog([rig()])
 
     const result = await loadRigDetailView(catalog, 'rig-1', {
-      createInspector: () => inspector([{
-        providerDeviceId: 'camera-0',
-        kind: 'camera',
-        configuredName: 'Camera slot',
-        name: 'Main camera',
-        connection: 'connected',
-        telemetry: {
-          availability: 'complete',
-          values: { kind: 'camera', activity: 'error' },
-        },
-      }]),
+      createInspector: () =>
+        inspector([
+          {
+            providerDeviceId: 'camera-0',
+            kind: 'camera',
+            configuredName: 'Camera slot',
+            name: 'Main camera',
+            connection: 'connected',
+            telemetry: {
+              availability: 'complete',
+              values: { kind: 'camera', activity: 'error' },
+            },
+          },
+        ]),
       now: () => refreshedAt,
     })
 
@@ -259,17 +255,20 @@ describe('Rig detail projection', () => {
     const onConflict = vi.fn()
 
     const result = await loadRigDetailView(catalog, recordA.id, {
-      createInspector: () => inspector([{
-        providerDeviceId: 'camera-b',
-        kind: 'camera',
-        configuredName: 'Other camera',
-        name: 'Other camera',
-        connection: 'connected',
-        telemetry: {
-          availability: 'complete',
-          values: { kind: 'camera', activity: 'idle' },
-        },
-      }]),
+      createInspector: () =>
+        inspector([
+          {
+            providerDeviceId: 'camera-b',
+            kind: 'camera',
+            configuredName: 'Other camera',
+            name: 'Other camera',
+            connection: 'connected',
+            telemetry: {
+              availability: 'complete',
+              values: { kind: 'camera', activity: 'idle' },
+            },
+          },
+        ]),
       now: () => refreshedAt,
       onConflict,
     })

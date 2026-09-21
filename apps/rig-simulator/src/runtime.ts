@@ -15,7 +15,7 @@ const normalizeDegrees = (value: number) => ((value % 360) + 360) % 360
 
 const slewDegreesPerSecond = 30
 
-const siderealDegreesPerSecond = siderealRadiansPerSecond * 180 / Math.PI
+const siderealDegreesPerSecond = (siderealRadiansPerSecond * 180) / Math.PI
 
 export type Preset = 'large-error' | 'near-aligned' | 'aligned'
 
@@ -58,7 +58,10 @@ export interface SimulatorState {
 }
 
 export class SimulatorError extends Error {
-  constructor(readonly number: number, message: string) {
+  constructor(
+    readonly number: number,
+    message: string,
+  ) {
     super(message)
   }
 }
@@ -79,14 +82,16 @@ export class SimulatorRuntime {
   private updated: number
   private joint = 30
   private declination = 60
-  private slew: {
-    start: number
-    duration: number
-    ra: number
-    dec: number
-    deltaRa: number
-    deltaDec: number
-  } | undefined
+  private slew:
+    | {
+        start: number
+        duration: number
+        ra: number
+        dec: number
+        deltaRa: number
+        deltaDec: number
+      }
+    | undefined
   private rate = 0
   private tracking = true
   private altitude = 480
@@ -131,7 +136,8 @@ export class SimulatorRuntime {
 
     if (camera.exposure) throw new SimulatorError(0x40b, 'An exposure is in progress')
 
-    if (resolution !== 'fast' && resolution !== 'full') throw new SimulatorError(0x401, 'Unknown resolution')
+    if (resolution !== 'fast' && resolution !== 'full')
+      throw new SimulatorError(0x401, 'Unknown resolution')
 
     if (camera.resolution === resolution) return
     this.abortExposure(number)
@@ -152,15 +158,14 @@ export class SimulatorRuntime {
       const fraction = Math.min(1, (time - slew.start) / slew.duration)
       const ra = slew.ra + slew.deltaRa * fraction
       this.declination = slew.dec + slew.deltaDec * fraction
-      this.joint = ra - (time - this.epoch) / 1000 * siderealDegreesPerSecond
+      this.joint = ra - ((time - this.epoch) / 1000) * siderealDegreesPerSecond
 
       if (fraction === 1) {
         this.slew = undefined
       }
     } else {
-      this.joint += seconds * (this.rate !== 0
-        ? this.rate
-        : this.tracking ? -siderealDegreesPerSecond : 0)
+      this.joint +=
+        seconds * (this.rate !== 0 ? this.rate : this.tracking ? -siderealDegreesPerSecond : 0)
     }
 
     this.updated = time
@@ -178,7 +183,7 @@ export class SimulatorRuntime {
   siderealTimeHours() {
     this.advance()
 
-    return (this.elapsed() * siderealDegreesPerSecond / 15) % 24
+    return ((this.elapsed() * siderealDegreesPerSecond) / 15) % 24
   }
   private pose() {
     return cameraPose({
@@ -209,7 +214,8 @@ export class SimulatorRuntime {
       slewing: !!this.slew || this.rate !== 0,
       raAxisDegrees: this.joint + this.elapsed() * siderealDegreesPerSecond,
       raRateDegreesPerSecond: this.rate,
-      rightAscensionHours: normalizeDegrees(this.joint + this.elapsed() * siderealDegreesPerSecond) / 15,
+      rightAscensionHours:
+        normalizeDegrees(this.joint + this.elapsed() * siderealDegreesPerSecond) / 15,
       declinationDegrees: this.declination,
     }
   }
@@ -294,9 +300,17 @@ export class SimulatorRuntime {
   slewTo(rightAscensionHours: number, declinationDegrees: number) {
     this.requireIdle()
 
-    if (!Number.isFinite(rightAscensionHours) || rightAscensionHours < 0 || rightAscensionHours >= 24
-      || !Number.isFinite(declinationDegrees) || Math.abs(declinationDegrees) > 90) {
-      throw new SimulatorError(0x401, 'Slew coordinates must be RA [0, 24) hours and Dec [-90, 90] degrees')
+    if (
+      !Number.isFinite(rightAscensionHours) ||
+      rightAscensionHours < 0 ||
+      rightAscensionHours >= 24 ||
+      !Number.isFinite(declinationDegrees) ||
+      Math.abs(declinationDegrees) > 90
+    ) {
+      throw new SimulatorError(
+        0x401,
+        'Slew coordinates must be RA [0, 24) hours and Dec [-90, 90] degrees',
+      )
     }
 
     if (this.slew || this.rate !== 0)
@@ -306,7 +320,7 @@ export class SimulatorRuntime {
     const ra = normalizeDegrees(this.joint + this.elapsed() * siderealDegreesPerSecond)
     const deltaRa = normalizeDegrees(rightAscensionHours * 15 - ra + 180) - 180
     const deltaDec = declinationDegrees - this.declination
-    const duration = Math.max(Math.abs(deltaRa), Math.abs(deltaDec)) / slewDegreesPerSecond * 1000
+    const duration = (Math.max(Math.abs(deltaRa), Math.abs(deltaDec)) / slewDegreesPerSecond) * 1000
 
     if (duration === 0) return
     this.slew = {
@@ -332,20 +346,35 @@ export class SimulatorRuntime {
     if (!Number.isFinite(duration) || duration < 0 || duration > 3600)
       throw new SimulatorError(0x401, 'Exposure duration must be between 0 and 3600 seconds')
 
-    if (this.rate !== 0 || this.slew) throw new SimulatorError(0x40b, 'Stop mount movement before exposing')
+    if (this.rate !== 0 || this.slew)
+      throw new SimulatorError(0x40b, 'Stop mount movement before exposing')
     // The rendered field must fit wholly inside the provisioned catalog patch.
     // A circumscribed spherical field also covers image corners and camera roll.
     const pose = this.pose()
-    const ra = normalizeDegrees(Math.atan2(pose.direction[1], pose.direction[0]) * 180 / Math.PI)
-    const dec = Math.asin(pose.direction[2]) * 180 / Math.PI
+    const ra = normalizeDegrees((Math.atan2(pose.direction[1], pose.direction[0]) * 180) / Math.PI)
+    const dec = (Math.asin(pose.direction[2]) * 180) / Math.PI
     const { width, height } = this.cameraState(number)
-    const fieldRadius = Math.atan(Math.tan(fieldHeightDegrees / 2 * Math.PI / 180) * Math.hypot(width / height, 1))
-    const declinationMargin = fieldRadius * 180 / Math.PI
-    const raMargin = Math.asin(Math.sin(fieldRadius) / Math.cos(dec * Math.PI / 180)) * 180 / Math.PI
 
-    if (isFixedCatalog(this.stars) && (ra - raMargin < 0 || ra + raMargin > 70 || dec - declinationMargin < 50
-      || dec + declinationMargin > 70)) {
-      throw new SimulatorError(0x40b, 'Camera field is outside the supported catalog patch (RA 0–70°, Dec 50–70°); move back or reset the simulator')
+    const fieldRadius = Math.atan(
+      Math.tan(((fieldHeightDegrees / 2) * Math.PI) / 180) * Math.hypot(width / height, 1),
+    )
+
+    const declinationMargin = (fieldRadius * 180) / Math.PI
+
+    const raMargin =
+      (Math.asin(Math.sin(fieldRadius) / Math.cos((dec * Math.PI) / 180)) * 180) / Math.PI
+
+    if (
+      isFixedCatalog(this.stars) &&
+      (ra - raMargin < 0 ||
+        ra + raMargin > 70 ||
+        dec - declinationMargin < 50 ||
+        dec + declinationMargin > 70)
+    ) {
+      throw new SimulatorError(
+        0x40b,
+        'Camera field is outside the supported catalog patch (RA 0–70°, Dec 50–70°); move back or reset the simulator',
+      )
     }
 
     this.abortExposure(number)
@@ -381,7 +410,8 @@ export class SimulatorRuntime {
     const camera = this.camera(number)
 
     const assertCurrent = () => {
-      if (camera.completed !== exposure) throw new SimulatorError(0x40b, 'The exposure was discarded')
+      if (camera.completed !== exposure)
+        throw new SimulatorError(0x40b, 'The exposure was discarded')
     }
 
     if (!camera.rendering) {
@@ -390,30 +420,45 @@ export class SimulatorRuntime {
       camera.rendering = (async () => {
         const direction = exposure.pose.direction
 
-        const radiusDegrees = Math.atan(Math.tan(fieldHeightDegrees / 2 * Math.PI / 180)
-          * Math.hypot(exposure.width / exposure.height, 1)) * 180 / Math.PI
-          + fieldHeightDegrees / exposure.height * 12
+        const radiusDegrees =
+          (Math.atan(
+            Math.tan(((fieldHeightDegrees / 2) * Math.PI) / 180) *
+              Math.hypot(exposure.width / exposure.height, 1),
+          ) *
+            180) /
+            Math.PI +
+          (fieldHeightDegrees / exposure.height) * 12
 
         const stars = !isFixedCatalog(this.stars)
-          ? await this.stars({
-              raDegrees: normalizeDegrees(Math.atan2(direction[1], direction[0]) * 180 / Math.PI),
-              decDegrees: Math.asin(direction[2]) * 180 / Math.PI,
-              radiusDegrees,
-            }, signal)
+          ? await this.stars(
+              {
+                raDegrees: normalizeDegrees(
+                  (Math.atan2(direction[1], direction[0]) * 180) / Math.PI,
+                ),
+                decDegrees: (Math.asin(direction[2]) * 180) / Math.PI,
+                radiusDegrees,
+              },
+              signal,
+            )
           : this.stars
 
         assertCurrent()
         signal.throwIfAborted()
 
-        return renderSkyAsync(stars, exposure.pose, {
-          width: exposure.width,
-          height: exposure.height,
-          fieldHeightDegrees,
-          seed: exposure.seed,
-          obscured: exposure.obscured,
-          sensor: number === 0 ? 'monochrome' : 'rggb',
-          exposureSeconds: exposure.duration,
-        }, signal)
+        return renderSkyAsync(
+          stars,
+          exposure.pose,
+          {
+            width: exposure.width,
+            height: exposure.height,
+            fieldHeightDegrees,
+            seed: exposure.seed,
+            obscured: exposure.obscured,
+            sensor: number === 0 ? 'monochrome' : 'rggb',
+            exposureSeconds: exposure.duration,
+          },
+          signal,
+        )
       })()
     }
 

@@ -3,10 +3,11 @@ import type { Route } from '@playwright/test'
 import type { CaptureView } from '@vela/model/web'
 import { readFileSync } from 'node:fs'
 
-const respond = <Body>(route: Route, body: Body) => route.fulfill({
-  contentType: 'application/json',
-  body: JSON.stringify(body),
-})
+const respond = <Body>(route: Route, body: Body) =>
+  route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify(body),
+  })
 
 const idle: CaptureView = {
   captureReadState: 'current',
@@ -28,15 +29,24 @@ const idle: CaptureView = {
   cooling: null,
 }
 
-test('a command stays responsive during polling and a late read cannot replace its result', async ({ page }) => {
+test('a command stays responsive during polling and a late read cannot replace its result', async ({
+  page,
+}) => {
   let commands = 0
   let reads = 0
   let holdReads = false
   let waitingRead = false
   let releaseRead!: () => void
   let releaseCommand!: () => void
-  const heldRead = new Promise<void>(resolve => { releaseRead = resolve })
-  const heldCommand = new Promise<void>(resolve => { releaseCommand = resolve })
+
+  const heldRead = new Promise<void>(resolve => {
+    releaseRead = resolve
+  })
+
+  const heldCommand = new Promise<void>(resolve => {
+    releaseCommand = resolve
+  })
+
   const exposing: CaptureView = { ...idle, phase: 'exposing', active: true, exposureSeconds: 2 }
   await page.route('**/api/web/rigs/rig-1/capture', async route => {
     reads++
@@ -70,10 +80,9 @@ test('a command stays responsive during polling and a late read cannot replace i
   expect(commands).toBe(1)
 })
 
-const preview = readFileSync(new URL(
-  '../../../packages/ui/src/components/fixtures/capture-star-field.png',
-  import.meta.url,
-))
+const preview = readFileSync(
+  new URL('../../../packages/ui/src/components/fixtures/capture-star-field.png', import.meta.url),
+)
 
 const firstImage = {
   id: 'frame-1',
@@ -89,17 +98,27 @@ const firstImage = {
   statistics: { detectedStars: 12, medianHfrPixels: 2.35 },
 }
 
-test('loads a fitted preview first and only presents 100 percent after its native image loads', async ({ page }) => {
+test('loads a fitted preview first and only presents 100 percent after its native image loads', async ({
+  page,
+}) => {
   const fitImageUrl = `${firstImage.imageUrl}/fit`
   let nativeRequests = 0
   let releaseNative!: () => void
-  const nativeGate = new Promise<void>(resolve => { releaseNative = resolve })
-  await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, {
-    ...idle,
-    phase: 'complete',
-    latestImage: { ...firstImage, fitImageUrl },
-  }))
-  await page.route(`**${fitImageUrl}`, route => route.fulfill({ contentType: 'image/png', body: preview }))
+
+  const nativeGate = new Promise<void>(resolve => {
+    releaseNative = resolve
+  })
+
+  await page.route('**/api/web/rigs/rig-1/capture', route =>
+    respond(route, {
+      ...idle,
+      phase: 'complete',
+      latestImage: { ...firstImage, fitImageUrl },
+    }),
+  )
+  await page.route(`**${fitImageUrl}`, route =>
+    route.fulfill({ contentType: 'image/png', body: preview }),
+  )
   await page.route(`**${firstImage.imageUrl}`, async route => {
     nativeRequests++
     await nativeGate
@@ -113,22 +132,37 @@ test('loads a fitted preview first and only presents 100 percent after its nativ
   await expect.poll(() => nativeRequests).toBe(1)
   await expect(image).toContainText('Loading full-resolution image')
   await expect(image.getByRole('img')).toHaveAttribute('src', fitImageUrl)
-  await expect(page.getByRole('region', { name: 'Image at 100 percent. Scroll to inspect.' })).toHaveCount(0)
+  await expect(
+    page.getByRole('region', { name: 'Image at 100 percent. Scroll to inspect.' }),
+  ).toHaveCount(0)
   releaseNative()
   await expect(image.getByRole('img')).toHaveAttribute('src', firstImage.imageUrl)
-  await expect(page.getByRole('region', { name: 'Image at 100 percent. Scroll to inspect.' })).toBeVisible()
+  await expect(
+    page.getByRole('region', { name: 'Image at 100 percent. Scroll to inspect.' }),
+  ).toBeVisible()
   await expect(image.locator('footer')).toContainText('2 s')
 })
 
-test('keeps the loaded image and its metadata together through a failed new-image request and retry', async ({ page }) => {
+test('keeps the loaded image and its metadata together through a failed new-image request and retry', async ({
+  page,
+}) => {
   let current: CaptureView = { ...idle, phase: 'complete', latestImage: firstImage }
   let newImageRequests = 0
   let failFirstRequest!: () => void
   let finishRetry!: () => void
-  const heldFailure = new Promise<void>(resolve => { failFirstRequest = resolve })
-  const heldRetry = new Promise<void>(resolve => { finishRetry = resolve })
+
+  const heldFailure = new Promise<void>(resolve => {
+    failFirstRequest = resolve
+  })
+
+  const heldRetry = new Promise<void>(resolve => {
+    finishRetry = resolve
+  })
+
   await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, current))
-  await page.route('**/api/rigs/rig-1/capture/images/frame-1', route => route.fulfill({ contentType: 'image/png', body: preview }))
+  await page.route('**/api/rigs/rig-1/capture/images/frame-1', route =>
+    route.fulfill({ contentType: 'image/png', body: preview }),
+  )
   await page.route('**/api/rigs/rig-1/capture/images/frame-2', async route => {
     newImageRequests++
 
@@ -169,13 +203,18 @@ test('keeps the loaded image and its metadata together through a failed new-imag
   finishRetry()
   await expect(image.getByRole('img')).toHaveAttribute('src', current.latestImage!.imageUrl)
   await expect(image.locator('footer')).toContainText('30 s')
-  await expect(image.getByRole('img')).toHaveAttribute('alt', '30 second exposure from Simulator Camera')
+  await expect(image.getByRole('img')).toHaveAttribute(
+    'alt',
+    '30 second exposure from Simulator Camera',
+  )
   await expect(image.locator('.capture-image__statistics')).toContainText('7')
   await expect(image.locator('.capture-image__statistics')).toContainText('3.60')
   await expect(image.locator('.capture-image__statistics')).not.toContainText('2.35')
 })
 
-test('retains the image during interrupted updates and shows the server exposure after reopening', async ({ page }) => {
+test('retains the image during interrupted updates and shows the server exposure after reopening', async ({
+  page,
+}) => {
   let offline = false
 
   let current: CaptureView = {
@@ -187,8 +226,12 @@ test('retains the image during interrupted updates and shows the server exposure
     latestImage: firstImage,
   }
 
-  await page.route('**/api/web/rigs/rig-1/capture', route => offline ? route.abort() : respond(route, current))
-  await page.route('**/api/rigs/rig-1/capture/images/frame-1', route => route.fulfill({ contentType: 'image/png', body: preview }))
+  await page.route('**/api/web/rigs/rig-1/capture', route =>
+    offline ? route.abort() : respond(route, current),
+  )
+  await page.route('**/api/rigs/rig-1/capture/images/frame-1', route =>
+    route.fulfill({ contentType: 'image/png', body: preview }),
+  )
   await page.goto('/rigs/rig-1/observe/capture')
   await expect(page.getByRole('spinbutton', { name: 'Exposure · seconds' })).toHaveValue('30')
   await expect(page.getByRole('spinbutton', { name: 'Exposure · seconds' })).toBeDisabled()
@@ -205,7 +248,9 @@ test('retains the image during interrupted updates and shows the server exposure
   await expect(image).toContainText('Previous exposure')
 })
 
-test('an ambiguous command is never replayed and requires an explicit state check', async ({ page }) => {
+test('an ambiguous command is never replayed and requires an explicit state check', async ({
+  page,
+}) => {
   let commands = 0
   let reads = 0
   await page.route('**/api/web/rigs/rig-1/capture', route => {
@@ -231,7 +276,9 @@ test('an ambiguous command is never replayed and requires an explicit state chec
   expect(commands).toBe(1)
 })
 
-test('an active exposure disappearing after restart stays unconfirmed until an explicit check', async ({ page }) => {
+test('an active exposure disappearing after restart stays unconfirmed until an explicit check', async ({
+  page,
+}) => {
   let current: CaptureView = {
     ...idle,
     phase: 'exposing',
@@ -249,7 +296,11 @@ test('an active exposure disappearing after restart stays unconfirmed until an e
   await page.goto('/rigs/rig-1/observe/capture')
   await expect(page.getByRole('button', { name: 'Stop exposure' })).toBeEnabled()
   current = idle
-  const warning = page.getByText('Vela no longer tracks the exposure that was active.', { exact: false })
+
+  const warning = page.getByText('Vela no longer tracks the exposure that was active.', {
+    exact: false,
+  })
+
   await expect(warning).toBeVisible()
   await expect(page.getByRole('button', { name: 'Take exposure' })).toBeDisabled()
   const readsAfterInterruption = reads
@@ -261,12 +312,16 @@ test('an active exposure disappearing after restart stays unconfirmed until an e
   await expect(page.getByRole('button', { name: 'Take exposure' })).toBeEnabled()
 })
 
-test('repeating capture restores server settings and can stop during image receipt', async ({ page }) => {
+test('repeating capture restores server settings and can stop during image receipt', async ({
+  page,
+}) => {
   let current: CaptureView = { ...idle, repeat: true }
   let startBody: unknown
   let stops = 0
   await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, current))
-  await page.route('**/api/rigs/rig-1/capture/images/frame-1', route => route.fulfill({ contentType: 'image/png', body: preview }))
+  await page.route('**/api/rigs/rig-1/capture/images/frame-1', route =>
+    route.fulfill({ contentType: 'image/png', body: preview }),
+  )
   await page.route('**/api/rigs/rig-1/capture/start', route => {
     startBody = route.request().postDataJSON()
     current = { ...current, phase: 'exposing', active: true }
@@ -289,17 +344,23 @@ test('repeating capture restores server settings and can stop during image recei
   await expect(page.getByRole('checkbox', { name: 'Repeat until stopped' })).toBeChecked()
   await expect(page.getByRole('checkbox', { name: 'Repeat until stopped' })).toBeDisabled()
   await expect(page.locator('.capture-page__count')).toHaveText('2images completed')
-  await expect(page.getByRole('region', { name: 'Latest image', exact: true }).getByRole('img')).toBeVisible()
+  await expect(
+    page.getByRole('region', { name: 'Latest image', exact: true }).getByRole('img'),
+  ).toBeVisible()
   await page.getByRole('button', { name: 'Stop run' }).click()
   await expect(page.getByRole('button', { name: 'Start run' })).toBeEnabled()
   await expect(page.locator('.capture-page__count')).toHaveText('2images completed')
-  await expect(page.getByRole('region', { name: 'Latest image', exact: true }).getByRole('img')).toHaveAttribute('src', firstImage.imageUrl)
+  await expect(
+    page.getByRole('region', { name: 'Latest image', exact: true }).getByRole('img'),
+  ).toHaveAttribute('src', firstImage.imageUrl)
   expect(stops).toBe(1)
   await page.getByText('Repeat until stopped', { exact: true }).click()
   await expect(page.getByRole('button', { name: 'Take exposure' })).toBeEnabled()
 })
 
-test('displays completed downloads during faster frame arrivals and coalesces pending images without mislabeling Fit', async ({ page }) => {
+test('displays completed downloads during faster frame arrivals and coalesces pending images without mislabeling Fit', async ({
+  page,
+}) => {
   const frame = (number: number) => ({
     ...firstImage,
     id: `stream-${number}`,
@@ -344,7 +405,10 @@ test('displays completed downloads during faster frame arrivals and coalesces pe
   await arrive(3)
   await finish(frame(1).fitImageUrl)
   await expect(image.getByRole('img')).toHaveAttribute('src', frame(1).fitImageUrl)
-  await expect(image.getByRole('img')).toHaveAttribute('alt', '1 second exposure from Simulator Camera')
+  await expect(image.getByRole('img')).toHaveAttribute(
+    'alt',
+    '1 second exposure from Simulator Camera',
+  )
   await expect.poll(() => requested).toContain(frame(3).fitImageUrl)
   expect(requested).not.toContain(frame(2).fitImageUrl)
 
@@ -359,18 +423,34 @@ test('displays completed downloads during faster frame arrivals and coalesces pe
   await finish(frame(5).fitImageUrl)
   await expect(image.getByRole('img')).toHaveAttribute('src', frame(5).fitImageUrl)
   await expect(image.locator('footer')).toContainText('5 s')
-  await expect(page.getByRole('button', { name: '100%', exact: true })).toHaveAttribute('aria-pressed', 'false')
-  await expect(page.getByRole('region', { name: 'Image at 100 percent. Scroll to inspect.' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '100%', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'false',
+  )
+  await expect(
+    page.getByRole('region', { name: 'Image at 100 percent. Scroll to inspect.' }),
+  ).toHaveCount(0)
   await finish(frame(5).imageUrl)
   await expect(image.getByRole('img')).toHaveAttribute('src', frame(5).imageUrl)
-  await expect(page.getByRole('button', { name: '100%', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('button', { name: '100%', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  )
 })
 
+test('distinguishes unavailable star measurements from an image with no measurable stars', async ({
+  page,
+}) => {
+  let current: CaptureView = {
+    ...idle,
+    phase: 'complete',
+    latestImage: { ...firstImage, statistics: null },
+  }
 
-test('distinguishes unavailable star measurements from an image with no measurable stars', async ({ page }) => {
-  let current: CaptureView = { ...idle, phase: 'complete', latestImage: { ...firstImage, statistics: null } }
   await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, current))
-  await page.route('**/api/rigs/rig-1/capture/images/*', route => route.fulfill({ contentType: 'image/png', body: preview }))
+  await page.route('**/api/rigs/rig-1/capture/images/*', route =>
+    route.fulfill({ contentType: 'image/png', body: preview }),
+  )
   await page.goto('/rigs/rig-1/observe/capture')
   const statistics = page.locator('.capture-image__statistics')
   await expect(statistics).toContainText('1600 × 1200')
@@ -389,15 +469,22 @@ test('distinguishes unavailable star measurements from an image with no measurab
   await expect(statistics.locator('dd')).toHaveText(['1600 × 1200', '0', '—'])
 })
 
-
-test('keeping the displayed frame remains independent of Stop when a newer preview is delayed', async ({ page }) => {
+test('keeping the displayed frame remains independent of Stop when a newer preview is delayed', async ({
+  page,
+}) => {
   let current = { ...idle, active: true, phase: 'exposing', latestImage: firstImage }
   let keptId = ''
   let stopped = false
   let releaseKeep!: () => void
-  const gate = new Promise<void>(resolve => { releaseKeep = resolve })
+
+  const gate = new Promise<void>(resolve => {
+    releaseKeep = resolve
+  })
+
   await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, current))
-  await page.route('**/api/rigs/rig-1/capture/images/frame-1', route => route.fulfill({ contentType: 'image/png', body: preview }))
+  await page.route('**/api/rigs/rig-1/capture/images/frame-1', route =>
+    route.fulfill({ contentType: 'image/png', body: preview }),
+  )
   await page.route('**/api/rigs/rig-1/capture/images/frame-2', route => route.abort())
   await page.route('**/api/rigs/rig-1/capture/images/*/keep', async route => {
     keptId = route.request().url().split('/').at(-2)!
@@ -425,10 +512,14 @@ test('keeping the displayed frame remains independent of Stop when a newer previ
   await page.getByRole('button', { name: 'Stop exposure' }).click()
   await expect.poll(() => stopped).toBe(true)
   releaseKeep()
-  await expect(page.getByText('This exposure is no longer available to save.', { exact: false })).toBeVisible()
+  await expect(
+    page.getByText('This exposure is no longer available to save.', { exact: false }),
+  ).toBeVisible()
 })
 
-test('saved collection opens a retained image and original downloads without camera state', async ({ page }) => {
+test('saved collection opens a retained image and original downloads without camera state', async ({
+  page,
+}) => {
   const saved = {
     ...firstImage,
     saved: true,
@@ -445,31 +536,48 @@ test('saved collection opens a retained image and original downloads without cam
 
     return route.abort()
   })
-  await page.route('**/api/web/rigs/rig-1/saved-images', route => respond(route, {
-    rigId: 'rig-1',
-    rigName: 'Offline rig',
-    images: [saved],
-  }))
-  await page.route('**/api/web/rigs/rig-1/saved-images/frame-1', route => respond(route, {
-    rigId: 'rig-1',
-    rigName: 'Offline rig',
-    image: saved,
-  }))
-  await page.route('**/api/rigs/rig-1/saved-images/frame-1/preview', route => route.fulfill({ contentType: 'image/png', body: preview }))
+  await page.route('**/api/web/rigs/rig-1/saved-images', route =>
+    respond(route, {
+      rigId: 'rig-1',
+      rigName: 'Offline rig',
+      images: [saved],
+    }),
+  )
+  await page.route('**/api/web/rigs/rig-1/saved-images/frame-1', route =>
+    respond(route, {
+      rigId: 'rig-1',
+      rigName: 'Offline rig',
+      image: saved,
+    }),
+  )
+  await page.route('**/api/rigs/rig-1/saved-images/frame-1/preview', route =>
+    route.fulfill({ contentType: 'image/png', body: preview }),
+  )
   await page.goto('/rigs/rig-1/observe/saved-images')
   await expect(page.getByRole('heading', { name: 'Saved images', exact: true })).toBeVisible()
   await page.locator('.vela-saved-card').click()
   await expect(page.getByRole('region', { name: 'Saved preview' }).getByRole('img')).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Download FITS' })).toHaveAttribute('href', saved.fitsUrl)
-  await expect(page.getByRole('link', { name: 'Download preview' })).toHaveAttribute('href', saved.previewDownloadUrl)
+  await expect(page.getByRole('link', { name: 'Download FITS' })).toHaveAttribute(
+    'href',
+    saved.fitsUrl,
+  )
+  await expect(page.getByRole('link', { name: 'Download preview' })).toHaveAttribute(
+    'href',
+    saved.previewDownloadUrl,
+  )
   expect(deviceReads).toBe(0)
 })
 
-test('keeps a manual save outcome and retry attached to its image after newer pixels load', async ({ page }) => {
+test('keeps a manual save outcome and retry attached to its image after newer pixels load', async ({
+  page,
+}) => {
   let current = { ...idle, active: true, phase: 'exposing', latestImage: firstImage }
   const requestedIds: string[] = []
   let finish!: () => void
-  const pending = new Promise<void>(resolve => { finish = resolve })
+
+  const pending = new Promise<void>(resolve => {
+    finish = resolve
+  })
 
   const saved = {
     ...firstImage,
@@ -482,7 +590,9 @@ test('keeps a manual save outcome and retry attached to its image after newer pi
   }
 
   await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, current))
-  await page.route('**/api/rigs/rig-1/capture/images/*', route => route.fulfill({ contentType: 'image/png', body: preview }))
+  await page.route('**/api/rigs/rig-1/capture/images/*', route =>
+    route.fulfill({ contentType: 'image/png', body: preview }),
+  )
   await page.route('**/api/rigs/rig-1/capture/images/*/keep', async route => {
     requestedIds.push(route.request().url().split('/').at(-2)!)
 
@@ -502,7 +612,10 @@ test('keeps a manual save outcome and retry attached to its image after newer pi
       imageUrl: '/api/rigs/rig-1/capture/images/frame-2',
     },
   }
-  await expect(page.getByRole('region', { name: 'Latest image' }).getByRole('img')).toHaveAttribute('src', current.latestImage.imageUrl)
+  await expect(page.getByRole('region', { name: 'Latest image' }).getByRole('img')).toHaveAttribute(
+    'src',
+    current.latestImage.imageUrl,
+  )
   await expect(page.getByText('Saving image from', { exact: false })).toBeVisible()
   finish()
   await expect(page.getByText('Saving could not be confirmed.', { exact: false })).toBeVisible()
@@ -521,7 +634,9 @@ test('labels estimated starts on the loaded capture and saved image detail', asy
 
     return respond(route, { ...idle, phase: 'complete', latestImage })
   })
-  await page.route(`**${firstImage.imageUrl}`, route => route.fulfill({ contentType: 'image/png', body: preview }))
+  await page.route(`**${firstImage.imageUrl}`, route =>
+    route.fulfill({ contentType: 'image/png', body: preview }),
+  )
   await page.goto('/rigs/rig-1/observe/capture')
   await expect(page.getByText('Start time estimated', { exact: true })).toBeVisible()
   estimated = false
@@ -540,13 +655,23 @@ test('labels estimated starts on the loaded capture and saved image detail', asy
     previewDownloadUrl: '/api/rigs/rig-1/saved-images/frame-1/download-preview',
   }
 
-  await page.route('**/api/web/rigs/rig-1/saved-images/frame-1', route => respond(route, { rigId: 'rig-1', rigName: 'Offline rig', image }))
-  await page.route(`**${image.imageUrl}`, route => route.fulfill({ contentType: 'image/png', body: preview }))
+  await page.route('**/api/web/rigs/rig-1/saved-images/frame-1', route =>
+    respond(route, { rigId: 'rig-1', rigName: 'Offline rig', image }),
+  )
+  await page.route(`**${image.imageUrl}`, route =>
+    route.fulfill({ contentType: 'image/png', body: preview }),
+  )
   await page.goto('/rigs/rig-1/observe/saved-images/frame-1')
-  await expect(page.getByRole('region', { name: 'Saved preview' }).getByText('Start time estimated', { exact: true })).toBeVisible()
+  await expect(
+    page
+      .getByRole('region', { name: 'Saved preview' })
+      .getByText('Start time estimated', { exact: true }),
+  ).toBeVisible()
 })
 
-test('shows cooler off when the sensor is near the requested temperature and turns it on only when asked', async ({ page }) => {
+test('shows cooler off when the sensor is near the requested temperature and turns it on only when asked', async ({
+  page,
+}) => {
   let cooling = {
     state: 'off' as const,
     canSetTemperature: true,

@@ -25,7 +25,9 @@
   border: 1px solid var(--vela-line);
   color: var(--vela-text);
 }
-.vela-capture-run-demo .vela-capture-controls .vela-checkbox { margin-top: 14px; }
+.vela-capture-run-demo .vela-capture-controls .vela-checkbox {
+  margin-top: 14px;
+}
 .vela-capture-run-count {
   display: flex;
   align-items: baseline;
@@ -33,10 +35,19 @@
   margin-top: 18px;
   font-variant-numeric: tabular-nums;
 }
-.vela-capture-run-count strong { font-size: 22px; font-weight: 550; }
-.vela-capture-run-count span { font-size: 12px; color: var(--vela-text-muted); }
+.vela-capture-run-count strong {
+  font-size: 22px;
+  font-weight: 550;
+}
+.vela-capture-run-count span {
+  font-size: 12px;
+  color: var(--vela-text-muted);
+}
 
-.vela-capture-image-statistics { padding: 12px 14px; border-top: 1px solid var(--vela-line); }
+.vela-capture-image-statistics {
+  padding: 12px 14px;
+  border-top: 1px solid var(--vela-line);
+}
 .vela-capture-image-statistics dl {
   display: grid;
   grid-template-columns: 1.3fr 1fr 1fr;

@@ -2,7 +2,13 @@ import { strict as assert } from 'node:assert'
 import { createHash } from 'node:crypto'
 import { test } from 'node:test'
 import type { Source } from './evidence.ts'
-import { reviewStandards, type GenerateReview, type Review, type ReviewInput, type Target } from './reviewer.ts'
+import {
+  reviewStandards,
+  type GenerateReview,
+  type Review,
+  type ReviewInput,
+  type Target,
+} from './reviewer.ts'
 import type { Citation, Diagnostic } from './rpc.ts'
 
 type ModelCitation = Omit<Citation, 'sha256'>
@@ -15,25 +21,34 @@ function source(path: string, code: string): Source {
   return { path, code, sha256: createHash('sha256').update(code).digest('hex') }
 }
 
-const target = source('apps/server/capture.ts', [
-  'export async function capture(camera: Camera) {',
-  '  try {',
-  '    return await camera.expose()',
-  '  } catch (error) {',
-  "    throw new Error('Capture failed')",
-  '  }',
-  '}',
-].join('\n'))
-const contract = source('apps/server/camera-contract.ts', [
-  'export interface Camera {',
-  '  /** Rejects with the device identity and transport failure. */',
-  '  expose(): Promise<Image>',
-  '}',
-].join('\n'))
-const codingStandards = source('CODING_STANDARDS.md', [
-  '## Errors, retries, and device commands',
-  'Translate low-level failures into stable boundary errors without discarding their meaningful cause.',
-].join('\n'))
+const target = source(
+  'apps/server/capture.ts',
+  [
+    'export async function capture(camera: Camera) {',
+    '  try {',
+    '    return await camera.expose()',
+    '  } catch (error) {',
+    "    throw new Error('Capture failed')",
+    '  }',
+    '}',
+  ].join('\n'),
+)
+const contract = source(
+  'apps/server/camera-contract.ts',
+  [
+    'export interface Camera {',
+    '  /** Rejects with the device identity and transport failure. */',
+    '  expose(): Promise<Image>',
+    '}',
+  ].join('\n'),
+)
+const codingStandards = source(
+  'CODING_STANDARDS.md',
+  [
+    '## Errors, retries, and device commands',
+    'Translate low-level failures into stable boundary errors without discarding their meaningful cause.',
+  ].join('\n'),
+)
 const guidance = source('AGENTS.md', 'Never report an unconfirmed operation as successful.')
 const input: ReviewInput = {
   targets: [target],
@@ -60,20 +75,24 @@ function causeDiagnostic(overrides: Partial<ModelDiagnostic> = {}): ModelDiagnos
     rule: 'error_context',
     severity: 'warning',
     message: 'Capture failure discards the device error',
-    explanation: 'The camera rejects with device and transport details, but the replacement error retains neither. The caller cannot distinguish a disconnected device from a failed exposure.',
-    suggestion: "Pass { cause: error } to the new Error constructor.",
+    explanation:
+      'The camera rejects with device and transport details, but the replacement error retains neither. The caller cannot distinguish a disconnected device from a failed exposure.',
+    suggestion: 'Pass { cause: error } to the new Error constructor.',
     location: {
       path: target.path,
       startLine: 5,
       endLine: 5,
       quote: "    throw new Error('Capture failed')",
     },
-    related: [{
-      path: contract.path,
-      startLine: 2,
-      endLine: 3,
-      quote: '  /** Rejects with the device identity and transport failure. */\n  expose(): Promise<Image>',
-    }],
+    related: [
+      {
+        path: contract.path,
+        startLine: 2,
+        endLine: 3,
+        quote:
+          '  /** Rejects with the device identity and transport failure. */\n  expose(): Promise<Image>',
+      },
+    ],
     ...overrides,
   }
 }
@@ -85,7 +104,12 @@ function response(
     missingEvidence?: Review['missingEvidence']
   } = {},
 ) {
-  return JSON.stringify({ reviewedPaths: [target.path], diagnostics, missingEvidence: [], ...overrides })
+  return JSON.stringify({
+    reviewedPaths: [target.path],
+    diagnostics,
+    missingEvidence: [],
+    ...overrides,
+  })
 }
 
 function review(raw = response(), overrides: Partial<ReviewInput> = {}) {
@@ -96,7 +120,11 @@ function assertRejected(result: Review, reason?: RegExp) {
   assert.equal(result.status, 'incomplete')
   assert.ok(result.error, 'Invalid output must not look like a clean review')
   if (reason) assert.match(result.error, reason)
-  assert.deepEqual(result.diagnostics, [], 'Reject the whole response, including earlier valid diagnostics')
+  assert.deepEqual(
+    result.diagnostics,
+    [],
+    'Reject the whole response, including earlier valid diagnostics',
+  )
   assert.deepEqual(result.missingEvidence, [])
 }
 
@@ -114,16 +142,20 @@ test('one direct review receives numbered targets and context and preserves a so
     assert.ok(prompt.includes(marker))
     const supplied = JSON.parse(prompt.slice(prompt.indexOf(marker) + marker.length))
     assert.deepEqual(supplied.requiredReviewedPaths, [target.path])
-    assert.deepEqual(supplied.targets, [{
-      path: target.path,
-      scope: 'changed_lines',
-      text: "1: export async function capture(camera: Camera) {\n2:   try {\n3:     return await camera.expose()\n4:   } catch (error) {\n5:     throw new Error('Capture failed')\n6:   }\n7: }",
-      diff: changedTarget.diff,
-    }])
-    assert.deepEqual(supplied.context, [{
-      path: contract.path,
-      text: '1: export interface Camera {\n2:   /** Rejects with the device identity and transport failure. */\n3:   expose(): Promise<Image>\n4: }',
-    }])
+    assert.deepEqual(supplied.targets, [
+      {
+        path: target.path,
+        scope: 'changed_lines',
+        text: "1: export async function capture(camera: Camera) {\n2:   try {\n3:     return await camera.expose()\n4:   } catch (error) {\n5:     throw new Error('Capture failed')\n6:   }\n7: }",
+        diff: changedTarget.diff,
+      },
+    ])
+    assert.deepEqual(supplied.context, [
+      {
+        path: contract.path,
+        text: '1: export interface Camera {\n2:   /** Rejects with the device identity and transport failure. */\n3:   expose(): Promise<Image>\n4: }',
+      },
+    ])
     assert.equal(supplied.codingStandards, codingStandards.code)
     assert.equal(supplied.projectGuidance, guidance.code)
     assert.equal(supplied.ruleIds.error_context, 'Errors, retries, and device commands')
@@ -139,11 +171,13 @@ test('one direct review receives numbered targets and context and preserves a so
   assert.equal(result.prompt, sentPrompt)
   assert.equal(result.response, raw)
   assert.ok(Number.isFinite(result.milliseconds) && result.milliseconds >= 0)
-  assert.deepEqual(result.diagnostics, [{
-    ...diagnostic,
-    location: { ...diagnostic.location, sha256: target.sha256 },
-    related: [{ ...diagnostic.related[0], sha256: contract.sha256 }],
-  }])
+  assert.deepEqual(result.diagnostics, [
+    {
+      ...diagnostic,
+      location: { ...diagnostic.location, sha256: target.sha256 },
+      related: [{ ...diagnostic.related[0], sha256: contract.sha256 }],
+    },
+  ])
   assert.deepEqual(result.missingEvidence, [])
 })
 
@@ -165,9 +199,14 @@ test('missing code evidence stays separate from diagnostics and must name a revi
   assert.equal(result.error, undefined)
   assert.deepEqual(result.diagnostics, [])
   assert.deepEqual(result.missingEvidence, [missing])
-  assertRejected(await review(response([causeDiagnostic()], {
-    missingEvidence: [{ ...missing, path: 'not-reviewed.ts' }],
-  })), /unknown target/)
+  assertRejected(
+    await review(
+      response([causeDiagnostic()], {
+        missingEvidence: [{ ...missing, path: 'not-reviewed.ts' }],
+      }),
+    ),
+    /unknown target/,
+  )
 })
 
 test('a mixed batch explicitly includes whole new files as well as changed-line targets', async () => {
@@ -202,10 +241,10 @@ test('every target must be covered exactly once, including targets without diagn
   ] as const) {
     await t.test(name, async () => {
       assertRejected(
-        await review(
-          response([causeDiagnostic()], { reviewedPaths: [...reviewedPaths] }),
-          { targets, context: [] },
-        ),
+        await review(response([causeDiagnostic()], { reviewedPaths: [...reviewedPaths] }), {
+          targets,
+          context: [],
+        }),
         /omitted targets|Unknown or repeated reviewed target/,
       )
     })
@@ -225,10 +264,13 @@ test('diagnostics use stable rule IDs rather than headings or invented rules', a
 
 test('invalid primary or related citations reject all diagnostics atomically', async t => {
   const diagnostic = causeDiagnostic()
-  const cases: { name: string, citation: ModelCitation }[] = [
+  const cases: { name: string; citation: ModelCitation }[] = [
     { name: 'fabricated quote', citation: { ...diagnostic.location, quote: 'throw error' } },
     { name: 'partial quote', citation: { ...diagnostic.location, quote: 'new Error' } },
-    { name: 'numbered quote', citation: { ...diagnostic.location, quote: `5: ${diagnostic.location.quote}` } },
+    {
+      name: 'numbered quote',
+      citation: { ...diagnostic.location, quote: `5: ${diagnostic.location.quote}` },
+    },
     { name: 'missing source', citation: { ...diagnostic.location, path: 'not-provided.ts' } },
     { name: 'out of range', citation: { ...diagnostic.location, endLine: 40 } },
     { name: 'reversed range', citation: { ...diagnostic.location, startLine: 6 } },
@@ -237,7 +279,9 @@ test('invalid primary or related citations reject all diagnostics atomically', a
   for (const { name, citation } of cases) {
     for (const position of ['primary', 'related'] as const) {
       await t.test(`${position}: ${name}`, async () => {
-        const invalid = causeDiagnostic(position === 'primary' ? { location: citation } : { related: [citation] })
+        const invalid = causeDiagnostic(
+          position === 'primary' ? { location: citation } : { related: [citation] },
+        )
         assertRejected(await review(response([diagnostic, invalid])))
       })
     }
@@ -307,17 +351,23 @@ test('a pure deletion can cite the surviving boundary', async () => {
   })
   const result = await review(response([diagnostic]), { targets: [deletedGuard] })
   assert.equal(result.error, undefined)
-  assert.deepEqual(result.diagnostics[0].location, { ...diagnostic.location, sha256: target.sha256 })
+  assert.deepEqual(result.diagnostics[0].location, {
+    ...diagnostic.location,
+    sha256: target.sha256,
+  })
 })
 
 test('malformed JSON and invalid diagnostic shapes retain raw output without accepting partial results', async t => {
   for (const [name, raw] of [
     ['malformed JSON', '{"reviewedPaths":['],
-    ['incomplete diagnostic', JSON.stringify({
-      reviewedPaths: [target.path],
-      diagnostics: [causeDiagnostic(), { rule: 'error_context' }],
-      missingEvidence: [],
-    })],
+    [
+      'incomplete diagnostic',
+      JSON.stringify({
+        reviewedPaths: [target.path],
+        diagnostics: [causeDiagnostic(), { rule: 'error_context' }],
+        missingEvidence: [],
+      }),
+    ],
   ]) {
     await t.test(name, async () => {
       const result = await review(raw)
@@ -344,7 +394,9 @@ test('input budget counts UTF-8 bytes and rejects before generation', async () =
 })
 
 test('output budget counts UTF-8 bytes even when individual diagnostics fit the schema', async () => {
-  const raw = response(Array.from({ length: 5 }, () => causeDiagnostic({ explanation: '界'.repeat(3500) })))
+  const raw = response(
+    Array.from({ length: 5 }, () => causeDiagnostic({ explanation: '界'.repeat(3500) })),
+  )
   assert.ok(raw.length < 48_000)
   assert.ok(Buffer.byteLength(raw) > 48_000)
   const result = await review(raw)
@@ -368,8 +420,12 @@ test('cancellation reaches pending generation and rejects instead of returning a
     controller.signal,
   )
   void checking.then(
-    () => { settled = true },
-    () => { settled = true },
+    () => {
+      settled = true
+    },
+    () => {
+      settled = true
+    },
   )
   const stopped = assert.rejects(checking, /Stopped pending review/)
   await started.promise
@@ -393,8 +449,12 @@ test('a successful response arriving after cancellation is never accepted', asyn
     controller.signal,
   )
   void checking.then(
-    () => { settled = true },
-    () => { settled = true },
+    () => {
+      settled = true
+    },
+    () => {
+      settled = true
+    },
   )
   const stopped = assert.rejects(checking, /Stopped before response/)
   await started.promise

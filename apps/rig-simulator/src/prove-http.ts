@@ -11,8 +11,16 @@ import { registerCapture } from '../../server/dist/capture/routes.js'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { resolve, join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
-import { createAlpacaAcquisition, createAlpacaProvider } from '../../../packages/alpaca/dist/index.js'
-import { createAlignmentBaseline, measureAlignment, type AlignmentSample, type AlignmentMeasurement } from '../../server/dist/alignment/geometry.js'
+import {
+  createAlpacaAcquisition,
+  createAlpacaProvider,
+} from '../../../packages/alpaca/dist/index.js'
+import {
+  createAlignmentBaseline,
+  measureAlignment,
+  type AlignmentSample,
+  type AlignmentMeasurement,
+} from '../../server/dist/alignment/geometry.js'
 import { createAstapSolver } from '../../server/dist/alignment/solver.js'
 import { imageWidth, imageHeight } from './optics.js'
 import { loadCatalog } from './catalog.js'
@@ -22,7 +30,8 @@ const catalogPath = process.env.VELA_STAR_CATALOG
 
 const executable = process.env.VELA_ASTAP
 
-if (!catalogPath || !executable) throw new Error('Set VELA_STAR_CATALOG and VELA_ASTAP; see README.md')
+if (!catalogPath || !executable)
+  throw new Error('Set VELA_STAR_CATALOG and VELA_ASTAP; see README.md')
 
 const output = resolve(process.env.VELA_SIM_OUTPUT ?? '.local/http-proof')
 
@@ -79,15 +88,19 @@ async function exposure() {
   assert.equal(pointing.tracking, true)
   const frame = await hardware.capture({ cameraId, exposureSeconds: 2, signal })
 
-  const solved = await solver.solve(frame, {
-    raDegrees: pointing.rightAscensionDegrees,
-    decDegrees: pointing.declinationDegrees,
-  }, signal)
+  const solved = await solver.solve(
+    frame,
+    {
+      raDegrees: pointing.rightAscensionDegrees,
+      decDegrees: pointing.declinationDegrees,
+    },
+    signal,
+  )
 
   return { pointing, frame, solved, pointingObservedAt }
 }
 
-async function sample(): Promise<{ sample: AlignmentSample, latitude: number }> {
+async function sample(): Promise<{ sample: AlignmentSample; latitude: number }> {
   const { pointing, frame, solved, pointingObservedAt } = await exposure()
   assert.equal(solved.status, 'solved', 'Clear synthetic exposure must actually solve')
 
@@ -98,8 +111,11 @@ async function sample(): Promise<{ sample: AlignmentSample, latitude: number }> 
       raDegrees: solved.raDegrees,
       decDegrees: solved.decDegrees,
       capturedAt: frame.capturedAt,
-      siderealTimeDegrees: (pointing.siderealTimeDegrees
-        + (Date.parse(frame.capturedAt) - pointingObservedAt) / 1000 * 360 / 86164.0905 + 360) % 360,
+      siderealTimeDegrees:
+        (pointing.siderealTimeDegrees +
+          (((Date.parse(frame.capturedAt) - pointingObservedAt) / 1000) * 360) / 86164.0905 +
+          360) %
+        360,
     },
     latitude: pointing.latitudeDegrees,
   }
@@ -111,10 +127,14 @@ function check(
   altitudeArcsec: number,
   azimuthArcsec: number,
 ) {
-  assert.ok(Math.abs(measurement.altitudeArcsec - altitudeArcsec) < toleranceArcsec,
-    `${name}: altitude ${measurement.altitudeArcsec} exceeds ${toleranceArcsec} arcsec tolerance from ${altitudeArcsec}`)
-  assert.ok(Math.abs(measurement.azimuthArcsec - azimuthArcsec) < toleranceArcsec,
-    `${name}: azimuth ${measurement.azimuthArcsec} exceeds ${toleranceArcsec} arcsec tolerance from ${azimuthArcsec}`)
+  assert.ok(
+    Math.abs(measurement.altitudeArcsec - altitudeArcsec) < toleranceArcsec,
+    `${name}: altitude ${measurement.altitudeArcsec} exceeds ${toleranceArcsec} arcsec tolerance from ${altitudeArcsec}`,
+  )
+  assert.ok(
+    Math.abs(measurement.azimuthArcsec - azimuthArcsec) < toleranceArcsec,
+    `${name}: azimuth ${measurement.azimuthArcsec} exceeds ${toleranceArcsec} arcsec tolerance from ${azimuthArcsec}`,
+  )
   const report = { name, expected: { altitudeArcsec, azimuthArcsec }, measured: measurement }
   reports.push(report)
   console.log(JSON.stringify(report))
@@ -127,29 +147,36 @@ async function proveCapture() {
   assert.equal((await provider.connectDevice(colorId)).outcome, 'connected')
   const devices = await provider.inspectDevices()
 
-  const catalog = createMemoryRigCatalog([{
-    id: 'proof',
-    name: 'Simulator proof',
-    endpoint: { host: '127.0.0.1', port: Number(new URL(baseUrl).port) },
-    addedAt: new Date().toISOString(),
-    lastObservedInventory: {
-      observedAt: new Date().toISOString(),
-      devices: devices.map(device => ({
-        uniqueId: device.providerDeviceId,
-        kind: device.kind,
-        name: device.configuredName,
-      })),
+  const catalog = createMemoryRigCatalog([
+    {
+      id: 'proof',
+      name: 'Simulator proof',
+      endpoint: { host: '127.0.0.1', port: Number(new URL(baseUrl).port) },
+      addedAt: new Date().toISOString(),
+      lastObservedInventory: {
+        observedAt: new Date().toISOString(),
+        devices: devices.map(device => ({
+          uniqueId: device.providerDeviceId,
+          kind: device.kind,
+          name: device.configuredName,
+        })),
+      },
     },
-  }])
+  ])
 
   const vela = Fastify()
   const operations = createRigOperations()
   registerImagingCamera(vela, catalog, operations)
   registerCapture(vela, catalog, operations)
-  const captureView = async () => (await vela.inject('/api/web/rigs/proof/capture')).json<CaptureView>()
+
+  const captureView = async () =>
+    (await vela.inject('/api/web/rigs/proof/capture')).json<CaptureView>()
 
   async function select(id: string) {
-    const choices = (await vela.inject('/api/web/rigs/proof/imaging-camera')).json<ImagingCameraView>()
+    const choices = (
+      await vela.inject('/api/web/rigs/proof/imaging-camera')
+    ).json<ImagingCameraView>()
+
     assert.equal(choices.cameras.length, 2)
     const camera = choices.cameras.find(camera => camera.id === id)
     assert.ok(camera?.name)
@@ -162,7 +189,11 @@ async function proveCapture() {
 
     assert.equal(response.statusCode, 200, response.body)
     assert.equal((await catalog.get('proof'))?.imagingCamera?.uniqueId, id)
-    assert.equal((await vela.inject('/api/web/rigs/proof/imaging-camera')).json<ImagingCameraView>().selected?.id, id)
+    assert.equal(
+      (await vela.inject('/api/web/rigs/proof/imaging-camera')).json<ImagingCameraView>().selected
+        ?.id,
+      id,
+    )
   }
 
   async function capture() {
@@ -206,7 +237,8 @@ async function proveCapture() {
       for (let offset = 8; offset < png.length;) {
         const length = png.readUInt32BE(offset)
 
-        if (png.toString('ascii', offset + 4, offset + 8) === 'IDAT') chunks.push(png.subarray(offset + 8, offset + 8 + length))
+        if (png.toString('ascii', offset + 4, offset + 8) === 'IDAT')
+          chunks.push(png.subarray(offset + 8, offset + 8 + length))
         offset += length + 12
       }
 
@@ -227,7 +259,10 @@ async function proveCapture() {
         }
       }
 
-      assert.ok(coloredPixels > 100, 'Preview must contain visible color, not just an RGB-encoded gray frame')
+      assert.ok(
+        coloredPixels > 100,
+        'Preview must contain visible color, not just an RGB-encoded gray frame',
+      )
     }
 
     return png.length
@@ -245,12 +280,18 @@ async function proveCapture() {
     await preview(color.imageUrl, imageWidth, imageHeight, true)
 
     // Read the same retained sensor frame using both negotiated transports.
-    const raw = await fetch(`${baseUrl}/api/v1/camera/1/imagearray`, { headers: { accept: 'application/imagebytes' } })
+    const raw = await fetch(`${baseUrl}/api/v1/camera/1/imagearray`, {
+      headers: { accept: 'application/imagebytes' },
+    })
+
     assert.match(raw.headers.get('content-type') ?? '', /^application\/imagebytes/)
     const binary = Buffer.from(await raw.arrayBuffer())
 
-    const json = z.object({ ErrorNumber: z.number(), Value: z.array(z.array(z.number())) }).parse(await fetch(`${baseUrl}/api/v1/camera/1/imagearray`, { headers: { accept: 'application/json' } })
-      .then(response => response.json()))
+    const json = z.object({ ErrorNumber: z.number(), Value: z.array(z.array(z.number())) }).parse(
+      await fetch(`${baseUrl}/api/v1/camera/1/imagearray`, {
+        headers: { accept: 'application/json' },
+      }).then(response => response.json()),
+    )
 
     assert.equal(json.ErrorNumber, 0)
     assert.equal(binary.readInt32LE(16), 44)
@@ -333,12 +374,19 @@ try {
   const second = await sample()
   await hardware.move(telescopeId, 1.5, 12, signal)
   const third = await sample()
-  const baseline = createAlignmentBaseline([first.sample, second.sample, third.sample], first.latitude)
+
+  const baseline = createAlignmentBaseline(
+    [first.sample, second.sample, third.sample],
+    first.latitude,
+  )
+
   check('baseline-large', baseline.measurement, 480, -360)
 
   // Keep the same baseline and mount joints through every physical adjustment.
   for (const [name, altitudeArcsec, azimuthArcsec] of [
-    ['partial', 240, -180], ['near', 12, -9], ['aligned', 0, 0],
+    ['partial', 240, -180],
+    ['near', 12, -9],
+    ['aligned', 0, 0],
   ] as const) {
     await control('adjust', { altitudeArcsec, azimuthArcsec })
     const next = await sample()
@@ -346,20 +394,32 @@ try {
   }
 
   await control('camera', { obscured: true })
-  assert.equal((await exposure()).solved.status, 'no-solution', 'Obscured pixels must fail in ASTAP')
+  assert.equal(
+    (await exposure()).solved.status,
+    'no-solution',
+    'Obscured pixels must fail in ASTAP',
+  )
   await control('camera', { obscured: false })
   const recovered = await sample()
   check('clear-recovery', measureAlignment(baseline, recovered.sample, true), 0, 0)
 
   const cancellation = new AbortController()
   const pending = hardware.capture({ cameraId, exposureSeconds: 10, signal: cancellation.signal })
-  const outcome = pending.then(() => 'unexpected image', () => 'cancelled')
+
+  const outcome = pending.then(
+    () => 'unexpected image',
+    () => 'cancelled',
+  )
+
   // Observe the pending exposure before issuing cancellation; no timing guess.
   const deadline = Date.now() + 5000
 
   while (true) {
     const response = await fetch(`${baseUrl}/simulator/state`)
-    const state = z.object({ cameraActivity: z.enum(['idle', 'exposing']) }).parse(await response.json())
+
+    const state = z
+      .object({ cameraActivity: z.enum(['idle', 'exposing']) })
+      .parse(await response.json())
 
     if (state.cameraActivity === 'exposing') break
 
@@ -374,19 +434,26 @@ try {
   check('restart-freshness', measureAlignment(baseline, restarted.sample, true), 0, 0)
   await hardware.abort(cameraId, telescopeId)
 
-  const idle = z.object({ cameraActivity: z.enum(['idle', 'exposing']), raRateDegreesPerSecond: z.number() }).parse(
-    await fetch(`${baseUrl}/simulator/state`).then(response => response.json()),
-  )
+  const idle = z
+    .object({ cameraActivity: z.enum(['idle', 'exposing']), raRateDegreesPerSecond: z.number() })
+    .parse(await fetch(`${baseUrl}/simulator/state`).then(response => response.json()))
 
   assert.equal(idle.cameraActivity, 'idle')
   assert.equal(idle.raRateDegreesPerSecond, 0)
   await proveCapture()
-  await writeFile(join(output, 'results.json'), JSON.stringify({
-    toleranceArcsec,
-    reports,
-    obscured: 'real ASTAP no-solution',
-    cancellation: 'exposure aborted and fresh restart solved',
-  }, null, 2))
+  await writeFile(
+    join(output, 'results.json'),
+    JSON.stringify(
+      {
+        toleranceArcsec,
+        reports,
+        obscured: 'real ASTAP no-solution',
+        cancellation: 'exposure aborted and fresh restart solved',
+      },
+      null,
+      2,
+    ),
+  )
   console.log(`HTTP proof passed: ${join(output, 'results.json')}`)
 } finally {
   try {

@@ -8,11 +8,7 @@ import type {
   RigState,
 } from '../rig/index.js'
 
-export type RigDeviceStatusAvailability =
-  | 'complete'
-  | 'partial'
-  | 'unavailable'
-  | 'unsupported'
+export type RigDeviceStatusAvailability = 'complete' | 'partial' | 'unavailable' | 'unsupported'
 
 export interface UnavailableRigDeviceStatus {
   readonly availability: 'unavailable'
@@ -33,16 +29,17 @@ interface ConnectedRigDeviceDetail extends RigDeviceIdentity {
   readonly observedAt: IsoDateTime
 }
 
-type UnavailableRigDeviceDetail = RigDeviceIdentity & (
-  | {
-      readonly connection: Extract<ConnectionStatus, 'disconnected'>
-      readonly observedAt: IsoDateTime
-    }
-  | {
-      readonly connection: Extract<ConnectionStatus, 'unavailable'>
-      readonly observedAt?: IsoDateTime
-    }
-)
+type UnavailableRigDeviceDetail = RigDeviceIdentity &
+  (
+    | {
+        readonly connection: Extract<ConnectionStatus, 'disconnected'>
+        readonly observedAt: IsoDateTime
+      }
+    | {
+        readonly connection: Extract<ConnectionStatus, 'unavailable'>
+        readonly observedAt?: IsoDateTime
+      }
+  )
 
 type RigDeviceView<Kind extends DeviceKind, Status> =
   | (ConnectedRigDeviceDetail & {

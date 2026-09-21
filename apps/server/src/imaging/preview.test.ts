@@ -53,7 +53,10 @@ describe('native image preview', () => {
       // SAFETY: all patterns contain four r/g/b characters and parity indexes stay within 0–3.
       const pixels = Float64Array.from(
         { length: 64 },
-        (_, i) => ({ r: 900, g: 300, b: 1200 })[pattern[(Math.floor(i / 8) % 2) * 2 + i % 2] as 'r' | 'g' | 'b'],
+        (_, i) =>
+          ({ r: 900, g: 300, b: 1200 })[
+            pattern[(Math.floor(i / 8) % 2) * 2 + (i % 2)] as 'r' | 'g' | 'b'
+          ],
       )
 
       const before = pixels.slice()

@@ -71,17 +71,19 @@ const capture = registerCapture(app, catalog, createRigOperations(), {
   savedImages: store,
   createInspector: () => ({
     async inspectDevices() {
-      return [{
-        providerDeviceId: 'replay',
-        kind: 'camera' as const,
-        configuredName: cameraName,
-        name: cameraName,
-        connection: 'connected' as const,
-        telemetry: {
-          availability: 'complete' as const,
-          values: { kind: 'camera' as const, activity: 'idle' as const },
+      return [
+        {
+          providerDeviceId: 'replay',
+          kind: 'camera' as const,
+          configuredName: cameraName,
+          name: cameraName,
+          connection: 'connected' as const,
+          telemetry: {
+            availability: 'complete' as const,
+            values: { kind: 'camera' as const, activity: 'idle' as const },
+          },
         },
-      }]
+      ]
     },
   }),
   createCamera: () => ({

@@ -50,23 +50,30 @@ function isHostname(host: string): boolean {
 
   if (withoutTrailingDot.length === 0) return false
 
-  return withoutTrailingDot.split('.').every((label) =>
-    /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i.test(label),
-  )
+  return withoutTrailingDot
+    .split('.')
+    .every(label => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i.test(label))
 }
 
 export const manualDiscoverySchema = z.strictObject({
   mode: z.literal('manual'),
   host: z.string().refine(isHostname),
-  port: z.number().int().min(1).max(65535).nullish().transform(port => port ?? defaultAlpacaPort),
+  port: z
+    .number()
+    .int()
+    .min(1)
+    .max(65535)
+    .nullish()
+    .transform(port => port ?? defaultAlpacaPort),
 })
 
-export const discoverRigsSchema = z.union([
-  z.strictObject({ mode: z.literal('scan') }),
-  manualDiscoverySchema,
-]).transform((value): DiscoverRigsInput => value.mode === 'scan'
-  ? value
-  : { mode: 'manual', endpoint: { host: value.host, port: value.port } })
+export const discoverRigsSchema = z
+  .union([z.strictObject({ mode: z.literal('scan') }), manualDiscoverySchema])
+  .transform((value): DiscoverRigsInput =>
+    value.mode === 'scan'
+      ? value
+      : { mode: 'manual', endpoint: { host: value.host, port: value.port } },
+  )
 
 export const parseDiscoverRigsInput = discoverRigsSchema.optional().catch(undefined).parse
 
@@ -88,7 +95,7 @@ function failureReason(error: AlpacaProviderError): DiscoveryFailureReason {
 }
 
 function hasServerDescription(inspection: AlpacaInspection): boolean {
-  return Object.values(inspection.server).some((value) => value !== undefined)
+  return Object.values(inspection.server).some(value => value !== undefined)
 }
 
 export function toObservedRigInventory(
@@ -97,14 +104,16 @@ export function toObservedRigInventory(
 ): ObservedRigInventory {
   return {
     observedAt,
-    devices: inspection.devices.flatMap((device) =>
+    devices: inspection.devices.flatMap(device =>
       device.providerDeviceId === undefined
         ? []
-        : [{
-            uniqueId: device.providerDeviceId,
-            kind: device.kind,
-            name: device.name,
-          }],
+        : [
+            {
+              uniqueId: device.providerDeviceId,
+              kind: device.kind,
+              name: device.name,
+            },
+          ],
     ),
   }
 }
@@ -144,7 +153,7 @@ async function candidateView(
     endpoint: inspection.endpoint,
 
     inspectedAt,
-    devices: inspection.devices.map((device) => ({
+    devices: inspection.devices.map(device => ({
       kind: device.kind,
       name: device.name,
     })),
@@ -156,12 +165,7 @@ async function candidateView(
 
 export async function discoverRigs(
   input: DiscoverRigsInput,
-  {
-    alpaca,
-    catalog,
-    now = () => new Date(),
-    signal,
-  }: DiscoverRigsOptions,
+  { alpaca, catalog, now = () => new Date(), signal }: DiscoverRigsOptions,
 ): Promise<RigDiscoveryResult> {
   throwIfCancelled(signal)
   let endpoints: ReadonlyArray<RigEndpoint>
@@ -192,10 +196,7 @@ export async function discoverRigs(
     throwIfCancelled(signal)
 
     try {
-      const inspection = await alpaca.inspect(
-        endpoint,
-        signal === undefined ? {} : { signal },
-      )
+      const inspection = await alpaca.inspect(endpoint, signal === undefined ? {} : { signal })
 
       throwIfCancelled(signal)
       candidates.push(await candidateView(inspection, catalog, now))

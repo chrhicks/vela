@@ -15,7 +15,7 @@ export const specimen: ComponentSpecimen = {
   description: 'A labeled native selection control with operational feedback.',
   controls: {
     label: { type: 'text', label: 'Label' },
-    value: { type: 'select', label: 'Value', options: cameras.map((camera) => camera.value) },
+    value: { type: 'select', label: 'Value', options: cameras.map(camera => camera.value) },
     invalid: { type: 'boolean', label: 'Invalid' },
     disabled: { type: 'boolean', label: 'Disabled' },
   },
@@ -23,7 +23,7 @@ export const specimen: ComponentSpecimen = {
     label: 'Imaging camera',
     value: 'asi2600',
     invalid: false,
-    disabled: false
+    disabled: false,
   },
   render: (props, onPropsChange) => (
     <div style={{ width: 'min(100%, 24rem)' }}>
@@ -31,9 +31,11 @@ export const specimen: ComponentSpecimen = {
         disabled={Boolean(props.disabled)}
         invalid={Boolean(props.invalid)}
         label={String(props.label)}
-        message={props.invalid ? 'Choose an available device.' : 'Used for the next capture sequence'}
+        message={
+          props.invalid ? 'Choose an available device.' : 'Used for the next capture sequence'
+        }
         options={cameras}
-        onChange={(event) => onPropsChange?.({ value: event.target.value })}
+        onChange={event => onPropsChange?.({ value: event.target.value })}
         value={String(props.value)}
       />
     </div>

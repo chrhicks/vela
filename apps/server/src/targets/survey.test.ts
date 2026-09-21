@@ -9,7 +9,9 @@ const directories: string[] = []
 
 afterEach(async () => {
   vi.useRealTimers()
-  await Promise.all(directories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })))
+  await Promise.all(
+    directories.splice(0).map(directory => rm(directory, { recursive: true, force: true })),
+  )
 })
 
 async function directory() {
@@ -35,7 +37,14 @@ describe('DSS2 persistent survey cache', () => {
   it('deduplicates an in-flight miss and serves the exact bytes offline after restart', async () => {
     const location = await directory()
     let release!: (value: Response) => void
-    const fetch = vi.fn<typeof globalThis.fetch>(() => new Promise((resolve) => { release = resolve }))
+
+    const fetch = vi.fn<typeof globalThis.fetch>(
+      () =>
+        new Promise(resolve => {
+          release = resolve
+        }),
+    )
+
     const cache = createSurveyCache({ directory: location, fetch })
     const first = cache.get('Norder3/Dir0/Npix2.jpg')
     const second = cache.get('Norder3/Dir0/Npix2.jpg')
@@ -70,7 +79,9 @@ describe('DSS2 persistent survey cache', () => {
 
     expect(fetch).not.toHaveBeenCalled()
     await cache.get('Norder9/Dir3140000/Npix3145727.jpg')
-    expect(fetch.mock.calls[0]?.[0]).toBe('https://alasky.cds.unistra.fr/DSS/DSSColor/Norder9/Dir3140000/Npix3145727.jpg')
+    expect(fetch.mock.calls[0]?.[0]).toBe(
+      'https://alasky.cds.unistra.fr/DSS/DSSColor/Norder9/Dir3140000/Npix3145727.jpg',
+    )
   })
 
   it('preserves survey properties and their full copyright text', async () => {
@@ -78,7 +89,8 @@ describe('DSS2 persistent survey cache', () => {
 
     const cache = createSurveyCache({
       directory: await directory(),
-      fetch: async () => new Response(text, { headers: { 'content-type': 'text/plain; charset=utf-8' } }),
+      fetch: async () =>
+        new Response(text, { headers: { 'content-type': 'text/plain; charset=utf-8' } }),
     })
 
     const result = await cache.get('properties')
@@ -90,10 +102,15 @@ describe('DSS2 persistent survey cache', () => {
   it('does not cache upstream errors, wrong media, invalid images or oversized streams', async () => {
     const location = await directory()
 
-    const fetch = vi.fn<typeof globalThis.fetch>()
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
       .mockResolvedValueOnce(new Response('unavailable', { status: 503 }))
-      .mockResolvedValueOnce(new Response('<html>bad</html>', { headers: { 'content-type': 'text/html' } }))
-      .mockResolvedValueOnce(new Response('not a JPEG', { headers: { 'content-type': 'image/jpeg' } }))
+      .mockResolvedValueOnce(
+        new Response('<html>bad</html>', { headers: { 'content-type': 'text/html' } }),
+      )
+      .mockResolvedValueOnce(
+        new Response('not a JPEG', { headers: { 'content-type': 'image/jpeg' } }),
+      )
       .mockResolvedValueOnce(response(2000))
       .mockResolvedValueOnce(response())
 
@@ -101,7 +118,7 @@ describe('DSS2 persistent survey cache', () => {
 
     for (let attempt = 0; attempt < 4; attempt++) {
       await expect(cache.get('Norder0/Dir0/Npix1.jpg')).rejects.toThrow()
-      expect((await readdir(location)).filter((name) => name.endsWith('.cache'))).toEqual([])
+      expect((await readdir(location)).filter(name => name.endsWith('.cache'))).toEqual([])
     }
 
     expect((await cache.get('Norder0/Dir0/Npix1.jpg')).body).toEqual(jpeg())
@@ -115,7 +132,11 @@ describe('DSS2 persistent survey cache', () => {
     await cache.get('Norder0/Dir0/Npix1.jpg')
     await cache.get('Norder0/Dir0/Npix2.jpg')
     const files = await readdir(location)
-    const sizes = await Promise.all(files.map(async (name) => (await stat(join(location, name))).size))
+
+    const sizes = await Promise.all(
+      files.map(async name => (await stat(join(location, name))).size),
+    )
+
     expect(sizes.reduce((sum, size) => sum + size, 0)).toBeLessThanOrEqual(2048)
     expect(files).toHaveLength(1)
     await cache.get('Norder0/Dir0/Npix2.jpg')
@@ -127,9 +148,14 @@ describe('DSS2 persistent survey cache', () => {
   it('aborts a stalled upstream request after the deadline without caching it', async () => {
     const location = await directory()
 
-    const fetch = vi.fn<typeof globalThis.fetch>((_url, options) => new Promise((_resolve, reject) => {
-      options?.signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true })
-    }))
+    const fetch = vi.fn<typeof globalThis.fetch>(
+      (_url, options) =>
+        new Promise((_resolve, reject) => {
+          options?.signal?.addEventListener('abort', () => reject(new Error('aborted')), {
+            once: true,
+          })
+        }),
+    )
 
     const cache = createSurveyCache({ directory: location, fetch })
     vi.useFakeTimers()
@@ -148,7 +174,9 @@ describe('DSS2 persistent survey cache', () => {
     await cache.thumbnail({ raDegrees: 12, decDegrees: -2, fovDegrees: 0.5 })
     expect(fetch).toHaveBeenCalledTimes(1)
     const url = new URL(String(fetch.mock.calls[0]?.[0]))
-    expect(url.origin + url.pathname).toBe('https://alasky.cds.unistra.fr/hips-image-services/hips2fits')
+    expect(url.origin + url.pathname).toBe(
+      'https://alasky.cds.unistra.fr/hips-image-services/hips2fits',
+    )
     expect(Object.fromEntries(url.searchParams)).toMatchObject({
       hips: 'CDS/P/DSS2/color',
       ra: '12',

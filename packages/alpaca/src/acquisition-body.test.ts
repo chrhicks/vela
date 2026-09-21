@@ -75,8 +75,17 @@ function cameraRig() {
       case 'imagearray':
         state.imageReads++
 
-        return Response.json({ ...envelope, Type: 2, Rank: 2, Value: [[1, 3], [2, 4]] })
-      default: throw new Error(`Unexpected request ${String(input)}`)
+        return Response.json({
+          ...envelope,
+          Type: 2,
+          Rank: 2,
+          Value: [
+            [1, 3],
+            [2, 4],
+          ],
+        })
+      default:
+        throw new Error(`Unexpected request ${String(input)}`)
     }
 
     return Response.json({ ...envelope, Value })
@@ -96,62 +105,82 @@ function cameraRig() {
 function pendingBody(contentType: string) {
   let stream!: ReadableStreamDefaultController<Uint8Array>
   let reading!: () => void
-  const started = new Promise<void>(resolve => { reading = resolve })
 
-  const response = new Response(new ReadableStream<Uint8Array>({
-    start(controller) { stream = controller },
-    pull() { reading() },
-  }, { highWaterMark: 0 }), { headers: { 'content-type': contentType } })
+  const started = new Promise<void>(resolve => {
+    reading = resolve
+  })
+
+  const response = new Response(
+    new ReadableStream<Uint8Array>(
+      {
+        start(controller) {
+          stream = controller
+        },
+        pull() {
+          reading()
+        },
+      },
+      { highWaterMark: 0 },
+    ),
+    { headers: { 'content-type': contentType } },
+  )
 
   return { response, stream, started }
 }
 
-it.each(['application/json', 'application/imagebytes'])('recovers the same exposure after a post-header %s image stream termination', async contentType => {
-  const rig = cameraRig()
-  const body = pendingBody(contentType)
-  let imageRequests = 0
-  const readStates: string[] = []
+it.each(['application/json', 'application/imagebytes'])(
+  'recovers the same exposure after a post-header %s image stream termination',
+  async contentType => {
+    const rig = cameraRig()
+    const body = pendingBody(contentType)
+    let imageRequests = 0
+    const readStates: string[] = []
 
-  const fetch: typeof globalThis.fetch = async (input, init) => {
-    if (String(input).endsWith('/imagearray')) {
-      imageRequests++
+    const fetch: typeof globalThis.fetch = async (input, init) => {
+      if (String(input).endsWith('/imagearray')) {
+        imageRequests++
 
-      if (imageRequests === 1) return body.response
+        if (imageRequests === 1) return body.response
+      }
+
+      return rig.fetch(input, init)
     }
 
-    return rig.fetch(input, init)
-  }
+    const acquisition = createAlpacaAcquisition({
+      baseUrl: 'http://fake',
+      fetch,
+      readRetryIntervalMs: 10,
+    })
 
-  const acquisition = createAlpacaAcquisition({ baseUrl: 'http://fake', fetch, readRetryIntervalMs: 10 })
+    const result = acquisition.capture({
+      cameraId: 'camera-id',
+      exposureSeconds: 1,
+      onReadState: state => {
+        readStates.push(state)
+        expect(rig.state.starts).toBe(1)
+        expect(rig.state.aborts).toBe(0)
+      },
+    })
 
-  const result = acquisition.capture({
-    cameraId: 'camera-id',
-    exposureSeconds: 1,
-    onReadState: state => {
-      readStates.push(state)
-      expect(rig.state.starts).toBe(1)
-      expect(rig.state.aborts).toBe(0)
-    },
-  })
-
-  await vi.waitFor(() => expect(rig.state.starts).toBe(1))
-  rig.complete()
-  await body.started
-  const originalTimestamp = rig.state.stamp
-  expect(readStates).toEqual([])
-  expect(rig.state.starts).toBe(1)
-  expect(rig.state.aborts).toBe(0)
-  body.stream.enqueue(new Uint8Array([1, 0]))
-  body.stream.error(new TypeError('terminated', { cause: new Error('ECONNRESET') }))
-  const frame = await result
-  expect(readStates).toEqual(['retrying', 'current'])
-  expect(frame.capturedAt).toBe(`${originalTimestamp}Z`)
-  expect(frame.capturedAtSource).toBeUndefined()
-  expect(Array.from(frame.pixels)).toEqual([1, 2, 3, 4])
-  expect(imageRequests).toBe(2)
-  expect(rig.state.starts).toBe(1)
-  expect(rig.state.aborts).toBe(0)
-})
+    await vi.waitFor(() => expect(rig.state.starts).toBe(1))
+    rig.complete()
+    await body.started
+    const originalTimestamp = rig.state.stamp
+    expect(readStates).toEqual([])
+    expect(rig.state.starts).toBe(1)
+    expect(rig.state.aborts).toBe(0)
+    body.stream.enqueue(new Uint8Array([1, 0]))
+    body.stream.error(new TypeError('terminated', { cause: new Error('ECONNRESET') }))
+    const frame = await result
+    expect(readStates).toEqual(['retrying', 'current'])
+    expect(frame.capturedAt).toBe(`${originalTimestamp}Z`)
+    expect(frame.capturedAtSource).toBeUndefined()
+    expect(Array.from(frame.pixels)).toEqual([1, 2, 3, 4])
+    expect(imageRequests).toBe(2)
+    expect(rig.state.starts).toBe(1)
+    expect(rig.state.aborts).toBe(0)
+  },
+)
 
 it('does not replay StartExposure or classify a terminated acknowledgement body as a retryable capture', async () => {
   const rig = cameraRig()
@@ -165,8 +194,16 @@ it('does not replay StartExposure or classify a terminated acknowledgement body 
     return String(input).endsWith('/startexposure') ? body.response : response
   }
 
-  const acquisition = createAlpacaAcquisition({ baseUrl: 'http://fake', fetch, readRetryIntervalMs: 10 })
-  const result = acquisition.capture({ cameraId: 'camera-id', exposureSeconds: 1, onReadState }).catch(error => error)
+  const acquisition = createAlpacaAcquisition({
+    baseUrl: 'http://fake',
+    fetch,
+    readRetryIntervalMs: 10,
+  })
+
+  const result = acquisition
+    .capture({ cameraId: 'camera-id', exposureSeconds: 1, onReadState })
+    .catch(error => error)
+
   await body.started
   expect(rig.state.starts).toBe(1)
   expect(rig.state.exposing).toBe(true)

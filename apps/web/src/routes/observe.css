@@ -16,19 +16,19 @@
 .vela-observe-hero small,
 .vela-observe-section-heading small {
   color: var(--vela-text-muted);
-  font-size: .74em;
+  font-size: 0.74em;
 }
 
 .vela-observe-entry h2 {
-  margin: calc(var(--vela-space) * .8) 0 0;
+  margin: calc(var(--vela-space) * 0.8) 0 0;
   font-size: 1.22em;
-  letter-spacing: -.02em;
+  letter-spacing: -0.02em;
 }
 
 .vela-observe-entry p {
   margin: calc(var(--vela-space) * 1.2) 0 0;
   color: var(--vela-text-muted);
-  font-size: .8em;
+  font-size: 0.8em;
   line-height: 1.55;
 }
 
@@ -65,13 +65,13 @@
   margin: calc(var(--vela-space) * 1.1) 0 0;
   font-size: clamp(1.75em, 4.4vw, 2.55em);
   font-weight: 740;
-  letter-spacing: -.04em;
+  letter-spacing: -0.04em;
 }
 
 .vela-observe-hero p {
   margin: calc(var(--vela-space) * 1.25) 0 0;
   color: var(--vela-text-muted);
-  font-size: .78em;
+  font-size: 0.78em;
 }
 
 .vela-observe-section-heading {
@@ -84,19 +84,19 @@
 }
 
 .vela-observe-section-heading h2 {
-  margin: calc(var(--vela-space) * .75) 0 0;
+  margin: calc(var(--vela-space) * 0.75) 0 0;
   font-size: 1.15em;
-  letter-spacing: -.02em;
+  letter-spacing: -0.02em;
 }
 
 .vela-observe-section-heading > span {
   color: var(--vela-text-muted);
-  font-size: .7em;
+  font-size: 0.7em;
 }
 
 .vela-observe-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.45fr) minmax(16rem, .72fr);
+  grid-template-columns: minmax(0, 1.45fr) minmax(16rem, 0.72fr);
   align-items: start;
   gap: calc(var(--vela-space) * 3);
 }
@@ -121,7 +121,7 @@
 .vela-observe-summary h3 {
   margin: 0;
   font-size: 1.08em;
-  letter-spacing: -.015em;
+  letter-spacing: -0.015em;
 }
 
 .vela-observe-summary h3:focus {
@@ -133,7 +133,7 @@
 .vela-observe p {
   margin: 0;
   color: var(--vela-text-muted);
-  font-size: .8em;
+  font-size: 0.8em;
   line-height: 1.55;
 }
 
@@ -152,11 +152,20 @@
   font-size: 1.35em;
 }
 
-.vela-observe-readiness[data-tone="positive"] .vela-observe-mark { color: var(--vela-positive); }
-.vela-observe-readiness[data-tone="danger"] .vela-observe-mark { color: var(--vela-danger); }
-.vela-observe-readiness[data-tone="accent"] .vela-observe-mark { color: var(--vela-accent); }
+.vela-observe-readiness[data-tone='positive'] .vela-observe-mark {
+  color: var(--vela-positive);
+}
+.vela-observe-readiness[data-tone='danger'] .vela-observe-mark {
+  color: var(--vela-danger);
+}
+.vela-observe-readiness[data-tone='accent'] .vela-observe-mark {
+  color: var(--vela-accent);
+}
 
-.vela-observe-mark svg { width: 1.7rem; height: 1.7rem; }
+.vela-observe-mark svg {
+  width: 1.7rem;
+  height: 1.7rem;
+}
 .vela-observe-spinner {
   width: 1.4rem;
   height: 1.4rem;
@@ -174,7 +183,10 @@
   border-top: var(--vela-border-width) solid var(--vela-line);
 }
 
-.vela-observe-result h4 { margin: 0 0 calc(var(--vela-space) * 2); font-size: .8em; }
+.vela-observe-result h4 {
+  margin: 0 0 calc(var(--vela-space) * 2);
+  font-size: 0.8em;
+}
 .vela-observe-result dl {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -186,14 +198,21 @@
   padding: calc(var(--vela-space) * 2.5);
   border-right: var(--vela-border-width) solid var(--vela-line);
 }
-.vela-observe-result dl > div:last-child { border-right: 0; }
-.vela-observe dt { color: var(--vela-text-muted); font-size: .7em; }
+.vela-observe-result dl > div:last-child {
+  border-right: 0;
+}
+.vela-observe dt {
+  color: var(--vela-text-muted);
+  font-size: 0.7em;
+}
 .vela-observe dd {
   margin: var(--vela-space) 0 0;
-  font-size: .8em;
+  font-size: 0.8em;
   overflow-wrap: anywhere;
 }
-.vela-observe-facts dl { margin: 0; }
+.vela-observe-facts dl {
+  margin: 0;
+}
 .vela-observe-facts dl > div {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -202,37 +221,77 @@
   padding: calc(var(--vela-space) * 2.3) 0;
   border-bottom: var(--vela-border-width) solid var(--vela-line);
 }
-.vela-observe-facts dl > div:first-child { padding-top: 0; }
-.vela-observe-facts dd { text-align: right; margin: 0; }
-.vela-observe .vela-observe-warning { color: var(--vela-warning); }
+.vela-observe-facts dl > div:first-child {
+  padding-top: 0;
+}
+.vela-observe-facts dd {
+  text-align: right;
+  margin: 0;
+}
+.vela-observe .vela-observe-warning {
+  color: var(--vela-warning);
+}
 
-@keyframes vela-observe-spin { to { transform: rotate(360deg); } }
+@keyframes vela-observe-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 
 @media (max-width: 47rem) {
-  .vela-observe-grid { grid-template-columns: 1fr; }
-  .vela-observe-entry > .vela-panel__body { grid-template-columns: auto minmax(0, 1fr); }
-  .vela-observe-entry .vela-button { grid-column: 2; justify-self: start; }
+  .vela-observe-grid {
+    grid-template-columns: 1fr;
+  }
+  .vela-observe-entry > .vela-panel__body {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .vela-observe-entry .vela-button {
+    grid-column: 2;
+    justify-self: start;
+  }
 }
 
 @media (max-width: 31rem) {
   .vela-observe-entry > .vela-panel__body,
-  .vela-observe-readiness > .vela-panel__body { padding: calc(var(--vela-space) * 4); }
+  .vela-observe-readiness > .vela-panel__body {
+    padding: calc(var(--vela-space) * 4);
+  }
   .vela-observe-entry > .vela-panel__body,
   .vela-observe-summary,
-  .vela-observe-result dl { grid-template-columns: 1fr; }
-  .vela-observe-entry .vela-button { grid-column: auto; width: 100%; }
-  .vela-observe-entry-mark { width: 3.2rem; height: 3.2rem; }
+  .vela-observe-result dl {
+    grid-template-columns: 1fr;
+  }
+  .vela-observe-entry .vela-button {
+    grid-column: auto;
+    width: 100%;
+  }
+  .vela-observe-entry-mark {
+    width: 3.2rem;
+    height: 3.2rem;
+  }
   .vela-observe-hero {
     grid-template-columns: auto minmax(0, 1fr);
     align-items: start;
     gap: calc(var(--vela-space) * 2.5);
   }
-  .vela-observe-hero > .vela-badge { grid-column: 1 / -1; justify-self: start; }
-  .vela-observe-actions > button { width: 100%; }
-  .vela-observe-result dl > div { border-right: 0; border-bottom: var(--vela-border-width) solid var(--vela-line); }
-  .vela-observe-result dl > div:last-child { border-bottom: 0; }
+  .vela-observe-hero > .vela-badge {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+  .vela-observe-actions > button {
+    width: 100%;
+  }
+  .vela-observe-result dl > div {
+    border-right: 0;
+    border-bottom: var(--vela-border-width) solid var(--vela-line);
+  }
+  .vela-observe-result dl > div:last-child {
+    border-bottom: 0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .vela-observe-spinner { animation: none; }
+  .vela-observe-spinner {
+    animation: none;
+  }
 }

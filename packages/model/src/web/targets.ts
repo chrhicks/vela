@@ -34,7 +34,7 @@ export interface TargetSkyPath {
   }>
   currentAltitudeDegrees: number
   highestAltitudeDegrees: number
-  aboveHorizonDuringDarkness: Array<{ startsAt: string, endsAt: string }>
+  aboveHorizonDuringDarkness: Array<{ startsAt: string; endsAt: string }>
 }
 
 export interface TargetsView {
@@ -42,7 +42,7 @@ export interface TargetsView {
   rigName: string
   targets: TargetView[]
   total: number
-  site: { latitudeDegrees: number, longitudeDegrees: number } | null
+  site: { latitudeDegrees: number; longitudeDegrees: number } | null
   siteUnavailableReason: string | null
 }
 
@@ -85,7 +85,7 @@ export interface TargetDiscoveryView {
     endsAt: string
     kind: 'current-night' | 'upcoming-night' | 'polar-night'
   } | null
-  site: { latitudeDegrees: number, longitudeDegrees: number } | null
+  site: { latitudeDegrees: number; longitudeDegrees: number } | null
   siteUnavailableReason: string | null
   query: string
   category: TargetCategory | 'all'
@@ -151,13 +151,15 @@ export interface FramingView {
   centering: FramingCentering | null
   desired: TargetPosition | null
   targetId: string | null
-  actual: (TargetPosition & {
-    checkId: string
-    capturedAt: string
-    corners: TargetPosition[]
-    rotationDegrees: number
-    offsetArcminutes: number
-  }) | null
+  actual:
+    | (TargetPosition & {
+        checkId: string
+        capturedAt: string
+        corners: TargetPosition[]
+        rotationDegrees: number
+        offsetArcminutes: number
+      })
+    | null
   error: string | null
   exposureSeconds: number
   /** A current solve can inform a user-requested correction to the edited composition. */

@@ -14,19 +14,25 @@ export function bayerPixel(
   if (x > 0 && y > 0 && x < width - 1 && y < height - 1) {
     const i = y * width + x
     const center = pixels[i]!
-    const own = pattern[(y % 2) * 2 + x % 2]
+    const own = pattern[(y % 2) * 2 + (x % 2)]
 
     if (own === 'g') {
       const horizontal = (pixels[i - 1]! + pixels[i + 1]!) / 2
       const vertical = (pixels[i - width]! + pixels[i + width]!) / 2
 
-      return pattern[(y % 2) * 2 + (x + 1) % 2] === 'r'
+      return pattern[(y % 2) * 2 + ((x + 1) % 2)] === 'r'
         ? [horizontal, center, vertical]
         : [vertical, center, horizontal]
     }
 
     const green = (pixels[i - width]! + pixels[i - 1]! + pixels[i + 1]! + pixels[i + width]!) / 4
-    const opposite = (pixels[i - width - 1]! + pixels[i - width + 1]! + pixels[i + width - 1]! + pixels[i + width + 1]!) / 4
+
+    const opposite =
+      (pixels[i - width - 1]! +
+        pixels[i - width + 1]! +
+        pixels[i + width - 1]! +
+        pixels[i + width + 1]!) /
+      4
 
     return own === 'r' ? [center, green, opposite] : [opposite, green, center]
   }
@@ -34,7 +40,7 @@ export function bayerPixel(
   // Border pixels average only the neighbors that exist.
   const values = [0, 0, 0]
   const counts = [0, 0, 0]
-  const channelAt = (px: number, py: number) => 'rgb'.indexOf(pattern[(py % 2) * 2 + px % 2]!)
+  const channelAt = (px: number, py: number) => 'rgb'.indexOf(pattern[(py % 2) * 2 + (px % 2)]!)
   const ownChannel = channelAt(x, y)
   values[ownChannel] = pixels[y * width + x]!
   counts[ownChannel] = 1

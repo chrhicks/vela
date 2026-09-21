@@ -32,7 +32,7 @@ export interface PlateWcs {
 
 export type SolveResult =
   | { status: 'no-solution' }
-  | ({ status: 'solved', capturedAt: string, wcs: PlateWcs } & SkyPosition)
+  | ({ status: 'solved'; capturedAt: string; wcs: PlateWcs } & SkyPosition)
 
 export interface PlateSolver {
   solve(frame: MonoFrame, hint: SkyPosition, signal: AbortSignal): Promise<SolveResult>
@@ -52,141 +52,170 @@ export function createAstapSolver(config: {
   const timeout = config.timeoutMs ?? 30_000
 
   if (
-    !config.executable.trim()
-    || !config.catalogPath.trim()
-    || !Number.isFinite(config.fieldHeightDegrees)
-    || config.fieldHeightDegrees <= 0
-    || config.fieldHeightDegrees > 90
-    || !Number.isFinite(timeout)
-    || timeout <= 0
-    || timeout > 120_000
-  ) throw new Error('Invalid ASTAP configuration')
+    !config.executable.trim() ||
+    !config.catalogPath.trim() ||
+    !Number.isFinite(config.fieldHeightDegrees) ||
+    config.fieldHeightDegrees <= 0 ||
+    config.fieldHeightDegrees > 90 ||
+    !Number.isFinite(timeout) ||
+    timeout <= 0 ||
+    timeout > 120_000
+  )
+    throw new Error('Invalid ASTAP configuration')
 
   return {
     async solve(frame, hint, signal) {
-      return trace.getTracer('vela.plate-solving').startActiveSpan('astap.solve', {
-        attributes: {
-          'astap.hint.ra_degrees': hint.raDegrees,
-          'astap.hint.dec_degrees': hint.decDegrees,
-          'astap.field_height_degrees': config.fieldHeightDegrees,
-          'astap.timeout_ms': timeout,
-          'image.width': frame.width,
-          'image.height': frame.height,
-          'image.captured_at': frame.capturedAt,
+      return trace.getTracer('vela.plate-solving').startActiveSpan(
+        'astap.solve',
+        {
+          attributes: {
+            'astap.hint.ra_degrees': hint.raDegrees,
+            'astap.hint.dec_degrees': hint.decDegrees,
+            'astap.field_height_degrees': config.fieldHeightDegrees,
+            'astap.timeout_ms': timeout,
+            'image.width': frame.width,
+            'image.height': frame.height,
+            'image.captured_at': frame.capturedAt,
+          },
         },
-      }, async (span): Promise<SolveResult> => {
-        try {
-          const deadline = performance.now() + timeout
-          signal.throwIfAborted()
-          validatePosition(hint)
-          const image = await encodeCaptureFits(frame, { exposureSeconds: 0, cameraName: 'Plate-solving exposure' })
-          const directory = await mkdtemp(join(tmpdir(), 'vela-astap-'))
-
+        async (span): Promise<SolveResult> => {
           try {
-            const path = join(directory, 'exposure.fits')
-            await writeFile(path, image)
+            const deadline = performance.now() + timeout
             signal.throwIfAborted()
+            validatePosition(hint)
 
-            // Start near the hint, then widen to the full celestial sphere. All
-            // attempts use the same exposure and share one elapsed-time budget.
-            for (const radius of [10, 15, 30, 60, 120, 180]) {
-              signal.throwIfAborted()
-              const remainingMs = Math.floor(deadline - performance.now())
-
-              if (remainingMs <= 0) throw new Error('ASTAP timed out')
-
-              const result = await trace.getTracer('vela.plate-solving').startActiveSpan('astap.attempt', {
-                attributes: { 'astap.search_radius_degrees': radius, 'astap.timeout_ms': remainingMs },
-              }, async (attempt): Promise<SolveResult | null> => {
-                try {
-                  const code = await runAstap(
-                    executable,
-                    [
-                      '-f', path,
-                      '-d', catalog,
-                      '-fov', String(config.fieldHeightDegrees),
-                      '-ra', String(hint.raDegrees / 15),
-                      '-spd', String(hint.decDegrees + 90),
-                      '-r', String(radius),
-                      '-s', '1000',
-                      ...(frame.color?.kind === 'bayer' ? ['-check', 'y'] : []),
-                    ],
-                    signal,
-                    remainingMs,
-                    attempt,
-                  )
-
-                  signal.throwIfAborted()
-
-                  if (performance.now() >= deadline) throw new Error('ASTAP timed out')
-
-                  if (code === 1 || code === 2) {
-                    const outcome = code === 1 ? 'no-match' : 'insufficient-stars'
-                    attempt.setAttribute('astap.outcome', outcome)
-                    span.setAttribute('astap.outcome', outcome)
-
-                    // A wider catalog search cannot add stars to this exposure.
-                    return code === 1 ? null : { status: 'no-solution' }
-                  }
-
-                  if (code !== 0) throw new Error(`ASTAP failed with exit code ${code}`)
-                  const wcs = parseWcs(await readFile(join(directory, 'exposure.ini'), 'utf8'), frame)
-                  signal.throwIfAborted()
-
-                  attempt.setAttribute('astap.outcome', 'solved')
-                  span.setAttribute('astap.outcome', 'solved')
-
-                  return {
-                    status: 'solved',
-                    capturedAt: frame.capturedAt,
-                    raDegrees: wcs.raDegrees,
-                    decDegrees: wcs.decDegrees,
-                    wcs,
-                  }
-                } catch (error) {
-                  attempt.setAttribute('astap.outcome', signal.aborted ? 'cancelled' : 'error')
-
-                  if (signal.aborted) attempt.setAttribute('operation.cancelled', true)
-                  else {
-                    attempt.setStatus({
-                      code: SpanStatusCode.ERROR,
-                      message: error instanceof Error ? error.message : 'ASTAP failed',
-                    })
-
-                    if (error instanceof Error) attempt.recordException(error)
-                  }
-
-                  throw error
-                } finally {
-                  attempt.end()
-                }
-              })
-
-              if (result) return result
-            }
-
-            return { status: 'no-solution' }
-          } finally {
-            await rm(directory, { recursive: true, force: true })
-          }
-        } catch (error) {
-          span.setAttribute('astap.outcome', signal.aborted ? 'cancelled' : 'error')
-
-          if (signal.aborted) span.setAttribute('operation.cancelled', true)
-          else {
-            span.setStatus({
-              code: SpanStatusCode.ERROR,
-              message: error instanceof Error ? error.message : 'ASTAP failed',
+            const image = await encodeCaptureFits(frame, {
+              exposureSeconds: 0,
+              cameraName: 'Plate-solving exposure',
             })
 
-            if (error instanceof Error) span.recordException(error)
-          }
+            const directory = await mkdtemp(join(tmpdir(), 'vela-astap-'))
 
-          throw error
-        } finally {
-          span.end()
-        }
-      })
+            try {
+              const path = join(directory, 'exposure.fits')
+              await writeFile(path, image)
+              signal.throwIfAborted()
+
+              // Start near the hint, then widen to the full celestial sphere. All
+              // attempts use the same exposure and share one elapsed-time budget.
+              for (const radius of [10, 15, 30, 60, 120, 180]) {
+                signal.throwIfAborted()
+                const remainingMs = Math.floor(deadline - performance.now())
+
+                if (remainingMs <= 0) throw new Error('ASTAP timed out')
+
+                const result = await trace.getTracer('vela.plate-solving').startActiveSpan(
+                  'astap.attempt',
+                  {
+                    attributes: {
+                      'astap.search_radius_degrees': radius,
+                      'astap.timeout_ms': remainingMs,
+                    },
+                  },
+                  async (attempt): Promise<SolveResult | null> => {
+                    try {
+                      const code = await runAstap(
+                        executable,
+                        [
+                          '-f',
+                          path,
+                          '-d',
+                          catalog,
+                          '-fov',
+                          String(config.fieldHeightDegrees),
+                          '-ra',
+                          String(hint.raDegrees / 15),
+                          '-spd',
+                          String(hint.decDegrees + 90),
+                          '-r',
+                          String(radius),
+                          '-s',
+                          '1000',
+                          ...(frame.color?.kind === 'bayer' ? ['-check', 'y'] : []),
+                        ],
+                        signal,
+                        remainingMs,
+                        attempt,
+                      )
+
+                      signal.throwIfAborted()
+
+                      if (performance.now() >= deadline) throw new Error('ASTAP timed out')
+
+                      if (code === 1 || code === 2) {
+                        const outcome = code === 1 ? 'no-match' : 'insufficient-stars'
+                        attempt.setAttribute('astap.outcome', outcome)
+                        span.setAttribute('astap.outcome', outcome)
+
+                        // A wider catalog search cannot add stars to this exposure.
+                        return code === 1 ? null : { status: 'no-solution' }
+                      }
+
+                      if (code !== 0) throw new Error(`ASTAP failed with exit code ${code}`)
+
+                      const wcs = parseWcs(
+                        await readFile(join(directory, 'exposure.ini'), 'utf8'),
+                        frame,
+                      )
+
+                      signal.throwIfAborted()
+
+                      attempt.setAttribute('astap.outcome', 'solved')
+                      span.setAttribute('astap.outcome', 'solved')
+
+                      return {
+                        status: 'solved',
+                        capturedAt: frame.capturedAt,
+                        raDegrees: wcs.raDegrees,
+                        decDegrees: wcs.decDegrees,
+                        wcs,
+                      }
+                    } catch (error) {
+                      attempt.setAttribute('astap.outcome', signal.aborted ? 'cancelled' : 'error')
+
+                      if (signal.aborted) attempt.setAttribute('operation.cancelled', true)
+                      else {
+                        attempt.setStatus({
+                          code: SpanStatusCode.ERROR,
+                          message: error instanceof Error ? error.message : 'ASTAP failed',
+                        })
+
+                        if (error instanceof Error) attempt.recordException(error)
+                      }
+
+                      throw error
+                    } finally {
+                      attempt.end()
+                    }
+                  },
+                )
+
+                if (result) return result
+              }
+
+              return { status: 'no-solution' }
+            } finally {
+              await rm(directory, { recursive: true, force: true })
+            }
+          } catch (error) {
+            span.setAttribute('astap.outcome', signal.aborted ? 'cancelled' : 'error')
+
+            if (signal.aborted) span.setAttribute('operation.cancelled', true)
+            else {
+              span.setStatus({
+                code: SpanStatusCode.ERROR,
+                message: error instanceof Error ? error.message : 'ASTAP failed',
+              })
+
+              if (error instanceof Error) span.recordException(error)
+            }
+
+            throw error
+          } finally {
+            span.end()
+          }
+        },
+      )
     },
   }
 }
@@ -203,26 +232,35 @@ function runAstap(
     // before callback/cleanup; cancellation cannot leave a writer in the tempdir.
     let cancelled = false
 
-    const child = execFile(executable, args, { timeout, killSignal: 'SIGKILL', maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
-      signal.removeEventListener('abort', abort)
-      span.setAttributes({
-        'astap.stdout': stdout.slice(-4096),
-        'astap.stderr': stderr.slice(-4096),
-        'astap.stdout.truncated': stdout.length > 4096,
-        'astap.stderr.truncated': stderr.length > 4096,
-      })
-      const exitCode = z.number().safeParse(error?.code)
+    const child = execFile(
+      executable,
+      args,
+      { timeout, killSignal: 'SIGKILL', maxBuffer: 1024 * 1024 },
+      (error, stdout, stderr) => {
+        signal.removeEventListener('abort', abort)
+        span.setAttributes({
+          'astap.stdout': stdout.slice(-4096),
+          'astap.stderr': stderr.slice(-4096),
+          'astap.stdout.truncated': stdout.length > 4096,
+          'astap.stderr.truncated': stderr.length > 4096,
+        })
+        const exitCode = z.number().safeParse(error?.code)
 
-      if (!error || exitCode.success)
-        span.setAttribute('astap.exit_code', error && exitCode.success ? exitCode.data : 0)
+        if (!error || exitCode.success)
+          span.setAttribute('astap.exit_code', error && exitCode.success ? exitCode.data : 0)
 
-      if (cancelled) return reject(signal.reason ?? new Error('Plate solving cancelled'))
+        if (cancelled) return reject(signal.reason ?? new Error('Plate solving cancelled'))
 
-      if (!error) return resolveCode(0)
+        if (!error) return resolveCode(0)
 
-      if (!error.killed && exitCode.success) return resolveCode(exitCode.data)
-      reject(new Error(error.killed ? 'ASTAP timed out' : `ASTAP could not run: ${error.message}`, { cause: error }))
-    })
+        if (!error.killed && exitCode.success) return resolveCode(exitCode.data)
+        reject(
+          new Error(error.killed ? 'ASTAP timed out' : `ASTAP could not run: ${error.message}`, {
+            cause: error,
+          }),
+        )
+      },
+    )
 
     const abort = () => {
       cancelled = true
@@ -235,7 +273,7 @@ function runAstap(
   })
 }
 
-function parseWcs(text: string, image: { width: number, height: number }): PlateWcs {
+function parseWcs(text: string, image: { width: number; height: number }): PlateWcs {
   const values = new Map<string, string>()
 
   for (const line of text.split(/\r?\n/)) {
@@ -256,7 +294,8 @@ function parseWcs(text: string, image: { width: number, height: number }): Plate
     return value
   }
 
-  if (values.get('PLTSOLVD') !== 'T') throw new Error('ASTAP success did not contain a solved plate')
+  if (values.get('PLTSOLVD') !== 'T')
+    throw new Error('ASTAP success did not contain a solved plate')
 
   const wcs: PlateWcs = {
     width: image.width,
@@ -271,26 +310,34 @@ function parseWcs(text: string, image: { width: number, height: number }): Plate
   validatePosition(wcs)
 
   if (
-    Math.abs(wcs.referenceX - (image.width + 1) / 2) > 1e-6
-    || Math.abs(wcs.referenceY - (image.height + 1) / 2) > 1e-6
-    || Math.abs(wcs.cd[0] * wcs.cd[3] - wcs.cd[1] * wcs.cd[2]) < 1e-15
-  ) throw new Error('Invalid ASTAP reference pixel or plate scale')
+    Math.abs(wcs.referenceX - (image.width + 1) / 2) > 1e-6 ||
+    Math.abs(wcs.referenceY - (image.height + 1) / 2) > 1e-6 ||
+    Math.abs(wcs.cd[0] * wcs.cd[3] - wcs.cd[1] * wcs.cd[2]) < 1e-15
+  )
+    throw new Error('Invalid ASTAP reference pixel or plate scale')
 
   return wcs
 }
 
 /** Project a sky position into ASTAP's FITS WCS, in zero-based image pixels. */
-export function projectSky(wcs: PlateWcs, position: SkyPosition): { x: number, y: number } | null {
+export function projectSky(wcs: PlateWcs, position: SkyPosition): { x: number; y: number } | null {
   validatePosition(position)
   const radians = Math.PI / 180
   const delta = (position.raDegrees - wcs.raDegrees) * radians
   const dec = position.decDegrees * radians
   const center = wcs.decDegrees * radians
-  const depth = Math.sin(center) * Math.sin(dec) + Math.cos(center) * Math.cos(dec) * Math.cos(delta)
+
+  const depth =
+    Math.sin(center) * Math.sin(dec) + Math.cos(center) * Math.cos(dec) * Math.cos(delta)
 
   if (depth <= 0) return null
-  const east = Math.cos(dec) * Math.sin(delta) / depth / radians
-  const north = (Math.cos(center) * Math.sin(dec) - Math.sin(center) * Math.cos(dec) * Math.cos(delta)) / depth / radians
+  const east = (Math.cos(dec) * Math.sin(delta)) / depth / radians
+
+  const north =
+    (Math.cos(center) * Math.sin(dec) - Math.sin(center) * Math.cos(dec) * Math.cos(delta)) /
+    depth /
+    radians
+
   const [a, b, c, d] = wcs.cd
   const determinant = a * d - b * c
 
@@ -302,10 +349,11 @@ export function projectSky(wcs: PlateWcs, position: SkyPosition): { x: number, y
 
 function validatePosition(position: SkyPosition) {
   if (
-    !Number.isFinite(position.raDegrees)
-    || position.raDegrees < 0
-    || position.raDegrees >= 360
-    || !Number.isFinite(position.decDegrees)
-    || Math.abs(position.decDegrees) > 90
-  ) throw new Error('Invalid plate coordinates')
+    !Number.isFinite(position.raDegrees) ||
+    position.raDegrees < 0 ||
+    position.raDegrees >= 360 ||
+    !Number.isFinite(position.decDegrees) ||
+    Math.abs(position.decDegrees) > 90
+  )
+    throw new Error('Invalid plate coordinates')
 }

@@ -41,16 +41,17 @@ describe('rig geometry', () => {
       expect(dot(pose.right, pose.right)).toBeCloseTo(1, 12)
     }
 
-    expect(cameraPose({ ...setup, raAxisDegrees: 40 }).up)
-      .not.toEqual(cameraPose({ ...setup, raAxisDegrees: 0 }).up)
+    expect(cameraPose({ ...setup, raAxisDegrees: 40 }).up).not.toEqual(
+      cameraPose({ ...setup, raAxisDegrees: 0 }).up,
+    )
   })
 
   it('applies altitude upward and azimuth eastward in local horizon coordinates', () => {
-    const latitude = 40 * Math.PI / 180
+    const latitude = (40 * Math.PI) / 180
     const north: Vector = [-Math.sin(latitude), 0, Math.cos(latitude)]
     const zenith: Vector = [Math.cos(latitude), 0, Math.sin(latitude)]
     const axis = polarAxis({ ...position, altitudeErrorDegrees: 1, azimuthErrorDegrees: 2 })
-    expect(Math.asin(dot(axis, zenith)) * 180 / Math.PI).toBeCloseTo(41, 10)
-    expect(Math.atan2(axis[1], dot(axis, north)) * 180 / Math.PI).toBeCloseTo(2, 10)
+    expect((Math.asin(dot(axis, zenith)) * 180) / Math.PI).toBeCloseTo(41, 10)
+    expect((Math.atan2(axis[1], dot(axis, north)) * 180) / Math.PI).toBeCloseTo(2, 10)
   })
 })

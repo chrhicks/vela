@@ -47,7 +47,9 @@ describe('capture response validation', () => {
     expect(isCaptureView({ ...view, latestImage: null }, 'rig-1')).toBe(true)
 
     for (const statistics of [null, { detectedStars: 0, medianHfrPixels: null }]) {
-      expect(isCaptureView({ ...view, latestImage: { ...view.latestImage, statistics } }, 'rig-1')).toBe(true)
+      expect(
+        isCaptureView({ ...view, latestImage: { ...view.latestImage, statistics } }, 'rig-1'),
+      ).toBe(true)
     }
   })
 
@@ -85,7 +87,9 @@ describe('capture response validation', () => {
       { capturedAt: 'yesterday' },
       { receivedAt: '2026-09-05T17:59:00.000Z' },
     ])
-      expect(isCaptureView({ ...view, latestImage: { ...view.latestImage, ...patch } }, 'rig-1')).toBe(false)
+      expect(
+        isCaptureView({ ...view, latestImage: { ...view.latestImage, ...patch } }, 'rig-1'),
+      ).toBe(false)
   })
 })
 
@@ -113,19 +117,31 @@ it('validates confirmed retention and exact same-origin download resources', () 
     expect(isSavedImage({ ...savedImage, ...patch }, 'rig-1')).toBe(false)
   }
 
-  expect(isSavedImagesView({ rigId: 'rig-1', rigName: 'Rig', images: [savedImage] }, 'rig-1')).toBe(true)
-  expect(isSavedImagesView({ rigId: 'rig-1', rigName: 'Rig', images: [savedImage, savedImage] }, 'rig-1')).toBe(false)
+  expect(isSavedImagesView({ rigId: 'rig-1', rigName: 'Rig', images: [savedImage] }, 'rig-1')).toBe(
+    true,
+  )
+  expect(
+    isSavedImagesView(
+      { rigId: 'rig-1', rigName: 'Rig', images: [savedImage, savedImage] },
+      'rig-1',
+    ),
+  ).toBe(false)
   expect(isCaptureView({ ...view, savedImageCount: null }, 'rig-1')).toBe(true)
-  expect(isCaptureView({
-    ...view,
-    cooling: {
-      state: 'off',
-      canSetTemperature: true,
-      sensorTemperatureC: 4.8,
-      setpointC: 5,
-      powerPercent: 0,
-    },
-  }, 'rig-1')).toBe(true)
+  expect(
+    isCaptureView(
+      {
+        ...view,
+        cooling: {
+          state: 'off',
+          canSetTemperature: true,
+          sensorTemperatureC: 4.8,
+          setpointC: 5,
+          powerPercent: 0,
+        },
+      },
+      'rig-1',
+    ),
+  ).toBe(true)
   expect(isCaptureView({ ...view, phase: 'saving', saveFrames: true }, 'rig-1')).toBe(true)
 
   for (const patch of [
@@ -141,11 +157,14 @@ it('validates confirmed retention and exact same-origin download resources', () 
 
 it('accepts legacy and known start sources and rejects unknown sources for live and saved images', () => {
   for (const capturedAtSource of [undefined, 'camera', 'server-estimate', 'unknown', null, 1]) {
-    const accepted = capturedAtSource === undefined
-      || capturedAtSource === 'camera'
-      || capturedAtSource === 'server-estimate'
+    const accepted =
+      capturedAtSource === undefined ||
+      capturedAtSource === 'camera' ||
+      capturedAtSource === 'server-estimate'
 
-    expect(isCaptureView({ ...view, latestImage: { ...view.latestImage, capturedAtSource } }, 'rig-1')).toBe(accepted)
+    expect(
+      isCaptureView({ ...view, latestImage: { ...view.latestImage, capturedAtSource } }, 'rig-1'),
+    ).toBe(accepted)
     expect(isSavedImage({ ...savedImage, capturedAtSource }, 'rig-1')).toBe(accepted)
   }
 })
@@ -162,7 +181,9 @@ it('pins native, fit and download to one declared renderer version and rejects m
   }
 
   expect(isSavedImage(current, 'rig-1')).toBe(true)
-  expect(isSavedImagesView({ rigId: 'rig-1', rigName: 'Rig', images: [current] }, 'rig-1')).toBe(true)
+  expect(isSavedImagesView({ rigId: 'rig-1', rigName: 'Rig', images: [current] }, 'rig-1')).toBe(
+    true,
+  )
 
   for (const patch of [
     { previewRendering: { status: 'current', version: '../preview' } },
@@ -172,5 +193,7 @@ it('pins native, fit and download to one declared renderer version and rejects m
     { imageUrl: 'https://elsewhere.example/preview' },
   ])
     expect(isSavedImage({ ...current, ...patch }, 'rig-1')).toBe(false)
-  expect(isSavedImage({ ...savedImage, previewRendering: { status: 'unavailable' } }, 'rig-1')).toBe(true)
+  expect(
+    isSavedImage({ ...savedImage, previewRendering: { status: 'unavailable' } }, 'rig-1'),
+  ).toBe(true)
 })

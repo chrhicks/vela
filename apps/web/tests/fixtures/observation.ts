@@ -31,12 +31,16 @@ export function observation(
         observedAt: now,
         ...(connected
           ? { connection: 'connected' as const, status: { availability: 'unsupported' as const } }
-          : { connection: 'disconnected' as const, status: { availability: 'unavailable' as const } }),
+          : {
+              connection: 'disconnected' as const,
+              status: { availability: 'unavailable' as const },
+            }),
       })),
     },
-    connectionPreparation: state === 'available'
-      ? { state, capabilities: ['connect-devices'] }
-      : { state, capabilities: [] },
+    connectionPreparation:
+      state === 'available'
+        ? { state, capabilities: ['connect-devices'] }
+        : { state, capabilities: [] },
   }
 }
 
@@ -55,7 +59,7 @@ export function offlineObservation() {
       ...view.rig,
       state: 'offline',
       connections: { total: 3, connected: 0, disconnected: 0, unavailable: 3 },
-      devices: view.rig.devices.map((item) => ({ ...item, connection: 'unavailable' })),
+      devices: view.rig.devices.map(item => ({ ...item, connection: 'unavailable' })),
     },
   }
 }

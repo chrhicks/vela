@@ -2,7 +2,10 @@ import type { ConnectRigDevicesResult, RigObservationView } from '@vela/model/we
 import { api } from '../../lib/api'
 import { isConnectRigDevicesResult, isRigObservationView } from './validation'
 
-export async function loadObservation(rigId: string, signal: AbortSignal): Promise<RigObservationView> {
+export async function loadObservation(
+  rigId: string,
+  signal: AbortSignal,
+): Promise<RigObservationView> {
   const value = await api(`web/rigs/${encodeURIComponent(rigId)}/observe`, { signal })
 
   if (!isRigObservationView(value) || value.rig.id !== rigId) {
@@ -12,7 +15,10 @@ export async function loadObservation(rigId: string, signal: AbortSignal): Promi
   return value
 }
 
-export async function connectDevices(rigId: string, signal: AbortSignal): Promise<ConnectRigDevicesResult> {
+export async function connectDevices(
+  rigId: string,
+  signal: AbortSignal,
+): Promise<ConnectRigDevicesResult> {
   const value = await api(`rigs/${encodeURIComponent(rigId)}/connections`, {
     method: 'POST',
     signal,

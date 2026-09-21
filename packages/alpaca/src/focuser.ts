@@ -67,8 +67,10 @@ export function createAlpacaFocuser({
     const devices = await client.configuredDevices(signal)
     rejectDuplicateDeviceIds(devices)
 
-    const found = devices.find(candidate =>
-      stableDeviceId(candidate) === focuserId && candidate.DeviceType.toLowerCase() === 'focuser')
+    const found = devices.find(
+      candidate =>
+        stableDeviceId(candidate) === focuserId && candidate.DeviceType.toLowerCase() === 'focuser',
+    )
 
     if (!found) throw new Error(`Configured focuser ${focuserId} was not found`)
 
@@ -77,29 +79,48 @@ export function createAlpacaFocuser({
     return found
   }
 
-  async function readStatus(focuser: ConfiguredDevice, signal?: AbortSignal): Promise<AlpacaFocuserStatus> {
+  async function readStatus(
+    focuser: ConfiguredDevice,
+    signal?: AbortSignal,
+  ): Promise<AlpacaFocuserStatus> {
     const absolute = await client.readBoolean(focuser, 'absolute', signal)
     const position = await client.readNumber(focuser, 'position', signal)
     const maxStep = await client.readNumber(focuser, 'maxstep', signal)
     const moving = await client.readBoolean(focuser, 'ismoving', signal)
 
-    if (!Number.isSafeInteger(position) || !Number.isSafeInteger(maxStep) || maxStep < 1 || position < 0 || position > maxStep) {
+    if (
+      !Number.isSafeInteger(position) ||
+      !Number.isSafeInteger(maxStep) ||
+      maxStep < 1 ||
+      position < 0 ||
+      position > maxStep
+    ) {
       invalid('Invalid focuser position', 'position')
     }
 
     return { absolute, position, maxStep, moving }
   }
 
-  function rejectUnsafeTarget(target: number, status: AlpacaFocuserStatus, window: FocuserTravelWindow) {
+  function rejectUnsafeTarget(
+    target: number,
+    status: AlpacaFocuserStatus,
+    window: FocuserTravelWindow,
+  ) {
     if (target === 0)
-      throw new Error('Focuser position 0 is a mechanical stop, not a home. Vela will not command Move(0).')
+      throw new Error(
+        'Focuser position 0 is a mechanical stop, not a home. Vela will not command Move(0).',
+      )
 
     if (!Number.isSafeInteger(target) || target < 1 || target > status.maxStep - 1) {
-      throw new Error('That focuser move would approach a mechanical travel limit. Vela will not command it.')
+      throw new Error(
+        'That focuser move would approach a mechanical travel limit. Vela will not command it.',
+      )
     }
 
     if (target < window.minPosition || target > window.maxPosition) {
-      throw new Error('That focuser move would leave the travel window around the starting position.')
+      throw new Error(
+        'That focuser move would leave the travel window around the starting position.',
+      )
     }
   }
 
@@ -160,7 +181,8 @@ export function createAlpacaFocuser({
         await waitStopped(focuser, operation)
         const after = await readStatus(focuser, operation)
 
-        if (after.position !== position) throw new Error('Focuser did not arrive at the commanded position')
+        if (after.position !== position)
+          throw new Error('Focuser did not arrive at the commanded position')
 
         return { position: after.position }
       } catch (error) {
@@ -180,7 +202,10 @@ export function createAlpacaFocuser({
           throw new Error(`${error.message} Vela did not repeat the move.`, { cause: error })
         }
 
-        throw new Error('The focuser did not confirm the commanded position. Vela did not repeat the move.', { cause: error })
+        throw new Error(
+          'The focuser did not confirm the commanded position. Vela did not repeat the move.',
+          { cause: error },
+        )
       }
     },
 

@@ -20,8 +20,8 @@ const samples: TargetSkyPath['samples'] = Array.from({ length: 97 }, (_, index) 
     sunAltitudeDegrees,
     moon: {
       azimuthDegrees: (170 + index * 2) % 360,
-      altitudeDegrees: 50 * Math.cos(index * Math.PI / 48),
-      illuminationFraction: .68,
+      altitudeDegrees: 50 * Math.cos((index * Math.PI) / 48),
+      illuminationFraction: 0.68,
       waxing: true,
     },
   }
@@ -62,7 +62,9 @@ for (const width of [1440, 390]) {
     await page.goto('/rigs/rig-1/observe/targets/m31')
     const sidebar = page.locator('.vela-target-sky-context')
     const time = sidebar.getByRole('slider', { name: 'Preview time for Andromeda Galaxy' })
-    await expect(sidebar.getByText('Local obstructions not included', { exact: true })).toBeVisible()
+    await expect(
+      sidebar.getByText('Local obstructions not included', { exact: true }),
+    ).toBeVisible()
     await expect(sidebar.locator('.vela-sky-path__moon-status')).toContainText('68% illuminated')
 
     for (const [index, phase] of [
@@ -77,12 +79,14 @@ for (const width of [1440, 390]) {
       await expect(time).toHaveAttribute('aria-valuetext', new RegExp(phase))
     }
 
-    const colors = await sidebar.locator('.vela-sky-path__light-track').evaluateAll(paths =>
-      [...new Set(paths.map(path => getComputedStyle(path).stroke))],
-    )
+    const colors = await sidebar
+      .locator('.vela-sky-path__light-track')
+      .evaluateAll(paths => [...new Set(paths.map(path => getComputedStyle(path).stroke))])
 
     expect(colors).toHaveLength(5)
-    await expect(sidebar.locator('.vela-sky-path__light-track[data-light="night"]').first()).toHaveCSS('stroke', 'rgb(99, 214, 239)')
+    await expect(
+      sidebar.locator('.vela-sky-path__light-track[data-light="night"]').first(),
+    ).toHaveCSS('stroke', 'rgb(99, 214, 239)')
     await expect(sidebar.getByText(/Light boundaries approximate/)).toBeVisible()
     await time.fill('23')
     const expand = page.getByRole('button', { name: 'Expand sky view' })
@@ -104,10 +108,14 @@ for (const width of [1440, 390]) {
   })
 }
 
-test('interrupted sky updates keep the selected time and label the old calculation', async ({ page }) => {
+test('interrupted sky updates keep the selected time and label the old calculation', async ({
+  page,
+}) => {
   await page.clock.install()
   let interrupted = false
-  await page.route('**/api/web/rigs/rig-1/targets/m31', route => interrupted ? route.abort() : route.fulfill({ json: target }))
+  await page.route('**/api/web/rigs/rig-1/targets/m31', route =>
+    interrupted ? route.abort() : route.fulfill({ json: target }),
+  )
   await page.route('**/api/web/rigs/rig-1/framing', route => route.abort())
   await page.route('**/api/survey/**', route => route.abort())
   await page.goto('/rigs/rig-1/observe/targets/m31')
@@ -123,7 +131,9 @@ test('interrupted sky updates keep the selected time and label the old calculati
 })
 
 test('missing site does not invent a sky or Moon', async ({ page }) => {
-  await page.route('**/api/web/rigs/rig-1/targets/m31', route => route.fulfill({ json: { ...target, sky: null } }))
+  await page.route('**/api/web/rigs/rig-1/targets/m31', route =>
+    route.fulfill({ json: { ...target, sky: null } }),
+  )
   await page.route('**/api/web/rigs/rig-1/framing', route => route.abort())
   await page.route('**/api/survey/**', route => route.abort())
   await page.goto('/rigs/rig-1/observe/targets/m31')

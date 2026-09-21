@@ -63,11 +63,13 @@ describe('discoverRigs', () => {
           return inspection(endpoint, [{ kind: 'switch', name: 'Legacy Switch' }])
         }
 
-        return inspection(endpoint, [{
-          providerDeviceId: 'camera-1',
-          kind: 'camera',
-          name: 'Main Camera',
-        }])
+        return inspection(endpoint, [
+          {
+            providerDeviceId: 'camera-1',
+            kind: 'camera',
+            name: 'Main Camera',
+          },
+        ])
       },
     }
 
@@ -94,58 +96,69 @@ describe('discoverRigs', () => {
           },
         },
       ],
-      failures: [{
-        view: { endpoint: endpointB, reason: 'unreachable' },
-        cause: providerError,
-      }],
+      failures: [
+        {
+          view: { endpoint: endpointB, reason: 'unreachable' },
+          cause: providerError,
+        },
+      ],
     })
   })
 
   it('marks a known Rig and updates its changed endpoint from stable device evidence', async () => {
-    const catalog = createMemoryRigCatalog([{
-      id: 'rig-1',
-      name: 'Backyard rig',
-      endpoint: endpointB,
-      addedAt: '2026-09-01T20:00:00.000Z',
-      lastObservedInventory: {
-        observedAt: '2026-09-01T20:00:00.000Z',
-        devices: [{ uniqueId: 'camera-1', kind: 'camera', name: 'Old camera name' }],
+    const catalog = createMemoryRigCatalog([
+      {
+        id: 'rig-1',
+        name: 'Backyard rig',
+        endpoint: endpointB,
+        addedAt: '2026-09-01T20:00:00.000Z',
+        lastObservedInventory: {
+          observedAt: '2026-09-01T20:00:00.000Z',
+          devices: [{ uniqueId: 'camera-1', kind: 'camera', name: 'Old camera name' }],
+        },
       },
-    }])
+    ])
 
     const alpaca: AlpacaDiscovery = {
       async scan() {
         return [endpointA]
       },
       async inspect() {
-        return inspection(endpointA, [{
-          providerDeviceId: 'camera-1',
-          kind: 'camera',
-          name: 'Main Camera',
-        }])
+        return inspection(endpointA, [
+          {
+            providerDeviceId: 'camera-1',
+            kind: 'camera',
+            name: 'Main Camera',
+          },
+        ])
       },
     }
 
-    const result = await discoverRigs({ mode: 'scan' }, {
-      alpaca,
-      catalog,
-      now: () => new Date('2026-09-02T20:00:00.000Z'),
-    })
+    const result = await discoverRigs(
+      { mode: 'scan' },
+      {
+        alpaca,
+        catalog,
+        now: () => new Date('2026-09-02T20:00:00.000Z'),
+      },
+    )
 
     expect(result.candidates[0]?.disposition).toEqual({
       state: 'already-added',
       rigId: 'rig-1',
     })
-    await expect(catalog.list()).resolves.toEqual([{
-      id: 'rig-1',
-      name: 'Backyard rig',
-      endpoint: endpointA,
-      addedAt: '2026-09-01T20:00:00.000Z',
-      lastObservedInventory: {
-        observedAt: '2026-09-02T20:00:00.000Z',
-        devices: [{ uniqueId: 'camera-1', kind: 'camera', name: 'Main Camera' }],
+    await expect(catalog.list()).resolves.toEqual([
+      {
+        id: 'rig-1',
+        name: 'Backyard rig',
+        endpoint: endpointA,
+        addedAt: '2026-09-01T20:00:00.000Z',
+        lastObservedInventory: {
+          observedAt: '2026-09-02T20:00:00.000Z',
+          devices: [{ uniqueId: 'camera-1', kind: 'camera', name: 'Main Camera' }],
+        },
       },
-    }])
+    ])
   })
 
   it('turns a known UDP scan failure into a sanitized failure while retaining its cause', async () => {
@@ -181,10 +194,7 @@ describe('discoverRigs', () => {
       },
     }
 
-    const discovery = discoverRigs(
-      { mode: 'scan' },
-      { alpaca, signal: controller.signal },
-    )
+    const discovery = discoverRigs({ mode: 'scan' }, { alpaca, signal: controller.signal })
 
     const rejection = expect(discovery).rejects.toBe(cancellation)
     controller.abort(cancellation)
@@ -195,16 +205,20 @@ describe('discoverRigs', () => {
 
 describe('discovery input', () => {
   it('normalizes valid manual input and its default port', () => {
-    expect(parseDiscoverRigsInput({
-      mode: 'manual',
-      host: 'ascom-remote.local',
-    })).toEqual({ mode: 'manual', endpoint: endpointB })
+    expect(
+      parseDiscoverRigsInput({
+        mode: 'manual',
+        host: 'ascom-remote.local',
+      }),
+    ).toEqual({ mode: 'manual', endpoint: endpointB })
 
-    expect(parseDiscoverRigsInput({
-      mode: 'manual',
-      host: '192.168.4.120',
-      port: 32323,
-    })).toEqual({ mode: 'manual', endpoint: endpointC })
+    expect(
+      parseDiscoverRigsInput({
+        mode: 'manual',
+        host: '192.168.4.120',
+        port: 32323,
+      }),
+    ).toEqual({ mode: 'manual', endpoint: endpointC })
   })
 
   it.each([
@@ -217,7 +231,7 @@ describe('discovery input', () => {
     { mode: 'manual', host: ' ascom-remote.local' },
     { mode: 'manual', host: '999.999.999.999' },
     { mode: 'manual', host: 'ascom-remote.local', port: 0 },
-  ])('rejects invalid input %#', (input) => {
+  ])('rejects invalid input %#', input => {
     expect(parseDiscoverRigsInput(input)).toBeUndefined()
   })
 })

@@ -35,9 +35,13 @@ const start = {
 
 const apps: ReturnType<typeof Fastify>[] = []
 
-afterEach(async () => { await Promise.all(apps.splice(0).map((app) => app.close())) })
+afterEach(async () => {
+  await Promise.all(apps.splice(0).map(app => app.close()))
+})
 
-function setup(settings: { record?: RigCatalogRecord, solver?: boolean, offsetDegrees?: number } = {}) {
+function setup(
+  settings: { record?: RigCatalogRecord; solver?: boolean; offsetDegrees?: number } = {},
+) {
   const catalog = createMemoryRigCatalog([settings.record ?? record])
   const operations = createRigOperations()
 
@@ -100,14 +104,17 @@ function setup(settings: { record?: RigCatalogRecord, solver?: boolean, offsetDe
     status: vi.fn(async () => ({ ...mount })),
     tracking: vi.fn(async () => {}),
     slew: vi.fn(async () => {}),
-    capture: vi.fn<FramingHardware['capture']>(({ signal }) => new Promise<MonoFrame>((resolve, reject) => {
-      completeCapture = resolve
-      signal.addEventListener('abort', () => reject(signal.reason), { once: true })
-    })),
+    capture: vi.fn<FramingHardware['capture']>(
+      ({ signal }) =>
+        new Promise<MonoFrame>((resolve, reject) => {
+          completeCapture = resolve
+          signal.addEventListener('abort', () => reject(signal.reason), { once: true })
+        }),
+    ),
   }
 
   const solver: PlateSolver = {
-    solve: vi.fn<PlateSolver['solve']>(async (frame) => ({
+    solve: vi.fn<PlateSolver['solve']>(async frame => ({
       status: 'solved',
       raDegrees: start.raDegrees - (settings.offsetDegrees ?? 0),
       decDegrees: start.decDegrees,
@@ -129,7 +136,9 @@ function setup(settings: { record?: RigCatalogRecord, solver?: boolean, offsetDe
     createHardware: () => hardware,
     createInspector: () => ({ inspectDevices: async () => inspections }),
     now: () => new Date(stamp),
-    waitForMountObservation: async signal => { signal.throwIfAborted() },
+    waitForMountObservation: async signal => {
+      signal.throwIfAborted()
+    },
   }
 
   if (settings.solver !== false) options.createSolver = () => solver
@@ -187,8 +196,20 @@ describe('target and framing HTTP boundary', () => {
       expect((await command(subject.app, body)).statusCode).toBe(400)
     }
 
-    for (const body of [{ focalLengthMm: 0 }, { focalLengthMm: '400' }, { focalLengthMm: 400, extra: true }]) {
-      expect((await subject.app.inject({ method: 'PUT', url: '/api/rigs/rig/framing/settings', payload: body })).statusCode).toBe(400)
+    for (const body of [
+      { focalLengthMm: 0 },
+      { focalLengthMm: '400' },
+      { focalLengthMm: 400, extra: true },
+    ]) {
+      expect(
+        (
+          await subject.app.inject({
+            method: 'PUT',
+            url: '/api/rigs/rig/framing/settings',
+            payload: body,
+          })
+        ).statusCode,
+      ).toBe(400)
     }
 
     expect((await command(subject.app, { extra: true }, 'stop')).statusCode).toBe(400)
@@ -205,7 +226,13 @@ describe('target and framing HTTP boundary', () => {
   it('stores focal settings in the catalog and reconstructs the field from saved values', async () => {
     const subject = setup()
     const before = (await subject.app.inject('/api/web/rigs/rig/framing')).json()
-    const saved = await subject.app.inject({ method: 'PUT', url: '/api/rigs/rig/framing/settings', payload: { focalLengthMm: 800 } })
+
+    const saved = await subject.app.inject({
+      method: 'PUT',
+      url: '/api/rigs/rig/framing/settings',
+      payload: { focalLengthMm: 800 },
+    })
+
     expect(saved.statusCode).toBe(200)
     expect((await subject.catalog.get('rig'))?.focalLengthMm).toBe(800)
     await subject.app.close()
@@ -217,13 +244,20 @@ describe('target and framing HTTP boundary', () => {
   })
 
   it.each(['unselected', 'renamed', 'disconnected', 'busy', 'site', 'solver'] as const)(
-    'rejects commands when readiness is missing: %s', async (failure) => {
+    'rejects commands when readiness is missing: %s',
+    async failure => {
       const { imagingCamera: _camera, ...unselected } = record
-      const subject = setup({ record: failure === 'unselected' ? unselected : record, solver: failure !== 'solver' })
 
-      if (failure === 'renamed') subject.inspections[0] = { ...subject.inspections[0]!, name: 'Different camera' }
+      const subject = setup({
+        record: failure === 'unselected' ? unselected : record,
+        solver: failure !== 'solver',
+      })
 
-      if (failure === 'disconnected') subject.inspections[0] = { ...subject.inspections[0]!, connection: 'disconnected' }
+      if (failure === 'renamed')
+        subject.inspections[0] = { ...subject.inspections[0]!, name: 'Different camera' }
+
+      if (failure === 'disconnected')
+        subject.inspections[0] = { ...subject.inspections[0]!, connection: 'disconnected' }
 
       if (failure === 'busy') {
         subject.inspections[0] = {
@@ -249,7 +283,15 @@ describe('target and framing HTTP boundary', () => {
 
     try {
       expect((await command(subject.app)).statusCode).toBe(409)
-      expect((await subject.app.inject({ method: 'PUT', url: '/api/rigs/rig/framing/settings', payload: { focalLengthMm: 500 } })).statusCode).toBe(409)
+      expect(
+        (
+          await subject.app.inject({
+            method: 'PUT',
+            url: '/api/rigs/rig/framing/settings',
+            payload: { focalLengthMm: 500 },
+          })
+        ).statusCode,
+      ).toBe(409)
       expect(subject.hardware.slew).not.toHaveBeenCalled()
       expect(subject.operations.owner('rig')).toBe('capture')
       expect((await subject.catalog.get('rig'))?.focalLengthMm).toBe(400)
@@ -265,50 +307,73 @@ describe('target and framing HTTP boundary', () => {
     await vi.waitFor(() => expect(subject.hardware.capture).toHaveBeenCalledTimes(1))
     expect(subject.operations.owner('rig')).toBe('framing')
     const reconnected = await subject.app.inject('/api/web/rigs/rig/framing')
-    expect(reconnected.json()).toMatchObject({ active: true, phase: 'exposing', targetId: 'ngc6205' })
+    expect(reconnected.json()).toMatchObject({
+      active: true,
+      phase: 'exposing',
+      targetId: 'ngc6205',
+    })
     expect((await command(subject.app)).statusCode).toBe(409)
     expect(subject.hardware.slew).toHaveBeenCalledTimes(1)
     subject.complete()
     await vi.waitFor(() => expect(subject.operations.owner('rig')).toBeUndefined())
     const completed = await subject.app.inject('/api/web/rigs/rig/framing')
-    expect(completed.json()).toMatchObject({ active: false, phase: 'checked', actual: { capturedAt: stamp } })
+    expect(completed.json()).toMatchObject({
+      active: false,
+      phase: 'checked',
+      actual: { capturedAt: stamp },
+    })
     expect(subject.solver.solve).toHaveBeenCalledTimes(1)
   })
 
-  it.each([false, true])('reports a completed operation consistently when a pending readiness read fails: %s', async fails => {
-    const subject = setup({ offsetDegrees: 0.1 })
-    subject.mount.pierSide = 'west'
-    expect((await command(subject.app)).statusCode).toBe(200)
-    await vi.waitFor(() => expect(subject.hardware.capture).toHaveBeenCalledTimes(1))
-    const geometry = await subject.adapter.cameraGeometry({ cameraId: 'camera', expectedCameraName: 'Imaging camera' })
-    let entered!: () => void
-    let release!: () => void
-    const inspecting = new Promise<void>(resolve => { entered = resolve })
-    const held = new Promise<void>(resolve => { release = resolve })
-    vi.mocked(subject.adapter.cameraGeometry).mockImplementationOnce(async () => {
-      entered()
-      await held
+  it.each([false, true])(
+    'reports a completed operation consistently when a pending readiness read fails: %s',
+    async fails => {
+      const subject = setup({ offsetDegrees: 0.1 })
+      subject.mount.pierSide = 'west'
+      expect((await command(subject.app)).statusCode).toBe(200)
+      await vi.waitFor(() => expect(subject.hardware.capture).toHaveBeenCalledTimes(1))
 
-      if (fails) throw new Error('Camera inspection interrupted')
+      const geometry = await subject.adapter.cameraGeometry({
+        cameraId: 'camera',
+        expectedCameraName: 'Imaging camera',
+      })
 
-      return geometry
-    })
-    const response = subject.app.inject('/api/web/rigs/rig/framing').then(result => result.json())
-    await inspecting
-    subject.complete()
-    await vi.waitFor(() => expect(subject.operations.owner('rig')).toBeUndefined())
-    release()
-    expect(await response).toMatchObject({
-      active: false,
-      phase: 'checked',
-      targetId: start.targetId,
-      actual: { checkId: expect.any(String), capturedAt: stamp },
-      checkCurrent: !fails,
-      canCenter: !fails,
-      pointingSide: fails ? 'unknown' : 'west',
-      unavailableReason: fails ? 'Camera inspection interrupted' : null,
-    })
-  })
+      let entered!: () => void
+      let release!: () => void
+
+      const inspecting = new Promise<void>(resolve => {
+        entered = resolve
+      })
+
+      const held = new Promise<void>(resolve => {
+        release = resolve
+      })
+
+      vi.mocked(subject.adapter.cameraGeometry).mockImplementationOnce(async () => {
+        entered()
+        await held
+
+        if (fails) throw new Error('Camera inspection interrupted')
+
+        return geometry
+      })
+      const response = subject.app.inject('/api/web/rigs/rig/framing').then(result => result.json())
+      await inspecting
+      subject.complete()
+      await vi.waitFor(() => expect(subject.operations.owner('rig')).toBeUndefined())
+      release()
+      expect(await response).toMatchObject({
+        active: false,
+        phase: 'checked',
+        targetId: start.targetId,
+        actual: { checkId: expect.any(String), capturedAt: stamp },
+        checkCurrent: !fails,
+        canCenter: !fails,
+        pointingSide: fails ? 'unknown' : 'west',
+        unavailableReason: fails ? 'Camera inspection interrupted' : null,
+      })
+    },
+  )
 
   it('does not publish a retained pointing side as current after telescope inspection fails', async () => {
     const subject = setup()
@@ -319,7 +384,9 @@ describe('target and framing HTTP boundary', () => {
     await vi.waitFor(() => expect(subject.operations.owner('rig')).toBeUndefined())
     const checked = (await subject.app.inject('/api/web/rigs/rig/framing')).json()
     expect(checked.pointingSide).toBe('west')
-    vi.mocked(subject.adapter.telescopeStatus).mockRejectedValueOnce(new Error('Telescope status timed out'))
+    vi.mocked(subject.adapter.telescopeStatus).mockRejectedValueOnce(
+      new Error('Telescope status timed out'),
+    )
     const unavailable = await subject.app.inject('/api/web/rigs/rig/framing')
     expect(unavailable.statusCode).toBe(200)
     expect(unavailable.json()).toMatchObject({
@@ -331,73 +398,88 @@ describe('target and framing HTTP boundary', () => {
       enabled: false,
       unavailableReason: 'Telescope status timed out',
     })
-    expect((await subject.app.inject('/api/web/rigs/rig/framing')).json()).toMatchObject({ pointingSide: 'west', checkCurrent: true })
+    expect((await subject.app.inject('/api/web/rigs/rig/framing')).json()).toMatchObject({
+      pointingSide: 'west',
+      checkCurrent: true,
+    })
     expect(subject.hardware.slew).not.toHaveBeenCalled()
     expect(subject.hardware.capture).toHaveBeenCalledTimes(1)
   })
 
-  it.each(['same target', 'different target'])('rejects an older browser check after another check of the %s', async target => {
-    const subject = setup({ offsetDegrees: 0.1 })
+  it.each(['same target', 'different target'])(
+    'rejects an older browser check after another check of the %s',
+    async target => {
+      const subject = setup({ offsetDegrees: 0.1 })
 
-    async function check(body: typeof start, count: number) {
-      expect((await command(subject.app, body)).statusCode).toBe(200)
-      await vi.waitFor(() => expect(subject.hardware.capture).toHaveBeenCalledTimes(count))
+      async function check(body: typeof start, count: number) {
+        expect((await command(subject.app, body)).statusCode).toBe(200)
+        await vi.waitFor(() => expect(subject.hardware.capture).toHaveBeenCalledTimes(count))
+        subject.complete()
+        await vi.waitFor(() => expect(subject.operations.owner('rig')).toBeUndefined())
+
+        return (await subject.app.inject('/api/web/rigs/rig/framing')).json()
+      }
+
+      const older = await check(start, 1)
+
+      const latest = await check(
+        target === 'same target'
+          ? start
+          : { ...start, targetId: 'ngc2024', raDegrees: start.raDegrees + 0.1 },
+        2,
+      )
+
+      expect(older.actual.checkId).toEqual(expect.any(String))
+      expect(latest.actual.checkId).not.toBe(older.actual.checkId)
+      // Captures may share a timestamp; their identities must still be distinct.
+      expect(latest.actual.capturedAt).toBe(older.actual.capturedAt)
+      expect(latest.canCenter).toBe(true)
+
+      const rejected = await command(
+        subject.app,
+        { checkId: older.actual.checkId, raDegrees: start.raDegrees, decDegrees: start.decDegrees },
+        'center',
+      )
+
+      expect(rejected.statusCode, rejected.body).toBe(409)
+      expect(rejected.json().error).toContain('check has changed')
+      expect(subject.hardware.slew).toHaveBeenCalledTimes(2)
+      expect(subject.hardware.capture).toHaveBeenCalledTimes(2)
+      expect(subject.operations.owner('rig')).toBeUndefined()
+      expect((await subject.app.inject('/api/web/rigs/rig/framing')).json().actual.checkId).toBe(
+        latest.actual.checkId,
+      )
+
+      const originalSolve = subject.solver.solve
+      subject.solver.solve = async (...args) => {
+        const solved = await originalSolve(...args)
+
+        return solved.status === 'solved' ? { ...solved, raDegrees: start.raDegrees + 0.2 } : solved
+      }
+
+      const accepted = await command(
+        subject.app,
+        {
+          checkId: latest.actual.checkId,
+          raDegrees: start.raDegrees + 0.2,
+          decDegrees: start.decDegrees,
+        },
+        'center',
+      )
+
+      expect(accepted.statusCode, accepted.body).toBe(200)
+      await vi.waitFor(() => expect(subject.hardware.capture).toHaveBeenCalledTimes(3))
+      expect(subject.hardware.slew).toHaveBeenCalledTimes(3)
       subject.complete()
       await vi.waitFor(() => expect(subject.operations.owner('rig')).toBeUndefined())
-
-      return (await subject.app.inject('/api/web/rigs/rig/framing')).json()
-    }
-
-    const older = await check(start, 1)
-
-    const latest = await check(
-      target === 'same target'
-        ? start
-        : { ...start, targetId: 'ngc2024', raDegrees: start.raDegrees + 0.1 },
-      2,
-    )
-
-    expect(older.actual.checkId).toEqual(expect.any(String))
-    expect(latest.actual.checkId).not.toBe(older.actual.checkId)
-    // Captures may share a timestamp; their identities must still be distinct.
-    expect(latest.actual.capturedAt).toBe(older.actual.capturedAt)
-    expect(latest.canCenter).toBe(true)
-
-    const rejected = await command(
-      subject.app,
-      { checkId: older.actual.checkId, raDegrees: start.raDegrees, decDegrees: start.decDegrees },
-      'center',
-    )
-
-    expect(rejected.statusCode, rejected.body).toBe(409)
-    expect(rejected.json().error).toContain('check has changed')
-    expect(subject.hardware.slew).toHaveBeenCalledTimes(2)
-    expect(subject.hardware.capture).toHaveBeenCalledTimes(2)
-    expect(subject.operations.owner('rig')).toBeUndefined()
-    expect((await subject.app.inject('/api/web/rigs/rig/framing')).json().actual.checkId).toBe(latest.actual.checkId)
-
-    const originalSolve = subject.solver.solve
-    subject.solver.solve = async (...args) => {
-      const solved = await originalSolve(...args)
-
-      return solved.status === 'solved' ? { ...solved, raDegrees: start.raDegrees + 0.2 } : solved
-    }
-
-    const accepted = await command(
-      subject.app,
-      { checkId: latest.actual.checkId, raDegrees: start.raDegrees + 0.2, decDegrees: start.decDegrees },
-      'center',
-    )
-
-    expect(accepted.statusCode, accepted.body).toBe(200)
-    await vi.waitFor(() => expect(subject.hardware.capture).toHaveBeenCalledTimes(3))
-    expect(subject.hardware.slew).toHaveBeenCalledTimes(3)
-    subject.complete()
-    await vi.waitFor(() => expect(subject.operations.owner('rig')).toBeUndefined())
-    const centered = (await subject.app.inject('/api/web/rigs/rig/framing')).json()
-    expect(centered.actual.checkId).not.toBe(latest.actual.checkId)
-    expect(centered.desired).toEqual({ raDegrees: start.raDegrees + 0.2, decDegrees: start.decDegrees })
-  })
+      const centered = (await subject.app.inject('/api/web/rigs/rig/framing')).json()
+      expect(centered.actual.checkId).not.toBe(latest.actual.checkId)
+      expect(centered.desired).toEqual({
+        raDegrees: start.raDegrees + 0.2,
+        decDegrees: start.decDegrees,
+      })
+    },
+  )
 
   it('checks an edited current composition without a movement command', async () => {
     const subject = setup()
@@ -434,7 +516,13 @@ describe('target and framing HTTP boundary', () => {
     subject.complete()
     await vi.waitFor(() => expect(subject.operations.owner('rig')).toBeUndefined())
     const checked = (await subject.app.inject('/api/web/rigs/rig/framing')).json()
-    const body = { checkId: checked.actual.checkId, raDegrees: start.raDegrees, decDegrees: start.decDegrees }
+
+    const body = {
+      checkId: checked.actual.checkId,
+      raDegrees: start.raDegrees,
+      decDegrees: start.decDegrees,
+    }
+
     expect((await command(subject.app, body, 'center')).statusCode).toBe(200)
     await vi.waitFor(() => expect(subject.hardware.capture).toHaveBeenCalledTimes(2))
     subject.complete()
@@ -446,21 +534,36 @@ describe('target and framing HTTP boundary', () => {
     subject.complete()
     await vi.waitFor(() => expect(subject.operations.owner('rig')).toBeUndefined())
     const final = (await subject.app.inject('/api/web/rigs/rig/framing')).json()
-    expect(final).toMatchObject({ phase: 'checked', checkCurrent: true, canCenter: false, centering: { outcome: 'not-converging' } })
-    expect((await command(subject.app, { ...body, checkId: final.actual.checkId }, 'center')).statusCode).toBe(409)
+    expect(final).toMatchObject({
+      phase: 'checked',
+      checkCurrent: true,
+      canCenter: false,
+      centering: { outcome: 'not-converging' },
+    })
+    expect(
+      (await command(subject.app, { ...body, checkId: final.actual.checkId }, 'center')).statusCode,
+    ).toBe(409)
     expect(subject.hardware.slew).toHaveBeenCalledTimes(2)
     expect((await command(subject.app, start, 'check')).statusCode).toBe(200)
     await vi.waitFor(() => expect(subject.hardware.capture).toHaveBeenCalledTimes(4))
     subject.complete()
     await vi.waitFor(() => expect(subject.operations.owner('rig')).toBeUndefined())
-    expect((await subject.app.inject('/api/web/rigs/rig/framing')).json()).toMatchObject({ canCenter: true, centering: null })
+    expect((await subject.app.inject('/api/web/rigs/rig/framing')).json()).toMatchObject({
+      canCenter: true,
+      centering: null,
+    })
   })
 
   it('serves real catalog identity without inventing a site and rejects malformed searches', async () => {
     const subject = setup()
     delete subject.mount.latitudeDegrees
     const target = await subject.app.inject('/api/web/rigs/rig/targets/ngc6205')
-    expect(target.json()).toMatchObject({ id: 'ngc6205', catalog: 'NGC 6205', sky: null, raDegrees: start.raDegrees })
+    expect(target.json()).toMatchObject({
+      id: 'ngc6205',
+      catalog: 'NGC 6205',
+      sky: null,
+      raDegrees: start.raDegrees,
+    })
     const search = await subject.app.inject('/api/web/rigs/rig/targets?q=Flame')
     expect(search.json().targets.map((item: { id: string }) => item.id)).toContain('ngc2024')
     expect(search.json().targets.map((item: { id: string }) => item.id)).not.toContain('ic0434')
@@ -483,13 +586,35 @@ describe('frozen target discovery HTTP boundary', () => {
     expect(first.targets.every((target: { opportunity: unknown }) => target.opportunity)).toBe(true)
     expect(first.calculatedAt).toBe(stamp)
     subject.mount.latitudeDegrees = -40
-    const next = (await subject.app.inject(`/api/web/rigs/rig/target-discovery?snapshot=${first.snapshotId}&offset=${first.pageSize}`)).json()
+
+    const next = (
+      await subject.app.inject(
+        `/api/web/rigs/rig/target-discovery?snapshot=${first.snapshotId}&offset=${first.pageSize}`,
+      )
+    ).json()
+
     expect(next.snapshotId).toBe(first.snapshotId)
     expect(next.site).toEqual(first.site)
-    expect(next.targets.every((target: { id: string }) => !first.targets.some((previous: { id: string }) => previous.id === target.id))).toBe(true)
-    const galaxies = (await subject.app.inject(`/api/web/rigs/rig/target-discovery?snapshot=${first.snapshotId}&category=galaxy&filter=broadband`)).json()
+    expect(
+      next.targets.every(
+        (target: { id: string }) =>
+          !first.targets.some((previous: { id: string }) => previous.id === target.id),
+      ),
+    ).toBe(true)
+
+    const galaxies = (
+      await subject.app.inject(
+        `/api/web/rigs/rig/target-discovery?snapshot=${first.snapshotId}&category=galaxy&filter=broadband`,
+      )
+    ).json()
+
     expect(galaxies.targets.length).toBeGreaterThan(0)
-    expect(galaxies.targets.every((target: { category: string, filterChoice: string }) => target.category === 'galaxy' && target.filterChoice === 'broadband')).toBe(true)
+    expect(
+      galaxies.targets.every(
+        (target: { category: string; filterChoice: string }) =>
+          target.category === 'galaxy' && target.filterChoice === 'broadband',
+      ),
+    ).toBe(true)
     expect(subject.adapter.telescopeStatus).toHaveBeenCalledTimes(1)
     const refreshed = (await subject.app.inject('/api/web/rigs/rig/target-discovery')).json()
     expect(refreshed.snapshotId).not.toBe(first.snapshotId)
@@ -504,14 +629,33 @@ describe('frozen target discovery HTTP boundary', () => {
     const view = (await subject.app.inject('/api/web/rigs/rig/target-discovery?q=M31')).json()
     expect(view.status).toBe('site-unavailable')
     expect(view.site).toBeNull()
-    expect(view.targets.some((target: { name: string }) => target.name === 'Andromeda Galaxy')).toBe(true)
-    expect(view.targets.every((target: { opportunity: unknown }) => target.opportunity === null)).toBe(true)
+    expect(
+      view.targets.some((target: { name: string }) => target.name === 'Andromeda Galaxy'),
+    ).toBe(true)
+    expect(
+      view.targets.every((target: { opportunity: unknown }) => target.opportunity === null),
+    ).toBe(true)
     const calls = vi.mocked(subject.adapter.telescopeStatus).mock.calls.length
-    expect((await subject.app.inject('/api/web/rigs/rig/target-discovery?snapshot=00000000-0000-0000-0000-000000000000')).statusCode).toBe(410)
+    expect(
+      (
+        await subject.app.inject(
+          '/api/web/rigs/rig/target-discovery?snapshot=00000000-0000-0000-0000-000000000000',
+        )
+      ).statusCode,
+    ).toBe(410)
     expect(subject.adapter.telescopeStatus).toHaveBeenCalledTimes(calls)
 
-    for (const query of ['category=potato', 'filter=red', 'offset=-1', 'offset=0.1', 'q=a&q=b', 'snapshot=no']) {
-      expect((await subject.app.inject(`/api/web/rigs/rig/target-discovery?${query}`)).statusCode).toBe(400)
+    for (const query of [
+      'category=potato',
+      'filter=red',
+      'offset=-1',
+      'offset=0.1',
+      'q=a&q=b',
+      'snapshot=no',
+    ]) {
+      expect(
+        (await subject.app.inject(`/api/web/rigs/rig/target-discovery?${query}`)).statusCode,
+      ).toBe(400)
     }
   })
 })
