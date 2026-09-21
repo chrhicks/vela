@@ -1,187 +1,168 @@
-# Jev standards-checking prototype
+# Standards review
 
-A project-local OpenCode **V2.0.8** plugin. Its purpose is to learn whether small,
-typed Jev judgments help the coding agent notice standards problems in actual work.
-It is a disposable experiment, not a merge gate or a comprehensive code reviewer.
+A Vela-local OpenCode V2 tool: **selected code + repository standards → one Luna
+review → source-backed diagnostics**. It has no detector stage, confidence gate,
+secondary agent, autonomous investigation loop, or automatic edits.
+
+The output is LSP-like: file and line range, stable rule ID, severity, explanation,
+related source evidence, and a suggested correction. Missing code context and
+failed or stale reviews are check status, not warnings on innocent source lines.
 
 ## Use
 
-From the Vela root, install the isolated tooling dependencies:
+Install the isolated tooling dependencies (OpenCode plugin APIs pinned to 2.0.8):
 
 ```sh
 pnpm --dir .opencode install --ignore-workspace --frozen-lockfile --ignore-scripts
 ```
 
-Provide `TYPESAFE_API_KEY` in the OpenCode server environment or this checkout's
-root `.env`. The plugin reads that one value without modifying the server's
-environment. It sends selected source and standards to TypeSafe.
+OpenCode discovers `.opencode/plugins/standards/` automatically. The tool uses
+the existing OpenCode provider connection for **`openai/gpt-5.6-luna#medium`**.
+No TypeSafe account, API key, or project `.env` is needed. Selected source,
+supporting context, and repository guidance go to the configured model provider.
 
-OpenCode discovers `plugins/standards/index.ts` automatically. Watched plugin
-changes reload automatically. For an existing session that has not discovered it:
+To use another available reasoning model, set the plugin's `reviewerModel` option:
+
+```jsonc
+{
+  "plugins": [{
+    "package": "./.opencode/plugins/standards",
+    "options": { "reviewerModel": "openai/gpt-5.6-luna#medium" }
+  }]
+}
+```
+
+The agent receives a `standards_check` tool and a reminder to use it after a
+coherent batch of edits. Nothing runs on individual edits or keystrokes.
+`/standards` asks the active agent to review current changes; `/standards path.ts`
+asks for whole-file review.
+
+```js
+// Current tracked and untracked changes against HEAD.
+{}
+
+// Explicit whole-file review.
+{ mode: 'files', paths: ['apps/server/src/example.ts'] }
+
+// Current source compared with a particular base commit.
+{ paths: ['apps/server/src/example.ts'], base: 'origin/main' }
+
+// Relevant contracts/docs help the model resolve a specific code question.
+{ paths: ['apps/server/src/example.ts'], supportingPaths: ['packages/model/src/example.ts'] }
+```
+
+Paths are relative to the session's Git checkout root, including after a session
+moves to a worktree. `base` selects the comparison commit, not a different source
+checkout. Supporting files are evidence, never additional review targets. New
+files are reviewed in full; removed files cannot supply post-image diagnostics
+and are reported incomplete. Unchanged targets and non-JS/TS paths are skipped.
+
+For an existing location that has not discovered the installed plugin:
 
 ```sh
 opencode api post /api/location/reload --header "x-opencode-directory:$PWD"
 ```
 
-The agent gets a `standards_check` tool and an instruction to use it after a
-coherent batch of edits. Nothing runs automatically on each edit. You can request
-a pass with `/standards`, or `/standards path/to/file.ts`. The command prompts the
-active agent to call the tool and investigate its findings.
+## Diagnostics and check status
 
-### Results panel preview
+The model reads `CODING_STANDARDS.md`, `AGENTS.md` when present, numbered target
+source/diffs, and explicit supporting context in one isolated call. It does not
+inherit the coding conversation, use tools, execute tests, or request follow-up
+generation automatically. The caller can supply newly identified missing context
+on a later check; unchanged inputs should not be rerun for a preferred answer.
 
-`/standards-results` opens the native terminal panel for this session's latest
-completed check. A clickable summary above the composer also opens it. New
-results update the summary without opening the panel or taking focus.
+`checks.ts` maps stable rule IDs to document section headings. It contains no
+independent question catalog or applicability rules. The documents remain the
+authority. A diagnostic must have:
 
-- `↑` / `↓` select files and judgments or scroll detail; concerns are listed first.
-- `←` / `→` move between files, judgments, and the scrollable question detail.
-  In the stacked layout, focusing detail gives it the list space; `←` returns to the judgments.
-- `A` toggles applicability scores and shows which standards cleared the cutoff.
-- `F` switches between the side panel and full screen; narrow terminals use full screen.
-- `R` reloads the saved result without calling Jev; `Esc` closes the panel.
+- an exact target source range and quotation;
+- a known section-level rule ID, such as `error_context` or `types_boundaries`;
+- severity (`error`, `warning`, or `information`), a specific message, an
+  explanation of concrete impact, and the smallest useful suggested correction;
+- exact source references for any related evidence.
 
-The panel reads existing evidence through a plugin RPC. It shows the winning
-answer, its probability, model confidence, the exact question, and alternative
-answer probabilities. These are model judgments, not proof. Incomplete files
-retain their error; saved answers from an invalidated evaluation are marked as
-unaccepted. The timestamp identifies the saved evaluation, not current source
-state. Older checks made before this preview do not populate its per-session
-latest-result pointer; run a new check to populate it.
+The plugin validates the response structure, accounts for every target, verifies
+quotes/ranges against saved sources, and checks that changes-mode diagnostics
+touch changed lines. Pure deletions may cite a surviving boundary; replacements
+must cite an added line. Invalid output is rejected atomically and remains
+incomplete. Citation validation establishes grounding, not model correctness.
 
-The TUI entrypoint is exported by `plugins/standards/package.json`; OpenCode loads
-it alongside the server plugin. No global terminal configuration is needed.
+An incomplete review can contain valid diagnostics alongside unresolved code
+questions or unreadable targets. A stale review retains its historical evidence
+but none of its diagnostics are accepted as current. Skipped paths are always
+visible. “No diagnostics” does not mean certified correct or approved to merge.
 
-Tool inputs:
+### Relationship to the repository verifier
 
-```js
-// Current tracked and untracked changes, compared with HEAD.
-{}
+This tool supplies focused feedback during implementation. The coding agent
+checks the evidence, corrects concrete issues, and performs focused verification.
+The fresh-context `vela-verifier` still independently reviews the PR at delivery.
+Its policy and verdicts are unchanged; give it only the PR URL, not this tool's
+conclusion as inherited authority. It does not need to invoke this tool itself.
 
-// Whole files, including unchanged code.
-{ mode: 'files', paths: ['.opencode/plugins/standards/jev.ts'] }
+Whether commands ran, a workshop specimen was accepted, rendered behavior was
+correct, or hardware behaved correctly belongs to delivery verification. The
+standards tool does not turn missing execution evidence into source diagnostics
+or routine missing-context warnings.
 
-// Changes in selected files compared with another commit/ref.
-{ paths: ['apps/server/src/example.ts'], base: 'origin/main' }
+## Results panel
 
-// Supply definitions or evidence without making them additional review targets.
-{ mode: 'files', paths: ['path/to/test.ts'], supportingPaths: ['path/to/helper.ts', 'path/to/contract.md'] }
-```
+In the terminal UI, `/standards-results` or the composer summary opens the latest
+saved review. Desktop receives diagnostics in the tool's conversation output;
+the panel is a native terminal contribution.
 
-Paths are relative to the session's Git checkout root. The tool resolves the
-session's current directory rather than assuming the plugin's loading directory.
-`base` selects the comparison commit; it still reviews the current working tree.
+- `↑` / `↓` select diagnostics or scroll evidence.
+- `←` / `→` move between the list and detail; narrow layouts expand focused detail.
+- `S` switches between diagnostics and check status, including empty reviews.
+- `F` expands the panel, `R` refreshes saved evidence, and `Esc` closes it.
 
-## Flow and output
+The panel separates diagnostics from check status, including missing evidence,
+errors, and skipped paths. Its model and timestamp identify a saved source snapshot.
+Refresh reloads evidence and rechecks source freshness without inference. Legacy
+detector reports show a clear notice and retain their original JSON artifact;
+there is no legacy detector implementation in the plugin.
 
-For each file or change:
+## Evidence and bounds
 
-1. Read source and, in changes mode, its diff. New files are reviewed in full.
-2. Read relevant sections verbatim from `CODING_STANDARDS.md` into
-   `state.coding_standards.<standard>`.
-3. Ask an applicability Noul per standard.
-4. For standards **strictly above 0.70**, ask their specific Choice questions,
-   supplying only those standards in the judgment request. `applicabilityThreshold`
-   can override this experimental cutoff.
-5. Return concise findings, for example `path/to/test.ts: async_tests`.
+- One model call per check with reviewable targets; none if input validation fails
+  or all targets are skipped. Generation times out after 90 seconds.
+- Up to 30 target paths and 30 supporting paths; 40,000 UTF-8 bytes per source;
+  180,000 bytes per assembled prompt; 48,000 bytes per response. Limits are
+  explicit failures, never silent clipping. Select a smaller coherent batch.
+- JS/TS targets; supporting text can also be Markdown, JSON, YAML, or plain text.
+  Ignored files, symlinks, credential-named paths, binary files, and paths outside
+  the checkout are excluded. Linux `/proc/self/fd` verifies the opened file.
+- Cancellation reaches source reads and the model generation fiber. This does
+  not guarantee when remote provider work or billing stops. The plugin adds no
+  retry loop; provider infrastructure may have its own transport policy.
+- Source versions, including standards and guidance, are checked after review
+  and on saved-report load. Changed or unavailable evidence makes the result stale.
+- `.opencode/.local/standards/<id>.json` stores the report, prompt, raw response,
+  model reference, timings, source snapshots/hashes, and base commit. These files
+  contain source, are Git-ignored and created with mode 0600. Oversized responses
+  are rejected without retaining their body. Delete old artifacts when unneeded.
 
-### Catalog coverage
-
-Each standards section now has semantic questions: 12 groups and 47 specific
-judgments. The original IDs remain stable:
-
-| Standard ID | Questions cover |
-| --- | --- |
-| `readability` | Explicit critical path, domain names, local reasoning/simple interfaces |
-| `formatting` | Consistency with surrounding style and unrelated diff churn |
-| `types_boundaries` | Domain types, input validation, earned normalization, adapter isolation, shared contracts, semantic page views |
-| `modules` | Narrow interfaces, visible composition/dependencies, deliberate effects, justified abstractions/dependencies |
-| `state_persistence` | Valuable durable facts, current observations, presentation-owned browser state |
-| `comments` | Useful comment rationale and owning durable documentation for changed behavior |
-| `error_context` | Causes, honest operation state, transient read recovery, uncertain physical writes, confirmation, explicit safety policy |
-| `tests` | Regression intent, deterministic/state-driven fakes, independent adapter references and failure coverage, public behavior, cross-boundary outcomes |
-| `async_tests` | Pending state, controlled completion, completed-outcome assertions |
-| `frontend` | Stable semantic components, hierarchy, responsive workflow, honest state, workshop evidence |
-| `trust_boundaries` | Server-owned credentials/device access, browser-safe environment, validation, intended network exposure |
-| `focused_verification` | Focused verification workflow and evidence-backed execution claims |
-
-Exact whitespace/semicolon syntax belongs to deterministic tooling, not Jev. This
-catalog does not add a formatting checker. It evaluates the semantic formatting
-guidance only. Nor can source alone establish that commands ran, a specimen was
-approved, or a view renders correctly. Those questions must abstain when necessary
-evidence is missing; a file named `specimen` is not proof of workshop evaluation.
-
-Use `supportingPaths` for relevant source, contracts, owning documentation, or
-verification reports. They appear at `state.supporting_context` and are evidence,
-not extra review targets or instructions. Reports need to identify the relevant
-change/outcomes; missing context is not proof of either compliance or violation.
-No automatic dependency traversal or collection of screenshots/execution history
-is added. This remains a text-only, probabilistic prototype, not complete coverage
-of standards in practice or independently calibrated detectors for each new rule.
-
-For this prototype, a standard is flagged when any of its specific questions has
-`violated` as its winning Choice. There is no judgment-confidence cutoff. A
-winning `insufficient_context` is reported as inconclusive unless another question
-already flags that standard. Raw subcheck results are always retained. Applicability
-is not compliance, and a skipped check is not a pass.
-
-The agent investigates why: read the source, consult the referenced standard, and
-decide whether the issue is code, context, or the question. Jev generates no
-explanation or fix. Do not rerun unchanged inputs to obtain a preferred verdict.
-
-## Evidence and limits
-
-- Raw requests/responses, selected source snapshots, file hashes, model IDs,
-  timings, and results are saved to `.opencode/.local/standards/<id>.json`.
-  The tool returns that path. These files contain source, are Git-ignored, and
-  exclude authorization headers/API keys. Delete the directory when done.
-- Model pinned to `jev-1.13.0`; questions live in `plugins/standards/checks.ts`.
-- Review targets are JavaScript/TypeScript. Supporting paths can also be Markdown,
-  text, JSON, or YAML. Ignored files and paths outside the checkout are excluded.
-  Unsupported targets are listed as skipped; unreadable/deleted sources and API
-  failures are reported as inconclusive.
-- At most 40 KB per source file and 60 KB for each assembled state. Larger inputs
-  are reported explicitly, never silently truncated. No automatic chunking or
-  dependency traversal: supply small, relevant `supportingPaths` when needed.
-- HTTP calls time out after 30 seconds. Stopping the OpenCode tool interrupts
-  transport through the Effect plugin adapter. There is no automatic retry loop.
-- Target source, supplied helpers, and standards are revalidated after each file's
-  evaluation. Changed or unreadable inputs invalidate its findings. Results are
-  observations of saved inputs, not certificates about later edits.
-
-The first live self-check exercised the registered OpenCode tool on its own code.
-A temporary mutation replacing Jev's contextual error/cause with `Error('Request
-failed')` was flagged as `error_context`; the mutation was then removed. Real
-results also included low-confidence `met` and `not_applicable` answers. Clean
-summary output therefore means no selected check reported a violation, not proof
-of compliance.
-
-Expanded-catalog spot checks compared a real adapter with a validation-removal
-mutation, plus small paired examples of retained preferences versus persisted live
-run state and server-API delegation versus browser-held device credentials. The
-targeted checks distinguished those pairs. They also emitted extra low-confidence
-flags: an ordinary browser request wrapper was marked `error_context.cause` with
-only 0.47 probability for the winning violation. Its code propagated fetch failures
-and identified HTTP failures by operation/status; no supplied response contract
-established additional missing details. That flag was not treated as a demonstrated
-defect. These are spot checks, not accuracy measurements for all 47 judgments.
+The [historical comparison](standards-evaluation.md) records why the detector
+gate was removed. It is a small experiment, not a general model accuracy benchmark.
+The [direct-review observation](standards-direct-review.md) records the positive
+and negative regression cases, exact citations, and registered-plugin checks.
 
 ## Verify
-
-Node 22.18+ is required for the local TypeScript test command.
 
 ```sh
 pnpm --dir .opencode check
 pnpm --dir .opencode test
+pnpm --dir .opencode test:render # Bun; renders the actual native TUI
 pnpm lint
 ```
 
-The focused tests use temporary Git repositories and request-driven fake API
-responses; they need neither a real API key nor paid inference. They cover routing,
-diff inputs, missing answers, excluded paths, cancellation, and changed inputs.
-Repository lint currently excludes `.opencode`; the dedicated typecheck/tests
-verify this tooling. Run the actual tool for semantic feedback separately.
+Node 22.18+ runs the TypeScript tests. They use temporary Git repositories and
+injected model responses, with no credentials or paid inference. The Bun render
+check exercises the real component at wide and narrow terminal sizes and saves
+captures in `.opencode/.local/panel-render/`. Repository lint excludes `.opencode`;
+the dedicated typecheck, behavioral tests and native render check cover this tool.
 
-Implementation: `index.ts` registers OpenCode contributions; `runner.ts` assembles
-inputs and curates results; `checks.ts` owns questions/source sections; `jev.ts`
-handles the HTTP and response-validation boundary.
+Boundaries: `index.ts` composes OpenCode generation/contributions; `runner.ts`
+collects one batch; `reviewer.ts` builds and validates one model review;
+`evidence.ts` owns source snapshots; `report.ts` loads/formats saved evidence;
+`rpc.ts` defines the diagnostic/report contract; `panel.tsx` presents it.
