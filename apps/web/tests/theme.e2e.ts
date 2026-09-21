@@ -35,6 +35,7 @@ for (const width of [1040, 390]) {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
 
     const capture: CaptureView = {
+      captureReadState: 'current',
       rigId: 'rig-1', rigName: 'Seestar S30', camera: { name: 'Main camera' }, enabled: true,
       unavailableReason: null, phase: 'idle', active: false, exposureSeconds: 2, elapsedSeconds: 0,
       error: null, saveFrames: false, savedImageCount: 0, latestImage: null, repeat: false, completedCount: 0, cooling: null,

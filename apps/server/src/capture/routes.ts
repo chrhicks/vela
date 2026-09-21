@@ -32,11 +32,12 @@ function configuredCamera(settings: CaptureSettings): CaptureCamera {
   const acquisition = createAlpacaAcquisition({ baseUrl: settings.endpoint })
 
   return {
-    async capture({ exposureSeconds, signal, onProgress }) {
+    async capture({ exposureSeconds, signal, onProgress, onReadState }) {
       try {
         return await acquisition.capture({ cameraId: settings.cameraId, expectedCameraName: settings.expectedCameraName, exposureSeconds, signal,
           onProgress: elapsedSeconds => onProgress({ phase: 'exposing', elapsedSeconds }),
           onReadout: () => onProgress({ phase: 'reading', elapsedSeconds: exposureSeconds }),
+          onReadState,
         })
       } catch (error) {
         if (error instanceof AlpacaCaptureStoppedError) throw new CaptureStoppedError()
@@ -98,6 +99,7 @@ export function registerCapture(
     const current = (): CaptureView => ({ ...(controllers.get(rigId)?.snapshot() ?? {
       rigId, rigName: rig.name, camera: null, enabled: false, unavailableReason: null,
       phase: 'idle', active: false, repeat: true, saveFrames: false, completedCount: 0, exposureSeconds: 2, elapsedSeconds: 0, error: null, latestImage: null, cooling: null,
+      captureReadState: 'current',
     }), savedImageCount })
 
     const unavailable = (reason: string): CaptureView => ({ ...current(), rigName: rig.name, enabled: false, unavailableReason: reason })
@@ -309,9 +311,9 @@ export function registerCapture(
       const view = controllers.get(rigId)?.snapshot()
 
       if (!view) return undefined
-      const { rigName, phase, active, completedCount, elapsedSeconds, exposureSeconds, error } = view
+      const { rigName, phase, captureReadState, active, completedCount, elapsedSeconds, exposureSeconds, error } = view
 
-      return { rigId, rigName, phase, active, completedCount, elapsedSeconds, exposureSeconds, error }
+      return { rigId, rigName, phase, captureReadState, active, completedCount, elapsedSeconds, exposureSeconds, error }
     },
   }
 }

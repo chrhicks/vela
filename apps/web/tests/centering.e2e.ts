@@ -8,6 +8,7 @@ const sample = (correction: number, offsetArcminutes: number, trend: FramingCent
 
 function initial(): FramingView {
   return {
+    captureReadState: 'current',
     rigId: 'rig-1', rigName: 'Test rig', enabled: true, unavailableReason: null, observedAt: new Date().toISOString(),
     focalLengthMm: 400, camera: { name: 'Test camera', width: 3000, height: 2000, fieldWidthDegrees: 3, fieldHeightDegrees: 2 },
     phase: 'checked', active: false, desired: target, targetId: target.id, error: null, exposureSeconds: 20,

@@ -3,6 +3,7 @@ import type { AutofocusView } from '@vela/model/web'
 import { isAutofocusView, isTravelLimitError } from './validation'
 
 const view: AutofocusView = {
+  captureReadState: 'current',
   rigId: 'fra', rigName: 'FRA 400', enabled: true, unavailableReason: null,
   cameraName: 'ASI2600', focuserName: 'EAF', phase: 'walking', activity: 'exposing', active: true,
   startPosition: 32842, currentPosition: 33042, maxStep: 60000, stepSize: 50, offsetSteps: 4,
@@ -23,6 +24,13 @@ const travelLimit: AutofocusView = {
 }
 
 describe('autofocus response validation', () => {
+  it('requires an explicit capture-read state independently of activity', () => {
+    expect(isAutofocusView({ ...view, captureReadState: 'retrying' }, 'fra')).toBe(true)
+
+    for (const captureReadState of [undefined, null, 'recovered']) {
+      expect(isAutofocusView({ ...view, captureReadState }, 'fra')).toBe(false)
+    }
+  })
   it('accepts a live walk whose start is the current EAF position', () => {
     expect(isAutofocusView(view, 'fra')).toBe(true)
     expect(isAutofocusView({ ...view, active: false }, 'fra')).toBe(false)

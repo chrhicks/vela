@@ -6,6 +6,8 @@ import { isAutofocusView, isTravelLimitError } from './validation'
 export function autofocusActivity(view: AutofocusView, offline: boolean) {
   if (offline) return 'Connection interrupted'
 
+  if (view.captureReadState === 'retrying') return 'Camera observation interrupted'
+
   if (view.activity === 'moving') return 'Moving to the next sample…'
 
   if (view.activity === 'exposing') return `Exposing at ${view.currentPosition ?? 'this stop'}…`
@@ -42,6 +44,7 @@ export function useAutofocus(rigId: string) {
   const [error, setError] = useState<string | null>(null)
   const generation = useRef(0)
   const writing = useRef(false)
+  const stopUnconfirmed = useRef(false)
   const alive = useRef(false)
 
   async function read() {
@@ -52,7 +55,15 @@ export function useAutofocus(rigId: string) {
 
       if (!isAutofocusView(next, rigId)) throw new Error('Invalid autofocus response')
 
-      if (alive.current && current === generation.current) { setView(next); setOffline(false) }
+      if (alive.current && current === generation.current) {
+        setView(next)
+        setOffline(false)
+
+        if (stopUnconfirmed.current && !next.active && ['stopped', 'failed', 'complete'].includes(next.phase)) {
+          stopUnconfirmed.current = false
+          setError(null)
+        }
+      }
     } catch {
       if (alive.current && current === generation.current) setOffline(true)
     }
@@ -77,6 +88,7 @@ export function useAutofocus(rigId: string) {
   async function command(action: 'start' | 'stop', body: Record<string, number> = {}) {
     if (writing.current || offline) return
     writing.current = true
+    stopUnconfirmed.current = false
     generation.current++
     setPending(true)
     setError(null)
@@ -96,7 +108,11 @@ export function useAutofocus(rigId: string) {
         ? cause.code
         : cause instanceof Error ? cause.message : 'Command response unavailable'
 
-      if (alive.current) setError(`${message}. The command was not repeated; check the current state before trying again.`)
+      if (alive.current) {
+        stopUnconfirmed.current = action === 'stop'
+        setError(`${message}. The command was not repeated; check the current state before trying again.`)
+      }
+
       await read()
     } finally {
       writing.current = false

@@ -7,6 +7,7 @@ const capture = z.object({
   rigId: text, rigName: text,
   phase: z.enum(['idle', 'exposing', 'reading', 'saving', 'stopping', 'complete', 'stopped', 'failed']),
   active: z.boolean(),
+  captureReadState: z.enum(['current', 'retrying']),
   completedCount: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
   elapsedSeconds: z.number().nonnegative(),
   exposureSeconds: z.number().min(0).max(600),

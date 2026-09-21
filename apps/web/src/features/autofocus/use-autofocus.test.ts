@@ -3,6 +3,7 @@ import type { AutofocusView } from '@vela/model/web'
 import { autofocusActivity } from './use-autofocus'
 
 const view: AutofocusView = {
+  captureReadState: 'current',
   rigId: 'fra', rigName: 'FRA 400', enabled: true, unavailableReason: null,
   cameraName: 'ASI2600', focuserName: 'EAF', phase: 'failed', activity: 'idle', active: false,
   startPosition: 32842, currentPosition: 32992, maxStep: 60000, stepSize: 50, offsetSteps: 4,

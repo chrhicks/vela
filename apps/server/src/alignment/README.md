@@ -20,10 +20,14 @@ until recovery or Stop, preserving the baseline, last solved image and its origi
 timestamp. The interface marks the device connection interrupted and asks the
 operator to pause adjustments until a fresh measurement arrives. Read-only pointing
 and validation are retried in place; preparation and motion are never replayed.
-A no-solution starts another exposure. A transport failure during capture can
-start a replacement exposure only when the adapter explicitly reports that no
-exposure command was sent, or an acknowledged exposure was cleaned up and the
-camera confirmed idle. Lost command responses, failed cleanup, invalid data,
+A no-solution starts another exposure. Known transport read failures during an
+acknowledged exposure retry inside acquisition without replacing that exposure.
+The controller shows `retrying`, clears the exposure timer, and preserves its
+baseline and timestamped last measurement; recovered reads restore `exposing`
+and the original timer but do not publish a measurement. A fresh capture attempt
+is allowed only when the adapter explicitly reports a safe pre-start failure.
+That retry refreshes and validates the mount observation and solve hint before
+requesting exposure. Preparation and motion are not repeated. Lost command responses, failed cleanup, invalid data,
 unsupported capabilities and subprocess errors still stop the operation.
 The latest acquired full-frame preview is published during baseline
 measurement before solving, including frames that cannot solve. Its exposure

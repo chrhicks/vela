@@ -19,7 +19,7 @@ afterEach(async () => {
 function setup(start = 32842, maxStep = 60000, { holdMoves = false, holdFinalMeasurement = false } = {}) {
   let position = start
   const moves: number[] = []
-  const captures: Array<ReturnType<typeof deferred<void>> & { position: number }> = []
+  const captures: Array<ReturnType<typeof deferred<void>> & Parameters<AutofocusCamera['capture']>[0] & { position: number }> = []
   const pendingMoves: Array<ReturnType<typeof deferred<void>> & { target: number }> = []
   const finalMeasurement = deferred<void>()
   const measuringFinal = deferred<void>()
@@ -49,10 +49,11 @@ function setup(start = 32842, maxStep = 60000, { holdMoves = false, holdFinalMea
   }
 
   const camera: AutofocusCamera = {
-    async capture({ signal, onProgress }) {
+    async capture(input) {
+      const { signal, onProgress } = input
       onProgress(0.2)
       const gate = deferred<void>()
-      captures.push({ position, ...gate })
+      captures.push({ position, ...input, ...gate })
       const abort = () => gate.reject(new AutofocusStoppedError())
       signal.addEventListener('abort', abort, { once: true })
       await gate.promise.finally(() => signal.removeEventListener('abort', abort))
@@ -101,27 +102,32 @@ it.each([
   Object.assign(new Error('Camera cleanup timed out'), { name: 'AbortError' }),
 ])('preserves a camera cleanup failure after Stop: $message', async failure => {
   const { controller, focuser, moves } = setup()
-  const exposing = deferred<void>()
+  const exposing = deferred<Parameters<AutofocusCamera['capture']>[0]>()
   const cleanup = deferred<never>()
+  const released = vi.fn()
 
   const camera: AutofocusCamera = {
-    async capture() {
-      exposing.resolve()
+    async capture(input) {
+      exposing.resolve(input)
 
       return cleanup.promise
     },
   }
 
-  await controller.start(camera, focuser)
-  await exposing.promise
+  await controller.start(camera, focuser, { onSettled: released })
+  const pending = await exposing.promise
+  pending.onReadState('retrying')
   const stopping = controller.stop()
-  expect(controller.snapshot()).toMatchObject({ active: true, activity: 'stopping' })
+  pending.onReadState('retrying')
+  expect(controller.snapshot()).toMatchObject({ active: true, activity: 'stopping', captureReadState: 'current' })
+  expect(released).not.toHaveBeenCalled()
   cleanup.reject(failure)
   await stopping
   expect(controller.snapshot()).toMatchObject({
-    phase: 'failed', active: false, currentPosition: 32842, restoredStart: true, error: failure.message,
+    phase: 'failed', active: false, currentPosition: 32842, restoredStart: true, error: failure.message, captureReadState: 'current',
   })
   expect(moves.at(-1)).toBe(32842)
+  expect(released).toHaveBeenCalledOnce()
 })
 
 it('restores start when Stop arrives while the final confirmation measurement is pending', async () => {
@@ -183,6 +189,41 @@ it('restores the start position on cancel and never commands 0', async () => {
   expect(controller.snapshot()).toMatchObject({ phase: 'stopped', startPosition: 32842, currentPosition: 32842, restoredStart: true })
   expect(moves.at(-1)).toBe(32842)
   expect(moves).not.toContain(0)
+})
+
+it('holds the current sample and lease through read recovery, then restores start when stopped during another interruption', async () => {
+  const { controller, camera, focuser, land, captures, moves } = setup()
+  const released = vi.fn()
+  await controller.start(camera, focuser, { onSettled: released })
+  await land()
+  await vi.waitFor(() => expect(captures).toHaveLength(1))
+  const prior = controller.snapshot().samples
+  expect(prior).toHaveLength(1)
+  const pending = captures[0]!
+  const exposureStartedAt = controller.snapshot().exposureStartedAt
+  pending.onReadState('retrying')
+  expect(controller.snapshot()).toMatchObject({ active: true, phase: 'walking', activity: 'exposing', captureReadState: 'retrying', samples: prior, exposureStartedAt })
+  expect(released).not.toHaveBeenCalled()
+  pending.onReadState('current')
+  expect(controller.snapshot()).toMatchObject({ captureReadState: 'current', activity: 'exposing', samples: prior, exposureStartedAt })
+  expect(captures).toHaveLength(1)
+  await land()
+  await vi.waitFor(() => expect(captures).toHaveLength(1))
+  expect(controller.snapshot().samples).toHaveLength(2)
+  pending.onReadState('retrying')
+  pending.onProgress(99)
+  expect(controller.snapshot()).toMatchObject({ captureReadState: 'current', elapsedSeconds: 0.2 })
+  const last = captures[0]!
+  last.onReadState('retrying')
+  const stopped = controller.stop()
+  last.onReadState('retrying')
+  expect(controller.snapshot()).toMatchObject({ activity: 'stopping', captureReadState: 'current' })
+  await stopped
+  last.onReadState('retrying')
+  expect(controller.snapshot()).toMatchObject({ active: false, phase: 'stopped', captureReadState: 'current', currentPosition: 32842, restoredStart: true })
+  expect(controller.snapshot().samples).toHaveLength(2)
+  expect(moves.at(-1)).toBe(32842)
+  expect(released).toHaveBeenCalledOnce()
 })
 
 it('aborts a window that would approach 0 without moving', async () => {

@@ -102,3 +102,11 @@ side is observed or explicitly unknown; download phase comes from image readout.
 NavigationView combines catalog identities with small snapshots of known capture
 controllers, including terminal phases. An absent controller does not confirm
 that a previously observed run finished; these snapshots are lost on restart.
+
+Capture, Framing, Autofocus and the Capture navigation summary require
+`captureReadState: 'current' | 'retrying'`, independent of the normal phase/activity.
+`retrying` means reads of the same acknowledged exposure are interrupted. `current`
+means no capture-read interruption is pending, not that an image completed. Start,
+Stop and settlement clear this state; prior images, solved checks and autofocus
+samples retain their own timestamps until a fresh result is published. Alignment
+uses its existing `activity: 'retrying'`, warning and exposure timer instead.

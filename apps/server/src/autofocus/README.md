@@ -18,6 +18,14 @@ Each short exposure appends `(position, HFR)` to the view immediately so the
 Observe graph can grow as the walk runs. The fit is the hyperbola minimum inside
 the sampled window. The lowest sampled HFR is comparison only.
 
+An acknowledged short exposure can remain pending while the adapter retries
+transport reads. `captureReadState` shows that interruption without changing the
+walk phase or exposing activity. Recovery does not append a sample or advance the
+focuser: those wait for the actual frame and measurement. Prior sample timestamps,
+the current position and the operation lease remain intact. Stop clears the read
+indicator and waits for camera cleanup and restoration; settled or cancelled
+capture callbacks cannot revive it.
+
 Stop during measurement still restores the start, including the final confirmation
 measurement. Only typed cancellation confirmed by a device boundary is reported
 as stopped; camera abort or cleanup failures remain failed even when return to the

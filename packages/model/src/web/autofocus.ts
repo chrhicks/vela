@@ -30,6 +30,8 @@ export interface AutofocusView {
   focuserName: string | null
   phase: AutofocusPhase
   activity: AutofocusActivity
+  /** Interrupted reads of the same exposure; current does not imply image completion. */
+  captureReadState: 'current' | 'retrying'
   active: boolean
   /** EAF position when the session began. Restore target. 0 is a reported mechanical stop, not a request to Move(0). */
   startPosition: number | null
