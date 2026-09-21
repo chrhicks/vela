@@ -35,7 +35,11 @@ interface ProjectedStar {
   color: readonly [number, number, number]
 }
 
-export function renderSky(stars: readonly Star[], pose: CameraPose, options: RenderOptions): Uint16Array {
+export function renderSky(
+  stars: readonly Star[],
+  pose: CameraPose,
+  options: RenderOptions,
+): Uint16Array {
   const steps = renderStripes(stars, pose, options)
   let step = steps.next()
 
@@ -45,7 +49,10 @@ export function renderSky(stars: readonly Star[], pose: CameraPose, options: Ren
 }
 
 export async function renderSkyAsync(
-  stars: readonly Star[], pose: CameraPose, options: RenderOptions, signal?: AbortSignal,
+  stars: readonly Star[],
+  pose: CameraPose,
+  options: RenderOptions,
+  signal?: AbortSignal,
 ): Promise<Uint16Array> {
   const steps = renderStripes(stars, pose, options)
 
@@ -64,7 +71,9 @@ export async function renderSkyAsync(
 }
 
 function* renderStripes(
-  stars: readonly Star[], pose: CameraPose, options: RenderOptions,
+  stars: readonly Star[],
+  pose: CameraPose,
+  options: RenderOptions,
 ): Generator<void, Uint16Array> {
   const { width, height, fieldHeightDegrees } = options
   const exposureScale = (options.exposureSeconds ?? 2) / 2
@@ -94,8 +103,16 @@ function* renderStripes(
       const star = stars[index]!
       const ra = star.raDegrees * Math.PI / 180
       const dec = star.decDegrees * Math.PI / 180
-      const direction = [Math.cos(dec) * Math.cos(ra), Math.cos(dec) * Math.sin(ra), Math.sin(dec)]
-      const dot = (axis: readonly number[]) => direction[0]! * axis[0]! + direction[1]! * axis[1]! + direction[2]! * axis[2]!
+
+      const direction = [
+        Math.cos(dec) * Math.cos(ra),
+        Math.cos(dec) * Math.sin(ra),
+        Math.sin(dec),
+      ]
+
+      const dot = (axis: readonly number[]) =>
+        direction[0]! * axis[0]! + direction[1]! * axis[1]! + direction[2]! * axis[2]!
+
       const depth = dot(pose.direction)
 
       if (depth <= 0) continue
@@ -136,8 +153,16 @@ function* renderStripes(
       if (starIndex > 0 && starIndex % 128 === 0) yield
       const { x, y, peak, color } = stripeStars[starIndex]!
 
-      for (let row = Math.max(firstRow, Math.ceil(y - radius)); row <= Math.min(endRow - 1, Math.floor(y + radius)); row++) {
-        for (let column = Math.max(0, Math.ceil(x - radius)); column <= Math.min(width - 1, Math.floor(x + radius)); column++) {
+      for (
+        let row = Math.max(firstRow, Math.ceil(y - radius));
+        row <= Math.min(endRow - 1, Math.floor(y + radius));
+        row++
+      ) {
+        for (
+          let column = Math.max(0, Math.ceil(x - radius));
+          column <= Math.min(width - 1, Math.floor(x + radius));
+          column++
+        ) {
           const distanceSquared = (column - x) ** 2 + (row - y) ** 2
           // Full sensor origin (0,0): R G / G B. No debayering at this boundary.
           const channel = row % 2 === 0 ? column % 2 : 1 + column % 2

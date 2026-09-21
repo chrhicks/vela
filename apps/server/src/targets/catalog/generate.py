@@ -14,20 +14,34 @@ SOURCES = {
   'addendum.csv': '1d8f0914e643ada325a5a94d88d8fefad6a4937a2f77cc34f21483af22b11983',
 }
 TYPES = {
-  '*': 'Star', '**': 'Double star', '*Ass': 'Association of stars',
-  'OCl': 'Open cluster', 'GCl': 'Globular cluster', 'Cl+N': 'Star cluster and nebula',
-  'G': 'Galaxy', 'GPair': 'Galaxy pair', 'GTrpl': 'Galaxy triplet',
-  'GGroup': 'Galaxy group', 'PN': 'Planetary nebula', 'HII': 'H II region',
-  'DrkN': 'Dark nebula', 'EmN': 'Emission nebula', 'Neb': 'Nebula',
-  'RfN': 'Reflection nebula', 'SNR': 'Supernova remnant', 'Nova': 'Nova',
+  '*': 'Star',
+  '**': 'Double star',
+  '*Ass': 'Association of stars',
+  'OCl': 'Open cluster',
+  'GCl': 'Globular cluster',
+  'Cl+N': 'Star cluster and nebula',
+  'G': 'Galaxy',
+  'GPair': 'Galaxy pair',
+  'GTrpl': 'Galaxy triplet',
+  'GGroup': 'Galaxy group',
+  'PN': 'Planetary nebula',
+  'HII': 'H II region',
+  'DrkN': 'Dark nebula',
+  'EmN': 'Emission nebula',
+  'Neb': 'Nebula',
+  'RfN': 'Reflection nebula',
+  'SNR': 'Supernova remnant',
+  'Nova': 'Nova',
   'Other': 'Other',
 }
 # These names refer to the retained source record, not a replacement position or size.
 # Evidence and the erroneous IC0434 aliases are recorded in README.md.
 EXTRA_NAMES = {
   'NGC6205': ['Great Hercules Cluster', 'Great Globular Cluster in Hercules'],
-  'IC1805': ['Heart Nebula'], 'IC1848': ['Soul Nebula', 'Embryo Nebula'],
-  'NGC2024': ['Flame Nebula'], 'B033': ['Barnard 33'],
+  'IC1805': ['Heart Nebula'],
+  'IC1848': ['Soul Nebula', 'Embryo Nebula'],
+  'NGC2024': ['Flame Nebula'],
+  'B033': ['Barnard 33'],
 }
 
 
@@ -73,10 +87,20 @@ def normalize(row):
       if number.strip():
         aliases.append(designation(prefix + number.strip()))
   aliases += common
-  return [name.lower(), designation(name), common[0] if common else None,
-          list(dict.fromkeys(aliases)), coordinate(row['RA'], True),
-          coordinate('+07:13:00.0' if name == 'IC3322A' and row['Dec'] == '+07:12:60.0' else row['Dec'], False), TYPES[row['Type']],
-          extent(row['MajAx']), extent(row['MinAx'])]
+  return [
+    name.lower(),
+    designation(name),
+    common[0] if common else None,
+    list(dict.fromkeys(aliases)),
+    coordinate(row['RA'], True),
+    coordinate(
+      '+07:13:00.0' if name == 'IC3322A' and row['Dec'] == '+07:12:60.0' else row['Dec'],
+      False,
+    ),
+    TYPES[row['Type']],
+    extent(row['MajAx']),
+    extent(row['MinAx']),
+  ]
 
 
 def generate():

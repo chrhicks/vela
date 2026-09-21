@@ -101,9 +101,21 @@ function VCurve({
     : ''
 
   return (
-    <svg className="vela-af-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Autofocus V-curve of focuser position versus star HFR">
+    <svg
+      className="vela-af-chart"
+      viewBox={`0 0 ${width} ${height}`}
+      role="img"
+      aria-label="Autofocus V-curve of focuser position versus star HFR"
+    >
       {[0.25, 0.5, 0.75, 1].map(fraction => (
-        <line key={fraction} className="vela-af-grid" x1={left} x2={width - right} y1={y(yMax * fraction)} y2={y(yMax * fraction)} />
+        <line
+          key={fraction}
+          className="vela-af-grid"
+          x1={left}
+          x2={width - right}
+          y1={y(yMax * fraction)}
+          y2={y(yMax * fraction)}
+        />
       ))}
       <line className="vela-af-axis" x1={left} y1={top} x2={left} y2={height - bottom} />
       <line className="vela-af-axis" x1={left} y1={height - bottom} x2={width - right} y2={height - bottom} />
@@ -116,7 +128,15 @@ function VCurve({
         </g>
       ))}
       <line className="vela-af-start" x1={x(start)} x2={x(start)} y1={top} y2={height - bottom} />
-      {fit && <line className="vela-af-fit-line" x1={x(Math.round(fit.p))} x2={x(Math.round(fit.p))} y1={top} y2={height - bottom} />}
+      {fit && (
+        <line
+          className="vela-af-fit-line"
+          x1={x(Math.round(fit.p))}
+          x2={x(Math.round(fit.p))}
+          y1={top}
+          y2={height - bottom}
+        />
+      )}
       {curve && <path className="vela-af-hyperbola" d={curve} />}
       {lowest && lowest.hfr !== null && (
         <circle className="vela-af-min-sample" cx={x(lowest.position)} cy={y(lowest.hfr)} r="8" />
@@ -192,18 +212,28 @@ function AutofocusPreview({ props, onPropsChange }: {
     return () => window.clearTimeout(finish)
   }, [phase])
 
-  const snapshotCount = phase === 'setup' || phase === 'travel-limit' ? 0
-    : playing ? landed
-    : phase === 'sampling' ? Math.min(4, allSamples.length)
-    : phase === 'restoring' || phase === 'restored' ? (landed > 0 ? landed : Math.min(3, allSamples.length))
-    : allSamples.length
+  let snapshotCount: number
+
+  if (phase === 'setup' || phase === 'travel-limit') {
+    snapshotCount = 0
+  } else if (playing) {
+    snapshotCount = landed
+  } else if (phase === 'sampling') {
+    snapshotCount = Math.min(4, allSamples.length)
+  } else if (phase === 'restoring' || phase === 'restored') {
+    snapshotCount = landed > 0 ? landed : Math.min(3, allSamples.length)
+  } else {
+    snapshotCount = allSamples.length
+  }
 
   const samples = allSamples.slice(0, snapshotCount)
   const fit = phase === 'complete' ? { p: FOCUS, a: MIN_HFR, b: CURVE_B } : null
 
-  const current = phase === 'complete' && fit ? Math.round(fit.p)
-    : phase === 'restored' || phase === 'restoring' || phase === 'setup' || phase === 'travel-limit' ? start
-    : samples.at(-1)?.position ?? start
+  const current = phase === 'complete' && fit
+    ? Math.round(fit.p)
+    : phase === 'restored' || phase === 'restoring' || phase === 'setup' || phase === 'travel-limit'
+      ? start
+      : samples.at(-1)?.position ?? start
 
   const travelBlocked = !planned || phase === 'travel-limit' || example === 'near-inward-limit'
   const setup = phase === 'setup' || phase === 'travel-limit'
@@ -231,12 +261,21 @@ function AutofocusPreview({ props, onPropsChange }: {
     restored: 'Start a new walk from the current position when you are ready.',
   }
 
-  const badge = setup ? (travelBlocked ? 'Blocked' : 'Not started')
-    : phase === 'sampling' ? 'Walking'
-    : phase === 'fitting' ? 'Fitting'
-    : phase === 'complete' ? 'Complete'
-    : phase === 'restoring' ? 'Restoring'
-    : 'Restored'
+  let badge: string
+
+  if (setup) {
+    badge = travelBlocked ? 'Blocked' : 'Not started'
+  } else if (phase === 'sampling') {
+    badge = 'Walking'
+  } else if (phase === 'fitting') {
+    badge = 'Fitting'
+  } else if (phase === 'complete') {
+    badge = 'Complete'
+  } else if (phase === 'restoring') {
+    badge = 'Restoring'
+  } else {
+    badge = 'Restored'
+  }
 
   function startWalk() {
     if (travelBlocked) return
@@ -249,11 +288,21 @@ function AutofocusPreview({ props, onPropsChange }: {
   const readout = (
     <Panel className="vela-af-readout">
       <dl>
-        <div><dt>Start</dt><dd>{start}</dd></div>
-        <div><dt>Current</dt><dd>{current}</dd></div>
+        <div>
+          <dt>Start</dt>
+          <dd>{start}</dd>
+        </div>
+        <div>
+          <dt>Current</dt>
+          <dd>{current}</dd>
+        </div>
         <div>
           <dt>Latest sample</dt>
-          <dd>{latest ? latest.hfr === null ? `${latest.position} · no stars` : `${latest.position} · ${latest.hfr.toFixed(2)} px` : '—'}</dd>
+          <dd>
+            {latest
+              ? latest.hfr === null ? `${latest.position} · no stars` : `${latest.position} · ${latest.hfr.toFixed(2)} px`
+              : '—'}
+          </dd>
         </div>
         <div>
           <dt>Fitted focus</dt>
@@ -269,7 +318,11 @@ function AutofocusPreview({ props, onPropsChange }: {
           {busy ? <span className="vela-af-activity__spinner" aria-hidden="true" /> : null}
           <strong>{activityLabel}</strong>
         </div>
-        <p>{samples.length ? `${samples.length} of ${allSamples.length || OFFSET * 2 + 1} shorts on the curve.` : 'No samples yet. The graph fills as each short exposure lands.'}</p>
+        <p>
+          {samples.length
+            ? `${samples.length} of ${allSamples.length || OFFSET * 2 + 1} shorts on the curve.`
+            : 'No samples yet. The graph fills as each short exposure lands.'}
+        </p>
       </div>
     </Panel>
   )
@@ -280,23 +333,54 @@ function AutofocusPreview({ props, onPropsChange }: {
         <span>Star HFR as the focuser walks</span>
         <span>Window around start · not a home to 0</span>
       </div>
-      <VCurve start={start} current={phase === 'setup' || phase === 'travel-limit' ? start : current} window={windowRange} samples={samples} fit={fit} />
+      <VCurve
+        start={start}
+        current={phase === 'setup' || phase === 'travel-limit' ? start : current}
+        window={windowRange}
+        samples={samples}
+        fit={fit}
+      />
       <div className="vela-af-legend">
-        <span><i data-kind="start" /> Start</span>
-        <span><i data-kind="sample" /> Sample</span>
-        <span><i data-kind="curve" /> Hyperbola</span>
-        <span><i data-kind="fit" /> Fitted minimum</span>
+        <span>
+          <i data-kind="start" />
+          {' Start'}
+        </span>
+        <span>
+          <i data-kind="sample" />
+          {' Sample'}
+        </span>
+        <span>
+          <i data-kind="curve" />
+          {' Hyperbola'}
+        </span>
+        <span>
+          <i data-kind="fit" />
+          {' Fitted minimum'}
+        </span>
       </div>
     </Panel>
   )
 
   return (
     <article className="vela-af-demo">
-      <header className="vela-af-shell"><strong>Vela</strong><span>Askar FRA 400</span><span>Observe</span></header>
+      <header className="vela-af-shell">
+        <strong>Vela</strong>
+        <span>Askar FRA 400</span>
+        <span>Observe</span>
+      </header>
       <main className="vela-af-main">
         <header className="vela-af-heading">
-          <div><p>Rig preparation</p><h1>Autofocus</h1></div>
-          <Badge tone={(setup && travelBlocked) || phase === 'restored' ? 'warning' : busy ? 'accent' : phase === 'complete' ? 'positive' : 'neutral'}>{badge}</Badge>
+          <div>
+            <p>Rig preparation</p>
+            <h1>Autofocus</h1>
+          </div>
+          <Badge
+            tone={(setup && travelBlocked) || phase === 'restored'
+              ? 'warning'
+              : busy ? 'accent' : phase === 'complete' ? 'positive' : 'neutral'}
+          >
+            {badge}
+          </Badge>
         </header>
         {setup && travelBlocked && (
           <div className="vela-af-notice" role="alert">
@@ -316,9 +400,18 @@ function AutofocusPreview({ props, onPropsChange }: {
               <h2>Focus from where you are</h2>
               <p>Vela will jump a little outward from the current EAF position, walk back through focus, and plot star size at each stop. Cancel returns here. Position 0 is a mechanical stop, not a home, and not backlash compensation off.</p>
               <dl className="vela-af-facts">
-                <div><dt>Current position</dt><dd>{start}</dd></div>
-                <div><dt>MaxStep</dt><dd>{FRA_MAX}</dd></div>
-                <div><dt>Window</dt><dd>{planned ? `${planned.low} → ${planned.high}` : 'Does not fit around start'}</dd></div>
+                <div>
+                  <dt>Current position</dt>
+                  <dd>{start}</dd>
+                </div>
+                <div>
+                  <dt>MaxStep</dt>
+                  <dd>{FRA_MAX}</dd>
+                </div>
+                <div>
+                  <dt>Window</dt>
+                  <dd>{planned ? `${planned.low} → ${planned.high}` : 'Does not fit around start'}</dd>
+                </div>
               </dl>
               <Input
                 label="Step size"
@@ -348,9 +441,24 @@ function AutofocusPreview({ props, onPropsChange }: {
                   : 'Points appear as each short lands. Stop restores the start position; Vela will not keep walking toward a limit.'}
               </p>
               {busy ? (
-                <Button size="large" onClick={() => { setPlaying(false); update({ phase: 'restored' }) }}>Stop and restore start</Button>
+                <Button
+                  size="large"
+                  onClick={() => {
+                    setPlaying(false)
+                    update({ phase: 'restored' })
+                  }}
+                >
+                  Stop and restore start
+                </Button>
               ) : (
-                <Button size="large" tone="accent" onClick={() => { setLanded(0); update({ phase: 'setup' }) }}>
+                <Button
+                  size="large"
+                  tone="accent"
+                  onClick={() => {
+                    setLanded(0)
+                    update({ phase: 'setup' })
+                  }}
+                >
                   {phase === 'complete' ? 'Focus again' : 'Back to setup'}
                 </Button>
               )}

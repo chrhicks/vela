@@ -15,8 +15,16 @@ function lightPhase(sunAltitude: number): SkyLightPhase {
   return sunAltitude < 0 ? 'civil' : 'daylight'
 }
 
-export function SkyInspection({ sky, targetName, stale }: { sky: TargetSkyPath | null, targetName: string, stale: boolean }) {
-  if (!sky) return <Panel title="Through the night" description="Site unavailable"><p>Site unavailable · sky path unknown</p></Panel>
+export function SkyInspection({ sky, targetName, stale }: {
+  sky: TargetSkyPath | null
+  targetName: string
+  stale: boolean
+}) {
+  if (!sky) return (
+    <Panel title="Through the night" description="Site unavailable">
+      <p>Site unavailable · sky path unknown</p>
+    </Panel>
+  )
 
   return <AvailableSky key={sky.startsAt} sky={sky} targetName={targetName} stale={stale} />
 }
@@ -29,9 +37,12 @@ function AvailableSky({ sky, targetName, stale }: { sky: TargetSkyPath, targetNa
   useEffect(() => { setOverlayHost(root.current?.closest('.vela-theme') ?? null) }, [])
   useEffect(() => {
     if (!expanded || !overlayHost) return
+
     // Keep the portal inside the app theme but outside the composition's
     // containing block. The rest of the app is inert while inspecting the sky.
-    const background = Array.from(overlayHost.children).filter((element): element is HTMLElement => element instanceof HTMLElement && !element.hasAttribute('data-sky-overlay'))
+    const background = Array.from(overlayHost.children).filter((element): element is HTMLElement =>
+      element instanceof HTMLElement && !element.hasAttribute('data-sky-overlay'))
+
     const previousInert = background.map(element => element.inert)
     const previousOverflow = document.body.style.overflow
     background.forEach(element => { element.inert = true })
@@ -52,7 +63,11 @@ function AvailableSky({ sky, targetName, stale }: { sky: TargetSkyPath, targetNa
 
   const skyProps: SkyPathProps = {
     targetName,
-    samples: sky.samples.map(sample => ({ ...sample, label: skyTime(sample.at), light: lightPhase(sample.sunAltitudeDegrees) })),
+    samples: sky.samples.map(sample => ({
+      ...sample,
+      label: skyTime(sample.at),
+      light: lightPhase(sample.sunAltitudeDegrees),
+    })),
     moonSamples: sky.samples.map(sample => sample.moon),
     selectedIndex,
     onSelectedIndexChange: (index: number) => setSelectedAt(sky.samples[index]!.at),
@@ -63,23 +78,43 @@ function AvailableSky({ sky, targetName, stale }: { sky: TargetSkyPath, targetNa
 
   const selectedDate = new Date(sky.samples[selectedIndex]!.at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 
-  const details = <>
-    <p className="vela-target-sky-time">{selectedDate} · Light boundaries approximate · 15-minute samples</p>
-    {stale && <p role="status">Sky updates interrupted · last calculation shown.</p>}
-  </>
+  const details = (
+    <>
+      <p className="vela-target-sky-time">{selectedDate} · Light boundaries approximate · 15-minute samples</p>
+      {stale && <p role="status">Sky updates interrupted · last calculation shown.</p>}
+    </>
+  )
 
-  return <div ref={root}>
-    <Panel title="Through the night" description={`Local time · ${stale ? 'last update' : 'calculated'} ${skyTime(sky.observedAt)}`}>
-      <SkyPath {...skyProps} compact />
-      {details}
-      <Button className="vela-target-expand-sky" tone="quiet" onClick={() => setExpanded(true)}>Expand sky view</Button>
-      <div className="vela-target-sky-facts"><strong>{skyWindow(sky)}</strong><span>{sky.highestAltitudeDegrees.toFixed(0)}° highest altitude</span></div>
-    </Panel>
-    {overlayHost && createPortal(<div data-sky-overlay>
-      <Dialog open={expanded} title={`${targetName} · Through the night`} description="Local time · target and Moon positions" dismissLabel="Close sky view" className="vela-target-sky-dialog" onDismiss={() => setExpanded(false)}>
-        <SkyPath {...skyProps} />
+  return (
+    <div ref={root}>
+      <Panel
+        title="Through the night"
+        description={`Local time · ${stale ? 'last update' : 'calculated'} ${skyTime(sky.observedAt)}`}
+      >
+        <SkyPath {...skyProps} compact />
         {details}
-      </Dialog>
-    </div>, overlayHost)}
-  </div>
+        <Button className="vela-target-expand-sky" tone="quiet" onClick={() => setExpanded(true)}>Expand sky view</Button>
+        <div className="vela-target-sky-facts">
+          <strong>{skyWindow(sky)}</strong>
+          <span>{sky.highestAltitudeDegrees.toFixed(0)}° highest altitude</span>
+        </div>
+      </Panel>
+      {overlayHost && createPortal(
+        <div data-sky-overlay>
+          <Dialog
+            open={expanded}
+            title={`${targetName} · Through the night`}
+            description="Local time · target and Moon positions"
+            dismissLabel="Close sky view"
+            className="vela-target-sky-dialog"
+            onDismiss={() => setExpanded(false)}
+          >
+            <SkyPath {...skyProps} />
+            {details}
+          </Dialog>
+        </div>,
+        overlayHost,
+      )}
+    </div>
+  )
 }

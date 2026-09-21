@@ -3,10 +3,27 @@ import type { CaptureView } from '@vela/model/web'
 
 const idle: CaptureView = {
   captureReadState: 'current',
-  rigId: 'rig-1', rigName: 'Cooling review', camera: { name: 'Main camera' }, enabled: true,
-  unavailableReason: null, phase: 'idle', active: false, exposureSeconds: 2, elapsedSeconds: 0,
-  error: null, saveFrames: false, savedImageCount: 0, latestImage: null, repeat: false, completedCount: 0,
-  cooling: { state: 'off', canSetTemperature: true, setpointC: 5, sensorTemperatureC: 5 },
+  rigId: 'rig-1',
+  rigName: 'Cooling review',
+  camera: { name: 'Main camera' },
+  enabled: true,
+  unavailableReason: null,
+  phase: 'idle',
+  active: false,
+  exposureSeconds: 2,
+  elapsedSeconds: 0,
+  error: null,
+  saveFrames: false,
+  savedImageCount: 0,
+  latestImage: null,
+  repeat: false,
+  completedCount: 0,
+  cooling: {
+    state: 'off',
+    canSetTemperature: true,
+    setpointC: 5,
+    sensorTemperatureC: 5,
+  },
 }
 
 test.beforeEach(async ({ page }) => {
@@ -26,7 +43,12 @@ test('keeps uncertain temperature visible through incomplete reads and capture c
     commands++
     current = { ...idle, cooling: { state: 'off', canSetTemperature: true } }
 
-    return route.fulfill({ status: 409, json: { error: 'The cooler command could not be confirmed. Check camera cooling before assuming it changed.' } })
+    return route.fulfill({
+      status: 409,
+      json: {
+        error: 'The cooler command could not be confirmed. Check camera cooling before assuming it changed.',
+      },
+    })
   })
   await page.route('**/api/rigs/rig-1/capture/start', route => {
     current = { ...current, active: true, phase: 'exposing' }

@@ -7,10 +7,12 @@ describe('camera tangent plane geometry', () => {
     const angle = 32 * Math.PI / 180
     const points = frameCorners(center, width, height, 32)
     // Forward-project the corners independently to recover the camera axes.
-    const r = Math.PI / 180, d0 = center.decDegrees * r
+    const r = Math.PI / 180
+    const d0 = center.decDegrees * r
 
     const plane = points.map(p => {
-      const da = (p.raDegrees - center.raDegrees) * r, d = p.decDegrees * r
+      const da = (p.raDegrees - center.raDegrees) * r
+      const d = p.decDegrees * r
       const denominator = Math.sin(d0) * Math.sin(d) + Math.cos(d0) * Math.cos(d) * Math.cos(da)
       const x = Math.cos(d) * Math.sin(da) / denominator
       const y = (Math.cos(d0) * Math.sin(d) - Math.sin(d0) * Math.cos(d) * Math.cos(da)) / denominator
@@ -20,7 +22,10 @@ describe('camera tangent plane geometry', () => {
 
     expect(points.some(p => p.raDegrees < 180)).toBe(true)
 
-    for (const [x, y] of plane) { expect(Math.abs(x!)).toBeCloseTo(width / 2, 8); expect(Math.abs(y!)).toBeCloseTo(height / 2, 8) }
+    for (const [x, y] of plane) {
+      expect(Math.abs(x!)).toBeCloseTo(width / 2, 8)
+      expect(Math.abs(y!)).toBeCloseTo(height / 2, 8)
+    }
 
     expect(offsetPosition(center, 0, 0)).toEqual(center)
   })

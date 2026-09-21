@@ -33,7 +33,10 @@ export interface SavedImage extends CaptureImage {
   fitsUrl: string
   previewDownloadUrl: string
   /** Rendering state is separate from immutable capture facts; absent on older API fixtures. */
-  previewRendering?: { status: 'current', version: 'background-v1' } | { status: 'legacy' } | { status: 'unavailable' }
+  previewRendering?:
+    | { status: 'current', version: 'background-v1' }
+    | { status: 'legacy' }
+    | { status: 'unavailable' }
 }
 
 export interface SavedImagesView {
@@ -48,7 +51,15 @@ export interface SavedImageView {
   image: SavedImage
 }
 
-export type CapturePhase = 'idle' | 'exposing' | 'reading' | 'saving' | 'stopping' | 'complete' | 'stopped' | 'failed'
+export type CapturePhase =
+  | 'idle'
+  | 'exposing'
+  | 'reading'
+  | 'saving'
+  | 'stopping'
+  | 'complete'
+  | 'stopped'
+  | 'failed'
 
 /** Confirmed imaging-camera cooling. Sensor temperature near a setpoint does not mean the cooler is on. */
 export interface CaptureCoolingView {

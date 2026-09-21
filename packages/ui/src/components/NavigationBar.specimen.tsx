@@ -19,7 +19,10 @@ export const specimen: ComponentSpecimen = {
     if (props.activity !== 'none') {
       const activity: NavigationActivity = {
         href: '#capture',
-        onClick: event => { event.preventDefault(); onPropsChange?.({ rig: 'askar', page: 'capture' }) },
+        onClick: event => {
+          event.preventDefault()
+          onPropsChange?.({ rig: 'askar', page: 'capture' })
+        },
         label: 'Askar FRA 400 capture. 17 captured. Current exposure 18 of 60 seconds. Open capture.',
         completedCount: 17,
         status: '18 / 60s',
@@ -47,13 +50,35 @@ export const specimen: ComponentSpecimen = {
       navigation.activity = activity
     }
 
-    return <NavigationBar
-      home={{ href: '#rigs', onClick: event => { event.preventDefault(); onPropsChange?.({ rig: 'all' }) } }}
-      rigs={[{ id: 'all', name: 'All rigs' }, { id: 'askar', name: 'Askar FRA 400' }, { id: 'seestar', name: 'Seestar S30' }]}
-      currentRigId={String(props.rig)}
-      onRigChange={rig => onPropsChange?.({ rig })}
-      links={props.rig === 'all' ? [] : ['observe', 'targets', 'capture'].map(page => ({ href: `#${page}`, label: page[0]!.toUpperCase() + page.slice(1), current: props.page === page, onClick: event => { event.preventDefault(); onPropsChange?.({ page }) } }))}
-      {...navigation}
-    />
+    return (
+      <NavigationBar
+        home={{
+          href: '#rigs',
+          onClick: event => {
+            event.preventDefault()
+            onPropsChange?.({ rig: 'all' })
+          }
+        }}
+        rigs={[
+          { id: 'all', name: 'All rigs' },
+          { id: 'askar', name: 'Askar FRA 400' },
+          { id: 'seestar', name: 'Seestar S30' }
+        ]}
+        currentRigId={String(props.rig)}
+        onRigChange={rig => onPropsChange?.({ rig })}
+        links={props.rig === 'all'
+          ? []
+          : ['observe', 'targets', 'capture'].map(page => ({
+            href: `#${page}`,
+            label: page[0]!.toUpperCase() + page.slice(1),
+            current: props.page === page,
+            onClick: event => {
+              event.preventDefault()
+              onPropsChange?.({ page })
+            }
+          }))}
+        {...navigation}
+      />
+    )
   },
 }

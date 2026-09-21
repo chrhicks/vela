@@ -48,7 +48,15 @@ export function useSimulator() {
     }
   }, [])
 
-  async function command(path: string, method: string, body: { altitudeArcsec: number; azimuthArcsec: number } | { preset: string } | { cameraNumber?: number; resolution?: string; obscured?: boolean }, success: string) {
+  async function command(
+    path: string,
+    method: string,
+    body:
+      | { altitudeArcsec: number; azimuthArcsec: number }
+      | { preset: string }
+      | { cameraNumber?: number; resolution?: string; obscured?: boolean },
+    success: string,
+  ) {
     if (writing.current) return
     generation.current++
     writing.current = true
@@ -56,14 +64,21 @@ export function useSimulator() {
     setNotice('Applying change…')
 
     try {
-      accept(await request(path, { method, body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } }))
+      accept(await request(path, {
+        method,
+        body: JSON.stringify(body),
+        headers: { 'Content-Type': 'application/json' },
+      }))
       setNotice(success)
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Change was not confirmed.')
 
       // Inspect once after an uncertain response. Never repeat the write.
-      try { accept(await request('/simulator/state')) }
-      catch { setAvailable(false) }
+      try {
+        accept(await request('/simulator/state'))
+      } catch {
+        setAvailable(false)
+      }
     } finally {
       writing.current = false
       setPending(false)
@@ -74,17 +89,25 @@ export function useSimulator() {
 }
 
 async function request(path: string, init: RequestInit = {}): Promise<SimulatorState> {
-  const response = await fetch(path, { ...init, signal: init.signal ? AbortSignal.any([init.signal, AbortSignal.timeout(5000)]) : AbortSignal.timeout(5000) })
+  const response = await fetch(path, {
+    ...init,
+    signal: init.signal
+      ? AbortSignal.any([init.signal, AbortSignal.timeout(5000)])
+      : AbortSignal.timeout(5000),
+  })
 
   if (!response.ok) {
     const error = await response.json().catch(() => undefined)
     const failure = z.object({ error: z.string() }).safeParse(error)
-    throw new Error(failure.success ? failure.data.error : 'Change was not confirmed. Check the current rig state.')
+    throw new Error(failure.success
+      ? failure.data.error
+      : 'Change was not confirmed. Check the current rig state.')
   }
 
   const value: unknown = await response.json()
 
-  if (!isState(value)) throw new Error('Simulator returned an invalid state. Change was not confirmed.')
+  if (!isState(value))
+    throw new Error('Simulator returned an invalid state. Change was not confirmed.')
 
   return value
 }
@@ -98,7 +121,8 @@ const cameraState = z.object({
   sensor: z.enum(['mono', 'rggb']),
   width: z.number(),
   height: z.number(),
-}).refine(camera => camera.width === cameraGeometry(camera.resolution).width
+}).refine(camera =>
+  camera.width === cameraGeometry(camera.resolution).width
   && camera.height === cameraGeometry(camera.resolution).height)
 
 const simulatorState = z.object({

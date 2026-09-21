@@ -4,8 +4,19 @@ import { createAlpacaAcquisition, AlpacaCaptureStoppedError, AlpacaCaptureRetrya
 import { AlpacaProviderError } from './error.js'
 
 function observatory() {
-  const camera = { DeviceName: 'Camera', DeviceType: 'Camera', DeviceNumber: 7, UniqueID: 'camera-id' }
-  const telescope = { DeviceName: 'Mount', DeviceType: 'Telescope', DeviceNumber: 3, UniqueID: 'mount-id' }
+  const camera = {
+    DeviceName: 'Camera',
+    DeviceType: 'Camera',
+    DeviceNumber: 7,
+    UniqueID: 'camera-id',
+  }
+
+  const telescope = {
+    DeviceName: 'Mount',
+    DeviceType: 'Telescope',
+    DeviceNumber: 3,
+    UniqueID: 'mount-id',
+  }
 
   interface CameraFixture {
     Type: number
@@ -102,7 +113,12 @@ function observatory() {
     else if (operation === 'binx') Value = state.binX
     else if (operation === 'biny') Value = state.binY
     else if (operation === 'bayeroffsetx' || operation === 'bayeroffsety') {
-      if (state.unsupportedOffset) return Response.json({ ClientTransactionID: 0, ServerTransactionID: 1, ErrorNumber: 1024, ErrorMessage: 'Not implemented' })
+      if (state.unsupportedOffset) return Response.json({
+        ClientTransactionID: 0,
+        ServerTransactionID: 1,
+        ErrorNumber: 1024,
+        ErrorMessage: 'Not implemented',
+      })
       Value = operation === 'bayeroffsetx' ? state.offsetX : state.offsetY
     }
     else if (operation === 'startx') Value = state.startX
@@ -118,7 +134,12 @@ function observatory() {
       Value = state.rate !== 0 || (state.stopping && state.pendingStopReads-- > 0)
     }
     else if (operation === 'lastexposurestarttime') {
-      if (state.stampError) return Response.json({ ClientTransactionID: 0, ServerTransactionID: 1, ErrorNumber: state.stampError, ErrorMessage: 'Timestamp unavailable' })
+      if (state.stampError) return Response.json({
+        ClientTransactionID: 0,
+        ServerTransactionID: 1,
+        ErrorNumber: state.stampError,
+        ErrorMessage: 'Timestamp unavailable',
+      })
       Value = state.stamp
     }
     else if (operation === 'declination') Value = 60
@@ -154,10 +175,22 @@ function observatory() {
 
       if (state.imageBinary) return new Response(state.imageBinary, { headers: { 'content-type': 'application/imagebytes' } })
 
-      return Response.json({ ClientTransactionID: 0, ServerTransactionID: 1, ErrorNumber: 0, ErrorMessage: '', ...state.image })
+      return Response.json({
+        ClientTransactionID: 0,
+        ServerTransactionID: 1,
+        ErrorNumber: 0,
+        ErrorMessage: '',
+        ...state.image,
+      })
     } else throw new Error(`Unexpected request ${url.pathname}`)
 
-    return Response.json({ ClientTransactionID: 0, ServerTransactionID: 1, ErrorNumber: 0, ErrorMessage: '', Value })
+    return Response.json({
+      ClientTransactionID: 0,
+      ServerTransactionID: 1,
+      ErrorNumber: 0,
+      ErrorMessage: '',
+      Value,
+    })
   }
 
   return {
@@ -198,7 +231,17 @@ describe('normalized Alpaca acquisition', () => {
       return rig.fetch(input, init)
     }
 
-    return { ...rig, reads, acquisition: createAlpacaAcquisition({ baseUrl: 'http://fake', fetch, requestTimeoutMs: 10, imageTimeoutMs: 10, readRetryIntervalMs: 10 }) }
+    return {
+      ...rig,
+      reads,
+      acquisition: createAlpacaAcquisition({
+        baseUrl: 'http://fake',
+        fetch,
+        requestTimeoutMs: 10,
+        imageTimeoutMs: 10,
+        readRetryIntervalMs: 10,
+      }),
+    }
   }
 
   it('classifies a device-list timeout before any write as a retryable capture', async () => {
@@ -245,7 +288,14 @@ describe('normalized Alpaca acquisition', () => {
     rig.state.cameraStopFails = true
     const controller = new AbortController()
     const onReadState = vi.fn()
-    const result = rig.acquisition.capture({ cameraId: 'camera-id', exposureSeconds: 1, signal: controller.signal, onReadState }).catch(error => error)
+
+    const result = rig.acquisition.capture({
+      cameraId: 'camera-id',
+      exposureSeconds: 1,
+      signal: controller.signal,
+      onReadState,
+    }).catch(error => error)
+
     await vi.waitFor(() => expect(onReadState).toHaveBeenCalledWith('retrying'))
     controller.abort()
     const error = await result
@@ -274,7 +324,14 @@ describe('normalized Alpaca acquisition', () => {
     const acquisition = createAlpacaAcquisition({ baseUrl: 'http://fake', fetch })
     const controller = new AbortController()
     const onReadState = vi.fn()
-    const result = acquisition.capture({ cameraId: 'camera-id', exposureSeconds: 1, signal: controller.signal, onReadState }).catch(error => error)
+
+    const result = acquisition.capture({
+      cameraId: 'camera-id',
+      exposureSeconds: 1,
+      signal: controller.signal,
+      onReadState,
+    }).catch(error => error)
+
     await vi.waitFor(() => expect(onReadState).toHaveBeenCalledWith('retrying'))
     controller.abort()
     const error = await result
@@ -309,7 +366,14 @@ describe('normalized Alpaca acquisition', () => {
     }
 
     const acquisition = createAlpacaAcquisition({ baseUrl: 'http://fake', fetch, readRetryIntervalMs: 60_000 })
-    const result = acquisition.capture({ cameraId: 'camera-id', exposureSeconds: 20, signal: controller.signal, onReadState })
+
+    const result = acquisition.capture({
+      cameraId: 'camera-id',
+      exposureSeconds: 20,
+      signal: controller.signal,
+      onReadState,
+    })
+
     const rejection = expect(result).rejects.toBeInstanceOf(AlpacaCaptureStoppedError)
     await vi.waitFor(() => expect(stage === 'request' ? pending : onReadState.mock.calls.length === 1).toBe(true))
     controller.abort()
@@ -335,7 +399,13 @@ describe('normalized Alpaca acquisition', () => {
       if (operation === 'imageready' && rig.state.starts > 0 && unavailable) throw new TypeError('Connection unavailable')
 
       if (operation === 'camerastate' && rig.state.starts > 0 && rig.state.aborts === 0) {
-        return Response.json({ ClientTransactionID: 0, ServerTransactionID: 1, ErrorNumber: 0, ErrorMessage: '', Value: cameraState })
+        return Response.json({
+          ClientTransactionID: 0,
+          ServerTransactionID: 1,
+          ErrorNumber: 0,
+          ErrorMessage: '',
+          Value: cameraState,
+        })
       }
 
       return rig.fetch(input, init)
@@ -390,7 +460,13 @@ describe('normalized Alpaca acquisition', () => {
       return rig.fetch(input, init)
     }
 
-    const acquisition = createAlpacaAcquisition({ baseUrl: 'http://fake', fetch, imageTimeoutMs: 10, readRetryIntervalMs: 10 })
+    const acquisition = createAlpacaAcquisition({
+      baseUrl: 'http://fake',
+      fetch,
+      imageTimeoutMs: 10,
+      readRetryIntervalMs: 10,
+    })
+
     const result = acquisition.capture({ cameraId: 'camera-id', exposureSeconds: 1, onReadState })
 
     const settled = replaced ? expect(result).rejects.toThrow('Exposure changed before image transfer')
@@ -442,7 +518,11 @@ describe('normalized Alpaca acquisition', () => {
     const rig = observatory()
     let resolved = false
 
-    const result = rig.acquisition.capture({ cameraId: 'camera-id', expectedCameraName: 'Camera', exposureSeconds: 1 }).then(frame => {
+    const result = rig.acquisition.capture({
+      cameraId: 'camera-id',
+      expectedCameraName: 'Camera',
+      exposureSeconds: 1,
+    }).then(frame => {
       resolved = true
 
       return frame
@@ -480,7 +560,11 @@ describe('normalized Alpaca acquisition', () => {
   it.each(['Different camera', ''])('rejects a changed or missing operational camera identity before exposure: %j', async cameraName => {
     const rig = observatory()
     rig.state.cameraName = cameraName
-    await expect(rig.acquisition.capture({ cameraId: 'camera-id', expectedCameraName: 'Camera', exposureSeconds: 1 })).rejects.toThrow()
+    await expect(rig.acquisition.capture({
+      cameraId: 'camera-id',
+      expectedCameraName: 'Camera',
+      exposureSeconds: 1,
+    })).rejects.toThrow()
     expect(rig.state.starts).toBe(0)
     expect(rig.state.aborts).toBe(0)
   })
@@ -522,7 +606,11 @@ describe('normalized Alpaca acquisition', () => {
   it('preserves the pre-exposure restriction for a monochrome-only consumer', async () => {
     const rig = observatory()
     rig.state.sensorType = 2
-    await expect(rig.acquisition.capture({ cameraId: 'camera-id', exposureSeconds: 1, monochromeOnly: true })).rejects.toThrow('requires a monochrome camera')
+    await expect(rig.acquisition.capture({
+      cameraId: 'camera-id',
+      exposureSeconds: 1,
+      monochromeOnly: true,
+    })).rejects.toThrow('requires a monochrome camera')
     expect(rig.state.starts).toBe(0)
     expect(rig.state.aborts).toBe(0)
   })
@@ -601,7 +689,11 @@ describe('normalized Alpaca acquisition', () => {
     rig.state.exposing = true
     const controller = new AbortController()
     controller.abort()
-    await expect(rig.acquisition.capture({ cameraId: 'camera-id', exposureSeconds: 1, signal: controller.signal })).rejects.toBeInstanceOf(AlpacaCaptureStoppedError)
+    await expect(rig.acquisition.capture({
+      cameraId: 'camera-id',
+      exposureSeconds: 1,
+      signal: controller.signal,
+    })).rejects.toBeInstanceOf(AlpacaCaptureStoppedError)
     expect(rig.state.starts).toBe(0)
     expect(rig.state.aborts).toBe(0)
     expect(rig.state.exposing).toBe(true)
@@ -610,7 +702,13 @@ describe('normalized Alpaca acquisition', () => {
   it('aborts a pending exposure with an independent signal after cancellation', async () => {
     const rig = observatory()
     const controller = new AbortController()
-    const result = rig.acquisition.capture({ cameraId: 'camera-id', exposureSeconds: 1, signal: controller.signal })
+
+    const result = rig.acquisition.capture({
+      cameraId: 'camera-id',
+      exposureSeconds: 1,
+      signal: controller.signal,
+    })
+
     const rejection = expect(result).rejects.toBeInstanceOf(AlpacaCaptureStoppedError)
     await started(rig)
     controller.abort()
@@ -622,7 +720,13 @@ describe('normalized Alpaca acquisition', () => {
   it('does not report confirmed cancellation when camera cleanup fails', async () => {
     const rig = observatory()
     const controller = new AbortController()
-    const result = rig.acquisition.capture({ cameraId: 'camera-id', exposureSeconds: 1, signal: controller.signal })
+
+    const result = rig.acquisition.capture({
+      cameraId: 'camera-id',
+      exposureSeconds: 1,
+      signal: controller.signal,
+    })
+
     const rejection = expect(result).rejects.not.toBeInstanceOf(AlpacaCaptureStoppedError)
     await started(rig)
     rig.state.cameraStopFails = true
@@ -690,8 +794,12 @@ describe('normalized Alpaca acquisition', () => {
   it('normalizes observer and pointing coordinates without disguising their reference frame', async () => {
     const rig = observatory()
     await expect(rig.acquisition.pointing('mount-id')).resolves.toEqual({
-      rightAscensionDegrees: 30, declinationDegrees: 60, siderealTimeDegrees: 60,
-      latitudeDegrees: 35, tracking: true, coordinateSystem: 'other',
+      rightAscensionDegrees: 30,
+      declinationDegrees: 60,
+      siderealTimeDegrees: 60,
+      latitudeDegrees: 35,
+      tracking: true,
+      coordinateSystem: 'other',
     })
   })
 })

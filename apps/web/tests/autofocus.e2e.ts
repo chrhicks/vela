@@ -3,11 +3,27 @@ import type { AutofocusView } from '@vela/model/web'
 
 const setup: AutofocusView = {
   captureReadState: 'current',
-  rigId: 'rig-1', rigName: 'Askar FRA 400', enabled: true, unavailableReason: null,
-  cameraName: 'ASI2600MM Pro', focuserName: 'EAF', phase: 'setup', activity: 'idle', active: false,
-  startPosition: null, currentPosition: 32842, maxStep: 60000, stepSize: 50, offsetSteps: 4,
-  exposureSeconds: 2, elapsedSeconds: 0, exposureStartedAt: null, samples: [], fit: null,
-  restoredStart: false, error: null,
+  rigId: 'rig-1',
+  rigName: 'Askar FRA 400',
+  enabled: true,
+  unavailableReason: null,
+  cameraName: 'ASI2600MM Pro',
+  focuserName: 'EAF',
+  phase: 'setup',
+  activity: 'idle',
+  active: false,
+  startPosition: null,
+  currentPosition: 32842,
+  maxStep: 60000,
+  stepSize: 50,
+  offsetSteps: 4,
+  exposureSeconds: 2,
+  elapsedSeconds: 0,
+  exposureStartedAt: null,
+  samples: [],
+  fit: null,
+  restoredStart: false,
+  error: null,
 }
 
 test('setup starts from the current EAF position and never offers a home to 0', async ({ page }) => {
@@ -33,7 +49,14 @@ test('the V-curve grows as each short lands', async ({ page }) => {
   let fit: AutofocusView['fit'] = null
 
   const view = (): AutofocusView => ({
-    ...setup, phase, activity, active, startPosition, currentPosition, samples, fit,
+    ...setup,
+    phase,
+    activity,
+    active,
+    startPosition,
+    currentPosition,
+    samples,
+    fit,
   })
 
   await page.route('**/api/web/rigs/rig-1/autofocus', route => route.fulfill({ json: view() }))
@@ -43,13 +66,23 @@ test('the V-curve grows as each short lands', async ({ page }) => {
     active = true
     activity = 'exposing'
     currentPosition = 33042
-    samples = [{ position: 33042, detectedStars: 18, hfrPixels: 5.42, capturedAt: '2026-09-17T00:00:00.000Z' }]
+    samples = [{
+      position: 33042,
+      detectedStars: 18,
+      hfrPixels: 5.42,
+      capturedAt: '2026-09-17T00:00:00.000Z',
+    }]
     await route.fulfill({ json: view() })
     setTimeout(() => {
       currentPosition = 32992
       samples = [
         ...samples,
-        { position: 32992, detectedStars: 24, hfrPixels: 4.1, capturedAt: '2026-09-17T00:00:02.000Z' },
+        {
+          position: 32992,
+          detectedStars: 24,
+          hfrPixels: 4.1,
+          capturedAt: '2026-09-17T00:00:02.000Z',
+        },
       ]
     }, 700)
   })
@@ -111,7 +144,12 @@ test('an unrestored failure is not labeled as a travel limit', async ({ page }) 
     startPosition: 32842,
     currentPosition: 32992,
     restoredStart: false,
-    samples: [{ position: 32992, detectedStars: 18, hfrPixels: 4.1, capturedAt: '2026-09-17T00:00:02.000Z' }],
+    samples: [{
+      position: 32992,
+      detectedStars: 18,
+      hfrPixels: 4.1,
+      capturedAt: '2026-09-17T00:00:02.000Z',
+    }],
     error: 'The focuser did not confirm return to the start position. Vela did not repeat the move.',
   }
 
@@ -138,7 +176,12 @@ test('a restored stop keeps the walk view and notice, then returns to setup', as
     startPosition: 32842,
     currentPosition: 32842,
     restoredStart: true,
-    samples: [{ position: 32942, detectedStars: 22, hfrPixels: 3.21, capturedAt: '2026-09-17T00:00:04.000Z' }],
+    samples: [{
+      position: 32942,
+      detectedStars: 22,
+      hfrPixels: 3.21,
+      capturedAt: '2026-09-17T00:00:04.000Z',
+    }],
   }
 
   await page.route('**/api/web/rigs/rig-1/autofocus', route => route.fulfill({ json: stopped }))
@@ -161,8 +204,20 @@ test('focus again returns to setup instead of starting another walk', async ({ p
     active: false,
     startPosition: 32842,
     currentPosition: 32838,
-    samples: [{ position: 32642, detectedStars: 40, hfrPixels: 5.06, capturedAt: '2026-09-17T00:00:10.000Z' }],
-    fit: { position: 32838, p: 32838.2, a: 2.18, b: 95, rSquared: 0.99, minSamplePosition: 32842 },
+    samples: [{
+      position: 32642,
+      detectedStars: 40,
+      hfrPixels: 5.06,
+      capturedAt: '2026-09-17T00:00:10.000Z',
+    }],
+    fit: {
+      position: 32838,
+      p: 32838.2,
+      a: 2.18,
+      b: 95,
+      rSquared: 0.99,
+      minSamplePosition: 32842,
+    },
   }
 
   await page.route('**/api/web/rigs/rig-1/autofocus', route => route.fulfill({ json: complete }))

@@ -4,12 +4,25 @@ import type { ImageColor } from './preview.js'
 
 /** Export acquisition samples without stretching, calibration, or row reversal. */
 export async function encodeCaptureFits(
-  frame: { width: number, height: number, pixels: ArrayLike<number>, capturedAt: string, capturedAtSource?: CaptureImage['capturedAtSource'], color?: ImageColor },
+  frame: {
+    width: number
+    height: number
+    pixels: ArrayLike<number>
+    capturedAt: string
+    capturedAtSource?: CaptureImage['capturedAtSource']
+    color?: ImageColor
+  },
   metadata: { exposureSeconds: number, cameraName: string },
 ): Promise<Buffer> {
   const { width, height, pixels } = frame
 
-  if (!Number.isSafeInteger(width) || width < 1 || !Number.isSafeInteger(height) || height < 1 || pixels.length !== width * height) {
+  if (
+    !Number.isSafeInteger(width)
+    || width < 1
+    || !Number.isSafeInteger(height)
+    || height < 1
+    || pixels.length !== width * height
+  ) {
     throw new Error('Cannot export FITS: image dimensions do not match its samples')
   }
 
@@ -40,10 +53,15 @@ export async function encodeCaptureFits(
   const bytesPerSample = unsigned16 ? 2 : 4
 
   const cards = [
-    card('SIMPLE', 'T'.padStart(20)), numberCard('BITPIX', bytesPerSample * 8), numberCard('NAXIS', 2),
-    numberCard('NAXIS1', width), numberCard('NAXIS2', height),
-    textCard('DATE-OBS', start.toISOString()), numberCard('EXPTIME', metadata.exposureSeconds),
-    textCard('INSTRUME', metadata.cameraName), textCard('ROWORDER', 'TOP-DOWN'),
+    card('SIMPLE', 'T'.padStart(20)),
+    numberCard('BITPIX', bytesPerSample * 8),
+    numberCard('NAXIS', 2),
+    numberCard('NAXIS1', width),
+    numberCard('NAXIS2', height),
+    textCard('DATE-OBS', start.toISOString()),
+    numberCard('EXPTIME', metadata.exposureSeconds),
+    textCard('INSTRUME', metadata.cameraName),
+    textCard('ROWORDER', 'TOP-DOWN'),
   ]
 
   if (unsigned16) cards.push(numberCard('BZERO', 32_768), numberCard('BSCALE', 1))

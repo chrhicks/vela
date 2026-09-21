@@ -46,9 +46,18 @@ function DialogPreview({ props, onPropsChange }: PreviewProps) {
           <p>This content is supplied by the consuming feature. The primitive owns the modal shell, accessible labelling, dismissal, focus behavior, and responsive scrolling.</p>
           <Input label="Example field" placeholder="Feature-owned value" />
           <dl className="vela-dialog-specimen__anatomy">
-            <div><dt>Header</dt><dd>Title, description, and close action</dd></div>
-            <div><dt>Body</dt><dd>Arbitrary consumer content with overflow</dd></div>
-            <div><dt>Footer</dt><dd>Feature-provided actions in stable chrome</dd></div>
+            <div>
+              <dt>Header</dt>
+              <dd>Title, description, and close action</dd>
+            </div>
+            <div>
+              <dt>Body</dt>
+              <dd>Arbitrary consumer content with overflow</dd>
+            </div>
+            <div>
+              <dt>Footer</dt>
+              <dd>Feature-provided actions in stable chrome</dd>
+            </div>
           </dl>
         </div>
       </Dialog>

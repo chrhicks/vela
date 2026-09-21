@@ -92,8 +92,13 @@ function isReadinessState(value: unknown): value is ReadinessState {
 function ShellHeader() {
   return (
     <header className="vela-observation-shell__header">
-      <div className="vela-observation-shell__brand"><span>V</span><strong>Vela</strong></div>
-      <nav aria-label="Primary"><span data-active="true">Rigs</span></nav>
+      <div className="vela-observation-shell__brand">
+        <span>V</span>
+        <strong>Vela</strong>
+      </div>
+      <nav aria-label="Primary">
+        <span data-active="true">Rigs</span>
+      </nav>
       <small>Observatory control</small>
     </header>
   )
@@ -247,7 +252,9 @@ function RigEntry({
       </header>
 
       <Panel className="vela-observation-entry" elevation="raised">
-        <div className="vela-observation-entry__mark"><ObservationMark /></div>
+        <div className="vela-observation-entry__mark">
+          <ObservationMark />
+        </div>
         <div className="vela-observation-entry__copy">
           <small>OBSERVATION WORKSPACE</small>
           <h2>Ready to use this Rig?</h2>
@@ -289,9 +296,18 @@ function ConnectionDetails({ rig, state }: { readonly rig: RigFixture; readonly 
 
   return (
     <dl className="vela-observation-result">
-      <div><dt>Confirmed connected</dt><dd>{rig.interruptedConnection.confirmed}</dd></div>
-      <div><dt>{state === 'partial' ? 'Connection failed' : 'Not confirmed'}</dt><dd>{rig.interruptedConnection.stoppedAt}</dd></div>
-      <div><dt>Not attempted</dt><dd>{rig.interruptedConnection.notAttempted}</dd></div>
+      <div>
+        <dt>Confirmed connected</dt>
+        <dd>{rig.interruptedConnection.confirmed}</dd>
+      </div>
+      <div>
+        <dt>{state === 'partial' ? 'Connection failed' : 'Not confirmed'}</dt>
+        <dd>{rig.interruptedConnection.stoppedAt}</dd>
+      </div>
+      <div>
+        <dt>Not attempted</dt>
+        <dd>{rig.interruptedConnection.notAttempted}</dd>
+      </div>
     </dl>
   )
 }
@@ -323,7 +339,14 @@ function ReadinessAction({
   if (state === 'connecting') {
     return (
       <div className="vela-observation-action">
-        <Button disabled leadingIcon={<span aria-hidden="true" className="vela-observation-button-spinner" />} size="large" tone="accent">Connecting devices…</Button>
+        <Button
+          disabled
+          leadingIcon={<span aria-hidden="true" className="vela-observation-button-spinner" />}
+          size="large"
+          tone="accent"
+        >
+          Connecting devices…
+        </Button>
         <p>Waiting for the Rig to confirm each connection. Vela will stop if a result cannot be established.</p>
       </div>
     )
@@ -341,9 +364,11 @@ function ReadinessAction({
   return (
     <div className="vela-observation-action">
       <Button onClick={onCheck} size="large" tone="neutral">Check Rig again</Button>
-      <p>{state === 'uncertain'
-        ? 'This only reads current state. Vela will not repeat the uncertain connection command.'
-        : `Vela will check ${rig.endpoint} again without connecting devices.`}</p>
+      <p>
+        {state === 'uncertain'
+          ? 'This only reads current state. Vela will not repeat the uncertain connection command.'
+          : `Vela will check ${rig.endpoint} again without connecting devices.`}
+      </p>
     </div>
   )
 }
@@ -408,7 +433,9 @@ function ObservationWorkspace({
       <Button className="vela-observation-back" onClick={onBack} size="small" tone="quiet">← Rig details</Button>
 
       <header className="vela-observe-hero">
-        <div className="vela-observe-hero__mark"><ObservationMark /></div>
+        <div className="vela-observe-hero__mark">
+          <ObservationMark />
+        </div>
         <div>
           <small>OBSERVATION</small>
           <h1>Observing with {rig.name}</h1>
@@ -419,14 +446,19 @@ function ObservationWorkspace({
 
       <section className="vela-observe-section" aria-labelledby="observation-readiness-title">
         <div className="vela-observe-section__heading">
-          <div><small>PREPARATION</small><h2 id="observation-readiness-title">Rig readiness</h2></div>
+          <div>
+            <small>PREPARATION</small>
+            <h2 id="observation-readiness-title">Rig readiness</h2>
+          </div>
           <span>Checked just now</span>
         </div>
 
         <div className="vela-observe-grid">
           <Panel className="vela-observe-readiness" data-state={state} elevation="raised">
             <div className="vela-observe-readiness__summary">
-              <div className="vela-observe-readiness__mark"><ReadinessMark state={state} /></div>
+              <div className="vela-observe-readiness__mark">
+                <ReadinessMark state={state} />
+              </div>
               <div aria-atomic="true" aria-live="polite" role="status">
                 <h3 ref={statusHeadingRef} tabIndex={-1}>{presentation.title}</h3>
                 <p>{presentation.description}</p>
@@ -437,11 +469,25 @@ function ObservationWorkspace({
             <ReadinessAction onCheck={onCheck} onConnect={onConnect} rig={rig} state={state} />
           </Panel>
 
-          <Panel className="vela-observe-facts" description={state === 'offline' ? rig.endpoint : rig.server} elevation="flat" title="What Vela can confirm">
+          <Panel
+            className="vela-observe-facts"
+            description={state === 'offline' ? rig.endpoint : rig.server}
+            elevation="flat"
+            title="What Vela can confirm"
+          >
             <dl>
-              <div data-state={state === 'offline' ? 'danger' : 'positive'}><dt>Alpaca server</dt><dd>{serverState}</dd></div>
-              <div data-state={connectionTone()}><dt>Device connections</dt><dd>{deviceState}</dd></div>
-              <div><dt>Live device state</dt><dd>{liveState}</dd></div>
+              <div data-state={state === 'offline' ? 'danger' : 'positive'}>
+                <dt>Alpaca server</dt>
+                <dd>{serverState}</dd>
+              </div>
+              <div data-state={connectionTone()}>
+                <dt>Device connections</dt>
+                <dd>{deviceState}</dd>
+              </div>
+              <div>
+                <dt>Live device state</dt>
+                <dd>{liveState}</dd>
+              </div>
             </dl>
             <p>Opening this workspace does not start an exposure or save an observation.</p>
           </Panel>

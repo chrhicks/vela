@@ -28,8 +28,19 @@ export function AutofocusCurve({
   const plotWidth = width - left - right
   const plotHeight = height - top - bottom
   const span = Math.max(offsetSteps * stepSize, 1)
-  const low = Math.min(start - span, ...samples.map(sample => sample.position), fit?.position ?? start)
-  const high = Math.max(start + span, ...samples.map(sample => sample.position), fit?.position ?? start)
+
+  const low = Math.min(
+    start - span,
+    ...samples.map(sample => sample.position),
+    fit?.position ?? start,
+  )
+
+  const high = Math.max(
+    start + span,
+    ...samples.map(sample => sample.position),
+    fit?.position ?? start,
+  )
+
   const pad = Math.max(high - low, 1) * 0.08
   const xMin = low - pad
   const xMax = high + pad
@@ -41,7 +52,10 @@ export function AutofocusCurve({
   const latest = samples.at(-1)
 
   const lowest = hfrs.length
-    ? samples.reduce((best, sample) => sample.hfrPixels !== null && (best.hfrPixels === null || sample.hfrPixels < best.hfrPixels) ? sample : best)
+    ? samples.reduce((best, sample) =>
+        sample.hfrPixels !== null && (best.hfrPixels === null || sample.hfrPixels < best.hfrPixels)
+          ? sample
+          : best)
     : null
 
   const curve = fit
@@ -53,9 +67,21 @@ export function AutofocusCurve({
     : ''
 
   return (
-    <svg className="vela-af-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Autofocus V-curve of focuser position versus star HFR">
+    <svg
+      className="vela-af-chart"
+      viewBox={`0 0 ${width} ${height}`}
+      role="img"
+      aria-label="Autofocus V-curve of focuser position versus star HFR"
+    >
       {[0.25, 0.5, 0.75, 1].map(fraction => (
-        <line key={fraction} className="vela-af-grid" x1={left} x2={width - right} y1={y(yMax * fraction)} y2={y(yMax * fraction)} />
+        <line
+          key={fraction}
+          className="vela-af-grid"
+          x1={left}
+          x2={width - right}
+          y1={y(yMax * fraction)}
+          y2={y(yMax * fraction)}
+        />
       ))}
       <line className="vela-af-axis" x1={left} y1={top} x2={left} y2={height - bottom} />
       <line className="vela-af-axis" x1={left} y1={height - bottom} x2={width - right} y2={height - bottom} />
@@ -68,9 +94,19 @@ export function AutofocusCurve({
         </g>
       ))}
       <line className="vela-af-start" x1={x(start)} x2={x(start)} y1={top} y2={height - bottom} />
-      {fit && <line className="vela-af-fit-line" x1={x(fit.position)} x2={x(fit.position)} y1={top} y2={height - bottom} />}
+      {fit && (
+        <line
+          className="vela-af-fit-line"
+          x1={x(fit.position)}
+          x2={x(fit.position)}
+          y1={top}
+          y2={height - bottom}
+        />
+      )}
       {curve && <path className="vela-af-hyperbola" d={curve} />}
-      {lowest?.hfrPixels != null && <circle className="vela-af-min-sample" cx={x(lowest.position)} cy={y(lowest.hfrPixels)} r="8" />}
+      {lowest?.hfrPixels != null && (
+        <circle className="vela-af-min-sample" cx={x(lowest.position)} cy={y(lowest.hfrPixels)} r="8" />
+      )}
       {samples.map((sample, index) => {
         const hfr = sample.hfrPixels ?? yMax * 0.08
 

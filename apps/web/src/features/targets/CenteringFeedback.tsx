@@ -3,7 +3,14 @@ import { WorkingIndicator } from '@vela/ui'
 
 export const arcminutes = (value: number) => `${value.toFixed(value < 10 ? 2 : 1)}′`
 
-export function FramingStatus({ view, checked, centering, offline, pending, commandUnconfirmed }: {
+export function FramingStatus({
+  view,
+  checked,
+  centering,
+  offline,
+  pending,
+  commandUnconfirmed,
+}: {
   view: FramingView | null
   checked: boolean
   centering: FramingCentering | null
@@ -16,10 +23,17 @@ export function FramingStatus({ view, checked, centering, offline, pending, comm
 
   if (view) {
     title = {
-      idle: 'Ready to frame', slewing: 'Moving to your composition', settling: 'Waiting for the mount to settle',
-      'needs-check': 'Ready to check the current frame', exposing: `Taking a ${view.exposureSeconds}-second test exposure`,
-      downloading: 'Receiving the image', solving: 'Measuring the new framing', checked: checked ? 'Framing checked' : 'Composition not checked',
-      stopping: 'Stopping framing', stopped: 'Framing stopped', failed: 'Framing not confirmed',
+      idle: 'Ready to frame',
+      slewing: 'Moving to your composition',
+      settling: 'Waiting for the mount to settle',
+      'needs-check': 'Ready to check the current frame',
+      exposing: `Taking a ${view.exposureSeconds}-second test exposure`,
+      downloading: 'Receiving the image',
+      solving: 'Measuring the new framing',
+      checked: checked ? 'Framing checked' : 'Composition not checked',
+      stopping: 'Stopping framing',
+      stopped: 'Framing stopped',
+      failed: 'Framing not confirmed',
     }[view.phase]
 
     if (centering?.outcome === 'working' && view.active) {
@@ -55,10 +69,15 @@ export function FramingStatus({ view, checked, centering, offline, pending, comm
     detail = 'The server is connected. Retrying reads for the same exposure; no new exposure or correction will start while waiting. The last solved framing is kept. You can stop while reads retry.'
   }
 
-  return <div className="vela-target-status" role="status" aria-live="polite">
-    <WorkingIndicator active={!!view?.active && view.captureReadState === 'current' && !offline && !commandUnconfirmed && !pending} />
-    <strong>{title}</strong>{detail && <p>{detail}</p>}
-  </div>
+  return (
+    <div className="vela-target-status" role="status" aria-live="polite">
+      <WorkingIndicator
+        active={!!view?.active && view.captureReadState === 'current' && !offline && !commandUnconfirmed && !pending}
+      />
+      <strong>{title}</strong>
+      {detail && <p>{detail}</p>}
+    </div>
+  )
 }
 
 function measurementLabel(correction: number, index: number) {
@@ -70,12 +89,27 @@ function measurementLabel(correction: number, index: number) {
 export function CenteringProgress({ centering, current }: { centering: FramingCentering, current: boolean }) {
   const measured = centering.measurements.filter(sample => sample.correction > 0).length
 
-  return <section className="vela-target-progress" aria-label="Centering measurements">
-    <header><h2>Measured progress</h2><span>{measured} {measured === 1 ? 'correction' : 'corrections'} measured{!current ? ' · last known' : ''}</span></header>
-    <ol>{centering.measurements.map((sample, index) => <li key={sample.checkId} data-latest={current && index === centering.measurements.length - 1}>
-      <span>{measurementLabel(sample.correction, index)}</span>
-      <strong>{arcminutes(sample.offsetArcminutes)}</strong>
-      <span>{{ starting: 'Starting frame', improved: 'Improved', worsened: 'Worsened', unchanged: 'Unchanged', 'within-tolerance': 'Within tolerance' }[sample.trend]}{sample.pointingSideChanged ? ' · side changed' : ''}</span>
-    </li>)}</ol>
-  </section>
+  return (
+    <section className="vela-target-progress" aria-label="Centering measurements">
+      <header>
+        <h2>Measured progress</h2>
+        <span>{measured} {measured === 1 ? 'correction' : 'corrections'} measured{!current ? ' · last known' : ''}</span>
+      </header>
+      <ol>
+        {centering.measurements.map((sample, index) => (
+          <li key={sample.checkId} data-latest={current && index === centering.measurements.length - 1}>
+            <span>{measurementLabel(sample.correction, index)}</span>
+            <strong>{arcminutes(sample.offsetArcminutes)}</strong>
+            <span>{{
+              starting: 'Starting frame',
+              improved: 'Improved',
+              worsened: 'Worsened',
+              unchanged: 'Unchanged',
+              'within-tolerance': 'Within tolerance',
+            }[sample.trend]}{sample.pointingSideChanged ? ' · side changed' : ''}</span>
+          </li>
+        ))}
+      </ol>
+    </section>
+  )
 }

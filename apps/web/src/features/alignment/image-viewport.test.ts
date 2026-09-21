@@ -3,9 +3,15 @@ import { alignmentViewport } from './image-viewport'
 import type { AlignmentMeasurement } from './image-viewport'
 
 const measurement: AlignmentMeasurement = {
-  imageWidth: 1600, imageHeight: 1200, fieldHeightDegrees: 2,
-  imageUrl: '/api/frame.png', targetX: 799.5, targetY: 599.5,
-  totalArcsec: 0, altitudeArcsec: 0, azimuthArcsec: 0,
+  imageWidth: 1600,
+  imageHeight: 1200,
+  fieldHeightDegrees: 2,
+  imageUrl: '/api/frame.png',
+  targetX: 799.5,
+  targetY: 599.5,
+  totalArcsec: 0,
+  altitudeArcsec: 0,
+  azimuthArcsec: 0,
 }
 
 describe('alignment display viewport', () => {
@@ -42,7 +48,13 @@ describe('alignment display viewport', () => {
 
   it('keeps a full frame tied to sensor bounds, and does not confuse a clipped fine view with an off-image target', () => {
     const frame = { ...measurement, targetX: 900, targetY: 650 }
-    expect(alignmentViewport(frame, 'full')).toMatchObject({ left: 0, top: 0, width: 1600, height: 1200, outsideImage: false })
+    expect(alignmentViewport(frame, 'full')).toMatchObject({
+      left: 0,
+      top: 0,
+      width: 1600,
+      height: 1200,
+      outsideImage: false,
+    })
     expect(alignmentViewport(frame, 'fine')).toMatchObject({ outsideImage: false, markersClipped: true })
   })
 })

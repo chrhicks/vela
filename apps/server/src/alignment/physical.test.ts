@@ -6,24 +6,43 @@ const signal = new AbortController().signal
 
 function observatory(mechanicalSign = -1) {
   const mount: AlpacaTelescopeStatus = {
-    rightAscensionDegrees: 10, declinationDegrees: 60, coordinateSystem: 'topocentric',
-    latitudeDegrees: 39, longitudeDegrees: -77, elevationMeters: 150,
-    tracking: true, trackingRate: 'sidereal', rightAscensionRateSecondsPerSiderealSecond: 0,
-    declinationRateArcsecondsPerSecond: 0, pierSide: 'east', slewing: false, parked: false,
+    rightAscensionDegrees: 10,
+    declinationDegrees: 60,
+    coordinateSystem: 'topocentric',
+    latitudeDegrees: 39,
+    longitudeDegrees: -77,
+    elevationMeters: 150,
+    tracking: true,
+    trackingRate: 'sidereal',
+    rightAscensionRateSecondsPerSiderealSecond: 0,
+    declinationRateArcsecondsPerSecond: 0,
+    pierSide: 'east',
+    slewing: false,
+    parked: false,
     observedAt: '2026-09-09T01:00:00Z',
   }
 
   const camera: AlpacaCameraGeometry = {
-    cameraName: 'Imager', sensorWidthPixels: 6000, sensorHeightPixels: 4000,
-    pixelWidthMicrons: 3.76, pixelHeightMicrons: 3.76, binX: 2, binY: 2,
-    width: 3000, height: 2000, startX: 0, startY: 0,
+    cameraName: 'Imager',
+    sensorWidthPixels: 6000,
+    sensorHeightPixels: 4000,
+    pixelWidthMicrons: 3.76,
+    pixelHeightMicrons: 3.76,
+    binX: 2,
+    binY: 2,
+    width: 3000,
+    height: 2000,
+    startX: 0,
+    startY: 0,
   }
 
   const mechanics = { sign: mechanicalSign, overshoot: 0, afterMove: () => {} }
   const unexpected = async (): Promise<never> => { throw new Error('Unexpected hardware operation') }
 
   const acquisition: AlpacaAcquisition = {
-    capture: unexpected, pointing: unexpected, abort: unexpected,
+    capture: unexpected,
+    pointing: unexpected,
+    abort: unexpected,
     rotateRightAscension: vi.fn(async (_id, rate, distance) => {
       const travel = Math.sign(mechanics.sign * rate) * (Math.abs(distance) + mechanics.overshoot)
       mount.rightAscensionDegrees = (mount.rightAscensionDegrees + travel + 360) % 360
@@ -39,18 +58,42 @@ function observatory(mechanicalSign = -1) {
   let observation = 0
 
   const device: AlpacaFraming = {
-    home: vi.fn(async () => { mount.tracking = false; mount.declinationDegrees = 90 }),
-    telescopeStatus: vi.fn(async () => ({ ...mount,
-      observedAt: new Date(Date.parse(mount.observedAt) + observation++ * 1000).toISOString() })),
+    home: vi.fn(async () => {
+      mount.tracking = false
+      mount.declinationDegrees = 90
+    }),
+    telescopeStatus: vi.fn(async () => ({
+      ...mount,
+      observedAt: new Date(Date.parse(mount.observedAt) + observation++ * 1000).toISOString(),
+    })),
     cameraGeometry: vi.fn(async () => ({ ...camera })),
-    setTracking: vi.fn(async (_id, tracking) => { mount.tracking = tracking }), slew: vi.fn(async target => { mount.rightAscensionDegrees = target.rightAscensionDegrees; mount.declinationDegrees = target.declinationDegrees }), abortTelescope: unexpected,
+    setTracking: vi.fn(async (_id, tracking) => { mount.tracking = tracking }),
+    slew: vi.fn(async target => {
+      mount.rightAscensionDegrees = target.rightAscensionDegrees
+      mount.declinationDegrees = target.declinationDegrees
+    }),
+    abortTelescope: unexpected,
   }
 
-  const settings = { cameraId: 'camera', cameraName: 'Imager', telescopeId: 'mount', focalLengthMm: 400 }
+  const settings = {
+    cameraId: 'camera',
+    cameraName: 'Imager',
+    telescopeId: 'mount',
+    focalLengthMm: 400,
+  }
+
   const settle = vi.fn(async (_signal: AbortSignal) => {})
 
-  return { mount, camera, mechanics, acquisition, device, settings, settle,
-    alignment: createPhysicalAlignment(settings, acquisition, device, settle) }
+  return {
+    mount,
+    camera,
+    mechanics,
+    acquisition,
+    device,
+    settings,
+    settle,
+    alignment: createPhysicalAlignment(settings, acquisition, device, settle),
+  }
 }
 
 describe('physical alignment sweep', () => {
@@ -197,11 +240,19 @@ describe('physical alignment sweep', () => {
   })
 
   it.each([
-    { parked: true }, { slewing: true }, { coordinateSystem: 'j2000' },
-    { trackingRate: 'lunar' }, { trackingRate: undefined },
-    { rightAscensionRateSecondsPerSiderealSecond: 0.001 }, { rightAscensionRateSecondsPerSiderealSecond: undefined },
-    { declinationRateArcsecondsPerSecond: 0.001 }, { declinationRateArcsecondsPerSecond: undefined },
-    { latitudeDegrees: -39 }, { latitudeDegrees: 86 }, { latitudeDegrees: undefined }, { longitudeDegrees: undefined },
+    { parked: true },
+    { slewing: true },
+    { coordinateSystem: 'j2000' },
+    { trackingRate: 'lunar' },
+    { trackingRate: undefined },
+    { rightAscensionRateSecondsPerSiderealSecond: 0.001 },
+    { rightAscensionRateSecondsPerSiderealSecond: undefined },
+    { declinationRateArcsecondsPerSecond: 0.001 },
+    { declinationRateArcsecondsPerSecond: undefined },
+    { latitudeDegrees: -39 },
+    { latitudeDegrees: 86 },
+    { latitudeDegrees: undefined },
+    { longitudeDegrees: undefined },
   ])('rejects unsuitable starting observations %j without motion', async changes => {
     const fake = observatory()
     fake.mount.tracking = false
@@ -213,9 +264,14 @@ describe('physical alignment sweep', () => {
   })
 
   it.each([
-    { tracking: false }, { trackingRate: 'solar' }, { pierSide: 'west' }, { latitudeDegrees: 40 },
-    { longitudeDegrees: -76 }, { elevationMeters: 151 },
-    { rightAscensionDegrees: 10.1 }, { declinationDegrees: 80.1 },
+    { tracking: false },
+    { trackingRate: 'solar' },
+    { pierSide: 'west' },
+    { latitudeDegrees: 40 },
+    { longitudeDegrees: -76 },
+    { elevationMeters: 151 },
+    { rightAscensionDegrees: 10.1 },
+    { declinationDegrees: 80.1 },
   ])('rejects an external change after preparation %j', async changes => {
     const fake = observatory()
     await fake.alignment.prepare(signal)

@@ -18,12 +18,18 @@ describe('display stretch', () => {
   ])('matches the original curve exactly across quarter-step samples from %s to %s', async (blackPoint, ceiling) => {
     const stretch = await createDisplayStretch(blackPoint, ceiling)
     const first = Math.floor(blackPoint * 4) - 4
-    const samples = Array.from({ length: Math.ceil(ceiling * 4) - first + 5 }, (_, index) => (first + index) / 4)
+
+    const samples = Array.from(
+      { length: Math.ceil(ceiling * 4) - first + 5 },
+      (_, index) => (first + index) / 4,
+    )
+
     expect(samples.map(stretch)).toEqual(samples.map(sample => originalStretch(sample, blackPoint, ceiling)))
   })
 
   it('preserves fractional border averages, arbitrary fractions, clipping, and signed acquisition extremes', async () => {
-    const blackPoint = -3.13, ceiling = 2048.19
+    const blackPoint = -3.13
+    const ceiling = 2048.19
     const stretch = await createDisplayStretch(blackPoint, ceiling)
 
     const samples = [
@@ -42,9 +48,15 @@ describe('display stretch', () => {
   })
 
   it('retains exact results when the acquisition range is too wide for reuse', async () => {
-    const blackPoint = -2147483648, ceiling = 2147483647
+    const blackPoint = -2147483648
+    const ceiling = 2147483647
     const stretch = await createDisplayStretch(blackPoint, ceiling)
-    const samples = Array.from({ length: 4097 }, (_, index) => blackPoint + index * (ceiling - blackPoint) / 4096)
+
+    const samples = Array.from(
+      { length: 4097 },
+      (_, index) => blackPoint + index * (ceiling - blackPoint) / 4096,
+    )
+
     samples.push(-70001, -1, 0, 1 / 3, 65536, 70003, ceiling + 1)
     expect(samples.map(stretch)).toEqual(samples.map(sample => originalStretch(sample, blackPoint, ceiling)))
   })

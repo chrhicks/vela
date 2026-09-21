@@ -41,7 +41,18 @@ for (const fixture of corpus) {
     if (hash(await readFile(resolve(dirname(path), retained.name))) !== retained.sha256) throw new Error(`Retained artifact changed: ${retained.name}`)
   }
 
-  const entry = { ...fixture, source, sha256, retainedHashes, width: frame.width, height: frame.height, color: frame.color, range: neutral.range, estimate: neutral.estimate }
+  const entry = {
+    ...fixture,
+    source,
+    sha256,
+    retainedHashes,
+    width: frame.width,
+    height: frame.height,
+    color: frame.color,
+    range: neutral.range,
+    estimate: neutral.estimate
+  }
+
   manifest.push(entry)
   console.log(fixture.key, JSON.stringify(neutral.estimate), sha256)
 }

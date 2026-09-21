@@ -43,7 +43,10 @@ try {
 
         if (scale === 'native') {
           assert.equal(geometry.images[0].displayed, 6248)
-          await specimen.locator('.vela-preview-color__window').first().evaluate(element => { element.scrollLeft = 1234; element.scrollTop = 567 })
+          await specimen.locator('.vela-preview-color__window').first().evaluate(element => {
+            element.scrollLeft = 1234
+            element.scrollTop = 567
+          })
           await page.waitForFunction(() => {
             const windows = [...document.querySelectorAll('.vela-preview-color__window')]
 

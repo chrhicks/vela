@@ -19,7 +19,12 @@ export const specimen: ComponentSpecimen = {
     invalid: { type: 'boolean', label: 'Invalid' },
     disabled: { type: 'boolean', label: 'Disabled' },
   },
-  defaultProps: { label: 'Imaging camera', value: 'asi2600', invalid: false, disabled: false },
+  defaultProps: {
+    label: 'Imaging camera',
+    value: 'asi2600',
+    invalid: false,
+    disabled: false
+  },
   render: (props, onPropsChange) => (
     <div style={{ width: 'min(100%, 24rem)' }}>
       <Select

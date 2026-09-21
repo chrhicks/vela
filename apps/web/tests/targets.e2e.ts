@@ -7,14 +7,51 @@ import { readFileSync } from 'node:fs'
 const respond = <Body>(route: Route, body: Body) => {
   // Healthy framing fixtures represent a fresh observation on every response.
   const response = z.object({ phase: z.string(), observedAt: z.string() }).safeParse(body).success
-    ? { ...body, observedAt: new Date().toISOString() } : body
+    ? { ...body, observedAt: new Date().toISOString() }
+    : body
 
   return route.fulfill({ contentType: 'application/json', body: JSON.stringify(response) })
 }
 
-const target: TargetView = { id: 'm31', name: 'Andromeda Galaxy', catalog: 'M31', kind: 'Galaxy', raDegrees: 10.6847, decDegrees: 41.269, sizeArcminutes: 178, thumbnailUrl: '/api/targets/m31/thumbnail', sky: null }
+const target: TargetView = {
+  id: 'm31',
+  name: 'Andromeda Galaxy',
+  catalog: 'M31',
+  kind: 'Galaxy',
+  raDegrees: 10.6847,
+  decDegrees: 41.269,
+  sizeArcminutes: 178,
+  thumbnailUrl: '/api/targets/m31/thumbnail',
+  sky: null,
+}
 
-const idle: FramingView = { rigId: 'rig-1', rigName: 'Test rig', enabled: true, unavailableReason: null, observedAt: new Date().toISOString(), focalLengthMm: 400, camera: { name: 'Test camera', width: 3000, height: 2000, fieldWidthDegrees: 3, fieldHeightDegrees: 2 }, phase: 'idle', active: false, captureReadState: 'current', desired: null, targetId: null, actual: null, error: null, exposureSeconds: 2, canCenter: false, checkCurrent: false, pointingSide: 'unknown', centering: null }
+const idle: FramingView = {
+  rigId: 'rig-1',
+  rigName: 'Test rig',
+  enabled: true,
+  unavailableReason: null,
+  observedAt: new Date().toISOString(),
+  focalLengthMm: 400,
+  camera: {
+    name: 'Test camera',
+    width: 3000,
+    height: 2000,
+    fieldWidthDegrees: 3,
+    fieldHeightDegrees: 2,
+  },
+  phase: 'idle',
+  active: false,
+  captureReadState: 'current',
+  desired: null,
+  targetId: null,
+  actual: null,
+  error: null,
+  exposureSeconds: 2,
+  canCenter: false,
+  checkCurrent: false,
+  pointingSide: 'unknown',
+  centering: null,
+}
 
 const allsky = readFileSync(new URL('./fixtures/survey-allsky.jpg', import.meta.url))
 
@@ -31,13 +68,34 @@ test('an untouched target and Reset frame send only the accepted slew fields', a
     submissions.push(body)
 
     if (Object.keys(body).sort().join(',') !== 'decDegrees,exposureSeconds,raDegrees,targetId') {
-      return route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ error: 'Invalid framing command body' }) })
+      return route.fulfill({
+        status: 400,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'Invalid framing command body' }),
+      })
     }
 
-    state = { ...state, targetId: body.targetId, desired: { raDegrees: body.raDegrees, decDegrees: body.decDegrees },
-      phase: 'checked', checkCurrent: true, actual: { raDegrees: body.raDegrees, decDegrees: body.decDegrees,
-        checkId: `check-${submissions.length}`, capturedAt: new Date().toISOString(), rotationDegrees: 0, offsetArcminutes: 0,
-        corners: [{ raDegrees: 9, decDegrees: 40 }, { raDegrees: 11, decDegrees: 40 }, { raDegrees: 11, decDegrees: 42 }, { raDegrees: 9, decDegrees: 42 }] } }
+    state = {
+      ...state,
+      targetId: body.targetId,
+      desired: { raDegrees: body.raDegrees, decDegrees: body.decDegrees },
+      phase: 'checked',
+      checkCurrent: true,
+      actual: {
+        raDegrees: body.raDegrees,
+        decDegrees: body.decDegrees,
+        checkId: `check-${submissions.length}`,
+        capturedAt: new Date().toISOString(),
+        rotationDegrees: 0,
+        offsetArcminutes: 0,
+        corners: [
+          { raDegrees: 9, decDegrees: 40 },
+          { raDegrees: 11, decDegrees: 40 },
+          { raDegrees: 11, decDegrees: 42 },
+          { raDegrees: 9, decDegrees: 42 },
+        ],
+      },
+    }
 
     return respond(route, state)
   })
@@ -49,7 +107,12 @@ test('an untouched target and Reset frame send only the accepted slew fields', a
   await page.getByRole('button', { name: 'Reset frame' }).click()
   await page.getByRole('button', { name: 'Slew & check' }).click()
   await expect(page.getByText('Framing checked', { exact: true })).toBeVisible()
-  expect(submissions).toEqual(Array(2).fill({ targetId: target.id, raDegrees: target.raDegrees, decDegrees: target.decDegrees, exposureSeconds: 2 }))
+  expect(submissions).toEqual(Array(2).fill({
+    targetId: target.id,
+    raDegrees: target.raDegrees,
+    decDegrees: target.decDegrees,
+    exposureSeconds: 2,
+  }))
 })
 
 test('catalog is paged and search updates use actual server results; missing site and image stay honest on mobile', async ({ page }) => {
@@ -59,7 +122,29 @@ test('catalog is paged and search updates use actual server results; missing sit
     queries.push(route.request().url())
     const params = new URL(route.request().url()).searchParams
 
-    return respond(route, { rigId: 'rig-1', rigName: 'Test rig', snapshotId: 'catalog-test', calculatedAt: new Date().toISOString(), status: 'site-unavailable', night: null, query: params.get('q') ?? '', category: params.get('category') ?? 'all', filter: params.get('filter') ?? 'all', offset: Number(params.get('offset')), pageSize: 24, targets: [{ ...target, category: 'galaxy', filterChoice: 'broadband', filterReason: 'Broadband preserves starlight.', opportunity: null }], total: 25, site: null, siteUnavailableReason: 'Mount site is unavailable.' })
+    return respond(route, {
+      rigId: 'rig-1',
+      rigName: 'Test rig',
+      snapshotId: 'catalog-test',
+      calculatedAt: new Date().toISOString(),
+      status: 'site-unavailable',
+      night: null,
+      query: params.get('q') ?? '',
+      category: params.get('category') ?? 'all',
+      filter: params.get('filter') ?? 'all',
+      offset: Number(params.get('offset')),
+      pageSize: 24,
+      targets: [{
+        ...target,
+        category: 'galaxy',
+        filterChoice: 'broadband',
+        filterReason: 'Broadband preserves starlight.',
+        opportunity: null,
+      }],
+      total: 25,
+      site: null,
+      siteUnavailableReason: 'Mount site is unavailable.',
+    })
   })
   await page.route('**/api/targets/*/thumbnail', route => route.abort())
   await page.goto('/rigs/rig-1/observe/targets')
@@ -69,7 +154,9 @@ test('catalog is paged and search updates use actual server results; missing sit
   await page.getByRole('button', { name: 'Next', exact: true }).click()
   await expect.poll(() => queries.some(q => q.includes('offset=24'))).toBe(true)
   await page.getByLabel('Find a target').fill('M31')
-  await expect.poll(() => queries.some(q => new URL(q).searchParams.get('q') === 'M31' && new URL(q).searchParams.get('offset') === '0')).toBe(true)
+  await expect.poll(() => queries.some(q =>
+    new URL(q).searchParams.get('q') === 'M31' && new URL(q).searchParams.get('offset') === '0',
+  )).toBe(true)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
 })
 
@@ -97,12 +184,24 @@ test('ambiguous command is not repeated and requires explicit current state chec
 })
 
 test('survey footprint uses projected coordinates and keyboard adjustment; tile requests stay same-origin', async ({ page, baseURL }) => {
-  const errors: string[] = [], external: string[] = []
+  const errors: string[] = []
+  const external: string[] = []
   page.on('pageerror', error => errors.push(error.message))
-  page.on('request', request => { if (request.url().startsWith('http') && new URL(request.url()).origin !== new URL(baseURL!).origin) external.push(request.url()) })
+  page.on('request', request => {
+    if (request.url().startsWith('http') && new URL(request.url()).origin !== new URL(baseURL!).origin)
+      external.push(request.url())
+  })
   await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
   await page.route('**/api/web/rigs/rig-1/framing', route => respond(route, idle))
-  await page.route('**/api/survey/dss2/**', route => route.request().url().endsWith('/properties') ? route.fulfill({ contentType: 'text/plain', body: 'dataproduct_type=image\nhips_order=9\nhips_tile_width=512\nhips_frame=equatorial\nhips_tile_format=jpeg\n' }) : route.fulfill({ contentType: 'image/jpeg', body: route.request().url().endsWith('Allsky.jpg') ? allsky : tile }))
+  await page.route('**/api/survey/dss2/**', route => route.request().url().endsWith('/properties')
+    ? route.fulfill({
+      contentType: 'text/plain',
+      body: 'dataproduct_type=image\nhips_order=9\nhips_tile_width=512\nhips_frame=equatorial\nhips_tile_format=jpeg\n',
+    })
+    : route.fulfill({
+      contentType: 'image/jpeg',
+      body: route.request().url().endsWith('Allsky.jpg') ? allsky : tile,
+    }))
   await page.goto('/rigs/rig-1/observe/targets/m31')
   const frame = page.getByRole('slider', { name: 'Camera frame position' })
   await expect(frame).toBeVisible({ timeout: 30000 })
@@ -143,13 +242,40 @@ test('survey footprint uses projected coordinates and keyboard adjustment; tile 
 })
 
 test('checked framing offers centering, active operations lock edits, and stale state blocks commands', async ({ page }) => {
-  let state: FramingView = { ...idle, phase: 'checked', checkCurrent: true, desired: target, targetId: target.id, canCenter: true, actual: { ...target, checkId: 'displayed-check', capturedAt: new Date().toISOString(), rotationDegrees: 32, offsetArcminutes: 2.4, corners: [{ raDegrees: 9, decDegrees: 40 }, { raDegrees: 11, decDegrees: 40 }, { raDegrees: 11, decDegrees: 42 }, { raDegrees: 9, decDegrees: 42 }] } }
-  let offline = false, corrections = 0, stops = 0
+  let state: FramingView = {
+    ...idle,
+    phase: 'checked',
+    checkCurrent: true,
+    desired: target,
+    targetId: target.id,
+    canCenter: true,
+    actual: {
+      ...target,
+      checkId: 'displayed-check',
+      capturedAt: new Date().toISOString(),
+      rotationDegrees: 32,
+      offsetArcminutes: 2.4,
+      corners: [
+        { raDegrees: 9, decDegrees: 40 },
+        { raDegrees: 11, decDegrees: 40 },
+        { raDegrees: 11, decDegrees: 42 },
+        { raDegrees: 9, decDegrees: 42 },
+      ],
+    },
+  }
+
+  let offline = false
+  let corrections = 0
+  let stops = 0
   await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
   await page.route('**/api/web/rigs/rig-1/framing', route => offline ? route.abort() : respond(route, state))
   await page.route('**/api/survey/**', route => route.abort())
   await page.route('**/api/rigs/rig-1/framing/center', route => {
-    expect(route.request().postDataJSON()).toEqual({ checkId: 'displayed-check', raDegrees: target.raDegrees, decDegrees: target.decDegrees })
+    expect(route.request().postDataJSON()).toEqual({
+      checkId: 'displayed-check',
+      raDegrees: target.raDegrees,
+      decDegrees: target.decDegrees,
+    })
     corrections++
     state = { ...state, phase: 'slewing', active: true, canCenter: false, checkCurrent: false }
 
@@ -180,8 +306,17 @@ test('checked framing offers centering, active operations lock edits, and stale 
 })
 
 test('a rejected adjusted composition cannot inherit the prior framing check after recovery', async ({ page }) => {
-  let state: FramingView = { ...idle, phase: 'checked', checkCurrent: true, desired: target, targetId: target.id, canCenter: true }
-  let rejectStart = true, commands = 0
+  let state: FramingView = {
+    ...idle,
+    phase: 'checked',
+    checkCurrent: true,
+    desired: target,
+    targetId: target.id,
+    canCenter: true,
+  }
+
+  let rejectStart = true
+  let commands = 0
   let submitted: { raDegrees: number, decDegrees: number } | null = null
   await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
   await page.route('**/api/web/rigs/rig-1/framing', route => respond(route, { ...state, observedAt: new Date().toISOString() }))
@@ -190,8 +325,19 @@ test('a rejected adjusted composition cannot inherit the prior framing check aft
     commands++
     submitted = route.request().postDataJSON()
 
-    if (rejectStart) return route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ error: 'Camera identity changed before framing.' }) })
-    state = { ...state, desired: submitted, phase: 'slewing', active: true, checkCurrent: false, observedAt: new Date().toISOString() }
+    if (rejectStart) return route.fulfill({
+      status: 409,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'Camera identity changed before framing.' }),
+    })
+    state = {
+      ...state,
+      desired: submitted,
+      phase: 'slewing',
+      active: true,
+      checkCurrent: false,
+      observedAt: new Date().toISOString(),
+    }
 
     return respond(route, state)
   })
@@ -222,7 +368,14 @@ test('a rejected adjusted composition cannot inherit the prior framing check aft
 })
 
 test('an explicit read recovers a completed adjusted check after its command response is lost', async ({ page }) => {
-  let state: FramingView = { ...idle, phase: 'checked', checkCurrent: true, desired: target, targetId: target.id }
+  let state: FramingView = {
+    ...idle,
+    phase: 'checked',
+    checkCurrent: true,
+    desired: target,
+    targetId: target.id,
+  }
+
   let commands = 0
   await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
   await page.route('**/api/web/rigs/rig-1/framing', route => respond(route, { ...state, observedAt: new Date().toISOString() }))
@@ -249,8 +402,21 @@ test('an explicit read recovers a completed adjusted check after its command res
 
 for (const failureSource of ['command', 'poll'] as const) {
   test(`precise framing error remains visible alongside recovery guidance after ${failureSource} failure`, async ({ page }) => {
-    let state: FramingView = { ...idle, targetId: target.id, desired: target, phase: 'slewing', active: true }
-    const failed: FramingView = { ...state, phase: 'failed', active: false, error: 'Telescope stop could not be confirmed' }
+    let state: FramingView = {
+      ...idle,
+      targetId: target.id,
+      desired: target,
+      phase: 'slewing',
+      active: true,
+    }
+
+    const failed: FramingView = {
+      ...state,
+      phase: 'failed',
+      active: false,
+      error: 'Telescope stop could not be confirmed',
+    }
+
     await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
     await page.route('**/api/web/rigs/rig-1/framing', route => respond(route, { ...state, observedAt: new Date().toISOString() }))
     await page.route('**/api/survey/**', route => route.abort())
@@ -262,7 +428,8 @@ for (const failureSource of ['command', 'poll'] as const) {
     await page.goto('/rigs/rig-1/observe/targets/m31')
     await expect(page.getByRole('button', { name: 'Stop framing' })).toBeEnabled()
 
-    if (failureSource === 'command') await page.getByRole('button', { name: 'Stop framing' }).click()
+    if (failureSource === 'command')
+      await page.getByRole('button', { name: 'Stop framing' }).click()
     else state = failed
     await expect(page.getByRole('alert').filter({ hasText: 'Telescope stop could not be confirmed' })).toBeVisible()
     await expect(page.getByRole('alert').filter({ hasText: 'Inspect the reported state' })).toBeVisible()
@@ -309,7 +476,29 @@ test('Targets breadcrumb preserves search and results page through a detail relo
   await page.route('**/api/web/rigs/rig-1/target-discovery?*', route => {
     queries.push(route.request().url())
 
-    return respond(route, { rigId: 'rig-1', rigName: 'Test rig', snapshotId: 'breadcrumb-night', calculatedAt: '2026-09-08T02:00:00.000Z', status: 'site-unavailable', night: null, query: 'galaxy', category: 'all', filter: 'all', offset: 24, pageSize: 12, targets: [{ ...target, category: 'galaxy', filterChoice: 'broadband', filterReason: 'Broadband preserves starlight.', opportunity: null }], total: 49, site: null, siteUnavailableReason: 'Site unavailable' })
+    return respond(route, {
+      rigId: 'rig-1',
+      rigName: 'Test rig',
+      snapshotId: 'breadcrumb-night',
+      calculatedAt: '2026-09-08T02:00:00.000Z',
+      status: 'site-unavailable',
+      night: null,
+      query: 'galaxy',
+      category: 'all',
+      filter: 'all',
+      offset: 24,
+      pageSize: 12,
+      targets: [{
+        ...target,
+        category: 'galaxy',
+        filterChoice: 'broadband',
+        filterReason: 'Broadband preserves starlight.',
+        opportunity: null,
+      }],
+      total: 49,
+      site: null,
+      siteUnavailableReason: 'Site unavailable',
+    })
   })
   await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
   await page.route('**/api/web/rigs/rig-1/framing', route => respond(route, idle))
@@ -330,7 +519,14 @@ test('Targets breadcrumb preserves search and results page through a detail relo
 })
 
 test('failure recovery preserves local drag, zoom and nudges while device commands remain blocked', async ({ page }) => {
-  let state: FramingView = { ...idle, active: true, phase: 'slewing', targetId: target.id, desired: target }
+  let state: FramingView = {
+    ...idle,
+    active: true,
+    phase: 'slewing',
+    targetId: target.id,
+    desired: target,
+  }
+
   let commands = 0
   let offline = false
   await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
@@ -340,14 +536,27 @@ test('failure recovery preserves local drag, zoom and nudges while device comman
 
     return route.abort()
   })
-  await page.route('**/api/survey/dss2/**', route => route.request().url().endsWith('/properties') ? route.fulfill({ contentType: 'text/plain', body: 'dataproduct_type=image\nhips_order=9\nhips_tile_width=512\nhips_frame=equatorial\nhips_tile_format=jpeg\n' }) : route.fulfill({ contentType: 'image/jpeg', body: route.request().url().endsWith('Allsky.jpg') ? allsky : tile }))
+  await page.route('**/api/survey/dss2/**', route => route.request().url().endsWith('/properties')
+    ? route.fulfill({
+      contentType: 'text/plain',
+      body: 'dataproduct_type=image\nhips_order=9\nhips_tile_width=512\nhips_frame=equatorial\nhips_tile_format=jpeg\n',
+    })
+    : route.fulfill({
+      contentType: 'image/jpeg',
+      body: route.request().url().endsWith('Allsky.jpg') ? allsky : tile,
+    }))
   await page.goto('/rigs/rig-1/observe/targets/m31')
   const frame = page.getByRole('slider', { name: 'Camera frame position' })
   await expect(frame).toBeVisible()
   await expect(frame).toHaveAttribute('aria-disabled', 'true')
   await expect(page.getByText('Framing in progress · editing paused')).toBeVisible()
   const initial = await frame.getAttribute('aria-valuetext')
-  state = { ...state, active: false, phase: 'failed', error: 'Telescope tracking change was not confirmed' }
+  state = {
+    ...state,
+    active: false,
+    phase: 'failed',
+    error: 'Telescope tracking change was not confirmed',
+  }
   await expect(page.getByRole('alert').filter({ hasText: 'Inspect the reported state' })).toBeVisible()
   await expect(frame).toHaveAttribute('aria-disabled', 'false')
   await expect(page.getByRole('button', { name: 'Slew & check' })).toBeDisabled()
@@ -388,14 +597,46 @@ test('failure recovery preserves local drag, zoom and nudges while device comman
 })
 
 test('an edited composition can center using its current coordinates and the last solved check', async ({ page }) => {
-  let state: FramingView = { ...idle, phase: 'checked', checkCurrent: true, desired: target, targetId: target.id, canCenter: true, actual: { ...target, checkId: 'usable-check', capturedAt: new Date().toISOString(), rotationDegrees: 0, offsetArcminutes: 0.1, corners: [{ raDegrees: 9, decDegrees: 40 }, { raDegrees: 11, decDegrees: 40 }, { raDegrees: 11, decDegrees: 42 }, { raDegrees: 9, decDegrees: 42 }] } }
+  let state: FramingView = {
+    ...idle,
+    phase: 'checked',
+    checkCurrent: true,
+    desired: target,
+    targetId: target.id,
+    canCenter: true,
+    actual: {
+      ...target,
+      checkId: 'usable-check',
+      capturedAt: new Date().toISOString(),
+      rotationDegrees: 0,
+      offsetArcminutes: 0.1,
+      corners: [
+        { raDegrees: 9, decDegrees: 40 },
+        { raDegrees: 11, decDegrees: 40 },
+        { raDegrees: 11, decDegrees: 42 },
+        { raDegrees: 9, decDegrees: 42 },
+      ],
+    },
+  }
+
   let command: { checkId: string, raDegrees: number, decDegrees: number } | null = null
   await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
   await page.route('**/api/web/rigs/rig-1/framing', route => respond(route, state))
   await page.route('**/api/survey/**', route => route.abort())
   await page.route('**/api/rigs/rig-1/framing/center', route => {
-    command = z.strictObject({ checkId: z.string(), raDegrees: z.number(), decDegrees: z.number() }).parse(route.request().postDataJSON())
-    state = { ...state, desired: { raDegrees: command.raDegrees, decDegrees: command.decDegrees }, active: true, phase: 'settling', checkCurrent: false, canCenter: false }
+    command = z.strictObject({
+      checkId: z.string(),
+      raDegrees: z.number(),
+      decDegrees: z.number(),
+    }).parse(route.request().postDataJSON())
+    state = {
+      ...state,
+      desired: { raDegrees: command.raDegrees, decDegrees: command.decDegrees },
+      active: true,
+      phase: 'settling',
+      checkCurrent: false,
+      canCenter: false,
+    }
 
     return respond(route, state)
   })
@@ -413,13 +654,37 @@ test('an edited composition can center using its current coordinates and the las
 })
 
 test('a recoverable check keeps the edited destination and offers a fresh exposure without a slew', async ({ page }) => {
-  let state: FramingView = { ...idle, phase: 'needs-check', desired: target, targetId: target.id, error: 'The image could not be solved. Check the current frame again.' }
-  const commands: { action: string, body: { targetId: string, raDegrees: number, decDegrees: number, exposureSeconds: number } }[] = []
+  let state: FramingView = {
+    ...idle,
+    phase: 'needs-check',
+    desired: target,
+    targetId: target.id,
+    error: 'The image could not be solved. Check the current frame again.',
+  }
+
+  const commands: {
+    action: string,
+    body: {
+      targetId: string,
+      raDegrees: number,
+      decDegrees: number,
+      exposureSeconds: number,
+    },
+  }[] = []
+
   await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
   await page.route('**/api/web/rigs/rig-1/framing', route => respond(route, { ...state, observedAt: new Date().toISOString() }))
   await page.route('**/api/survey/**', route => route.abort())
   await page.route('**/api/rigs/rig-1/framing/*', route => {
-    commands.push({ action: route.request().url().split('/').at(-1)!, body: z.strictObject({ targetId: z.string(), raDegrees: z.number(), decDegrees: z.number(), exposureSeconds: z.number() }).parse(route.request().postDataJSON()) })
+    commands.push({
+      action: route.request().url().split('/').at(-1)!,
+      body: z.strictObject({
+        targetId: z.string(),
+        raDegrees: z.number(),
+        decDegrees: z.number(),
+        exposureSeconds: z.number(),
+      }).parse(route.request().postDataJSON()),
+    })
     state = { ...state, active: false, phase: 'needs-check' }
 
     return respond(route, state)

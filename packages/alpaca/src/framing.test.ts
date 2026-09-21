@@ -6,11 +6,31 @@ function observatory(requestTimeoutMs = 100) {
   interface PropertyFixtures { [operation: string]: ResponseFixture }
 
   const values: PropertyFixtures = {
-    connected: true, name: ' Camera ', cameraxsize: 6000, cameraysize: 4000,
-    pixelsizex: 3.76, pixelsizey: 3.76, binx: 2, biny: 2, numx: 2000, numy: 1500, startx: 50, starty: 100,
-    rightascension: 2, declination: -20, equatorialsystem: 1,
-    sitelatitude: 35, sitelongitude: -80, siteelevation: 200,
-    tracking: true, slewing: false, atpark: false, canslewasync: true, cansettracking: true, canfindhome: true, athome: false,
+    connected: true,
+    name: ' Camera ',
+    cameraxsize: 6000,
+    cameraysize: 4000,
+    pixelsizex: 3.76,
+    pixelsizey: 3.76,
+    binx: 2,
+    biny: 2,
+    numx: 2000,
+    numy: 1500,
+    startx: 50,
+    starty: 100,
+    rightascension: 2,
+    declination: -20,
+    equatorialsystem: 1,
+    sitelatitude: 35,
+    sitelongitude: -80,
+    siteelevation: 200,
+    tracking: true,
+    slewing: false,
+    atpark: false,
+    canslewasync: true,
+    cansettracking: true,
+    canfindhome: true,
+    athome: false,
   }
 
   const writes: { operation: string; parameters: URLSearchParams }[] = []
@@ -21,8 +41,17 @@ function observatory(requestTimeoutMs = 100) {
   let started!: () => void
   const whenStarted = new Promise<void>(resolve => { started = resolve })
 
-  const state = { loseSlew: false, loseTracking: false, stopFails: false, onSlew: () => {}, onHome: () => {}, onTracking: () => {},
-    trackingDelayReads: 0, rejectTracking: false, trackingReadFails: false }
+  const state = {
+    loseSlew: false,
+    loseTracking: false,
+    stopFails: false,
+    onSlew: () => {},
+    onHome: () => {},
+    onTracking: () => {},
+    trackingDelayReads: 0,
+    rejectTracking: false,
+    trackingReadFails: false,
+  }
 
   let requestedTracking: boolean | undefined
 
@@ -31,7 +60,14 @@ function observatory(requestTimeoutMs = 100) {
     const path = new URL(String(input)).pathname
     requests.push({ method: init?.method ?? 'GET', path })
     const operation = path.split('/').at(-1)!
-    const envelope = (Value?: ResponseFixture, ErrorNumber = 0) => Response.json({ ClientTransactionID: 0, ServerTransactionID: 1, ErrorNumber, ErrorMessage: '', Value })
+
+    const envelope = (Value?: ResponseFixture, ErrorNumber = 0) => Response.json({
+      ClientTransactionID: 0,
+      ServerTransactionID: 1,
+      ErrorNumber,
+      ErrorMessage: '',
+      Value,
+    })
 
     if (transportFailures.has(operation)) throw new TypeError('Device unreachable')
 
@@ -61,7 +97,12 @@ function observatory(requestTimeoutMs = 100) {
         if (state.stopFails) throw new TypeError('Abort unreachable')
         values.slewing = false
       } else if (operation === 'tracking') {
-        if (state.rejectTracking) return Response.json({ ClientTransactionID: 0, ServerTransactionID: 1, ErrorNumber: 1280, ErrorMessage: 'Mount rejected tracking mode' })
+        if (state.rejectTracking) return Response.json({
+          ClientTransactionID: 0,
+          ServerTransactionID: 1,
+          ErrorNumber: 1280,
+          ErrorMessage: 'Mount rejected tracking mode',
+        })
         requestedTracking = parameters.get('Tracking') === 'true'
 
         if (!state.trackingDelayReads) values.tracking = requestedTracking
@@ -92,12 +133,23 @@ function observatory(requestTimeoutMs = 100) {
     return envelope(values[operation])
   }
 
-  const framing = createAlpacaFraming({ baseUrl: 'http://fake', fetch, requestTimeoutMs, pollIntervalMs: 1, slewTimeoutMs: 100 })
+  const framing = createAlpacaFraming({
+    baseUrl: 'http://fake',
+    fetch,
+    requestTimeoutMs,
+    pollIntervalMs: 1,
+    slewTimeoutMs: 100,
+  })
 
   return { framing, values, writes, requests, unsupported, errors, transportFailures, state, whenStarted }
 }
 
-const target = { telescopeId: 'mount-id', rightAscensionDegrees: 45, declinationDegrees: 25, coordinateSystem: 'topocentric' as const }
+const target = {
+  telescopeId: 'mount-id',
+  rightAscensionDegrees: 45,
+  declinationDegrees: 25,
+  coordinateSystem: 'topocentric' as const,
+}
 
 describe('framing boundary', () => {
   it('confirms home only after both motion ends and home is observed, without restoring tracking', async () => {
@@ -175,8 +227,17 @@ describe('framing boundary', () => {
   it('reads physical sensor geometry separately from the binned subframe and verifies camera identity', async () => {
     const fake = observatory()
     await expect(fake.framing.cameraGeometry({ cameraId: 'camera-id', expectedCameraName: 'Camera' })).resolves.toEqual({
-      cameraName: 'Camera', sensorWidthPixels: 6000, sensorHeightPixels: 4000, pixelWidthMicrons: 3.76, pixelHeightMicrons: 3.76,
-      binX: 2, binY: 2, width: 2000, height: 1500, startX: 50, startY: 100,
+      cameraName: 'Camera',
+      sensorWidthPixels: 6000,
+      sensorHeightPixels: 4000,
+      pixelWidthMicrons: 3.76,
+      pixelHeightMicrons: 3.76,
+      binX: 2,
+      binY: 2,
+      width: 2000,
+      height: 1500,
+      startX: 50,
+      startY: 100,
     })
     await expect(fake.framing.cameraGeometry({ cameraId: 'camera-id', expectedCameraName: 'Different camera' })).rejects.toThrow('changed')
     expect(fake.writes).toEqual([])
@@ -193,7 +254,16 @@ describe('framing boundary', () => {
     fake.unsupported.add('equatorialsystem')
     fake.unsupported.add('siteelevation')
     const status = await fake.framing.telescopeStatus('mount-id')
-    expect(status).toMatchObject({ coordinateSystem: 'unknown', rightAscensionDegrees: 30, declinationDegrees: -20, latitudeDegrees: 35, longitudeDegrees: -80, tracking: true, slewing: false, parked: false })
+    expect(status).toMatchObject({
+      coordinateSystem: 'unknown',
+      rightAscensionDegrees: 30,
+      declinationDegrees: -20,
+      latitudeDegrees: 35,
+      longitudeDegrees: -80,
+      tracking: true,
+      slewing: false,
+      parked: false,
+    })
     expect(status).not.toHaveProperty('elevationMeters')
     expect(Number.isFinite(Date.parse(status.observedAt))).toBe(true)
     fake.unsupported.delete('equatorialsystem')
@@ -227,9 +297,19 @@ describe('framing boundary', () => {
 
   it('reads pointing side once when both options request it, retaining alignment rates', async () => {
     const fake = observatory()
-    Object.assign(fake.values, { trackingrate: 2, rightascensionrate: -0.25, declinationrate: 1.5, sideofpier: 1 })
+    Object.assign(fake.values, {
+      trackingrate: 2,
+      rightascensionrate: -0.25,
+      declinationrate: 1.5,
+      sideofpier: 1,
+    })
     const status = await fake.framing.telescopeStatus('mount-id', undefined, { includeAlignmentObservations: true, includePointingSide: true })
-    expect(status).toMatchObject({ trackingRate: 'solar', rightAscensionRateSecondsPerSiderealSecond: -0.25, declinationRateArcsecondsPerSecond: 1.5, pierSide: 'west' })
+    expect(status).toMatchObject({
+      trackingRate: 'solar',
+      rightAscensionRateSecondsPerSiderealSecond: -0.25,
+      declinationRateArcsecondsPerSecond: 1.5,
+      pierSide: 'west',
+    })
     expect(fake.requests.filter(request => request.path.endsWith('/sideofpier'))).toEqual([{ method: 'GET', path: '/api/v1/telescope/3/sideofpier' }])
   })
 
@@ -249,7 +329,11 @@ describe('framing boundary', () => {
   it('preserves driver and transport failures instead of omitting unavailable pointing side', async () => {
     const fake = observatory()
     fake.errors.set('sideofpier', 1280)
-    await expect(fake.framing.telescopeStatus('mount-id', undefined, { includePointingSide: true })).rejects.toMatchObject({ reason: 'protocol-error', errorNumber: 1280, endpoint: '/api/v1/telescope/3/sideofpier' })
+    await expect(fake.framing.telescopeStatus('mount-id', undefined, { includePointingSide: true })).rejects.toMatchObject({
+      reason: 'protocol-error',
+      errorNumber: 1280,
+      endpoint: '/api/v1/telescope/3/sideofpier',
+    })
     fake.errors.clear()
     fake.transportFailures.add('sideofpier')
     await expect(fake.framing.telescopeStatus('mount-id', undefined, { includePointingSide: true })).rejects.toMatchObject({ reason: 'transport', endpoint: '/api/v1/telescope/3/sideofpier' })
@@ -257,15 +341,30 @@ describe('framing boundary', () => {
 
   it.each([0, 1, 2, 3])('normalizes alignment observations with tracking mode %s', async trackingrate => {
     const fake = observatory()
-    Object.assign(fake.values, { trackingrate, rightascensionrate: -0.25, declinationrate: 1.5, sideofpier: 0 })
+    Object.assign(fake.values, {
+      trackingrate,
+      rightascensionrate: -0.25,
+      declinationrate: 1.5,
+      sideofpier: 0,
+    })
     const status = await fake.framing.telescopeStatus('mount-id', undefined, { includeAlignmentObservations: true })
-    expect(status).toMatchObject({ trackingRate: ['sidereal', 'lunar', 'solar', 'king'][trackingrate], rightAscensionRateSecondsPerSiderealSecond: -0.25, declinationRateArcsecondsPerSecond: 1.5, pierSide: 'east' })
+    expect(status).toMatchObject({
+      trackingRate: ['sidereal', 'lunar', 'solar', 'king'][trackingrate],
+      rightAscensionRateSecondsPerSiderealSecond: -0.25,
+      declinationRateArcsecondsPerSecond: 1.5,
+      pierSide: 'east',
+    })
     expect(fake.writes).toEqual([])
   })
 
   it.each([[-1, 'unknown'], [1, 'west']] as const)('retains pier pointing state %s as %s', async (sideofpier, pierSide) => {
     const fake = observatory()
-    Object.assign(fake.values, { trackingrate: 0, rightascensionrate: 0, declinationrate: 0, sideofpier })
+    Object.assign(fake.values, {
+      trackingrate: 0,
+      rightascensionrate: 0,
+      declinationrate: 0,
+      sideofpier,
+    })
     expect(await fake.framing.telescopeStatus('mount-id', undefined, { includeAlignmentObservations: true })).toMatchObject({ pierSide })
   })
 
@@ -275,7 +374,12 @@ describe('framing boundary', () => {
     for (const property of ['trackingrate', 'rightascensionrate', 'declinationrate', 'sideofpier']) fake.unsupported.add(property)
     const status = await fake.framing.telescopeStatus('mount-id', undefined, { includeAlignmentObservations: true })
 
-    for (const property of ['trackingRate', 'rightAscensionRateSecondsPerSiderealSecond', 'declinationRateArcsecondsPerSecond', 'pierSide']) expect(status).not.toHaveProperty(property)
+    for (const property of [
+      'trackingRate',
+      'rightAscensionRateSecondsPerSiderealSecond',
+      'declinationRateArcsecondsPerSecond',
+      'pierSide',
+    ]) expect(status).not.toHaveProperty(property)
   })
 
   it.each([
@@ -285,13 +389,24 @@ describe('framing boundary', () => {
     ['sideofpier', 2], ['sideofpier', 0.5], ['sideofpier', '-1'],
   ])('rejects malformed alignment property %s=%s', async (property, value) => {
     const fake = observatory()
-    Object.assign(fake.values, { trackingrate: 0, rightascensionrate: 0, declinationrate: 0, sideofpier: -1, [String(property)]: value })
+    Object.assign(fake.values, {
+      trackingrate: 0,
+      rightascensionrate: 0,
+      declinationrate: 0,
+      sideofpier: -1,
+      [String(property)]: value,
+    })
     await expect(fake.framing.telescopeStatus('mount-id', undefined, { includeAlignmentObservations: true })).rejects.toMatchObject({ reason: 'invalid-response' })
   })
 
   it.each(['trackingrate', 'rightascensionrate', 'declinationrate', 'sideofpier'])('propagates a real alignment observation failure from %s, while ordinary framing does not request it', async property => {
     const fake = observatory()
-    Object.assign(fake.values, { trackingrate: 0, rightascensionrate: 0, declinationrate: 0, sideofpier: -1 })
+    Object.assign(fake.values, {
+      trackingrate: 0,
+      rightascensionrate: 0,
+      declinationrate: 0,
+      sideofpier: -1,
+    })
     fake.errors.set(property, 1280)
     await expect(fake.framing.telescopeStatus('mount-id')).resolves.toMatchObject({ tracking: true })
     await expect(fake.framing.telescopeStatus('mount-id', undefined, { includeAlignmentObservations: true })).rejects.toMatchObject({ reason: 'protocol-error', errorNumber: 1280 })

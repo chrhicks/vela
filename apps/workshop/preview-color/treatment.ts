@@ -9,5 +9,10 @@ export async function neutralPreviews(frame: PreviewFrame) {
   const estimate = backgroundOffsets(frame, range)
   const { native, fit } = await capturePreviews(frame.width, frame.height, frame.pixels, frame.color)
 
-  return { native, fit: fit ?? native, range, estimate }
+  return {
+    native,
+    fit: fit ?? native,
+    range,
+    estimate
+  }
 }

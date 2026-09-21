@@ -5,7 +5,12 @@ import type { RigCatalog } from './catalog.js'
 import type { RigOperations } from './operations.js'
 import { inspectRigDetail, type RigDetailOptions } from './detail.js'
 
-export function registerImagingCamera(app: FastifyInstance, catalog: RigCatalog, operations: RigOperations, options: RigDetailOptions = {}) {
+export function registerImagingCamera(
+  app: FastifyInstance,
+  catalog: RigCatalog,
+  operations: RigOperations,
+  options: RigDetailOptions = {},
+) {
   async function inspect(rigId: string): Promise<ImagingCameraView | undefined> {
     const detail = await inspectRigDetail(catalog, rigId, options)
 
@@ -14,9 +19,15 @@ export function registerImagingCamera(app: FastifyInstance, catalog: RigCatalog,
 
     if (!rig) return undefined
 
-    const cameras = detail.state === 'current' ? detail.inspections
-      .filter(device => device.kind === 'camera')
-      .map(device => ({ id: device.providerDeviceId, name: device.name?.trim() || null, configuredName: device.configuredName })) : []
+    const cameras = detail.state === 'current'
+      ? detail.inspections
+        .filter(device => device.kind === 'camera')
+        .map(device => ({
+          id: device.providerDeviceId,
+          name: device.name?.trim() || null,
+          configuredName: device.configuredName,
+        }))
+      : []
 
     const selected = rig.imagingCamera
     const match = cameras.find(camera => camera.id === selected?.uniqueId)
@@ -36,7 +47,8 @@ export function registerImagingCamera(app: FastifyInstance, catalog: RigCatalog,
     }
 
     return {
-      rigId, cameras,
+      rigId,
+      cameras,
       selected: selected ? { id: selected.uniqueId, name: selected.name } : null,
       state: selectionState(),
       editable: detail.state === 'current' && !operations.owner(rigId),
@@ -62,12 +74,24 @@ export function registerImagingCamera(app: FastifyInstance, catalog: RigCatalog,
       if (!view) return reply.code(404).send({ error: 'Rig not found' })
       const camera = view.cameras.find(camera => camera.id === body.id)
 
-      if (!camera?.name || camera.name !== body.name) return reply.code(409).send({ error: 'Camera identity changed or is unavailable. Refresh and select it again.' })
+      if (!camera?.name || camera.name !== body.name) {
+        return reply.code(409).send({
+          error: 'Camera identity changed or is unavailable. Refresh and select it again.',
+        })
+      }
+
       const saved = await catalog.setImagingCamera(view.rigId, { uniqueId: camera.id, name: camera.name })
 
       if (!saved) return reply.code(404).send({ error: 'Rig not found' })
 
-      return { ...view, selected: { id: camera.id, name: camera.name }, state: 'ready', editable: true }
-    } finally { release() }
+      return {
+        ...view,
+        selected: { id: camera.id, name: camera.name },
+        state: 'ready',
+        editable: true,
+      }
+    } finally {
+      release()
+    }
   })
 }

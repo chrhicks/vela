@@ -13,7 +13,12 @@ const crcTable = Uint32Array.from({ length: 256 }, (_, byte) => {
   return crc >>> 0
 })
 
-export async function encodePng(width: number, height: number, channels: number, data: Buffer) {
+export async function encodePng(
+  width: number,
+  height: number,
+  channels: number,
+  data: Buffer,
+) {
   const header = Buffer.alloc(13)
   header.writeUInt32BE(width, 0)
   header.writeUInt32BE(height, 4)
@@ -21,7 +26,12 @@ export async function encodePng(width: number, height: number, channels: number,
   header[9] = channels === 3 ? 2 : 0
   const compressed = await compress(data)
 
-  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), await chunk('IHDR', header), await chunk('IDAT', compressed), await chunk('IEND', Buffer.alloc(0))])
+  return Buffer.concat([
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+    await chunk('IHDR', header),
+    await chunk('IDAT', compressed),
+    await chunk('IEND', Buffer.alloc(0)),
+  ])
 }
 
 async function chunk(type: string, data: Buffer): Promise<Buffer> {

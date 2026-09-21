@@ -9,15 +9,28 @@ const site = { latitudeDegrees: 40, longitudeDegrees: -75, elevationMeters: 0 }
 const now = new Date('2026-09-07T04:00:00Z')
 
 const target = (id: string, overrides: Partial<CatalogTarget> = {}): CatalogTarget => ({
-  id, catalogName: id, commonName: null, aliases: [id], raDegrees: 10.68470833,
-  decDegrees: 41.26875, type: 'Galaxy', majorAxisArcminutes: 100, minorAxisArcminutes: null, ...overrides,
+  id,
+  catalogName: id,
+  commonName: null,
+  aliases: [id],
+  raDegrees: 10.68470833,
+  decDegrees: 41.26875,
+  type: 'Galaxy',
+  majorAxisArcminutes: 100,
+  minorAxisArcminutes: null,
+  ...overrides,
 })
 
 function preciseAltitude(record: CatalogTarget, at: string, location = site) {
   const date = new Date(at)
   const position = toMount(record, 'topocentric', date, location)
 
-  return Horizon(date, new Observer(location.latitudeDegrees, location.longitudeDegrees, 0), position.raDegrees / 15, position.decDegrees).altitude
+  return Horizon(
+    date,
+    new Observer(location.latitudeDegrees, location.longitudeDegrees, 0),
+    position.raDegrees / 15,
+    position.decDegrees,
+  ).altitude
 }
 
 describe('target discovery', () => {
@@ -34,7 +47,11 @@ describe('target discovery', () => {
       expect(Number.isFinite(candidate.score)).toBe(true)
       const opportunity = candidate.opportunity
 
-      if (!opportunity) { ineligible = true; expect(candidate.eligible).toBe(false); continue }
+      if (!opportunity) {
+        ineligible = true
+        expect(candidate.eligible).toBe(false)
+        continue
+      }
 
       expect(ineligible).toBe(false)
       expect(Date.parse(opportunity.startsAt)).toBeGreaterThanOrEqual(now.getTime())
@@ -61,7 +78,13 @@ describe('target discovery', () => {
   })
 
   it('matches precise altitude at useful interval edges and maxima across RA wrap and circumpolar targets', () => {
-    const targets = [target('m31'), target('wrap', { raDegrees: 359.99, decDegrees: 10 }), target('pole', { raDegrees: 0.01, decDegrees: 89.99 }), target('vega', { raDegrees: 279.2347, decDegrees: 38.7837 })]
+    const targets = [
+      target('m31'),
+      target('wrap', { raDegrees: 359.99, decDegrees: 10 }),
+      target('pole', { raDegrees: 0.01, decDegrees: 89.99 }),
+      target('vega', { raDegrees: 279.2347, decDegrees: 38.7837 }),
+    ]
+
     const result = discoverTargets({ targets, site, now })
 
     for (const candidate of result.candidates) {
@@ -93,7 +116,13 @@ describe('target discovery', () => {
   it.each([90, -90])('handles continuous darkness and finite altitudes at latitude %s', latitudeDegrees => {
     const location = { ...site, latitudeDegrees }
     const date = new Date(latitudeDegrees > 0 ? '2026-12-21T00:00:00Z' : '2026-06-21T00:00:00Z')
-    const result = discoverTargets({ targets: [target('polar', { decDegrees: latitudeDegrees > 0 ? 60 : -60 })], site: location, now: date })
+
+    const result = discoverTargets({
+      targets: [target('polar', { decDegrees: latitudeDegrees > 0 ? 60 : -60 })],
+      site: location,
+      now: date,
+    })
+
     expect(result.window?.kind).toBe('polar-night')
     const opportunity = result.candidates[0]!.opportunity!
     expect(opportunity.usefulMinutes).toBeCloseTo(1440, 6)
@@ -112,7 +141,12 @@ describe('target discovery', () => {
       expect(result.candidates.every(candidate => !candidate.eligible && candidate.opportunity === null)).toBe(true)
     }
 
-    const polarDay = discoverTargets({ targets, site: { ...site, latitudeDegrees: 90 }, now: new Date('2026-06-21T00:00:00Z') })
+    const polarDay = discoverTargets({
+      targets,
+      site: { ...site, latitudeDegrees: 90 },
+      now: new Date('2026-06-21T00:00:00Z'),
+    })
+
     expect(polarDay.status).toBe('no-darkness')
     expect(polarDay.candidates.every(candidate => !candidate.eligible)).toBe(true)
     expect(() => discoverTargets({ targets, site, now: new Date('invalid') })).toThrow(RangeError)
@@ -124,7 +158,11 @@ describe('target discovery', () => {
     const result = discoverTargets({ targets: [...records, uncertain], site: null, now })
 
     for (const candidate of result.candidates) {
-      expect(candidate.filter).toBe(candidate.target.id === 'mixed' ? 'uncertain' : ['ngc1432', 'ngc1435', 'ngc7023', 'ngc0224'].includes(candidate.target.id) ? 'broadband' : 'dual-band')
+      expect(candidate.filter).toBe(candidate.target.id === 'mixed'
+        ? 'uncertain'
+        : ['ngc1432', 'ngc1435', 'ngc7023', 'ngc0224'].includes(candidate.target.id)
+          ? 'broadband'
+          : 'dual-band')
     }
 
     expect(result.candidates.find(candidate => candidate.target.id === 'mixed')!.target).toBe(uncertain)
@@ -137,7 +175,8 @@ describe('target discovery', () => {
     // At latitude 40, declination 0 reaches altitude 30 at hour angle ~49.25°.
     const setting = target('ngc1976', {
       ...fromMount({ raDegrees: (lst - 49 + 360) % 360, decDegrees: 0 }, 'topocentric', now, site),
-      type: 'Nebula', majorAxisArcminutes: 120,
+      type: 'Nebula',
+      majorAxisArcminutes: 120,
     })
 
     const sustained = target('ordinary', { ...fromMount({ raDegrees: lst, decDegrees: 40 }, 'topocentric', now, site) })

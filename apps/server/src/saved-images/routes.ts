@@ -3,7 +3,11 @@ import type { RigCatalog } from '../rig/catalog.js'
 import type { SavedImageStore } from './store.js'
 import { PREVIEW_VERSION } from '../imaging/background.js'
 
-export function registerSavedImages(app: FastifyInstance, catalog: RigCatalog, store: SavedImageStore) {
+export function registerSavedImages(
+  app: FastifyInstance,
+  catalog: RigCatalog,
+  store: SavedImageStore,
+) {
   app.get<{ Params: { rigId: string } }>('/api/web/rigs/:rigId/saved-images', async (request, reply) => {
     reply.header('cache-control', 'no-store')
     const rig = await catalog.get(request.params.rigId)
@@ -29,7 +33,9 @@ export function registerSavedImages(app: FastifyInstance, catalog: RigCatalog, s
     try {
       const image = await store.refreshPreview(rigId, imageId)
 
-      return image ? { rigId, rigName: rig.name, image } : reply.code(404).send({ error: 'Saved image not found' })
+      return image
+        ? { rigId, rigName: rig.name, image }
+        : reply.code(404).send({ error: 'Saved image not found' })
     } catch (error) {
       request.log.error(error, 'Could not read saved image')
 
@@ -50,7 +56,8 @@ export function registerSavedImages(app: FastifyInstance, catalog: RigCatalog, s
       app.get<{ Params: { rigId: string, imageId: string, version?: string } }>(path, async (request, reply) => {
         const { rigId, imageId } = request.params
 
-        if (versioned && request.params.version !== PREVIEW_VERSION) return reply.code(404).send({ error: 'Unknown preview version' })
+        if (versioned && request.params.version !== PREVIEW_VERSION)
+          return reply.code(404).send({ error: 'Unknown preview version' })
 
         if (!await catalog.get(rigId)) return reply.code(404).send({ error: 'Rig not found' })
 
@@ -58,7 +65,10 @@ export function registerSavedImages(app: FastifyInstance, catalog: RigCatalog, s
           const metadata = await store.get(rigId, imageId)
 
           if (!metadata) return reply.code(404).send({ error: 'Saved image not found' })
-          const file = versioned && resource.kind !== 'fits' ? await store.previewFile(rigId, imageId, resource.kind) : await store.file(rigId, imageId, resource.kind)
+
+          const file = versioned && resource.kind !== 'fits'
+            ? await store.previewFile(rigId, imageId, resource.kind)
+            : await store.file(rigId, imageId, resource.kind)
 
           if (!file) return reply.code(404).send({ error: 'Saved image file not found' })
 

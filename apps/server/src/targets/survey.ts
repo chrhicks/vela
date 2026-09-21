@@ -70,9 +70,16 @@ function thumbnailUrl(target: SurveyThumbnail): string {
 
   const url = new URL(CUTOUT)
   url.search = new URLSearchParams({
-    hips: 'CDS/P/DSS2/color', width: '400', height: '300', projection: 'TAN',
-    coordsys: 'icrs', ra: String(raDegrees), dec: String(decDegrees),
-    fov: String(fov), rotation_angle: '0', format: 'jpg',
+    hips: 'CDS/P/DSS2/color',
+    width: '400',
+    height: '300',
+    projection: 'TAN',
+    coordsys: 'icrs',
+    ra: String(raDegrees),
+    dec: String(decDegrees),
+    fov: String(fov),
+    rotation_angle: '0',
+    format: 'jpg',
   }).toString()
 
   return url.href
@@ -247,7 +254,9 @@ export function createSurveyCache(options: SurveyCacheOptions = {}) {
         await writeFile(temporary, bytes, { flag: 'wx' })
         await rename(temporary, join(directory, name))
       } finally {
-        await unlink(temporary).catch(error => { if (!missing(error)) throw error })
+        await unlink(temporary).catch(error => {
+          if (!missing(error)) throw error
+        })
       }
 
       totalBytes -= entries.get(name)?.bytes ?? 0
@@ -284,7 +293,13 @@ export type SurveyCache = ReturnType<typeof createSurveyCache>
 
 export function registerSurvey(app: FastifyInstance, cache: SurveyCache) {
   app.get<{ Params: { '*': string } }>('/api/survey/dss2/*', {
-    schema: { params: { type: 'object', required: ['*'], properties: { '*': { type: 'string', maxLength: 100 } } } },
+    schema: {
+      params: {
+        type: 'object',
+        required: ['*'],
+        properties: { '*': { type: 'string', maxLength: 100 } },
+      },
+    },
   }, async (request, reply) => {
     if (request.raw.url?.includes('?')) return reply.code(400).send({ error: 'Survey tile queries are unsupported' })
 
@@ -301,12 +316,18 @@ export function registerSurvey(app: FastifyInstance, cache: SurveyCache) {
     }
   })
   app.get<{ Querystring: { ra: number, dec: number, fov: number } }>('/api/survey/thumbnail', {
-    schema: { querystring: { type: 'object', required: ['ra', 'dec', 'fov'], additionalProperties: false,
-      properties: {
-        ra: { type: 'number', minimum: 0, exclusiveMaximum: 360 },
-        dec: { type: 'number', minimum: -90, maximum: 90 },
-        fov: { type: 'number', minimum: 0.5, maximum: 5 },
-      } } },
+    schema: {
+      querystring: {
+        type: 'object',
+        required: ['ra', 'dec', 'fov'],
+        additionalProperties: false,
+        properties: {
+          ra: { type: 'number', minimum: 0, exclusiveMaximum: 360 },
+          dec: { type: 'number', minimum: -90, maximum: 90 },
+          fov: { type: 'number', minimum: 0.5, maximum: 5 },
+        },
+      },
+    },
   }, async (request, reply) => {
     const parameters = new URL(request.raw.url!, 'http://localhost').searchParams
 
@@ -316,7 +337,11 @@ export function registerSurvey(app: FastifyInstance, cache: SurveyCache) {
     }
 
     try {
-      const image = await cache.thumbnail({ raDegrees: request.query.ra, decDegrees: request.query.dec, fovDegrees: request.query.fov })
+      const image = await cache.thumbnail({
+        raDegrees: request.query.ra,
+        decDegrees: request.query.dec,
+        fovDegrees: request.query.fov,
+      })
 
       return reply.type(image.contentType).header('cache-control', 'public, max-age=86400')
         .header('x-survey-source', SURVEY_ATTRIBUTION.source).send(image.body)

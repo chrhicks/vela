@@ -15,7 +15,15 @@ export interface TabsProps extends Omit<HTMLAttributes<HTMLDivElement>, 'onChang
   size?: 'small' | 'medium'
 }
 
-export function Tabs({ items, value, defaultValue, onValueChange, size = 'medium', className = '', ...props }: TabsProps) {
+export function Tabs({
+  items,
+  value,
+  defaultValue,
+  onValueChange,
+  size = 'medium',
+  className = '',
+  ...props
+}: TabsProps) {
   const fallback = defaultValue ?? items[0]?.id ?? ''
   const [internalValue, setInternalValue] = useState(fallback)
   const selectedValue = value ?? internalValue

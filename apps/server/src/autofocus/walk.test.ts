@@ -40,7 +40,8 @@ describe('autofocus walk window', () => {
     if (!planned.ok) return
 
     const inner = planned.plan.positions.map(position => ({
-      position, hfrPixels: position === 32642 ? 2.1 : 4,
+      position,
+      hfrPixels: position === 32642 ? 2.1 : 4,
     }))
 
     expect(extraInwardPosition(planned.plan, inner)).toBe(32592)

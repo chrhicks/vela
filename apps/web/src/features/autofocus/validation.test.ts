@@ -4,12 +4,32 @@ import { isAutofocusView, isTravelLimitError } from './validation'
 
 const view: AutofocusView = {
   captureReadState: 'current',
-  rigId: 'fra', rigName: 'FRA 400', enabled: true, unavailableReason: null,
-  cameraName: 'ASI2600', focuserName: 'EAF', phase: 'walking', activity: 'exposing', active: true,
-  startPosition: 32842, currentPosition: 33042, maxStep: 60000, stepSize: 50, offsetSteps: 4,
-  exposureSeconds: 2, elapsedSeconds: 0.4, exposureStartedAt: '2026-09-17T00:00:00.000Z',
-  samples: [{ position: 33042, detectedStars: 12, hfrPixels: 5.1, capturedAt: '2026-09-17T00:00:00.000Z' }],
-  fit: null, restoredStart: false, error: null,
+  rigId: 'fra',
+  rigName: 'FRA 400',
+  enabled: true,
+  unavailableReason: null,
+  cameraName: 'ASI2600',
+  focuserName: 'EAF',
+  phase: 'walking',
+  activity: 'exposing',
+  active: true,
+  startPosition: 32842,
+  currentPosition: 33042,
+  maxStep: 60000,
+  stepSize: 50,
+  offsetSteps: 4,
+  exposureSeconds: 2,
+  elapsedSeconds: 0.4,
+  exposureStartedAt: '2026-09-17T00:00:00.000Z',
+  samples: [{
+    position: 33042,
+    detectedStars: 12,
+    hfrPixels: 5.1,
+    capturedAt: '2026-09-17T00:00:00.000Z',
+  }],
+  fit: null,
+  restoredStart: false,
+  error: null,
 }
 
 const travelLimit: AutofocusView = {
@@ -52,14 +72,24 @@ describe('autofocus response validation', () => {
   it('accepts complete and unrestored failed views as idle terminal state', () => {
     expect(isAutofocusView({ ...view, phase: 'complete', activity: 'idle', active: false }, 'fra')).toBe(true)
     expect(isAutofocusView({
-      ...view, phase: 'failed', activity: 'idle', active: false, restoredStart: false,
+      ...view,
+      phase: 'failed',
+      activity: 'idle',
+      active: false,
+      restoredStart: false,
       error: 'The focuser did not confirm return to the start position. Vela did not repeat the move.',
     }, 'fra')).toBe(true)
   })
 
   it('rejects a sample that claims stars without HFR', () => {
     expect(isAutofocusView({
-      ...view, samples: [{ position: 33042, detectedStars: 3, hfrPixels: null, capturedAt: '2026-09-17T00:00:00.000Z' }],
+      ...view,
+      samples: [{
+        position: 33042,
+        detectedStars: 3,
+        hfrPixels: null,
+        capturedAt: '2026-09-17T00:00:00.000Z',
+      }],
     }, 'fra')).toBe(false)
   })
 })

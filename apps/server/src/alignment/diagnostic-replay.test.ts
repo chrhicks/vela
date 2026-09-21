@@ -15,51 +15,116 @@ const roots: string[] = []
 
 afterEach(async () => { await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))) })
 
-async function physicalTrial(phase?: 'finished' | 'stopped' | 'failed', format: 'small-signed32' | 'signed32' | 'unsigned16' = 'small-signed32') {
+async function physicalTrial(
+  phase?: 'finished' | 'stopped' | 'failed',
+  format: 'small-signed32' | 'signed32' | 'unsigned16' = 'small-signed32',
+) {
   const root = await mkdtemp(join(tmpdir(), 'vela-diagnostic-replay-test-'))
   roots.push(root)
   const onError = vi.fn()
   const runId = randomUUID()
 
   const run = (await createAlignmentDiagnostics(root, onError)({
-    runId, rigId: 'physical', rigName: 'Fixture rig', mode: 'physical',
-    cameraId: 'camera', telescopeId: 'mount', cameraName: 'Fixture camera', exposureSeconds: 2,
+    runId,
+    rigId: 'physical',
+    rigName: 'Fixture rig',
+    mode: 'physical',
+    cameraId: 'camera',
+    telescopeId: 'mount',
+    cameraName: 'Fixture camera',
+    exposureSeconds: 2,
   }))!
 
   const reference = fixture.cases[1]!
-  const samples = reference.samples.map(capture => physicalAlignmentSample(capture.solved, { capturedAt: capture.capturedAt, exposureSeconds: 2 }, fixture.site))
+
+  const samples = reference.samples.map(capture => physicalAlignmentSample(
+    capture.solved,
+    { capturedAt: capture.capturedAt, exposureSeconds: 2 },
+    fixture.site,
+  ))
+
   const baseline = createAlignmentBaseline([samples[0]!, samples[1]!, samples[2]!], fixture.site.latitudeDegrees)
 
   const mount: AlpacaTelescopeStatus = {
-    rightAscensionDegrees: 10, declinationDegrees: 60, coordinateSystem: 'topocentric', ...fixture.site,
-    tracking: true, trackingRate: 'sidereal', rightAscensionRateSecondsPerSiderealSecond: 0,
-    declinationRateArcsecondsPerSecond: 0, pierSide: 'east', parked: false, slewing: false,
+    rightAscensionDegrees: 10,
+    declinationDegrees: 60,
+    coordinateSystem: 'topocentric',
+    ...fixture.site,
+    tracking: true,
+    trackingRate: 'sidereal',
+    rightAscensionRateSecondsPerSiderealSecond: 0,
+    declinationRateArcsecondsPerSecond: 0,
+    pierSide: 'east',
+    parked: false,
+    slewing: false,
     observedAt: reference.samples[0].capturedAt,
   }
 
   let frameSerial = 0
 
-  async function capture(input: typeof reference.adjusted, phase: 'baseline' | 'adjusting', position: number) {
+  async function capture(
+    input: typeof reference.adjusted,
+    phase: 'baseline' | 'adjusting',
+    position: number,
+  ) {
     frameSerial++
 
     const width = format === 'small-signed32' ? 2 : 32
 
     const frame: AlpacaFrame = {
-      width, height: width, pixels: format === 'small-signed32'
-        ? new Float64Array([frameSerial, 65535, -32768, 2_147_483_647]) : new Float64Array(width * width).fill(format === 'signed32' ? -1 : 1),
-      capturedAt: input.capturedAt, capturedAtSource: 'server-estimate',
+      width,
+      height: width,
+      pixels: format === 'small-signed32'
+        ? new Float64Array([frameSerial, 65535, -32768, 2_147_483_647])
+        : new Float64Array(width * width).fill(format === 'signed32' ? -1 : 1),
+      capturedAt: input.capturedAt,
+      capturedAtSource: 'server-estimate',
       color: format === 'small-signed32' ? { kind: 'bayer', pattern: 'gbrg' } : { kind: 'mono' },
     }
 
-    const sample = physicalAlignmentSample(input.solved, { capturedAt: input.capturedAt, exposureSeconds: 2 }, fixture.site)
+    const sample = physicalAlignmentSample(
+      input.solved,
+      { capturedAt: input.capturedAt, exposureSeconds: 2 },
+      fixture.site,
+    )
 
     const evidence: AlignmentFrameEvidence = {
-      phase, position, sample, hint: input.solved, fieldHeightDegrees: 3,
-      solution: { status: 'solved', ...input.solved, capturedAt: input.capturedAt,
-        wcs: { width, height: width, referenceX: 1.25, referenceY: 1.75, ...input.solved, cd: [0.00043, 0.00032, 0.00032, -0.00043] } },
-      physical: { site: fixture.site, before: mount, after: { ...mount, observedAt: sample.capturedAt },
-        camera: { cameraName: 'Fixture camera', sensorWidthPixels: width * 4, sensorHeightPixels: width * 4, width, height: width,
-          pixelWidthMicrons: 3.76, pixelHeightMicrons: 3.76, binX: 2, binY: 2, startX: 1, startY: 1 } },
+      phase,
+      position,
+      sample,
+      hint: input.solved,
+      fieldHeightDegrees: 3,
+      solution: {
+        status: 'solved',
+        ...input.solved,
+        capturedAt: input.capturedAt,
+        wcs: {
+          width,
+          height: width,
+          referenceX: 1.25,
+          referenceY: 1.75,
+          ...input.solved,
+          cd: [0.00043, 0.00032, 0.00032, -0.00043],
+        },
+      },
+      physical: {
+        site: fixture.site,
+        before: mount,
+        after: { ...mount, observedAt: sample.capturedAt },
+        camera: {
+          cameraName: 'Fixture camera',
+          sensorWidthPixels: width * 4,
+          sensorHeightPixels: width * 4,
+          width,
+          height: width,
+          pixelWidthMicrons: 3.76,
+          pixelHeightMicrons: 3.76,
+          binX: 2,
+          binY: 2,
+          startX: 1,
+          startY: 1,
+        },
+      },
     }
 
     await run.recordFrame(frame, evidence)
@@ -98,13 +163,21 @@ describe('alignment diagnostic replay', () => {
     const latest = await readFile(join(trial.directory, frames.at(-1)!.original.filename))
 
     const pixels = Array.from({ length: 1024 }, (_, index) => format === 'unsigned16'
-      ? latest.readInt16BE(2880 + index * 2) + 32_768 : latest.readInt32BE(2880 + index * 4))
+      ? latest.readInt16BE(2880 + index * 2) + 32_768
+      : latest.readInt32BE(2880 + index * 4))
 
     expect(pixels).toEqual(Array(1024).fill(format === 'unsigned16' ? 1 : -1))
     expect(await replayAlignmentDiagnostics(trial.directory)).toMatchObject({
       counts: { frames: 5, measurements: 3, physicalFrames: 5, verifiedOriginals: 4 },
-      baseline: trial.baseline, finalMeasurement: trial.measurement, outcome: { phase: 'finished' },
-      maximumDiscrepancies: { measurementArcsec: 0, correctionTargetDegrees: 0, physicalSampleDegrees: 0, physicalSampleTimeMs: 0 },
+      baseline: trial.baseline,
+      finalMeasurement: trial.measurement,
+      outcome: { phase: 'finished' },
+      maximumDiscrepancies: {
+        measurementArcsec: 0,
+        correctionTargetDegrees: 0,
+        physicalSampleDegrees: 0,
+        physicalSampleTimeMs: 0,
+      },
     })
   })
 
@@ -200,10 +273,21 @@ describe('alignment diagnostic replay', () => {
     expect(filenames).toEqual(expect.arrayContaining(frames.filter((_, index) => index !== 3).map(frame => frame.original.filename)))
 
     const report = await replayAlignmentDiagnostics(trial.directory)
-    expect(report).toMatchObject({ validation: 'production-math-reproducibility-only', mode: 'physical', runId: trial.runId,
-      outcome: { phase: 'finished', error: null }, counts: { frames: 5, measurements: 3, physicalFrames: 5, verifiedOriginals: 4 },
-      baseline: trial.baseline, finalMeasurement: trial.measurement,
-      maximumDiscrepancies: { measurementArcsec: 0, correctionTargetDegrees: 0, physicalSampleDegrees: 0, physicalSampleTimeMs: 0 } })
+    expect(report).toMatchObject({
+      validation: 'production-math-reproducibility-only',
+      mode: 'physical',
+      runId: trial.runId,
+      outcome: { phase: 'finished', error: null },
+      counts: { frames: 5, measurements: 3, physicalFrames: 5, verifiedOriginals: 4 },
+      baseline: trial.baseline,
+      finalMeasurement: trial.measurement,
+      maximumDiscrepancies: {
+        measurementArcsec: 0,
+        correctionTargetDegrees: 0,
+        physicalSampleDegrees: 0,
+        physicalSampleTimeMs: 0,
+      },
+    })
     expect(Math.abs(report.baseline!.measurement.altitudeArcsec - fixture.cases[1]!.altitude)).toBeLessThan(1)
   })
 

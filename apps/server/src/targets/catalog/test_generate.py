@@ -4,9 +4,16 @@ from generate import coordinate, extent, normalize
 
 class CatalogImportTest(unittest.TestCase):
   def test_rejects_malformed_or_out_of_range_coordinates(self):
-    for value, ra in [('24:00:00', True), ('23:60:00', True), ('12:00:60', True),
-                      ('NaN', True), ('12:00:00', False), ('+90:00:01', False),
-                      ('-91:00:00', False), ('-02:00:00', True)]:
+    for value, ra in [
+      ('24:00:00', True),
+      ('23:60:00', True),
+      ('12:00:60', True),
+      ('NaN', True),
+      ('12:00:00', False),
+      ('+90:00:01', False),
+      ('-91:00:00', False),
+      ('-02:00:00', True),
+    ]:
       with self.subTest(value=value), self.assertRaises(ValueError):
         coordinate(value, ra)
     self.assertEqual(coordinate('-00:30:00', False), -0.5)

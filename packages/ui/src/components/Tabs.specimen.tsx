@@ -18,9 +18,36 @@ export const specimen: ComponentSpecimen = {
     <div style={{ width: 'min(100%, 34rem)' }}>
       <Tabs
         items={[
-          { id: 'status', label: 'Status', content: <div className="vela-specimen-copy"><Badge marker={<i />} tone="positive">Connected</Badge><p>Camera temperature is stable at −5.0 °C.</p></div> },
-          { id: 'settings', label: 'Settings', content: <div className="vela-specimen-copy"><strong>Gain 100 · Offset 50</strong><p>Applied to the next exposure.</p></div> },
-          { id: 'history', label: 'History', content: <div className="vela-specimen-copy"><strong>42 completed exposures</strong><p>Last frame completed 18 seconds ago.</p></div> },
+          {
+            id: 'status',
+            label: 'Status',
+            content: (
+              <div className="vela-specimen-copy">
+                <Badge marker={<i />} tone="positive">Connected</Badge>
+                <p>Camera temperature is stable at −5.0 °C.</p>
+              </div>
+            )
+          },
+          {
+            id: 'settings',
+            label: 'Settings',
+            content: (
+              <div className="vela-specimen-copy">
+                <strong>Gain 100 · Offset 50</strong>
+                <p>Applied to the next exposure.</p>
+              </div>
+            )
+          },
+          {
+            id: 'history',
+            label: 'History',
+            content: (
+              <div className="vela-specimen-copy">
+                <strong>42 completed exposures</strong>
+                <p>Last frame completed 18 seconds ago.</p>
+              </div>
+            )
+          },
         ]}
         size={z.enum(['small', 'medium']).parse(props.size)}
         onValueChange={(selected) => onPropsChange?.({ selected })}

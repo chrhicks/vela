@@ -16,8 +16,13 @@ export async function createDisplayStretch(blackPoint: number, ceiling: number) 
   const first = Math.ceil(blackPoint * 4)
   const size = Math.floor(ceiling * 4) - first + 1
 
-  const table = ceiling > blackPoint && Number.isSafeInteger(first) && Number.isSafeInteger(size) && size > 0 && size <= 262_144
-    ? new Uint8Array(size) : null
+  const table = ceiling > blackPoint
+    && Number.isSafeInteger(first)
+    && Number.isSafeInteger(size)
+    && size > 0
+    && size <= 262_144
+    ? new Uint8Array(size)
+    : null
 
   if (table) {
     for (let index = 0; index < table.length; index++) {
@@ -29,6 +34,8 @@ export async function createDisplayStretch(blackPoint: number, ceiling: number) 
   return (sample: number) => {
     const index = sample * 4 - first
 
-    return table && Number.isInteger(index) && index >= 0 && index < table.length ? table[index]! : transfer(sample)
+    return table && Number.isInteger(index) && index >= 0 && index < table.length
+      ? table[index]!
+      : transfer(sample)
   }
 }

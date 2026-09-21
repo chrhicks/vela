@@ -4,9 +4,28 @@ import { AlpacaProviderError } from './error.js'
 import type { ResponseFixture } from './internal/test-fixtures.js'
 
 function cameraRig() {
-  const camera = { DeviceName: 'Camera', DeviceType: 'Camera', DeviceNumber: 7, UniqueID: 'camera-id' }
-  const state = { ready: true, exposing: false, starts: 0, aborts: 0, imageReads: 0, stamp: '2026-09-05T01:00:00' }
-  const envelope = { ClientTransactionID: 0, ServerTransactionID: 1, ErrorNumber: 0, ErrorMessage: '' }
+  const camera = {
+    DeviceName: 'Camera',
+    DeviceType: 'Camera',
+    DeviceNumber: 7,
+    UniqueID: 'camera-id',
+  }
+
+  const state = {
+    ready: true,
+    exposing: false,
+    starts: 0,
+    aborts: 0,
+    imageReads: 0,
+    stamp: '2026-09-05T01:00:00',
+  }
+
+  const envelope = {
+    ClientTransactionID: 0,
+    ServerTransactionID: 1,
+    ErrorNumber: 0,
+    ErrorMessage: '',
+  }
 
   const fetch: typeof globalThis.fetch = async (input, init) => {
     init?.signal?.throwIfAborted()
@@ -14,16 +33,32 @@ function cameraRig() {
     let Value: ResponseFixture
 
     switch (operation) {
-      case 'configureddevices': Value = [camera]; break
+      case 'configureddevices':
+        Value = [camera]
+        break
       case 'connected':
-      case 'canabortexposure': Value = true; break
-      case 'name': Value = camera.DeviceName; break
-      case 'sensortype': Value = 0; break
+      case 'canabortexposure':
+        Value = true
+        break
+      case 'name':
+        Value = camera.DeviceName
+        break
+      case 'sensortype':
+        Value = 0
+        break
       case 'numx':
-      case 'numy': Value = 2; break
-      case 'camerastate': Value = state.exposing ? 2 : 0; break
-      case 'imageready': Value = state.ready; break
-      case 'lastexposurestarttime': Value = state.stamp; break
+      case 'numy':
+        Value = 2
+        break
+      case 'camerastate':
+        Value = state.exposing ? 2 : 0
+        break
+      case 'imageready':
+        Value = state.ready
+        break
+      case 'lastexposurestarttime':
+        Value = state.stamp
+        break
       case 'startexposure':
         expect(init?.method).toBe('PUT')
         expect(String(init?.body)).toBe('Duration=1&Light=true')
@@ -89,11 +124,15 @@ it.each(['application/json', 'application/imagebytes'])('recovers the same expos
 
   const acquisition = createAlpacaAcquisition({ baseUrl: 'http://fake', fetch, readRetryIntervalMs: 10 })
 
-  const result = acquisition.capture({ cameraId: 'camera-id', exposureSeconds: 1, onReadState: state => {
-    readStates.push(state)
-    expect(rig.state.starts).toBe(1)
-    expect(rig.state.aborts).toBe(0)
-  } })
+  const result = acquisition.capture({
+    cameraId: 'camera-id',
+    exposureSeconds: 1,
+    onReadState: state => {
+      readStates.push(state)
+      expect(rig.state.starts).toBe(1)
+      expect(rig.state.aborts).toBe(0)
+    },
+  })
 
   await vi.waitFor(() => expect(rig.state.starts).toBe(1))
   rig.complete()

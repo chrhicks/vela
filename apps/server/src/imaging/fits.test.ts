@@ -3,9 +3,16 @@ import { encodeCaptureFits } from './fits.js'
 
 const metadata = { exposureSeconds: 1.5, cameraName: "Chris's camera" }
 
-const frame = { width: 3, height: 2, pixels: [-2_147_483_648, -1, 0, 1, 65535, 2_147_483_647], capturedAt: '2026-09-05T19:00:00-04:00' }
+const frame = {
+  width: 3,
+  height: 2,
+  pixels: [-2_147_483_648, -1, 0, 1, 65535, 2_147_483_647],
+  capturedAt: '2026-09-05T19:00:00-04:00',
+}
 
-function header(buffer: Buffer) { return buffer.subarray(0, 2880).toString('ascii').match(/.{80}/g)! }
+function header(buffer: Buffer) {
+  return buffer.subarray(0, 2880).toString('ascii').match(/.{80}/g)!
+}
 
 describe('original capture FITS', () => {
   it('stores every unsigned 16-bit value losslessly without changing acquisition samples', async () => {
@@ -89,18 +96,22 @@ describe('original capture FITS', () => {
 
     const writingTick = new Promise<void>(resolve => { observeWriting = resolve })
 
-    Object.defineProperty(pixels, 0, { get() {
-      firstReads++
+    Object.defineProperty(pixels, 0, {
+      get() {
+        firstReads++
 
-      if (firstReads === 2) setImmediate(observeWriting)
+        if (firstReads === 2) setImmediate(observeWriting)
 
-      return value
-    } })
-    Object.defineProperty(pixels, pixels.length - 1, { get() {
-      lastReads++
+        return value
+      },
+    })
+    Object.defineProperty(pixels, pixels.length - 1, {
+      get() {
+        lastReads++
 
-      return value
-    } })
+        return value
+      },
+    })
     const validationTick = new Promise<void>(resolve => setImmediate(resolve))
     const pending = encodeCaptureFits({ ...frame, width: 512, height: 384, pixels }, metadata)
     await validationTick

@@ -10,7 +10,8 @@ const options = { width: 101, height: 101, fieldHeightDegrees: 10, seed: 42 }
 function brightest(image: Uint16Array) {
   let maximum = 0
 
-  for (let index = 1; index < image.length; index++) if (image[index]! > image[maximum]!) maximum = index
+  for (let index = 1; index < image.length; index++)
+    if (image[index]! > image[maximum]!) maximum = index
 
   return [maximum % options.width, Math.floor(maximum / options.width)]
 }

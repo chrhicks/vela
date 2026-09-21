@@ -16,45 +16,115 @@ const explanation = 'The UI reports success after starting the request, before t
   + 'The returned promise only acknowledges dispatch; it does not establish the physical outcome. '
   + 'A later read can still report an interrupted exposure. The starting state must stay distinct from confirmed completion.'
 const report = Schema.decodeUnknownSync(reportSchema)({
-  artifact: 'render-fixture.json', time: '2026-09-20T12:00:00Z', mode: 'changes', schemaVersion: 3,
-  model: 'fixture/luna', status: 'complete', missingEvidence: [],
+  artifact: 'render-fixture.json',
+  time: '2026-09-20T12:00:00Z',
+  mode: 'changes',
+  schemaVersion: 3,
+  model: 'fixture/luna',
+  status: 'complete',
+  missingEvidence: [],
   files: [{ path: 'apps/server/src/capture.ts' }, { path: 'packages/alpaca/src/camera.ts' }],
   diagnostics: [
-    { rule: 'readability.names', severity: 'information', message: 'Name the observed state',
-      explanation: 'The value represents the last observed device state.', suggestion: 'Use observedState.',
-      location: { path: 'apps/server/src/capture.ts', startLine: 60, endLine: 60, quote: 'const state = readState()', sha256: 'b'.repeat(64) }, related: [],
+    {
+      rule: 'readability.names',
+      severity: 'information',
+      message: 'Name the observed state',
+      explanation: 'The value represents the last observed device state.',
+      suggestion: 'Use observedState.',
+      location: {
+        path: 'apps/server/src/capture.ts',
+        startLine: 60,
+        endLine: 60,
+        quote: 'const state = readState()',
+        sha256: 'b'.repeat(64),
+      },
+      related: [],
     },
-    { rule: 'error_context.confirmation', severity: 'error', message: 'Success before confirmation', explanation,
+    {
+      rule: 'error_context.confirmation',
+      severity: 'error',
+      message: 'Success before confirmation',
+      explanation,
       suggestion: 'Publish completion only after the device confirms it.',
-      location: { path: 'apps/server/src/capture.ts', startLine: 41, endLine: 55,
-        quote: ['startExposure()', 'publishSuccess()', ...Array.from({ length: 12 }, (_, index) => `// device observation ${index + 1}: still pending`), 'return unconfirmedResult'].join('\n'),
+      location: {
+        path: 'apps/server/src/capture.ts',
+        startLine: 41,
+        endLine: 55,
+        quote: [
+          'startExposure()',
+          'publishSuccess()',
+          ...Array.from({ length: 12 }, (_, index) => `// device observation ${index + 1}: still pending`),
+          'return unconfirmedResult',
+        ].join('\n'),
         sha256: 'a'.repeat(64),
       },
-      related: [{ path: 'packages/alpaca/src/camera.ts', startLine: 11, endLine: 12, quote: 'await dispatchExposure()\nreturn { dispatched: true }', sha256: 'c'.repeat(64) }],
+      related: [{
+        path: 'packages/alpaca/src/camera.ts',
+        startLine: 11,
+        endLine: 12,
+        quote: 'await dispatchExposure()\nreturn { dispatched: true }',
+        sha256: 'c'.repeat(64),
+      }],
     },
-    { rule: 'error_context.cause', severity: 'warning', message: 'Original cause is lost',
-      explanation: 'The replacement error drops the transport failure.', suggestion: 'Preserve the original error as cause.',
-      location: { path: 'apps/server/src/capture.ts', startLine: 70, endLine: 70, quote: 'throw new Error("Capture failed")', sha256: 'd'.repeat(64) }, related: [],
+    {
+      rule: 'error_context.cause',
+      severity: 'warning',
+      message: 'Original cause is lost',
+      explanation: 'The replacement error drops the transport failure.',
+      suggestion: 'Preserve the original error as cause.',
+      location: {
+        path: 'apps/server/src/capture.ts',
+        startLine: 70,
+        endLine: 70,
+        quote: 'throw new Error("Capture failed")',
+        sha256: 'd'.repeat(64),
+      },
+      related: [],
     },
   ],
 })
 const incomplete: Report = {
-  ...report, artifact: 'incomplete.json', status: 'incomplete', error: 'Review stopped before all source was checked.',
-  missingEvidence: [{ path: 'packages/alpaca/src/validation.ts', reason: 'Adapter contract was not supplied.', nextAction: 'Include the adapter validation contract in the next review.' }],
-  files: [...report.files, { path: 'assets/image.png', skipped: 'Binary file excluded.' }, { path: 'apps/server/src/missing.ts', error: 'Source could not be read.' }],
+  ...report,
+  artifact: 'incomplete.json',
+  status: 'incomplete',
+  error: 'Review stopped before all source was checked.',
+  missingEvidence: [{
+    path: 'packages/alpaca/src/validation.ts',
+    reason: 'Adapter contract was not supplied.',
+    nextAction: 'Include the adapter validation contract in the next review.',
+  }],
+  files: [
+    ...report.files,
+    { path: 'assets/image.png', skipped: 'Binary file excluded.' },
+    { path: 'apps/server/src/missing.ts', error: 'Source could not be read.' },
+  ],
 }
 
 const output = fileURLToPath(new URL('../../.local/panel-render/', import.meta.url))
 await mkdir(output, { recursive: true })
 
 for (const [width, height] of [[120, 36], [72, 28]]) {
-  type Layer = { enabled: boolean; commands: { bind: string; run: () => void }[] }
+  type Layer = {
+    enabled: boolean
+    commands: { bind: string; run: () => void }[]
+  }
   let layer: (() => Layer) | undefined
   // Only host section/view bindings are mocked. Selection and scrolling use
   // OpenTUI's actual input dispatcher and focus handling.
   const keymap = { layer: (input: () => Layer) => { layer = input } } as unknown as Context['keymap']
   const [currentReport, setReport] = createSignal(report)
-  const screen = await testRender(() => <ResultsPanel report={currentReport()} width={width} focused={true} theme={theme} keymap={keymap} />, { width, height })
+  const screen = await testRender(
+    () => (
+      <ResultsPanel
+        report={currentReport()}
+        width={width}
+        focused={true}
+        theme={theme}
+        keymap={keymap}
+      />
+    ),
+    { width, height },
+  )
   const captures: string[] = []
   function capture(label: string) {
     const frame = screen.captureCharFrame()
@@ -70,7 +140,9 @@ for (const [width, height] of [[120, 36], [72, 28]]) {
   }
   function detailText(frame: string) {
     // The adjacent list must not be interleaved with wrapped detail text.
-    return width >= 100 ? frame.split('\n').map(line => line.slice(Math.round((width - 2) * 0.48) + 2)).join('\n') : frame
+    return width >= 100
+      ? frame.split('\n').map(line => line.slice(Math.round((width - 2) * 0.48) + 2)).join('\n')
+      : frame
   }
   async function command(bind: string) {
     const current = layer?.()
@@ -156,7 +228,10 @@ for (const [width, height] of [[120, 36], [72, 28]]) {
     await command('s')
     includes(capture('Return to diagnostics'), 'error · Success before confirmation')
 
-    await show({ ...incomplete, artifact: 'empty-incomplete.json', diagnostics: [] }, 'Incomplete without diagnostics')
+    await show(
+      { ...incomplete, artifact: 'empty-incomplete.json', diagnostics: [] },
+      'Incomplete without diagnostics',
+    )
     includes(screen.captureCharFrame(), 'No diagnostics available. Review incomplete')
     await command('s')
     includes(await scrollToEnd('Status without diagnostics'), 'Source could not be read.')
@@ -168,7 +243,10 @@ for (const [width, height] of [[120, 36], [72, 28]]) {
     await command('right')
     includes(capture('Stale detail'), 'Unaccepted · error · Success before confirmation')
 
-    const empty = await show({ ...report, artifact: 'empty-complete.json', diagnostics: [], files: [] }, 'Complete without diagnostics')
+    const empty = await show(
+      { ...report, artifact: 'empty-complete.json', diagnostics: [], files: [] },
+      'Complete without diagnostics',
+    )
     includes(empty, 'No diagnostics from this review. This does not certify the source is correct.')
     await command('s')
     includes(capture('Status without files'), 'No source files in this report.')

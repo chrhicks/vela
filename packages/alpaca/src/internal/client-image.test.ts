@@ -14,8 +14,20 @@ it.each(['application/json', 'application/imagebytes'])('bounds %s image transfe
     }), { headers: { 'content-type': contentType } })
   }
 
-  const client = createAlpacaClient({ baseUrl: 'http://fake', fetch, requestTimeoutMs: 5_000, imageTimeoutMs: 60_000 })
-  const camera = { DeviceName: 'Camera', DeviceType: 'Camera', DeviceNumber: 0, UniqueID: 'camera' }
+  const client = createAlpacaClient({
+    baseUrl: 'http://fake',
+    fetch,
+    requestTimeoutMs: 5_000,
+    imageTimeoutMs: 60_000,
+  })
+
+  const camera = {
+    DeviceName: 'Camera',
+    DeviceType: 'Camera',
+    DeviceNumber: 0,
+    UniqueID: 'camera',
+  }
+
   let imageSettled = false
   const image = client.image(camera).finally(() => { imageSettled = true })
   const imageFailure = expect(image).rejects.toThrow('timed out after 60000ms')
@@ -28,8 +40,23 @@ it.each(['application/json', 'application/imagebytes'])('bounds %s image transfe
 })
 
 it('negotiates ImageBytes and uses the actual response Content-Type for JSON fallback', async () => {
-  const camera = { DeviceName: 'Camera', DeviceType: 'Camera', DeviceNumber: 0, UniqueID: 'camera' }
-  const json = { ErrorNumber: 0, ErrorMessage: '', ClientTransactionID: 0, ServerTransactionID: 1, Type: 2, Rank: 2, Value: [[7]] }
+  const camera = {
+    DeviceName: 'Camera',
+    DeviceType: 'Camera',
+    DeviceNumber: 0,
+    UniqueID: 'camera',
+  }
+
+  const json = {
+    ErrorNumber: 0,
+    ErrorMessage: '',
+    ClientTransactionID: 0,
+    ServerTransactionID: 1,
+    Type: 2,
+    Rank: 2,
+    Value: [[7]],
+  }
+
   const bytes = new ArrayBuffer(46)
   const metadata = new DataView(bytes)
   const fields = [1, 0, 0, 1, 44, 2, 8, 2, 1, 1, 0]
@@ -56,9 +83,31 @@ it('negotiates ImageBytes and uses the actual response Content-Type for JSON fal
 })
 
 it('rejects an unrecognized Content-Type and preserves a JSON protocol error', async () => {
-  const camera = { DeviceName: 'Camera', DeviceType: 'Camera', DeviceNumber: 0, UniqueID: 'camera' }
-  const unsupported = createAlpacaClient({ baseUrl: 'http://fake', fetch: async () => new Response('binary?', { headers: { 'content-type': 'application/octet-stream' } }) })
+  const camera = {
+    DeviceName: 'Camera',
+    DeviceType: 'Camera',
+    DeviceNumber: 0,
+    UniqueID: 'camera',
+  }
+
+  const unsupported = createAlpacaClient({
+    baseUrl: 'http://fake',
+    fetch: async () => new Response('binary?', {
+      headers: { 'content-type': 'application/octet-stream' },
+    }),
+  })
+
   await expect(unsupported.image(camera)).rejects.toMatchObject({ reason: 'invalid-response' })
-  const failed = createAlpacaClient({ baseUrl: 'http://fake', fetch: async () => Response.json({ ClientTransactionID: 0, ServerTransactionID: 1, ErrorNumber: 1025, ErrorMessage: 'Camera disconnected' }) })
+
+  const failed = createAlpacaClient({
+    baseUrl: 'http://fake',
+    fetch: async () => Response.json({
+      ClientTransactionID: 0,
+      ServerTransactionID: 1,
+      ErrorNumber: 1025,
+      ErrorMessage: 'Camera disconnected',
+    }),
+  })
+
   await expect(failed.image(camera)).rejects.toMatchObject({ reason: 'protocol-error', errorNumber: 1025 })
 })

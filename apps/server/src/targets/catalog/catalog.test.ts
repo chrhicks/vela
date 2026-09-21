@@ -4,10 +4,18 @@ import { getTarget, listTargets, searchTargets } from './index.js'
 describe('local target catalog', () => {
   it('resolves familiar names to the correct physical source records', () => {
     const identities = [
-      [' M  013 ', 'ngc6205'], ['M31', 'ngc0224'], ['Andromeda Galaxy', 'ngc0224'],
-      ['Crescent', 'ngc6888'], ['North America', 'ngc7000'], ['Heart', 'ic1805'],
-      ['Soul', 'ic1848'], ['Horsehead', 'b033'], ['Barnard 33', 'b033'],
-      ['Flame', 'ngc2024'], ['NGC 0224', 'ngc0224'], ['B33', 'b033'],
+      [' M  013 ', 'ngc6205'],
+      ['M31', 'ngc0224'],
+      ['Andromeda Galaxy', 'ngc0224'],
+      ['Crescent', 'ngc6888'],
+      ['North America', 'ngc7000'],
+      ['Heart', 'ic1805'],
+      ['Soul', 'ic1848'],
+      ['Horsehead', 'b033'],
+      ['Barnard 33', 'b033'],
+      ['Flame', 'ngc2024'],
+      ['NGC 0224', 'ngc0224'],
+      ['B33', 'b033'],
     ]
 
     for (const [query, id] of identities) {
@@ -20,11 +28,16 @@ describe('local target catalog', () => {
 
   it('retains J2000 coordinates and source extents, including unknown minor axes', () => {
     expect(getTarget('ngc6205')).toMatchObject({
-      type: 'Globular cluster', raDegrees: 250.42345833, decDegrees: 36.46130556,
-      majorAxisArcminutes: 16.5, minorAxisArcminutes: null,
+      type: 'Globular cluster',
+      raDegrees: 250.42345833,
+      decDegrees: 36.46130556,
+      majorAxisArcminutes: 16.5,
+      minorAxisArcminutes: null,
     })
     expect(getTarget('b033')).toMatchObject({
-      type: 'Dark nebula', raDegrees: 85.24583333, decDegrees: -2.45833333,
+      type: 'Dark nebula',
+      raDegrees: 85.24583333,
+      decDegrees: -2.45833333,
     })
     expect(getTarget('ic1805')?.type).toBe('Star cluster and nebula')
   })

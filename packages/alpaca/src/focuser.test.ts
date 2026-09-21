@@ -19,7 +19,11 @@ interface FocuserBehavior {
 
 function observatory(requestTimeoutMs = 100) {
   const values: FocuserReadFixtures = {
-    connected: true, absolute: true, position: 32842, maxstep: 60000, ismoving: false,
+    connected: true,
+    absolute: true,
+    position: 32842,
+    maxstep: 60000,
+    ismoving: false,
   }
 
   const writes: { operation: string, parameters: URLSearchParams }[] = []
@@ -37,11 +41,20 @@ function observatory(requestTimeoutMs = 100) {
     const operation = new URL(String(input)).pathname.split('/').at(-1)!
 
     const envelope = (Value?: ResponseFixture, ErrorNumber = 0, ErrorMessage = '') => Response.json({
-      ClientTransactionID: 0, ServerTransactionID: 1, ErrorNumber, ErrorMessage, Value,
+      ClientTransactionID: 0,
+      ServerTransactionID: 1,
+      ErrorNumber,
+      ErrorMessage,
+      Value,
     })
 
     if (operation === 'configureddevices') {
-      return envelope([{ DeviceName: 'EAF', DeviceType: 'Focuser', DeviceNumber: 0, UniqueID: 'eaf-id' }])
+      return envelope([{
+        DeviceName: 'EAF',
+        DeviceType: 'Focuser',
+        DeviceNumber: 0,
+        UniqueID: 'eaf-id',
+      }])
     }
 
     if (init?.method === 'PUT') {
@@ -74,7 +87,13 @@ function observatory(requestTimeoutMs = 100) {
     return envelope(entry[1])
   }
 
-  const focuser = createAlpacaFocuser({ baseUrl: 'http://fake', fetch, requestTimeoutMs, pollIntervalMs: 1, moveTimeoutMs: 100 })
+  const focuser = createAlpacaFocuser({
+    baseUrl: 'http://fake',
+    fetch,
+    requestTimeoutMs,
+    pollIntervalMs: 1,
+    moveTimeoutMs: 100,
+  })
 
   return { focuser, values, writes, state, whenStarted }
 }
@@ -94,8 +113,16 @@ describe('focuser write boundary', () => {
 
   it('never commands Move(0) or a position at MaxStep', async () => {
     const fake = observatory()
-    await expect(fake.focuser.move({ focuserId: 'eaf-id', position: 0, window: { minPosition: 0, maxPosition: 100 } })).rejects.toThrow(/not a home/)
-    await expect(fake.focuser.move({ focuserId: 'eaf-id', position: 60000, window: { minPosition: 1, maxPosition: 60000 } })).rejects.toThrow(/mechanical travel limit/)
+    await expect(fake.focuser.move({
+      focuserId: 'eaf-id',
+      position: 0,
+      window: { minPosition: 0, maxPosition: 100 },
+    })).rejects.toThrow(/not a home/)
+    await expect(fake.focuser.move({
+      focuserId: 'eaf-id',
+      position: 60000,
+      window: { minPosition: 1, maxPosition: 60000 },
+    })).rejects.toThrow(/mechanical travel limit/)
     expect(fake.writes).toEqual([])
   })
 
@@ -123,7 +150,14 @@ describe('focuser write boundary', () => {
   it('cancels only after independent halt confirmation', async () => {
     const fake = observatory()
     const controller = new AbortController()
-    const assertion = expect(fake.focuser.move({ focuserId: 'eaf-id', position: 33042, window, signal: controller.signal })).rejects.toBeInstanceOf(AlpacaFocuserStoppedError)
+
+    const assertion = expect(fake.focuser.move({
+      focuserId: 'eaf-id',
+      position: 33042,
+      window,
+      signal: controller.signal,
+    })).rejects.toBeInstanceOf(AlpacaFocuserStoppedError)
+
     await fake.whenStarted
     controller.abort()
     await assertion

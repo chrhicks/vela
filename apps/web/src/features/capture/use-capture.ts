@@ -9,8 +9,14 @@ export function captureActivity(view: CaptureView, offline: boolean) {
   if (view.captureReadState === 'retrying') return 'Camera observation interrupted'
 
   return {
-    idle: 'Ready for an exposure', exposing: 'Exposing', reading: 'Receiving image', saving: 'Saving image', stopping: 'Stopping capture',
-    complete: 'Image received', stopped: 'Capture stopped', failed: 'Capture stopped · error',
+    idle: 'Ready for an exposure',
+    exposing: 'Exposing',
+    reading: 'Receiving image',
+    saving: 'Saving image',
+    stopping: 'Stopping capture',
+    complete: 'Image received',
+    stopped: 'Capture stopped',
+    failed: 'Capture stopped · error',
   }[view.phase]
 }
 
@@ -116,7 +122,11 @@ export function useCapture(rigId: string) {
 
   async function post(
     path: 'start' | 'stop' | 'cooling',
-    body: { exposureSeconds: number, repeat: boolean, saveFrames: boolean } | { coolerOn: boolean } | { setpointC: number } | Record<string, never>,
+    body:
+      | { exposureSeconds: number, repeat: boolean, saveFrames: boolean }
+      | { coolerOn: boolean }
+      | { setpointC: number }
+      | Record<string, never>,
   ) {
     if (writing.current || !alive.current) return
 
@@ -147,7 +157,8 @@ export function useCapture(rigId: string) {
 
     try {
       const next = await api(`rigs/${encodeURIComponent(rigId)}/capture/${path}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
         signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]),
       })
@@ -197,7 +208,19 @@ export function useCapture(rigId: string) {
     }
   }
 
-  return { view, offline, pending, coolingPending, refreshing, error, coolingError, commandUnconfirmed, coolingUnconfirmed, canStart, canStop, canCool,
+  return {
+    view,
+    offline,
+    pending,
+    coolingPending,
+    refreshing,
+    error,
+    coolingError,
+    commandUnconfirmed,
+    coolingUnconfirmed,
+    canStart,
+    canStop,
+    canCool,
     start: (seconds: number, repeat: boolean, saveFrames: boolean) => {
       if (!Number.isFinite(seconds) || seconds < 0.1 || seconds > 600) return Promise.resolve()
 
@@ -206,5 +229,6 @@ export function useCapture(rigId: string) {
     stop: () => post('stop', {}),
     setCooler: (coolerOn: boolean) => post('cooling', { coolerOn }),
     setCoolingTemperature: (setpointC: number) => post('cooling', { setpointC }),
-    refresh: () => read(true) }
+    refresh: () => read(true),
+  }
 }

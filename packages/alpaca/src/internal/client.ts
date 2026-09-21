@@ -16,8 +16,18 @@ import {
 } from './types/management.js'
 
 export interface AlpacaClient {
-  command(device: ConfiguredDevice, operation: string, parameters: Record<string, string>, signal?: AbortSignal): Promise<void>
-  readValue<S extends Schema.ConstraintDecoder<unknown>>(device: ConfiguredDevice, operation: string, schema: S, signal?: AbortSignal): Promise<S['Type']>
+  command(
+    device: ConfiguredDevice,
+    operation: string,
+    parameters: Record<string, string>,
+    signal?: AbortSignal,
+  ): Promise<void>
+  readValue<S extends Schema.ConstraintDecoder<unknown>>(
+    device: ConfiguredDevice,
+    operation: string,
+    schema: S,
+    signal?: AbortSignal,
+  ): Promise<S['Type']>
   image(device: ConfiguredDevice, signal?: AbortSignal): Promise<CameraImage>
   apiVersions(signal?: AbortSignal): Promise<ReadonlyArray<number>>
   serverDescription(signal?: AbortSignal): Promise<ServerDescription>
@@ -68,7 +78,11 @@ export function createAlpacaClient({
   const apiBasePath = '/api/v1'
   const managementBasePath = '/management/v1'
 
-  function tracedRequest<T>(endpoint: string, method: 'GET' | 'PUT', operation: (span: Span) => Promise<T>): Promise<T> {
+  function tracedRequest<T>(
+    endpoint: string,
+    method: 'GET' | 'PUT',
+    operation: (span: Span) => Promise<T>,
+  ): Promise<T> {
     const path = endpoint.split('?')[0]!
     const parts = path.split('/')
 
@@ -124,7 +138,9 @@ export function createAlpacaClient({
     const span = trace.getActiveSpan()
     let timedOut = false
 
-    const onAbort = () => controller.abort(operationSignal === undefined ? undefined : (operationSignal.reason ?? new DOMException('The operation was aborted', 'AbortError')))
+    const onAbort = () => controller.abort(operationSignal === undefined
+      ? undefined
+      : (operationSignal.reason ?? new DOMException('The operation was aborted', 'AbortError')))
 
     if (operationSignal?.aborted) {
       onAbort()
@@ -172,7 +188,10 @@ export function createAlpacaClient({
           ...init,
           signal: controller.signal,
         })
-        span?.setAttributes({ 'http.response.status_code': response.status, 'alpaca.response.headers_ms': performance.now() - dispatchedAt })
+        span?.setAttributes({
+          'http.response.status_code': response.status,
+          'alpaca.response.headers_ms': performance.now() - dispatchedAt,
+        })
         span?.addEvent('alpaca.response.headers')
       } catch (cause) {
         throwTransportError(cause)
@@ -350,19 +369,33 @@ export function createAlpacaClient({
       const endpoint = deviceEndpoint(device, 'imagearray')
 
       return tracedRequest(endpoint, 'GET', async span => {
-        const value = await request(endpoint, Schema.Unknown, operationSignal,
-          { headers: { accept: 'application/imagebytes, application/json;q=0.9' } }, imageTimeoutMs, 'image')
+        const value = await request(
+          endpoint,
+          Schema.Unknown,
+          operationSignal,
+          { headers: { accept: 'application/imagebytes, application/json;q=0.9' } },
+          imageTimeoutMs,
+          'image',
+        )
 
         if (value instanceof ArrayBuffer) {
           if (value.byteLength >= 16) {
             const metadata = new DataView(value)
-            span.setAttributes({ 'alpaca.client_transaction_id': metadata.getUint32(8, true), 'alpaca.server_transaction_id': metadata.getUint32(12, true) })
+            span.setAttributes({
+              'alpaca.client_transaction_id': metadata.getUint32(8, true),
+              'alpaca.server_transaction_id': metadata.getUint32(12, true),
+            })
           }
 
           const decodeStartedAt = performance.now()
 
-          try { imageBytesMetadata(value) }
-          finally { span.addEvent('alpaca.response.decode', { 'alpaca.decode.duration_ms': performance.now() - decodeStartedAt }) }
+          try {
+            imageBytesMetadata(value)
+          } finally {
+            span.addEvent('alpaca.response.decode', {
+              'alpaca.decode.duration_ms': performance.now() - decodeStartedAt,
+            })
+          }
 
           span.setAttribute('alpaca.error_number', 0)
 

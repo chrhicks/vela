@@ -30,9 +30,11 @@ export function HomeProvider({ children }: { children: React.ReactNode }) {
     } catch {
       if (requestGeneration.current !== generation) return
 
-      setError(homeView === null
-        ? 'Vela could not load your rigs. Check the server and try again.'
-        : 'Vela could not refresh your rigs. Showing the previous state.')
+      setError(
+        homeView === null
+          ? 'Vela could not load your rigs. Check the server and try again.'
+          : 'Vela could not refresh your rigs. Showing the previous state.',
+      )
     } finally {
       if (requestGeneration.current === generation) setLoading(false)
     }
@@ -46,12 +48,14 @@ export function HomeProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   return (
-    <HomeContext.Provider value={{
-      home: homeView ?? undefined,
-      loading,
-      error,
-      refresh: fetchHomeView,
-    }}>
+    <HomeContext.Provider
+      value={{
+        home: homeView ?? undefined,
+        loading,
+        error,
+        refresh: fetchHomeView,
+      }}
+    >
       {children}
     </HomeContext.Provider>
   )

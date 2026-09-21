@@ -95,9 +95,11 @@ export function createRigConnectionCoordinator({
   ): Promise<InspectRigDetailResult> {
     let inspectionOptions: RigDetailOptions = { createInspector, now }
 
-    if (options.onConflict !== undefined) inspectionOptions = { ...inspectionOptions, onConflict: options.onConflict }
+    if (options.onConflict !== undefined)
+      inspectionOptions = { ...inspectionOptions, onConflict: options.onConflict }
 
-    if (options.onUnavailable !== undefined) inspectionOptions = { ...inspectionOptions, onUnavailable: options.onUnavailable }
+    if (options.onUnavailable !== undefined)
+      inspectionOptions = { ...inspectionOptions, onUnavailable: options.onUnavailable }
 
     if (signal !== null) inspectionOptions = { ...inspectionOptions, signal: signal }
 
@@ -390,7 +392,9 @@ function unavailableResult(
     outcome: 'unavailable',
     reason: detail.state === 'conflict'
       ? 'identity-conflict'
-      : detail.reason === 'offline' ? 'offline' : 'device-state-unavailable',
+      : detail.reason === 'offline'
+        ? 'offline'
+        : 'device-state-unavailable',
     view: rigObservationView(detail.view),
   }
 }

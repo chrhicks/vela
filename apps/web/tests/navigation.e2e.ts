@@ -2,14 +2,29 @@ import { expect, test } from '@playwright/test'
 import type { NavigationView } from '@vela/model/web'
 
 const initial: NavigationView = {
-  rigs: [{ id: 'rig-1', name: 'Askar FRA 400' }, { id: 'rig-2', name: 'Seestar S30' }],
-  captures: [{ rigId: 'rig-1', rigName: 'Askar FRA 400', phase: 'exposing', active: true, captureReadState: 'current', completedCount: 17, elapsedSeconds: 18, exposureSeconds: 60, error: null }],
+  rigs: [
+    { id: 'rig-1', name: 'Askar FRA 400' },
+    { id: 'rig-2', name: 'Seestar S30' },
+  ],
+  captures: [{
+    rigId: 'rig-1',
+    rigName: 'Askar FRA 400',
+    phase: 'exposing',
+    active: true,
+    captureReadState: 'current',
+    completedCount: 17,
+    elapsedSeconds: 18,
+    exposureSeconds: 60,
+    error: null,
+  }],
 }
 
 for (const width of [1440, 390]) {
   test(`navigation preserves capture identity and target query at ${width}px`, async ({ page }) => {
     const writes: string[] = []
-    page.on('request', request => { if (request.method() !== 'GET') writes.push(request.url()) })
+    page.on('request', request => {
+      if (request.method() !== 'GET') writes.push(request.url())
+    })
     await page.setViewportSize({ width, height: 900 })
     await page.route('**/api/**', route => route.fulfill({ status: 503, json: { error: 'Unavailable' } }))
     await page.route('**/api/web/navigation', route => route.fulfill({ json: initial }))
@@ -40,7 +55,9 @@ test('activity reports loss, readout and confirmed end without inventing complet
   let view = structuredClone(initial)
   let unavailable = false
   await page.route('**/api/**', route => route.fulfill({ status: 503, json: { error: 'Unavailable' } }))
-  await page.route('**/api/web/navigation', route => unavailable ? route.fulfill({ status: 503, json: {} }) : route.fulfill({ json: view }))
+  await page.route('**/api/web/navigation', route => unavailable
+    ? route.fulfill({ status: 503, json: {} })
+    : route.fulfill({ json: view }))
   await page.goto('/rigs/rig-1/observe')
   const bar = page.locator('.vela-navigation')
   await expect(bar.locator('progress')).toHaveAttribute('value', '18')

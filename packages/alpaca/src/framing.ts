@@ -64,8 +64,15 @@ export interface AlpacaFramingOptions {
 }
 
 export interface AlpacaFraming {
-  cameraGeometry(options: { cameraId: string; expectedCameraName?: string }, signal?: AbortSignal): Promise<AlpacaCameraGeometry>
-  telescopeStatus(telescopeId: string, signal?: AbortSignal, options?: { includeAlignmentObservations?: boolean; includePointingSide?: boolean }): Promise<AlpacaTelescopeStatus>
+  cameraGeometry(
+    options: { cameraId: string; expectedCameraName?: string },
+    signal?: AbortSignal,
+  ): Promise<AlpacaCameraGeometry>
+  telescopeStatus(
+    telescopeId: string,
+    signal?: AbortSignal,
+    options?: { includeAlignmentObservations?: boolean; includePointingSide?: boolean },
+  ): Promise<AlpacaTelescopeStatus>
   setTracking(telescopeId: string, tracking: boolean, signal?: AbortSignal): Promise<void>
   slew(options: AlpacaSlewOptions, signal?: AbortSignal): Promise<void>
   home(telescopeId: string, signal?: AbortSignal): Promise<void>
@@ -83,7 +90,13 @@ function invalid(message: string, endpoint: string): never {
   throw new AlpacaProviderError(message, { reason: 'invalid-response', endpoint })
 }
 
-function validateNumber(value: number, minimum: number, maximum: number, endpoint: string, integer = false) {
+function validateNumber(
+  value: number,
+  minimum: number,
+  maximum: number,
+  endpoint: string,
+  integer = false,
+) {
   if (!Number.isFinite(value) || value < minimum || value > maximum || (integer && !Number.isInteger(value))) {
     invalid(`Invalid ${endpoint}`, endpoint)
   }
@@ -95,9 +108,16 @@ function unsupported(error: unknown): error is AlpacaProviderError {
   return error instanceof AlpacaProviderError && error.reason === 'protocol-error' && error.errorNumber === 1024
 }
 
-export function createAlpacaFraming({ baseUrl, fetch = globalThis.fetch, requestTimeoutMs = 5_000, slewTimeoutMs = 180_000, pollIntervalMs = 200 }: AlpacaFramingOptions): AlpacaFraming {
+export function createAlpacaFraming({
+  baseUrl,
+  fetch = globalThis.fetch,
+  requestTimeoutMs = 5_000,
+  slewTimeoutMs = 180_000,
+  pollIntervalMs = 200,
+}: AlpacaFramingOptions): AlpacaFraming {
   for (const value of [requestTimeoutMs, slewTimeoutMs, pollIntervalMs]) {
-    if (!Number.isInteger(value) || value <= 0) throw new RangeError('Framing timeouts and poll interval must be positive integers')
+    if (!Number.isInteger(value) || value <= 0)
+      throw new RangeError('Framing timeouts and poll interval must be positive integers')
   }
 
   const client = createAlpacaClient({ baseUrl, fetch, requestTimeoutMs })
@@ -118,8 +138,9 @@ export function createAlpacaFraming({ baseUrl, fetch = globalThis.fetch, request
   async function frame(telescope: ConfiguredDevice, signal?: AbortSignal): Promise<AlpacaCoordinateSystem> {
     let value: number
 
-    try { value = await client.readNumber(telescope, 'equatorialsystem', signal) }
-    catch (error) {
+    try {
+      value = await client.readNumber(telescope, 'equatorialsystem', signal)
+    } catch (error) {
       if (unsupported(error)) return 'unknown'
       throw error
     }
@@ -131,9 +152,16 @@ export function createAlpacaFraming({ baseUrl, fetch = globalThis.fetch, request
     return result
   }
 
-  async function optionalNumber(telescope: ConfiguredDevice, property: string, minimum: number, maximum: number, signal?: AbortSignal) {
-    try { return validateNumber(await client.readNumber(telescope, property, signal), minimum, maximum, property) }
-    catch (error) {
+  async function optionalNumber(
+    telescope: ConfiguredDevice,
+    property: string,
+    minimum: number,
+    maximum: number,
+    signal?: AbortSignal,
+  ) {
+    try {
+      return validateNumber(await client.readNumber(telescope, property, signal), minimum, maximum, property)
+    } catch (error) {
       if (unsupported(error)) return undefined
       throw error
     }
@@ -154,25 +182,42 @@ export function createAlpacaFraming({ baseUrl, fetch = globalThis.fetch, request
     const signal = AbortSignal.timeout(Math.min(slewTimeoutMs, 15_000))
     let commandError: unknown
 
-    try { await client.command(telescope, 'abortslew', {}, signal) }
-    catch (error) { commandError = error }
+    try {
+      await client.command(telescope, 'abortslew', {}, signal)
+    } catch (error) {
+      commandError = error
+    }
 
-    try { await waitStopped(telescope, signal) }
-    catch (error) {
-      throw new AggregateError(commandError === undefined ? [error] : [commandError, error], 'Telescope stop could not be confirmed')
+    try {
+      await waitStopped(telescope, signal)
+    } catch (error) {
+      throw new AggregateError(
+        commandError === undefined ? [error] : [commandError, error],
+        'Telescope stop could not be confirmed',
+      )
     }
   }
 
   return {
     async cameraGeometry({ cameraId, expectedCameraName }, signal) {
-      if (expectedCameraName !== undefined && !expectedCameraName.trim()) throw new RangeError('Expected camera name must not be blank')
+      if (expectedCameraName !== undefined && !expectedCameraName.trim())
+        throw new RangeError('Expected camera name must not be blank')
       const camera = await device(cameraId, 'camera', signal)
       const cameraName = (await client.readString(camera, 'name', signal)).trim()
 
       if (!cameraName) invalid('Camera returned a blank operational name', 'name')
 
-      if (expectedCameraName !== undefined && cameraName !== expectedCameraName.trim()) throw new Error('The camera in this driver slot has changed; select the imaging camera again')
-      const number = async (property: string, minimum = 1, integer = true) => validateNumber(await client.readNumber(camera, property, signal), minimum, 2147483647, property, integer)
+      if (expectedCameraName !== undefined && cameraName !== expectedCameraName.trim())
+        throw new Error('The camera in this driver slot has changed; select the imaging camera again')
+
+      const number = async (property: string, minimum = 1, integer = true) => validateNumber(
+        await client.readNumber(camera, property, signal),
+        minimum,
+        2147483647,
+        property,
+        integer,
+      )
+
       const sensorWidthPixels = await number('cameraxsize')
       const sensorHeightPixels = await number('cameraysize')
       const pixelWidthMicrons = await number('pixelsizex', Number.MIN_VALUE, false)
@@ -184,9 +229,22 @@ export function createAlpacaFraming({ baseUrl, fetch = globalThis.fetch, request
       const startX = await number('startx', 0)
       const startY = await number('starty', 0)
 
-      if ((startX + width) * binX > sensorWidthPixels || (startY + height) * binY > sensorHeightPixels) invalid('Camera subframe exceeds the sensor', 'numx/numy/startx/starty')
+      if ((startX + width) * binX > sensorWidthPixels || (startY + height) * binY > sensorHeightPixels)
+        invalid('Camera subframe exceeds the sensor', 'numx/numy/startx/starty')
 
-      return { cameraName, sensorWidthPixels, sensorHeightPixels, pixelWidthMicrons, pixelHeightMicrons, binX, binY, width, height, startX, startY }
+      return {
+        cameraName,
+        sensorWidthPixels,
+        sensorHeightPixels,
+        pixelWidthMicrons,
+        pixelHeightMicrons,
+        binX,
+        binY,
+        width,
+        height,
+        startX,
+        startY,
+      }
     },
 
     async telescopeStatus(telescopeId, signal, options) {
@@ -261,8 +319,11 @@ export function createAlpacaFraming({ baseUrl, fetch = globalThis.fetch, request
       signal?.throwIfAborted()
       let commandError: unknown
 
-      try { await client.command(telescope, 'tracking', { Tracking: String(tracking) }, signal) }
-      catch (error) { commandError = error }
+      try {
+        await client.command(telescope, 'tracking', { Tracking: String(tracking) }, signal)
+      } catch (error) {
+        commandError = error
+      }
 
       // A lost setter response is resolved by observing the requested state,
       // never by replaying the write. Caller cancellation cannot cancel inspection.
@@ -283,7 +344,8 @@ export function createAlpacaFraming({ baseUrl, fetch = globalThis.fetch, request
           await delay(pollIntervalMs, undefined, { signal: confirmation })
         }
       } catch (error) {
-        const detail = confirmation.aborted ? 'Requested tracking state was not observed before the confirmation deadline'
+        const detail = confirmation.aborted
+          ? 'Requested tracking state was not observed before the confirmation deadline'
           : error instanceof Error ? error.message : 'Tracking state inspection failed'
 
         throw new Error(`Telescope tracking change was not confirmed. ${detail}.${commandDetail}`, { cause: error })
@@ -293,12 +355,16 @@ export function createAlpacaFraming({ baseUrl, fetch = globalThis.fetch, request
     },
 
     async slew({ telescopeId, rightAscensionDegrees, declinationDegrees, coordinateSystem }, signal) {
-      if (!Number.isFinite(rightAscensionDegrees) || rightAscensionDegrees < 0 || rightAscensionDegrees >= 360 || !Number.isFinite(declinationDegrees) || Math.abs(declinationDegrees) > 90) throw new RangeError('Invalid slew coordinates')
+      if (!Number.isFinite(rightAscensionDegrees) || rightAscensionDegrees < 0 || rightAscensionDegrees >= 360
+        || !Number.isFinite(declinationDegrees) || Math.abs(declinationDegrees) > 90)
+        throw new RangeError('Invalid slew coordinates')
 
-      if (!coordinateSystems.some(system => system === coordinateSystem) || coordinateSystem === 'other') throw new Error('Slew requires a supported, explicit coordinate frame')
+      if (!coordinateSystems.some(system => system === coordinateSystem) || coordinateSystem === 'other')
+        throw new Error('Slew requires a supported, explicit coordinate frame')
       const telescope = await device(telescopeId, 'telescope', signal)
 
-      if (await frame(telescope, signal) !== coordinateSystem) throw new Error('Slew coordinates do not match the telescope coordinate frame')
+      if (await frame(telescope, signal) !== coordinateSystem)
+        throw new Error('Slew coordinates do not match the telescope coordinate frame')
 
       if (await client.readBoolean(telescope, 'atpark', signal)) throw new Error('Telescope is parked')
 
@@ -312,7 +378,10 @@ export function createAlpacaFraming({ baseUrl, fetch = globalThis.fetch, request
       const operationSignal = signal ? AbortSignal.any([signal, deadline]) : deadline
 
       try {
-        await client.command(telescope, 'slewtocoordinatesasync', { RightAscension: String(rightAscensionDegrees / 15), Declination: String(declinationDegrees) }, operationSignal)
+        await client.command(telescope, 'slewtocoordinatesasync', {
+          RightAscension: String(rightAscensionDegrees / 15),
+          Declination: String(declinationDegrees),
+        }, operationSignal)
         await waitStopped(telescope, operationSignal)
       } catch (error) {
         // Any attempted write can leave physical movement behind, even when

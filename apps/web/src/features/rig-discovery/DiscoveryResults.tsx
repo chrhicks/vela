@@ -9,12 +9,19 @@ interface Props {
   onSelectedChange(candidate: DiscoveryCandidateView | null): void
 }
 
-export function DiscoveryResults({ request, result, selected, onSelectedChange }: Props) {
+export function DiscoveryResults({
+  request,
+  result,
+  selected,
+  onSelectedChange,
+}: Props) {
   if (result.candidates.length === 0) {
     return (
       <div className="rig-discovery-results">
         <EmptyDiscoveryResult failures={result.failures} request={request} />
-        <DiscoveryFailures failures={result.failures.filter((failure) => failure.reason !== 'scan-failed')} />
+        <DiscoveryFailures
+          failures={result.failures.filter((failure) => failure.reason !== 'scan-failed')}
+        />
       </div>
     )
   }
@@ -26,7 +33,9 @@ export function DiscoveryResults({ request, result, selected, onSelectedChange }
   return (
     <div className="rig-discovery-results">
       <div className="rig-discovery-results__summary">
-        <strong>{result.candidates.length} {result.candidates.length === 1 ? 'server' : 'servers'} inspected</strong>
+        <strong>
+          {result.candidates.length} {result.candidates.length === 1 ? 'server' : 'servers'} inspected
+        </strong>
         <span>{selectableCandidates > 0 ? 'Select one to continue' : 'No rigs can be added'}</span>
       </div>
       <div className="rig-discovery-results__candidates">
@@ -62,7 +71,10 @@ function DiscoveryCandidate({
       <div className="rig-discovery-candidate__heading">
         <div>
           <strong>{candidate.server?.name ?? candidate.endpoint.host}</strong>
-          <span>{candidate.endpoint.host}:{candidate.endpoint.port} · {candidate.devices.length} {candidate.devices.length === 1 ? 'device' : 'devices'}</span>
+          <span>
+            {candidate.endpoint.host}:{candidate.endpoint.port} · {candidate.devices.length}{' '}
+            {candidate.devices.length === 1 ? 'device' : 'devices'}
+          </span>
         </div>
         <Badge size="small" tone={presentation.tone}>{presentation.label}</Badge>
       </div>
@@ -135,7 +147,11 @@ function DiscoveryFailures({ failures }: { failures: ReadonlyArray<DiscoveryFail
 
   return (
     <section aria-label="Discovery warnings" className="rig-discovery-failures">
-      <strong>{failures.length === 1 ? 'One server could not be inspected' : `${failures.length} servers could not be inspected`}</strong>
+      <strong>
+        {failures.length === 1
+          ? 'One server could not be inspected'
+          : `${failures.length} servers could not be inspected`}
+      </strong>
       <ul>
         {failures.map((failure, index) => (
           <li key={`${failure.endpoint?.host ?? failure.reason}-${failure.endpoint?.port ?? index}`}>

@@ -22,9 +22,20 @@ afterEach(async () => {
   context.disable()
 })
 
-const telescope = { DeviceName: 'Mount', DeviceType: 'Telescope', DeviceNumber: 0, UniqueID: 'mount' }
+const telescope = {
+  DeviceName: 'Mount',
+  DeviceType: 'Telescope',
+  DeviceNumber: 0,
+  UniqueID: 'mount',
+}
 
-const envelope = (Value: ResponseFixture, ErrorNumber = 0) => ({ ClientTransactionID: 7, ServerTransactionID: 23, ErrorNumber, ErrorMessage: ErrorNumber ? 'Device rejected command' : '', Value })
+const envelope = (Value: ResponseFixture, ErrorNumber = 0) => ({
+  ClientTransactionID: 7,
+  ServerTransactionID: 23,
+  ErrorNumber,
+  ErrorMessage: ErrorNumber ? 'Device rejected command' : '',
+  Value,
+})
 
 it('keeps tracing optional when no SDK provider is registered', async () => {
   const client = createAlpacaClient({ baseUrl: 'http://fake', fetch: async () => Response.json(envelope(12)) })
@@ -102,9 +113,17 @@ it('marks HTTP 200 protocol errors and malformed values as errors, including bin
     for (const key of ['body', 'pixels', 'Value']) expect(span.attributes).not.toHaveProperty(key)
   }
 
-  expect(spans[0]!.attributes).toMatchObject({ 'alpaca.error_number': 1025, 'alpaca.command.rate': '0', 'alpaca.command.axis': '0' })
+  expect(spans[0]!.attributes).toMatchObject({
+    'alpaca.error_number': 1025,
+    'alpaca.command.rate': '0',
+    'alpaca.command.axis': '0',
+  })
   expect(spans[1]!.attributes['alpaca.failure.reason']).toBe('invalid-response')
-  expect(spans[2]!.attributes).toMatchObject({ 'alpaca.error_number': 1025, 'alpaca.client_transaction_id': 0xffffffff, 'alpaca.server_transaction_id': 42 })
+  expect(spans[2]!.attributes).toMatchObject({
+    'alpaca.error_number': 1025,
+    'alpaca.client_transaction_id': 0xffffffff,
+    'alpaca.server_transaction_id': 42,
+  })
 })
 
 it.each([false, true])('correlates rotation requests and independent confirmed cleanup (cancel=%s)', async cancel => {
@@ -149,8 +168,11 @@ it.each([false, true])('correlates rotation requests and independent confirmed c
   const acquisition = createAlpacaAcquisition({ baseUrl: 'http://fake', fetch })
 
   const result = trace.getTracer('test').startActiveSpan('alignment.move', async span => {
-    try { await acquisition.rotateRightAscension('mount', 3, -0.1, controller.signal) }
-    finally { span.end() }
+    try {
+      await acquisition.rotateRightAscension('mount', 3, -0.1, controller.signal)
+    } finally {
+      span.end()
+    }
   })
 
   if (cancel) {

@@ -31,7 +31,10 @@ interface CameraState {
   dropSetpointWrite?: boolean
 }
 
-function scriptedCamera(state: CameraState, requests: Array<{ method: string, path: string, body?: string }> = []): typeof globalThis.fetch {
+function scriptedCamera(
+  state: CameraState,
+  requests: Array<{ method: string, path: string, body?: string }> = [],
+): typeof globalThis.fetch {
   return async (input, init) => {
     const url = new URL(String(input))
     const method = init?.method ?? 'GET'

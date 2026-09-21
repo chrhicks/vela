@@ -22,7 +22,12 @@ interface Props {
 
 type DiscoveryState =
   | { view: 'start' }
-  | { view: 'manual'; host: string; port: string; error?: string }
+  | {
+      view: 'manual'
+      host: string
+      port: string
+      error?: string
+    }
   | { view: 'scanning'; request: DiscoverRigsRequest }
   | {
       view: 'results'
@@ -179,7 +184,11 @@ export default function RigDiscoveryDialog({ open, onAdded, onDismiss }: Props) 
     setDiscoveryState({ ...review, adding: true, error: undefined })
 
     try {
-      await addRig(review.rigName.trim(), review.candidate.endpoint, controller.signal)
+      await addRig(
+        review.rigName.trim(),
+        review.candidate.endpoint,
+        controller.signal,
+      )
 
       if (requestController.current !== controller) return
 
@@ -209,8 +218,12 @@ export default function RigDiscoveryDialog({ open, onAdded, onDismiss }: Props) 
       case 'start':
         return (
           <>
-            <Button onClick={() => showManualEntry()} tone="quiet">Enter an address manually</Button>
-            <Button onClick={() => void runDiscovery({ mode: 'scan' })} tone="accent">Scan for rigs</Button>
+            <Button onClick={() => showManualEntry()} tone="quiet">
+              Enter an address manually
+            </Button>
+            <Button onClick={() => void runDiscovery({ mode: 'scan' })} tone="accent">
+              Scan for rigs
+            </Button>
           </>
         )
       case 'manual':
@@ -235,15 +248,32 @@ export default function RigDiscoveryDialog({ open, onAdded, onDismiss }: Props) 
             {discoveryState.request.mode === 'manual' ? (
               <Button onClick={changeManualAddress} tone="quiet">Change address</Button>
             ) : (
-              <Button onClick={() => void runDiscovery(discoveryState.request)} tone="quiet">Scan again</Button>
+              <Button
+                onClick={() => void runDiscovery(discoveryState.request)}
+                tone="quiet"
+              >
+                Scan again
+              </Button>
             )}
-            <Button disabled={!discoveryState.selected} onClick={reviewCandidate} tone="accent">Review rig</Button>
+            <Button
+              disabled={!discoveryState.selected}
+              onClick={reviewCandidate}
+              tone="accent"
+            >
+              Review rig
+            </Button>
           </>
         )
       case 'review':
         return (
           <>
-            <Button disabled={discoveryState.adding} onClick={returnToResults} tone="quiet">Back</Button>
+            <Button
+              disabled={discoveryState.adding}
+              onClick={returnToResults}
+              tone="quiet"
+            >
+              Back
+            </Button>
             <Button
               disabled={discoveryState.adding || !discoveryState.rigName.trim()}
               onClick={() => void addReviewedRig()}
@@ -256,8 +286,18 @@ export default function RigDiscoveryDialog({ open, onAdded, onDismiss }: Props) 
       case 'request-failed':
         return (
           <>
-            <Button onClick={() => returnToRequest(discoveryState.request)} tone="quiet">Back</Button>
-            <Button onClick={() => void runDiscovery(discoveryState.request)} tone="accent">Try again</Button>
+            <Button
+              onClick={() => returnToRequest(discoveryState.request)}
+              tone="quiet"
+            >
+              Back
+            </Button>
+            <Button
+              onClick={() => void runDiscovery(discoveryState.request)}
+              tone="accent"
+            >
+              Try again
+            </Button>
           </>
         )
     }
@@ -284,7 +324,9 @@ export default function RigDiscoveryDialog({ open, onAdded, onDismiss }: Props) 
           port={discoveryState.port}
         />
       ) : null}
-      {discoveryState.view === 'scanning' ? <DiscoveryProgress request={discoveryState.request} /> : null}
+      {discoveryState.view === 'scanning' ? (
+        <DiscoveryProgress request={discoveryState.request} />
+      ) : null}
       {discoveryState.view === 'results' ? (
         <DiscoveryResults
           onSelectedChange={selectCandidate}

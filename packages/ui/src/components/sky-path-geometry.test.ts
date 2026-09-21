@@ -10,7 +10,13 @@ describe('overhead sky geometry', () => {
   })
 
   it('preserves unknown sectors while interpolating known heights across north', () => {
-    const points = [{ azimuthDegrees: 30, altitudeDegrees: 20 }, { azimuthDegrees: 120, altitudeDegrees: null }, { azimuthDegrees: 240, altitudeDegrees: 10 }, { azimuthDegrees: 330, altitudeDegrees: 10 }]
+    const points = [
+      { azimuthDegrees: 30, altitudeDegrees: 20 },
+      { azimuthDegrees: 120, altitudeDegrees: null },
+      { azimuthDegrees: 240, altitudeDegrees: 10 },
+      { azimuthDegrees: 330, altitudeDegrees: 10 }
+    ]
+
     expect(horizonAt(points, 0)).toBe(15)
     expect(horizonAt(points, 90)).toBeNull()
     expect(horizonAt(points, 180)).toBeNull()

@@ -4,22 +4,74 @@ import type { Page } from '@playwright/test'
 import type { TargetDiscoveryView } from '@vela/model/web'
 
 const saved: TargetDiscoveryView = {
-  rigId: 'rig-1', rigName: 'Test rig', snapshotId: 'night-original', calculatedAt: '2026-09-08T02:00:00.000Z',
-  status: 'available', night: { startsAt: '2026-09-08T02:00:00.000Z', endsAt: '2026-09-08T09:00:00.000Z', kind: 'current-night' },
-  site: { latitudeDegrees: 40, longitudeDegrees: -75 }, siteUnavailableReason: null,
-  query: '', category: 'all', filter: 'all', offset: 0, pageSize: 2, total: 6,
-  targets: [{ id: 'm31', name: 'Andromeda Galaxy', catalog: 'M31', kind: 'Galaxy', raDegrees: 10.6847, decDegrees: 41.269, sizeArcminutes: 178, thumbnailUrl: '/api/survey/thumbnail?ra=10&dec=41&fov=3', sky: null,
-    category: 'galaxy', filterChoice: 'broadband', filterReason: 'Broadband preserves the galaxy’s starlight.',
-    opportunity: { startsAt: '2026-09-08T02:00:00.000Z', endsAt: '2026-09-08T07:00:00.000Z', usefulMinutes: 300, bestAt: '2026-09-08T05:00:00.000Z', bestAltitudeDegrees: 80, currentAltitudeDegrees: 48 } }],
+  rigId: 'rig-1',
+  rigName: 'Test rig',
+  snapshotId: 'night-original',
+  calculatedAt: '2026-09-08T02:00:00.000Z',
+  status: 'available',
+  night: {
+    startsAt: '2026-09-08T02:00:00.000Z',
+    endsAt: '2026-09-08T09:00:00.000Z',
+    kind: 'current-night',
+  },
+  site: { latitudeDegrees: 40, longitudeDegrees: -75 },
+  siteUnavailableReason: null,
+  query: '',
+  category: 'all',
+  filter: 'all',
+  offset: 0,
+  pageSize: 2,
+  total: 6,
+  targets: [{
+    id: 'm31',
+    name: 'Andromeda Galaxy',
+    catalog: 'M31',
+    kind: 'Galaxy',
+    raDegrees: 10.6847,
+    decDegrees: 41.269,
+    sizeArcminutes: 178,
+    thumbnailUrl: '/api/survey/thumbnail?ra=10&dec=41&fov=3',
+    sky: null,
+    category: 'galaxy',
+    filterChoice: 'broadband',
+    filterReason: 'Broadband preserves the galaxy’s starlight.',
+    opportunity: {
+      startsAt: '2026-09-08T02:00:00.000Z',
+      endsAt: '2026-09-08T07:00:00.000Z',
+      usefulMinutes: 300,
+      bestAt: '2026-09-08T05:00:00.000Z',
+      bestAltitudeDegrees: 80,
+      currentAltitudeDegrees: 48,
+    },
+  }],
 }
 
 async function seed(page: Page) {
-  await page.addInitScript(value => localStorage.setItem('vela:target-discovery:v1:rig-1', JSON.stringify(value)), saved)
+  await page.addInitScript(
+    value => localStorage.setItem('vela:target-discovery:v1:rig-1', JSON.stringify(value)),
+    saved,
+  )
   await page.route('**/api/survey/**', route => route.abort())
 }
 
 function response(url: URL, snapshotId = saved.snapshotId): TargetDiscoveryView {
-  return { ...saved, snapshotId, query: url.searchParams.get('q') ?? '', category: z.enum(['all', 'emission', 'reflection-dark', 'galaxy', 'cluster', 'planetary', 'other']).parse(url.searchParams.get('category') ?? 'all'), filter: z.enum(['all', 'dual-band', 'broadband', 'uncertain']).parse(url.searchParams.get('filter') ?? 'all'), offset: Number(url.searchParams.get('offset') ?? 0) }
+  return {
+    ...saved,
+    snapshotId,
+    query: url.searchParams.get('q') ?? '',
+    category: z.enum([
+      'all',
+      'emission',
+      'reflection-dark',
+      'galaxy',
+      'cluster',
+      'planetary',
+      'other',
+    ]).parse(url.searchParams.get('category') ?? 'all'),
+    filter: z.enum(['all', 'dual-band', 'broadband', 'uncertain'])
+      .parse(url.searchParams.get('filter') ?? 'all'),
+    offset: Number(url.searchParams.get('offset') ?? 0),
+  }
 }
 
 test('saved suggestions paint on reload without recalculating, including on a phone', async ({ page }) => {
@@ -138,7 +190,11 @@ for (const width of [1280, 390]) {
     await expect(results).toContainText('Results for “M31 galaxy”')
     await expect(search).toBeFocused()
 
-    for (const control of [page.getByRole('button', { name: 'Galaxies', exact: true }), page.getByRole('button', { name: 'Broadband subjects', exact: true }), page.getByRole('button', { name: 'Refresh', exact: true })]) {
+    for (const control of [
+      page.getByRole('button', { name: 'Galaxies', exact: true }),
+      page.getByRole('button', { name: 'Broadband subjects', exact: true }),
+      page.getByRole('button', { name: 'Refresh', exact: true }),
+    ]) {
       await next.click()
       await expect(page.getByLabel('Target pages')).toContainText('3–4 of 6')
       await control.click()

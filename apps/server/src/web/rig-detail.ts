@@ -123,7 +123,8 @@ function cameraStatus(
 
   let status: RigCameraStatus = { availability, activity: telemetry.activity ?? 'unknown' }
 
-  if (telemetry.sensorTemperatureC !== undefined) status = { ...status, sensorTemperatureC: telemetry.sensorTemperatureC }
+  if (telemetry.sensorTemperatureC !== undefined)
+    status = { ...status, sensorTemperatureC: telemetry.sensorTemperatureC }
 
   if (usefulCooling && telemetry.cooling !== undefined) {
     const cooling = telemetry.cooling.powerPercent === undefined
@@ -155,9 +156,21 @@ function telescopeStatus(
   return {
     availability,
     activity: telescopeActivity(telemetry),
-    tracking: telemetry.tracking === undefined ? 'unknown' : telemetry.tracking ? 'on' : 'off',
-    parking: telemetry.parked === undefined ? 'unknown' : telemetry.parked ? 'parked' : 'unparked',
-    home: telemetry.atHome === undefined ? 'unknown' : telemetry.atHome ? 'at-home' : 'away',
+    tracking: telemetry.tracking === undefined
+      ? 'unknown'
+      : telemetry.tracking
+        ? 'on'
+        : 'off',
+    parking: telemetry.parked === undefined
+      ? 'unknown'
+      : telemetry.parked
+        ? 'parked'
+        : 'unparked',
+    home: telemetry.atHome === undefined
+      ? 'unknown'
+      : telemetry.atHome
+        ? 'at-home'
+        : 'away',
   }
 }
 
@@ -189,7 +202,14 @@ function focuserStatus(
       : { availability: 'partial', activity: 'unknown' }
   }
 
-  let status: RigFocuserStatus = { availability, activity: telemetry.moving === undefined ? 'unknown' : telemetry.moving ? 'moving' : 'idle' }
+  let status: RigFocuserStatus = {
+    availability,
+    activity: telemetry.moving === undefined
+      ? 'unknown'
+      : telemetry.moving
+        ? 'moving'
+        : 'idle',
+  }
 
   if (telemetry.position !== undefined) status = { ...status, position: telemetry.position }
 
@@ -208,7 +228,14 @@ function filterWheelStatus(
       : { availability: 'partial', activity: 'unknown' }
   }
 
-  let status: RigFilterWheelStatus = { availability, activity: telemetry.moving === undefined ? 'unknown' : telemetry.moving ? 'moving' : 'idle' }
+  let status: RigFilterWheelStatus = {
+    availability,
+    activity: telemetry.moving === undefined
+      ? 'unknown'
+      : telemetry.moving
+        ? 'moving'
+        : 'idle',
+  }
 
   if (telemetry.position !== undefined) status = { ...status, position: telemetry.position }
 
@@ -233,11 +260,15 @@ function conditionsStatus(
 
   if (!reporting && availability === 'complete') return { availability: 'unsupported' }
 
-  let status: RigObservingConditionsStatus = { availability, activity: reporting ? 'reporting' : 'unknown' }
+  let status: RigObservingConditionsStatus = {
+    availability,
+    activity: reporting ? 'reporting' : 'unknown',
+  }
 
   if (telemetry.temperatureC !== undefined) status = { ...status, temperatureC: telemetry.temperatureC }
 
-  if (telemetry.humidityPercent !== undefined) status = { ...status, humidityPercent: telemetry.humidityPercent }
+  if (telemetry.humidityPercent !== undefined)
+    status = { ...status, humidityPercent: telemetry.humidityPercent }
 
   if (telemetry.dewPointC !== undefined) status = { ...status, dewPointC: telemetry.dewPointC }
 

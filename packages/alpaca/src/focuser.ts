@@ -56,7 +56,8 @@ export function createAlpacaFocuser({
   pollIntervalMs = 100,
 }: AlpacaFocuserOptions): AlpacaFocuser {
   for (const value of [requestTimeoutMs, moveTimeoutMs, pollIntervalMs]) {
-    if (!Number.isInteger(value) || value <= 0) throw new RangeError('Focuser timeouts and poll interval must be positive integers')
+    if (!Number.isInteger(value) || value <= 0)
+      throw new RangeError('Focuser timeouts and poll interval must be positive integers')
   }
 
   const client = createAlpacaClient({ baseUrl, fetch, requestTimeoutMs })
@@ -65,7 +66,9 @@ export function createAlpacaFocuser({
     signal?.throwIfAborted()
     const devices = await client.configuredDevices(signal)
     rejectDuplicateDeviceIds(devices)
-    const found = devices.find(candidate => stableDeviceId(candidate) === focuserId && candidate.DeviceType.toLowerCase() === 'focuser')
+
+    const found = devices.find(candidate =>
+      stableDeviceId(candidate) === focuserId && candidate.DeviceType.toLowerCase() === 'focuser')
 
     if (!found) throw new Error(`Configured focuser ${focuserId} was not found`)
 
@@ -88,7 +91,8 @@ export function createAlpacaFocuser({
   }
 
   function rejectUnsafeTarget(target: number, status: AlpacaFocuserStatus, window: FocuserTravelWindow) {
-    if (target === 0) throw new Error('Focuser position 0 is a mechanical stop, not a home. Vela will not command Move(0).')
+    if (target === 0)
+      throw new Error('Focuser position 0 is a mechanical stop, not a home. Vela will not command Move(0).')
 
     if (!Number.isSafeInteger(target) || target < 1 || target > status.maxStep - 1) {
       throw new Error('That focuser move would approach a mechanical travel limit. Vela will not command it.')
@@ -103,7 +107,8 @@ export function createAlpacaFocuser({
     while (true) {
       signal.throwIfAborted()
 
-      if (!(await client.connected(focuser, signal))) throw new Error('Focuser disconnected before stop could be confirmed')
+      if (!(await client.connected(focuser, signal)))
+        throw new Error('Focuser disconnected before stop could be confirmed')
 
       if (!(await client.readBoolean(focuser, 'ismoving', signal))) return
       await delay(pollIntervalMs, undefined, { signal })
@@ -114,12 +119,19 @@ export function createAlpacaFocuser({
     const signal = AbortSignal.timeout(Math.min(moveTimeoutMs, 15_000))
     let commandError: unknown
 
-    try { await client.command(focuser, 'halt', {}, signal) }
-    catch (error) { commandError = error }
+    try {
+      await client.command(focuser, 'halt', {}, signal)
+    } catch (error) {
+      commandError = error
+    }
 
-    try { await waitStopped(focuser, signal) }
-    catch (error) {
-      throw new AggregateError(commandError === undefined ? [error] : [commandError, error], 'Focuser stop could not be confirmed')
+    try {
+      await waitStopped(focuser, signal)
+    } catch (error) {
+      throw new AggregateError(
+        commandError === undefined ? [error] : [commandError, error],
+        'Focuser stop could not be confirmed',
+      )
     }
   }
 
@@ -152,8 +164,9 @@ export function createAlpacaFocuser({
 
         return { position: after.position }
       } catch (error) {
-        try { await stop(focuser) }
-        catch (stopError) {
+        try {
+          await stop(focuser)
+        } catch (stopError) {
           if (signal?.aborted) throw stopError
           throw error
         }

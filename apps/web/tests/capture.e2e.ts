@@ -3,13 +3,29 @@ import type { Route } from '@playwright/test'
 import type { CaptureView } from '@vela/model/web'
 import { readFileSync } from 'node:fs'
 
-const respond = <Body>(route: Route, body: Body) => route.fulfill({ contentType: 'application/json', body: JSON.stringify(body) })
+const respond = <Body>(route: Route, body: Body) => route.fulfill({
+  contentType: 'application/json',
+  body: JSON.stringify(body),
+})
 
 const idle: CaptureView = {
   captureReadState: 'current',
-  rigId: 'rig-1', rigName: 'Offline rig', camera: { name: 'Simulator Camera' }, enabled: true,
-  unavailableReason: null, phase: 'idle', active: false, exposureSeconds: 2, elapsedSeconds: 0,
-  error: null, saveFrames: false, savedImageCount: 0, latestImage: null, repeat: false, completedCount: 0, cooling: null,
+  rigId: 'rig-1',
+  rigName: 'Offline rig',
+  camera: { name: 'Simulator Camera' },
+  enabled: true,
+  unavailableReason: null,
+  phase: 'idle',
+  active: false,
+  exposureSeconds: 2,
+  elapsedSeconds: 0,
+  error: null,
+  saveFrames: false,
+  savedImageCount: 0,
+  latestImage: null,
+  repeat: false,
+  completedCount: 0,
+  cooling: null,
 }
 
 test('a command stays responsive during polling and a late read cannot replace its result', async ({ page }) => {
@@ -54,11 +70,23 @@ test('a command stays responsive during polling and a late read cannot replace i
   expect(commands).toBe(1)
 })
 
-const preview = readFileSync(new URL('../../../packages/ui/src/components/fixtures/capture-star-field.png', import.meta.url))
+const preview = readFileSync(new URL(
+  '../../../packages/ui/src/components/fixtures/capture-star-field.png',
+  import.meta.url,
+))
 
 const firstImage = {
-  id: 'frame-1', saved: false, imageUrl: '/api/rigs/rig-1/capture/images/frame-1', width: 1600, height: 1200,
-  exposureSeconds: 2, capturedAt: '2026-09-05T18:00:00.000Z', receivedAt: '2026-09-05T18:00:03.000Z', cameraName: 'Simulator Camera', color: 'mono', statistics: { detectedStars: 12, medianHfrPixels: 2.35 },
+  id: 'frame-1',
+  saved: false,
+  imageUrl: '/api/rigs/rig-1/capture/images/frame-1',
+  width: 1600,
+  height: 1200,
+  exposureSeconds: 2,
+  capturedAt: '2026-09-05T18:00:00.000Z',
+  receivedAt: '2026-09-05T18:00:03.000Z',
+  cameraName: 'Simulator Camera',
+  color: 'mono',
+  statistics: { detectedStars: 12, medianHfrPixels: 2.35 },
 }
 
 test('loads a fitted preview first and only presents 100 percent after its native image loads', async ({ page }) => {
@@ -66,7 +94,11 @@ test('loads a fitted preview first and only presents 100 percent after its nativ
   let nativeRequests = 0
   let releaseNative!: () => void
   const nativeGate = new Promise<void>(resolve => { releaseNative = resolve })
-  await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, { ...idle, phase: 'complete', latestImage: { ...firstImage, fitImageUrl } }))
+  await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, {
+    ...idle,
+    phase: 'complete',
+    latestImage: { ...firstImage, fitImageUrl },
+  }))
   await page.route(`**${fitImageUrl}`, route => route.fulfill({ contentType: 'image/png', body: preview }))
   await page.route(`**${firstImage.imageUrl}`, async route => {
     nativeRequests++
@@ -113,7 +145,16 @@ test('keeps the loaded image and its metadata together through a failed new-imag
   await expect(image.getByRole('img')).toHaveAttribute('src', firstImage.imageUrl)
   await expect(image.locator('footer')).toContainText('2 s')
 
-  current = { ...current, latestImage: { ...firstImage, id: 'frame-2', imageUrl: '/api/rigs/rig-1/capture/images/frame-2', exposureSeconds: 30, statistics: { detectedStars: 7, medianHfrPixels: 3.6 } } }
+  current = {
+    ...current,
+    latestImage: {
+      ...firstImage,
+      id: 'frame-2',
+      imageUrl: '/api/rigs/rig-1/capture/images/frame-2',
+      exposureSeconds: 30,
+      statistics: { detectedStars: 7, medianHfrPixels: 3.6 },
+    },
+  }
   await expect.poll(() => newImageRequests).toBe(1)
   await expect(image.getByRole('img')).toHaveAttribute('src', firstImage.imageUrl)
   await expect(image.locator('footer')).toContainText('2 s')
@@ -136,7 +177,16 @@ test('keeps the loaded image and its metadata together through a failed new-imag
 
 test('retains the image during interrupted updates and shows the server exposure after reopening', async ({ page }) => {
   let offline = false
-  let current: CaptureView = { ...idle, phase: 'exposing', active: true, exposureSeconds: 30, elapsedSeconds: 8, latestImage: firstImage }
+
+  let current: CaptureView = {
+    ...idle,
+    phase: 'exposing',
+    active: true,
+    exposureSeconds: 30,
+    elapsedSeconds: 8,
+    latestImage: firstImage,
+  }
+
   await page.route('**/api/web/rigs/rig-1/capture', route => offline ? route.abort() : respond(route, current))
   await page.route('**/api/rigs/rig-1/capture/images/frame-1', route => route.fulfill({ contentType: 'image/png', body: preview }))
   await page.goto('/rigs/rig-1/observe/capture')
@@ -182,7 +232,14 @@ test('an ambiguous command is never replayed and requires an explicit state chec
 })
 
 test('an active exposure disappearing after restart stays unconfirmed until an explicit check', async ({ page }) => {
-  let current: CaptureView = { ...idle, phase: 'exposing', active: true, exposureSeconds: 30, elapsedSeconds: 8 }
+  let current: CaptureView = {
+    ...idle,
+    phase: 'exposing',
+    active: true,
+    exposureSeconds: 30,
+    elapsedSeconds: 8,
+  }
+
   let reads = 0
   await page.route('**/api/web/rigs/rig-1/capture', route => {
     reads++
@@ -243,12 +300,23 @@ test('repeating capture restores server settings and can stop during image recei
 })
 
 test('displays completed downloads during faster frame arrivals and coalesces pending images without mislabeling Fit', async ({ page }) => {
-  const frame = (number: number) => ({ ...firstImage, id: `stream-${number}`,
+  const frame = (number: number) => ({
+    ...firstImage,
+    id: `stream-${number}`,
     imageUrl: `/api/rigs/rig-1/capture/images/stream-${number}`,
-    fitImageUrl: `/api/rigs/rig-1/capture/images/stream-${number}/fit`, exposureSeconds: number,
+    fitImageUrl: `/api/rigs/rig-1/capture/images/stream-${number}/fit`,
+    exposureSeconds: number,
   })
 
-  let current = { ...idle, active: true, repeat: true, phase: 'exposing', completedCount: 1, latestImage: frame(1) }
+  let current = {
+    ...idle,
+    active: true,
+    repeat: true,
+    phase: 'exposing',
+    completedCount: 1,
+    latestImage: frame(1),
+  }
+
   const pending = new Map<string, Route>()
   const requested: string[] = []
   await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, current))
@@ -308,7 +376,15 @@ test('distinguishes unavailable star measurements from an image with no measurab
   await expect(statistics).toContainText('1600 × 1200')
   await expect(statistics).toContainText('Star measurements unavailable')
   await expect(statistics.locator('dd')).toHaveText(['1600 × 1200', '—', '—'])
-  current = { ...current, latestImage: { ...firstImage, id: 'starless', imageUrl: '/api/rigs/rig-1/capture/images/starless', statistics: { detectedStars: 0, medianHfrPixels: null } } }
+  current = {
+    ...current,
+    latestImage: {
+      ...firstImage,
+      id: 'starless',
+      imageUrl: '/api/rigs/rig-1/capture/images/starless',
+      statistics: { detectedStars: 0, medianHfrPixels: null },
+    },
+  }
   await expect(statistics).toContainText('No measurable stars')
   await expect(statistics.locator('dd')).toHaveText(['1600 × 1200', '0', '—'])
 })
@@ -335,7 +411,14 @@ test('keeping the displayed frame remains independent of Stop when a newer previ
   })
   await page.goto('/rigs/rig-1/observe/capture')
   await expect(page.getByRole('button', { name: 'Keep this image' })).toBeVisible()
-  current = { ...current, latestImage: { ...firstImage, id: 'frame-2', imageUrl: '/api/rigs/rig-1/capture/images/frame-2' } }
+  current = {
+    ...current,
+    latestImage: {
+      ...firstImage,
+      id: 'frame-2',
+      imageUrl: '/api/rigs/rig-1/capture/images/frame-2',
+    },
+  }
   await page.waitForTimeout(1300)
   await page.getByRole('button', { name: 'Keep this image' }).click()
   await expect.poll(() => keptId).toBe('frame-1')
@@ -346,9 +429,15 @@ test('keeping the displayed frame remains independent of Stop when a newer previ
 })
 
 test('saved collection opens a retained image and original downloads without camera state', async ({ page }) => {
-  const saved = { ...firstImage, saved: true, rigId: 'rig-1', savedAt: firstImage.receivedAt,
-    imageUrl: '/api/rigs/rig-1/saved-images/frame-1/preview', fitsUrl: '/api/rigs/rig-1/saved-images/frame-1/fits',
-    previewDownloadUrl: '/api/rigs/rig-1/saved-images/frame-1/download-preview' }
+  const saved = {
+    ...firstImage,
+    saved: true,
+    rigId: 'rig-1',
+    savedAt: firstImage.receivedAt,
+    imageUrl: '/api/rigs/rig-1/saved-images/frame-1/preview',
+    fitsUrl: '/api/rigs/rig-1/saved-images/frame-1/fits',
+    previewDownloadUrl: '/api/rigs/rig-1/saved-images/frame-1/download-preview',
+  }
 
   let deviceReads = 0
   await page.route('**/api/web/rigs/rig-1/capture', route => {
@@ -356,8 +445,16 @@ test('saved collection opens a retained image and original downloads without cam
 
     return route.abort()
   })
-  await page.route('**/api/web/rigs/rig-1/saved-images', route => respond(route, { rigId: 'rig-1', rigName: 'Offline rig', images: [saved] }))
-  await page.route('**/api/web/rigs/rig-1/saved-images/frame-1', route => respond(route, { rigId: 'rig-1', rigName: 'Offline rig', image: saved }))
+  await page.route('**/api/web/rigs/rig-1/saved-images', route => respond(route, {
+    rigId: 'rig-1',
+    rigName: 'Offline rig',
+    images: [saved],
+  }))
+  await page.route('**/api/web/rigs/rig-1/saved-images/frame-1', route => respond(route, {
+    rigId: 'rig-1',
+    rigName: 'Offline rig',
+    image: saved,
+  }))
   await page.route('**/api/rigs/rig-1/saved-images/frame-1/preview', route => route.fulfill({ contentType: 'image/png', body: preview }))
   await page.goto('/rigs/rig-1/observe/saved-images')
   await expect(page.getByRole('heading', { name: 'Saved images', exact: true })).toBeVisible()
@@ -374,9 +471,15 @@ test('keeps a manual save outcome and retry attached to its image after newer pi
   let finish!: () => void
   const pending = new Promise<void>(resolve => { finish = resolve })
 
-  const saved = { ...firstImage, saved: true, rigId: 'rig-1', savedAt: firstImage.receivedAt,
-    imageUrl: '/api/rigs/rig-1/saved-images/frame-1/preview', fitsUrl: '/api/rigs/rig-1/saved-images/frame-1/fits',
-    previewDownloadUrl: '/api/rigs/rig-1/saved-images/frame-1/download-preview' }
+  const saved = {
+    ...firstImage,
+    saved: true,
+    rigId: 'rig-1',
+    savedAt: firstImage.receivedAt,
+    imageUrl: '/api/rigs/rig-1/saved-images/frame-1/preview',
+    fitsUrl: '/api/rigs/rig-1/saved-images/frame-1/fits',
+    previewDownloadUrl: '/api/rigs/rig-1/saved-images/frame-1/download-preview',
+  }
 
   await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, current))
   await page.route('**/api/rigs/rig-1/capture/images/*', route => route.fulfill({ contentType: 'image/png', body: preview }))
@@ -391,7 +494,14 @@ test('keeps a manual save outcome and retry attached to its image after newer pi
   await page.goto('/rigs/rig-1/observe/capture')
   await page.getByRole('button', { name: 'Keep this image' }).click()
   await expect.poll(() => requestedIds.length).toBe(1)
-  current = { ...current, latestImage: { ...firstImage, id: 'frame-2', imageUrl: '/api/rigs/rig-1/capture/images/frame-2' } }
+  current = {
+    ...current,
+    latestImage: {
+      ...firstImage,
+      id: 'frame-2',
+      imageUrl: '/api/rigs/rig-1/capture/images/frame-2',
+    },
+  }
   await expect(page.getByRole('region', { name: 'Latest image' }).getByRole('img')).toHaveAttribute('src', current.latestImage.imageUrl)
   await expect(page.getByText('Saving image from', { exact: false })).toBeVisible()
   finish()
@@ -419,8 +529,16 @@ test('labels estimated starts on the loaded capture and saved image detail', asy
   await expect(page.getByAltText('2 second exposure from Simulator Camera')).toBeVisible()
   await expect(page.getByText('Start time estimated', { exact: true })).toHaveCount(0)
 
-  const image = { ...firstImage, capturedAtSource: 'server-estimate', saved: true, rigId: 'rig-1', savedAt: '2026-09-05T18:00:04.000Z',
-    imageUrl: '/api/rigs/rig-1/saved-images/frame-1/preview', fitsUrl: '/api/rigs/rig-1/saved-images/frame-1/fits', previewDownloadUrl: '/api/rigs/rig-1/saved-images/frame-1/download-preview' }
+  const image = {
+    ...firstImage,
+    capturedAtSource: 'server-estimate',
+    saved: true,
+    rigId: 'rig-1',
+    savedAt: '2026-09-05T18:00:04.000Z',
+    imageUrl: '/api/rigs/rig-1/saved-images/frame-1/preview',
+    fitsUrl: '/api/rigs/rig-1/saved-images/frame-1/fits',
+    previewDownloadUrl: '/api/rigs/rig-1/saved-images/frame-1/download-preview',
+  }
 
   await page.route('**/api/web/rigs/rig-1/saved-images/frame-1', route => respond(route, { rigId: 'rig-1', rigName: 'Offline rig', image }))
   await page.route(`**${image.imageUrl}`, route => route.fulfill({ contentType: 'image/png', body: preview }))
@@ -430,7 +548,11 @@ test('labels estimated starts on the loaded capture and saved image detail', asy
 
 test('shows cooler off when the sensor is near the requested temperature and turns it on only when asked', async ({ page }) => {
   let cooling = {
-    state: 'off' as const, canSetTemperature: true, sensorTemperatureC: 4.8, setpointC: 5, powerPercent: 0,
+    state: 'off' as const,
+    canSetTemperature: true,
+    sensorTemperatureC: 4.8,
+    setpointC: 5,
+    powerPercent: 0,
   }
 
   const commands: unknown[] = []

@@ -137,7 +137,12 @@ describe('@vela/model boundaries', () => {
       exposureSeconds: 2,
       elapsedSeconds: 0.4,
       exposureStartedAt: '2026-09-17T00:00:00.000Z',
-      samples: [{ position: 33042, detectedStars: 12, hfrPixels: 5.1, capturedAt: '2026-09-17T00:00:00.000Z' }],
+      samples: [{
+        position: 33042,
+        detectedStars: 12,
+        hfrPixels: 5.1,
+        capturedAt: '2026-09-17T00:00:00.000Z',
+      }],
       fit: null,
       restoredStart: false,
       error: null,
