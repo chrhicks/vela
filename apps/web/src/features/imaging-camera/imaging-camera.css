@@ -1,11 +1,39 @@
 .vela-imaging-camera { margin-bottom: 24px; }
-.vela-imaging-camera__summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.vela-imaging-camera__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
 .vela-imaging-camera__summary > div { min-width: 0; overflow-wrap: anywhere; }
-.vela-imaging-camera__summary h2 { margin: 0; font-size: 14px; font-weight: 550; }
+.vela-imaging-camera__summary h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 550;
+}
 .vela-imaging-camera__summary p { margin: 7px 0 0; font-size: 14px; }
-.vela-imaging-camera__summary small { display: block; margin-top: 5px; font-size: 11px; color: var(--vela-text-muted); }
+.vela-imaging-camera__summary small {
+  display: block;
+  margin-top: 5px;
+  font-size: 11px;
+  color: var(--vela-text-muted);
+}
 .vela-imaging-camera__form { margin-top: 20px; max-width: 36rem; }
-.vela-imaging-camera__form > p { color: var(--vela-text-muted); line-height: 1.6; font-size: 12px; margin: 10px 0 14px; }
-.vela-imaging-camera__actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.vela-imaging-camera__notice { color: var(--vela-warning); line-height: 1.6; font-size: 13px; margin: 16px 0 0; }
+.vela-imaging-camera__form > p {
+  color: var(--vela-text-muted);
+  line-height: 1.6;
+  font-size: 12px;
+  margin: 10px 0 14px;
+}
+.vela-imaging-camera__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.vela-imaging-camera__notice {
+  color: var(--vela-warning);
+  line-height: 1.6;
+  font-size: 13px;
+  margin: 16px 0 0;
+}
 .vela-imaging-camera__notice + .vela-button { margin-top: 12px; }

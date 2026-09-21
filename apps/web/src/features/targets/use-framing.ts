@@ -38,7 +38,8 @@ export function useFraming(rigId: string) {
         signal: AbortSignal.any([controller.signal, AbortSignal.timeout(5000)]),
       })
 
-      if (!isFramingView(next, rigId) || Date.now() - Date.parse(next.observedAt) > 15000) throw new Error('Invalid or stale framing response')
+      if (!isFramingView(next, rigId) || Date.now() - Date.parse(next.observedAt) > 15000)
+        throw new Error('Invalid or stale framing response')
 
       if (!alive.current || current !== generation.current) return
       const interruptedExposure = lastView.current?.active && next.phase === 'idle'
@@ -102,7 +103,17 @@ export function useFraming(rigId: string) {
   const canStart = !!view?.enabled && !view.active && !offline && !pending && !commandUnconfirmed
   const canStop = !!view?.active && view.phase !== 'stopping' && !offline && !pending && !commandUnconfirmed
 
-  async function command(action: 'start' | 'check' | 'stop' | 'center' | 'settings', body: { targetId?: string; raDegrees?: number; decDegrees?: number; exposureSeconds?: number; checkId?: string; focalLengthMm?: number } = {}) {
+  async function command(
+    action: 'start' | 'check' | 'stop' | 'center' | 'settings',
+    body: {
+      targetId?: string
+      raDegrees?: number
+      decDegrees?: number
+      exposureSeconds?: number
+      checkId?: string
+      focalLengthMm?: number
+    } = {},
+  ) {
     const allowed = {
       stop: canStop,
       center: canStart && !!view?.canCenter && !!view.actual,
@@ -126,12 +137,14 @@ export function useFraming(rigId: string) {
 
     try {
       const next = await api(`rigs/${encodeURIComponent(rigId)}/framing/${action}`, {
-        method: action === 'settings' ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' },
+        method: action === 'settings' ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
         signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]),
       })
 
-      if (!isFramingView(next, rigId) || Date.now() - Date.parse(next.observedAt) > 15000) throw new Error('Invalid or stale framing response')
+      if (!isFramingView(next, rigId) || Date.now() - Date.parse(next.observedAt) > 15000)
+        throw new Error('Invalid or stale framing response')
 
       if (!alive.current || current !== generation.current) return
       lastView.current = next
@@ -159,10 +172,33 @@ export function useFraming(rigId: string) {
     }
   }
 
-  return { view, offline, pending, refreshing, error, commandUnconfirmed, canStart, canStop,
-    start: ({ targetId, raDegrees, decDegrees, exposureSeconds }: { targetId: string, raDegrees: number, decDegrees: number, exposureSeconds: number }) =>
+  return {
+    view,
+    offline,
+    pending,
+    refreshing,
+    error,
+    commandUnconfirmed,
+    canStart,
+    canStop,
+    start: ({ targetId, raDegrees, decDegrees, exposureSeconds }: {
+      targetId: string
+      raDegrees: number
+      decDegrees: number
+      exposureSeconds: number
+    }) =>
       command('start', { targetId, raDegrees, decDegrees, exposureSeconds }),
-    check: ({ targetId, raDegrees, decDegrees, exposureSeconds }: { targetId: string, raDegrees: number, decDegrees: number, exposureSeconds: number }) =>
+    check: ({ targetId, raDegrees, decDegrees, exposureSeconds }: {
+      targetId: string
+      raDegrees: number
+      decDegrees: number
+      exposureSeconds: number
+    }) =>
       command('check', { targetId, raDegrees, decDegrees, exposureSeconds }),
-    center: ({ raDegrees, decDegrees }: { raDegrees: number, decDegrees: number }) => command('center', { checkId: view?.actual?.checkId, raDegrees, decDegrees }), settings: (focalLengthMm: number) => command('settings', { focalLengthMm }), stop: () => command('stop'), refresh: () => read(true) }
+    center: ({ raDegrees, decDegrees }: { raDegrees: number, decDegrees: number }) =>
+      command('center', { checkId: view?.actual?.checkId, raDegrees, decDegrees }),
+    settings: (focalLengthMm: number) => command('settings', { focalLengthMm }),
+    stop: () => command('stop'),
+    refresh: () => read(true),
+  }
 }

@@ -15,28 +15,39 @@ from html.parser import HTMLParser
 from pathlib import Path
 
 URL = "https://en.wikipedia.org/w/api.php?" + urllib.parse.urlencode({
-    "action": "parse", "page": "List_of_proper_names_of_stars",
-    "prop": "text", "format": "json", "origin": "*",
+    "action": "parse",
+    "page": "List_of_proper_names_of_stars",
+    "prop": "text",
+    "format": "json",
+    "origin": "*",
 })
 
 class TableRows(HTMLParser):
     def __init__(self):
         super().__init__()
         self.rows, self.row, self.cell, self.cell_depth = [], None, None, 0
+
     def handle_starttag(self, tag, attrs):
-        if tag == "tr": self.row = []
+        if tag == "tr":
+            self.row = []
         elif tag in ("td", "th") and self.row is not None:
             self.cell, self.cell_depth = [], 1
-        elif self.cell is not None: self.cell_depth += 1
+        elif self.cell is not None:
+            self.cell_depth += 1
+
     def handle_endtag(self, tag):
         if tag in ("td", "th") and self.cell is not None:
             self.row.append("".join(self.cell).strip())
             self.cell, self.cell_depth = None, 0
         elif tag == "tr" and self.row is not None:
-            self.rows.append(self.row); self.row = None
-        elif self.cell is not None: self.cell_depth -= 1
+            self.rows.append(self.row)
+            self.row = None
+        elif self.cell is not None:
+            self.cell_depth -= 1
+
     def handle_data(self, data):
-        if self.cell is not None: self.cell.append(data)
+        if self.cell is not None:
+            self.cell.append(data)
 
 def clean(value):
     return re.sub(r"\s+", " ", html.unescape(value)).strip()
@@ -46,20 +57,33 @@ def is_single_word(name):
     return bool(re.fullmatch(r"[^\W\d_][\w'’\-]*", name, flags=re.UNICODE))
 
 def main():
-    request = urllib.request.Request(URL, headers={"User-Agent": "FirstLightNameFinder/1.0 (personal project)"})
+    request = urllib.request.Request(
+        URL,
+        headers={"User-Agent": "FirstLightNameFinder/1.0 (personal project)"},
+    )
     with urllib.request.urlopen(request) as response:
         markup = json.load(response)["parse"]["text"]["*"]
-    parser = TableRows(); parser.feed(markup)
+    parser = TableRows()
+    parser.feed(markup)
     seen, stars = set(), []
+
     for row in parser.rows:
-        if len(row) < 4: continue
+        if len(row) < 4:
+            continue
         name, designation, constellation, origin = map(clean, row[:4])
         name = re.sub(r"[†‡*]+$", "", name).strip()
-        if not is_single_word(name) or name in seen or name == "Name": continue
+        if not is_single_word(name) or name in seen or name == "Name":
+            continue
         # The page's star table uses a constellation and cultural-origin column.
-        if not constellation or not origin or constellation in {"Constellation", "Origin"}: continue
+        if not constellation or not origin or constellation in {"Constellation", "Origin"}:
+            continue
         seen.add(name)
-        stars.append({"name": name, "reference": f"{designation} — {constellation}", "origin": origin})
+        stars.append({
+            "name": name,
+            "reference": f"{designation} — {constellation}",
+            "origin": origin,
+        })
+
     stars.sort(key=lambda star: star["name"].casefold())
     output = Path(__file__).resolve().parents[1] / "public" / "data" / "iau-named-stars.js"
     output.parent.mkdir(exist_ok=True)
@@ -71,4 +95,5 @@ def main():
     )
     print(f"Wrote {len(stars)} single-word proper star names to {output}")
 
-if __name__ == "__main__": main()
+if __name__ == "__main__":
+    main()

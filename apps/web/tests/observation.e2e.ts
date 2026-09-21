@@ -2,25 +2,48 @@ import { expect, test } from '@playwright/test'
 import type { Route } from '@playwright/test'
 import { device, observation, offlineObservation } from './fixtures/observation'
 
-const respond = <Body>(route: Route, body: Body, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
+const respond = <Body>(route: Route, body: Body, status = 200) => route.fulfill({
+  status,
+  contentType: 'application/json',
+  body: JSON.stringify(body),
+})
 
 // Keep adjacent Observe features deterministic; these tests own readiness only.
 test.beforeEach(async ({ page }) => {
   await page.route('**/api/web/rigs/*/capture', route => respond(route, {
-    rigId: route.request().url().split('/').at(-2), rigName: 'Test rig', camera: null,
-    enabled: false, unavailableReason: 'No imaging camera selected.', phase: 'idle', active: false,
-    exposureSeconds: 2, elapsedSeconds: 0, repeat: false, saveFrames: false, savedImageCount: 0,
+    rigId: route.request().url().split('/').at(-2),
+    rigName: 'Test rig',
+    camera: null,
+    enabled: false,
+    unavailableReason: 'No imaging camera selected.',
+    phase: 'idle',
+    active: false,
+    exposureSeconds: 2,
+    elapsedSeconds: 0,
+    repeat: false,
+    saveFrames: false,
+    savedImageCount: 0,
     captureReadState: 'current',
-    completedCount: 0, error: null, latestImage: null, cooling: null,
+    completedCount: 0,
+    error: null,
+    latestImage: null,
+    cooling: null,
   }))
   await page.route('**/api/web/rigs/*/imaging-camera', route => respond(route, {
-    rigId: route.request().url().split('/').at(-2), editable: true, state: 'unselected', selected: null, cameras: [],
+    rigId: route.request().url().split('/').at(-2),
+    editable: true,
+    state: 'unselected',
+    selected: null,
+    cameras: [],
   }))
 })
 
 test('enters and leaves observation without a hardware command', async ({ page }) => {
   let commands = 0
-  await page.route('**/api/rigs/*/connections', async (route) => { commands++; await respond(route, {}) })
+  await page.route('**/api/rigs/*/connections', async (route) => {
+    commands++
+    await respond(route, {})
+  })
   await page.route('**/api/web/rigs/rig-1', (route) => respond(route, observation().rig))
   await page.route('**/api/web/rigs/rig-1/observe', (route) => respond(route, observation()))
   await page.goto('/rigs/rig-1')
@@ -46,7 +69,12 @@ test('connects once, shows neutral progress, and focuses the confirmed result', 
   await page.route('**/api/rigs/rig-1/connections', async (route) => {
     commands++
     await pending
-    await respond(route, { outcome: 'complete', command: 'completed', confirmedConnected: [device(0), device(1), device(2)], view: observation('complete') })
+    await respond(route, {
+      outcome: 'complete',
+      command: 'completed',
+      confirmedConnected: [device(0), device(1), device(2)],
+      view: observation('complete'),
+    })
   })
   await page.goto('/rigs/rig-1/observe')
   await page.getByRole('button', { name: 'Connect devices' }).dblclick()
@@ -69,7 +97,13 @@ test('renders partial rejection and only retries with a new explicit command', a
   await page.route('**/api/rigs/rig-1/connections', (route) => {
     commands++
 
-    return respond(route, { outcome: 'partial', confirmedConnected: [device(0)], failed: { ...device(1), reason: 'rejected' }, notAttempted: [device(2)], view: observation() })
+    return respond(route, {
+      outcome: 'partial',
+      confirmedConnected: [device(0)],
+      failed: { ...device(1), reason: 'rejected' },
+      notAttempted: [device(2)],
+      view: observation(),
+    })
   })
   await page.goto('/rigs/rig-1/observe')
   await page.getByRole('button', { name: 'Connect devices' }).click()
@@ -87,7 +121,13 @@ test('uncertainty requires a state check before offering another command', async
   await page.route('**/api/rigs/rig-1/connections', (route) => {
     commands++
 
-    return respond(route, { outcome: 'uncertain', confirmedConnected: [device(0)], uncertain: { ...device(1), reason: 'verification-timeout' }, notAttempted: [device(2)], view: observation('unavailable') })
+    return respond(route, {
+      outcome: 'uncertain',
+      confirmedConnected: [device(0)],
+      uncertain: { ...device(1), reason: 'verification-timeout' },
+      notAttempted: [device(2)],
+      view: observation('unavailable'),
+    })
   })
   await page.goto('/rigs/rig-1/observe')
   await page.getByRole('button', { name: 'Connect devices' }).click()
@@ -110,9 +150,16 @@ for (const failure of ['transport', 'malformed', 'conflicting-fields']) {
     await page.route('**/api/rigs/rig-1/connections', (route) => {
       commands++
 
-      return failure === 'transport' ? route.abort() : respond(route, failure === 'malformed' ? { outcome: 'complete' } : {
-        outcome: 'uncertain', confirmedConnected: [], notAttempted: [], uncertain: { ...device(0), reason: 'write-outcome-unknown' }, failed: null, view: observation(),
-      })
+      return failure === 'transport'
+        ? route.abort()
+        : respond(route, failure === 'malformed' ? { outcome: 'complete' } : {
+          outcome: 'uncertain',
+          confirmedConnected: [],
+          notAttempted: [],
+          uncertain: { ...device(0), reason: 'write-outcome-unknown' },
+          failed: null,
+          view: observation(),
+        })
     })
     await page.goto('/rigs/rig-1/observe')
     await page.getByRole('button', { name: 'Connect devices' }).click()
@@ -136,7 +183,8 @@ test('handles already prepared, offline, missing and malformed observations', as
   response = offlineObservation()
   await page.reload()
   await expect(page.getByRole('heading', { name: 'This Rig is offline' })).toBeVisible()
-  response = null; status = 404
+  response = null
+  status = 404
   await page.reload()
   await expect(page.getByRole('heading', { name: 'Rig not found' })).toBeVisible()
   status = 200
@@ -223,16 +271,34 @@ test('leaving a pending command cannot overwrite another Rig', async ({ page }) 
     rigs: ['rig-1', 'rig-2'].map((id) => {
       const { name, connections, capabilities, refreshedAt } = observation('available', id).rig
 
-      return { id, name, connections, capabilities, reachability: 'reachable', lastSeenAt: refreshedAt }
+      return {
+        id,
+        name,
+        connections,
+        capabilities,
+        reachability: 'reachable',
+        lastSeenAt: refreshedAt,
+      }
     }),
     refreshedAt: observation().rig.refreshedAt,
   }))
-  await page.route('**/api/web/rigs/*/observe', (route) => respond(route, observation('available', route.request().url().includes('rig-2') ? 'rig-2' : 'rig-1')))
-  await page.route('**/api/web/rigs/rig-*', (route) => respond(route, observation('available', route.request().url().endsWith('rig-2') ? 'rig-2' : 'rig-1').rig))
+  await page.route('**/api/web/rigs/*/observe', (route) => respond(route, observation(
+    'available',
+    route.request().url().includes('rig-2') ? 'rig-2' : 'rig-1',
+  )))
+  await page.route('**/api/web/rigs/rig-*', (route) => respond(route, observation(
+    'available',
+    route.request().url().endsWith('rig-2') ? 'rig-2' : 'rig-1',
+  ).rig))
   await page.route('**/api/rigs/rig-1/connections', async (route) => {
     commandStarted()
     await pending
-    await respond(route, { outcome: 'complete', command: 'not-needed', confirmedConnected: [], view: observation('complete') }).catch(() => {})
+    await respond(route, {
+      outcome: 'complete',
+      command: 'not-needed',
+      confirmedConnected: [],
+      view: observation('complete'),
+    }).catch(() => {})
     commandSettled()
   })
   await page.goto('/rigs/rig-1/observe')
@@ -287,7 +353,9 @@ for (const state of ['available', 'unavailable'] as const) {
   test(`keeps confirmed command evidence when the subsequent view is ${state}`, async ({ page }) => {
     await page.route('**/api/web/rigs/rig-1/observe', (route) => respond(route, observation()))
     await page.route('**/api/rigs/rig-1/connections', (route) => respond(route, {
-      outcome: 'complete', command: 'completed', confirmedConnected: [device(0), device(1), device(2)],
+      outcome: 'complete',
+      command: 'completed',
+      confirmedConnected: [device(0), device(1), device(2)],
       view: observation(state),
     }))
     await page.goto('/rigs/rig-1/observe')

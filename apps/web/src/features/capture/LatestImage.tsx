@@ -60,11 +60,13 @@ export function useLoadedImage(image: CaptureImage | null, native = false) {
         }
       }
 
-      inFlight.current = { cancel() {
-        cancelled = true
-        window.clearTimeout(timer)
-        detach()
-      } }
+      inFlight.current = {
+        cancel() {
+          cancelled = true
+          window.clearTimeout(timer)
+          detach()
+        },
+      }
       setLoading(true)
       setFailed(false)
 
@@ -112,19 +114,29 @@ export function useLoadedImage(image: CaptureImage | null, native = false) {
   }, [id, url, native])
 
   useEffect(() => {
-    if (image?.saved) setLoaded(current => current?.image.id === image.id && !current.image.saved
-      ? { ...current, image: { ...current.image, saved: true } } : current)
+    if (image?.saved) setLoaded(current =>
+      current?.image.id === image.id && !current.image.saved
+        ? { ...current, image: { ...current.image, saved: true } }
+        : current)
   }, [id, image?.saved, loaded?.image.id])
 
-  return { loadedImage: image ? loaded?.image ?? null : null, loadedUrl: image ? loaded?.url : undefined, loading, failed }
+  return {
+    loadedImage: image ? loaded?.image ?? null : null,
+    loadedUrl: image ? loaded?.url : undefined,
+    loading,
+    failed,
+  }
 }
 
 export function CameraMark() {
-  return <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-    <rect x="6" y="12" width="36" height="26" rx="5" />
-    <path d="m15 12 3-5h12l3 5M35 19h2" />
-    <circle cx="24" cy="25" r="8" /><circle cx="24" cy="25" r="3" />
-  </svg>
+  return (
+    <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+      <rect x="6" y="12" width="36" height="26" rx="5" />
+      <path d="m15 12 3-5h12l3 5M35 19h2" />
+      <circle cx="24" cy="25" r="8" />
+      <circle cx="24" cy="25" r="3" />
+    </svg>
+  )
 }
 
 export function LatestImage({ image, busy, interrupted, rigId, savedDetail = false }: {
@@ -157,51 +169,138 @@ export function LatestImage({ image, busy, interrupted, rigId, savedDetail = fal
   }, [nativeVisible, frame?.id])
 
   const seconds = frame ? Math.max(0, Math.floor((now - Date.parse(frame.receivedAt)) / 1000)) : 0
-  const age = seconds < 60 ? `${seconds} s ago` : seconds < 3600 ? `${Math.floor(seconds / 60)} min ago` : `${Math.floor(seconds / 3600)} h ago`
+
+  const age = seconds < 60
+    ? `${seconds} s ago`
+    : seconds < 3600
+      ? `${Math.floor(seconds / 60)} min ago`
+      : `${Math.floor(seconds / 3600)} h ago`
+
   const previous = busy || interrupted || (!!frame && frame.id !== image?.id)
 
   const frameSaved = !!frame && (frame.saved || (image?.id === frame.id && image.saved)
     || (retention.result?.image.id === frame.id && retention.result.status === 'saved'))
 
-  return <section className="capture-image" aria-label={savedDetail ? 'Saved preview' : 'Latest image'}>
-    <header>
-      <div><h2>{savedDetail && frame ? new Date(frame.capturedAt).toLocaleTimeString() : 'Latest image'}</h2><span>{savedDetail && frame ? new Date(frame.capturedAt).toLocaleDateString() : frame ? `${age}${previous ? ' · Previous exposure' : ''}` : loading ? 'Loading image…' : 'No exposure yet'}</span></div>
-      {frame && <div className="capture-image__actions"><div className="capture-image__zoom" role="group" aria-label="Image scale">
-        <Button size="small" tone={nativeVisible ? 'quiet' : 'neutral'} aria-pressed={!nativeVisible} onClick={() => setZoomed(false)}>Fit</Button>
-        <Button size="small" tone={nativeVisible ? 'neutral' : 'quiet'} aria-pressed={nativeVisible} onClick={() => setZoomed(true)}>100%</Button>
-      </div>{savedDetail || frameSaved ? <Badge tone="positive">Saved</Badge> : rigId && <Button size="small" disabled={retention.pending} onClick={() => void retention.keep(frame)}>{retention.pending && retention.result?.image.id === frame.id ? 'Saving…' : 'Keep this image'}</Button>}</div>}
-    </header>
-    {retention.result && (retention.result.image.id !== frame?.id || retention.result.status === 'failed') && <div className="capture-image__retention" data-failed={retention.result.status === 'failed' || undefined} role="status">
-      {retentionMessage(retention.result, retention.keep)}
-    </div>}
-    {loadingNative && <p className="capture-image__error" role="status">Loading full-resolution image… The fitted preview stays visible.</p>}
-    {failed && <p className="capture-image__error" role="status">{zoomed && frame?.id === image?.id ? 'The full-resolution image could not be loaded. The fitted preview is kept below.' : `The latest image could not be loaded.${frame ? ' The previous exposure is kept below.' : ' No image is available to display.'}`}</p>}
-    <div className="capture-image__window" data-zoomed={nativeVisible || undefined} ref={imageWindow}
-      tabIndex={nativeVisible ? 0 : undefined} role={nativeVisible ? 'region' : undefined}
-      aria-label={nativeVisible ? 'Image at 100 percent. Scroll to inspect.' : undefined}>
-      {frame ? <img src={loadedUrl} width={frame.width} height={frame.height}
-        style={nativeVisible ? { width: frame.width, height: frame.height } : undefined}
-        alt={`${frame.exposureSeconds} second exposure from ${frame.cameraName}`} />
-        : <div className="capture-image__empty"><CameraMark />
-          <h3>{loading ? 'Loading your exposure' : interrupted ? 'Waiting for your first image' : busy ? 'Taking your first exposure' : 'Your first image starts here'}</h3>
-          <p>{interrupted ? 'Exposure progress is unavailable. The image will appear when it is received.' : busy || loading ? 'The image will appear when it is received.' : 'Choose an exposure time, then take an image to check what the camera sees.'}</p>
-        </div>}
-    </div>
-    {frame && <div className="capture-image__statistics">
-      <dl aria-label="Image statistics">
-        <div><dt>Dimensions</dt><dd>{frame.width} × {frame.height}</dd></div>
-        <div><dt title="Detected stars with a reliable measurement">Stars</dt><dd>{frame.statistics?.detectedStars ?? '—'}</dd></div>
-        <div><dt title="Median half-flux radius in native image pixels">HFR · px</dt><dd>{frame.statistics?.medianHfrPixels?.toFixed(2) ?? '—'}</dd></div>
-      </dl>
-      {frame.capturedAtSource === 'server-estimate' && <p>Start time estimated</p>}
-      {!frame.statistics ? <p>Star measurements unavailable for this image.</p>
-        : frame.statistics.detectedStars === 0 ? <p>No measurable stars in this image.</p> : null}
-    </div>}
-    {frame && <footer>
-      <span>{frame.exposureSeconds} s <i>·</i> {frame.color === 'color' ? 'Color' : 'Mono'}</span>
-      <span>{nativeVisible ? 'Scroll to inspect' : 'Display stretched'}</span>
-    </footer>}
-  </section>
+  return (
+    <section className="capture-image" aria-label={savedDetail ? 'Saved preview' : 'Latest image'}>
+      <header>
+        <div>
+          <h2>{savedDetail && frame ? new Date(frame.capturedAt).toLocaleTimeString() : 'Latest image'}</h2>
+          <span>{savedDetail && frame
+            ? new Date(frame.capturedAt).toLocaleDateString()
+            : frame
+              ? `${age}${previous ? ' · Previous exposure' : ''}`
+              : loading ? 'Loading image…' : 'No exposure yet'}</span>
+        </div>
+        {frame && (
+          <div className="capture-image__actions">
+            <div className="capture-image__zoom" role="group" aria-label="Image scale">
+              <Button
+                size="small"
+                tone={nativeVisible ? 'quiet' : 'neutral'}
+                aria-pressed={!nativeVisible}
+                onClick={() => setZoomed(false)}
+              >
+                Fit
+              </Button>
+              <Button
+                size="small"
+                tone={nativeVisible ? 'neutral' : 'quiet'}
+                aria-pressed={nativeVisible}
+                onClick={() => setZoomed(true)}
+              >
+                100%
+              </Button>
+            </div>
+            {savedDetail || frameSaved ? <Badge tone="positive">Saved</Badge> : rigId && (
+              <Button size="small" disabled={retention.pending} onClick={() => void retention.keep(frame)}>
+                {retention.pending && retention.result?.image.id === frame.id ? 'Saving…' : 'Keep this image'}
+              </Button>
+            )}
+          </div>
+        )}
+      </header>
+      {retention.result && (retention.result.image.id !== frame?.id || retention.result.status === 'failed') && (
+        <div
+          className="capture-image__retention"
+          data-failed={retention.result.status === 'failed' || undefined}
+          role="status"
+        >
+          {retentionMessage(retention.result, retention.keep)}
+        </div>
+      )}
+      {loadingNative && (
+        <p className="capture-image__error" role="status">Loading full-resolution image… The fitted preview stays visible.</p>
+      )}
+      {failed && (
+        <p className="capture-image__error" role="status">
+          {zoomed && frame?.id === image?.id
+            ? 'The full-resolution image could not be loaded. The fitted preview is kept below.'
+            : `The latest image could not be loaded.${frame ? ' The previous exposure is kept below.' : ' No image is available to display.'}`}
+        </p>
+      )}
+      <div
+        className="capture-image__window"
+        data-zoomed={nativeVisible || undefined}
+        ref={imageWindow}
+        tabIndex={nativeVisible ? 0 : undefined}
+        role={nativeVisible ? 'region' : undefined}
+        aria-label={nativeVisible ? 'Image at 100 percent. Scroll to inspect.' : undefined}
+      >
+        {frame ? (
+          <img
+            src={loadedUrl}
+            width={frame.width}
+            height={frame.height}
+            style={nativeVisible ? { width: frame.width, height: frame.height } : undefined}
+            alt={`${frame.exposureSeconds} second exposure from ${frame.cameraName}`}
+          />
+        ) : (
+          <div className="capture-image__empty">
+            <CameraMark />
+            <h3>{loading
+              ? 'Loading your exposure'
+              : interrupted
+                ? 'Waiting for your first image'
+                : busy ? 'Taking your first exposure' : 'Your first image starts here'}</h3>
+            <p>{interrupted
+              ? 'Exposure progress is unavailable. The image will appear when it is received.'
+              : busy || loading
+                ? 'The image will appear when it is received.'
+                : 'Choose an exposure time, then take an image to check what the camera sees.'}</p>
+          </div>
+        )}
+      </div>
+
+      {frame && (
+        <div className="capture-image__statistics">
+          <dl aria-label="Image statistics">
+            <div>
+              <dt>Dimensions</dt>
+              <dd>{frame.width} × {frame.height}</dd>
+            </div>
+            <div>
+              <dt title="Detected stars with a reliable measurement">Stars</dt>
+              <dd>{frame.statistics?.detectedStars ?? '—'}</dd>
+            </div>
+            <div>
+              <dt title="Median half-flux radius in native image pixels">HFR · px</dt>
+              <dd>{frame.statistics?.medianHfrPixels?.toFixed(2) ?? '—'}</dd>
+            </div>
+          </dl>
+          {frame.capturedAtSource === 'server-estimate' && <p>Start time estimated</p>}
+          {!frame.statistics ? <p>Star measurements unavailable for this image.</p>
+            : frame.statistics.detectedStars === 0 ? <p>No measurable stars in this image.</p> : null}
+        </div>
+      )}
+      {frame && (
+        <footer>
+          <span>{frame.exposureSeconds} s <i>·</i> {frame.color === 'color' ? 'Color' : 'Mono'}</span>
+          <span>{nativeVisible ? 'Scroll to inspect' : 'Display stretched'}</span>
+        </footer>
+      )}
+    </section>
+  )
 }
 
 type KeptFrame = Pick<CaptureImage, 'id' | 'capturedAt'>
@@ -221,8 +320,14 @@ function retentionMessage(result: KeepResult, keep: (image: KeptFrame) => Promis
     case 'saved':
       return `Image from ${time} saved.`
     case 'failed':
-      return <><p>Image from {time}: {result.error}</p>
-        {result.retryable && <Button size="small" onClick={() => void keep(result.image)}>Retry saving image</Button>}</>
+      return (
+        <>
+          <p>Image from {time}: {result.error}</p>
+          {result.retryable && (
+            <Button size="small" onClick={() => void keep(result.image)}>Retry saving image</Button>
+          )}
+        </>
+      )
   }
 }
 
@@ -238,16 +343,23 @@ function useImageRetention(rigId: string | undefined) {
 
     try {
       const response = await api(`rigs/${encodeURIComponent(rigId)}/capture/images/${encodeURIComponent(image.id)}/keep`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(30_000),
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+        signal: AbortSignal.timeout(30_000),
       })
 
       if (!isSavedImage(response, rigId) || response.id !== image.id) throw new Error('Invalid saved image response')
       setResult({ image, status: 'saved' })
     } catch (cause) {
       const expired = cause instanceof ApiError && cause.status === 410
-      setResult({ image, status: 'failed', retryable: !expired, error: expired
-        ? 'This exposure is no longer available to save. Keep a newer image, or turn on Save frames before capturing.'
-        : 'Saving could not be confirmed. Check Saved images, or retry saving this image.',
+      setResult({
+        image,
+        status: 'failed',
+        retryable: !expired,
+        error: expired
+          ? 'This exposure is no longer available to save. Keep a newer image, or turn on Save frames before capturing.'
+          : 'Saving could not be confirmed. Check Saved images, or retry saving this image.',
       })
     } finally {
       writing.current = false

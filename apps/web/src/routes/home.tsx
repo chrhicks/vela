@@ -95,7 +95,9 @@ function RigCard({ rig }: { readonly rig: RigView }) {
           <strong>{rig.connections.connected} of {rig.connections.total}</strong>
           <small>devices connected</small>
         </span>
-        <strong>View rig <i>→</i></strong>
+        <strong>
+          View rig <i>→</i>
+        </strong>
       </div>
     </Link>
   )

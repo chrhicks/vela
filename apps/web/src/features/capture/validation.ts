@@ -103,9 +103,17 @@ export function isSavedImage(value: unknown, rigId: string): value is SavedImage
     && (result.data.fitImageUrl === undefined || result.data.fitImageUrl === `${preview}/fit`)
 }
 
-const savedImagesView = z.object({ rigId: z.string(), rigName: text, images: z.array(savedImage) })
+const savedImagesView = z.object({
+  rigId: z.string(),
+  rigName: text,
+  images: z.array(savedImage),
+})
 
-const savedImageView = z.object({ rigId: z.string(), rigName: text, image: savedImage })
+const savedImageView = z.object({
+  rigId: z.string(),
+  rigName: text,
+  image: savedImage,
+})
 
 export function isSavedImagesView(value: unknown, rigId: string): value is SavedImagesView {
   const result = savedImagesView.safeParse(value)

@@ -3,10 +3,21 @@ import { useEffect, useState } from 'react'
 import { api } from '../../lib/api'
 import { isNavigationView } from './validation'
 
-type State = { view: NavigationView | null; activity: NavigationCapture | null; offline: boolean; missing: boolean }
+type State = {
+  view: NavigationView | null
+  activity: NavigationCapture | null
+  offline: boolean
+  missing: boolean
+}
 
 export function useNavigation() {
-  const [state, setState] = useState<State>({ view: null, activity: null, offline: false, missing: false })
+  const [state, setState] = useState<State>({
+    view: null,
+    activity: null,
+    offline: false,
+    missing: false,
+  })
+
   useEffect(() => {
     let disposed = false
     let timer: ReturnType<typeof setTimeout>
@@ -16,7 +27,9 @@ export function useNavigation() {
       request = new AbortController()
 
       try {
-        const view = await api('web/navigation', { signal: AbortSignal.any([request.signal, AbortSignal.timeout(5000)]) })
+        const view = await api('web/navigation', {
+          signal: AbortSignal.any([request.signal, AbortSignal.timeout(5000)]),
+        })
 
         if (!isNavigationView(view)) throw new Error('Invalid navigation response')
 
@@ -36,7 +49,12 @@ export function useNavigation() {
 
           if (disappeared) return { view, activity: last, offline: false, missing: true }
 
-          return { view, activity: view.captures.find(capture => capture.phase === 'failed') ?? null, offline: false, missing: false }
+          return {
+            view,
+            activity: view.captures.find(capture => capture.phase === 'failed') ?? null,
+            offline: false,
+            missing: false,
+          }
         })
       } catch {
         if (!disposed) setState(previous => ({ ...previous, offline: true }))

@@ -9,7 +9,13 @@ interface Props {
   onRigNameChange(name: string): void
 }
 
-export function RigReview({ adding, candidate, error, rigName, onRigNameChange }: Props) {
+export function RigReview({
+  adding,
+  candidate,
+  error,
+  rigName,
+  onRigNameChange,
+}: Props) {
   const reportedName = candidate.server?.name ?? candidate.endpoint.host
 
   return (

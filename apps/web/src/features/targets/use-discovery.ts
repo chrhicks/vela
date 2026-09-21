@@ -23,7 +23,12 @@ export function savedDiscovery(rigId: string): TargetDiscoveryView | null {
 }
 
 export function selectionOf(view: TargetDiscoveryView): DiscoverySelection {
-  return { query: view.query, category: view.category, filter: view.filter, offset: view.offset }
+  return {
+    query: view.query,
+    category: view.category,
+    filter: view.filter,
+    offset: view.offset,
+  }
 }
 
 /** The saved page paints immediately. No timer replaces a browsing calculation. */
@@ -38,11 +43,19 @@ export function useDiscovery(rigId: string, selection: DiscoverySelection) {
   const requestVersion = useRef(0)
   const needsRefresh = useRef(false)
   const { query, category, filter, offset } = selection
+
   useEffect(() => {
     const refreshed = needsRefresh.current
     const existing = current.current
 
-    if (!refreshed && existing && existing.query === query && existing.category === category && existing.filter === filter && existing.offset === offset) {
+    if (
+      !refreshed
+      && existing
+      && existing.query === query
+      && existing.category === category
+      && existing.filter === filter
+      && existing.offset === offset
+    ) {
       setLoading(false)
       setError(null)
 
@@ -68,7 +81,11 @@ export function useDiscovery(rigId: string, selection: DiscoverySelection) {
       setView(next)
       setSaved(false)
 
-      try { localStorage.setItem(key(rigId), JSON.stringify(next)) } catch { /* Browsing remains available when storage is full or disabled. */ }
+      try {
+        localStorage.setItem(key(rigId), JSON.stringify(next))
+      } catch {
+        /* Browsing remains available when storage is full or disabled. */
+      }
     }).catch(cause => {
       if (controller.signal.aborted || version !== requestVersion.current) return
       setError(cause instanceof ApiError && cause.status === 410
@@ -81,7 +98,14 @@ export function useDiscovery(rigId: string, selection: DiscoverySelection) {
     })
 
     return () => controller.abort()
-  }, [rigId, query, category, filter, offset, refreshVersion])
+  }, [
+    rigId,
+    query,
+    category,
+    filter,
+    offset,
+    refreshVersion,
+  ])
 
   const refresh = useCallback(() => {
     needsRefresh.current = true

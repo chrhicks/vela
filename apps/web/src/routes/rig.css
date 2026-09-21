@@ -180,7 +180,11 @@
   stroke-width: 1.25;
 }
 
-.vela-rig-device__state p { display: grid; gap: calc(var(--vela-space) * .45); margin: 0; }
+.vela-rig-device__state p {
+  display: grid;
+  gap: calc(var(--vela-space) * .45);
+  margin: 0;
+}
 .vela-rig-device__state small {
   color: var(--vela-text-muted);
   font-size: .57em;
@@ -235,7 +239,11 @@
 
 .vela-rig-device__metrics [data-tone="muted"] dd { color: var(--vela-text-muted); font-weight: 560; }
 .vela-rig-device__metrics [data-tone="warning"] dd { color: var(--vela-warning); }
-.vela-rig-device__channels { display: flex; flex-wrap: wrap; gap: calc(var(--vela-space) * 1); }
+.vela-rig-device__channels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--vela-space) * 1);
+}
 .vela-rig-device__channels > span {
   display: flex;
   align-items: center;
@@ -248,7 +256,11 @@
 
 .vela-rig-device__channels small { color: var(--vela-text-muted); font-size: .58em; }
 .vela-rig-device__channels strong { font-size: .62em; }
-.vela-rig-device__channels em { color: var(--vela-text-muted); font-size: .56rem; font-style: normal; }
+.vela-rig-device__channels em {
+  color: var(--vela-text-muted);
+  font-size: .56rem;
+  font-style: normal;
+}
 .vela-rig-device__empty {
   margin: 0;
   padding: calc(var(--vela-space) * 2.5);
@@ -330,7 +342,11 @@
 
 .vela-rig-details__body > div { display: grid; gap: calc(var(--vela-space) * .65); }
 .vela-rig-details__body dt { color: var(--vela-text-muted); font-size: .62em; }
-.vela-rig-details__body dd { margin: 0; font-size: .72em; font-weight: 610; }
+.vela-rig-details__body dd {
+  margin: 0;
+  font-size: .72em;
+  font-weight: 610;
+}
 .vela-rig-management {
   display: flex;
   align-items: center;
@@ -361,7 +377,12 @@
   background: var(--vela-danger) !important;
 }
 
-.vela-rig-forget-copy { margin: 0; color: var(--vela-text-muted); font-size: .84em; line-height: 1.5; }
+.vela-rig-forget-copy {
+  margin: 0;
+  color: var(--vela-text-muted);
+  font-size: .84em;
+  line-height: 1.5;
+}
 .vela-rig-forget-error { color: var(--vela-danger); font-size: .78rem; }
 .vela-rig-home__heading {
   display: flex;
@@ -456,7 +477,11 @@
   border-top: var(--vela-border-width) solid var(--vela-line);
 }
 
-.vela-rig-summary__connections { display: flex; align-items: baseline; gap: calc(var(--vela-space) * 1); }
+.vela-rig-summary__connections {
+  display: flex;
+  align-items: baseline;
+  gap: calc(var(--vela-space) * 1);
+}
 .vela-rig-summary__connections strong { color: var(--vela-positive); font-size: .76em; }
 .vela-rig-summary__connections small { color: var(--vela-text-muted); font-size: .64em; }
 .vela-rig-summary__connections[data-state="attention"] strong { color: var(--vela-warning); }
@@ -482,10 +507,18 @@
   .vela-rig-page,
   .vela-rig-home { padding: calc(var(--vela-space) * 4) calc(var(--vela-space) * 3) calc(var(--vela-space) * 7); }
   .vela-rig-page__back { margin-bottom: calc(var(--vela-space) * 3); margin-left: calc(var(--vela-space) * -2.5); }
-  .vela-rig-hero { display: grid; align-items: start; margin-bottom: calc(var(--vela-space) * 5); }
+  .vela-rig-hero {
+    display: grid;
+    align-items: start;
+    margin-bottom: calc(var(--vela-space) * 5);
+  }
   .vela-rig-hero__status { grid-template-columns: auto minmax(0, 1fr) auto; justify-items: start; }
   .vela-rig-hero__status > .vela-badge { grid-column: auto; }
-  .vela-rig-hero__status > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .vela-rig-hero__status > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   .vela-rig-notice { margin-top: 0; }
   .vela-rig-section-heading > span { display: none; }
   .vela-rig-device .vela-panel__header { display: grid; min-height: 0; }
@@ -502,7 +535,11 @@
   .vela-rig-details__body { grid-template-columns: 1fr; }
   .vela-rig-management { display: grid; }
   .vela-rig-management .vela-button { justify-self: start; }
-  .vela-rig-home__heading { display: grid; align-items: start; margin-top: 0; }
+  .vela-rig-home__heading {
+    display: grid;
+    align-items: start;
+    margin-top: 0;
+  }
   .vela-rig-home__heading .vela-button { justify-self: start; }
   .vela-rig-summary__heading { display: grid; }
   .vela-rig-summary__heading .vela-badge { justify-self: start; }
