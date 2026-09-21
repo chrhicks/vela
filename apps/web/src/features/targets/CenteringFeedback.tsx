@@ -50,10 +50,13 @@ export function FramingStatus({ view, checked, centering, offline, pending, comm
   } else if (pending) {
     title = 'Sending command…'
     detail = 'Waiting for the server to confirm the request.'
+  } else if (view?.captureReadState === 'retrying') {
+    title = 'Camera observation interrupted'
+    detail = 'The server is connected. Retrying reads for the same exposure; no new exposure or correction will start while waiting. The last solved framing is kept. You can stop while reads retry.'
   }
 
   return <div className="vela-target-status" role="status" aria-live="polite">
-    <WorkingIndicator active={!!view?.active && !offline && !commandUnconfirmed && !pending} />
+    <WorkingIndicator active={!!view?.active && view.captureReadState === 'current' && !offline && !commandUnconfirmed && !pending} />
     <strong>{title}</strong>{detail && <p>{detail}</p>}
   </div>
 }

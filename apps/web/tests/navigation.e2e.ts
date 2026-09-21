@@ -3,7 +3,7 @@ import type { NavigationView } from '@vela/model/web'
 
 const initial: NavigationView = {
   rigs: [{ id: 'rig-1', name: 'Askar FRA 400' }, { id: 'rig-2', name: 'Seestar S30' }],
-  captures: [{ rigId: 'rig-1', rigName: 'Askar FRA 400', phase: 'exposing', active: true, completedCount: 17, elapsedSeconds: 18, exposureSeconds: 60, error: null }],
+  captures: [{ rigId: 'rig-1', rigName: 'Askar FRA 400', phase: 'exposing', active: true, captureReadState: 'current', completedCount: 17, elapsedSeconds: 18, exposureSeconds: 60, error: null }],
 }
 
 for (const width of [1440, 390]) {

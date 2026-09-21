@@ -1,0 +1,13 @@
+# Autofocus presentation
+
+The server owns the active walk, positions, samples, fit and restoration outcome.
+The browser displays those projections without advancing the walk itself.
+
+`captureReadState: 'retrying'` retains the curve and last sample timestamp while
+the same exposure's reads retry. The notice identifies the interruption, and the
+activity spinner and graph's current-position annotation pause. Stop and restore
+start remains available while server communication permits it. Current reads
+resume the supplied activity; they do not add a sample or confirm fitted focus.
+
+Offline and unconfirmed command feedback take precedence over camera-read retry
+feedback. A restoration failure remains a failure, with prior samples retained.

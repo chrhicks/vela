@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs'
 const respond = <Body>(route: Route, body: Body) => route.fulfill({ contentType: 'application/json', body: JSON.stringify(body) })
 
 const idle: CaptureView = {
+  captureReadState: 'current',
   rigId: 'rig-1', rigName: 'Offline rig', camera: { name: 'Simulator Camera' }, enabled: true,
   unavailableReason: null, phase: 'idle', active: false, exposureSeconds: 2, elapsedSeconds: 0,
   error: null, saveFrames: false, savedImageCount: 0, latestImage: null, repeat: false, completedCount: 0, cooling: null,
@@ -169,7 +170,7 @@ test('an ambiguous command is never replayed and requires an explicit state chec
   })
   await page.goto('/rigs/rig-1/observe/capture')
   await page.getByRole('button', { name: 'Take exposure' }).click()
-  await expect(page.getByText('Command outcome unknown')).toBeVisible()
+  await expect(page.locator('.capture-page__warning')).toContainText('Command outcome unknown')
   const readsAfterCommand = reads
   await expect.poll(() => reads).toBeGreaterThan(readsAfterCommand)
   await expect(page.getByRole('button', { name: 'Take exposure' })).toBeDisabled()
@@ -449,4 +450,3 @@ test('shows cooler off when the sensor is near the requested temperature and tur
   await expect.poll(() => commands).toEqual([{ coolerOn: true }])
   await expect(region.getByText('On', { exact: true })).toBeVisible()
 })
-

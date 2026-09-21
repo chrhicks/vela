@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test'
 import type { AutofocusView } from '@vela/model/web'
 
 const setup: AutofocusView = {
+  captureReadState: 'current',
   rigId: 'rig-1', rigName: 'Askar FRA 400', enabled: true, unavailableReason: null,
   cameraName: 'ASI2600MM Pro', focuserName: 'EAF', phase: 'setup', activity: 'idle', active: false,
   startPosition: null, currentPosition: 32842, maxStep: 60000, stepSize: 50, offsetSteps: 4,

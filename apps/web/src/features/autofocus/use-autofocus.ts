@@ -6,6 +6,8 @@ import { isAutofocusView, isTravelLimitError } from './validation'
 export function autofocusActivity(view: AutofocusView, offline: boolean) {
   if (offline) return 'Connection interrupted'
 
+  if (view.captureReadState === 'retrying') return 'Camera observation interrupted'
+
   if (view.activity === 'moving') return 'Moving to the next sample…'
 
   if (view.activity === 'exposing') return `Exposing at ${view.currentPosition ?? 'this stop'}…`
