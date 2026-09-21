@@ -68,3 +68,12 @@ layout with real preview URLs and native download links for FITS and preview PNG
 Manual-save feedback is owned by the image viewer rather than a keyed frame
 button. A new exposure may replace displayed pixels while an earlier save is
 pending; its outcome and explicit retry stay associated with the selected image.
+## Retained-preview versions
+
+Saved-image validation pins native, fit and PNG-download URLs to the same declared
+renderer version, or to the legacy original URLs when refresh is unavailable.
+The saved-image page displays server-owned rendering status separately from the
+capture facts. Opening a legacy detail may take time to prepare its bounded
+display derivative; collection loading does not initiate archive-wide work.
+Downloads match the displayed treatment at native resolution; originals remain
+preserved. Capture's live image IDs are already immutable per new acquisition.
