@@ -216,10 +216,11 @@ exercise failed solves, then clear it to recover. Stop before resetting or
 repositioning; Measure again takes a fresh baseline. Finish keeps the final
 measurement for reference without claiming an automatic alignment threshold.
 
-The interface preserves the approved workshop hierarchy and fixed 20-arcminute
-crop, using actual captured pixels and WCS target coordinates. Its reference is
-the optical center, not an invented detected star. Readings report capture age,
-not the time a cached preview finished loading.
+The interface uses actual captured pixels and WCS target coordinates. Its
+reference is the optical center, not an invented detected star. Readings report
+capture age, not the time a cached preview finished loading. The approved fit,
+fine and same-exposure enlargement behavior is owned by the
+[browser inspection contract](../../../web/src/features/alignment/README.md).
 
 ## Validation limits
 
