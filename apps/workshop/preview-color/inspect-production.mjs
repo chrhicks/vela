@@ -76,7 +76,8 @@ try {
   const freshNative = await (await page.request.get(`${base}${capture.latestImage.imageUrl}`)).body()
   const cooled = await readFile(new URL('../.local/preview-color/cooled-neutral-native.png', import.meta.url))
   assert.equal(hash(freshNative), hash(cooled))
-  await page.waitForFunction(() => [...document.querySelectorAll('img')].some(image => image.src.includes('/capture/images/') && image.complete && image.naturalWidth > 0))
+  const freshDisplayUrl = new URL(capture.latestImage.fitImageUrl ?? capture.latestImage.imageUrl, base).href
+  await page.waitForFunction(expectedUrl => [...document.querySelectorAll('img')].some(image => image.src === expectedUrl && image.complete && image.naturalWidth > 0), freshDisplayUrl, { timeout: 120_000 })
   await page.screenshot({ path: new URL('new-replayed-capture.png', output).pathname, fullPage: true })
   const savedFresh = await (await page.request.get(`${base}/api/web/rigs/${rig}/saved-images/${capture.latestImage.id}`)).json()
   assert.equal(savedFresh.image.previewRendering.status, 'current')
