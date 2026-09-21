@@ -78,6 +78,13 @@ before another centering request. Downloading is published from acquisition's
 actual readout callback. Browser loss does not stop the server-owned loop; Stop
 holds the rig lease until cleanup confirms completion.
 
+`captureReadState` independently marks interrupted transport reads of an
+acknowledged exposure. The adapter retries those reads in place; recovery does
+not complete the frame, repeat a slew or authorize another correction. The last
+solved footprint, timestamp and centering history remain intact until a new solve
+is published. Stop clears that indicator and waits for cleanup, preserving failed
+cleanup as failure. Callbacks from cancelled or settled captures are ignored.
+
 When `VELA_TRACE_PATH` is enabled, [framing tracing](../../../../docs/local-tracing.md#centering-and-framing-evidence)
 persists exact desired/solved positions, WCS, pre/post mount readings, commands and
 per-correction outcomes under one trace. Completed child records are available

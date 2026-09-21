@@ -29,6 +29,7 @@ const autofocus = z.object({
   phase: z.enum(['setup', 'walking', 'fitting', 'confirming', 'complete', 'stopped', 'failed']),
   activity: z.enum(['idle', 'moving', 'exposing', 'measuring', 'fitting', 'restoring', 'stopping']),
   active: z.boolean(),
+  captureReadState: z.enum(['current', 'retrying']),
   startPosition: z.number().int().nullable(),
   currentPosition: z.number().int().nullable(),
   maxStep: z.number().int().nullable(),

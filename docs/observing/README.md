@@ -1,6 +1,8 @@
 # Field-test follow-ups — current status
 
-**Last reconciled: September 21, 2026, after PR #73 (`96271ee`).**
+**Last reconciled: September 21, 2026.** Delivery baseline: PR #73 (`96271ee`).
+Chris selected the recommended sequence and then authorized parallel Rift agents.
+The implementation/design tracks below are active; integration and acceptance stay separate.
 
 Start here to see what remains from the September 14–15 FRA/Veil field test.
 This is the maintained status rollup; the linked investigations preserve dated
@@ -18,19 +20,20 @@ have not been selected for implementation merely by appearing on this list.
 
 | Follow-up | Current status and next bounded step | Detailed plan |
 | --- | --- | --- |
-| Preserve an acknowledged exposure through read interruptions | **Open — recommended next.** Acquisition still attempts cleanup after readiness/timestamp/image-read failure. Retry observation of the same exposure with paced, cancellable reads and honest interrupted status; never resend StartExposure. | [Recovery stage 1](recovery-and-guiding.md#stage-1-prevent-read-outages-from-becoming-unnecessary-uncertain-cleanup) |
-| Preserve prepared stages; improve transport classification | **Open.** Retain completed Home/probe/sweep progress through transient read failures. Distinguish body-stream transport failures from invalid data; retain bounded motion feedback and confirmation deadlines. | [Recovery stage 2](recovery-and-guiding.md#stage-2-transport-classification-and-prepared-stage-reads) |
+| Preserve an acknowledged exposure through read interruptions | **In progress — [CHI-193](https://linear.app/chicks/issue/CHI-193).** Retry observation of the same exposure with paced, cancellable reads and honest interrupted status; never resend StartExposure. Includes workshop recovery feedback and independent/browser verification before delivery. | [Recovery stage 1](recovery-and-guiding.md#stage-1-prevent-read-outages-from-becoming-unnecessary-uncertain-cleanup) |
+| Preserve prepared stages; improve transport classification | **Transport classification in progress — [CHI-195](https://linear.app/chicks/issue/CHI-195).** Distinguish body-stream transport failures from invalid data. Prepared Home/probe/sweep-stage recovery remains open; retain bounded motion feedback and confirmation deadlines. | [Recovery stage 2](recovery-and-guiding.md#stage-2-transport-classification-and-prepared-stage-reads) |
 | Preserve raw captures and measurements when presentation fails | **Open.** Preview failure can still prevent capture publication/saving; alignment preview or target-projection failure can end useful measurement. Represent unavailable presentation separately from retained originals/results. | [Recovery stage 3](recovery-and-guiding.md#stage-3-display-artifacts-should-not-own-acquisitionmeasurement-success) |
 | Individual alignment-frame failures | **Open.** Distinguish solve-budget expiry from configuration failure and cancellation; retain a valid baseline when a later image can recover. Geometry rejection needs evidence-based classification, not catch-all retry. | [Solver and individual-frame failure](recovery-and-guiding.md#solver-and-individual-frame-failure) |
-| Alignment image inspection | **Open — workshop needed.** The adjustment view still has a fixed 20′ crop and limited baseline inspection. Evaluate fit-to-context, fine zoom and expanded/native views on phone and desktop. Fit-both is a proposal, not an approved design. | [Imagery workshop](alignment-and-framing.md#p2-imagery-and-command-feedback-in-the-workshop) |
-| Green preview treatment, including saved images | **Open — workshop needed.** Compare retained real exposures, adopt one display-only treatment, and version/regenerate retained derivatives. Decide refreshed-preview display/download semantics; preserve original FITS. | [Preview tint](imaging-and-processing.md#1-preview-tint-fix-one-renderer-and-its-retained-derivatives) |
-| Lossless unsigned-16 FITS when representable | **Open.** Encoder still always writes signed 32-bit. Add conditional lossless encoding with signed-32 fallback; verify sample equality and ASTAP/Siril compatibility. Retained originals stay unchanged. | [FITS compatibility](imaging-and-processing.md#2-fits-unsigned-16-bit-compatibility-preserving-all-sample-values) |
+| Alignment image inspection | **Workshop candidate ready; design feedback pending — [CHI-194](https://linear.app/chicks/issue/CHI-194).** Fit-to-context, fine zoom and expanded/native views on phone and desktop are in an isolated Rift. Production still uses the fixed 20′ crop; fit-both and zoom scales are proposals. | [Imagery workshop](alignment-and-framing.md#p2-imagery-and-command-feedback-in-the-workshop) |
+| Green preview treatment, including saved images | **Workshop comparison in progress — [CHI-197](https://linear.app/chicks/issue/CHI-197).** Compare retained real exposures before choosing a display-only treatment. Production adoption and retained-derivative regeneration remain future steps; refreshed-preview display/download semantics need a decision. Original FITS stay intact. | [Preview tint](imaging-and-processing.md#1-preview-tint-fix-one-renderer-and-its-retained-derivatives) |
+| Lossless unsigned-16 FITS when representable | **Implementation/validation in progress — [CHI-196](https://linear.app/chicks/issue/CHI-196).** Conditional lossless encoding with signed-32 fallback in an isolated Rift; verify sample equality and ASTAP/Siril compatibility before integration. Retained originals stay unchanged. | [FITS compatibility](imaging-and-processing.md#2-fits-unsigned-16-bit-compatibility-preserving-all-sample-values) |
 | Control-service outage presentation | **Open.** Clarify interrupted/unconfirmed outcome and last completed artifact; inspect fresh device state on return. This does not restore a crashed run or automatically reapply physical settings. | [Service outage boundary](recovery-and-guiding.md#control-service-outage-recovery-boundary-not-restart-automation) |
 | Working feedback beyond centering | **Open — separate adoption task.** Reusable Working + shimmer exists; choose the next long-running flows and preserve stale/uncertain and reduced-motion behavior. | [WorkingIndicator](../../packages/ui/src/components/WorkingIndicator.tsx), [centering delivery #73](https://github.com/chrhicks/vela/pull/73) |
 | Explain image-quality metrics | **Open — small presentation follow-up.** Make measured-star population and HFR limits accessible on phones; a low HFR among a few surviving stars is not a focus/quality certificate. | [Image-quality metrics](imaging-and-processing.md#5-image-quality-metrics-and-selection-expose-limits-avoid-false-certainty) |
 
-**Suggested sequence, not an execution commitment:** exposure-read recovery →
+**Selected sequence (Chris, September 21):** exposure-read recovery →
 alignment-inspection workshop → FITS compatibility → preview-color workshop.
+Parallel preparation is authorized; this order remains the integration/review preference.
 Keep transport and artifact-contract changes reviewable separately. The next
 clear session need not wait for the whole backlog.
 

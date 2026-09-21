@@ -105,8 +105,8 @@ function setup(openDiagnostics?: AlignmentDiagnosticsFactory) {
     return requests.shift()!
   }
 
-  async function baseline() {
-    await controller.start('physical', 'Physical rig')
+  async function baseline(onSettled?: () => void) {
+    await controller.start('physical', 'Physical rig', onSettled)
 
     for (let index = 0; index < 3; index++) (await nextSolve()).complete()
   }
@@ -250,7 +250,86 @@ it('retries an explicitly recoverable capture but stops on an unclassified trans
   control.waits.shift()!()
   await vi.waitFor(() => expect(subject.controller.active()).toBe(false))
   expect(subject.hardware.capture).toHaveBeenCalledTimes(2)
+  expect(subject.physical.pointing).toHaveBeenCalledTimes(2)
   expect(subject.controller.snapshot()).toMatchObject({ phase: 'failed', error: 'Device read timed out' })
+})
+
+it('revalidates mount state before a fresh pre-start capture retry', async () => {
+  const subject = setup()
+  vi.mocked(subject.hardware.capture).mockRejectedValueOnce(new AlpacaCaptureRetryableError(readTimeout()))
+  await subject.controller.start('physical', 'Physical rig')
+  await vi.waitFor(() => expect(control.waits).toHaveLength(1))
+  vi.mocked(subject.physical.pointing).mockRejectedValueOnce(new Error('Tracking is off'))
+  control.waits.shift()!()
+  await vi.waitFor(() => expect(subject.controller.active()).toBe(false))
+  expect(subject.hardware.capture).toHaveBeenCalledOnce()
+  expect(subject.controller.snapshot()).toMatchObject({ phase: 'failed', error: 'Tracking is off' })
+})
+
+it('preserves the alignment baseline and timer through same-exposure read recovery, then publishes only the solved result', async () => {
+  const subject = setup()
+  await subject.baseline()
+  await vi.waitFor(() => expect(control.waits).toHaveLength(1))
+  const previous = subject.controller.snapshot()
+  const original = vi.mocked(subject.hardware.capture).getMockImplementation()!
+  let complete = () => {}
+
+  vi.mocked(subject.hardware.capture).mockImplementationOnce(async input => {
+    const frame = await original(input)
+    await new Promise<void>(resolve => { complete = resolve })
+
+    return frame
+  })
+  control.waits.shift()!()
+  await vi.waitFor(() => expect(subject.captures).toHaveLength(4))
+  const pending = subject.captures[3]!
+  const startedAt = subject.controller.snapshot().exposureStartedAt
+  pending.onReadState!('retrying')
+  expect(subject.controller.snapshot()).toMatchObject({ phase: 'adjusting', activity: 'retrying', exposureStartedAt: null, warning: expect.stringContaining('interrupted'), measurement: previous.measurement, measuredAt: previous.measuredAt })
+  pending.onReadState!('current')
+  expect(subject.controller.snapshot()).toMatchObject({ active: true, activity: 'exposing', exposureStartedAt: startedAt, warning: null, measurement: previous.measurement, measuredAt: previous.measuredAt })
+  expect(subject.hardware.capture).toHaveBeenCalledTimes(4)
+  expect(subject.physical.move).toHaveBeenCalledTimes(2)
+  complete()
+  const solve = await subject.nextSolve()
+  pending.onReadState!('retrying')
+  expect(subject.controller.snapshot()).toMatchObject({ activity: 'solving', warning: null, exposureStartedAt: null })
+  solve.complete()
+  await vi.waitFor(() => expect(subject.controller.snapshot().measuredAt).toBe(frames[3]!.capturedAt))
+})
+
+it.each([
+  { cleanup: new DOMException('Stopped', 'AbortError'), phase: 'stopped' },
+  { cleanup: new Error('Camera cleanup unconfirmed'), phase: 'failed' },
+])('keeps the alignment lease and measurement through Stop in capture read recovery until $phase', async ({ cleanup, phase }) => {
+  const subject = setup()
+  const released = vi.fn()
+  await subject.baseline(released)
+  await vi.waitFor(() => expect(control.waits).toHaveLength(1))
+  const previous = subject.controller.snapshot()
+  let capture: AlpacaCaptureOptions | undefined
+  let fail = (_error: Error) => {}
+
+  vi.mocked(subject.hardware.capture).mockImplementationOnce(input => {
+    capture = input
+
+    return new Promise((_resolve, reject) => { fail = reject })
+  })
+  control.waits.shift()!()
+  await vi.waitFor(() => expect(capture).toBeDefined())
+  capture!.onReadState!('retrying')
+  const stopping = subject.controller.stop()
+  await vi.waitFor(() => expect(capture!.signal!.aborted).toBe(true))
+  capture!.onReadState!('retrying')
+  expect(subject.controller.snapshot()).toMatchObject({ active: true, activity: 'stopping', warning: null, exposureStartedAt: null })
+  expect(released).not.toHaveBeenCalled()
+  fail(cleanup)
+  await stopping
+  capture!.onReadState!('current')
+  expect(subject.controller.snapshot()).toMatchObject({ active: false, phase, activity: 'idle', exposureStartedAt: null, warning: null, measurement: previous.measurement, measuredAt: previous.measuredAt })
+  expect(subject.hardware.capture).toHaveBeenCalledTimes(4)
+  expect(subject.physical.move).toHaveBeenCalledTimes(2)
+  expect(released).toHaveBeenCalledOnce()
 })
 
 function recording(): AlignmentDiagnosticRun {

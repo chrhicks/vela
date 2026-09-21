@@ -24,6 +24,7 @@ export interface CaptureCamera {
     exposureSeconds: number
     signal: AbortSignal
     onProgress: (progress: CaptureProgress) => void
+    onReadState: (state: CaptureView['captureReadState']) => void
   }): Promise<CaptureFrame>
 }
 
@@ -49,6 +50,7 @@ export function createCaptureController(
   let view: CaptureView = {
     rigId: settings.rigId, rigName: settings.rigName, camera: null,
     enabled: true, unavailableReason: null, phase: 'idle', active: false,
+    captureReadState: 'current',
     repeat: true, saveFrames: false, savedImageCount: 0, completedCount: 0, exposureSeconds: 2, elapsedSeconds: 0, error: null, latestImage: null, cooling: null,
   }
 
@@ -84,11 +86,17 @@ export function createCaptureController(
   async function acquire(exposureSeconds: number, signal: AbortSignal, camera: CaptureCamera, cameraName: string, repeat: boolean, saveFrames: boolean) {
     try {
       do {
-        patch({ phase: 'exposing', elapsedSeconds: 0 })
+        patch({ phase: 'exposing', elapsedSeconds: 0, captureReadState: 'current' })
+        let capturePending = true
 
         const frame = await camera.capture({ exposureSeconds, signal, onProgress(progress) {
-          if (!signal.aborted) patch({ phase: progress.phase, elapsedSeconds: progress.elapsedSeconds })
-        } })
+          if (capturePending && !signal.aborted) patch({ phase: progress.phase, elapsedSeconds: progress.elapsedSeconds })
+        }, onReadState(captureReadState) {
+          if (capturePending && !signal.aborted) patch({ captureReadState })
+        } }).finally(() => {
+          capturePending = false
+          patch({ captureReadState: 'current' })
+        })
 
         // A completed acquisition wins a race with Stop: publish the actual result.
         if (!signal.aborted) patch({ phase: 'reading' })
@@ -133,7 +141,7 @@ export function createCaptureController(
       if (signal.aborted && error instanceof CaptureStoppedError) patch({ phase: 'stopped' })
       else patch({ phase: 'failed', error: error instanceof Error ? error.message : 'Exposure failed' })
     } finally {
-      patch({ active: false })
+      patch({ active: false, captureReadState: 'current' })
     }
   }
 
@@ -142,7 +150,7 @@ export function createCaptureController(
 
     if (!Number.isFinite(exposureSeconds) || exposureSeconds <= 0) throw new Error('Exposure duration must be positive')
     cancellation = new AbortController()
-    patch({ camera: { name: cameraName }, phase: 'exposing', active: true, repeat, saveFrames, completedCount: 0, exposureSeconds, elapsedSeconds: 0, error: null })
+    patch({ camera: { name: cameraName }, phase: 'exposing', active: true, repeat, saveFrames, completedCount: 0, exposureSeconds, elapsedSeconds: 0, error: null, captureReadState: 'current' })
     running = acquire(exposureSeconds, cancellation.signal, camera, cameraName, repeat, saveFrames).finally(() => {
       running = undefined
       onSettled?.()
@@ -153,7 +161,7 @@ export function createCaptureController(
 
   async function stop() {
     if (running) {
-      patch({ phase: 'stopping' })
+      patch({ phase: 'stopping', captureReadState: 'current' })
       cancellation!.abort()
       await running
     }

@@ -78,25 +78,59 @@ it('retains the prior image and its metadata during a subsequent failed exposure
   expect(controller.image(previous.id)).toBeDefined()
 })
 
+it('keeps the same pending exposure, previous image and run lease through interrupted and recovered reads', async () => {
+  const { controller, requests, frame } = setup()
+  const settled = vi.fn()
+  await controller.start(10, { repeat: true, onSettled: settled })
+  requests[0]!.resolve(frame)
+  await vi.waitFor(() => expect(requests).toHaveLength(2))
+  const previous = controller.snapshot().latestImage
+  const pending = requests[1]!
+  pending.onProgress({ phase: 'reading', elapsedSeconds: 10 })
+  pending.onReadState('retrying')
+  expect(controller.snapshot()).toMatchObject({ active: true, phase: 'reading', captureReadState: 'retrying', completedCount: 1, latestImage: previous })
+  expect(settled).not.toHaveBeenCalled()
+  pending.onReadState('current')
+  expect(controller.snapshot()).toMatchObject({ active: true, phase: 'reading', captureReadState: 'current', completedCount: 1, latestImage: previous })
+  expect(requests).toHaveLength(2)
+  pending.resolve({ ...frame, capturedAt: '2026-09-05T16:01:00Z' })
+  await vi.waitFor(() => expect(requests).toHaveLength(3))
+  pending.onReadState('retrying')
+  pending.onProgress({ phase: 'reading', elapsedSeconds: 10 })
+  expect(controller.snapshot()).toMatchObject({ phase: 'exposing', captureReadState: 'current', elapsedSeconds: 0, completedCount: 2,
+    latestImage: { capturedAt: '2026-09-05T16:01:00Z' } })
+  const stopping = controller.stop()
+  requests[2]!.reject(new CaptureStoppedError())
+  await stopping
+  expect(settled).toHaveBeenCalledOnce()
+})
+
 it.each([
   { rejection: new CaptureStoppedError(), phase: 'stopped', error: null },
   { rejection: new Error('Camera cleanup unconfirmed'), phase: 'failed', error: 'Camera cleanup unconfirmed' },
   { rejection: new DOMException('Unconfirmed abort', 'AbortError'), phase: 'failed', error: 'Unconfirmed abort' },
 ])('waits for cleanup and reports $phase for $rejection.name', async ({ rejection, phase, error }) => {
   const { controller, requests } = setup()
-  await controller.start(10)
+  const released = vi.fn()
+  await controller.start(10, { onSettled: released })
+  requests[0]!.onReadState('retrying')
   const stop = controller.stop()
   let settled = false
   void stop.then(() => { settled = true })
   await Promise.resolve()
   expect(requests[0]!.signal.aborted).toBe(true)
   expect(settled).toBe(false)
-  expect(controller.snapshot()).toMatchObject({ phase: 'stopping', active: true })
+  expect(controller.snapshot()).toMatchObject({ phase: 'stopping', active: true, captureReadState: 'current' })
+  expect(released).not.toHaveBeenCalled()
+  requests[0]!.onReadState('retrying')
   requests[0]!.onProgress({ phase: 'reading', elapsedSeconds: 10 })
   expect(controller.snapshot().phase).toBe('stopping')
   await expect(controller.start(10)).rejects.toThrow('already running')
   requests[0]!.reject(rejection)
-  expect(await stop).toMatchObject({ phase, error, active: false })
+  expect(await stop).toMatchObject({ phase, error, active: false, captureReadState: 'current' })
+  requests[0]!.onReadState('retrying')
+  expect(controller.snapshot().captureReadState).toBe('current')
+  expect(released).toHaveBeenCalledOnce()
 })
 
 it('keeps an exposure that actually completed while Stop was being requested', async () => {

@@ -1,0 +1,86 @@
+import { expect, test } from '@playwright/test'
+
+const specimenUrl = (width: number, stopOutcome = 'confirmed') =>
+  `/?component=panel&specimen=panel-capture-runs&profile=vela-current&mode=dark&context=isolated&viewport=${width}&prop.screen=capture&prop.phase=exposing&prop.completed=3&prop.frame=3&prop.repeat=true&prop.hasImage=true&prop.stopOutcome=${stopOutcome}`
+
+test.beforeEach(async ({ page }) => {
+  await page.setViewportSize({ width: 1700, height: 2200 })
+  await page.route('**/__workshop/**', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ session: null, profiles: [] }) }))
+  await page.clock.install()
+  await page.clock.pauseAt(new Date())
+})
+
+for (const width of [1040, 390]) {
+  test(`camera-read recovery retains the image and receives the same exposure at ${width}px`, async ({ page }, testInfo) => {
+    await page.goto(specimenUrl(width))
+    const demo = page.locator('.vela-capture-run-demo')
+    const count = demo.locator('.vela-capture-run-count strong')
+    const image = demo.locator('.vela-capture-image__window canvas')
+    const previousImage = await image.evaluate((canvas: HTMLCanvasElement) => canvas.toDataURL())
+    await demo.getByRole('button', { name: 'Interrupt camera reads', exact: true }).click()
+    await expect(demo.getByRole('alert')).toContainText('server is connected')
+    await expect(demo.getByRole('status')).toHaveText('Camera observation interrupted')
+    await expect(demo.getByRole('progressbar')).toHaveCount(0)
+    await expect(demo.getByRole('button', { name: 'Stop run', exact: true })).toBeEnabled()
+    await expect(demo.getByLabel('Exposure · seconds')).toBeDisabled()
+    await expect(count).toHaveText('3')
+    await page.clock.runFor(6000)
+    await expect(demo.getByRole('status')).toHaveText('Camera observation interrupted')
+    await expect(demo.locator('.vela-capture-image > header')).toContainText('Previous exposure')
+    expect(await image.evaluate((canvas: HTMLCanvasElement) => canvas.toDataURL())).toBe(previousImage)
+    expect(await demo.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
+    await demo.screenshot({ path: testInfo.outputPath(`interrupted-${width}.png`) })
+
+    // Moving through Observe must not restart or discard the pending exposure.
+    await demo.getByRole('button', { name: '← Observe', exact: true }).click()
+    await expect(demo.getByRole('status')).toHaveText('Camera observation interrupted · 3 completed')
+    await demo.getByRole('button', { name: 'View capture →', exact: true }).click()
+    await page.clock.runFor(6000)
+    await expect(demo.getByRole('status')).toHaveText('Camera reads recovered · receiving image')
+    await expect(demo.locator('.vela-capture-progress')).toContainText('Receiving the same exposure 4. It was not restarted.')
+    await expect(count).toHaveText('3')
+    expect(await image.evaluate((canvas: HTMLCanvasElement) => canvas.toDataURL())).toBe(previousImage)
+    await demo.screenshot({ path: testInfo.outputPath(`recovered-${width}.png`) })
+    await page.clock.runFor(2000)
+    await expect(count).toHaveText('4')
+    await expect(demo.getByRole('status')).toHaveText('Exposing')
+    await expect(demo.locator('.vela-capture-progress')).toContainText('Exposure 5.')
+    expect(await image.evaluate((canvas: HTMLCanvasElement) => canvas.toDataURL())).not.toBe(previousImage)
+    await demo.getByRole('button', { name: 'Stop run', exact: true }).click()
+    await page.clock.runFor(2000)
+    await expect(demo.getByRole('status')).toHaveText('Capture stopped')
+  })
+
+  test(`Stop during a read outage cancels recovery and keeps uncertain cleanup failed at ${width}px`, async ({ page }, testInfo) => {
+    await page.goto(specimenUrl(width, 'uncertain'))
+    const demo = page.locator('.vela-capture-run-demo')
+    const image = demo.locator('.vela-capture-image__window canvas')
+    const previousImage = await image.evaluate((canvas: HTMLCanvasElement) => canvas.toDataURL())
+    await demo.getByRole('button', { name: 'Interrupt camera reads', exact: true }).click()
+    await expect(demo.getByRole('status')).toHaveText('Camera observation interrupted')
+    await page.clock.runFor(3000)
+    await demo.getByRole('button', { name: 'Stop run', exact: true }).click()
+    await expect(demo.getByRole('status')).toHaveText('Stopping capture')
+    await expect(demo.getByRole('button', { name: 'Stopping…', exact: true })).toBeDisabled()
+    await page.clock.runFor(2000)
+    await expect(demo.getByRole('status')).toHaveText('Capture failed · camera stop unconfirmed')
+    await expect(demo.getByRole('alert')).toContainText('camera may still be exposing')
+    await expect(demo.getByRole('button', { name: 'Start run', exact: true })).toBeDisabled()
+    await page.clock.runFor(20000)
+    await expect(demo.getByRole('status')).toHaveText('Capture failed · camera stop unconfirmed')
+    await expect(demo.locator('.vela-capture-run-count strong')).toHaveText('3')
+    await expect(demo.getByRole('progressbar')).toHaveCount(0)
+    expect(await image.evaluate((canvas: HTMLCanvasElement) => canvas.toDataURL())).toBe(previousImage)
+    expect(await demo.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
+    await demo.screenshot({ path: testInfo.outputPath(`cleanup-uncertain-${width}.png`) })
+  })
+}
+
+test('a browser/server disconnection does not offer the camera-read recovery interaction', async ({ page }) => {
+  await page.goto(specimenUrl(1040).replace('prop.phase=exposing', 'prop.phase=disconnected'))
+  const demo = page.locator('.vela-capture-run-demo')
+  await expect(demo.getByRole('alert')).toContainText('Waiting for the server to reconnect')
+  await expect(demo.getByRole('button', { name: 'Start run', exact: true })).toBeDisabled()
+  await expect(demo.getByRole('button', { name: 'Interrupt camera reads', exact: true })).toHaveCount(0)
+  await expect(demo.getByRole('button', { name: 'Play read recovery', exact: true })).toHaveCount(0)
+})

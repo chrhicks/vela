@@ -3,6 +3,7 @@ import type { FramingView } from '@vela/model/web'
 import { isFramingView } from './validation'
 
 const view: FramingView = {
+  captureReadState: 'current',
   rigId: 'rig', rigName: 'Rig', enabled: true, active: true, canCenter: false, checkCurrent: false,
   observedAt: '2026-09-21T00:00:00Z', error: null, unavailableReason: null, targetId: 'm31', exposureSeconds: 20,
   phase: 'downloading', pointingSide: 'unknown', focalLengthMm: 400, desired: { raDegrees: 10, decDegrees: 40 }, camera: null, actual: null,
@@ -12,6 +13,13 @@ const view: FramingView = {
 }
 
 describe('framing transport validation', () => {
+  it('requires an explicit capture-read state independently of phase', () => {
+    expect(isFramingView({ ...view, captureReadState: 'retrying' }, 'rig')).toBe(true)
+
+    for (const captureReadState of [undefined, null, 'recovered']) {
+      expect(isFramingView({ ...view, captureReadState }, 'rig')).toBe(false)
+    }
+  })
   it('accepts image transfer and unknown pointing side without losing centering measurements', () => {
     expect(isFramingView(view, 'rig')).toBe(true)
     expect(isFramingView({ ...view, centering: null }, 'rig')).toBe(true)

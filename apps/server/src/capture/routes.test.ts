@@ -291,19 +291,28 @@ it('projects navigation progress and terminal state without inspecting devices o
   subject.captures[0]!.onProgress({ phase: 'exposing', elapsedSeconds: 4 })
   expect((await navigation()).captures).toEqual([{
     rigId: 'sim', rigName: 'Simulator', active: true, phase: 'exposing',
+    captureReadState: 'current',
     completedCount: 0, elapsedSeconds: 4, exposureSeconds: 10, error: null,
   }])
   subject.captures[0]!.resolve(frame)
   await vi.waitFor(() => expect(subject.captures).toHaveLength(2))
   subject.captures[1]!.onProgress({ phase: 'reading', elapsedSeconds: 10 })
+  subject.captures[1]!.onReadState('retrying')
   expect((await navigation()).captures).toEqual([{
     rigId: 'sim', rigName: 'Simulator', active: true, phase: 'reading',
+    captureReadState: 'retrying',
     completedCount: 1, elapsedSeconds: 10, exposureSeconds: 10, error: null,
   }])
+  expect(subject.operations.owner('sim')).toBe('capture')
+  subject.captures[1]!.onReadState('current')
+  expect((await navigation()).captures[0]).toMatchObject({ active: true, phase: 'reading', completedCount: 1, captureReadState: 'current' })
+  expect(subject.captures).toHaveLength(2)
+  subject.captures[1]!.onReadState('retrying')
   subject.captures[1]!.reject(new Error('Readout failed'))
   await vi.waitFor(() => expect(subject.operations.owner('sim')).toBeUndefined())
   expect((await navigation()).captures[0]).toMatchObject({
     rigId: 'sim', rigName: 'Simulator', phase: 'failed', active: false, completedCount: 1, error: 'Readout failed',
+    captureReadState: 'current',
   })
   expect(subject.inspections()).toBe(inspectionsAtStart)
   expect(count).not.toHaveBeenCalled()

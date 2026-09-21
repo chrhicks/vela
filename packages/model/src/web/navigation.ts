@@ -4,6 +4,7 @@ export interface NavigationCapture {
   rigId: string
   rigName: string
   phase: CapturePhase
+  captureReadState: 'current' | 'retrying'
   active: boolean
   completedCount: number
   elapsedSeconds: number

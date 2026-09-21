@@ -49,6 +49,8 @@ export interface AlpacaCaptureOptions {
   signal?: AbortSignal
   onProgress?: (elapsedSeconds: number) => void
   onReadout?: () => void
+  /** Observation of this acknowledged exposure is interrupted; no new exposure is started. */
+  onReadState?: (state: 'retrying' | 'current') => void
 }
 
 export interface AlpacaAcquisitionOptions {
@@ -56,6 +58,7 @@ export interface AlpacaAcquisitionOptions {
   fetch?: typeof globalThis.fetch
   requestTimeoutMs?: number
   imageTimeoutMs?: number
+  readRetryIntervalMs?: number
 }
 
 const coordinateSystems = ['other', 'topocentric', 'j2000', 'j2050', 'b1950'] as const
@@ -113,10 +116,12 @@ function decodeFrame(raw: CameraImage, width: number, height: number, capturedAt
   return { width, height, pixels, capturedAt, color }
 }
 
-export function createAlpacaAcquisition({ baseUrl, fetch = globalThis.fetch, requestTimeoutMs = 5_000, imageTimeoutMs = 60_000 }: AlpacaAcquisitionOptions): AlpacaAcquisition {
+export function createAlpacaAcquisition({ baseUrl, fetch = globalThis.fetch, requestTimeoutMs = 5_000, imageTimeoutMs = 60_000, readRetryIntervalMs = 1_000 }: AlpacaAcquisitionOptions): AlpacaAcquisition {
   if (!Number.isInteger(requestTimeoutMs) || requestTimeoutMs <= 0) throw new RangeError('Invalid request timeout')
 
   if (!Number.isInteger(imageTimeoutMs) || imageTimeoutMs <= 0) throw new RangeError('Invalid image timeout')
+
+  if (!Number.isInteger(readRetryIntervalMs) || readRetryIntervalMs <= 0) throw new RangeError('Invalid read retry interval')
   const client = createAlpacaClient({ baseUrl, fetch, requestTimeoutMs, imageTimeoutMs })
 
   async function device(id: string, kind: string, signal?: AbortSignal) {
@@ -227,7 +232,7 @@ export function createAlpacaAcquisition({ baseUrl, fetch = globalThis.fetch, req
   }
 
   return {
-    async capture({ cameraId, expectedCameraName, exposureSeconds, monochromeOnly = false, signal, onProgress, onReadout }) {
+    async capture({ cameraId, expectedCameraName, exposureSeconds, monochromeOnly = false, signal, onProgress, onReadout, onReadState }) {
       bounded(exposureSeconds, 0.001, 3600, 'exposure duration')
 
       if (expectedCameraName !== undefined && expectedCameraName.trim() === '') throw new RangeError('Expected camera name must not be blank')
@@ -253,13 +258,11 @@ export function createAlpacaAcquisition({ baseUrl, fetch = globalThis.fetch, req
           ? await exposureStart(camera, signal)
           : undefined
 
-        if (expectedCameraName !== undefined) {
-          const currentName = (await client.readString(camera, 'name', signal)).trim()
+        const currentName = (await client.readString(camera, 'name', signal)).trim()
 
-          if (!currentName) invalid('Camera returned a blank operational name', 'name')
+        if (!currentName) invalid('Camera returned a blank operational name', 'name')
 
-          if (currentName !== expectedCameraName.trim()) throw new Error('The camera in this driver slot has changed; select the imaging camera again')
-        }
+        if (expectedCameraName !== undefined && currentName !== expectedCameraName.trim()) throw new Error('The camera in this driver slot has changed; select the imaging camera again')
 
         signal?.throwIfAborted()
         const startedAt = performance.now()
@@ -268,23 +271,93 @@ export function createAlpacaAcquisition({ baseUrl, fetch = globalThis.fetch, req
         // A lost response can still mean the exposure started. Never replay it.
         await client.command(camera, 'startexposure', { Duration: String(exposureSeconds), Light: 'true' }, signal)
         acknowledged = true
+        const exposedCamera = camera
+        let interrupted = false
         let observedNotReady = false
 
-        while (!(await client.readBoolean(camera, 'imageready', signal))) {
+        async function revalidateCamera() {
+          const devices = await client.configuredDevices(signal)
+          rejectDuplicateDeviceIds(devices)
+
+          const sameSlot = devices.find(candidate => candidate.DeviceType.toLowerCase() === 'camera'
+            && candidate.DeviceNumber === exposedCamera.DeviceNumber)
+
+          if (!sameSlot || stableDeviceId(sameSlot) !== cameraId) {
+            camera = undefined
+            throw new Error('Camera identity changed during the interruption; original exposure outcome is unconfirmed')
+          }
+
+          if ((await client.readString(exposedCamera, 'name', signal)).trim() !== currentName) {
+            camera = undefined
+            throw new Error('Camera in this driver slot changed during the interruption; original exposure outcome is unconfirmed')
+          }
+
+          if (!(await client.connected(exposedCamera, signal))) throw new Error('Camera disconnected during the exposure')
+          const currentColor = await frameColor(exposedCamera, monochromeOnly, signal)
+
+          if (await client.readNumber(exposedCamera, 'numx', signal) !== width
+            || await client.readNumber(exposedCamera, 'numy', signal) !== height
+            || JSON.stringify(currentColor) !== JSON.stringify(color)) throw new Error('Camera image configuration changed during the exposure')
+        }
+
+        // Only reads of this acknowledged exposure belong here. Start and cleanup
+        // remain single commands; unresponsive reads do not discard an exposure.
+        async function observe<T>(read: () => Promise<T>): Promise<T> {
+          while (true) {
+            signal?.throwIfAborted()
+
+            try {
+              if (interrupted) await revalidateCamera()
+              const result = await read()
+              signal?.throwIfAborted()
+
+              if (interrupted) {
+                interrupted = false
+                onReadState?.('current')
+                trace.getTracer('@vela/alpaca').startSpan('alpaca.capture.read-recovered', { attributes: { 'alpaca.device.id': cameraId } }).end()
+              }
+
+              return result
+            } catch (error) {
+              if (signal?.aborted || !(error instanceof AlpacaProviderError) || error.reason !== 'transport') throw error
+
+              if (!interrupted) {
+                interrupted = true
+                onReadState?.('retrying')
+                trace.getTracer('@vela/alpaca').startSpan('alpaca.capture.read-interrupted', { attributes: {
+                  'alpaca.device.id': cameraId, 'alpaca.read.endpoint': error.endpoint ?? '',
+                } }).end()
+              }
+
+              await delay(readRetryIntervalMs, undefined, signal === undefined ? {} : { signal })
+            }
+          }
+        }
+
+        async function ready() {
+          const imageReady = await client.readBoolean(exposedCamera, 'imageready', signal)
+
+          if (imageReady) return true
           observedNotReady = true
           const elapsed = (performance.now() - startedAt) / 1000
-
-          if (elapsed > exposureSeconds + 60) throw new Error('Camera exposure did not complete in time')
-          const cameraState = await client.readNumber(camera, 'camerastate', signal)
+          const cameraState = await client.readNumber(exposedCamera, 'camerastate', signal)
 
           if (!Number.isInteger(cameraState) || cameraState < 0 || cameraState > 5) invalid('Invalid camera activity state', 'camerastate')
 
           if (cameraState === 5) throw new Error('Camera reported an exposure error')
+
+          if (elapsed > exposureSeconds + 60) throw new Error('Camera exposure did not complete in time')
+
+          return false
+        }
+
+        while (!(await observe(ready))) {
+          const elapsed = (performance.now() - startedAt) / 1000
           onProgress?.(Math.min(elapsed, exposureSeconds))
           await delay(200, undefined, signal === undefined ? {} : { signal })
         }
 
-        const stamp = await exposureStart(camera, signal)
+        const stamp = await observe(() => exposureStart(exposedCamera, signal))
 
         if (stamp === undefined && !observedNotReady) invalid('Camera exposure freshness is unconfirmed without a timestamp or image-ready transition', 'imageready')
 
@@ -293,7 +366,18 @@ export function createAlpacaAcquisition({ baseUrl, fetch = globalThis.fetch, req
 
         if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/.test(capturedAt) || !Number.isFinite(Date.parse(capturedAt))) invalid('Invalid exposure UTC timestamp', 'lastexposurestarttime')
         onReadout?.()
-        const frame = decodeFrame(await client.image(camera, signal), width, height, capturedAt, color)
+
+        const frame = await observe(async () => {
+          if (!(await client.readBoolean(exposedCamera, 'imageready', signal))) throw new Error('The completed exposure is no longer available')
+
+          if (await exposureStart(exposedCamera, signal) !== stamp) throw new Error('Exposure changed before image transfer; freshness is unconfirmed')
+          const image = await client.image(exposedCamera, signal)
+
+          if (!(await client.readBoolean(exposedCamera, 'imageready', signal))
+            || await exposureStart(exposedCamera, signal) !== stamp) throw new Error('Exposure changed during image transfer; freshness is unconfirmed')
+
+          return decodeFrame(image, width, height, capturedAt, color)
+        })
 
         return stamp === undefined ? { ...frame, capturedAtSource: 'server-estimate' } : frame
       } catch (error) {

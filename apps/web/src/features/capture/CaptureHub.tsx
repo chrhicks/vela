@@ -27,7 +27,7 @@ export function CaptureHub({ rigId }: { rigId: string }) {
       <div className="vela-capture-entry__body">
         <h2>Capture</h2><p>Capture images and inspect the latest exposure.</p>
         <div className="vela-capture-entry__status" role="status">
-          {offline ? 'Capture updates interrupted · last known state' : view?.active ? view.phase === 'stopping' ? 'Stopping capture…' : view.phase === 'saving' ? 'Saving image…' : view.phase === 'reading' ? 'Receiving image…' : 'Exposing…' : view?.phase === 'failed' ? 'Capture stopped' : view?.phase === 'stopped' ? 'Capture stopped' : !view ? 'Loading capture state…' : !view.enabled ? view.unavailableReason : !image ? loading ? 'Loading latest image…' : 'No image captured yet' : null}
+          {offline ? 'Capture updates interrupted · last known state' : view?.captureReadState === 'retrying' ? 'Camera observation interrupted · Retrying reads for the same exposure' : view?.active ? view.phase === 'stopping' ? 'Stopping capture…' : view.phase === 'saving' ? 'Saving image…' : view.phase === 'reading' ? 'Receiving image…' : 'Exposing…' : view?.phase === 'failed' ? 'Capture stopped' : view?.phase === 'stopped' ? 'Capture stopped' : !view ? 'Loading capture state…' : !view.enabled ? view.unavailableReason : !image ? loading ? 'Loading latest image…' : 'No image captured yet' : null}
           {view?.active && <span>{view.completedCount} completed{offline ? ' · last known' : ''}</span>}
           {coolingSummary(view?.cooling) && <span>{coolingSummary(view?.cooling)}{offline ? ' · last known' : ''}</span>}
           {image && <span>{image.exposureSeconds} s · {age} s ago</span>}

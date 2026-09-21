@@ -10,6 +10,7 @@ test.beforeEach(async ({ page }) => {
     rigId: route.request().url().split('/').at(-2), rigName: 'Test rig', camera: null,
     enabled: false, unavailableReason: 'No imaging camera selected.', phase: 'idle', active: false,
     exposureSeconds: 2, elapsedSeconds: 0, repeat: false, saveFrames: false, savedImageCount: 0,
+    captureReadState: 'current',
     completedCount: 0, error: null, latestImage: null, cooling: null,
   }))
   await page.route('**/api/web/rigs/*/imaging-camera', route => respond(route, {

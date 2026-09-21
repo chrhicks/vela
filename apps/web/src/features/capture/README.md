@@ -29,6 +29,13 @@ a run is active. Stop remains available during image receipt as well as exposure
 the view waits for confirmed cleanup and never starts the next image itself.
 Observe shows the same server count, so page navigation does not control the run.
 
+`captureReadState` separates interrupted camera reads from the underlying capture
+phase and browser/server reachability. While retrying the same exposure, the page,
+Observe entry and navigation keep the completed count and previous image, hide
+exposure progress, and explain the pending read. Stop remains available. A current
+read resumes the supplied phase; it does not imply that an image completed.
+The interruption panel follows the CHI-193 workshop candidate, pending design review.
+
 The latest-image statistics row uses the loaded image's dimensions and measured
 star count/HFR. Image pixels, exposure metadata and measurements commit together,
 including when a newer image fails to load or intermediate arrivals are skipped.

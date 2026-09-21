@@ -28,7 +28,12 @@ export interface FramingHardware {
   status(signal?: AbortSignal): Promise<FramingMount>
   tracking(enabled: boolean, signal: AbortSignal): Promise<void>
   slew(position: TargetPosition, frame: string, signal: AbortSignal): Promise<void>
-  capture(seconds: number, signal: AbortSignal, onReadout?: () => void): Promise<FramingFrame>
+  capture(input: {
+    exposureSeconds: number
+    signal: AbortSignal
+    onReadout: () => void
+    onReadState: (state: FramingView['captureReadState']) => void
+  }): Promise<FramingFrame>
 }
 
 export function mountSite(mount: FramingMount): Site {
@@ -77,9 +82,10 @@ function recordFraming(name: string, attributes: Attributes) {
 /** One server-owned request. Every corrective movement earns a fresh solved check. */
 export function createFramingController(now = () => new Date(),
   waitForMountObservation: (signal: AbortSignal) => Promise<void> = signal => delay(1000, undefined, { signal })) {
-  let state: Pick<FramingView, 'phase' | 'active' | 'desired' | 'targetId' | 'actual' | 'error' | 'exposureSeconds' | 'pointingSide' | 'centering'> = {
+  let state: Pick<FramingView, 'phase' | 'captureReadState' | 'active' | 'desired' | 'targetId' | 'actual' | 'error' | 'exposureSeconds' | 'pointingSide' | 'centering'> = {
     phase: 'idle', active: false, desired: null, targetId: null, actual: null, error: null, exposureSeconds: 2,
     pointingSide: 'unknown', centering: null,
+    captureReadState: 'current',
   }
 
   let abort: AbortController | undefined
@@ -138,10 +144,19 @@ export function createFramingController(now = () => new Date(),
     while (true) {
       const landed = await settledMount(hardware, signal)
       signal.throwIfAborted()
-      state = { ...state, phase: 'exposing', error: null }
+      state = { ...state, phase: 'exposing', error: null, captureReadState: 'current' }
+      let capturePending = true
 
-      const frame = await hardware.capture(input.exposureSeconds, signal, () => {
-        if (!signal.aborted) state = { ...state, phase: 'downloading' }
+      const frame = await hardware.capture({ exposureSeconds: input.exposureSeconds, signal,
+        onReadout() {
+          if (capturePending && !signal.aborted) state = { ...state, phase: 'downloading' }
+        },
+        onReadState(captureReadState) {
+          if (capturePending && !signal.aborted) state = { ...state, captureReadState }
+        },
+      }).finally(() => {
+        capturePending = false
+        state = { ...state, captureReadState: 'current' }
       })
 
       signal.throwIfAborted()
@@ -230,7 +245,7 @@ export function createFramingController(now = () => new Date(),
     const previousCheck = checkSnapshot()
     abort = new AbortController()
     const signal = abort.signal
-    state = { ...state, actual: input.targetId === state.targetId ? state.actual : null,
+    state = { ...state, captureReadState: 'current', actual: input.targetId === state.targetId ? state.actual : null,
       desired: input.desired, targetId: input.targetId, exposureSeconds: input.exposureSeconds, active: true, phase: input.action === 'check' ? 'settling' : 'slewing', error: null, centering: null }
 
     const attributes = { 'framing.run.id': randomUUID(), 'framing.action': input.action,
@@ -310,7 +325,7 @@ export function createFramingController(now = () => new Date(),
           if (error instanceof Error) span.recordException(error)
         }
       } finally {
-        state = { ...state, active: false }
+        state = { ...state, active: false, captureReadState: 'current' }
         span.setAttributes({ 'framing.phase': state.phase, 'framing.outcome': state.centering?.outcome ?? state.phase,
           'framing.corrections': state.centering?.correction ?? 0, 'operation.cancelled': signal.aborted })
         span.end()
@@ -325,7 +340,7 @@ export function createFramingController(now = () => new Date(),
     snapshot: () => structuredClone(state), canCenter, checkCurrent, start,
     async stop() {
       if (state.active) {
-        state = { ...state, phase: 'stopping' }
+        state = { ...state, phase: 'stopping', captureReadState: 'current' }
         abort?.abort(new DOMException('Framing stopped', 'AbortError'))
       }
 

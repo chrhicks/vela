@@ -47,7 +47,7 @@ function workshop(wait: (signal: AbortSignal) => Promise<void> = async signal =>
       mount.rightAscensionDegrees = position.raDegrees
       mount.declinationDegrees = position.decDegrees
     }),
-    capture: vi.fn(async (_seconds, signal) => {
+    capture: vi.fn(async ({ signal }) => {
       signal.throwIfAborted()
 
       return frame
@@ -144,6 +144,72 @@ describe('framing controller', () => {
     const upperRight = projectSky(solved.wcs, actual.corners[2]!)!
     expect(upperRight.x).toBeCloseTo(1999.5, 8)
     expect(upperRight.y).toBeCloseTo(999.5, 8)
+  })
+
+  it('keeps the solved footprint and centering history through read recovery without another capture or correction', async () => {
+    const fake = workshop()
+    await fake.start({ check: true }).finished
+    const previous = fake.controller.snapshot().actual
+    const capture = deferred<Parameters<FramingHardware['capture']>[0]>()
+    const frame = deferred<MonoFrame>()
+    fake.hardware.capture = vi.fn(input => {
+      capture.resolve(input)
+
+      return frame.promise
+    })
+    fake.solver.solve = vi.fn(async () => solution(desired))
+    const run = fake.start({ center: true })
+    const pending = await capture.promise
+    const history = fake.controller.snapshot().centering
+    pending.onReadout()
+    pending.onReadState('retrying')
+    expect(fake.controller.snapshot()).toMatchObject({ active: true, phase: 'downloading', captureReadState: 'retrying', actual: previous, centering: history })
+    expect(run.release).not.toHaveBeenCalled()
+    pending.onReadState('current')
+    expect(fake.controller.snapshot()).toMatchObject({ phase: 'downloading', captureReadState: 'current', actual: previous, centering: history })
+    expect(fake.solver.solve).not.toHaveBeenCalled()
+    expect(fake.hardware.capture).toHaveBeenCalledOnce()
+    expect(fake.slews).toHaveLength(1)
+    frame.resolve(fake.frame)
+    await run.finished
+    pending.onReadState('retrying')
+    pending.onReadout()
+    expect(fake.controller.snapshot()).toMatchObject({ phase: 'checked', captureReadState: 'current', active: false, centering: { outcome: 'centered', correction: 1 } })
+    expect(fake.controller.snapshot().centering?.measurements).toHaveLength(2)
+    expect(run.release).toHaveBeenCalledOnce()
+  })
+
+  it.each([
+    { cleanup: new DOMException('Stopped', 'AbortError'), phase: 'stopped' },
+    { cleanup: new Error('Camera cleanup unconfirmed'), phase: 'failed' },
+  ])('holds the lease and history through Stop during read interruption until cleanup reports $phase', async ({ cleanup, phase }) => {
+    const fake = workshop()
+    await fake.start({ check: true }).finished
+    const previous = fake.controller.snapshot().actual
+    const capture = deferred<Parameters<FramingHardware['capture']>[0]>()
+    const frame = deferred<MonoFrame>()
+    fake.hardware.capture = vi.fn(input => {
+      capture.resolve(input)
+
+      return frame.promise
+    })
+    const run = fake.start({ center: true })
+    const pending = await capture.promise
+    pending.onReadState('retrying')
+    const stopping = fake.controller.stop()
+    pending.onReadState('retrying')
+    pending.onReadout()
+    expect(pending.signal.aborted).toBe(true)
+    expect(fake.controller.snapshot()).toMatchObject({ active: true, phase: 'stopping', captureReadState: 'current', actual: previous })
+    expect(run.release).not.toHaveBeenCalled()
+    frame.reject(cleanup)
+    await stopping
+    pending.onReadState('retrying')
+    expect(fake.controller.snapshot()).toMatchObject({ active: false, phase, captureReadState: 'current', actual: previous,
+      centering: { outcome: 'interrupted', correction: 1, measurements: [expect.objectContaining({ checkId: previous!.checkId, capturedAt: previous!.capturedAt })] } })
+    expect(fake.hardware.capture).toHaveBeenCalledOnce()
+    expect(fake.slews).toHaveLength(1)
+    expect(run.release).toHaveBeenCalledOnce()
   })
 
   it.each(['no-solution', 'solver-error'] as const)('never marks an unsuccessful solve as checked: %s', async failure => {
@@ -335,7 +401,7 @@ describe('framing controller', () => {
 
     if (reason === 'uncertain-slew') fake.hardware.slew = vi.fn(async () => { throw new Error('Slew outcome unknown') })
     else if (reason === 'solve-failed') fake.solver.solve = vi.fn<PlateSolver['solve']>(async () => ({ status: 'no-solution' }))
-    else fake.hardware.capture = vi.fn(async (_seconds, signal, onReadout) => {
+    else fake.hardware.capture = vi.fn(async ({ signal, onReadout }) => {
       onReadout?.()
       arrived.resolve()
 

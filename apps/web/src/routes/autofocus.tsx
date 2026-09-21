@@ -30,6 +30,7 @@ function AutofocusPage({ rigId }: { rigId: string }) {
   const disabled = pending || offline
   const setup = !view.active && (view.phase === 'setup' || returnedToSetup)
   const busy = view.active
+  const retrying = view.captureReadState === 'retrying'
   const latest = view.samples.at(-1)
 
   const lowest = view.samples.reduce<AutofocusView['samples'][number] | undefined>((best, sample) => {
@@ -56,13 +57,19 @@ function AutofocusPage({ rigId }: { rigId: string }) {
     body: error || view.error || 'The start position was not confirmed. Vela did not repeat the move.',
   } : error || view.error || (!view.enabled && view.unavailableReason) ? {
     role: 'status' as const,
-    title: error || (view.error && !isTravelLimitError(view.error)) ? 'Walk did not start' : 'Autofocus',
+    title: error && view.active ? 'Command outcome unknown' : error || (view.error && !isTravelLimitError(view.error)) ? 'Walk did not start' : 'Autofocus',
     body: error || view.error || view.unavailableReason,
+  } : retrying && !offline ? {
+    role: 'status' as const,
+    title: 'Camera observation interrupted',
+    body: 'The server is connected. Retrying reads for the same exposure; no new exposure or focus move will start while waiting. Samples on the curve are kept. You can stop and restore start while reads retry.',
   } : null
 
-  const activity = autofocusActivity(view, offline)
+  const activity = offline ? 'Connection interrupted' : error ? 'Command outcome unknown' : pending ? 'Sending command…' : autofocusActivity(view, false)
 
   const badge = offline ? 'Disconnected'
+    : error ? 'Confirmation needed'
+    : retrying ? 'Awaiting camera'
     : setup ? (view.error || travelBlocked ? 'Blocked' : 'Not started')
     : view.phase === 'walking' ? 'Walking'
     : view.phase === 'fitting' ? 'Fitting'
@@ -75,7 +82,7 @@ function AutofocusPage({ rigId }: { rigId: string }) {
     {back}
     <header className="vela-af-heading">
       <div><p>{view.rigName} · Rig preparation</p><h1>Autofocus</h1></div>
-      <Badge tone={offline || view.phase === 'failed' || (!setup && view.phase === 'stopped') || (setup && travelBlocked) ? 'warning' : busy ? 'accent' : view.phase === 'complete' && !setup ? 'positive' : 'neutral'}>{badge}</Badge>
+      <Badge tone={offline || error || retrying || view.phase === 'failed' || (!setup && view.phase === 'stopped') || (setup && travelBlocked) ? 'warning' : busy ? 'accent' : view.phase === 'complete' && !setup ? 'positive' : 'neutral'}>{badge}</Badge>
     </header>
     {notice && (
       <div className="vela-af-notice" role={notice.role}>
@@ -120,7 +127,7 @@ function AutofocusPage({ rigId }: { rigId: string }) {
         activity={activity}
         latest={latest}
         lowest={lowest}
-        offline={offline}
+        interrupted={offline || !!error || pending || retrying}
         disabled={disabled}
         busy={busy}
         onStop={() => void stop()}
@@ -131,13 +138,13 @@ function AutofocusPage({ rigId }: { rigId: string }) {
 }
 
 function Walk({
-  view, activity, latest, lowest, offline, disabled, busy, onStop, onBackToSetup,
+  view, activity, latest, lowest, interrupted, disabled, busy, onStop, onBackToSetup,
 }: {
   view: AutofocusView
   activity: string
   latest: AutofocusView['samples'][number] | undefined
   lowest: AutofocusView['samples'][number] | undefined
-  offline: boolean
+  interrupted: boolean
   disabled: boolean
   busy: boolean
   onStop: () => void
@@ -156,7 +163,7 @@ function Walk({
         {view.startPosition !== null && (
           <AutofocusCurve
             start={view.startPosition}
-            current={view.currentPosition}
+            current={interrupted ? null : view.currentPosition}
             samples={view.samples}
             fit={view.fit}
             stepSize={view.stepSize}
@@ -183,10 +190,11 @@ function Walk({
         </dl>
         <div className="vela-af-activity">
           <div className="vela-af-activity__line" role="status">
-            {busy && !offline ? <span className="vela-af-activity__spinner" aria-hidden="true" /> : null}
+            {busy && !interrupted ? <span className="vela-af-activity__spinner" aria-hidden="true" /> : null}
             <strong>{activity}</strong>
           </div>
           <p>{view.samples.length ? `${view.samples.length} of ${expected} shorts on the curve.` : 'No samples yet. The graph fills as each short exposure lands.'}</p>
+          {latest && <p>Last sample <time dateTime={latest.capturedAt}>{new Date(latest.capturedAt).toLocaleTimeString()}</time></p>}
         </div>
       </Panel>
       <div className="vela-af-actions">

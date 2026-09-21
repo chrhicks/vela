@@ -265,7 +265,7 @@ function configuredHardware(rig: RigCatalogRecord, telescopeId: string, adapter:
 
       return adapter.slew({ telescopeId, rightAscensionDegrees: position.raDegrees, declinationDegrees: position.decDegrees, coordinateSystem: frame }, signal)
     },
-    capture: (exposureSeconds, signal, onReadout) => acquisition.capture({ cameraId: rig.imagingCamera!.uniqueId, expectedCameraName: rig.imagingCamera!.name, exposureSeconds, signal, onReadout: () => onReadout?.() }),
+    capture: ({ exposureSeconds, signal, onReadout, onReadState }) => acquisition.capture({ cameraId: rig.imagingCamera!.uniqueId, expectedCameraName: rig.imagingCamera!.name, exposureSeconds, signal, onReadout: () => onReadout(), onReadState }),
   }
 }
 

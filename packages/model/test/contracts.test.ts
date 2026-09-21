@@ -127,6 +127,7 @@ describe('@vela/model boundaries', () => {
       focuserName: 'EAF',
       phase: 'walking',
       activity: 'exposing',
+      captureReadState: 'current',
       active: true,
       startPosition: 32842,
       currentPosition: 33042,

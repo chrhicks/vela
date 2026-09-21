@@ -183,8 +183,8 @@ export function LatestImage({ image, busy, interrupted, rigId, savedDetail = fal
         style={nativeVisible ? { width: frame.width, height: frame.height } : undefined}
         alt={`${frame.exposureSeconds} second exposure from ${frame.cameraName}`} />
         : <div className="capture-image__empty"><CameraMark />
-          <h3>{loading ? 'Loading your exposure' : busy ? 'Taking your first exposure' : 'Your first image starts here'}</h3>
-          <p>{busy || loading ? 'The image will appear when it is received.' : 'Choose an exposure time, then take an image to check what the camera sees.'}</p>
+          <h3>{loading ? 'Loading your exposure' : interrupted ? 'Waiting for your first image' : busy ? 'Taking your first exposure' : 'Your first image starts here'}</h3>
+          <p>{interrupted ? 'Exposure progress is unavailable. The image will appear when it is received.' : busy || loading ? 'The image will appear when it is received.' : 'Choose an exposure time, then take an image to check what the camera sees.'}</p>
         </div>}
     </div>
     {frame && <div className="capture-image__statistics">

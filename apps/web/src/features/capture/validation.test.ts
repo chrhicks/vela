@@ -3,6 +3,7 @@ import type { CaptureView } from '@vela/model/web'
 import { isCaptureView, isSavedImage, isSavedImagesView } from './validation'
 
 const view: CaptureView = {
+  captureReadState: 'current',
   rigId: 'rig-1', rigName: 'Offline rig', camera: { name: 'Simulator Camera' }, enabled: true,
   unavailableReason: null, phase: 'exposing', active: true, exposureSeconds: 10, elapsedSeconds: 2,
   error: null, saveFrames: false, savedImageCount: 0, repeat: true, completedCount: 1, cooling: null,
@@ -13,6 +14,13 @@ const view: CaptureView = {
 }
 
 describe('capture response validation', () => {
+  it('requires an explicit capture-read state independently of phase', () => {
+    expect(isCaptureView({ ...view, captureReadState: 'retrying' }, 'rig-1')).toBe(true)
+
+    for (const captureReadState of [undefined, null, 'recovered']) {
+      expect(isCaptureView({ ...view, captureReadState }, 'rig-1')).toBe(false)
+    }
+  })
   it('accepts a previous image with its own exposure metadata while another exposure runs', () => {
     expect(isCaptureView(view, 'rig-1')).toBe(true)
     expect(isCaptureView({ ...view, latestImage: null }, 'rig-1')).toBe(true)

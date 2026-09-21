@@ -14,7 +14,7 @@ const respond = <Body>(route: Route, body: Body) => {
 
 const target: TargetView = { id: 'm31', name: 'Andromeda Galaxy', catalog: 'M31', kind: 'Galaxy', raDegrees: 10.6847, decDegrees: 41.269, sizeArcminutes: 178, thumbnailUrl: '/api/targets/m31/thumbnail', sky: null }
 
-const idle: FramingView = { rigId: 'rig-1', rigName: 'Test rig', enabled: true, unavailableReason: null, observedAt: new Date().toISOString(), focalLengthMm: 400, camera: { name: 'Test camera', width: 3000, height: 2000, fieldWidthDegrees: 3, fieldHeightDegrees: 2 }, phase: 'idle', active: false, desired: null, targetId: null, actual: null, error: null, exposureSeconds: 2, canCenter: false, checkCurrent: false, pointingSide: 'unknown', centering: null }
+const idle: FramingView = { rigId: 'rig-1', rigName: 'Test rig', enabled: true, unavailableReason: null, observedAt: new Date().toISOString(), focalLengthMm: 400, camera: { name: 'Test camera', width: 3000, height: 2000, fieldWidthDegrees: 3, fieldHeightDegrees: 2 }, phase: 'idle', active: false, captureReadState: 'current', desired: null, targetId: null, actual: null, error: null, exposureSeconds: 2, canCenter: false, checkCurrent: false, pointingSide: 'unknown', centering: null }
 
 const allsky = readFileSync(new URL('./fixtures/survey-allsky.jpg', import.meta.url))
 
@@ -96,10 +96,10 @@ test('ambiguous command is not repeated and requires explicit current state chec
   await expect(page.getByText('Reference survey unavailable')).toBeVisible()
 })
 
-test('survey footprint uses projected coordinates and keyboard adjustment; tile requests stay same-origin', async ({ page }) => {
+test('survey footprint uses projected coordinates and keyboard adjustment; tile requests stay same-origin', async ({ page, baseURL }) => {
   const errors: string[] = [], external: string[] = []
   page.on('pageerror', error => errors.push(error.message))
-  page.on('request', request => { if (request.url().startsWith('http') && !request.url().startsWith('http://127.0.0.1:5175')) external.push(request.url()) })
+  page.on('request', request => { if (request.url().startsWith('http') && new URL(request.url()).origin !== new URL(baseURL!).origin) external.push(request.url()) })
   await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
   await page.route('**/api/web/rigs/rig-1/framing', route => respond(route, idle))
   await page.route('**/api/survey/dss2/**', route => route.request().url().endsWith('/properties') ? route.fulfill({ contentType: 'text/plain', body: 'dataproduct_type=image\nhips_order=9\nhips_tile_width=512\nhips_frame=equatorial\nhips_tile_format=jpeg\n' }) : route.fulfill({ contentType: 'image/jpeg', body: route.request().url().endsWith('Allsky.jpg') ? allsky : tile }))

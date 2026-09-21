@@ -28,7 +28,13 @@ detected-star count and median HFR remain attached to that image. An unavailable
 analysis never discards the acquired image; see [image processing](../imaging/README.md)
 for measurement limits. Later pending, failed or stopped exposures retain that image and its
 metadata. The run count increments only when an image is published and resets
-on each start. Any acquisition or preview failure ends the run without replay. Preview stretching preserves native dimensions for 100% inspection;
+on each start. During an acknowledged exposure, the adapter retries known transport
+read failures in place without another exposure command. The controller projects
+`captureReadState` independently of exposing/reading, including in navigation.
+Read recovery is not image completion: it preserves the last image, count and lease.
+Stop clears the interruption indicator immediately and still waits for cleanup;
+late callbacks cannot update a cancelled or settled acquisition.
+Any terminal acquisition or preview failure ends the run without replay. Preview stretching preserves native dimensions for 100% inspection;
 only the latest three image pairs and their temporary original FITS buffers remain
 in memory. Saving releases the temporary original buffer after the archive confirms
 the write. This bounded cache lets Keep this image target the displayed frame when

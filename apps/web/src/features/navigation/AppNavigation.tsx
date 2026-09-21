@@ -65,6 +65,8 @@ function activityPresentation(activity: NavigationCapture, offline: boolean, mis
 
   if (offline) return { status: 'Updates lost', note: 'Last known · open Capture →', interrupted: true }
 
+  if (activity.captureReadState === 'retrying') return { status: 'Awaiting camera', note: 'Retrying same exposure · open Capture →', interrupted: true }
+
   switch (activity.phase) {
     case 'exposing': {
       const elapsed = Math.min(activity.elapsedSeconds, activity.exposureSeconds)

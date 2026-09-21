@@ -6,6 +6,8 @@ import { isCaptureView } from './validation'
 export function captureActivity(view: CaptureView, offline: boolean) {
   if (offline) return 'Connection interrupted'
 
+  if (view.captureReadState === 'retrying') return 'Camera observation interrupted'
+
   return {
     idle: 'Ready for an exposure', exposing: 'Exposing', reading: 'Receiving image', saving: 'Saving image', stopping: 'Stopping capture',
     complete: 'Image received', stopped: 'Capture stopped', failed: 'Capture stopped · error',

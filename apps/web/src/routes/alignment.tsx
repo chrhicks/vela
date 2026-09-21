@@ -224,7 +224,7 @@ function AlignmentPage({ rigId }: { rigId: string }) {
     <div className="vela-polar-activity__line" role="status">
       <span
         className="vela-polar-activity__spinner"
-        style={{ visibility: view.active && !offline ? 'visible' : 'hidden' }}
+        style={{ visibility: view.active && !offline && !retrying ? 'visible' : 'hidden' }}
         aria-hidden="true"
       />
       <strong>{activity}</strong>
@@ -255,7 +255,7 @@ function AlignmentPage({ rigId }: { rigId: string }) {
     </header>
     {view.warning && <div className="vela-polar-solve-warning" role="alert">
       <strong>{retrying ? 'Device connection interrupted' : 'Plate-solving failed'}</strong>
-      <p>{retrying ? 'Retrying automatically. ' : view.active && !offline && view.activity !== 'stopping' ? 'Trying another image. ' : ''}{measurement ? 'Showing the last successful solve.' : 'No alignment result yet.'}</p>
+      <p>{retrying ? 'Retrying device reads automatically. Any pending exposure is kept; it is not restarted while reads retry. ' : view.active && !offline && view.activity !== 'stopping' ? 'Trying another image. ' : ''}{measurement ? 'Showing the last successful solve.' : 'No alignment result yet.'}</p>
     </div>}
     {imageError && <p className="vela-polar-notice" role="status">The latest solved image could not be loaded. Previous readings and overlay remain together.</p>}
     {(error || view.error || !view.enabled) && <p className="vela-polar-notice" role="status">{error || view.error || view.unavailableReason}</p>}
@@ -272,6 +272,7 @@ function AlignmentPage({ rigId }: { rigId: string }) {
 
               const status = solved ? 'Solved'
                 : !current ? 'Not measured'
+                : offline || retrying ? 'Observation interrupted'
                 : view.activity === 'homing' ? 'Preparing starting field…'
                 : view.activity === 'moving' ? 'Moving' : 'Measuring'
 
