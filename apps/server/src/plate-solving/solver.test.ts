@@ -28,9 +28,10 @@ async function fixture(body: string, timeoutMs = 3000) {
   return { root, marker, attempts, solver: createAstapSolver({ executable, catalogPath: root, fieldHeightDegrees: 3, timeoutMs }) }
 }
 
-it('sends raw signed-32 FITS, normalizes a solved center and removes per-exposure artifacts', async () => {
+it('sends lossless unsigned-16 FITS, normalizes a solved center and removes per-exposure artifacts', async () => {
   const fixtureData = await fixture(`const image = fs.readFileSync(path)
-if (!image.subarray(0,2880).toString().includes('BITPIX  =                   32') || image.readInt32BE(2884) !== 65535) process.exit(16)
+const header = image.subarray(0,2880).toString()
+if (!header.includes('BITPIX  =                   16') || !header.includes('BZERO   =                32768') || !header.includes('BSCALE  =                    1') || image.readInt16BE(2882) + 32768 !== 65535) process.exit(16)
 fs.writeFileSync(path.replace('.fits','.ini'), ${JSON.stringify(ini)})`)
 
   const solution = await fixtureData.solver.solve(frame, hint, new AbortController().signal)
