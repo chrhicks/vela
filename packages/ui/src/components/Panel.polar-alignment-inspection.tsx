@@ -152,13 +152,11 @@ function InspectionView({ target, status }: { readonly target: Target | undefine
         <div className="vela-polar-inspection-legend">
           <span>
             <i />
-            {' '}
-            Frame reference
+            {' Frame reference'}
           </span>
           <span>
             <i />
-            {' '}
-            Correction target
+            {' Correction target'}
           </span>
         </div>
       )}
@@ -181,11 +179,9 @@ export function AlignmentImageInspection({ target, title, status }: {
       </div>
       <InspectionView target={target} status={status} />
       <figcaption>
-        Exposure started
-        {' '}
+        {'Exposure started '}
         <time dateTime="2026-09-14T20:25:49">8:25:49 PM</time>
-        {' '}
-        · Fixture
+        {' · Fixture'}
       </figcaption>
       <Dialog
         open={expanded}

@@ -317,11 +317,9 @@ function DiscoveryDialogPreview({ props, onPropsChange }: PreviewProps) {
               <Input inputMode="numeric" label="Port" onChange={(event) => setPort(event.target.value)} value={port} />
             </div>
             <p>
-              Vela will inspect
-              {' '}
+              {'Vela will inspect '}
               <strong>{host || 'this host'}:{port || '11111'}</strong>
-              {' '}
-              using the read-only Alpaca Management API.
+              {' using the read-only Alpaca Management API.'}
             </p>
           </form>
         ) : null}

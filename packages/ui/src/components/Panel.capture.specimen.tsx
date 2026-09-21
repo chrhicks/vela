@@ -225,8 +225,7 @@ function CapturePreview({ props, onPropsChange }: {
                 <h2>Polar alignment</h2>
                 <p>Measure your alignment and adjust the mount when you need to.</p>
                 <a href={alignmentHref}>
-                  Open polar alignment
-                  {' '}
+                  {'Open polar alignment '}
                   <span aria-hidden="true">→</span>
                 </a>
               </Panel>
@@ -235,8 +234,7 @@ function CapturePreview({ props, onPropsChange }: {
                 <h2>Autofocus</h2>
                 <p>Walk a small window around the current focuser position and watch the V-curve as shorts land.</p>
                 <a href={autofocusHref}>
-                  Open autofocus
-                  {' '}
+                  {'Open autofocus '}
                   <span aria-hidden="true">→</span>
                 </a>
               </Panel>
@@ -314,16 +312,11 @@ function CapturePreview({ props, onPropsChange }: {
                   <footer>
                     <span>
                       {imageSeconds}
-                      {' '}
-                      s
-                      {' '}
+                      {' s '}
                       <i>·</i>
-                      {' '}
-                      Mono
-                      {' '}
+                      {' Mono '}
                       <i>·</i>
-                      {' '}
-                      1600 × 1200
+                      {' 1600 × 1200'}
                     </span>
                     <span>{zoomed ? 'Scroll to inspect' : 'Display stretched'}</span>
                   </footer>

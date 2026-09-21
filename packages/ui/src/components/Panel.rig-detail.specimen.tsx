@@ -520,8 +520,7 @@ function HomeView({
                   <small>devices connected</small>
                 </span>
                 <strong>
-                  View rig
-                  {' '}
+                  {'View rig '}
                   <i>→</i>
                 </strong>
               </span>

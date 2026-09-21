@@ -82,12 +82,9 @@ function NavigationPreview({ props, onPropsChange }: { props: Props; onPropsChan
                   </a>
                   <small>
                     {target.credit}
-                    {' '}
-                    ·
-                    {' '}
+                    {' · '}
                     <a href={target.source} target="_blank" rel="noreferrer">Source</a>
-                    {' '}
-                    · CC BY 4.0
+                    {' · CC BY 4.0'}
                   </small>
                 </div>
               </article>
@@ -101,12 +98,9 @@ function NavigationPreview({ props, onPropsChange }: { props: Props; onPropsChan
             <img className="vela-nav-demo__target-image" src={target.image} alt={`${target.name} reference photograph`} />
             <p className="vela-nav-demo__credit">
               {target.credit}
-              {' '}
-              ·
-              {' '}
+              {' · '}
               <a href={target.source} target="_blank" rel="noreferrer">Source</a>
-              {' '}
-              · CC BY 4.0
+              {' · CC BY 4.0'}
             </p>
           </>
         )
@@ -285,8 +279,7 @@ function NavigationPreview({ props, onPropsChange }: { props: Props; onPropsChan
         </label>
         {phase === 'capturing' && (
           <label>
-            Exposure elapsed
-            {' '}
+            {'Exposure elapsed '}
             <input
               aria-label="Sample exposure elapsed seconds"
               type="range"

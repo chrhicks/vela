@@ -338,8 +338,7 @@ function AlignmentPreview({ props, onPropsChange }: {
           </div>
         )}
         <footer className="vela-polar-prototype">
-          Workshop prototype ·
-          {' '}
+          {'Workshop prototype · '}
           {baseline
             ? 'illustrative setup · measurement preview is accelerated'
             : 'illustrative star field and measurements'}

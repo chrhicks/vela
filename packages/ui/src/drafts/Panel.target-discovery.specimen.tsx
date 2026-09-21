@@ -102,8 +102,7 @@ function Discovery({ props, onPropsChange }: { props: Props; onPropsChange?: (pa
         ))}
       </nav>
       <p className="vela-discovery-demo__filter-note">
-        Your filter:
-        {' '}
+        {'Your filter: '}
         <strong>Optolong L-Ultimate · dual 3nm Hα / O III</strong>
         <span>Advice assumes you choose to fit it.</span>
       </p>
@@ -130,13 +129,11 @@ function Discovery({ props, onPropsChange }: { props: Props; onPropsChange?: (pa
                 <p>{target.detail}</p>
               </div>
               <Button tone="quiet" onClick={() => update({ selected: target.name })}>
-                Explore target
-                {' '}
+                {'Explore target '}
                 <span aria-hidden="true">→</span>
               </Button>
               <small>
-                Reference image ·
-                {' '}
+                {'Reference image · '}
                 <a href={target.source} target="_blank" rel="noreferrer">{target.credit}</a>
               </small>
             </div>

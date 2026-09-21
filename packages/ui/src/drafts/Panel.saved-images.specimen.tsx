@@ -204,8 +204,7 @@ function SavedImagesPreview({ props, onPropsChange }: { props: Props, onPropsCha
             size="small"
             onClick={() => update({ screen: screen === 'detail' ? 'saved' : 'observe' })}
           >
-            ←
-            {' '}
+            {'← '}
             {screen === 'detail' ? 'Saved images' : 'Observe'}
           </Button>
         )}
@@ -396,8 +395,7 @@ function SavedImagesPreview({ props, onPropsChange }: { props: Props, onPropsCha
                           <strong>{time(id)}</strong>
                           <span>{exposureFor(id)} s · Color</span>
                           <small>
-                            FITS + preview
-                            {' '}
+                            {'FITS + preview '}
                             <span aria-hidden="true">→</span>
                           </small>
                         </div>
