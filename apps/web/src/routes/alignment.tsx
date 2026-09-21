@@ -4,6 +4,7 @@ import { Badge, Button, Panel } from '@vela/ui'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { api } from '../lib/api'
+import { AlignmentImage } from '../features/alignment/AlignmentImage'
 import './alignment.css'
 
 function useAlignment(rigId: string) {
@@ -194,9 +195,11 @@ function AlignmentPage({ rigId }: { rigId: string }) {
   const measurement = solved?.measurement ?? null
   const baseline = !measurement || view.phase === 'baseline'
   const elapsed = view.exposureStartedAt ? Math.min(view.exposureSeconds, Math.max(0, (now - Date.parse(view.exposureStartedAt)) / 1000)) : 0
+  // The controller publishes the solved frame's exposure start as measuredAt, not solve completion.
   const age = solved?.measuredAt ? `${Math.max(0, Math.floor((now - Date.parse(solved.measuredAt)) / 1000))} s ago` : 'Not measured'
   const activity = alignmentActivity(view, offline)
   const retrying = view.activity === 'retrying'
+  const imageReadState = offline ? 'offline' : retrying ? 'retrying' : 'current'
 
   const nextInstruction = view.active
     ? 'After the third solve, the adjustment view will show your alignment error and the target reticle.'
@@ -296,7 +299,10 @@ function AlignmentPage({ rigId }: { rigId: string }) {
               </div>
             </dl>
           )}
-          {view.preview && <BaselineFrame key={view.preview.imageUrl} preview={view.preview} />}
+          {view.preview && <AlignmentImage frame={{ ...view.preview, solution: null,
+            title: `Latest exposure · Position ${view.preview.position}`,
+            alt: `Latest camera exposure at baseline position ${view.preview.position}`,
+          }} readState={imageReadState} now={now} retained={!view.active} noSolution={!!view.warning && !retrying} />}
         </Panel>
         <div className="vela-polar-baseline__next">
           <h3>{view.active ? 'What happens next' : 'Before you start'}</h3>
@@ -333,7 +339,9 @@ function AlignmentPage({ rigId }: { rigId: string }) {
           </div>
           {activityArea}
         </Panel>
-        <SolvedFrame measurement={measurement} />
+        <AlignmentImage frame={{ ...measurement, solution: measurement, capturedAt: solved?.measuredAt ?? null,
+          title: 'Last solved frame', alt: 'Solved camera image with frame reference and alignment target',
+        }} readState={imageReadState} now={now} retained={!view.active || imageError || view.activity !== 'waiting' || view.measurement?.imageUrl !== measurement.imageUrl} />
         <div className="vela-polar-actions">
           <p>{adjustmentInstruction}</p>
           {view.active ? (
@@ -355,50 +363,4 @@ function AlignmentPage({ rigId }: { rigId: string }) {
     )}
     <footer className="vela-polar-prototype">{physical ? 'Physical-rig alignment trial · Camera images and plate solves' : 'Configured offline alignment model · Generated sky images, real plate solves · Physical-rig alignment is not yet validated.'}</footer>
   </section>
-}
-
-function SolvedFrame({ measurement: m }: { measurement: NonNullable<AlignmentView['measurement']> }) {
-  const x = (m.imageWidth - 1) / 2
-  const y = (m.imageHeight - 1) / 2
-  const fieldHeight = m.imageHeight * (20 / 60) / m.fieldHeightDegrees
-  const fieldWidth = fieldHeight * 1.6
-  const scale = fieldHeight / 400
-  const barX = x - fieldWidth / 2 + 24 * scale
-  const barY = y + fieldHeight / 2 - 24 * scale
-
-  return <figure className="vela-polar-image"><div className="vela-polar-image-heading"><span>Last solved frame</span><span>20′ field · fixed scale</span></div>
-    <svg viewBox={`${x - fieldWidth / 2} ${y - fieldHeight / 2} ${fieldWidth} ${fieldHeight}`} role="img" aria-label="Solved camera image with frame reference and alignment target"><image href={m.imageUrl} width={m.imageWidth} height={m.imageHeight} />
-      <g fill="none" stroke="var(--vela-polar-target)" strokeWidth={1.4 * scale}><circle cx={m.targetX} cy={m.targetY} r={16 * scale} /><circle cx={m.targetX} cy={m.targetY} r={32 * scale} opacity=".55" /><path d={`M${m.targetX - 48 * scale} ${m.targetY}h${36 * scale}m${24 * scale} 0h${36 * scale}M${m.targetX} ${m.targetY - 48 * scale}v${36 * scale}m0 ${24 * scale}v${36 * scale}`} /></g>
-      <path d={`M${x} ${y}H${m.targetX}V${m.targetY}`} fill="none" stroke="var(--vela-polar-reference)" strokeWidth={1.4 * scale} strokeDasharray={`${5 * scale} ${5 * scale}`} /><line x1={x} y1={y} x2={m.targetX} y2={m.targetY} stroke="var(--vela-polar-reference)" strokeWidth={1.6 * scale} /><circle cx={x} cy={y} r={10 * scale} fill="none" stroke="var(--vela-polar-reference)" strokeWidth={1.5 * scale} />
-      <path d={`M${barX} ${barY}h${fieldHeight / 10}m${-fieldHeight / 10} ${-4 * scale}v${8 * scale}m${fieldHeight / 10} ${-8 * scale}v${8 * scale}`} stroke="var(--vela-text-muted)" fill="none" strokeWidth={scale} />
-      <text x={barX} y={barY - 12 * scale} fill="var(--vela-text-muted)" fontSize={14 * scale}>2′</text>
-    </svg><figcaption><span><i /> Frame reference</span><span><i /> Alignment target</span></figcaption></figure>
-}
-
-function BaselineFrame({ preview }: { preview: NonNullable<AlignmentView['preview']> }) {
-  const [imageError, setImageError] = useState(false)
-  const [imageAttempt, setImageAttempt] = useState(0)
-  useEffect(() => {
-    if (!imageError) return
-
-    const retry = setTimeout(() => {
-      setImageError(false)
-      setImageAttempt(attempt => attempt + 1)
-    }, 1500)
-
-    return () => clearTimeout(retry)
-  }, [imageError, imageAttempt])
-
-  return <figure className="vela-polar-image">
-    <div className="vela-polar-image-heading"><span>Latest exposure · Position {preview.position}</span><span>Full frame</span></div>
-    <img key={imageAttempt} src={preview.imageUrl} width={preview.imageWidth} height={preview.imageHeight}
-      alt={`Latest camera exposure at baseline position ${preview.position}`}
-      onError={() => setImageError(true)} onLoad={() => setImageError(false)} />
-    {imageError && <p role="status">The exposure preview could not be loaded. Retrying…</p>}
-    <figcaption><div>
-      {preview.capturedAtSource === 'server-estimate' ? 'Estimated exposure start' : 'Exposure started'}{' '}
-      <time dateTime={preview.capturedAt}>{new Date(preview.capturedAt).toLocaleTimeString()}</time>
-      {' · No alignment result yet'}
-    </div></figcaption>
-  </figure>
 }
