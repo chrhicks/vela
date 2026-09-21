@@ -13,7 +13,8 @@ export type CheckInput = { paths?: readonly string[], mode?: 'files' | 'changes'
 
 function errorText(error: unknown): string {
   if (!(error instanceof Error)) return String(error)
-  return error.cause ? `${error.message}: ${errorText(error.cause)}` : error.message
+  const message = error.message || String(error) || 'Unknown review failure'
+  return error.cause ? `${message}: ${errorText(error.cause)}` : message
 }
 
 export async function checkStandards(directory: string, input: CheckInput, signal: AbortSignal,
@@ -71,7 +72,7 @@ export async function checkStandards(directory: string, input: CheckInput, signa
     }
     if (targets.length) {
       review = await reviewStandards({ targets, context, standards, guidance }, reviewer.generate, signal)
-      report = { ...report, diagnostics: review.diagnostics, missingEvidence: review.missingEvidence, error: review.error }
+      report = { ...report, status: review.status, diagnostics: review.diagnostics, missingEvidence: review.missingEvidence, error: review.error }
     }
     if (report.error || report.missingEvidence.length || files.some(file => file.error)) report = { ...report, status: 'incomplete' }
     try { await reader.validate() } catch (error) {

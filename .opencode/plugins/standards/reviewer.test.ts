@@ -74,6 +74,7 @@ function review(raw = response(), overrides: Partial<ReviewInput> = {}) {
 }
 
 function assertRejected(result: Review, reason?: RegExp) {
+  assert.equal(result.status, 'incomplete')
   assert.ok(result.error, 'Invalid output must not look like a clean review')
   if (reason) assert.match(result.error, reason)
   assert.deepEqual(result.diagnostics, [], 'Reject the whole response, including earlier valid diagnostics')
