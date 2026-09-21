@@ -7,7 +7,12 @@ import { PREVIEW_VERSION } from '../imaging/background.js'
 import { createRetainedPreviews, currentPreview, markCurrentPreview } from './previews.js'
 import { syncDirectory, writeDurable } from './durable-files.js'
 
-export type SavedImageFiles = { fits: Buffer, native: Buffer, fit?: Buffer, previewVersion?: typeof PREVIEW_VERSION }
+export type SavedImageFiles = {
+  fits: Buffer
+  native: Buffer
+  fit?: Buffer
+  previewVersion?: typeof PREVIEW_VERSION
+}
 
 type FileKind = 'fits' | 'native' | 'fit'
 
@@ -28,16 +33,23 @@ function metadata(rigId: string, image: CaptureImage, files: SavedImageFiles): S
   const { fitImageUrl: _fitImageUrl, ...original } = image
 
   const saved: SavedImage = {
-    ...original, rigId, saved: true, savedAt: new Date().toISOString(),
+    ...original,
+    rigId,
+    saved: true,
+    savedAt: new Date().toISOString(),
     imageUrl: `${url}/preview`,
-    fitsUrl: `${url}/fits`, previewDownloadUrl: `${url}/download-preview`,
+    fitsUrl: `${url}/fits`,
+    previewDownloadUrl: `${url}/download-preview`,
   }
 
   return files.fit ? { ...saved, fitImageUrl: `${url}/fit` } : saved
 }
 
 function newest(images: SavedImage[]) {
-  return images.sort((a, b) => Date.parse(b.capturedAt) - Date.parse(a.capturedAt) || Date.parse(b.savedAt) - Date.parse(a.savedAt))
+  return images.sort((a, b) =>
+    Date.parse(b.capturedAt) - Date.parse(a.capturedAt)
+    || Date.parse(b.savedAt) - Date.parse(a.savedAt),
+  )
 }
 
 export function createMemorySavedImageStore(): SavedImageStore {
@@ -56,7 +68,11 @@ export function createMemorySavedImageStore(): SavedImageStore {
 
       if (existing) return structuredClone(existing.image)
       const original = metadata(rigId, image, files)
-      const saved = files.previewVersion === PREVIEW_VERSION ? currentPreview(original, !!files.fit) : original
+
+      const saved = files.previewVersion === PREVIEW_VERSION
+        ? currentPreview(original, !!files.fit)
+        : original
+
       const copied: SavedImageFiles = { fits: Buffer.from(files.fits), native: Buffer.from(files.native) }
 
       if (files.fit) copied.fit = Buffer.from(files.fit)
@@ -64,10 +80,18 @@ export function createMemorySavedImageStore(): SavedImageStore {
 
       return structuredClone(saved)
     },
-    async list(rigId) { return newest(Array.from(rigs.get(rigId)?.values() ?? [], item => structuredClone(item.image))) },
-    async count(rigId) { return rigs.get(rigId)?.size ?? 0 },
-    async get(rigId, imageId) { return structuredClone(rigs.get(rigId)?.get(imageId)?.image) },
-    async refreshPreview(rigId, imageId) { return this.get(rigId, imageId) },
+    async list(rigId) {
+      return newest(Array.from(rigs.get(rigId)?.values() ?? [], item => structuredClone(item.image)))
+    },
+    async count(rigId) {
+      return rigs.get(rigId)?.size ?? 0
+    },
+    async get(rigId, imageId) {
+      return structuredClone(rigs.get(rigId)?.get(imageId)?.image)
+    },
+    async refreshPreview(rigId, imageId) {
+      return this.get(rigId, imageId)
+    },
     async previewFile(rigId, imageId, kind) {
       const entry = rigs.get(rigId)?.get(imageId)
 
@@ -83,7 +107,10 @@ export function createMemorySavedImageStore(): SavedImageStore {
   }
 }
 
-export async function openFileSavedImageStore(path: string, openFile: typeof open = open): Promise<SavedImageStore> {
+export async function openFileSavedImageStore(
+  path: string,
+  openFile: typeof open = open,
+): Promise<SavedImageStore> {
   await mkdir(path, { recursive: true })
   const pending = new Map<string, Promise<SavedImage>>()
   const previews = createRetainedPreviews(openFile)
@@ -113,7 +140,8 @@ export async function openFileSavedImageStore(path: string, openFile: typeof ope
     for (const entry of entries) {
       const image = await readMetadata(join(rigPath(rigId), entry.name), rigId)
 
-      if (!image || digest(image.id) !== entry.name) throw new Error('Saved image metadata does not match its directory')
+      if (!image || digest(image.id) !== entry.name)
+        throw new Error('Saved image metadata does not match its directory')
       images.push(await previews.describe(join(rigPath(rigId), entry.name), image))
     }
 
@@ -138,7 +166,8 @@ export async function openFileSavedImageStore(path: string, openFile: typeof ope
 
       await writeDurable(join(temporary, 'metadata.json'), JSON.stringify(saved), openFile)
 
-      if (files.previewVersion === PREVIEW_VERSION) await markCurrentPreview(temporary, files.fits, !!files.fit, openFile)
+      if (files.previewVersion === PREVIEW_VERSION)
+        await markCurrentPreview(temporary, files.fits, !!files.fit, openFile)
       await syncDirectory(temporary)
 
       try {
@@ -169,7 +198,10 @@ export async function openFileSavedImageStore(path: string, openFile: typeof ope
       if (current) return current
 
       const operation = save(rigId, image, files).catch(error => {
-        throw new Error(`Could not save image ${image.id}: ${error instanceof Error ? error.message : String(error)}`, { cause: error })
+        throw new Error(
+          `Could not save image ${image.id}: ${error instanceof Error ? error.message : String(error)}`,
+          { cause: error },
+        )
       }).finally(() => pending.delete(key))
 
       pending.set(key, operation)
@@ -177,7 +209,9 @@ export async function openFileSavedImageStore(path: string, openFile: typeof ope
       return operation
     },
     list,
-    async count(rigId) { return (await completedDirectories(rigId)).length },
+    async count(rigId) {
+      return (await completedDirectories(rigId)).length
+    },
     get,
     async refreshPreview(rigId, imageId) {
       const directory = imagePath(rigId, imageId)
@@ -200,17 +234,26 @@ export async function openFileSavedImageStore(path: string, openFile: typeof ope
   }
 }
 
-function digest(id: string) { return createHash('sha256').update(id).digest('hex') }
+function digest(id: string) {
+  return createHash('sha256').update(id).digest('hex')
+}
 
 const fileErrorCode = z.object({ code: z.string() }).transform(error => error.code).optional().catch(undefined)
 
-function missing(error: unknown): error is NodeJS.ErrnoException { return fileErrorCode.parse(error) === 'ENOENT' }
+function missing(error: unknown): error is NodeJS.ErrnoException {
+  return fileErrorCode.parse(error) === 'ENOENT'
+}
 
-async function readMetadata(directory: string, rigId: string, imageId?: string): Promise<SavedImage | undefined> {
+async function readMetadata(
+  directory: string,
+  rigId: string,
+  imageId?: string,
+): Promise<SavedImage | undefined> {
   let text: string
 
-  try { text = await readFile(join(directory, 'metadata.json'), 'utf8') }
-  catch (error) {
+  try {
+    text = await readFile(join(directory, 'metadata.json'), 'utf8')
+  } catch (error) {
     if (missing(error)) return undefined
     throw error
   }
@@ -231,7 +274,12 @@ async function readMetadata(directory: string, rigId: string, imageId?: string):
   const url = `/api/rigs/${encodeURIComponent(rigId)}/saved-images/${encodeURIComponent(image.id)}`
   const { fitImageUrl, ...original } = image
 
-  const saved = { ...original, imageUrl: `${url}/preview`, fitsUrl: `${url}/fits`, previewDownloadUrl: `${url}/download-preview` }
+  const saved = {
+    ...original,
+    imageUrl: `${url}/preview`,
+    fitsUrl: `${url}/fits`,
+    previewDownloadUrl: `${url}/download-preview`,
+  }
 
   return fitImageUrl ? { ...saved, fitImageUrl: `${url}/fit` } : saved
 }
@@ -239,14 +287,26 @@ async function readMetadata(directory: string, rigId: string, imageId?: string):
 const timestamp = z.string().refine(value => Number.isFinite(Date.parse(value)))
 
 const savedImageSchema = z.object({
-  id: z.string(), rigId: z.string(), saved: z.literal(true), savedAt: timestamp,
-  capturedAt: timestamp, receivedAt: timestamp,
+  id: z.string(),
+  rigId: z.string(),
+  saved: z.literal(true),
+  savedAt: timestamp,
+  capturedAt: timestamp,
+  receivedAt: timestamp,
   capturedAtSource: z.enum(['camera', 'server-estimate']).optional(),
-  width: z.number().int().positive(), height: z.number().int().positive(),
-  cameraName: z.string(), exposureSeconds: z.number().nonnegative(),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+  cameraName: z.string(),
+  exposureSeconds: z.number().nonnegative(),
   color: z.enum(['mono', 'color']),
-  statistics: z.object({ detectedStars: z.number().int().nonnegative(), medianHfrPixels: z.number().nonnegative().nullable() }).nullable(),
-  imageUrl: z.string(), fitImageUrl: z.string().optional(), fitsUrl: z.string(), previewDownloadUrl: z.string(),
+  statistics: z.object({
+    detectedStars: z.number().int().nonnegative(),
+    medianHfrPixels: z.number().nonnegative().nullable(),
+  }).nullable(),
+  imageUrl: z.string(),
+  fitImageUrl: z.string().optional(),
+  fitsUrl: z.string(),
+  previewDownloadUrl: z.string(),
 }).transform(({ capturedAtSource, fitImageUrl, ...required }): SavedImage => {
   let image: SavedImage = required
 

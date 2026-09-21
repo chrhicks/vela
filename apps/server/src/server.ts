@@ -16,8 +16,11 @@ let shutdownTask: Promise<void> | undefined
 function shutdown() {
   if (shutdownTask) return shutdownTask
   shutdownTask = (async () => {
-    try { await app?.close() }
-    finally { await telemetry.shutdown() }
+    try {
+      await app?.close()
+    } finally {
+      await telemetry.shutdown()
+    }
   })()
 
   return shutdownTask
@@ -45,14 +48,21 @@ try {
   const rigCatalog = await openFileRigCatalog(rigCatalogPath)
   const alignment = alignmentSettings(process.env)
 
-  const savedImages = await openFileSavedImageStore(process.env.VELA_SAVED_IMAGES_PATH
-    ? resolve(process.env.VELA_SAVED_IMAGES_PATH)
-    : resolve(dirname(rigCatalogPath), 'saved-images'))
+  const savedImages = await openFileSavedImageStore(
+    process.env.VELA_SAVED_IMAGES_PATH
+      ? resolve(process.env.VELA_SAVED_IMAGES_PATH)
+      : resolve(dirname(rigCatalogPath), 'saved-images'),
+  )
 
   const targets = process.env.VELA_ASTAP && process.env.VELA_STAR_CATALOG
-    ? { solver: { executable: process.env.VELA_ASTAP, catalogPath: process.env.VELA_STAR_CATALOG } } : {}
+    ? { solver: { executable: process.env.VELA_ASTAP, catalogPath: process.env.VELA_STAR_CATALOG } }
+    : {}
 
-  const surveyCache = createSurveyCache(process.env.VELA_SURVEY_CACHE_PATH ? { directory: resolve(process.env.VELA_SURVEY_CACHE_PATH) } : {})
+  const surveyCache = createSurveyCache(
+    process.env.VELA_SURVEY_CACHE_PATH
+      ? { directory: resolve(process.env.VELA_SURVEY_CACHE_PATH) }
+      : {},
+  )
 
   if (!shutdownTask) {
     const options = { rigCatalog, savedImages, targets, surveyCache }

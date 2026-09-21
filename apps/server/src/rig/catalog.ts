@@ -29,7 +29,10 @@ export interface RigCatalog {
     inventory: ObservedRigInventory,
   ): Promise<RigCandidateMatch>
   add(input: AddRigInput): Promise<AddRigResult>
-  setImagingCamera(rigId: RigId, camera: NonNullable<RigCatalogRecord['imagingCamera']>): Promise<boolean>
+  setImagingCamera(
+    rigId: RigId,
+    camera: NonNullable<RigCatalogRecord['imagingCamera']>,
+  ): Promise<boolean>
   setFocalLength(rigId: RigId, focalLengthMm: number): Promise<boolean>
   forget(rigId: RigId): Promise<boolean>
 }
@@ -55,9 +58,24 @@ const inventorySchema = z.strictObject({
   observedAt: isoDateTime,
   devices: z.array(z.strictObject({
     uniqueId: canonicalString,
-    kind: z.enum(['camera', 'cover-calibrator', 'dome', 'filter-wheel', 'focuser', 'observing-conditions', 'rotator', 'safety-monitor', 'switch', 'telescope', 'unknown']),
+    kind: z.enum([
+      'camera',
+      'cover-calibrator',
+      'dome',
+      'filter-wheel',
+      'focuser',
+      'observing-conditions',
+      'rotator',
+      'safety-monitor',
+      'switch',
+      'telescope',
+      'unknown',
+    ]),
     name: nonEmptyString,
-  })).refine(devices => new Set(devices.map(device => device.uniqueId)).size === devices.length, 'Device IDs must be unique within a Rig'),
+  })).refine(
+    devices => new Set(devices.map(device => device.uniqueId)).size === devices.length,
+    'Device IDs must be unique within a Rig',
+  ),
 })
 
 const rigSchema = z.strictObject({
@@ -79,7 +97,10 @@ const rigSchema = z.strictObject({
 })
 
 const catalogSchema = z.strictObject({
-  rigs: z.array(rigSchema).refine(rigs => new Set(rigs.map(rig => rig.id)).size === rigs.length, 'Rig IDs must be unique'),
+  rigs: z.array(rigSchema).refine(
+    rigs => new Set(rigs.map(rig => rig.id)).size === rigs.length,
+    'Rig IDs must be unique',
+  ),
 })
 
 export class InvalidRigInventoryError extends Error {
@@ -215,10 +236,14 @@ function createRigCatalog(
 
     setImagingCamera(rigId, camera) {
       return change(async () => {
-        if (!canonicalString.safeParse(camera.uniqueId).success || !nonEmptyString.safeParse(camera.name).success) throw new Error('Invalid imaging camera')
+        if (!canonicalString.safeParse(camera.uniqueId).success || !nonEmptyString.safeParse(camera.name).success)
+          throw new Error('Invalid imaging camera')
 
         if (!records.some(record => record.id === rigId)) return false
-        await replace(records.map(record => record.id === rigId ? { ...record, imagingCamera: { ...camera } } : record))
+        await replace(records.map(record => record.id === rigId
+          ? { ...record, imagingCamera: { ...camera } }
+          : record,
+        ))
 
         return true
       })
@@ -226,7 +251,8 @@ function createRigCatalog(
 
     setFocalLength(rigId, focalLengthMm) {
       return change(async () => {
-        if (!Number.isFinite(focalLengthMm) || focalLengthMm < 10 || focalLengthMm > 20000) throw new Error('Invalid focal length')
+        if (!Number.isFinite(focalLengthMm) || focalLengthMm < 10 || focalLengthMm > 20000)
+          throw new Error('Invalid focal length')
 
         if (!records.some(record => record.id === rigId)) return false
         await replace(records.map(record => record.id === rigId ? { ...record, focalLengthMm } : record))

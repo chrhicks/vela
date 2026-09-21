@@ -9,9 +9,18 @@ import { createMemorySavedImageStore, openFileSavedImageStore } from './store.js
 
 
 const image: CaptureImage = {
-  id: 'frame-1', imageUrl: '/temporary.png', fitImageUrl: '/temporary-fit.png', width: 3, height: 2,
-  exposureSeconds: 10, capturedAt: '2026-09-05T23:00:00.000Z', receivedAt: '2026-09-05T23:00:10.000Z',
-  cameraName: 'Camera', color: 'mono', statistics: null, saved: false,
+  id: 'frame-1',
+  imageUrl: '/temporary.png',
+  fitImageUrl: '/temporary-fit.png',
+  width: 3,
+  height: 2,
+  exposureSeconds: 10,
+  capturedAt: '2026-09-05T23:00:00.000Z',
+  receivedAt: '2026-09-05T23:00:10.000Z',
+  cameraName: 'Camera',
+  color: 'mono',
+  statistics: null,
+  saved: false,
 }
 
 const files = { fits: Buffer.from('original'), native: Buffer.from('preview'), fit: Buffer.from('small') }
@@ -32,8 +41,15 @@ afterEach(async () => {
 
 describe('saved image store', () => {
   it.each(['memory', 'file'])('%s preserves one artifact per rig/frame with isolated downloads', async kind => {
-    const store = kind === 'memory' ? createMemorySavedImageStore() : await openFileSavedImageStore(await temporary())
-    const [first, duplicate] = await Promise.all([store.save('rig/../one', image, files), store.save('rig/../one', image, files)])
+    const store = kind === 'memory'
+      ? createMemorySavedImageStore()
+      : await openFileSavedImageStore(await temporary())
+
+    const [first, duplicate] = await Promise.all([
+      store.save('rig/../one', image, files),
+      store.save('rig/../one', image, files),
+    ])
+
     expect(duplicate).toEqual(first)
     expect(first).toMatchObject({ saved: true, rigId: 'rig/../one', id: image.id })
     expect(first.imageUrl).toBe('/api/rigs/rig%2F..%2Fone/saved-images/frame-1/preview')
@@ -44,7 +60,11 @@ describe('saved image store', () => {
     expect(await store.file('rig/../one', image.id, 'fits')).toEqual(files.fits)
     expect(await store.file('rig/../one', image.id, 'native')).toEqual(files.native)
     expect(await store.file('rig/../one', image.id, 'fit')).toEqual(files.fit)
-    await store.save('rig/../one', { ...image, id: '../next', capturedAt: '2026-09-05T20:00:00-04:00' }, { fits: files.fits, native: files.native })
+    await store.save(
+      'rig/../one',
+      { ...image, id: '../next', capturedAt: '2026-09-05T20:00:00-04:00' },
+      { fits: files.fits, native: files.native },
+    )
     expect((await store.list('rig/../one')).map(item => item.id)).toEqual(['../next', 'frame-1'])
     expect((await store.get('rig/../one', '../next'))?.fitImageUrl).toBeUndefined()
     expect(await store.file('rig/../one', '../next', 'fit')).toBeUndefined()
@@ -54,7 +74,12 @@ describe('saved image store', () => {
     const root = await temporary()
     const first = await openFileSavedImageStore(root)
     const second = await openFileSavedImageStore(root)
-    const [saved, duplicate] = await Promise.all([first.save('rig', image, files), second.save('rig', image, files)])
+
+    const [saved, duplicate] = await Promise.all([
+      first.save('rig', image, files),
+      second.save('rig', image, files),
+    ])
+
     expect(saved).toEqual(duplicate)
     const rigDirectory = join(root, createHash('sha256').update('rig').digest('hex'))
     await mkdir(join(rigDirectory, '.pending-interrupted'))
@@ -120,7 +145,14 @@ it('preserves estimated starts on disk and rejects unknown provenance without re
   const saved = await store.save('rig', { ...image, capturedAtSource: 'server-estimate' }, files)
   const reopened = await openFileSavedImageStore(root)
   expect(await reopened.get('rig', image.id)).toMatchObject({ capturedAtSource: 'server-estimate' })
-  const metadataPath = join(root, createHash('sha256').update('rig').digest('hex'), createHash('sha256').update(image.id).digest('hex'), 'metadata.json')
+
+  const metadataPath = join(
+    root,
+    createHash('sha256').update('rig').digest('hex'),
+    createHash('sha256').update(image.id).digest('hex'),
+    'metadata.json',
+  )
+
   await writeFile(metadataPath, JSON.stringify({ ...saved, capturedAtSource: 'unknown' }))
   await expect(reopened.get('rig', image.id)).rejects.toThrow('Invalid saved image metadata')
   const { capturedAtSource: _capturedAtSource, ...legacy } = saved

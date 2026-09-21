@@ -28,7 +28,10 @@ function device(
   } as RigDeviceDetailView
 }
 
-function rig(devices: ReadonlyArray<RigDeviceDetailView>, state: RigDetailView['state'] = 'reachable'): RigDetailView {
+function rig(
+  devices: ReadonlyArray<RigDeviceDetailView>,
+  state: RigDetailView['state'] = 'reachable',
+): RigDetailView {
   return {
     id: 'rig-1',
     name: 'Backyard rig',
