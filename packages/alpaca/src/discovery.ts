@@ -107,7 +107,8 @@ export function createAlpacaDiscovery({
         name: device.DeviceName,
       }
 
-      if (providerDeviceId !== undefined && providerDeviceId.length > 0) inspection.providerDeviceId = providerDeviceId
+      if (providerDeviceId !== undefined && providerDeviceId.length > 0)
+        inspection.providerDeviceId = providerDeviceId
 
       return inspection
     })

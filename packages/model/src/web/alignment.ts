@@ -7,7 +7,15 @@ export interface AlignmentView {
   enabled: boolean
   unavailableReason: string | null
   phase: 'setup' | 'baseline' | 'adjusting' | 'stopped' | 'finished' | 'failed'
-  activity: 'idle' | 'exposing' | 'solving' | 'homing' | 'moving' | 'waiting' | 'retrying' | 'stopping'
+  activity:
+    | 'idle'
+    | 'exposing'
+    | 'solving'
+    | 'homing'
+    | 'moving'
+    | 'waiting'
+    | 'retrying'
+    | 'stopping'
   active: boolean
   position: number
   solvedPositions: number

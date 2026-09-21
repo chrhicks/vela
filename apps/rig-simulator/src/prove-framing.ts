@@ -28,7 +28,10 @@ await mkdir(output, { recursive: true })
 
 let clockOffset = 0
 
-const simulator = buildSimulator({ stars: createStarSource(catalogPath), now: () => performance.now() + clockOffset })
+const simulator = buildSimulator({
+  stars: createStarSource(catalogPath),
+  now: () => performance.now() + clockOffset,
+})
 
 const vela = Fastify()
 
@@ -48,14 +51,20 @@ try {
   const devices = await provider.inspectDevices()
 
   const catalog = createMemoryRigCatalog([{
-    id: 'proof', name: 'Framing proof',
+    id: 'proof',
+    name: 'Framing proof',
     endpoint: { host: '127.0.0.1', port: Number(new URL(baseUrl).port) },
     imagingCamera: { uniqueId: cameraId, name: 'Simulator Camera' },
     focalLengthMm,
     addedAt: new Date().toISOString(),
-    lastObservedInventory: { observedAt: new Date().toISOString(), devices: devices.map(device => ({
-      uniqueId: device.providerDeviceId, kind: device.kind, name: device.configuredName,
-    })) },
+    lastObservedInventory: {
+      observedAt: new Date().toISOString(),
+      devices: devices.map(device => ({
+        uniqueId: device.providerDeviceId,
+        kind: device.kind,
+        name: device.configuredName,
+      })),
+    },
   }])
 
   const operations = createRigOperations()
@@ -70,14 +79,37 @@ try {
     return response.json<FramingView>()
   }
 
-  async function command(command: string, payload: { targetId?: string; raDegrees?: number; decDegrees?: number; exposureSeconds?: number; checkId?: string } = {}) {
-    const response = await vela.inject({ method: 'POST', url: `/api/rigs/proof/framing/${command}`, payload })
+  async function command(
+    command: string,
+    payload: {
+      targetId?: string
+      raDegrees?: number
+      decDegrees?: number
+      exposureSeconds?: number
+      checkId?: string
+    } = {},
+  ) {
+    const response = await vela.inject({
+      method: 'POST',
+      url: `/api/rigs/proof/framing/${command}`,
+      payload,
+    })
+
     assert.equal(response.statusCode, 200, response.body)
 
     return response.json<FramingView>()
   }
 
-  async function control(path: string, payload: { preset?: string; obscured?: boolean; cameraNumber?: number; resolution?: string }, method: 'PUT' | 'POST' = 'PUT') {
+  async function control(
+    path: string,
+    payload: {
+      preset?: string
+      obscured?: boolean
+      cameraNumber?: number
+      resolution?: string
+    },
+    method: 'PUT' | 'POST' = 'PUT',
+  ) {
     const response = await simulator.inject({ method, url: `/simulator/${path}`, payload })
     assert.equal(response.statusCode, 200, response.body)
   }
@@ -97,8 +129,14 @@ try {
     throw new Error('Framing proof timed out')
   }
 
-  const start = (exposureSeconds = 2, position = { raDegrees: eagle.raDegrees, decDegrees: eagle.decDegrees }) => command('start', {
-    targetId: eagle.id, raDegrees: position.raDegrees, decDegrees: position.decDegrees, exposureSeconds,
+  const start = (
+    exposureSeconds = 2,
+    position = { raDegrees: eagle.raDegrees, decDegrees: eagle.decDegrees },
+  ) => command('start', {
+    targetId: eagle.id,
+    raDegrees: position.raDegrees,
+    decDegrees: position.decDegrees,
+    exposureSeconds,
   })
 
   const finish = () => waitFor(state => !state.active)
@@ -128,8 +166,11 @@ try {
   const centered = checked(await finish())
   assert.ok(centered.offsetArcminutes < 0.5 && centered.offsetArcminutes < first.offsetArcminutes / 5,
     `Center must reduce the measured error: ${first.offsetArcminutes} → ${centered.offsetArcminutes}`)
-  reports.push({ scenario: 'eagle-check-and-center', firstOffsetArcminutes: first.offsetArcminutes,
-    centeredOffsetArcminutes: centered.offsetArcminutes })
+  reports.push({
+    scenario: 'eagle-check-and-center',
+    firstOffsetArcminutes: first.offsetArcminutes,
+    centeredOffsetArcminutes: centered.offsetArcminutes,
+  })
 
   await control('reset', { preset: 'large-error' }, 'POST')
   await start()
@@ -182,8 +223,12 @@ try {
   await start()
   const full = checked(await finish())
   assert.ok(Math.abs(full.offsetArcminutes - first.offsetArcminutes) < 0.1)
-  reports.push({ scenario: 'full-resolution-same-field', offsetArcminutes: full.offsetArcminutes,
-    fieldWidthDegrees: fullGeometry.fieldWidthDegrees, fieldHeightDegrees: fullGeometry.fieldHeightDegrees })
+  reports.push({
+    scenario: 'full-resolution-same-field',
+    offsetArcminutes: full.offsetArcminutes,
+    fieldWidthDegrees: fullGeometry.fieldWidthDegrees,
+    fieldHeightDegrees: fullGeometry.fieldHeightDegrees,
+  })
 
   const colorId = 'vela-simulator-color-camera'
   assert.equal((await provider.connectDevice(colorId)).outcome, 'connected')
@@ -193,8 +238,11 @@ try {
   await command('center', { checkId: colorFirst.checkId })
   const colorCentered = checked(await finish())
   assert.ok(colorCentered.offsetArcminutes < 0.5)
-  reports.push({ scenario: 'color-check-and-center', firstOffsetArcminutes: colorFirst.offsetArcminutes,
-    centeredOffsetArcminutes: colorCentered.offsetArcminutes })
+  reports.push({
+    scenario: 'color-check-and-center',
+    firstOffsetArcminutes: colorFirst.offsetArcminutes,
+    centeredOffsetArcminutes: colorCentered.offsetArcminutes,
+  })
 
   // Browser regression: the crowded Crescent field failed at five seconds
   // in the old low-resolution renderer despite abundant image stars.
@@ -206,8 +254,12 @@ try {
     await command('center', { checkId: before.checkId })
     const after = checked(await finish())
     assert.ok(after.offsetArcminutes < 0.5)
-    reports.push({ scenario: 'crescent-color-check-and-center', exposureSeconds: seconds,
-      firstOffsetArcminutes: before.offsetArcminutes, centeredOffsetArcminutes: after.offsetArcminutes })
+    reports.push({
+      scenario: 'crescent-color-check-and-center',
+      exposureSeconds: seconds,
+      firstOffsetArcminutes: before.offsetArcminutes,
+      centeredOffsetArcminutes: after.offsetArcminutes,
+    })
   }
 
   // An established browser session samples a different polar-error orientation
@@ -226,7 +278,11 @@ try {
   for (const position of [{ raDegrees: 359.9, decDegrees: 0 }, { raDegrees: 45, decDegrees: 89 }]) {
     await start(2, position)
     const result = checked(await finish())
-    reports.push({ scenario: 'all-sky-field', desired: position, offsetArcminutes: result.offsetArcminutes })
+    reports.push({
+      scenario: 'all-sky-field',
+      desired: position,
+      offsetArcminutes: result.offsetArcminutes,
+    })
   }
 
   await writeFile(join(output, 'results.json'), JSON.stringify(reports, null, 2) + '\n')

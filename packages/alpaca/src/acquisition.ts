@@ -75,9 +75,19 @@ export interface AlpacaPointing {
 export interface AlpacaAcquisition {
   capture(options: AlpacaCaptureOptions): Promise<AlpacaFrame>
   pointing(telescopeId: string, signal?: AbortSignal): Promise<AlpacaPointing>
-  move(telescopeId: string, rateDegreesPerSecond: number, durationSeconds: number, signal?: AbortSignal): Promise<void>
+  move(
+    telescopeId: string,
+    rateDegreesPerSecond: number,
+    durationSeconds: number,
+    signal?: AbortSignal,
+  ): Promise<void>
   /** Rotate the primary axis until observed RA reaches the signed angular travel. */
-  rotateRightAscension(telescopeId: string, rateDegreesPerSecond: number, distanceDegrees: number, signal?: AbortSignal): Promise<void>
+  rotateRightAscension(
+    telescopeId: string,
+    rateDegreesPerSecond: number,
+    distanceDegrees: number,
+    signal?: AbortSignal,
+  ): Promise<void>
   abort(cameraId: string, telescopeId: string): Promise<void>
 }
 
@@ -91,20 +101,34 @@ function bounded(value: number, minimum: number, maximum: number, label: string)
   return value
 }
 
-function decodeFrame(raw: CameraImage, width: number, height: number, capturedAt: string, color: AlpacaFrameColor): AlpacaFrame {
+function decodeFrame(
+  raw: CameraImage,
+  width: number,
+  height: number,
+  capturedAt: string,
+  color: AlpacaFrameColor,
+): AlpacaFrame {
   const endpoint = 'imagearray'
 
-  if (raw instanceof ArrayBuffer) return { width, height, pixels: imageBytesPixels(raw, width, height), capturedAt, color }
+  if (raw instanceof ArrayBuffer) return {
+    width,
+    height,
+    pixels: imageBytesPixels(raw, width, height),
+    capturedAt,
+    color,
+  }
 
   const image = raw
 
-  if (!Array.isArray(image.Value) || image.Value.length !== width) invalid('Image width differs from exposure dimensions', endpoint)
+  if (!Array.isArray(image.Value) || image.Value.length !== width)
+    invalid('Image width differs from exposure dimensions', endpoint)
   const pixels = new Float64Array(width * height)
 
   for (let x = 0; x < width; x++) {
     const column = image.Value[x]
 
-    if (!Array.isArray(column) || column.length !== height) invalid('Image has inconsistent column dimensions', endpoint)
+    if (!Array.isArray(column) || column.length !== height)
+      invalid('Image has inconsistent column dimensions', endpoint)
 
     for (let y = 0; y < height; y++) {
       const value = column[y]!
@@ -116,19 +140,29 @@ function decodeFrame(raw: CameraImage, width: number, height: number, capturedAt
   return { width, height, pixels, capturedAt, color }
 }
 
-export function createAlpacaAcquisition({ baseUrl, fetch = globalThis.fetch, requestTimeoutMs = 5_000, imageTimeoutMs = 60_000, readRetryIntervalMs = 1_000 }: AlpacaAcquisitionOptions): AlpacaAcquisition {
-  if (!Number.isInteger(requestTimeoutMs) || requestTimeoutMs <= 0) throw new RangeError('Invalid request timeout')
+export function createAlpacaAcquisition({
+  baseUrl,
+  fetch = globalThis.fetch,
+  requestTimeoutMs = 5_000,
+  imageTimeoutMs = 60_000,
+  readRetryIntervalMs = 1_000,
+}: AlpacaAcquisitionOptions): AlpacaAcquisition {
+  if (!Number.isInteger(requestTimeoutMs) || requestTimeoutMs <= 0)
+    throw new RangeError('Invalid request timeout')
 
   if (!Number.isInteger(imageTimeoutMs) || imageTimeoutMs <= 0) throw new RangeError('Invalid image timeout')
 
-  if (!Number.isInteger(readRetryIntervalMs) || readRetryIntervalMs <= 0) throw new RangeError('Invalid read retry interval')
+  if (!Number.isInteger(readRetryIntervalMs) || readRetryIntervalMs <= 0)
+    throw new RangeError('Invalid read retry interval')
   const client = createAlpacaClient({ baseUrl, fetch, requestTimeoutMs, imageTimeoutMs })
 
   async function device(id: string, kind: string, signal?: AbortSignal) {
     signal?.throwIfAborted()
     const devices = await client.configuredDevices(signal)
     rejectDuplicateDeviceIds(devices)
-    const found = devices.find(candidate => stableDeviceId(candidate) === id && candidate.DeviceType.toLowerCase() === kind)
+
+    const found = devices.find(candidate =>
+      stableDeviceId(candidate) === id && candidate.DeviceType.toLowerCase() === kind)
 
     if (!found) throw new Error(`Configured ${kind} ${id} was not found`)
 
@@ -150,7 +184,8 @@ export function createAlpacaAcquisition({ baseUrl, fetch = globalThis.fetch, req
 
       span?.addEvent('alpaca.stop.confirmed')
     } catch (error) {
-      if (confirmation.aborted) throw new Error('Telescope did not confirm movement stopped within 5 seconds')
+      if (confirmation.aborted)
+        throw new Error('Telescope did not confirm movement stopped within 5 seconds')
       throw error
     }
   }
@@ -158,7 +193,8 @@ export function createAlpacaAcquisition({ baseUrl, fetch = globalThis.fetch, req
   async function stopCamera(camera: ConfiguredDevice) {
     await client.command(camera, 'abortexposure', {})
 
-    if (await client.readNumber(camera, 'camerastate') !== 0) throw new Error('Camera did not confirm exposure stopped')
+    if (await client.readNumber(camera, 'camerastate') !== 0)
+      throw new Error('Camera did not confirm exposure stopped')
   }
 
   async function primaryAxis(telescopeId: string, rate: number, signal?: AbortSignal) {
@@ -167,14 +203,23 @@ export function createAlpacaAcquisition({ baseUrl, fetch = globalThis.fetch, req
 
     if (!(await client.connected(telescope, signal))) throw new Error('Telescope is disconnected')
 
-    if (!(await client.readBoolean(telescope, 'canmoveaxis?Axis=0', signal))) throw new Error('Telescope cannot move its primary axis')
+    if (!(await client.readBoolean(telescope, 'canmoveaxis?Axis=0', signal)))
+      throw new Error('Telescope cannot move its primary axis')
 
     if (await client.readBoolean(telescope, 'slewing', signal)) throw new Error('Telescope is already moving')
-    const ranges = await client.readValue(telescope, 'axisrates?Axis=0', Schema.Array(Schema.Struct({ Minimum: Schema.Finite, Maximum: Schema.Finite })), signal)
 
-    if (ranges.some(range => range.Minimum < 0 || range.Maximum < range.Minimum)) invalid('Invalid axis rate ranges', 'axisrates')
+    const ranges = await client.readValue(
+      telescope,
+      'axisrates?Axis=0',
+      Schema.Array(Schema.Struct({ Minimum: Schema.Finite, Maximum: Schema.Finite })),
+      signal,
+    )
 
-    if (rate !== 0 && !ranges.some(range => Math.abs(rate) >= range.Minimum && Math.abs(rate) <= range.Maximum)) throw new Error('Requested rate is not supported by telescope')
+    if (ranges.some(range => range.Minimum < 0 || range.Maximum < range.Minimum))
+      invalid('Invalid axis rate ranges', 'axisrates')
+
+    if (rate !== 0 && !ranges.some(range => Math.abs(rate) >= range.Minimum && Math.abs(rate) <= range.Maximum))
+      throw new Error('Requested rate is not supported by telescope')
 
     return telescope
   }
@@ -187,10 +232,15 @@ export function createAlpacaAcquisition({ baseUrl, fetch = globalThis.fetch, req
     return hours * 15
   }
 
-  async function frameColor(camera: ConfiguredDevice, monochromeOnly: boolean, signal?: AbortSignal): Promise<AlpacaFrameColor> {
+  async function frameColor(
+    camera: ConfiguredDevice,
+    monochromeOnly: boolean,
+    signal?: AbortSignal,
+  ): Promise<AlpacaFrameColor> {
     const sensorType = await client.readNumber(camera, 'sensortype', signal)
 
-    if (!Number.isInteger(sensorType) || sensorType < 0 || sensorType > 5) invalid('Invalid camera sensor type', 'sensortype')
+    if (!Number.isInteger(sensorType) || sensorType < 0 || sensorType > 5)
+      invalid('Invalid camera sensor type', 'sensortype')
 
     if (sensorType === 0) return { kind: 'mono' }
 
@@ -200,17 +250,20 @@ export function createAlpacaAcquisition({ baseUrl, fetch = globalThis.fetch, req
     const binX = await client.readNumber(camera, 'binx', signal)
     const binY = await client.readNumber(camera, 'biny', signal)
 
-    if (!Number.isInteger(binX) || !Number.isInteger(binY) || binX < 1 || binY < 1) invalid('Invalid camera binning', 'binx/biny')
+    if (!Number.isInteger(binX) || !Number.isInteger(binY) || binX < 1 || binY < 1)
+      invalid('Invalid camera binning', 'binx/biny')
 
     if (binX !== 1 || binY !== 1) throw new Error('Bayer color capture requires 1 × 1 binning')
     const offsetX = await client.readNumber(camera, 'bayeroffsetx', signal)
     const offsetY = await client.readNumber(camera, 'bayeroffsety', signal)
 
-    if (![offsetX, offsetY].every(value => value === 0 || value === 1)) invalid('Invalid RGGB Bayer offset', 'bayeroffsetx/bayeroffsety')
+    if (![offsetX, offsetY].every(value => value === 0 || value === 1))
+      invalid('Invalid RGGB Bayer offset', 'bayeroffsetx/bayeroffsety')
     const startX = await client.readNumber(camera, 'startx', signal)
     const startY = await client.readNumber(camera, 'starty', signal)
 
-    if (![startX, startY].every(value => Number.isInteger(value) && value >= 0 && value <= 2147483647)) invalid('Invalid camera subframe origin', 'startx/starty')
+    if (![startX, startY].every(value => Number.isInteger(value) && value >= 0 && value <= 2147483647))
+      invalid('Invalid camera subframe origin', 'startx/starty')
     // ASCOM offsets refer to the full sensor and do not include StartX/StartY.
     // A 2×2 matrix repeats, so subtracting and adding its offset have equal parity.
     const patterns = ['rggb', 'grbg', 'gbrg', 'bggr'] as const
@@ -226,16 +279,27 @@ export function createAlpacaAcquisition({ baseUrl, fetch = globalThis.fetch, req
       // ASI drivers can return blank success for this optional property.
       return stamp.trim() === '' ? undefined : stamp
     } catch (error) {
-      if (error instanceof AlpacaProviderError && error.reason === 'protocol-error' && error.errorNumber === 1024) return undefined
+      if (error instanceof AlpacaProviderError && error.reason === 'protocol-error' && error.errorNumber === 1024)
+        return undefined
       throw error
     }
   }
 
   return {
-    async capture({ cameraId, expectedCameraName, exposureSeconds, monochromeOnly = false, signal, onProgress, onReadout, onReadState }) {
+    async capture({
+      cameraId,
+      expectedCameraName,
+      exposureSeconds,
+      monochromeOnly = false,
+      signal,
+      onProgress,
+      onReadout,
+      onReadState,
+    }) {
       bounded(exposureSeconds, 0.001, 3600, 'exposure duration')
 
-      if (expectedCameraName !== undefined && expectedCameraName.trim() === '') throw new RangeError('Expected camera name must not be blank')
+      if (expectedCameraName !== undefined && expectedCameraName.trim() === '')
+        throw new RangeError('Expected camera name must not be blank')
       let camera: ConfiguredDevice | undefined
       let attempted = false
       let acknowledged = false
@@ -248,11 +312,13 @@ export function createAlpacaAcquisition({ baseUrl, fetch = globalThis.fetch, req
 
         if (await client.readNumber(camera, 'camerastate', signal) !== 0) throw new Error('Camera is already active')
 
-        if (!(await client.readBoolean(camera, 'canabortexposure', signal))) throw new Error('Camera cannot abort an exposure')
+        if (!(await client.readBoolean(camera, 'canabortexposure', signal)))
+          throw new Error('Camera cannot abort an exposure')
         const width = await client.readNumber(camera, 'numx', signal)
         const height = await client.readNumber(camera, 'numy', signal)
 
-        if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || width * height > 40_000_000) invalid('Invalid camera image dimensions', 'numx/numy')
+        if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || width * height > 40_000_000)
+          invalid('Invalid camera image dimensions', 'numx/numy')
 
         const previousStart = await client.readBoolean(camera, 'imageready', signal)
           ? await exposureStart(camera, signal)
@@ -262,7 +328,8 @@ export function createAlpacaAcquisition({ baseUrl, fetch = globalThis.fetch, req
 
         if (!currentName) invalid('Camera returned a blank operational name', 'name')
 
-        if (expectedCameraName !== undefined && currentName !== expectedCameraName.trim()) throw new Error('The camera in this driver slot has changed; select the imaging camera again')
+        if (expectedCameraName !== undefined && currentName !== expectedCameraName.trim())
+          throw new Error('The camera in this driver slot has changed; select the imaging camera again')
 
         signal?.throwIfAborted()
         const startedAt = performance.now()
@@ -297,7 +364,8 @@ export function createAlpacaAcquisition({ baseUrl, fetch = globalThis.fetch, req
 
           if (await client.readNumber(exposedCamera, 'numx', signal) !== width
             || await client.readNumber(exposedCamera, 'numy', signal) !== height
-            || JSON.stringify(currentColor) !== JSON.stringify(color)) throw new Error('Camera image configuration changed during the exposure')
+            || JSON.stringify(currentColor) !== JSON.stringify(color))
+            throw new Error('Camera image configuration changed during the exposure')
         }
 
         // Only reads of this acknowledged exposure belong here. Start and cleanup
@@ -314,19 +382,25 @@ export function createAlpacaAcquisition({ baseUrl, fetch = globalThis.fetch, req
               if (interrupted) {
                 interrupted = false
                 onReadState?.('current')
-                trace.getTracer('@vela/alpaca').startSpan('alpaca.capture.read-recovered', { attributes: { 'alpaca.device.id': cameraId } }).end()
+                trace.getTracer('@vela/alpaca').startSpan('alpaca.capture.read-recovered', {
+                  attributes: { 'alpaca.device.id': cameraId },
+                }).end()
               }
 
               return result
             } catch (error) {
-              if (signal?.aborted || !(error instanceof AlpacaProviderError) || error.reason !== 'transport') throw error
+              if (signal?.aborted || !(error instanceof AlpacaProviderError) || error.reason !== 'transport')
+                throw error
 
               if (!interrupted) {
                 interrupted = true
                 onReadState?.('retrying')
-                trace.getTracer('@vela/alpaca').startSpan('alpaca.capture.read-interrupted', { attributes: {
-                  'alpaca.device.id': cameraId, 'alpaca.read.endpoint': error.endpoint ?? '',
-                } }).end()
+                trace.getTracer('@vela/alpaca').startSpan('alpaca.capture.read-interrupted', {
+                  attributes: {
+                    'alpaca.device.id': cameraId,
+                    'alpaca.read.endpoint': error.endpoint ?? '',
+                  },
+                }).end()
               }
 
               await delay(readRetryIntervalMs, undefined, signal === undefined ? {} : { signal })
@@ -342,7 +416,8 @@ export function createAlpacaAcquisition({ baseUrl, fetch = globalThis.fetch, req
           const elapsed = (performance.now() - startedAt) / 1000
           const cameraState = await client.readNumber(exposedCamera, 'camerastate', signal)
 
-          if (!Number.isInteger(cameraState) || cameraState < 0 || cameraState > 5) invalid('Invalid camera activity state', 'camerastate')
+          if (!Number.isInteger(cameraState) || cameraState < 0 || cameraState > 5)
+            invalid('Invalid camera activity state', 'camerastate')
 
           if (cameraState === 5) throw new Error('Camera reported an exposure error')
 
@@ -359,22 +434,31 @@ export function createAlpacaAcquisition({ baseUrl, fetch = globalThis.fetch, req
 
         const stamp = await observe(() => exposureStart(exposedCamera, signal))
 
-        if (stamp === undefined && !observedNotReady) invalid('Camera exposure freshness is unconfirmed without a timestamp or image-ready transition', 'imageready')
+        if (stamp === undefined && !observedNotReady)
+          invalid('Camera exposure freshness is unconfirmed without a timestamp or image-ready transition', 'imageready')
 
-        if (stamp !== undefined && stamp === previousStart) invalid('Camera returned the previous exposure; freshness is unconfirmed', 'lastexposurestarttime')
-        const capturedAt = stamp === undefined ? requestedAt : stamp.endsWith('Z') ? stamp : `${stamp}Z`
+        if (stamp !== undefined && stamp === previousStart)
+          invalid('Camera returned the previous exposure; freshness is unconfirmed', 'lastexposurestarttime')
 
-        if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/.test(capturedAt) || !Number.isFinite(Date.parse(capturedAt))) invalid('Invalid exposure UTC timestamp', 'lastexposurestarttime')
+        const capturedAt = stamp === undefined
+          ? requestedAt
+          : stamp.endsWith('Z') ? stamp : `${stamp}Z`
+
+        if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/.test(capturedAt) || !Number.isFinite(Date.parse(capturedAt)))
+          invalid('Invalid exposure UTC timestamp', 'lastexposurestarttime')
         onReadout?.()
 
         const frame = await observe(async () => {
-          if (!(await client.readBoolean(exposedCamera, 'imageready', signal))) throw new Error('The completed exposure is no longer available')
+          if (!(await client.readBoolean(exposedCamera, 'imageready', signal)))
+            throw new Error('The completed exposure is no longer available')
 
-          if (await exposureStart(exposedCamera, signal) !== stamp) throw new Error('Exposure changed before image transfer; freshness is unconfirmed')
+          if (await exposureStart(exposedCamera, signal) !== stamp)
+            throw new Error('Exposure changed before image transfer; freshness is unconfirmed')
           const image = await client.image(exposedCamera, signal)
 
           if (!(await client.readBoolean(exposedCamera, 'imageready', signal))
-            || await exposureStart(exposedCamera, signal) !== stamp) throw new Error('Exposure changed during image transfer; freshness is unconfirmed')
+            || await exposureStart(exposedCamera, signal) !== stamp)
+            throw new Error('Exposure changed during image transfer; freshness is unconfirmed')
 
           return decodeFrame(image, width, height, capturedAt, color)
         })
@@ -411,7 +495,14 @@ export function createAlpacaAcquisition({ baseUrl, fetch = globalThis.fetch, req
 
       if (coordinateSystem === undefined) invalid('Invalid equatorial coordinate system', 'equatorialsystem')
 
-      return { rightAscensionDegrees: ra * 15, declinationDegrees: dec, siderealTimeDegrees: sidereal * 15, latitudeDegrees: latitude, tracking, coordinateSystem }
+      return {
+        rightAscensionDegrees: ra * 15,
+        declinationDegrees: dec,
+        siderealTimeDegrees: sidereal * 15,
+        latitudeDegrees: latitude,
+        tracking,
+        coordinateSystem,
+      }
     },
 
     async move(telescopeId, rateDegreesPerSecond, durationSeconds, signal) {
@@ -471,7 +562,10 @@ export function createAlpacaAcquisition({ baseUrl, fetch = globalThis.fetch, req
               if (travelled < -1) throw new Error('Telescope RA moved in the opposite direction')
 
               if (travelled >= Math.abs(distanceDegrees)) {
-                span.addEvent('alpaca.rotation.threshold', { 'alpaca.ra.degrees': current, 'alpaca.ra.travelled_degrees': travelled })
+                span.addEvent('alpaca.rotation.threshold', {
+                  'alpaca.ra.degrees': current,
+                  'alpaca.ra.travelled_degrees': travelled,
+                })
                 break
               }
             }

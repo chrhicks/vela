@@ -79,14 +79,30 @@ export class SimulatorRuntime {
   private updated: number
   private joint = 30
   private declination = 60
-  private slew: { start: number; duration: number; ra: number; dec: number; deltaRa: number; deltaDec: number } | undefined
+  private slew: {
+    start: number
+    duration: number
+    ra: number
+    dec: number
+    deltaRa: number
+    deltaDec: number
+  } | undefined
   private rate = 0
   private tracking = true
   private altitude = 480
   private azimuth = -360
   private obscured = false
   private telescopeConnected = false
-  private cameras: Camera[] = [0, 1].map(() => ({ connected: false, resolution: 'full', seed: 0, exposure: undefined, completed: undefined, rendering: undefined, cancellation: undefined }))
+  private cameras: Camera[] = [0, 1].map(() => ({
+    connected: false,
+    resolution: 'full',
+    seed: 0,
+    exposure: undefined,
+    completed: undefined,
+    rendering: undefined,
+    cancellation: undefined,
+  }))
+
   private camera(number = 0) {
     const camera = this.cameras[number]
 
@@ -98,10 +114,16 @@ export class SimulatorRuntime {
     this.advance()
     const camera = this.camera(number)
 
-    return { number, connected: camera.connected, activity: camera.exposure ? 'exposing' : 'idle',
-      imageReady: !!camera.completed, sensor: number === 0 ? 'mono' : 'rggb', resolution: camera.resolution,
+    return {
+      number,
+      connected: camera.connected,
+      activity: camera.exposure ? 'exposing' : 'idle',
+      imageReady: !!camera.completed,
+      sensor: number === 0 ? 'mono' : 'rggb',
+      resolution: camera.resolution,
       width: cameraGeometry(camera.resolution).width,
-      height: cameraGeometry(camera.resolution).height }
+      height: cameraGeometry(camera.resolution).height,
+    }
   }
   configureCamera(number: number, resolution: 'fast' | 'full') {
     this.advance()
@@ -115,7 +137,10 @@ export class SimulatorRuntime {
     this.abortExposure(number)
     camera.resolution = resolution
   }
-  constructor(private readonly stars: readonly Star[] | StarSource, private readonly now: () => number = () => performance.now()) {
+  constructor(
+    private readonly stars: readonly Star[] | StarSource,
+    private readonly now: () => number = () => performance.now(),
+  ) {
     this.epoch = this.updated = now()
   }
   private advance() {
@@ -133,7 +158,9 @@ export class SimulatorRuntime {
         this.slew = undefined
       }
     } else {
-      this.joint += seconds * (this.rate !== 0 ? this.rate : this.tracking ? -siderealDegreesPerSecond : 0)
+      this.joint += seconds * (this.rate !== 0
+        ? this.rate
+        : this.tracking ? -siderealDegreesPerSecond : 0)
     }
 
     this.updated = time
@@ -154,24 +181,37 @@ export class SimulatorRuntime {
     return (this.elapsed() * siderealDegreesPerSecond / 15) % 24
   }
   private pose() {
-    return cameraPose({ latitudeDegrees: 40, altitudeErrorDegrees: this.altitude / 3600,
-      azimuthErrorDegrees: this.azimuth / 3600, raAxisDegrees: this.joint,
-      declinationDegrees: this.declination, elapsedSeconds: this.elapsed(), tracking: false })
+    return cameraPose({
+      latitudeDegrees: 40,
+      altitudeErrorDegrees: this.altitude / 3600,
+      azimuthErrorDegrees: this.azimuth / 3600,
+      raAxisDegrees: this.joint,
+      declinationDegrees: this.declination,
+      elapsedSeconds: this.elapsed(),
+      tracking: false,
+    })
   }
   state(): SimulatorState {
     this.advance()
     const cameras = this.cameras.map((_, number) => this.cameraState(number))
     const mono = cameras[0]!
 
-    return { altitudeArcsec: this.altitude, azimuthArcsec: this.azimuth, obscured: this.obscured,
-      cameras, cameraConnected: mono.connected, telescopeConnected: this.telescopeConnected,
-      cameraActivity: mono.activity, imageReady: mono.imageReady,
+    return {
+      altitudeArcsec: this.altitude,
+      azimuthArcsec: this.azimuth,
+      obscured: this.obscured,
+      cameras,
+      cameraConnected: mono.connected,
+      telescopeConnected: this.telescopeConnected,
+      cameraActivity: mono.activity,
+      imageReady: mono.imageReady,
       tracking: this.rate === 0 && this.tracking,
       slewing: !!this.slew || this.rate !== 0,
       raAxisDegrees: this.joint + this.elapsed() * siderealDegreesPerSecond,
       raRateDegreesPerSecond: this.rate,
       rightAscensionHours: normalizeDegrees(this.joint + this.elapsed() * siderealDegreesPerSecond) / 15,
-      declinationDegrees: this.declination }
+      declinationDegrees: this.declination,
+    }
   }
   connect(device: 'camera' | 'telescope', connected: boolean, number = 0) {
     this.advance()
@@ -187,19 +227,23 @@ export class SimulatorRuntime {
     }
   }
   requireConnected(device: 'camera' | 'telescope', number = 0) {
-    if (!(device === 'camera' ? this.camera(number).connected : this.telescopeConnected)) throw new SimulatorError(0x407, `${device} is disconnected`)
+    if (!(device === 'camera' ? this.camera(number).connected : this.telescopeConnected))
+      throw new SimulatorError(0x407, `${device} is disconnected`)
   }
   private requireIdle() {
     this.advance()
 
-    if (this.cameras.some(camera => camera.exposure)) throw new SimulatorError(0x40b, 'An exposure is in progress')
+    if (this.cameras.some(camera => camera.exposure))
+      throw new SimulatorError(0x40b, 'An exposure is in progress')
   }
   adjust(altitude: number, azimuth: number) {
     this.requireIdle()
 
-    if (this.slew || this.rate !== 0) throw new SimulatorError(0x40b, 'Stop mount movement before adjusting the mount')
+    if (this.slew || this.rate !== 0)
+      throw new SimulatorError(0x40b, 'Stop mount movement before adjusting the mount')
 
-    if (![altitude, azimuth].every(value => Number.isFinite(value) && Math.abs(value) <= 18000)) throw new SimulatorError(0x401, 'Offsets must be within ±18000 arcseconds')
+    if (![altitude, azimuth].every(value => Number.isFinite(value) && Math.abs(value) <= 18000))
+      throw new SimulatorError(0x401, 'Offsets must be within ±18000 arcseconds')
     this.altitude = altitude
     this.azimuth = azimuth
   }
@@ -232,7 +276,8 @@ export class SimulatorRuntime {
   setTracking(tracking: boolean) {
     this.requireIdle()
 
-    if (this.rate !== 0 || this.slew) throw new SimulatorError(0x40b, 'Stop mount movement before changing tracking')
+    if (this.rate !== 0 || this.slew)
+      throw new SimulatorError(0x40b, 'Stop mount movement before changing tracking')
     this.tracking = tracking
   }
   move(rate: number) {
@@ -240,7 +285,8 @@ export class SimulatorRuntime {
 
     if (rate !== 0) this.requireIdle()
 
-    if (!Number.isFinite(rate) || Math.abs(rate) > 1.5) throw new SimulatorError(0x401, 'RA rate must be within ±1.5 degrees per second')
+    if (!Number.isFinite(rate) || Math.abs(rate) > 1.5)
+      throw new SimulatorError(0x401, 'RA rate must be within ±1.5 degrees per second')
 
     if (this.slew) throw new SimulatorError(0x40b, 'Stop coordinate slew before moving an axis')
     this.rate = rate
@@ -253,7 +299,8 @@ export class SimulatorRuntime {
       throw new SimulatorError(0x401, 'Slew coordinates must be RA [0, 24) hours and Dec [-90, 90] degrees')
     }
 
-    if (this.slew || this.rate !== 0) throw new SimulatorError(0x40b, 'Stop mount movement before starting a slew')
+    if (this.slew || this.rate !== 0)
+      throw new SimulatorError(0x40b, 'Stop mount movement before starting a slew')
 
     if (!this.tracking) throw new SimulatorError(0x40b, 'Equatorial slew requires tracking')
     const ra = normalizeDegrees(this.joint + this.elapsed() * siderealDegreesPerSecond)
@@ -262,7 +309,14 @@ export class SimulatorRuntime {
     const duration = Math.max(Math.abs(deltaRa), Math.abs(deltaDec)) / slewDegreesPerSecond * 1000
 
     if (duration === 0) return
-    this.slew = { start: this.updated, duration, ra, dec: this.declination, deltaRa, deltaDec }
+    this.slew = {
+      start: this.updated,
+      duration,
+      ra,
+      dec: this.declination,
+      deltaRa,
+      deltaDec,
+    }
   }
   stop() {
     this.advance()
@@ -275,7 +329,8 @@ export class SimulatorRuntime {
 
     if (camera.exposure) throw new SimulatorError(0x40b, 'An exposure is in progress')
 
-    if (!Number.isFinite(duration) || duration < 0 || duration > 3600) throw new SimulatorError(0x401, 'Exposure duration must be between 0 and 3600 seconds')
+    if (!Number.isFinite(duration) || duration < 0 || duration > 3600)
+      throw new SimulatorError(0x401, 'Exposure duration must be between 0 and 3600 seconds')
 
     if (this.rate !== 0 || this.slew) throw new SimulatorError(0x40b, 'Stop mount movement before exposing')
     // The rendered field must fit wholly inside the provisioned catalog patch.
@@ -294,8 +349,16 @@ export class SimulatorRuntime {
     }
 
     this.abortExposure(number)
-    camera.exposure = { start: this.updated, duration, timestamp: new Date().toISOString().replace(/Z$/, ''),
-      pose, obscured: this.obscured || !light, seed: ++camera.seed, width, height }
+    camera.exposure = {
+      start: this.updated,
+      duration,
+      timestamp: new Date().toISOString().replace(/Z$/, ''),
+      pose,
+      obscured: this.obscured || !light,
+      seed: ++camera.seed,
+      width,
+      height,
+    }
   }
   abortExposure(number = 0) {
     const camera = this.camera(number)
@@ -331,19 +394,25 @@ export class SimulatorRuntime {
           * Math.hypot(exposure.width / exposure.height, 1)) * 180 / Math.PI
           + fieldHeightDegrees / exposure.height * 12
 
-        const stars = !isFixedCatalog(this.stars) ? await this.stars({
-          raDegrees: normalizeDegrees(Math.atan2(direction[1], direction[0]) * 180 / Math.PI),
-          decDegrees: Math.asin(direction[2]) * 180 / Math.PI,
-          radiusDegrees,
-        }, signal) : this.stars
+        const stars = !isFixedCatalog(this.stars)
+          ? await this.stars({
+              raDegrees: normalizeDegrees(Math.atan2(direction[1], direction[0]) * 180 / Math.PI),
+              decDegrees: Math.asin(direction[2]) * 180 / Math.PI,
+              radiusDegrees,
+            }, signal)
+          : this.stars
 
         assertCurrent()
         signal.throwIfAborted()
 
         return renderSkyAsync(stars, exposure.pose, {
-          width: exposure.width, height: exposure.height, fieldHeightDegrees,
-          seed: exposure.seed, obscured: exposure.obscured,
-          sensor: number === 0 ? 'monochrome' : 'rggb', exposureSeconds: exposure.duration,
+          width: exposure.width,
+          height: exposure.height,
+          fieldHeightDegrees,
+          seed: exposure.seed,
+          obscured: exposure.obscured,
+          sensor: number === 0 ? 'monochrome' : 'rggb',
+          exposureSeconds: exposure.duration,
         }, signal)
       })()
     }
