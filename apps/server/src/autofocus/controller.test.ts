@@ -5,7 +5,11 @@ import { hyperbola } from './hyperbola.js'
 function deferred<T>() {
   let resolve!: (value: T) => void
   let reject!: (error: Error) => void
-  const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no })
+
+  const promise = new Promise<T>((yes, no) => {
+    resolve = yes
+    reject = no
+  })
 
   return { promise, resolve, reject }
 }
@@ -58,7 +62,13 @@ function setup(start = 32842, maxStep = 60000, { holdMoves = false, holdFinalMea
       signal.addEventListener('abort', abort, { once: true })
       await gate.promise.finally(() => signal.removeEventListener('abort', abort))
 
-      return { width: 8, height: 8, pixels: new Float64Array(64), capturedAt: '2026-09-17T00:00:00.000Z', color: { kind: 'mono' as const } }
+      return {
+        width: 8,
+        height: 8,
+        pixels: new Float64Array(64),
+        capturedAt: '2026-09-17T00:00:00.000Z',
+        color: { kind: 'mono' as const },
+      }
     },
   }
 
@@ -94,7 +104,18 @@ function setup(start = 32842, maxStep = 60000, { holdMoves = false, holdFinalMea
     await controller.stop()
   })
 
-  return { controller, focuser, camera, moves, land, arrive, captures, finalMeasurement, measuringFinal, position: () => position }
+  return {
+    controller,
+    focuser,
+    camera,
+    moves,
+    land,
+    arrive,
+    captures,
+    finalMeasurement,
+    measuringFinal,
+    position: () => position,
+  }
 }
 
 it.each([
@@ -124,14 +145,28 @@ it.each([
   cleanup.reject(failure)
   await stopping
   expect(controller.snapshot()).toMatchObject({
-    phase: 'failed', active: false, currentPosition: 32842, restoredStart: true, error: failure.message, captureReadState: 'current',
+    phase: 'failed',
+    active: false,
+    currentPosition: 32842,
+    restoredStart: true,
+    error: failure.message,
+    captureReadState: 'current',
   })
   expect(moves.at(-1)).toBe(32842)
   expect(released).toHaveBeenCalledOnce()
 })
 
 it('restores start when Stop arrives while the final confirmation measurement is pending', async () => {
-  const { controller, camera, focuser, land, moves, finalMeasurement, measuringFinal } = setup(32842, 60000, { holdFinalMeasurement: true })
+  const {
+    controller,
+    camera,
+    focuser,
+    land,
+    moves,
+    finalMeasurement,
+    measuringFinal,
+  } = setup(32842, 60000, { holdFinalMeasurement: true })
+
   await controller.start(camera, focuser)
 
   for (let count = 0; count < 10; count++) await land()
@@ -143,7 +178,13 @@ it('restores start when Stop arrives while the final confirmation measurement is
   expect(controller.snapshot()).toMatchObject({ activity: 'stopping', active: true })
   finalMeasurement.resolve()
   await stopping
-  expect(controller.snapshot()).toMatchObject({ phase: 'stopped', active: false, currentPosition: 32842, restoredStart: true, error: null })
+  expect(controller.snapshot()).toMatchObject({
+    phase: 'stopped',
+    active: false,
+    currentPosition: 32842,
+    restoredStart: true,
+    error: null,
+  })
   expect(moves.at(-1)).toBe(32842)
 })
 
@@ -202,7 +243,14 @@ it('holds the current sample and lease through read recovery, then restores star
   const pending = captures[0]!
   const exposureStartedAt = controller.snapshot().exposureStartedAt
   pending.onReadState('retrying')
-  expect(controller.snapshot()).toMatchObject({ active: true, phase: 'walking', activity: 'exposing', captureReadState: 'retrying', samples: prior, exposureStartedAt })
+  expect(controller.snapshot()).toMatchObject({
+    active: true,
+    phase: 'walking',
+    activity: 'exposing',
+    captureReadState: 'retrying',
+    samples: prior,
+    exposureStartedAt,
+  })
   expect(released).not.toHaveBeenCalled()
   pending.onReadState('current')
   expect(controller.snapshot()).toMatchObject({ captureReadState: 'current', activity: 'exposing', samples: prior, exposureStartedAt })
@@ -220,7 +268,13 @@ it('holds the current sample and lease through read recovery, then restores star
   expect(controller.snapshot()).toMatchObject({ activity: 'stopping', captureReadState: 'current' })
   await stopped
   last.onReadState('retrying')
-  expect(controller.snapshot()).toMatchObject({ active: false, phase: 'stopped', captureReadState: 'current', currentPosition: 32842, restoredStart: true })
+  expect(controller.snapshot()).toMatchObject({
+    active: false,
+    phase: 'stopped',
+    captureReadState: 'current',
+    currentPosition: 32842,
+    restoredStart: true,
+  })
   expect(controller.snapshot().samples).toHaveLength(2)
   expect(moves.at(-1)).toBe(32842)
   expect(released).toHaveBeenCalledOnce()
@@ -229,7 +283,13 @@ it('holds the current sample and lease through read recovery, then restores star
 it('aborts a window that would approach 0 without moving', async () => {
   const { controller, camera, focuser, moves } = setup(80)
   const view = await controller.start(camera, focuser, { stepSize: 50, offsetSteps: 4 })
-  expect(view).toMatchObject({ phase: 'setup', active: false, startPosition: null, currentPosition: 80, restoredStart: false })
+  expect(view).toMatchObject({
+    phase: 'setup',
+    active: false,
+    startPosition: null,
+    currentPosition: 80,
+    restoredStart: false,
+  })
   expect(view.error).toMatch(/MaxStep|0/)
   expect(moves).toEqual([])
 })
@@ -237,7 +297,13 @@ it('aborts a window that would approach 0 without moving', async () => {
 it('reports a start at position 0 as setup with an error and does not command Move(0)', async () => {
   const { controller, camera, focuser, moves } = setup(0)
   const view = await controller.start(camera, focuser, { stepSize: 50, offsetSteps: 4 })
-  expect(view).toMatchObject({ phase: 'setup', active: false, startPosition: null, currentPosition: 0, restoredStart: false })
+  expect(view).toMatchObject({
+    phase: 'setup',
+    active: false,
+    startPosition: null,
+    currentPosition: 0,
+    restoredStart: false,
+  })
   expect(view.error).toMatch(/mechanical limit/)
   expect(moves).toEqual([])
 })
@@ -246,7 +312,13 @@ it('returns to setup when the focuser is not absolute, instead of leftover walki
   const { controller, camera, focuser, moves } = setup()
   focuser.status = async () => ({ absolute: false, position: 32842, maxStep: 60000, moving: false })
   const view = await controller.start(camera, focuser)
-  expect(view).toMatchObject({ phase: 'setup', active: false, startPosition: null, currentPosition: 32842, restoredStart: false })
+  expect(view).toMatchObject({
+    phase: 'setup',
+    active: false,
+    startPosition: null,
+    currentPosition: 32842,
+    restoredStart: false,
+  })
   expect(view.error).toMatch(/absolute/)
   expect(moves).toEqual([])
 })

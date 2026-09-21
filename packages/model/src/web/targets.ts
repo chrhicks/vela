@@ -1,5 +1,8 @@
 /** Catalog and framing positions are fixed J2000 equatorial degrees. */
-export interface TargetPosition { raDegrees: number, decDegrees: number }
+export interface TargetPosition {
+  raDegrees: number
+  decDegrees: number
+}
 
 export interface TargetView extends TargetPosition {
   id: string
@@ -43,7 +46,13 @@ export interface TargetsView {
   siteUnavailableReason: string | null
 }
 
-export type TargetCategory = 'emission' | 'reflection-dark' | 'galaxy' | 'cluster' | 'planetary' | 'other'
+export type TargetCategory =
+  | 'emission'
+  | 'reflection-dark'
+  | 'galaxy'
+  | 'cluster'
+  | 'planetary'
+  | 'other'
 
 export type TargetFilterChoice = 'dual-band' | 'broadband' | 'uncertain'
 
@@ -71,7 +80,11 @@ export interface TargetDiscoveryView {
   snapshotId: string
   calculatedAt: string
   status: 'available' | 'site-unavailable' | 'no-darkness'
-  night: { startsAt: string, endsAt: string, kind: 'current-night' | 'upcoming-night' | 'polar-night' } | null
+  night: {
+    startsAt: string
+    endsAt: string
+    kind: 'current-night' | 'upcoming-night' | 'polar-night'
+  } | null
   site: { latitudeDegrees: number, longitudeDegrees: number } | null
   siteUnavailableReason: string | null
   query: string
@@ -117,7 +130,18 @@ export interface FramingView {
     fieldWidthDegrees: number
     fieldHeightDegrees: number
   } | null
-  phase: 'idle' | 'slewing' | 'settling' | 'exposing' | 'downloading' | 'solving' | 'checked' | 'needs-check' | 'stopping' | 'stopped' | 'failed'
+  phase:
+    | 'idle'
+    | 'slewing'
+    | 'settling'
+    | 'exposing'
+    | 'downloading'
+    | 'solving'
+    | 'checked'
+    | 'needs-check'
+    | 'stopping'
+    | 'stopped'
+    | 'failed'
   /** Interrupted reads of the same exposure; current does not imply image completion. */
   captureReadState: 'current' | 'retrying'
   active: boolean

@@ -8,9 +8,16 @@ import { createAstapSolver, projectSky } from './solver.js'
 
 const directories: string[] = []
 
-afterEach(async () => { await Promise.all(directories.splice(0).map(path => rm(path, { recursive: true, force: true }))) })
+afterEach(async () => {
+  await Promise.all(directories.splice(0).map(path => rm(path, { recursive: true, force: true })))
+})
 
-const frame = { width: 2, height: 2, pixels: [0, 65535, 123, 20], capturedAt: '2026-09-05T01:00:00Z' }
+const frame = {
+  width: 2,
+  height: 2,
+  pixels: [0, 65535, 123, 20],
+  capturedAt: '2026-09-05T01:00:00Z',
+}
 
 const hint = { raDegrees: 30, decDegrees: 60 }
 
@@ -25,7 +32,12 @@ async function fixture(body: string, timeoutMs = 3000) {
   const script = `#!${process.execPath}\nconst fs = require('node:fs')\nconst path = process.argv[process.argv.indexOf('-f') + 1]\nfs.writeFileSync(${JSON.stringify(marker)}, path)\nfs.appendFileSync(${JSON.stringify(attempts)}, JSON.stringify({ path, args: process.argv.slice(2), hash: require('node:crypto').createHash('sha256').update(fs.readFileSync(path)).digest('hex') }) + '\\n')\n${body}\n`
   await writeFile(executable, script, { mode: 0o755 })
 
-  return { root, marker, attempts, solver: createAstapSolver({ executable, catalogPath: root, fieldHeightDegrees: 3, timeoutMs }) }
+  return {
+    root,
+    marker,
+    attempts,
+    solver: createAstapSolver({ executable, catalogPath: root, fieldHeightDegrees: 3, timeoutMs }),
+  }
 }
 
 it('sends lossless unsigned-16 FITS, normalizes a solved center and removes per-exposure artifacts', async () => {
@@ -66,7 +78,9 @@ it('cancels a running solver and removes its scratch directory after process ter
   const controller = new AbortController()
   const result = solver.solve(frame, hint, controller.signal)
   const rejected = expect(result).rejects.toThrow('operator stopped')
-  await vi.waitFor(async () => { expect(await readFile(marker, 'utf8')).toContain('exposure.fits') })
+  await vi.waitFor(async () => {
+    expect(await readFile(marker, 'utf8')).toContain('exposure.fits')
+  })
   controller.abort(new Error('operator stopped'))
   await rejected
   expect(await readAttempts(attempts)).toHaveLength(1)
@@ -86,7 +100,11 @@ it('preserves negative acquisition samples and tells ASTAP to check a Bayer expo
 if (image.readInt32BE(2880) !== -40 || !image.subarray(0,2880).toString().includes("'GBRG'") || process.argv[process.argv.indexOf('-check') + 1] !== 'y') process.exit(16)
 fs.writeFileSync(path.replace('.fits','.ini'), ${JSON.stringify(ini)})`)
 
-  await expect(solver.solve({ ...frame, pixels: [-40, 65535, 1, 2], color: { kind: 'bayer', pattern: 'gbrg' } }, hint, new AbortController().signal)).resolves.toMatchObject({ status: 'solved' })
+  await expect(solver.solve(
+    { ...frame, pixels: [-40, 65535, 1, 2], color: { kind: 'bayer', pattern: 'gbrg' } },
+    hint,
+    new AbortController().signal,
+  )).resolves.toMatchObject({ status: 'solved' })
 })
 
 
@@ -160,7 +178,9 @@ fs.writeFileSync(path.replace('.fits','.ini'), ${JSON.stringify(ini)})`)
   expect(calls.map(call => call.args[call.args.indexOf('-r') + 1])).toEqual(['10', '15', '30'])
   expect(new Set(calls.map(call => call.path)).size).toBe(1)
   expect(new Set(calls.map(call => call.hash)).size).toBe(1)
-  expect(new Set(calls.map(call => JSON.stringify(call.args.map((arg, index, args) => args[index - 1] === '-r' ? 'radius' : arg)))).size).toBe(1)
+  expect(new Set(calls.map(call => JSON.stringify(
+    call.args.map((arg, index, args) => args[index - 1] === '-r' ? 'radius' : arg),
+  ))).size).toBe(1)
 })
 
 it('searches through the full sky for no-match but never retries insufficient stars or process errors', async () => {

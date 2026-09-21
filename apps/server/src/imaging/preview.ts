@@ -7,20 +7,31 @@ import { backgroundOffsets, linkedRange } from './background.js'
 /** A display stretch at native dimensions; acquisition pixels remain unchanged. */
 export type ImageColor = { kind: 'mono' } | { kind: 'bayer', pattern: BayerPattern }
 
-export async function previewPng(width: number, height: number, pixels: ArrayLike<number>, color: ImageColor = { kind: 'mono' }): Promise<Buffer> {
+export async function previewPng(
+  width: number,
+  height: number,
+  pixels: ArrayLike<number>,
+  color: ImageColor = { kind: 'mono' },
+): Promise<Buffer> {
   const { data, channels } = await stretch(width, height, pixels, color)
 
   return encodePng(width, height, channels, data)
 }
 
-export async function capturePreviews(width: number, height: number, pixels: ArrayLike<number>, color: ImageColor = { kind: 'mono' }) {
+export async function capturePreviews(
+  width: number,
+  height: number,
+  pixels: ArrayLike<number>,
+  color: ImageColor = { kind: 'mono' },
+) {
   const { data, channels } = await stretch(width, height, pixels, color)
   const native = await encodePng(width, height, channels, data)
   const factor = Math.ceil(Math.max(width, height) / 1600)
 
   if (factor <= 1) return { native, fit: undefined }
 
-  const fitWidth = Math.ceil(width / factor), fitHeight = Math.ceil(height / factor)
+  const fitWidth = Math.ceil(width / factor)
+  const fitHeight = Math.ceil(height / factor)
   const fitStride = fitWidth * channels + 1
   const nativeStride = width * channels + 1
   const fitted = Buffer.alloc(fitStride * fitHeight)
@@ -30,14 +41,17 @@ export async function capturePreviews(width: number, height: number, pixels: Arr
     if (y % 16 === 0) await setImmediate()
 
     for (let x = 0; x < fitWidth; x++) {
-      const xEnd = Math.min(width, (x + 1) * factor), yEnd = Math.min(height, (y + 1) * factor)
+      const xEnd = Math.min(width, (x + 1) * factor)
+      const yEnd = Math.min(height, (y + 1) * factor)
       const count = (xEnd - x * factor) * (yEnd - y * factor)
 
       for (let channel = 0; channel < channels; channel++) {
         let sum = 0
 
-        for (let sy = y * factor; sy < yEnd; sy++) for (let sx = x * factor; sx < xEnd; sx++) {
-          sum += data[sy * nativeStride + sx * channels + channel + 1]!
+        for (let sy = y * factor; sy < yEnd; sy++) {
+          for (let sx = x * factor; sx < xEnd; sx++) {
+            sum += data[sy * nativeStride + sx * channels + channel + 1]!
+          }
         }
 
         fitted[y * fitStride + x * channels + channel + 1] = Math.round(sum / count)
@@ -48,7 +62,12 @@ export async function capturePreviews(width: number, height: number, pixels: Arr
   return { native, fit: await encodePng(fitWidth, fitHeight, channels, fitted) }
 }
 
-async function stretch(width: number, height: number, pixels: ArrayLike<number>, color: ImageColor) {
+async function stretch(
+  width: number,
+  height: number,
+  pixels: ArrayLike<number>,
+  color: ImageColor,
+) {
   const range = linkedRange(pixels)
   const { offsets } = backgroundOffsets({ width, height, pixels, color }, range)
   const display = await createDisplayStretch(range.black, range.ceiling)
@@ -61,7 +80,9 @@ async function stretch(width: number, height: number, pixels: ArrayLike<number>,
     if (y % 16 === 0) await setImmediate()
 
     for (let x = 0; x < width; x++) {
-      const rgb = color.kind === 'bayer' ? bayerPixel(width, height, pixels, color.pattern, x, y) : [pixels[y * width + x]!]
+      const rgb = color.kind === 'bayer'
+        ? bayerPixel(width, height, pixels, color.pattern, x, y)
+        : [pixels[y * width + x]!]
 
       for (let channel = 0; channel < channels; channel++) {
         data[y * stride + x * channels + channel + 1] = display(rgb[channel]! - offsets[channel]!)

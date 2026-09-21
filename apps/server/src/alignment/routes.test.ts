@@ -11,29 +11,56 @@ import { createRigOperations } from '../rig/operations.js'
 import { alignmentSettings, registerAlignment } from './routes.js'
 
 const initialState: AlignmentView = {
-  rigId: '', rigName: '', active: false, enabled: true, unavailableReason: null,
-  phase: 'setup', activity: 'idle', position: 0, solvedPositions: 0, exposureSeconds: 2,
-  exposureStartedAt: null, measuredAt: null, warning: null, error: null, measurement: null,
+  rigId: '',
+  rigName: '',
+  active: false,
+  enabled: true,
+  unavailableReason: null,
+  phase: 'setup',
+  activity: 'idle',
+  position: 0,
+  solvedPositions: 0,
+  exposureSeconds: 2,
+  exposureStartedAt: null,
+  measuredAt: null,
+  warning: null,
+  error: null,
+  measurement: null,
 }
 
 const mocks = {
-  acquisition: vi.fn(createAlpacaAcquisition), framing: vi.fn(createAlpacaFraming),
-  physical: vi.fn(createPhysicalAlignment), solver: vi.fn(createAstapSolver), controller: vi.fn(createAlignmentController),
+  acquisition: vi.fn(createAlpacaAcquisition),
+  framing: vi.fn(createAlpacaFraming),
+  physical: vi.fn(createPhysicalAlignment),
+  solver: vi.fn(createAstapSolver),
+  controller: vi.fn(createAlignmentController),
   start: vi.fn<ReturnType<typeof createAlignmentController>['start']>(),
   stop: vi.fn<ReturnType<typeof createAlignmentController>['stop']>(),
   state: initialState,
 }
 
-const env = { VELA_ALIGNMENT_ENDPOINT: 'http://mount:11111', VELA_ALIGNMENT_CAMERA_ID: 'camera',
-  VELA_ALIGNMENT_TELESCOPE_ID: 'telescope', VELA_ASTAP: '/bin/astap', VELA_STAR_CATALOG: '/stars' }
+const env = {
+  VELA_ALIGNMENT_ENDPOINT: 'http://mount:11111',
+  VELA_ALIGNMENT_CAMERA_ID: 'camera',
+  VELA_ALIGNMENT_TELESCOPE_ID: 'telescope',
+  VELA_ASTAP: '/bin/astap',
+  VELA_STAR_CATALOG: '/stars',
+}
 
 const rig: RigCatalogRecord = {
-  id: 'rig', name: 'FRA', endpoint: { host: 'mount', port: 11111 },
-  imagingCamera: { uniqueId: 'camera', name: 'Current imager' }, focalLengthMm: 400,
-  addedAt: '2026-09-09T00:00:00Z', lastObservedInventory: { observedAt: '2026-09-09T00:00:00Z', devices: [
-    { uniqueId: 'camera', kind: 'camera', name: 'Old inventory name' },
-    { uniqueId: 'telescope', kind: 'telescope', name: 'Mount' },
-  ] },
+  id: 'rig',
+  name: 'FRA',
+  endpoint: { host: 'mount', port: 11111 },
+  imagingCamera: { uniqueId: 'camera', name: 'Current imager' },
+  focalLengthMm: 400,
+  addedAt: '2026-09-09T00:00:00Z',
+  lastObservedInventory: {
+    observedAt: '2026-09-09T00:00:00Z',
+    devices: [
+      { uniqueId: 'camera', kind: 'camera', name: 'Old inventory name' },
+      { uniqueId: 'telescope', kind: 'telescope', name: 'Mount' },
+    ],
+  },
 }
 
 const { imagingCamera: _camera, ...withoutCamera } = rig
@@ -66,22 +93,51 @@ beforeEach(() => {
 
     return mocks.state
   })
-  mocks.controller.mockImplementation(() => ({ snapshot: () => ({ ...mocks.state }), active: () => mocks.state.active,
-    start: mocks.start, stop: mocks.stop, image: () => undefined }))
+  mocks.controller.mockImplementation(() => ({
+    snapshot: () => ({ ...mocks.state }),
+    active: () => mocks.state.active,
+    start: mocks.start,
+    stop: mocks.stop,
+    image: () => undefined,
+  }))
 })
 
 afterEach(async () => { await Promise.all(apps.splice(0).map(app => app.close())) })
 
-function setup(records = [rig], configured = true, mode: 'physical' | 'offline' = 'physical', diagnosticsPath?: string) {
+function setup(
+  records = [rig],
+  configured = true,
+  mode: 'physical' | 'offline' = 'physical',
+  diagnosticsPath?: string,
+) {
   const app = Fastify()
   apps.push(app)
   const catalog = createMemoryRigCatalog(records)
   const operations = createRigOperations()
-  registerAlignment(app, catalog, configured ? alignmentSettings({ ...env, VELA_ALIGNMENT_MODE: mode,
-    VELA_ALIGNMENT_DIAGNOSTICS_PATH: diagnosticsPath }) : undefined, operations, mocks)
+  registerAlignment(
+    app,
+    catalog,
+    configured
+      ? alignmentSettings({
+        ...env,
+        VELA_ALIGNMENT_MODE: mode,
+        VELA_ALIGNMENT_DIAGNOSTICS_PATH: diagnosticsPath,
+      })
+      : undefined,
+    operations,
+    mocks,
+  )
 
-  const command = (name: string, rigId = 'rig', payload: null | string | readonly string[] | { exposureSeconds?: number } = {}) => app.inject({ method: 'POST',
-    url: `/api/rigs/${rigId}/alignment/${name}`, headers: { 'content-type': 'application/json' }, payload: JSON.stringify(payload) })
+  const command = (
+    name: string,
+    rigId = 'rig',
+    payload: null | string | readonly string[] | { exposureSeconds?: number } = {},
+  ) => app.inject({
+    method: 'POST',
+    url: `/api/rigs/${rigId}/alignment/${name}`,
+    headers: { 'content-type': 'application/json' },
+    payload: JSON.stringify(payload),
+  })
 
   return { app, catalog, operations, command }
 }
@@ -89,8 +145,13 @@ function setup(records = [rig], configured = true, mode: 'physical' | 'offline' 
 describe('alignment environment settings', () => {
   it('remains unavailable without an explicit endpoint', () => { expect(alignmentSettings({})).toBeUndefined() })
   it.each([undefined, 'offline', 'physical'])('accepts configured mode %s', mode => {
-    expect(alignmentSettings({ ...env, VELA_ALIGNMENT_MODE: mode })).toMatchObject({ endpoint: env.VELA_ALIGNMENT_ENDPOINT,
-      cameraId: 'camera', telescopeId: 'telescope', executable: '/bin/astap', catalogPath: '/stars' })
+    expect(alignmentSettings({ ...env, VELA_ALIGNMENT_MODE: mode })).toMatchObject({
+      endpoint: env.VELA_ALIGNMENT_ENDPOINT,
+      cameraId: 'camera',
+      telescopeId: 'telescope',
+      executable: '/bin/astap',
+      catalogPath: '/stars',
+    })
     expect(alignmentSettings({ ...env, VELA_ALIGNMENT_MODE: mode })?.mode).toBe(mode === 'physical' ? 'physical' : undefined)
   })
   it.each(['https://mount:11111', 'http://mount:11111/api', 'http://user:pass@mount:11111', 'http://mount:11111/?x=1'])('rejects invalid endpoint %s', endpoint => {
@@ -155,7 +216,16 @@ describe('alignment routes', () => {
     await catalog.setImagingCamera('rig', { uniqueId: 'camera', name: 'Updated imager' })
     await catalog.setFocalLength('rig', 320)
     expect((await command('start')).statusCode).toBe(200)
-    expect(mocks.physical).toHaveBeenCalledWith({ cameraId: 'camera', telescopeId: 'telescope', cameraName: 'Updated imager', focalLengthMm: 320 }, mocks.acquisition.mock.results[0]!.value, mocks.framing.mock.results[0]!.value)
+    expect(mocks.physical).toHaveBeenCalledWith(
+      {
+        cameraId: 'camera',
+        telescopeId: 'telescope',
+        cameraName: 'Updated imager',
+        focalLengthMm: 320,
+      },
+      mocks.acquisition.mock.results[0]!.value,
+      mocks.framing.mock.results[0]!.value,
+    )
     const [composition] = mocks.controller.mock.calls[0]!
 
     if (composition.mode !== 'physical') throw new Error('Expected physical composition')

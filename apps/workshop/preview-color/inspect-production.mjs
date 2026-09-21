@@ -53,7 +53,13 @@ try {
     await page.getByRole('button', { name: '100%', exact: true }).click()
     await page.waitForFunction(() => [...document.querySelectorAll('img')].some(image => image.src.endsWith('/background-v1/preview') && image.complete && image.naturalWidth === 6248))
     await page.screenshot({ path: new URL(`${fixture.key}-saved-native-desktop.png`, output).pathname, fullPage: true })
-    evidence.push({ fixture: fixture.key, originalSha256: hash(original), approvedNativeSha256: hash(native), approvedFitSha256: hash(fit), downloadMatchesDisplay: true })
+    evidence.push({
+      fixture: fixture.key,
+      originalSha256: hash(original),
+      approvedNativeSha256: hash(native),
+      approvedFitSha256: hash(fit),
+      downloadMatchesDisplay: true
+    })
   }
 
   await page.goto(`${base}${prefix}/saved-images/unsupported-review-fixture`)
@@ -92,7 +98,13 @@ try {
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
   await page.screenshot({ path: new URL('cooled-saved-phone.png', output).pathname, fullPage: true })
   assert.deepEqual(errors, [])
-  await writeFile(new URL('production-results.json', output), JSON.stringify({ evidence, freshCaptureId: capture.latestImage.id, freshCaptureMatchesApprovedB: true, statisticsUnchanged: capture.latestImage.statistics, errors }, null, 2))
+  await writeFile(new URL('production-results.json', output), JSON.stringify({
+    evidence,
+    freshCaptureId: capture.latestImage.id,
+    freshCaptureMatchesApprovedB: true,
+    statisticsUnchanged: capture.latestImage.statistics,
+    errors
+  }, null, 2))
   console.log(JSON.stringify({ checkedRetained: evidence.length, freshCaptureId: capture.latestImage.id, errors }, null, 2))
 } catch (error) {
   console.error('Failed URL:', page.url(), errors)

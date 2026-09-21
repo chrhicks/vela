@@ -27,14 +27,26 @@ function LightPreview({ props, onPropsChange }: { props: Props; onPropsChange?: 
   const target = String(values.target)
   const samples = getSkySamples(target, 12, 97, 15).map((sample, index) => ({ ...sample, light: phaseAt(index) }))
 
-  return <div className="vela-sky-path-specimen">
-    <p className="vela-sky-path-specimen__caption">Sample day and night · invented light windows</p>
-    <SkyPath samples={samples} targetName={target === 'm13' ? 'Hercules Cluster' : 'Andromeda'} selectedIndex={Number(values.selectedIndex)} onSelectedIndexChange={selectedIndex => update({ selectedIndex })} nowIndex={0} compact={Boolean(values.compact)} />
-  </div>
+  return (
+    <div className="vela-sky-path-specimen">
+      <p className="vela-sky-path-specimen__caption">Sample day and night · invented light windows</p>
+      <SkyPath
+        samples={samples}
+        targetName={target === 'm13' ? 'Hercules Cluster' : 'Andromeda'}
+        selectedIndex={Number(values.selectedIndex)}
+        onSelectedIndexChange={selectedIndex => update({ selectedIndex })}
+        nowIndex={0}
+        compact={Boolean(values.compact)}
+      />
+    </div>
+  )
 }
 
 export const specimen: ComponentSpecimen = {
-  componentId: 'sky-path', componentName: 'Sky path', id: 'sky-path-light-windows', name: 'Light windows',
+  componentId: 'sky-path',
+  componentName: 'Sky path',
+  id: 'sky-path-light-windows',
+  name: 'Light windows',
   description: 'Colored target-path segments distinguish daylight, twilight stages and astronomical darkness. Invented 24-hour fixtures; no production solar data.',
   controls: {
     target: { type: 'select', label: 'Target', options: ['m13', 'andromeda'] },

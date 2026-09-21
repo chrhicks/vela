@@ -34,16 +34,23 @@ for (const [name, altitudeArcsec, azimuthArcsec] of [
 
   for (let index = 0; index < 3; index++) {
     const position: MountPosition = {
-      latitudeDegrees: 40, altitudeErrorDegrees: altitudeArcsec / 3600,
-      azimuthErrorDegrees: azimuthArcsec / 3600, raAxisDegrees: 10 + index * 20,
-      declinationDegrees: 60, elapsedSeconds: index * 45, tracking: true,
+      latitudeDegrees: 40,
+      altitudeErrorDegrees: altitudeArcsec / 3600,
+      azimuthErrorDegrees: azimuthArcsec / 3600,
+      raAxisDegrees: 10 + index * 20,
+      declinationDegrees: 60,
+      elapsedSeconds: index * 45,
+      tracking: true,
     }
 
     const pose = cameraPose(position)
     const path = join(output, `${name}-${index}.fits`)
 
     const pixels = renderSky(stars, pose, {
-      width: 1600, height: 1200, fieldHeightDegrees: 3, seed: index + 42,
+      width: 1600,
+      height: 1200,
+      fieldHeightDegrees: 3,
+      seed: index + 42,
     })
 
     await writeFile(path, writeFits(1600, 1200, pixels))
@@ -52,13 +59,20 @@ for (const [name, altitudeArcsec, azimuthArcsec] of [
     const angle = -position.elapsedSeconds * siderealRadiansPerSecond
     points.push([
       measured[0] * Math.cos(angle) - measured[1] * Math.sin(angle),
-      measured[0] * Math.sin(angle) + measured[1] * Math.cos(angle), measured[2],
+      measured[0] * Math.sin(angle) + measured[1] * Math.cos(angle),
+      measured[2],
     ])
   }
 
   const a = subtract(points[1]!, points[0]!)
   const b = subtract(points[2]!, points[0]!)
-  let axis: Vector = [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
+
+  let axis: Vector = [
+    a[1] * b[2] - a[2] * b[1],
+    a[2] * b[0] - a[0] * b[2],
+    a[0] * b[1] - a[1] * b[0],
+  ]
+
   const length = Math.hypot(...axis) * (axis[2] < 0 ? -1 : 1)
   axis = [axis[0] / length, axis[1] / length, axis[2] / length]
   const latitude = 40 * radians
@@ -80,12 +94,22 @@ for (const [name, altitudeArcsec, azimuthArcsec] of [
 // A failed exposure must exercise the solver, not inject a solved=false shortcut.
 const obscuredPath = join(output, 'obscured.fits')
 
-const pose = cameraPose({ latitudeDegrees: 40, altitudeErrorDegrees: 0,
-  azimuthErrorDegrees: 0, raAxisDegrees: 30, declinationDegrees: 60,
-  elapsedSeconds: 0, tracking: true })
+const pose = cameraPose({
+  latitudeDegrees: 40,
+  altitudeErrorDegrees: 0,
+  azimuthErrorDegrees: 0,
+  raAxisDegrees: 30,
+  declinationDegrees: 60,
+  elapsedSeconds: 0,
+  tracking: true,
+})
 
 await writeFile(obscuredPath, writeFits(1600, 1200, renderSky(stars, pose, {
-  width: 1600, height: 1200, fieldHeightDegrees: 3, seed: 99, obscured: true,
+  width: 1600,
+  height: 1200,
+  fieldHeightDegrees: 3,
+  seed: 99,
+  obscured: true,
 })))
 
 const obscured = await invokeSolver(obscuredPath, pose.direction)
@@ -128,8 +152,14 @@ async function invokeSolver(path: string, hint: Vector) {
   const ra = (Math.atan2(hint[1], hint[0]) / radians + 360) % 360
   const dec = Math.asin(hint[2]) / radians
 
-  const args = ['-f', path, '-d', resolve(catalogPath!), '-fov', '3',
-    '-ra', String(ra / 15 + 0.05), '-spd', String(dec + 90.3), '-r', '5']
+  const args = [
+    '-f', path,
+    '-d', resolve(catalogPath!),
+    '-fov', '3',
+    '-ra', String(ra / 15 + 0.05),
+    '-spd', String(dec + 90.3),
+    '-r', '5',
+  ]
 
   try {
     const result = await run(resolve(solverPath!), args, { timeout: 30_000 })
@@ -137,7 +167,11 @@ async function invokeSolver(path: string, hint: Vector) {
 
     return { code: 0, stdout: result.stdout }
   } catch (error) {
-    const result = z.object({ code: z.number(), stdout: z.string().optional(), stderr: z.string().optional() }).safeParse(error)
+    const result = z.object({
+      code: z.number(),
+      stdout: z.string().optional(),
+      stderr: z.string().optional(),
+    }).safeParse(error)
 
     if (!result.success) throw error
     const failure = result.data

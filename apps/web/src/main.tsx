@@ -20,7 +20,14 @@ const router = createBrowserRouter([
     path: '/',
     Component: Shell,
     children: [
-      { index: true, Component: () => <HomeProvider><Home /></HomeProvider> },
+      {
+        index: true,
+        Component: () => (
+          <HomeProvider>
+            <Home />
+          </HomeProvider>
+        ),
+      },
       { path: 'rigs/:rigId', Component: RigDetail },
       { path: 'rigs/:rigId/observe', Component: Observe },
       { path: 'rigs/:rigId/observe/targets', Component: Targets },

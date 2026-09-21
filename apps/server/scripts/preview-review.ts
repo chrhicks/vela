@@ -36,7 +36,9 @@ for (const fixture of corpus) {
   if (await stat(resolve(destination, 'metadata.json')).catch(() => undefined)) continue
   await mkdir(destination, { recursive: true })
 
-  for (const file of ['original.fits', 'preview.png', 'fit.png', 'metadata.json']) await copyFile(resolve(sourcePath(fixture.id), file), resolve(destination, file))
+  for (const file of ['original.fits', 'preview.png', 'fit.png', 'metadata.json']) {
+    await copyFile(resolve(sourcePath(fixture.id), file), resolve(destination, file))
+  }
 }
 
 const store = await openFileSavedImageStore(savedPath)
@@ -50,9 +52,15 @@ const frame = await readRetainedFits(original)
 const cameraName = 'Offline replay of 47d1a817 · no hardware'
 
 const rig = {
-  id: rigId, name: 'Preview review · retained-frame replay', endpoint: { host: '127.0.0.1', port: 1 },
-  imagingCamera: { uniqueId: 'replay', name: cameraName }, addedAt: '2026-09-21T00:00:00.000Z',
-  lastObservedInventory: { observedAt: '2026-09-21T00:00:00.000Z', devices: [{ uniqueId: 'replay', kind: 'camera' as const, name: cameraName }] },
+  id: rigId,
+  name: 'Preview review · retained-frame replay',
+  endpoint: { host: '127.0.0.1', port: 1 },
+  imagingCamera: { uniqueId: 'replay', name: cameraName },
+  addedAt: '2026-09-21T00:00:00.000Z',
+  lastObservedInventory: {
+    observedAt: '2026-09-21T00:00:00.000Z',
+    devices: [{ uniqueId: 'replay', kind: 'camera' as const, name: cameraName }],
+  },
 }
 
 const catalog = createMemoryRigCatalog([rig])
@@ -61,19 +69,41 @@ const app = Fastify()
 
 const capture = registerCapture(app, catalog, createRigOperations(), {
   savedImages: store,
-  createInspector: () => ({ async inspectDevices() {
-    return [{ providerDeviceId: 'replay', kind: 'camera' as const, configuredName: cameraName, name: cameraName, connection: 'connected' as const,
-      telemetry: { availability: 'complete' as const, values: { kind: 'camera' as const, activity: 'idle' as const } } }]
-  } }),
-  createCamera: () => ({ async capture({ signal, onProgress }) {
-    onProgress({ phase: 'exposing', elapsedSeconds: 0 })
+  createInspector: () => ({
+    async inspectDevices() {
+      return [{
+        providerDeviceId: 'replay',
+        kind: 'camera' as const,
+        configuredName: cameraName,
+        name: cameraName,
+        connection: 'connected' as const,
+        telemetry: {
+          availability: 'complete' as const,
+          values: { kind: 'camera' as const, activity: 'idle' as const },
+        },
+      }]
+    },
+  }),
+  createCamera: () => ({
+    async capture({ signal, onProgress }) {
+      onProgress({ phase: 'exposing', elapsedSeconds: 0 })
 
-    try { await setTimeout(400, undefined, { signal }) }
-    catch { throw new CaptureStoppedError() }
+      try {
+        await setTimeout(400, undefined, { signal })
+      } catch {
+        throw new CaptureStoppedError()
+      }
 
-    return { ...frame, capturedAt: new Date().toISOString(), capturedAtSource: 'server-estimate' as const }
-  } }),
-  createCooling: () => { throw new Error('Cooling is unavailable in the device-free preview review') },
+      return {
+        ...frame,
+        capturedAt: new Date().toISOString(),
+        capturedAtSource: 'server-estimate' as const,
+      }
+    },
+  }),
+  createCooling: () => {
+    throw new Error('Cooling is unavailable in the device-free preview review')
+  },
 })
 
 registerSavedImages(app, catalog, store)
@@ -86,11 +116,19 @@ const cooled = await store.get(rigId, cooledId)
 
 if (!cooled) throw new Error('Missing copied cooled fixture')
 
-await store.save(rigId, { ...cooled, id: 'unsupported-review-fixture', cameraName: 'Unsupported original · review fixture' }, {
-  fits: Buffer.from('Deliberately unsupported review-only file; no retained original modified.'),
-  native: await readFile(resolve(sourcePath(cooledId), 'preview.png')),
-  fit: await readFile(resolve(sourcePath(cooledId), 'fit.png')),
-})
+await store.save(
+  rigId,
+  {
+    ...cooled,
+    id: 'unsupported-review-fixture',
+    cameraName: 'Unsupported original · review fixture',
+  },
+  {
+    fits: Buffer.from('Deliberately unsupported review-only file; no retained original modified.'),
+    native: await readFile(resolve(sourcePath(cooledId), 'preview.png')),
+    fit: await readFile(resolve(sourcePath(cooledId), 'fit.png')),
+  },
+)
 
 await app.listen({ host: '127.0.0.1', port: 5192 })
 

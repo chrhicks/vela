@@ -2,40 +2,125 @@ import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import type { FramingCentering, FramingView, TargetView } from '@vela/model/web'
 
-const target: TargetView = { id: 'm31', name: 'Andromeda Galaxy', catalog: 'M31', kind: 'Galaxy', raDegrees: 10.6847, decDegrees: 41.269, sizeArcminutes: 178, thumbnailUrl: '/api/targets/m31/thumbnail', sky: null }
+const target: TargetView = {
+  id: 'm31',
+  name: 'Andromeda Galaxy',
+  catalog: 'M31',
+  kind: 'Galaxy',
+  raDegrees: 10.6847,
+  decDegrees: 41.269,
+  sizeArcminutes: 178,
+  thumbnailUrl: '/api/targets/m31/thumbnail',
+  sky: null,
+}
 
-const sample = (correction: number, offsetArcminutes: number, trend: FramingCentering['measurements'][number]['trend']): FramingCentering['measurements'][number] => ({ correction, offsetArcminutes, trend, checkId: `check-${correction}`, capturedAt: new Date().toISOString(), rotationDegrees: 32, pointingSide: 'east', pointingSideChanged: correction === 1 })
+const sample = (
+  correction: number,
+  offsetArcminutes: number,
+  trend: FramingCentering['measurements'][number]['trend'],
+): FramingCentering['measurements'][number] => ({
+  correction,
+  offsetArcminutes,
+  trend,
+  checkId: `check-${correction}`,
+  capturedAt: new Date().toISOString(),
+  rotationDegrees: 32,
+  pointingSide: 'east',
+  pointingSideChanged: correction === 1,
+})
 
 function initial(): FramingView {
   return {
     captureReadState: 'current',
-    rigId: 'rig-1', rigName: 'Test rig', enabled: true, unavailableReason: null, observedAt: new Date().toISOString(),
-    focalLengthMm: 400, camera: { name: 'Test camera', width: 3000, height: 2000, fieldWidthDegrees: 3, fieldHeightDegrees: 2 },
-    phase: 'checked', active: false, desired: target, targetId: target.id, error: null, exposureSeconds: 20,
-    canCenter: true, checkCurrent: true, pointingSide: 'unknown', centering: null,
-    actual: { ...target, ...sample(0, 42.4, 'starting'), corners: [{ raDegrees: 9, decDegrees: 40 }, { raDegrees: 11, decDegrees: 40 }, { raDegrees: 11, decDegrees: 42 }, { raDegrees: 9, decDegrees: 42 }] },
+    rigId: 'rig-1',
+    rigName: 'Test rig',
+    enabled: true,
+    unavailableReason: null,
+    observedAt: new Date().toISOString(),
+    focalLengthMm: 400,
+    camera: {
+      name: 'Test camera',
+      width: 3000,
+      height: 2000,
+      fieldWidthDegrees: 3,
+      fieldHeightDegrees: 2,
+    },
+    phase: 'checked',
+    active: false,
+    desired: target,
+    targetId: target.id,
+    error: null,
+    exposureSeconds: 20,
+    canCenter: true,
+    checkCurrent: true,
+    pointingSide: 'unknown',
+    centering: null,
+    actual: {
+      ...target,
+      ...sample(0, 42.4, 'starting'),
+      corners: [
+        { raDegrees: 9, decDegrees: 40 },
+        { raDegrees: 11, decDegrees: 40 },
+        { raDegrees: 11, decDegrees: 42 },
+        { raDegrees: 9, decDegrees: 42 },
+      ],
+    },
   }
 }
 
 async function rig(page: Page) {
   const commands: string[] = []
   const rig = { state: initial(), offline: false, stale: false, commands }
-  const response = () => JSON.stringify({ ...rig.state, observedAt: new Date(Date.now() - (rig.stale ? 60000 : 0)).toISOString() })
+
+  const response = () => JSON.stringify({
+    ...rig.state,
+    observedAt: new Date(Date.now() - (rig.stale ? 60000 : 0)).toISOString(),
+  })
+
   await page.route('**/api/web/rigs/rig-1/targets/m31', route => route.fulfill({ json: target }))
   await page.route('**/api/survey/**', route => route.abort())
-  await page.route('**/api/web/rigs/rig-1/framing', route => rig.offline ? route.abort() : route.fulfill({ contentType: 'application/json', body: response() }))
+  await page.route('**/api/web/rigs/rig-1/framing', route => rig.offline
+    ? route.abort()
+    : route.fulfill({ contentType: 'application/json', body: response() }))
   await page.route('**/api/rigs/rig-1/framing/*', route => {
     const action = route.request().url().split('/').at(-1)!
     rig.commands.push(action)
 
     if (action === 'center') {
-      expect(route.request().postDataJSON()).toEqual({ checkId: 'check-0', raDegrees: target.raDegrees, decDegrees: target.decDegrees })
-      rig.state = { ...rig.state, active: true, phase: 'exposing', checkCurrent: false, canCenter: false,
-        centering: { toleranceArcminutes: .5, maxCorrections: 4, correction: 1, outcome: 'working', measurements: [sample(0, 42.4, 'starting')] } }
+      expect(route.request().postDataJSON()).toEqual({
+        checkId: 'check-0',
+        raDegrees: target.raDegrees,
+        decDegrees: target.decDegrees,
+      })
+      rig.state = {
+        ...rig.state,
+        active: true,
+        phase: 'exposing',
+        checkCurrent: false,
+        canCenter: false,
+        centering: {
+          toleranceArcminutes: .5,
+          maxCorrections: 4,
+          correction: 1,
+          outcome: 'working',
+          measurements: [sample(0, 42.4, 'starting')],
+        },
+      }
     } else if (action === 'stop') {
-      rig.state = { ...rig.state, active: false, phase: 'stopped', centering: { ...rig.state.centering!, outcome: 'interrupted' } }
+      rig.state = {
+        ...rig.state,
+        active: false,
+        phase: 'stopped',
+        centering: { ...rig.state.centering!, outcome: 'interrupted' },
+      }
     } else if (action === 'check') {
-      rig.state = { ...rig.state, active: true, phase: 'exposing', centering: null, checkCurrent: false }
+      rig.state = {
+        ...rig.state,
+        active: true,
+        phase: 'exposing',
+        centering: null,
+        checkCurrent: false,
+      }
     }
 
     return route.fulfill({ contentType: 'application/json', body: response() })
@@ -60,8 +145,20 @@ for (const width of [1280, 390]) {
     device.state = { ...device.state, phase: 'solving' }
     await expect(status).toContainText('Measuring the new framing')
     const final = sample(1, .35, 'within-tolerance')
-    device.state = { ...device.state, active: false, phase: 'checked', checkCurrent: true, canCenter: true, pointingSide: 'east',
-      actual: { ...device.state.actual!, ...final }, centering: { ...device.state.centering!, outcome: 'centered', measurements: [sample(0, 42.4, 'starting'), final] } }
+    device.state = {
+      ...device.state,
+      active: false,
+      phase: 'checked',
+      checkCurrent: true,
+      canCenter: true,
+      pointingSide: 'east',
+      actual: { ...device.state.actual!, ...final },
+      centering: {
+        ...device.state.centering!,
+        outcome: 'centered',
+        measurements: [sample(0, 42.4, 'starting'), final],
+      },
+    }
     await expect(status).toContainText('Composition centered')
     await expect(page.locator('.vela-target-offset > strong')).toHaveText('0.35′')
     await expect(page.getByRole('region', { name: 'Centering measurements' }).getByRole('listitem')).toHaveCount(2)
@@ -89,10 +186,34 @@ for (const outcome of ['not-converging', 'limit-reached'] as const) {
     await page.getByRole('button', { name: 'Center composition', exact: true }).click()
     await expect(page.locator('.vela-target-status')).toContainText('Taking a 20-second test exposure')
     const offsets = outcome === 'not-converging' ? [42.4, 53.8, 67.1] : [42.4, 20, 10, 5, 2]
-    const measurements = offsets.map((offset, correction) => sample(correction, offset, correction === 0 ? 'starting' : outcome === 'not-converging' ? 'worsened' : 'improved'))
-    device.state = { ...device.state, phase: 'checked', active: false, checkCurrent: true, canCenter: false,
-      actual: { ...device.state.actual!, ...measurements.at(-1)! }, centering: { ...device.state.centering!, correction: measurements.length - 1, outcome, measurements } }
-    await expect(page.locator('.vela-target-status')).toContainText(outcome === 'not-converging' ? 'Centering is not converging' : 'Centering correction limit reached')
+
+    const measurements = offsets.map((offset, correction) => sample(
+      correction,
+      offset,
+      correction === 0
+        ? 'starting'
+        : outcome === 'not-converging' ? 'worsened' : 'improved',
+    ))
+
+    device.state = {
+      ...device.state,
+      phase: 'checked',
+      active: false,
+      checkCurrent: true,
+      canCenter: false,
+      actual: { ...device.state.actual!, ...measurements.at(-1)! },
+      centering: {
+        ...device.state.centering!,
+        correction: measurements.length - 1,
+        outcome,
+        measurements,
+      },
+    }
+    await expect(page.locator('.vela-target-status')).toContainText(
+      outcome === 'not-converging'
+        ? 'Centering is not converging'
+        : 'Centering correction limit reached',
+    )
     await expect(page.getByRole('button', { name: 'Center composition', exact: true })).toBeDisabled()
     await expect(page.getByRole('link', { name: 'Continue to capture' })).toBeVisible()
     await page.getByRole('button', { name: 'Check current frame', exact: true }).click()
@@ -159,14 +280,36 @@ test('an uncertain centering response shows neither animation nor success until 
 test('an already-close frame requires the fresh no-movement recheck to confirm centered', async ({ page }) => {
   const device = await rig(page)
   const before = sample(0, .35, 'starting')
-  device.state = { ...device.state, active: true, phase: 'exposing', checkCurrent: false, canCenter: false,
+  device.state = {
+    ...device.state,
+    active: true,
+    phase: 'exposing',
+    checkCurrent: false,
+    canCenter: false,
     actual: { ...device.state.actual!, ...before },
-    centering: { toleranceArcminutes: .5, maxCorrections: 4, correction: 0, outcome: 'working', measurements: [before] } }
+    centering: {
+      toleranceArcminutes: .5,
+      maxCorrections: 4,
+      correction: 0,
+      outcome: 'working',
+      measurements: [before],
+    },
+  }
   await expect(page.locator('.vela-target-status')).toContainText('Checking the current frame before any correction')
   await expect(page.getByText('Composition centered', { exact: true })).toHaveCount(0)
   const after = { ...sample(0, .4, 'within-tolerance'), checkId: 'fresh-no-movement-check' }
-  device.state = { ...device.state, active: false, phase: 'checked', checkCurrent: true, actual: { ...device.state.actual!, ...after },
-    centering: { ...device.state.centering!, outcome: 'centered', measurements: [before, after] } }
+  device.state = {
+    ...device.state,
+    active: false,
+    phase: 'checked',
+    checkCurrent: true,
+    actual: { ...device.state.actual!, ...after },
+    centering: {
+      ...device.state.centering!,
+      outcome: 'centered',
+      measurements: [before, after],
+    },
+  }
   await expect(page.locator('.vela-target-status')).toContainText('Composition centered')
   const progress = page.getByRole('region', { name: 'Centering measurements' })
   await expect(progress.getByText('Recheck', { exact: true })).toBeVisible()

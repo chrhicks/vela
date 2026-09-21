@@ -22,7 +22,11 @@ describe('hyperbola focus fit', () => {
 
   it('ignores starless points and refuses a flat line', () => {
     expect(fitHyperbola([
-      { x: 1, y: 0 }, { x: 2, y: 0 }, { x: 3, y: 0 }, { x: 4, y: 0 }, { x: 5, y: 0 },
+      { x: 1, y: 0 },
+      { x: 2, y: 0 },
+      { x: 3, y: 0 },
+      { x: 4, y: 0 },
+      { x: 5, y: 0 },
     ])).toBeNull()
     const flat = [10, 20, 30, 40, 50, 60].map(x => ({ x, y: 2 }))
     const fit = fitHyperbola(flat)

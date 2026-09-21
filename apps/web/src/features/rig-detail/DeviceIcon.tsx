@@ -54,5 +54,9 @@ export function DeviceIcon({ kind }: { readonly kind: DeviceKind }) {
     )
   }
 
-  return <svg aria-hidden="true" fill="none" viewBox="0 0 20 20">{drawing}</svg>
+  return (
+    <svg aria-hidden="true" fill="none" viewBox="0 0 20 20">
+      {drawing}
+    </svg>
+  )
 }

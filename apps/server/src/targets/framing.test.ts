@@ -8,7 +8,11 @@ import { angularDistance } from './sky.js'
 function deferred<T>() {
   let resolve!: (value: T) => void
   let reject!: (error: Error) => void
-  const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no })
+
+  const promise = new Promise<T>((yes, no) => {
+    resolve = yes
+    reject = no
+  })
 
   return { promise, resolve, reject }
 }
@@ -18,8 +22,19 @@ const desired = { raDegrees: 10, decDegrees: 20 }
 const at = '2026-09-07T04:00:00Z'
 
 function solution(position = { raDegrees: 9, decDegrees: 20 }): SolveResult {
-  return { status: 'solved', ...position, capturedAt: at,
-    wcs: { width: 100, height: 80, referenceX: 50.5, referenceY: 40.5, ...position, cd: [-0.01, 0.002, 0.003, 0.01] } }
+  return {
+    status: 'solved',
+    ...position,
+    capturedAt: at,
+    wcs: {
+      width: 100,
+      height: 80,
+      referenceX: 50.5,
+      referenceY: 40.5,
+      ...position,
+      cd: [-0.01, 0.002, 0.003, 0.01],
+    },
+  }
 }
 
 function workshop(wait: (signal: AbortSignal) => Promise<void> = async signal => { signal.throwIfAborted() }) {
@@ -27,12 +42,25 @@ function workshop(wait: (signal: AbortSignal) => Promise<void> = async signal =>
   const controller = createFramingController(() => date, wait)
 
   const mount: FramingMount = {
-    rightAscensionDegrees: 10, declinationDegrees: 20, coordinateSystem: 'j2000', tracking: true,
-    slewing: false, parked: false, observedAt: at, latitudeDegrees: 40, longitudeDegrees: -75,
+    rightAscensionDegrees: 10,
+    declinationDegrees: 20,
+    coordinateSystem: 'j2000',
+    tracking: true,
+    slewing: false,
+    parked: false,
+    observedAt: at,
+    latitudeDegrees: 40,
+    longitudeDegrees: -75,
   }
 
   const slews: TargetPosition[] = []
-  const frame: MonoFrame = { width: 100, height: 80, pixels: new Float64Array(8000), capturedAt: at }
+
+  const frame: MonoFrame = {
+    width: 100,
+    height: 80,
+    pixels: new Float64Array(8000),
+    capturedAt: at,
+  }
 
   const hardware: FramingHardware = {
     status: vi.fn(async signal => {
@@ -40,7 +68,10 @@ function workshop(wait: (signal: AbortSignal) => Promise<void> = async signal =>
 
       return { ...mount }
     }),
-    tracking: vi.fn(async (enabled, signal) => { signal.throwIfAborted(); mount.tracking = enabled }),
+    tracking: vi.fn(async (enabled, signal) => {
+      signal.throwIfAborted()
+      mount.tracking = enabled
+    }),
     slew: vi.fn(async (position, _frame, signal) => {
       signal.throwIfAborted()
       slews.push(position)
@@ -56,15 +87,41 @@ function workshop(wait: (signal: AbortSignal) => Promise<void> = async signal =>
 
   const solver: PlateSolver = { solve: vi.fn(async () => solution()) }
 
-  const start = (input: { center?: boolean, check?: boolean, desired?: TargetPosition, configuration?: string } = {}) => {
+  const start = (input: {
+    center?: boolean
+    check?: boolean
+    desired?: TargetPosition
+    configuration?: string
+  } = {}) => {
     const finished = deferred<void>()
     const release = vi.fn(() => finished.resolve())
-    const initial = controller.start({ desired: input.desired ?? desired, targetId: 'target', exposureSeconds: 2, configuration: input.configuration ?? 'camera+mount+focal-length', action: input.check ? 'check' : input.center ? 'center' : 'start' }, hardware, solver, release)
+
+    const initial = controller.start(
+      {
+        desired: input.desired ?? desired,
+        targetId: 'target',
+        exposureSeconds: 2,
+        configuration: input.configuration ?? 'camera+mount+focal-length',
+        action: input.check ? 'check' : input.center ? 'center' : 'start',
+      },
+      hardware,
+      solver,
+      release,
+    )
 
     return { initial, release, finished: finished.promise }
   }
 
-  return { controller, hardware, solver, mount, slews, frame, start, advance: (milliseconds: number) => { date = new Date(date.getTime() + milliseconds) } }
+  return {
+    controller,
+    hardware,
+    solver,
+    mount,
+    slews,
+    frame,
+    start,
+    advance: (milliseconds: number) => { date = new Date(date.getTime() + milliseconds) },
+  }
 }
 
 describe('framing controller', () => {
@@ -98,7 +155,12 @@ describe('framing controller', () => {
     solve.resolve(solved)
     await run.finished
     const view = fake.controller.snapshot()
-    expect(view).toMatchObject({ phase: 'checked', active: false, error: null, actual: { raDegrees: 9, decDegrees: 20, capturedAt: at } })
+    expect(view).toMatchObject({
+      phase: 'checked',
+      active: false,
+      error: null,
+      actual: { raDegrees: 9, decDegrees: 20, capturedAt: at },
+    })
     expect(run.release).toHaveBeenCalledTimes(1)
     expect(fake.slews).toEqual([desired])
     expect(view.actual!.offsetArcminutes).toBeCloseTo(angularDistance(desired, { raDegrees: 9, decDegrees: 20 }) * 60, 10)
@@ -131,8 +193,19 @@ describe('framing controller', () => {
     const solved = solution()
 
     if (solved.status !== 'solved') throw new Error('Expected fixture')
-    solved.wcs = { ...solved.wcs, width: 2000, height: 1000, referenceX: 1000.5, referenceY: 500.5,
-      cd: [-0.001 * Math.cos(angle), -0.001 * Math.sin(angle), -0.001 * Math.sin(angle), 0.001 * Math.cos(angle)] }
+    solved.wcs = {
+      ...solved.wcs,
+      width: 2000,
+      height: 1000,
+      referenceX: 1000.5,
+      referenceY: 500.5,
+      cd: [
+        -0.001 * Math.cos(angle),
+        -0.001 * Math.sin(angle),
+        -0.001 * Math.sin(angle),
+        0.001 * Math.cos(angle),
+      ],
+    }
     fake.solver.solve = async () => solved
     await fake.start().finished
     const actual = fake.controller.snapshot().actual!
@@ -163,10 +236,21 @@ describe('framing controller', () => {
     const history = fake.controller.snapshot().centering
     pending.onReadout()
     pending.onReadState('retrying')
-    expect(fake.controller.snapshot()).toMatchObject({ active: true, phase: 'downloading', captureReadState: 'retrying', actual: previous, centering: history })
+    expect(fake.controller.snapshot()).toMatchObject({
+      active: true,
+      phase: 'downloading',
+      captureReadState: 'retrying',
+      actual: previous,
+      centering: history,
+    })
     expect(run.release).not.toHaveBeenCalled()
     pending.onReadState('current')
-    expect(fake.controller.snapshot()).toMatchObject({ phase: 'downloading', captureReadState: 'current', actual: previous, centering: history })
+    expect(fake.controller.snapshot()).toMatchObject({
+      phase: 'downloading',
+      captureReadState: 'current',
+      actual: previous,
+      centering: history,
+    })
     expect(fake.solver.solve).not.toHaveBeenCalled()
     expect(fake.hardware.capture).toHaveBeenCalledOnce()
     expect(fake.slews).toHaveLength(1)
@@ -174,7 +258,12 @@ describe('framing controller', () => {
     await run.finished
     pending.onReadState('retrying')
     pending.onReadout()
-    expect(fake.controller.snapshot()).toMatchObject({ phase: 'checked', captureReadState: 'current', active: false, centering: { outcome: 'centered', correction: 1 } })
+    expect(fake.controller.snapshot()).toMatchObject({
+      phase: 'checked',
+      captureReadState: 'current',
+      active: false,
+      centering: { outcome: 'centered', correction: 1 },
+    })
     expect(fake.controller.snapshot().centering?.measurements).toHaveLength(2)
     expect(run.release).toHaveBeenCalledOnce()
   })
@@ -205,8 +294,17 @@ describe('framing controller', () => {
     frame.reject(cleanup)
     await stopping
     pending.onReadState('retrying')
-    expect(fake.controller.snapshot()).toMatchObject({ active: false, phase, captureReadState: 'current', actual: previous,
-      centering: { outcome: 'interrupted', correction: 1, measurements: [expect.objectContaining({ checkId: previous!.checkId, capturedAt: previous!.capturedAt })] } })
+    expect(fake.controller.snapshot()).toMatchObject({
+      active: false,
+      phase,
+      captureReadState: 'current',
+      actual: previous,
+      centering: {
+        outcome: 'interrupted',
+        correction: 1,
+        measurements: [expect.objectContaining({ checkId: previous!.checkId, capturedAt: previous!.capturedAt })],
+      },
+    })
     expect(fake.hardware.capture).toHaveBeenCalledOnce()
     expect(fake.slews).toHaveLength(1)
     expect(run.release).toHaveBeenCalledOnce()
@@ -222,7 +320,12 @@ describe('framing controller', () => {
 
     const run = fake.start()
     await run.finished
-    expect(fake.controller.snapshot()).toMatchObject({ phase: failure === 'no-solution' ? 'needs-check' : 'failed', active: false, actual: null, error: expect.any(String) })
+    expect(fake.controller.snapshot()).toMatchObject({
+      phase: failure === 'no-solution' ? 'needs-check' : 'failed',
+      active: false,
+      actual: null,
+      error: expect.any(String),
+    })
     expect(fake.controller.canCenter(fake.mount, 'camera+mount+focal-length')).toBe(false)
     expect(fake.slews).toHaveLength(1)
     expect(run.release).toHaveBeenCalledTimes(1)
@@ -304,7 +407,10 @@ describe('framing controller', () => {
     const offsets = [42.4, 86.4, 8.95, 2.38, 0.35]
     fake.mount.pierSide = initialSide
     fake.solver.solve = vi.fn(async () => {
-      const solved = solution({ raDegrees: desired.raDegrees, decDegrees: desired.decDegrees + offsets[fake.slews.length]! / 60 })
+      const solved = solution({
+        raDegrees: desired.raDegrees,
+        decDegrees: desired.decDegrees + offsets[fake.slews.length]! / 60,
+      })
 
       if (solved.status === 'solved' && fake.slews.length > 0) solved.wcs.cd = [0.01, -0.002, -0.003, -0.01]
 
@@ -321,7 +427,11 @@ describe('framing controller', () => {
     const run = fake.start({ center: true })
     await run.finished
     const view = fake.controller.snapshot()
-    expect(view).toMatchObject({ phase: 'checked', active: false, centering: { outcome: 'centered', correction: 4, toleranceArcminutes: 0.5, maxCorrections: 4 } })
+    expect(view).toMatchObject({
+      phase: 'checked',
+      active: false,
+      centering: { outcome: 'centered', correction: 4, toleranceArcminutes: 0.5, maxCorrections: 4 },
+    })
     expect(fake.slews).toHaveLength(4)
     let commandedDec = desired.decDegrees
 
@@ -347,7 +457,10 @@ describe('framing controller', () => {
     { offsets: [42.4, 42.4, 42.4, 42.4, 42.4], outcome: 'limit-reached', moves: 4 },
   ])('bounds corrections and requires an explicit new check after $outcome ($offsets)', async ({ offsets, outcome, moves }) => {
     const fake = workshop()
-    fake.solver.solve = async () => solution({ raDegrees: desired.raDegrees, decDegrees: desired.decDegrees + offsets[fake.slews.length]! / 60 })
+    fake.solver.solve = async () => solution({
+      raDegrees: desired.raDegrees,
+      decDegrees: desired.decDegrees + offsets[fake.slews.length]! / 60,
+    })
     await fake.start({ check: true }).finished
     await fake.start({ center: true }).finished
     expect(fake.slews).toHaveLength(moves)
@@ -418,7 +531,14 @@ describe('framing controller', () => {
     }
 
     await run.finished
-    expect(fake.controller.snapshot()).toMatchObject({ active: false, centering: { outcome: 'interrupted', correction: 1, measurements: [expect.objectContaining({ trend: 'starting' })] } })
+    expect(fake.controller.snapshot()).toMatchObject({
+      active: false,
+      centering: {
+        outcome: 'interrupted',
+        correction: 1,
+        measurements: [expect.objectContaining({ trend: 'starting' })],
+      },
+    })
     expect(fake.hardware.slew).toHaveBeenCalledTimes(1)
     expect(fake.controller.canCenter(fake.mount, 'camera+mount+focal-length')).toBe(false)
     expect(run.release).toHaveBeenCalledTimes(1)
@@ -499,7 +619,10 @@ describe('framing controller', () => {
     const cleanup = deferred<void>()
     fake.hardware.slew = async (_position, _frame, signal) => {
       moving.resolve()
-      await new Promise<void>(resolve => signal.addEventListener('abort', () => { cancelled.resolve(); resolve() }, { once: true }))
+      await new Promise<void>(resolve => signal.addEventListener('abort', () => {
+        cancelled.resolve()
+        resolve()
+      }, { once: true }))
       await cleanup.promise
 
       if (failedCleanup) throw new Error('Telescope stop could not be confirmed')

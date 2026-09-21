@@ -60,58 +60,134 @@ function SimulatorPreview({ props, onPropsChange }: {
 
   return (
     <article className="vela-sim-demo">
-      <header className="vela-sim-heading"><div><p>Development rig</p><h1>Rig simulator</h1></div><span>Workshop preview</span></header>
+      <header className="vela-sim-heading">
+        <div>
+          <p>Development rig</p>
+          <h1>Rig simulator</h1>
+        </div>
+        <span>Workshop preview</span>
+      </header>
       <p className="vela-sim-intro">Adjust the rig here. Watch Vela respond in its own window.</p>
       <div className="vela-sim-layout">
         <Panel title="Adjust the mount" description="These controls stand in for the mount’s adjustment knobs.">
-          <Select label="Adjustment per press" value={step} onChange={event => setStep(event.target.value)} options={[
-            { value: '60', label: 'Coarse · 1 arcminute' }, { value: '5', label: 'Fine · 5 arcseconds' },
-          ]} />
+          <Select
+            label="Adjustment per press"
+            value={step}
+            onChange={event => setStep(event.target.value)}
+            options={[
+              { value: '60', label: 'Coarse · 1 arcminute' },
+              { value: '5', label: 'Fine · 5 arcseconds' },
+            ]}
+          />
           <div className="vela-sim-axes">
-            <section aria-label="Altitude adjustment"><div className="vela-sim-axis-heading"><h2>Altitude</h2><span>Vertical</span></div>
-              <strong>{offset(altitude)}</strong><p>{altitude === 0 ? 'At the pole’s altitude' : altitude > 0 ? 'Above the pole' : 'Below the pole'}</p>
-              <div className="vela-sim-buttons"><Button tone="neutral" disabled={altitude <= -18000} onClick={() => nudge('altitude', -1)}>↓ Lower</Button><Button tone="neutral" disabled={altitude >= 18000} onClick={() => nudge('altitude', 1)}>↑ Raise</Button></div>
+            <section aria-label="Altitude adjustment">
+              <div className="vela-sim-axis-heading">
+                <h2>Altitude</h2>
+                <span>Vertical</span>
+              </div>
+              <strong>{offset(altitude)}</strong>
+              <p>{altitude === 0 ? 'At the pole’s altitude' : altitude > 0 ? 'Above the pole' : 'Below the pole'}</p>
+              <div className="vela-sim-buttons">
+                <Button tone="neutral" disabled={altitude <= -18000} onClick={() => nudge('altitude', -1)}>↓ Lower</Button>
+                <Button tone="neutral" disabled={altitude >= 18000} onClick={() => nudge('altitude', 1)}>↑ Raise</Button>
+              </div>
             </section>
-            <section aria-label="Azimuth adjustment"><div className="vela-sim-axis-heading"><h2>Azimuth</h2><span>Horizontal</span></div>
-              <strong>{offset(azimuth)}</strong><p>{azimuth === 0 ? 'Pointing north' : azimuth > 0 ? 'East of north' : 'West of north'}</p>
-              <div className="vela-sim-buttons"><Button tone="neutral" disabled={azimuth <= -18000} onClick={() => nudge('azimuth', -1)}>← West</Button><Button tone="neutral" disabled={azimuth >= 18000} onClick={() => nudge('azimuth', 1)}>East →</Button></div>
+            <section aria-label="Azimuth adjustment">
+              <div className="vela-sim-axis-heading">
+                <h2>Azimuth</h2>
+                <span>Horizontal</span>
+              </div>
+              <strong>{offset(azimuth)}</strong>
+              <p>{azimuth === 0 ? 'Pointing north' : azimuth > 0 ? 'East of north' : 'West of north'}</p>
+              <div className="vela-sim-buttons">
+                <Button tone="neutral" disabled={azimuth <= -18000} onClick={() => nudge('azimuth', -1)}>← West</Button>
+                <Button tone="neutral" disabled={azimuth >= 18000} onClick={() => nudge('azimuth', 1)}>East →</Button>
+              </div>
             </section>
           </div>
           <p className="vela-sim-note">Actual simulated offsets, not Vela’s measured alignment error.</p>
           <div className="vela-sim-status" role="status">{notice}</div>
-          <details className="vela-sim-details"><summary onClick={() => {
-            setDraftAltitude(String(altitude))
-            setDraftAzimuth(String(azimuth))
-          }}>Set exact offsets</summary>
-            <form onSubmit={event => {
-              event.preventDefault()
-              const fields = new FormData(event.currentTarget)
-              const alt = Number(fields.get('altitude'))
-              const az = Number(fields.get('azimuth'))
+          <details className="vela-sim-details">
+            <summary
+              onClick={() => {
+                setDraftAltitude(String(altitude))
+                setDraftAzimuth(String(azimuth))
+              }}
+            >
+              Set exact offsets
+            </summary>
+            <form
+              onSubmit={event => {
+                event.preventDefault()
+                const fields = new FormData(event.currentTarget)
+                const alt = Number(fields.get('altitude'))
+                const az = Number(fields.get('azimuth'))
 
-              if (![alt, az].every(value => Number.isInteger(value) && Math.abs(value) <= 18000)) return
-              setAltitude(alt)
-              setAzimuth(az)
-              setNotice('Exact offsets applied · next exposure uses this position')
-            }}>
-              <Input name="altitude" required label="Altitude · arcseconds" type="number" min={-18000} max={18000} step={1} value={draftAltitude} onInput={event => setDraftAltitude(event.currentTarget.value)} message="Positive is above the pole." />
-              <Input name="azimuth" required label="Azimuth · arcseconds" type="number" min={-18000} max={18000} step={1} value={draftAzimuth} onInput={event => setDraftAzimuth(event.currentTarget.value)} message="Positive is east of north." />
+                if (![alt, az].every(value => Number.isInteger(value) && Math.abs(value) <= 18000)) return
+                setAltitude(alt)
+                setAzimuth(az)
+                setNotice('Exact offsets applied · next exposure uses this position')
+              }}
+            >
+              <Input
+                name="altitude"
+                required
+                label="Altitude · arcseconds"
+                type="number"
+                min={-18000}
+                max={18000}
+                step={1}
+                value={draftAltitude}
+                onInput={event => setDraftAltitude(event.currentTarget.value)}
+                message="Positive is above the pole."
+              />
+              <Input
+                name="azimuth"
+                required
+                label="Azimuth · arcseconds"
+                type="number"
+                min={-18000}
+                max={18000}
+                step={1}
+                value={draftAzimuth}
+                onInput={event => setDraftAzimuth(event.currentTarget.value)}
+                message="Positive is east of north."
+              />
               <Button type="submit" tone="neutral" disabled={!valid}>Apply offsets</Button>
             </form>
           </details>
         </Panel>
         <div className="vela-sim-side">
           <Panel title="Camera view" description="Try an exposure without visible stars.">
-            <div className="vela-sim-camera"><strong>{covered ? 'Obscured' : 'Clear sky'}</strong><p>{covered ? 'New exposures contain only background noise. A solve should fail.' : 'New exposures contain the generated star field.'}</p></div>
-            <Button tone="neutral" onClick={() => {
-              setCovered(!covered)
-              onPropsChange?.({ camera: covered ? 'clear' : 'obscured' })
-            }}>{covered ? 'Clear the camera' : 'Obscure the camera'}</Button>
+            <div className="vela-sim-camera">
+              <strong>{covered ? 'Obscured' : 'Clear sky'}</strong>
+              <p>
+                {covered
+                  ? 'New exposures contain only background noise. A solve should fail.'
+                  : 'New exposures contain the generated star field.'}
+              </p>
+            </div>
+            <Button
+              tone="neutral"
+              onClick={() => {
+                setCovered(!covered)
+                onPropsChange?.({ camera: covered ? 'clear' : 'obscured' })
+              }}
+            >
+              {covered ? 'Clear the camera' : 'Obscure the camera'}
+            </Button>
           </Panel>
           <Panel title="Start again" description="Return to a known setup for another attempt.">
-            <Select label="Starting position" value={example} onChange={event => setExample(z.enum(['large-error', 'near-aligned', 'aligned']).parse(event.target.value))} options={[
-              { value: 'large-error', label: 'Large error' }, { value: 'near-aligned', label: 'Nearly aligned' }, { value: 'aligned', label: 'Aligned' },
-            ]} />
+            <Select
+              label="Starting position"
+              value={example}
+              onChange={event => setExample(z.enum(['large-error', 'near-aligned', 'aligned']).parse(event.target.value))}
+              options={[
+                { value: 'large-error', label: 'Large error' },
+                { value: 'near-aligned', label: 'Nearly aligned' },
+                { value: 'aligned', label: 'Aligned' },
+              ]}
+            />
             <p className="vela-sim-note">Reset restores these offsets and clears the camera. Start a fresh alignment measurement in Vela afterward.</p>
             <Button tone="neutral" onClick={reset}>Reset rig</Button>
           </Panel>
@@ -123,7 +199,9 @@ function SimulatorPreview({ props, onPropsChange }: {
 }
 
 export const specimen: ComponentSpecimen = {
-  componentId: 'panel', componentName: 'Panel / Card', id: 'panel-rig-simulator',
+  componentId: 'panel',
+  componentName: 'Panel / Card',
+  id: 'panel-rig-simulator',
   name: 'Rig simulator · Product example',
   description: 'Separate simulator controls for mount adjustments, obscured imagery and reset. Local interactive fixtures only; no hardware or simulator service connected. Offsets describe simulation truth, not measured alignment.',
   controls: {

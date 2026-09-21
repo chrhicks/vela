@@ -6,7 +6,14 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   leadingIcon?: ReactNode
 }
 
-export function Button({ tone = 'neutral', size = 'medium', leadingIcon, children, className = '', ...props }: ButtonProps) {
+export function Button({
+  tone = 'neutral',
+  size = 'medium',
+  leadingIcon,
+  children,
+  className = '',
+  ...props
+}: ButtonProps) {
   return (
     <button className={`vela-button ${className}`.trim()} data-size={size} data-tone={tone} {...props}>
       {leadingIcon}

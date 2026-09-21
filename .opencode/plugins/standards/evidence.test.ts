@@ -26,11 +26,19 @@ test('retains full original UTF-8 sources once with exact hashes and independent
   await writeFile(join(root, 'empty.md'), '')
   assert.deepEqual(reader.snapshots(), [])
   const source = await reader.read('./source.ts')
-  const expected = { path: 'source.ts', code, sha256: createHash('sha256').update(code).digest('hex') }
+  const expected = {
+    path: 'source.ts',
+    code,
+    sha256: createHash('sha256').update(code).digest('hex'),
+  }
   assert.deepEqual(source, expected)
   assert.deepEqual(await reader.read('source.ts'), expected)
   const empty = await reader.read('empty.md')
-  assert.deepEqual(empty, { path: 'empty.md', code: '', sha256: createHash('sha256').update('').digest('hex') })
+  assert.deepEqual(empty, {
+    path: 'empty.md',
+    code: '',
+    sha256: createHash('sha256').update('').digest('hex'),
+  })
   source.code = 'caller mutation'
   const snapshots = reader.snapshots()
   snapshots[0].path = 'wrong.ts'
@@ -64,7 +72,14 @@ test('rejects ignored and credential paths, outside paths, malformed paths, and 
   for (const path of ['outside.ts', 'alias.ts', 'alias-dir/source.ts', 'outside-dir/outside.ts']) {
     await assert.rejects(reader.read(path), /symlinks/)
   }
-  for (const path of ['', 'bad\0.ts', '../outside.ts', join(root, 'visible/source.ts'), '.git/config', 'credentials/../visible/source.ts']) {
+  for (const path of [
+    '',
+    'bad\0.ts',
+    '../outside.ts',
+    join(root, 'visible/source.ts'),
+    '.git/config',
+    'credentials/../visible/source.ts',
+  ]) {
     await assert.rejects(reader.read(path), /checkout-relative|outside the allowed/)
   }
   assert.deepEqual(reader.snapshots(), [])
@@ -142,7 +157,13 @@ test('rejects binary, invalid UTF-8, unsupported, directory, and FIFO sources wi
   await writeFile(join(root, 'picture.svg'), '<svg/>')
   await mkdir(join(root, 'directory.ts'))
   execFileSync('mkfifo', [join(root, 'pipe.ts')])
-  for (const [path, error] of [['binary.ts', /binary/], ['invalid.ts', /UTF-8/], ['picture.svg', /Unsupported/], ['directory.ts', /regular/], ['pipe.ts', /regular/]] as const) {
+  for (const [path, error] of [
+    ['binary.ts', /binary/],
+    ['invalid.ts', /UTF-8/],
+    ['picture.svg', /Unsupported/],
+    ['directory.ts', /regular/],
+    ['pipe.ts', /regular/],
+  ] as const) {
     await assert.rejects(reader.read(path), error)
   }
   assert.deepEqual(reader.snapshots(), [])

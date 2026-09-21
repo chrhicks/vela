@@ -61,11 +61,21 @@ describe('coordinate slews and all-sky exposure snapshots', () => {
     let time = 0
     const runtime = new SimulatorRuntime([], () => time)
     runtime.slewTo(23, -30)
-    expect(runtime.state()).toMatchObject({ slewing: true, tracking: true, rightAscensionHours: 2, declinationDegrees: 60 })
+    expect(runtime.state()).toMatchObject({
+      slewing: true,
+      tracking: true,
+      rightAscensionHours: 2,
+      declinationDegrees: 60,
+    })
     time = 1500
     expect(runtime.state()).toMatchObject({ rightAscensionHours: 0.5, declinationDegrees: 15 })
     time = 100000
-    expect(runtime.state()).toMatchObject({ slewing: false, tracking: true, rightAscensionHours: 23, declinationDegrees: -30 })
+    expect(runtime.state()).toMatchObject({
+      slewing: false,
+      tracking: true,
+      rightAscensionHours: 23,
+      declinationDegrees: -30,
+    })
     time += 100000
     expect(runtime.state().rightAscensionHours).toBeCloseTo(23)
   })

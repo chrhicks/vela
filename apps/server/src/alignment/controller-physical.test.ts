@@ -13,12 +13,24 @@ import type { PlateSolver, SkyPosition, SolveResult } from './solver.js'
 import { createAlignmentDiagnostics, type AlignmentDiagnosticRun, type AlignmentDiagnosticsFactory } from './diagnostics.js'
 import { replayAlignmentDiagnostics } from './diagnostic-replay.js'
 
-const control: { waits: Array<() => void>, wait: (signal: AbortSignal) => Promise<void>, afterPreview?: (() => void) | undefined } = createTestCadence()
+const control: {
+  waits: Array<() => void>
+  wait: (signal: AbortSignal) => Promise<void>
+  afterPreview?: (() => void) | undefined
+} = createTestCadence()
 
 const frames = [...fixture.cases[0]!.samples, fixture.cases[0]!.adjusted]
 
-const settings = { mode: 'physical' as const, endpoint: 'http://physical.test', cameraId: 'selected-camera', telescopeId: 'mount',
-  executable: '/unused', catalogPath: '/unused', exposureSeconds: 2, fieldHeightDegrees: 3 }
+const settings = {
+  mode: 'physical' as const,
+  endpoint: 'http://physical.test',
+  cameraId: 'selected-camera',
+  telescopeId: 'mount',
+  executable: '/unused',
+  catalogPath: '/unused',
+  exposureSeconds: 2,
+  fieldHeightDegrees: 3,
+}
 
 const fieldHeightDegrees = 2 * Math.atan(4176 * 3.76 / 2000 / 400) * 180 / Math.PI
 
@@ -42,26 +54,60 @@ function setup(openDiagnostics?: AlignmentDiagnosticsFactory) {
       captures.push(options)
       const frame = frames[exposures++]!
 
-      return { width: 4, height: 4, pixels: new Float64Array([900, 200, 900, 200, 200, 50, 200, 50, 900, 200, 900, 200, 200, 50, 200, 50]),
-        capturedAt: frame.capturedAt, capturedAtSource: 'server-estimate' as const, color: { kind: 'bayer' as const, pattern: 'rggb' as const } }
+      return {
+        width: 4,
+        height: 4,
+        pixels: new Float64Array([900, 200, 900, 200, 200, 50, 200, 50, 900, 200, 900, 200, 200, 50, 200, 50]),
+        capturedAt: frame.capturedAt,
+        capturedAtSource: 'server-estimate' as const,
+        color: { kind: 'bayer' as const, pattern: 'rggb' as const },
+      }
     }),
     pointing: vi.fn(async () => { throw new Error('Physical mode must not read synthetic pointing') }),
     move: vi.fn(async () => { throw new Error('Physical mode must not perform a simulator preparation move') }),
     abort: vi.fn(async () => {}),
   }
 
-  const sample = vi.fn((solved: SkyPosition, capture: { capturedAt: string, exposureSeconds: number }) => physicalAlignmentSample(solved, capture, fixture.site))
+  const sample = vi.fn((
+    solved: SkyPosition,
+    capture: { capturedAt: string, exposureSeconds: number },
+  ) => physicalAlignmentSample(solved, capture, fixture.site))
 
-  const observedMount = () => ({ rightAscensionDegrees: 40, declinationDegrees: 60, coordinateSystem: 'topocentric' as const,
-    ...fixture.site, tracking: true, slewing: false, parked: false, observedAt: frames[Math.max(0, exposures - 1)]!.capturedAt })
+  const observedMount = () => ({
+    rightAscensionDegrees: 40,
+    declinationDegrees: 60,
+    coordinateSystem: 'topocentric' as const,
+    ...fixture.site,
+    tracking: true,
+    slewing: false,
+    parked: false,
+    observedAt: frames[Math.max(0, exposures - 1)]!.capturedAt,
+  })
 
   const physical: PhysicalAlignment = {
     cameraName: 'Selected RGGB camera',
     prepare: vi.fn(async () => ({ fieldHeightDegrees })),
-    pointing: vi.fn(async () => ({ hint: frames[exposures]!.solved, latitude: fixture.site.latitudeDegrees,
-      observation: { site: fixture.site, mount: observedMount(), camera: { cameraName: 'Selected RGGB camera',
-        sensorWidthPixels: 4, sensorHeightPixels: 4, pixelWidthMicrons: 3.76, pixelHeightMicrons: 3.76,
-        binX: 1, binY: 1, width: 4, height: 4, startX: 0, startY: 0 } } })),
+    pointing: vi.fn(async () => ({
+      hint: frames[exposures]!.solved,
+      latitude: fixture.site.latitudeDegrees,
+      observation: {
+        site: fixture.site,
+        mount: observedMount(),
+        camera: {
+          cameraName: 'Selected RGGB camera',
+          sensorWidthPixels: 4,
+          sensorHeightPixels: 4,
+          pixelWidthMicrons: 3.76,
+          pixelHeightMicrons: 3.76,
+          binX: 1,
+          binY: 1,
+          width: 4,
+          height: 4,
+          startX: 0,
+          startY: 0,
+        },
+      },
+    })),
     move: vi.fn(async () => {}),
     validate: vi.fn(async () => {
       if (externalChange) throw new Error('The mount pointing side changed. Measure a new baseline.')
@@ -77,25 +123,46 @@ function setup(openDiagnostics?: AlignmentDiagnosticsFactory) {
       const index = exposures - 1
       const abort = () => reject(new DOMException('Stopped', 'AbortError'))
       signal.addEventListener('abort', abort, { once: true })
-      requests.push({ index, complete: () => {
-        signal.removeEventListener('abort', abort)
-        const frame = frames[index]!
-        resolve({ status: 'solved', capturedAt: frame.capturedAt, ...frame.solved,
-          wcs: { width: 4, height: 4, referenceX: 2.5, referenceY: 2.5, ...frame.solved, cd: [0.1, 0, 0, -0.1] } })
-      } })
+      requests.push({
+        index,
+        complete: () => {
+          signal.removeEventListener('abort', abort)
+          const frame = frames[index]!
+          resolve({
+            status: 'solved',
+            capturedAt: frame.capturedAt,
+            ...frame.solved,
+            wcs: {
+              width: 4,
+              height: 4,
+              referenceX: 2.5,
+              referenceY: 2.5,
+              ...frame.solved,
+              cd: [0.1, 0, 0, -0.1],
+            },
+          })
+        },
+      })
     }),
   }
 
   const solverFactory = vi.fn((_height: number) => solver)
 
-  const controller = createAlignmentController({ mode: 'physical', settings, hardware, physical, createSolver: solverFactory, waitForNextExposure: control.wait,
+  const controller = createAlignmentController({
+    mode: 'physical',
+    settings,
+    hardware,
+    physical,
+    createSolver: solverFactory,
+    waitForNextExposure: control.wait,
     openDiagnostics,
     renderPreview: async (...args) => {
       const png = await previewPng(...args)
       control.afterPreview?.()
 
       return png
-    } })
+    },
+  })
 
   stops.push(() => controller.stop())
 
@@ -111,8 +178,17 @@ function setup(openDiagnostics?: AlignmentDiagnosticsFactory) {
     for (let index = 0; index < 3; index++) (await nextSolve()).complete()
   }
 
-  return { controller, hardware, physical, sample, captures, solverFactory, baseline, nextSolve,
-    changeMount: () => { externalChange = true } }
+  return {
+    controller,
+    hardware,
+    physical,
+    sample,
+    captures,
+    solverFactory,
+    baseline,
+    nextSolve,
+    changeMount: () => { externalChange = true },
+  }
 }
 
 it('uses physical optics, selected Bayer camera, and midpoint geometry while preserving capture start and provenance', async () => {
@@ -131,8 +207,13 @@ it('uses physical optics, selected Bayer camera, and midpoint geometry while pre
   }
 
   const view = subject.controller.snapshot()
-  expect(view).toMatchObject({ phase: 'adjusting', mode: 'physical', cameraName: 'Selected RGGB camera', measuredAt: frames[2]!.capturedAt,
-    measurement: { fieldHeightDegrees, capturedAtSource: 'server-estimate' } })
+  expect(view).toMatchObject({
+    phase: 'adjusting',
+    mode: 'physical',
+    cameraName: 'Selected RGGB camera',
+    measuredAt: frames[2]!.capturedAt,
+    measurement: { fieldHeightDegrees, capturedAtSource: 'server-estimate' },
+  })
   expect(subject.sample.mock.calls[2]![1]).toEqual({ capturedAt: frames[2]!.capturedAt, exposureSeconds: 2 })
   expect(Date.parse(subject.sample.mock.results[2]!.value.capturedAt) - Date.parse(view.measuredAt!)).toBe(1000)
   const imageId = view.measurement!.imageUrl.split('/').at(-1)!
@@ -160,8 +241,12 @@ it.each(['during solve', 'during preview'] as const)('rejects external movement 
   }
 
   await vi.waitFor(() => expect(subject.controller.active()).toBe(false))
-  expect(subject.controller.snapshot()).toMatchObject({ phase: 'failed', measuredAt: null, measurement: null,
-    error: 'The mount pointing side changed. Measure a new baseline.' })
+  expect(subject.controller.snapshot()).toMatchObject({
+    phase: 'failed',
+    measuredAt: null,
+    measurement: null,
+    error: 'The mount pointing side changed. Measure a new baseline.',
+  })
 })
 
 it('retains the previous solved image and timestamp when external movement invalidates a new preview', async () => {
@@ -285,9 +370,23 @@ it('preserves the alignment baseline and timer through same-exposure read recove
   const pending = subject.captures[3]!
   const startedAt = subject.controller.snapshot().exposureStartedAt
   pending.onReadState!('retrying')
-  expect(subject.controller.snapshot()).toMatchObject({ phase: 'adjusting', activity: 'retrying', exposureStartedAt: null, warning: expect.stringContaining('interrupted'), measurement: previous.measurement, measuredAt: previous.measuredAt })
+  expect(subject.controller.snapshot()).toMatchObject({
+    phase: 'adjusting',
+    activity: 'retrying',
+    exposureStartedAt: null,
+    warning: expect.stringContaining('interrupted'),
+    measurement: previous.measurement,
+    measuredAt: previous.measuredAt,
+  })
   pending.onReadState!('current')
-  expect(subject.controller.snapshot()).toMatchObject({ active: true, activity: 'exposing', exposureStartedAt: startedAt, warning: null, measurement: previous.measurement, measuredAt: previous.measuredAt })
+  expect(subject.controller.snapshot()).toMatchObject({
+    active: true,
+    activity: 'exposing',
+    exposureStartedAt: startedAt,
+    warning: null,
+    measurement: previous.measurement,
+    measuredAt: previous.measuredAt,
+  })
   expect(subject.hardware.capture).toHaveBeenCalledTimes(4)
   expect(subject.physical.move).toHaveBeenCalledTimes(2)
   complete()
@@ -326,15 +425,27 @@ it.each([
   fail(cleanup)
   await stopping
   capture!.onReadState!('current')
-  expect(subject.controller.snapshot()).toMatchObject({ active: false, phase, activity: 'idle', exposureStartedAt: null, warning: null, measurement: previous.measurement, measuredAt: previous.measuredAt })
+  expect(subject.controller.snapshot()).toMatchObject({
+    active: false,
+    phase,
+    activity: 'idle',
+    exposureStartedAt: null,
+    warning: null,
+    measurement: previous.measurement,
+    measuredAt: previous.measuredAt,
+  })
   expect(subject.hardware.capture).toHaveBeenCalledTimes(4)
   expect(subject.physical.move).toHaveBeenCalledTimes(2)
   expect(released).toHaveBeenCalledOnce()
 })
 
 function recording(): AlignmentDiagnosticRun {
-  return { recordFrame: vi.fn(async () => {}), recordBaseline: vi.fn(async () => {}),
-    recordMeasurement: vi.fn(async () => {}), finish: vi.fn(async () => {}) }
+  return {
+    recordFrame: vi.fn(async () => {}),
+    recordBaseline: vi.fn(async () => {}),
+    recordMeasurement: vi.fn(async () => {}),
+    finish: vi.fn(async () => {}),
+  }
 }
 
 it('records the exact solved baseline, midpoint, site and existing mount observations before finishing', async () => {
@@ -343,13 +454,25 @@ it('records the exact solved baseline, midpoint, site and existing mount observa
   const subject = setup(open)
   await subject.baseline()
   await vi.waitFor(() => expect(control.waits).toHaveLength(1))
-  expect(open).toHaveBeenCalledWith(expect.objectContaining({ rigId: 'physical', mode: 'physical',
-    cameraName: 'Selected RGGB camera', exposureSeconds: 2 }))
+  expect(open).toHaveBeenCalledWith(expect.objectContaining({
+    rigId: 'physical',
+    mode: 'physical',
+    cameraName: 'Selected RGGB camera',
+    exposureSeconds: 2,
+  }))
   expect(evidence.recordFrame).toHaveBeenCalledTimes(3)
   const [frame, recorded] = vi.mocked(evidence.recordFrame).mock.calls[0]!
   expect(frame.capturedAtSource).toBe('server-estimate')
-  expect(recorded).toMatchObject({ phase: 'baseline', position: 1, solution: { ...frames[0]!.solved },
-    physical: { site: fixture.site, before: { observedAt: frame.capturedAt }, after: { observedAt: frame.capturedAt } } })
+  expect(recorded).toMatchObject({
+    phase: 'baseline',
+    position: 1,
+    solution: { ...frames[0]!.solved },
+    physical: {
+      site: fixture.site,
+      before: { observedAt: frame.capturedAt },
+      after: { observedAt: frame.capturedAt },
+    },
+  })
   expect(Date.parse(recorded.sample.capturedAt) - Date.parse(frame.capturedAt)).toBe(1000)
   expect(vi.mocked(evidence.recordBaseline).mock.calls[0]![0]).toEqual(subject.sample.mock.results.map(result => result.value))
 
@@ -424,9 +547,17 @@ it('replays a physical controller trial from its actual recorded bundle', async 
     await subject.controller.stop(true)
     expect(errors).toEqual([])
     const report = await replayAlignmentDiagnostics(join(directory, (await readdir(directory))[0]!))
-    expect(report).toMatchObject({ mode: 'physical', outcome: { phase: 'finished', error: null },
+    expect(report).toMatchObject({
+      mode: 'physical',
+      outcome: { phase: 'finished', error: null },
       counts: { frames: 4, measurements: 2, physicalFrames: 4, verifiedOriginals: 4 },
-      maximumDiscrepancies: { measurementArcsec: 0, correctionTargetDegrees: 0, physicalSampleDegrees: 0, physicalSampleTimeMs: 0 } })
+      maximumDiscrepancies: {
+        measurementArcsec: 0,
+        correctionTargetDegrees: 0,
+        physicalSampleDegrees: 0,
+        physicalSampleTimeMs: 0,
+      },
+    })
     expect(report.finalMeasurement?.totalArcsec).toBe(subject.controller.snapshot().measurement?.totalArcsec)
   } finally {
     await subject.controller.stop()

@@ -102,18 +102,30 @@ export function createAlpacaCameraCooling({
         const name = await client.readString(device, 'name', signal)
 
         if (name.trim() !== expectedCameraName) {
-          return { outcome: 'failed', reason: 'not-confirmed', message: 'Camera identity changed or is unavailable.' }
+          return {
+            outcome: 'failed',
+            reason: 'not-confirmed',
+            message: 'Camera identity changed or is unavailable.',
+          }
         }
       }
 
       const capabilities = await readCapabilities(client, device, signal)
 
       if (setpointC !== undefined && !capabilities.canSetTemperature) {
-        return { outcome: 'failed', reason: 'unsupported', message: 'This camera does not accept a target temperature.' }
+        return {
+          outcome: 'failed',
+          reason: 'unsupported',
+          message: 'This camera does not accept a target temperature.',
+        }
       }
 
       if (coolerOn !== undefined && !capabilities.coolerReadable) {
-        return { outcome: 'failed', reason: 'unsupported', message: 'This camera does not report cooler on or off.' }
+        return {
+          outcome: 'failed',
+          reason: 'unsupported',
+          message: 'This camera does not report cooler on or off.',
+        }
       }
 
       if (setpointC !== undefined) {
@@ -142,14 +154,26 @@ export function createAlpacaCameraCooling({
 
       const observation = await readObservation(client, device, signal)
 
-      if (!observation) return { outcome: 'failed', reason: 'not-confirmed', message: 'The camera did not report cooler state after the command.' }
+      if (!observation) return {
+        outcome: 'failed',
+        reason: 'not-confirmed',
+        message: 'The camera did not report cooler state after the command.',
+      }
 
       if (coolerOn !== undefined && observation.state !== (coolerOn ? 'on' : 'off')) {
-        return { outcome: 'failed', reason: 'not-confirmed', message: 'The camera did not confirm the requested cooler state.' }
+        return {
+          outcome: 'failed',
+          reason: 'not-confirmed',
+          message: 'The camera did not confirm the requested cooler state.',
+        }
       }
 
       if (setpointC !== undefined && (observation.setpointC === undefined || Math.abs(observation.setpointC - setpointC) > setpointToleranceC)) {
-        return { outcome: 'failed', reason: 'not-confirmed', message: 'The camera did not confirm the requested temperature.' }
+        return {
+          outcome: 'failed',
+          reason: 'not-confirmed',
+          message: 'The camera did not confirm the requested temperature.',
+        }
       }
 
       return { outcome: 'confirmed', observation }
@@ -200,7 +224,10 @@ async function writeAndVerify<Value>(
   try {
     const value = await read()
 
-    if (confirmed(value)) return { outcome: 'confirmed', observation: { state: 'off', canSetTemperature: false, canGetPower: false } }
+    if (confirmed(value)) return {
+      outcome: 'confirmed',
+      observation: { state: 'off', canSetTemperature: false, canGetPower: false },
+    }
 
     return writeOutcomeUnknown
       ? { outcome: 'uncertain', reason: 'write-outcome-unknown' }

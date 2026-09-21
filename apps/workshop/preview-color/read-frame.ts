@@ -10,7 +10,10 @@ export function readFrame(bytes: Buffer): PreviewFrame {
     const card = bytes.toString('ascii', offset, offset + 80)
     const key = card.slice(0, 8).trim()
 
-    if (key === 'END') { ended = true; break }
+    if (key === 'END') {
+      ended = true
+      break
+    }
 
     if (card.slice(8, 10) !== '= ') continue
 
@@ -36,5 +39,10 @@ export function readFrame(bytes: Buffer): PreviewFrame {
 
   for (let i = 0; i < count; i++) pixels[i] = bytes.readInt32BE(2880 + i * 4)
 
-  return { width, height, pixels, color: pattern ? { kind: 'bayer', pattern } : { kind: 'mono' } }
+  return {
+    width,
+    height,
+    pixels,
+    color: pattern ? { kind: 'bayer', pattern } : { kind: 'mono' }
+  }
 }

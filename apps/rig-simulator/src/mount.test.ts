@@ -2,8 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { cameraPose, polarAxis, type MountPosition, type Vector } from './mount.js'
 
 const position: MountPosition = {
-  latitudeDegrees: 40, altitudeErrorDegrees: 0, azimuthErrorDegrees: 0,
-  raAxisDegrees: 30, declinationDegrees: 60, elapsedSeconds: 0, tracking: true,
+  latitudeDegrees: 40,
+  altitudeErrorDegrees: 0,
+  azimuthErrorDegrees: 0,
+  raAxisDegrees: 30,
+  declinationDegrees: 60,
+  elapsedSeconds: 0,
+  tracking: true,
 }
 
 const dot = (a: Vector, b: Vector) => a.reduce((sum, value, i) => sum + value * b[i]!, 0)

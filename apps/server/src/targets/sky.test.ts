@@ -17,10 +17,26 @@ const date = new Date('2026-09-07T04:00:00Z')
 // allows Astronomy Engine's shorter nutation model, omitted light deflection,
 // ICRS frame bias and first-order aberration, while detecting absent aberration.
 const benchmarks = [
-  { catalog: { raDegrees: 359.99, decDegrees: 82 }, apparent: { raDegrees: 0.35785842911299515, decDegrees: 82.14840755360858 }, altitude: 46.73537485217423 },
-  { catalog: { raDegrees: 10.68470833, decDegrees: 41.26875 }, apparent: { raDegrees: 11.058091306851674, decDegrees: 41.41611865040379 }, altitude: 60.06028088597603 },
-  { catalog: { raDegrees: 0.01, decDegrees: -80 }, apparent: { raDegrees: 0.3931427977204232, decDegrees: -79.848558666562 }, altitude: -30.983898663858042 },
-  { catalog: { raDegrees: 279.23473479, decDegrees: 38.78368896 }, apparent: { raDegrees: 279.4629823829434, decDegrees: 38.81040994135053 }, altitude: 50.541090008198246 },
+  {
+    catalog: { raDegrees: 359.99, decDegrees: 82 },
+    apparent: { raDegrees: 0.35785842911299515, decDegrees: 82.14840755360858 },
+    altitude: 46.73537485217423,
+  },
+  {
+    catalog: { raDegrees: 10.68470833, decDegrees: 41.26875 },
+    apparent: { raDegrees: 11.058091306851674, decDegrees: 41.41611865040379 },
+    altitude: 60.06028088597603,
+  },
+  {
+    catalog: { raDegrees: 0.01, decDegrees: -80 },
+    apparent: { raDegrees: 0.3931427977204232, decDegrees: -79.848558666562 },
+    altitude: -30.983898663858042,
+  },
+  {
+    catalog: { raDegrees: 279.23473479, decDegrees: 38.78368896 },
+    apparent: { raDegrees: 279.4629823829434, decDegrees: 38.81040994135053 },
+    altitude: 50.541090008198246,
+  },
 ]
 
 describe('target sky coordinates', () => {
@@ -30,7 +46,11 @@ describe('target sky coordinates', () => {
     expect(Math.abs(skyPath(catalog, site, date).currentAltitudeDegrees - altitude) * 3600).toBeLessThan(0.5)
   })
 
-  it.each([{ raDegrees: 359.99, decDegrees: 89.99 }, { raDegrees: 0.01, decDegrees: -89.99 }, { raDegrees: 280, decDegrees: 20 }])('round trips across RA wrap and near celestial poles: %j', catalog => {
+  it.each([
+    { raDegrees: 359.99, decDegrees: 89.99 },
+    { raDegrees: 0.01, decDegrees: -89.99 },
+    { raDegrees: 280, decDegrees: 20 },
+  ])('round trips across RA wrap and near celestial poles: %j', catalog => {
     const mount = toMount(catalog, 'topocentric', date, site)
     expect(mount.raDegrees).toBeGreaterThanOrEqual(0)
     expect(mount.raDegrees).toBeLessThan(360)
@@ -148,7 +168,16 @@ describe('target sky night', () => {
 
 describe('inverse plate projection', () => {
   it.each([[-0.001, 0.0003, 0.0002, 0.001], [0.001, 0.0003, -0.0002, 0.001]] as const)('round trips rotated TAN plates for both parities: %j', (...cd) => {
-    const wcs: PlateWcs = { width: 1000, height: 800, referenceX: 500.5, referenceY: 400.5, raDegrees: 359.95, decDegrees: 82, cd }
+    const wcs: PlateWcs = {
+      width: 1000,
+      height: 800,
+      referenceX: 500.5,
+      referenceY: 400.5,
+      raDegrees: 359.95,
+      decDegrees: 82,
+      cd,
+    }
+
     expect(angularDistance(skyAtPixel(wcs, 499.5, 399.5), { raDegrees: 359.95, decDegrees: 82 })).toBeLessThan(1e-10)
 
     for (const [x, y] of [[0, 0], [999, 799], [500, 100], [100, 700], [-0.5, 799.5]]) {

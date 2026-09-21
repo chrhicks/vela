@@ -188,7 +188,11 @@
 }
 .vela-observe-result dl > div:last-child { border-right: 0; }
 .vela-observe dt { color: var(--vela-text-muted); font-size: .7em; }
-.vela-observe dd { margin: var(--vela-space) 0 0; font-size: .8em; overflow-wrap: anywhere; }
+.vela-observe dd {
+  margin: var(--vela-space) 0 0;
+  font-size: .8em;
+  overflow-wrap: anywhere;
+}
 .vela-observe-facts dl { margin: 0; }
 .vela-observe-facts dl > div {
   display: grid;
@@ -218,7 +222,11 @@
   .vela-observe-result dl { grid-template-columns: 1fr; }
   .vela-observe-entry .vela-button { grid-column: auto; width: 100%; }
   .vela-observe-entry-mark { width: 3.2rem; height: 3.2rem; }
-  .vela-observe-hero { grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: calc(var(--vela-space) * 2.5); }
+  .vela-observe-hero {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: calc(var(--vela-space) * 2.5);
+  }
   .vela-observe-hero > .vela-badge { grid-column: 1 / -1; justify-self: start; }
   .vela-observe-actions > button { width: 100%; }
   .vela-observe-result dl > div { border-right: 0; border-bottom: var(--vela-border-width) solid var(--vela-line); }

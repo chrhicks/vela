@@ -8,8 +8,14 @@ import { createRigOperations } from './operations.js'
 import { registerImagingCamera } from './imaging-camera.js'
 
 const rig = {
-  id: 'rig', name: 'Rig', endpoint: { host: 'localhost', port: 11111 }, addedAt: '2026-09-01T00:00:00.000Z',
-  lastObservedInventory: { observedAt: '2026-09-01T00:00:00.000Z', devices: [{ uniqueId: 'slot', kind: 'camera' as const, name: 'Slot' }] },
+  id: 'rig',
+  name: 'Rig',
+  endpoint: { host: 'localhost', port: 11111 },
+  addedAt: '2026-09-01T00:00:00.000Z',
+  lastObservedInventory: {
+    observedAt: '2026-09-01T00:00:00.000Z',
+    devices: [{ uniqueId: 'slot', kind: 'camera' as const, name: 'Slot' }],
+  },
 }
 
 it('persists selected identity separately from replaceable inventory', async () => {
@@ -23,7 +29,9 @@ it('persists selected identity separately from replaceable inventory', async () 
     await catalog.observe(rig.endpoint, { ...rig.lastObservedInventory, devices: [] })
     expect((await (await openFileRigCatalog(path)).get('rig'))?.imagingCamera).toEqual({ uniqueId: 'slot', name: 'Main camera' })
     expect(await catalog.setImagingCamera('unknown', { uniqueId: 'slot', name: 'Camera' })).toBe(false)
-  } finally { await rm(directory, { recursive: true, force: true }) }
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
 })
 
 it('requires explicit current identity and excludes selection changes during rig work', async () => {
@@ -32,12 +40,32 @@ it('requires explicit current identity and excludes selection changes during rig
   const operations = createRigOperations()
   let name = 'Main camera'
   let present = true
-  registerImagingCamera(app, catalog, operations, { createInspector: () => ({ async inspectDevices() {
-    return present ? [{ providerDeviceId: 'slot', configuredName: 'Slot', name, kind: 'camera' as const,
-      connection: 'connected' as const, telemetry: { availability: 'complete' as const, values: { kind: 'camera' as const, activity: 'idle' as const } } }] : []
-  } }) })
+  registerImagingCamera(app, catalog, operations, {
+    createInspector: () => ({
+      async inspectDevices() {
+        return present
+          ? [{
+              providerDeviceId: 'slot',
+              configuredName: 'Slot',
+              name,
+              kind: 'camera' as const,
+              connection: 'connected' as const,
+              telemetry: {
+                availability: 'complete' as const,
+                values: { kind: 'camera' as const, activity: 'idle' as const },
+              },
+            }]
+          : []
+      },
+    }),
+  })
   const get = () => app.inject('/api/web/rigs/rig/imaging-camera')
-  const put = (cameraName = name) => app.inject({ method: 'PUT', url: '/api/rigs/rig/imaging-camera', payload: { id: 'slot', name: cameraName } })
+
+  const put = (cameraName = name) => app.inject({
+    method: 'PUT',
+    url: '/api/rigs/rig/imaging-camera',
+    payload: { id: 'slot', name: cameraName },
+  })
 
   try {
     expect((await get()).json()).toMatchObject({ selected: null, state: 'unselected', editable: true })
@@ -54,5 +82,7 @@ it('requires explicit current identity and excludes selection changes during rig
     present = false
     expect((await get()).json()).toMatchObject({ selected: { name: 'Guide camera' }, state: 'missing' })
     expect((await put()).statusCode).toBe(409)
-  } finally { await app.close() }
+  } finally {
+    await app.close()
+  }
 })

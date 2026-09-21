@@ -98,11 +98,21 @@ export function RigDetail() {
       </header>
 
       <Panel className="vela-observe-entry" elevation="raised">
-        <span className="vela-observe-entry-mark"><ObservationMark /></span>
-        <div><small>Observation workspace</small><h2>Ready to use this Rig?</h2>
+        <span className="vela-observe-entry-mark">
+          <ObservationMark />
+        </span>
+        <div>
+          <small>Observation workspace</small>
+          <h2>Ready to use this Rig?</h2>
           <p>Open a focused workspace for preparing and observing with {view.name}.</p>
         </div>
-        <Button tone="accent" size="large" onClick={() => navigate(`/rigs/${encodeURIComponent(view.id)}/observe`)}>Start observing</Button>
+        <Button
+          tone="accent"
+          size="large"
+          onClick={() => navigate(`/rigs/${encodeURIComponent(view.id)}/observe`)}
+        >
+          Start observing
+        </Button>
       </Panel>
 
       {interrupted ? (
@@ -127,7 +137,10 @@ export function RigDetail() {
 
       <section aria-labelledby="rig-devices-title" className="vela-rig-devices">
         <div className="vela-rig-section-heading">
-          <div><small>EQUIPMENT</small><h2 id="rig-devices-title">Devices</h2></div>
+          <div>
+            <small>EQUIPMENT</small>
+            <h2 id="rig-devices-title">Devices</h2>
+          </div>
           <span>Refreshes every 5 seconds</span>
         </div>
         {devices.length === 0 ? (
@@ -156,9 +169,18 @@ export function RigDetail() {
         </button>
         {detailsOpen ? (
           <dl className="vela-rig-details__body">
-            <div><dt>Endpoint</dt><dd>{formatEndpoint(view)}</dd></div>
-            <div><dt>Added to Vela</dt><dd>{formatDateTime(view.addedAt)}</dd></div>
-            <div><dt>Last inventory</dt><dd>{formatDateTime(view.lastInventoryAt)}</dd></div>
+            <div>
+              <dt>Endpoint</dt>
+              <dd>{formatEndpoint(view)}</dd>
+            </div>
+            <div>
+              <dt>Added to Vela</dt>
+              <dd>{formatDateTime(view.addedAt)}</dd>
+            </div>
+            <div>
+              <dt>Last inventory</dt>
+              <dd>{formatDateTime(view.lastInventoryAt)}</dd>
+            </div>
           </dl>
         ) : null}
       </section>

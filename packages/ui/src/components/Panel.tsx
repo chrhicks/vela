@@ -8,7 +8,16 @@ export interface PanelProps extends HTMLAttributes<HTMLElement> {
   elevation?: 'flat' | 'raised'
 }
 
-export function Panel({ title, description, action, footer, elevation = 'flat', children, className = '', ...props }: PanelProps) {
+export function Panel({
+  title,
+  description,
+  action,
+  footer,
+  elevation = 'flat',
+  children,
+  className = '',
+  ...props
+}: PanelProps) {
   return (
     <section className={`vela-panel ${className}`.trim()} data-elevation={elevation} {...props}>
       {title || description || action ? (

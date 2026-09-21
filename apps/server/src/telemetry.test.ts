@@ -37,7 +37,8 @@ async function span(name = 'alpaca.request'): Promise<ReadableSpan> {
   return result
 }
 
-const exportSpans = (exporter: SpanExporter, spans: ReadableSpan[]) => new Promise<ExportResult>(resolve => exporter.export(spans, resolve))
+const exportSpans = (exporter: SpanExporter, spans: ReadableSpan[]) =>
+  new Promise<ExportResult>(resolve => exporter.export(spans, resolve))
 
 const records = async (path: string) => (await readFile(path, 'utf8')).trim().split('\n').map(line => JSON.parse(line))
 
@@ -68,9 +69,16 @@ describe('local tracing', () => {
 
     try {
       // No explicit forceFlush: the one-second batch timer makes children live.
-      await vi.waitFor(async () => expect(await records(file)).toHaveLength(1), { timeout: 2500, interval: 50 })
+      await vi.waitFor(
+        async () => expect(await records(file)).toHaveLength(1),
+        { timeout: 2500, interval: 50 },
+      )
       const [child] = await records(file)
-      expect(child).toMatchObject({ name: 'alpaca.request', parentSpanId: rootId, attributes: { 'run.id': 'detached-run' } })
+      expect(child).toMatchObject({
+        name: 'alpaca.request',
+        parentSpanId: rootId,
+        attributes: { 'run.id': 'detached-run' },
+      })
       expect(child.traceId).toBe(root.spanContext().traceId)
       expect(child.events[0].name).toBe('headers.received')
       expect(child.startTimeUnixNano).toMatch(/^\d+$/)
@@ -88,7 +96,11 @@ describe('local tracing', () => {
     const file = join(dir, 'trace.jsonl')
     const exporter = createTraceFileExporter(file, { maxFileBytes: 1700, retainedFiles: 3 })
 
-    for (let index = 0; index < 12; index++) expect((await exportSpans(exporter, [await span(`request-${index}`)])).code).toBe(ExportResultCode.SUCCESS)
+    for (let index = 0; index < 12; index++) {
+      expect((await exportSpans(exporter, [await span(`request-${index}`)])).code)
+        .toBe(ExportResultCode.SUCCESS)
+    }
+
     await exporter.shutdown()
     expect((await readdir(dir)).sort()).toEqual(['trace.jsonl', 'trace.jsonl.1', 'trace.jsonl.2'])
 

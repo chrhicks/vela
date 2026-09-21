@@ -23,20 +23,53 @@ interface StarPolicy {
 }
 
 const capturePolicy: StarPolicy = {
-  aperture: 12, patchRadius: 16, isolation: 12, peakSigma: 8, peakWindow: 1,
-  centroidRadius: 8, centroidWander: 3, annulusInner: 13, outerFluxFraction: 0.04, elongation: 0.65,
-  minHfrMono: 0.9, minHfrBayer: 1.4, mergeBlends: false,
+  aperture: 12,
+  patchRadius: 16,
+  isolation: 12,
+  peakSigma: 8,
+  peakWindow: 1,
+  centroidRadius: 8,
+  centroidWander: 3,
+  annulusInner: 13,
+  outerFluxFraction: 0.04,
+  elongation: 0.65,
+  minHfrMono: 0.9,
+  minHfrBayer: 1.4,
+  mergeBlends: false,
 }
 
 const autofocusPolicy: StarPolicy = {
-  aperture: 40, patchRadius: 48, isolation: 48, peakSigma: 5, peakWindow: 2,
-  centroidRadius: 28, centroidWander: 10, annulusInner: 41, outerFluxFraction: 0.4, elongation: 0.9,
-  minHfrMono: 0.5, minHfrBayer: 0.8, mergeBlends: true,
+  aperture: 40,
+  patchRadius: 48,
+  isolation: 48,
+  peakSigma: 5,
+  peakWindow: 2,
+  centroidRadius: 28,
+  centroidWander: 10,
+  annulusInner: 41,
+  outerFluxFraction: 0.4,
+  elongation: 0.9,
+  minHfrMono: 0.5,
+  minHfrBayer: 0.8,
+  mergeBlends: true,
 }
 
 /** Conservative measurements of isolated, adequately sampled stars in linear image data. */
-export async function measureStars(width: number, height: number, pixels: ArrayLike<number>, color: ImageColor = { kind: 'mono' }, policy: StarPolicy = capturePolicy) {
-  if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || width * height > 50_000_000 || pixels.length !== width * height) throw new Error('Invalid image dimensions')
+export async function measureStars(
+  width: number,
+  height: number,
+  pixels: ArrayLike<number>,
+  color: ImageColor = { kind: 'mono' },
+  policy: StarPolicy = capturePolicy,
+) {
+  if (
+    !Number.isInteger(width)
+    || !Number.isInteger(height)
+    || width < 1
+    || height < 1
+    || width * height > 50_000_000
+    || pixels.length !== width * height
+  ) throw new Error('Invalid image dimensions')
 
   // Every sample matters: invalid edges and unused Bayer pixels must not look starless.
   for (let index = 0; index < pixels.length; index++) {
@@ -50,7 +83,9 @@ export async function measureStars(width: number, height: number, pixels: ArrayL
   const sample = (x: number, y: number) => {
     const index = y * scale * width + x * scale
 
-    return scale === 1 ? pixels[index]! : (pixels[index]! + pixels[index + 1]! + pixels[index + width]! + pixels[index + width + 1]!) / 4
+    return scale === 1
+      ? pixels[index]!
+      : (pixels[index]! + pixels[index + 1]! + pixels[index + width]! + pixels[index + width + 1]!) / 4
   }
 
   const columns = Math.floor(width / scale)
@@ -90,13 +125,19 @@ export async function measureStars(width: number, height: number, pixels: ArrayL
           if (dx === 0 && dy === 0) continue
           const neighbor = sample(x + dx, y + dy)
 
-          if (neighbor > value || (neighbor === value && (dy < 0 || (dy === 0 && dx < 0)))) maximum = false
+          if (neighbor > value || (neighbor === value && (dy < 0 || (dy === 0 && dx < 0))))
+            maximum = false
 
           if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1 && neighbor > sky.level + 3 * sky.noise) support++
         }
       }
 
-      if (maximum && support >= 4) peaks.push({ x: x * scale + (scale - 1) / 2, y: y * scale + (scale - 1) / 2 })
+      if (maximum && support >= 4) {
+        peaks.push({
+          x: x * scale + (scale - 1) / 2,
+          y: y * scale + (scale - 1) / 2,
+        })
+      }
     }
 
     if (y % 32 === 0) await setImmediate()
@@ -150,7 +191,8 @@ export async function measureStars(width: number, height: number, pixels: ArrayL
       for (let dy = -1; dy <= 1; dy++) {
         for (let dx = -1; dx <= 1; dx++) {
           for (const other of buckets.get(`${bx + dx},${by + dy}`) ?? []) {
-            if (other !== peak && Math.hypot(other.x - peak.x, other.y - peak.y) < policy.isolation) blended = true
+            if (other !== peak && Math.hypot(other.x - peak.x, other.y - peak.y) < policy.isolation)
+              blended = true
           }
         }
       }
@@ -165,11 +207,19 @@ export async function measureStars(width: number, height: number, pixels: ArrayL
     }
   }
 
-  return { detectedStars: radii.length, medianHfrPixels: radii.length ? median(radii) : null }
+  return {
+    detectedStars: radii.length,
+    medianHfrPixels: radii.length ? median(radii) : null,
+  }
 }
 
 /** Defocus-capable HFR for an autofocus walk. Capture continues to use measureStars. */
-export async function measureAutofocusStars(width: number, height: number, pixels: ArrayLike<number>, color: ImageColor = { kind: 'mono' }) {
+export async function measureAutofocusStars(
+  width: number,
+  height: number,
+  pixels: ArrayLike<number>,
+  color: ImageColor = { kind: 'mono' },
+) {
   return measureStars(width, height, pixels, color, autofocusPolicy)
 }
 
@@ -185,13 +235,23 @@ function background(values: number[]): Background {
 
   if (!finite.length) return { level: NaN, noise: NaN }
   const level = median(finite)
+
   // A numerical floor permits noiseless floating-point fixtures without treating rounding as signal.
-  const noise = Math.max(1.4826 * median(finite.map(value => Math.abs(value - level))), Math.max(1, Math.abs(level)) * 1e-9)
+  const noise = Math.max(
+    1.4826 * median(finite.map(value => Math.abs(value - level))),
+    Math.max(1, Math.abs(level)) * 1e-9,
+  )
 
   return { level, noise }
 }
 
-function luminance(width: number, pixels: ArrayLike<number>, color: ImageColor, x: number, y: number) {
+function luminance(
+  width: number,
+  pixels: ArrayLike<number>,
+  color: ImageColor,
+  x: number,
+  y: number,
+) {
   const value = (dx: number, dy: number) => pixels[(y + dy) * width + x + dx]!
 
   if (color.kind === 'mono') return value(0, 0)
@@ -211,12 +271,24 @@ function luminance(width: number, pixels: ArrayLike<number>, color: ImageColor, 
   return (center + green + opposite) / 3
 }
 
-function measureStar(width: number, height: number, pixels: ArrayLike<number>, color: ImageColor, peak: Peak, policy: StarPolicy): number | null {
+function measureStar(
+  width: number,
+  height: number,
+  pixels: ArrayLike<number>,
+  color: ImageColor,
+  peak: Peak,
+  policy: StarPolicy,
+): number | null {
   const ox = Math.round(peak.x)
   const oy = Math.round(peak.y)
   const { aperture, patchRadius } = policy
 
-  if (ox <= patchRadius || oy <= patchRadius || ox >= width - patchRadius - 1 || oy >= height - patchRadius - 1) return null
+  if (
+    ox <= patchRadius
+    || oy <= patchRadius
+    || ox >= width - patchRadius - 1
+    || oy >= height - patchRadius - 1
+  ) return null
   const patch: { x: number, y: number, value: number }[] = []
   const annulus: number[] = []
 
@@ -321,7 +393,9 @@ function measureStar(width: number, height: number, pixels: ArrayLike<number>, c
     if (enclosed + flux >= total / 2) {
       const radius = (bin + (total / 2 - enclosed) / flux) / binsPerPixel
 
-      return radius >= (color.kind === 'mono' ? policy.minHfrMono : policy.minHfrBayer) ? radius : null
+      return radius >= (color.kind === 'mono' ? policy.minHfrMono : policy.minHfrBayer)
+        ? radius
+        : null
     }
 
     enclosed += flux

@@ -2,9 +2,26 @@ import { describe, expect, it } from 'vitest'
 import { measureAutofocusStars, measureStars } from './statistics.js'
 import type { ImageColor } from './preview.js'
 
-type Star = { x: number, y: number, sigma: number, amplitude?: number, profile?: 'exponential' | 'doughnut', width?: number }
+type Star = {
+  x: number
+  y: number
+  sigma: number
+  amplitude?: number
+  profile?: 'exponential' | 'doughnut'
+  width?: number
+}
 
-function image(stars: Star[], options: { width?: number, height?: number, background?: number, noise?: number, color?: ImageColor, clip?: number } = {}) {
+function image(
+  stars: Star[],
+  options: {
+    width?: number
+    height?: number
+    background?: number
+    noise?: number
+    color?: ImageColor
+    clip?: number
+  } = {},
+) {
   const width = options.width ?? 96
   const height = options.height ?? 96
   const pixels = new Float64Array(width * height)
@@ -43,7 +60,10 @@ function image(stars: Star[], options: { width?: number, height?: number, backgr
       }
 
       // SAFETY: Bayer patterns contain four r/g/b characters; parity indexes stay within 0–3.
-      const gain = options.color?.kind === 'bayer' ? { r: 1.8, g: 1, b: 0.45 }[options.color.pattern[(y % 2) * 2 + x % 2] as 'r' | 'g' | 'b'] : 1
+      const gain = options.color?.kind === 'bayer'
+        ? { r: 1.8, g: 1, b: 0.45 }[options.color.pattern[(y % 2) * 2 + x % 2] as 'r' | 'g' | 'b']
+        : 1
+
       const noise = (options.noise ?? 0) * Math.sqrt(-2 * Math.log(random())) * Math.cos(2 * Math.PI * random())
       pixels[y * width + x] = Math.min(options.clip ?? Infinity, (signal + (options.background ?? 100)) * gain + noise)
     }
@@ -93,7 +113,12 @@ describe('measureStars', () => {
   })
 
   it('reports the median of measured isolated stars', async () => {
-    const frame = image([{ x: 24, y: 24, sigma: 1.5 }, { x: 66, y: 24, sigma: 2 }, { x: 45, y: 68, sigma: 3 }])
+    const frame = image([
+      { x: 24, y: 24, sigma: 1.5 },
+      { x: 66, y: 24, sigma: 2 },
+      { x: 45, y: 68, sigma: 3 },
+    ])
+
     const result = await measureStars(frame.width, frame.height, frame.pixels)
     expect(result.detectedStars).toBe(3)
     expect(Math.abs(result.medianHfrPixels! - expected(2))).toBeLessThan(0.11)
@@ -157,11 +182,18 @@ describe('measureStars', () => {
       image([{ x: 45, y: 45, sigma: 8 }]),
     ]
 
-    for (const frame of frames) expect(await measureStars(frame.width, frame.height, frame.pixels)).toEqual({ detectedStars: 0, medianHfrPixels: null })
+    for (const frame of frames) {
+      expect(await measureStars(frame.width, frame.height, frame.pixels))
+        .toEqual({ detectedStars: 0, medianHfrPixels: null })
+    }
   })
 
   it('measures defocused doughnuts that capture star measurements reject', async () => {
-    const frame = image([{ x: 100, y: 100, sigma: 14, profile: 'doughnut', amplitude: 1200, width: 3.5 }], { width: 200, height: 200 })
+    const frame = image(
+      [{ x: 100, y: 100, sigma: 14, profile: 'doughnut', amplitude: 1200, width: 3.5 }],
+      { width: 200, height: 200 },
+    )
+
     expect(await measureStars(frame.width, frame.height, frame.pixels)).toEqual({ detectedStars: 0, medianHfrPixels: null })
     const autofocus = await measureAutofocusStars(frame.width, frame.height, frame.pixels)
     expect(autofocus.detectedStars).toBeGreaterThan(0)

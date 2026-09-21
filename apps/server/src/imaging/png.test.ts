@@ -16,13 +16,17 @@ function referenceCrc(bytes: Buffer) {
 }
 
 it('encodes lossless pixels and valid PNG checksums across multiple processing batches', async () => {
-  const width = 512, height = 512, stride = width * 3 + 1
+  const width = 512
+  const height = 512
+  const stride = width * 3 + 1
   const data = Buffer.alloc(stride * height)
   let seed = 37
 
-  for (let y = 0; y < height; y++) for (let x = 1; x < stride; x++) {
-    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0
-    data[y * stride + x] = seed >>> 24
+  for (let y = 0; y < height; y++) {
+    for (let x = 1; x < stride; x++) {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0
+      data[y * stride + x] = seed >>> 24
+    }
   }
 
   const original = Buffer.from(data)

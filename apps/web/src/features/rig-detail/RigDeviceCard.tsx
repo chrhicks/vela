@@ -51,14 +51,18 @@ export function RigDeviceCard({
       )}
       className="vela-rig-device"
       data-connection={stale ? 'last-known' : device.connection}
-      description={device.configuredName !== device.name
-        ? `${kindLabels[device.kind]} · ${device.configuredName}`
-        : kindLabels[device.kind]}
+      description={
+        device.configuredName !== device.name
+          ? `${kindLabels[device.kind]} · ${device.configuredName}`
+          : kindLabels[device.kind]
+      }
       elevation="raised"
       title={device.name}
     >
       <div className="vela-rig-device__state">
-        <span className="vela-rig-device__icon"><DeviceIcon kind={device.kind} /></span>
+        <span className="vela-rig-device__icon">
+          <DeviceIcon kind={device.kind} />
+        </span>
         <p>
           <small>STATUS</small>
           <strong>{presentation.activity}</strong>
@@ -82,7 +86,9 @@ export function RigDeviceCard({
           {presentation.channels.map((channel) => (
             <span key={channel.id}>
               <small>{channel.name}</small>
-              {channel.value === undefined ? null : <strong>{formatNumber(channel.value)}</strong>}
+              {channel.value === undefined ? null : (
+                <strong>{formatNumber(channel.value)}</strong>
+              )}
               {channel.on === undefined ? null : <em>{channel.on ? 'On' : 'Off'}</em>}
             </span>
           ))}
@@ -163,7 +169,9 @@ function devicePresentation(device: RigDeviceDetailView): DevicePresentation {
         activity: titleCase(device.status.activity),
         note: device.status.availability === 'partial'
           ? 'Some values could not be read'
-          : device.status.position === undefined ? 'Position unavailable' : 'Absolute position',
+          : device.status.position === undefined
+            ? 'Position unavailable'
+            : 'Absolute position',
         metrics: [
           optionalMetric('Position', device.status.position, formatInteger),
           optionalMetric('Temperature', device.status.temperatureC, formatTemperature),
@@ -174,7 +182,9 @@ function devicePresentation(device: RigDeviceDetailView): DevicePresentation {
         activity: titleCase(device.status.activity),
         note: device.status.availability === 'partial'
           ? 'Some values could not be read'
-          : device.status.filterName === undefined ? 'Selection unavailable' : 'Filter selected',
+          : device.status.filterName === undefined
+            ? 'Selection unavailable'
+            : 'Filter selected',
         metrics: [
           device.status.filterName === undefined
             ? optionalMetric(
@@ -214,7 +224,11 @@ function devicePresentation(device: RigDeviceDetailView): DevicePresentation {
     }
 
     default:
-      return { activity: 'Limited status', note: 'Detailed status is not available', metrics: [] }
+      return {
+        activity: 'Limited status',
+        note: 'Detailed status is not available',
+        metrics: [],
+      }
   }
 }
 
@@ -237,9 +251,21 @@ function cameraNote(activity: string): string {
   }
 }
 
-function telescopeNote(tracking: 'on' | 'off' | 'unknown', home: 'at-home' | 'away' | 'unknown'): string {
-  const trackingLabel = { on: 'Tracking', off: 'Not tracking', unknown: 'Tracking unknown' }[tracking]
-  const homeLabel = { 'at-home': 'At home', away: 'Away from home', unknown: 'Home unknown' }[home]
+function telescopeNote(
+  tracking: 'on' | 'off' | 'unknown',
+  home: 'at-home' | 'away' | 'unknown',
+): string {
+  const trackingLabel = {
+    on: 'Tracking',
+    off: 'Not tracking',
+    unknown: 'Tracking unknown',
+  }[tracking]
+
+  const homeLabel = {
+    'at-home': 'At home',
+    away: 'Away from home',
+    unknown: 'Home unknown',
+  }[home]
 
   return `${trackingLabel} · ${homeLabel}`
 }
@@ -271,7 +297,10 @@ function isMetric(value: Metric | undefined): value is Metric {
 }
 
 function formatTemperature(value: number): string {
-  return `${value.toLocaleString(undefined, { maximumFractionDigits: 1, minimumFractionDigits: 1 })} °C`
+  return `${value.toLocaleString(undefined, {
+    maximumFractionDigits: 1,
+    minimumFractionDigits: 1,
+  })} °C`
 }
 
 function formatPercentage(value: number): string {

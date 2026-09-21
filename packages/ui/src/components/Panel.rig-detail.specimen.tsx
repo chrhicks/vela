@@ -249,17 +249,50 @@ function DeviceIcon({ kind }: { kind: DeviceKind }) {
   let drawing: ReactNode
 
   if (kind === 'telescope') {
-    drawing = <><path d="m5 8 10-4 2.2 5.2-10 4L5 8Z" /><path d="m9 12 3 2m-1.5-1-3 6m3-6 5 5M3.8 6.8 6 12" /></>
+    drawing = (
+      <>
+        <path d="m5 8 10-4 2.2 5.2-10 4L5 8Z" />
+        <path d="m9 12 3 2m-1.5-1-3 6m3-6 5 5M3.8 6.8 6 12" />
+      </>
+    )
   } else if (kind === 'camera') {
-    drawing = <><rect height="10" rx="2" width="14" x="3" y="6" /><circle cx="10" cy="11" r="3.2" /><path d="m6 6 1-2h6l1 2" /></>
+    drawing = (
+      <>
+        <rect height="10" rx="2" width="14" x="3" y="6" />
+        <circle cx="10" cy="11" r="3.2" />
+        <path d="m6 6 1-2h6l1 2" />
+      </>
+    )
   } else if (kind === 'focuser') {
-    drawing = <><circle cx="10" cy="10" r="5" /><circle cx="10" cy="10" r="2" /><path d="M10 2v3m0 10v3M2 10h3m10 0h3" /></>
+    drawing = (
+      <>
+        <circle cx="10" cy="10" r="5" />
+        <circle cx="10" cy="10" r="2" />
+        <path d="M10 2v3m0 10v3M2 10h3m10 0h3" />
+      </>
+    )
   } else if (kind === 'filter-wheel') {
-    drawing = <><circle cx="10" cy="10" r="7" /><circle cx="10" cy="6" r="1.2" /><circle cx="6.5" cy="12" r="1.2" /><circle cx="13.5" cy="12" r="1.2" /></>
+    drawing = (
+      <>
+        <circle cx="10" cy="10" r="7" />
+        <circle cx="10" cy="6" r="1.2" />
+        <circle cx="6.5" cy="12" r="1.2" />
+        <circle cx="13.5" cy="12" r="1.2" />
+      </>
+    )
   } else if (kind === 'conditions') {
-    drawing = <><path d="M6 14.5a3.5 3.5 0 1 1 1.2-6.8A5 5 0 0 1 17 9.3a2.7 2.7 0 0 1-.7 5.2H6Z" /><path d="M8 17h.01m4 0h.01" /></>
+    drawing = (
+      <>
+        <path d="M6 14.5a3.5 3.5 0 1 1 1.2-6.8A5 5 0 0 1 17 9.3a2.7 2.7 0 0 1-.7 5.2H6Z" />
+        <path d="M8 17h.01m4 0h.01" />
+      </>
+    )
   } else {
-    drawing = <><path d="m11.5 2-6 9h5l-2 7 6-9h-5l2-7Z" /></>
+    drawing = (
+      <>
+        <path d="m11.5 2-6 9h5l-2 7 6-9h-5l2-7Z" />
+      </>
+    )
   }
 
   return <svg aria-hidden="true" fill="none" viewBox="0 0 20 20">{drawing}</svg>
@@ -268,8 +301,14 @@ function DeviceIcon({ kind }: { kind: DeviceKind }) {
 function ShellHeader() {
   return (
     <header className="vela-rig-shell__header">
-      <div className="vela-rig-shell__brand"><span>V</span><strong>Vela</strong></div>
-      <nav aria-label="Primary"><span data-active="true">Rigs</span><span>Library</span></nav>
+      <div className="vela-rig-shell__brand">
+        <span>V</span>
+        <strong>Vela</strong>
+      </div>
+      <nav aria-label="Primary">
+        <span data-active="true">Rigs</span>
+        <span>Library</span>
+      </nav>
       <small>Observatory control</small>
     </header>
   )
@@ -335,7 +374,9 @@ function disconnectedDevice(device: DeviceFixture): DeviceFixture {
     metrics: [],
   }
 
-  return device.configuredName === undefined ? disconnected : { ...disconnected, configuredName: device.configuredName }
+  return device.configuredName === undefined
+    ? disconnected
+    : { ...disconnected, configuredName: device.configuredName }
 }
 
 function DeviceCard({ device }: { device: DeviceFixture }) {
@@ -354,8 +395,14 @@ function DeviceCard({ device }: { device: DeviceFixture }) {
       title={device.name}
     >
       <div className="vela-rig-device__state">
-        <span className="vela-rig-device__icon"><DeviceIcon kind={device.kind} /></span>
-        <p><small>STATUS</small><strong>{device.activity}</strong><span>{device.activityNote}</span></p>
+        <span className="vela-rig-device__icon">
+          <DeviceIcon kind={device.kind} />
+        </span>
+        <p>
+          <small>STATUS</small>
+          <strong>{device.activity}</strong>
+          <span>{device.activityNote}</span>
+        </p>
       </div>
 
       {device.metrics.length > 0 ? (
@@ -372,7 +419,10 @@ function DeviceCard({ device }: { device: DeviceFixture }) {
       {device.channels ? (
         <div className="vela-rig-device__channels">
           {device.channels.map((channel) => (
-            <span key={channel.label}><small>{channel.label}</small><strong>{channel.value}</strong></span>
+            <span key={channel.label}>
+              <small>{channel.label}</small>
+              <strong>{channel.value}</strong>
+            </span>
           ))}
         </div>
       ) : null}
@@ -415,14 +465,30 @@ function HomeView({
   onOpen: (rig: RigId, scenario: Scenario) => void
 }) {
   const cards = [
-    { rig: askar, connected: 6, scenario: 'live' as const, state: 'Reachable', tone: 'positive' as const },
-    { rig: seestar, connected: 0, scenario: 'disconnected' as const, state: 'Reachable', tone: 'positive' as const },
+    {
+      rig: askar,
+      connected: 6,
+      scenario: 'live' as const,
+      state: 'Reachable',
+      tone: 'positive' as const
+    },
+    {
+      rig: seestar,
+      connected: 0,
+      scenario: 'disconnected' as const,
+      state: 'Reachable',
+      tone: 'positive' as const
+    },
   ].filter((card) => !forgottenRigs.has(card.rig.id))
 
   return (
     <main className="vela-rig-home">
       <div className="vela-rig-home__heading">
-        <div><small>OBSERVATORY</small><h1>Rigs</h1><p>Choose a Rig to see what is connected and what it is doing.</p></div>
+        <div>
+          <small>OBSERVATORY</small>
+          <h1>Rigs</h1>
+          <p>Choose a Rig to see what is connected and what it is doing.</p>
+        </div>
         <Button size="small" tone="accent">Add rig</Button>
       </div>
       {cards.length === 0 ? (
@@ -434,15 +500,29 @@ function HomeView({
       ) : (
         <div className="vela-rig-home__grid">
           {cards.map((card) => (
-            <button className="vela-rig-summary" key={card.rig.id} onClick={() => onOpen(card.rig.id, card.scenario)} type="button">
-              <span className="vela-rig-summary__heading"><strong>{card.rig.name}</strong><Badge marker={<i />} size="small" tone={card.tone}>{card.state}</Badge></span>
+            <button
+              className="vela-rig-summary"
+              key={card.rig.id}
+              onClick={() => onOpen(card.rig.id, card.scenario)}
+              type="button"
+            >
+              <span className="vela-rig-summary__heading">
+                <strong>{card.rig.name}</strong>
+                <Badge marker={<i />} size="small" tone={card.tone}>{card.state}</Badge>
+              </span>
               <span className="vela-rig-summary__server">{card.rig.server}</span>
               <span className="vela-rig-summary__footer">
-                <span className="vela-rig-summary__connections" data-state={card.connected === card.rig.devices.length ? 'complete' : 'attention'}>
+                <span
+                  className="vela-rig-summary__connections"
+                  data-state={card.connected === card.rig.devices.length ? 'complete' : 'attention'}
+                >
                   <strong>{card.connected} of {card.rig.devices.length}</strong>
                   <small>devices connected</small>
                 </span>
-                <strong>View rig <i>→</i></strong>
+                <strong>
+                  {'View rig '}
+                  <i>→</i>
+                </strong>
               </span>
             </button>
           ))}
@@ -456,15 +536,30 @@ function RigDetails({ open, rig, onToggle }: { open: boolean; rig: RigFixture; o
   return (
     <section className="vela-rig-details">
       <button aria-expanded={open} className="vela-rig-details__summary" onClick={onToggle} type="button">
-        <span><strong>Rig details</strong><small>{rig.endpoint} · Added {rig.addedAt}</small></span>
+        <span>
+          <strong>Rig details</strong>
+          <small>{rig.endpoint} · Added {rig.addedAt}</small>
+        </span>
         <i aria-hidden="true">⌄</i>
       </button>
       {open ? (
         <dl className="vela-rig-details__body">
-          <div><dt>Endpoint</dt><dd>{rig.endpoint}</dd></div>
-          <div><dt>Alpaca server</dt><dd>{rig.server}</dd></div>
-          <div><dt>Added to Vela</dt><dd>{rig.addedAt}</dd></div>
-          <div><dt>Last inventory</dt><dd>Today at 8:42 PM</dd></div>
+          <div>
+            <dt>Endpoint</dt>
+            <dd>{rig.endpoint}</dd>
+          </div>
+          <div>
+            <dt>Alpaca server</dt>
+            <dd>{rig.server}</dd>
+          </div>
+          <div>
+            <dt>Added to Vela</dt>
+            <dd>{rig.addedAt}</dd>
+          </div>
+          <div>
+            <dt>Last inventory</dt>
+            <dd>Today at 8:42 PM</dd>
+          </div>
         </dl>
       ) : null}
     </section>
@@ -520,15 +615,27 @@ function RigView({
       </header>
 
       {scenario === 'stale' ? (
-        <div className="vela-rig-notice" data-tone="warning"><strong>Live updates are interrupted</strong><span>Showing the most recent values Vela received. They may no longer describe the Rig.</span></div>
+        <div className="vela-rig-notice" data-tone="warning">
+          <strong>Live updates are interrupted</strong>
+          <span>Showing the most recent values Vela received. They may no longer describe the Rig.</span>
+        </div>
       ) : null}
 
       {scenario === 'offline' ? (
-        <div className="vela-rig-notice" data-tone="danger"><strong>This Rig is offline</strong><span>Vela cannot reach {rig.endpoint}. Device names come from the last successful inventory.</span></div>
+        <div className="vela-rig-notice" data-tone="danger">
+          <strong>This Rig is offline</strong>
+          <span>Vela cannot reach {rig.endpoint}. Device names come from the last successful inventory.</span>
+        </div>
       ) : null}
 
       <section className="vela-rig-devices" aria-labelledby="rig-devices-title">
-        <div className="vela-rig-section-heading"><div><small>EQUIPMENT</small><h2 id="rig-devices-title">Devices</h2></div><span>Refreshes every 5 seconds</span></div>
+        <div className="vela-rig-section-heading">
+          <div>
+            <small>EQUIPMENT</small>
+            <h2 id="rig-devices-title">Devices</h2>
+          </div>
+          <span>Refreshes every 5 seconds</span>
+        </div>
         <div className="vela-rig-device-grid">
           {devices.map((device) => <DeviceCard device={device} key={device.id} />)}
         </div>
@@ -537,7 +644,10 @@ function RigView({
       <RigDetails onToggle={onDetailsToggle} open={detailsOpen} rig={rig} />
 
       <section className="vela-rig-management">
-        <div><strong>Remove this Rig from Vela</strong><p>This only removes the saved Rig. It does not change the Alpaca server or hardware.</p></div>
+        <div>
+          <strong>Remove this Rig from Vela</strong>
+          <p>This only removes the saved Rig. It does not change the Alpaca server or hardware.</p>
+        </div>
         <Button className="vela-rig__forget-button" onClick={onForget} size="small" tone="quiet">Forget rig</Button>
       </section>
     </main>
@@ -580,7 +690,21 @@ function RigDetailPreview({ props, onPropsChange }: PreviewProps) {
 
       <Dialog
         description="This removes the saved Rig from Vela. It does not change the Alpaca server or any hardware."
-        footer={<><Button onClick={() => setForgetOpen(false)} tone="quiet">Cancel</Button><Button className="vela-rig__confirm-forget" onClick={() => { setForgetOpen(false); setForgottenRigs((current) => new Set([...current, rig.id])); update({ screen: 'home' }) }}>Forget rig</Button></>}
+        footer={(
+          <>
+            <Button onClick={() => setForgetOpen(false)} tone="quiet">Cancel</Button>
+            <Button
+              className="vela-rig__confirm-forget"
+              onClick={() => {
+                setForgetOpen(false)
+                setForgottenRigs((current) => new Set([...current, rig.id]))
+                update({ screen: 'home' })
+              }}
+            >
+              Forget rig
+            </Button>
+          </>
+        )}
         onDismiss={() => setForgetOpen(false)}
         open={forgetOpen}
         title={`Forget ${rig.name}?`}
@@ -603,6 +727,11 @@ export const specimen: ComponentSpecimen = {
     scenario: { type: 'select', label: 'State', options: scenarios },
     detailsOpen: { type: 'boolean', label: 'Rig details open' },
   },
-  defaultProps: { screen: 'rig', rig: 'askar', scenario: 'live', detailsOpen: false },
+  defaultProps: {
+    screen: 'rig',
+    rig: 'askar',
+    scenario: 'live',
+    detailsOpen: false
+  },
   render: (props, onPropsChange) => <RigDetailPreview onPropsChange={onPropsChange} props={props} />,
 }

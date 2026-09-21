@@ -25,8 +25,18 @@ export function imageBytesMetadata(bytes: ArrayBuffer): DataView {
   const dimension3 = view.getInt32(40, true)
 
   if (metadataVersion !== 1) invalid('Unsupported ImageBytes metadata version')
+
   // Transaction identifiers are unsigned; all other metadata fields are nonnegative Int32.
-  const nonnegativeFields = [errorNumber, dataStart, imageElementType, transmissionElementType, rank, dimension1, dimension2, dimension3]
+  const nonnegativeFields = [
+    errorNumber,
+    dataStart,
+    imageElementType,
+    transmissionElementType,
+    rank,
+    dimension1,
+    dimension2,
+    dimension3,
+  ]
 
   if (nonnegativeFields.some(value => value < 0)) invalid('Negative ImageBytes metadata value')
 
@@ -97,7 +107,8 @@ export function imageBytesPixels(bytes: ArrayBuffer, width: number, height: numb
     default: invalid('Unsupported ImageBytes transmission element type')
   }
 
-  if (bytes.byteLength - dataStart !== width * height * size) invalid('ImageBytes payload length differs from image dimensions')
+  if (bytes.byteLength - dataStart !== width * height * size)
+    invalid('ImageBytes payload length differs from image dimensions')
   const pixels = new Float64Array(width * height)
   let offset = dataStart
 

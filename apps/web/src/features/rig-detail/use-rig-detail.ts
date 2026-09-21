@@ -52,9 +52,11 @@ export function useRigDetail(rigId: string): RigDetailResult {
         return
       }
 
-      setState((current) => current.view === undefined
-        ? { refreshing: true, interrupted: false, initialError: 'unavailable' }
-        : { ...current, refreshing: true, interrupted: true })
+      setState((current) =>
+        current.view === undefined
+          ? { refreshing: true, interrupted: false, initialError: 'unavailable' }
+          : { ...current, refreshing: true, interrupted: true },
+      )
     } finally {
       if (requestGeneration.current === generation) {
         inFlight.current = false

@@ -5,7 +5,14 @@ const radians = Math.PI / 180
 
 // Independent horizon-coordinate construction: tilt in the meridian, then turn
 // north/east components about the zenith. No renderer or production math imports.
-function sample(altitude: number, azimuth: number, joint: number, sidereal: number, declination = 60, latitudeDegrees = 40): AlignmentSample {
+function sample(
+  altitude: number,
+  azimuth: number,
+  joint: number,
+  sidereal: number,
+  declination = 60,
+  latitudeDegrees = 40,
+): AlignmentSample {
   const latitude = latitudeDegrees * radians
   const dec = declination * radians
   const a = altitude / 3600 * radians
@@ -22,17 +29,28 @@ function sample(altitude: number, azimuth: number, joint: number, sidereal: numb
   const localX = up * Math.cos(latitude) - turnedNorth * Math.sin(latitude)
   const localZ = up * Math.sin(latitude) + turnedNorth * Math.cos(latitude)
 
-  return { raDegrees: (Math.atan2(turnedEast, localX) / radians + sidereal + 720) % 360,
+  return {
+    raDegrees: (Math.atan2(turnedEast, localX) / radians + sidereal + 720) % 360,
     decDegrees: Math.atan2(localZ, Math.hypot(localX, turnedEast)) / radians,
-    capturedAt: new Date(1_700_000_000_000 + sidereal * 1000).toISOString(), siderealTimeDegrees: sidereal }
+    capturedAt: new Date(1_700_000_000_000 + sidereal * 1000).toISOString(),
+    siderealTimeDegrees: sidereal,
+  }
 }
 
 function baseline(altitude: number, azimuth: number) {
-  return createAlignmentBaseline([sample(altitude, azimuth, 10, 359), sample(altitude, azimuth, 30, 359.1),
-    sample(altitude, azimuth, 50, 359.2)], 40)
+  return createAlignmentBaseline([
+    sample(altitude, azimuth, 10, 359),
+    sample(altitude, azimuth, 30, 359.1),
+    sample(altitude, azimuth, 50, 359.2),
+  ], 40)
 }
 
-function check(actual: { altitudeArcsec: number, azimuthArcsec: number, totalArcsec: number }, altitude: number, azimuth: number, latitudeDegrees = 40) {
+function check(
+  actual: { altitudeArcsec: number, azimuthArcsec: number, totalArcsec: number },
+  altitude: number,
+  azimuth: number,
+  latitudeDegrees = 40,
+) {
   const latitude = latitudeDegrees * radians
   expect(actual.altitudeArcsec).toBeCloseTo(altitude, 5)
   expect(actual.azimuthArcsec).toBeCloseTo(azimuth, 5)
@@ -41,8 +59,10 @@ function check(actual: { altitudeArcsec: number, azimuthArcsec: number, totalArc
   const east = Math.cos(alt) * Math.sin(azimuth / 3600 * radians)
   const up = Math.sin(alt)
 
-  const expected = Math.atan2(Math.hypot(up * Math.cos(latitude) - north * Math.sin(latitude), east),
-    up * Math.sin(latitude) + north * Math.cos(latitude)) / radians * 3600
+  const expected = Math.atan2(
+    Math.hypot(up * Math.cos(latitude) - north * Math.sin(latitude), east),
+    up * Math.sin(latitude) + north * Math.cos(latitude),
+  ) / radians * 3600
 
   expect(actual.totalArcsec).toBeCloseTo(expected, 5)
 }
@@ -75,7 +95,11 @@ describe('polar measurement from solved directions', () => {
       ], 40)
 
       check(reference.measurement, altitude, azimuth)
-      check(measureAlignment(reference, sample(altitude / 2, azimuth / 2, -25, 2.2, declination), true), altitude / 2, azimuth / 2)
+      check(
+        measureAlignment(reference, sample(altitude / 2, azimuth / 2, -25, 2.2, declination), true),
+        altitude / 2,
+        azimuth / 2,
+      )
       check(measureAlignment(reference, sample(0, 0, -25, 2.2, declination), true), 0, 0)
     }
   })
@@ -107,7 +131,14 @@ describe('polar measurement from solved directions', () => {
     // A nominal +130,+76,+22 corridor also advances with tracking during each leg.
     const reference = createAlignmentBaseline([
       sample(altitude, azimuth, 130, sidereal(0), 80, latitudeDegrees),
-      sample(altitude, azimuth, 130 - legDegrees - 70 * siderealDegreesPerSecond, sidereal(70), 80, latitudeDegrees),
+      sample(
+        altitude,
+        azimuth,
+        130 - legDegrees - 70 * siderealDegreesPerSecond,
+        sidereal(70),
+        80,
+        latitudeDegrees,
+      ),
       sample(altitude, azimuth, finalJoint, sidereal(finalElapsedSeconds), 80, latitudeDegrees),
     ], latitudeDegrees)
 

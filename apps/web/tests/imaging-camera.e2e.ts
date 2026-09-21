@@ -2,24 +2,46 @@ import { expect, test, type Page, type Route } from '@playwright/test'
 import type { ImagingCameraView } from '@vela/model/web'
 import { observation } from './fixtures/observation'
 
-const respond = <Body>(route: Route, body: Body) => route.fulfill({ contentType: 'application/json', body: JSON.stringify(body) })
+const respond = <Body>(route: Route, body: Body) => route.fulfill({
+  contentType: 'application/json',
+  body: JSON.stringify(body),
+})
 
 const cameras = [
   { id: 'main', name: 'ZWO ASI2600MC Pro', configuredName: 'ASI Camera (1)' },
   { id: 'guide', name: 'ZWO ASI220MM Mini', configuredName: 'ASI Camera (2)' },
 ]
 
-const empty: ImagingCameraView = { rigId: 'rig-1', selected: null, cameras, state: 'unselected', editable: true }
+const empty: ImagingCameraView = {
+  rigId: 'rig-1',
+  selected: null,
+  cameras,
+  state: 'unselected',
+  editable: true,
+}
 
 const saved: ImagingCameraView = { ...empty, selected: { id: 'main', name: cameras[0]!.name }, state: 'ready' }
 
 async function observe(page: Page) {
   await page.route('**/api/web/rigs/rig-1/observe', route => respond(route, observation('complete')))
   await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, {
-    rigId: 'rig-1', rigName: 'Seestar S30', camera: null, enabled: false,
-    unavailableReason: 'Choose an imaging camera.', phase: 'idle', active: false,
-    exposureSeconds: 2, elapsedSeconds: 0, error: null, latestImage: null, cooling: null,
-    captureReadState: 'current', repeat: false, saveFrames: false, savedImageCount: 0, completedCount: 0,
+    rigId: 'rig-1',
+    rigName: 'Seestar S30',
+    camera: null,
+    enabled: false,
+    unavailableReason: 'Choose an imaging camera.',
+    phase: 'idle',
+    active: false,
+    exposureSeconds: 2,
+    elapsedSeconds: 0,
+    error: null,
+    latestImage: null,
+    cooling: null,
+    captureReadState: 'current',
+    repeat: false,
+    saveFrames: false,
+    savedImageCount: 0,
+    completedCount: 0,
   }))
   await page.goto('/rigs/rig-1/observe')
 }
@@ -29,7 +51,8 @@ test('remembers the server-confirmed choice after reload and rejects a late pre-
   await page.addInitScript(() => {
     const original = window.fetch
     window.fetch = (input, init) => String(input).includes('/api/web/rigs/rig-1/imaging-camera')
-      ? original(input, { ...init, signal: null }) : original(input, init)
+      ? original(input, { ...init, signal: null })
+      : original(input, init)
   })
   let current = empty
   let writes = 0
@@ -42,7 +65,10 @@ test('remembers the server-confirmed choice after reload and rejects a late pre-
     const snapshot = current
     const delayed = hold && !held
 
-    if (delayed) { held = true; await waiting }
+    if (delayed) {
+      held = true
+      await waiting
+    }
 
     await respond(route, snapshot)
 
@@ -103,7 +129,10 @@ test('reconciles a lost save response from persisted selection without replaying
   let release!: () => void
   const waiting = new Promise<void>(resolve => { release = resolve })
   await page.route('**/api/web/rigs/rig-1/imaging-camera', async route => {
-    if (writes) { check = true; await waiting }
+    if (writes) {
+      check = true
+      await waiting
+    }
 
     await respond(route, current)
   })
@@ -133,7 +162,10 @@ test('an explicit check unlocks an unsaved uncertain choice without replaying it
     writes++
 
     if (writes === 1) await route.abort()
-    else { current = saved; await respond(route, current) }
+    else {
+      current = saved
+      await respond(route, current)
+    }
   })
   await observe(page)
   const panel = page.getByRole('region', { name: 'Imaging camera', exact: true })

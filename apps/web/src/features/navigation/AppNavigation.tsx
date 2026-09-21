@@ -13,17 +13,27 @@ export function AppNavigation() {
   const base = rigId ? `/rigs/${encodeURIComponent(rigId)}` : ''
   const targets = useRef(new Map<string, string>())
   const inTargets = pathname.startsWith(`${base}/observe/targets`)
+
   useEffect(() => {
     if (rigId && inTargets) targets.current.set(rigId, search)
   }, [rigId, inTargets, search])
-  const targetSearch = inTargets ? search : targets.current.get(rigId) ?? ''
-  const currentPage = inTargets ? 'Targets' : pathname.startsWith(`${base}/observe/capture`) ? 'Capture' : 'Observe'
 
-  const routeLink = (href: string) => ({ href, onClick: (event: MouseEvent<HTMLAnchorElement>) => {
-    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
-    event.preventDefault()
-    navigate(href)
-  } })
+  const targetSearch = inTargets ? search : targets.current.get(rigId) ?? ''
+
+  const currentPage = inTargets
+    ? 'Targets'
+    : pathname.startsWith(`${base}/observe/capture`)
+      ? 'Capture'
+      : 'Observe'
+
+  const routeLink = (href: string) => ({
+    href,
+    onClick: (event: MouseEvent<HTMLAnchorElement>) => {
+      if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+      event.preventDefault()
+      navigate(href)
+    },
+  })
 
   const rigs = [{ id: '', name: 'All rigs' }, ...(view?.rigs ?? [])]
 
@@ -44,28 +54,50 @@ export function AppNavigation() {
     activityProps.activity = current
   }
 
-  return <NavigationBar
-    home={routeLink('/')}
-    rigs={rigs}
-    currentRigId={rigId}
-    onRigChange={id => navigate(id ? `/rigs/${encodeURIComponent(id)}/observe` : '/')}
-    links={rigId ? [
-      { label: 'Observe', ...routeLink(`${base}/observe`), current: currentPage === 'Observe' },
-      { label: 'Targets', ...routeLink(`${base}/observe/targets${targetSearch}`), current: currentPage === 'Targets' },
-      { label: 'Capture', ...routeLink(`${base}/observe/capture`), current: currentPage === 'Capture' },
-    ] : []}
-    {...activityProps}
-  />
+  return (
+    <NavigationBar
+      home={routeLink('/')}
+      rigs={rigs}
+      currentRigId={rigId}
+      onRigChange={id => navigate(id ? `/rigs/${encodeURIComponent(id)}/observe` : '/')}
+      links={rigId ? [
+        {
+          label: 'Observe',
+          ...routeLink(`${base}/observe`),
+          current: currentPage === 'Observe',
+        },
+        {
+          label: 'Targets',
+          ...routeLink(`${base}/observe/targets${targetSearch}`),
+          current: currentPage === 'Targets',
+        },
+        {
+          label: 'Capture',
+          ...routeLink(`${base}/observe/capture`),
+          current: currentPage === 'Capture',
+        },
+      ] : []}
+      {...activityProps}
+    />
+  )
 }
 
 type ActivityPresentation = Pick<NavigationActivity, 'status' | 'note' | 'progress'> & { interrupted: boolean }
 
-function activityPresentation(activity: NavigationCapture, offline: boolean, missing: boolean): ActivityPresentation {
+function activityPresentation(
+  activity: NavigationCapture,
+  offline: boolean,
+  missing: boolean,
+): ActivityPresentation {
   if (missing) return { status: 'Tracking lost', note: 'Last known · open Capture →', interrupted: true }
 
   if (offline) return { status: 'Updates lost', note: 'Last known · open Capture →', interrupted: true }
 
-  if (activity.captureReadState === 'retrying') return { status: 'Awaiting camera', note: 'Retrying same exposure · open Capture →', interrupted: true }
+  if (activity.captureReadState === 'retrying') return {
+    status: 'Awaiting camera',
+    note: 'Retrying same exposure · open Capture →',
+    interrupted: true,
+  }
 
   switch (activity.phase) {
     case 'exposing': {

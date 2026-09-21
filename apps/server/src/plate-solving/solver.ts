@@ -15,7 +15,10 @@ export interface MonoFrame {
   color?: ImageColor
 }
 
-export interface SkyPosition { raDegrees: number, decDegrees: number }
+export interface SkyPosition {
+  raDegrees: number
+  decDegrees: number
+}
 
 export interface PlateWcs {
   width: number
@@ -27,7 +30,9 @@ export interface PlateWcs {
   cd: readonly [number, number, number, number]
 }
 
-export type SolveResult = { status: 'no-solution' } | ({ status: 'solved', capturedAt: string, wcs: PlateWcs } & SkyPosition)
+export type SolveResult =
+  | { status: 'no-solution' }
+  | ({ status: 'solved', capturedAt: string, wcs: PlateWcs } & SkyPosition)
 
 export interface PlateSolver {
   solve(frame: MonoFrame, hint: SkyPosition, signal: AbortSignal): Promise<SolveResult>
@@ -46,21 +51,30 @@ export function createAstapSolver(config: {
   const catalog = resolve(config.catalogPath)
   const timeout = config.timeoutMs ?? 30_000
 
-  if (!config.executable.trim() || !config.catalogPath.trim()
-    || !Number.isFinite(config.fieldHeightDegrees) || config.fieldHeightDegrees <= 0 || config.fieldHeightDegrees > 90
-    || !Number.isFinite(timeout) || timeout <= 0 || timeout > 120_000) throw new Error('Invalid ASTAP configuration')
+  if (
+    !config.executable.trim()
+    || !config.catalogPath.trim()
+    || !Number.isFinite(config.fieldHeightDegrees)
+    || config.fieldHeightDegrees <= 0
+    || config.fieldHeightDegrees > 90
+    || !Number.isFinite(timeout)
+    || timeout <= 0
+    || timeout > 120_000
+  ) throw new Error('Invalid ASTAP configuration')
 
   return {
     async solve(frame, hint, signal) {
-      return trace.getTracer('vela.plate-solving').startActiveSpan('astap.solve', { attributes: {
-        'astap.hint.ra_degrees': hint.raDegrees,
-        'astap.hint.dec_degrees': hint.decDegrees,
-        'astap.field_height_degrees': config.fieldHeightDegrees,
-        'astap.timeout_ms': timeout,
-        'image.width': frame.width,
-        'image.height': frame.height,
-        'image.captured_at': frame.capturedAt,
-      } }, async (span): Promise<SolveResult> => {
+      return trace.getTracer('vela.plate-solving').startActiveSpan('astap.solve', {
+        attributes: {
+          'astap.hint.ra_degrees': hint.raDegrees,
+          'astap.hint.dec_degrees': hint.decDegrees,
+          'astap.field_height_degrees': config.fieldHeightDegrees,
+          'astap.timeout_ms': timeout,
+          'image.width': frame.width,
+          'image.height': frame.height,
+          'image.captured_at': frame.capturedAt,
+        },
+      }, async (span): Promise<SolveResult> => {
         try {
           const deadline = performance.now() + timeout
           signal.throwIfAborted()
@@ -85,10 +99,22 @@ export function createAstapSolver(config: {
                 attributes: { 'astap.search_radius_degrees': radius, 'astap.timeout_ms': remainingMs },
               }, async (attempt): Promise<SolveResult | null> => {
                 try {
-                  const code = await runAstap(executable, ['-f', path, '-d', catalog,
-                    '-fov', String(config.fieldHeightDegrees), '-ra', String(hint.raDegrees / 15),
-                    '-spd', String(hint.decDegrees + 90), '-r', String(radius), '-s', '1000',
-                    ...(frame.color?.kind === 'bayer' ? ['-check', 'y'] : [])], signal, remainingMs, attempt)
+                  const code = await runAstap(
+                    executable,
+                    [
+                      '-f', path,
+                      '-d', catalog,
+                      '-fov', String(config.fieldHeightDegrees),
+                      '-ra', String(hint.raDegrees / 15),
+                      '-spd', String(hint.decDegrees + 90),
+                      '-r', String(radius),
+                      '-s', '1000',
+                      ...(frame.color?.kind === 'bayer' ? ['-check', 'y'] : []),
+                    ],
+                    signal,
+                    remainingMs,
+                    attempt,
+                  )
 
                   signal.throwIfAborted()
 
@@ -110,14 +136,22 @@ export function createAstapSolver(config: {
                   attempt.setAttribute('astap.outcome', 'solved')
                   span.setAttribute('astap.outcome', 'solved')
 
-                  return { status: 'solved', capturedAt: frame.capturedAt,
-                    raDegrees: wcs.raDegrees, decDegrees: wcs.decDegrees, wcs }
+                  return {
+                    status: 'solved',
+                    capturedAt: frame.capturedAt,
+                    raDegrees: wcs.raDegrees,
+                    decDegrees: wcs.decDegrees,
+                    wcs,
+                  }
                 } catch (error) {
                   attempt.setAttribute('astap.outcome', signal.aborted ? 'cancelled' : 'error')
 
                   if (signal.aborted) attempt.setAttribute('operation.cancelled', true)
                   else {
-                    attempt.setStatus({ code: SpanStatusCode.ERROR, message: error instanceof Error ? error.message : 'ASTAP failed' })
+                    attempt.setStatus({
+                      code: SpanStatusCode.ERROR,
+                      message: error instanceof Error ? error.message : 'ASTAP failed',
+                    })
 
                     if (error instanceof Error) attempt.recordException(error)
                   }
@@ -140,7 +174,10 @@ export function createAstapSolver(config: {
 
           if (signal.aborted) span.setAttribute('operation.cancelled', true)
           else {
-            span.setStatus({ code: SpanStatusCode.ERROR, message: error instanceof Error ? error.message : 'ASTAP failed' })
+            span.setStatus({
+              code: SpanStatusCode.ERROR,
+              message: error instanceof Error ? error.message : 'ASTAP failed',
+            })
 
             if (error instanceof Error) span.recordException(error)
           }
@@ -154,7 +191,13 @@ export function createAstapSolver(config: {
   }
 }
 
-function runAstap(executable: string, args: string[], signal: AbortSignal, timeout: number, span: Span): Promise<number> {
+function runAstap(
+  executable: string,
+  args: string[],
+  signal: AbortSignal,
+  timeout: number,
+  span: Span,
+): Promise<number> {
   return new Promise((resolveCode, reject) => {
     // SIGKILL also bounds tools that ignore SIGTERM. execFile waits for exit
     // before callback/cleanup; cancellation cannot leave a writer in the tempdir.
@@ -170,7 +213,8 @@ function runAstap(executable: string, args: string[], signal: AbortSignal, timeo
       })
       const exitCode = z.number().safeParse(error?.code)
 
-      if (!error || exitCode.success) span.setAttribute('astap.exit_code', error && exitCode.success ? exitCode.data : 0)
+      if (!error || exitCode.success)
+        span.setAttribute('astap.exit_code', error && exitCode.success ? exitCode.data : 0)
 
       if (cancelled) return reject(signal.reason ?? new Error('Plate solving cancelled'))
 
@@ -180,7 +224,10 @@ function runAstap(executable: string, args: string[], signal: AbortSignal, timeo
       reject(new Error(error.killed ? 'ASTAP timed out' : `ASTAP could not run: ${error.message}`, { cause: error }))
     })
 
-    const abort = () => { cancelled = true; child.kill('SIGKILL') }
+    const abort = () => {
+      cancelled = true
+      child.kill('SIGKILL')
+    }
 
     signal.addEventListener('abort', abort, { once: true })
 
@@ -200,7 +247,8 @@ function parseWcs(text: string, image: { width: number, height: number }): Plate
   const number = (key: string) => {
     const raw = values.get(key)
 
-    if (!raw || !/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(raw)) throw new Error(`Invalid ASTAP ${key}`)
+    if (!raw || !/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(raw))
+      throw new Error(`Invalid ASTAP ${key}`)
     const value = Number(raw)
 
     if (!Number.isFinite(value)) throw new Error(`Invalid ASTAP ${key}`)
@@ -210,15 +258,23 @@ function parseWcs(text: string, image: { width: number, height: number }): Plate
 
   if (values.get('PLTSOLVD') !== 'T') throw new Error('ASTAP success did not contain a solved plate')
 
-  const wcs: PlateWcs = { width: image.width, height: image.height, referenceX: number('CRPIX1'), referenceY: number('CRPIX2'),
-    raDegrees: number('CRVAL1'), decDegrees: number('CRVAL2'),
-    cd: [number('CD1_1'), number('CD1_2'), number('CD2_1'), number('CD2_2')] }
+  const wcs: PlateWcs = {
+    width: image.width,
+    height: image.height,
+    referenceX: number('CRPIX1'),
+    referenceY: number('CRPIX2'),
+    raDegrees: number('CRVAL1'),
+    decDegrees: number('CRVAL2'),
+    cd: [number('CD1_1'), number('CD1_2'), number('CD2_1'), number('CD2_2')],
+  }
 
   validatePosition(wcs)
 
-  if (Math.abs(wcs.referenceX - (image.width + 1) / 2) > 1e-6
+  if (
+    Math.abs(wcs.referenceX - (image.width + 1) / 2) > 1e-6
     || Math.abs(wcs.referenceY - (image.height + 1) / 2) > 1e-6
-    || Math.abs(wcs.cd[0] * wcs.cd[3] - wcs.cd[1] * wcs.cd[2]) < 1e-15) throw new Error('Invalid ASTAP reference pixel or plate scale')
+    || Math.abs(wcs.cd[0] * wcs.cd[3] - wcs.cd[1] * wcs.cd[2]) < 1e-15
+  ) throw new Error('Invalid ASTAP reference pixel or plate scale')
 
   return wcs
 }
@@ -238,11 +294,18 @@ export function projectSky(wcs: PlateWcs, position: SkyPosition): { x: number, y
   const [a, b, c, d] = wcs.cd
   const determinant = a * d - b * c
 
-  return { x: wcs.referenceX - 1 + (east * d - north * b) / determinant,
-    y: wcs.referenceY - 1 + (north * a - east * c) / determinant }
+  return {
+    x: wcs.referenceX - 1 + (east * d - north * b) / determinant,
+    y: wcs.referenceY - 1 + (north * a - east * c) / determinant,
+  }
 }
 
 function validatePosition(position: SkyPosition) {
-  if (!Number.isFinite(position.raDegrees) || position.raDegrees < 0 || position.raDegrees >= 360
-    || !Number.isFinite(position.decDegrees) || Math.abs(position.decDegrees) > 90) throw new Error('Invalid plate coordinates')
+  if (
+    !Number.isFinite(position.raDegrees)
+    || position.raDegrees < 0
+    || position.raDegrees >= 360
+    || !Number.isFinite(position.decDegrees)
+    || Math.abs(position.decDegrees) > 90
+  ) throw new Error('Invalid plate coordinates')
 }

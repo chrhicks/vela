@@ -158,7 +158,10 @@ export function buildApp({
       inspection = await alpacaDiscovery.inspect(input.endpoint)
     } catch (error) {
       if (error instanceof AlpacaProviderError) {
-        request.log.warn({ err: error, endpoint: input.endpoint }, 'Rig inspection failed before addition')
+        request.log.warn(
+          { err: error, endpoint: input.endpoint },
+          'Rig inspection failed before addition',
+        )
 
         return reply.code(502).send({ error: 'rig-inspection-failed' })
       }
@@ -214,7 +217,10 @@ export function buildApp({
     createInventory,
     now,
     onConflict(rig) {
-      request.log.warn({ rigId: rig.id }, 'Known Rig identity conflicts with its current endpoint')
+      request.log.warn(
+        { rigId: rig.id },
+        'Known Rig identity conflicts with its current endpoint',
+      )
     },
     onUnavailable(rig, cause) {
       request.log.warn({ err: cause, rigId: rig.id }, 'Known Rig is unavailable')
@@ -287,10 +293,16 @@ export function buildApp({
         now,
         signal: controller.signal,
         onConflict(rig) {
-          request.log.warn({ rigId: rig.id }, 'Known Rig identity conflicts with its current endpoint')
+          request.log.warn(
+            { rigId: rig.id },
+            'Known Rig identity conflicts with its current endpoint',
+          )
         },
         onUnavailable(rig, state, cause) {
-          request.log.warn({ err: cause, rigId: rig.id, state }, 'Known Rig detail is unavailable')
+          request.log.warn(
+            { err: cause, rigId: rig.id, state },
+            'Known Rig detail is unavailable',
+          )
         },
       })
 
@@ -313,14 +325,23 @@ function rigConnectionLogging(
 ): Pick<RigConnectionRequestOptions, 'onConflict' | 'onProviderResult' | 'onUnavailable'> {
   return {
     onConflict(rig) {
-      request.log.warn({ rigId: rig.id }, 'Known Rig identity conflicts before device connection')
+      request.log.warn(
+        { rigId: rig.id },
+        'Known Rig identity conflicts before device connection',
+      )
     },
     onProviderResult(providerDeviceId, result) {
       if (!(result instanceof AlpacaProviderError) && result.outcome === 'connected') return
-      request.log.warn({ providerDeviceId, result }, 'Rig device connection did not confirm success')
+      request.log.warn(
+        { providerDeviceId, result },
+        'Rig device connection did not confirm success',
+      )
     },
     onUnavailable(rig, state, cause) {
-      request.log.warn({ err: cause, rigId: rig.id, state }, 'Known Rig connection state is unavailable')
+      request.log.warn(
+        { err: cause, rigId: rig.id, state },
+        'Known Rig connection state is unavailable',
+      )
     },
   }
 }

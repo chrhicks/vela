@@ -17,23 +17,47 @@ const roots: string[] = []
 const digest = (value: string | Buffer) => createHash('sha256').update(value).digest('hex')
 
 const image: CaptureImage = {
-  id: 'retained', imageUrl: '/old-preview', width: 1602, height: 32, capturedAt: '2026-09-15T03:00:00.000Z',
-  receivedAt: '2026-09-15T03:03:00.000Z', capturedAtSource: 'server-estimate', exposureSeconds: 180,
-  cameraName: 'Retained camera', color: 'color', statistics: { detectedStars: 42, medianHfrPixels: 4 }, saved: true,
+  id: 'retained',
+  imageUrl: '/old-preview',
+  width: 1602,
+  height: 32,
+  capturedAt: '2026-09-15T03:00:00.000Z',
+  receivedAt: '2026-09-15T03:03:00.000Z',
+  capturedAtSource: 'server-estimate',
+  exposureSeconds: 180,
+  cameraName: 'Retained camera',
+  color: 'color',
+  statistics: { detectedStars: 42, medianHfrPixels: 4 },
+  saved: true,
 }
 
 async function setup(openFile = open) {
   const root = await mkdtemp(join(tmpdir(), 'vela-preview-'))
   roots.push(root)
   const catalog = createMemoryRigCatalog()
-  const added = await catalog.add({ name: 'Retained test', endpoint: { host: '127.0.0.1', port: 1 }, inventory: { devices: [], observedAt: image.capturedAt } })
+
+  const added = await catalog.add({
+    name: 'Retained test',
+    endpoint: { host: '127.0.0.1', port: 1 },
+    inventory: { devices: [], observedAt: image.capturedAt },
+  })
 
   if (added.state !== 'added') throw new Error('Fixture rig was not added')
   const { rig } = added
   const store = await openFileSavedImageStore(root, openFile)
-  const pixels = Int32Array.from({ length: image.width * image.height }, (_, i) => (i % 2 + Math.floor(i / image.width) % 2) % 2 ? 530 : 500)
+
+  const pixels = Int32Array.from(
+    { length: image.width * image.height },
+    (_, i) => (i % 2 + Math.floor(i / image.width) % 2) % 2 ? 530 : 500,
+  )
+
   const color = { kind: 'bayer', pattern: 'rggb' } as const
-  const fits = await encodeCaptureFits({ ...image, color, pixels }, { exposureSeconds: image.exposureSeconds, cameraName: image.cameraName })
+
+  const fits = await encodeCaptureFits(
+    { ...image, color, pixels },
+    { exposureSeconds: image.exposureSeconds, cameraName: image.cameraName },
+  )
+
   const files = { fits, native: Buffer.from('first native bytes'), fit: Buffer.from('first fit bytes') }
   await store.save(rig.id, image, files)
   const directory = join(root, digest(rig.id), digest(image.id))
@@ -52,9 +76,18 @@ it('lazily publishes a versioned native/fit pair, preserves every original byte/
   const before = await readFile(join(directory, 'metadata.json'))
   expect((await store.list(rig.id))[0]?.previewRendering).toEqual({ status: 'legacy' })
   expect(await readdir(directory)).not.toContain('previews')
-  const [first, duplicate] = await Promise.all([store.refreshPreview(rig.id, image.id), store.refreshPreview(rig.id, image.id)])
+
+  const [first, duplicate] = await Promise.all([
+    store.refreshPreview(rig.id, image.id),
+    store.refreshPreview(rig.id, image.id),
+  ])
+
   expect(first).toEqual(duplicate)
-  expect(first).toMatchObject({ ...image, imageUrl: expect.stringContaining('/previews/background-v1/preview'), previewRendering: { status: 'current', version: PREVIEW_VERSION } })
+  expect(first).toMatchObject({
+    ...image,
+    imageUrl: expect.stringContaining('/previews/background-v1/preview'),
+    previewRendering: { status: 'current', version: PREVIEW_VERSION },
+  })
   const expected = await capturePreviews(image.width, image.height, subject.pixels, subject.color)
   expect(await store.previewFile(rig.id, image.id, 'native')).toEqual(expected.native)
   expect(await store.previewFile(rig.id, image.id, 'fit')).toEqual(expected.fit)
@@ -130,13 +163,26 @@ it('keeps unsupported originals viewable and pins old URLs while display/downloa
     expect(failed.previewRendering).toEqual({ status: 'unavailable' })
     expect((await app.inject(failed.imageUrl)).rawPayload).toEqual(files.native)
     expect((await app.inject(failed.previewDownloadUrl)).rawPayload).toEqual(files.native)
-  } finally { await app.close() }
+  } finally {
+    await app.close()
+  }
 })
 
 it('marks fresh captures current without storing a second copy of their already-correct PNGs', async () => {
   const { store, rig, root, directory, pixels, color, files } = await setup()
   const rendered = await capturePreviews(image.width, image.height, pixels, color)
-  const fresh = await store.save(rig.id, { ...image, id: 'fresh' }, { ...files, native: rendered.native, fit: rendered.fit!, previewVersion: PREVIEW_VERSION })
+
+  const fresh = await store.save(
+    rig.id,
+    { ...image, id: 'fresh' },
+    {
+      ...files,
+      native: rendered.native,
+      fit: rendered.fit!,
+      previewVersion: PREVIEW_VERSION,
+    },
+  )
+
   expect(fresh.previewRendering?.status).toBe('current')
   const reopened = await openFileSavedImageStore(root)
   expect(await reopened.get(rig.id, 'fresh')).toEqual(fresh)

@@ -33,8 +33,14 @@ try {
   await available(3001, '127.0.0.1')
   await available(5173, '0.0.0.0')
   console.log(`Starting Vela for http://${env.VELA_LAN_HOST}:5173 — Ctrl+C stops this run.`)
+
   // A separate process group lets this command stop pnpm and all its watchers.
-  const child = spawn('pnpm', ['dev'], { cwd: root, env, stdio: 'inherit', detached: true })
+  const child = spawn('pnpm', ['dev'], {
+    cwd: root,
+    env,
+    stdio: 'inherit',
+    detached: true,
+  })
 
   const stop = signal => {
     try {
@@ -63,7 +69,9 @@ try {
 function available(port, host) {
   return new Promise((resolveReady, reject) => {
     const server = createServer()
-    server.once('error', error => reject(new Error(`Port ${port} is unavailable (${error.code}). Stop the existing server first.`)))
+    server.once('error', error => reject(new Error(
+      `Port ${port} is unavailable (${error.code}). Stop the existing server first.`,
+    )))
     server.listen({ port, host }, () => server.close(resolveReady))
   })
 }
