@@ -12,16 +12,19 @@
 }
 .vela-discovery__eyebrow {
   color: var(--vela-accent);
-  font-size: .8em;
+  font-size: 0.8em;
   font-weight: 650;
 }
 .vela-discovery h1 {
   margin: 0;
   font-size: clamp(1.45rem, 4cqi, 2rem);
   font-weight: 650;
-  letter-spacing: -.025em;
+  letter-spacing: -0.025em;
 }
-.vela-discovery__header p:last-child { margin: 8px 0 0; color: var(--vela-text-muted); }
+.vela-discovery__header p:last-child {
+  margin: 8px 0 0;
+  color: var(--vela-text-muted);
+}
 .vela-discovery__snapshot {
   display: flex;
   justify-content: space-between;
@@ -29,7 +32,7 @@
   gap: 8px 20px;
   padding: 22px 0 16px;
   color: var(--vela-text-muted);
-  font-size: .75em;
+  font-size: 0.75em;
 }
 .vela-discovery__filters {
   display: flex;
@@ -42,27 +45,35 @@
   background: var(--vela-surface);
   color: var(--vela-text-muted);
   font: inherit;
-  font-size: .8em;
+  font-size: 0.8em;
   padding: 8px 14px;
   cursor: pointer;
 }
-.vela-discovery__filters button[aria-pressed=true] {
+.vela-discovery__filters button[aria-pressed='true'] {
   color: var(--vela-text);
   background: var(--vela-surface-raised);
   border-color: var(--vela-accent);
 }
-.vela-discovery__filters button:focus-visible { outline: 2px solid var(--vela-focus); outline-offset: 3px; }
+.vela-discovery__filters button:focus-visible {
+  outline: 2px solid var(--vela-focus);
+  outline-offset: 3px;
+}
 .vela-discovery__filter-note {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 6px;
-  font-size: .75em;
+  font-size: 0.75em;
   line-height: 1.6;
   color: var(--vela-text-muted);
   margin: 18px 0;
 }
-.vela-discovery__filter-note strong { color: var(--vela-text); font-weight: 500; }
-.vela-discovery__filter-note span { flex-basis: 100%; }
+.vela-discovery__filter-note strong {
+  color: var(--vela-text);
+  font-weight: 500;
+}
+.vela-discovery__filter-note span {
+  flex-basis: 100%;
+}
 .vela-discovery__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -93,13 +104,15 @@
   color: var(--vela-text);
   background: var(--vela-surface);
   border-radius: var(--vela-radius);
-  font-size: .7em;
+  font-size: 0.7em;
 }
-.vela-discovery__body { padding: 20px; }
+.vela-discovery__body {
+  padding: 20px;
+}
 .vela-discovery__catalog {
   margin: 0 0 6px;
   color: var(--vela-text-muted);
-  font-size: .75em;
+  font-size: 0.75em;
 }
 .vela-discovery h2 {
   margin: 0 0 18px;
@@ -109,12 +122,18 @@
 .vela-discovery__window {
   display: grid;
   gap: 5px;
-  font-size: .82em;
+  font-size: 0.82em;
 }
-.vela-discovery__window strong { color: var(--vela-positive); font-weight: 550; }
-.vela-discovery__window span, .vela-discovery__reason { color: var(--vela-text-muted); }
+.vela-discovery__window strong {
+  color: var(--vela-positive);
+  font-weight: 550;
+}
+.vela-discovery__window span,
 .vela-discovery__reason {
-  font-size: .8em;
+  color: var(--vela-text-muted);
+}
+.vela-discovery__reason {
+  font-size: 0.8em;
   line-height: 1.6;
   min-height: 2.6em;
 }
@@ -122,37 +141,63 @@
   border-top: 1px solid var(--vela-line);
   margin: 18px 0;
   padding-top: 16px;
-  font-size: .76em;
+  font-size: 0.76em;
   line-height: 1.6;
 }
-.vela-discovery__advice strong { font-weight: 550; }
-.vela-discovery__advice p { margin: 4px 0 0; color: var(--vela-text-muted); }
-.vela-discovery__body > .vela-button { width: 100%; justify-content: space-between; }
+.vela-discovery__advice strong {
+  font-weight: 550;
+}
+.vela-discovery__advice p {
+  margin: 4px 0 0;
+  color: var(--vela-text-muted);
+}
+.vela-discovery__body > .vela-button {
+  width: 100%;
+  justify-content: space-between;
+}
 .vela-discovery__body small {
   display: block;
   margin-top: 14px;
   color: var(--vela-text-muted);
-  font-size: .6em;
+  font-size: 0.6em;
   line-height: 1.5;
 }
-.vela-discovery__body small a { color: inherit; }
+.vela-discovery__body small a {
+  color: inherit;
+}
 .vela-discovery__footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 10px;
   padding: 20px 0;
-  font-size: .8em;
+  font-size: 0.8em;
   color: var(--vela-text-muted);
 }
-.vela-discovery__footer > div { display: flex; gap: 8px; }
-.vela-discovery__selection { font-size: .8em; color: var(--vela-text-muted); }
+.vela-discovery__footer > div {
+  display: flex;
+  gap: 8px;
+}
+.vela-discovery__selection {
+  font-size: 0.8em;
+  color: var(--vela-text-muted);
+}
 @container (max-width: 580px) {
-  .vela-discovery__grid { grid-template-columns: 1fr; }
-  .vela-discovery__header { align-items: flex-start; }
-  .vela-discovery__header > .vela-button { margin-top: 12px; }
-  .vela-discovery__body { padding: 16px; }
-  .vela-discovery__footer { flex-wrap: wrap; }
+  .vela-discovery__grid {
+    grid-template-columns: 1fr;
+  }
+  .vela-discovery__header {
+    align-items: flex-start;
+  }
+  .vela-discovery__header > .vela-button {
+    margin-top: 12px;
+  }
+  .vela-discovery__body {
+    padding: 16px;
+  }
+  .vela-discovery__footer {
+    flex-wrap: wrap;
+  }
 }
 
 .vela-discovery__search {
@@ -161,12 +206,15 @@
   align-items: flex-end;
   margin-bottom: 16px;
 }
-.vela-discovery__search > .vela-field { flex: 1; min-width: 0; }
+.vela-discovery__search > .vela-field {
+  flex: 1;
+  min-width: 0;
+}
 .vela-discovery__search label {
   display: grid;
   gap: 5px;
   color: var(--vela-text-muted);
-  font-size: .75em;
+  font-size: 0.75em;
 }
 .vela-discovery__search select {
   min-height: var(--vela-control-height);
@@ -189,16 +237,28 @@
 .vela-discovery__empty {
   padding: 30px 0;
   color: var(--vela-text-muted);
-  font-size: .85em;
+  font-size: 0.85em;
 }
 @container (max-width: 580px) {
-  .vela-discovery__search { flex-direction: column; align-items: stretch; }
+  .vela-discovery__search {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
 
-.vela-discovery__image { display: block; color: inherit; }
-.vela-discovery > .vela-field { margin-bottom: 18px; }
-.vela-discovery__filters { margin-top: 12px; }
-.vela-discovery__light button { font-size: .75em; }
+.vela-discovery__image {
+  display: block;
+  color: inherit;
+}
+.vela-discovery > .vela-field {
+  margin-bottom: 18px;
+}
+.vela-discovery__filters {
+  margin-top: 12px;
+}
+.vela-discovery__light button {
+  font-size: 0.75em;
+}
 .vela-discovery__catalog {
   display: flex;
   justify-content: space-between;
@@ -210,17 +270,28 @@
   gap: 12px;
   margin: 24px 0 16px;
   color: var(--vela-text-muted);
-  font-size: .85em;
+  font-size: 0.85em;
 }
-.vela-discovery__results strong { color: var(--vela-text); }
+.vela-discovery__results strong {
+  color: var(--vela-text);
+}
 .vela-discovery__method {
   padding: 16px 0;
   color: var(--vela-text-muted);
-  font-size: .8em;
+  font-size: 0.8em;
   line-height: 1.7;
   max-width: 75ch;
 }
-.vela-discovery__method summary { cursor: pointer; color: var(--vela-text); }
-.vela-discovery__body > a { text-decoration: none; }
-.vela-discovery__results { scroll-margin-top: 76px; }
-.vela-discovery__results:focus { outline: none; }
+.vela-discovery__method summary {
+  cursor: pointer;
+  color: var(--vela-text);
+}
+.vela-discovery__body > a {
+  text-decoration: none;
+}
+.vela-discovery__results {
+  scroll-margin-top: 76px;
+}
+.vela-discovery__results:focus {
+  outline: none;
+}

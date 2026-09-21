@@ -19,7 +19,7 @@ function fakeFetch(
   routes: Record<string, ResponseFixture | Error>,
   requests: string[] = [],
 ): typeof globalThis.fetch {
-  return async (input) => {
+  return async input => {
     const url = new URL(String(input))
     const key = `${url.pathname}${url.search}`
     requests.push(key)
@@ -43,14 +43,16 @@ const devices = [
 ]
 
 function commonRoutes() {
-  return Object.fromEntries(devices.flatMap((device) => {
-    const base = `/api/v1/${device.DeviceType.toLowerCase()}/${device.DeviceNumber}`
+  return Object.fromEntries(
+    devices.flatMap(device => {
+      const base = `/api/v1/${device.DeviceType.toLowerCase()}/${device.DeviceNumber}`
 
-    return [
-      [`${base}/connected`, envelope(true)],
-      [`${base}/name`, envelope(`${device.DeviceType} hardware`)],
-    ]
-  }))
+      return [
+        [`${base}/connected`, envelope(true)],
+        [`${base}/name`, envelope(`${device.DeviceType} hardware`)],
+      ]
+    }),
+  )
 }
 
 describe('Alpaca device inspection', () => {
@@ -235,21 +237,26 @@ describe('Alpaca device inspection', () => {
 
     const provider = createAlpacaProvider({
       baseUrl: 'http://alpaca.test',
-      fetch: fakeFetch({
-        '/management/v1/configureddevices': envelope([devices[0]]),
-        '/api/v1/camera/0/connected': envelope(false),
-        '/api/v1/camera/0/name': envelope('', 1031, 'Name unavailable while disconnected'),
-      }, requests),
+      fetch: fakeFetch(
+        {
+          '/management/v1/configureddevices': envelope([devices[0]]),
+          '/api/v1/camera/0/connected': envelope(false),
+          '/api/v1/camera/0/name': envelope('', 1031, 'Name unavailable while disconnected'),
+        },
+        requests,
+      ),
     })
 
-    await expect(provider.inspectDevices()).resolves.toEqual([{
-      providerDeviceId: 'camera-0',
-      kind: 'camera',
-      configuredName: 'Camera slot',
-      name: 'Camera slot',
-      connection: 'disconnected',
-      telemetry: { availability: 'unavailable' },
-    }])
+    await expect(provider.inspectDevices()).resolves.toEqual([
+      {
+        providerDeviceId: 'camera-0',
+        kind: 'camera',
+        configuredName: 'Camera slot',
+        name: 'Camera slot',
+        connection: 'disconnected',
+        telemetry: { availability: 'unavailable' },
+      },
+    ])
     expect(requests).toEqual([
       '/management/v1/configureddevices',
       '/api/v1/camera/0/connected',
@@ -266,23 +273,29 @@ describe('Alpaca device inspection', () => {
         '/api/v1/camera/0/name': envelope('  ZWO ASI220MM Mini  '),
         '/api/v1/camera/0/camerastate': envelope(99),
         '/api/v1/camera/0/ccdtemperature': envelope('hot'),
-        '/api/v1/camera/0/cansetccdtemperature': envelope(false, 1024, 'Property is not implemented'),
+        '/api/v1/camera/0/cansetccdtemperature': envelope(
+          false,
+          1024,
+          'Property is not implemented',
+        ),
         '/api/v1/camera/0/cangetcoolerpower': envelope(false, 1024, 'Property is not implemented'),
         '/api/v1/camera/0/cooleron': envelope(false, 1024, 'Property is not implemented'),
       }),
     })
 
-    await expect(provider.inspectDevices()).resolves.toEqual([{
-      providerDeviceId: 'camera-0',
-      kind: 'camera',
-      configuredName: 'Camera slot',
-      name: 'ZWO ASI220MM Mini',
-      connection: 'connected',
-      telemetry: {
-        availability: 'partial',
-        values: { kind: 'camera' },
+    await expect(provider.inspectDevices()).resolves.toEqual([
+      {
+        providerDeviceId: 'camera-0',
+        kind: 'camera',
+        configuredName: 'Camera slot',
+        name: 'ZWO ASI220MM Mini',
+        connection: 'connected',
+        telemetry: {
+          availability: 'partial',
+          values: { kind: 'camera' },
+        },
       },
-    }])
+    ])
   })
 
   it('reports an active open-loop cooler without setpoint control', async () => {
@@ -301,27 +314,29 @@ describe('Alpaca device inspection', () => {
       }),
     })
 
-    await expect(provider.inspectDevices()).resolves.toEqual([{
-      providerDeviceId: 'camera-0',
-      kind: 'camera',
-      configuredName: 'Camera slot',
-      name: 'Open-loop camera',
-      connection: 'connected',
-      telemetry: {
-        availability: 'complete',
-        values: {
-          kind: 'camera',
-          activity: 'idle',
-          sensorTemperatureC: -2,
-          cooling: {
-            state: 'on',
-            setpointControl: false,
-            powerReporting: true,
-            powerPercent: 75,
+    await expect(provider.inspectDevices()).resolves.toEqual([
+      {
+        providerDeviceId: 'camera-0',
+        kind: 'camera',
+        configuredName: 'Camera slot',
+        name: 'Open-loop camera',
+        connection: 'connected',
+        telemetry: {
+          availability: 'complete',
+          values: {
+            kind: 'camera',
+            activity: 'idle',
+            sensorTemperatureC: -2,
+            cooling: {
+              state: 'on',
+              setpointControl: false,
+              powerReporting: true,
+              powerPercent: 75,
+            },
           },
         },
       },
-    }])
+    ])
   })
 
   it('omits invalid cooler power and marks the inspection partial', async () => {
@@ -420,18 +435,21 @@ describe('Alpaca device inspection', () => {
 
     const provider = createAlpacaProvider({
       baseUrl: 'http://alpaca.test',
-      fetch: fakeFetch({
-        '/management/v1/configureddevices': envelope([devices[0]]),
-        '/api/v1/camera/0/connected': envelope(true),
-        '/api/v1/camera/0/name': envelope('Cooled camera'),
-        '/api/v1/camera/0/camerastate': envelope(0),
-        '/api/v1/camera/0/ccdtemperature': envelope(-2),
-        '/api/v1/camera/0/cansetccdtemperature': envelope(true),
-        '/api/v1/camera/0/cangetcoolerpower': envelope(true),
-        '/api/v1/camera/0/cooleron': envelope(false),
-        '/api/v1/camera/0/setccdtemperature': envelope(5),
-        '/api/v1/camera/0/coolerpower': envelope(0),
-      }, requests),
+      fetch: fakeFetch(
+        {
+          '/management/v1/configureddevices': envelope([devices[0]]),
+          '/api/v1/camera/0/connected': envelope(true),
+          '/api/v1/camera/0/name': envelope('Cooled camera'),
+          '/api/v1/camera/0/camerastate': envelope(0),
+          '/api/v1/camera/0/ccdtemperature': envelope(-2),
+          '/api/v1/camera/0/cansetccdtemperature': envelope(true),
+          '/api/v1/camera/0/cangetcoolerpower': envelope(true),
+          '/api/v1/camera/0/cooleron': envelope(false),
+          '/api/v1/camera/0/setccdtemperature': envelope(5),
+          '/api/v1/camera/0/coolerpower': envelope(0),
+        },
+        requests,
+      ),
     })
 
     const [inspection] = await provider.inspectDevices()
@@ -477,7 +495,6 @@ describe('Alpaca device inspection', () => {
     })
   })
 
-
   it('marks missing temperature partial when setpoint control implies temperature support', async () => {
     const provider = createAlpacaProvider({
       baseUrl: 'http://alpaca.test',
@@ -510,7 +527,10 @@ describe('Alpaca device inspection', () => {
       '/api/v1/telescope/0/tracking': envelope(false),
     }
 
-    const provider = createAlpacaProvider({ baseUrl: 'http://alpaca.test', fetch: fakeFetch(routes) })
+    const provider = createAlpacaProvider({
+      baseUrl: 'http://alpaca.test',
+      fetch: fakeFetch(routes),
+    })
 
     const [inspection] = await provider.inspectDevices()
     expect(inspection?.telemetry).toEqual({
@@ -588,7 +608,10 @@ describe('Alpaca device inspection', () => {
       '/api/v1/focuser/0/temperature': envelope(0, 1024, 'Not implemented'),
     }
 
-    const provider = createAlpacaProvider({ baseUrl: 'http://alpaca.test', fetch: fakeFetch(routes) })
+    const provider = createAlpacaProvider({
+      baseUrl: 'http://alpaca.test',
+      fetch: fakeFetch(routes),
+    })
 
     const [inspection] = await provider.inspectDevices()
     expect(inspection?.telemetry).toEqual({
@@ -646,21 +669,23 @@ describe('Alpaca device inspection', () => {
       }),
     })
 
-    await expect(provider.inspectDevices()).resolves.toEqual([{
-      providerDeviceId: 'observingconditions-0',
-      kind: 'observing-conditions',
-      configuredName: 'ObservingConditions slot',
-      name: 'Weather station',
-      connection: 'connected',
-      telemetry: {
-        availability: 'partial',
-        values: {
-          kind: 'observing-conditions',
-          temperatureC: 23,
-          dewPointC: 17,
+    await expect(provider.inspectDevices()).resolves.toEqual([
+      {
+        providerDeviceId: 'observingconditions-0',
+        kind: 'observing-conditions',
+        configuredName: 'ObservingConditions slot',
+        name: 'Weather station',
+        connection: 'connected',
+        telemetry: {
+          availability: 'partial',
+          values: {
+            kind: 'observing-conditions',
+            temperatureC: 23,
+            dewPointC: 17,
+          },
         },
       },
-    }])
+    ])
   })
 
   it('omits invalid filter positions and marks the inspection partial', async () => {
@@ -728,15 +753,17 @@ describe('Alpaca device inspection', () => {
       availability: 'partial',
       values: {
         kind: 'switch',
-        channels: [{
-          id: 0,
-          name: 'Output',
-          description: 'Output channel',
-          minimum: 0,
-          maximum: 1,
-          step: 1,
-          writable: false,
-        }],
+        channels: [
+          {
+            id: 0,
+            name: 'Output',
+            description: 'Output channel',
+            minimum: 0,
+            maximum: 1,
+            step: 1,
+            writable: false,
+          },
+        ],
       },
     })
   })
@@ -765,7 +792,9 @@ describe('Alpaca device inspection', () => {
       availability: 'partial',
       values: {
         kind: 'switch',
-        channels: [{ id: 0, name: 'Output', description: 'Output channel', on: true, writable: false }],
+        channels: [
+          { id: 0, name: 'Output', description: 'Output channel', on: true, writable: false },
+        ],
       },
     })
   })
@@ -839,25 +868,30 @@ describe('Alpaca device inspection', () => {
 
     const provider = createAlpacaProvider({
       baseUrl: 'http://alpaca.test',
-      fetch: fakeFetch({
-        '/management/v1/configureddevices': envelope([devices[5]]),
-        '/api/v1/switch/0/connected': envelope(true),
-        '/api/v1/switch/0/name': envelope('Power box'),
-        '/api/v1/switch/0/maxswitch': envelope(257),
-      }, requests),
+      fetch: fakeFetch(
+        {
+          '/management/v1/configureddevices': envelope([devices[5]]),
+          '/api/v1/switch/0/connected': envelope(true),
+          '/api/v1/switch/0/name': envelope('Power box'),
+          '/api/v1/switch/0/maxswitch': envelope(257),
+        },
+        requests,
+      ),
     })
 
-    await expect(provider.inspectDevices()).resolves.toEqual([{
-      providerDeviceId: 'switch-0',
-      kind: 'switch',
-      configuredName: 'Switch slot',
-      name: 'Power box',
-      connection: 'connected',
-      telemetry: {
-        availability: 'partial',
-        values: { kind: 'switch' },
+    await expect(provider.inspectDevices()).resolves.toEqual([
+      {
+        providerDeviceId: 'switch-0',
+        kind: 'switch',
+        configuredName: 'Switch slot',
+        name: 'Power box',
+        connection: 'connected',
+        telemetry: {
+          availability: 'partial',
+          values: { kind: 'switch' },
+        },
       },
-    }])
+    ])
     expect(requests).toHaveLength(4)
   })
 
@@ -896,12 +930,12 @@ describe('Alpaca device inspection', () => {
 
   it.each(['camerastate', 'ccdtemperature'])(
     'propagates cancellation during %s without degrading it to partial data',
-    async (operation) => {
+    async operation => {
       const controller = new AbortController()
       const cancellation = new Error('superseded')
       let markReadStarted!: () => void
 
-      const readStarted = new Promise<void>((resolve) => {
+      const readStarted = new Promise<void>(resolve => {
         markReadStarted = resolve
       })
 
@@ -923,7 +957,9 @@ describe('Alpaca device inspection', () => {
 
         if (path === `/api/v1/camera/0/${operation}`) {
           return new Promise<Response>((_resolve, reject) => {
-            init?.signal?.addEventListener('abort', () => reject(init.signal?.reason), { once: true })
+            init?.signal?.addEventListener('abort', () => reject(init.signal?.reason), {
+              once: true,
+            })
             markReadStarted()
           })
         }

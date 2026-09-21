@@ -1,7 +1,7 @@
 import { setImmediate } from 'node:timers/promises'
 import type { PreviewFrame } from './background.js'
 
-export const MAX_RETAINED_FITS_BYTES = 2880 + Math.ceil(30_000_000 * 4 / 2880) * 2880
+export const MAX_RETAINED_FITS_BYTES = 2880 + Math.ceil((30_000_000 * 4) / 2880) * 2880
 
 /** Only Vela's signed32 and offset unsigned16 originals, not arbitrary FITS imports. */
 export async function readRetainedFits(bytes: Buffer): Promise<PreviewFrame> {
@@ -44,19 +44,28 @@ export async function readRetainedFits(bytes: Buffer): Promise<PreviewFrame> {
 
     if (!supported.has(key) || card.slice(8, 10) !== '= ' || cards.has(key))
       throw new Error('Malformed or unsupported retained FITS header')
-    cards.set(key, card.slice(10).trim().replace(/^'(.*)'$/, '$1'))
+    cards.set(
+      key,
+      card
+        .slice(10)
+        .trim()
+        .replace(/^'(.*)'$/, '$1'),
+    )
   }
 
   if (!headerEnd || !bytes.subarray(headerEnd, 2880).every(value => value === 32))
     throw new Error('Invalid retained FITS header padding')
-  const unsigned = cards.get('BITPIX') === '16' && cards.get('BZERO') === '32768' && cards.get('BSCALE') === '1'
+
+  const unsigned =
+    cards.get('BITPIX') === '16' && cards.get('BZERO') === '32768' && cards.get('BSCALE') === '1'
+
   const signed = cards.get('BITPIX') === '32' && !cards.has('BZERO') && !cards.has('BSCALE')
 
   if (
-    cards.get('SIMPLE') !== 'T'
-    || cards.get('NAXIS') !== '2'
-    || cards.get('ROWORDER') !== 'TOP-DOWN'
-    || (!unsigned && !signed)
+    cards.get('SIMPLE') !== 'T' ||
+    cards.get('NAXIS') !== '2' ||
+    cards.get('ROWORDER') !== 'TOP-DOWN' ||
+    (!unsigned && !signed)
   ) {
     throw new Error('Unsupported retained FITS encoding')
   }
@@ -68,12 +77,12 @@ export async function readRetainedFits(bytes: Buffer): Promise<PreviewFrame> {
   const dataEnd = 2880 + count * sampleBytes
 
   if (
-    !Number.isSafeInteger(width)
-    || !Number.isSafeInteger(height)
-    || width < 1
-    || height < 1
-    || count > 30_000_000
-    || bytes.length !== 2880 + Math.ceil(count * sampleBytes / 2880) * 2880
+    !Number.isSafeInteger(width) ||
+    !Number.isSafeInteger(height) ||
+    width < 1 ||
+    height < 1 ||
+    count > 30_000_000 ||
+    bytes.length !== 2880 + Math.ceil((count * sampleBytes) / 2880) * 2880
   ) {
     throw new Error('Invalid retained FITS dimensions or payload length')
   }
@@ -83,12 +92,13 @@ export async function readRetainedFits(bytes: Buffer): Promise<PreviewFrame> {
   const pattern = cards.get('BAYERPAT')?.toLowerCase()
 
   if (
-    pattern !== undefined
-    && pattern !== 'rggb'
-    && pattern !== 'grbg'
-    && pattern !== 'gbrg'
-    && pattern !== 'bggr'
-  ) throw new Error('Unsupported retained Bayer pattern')
+    pattern !== undefined &&
+    pattern !== 'rggb' &&
+    pattern !== 'grbg' &&
+    pattern !== 'gbrg' &&
+    pattern !== 'bggr'
+  )
+    throw new Error('Unsupported retained Bayer pattern')
   const pixels = new Int32Array(count)
 
   for (let begin = 0; begin < count; begin += 65_536) {

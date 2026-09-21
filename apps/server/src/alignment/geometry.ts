@@ -11,7 +11,7 @@ export interface AlignmentMeasurement {
   altitudeArcsec: number
   azimuthArcsec: number
   totalArcsec: number
-  correctionTarget: { raDegrees: number, decDegrees: number }
+  correctionTarget: { raDegrees: number; decDegrees: number }
 }
 
 type Vector = readonly [number, number, number]
@@ -56,8 +56,8 @@ export function createAlignmentBaseline(
 
   const nominalDirection = unadjust(
     points[2]!,
-    errors.altitudeArcsec * rad / 3600,
-    errors.azimuthArcsec * rad / 3600,
+    (errors.altitudeArcsec * rad) / 3600,
+    (errors.azimuthArcsec * rad) / 3600,
     latitudeDegrees,
   )
 
@@ -67,7 +67,9 @@ export function createAlignmentBaseline(
     nominalDirection,
     measurement: {
       ...errors,
-      correctionTarget: coordinates(rotate(nominalDirection, pole, reference.siderealTimeDegrees * rad)),
+      correctionTarget: coordinates(
+        rotate(nominalDirection, pole, reference.siderealTimeDegrees * rad),
+      ),
     },
   }
 }
@@ -80,10 +82,14 @@ export function measureAlignment(
   tracking: boolean,
 ): AlignmentMeasurement {
   const observed = localDirection(sample)
-  const angle = tracking ? -(sample.siderealTimeDegrees - baseline.reference.siderealTimeDegrees) * rad : 0
+
+  const angle = tracking
+    ? -(sample.siderealTimeDegrees - baseline.reference.siderealTimeDegrees) * rad
+    : 0
+
   const nominal = rotate(baseline.nominalDirection, pole, angle)
-  let altitude = baseline.measurement.altitudeArcsec * rad / 3600
-  let azimuth = baseline.measurement.azimuthArcsec * rad / 3600
+  let altitude = (baseline.measurement.altitudeArcsec * rad) / 3600
+  let azimuth = (baseline.measurement.azimuthArcsec * rad) / 3600
   // Azimuth rotation preserves elevation. Its altitude inverse has two branches;
   // keep the branch connected to the baseline rather than accepting a second root.
   const initialSensitivity = altitudeSensitivity(nominal, altitude, baseline.latitudeDegrees)
@@ -108,23 +114,32 @@ export function measureAlignment(
     const bb = dot(b, b)
     const determinant = aa * bb - ab * ab
 
-    if (determinant < 1e-6) throw new Error('This sightline cannot distinguish altitude and azimuth adjustments')
+    if (determinant < 1e-6)
+      throw new Error('This sightline cannot distinguish altitude and azimuth adjustments')
     const ar = dot(a, residual)
     const br = dot(b, residual)
     const deltaAltitude = (ar * bb - br * ab) / determinant
     const deltaAzimuth = (br * aa - ar * ab) / determinant
     altitude += deltaAltitude
     azimuth += deltaAzimuth
-    assertFiniteAngles(altitude / rad * 3600, azimuth / rad * 3600)
+    assertFiniteAngles((altitude / rad) * 3600, (azimuth / rad) * 3600)
 
-    if (initialSensitivity * altitudeSensitivity(nominal, altitude, baseline.latitudeDegrees) <= 0) {
-      throw new Error('The adjustment calculation crossed an ambiguous sightline geometry; start a new baseline')
+    if (
+      initialSensitivity * altitudeSensitivity(nominal, altitude, baseline.latitudeDegrees) <=
+      0
+    ) {
+      throw new Error(
+        'The adjustment calculation crossed an ambiguous sightline geometry; start a new baseline',
+      )
     }
 
     if (Math.hypot(deltaAltitude, deltaAzimuth) < 1e-10) break
   }
 
-  if (length(difference(adjust(nominal, altitude, azimuth, baseline.latitudeDegrees), observed)) > 1e-7) {
+  if (
+    length(difference(adjust(nominal, altitude, azimuth, baseline.latitudeDegrees), observed)) >
+    1e-7
+  ) {
     throw new Error('The new sightline does not fit the adjustment baseline')
   }
 
@@ -137,10 +152,15 @@ export function measureAlignment(
 }
 
 function localDirection(sample: AlignmentSample): Vector {
-  if (![sample.raDegrees, sample.decDegrees, sample.siderealTimeDegrees].every(Number.isFinite)
-    || sample.raDegrees < 0 || sample.raDegrees >= 360 || Math.abs(sample.decDegrees) > 90
-    || sample.siderealTimeDegrees < 0 || sample.siderealTimeDegrees >= 360
-    || !Number.isFinite(Date.parse(sample.capturedAt))) {
+  if (
+    ![sample.raDegrees, sample.decDegrees, sample.siderealTimeDegrees].every(Number.isFinite) ||
+    sample.raDegrees < 0 ||
+    sample.raDegrees >= 360 ||
+    Math.abs(sample.decDegrees) > 90 ||
+    sample.siderealTimeDegrees < 0 ||
+    sample.siderealTimeDegrees >= 360 ||
+    !Number.isFinite(Date.parse(sample.capturedAt))
+  ) {
     throw new Error('Invalid alignment sample')
   }
 
@@ -152,13 +172,17 @@ function localDirection(sample: AlignmentSample): Vector {
 
 function axisErrors(axis: Vector, latitudeDegrees: number) {
   const latitude = latitudeDegrees * rad
-  const altitude = Math.asin(Math.max(-1, Math.min(1, axis[0] * Math.cos(latitude) + axis[2] * Math.sin(latitude))))
+
+  const altitude = Math.asin(
+    Math.max(-1, Math.min(1, axis[0] * Math.cos(latitude) + axis[2] * Math.sin(latitude))),
+  )
+
   const azimuth = Math.atan2(axis[1], -axis[0] * Math.sin(latitude) + axis[2] * Math.cos(latitude))
 
   return {
     altitudeArcsec: (altitude / rad - latitudeDegrees) * 3600,
-    azimuthArcsec: azimuth / rad * 3600,
-    totalArcsec: Math.atan2(Math.hypot(axis[0], axis[1]), axis[2]) / rad * 3600,
+    azimuthArcsec: (azimuth / rad) * 3600,
+    totalArcsec: (Math.atan2(Math.hypot(axis[0], axis[1]), axis[2]) / rad) * 3600,
   }
 }
 
@@ -206,18 +230,22 @@ function rotate(v: Vector, axis: Vector, angle: number): Vector {
   ]
 }
 
-function dot(a: Vector, b: Vector) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2] }
-
-function cross(a: Vector, b: Vector): Vector {
-  return [
-    a[1] * b[2] - a[2] * b[1],
-    a[2] * b[0] - a[0] * b[2],
-    a[0] * b[1] - a[1] * b[0],
-  ]
+function dot(a: Vector, b: Vector) {
+  return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 }
 
-function difference(a: Vector, b: Vector): Vector { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]] }
+function cross(a: Vector, b: Vector): Vector {
+  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
+}
 
-function scale(a: Vector, s: number): Vector { return [a[0] * s, a[1] * s, a[2] * s] }
+function difference(a: Vector, b: Vector): Vector {
+  return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
+}
 
-function length(a: Vector) { return Math.hypot(...a) }
+function scale(a: Vector, s: number): Vector {
+  return [a[0] * s, a[1] * s, a[2] * s]
+}
+
+function length(a: Vector) {
+  return Math.hypot(...a)
+}

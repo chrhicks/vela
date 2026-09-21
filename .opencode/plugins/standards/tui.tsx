@@ -7,12 +7,22 @@ import { ResultsPanel, reportSummary } from './panel.tsx'
 function useReport(sessionID: () => string) {
   const context = usePlugin()
   const rpc = context.client.rpc(StandardsResults)
-  const [report, { refetch }] = createResource(sessionID, id => rpc.latest({ sessionID: id }, {
-    location: context.data.session.get(id)?.location ?? context.location ?? context.data.location.default(),
-  }))
-  onCleanup(rpc.events.on('updated', event => {
-    if (event.data.sessionID === sessionID()) void refetch()
-  }))
+  const [report, { refetch }] = createResource(sessionID, id =>
+    rpc.latest(
+      { sessionID: id },
+      {
+        location:
+          context.data.session.get(id)?.location ??
+          context.location ??
+          context.data.location.default(),
+      },
+    ),
+  )
+  onCleanup(
+    rpc.events.on('updated', event => {
+      if (event.data.sessionID === sessionID()) void refetch()
+    }),
+  )
   return { report, refetch }
 }
 
@@ -23,7 +33,12 @@ function Panel(props: { panel: PanelInput }) {
     mode: 'global',
     enabled: props.panel.focused,
     commands: [
-      { bind: 'r', run: () => { void refetch() } },
+      {
+        bind: 'r',
+        run: () => {
+          void refetch()
+        },
+      },
       { bind: 'escape', run: props.panel.close },
       { bind: 'f', run: props.panel.toggleFullscreen },
     ],
@@ -90,14 +105,18 @@ export default Plugin.define({
       render: () => {
         context.keymap.layer(() => ({
           mode: 'global',
-          commands: [{
-            id: 'vela.standards.results',
-            title: 'Inspect standards results',
-            group: 'Vela',
-            palette: true,
-            slash: { name: 'standards-results' },
-            run: () => { context.ui.panel.open('vela.standards.results') },
-          }],
+          commands: [
+            {
+              id: 'vela.standards.results',
+              title: 'Inspect standards results',
+              group: 'Vela',
+              palette: true,
+              slash: { name: 'standards-results' },
+              run: () => {
+                context.ui.panel.open('vela.standards.results')
+              },
+            },
+          ],
         }))
         return null
       },

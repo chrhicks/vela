@@ -26,7 +26,11 @@ export type AlpacaDeviceConnectionResult =
     }
   | {
       readonly outcome: 'uncertain'
-      readonly reason: 'cancelled' | 'verification-timeout' | 'verification-unavailable' | 'write-outcome-unknown'
+      readonly reason:
+        | 'cancelled'
+        | 'verification-timeout'
+        | 'verification-unavailable'
+        | 'write-outcome-unknown'
     }
 
 export interface AlpacaDevice {

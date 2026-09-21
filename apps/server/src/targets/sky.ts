@@ -7,7 +7,7 @@ export { angularDistance, fromMount, toMount, type Site } from '../astronomy/coo
 
 const radians = Math.PI / 180
 
-const wrap = (degrees: number) => (degrees % 360 + 360) % 360
+const wrap = (degrees: number) => ((degrees % 360) + 360) % 360
 
 /** Inverse TAN projection, preserving the CD matrix's scale, rotation and parity. */
 export function skyAtPixel(wcs: PlateWcs, x: number, y: number): TargetPosition {
@@ -20,7 +20,8 @@ export function skyAtPixel(wcs: PlateWcs, x: number, y: number): TargetPosition 
 
   return {
     raDegrees: wrap(wcs.raDegrees + Math.atan2(east, denominator) / radians),
-    decDegrees: Math.atan2(Math.sin(dec) + north * Math.cos(dec), Math.hypot(denominator, east)) / radians,
+    decDegrees:
+      Math.atan2(Math.sin(dec) + north * Math.cos(dec), Math.hypot(denominator, east)) / radians,
   }
 }
 
@@ -34,12 +35,19 @@ export function plateCorners(wcs: PlateWcs): TargetPosition[] {
 }
 
 export function skyPath(target: TargetPosition, site: Site, now: Date): TargetSkyPath {
-  const observer = new Observer(site.latitudeDegrees, site.longitudeDegrees, site.elevationMeters ?? 0)
+  const observer = new Observer(
+    site.latitudeDegrees,
+    site.longitudeDegrees,
+    site.elevationMeters ?? 0,
+  )
+
   // A local solar noon-to-noon span includes the current/coming observing night,
   // without assuming the server or browser timezone is the observatory's zone.
-  const solarOffset = site.longitudeDegrees / 15 * 3_600_000
+  const solarOffset = (site.longitudeDegrees / 15) * 3_600_000
   const local = new Date(now.getTime() + solarOffset)
-  let noon = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate(), 12) - solarOffset
+
+  let noon =
+    Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate(), 12) - solarOffset
 
   if (now.getTime() < noon) {
     const sunNow = Equator(Body.Sun, now, observer, true, true)

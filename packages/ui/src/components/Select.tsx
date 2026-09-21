@@ -30,11 +30,24 @@ export function Select({
     <label className="vela-field" htmlFor={selectId}>
       {label ? <span className="vela-field__label">{label}</span> : null}
       <span className="vela-select-shell">
-        <select {...props} className={`vela-select ${className}`.trim()} data-invalid={invalid} id={selectId}>
-          {options.map((option) => <option disabled={option.disabled} key={option.value} value={option.value}>{option.label}</option>)}
+        <select
+          {...props}
+          className={`vela-select ${className}`.trim()}
+          data-invalid={invalid}
+          id={selectId}
+        >
+          {options.map(option => (
+            <option disabled={option.disabled} key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
         </select>
       </span>
-      {message ? <span className="vela-field__message" data-invalid={invalid}>{message}</span> : null}
+      {message ? (
+        <span className="vela-field__message" data-invalid={invalid}>
+          {message}
+        </span>
+      ) : null}
     </label>
   )
 }

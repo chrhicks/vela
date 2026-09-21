@@ -15,19 +15,21 @@ describe('hyperbola focus fit', () => {
     expect(fit!.p).toBeGreaterThan(32800)
     expect(fit!.p).toBeLessThan(32880)
     expect(fit!.rSquared).toBeGreaterThan(0.99)
-    const minSample = points.reduce((best, point) => point.y < best.y ? point : best)
+    const minSample = points.reduce((best, point) => (point.y < best.y ? point : best))
     expect(minSample.x).toBe(32842)
     expect(Math.round(fit!.p)).not.toBe(minSample.x)
   })
 
   it('ignores starless points and refuses a flat line', () => {
-    expect(fitHyperbola([
-      { x: 1, y: 0 },
-      { x: 2, y: 0 },
-      { x: 3, y: 0 },
-      { x: 4, y: 0 },
-      { x: 5, y: 0 },
-    ])).toBeNull()
+    expect(
+      fitHyperbola([
+        { x: 1, y: 0 },
+        { x: 2, y: 0 },
+        { x: 3, y: 0 },
+        { x: 4, y: 0 },
+        { x: 5, y: 0 },
+      ]),
+    ).toBeNull()
     const flat = [10, 20, 30, 40, 50, 60].map(x => ({ x, y: 2 }))
     const fit = fitHyperbola(flat)
     expect(!fit || fit.rSquared < 0.7).toBe(true)

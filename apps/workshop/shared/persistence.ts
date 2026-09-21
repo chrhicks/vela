@@ -9,9 +9,13 @@ export interface WorkshopPersistence {
   profiles: DesignProfile[]
 }
 
-const sessionPayload = z.custom<WorkingSession>(isWorkingSession, 'Invalid workshop session payload')
+const sessionPayload = z.custom<WorkingSession>(
+  isWorkingSession,
+  'Invalid workshop session payload',
+)
 
-const profilePayload = z.custom<DesignProfile>(isDesignProfile, 'Invalid design profile payload')
+const profilePayload = z
+  .custom<DesignProfile>(isDesignProfile, 'Invalid design profile payload')
   .refine(value => isSafeProfileId(value.id), 'Invalid design profile payload')
   .refine(value => !value.readonly, 'Read-only profiles cannot be persisted')
 

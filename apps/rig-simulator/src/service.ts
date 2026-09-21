@@ -1,7 +1,12 @@
 import { z } from 'zod'
 import Fastify from 'fastify'
 import { Readable } from 'node:stream'
-import { acceptsImageBytes, encodeImageBytes, imageBytesError, imageJsonChunks } from './image-bytes.js'
+import {
+  acceptsImageBytes,
+  encodeImageBytes,
+  imageBytesError,
+  imageJsonChunks,
+} from './image-bytes.js'
 import type { FastifyRequest } from 'fastify'
 import { cameraGeometry } from './optics.js'
 import type { Star, StarSource } from './catalog.js'
@@ -9,29 +14,33 @@ import { SimulatorError, SimulatorRuntime } from './runtime.js'
 
 const parameterValue = z.json()
 
-const parameterSchema = z.record(z.string(), parameterValue).nullish().transform(value => {
-  const result = new Map<string, z.infer<typeof parameterValue>>()
+const parameterSchema = z
+  .record(z.string(), parameterValue)
+  .nullish()
+  .transform(value => {
+    const result = new Map<string, z.infer<typeof parameterValue>>()
 
-  for (const [key, item] of Object.entries(value ?? {})) {
-    const name = key.toLowerCase()
+    for (const [key, item] of Object.entries(value ?? {})) {
+      const name = key.toLowerCase()
 
-    if (result.has(name)) throw new SimulatorError(0x401, `Duplicate parameter ${key}`)
-    result.set(name, item)
-  }
+      if (result.has(name)) throw new SimulatorError(0x401, `Duplicate parameter ${key}`)
+      result.set(name, item)
+    }
 
-  return result
-}).catch(() => {
-  throw new SimulatorError(0x401, 'Expected named parameters')
-})
+    return result
+  })
+  .catch(() => {
+    throw new SimulatorError(0x401, 'Expected named parameters')
+  })
 
 type AlpacaParameters = z.infer<typeof parameterSchema>
 
 const parameters = parameterSchema.parse
 
-const numericParameter = z.union([
-  z.number(),
-  z.string().regex(/^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i),
-]).transform(Number).refine(Number.isFinite)
+const numericParameter = z
+  .union([z.number(), z.string().regex(/^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i)])
+  .transform(Number)
+  .refine(Number.isFinite)
 
 function numberParameter(params: AlpacaParameters, key: string) {
   const parsed = numericParameter.safeParse(params.get(key))
@@ -43,7 +52,11 @@ function numberParameter(params: AlpacaParameters, key: string) {
 
 const booleanValue = z.union([
   z.boolean(),
-  z.string().toLowerCase().pipe(z.enum(['true', 'false'])).transform(value => value === 'true'),
+  z
+    .string()
+    .toLowerCase()
+    .pipe(z.enum(['true', 'false']))
+    .transform(value => value === 'true'),
 ])
 
 function booleanParameter(params: AlpacaParameters, key: string) {
@@ -62,7 +75,10 @@ function axisParameter(params: AlpacaParameters) {
   return axis
 }
 
-export function buildSimulator({ stars, now }: {
+export function buildSimulator({
+  stars,
+  now,
+}: {
   stars: readonly Star[] | StarSource
   now?: () => number
 }) {
@@ -75,82 +91,95 @@ export function buildSimulator({ stars, now }: {
 
   const runtime = new SimulatorRuntime(stars, now)
   let transaction = 0
-  app.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'string' }, (_request, body, done) => {
-    const params: Record<string, string | string[]> = {}
+  app.addContentTypeParser(
+    'application/x-www-form-urlencoded',
+    { parseAs: 'string' },
+    (_request, body, done) => {
+      const params: Record<string, string | string[]> = {}
 
-    for (const [key, value] of new URLSearchParams(z.string().parse(body))) {
-      const name = key.toLowerCase()
-      params[name] = Object.hasOwn(params, name)
-        ? [...(Array.isArray(params[name]) ? params[name] : [params[name]!]), value]
-        : value
-    }
+      for (const [key, value] of new URLSearchParams(z.string().parse(body))) {
+        const name = key.toLowerCase()
+        params[name] = Object.hasOwn(params, name)
+          ? [...(Array.isArray(params[name]) ? params[name] : [params[name]!]), value]
+          : value
+      }
 
-    done(null, params)
-  })
+      done(null, params)
+    },
+  )
   app.get('/simulator/state', async () => runtime.state())
 
   function control(request: FastifyRequest, action: (body: AlpacaParameters) => void) {
     if (!request.headers['content-type']?.startsWith('application/json'))
       throw new SimulatorError(0x401, 'Simulator controls require JSON')
 
-    if (request.headers.origin && ![
-      'http://localhost:5177',
-      'http://127.0.0.1:5177',
-      'http://localhost:7850',
-      'http://127.0.0.1:7850',
-    ].includes(request.headers.origin))
+    if (
+      request.headers.origin &&
+      ![
+        'http://localhost:5177',
+        'http://127.0.0.1:5177',
+        'http://localhost:7850',
+        'http://127.0.0.1:7850',
+      ].includes(request.headers.origin)
+    )
       throw new SimulatorError(0x401, 'Origin is not permitted')
     action(parameters(request.body))
 
     return runtime.state()
   }
 
-  app.put('/simulator/adjust', async request => control(request, body => {
-    const offsets = z.tuple([z.number(), z.number()]).safeParse([
-      body.get('altitudearcsec'),
-      body.get('azimutharcsec'),
-    ])
+  app.put('/simulator/adjust', async request =>
+    control(request, body => {
+      const offsets = z
+        .tuple([z.number(), z.number()])
+        .safeParse([body.get('altitudearcsec'), body.get('azimutharcsec')])
 
-    if (!offsets.success) throw new SimulatorError(0x401, 'Offsets must be numbers')
-    runtime.adjust(...offsets.data)
-  }))
-  app.put('/simulator/camera', async request => control(request, body => {
-    const obscured = body.get('obscured')
-    const resolution = body.get('resolution')
+      if (!offsets.success) throw new SimulatorError(0x401, 'Offsets must be numbers')
+      runtime.adjust(...offsets.data)
+    }),
+  )
+  app.put('/simulator/camera', async request =>
+    control(request, body => {
+      const obscured = body.get('obscured')
+      const resolution = body.get('resolution')
 
-    if (obscured !== undefined && obscured !== true && obscured !== false)
-      throw new SimulatorError(0x401, 'Obscured must be a boolean')
+      if (obscured !== undefined && obscured !== true && obscured !== false)
+        throw new SimulatorError(0x401, 'Obscured must be a boolean')
 
-    if (resolution !== undefined && resolution !== 'fast' && resolution !== 'full')
-      throw new SimulatorError(0x401, 'Unknown resolution')
+      if (resolution !== undefined && resolution !== 'fast' && resolution !== 'full')
+        throw new SimulatorError(0x401, 'Unknown resolution')
 
-    const cameraNumber = body.get('cameranumber') === undefined
-      ? 0
-      : numberParameter(body, 'cameranumber')
+      const cameraNumber =
+        body.get('cameranumber') === undefined ? 0 : numberParameter(body, 'cameranumber')
 
-    if (!Number.isInteger(cameraNumber) || ![0, 1].includes(cameraNumber))
-      throw new SimulatorError(0x401, 'Unknown camera')
+      if (!Number.isInteger(cameraNumber) || ![0, 1].includes(cameraNumber))
+        throw new SimulatorError(0x401, 'Unknown camera')
 
-    if (obscured === undefined && resolution === undefined)
-      throw new SimulatorError(0x401, 'Camera control is empty')
+      if (obscured === undefined && resolution === undefined)
+        throw new SimulatorError(0x401, 'Camera control is empty')
 
-    // Configure first: a rejected busy/unsupported mode must not change obstruction.
-    if (resolution !== undefined) runtime.configureCamera(cameraNumber, resolution)
+      // Configure first: a rejected busy/unsupported mode must not change obstruction.
+      if (resolution !== undefined) runtime.configureCamera(cameraNumber, resolution)
 
-    if (obscured !== undefined) runtime.setObscured(obscured)
-  }))
-  app.post('/simulator/reset', async request => control(request, body => {
-    const preset = body.get('preset')
+      if (obscured !== undefined) runtime.setObscured(obscured)
+    }),
+  )
+  app.post('/simulator/reset', async request =>
+    control(request, body => {
+      const preset = body.get('preset')
 
-    if (preset !== 'large-error' && preset !== 'near-aligned' && preset !== 'aligned')
-      throw new SimulatorError(0x401, 'Unknown preset')
-    runtime.reset(preset)
-  }))
+      if (preset !== 'large-error' && preset !== 'near-aligned' && preset !== 'aligned')
+        throw new SimulatorError(0x401, 'Unknown preset')
+      runtime.reset(preset)
+    }),
+  )
   app.setErrorHandler((error, request, reply) => {
     const message = error instanceof Error ? error.message : 'Invalid request'
 
     if (request.url.startsWith('/simulator/'))
-      return reply.code(error instanceof SimulatorError && error.number === 0x40b ? 409 : 400).send({ error: message })
+      return reply
+        .code(error instanceof SimulatorError && error.number === 0x40b ? 409 : 400)
+        .send({ error: message })
     const httpError = z.object({ statusCode: z.number() }).safeParse(error)
     const status = httpError.success ? httpError.data.statusCode : 500
 
@@ -228,8 +257,10 @@ export function buildSimulator({ stars, now }: {
         const device = request.params.device.toLowerCase()
         const member = request.params.member.toLowerCase()
 
-        if ((device !== 'camera' && device !== 'telescope')
-          || !(request.params.number === '0' || device === 'camera' && request.params.number === '1'))
+        if (
+          (device !== 'camera' && device !== 'telescope') ||
+          !(request.params.number === '0' || (device === 'camera' && request.params.number === '1'))
+        )
           return reply.code(404).send({ error: 'Unknown simulator device' })
         const kind = device
         const cameraNumber = Number(request.params.number)
@@ -238,14 +269,17 @@ export function buildSimulator({ stars, now }: {
 
         if (member === 'connected') {
           if (request.method === 'GET')
-            return { ...envelope, Value: kind === 'camera' ? camera.connected : state.telescopeConnected }
+            return {
+              ...envelope,
+              Value: kind === 'camera' ? camera.connected : state.telescopeConnected,
+            }
           runtime.connect(kind, booleanParameter(params, 'connected'), cameraNumber)
 
           return envelope
         }
 
         const common = {
-          name: `Simulator ${kind === 'camera' ? cameraNumber === 1 ? 'Color Camera' : 'Camera' : 'Telescope'}`,
+          name: `Simulator ${kind === 'camera' ? (cameraNumber === 1 ? 'Color Camera' : 'Camera') : 'Telescope'}`,
           description: 'Development-only Vela sky simulator',
           driverinfo: 'Bounded Alpaca subset for local development',
           driverversion: '0.0.0',
@@ -293,7 +327,10 @@ export function buildSimulator({ stars, now }: {
 
             if (entry) return { ...envelope, Value: entry[1] }
 
-            if (camera.sensor === 'rggb' && (member === 'bayeroffsetx' || member === 'bayeroffsety'))
+            if (
+              camera.sensor === 'rggb' &&
+              (member === 'bayeroffsetx' || member === 'bayeroffsety')
+            )
               return { ...envelope, Value: 0 }
 
             if (member === 'imagearray') {
@@ -306,7 +343,9 @@ export function buildSimulator({ stars, now }: {
                 return reply.type('application/imagebytes').send(bytes)
               }
 
-              return reply.type('application/json').send(Readable.from(imageJsonChunks(frame, envelope, assertCurrent)))
+              return reply
+                .type('application/json')
+                .send(Readable.from(imageJsonChunks(frame, envelope, assertCurrent)))
             }
 
             if (member === 'lastexposureduration')
@@ -345,7 +384,10 @@ export function buildSimulator({ stars, now }: {
             if (member === 'canmoveaxis') return { ...envelope, Value: axisParameter(params) === 0 }
 
             if (member === 'axisrates')
-              return { ...envelope, Value: axisParameter(params) === 0 ? [{ Minimum: 0, Maximum: 1.5 }] : [] }
+              return {
+                ...envelope,
+                Value: axisParameter(params) === 0 ? [{ Minimum: 0, Maximum: 1.5 }] : [],
+              }
           }
         } else if (kind === 'camera') {
           if (member === 'startexposure') {
@@ -395,13 +437,17 @@ export function buildSimulator({ stars, now }: {
           }
 
           if (member === 'slewtocoordinatesasync') {
-            runtime.slewTo(numberParameter(params, 'rightascension'), numberParameter(params, 'declination'))
+            runtime.slewTo(
+              numberParameter(params, 'rightascension'),
+              numberParameter(params, 'declination'),
+            )
 
             return envelope
           }
 
           if (member === 'moveaxis') {
-            if (axisParameter(params) !== 0) throw new SimulatorError(0x400, 'Only the RA axis supports MoveAxis')
+            if (axisParameter(params) !== 0)
+              throw new SimulatorError(0x400, 'Only the RA axis supports MoveAxis')
             runtime.move(numberParameter(params, 'rate'))
 
             return envelope
@@ -413,8 +459,12 @@ export function buildSimulator({ stars, now }: {
         if (!(error instanceof SimulatorError)) throw error
         const failure = { ...envelope, ErrorNumber: error.number, ErrorMessage: error.message }
 
-        if (request.method === 'GET' && request.params.device.toLowerCase() === 'camera'
-          && request.params.member.toLowerCase() === 'imagearray' && acceptsImageBytes(request.headers.accept)) {
+        if (
+          request.method === 'GET' &&
+          request.params.device.toLowerCase() === 'camera' &&
+          request.params.member.toLowerCase() === 'imagearray' &&
+          acceptsImageBytes(request.headers.accept)
+        ) {
           return reply.type('application/imagebytes').send(imageBytesError(failure))
         }
 

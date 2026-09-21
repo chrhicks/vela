@@ -1,5 +1,10 @@
 import { afterEach, expect, it, vi } from 'vitest'
-import { AutofocusStoppedError, createAutofocusController, type AutofocusCamera, type AutofocusFocuser } from './controller.js'
+import {
+  AutofocusStoppedError,
+  createAutofocusController,
+  type AutofocusCamera,
+  type AutofocusFocuser,
+} from './controller.js'
 import { hyperbola } from './hyperbola.js'
 
 function deferred<T>() {
@@ -20,10 +25,19 @@ afterEach(async () => {
   await Promise.all(stops.splice(0).map(stop => stop()))
 })
 
-function setup(start = 32842, maxStep = 60000, { holdMoves = false, holdFinalMeasurement = false } = {}) {
+function setup(
+  start = 32842,
+  maxStep = 60000,
+  { holdMoves = false, holdFinalMeasurement = false } = {},
+) {
   let position = start
   const moves: number[] = []
-  const captures: Array<ReturnType<typeof deferred<void>> & Parameters<AutofocusCamera['capture']>[0] & { position: number }> = []
+
+  const captures: Array<
+    ReturnType<typeof deferred<void>> &
+      Parameters<AutofocusCamera['capture']>[0] & { position: number }
+  > = []
+
   const pendingMoves: Array<ReturnType<typeof deferred<void>> & { target: number }> = []
   const finalMeasurement = deferred<void>()
   const measuringFinal = deferred<void>()
@@ -140,7 +154,11 @@ it.each([
   pending.onReadState('retrying')
   const stopping = controller.stop()
   pending.onReadState('retrying')
-  expect(controller.snapshot()).toMatchObject({ active: true, activity: 'stopping', captureReadState: 'current' })
+  expect(controller.snapshot()).toMatchObject({
+    active: true,
+    activity: 'stopping',
+    captureReadState: 'current',
+  })
   expect(released).not.toHaveBeenCalled()
   cleanup.reject(failure)
   await stopping
@@ -157,22 +175,22 @@ it.each([
 })
 
 it('restores start when Stop arrives while the final confirmation measurement is pending', async () => {
-  const {
-    controller,
-    camera,
-    focuser,
-    land,
-    moves,
-    finalMeasurement,
-    measuringFinal,
-  } = setup(32842, 60000, { holdFinalMeasurement: true })
+  const { controller, camera, focuser, land, moves, finalMeasurement, measuringFinal } = setup(
+    32842,
+    60000,
+    { holdFinalMeasurement: true },
+  )
 
   await controller.start(camera, focuser)
 
   for (let count = 0; count < 10; count++) await land()
 
   await measuringFinal.promise
-  expect(controller.snapshot()).toMatchObject({ phase: 'confirming', activity: 'measuring', active: true })
+  expect(controller.snapshot()).toMatchObject({
+    phase: 'confirming',
+    activity: 'measuring',
+    active: true,
+  })
   expect(controller.snapshot().currentPosition).not.toBe(32842)
   const stopping = controller.stop()
   expect(controller.snapshot()).toMatchObject({ activity: 'stopping', active: true })
@@ -189,9 +207,17 @@ it('restores start when Stop arrives while the final confirmation measurement is
 })
 
 it('lands each (position, HFR) sample on the view before the next move, then fits a hyperbola', async () => {
-  const { controller, camera, focuser, land, arrive, moves } = setup(32842, 60000, { holdMoves: true })
+  const { controller, camera, focuser, land, arrive, moves } = setup(32842, 60000, {
+    holdMoves: true,
+  })
+
   await controller.start(camera, focuser, { stepSize: 50, offsetSteps: 4, exposureSeconds: 2 })
-  expect(controller.snapshot()).toMatchObject({ active: true, startPosition: 32842, phase: 'walking', samples: [] })
+  expect(controller.snapshot()).toMatchObject({
+    active: true,
+    startPosition: 32842,
+    phase: 'walking',
+    samples: [],
+  })
 
   for (let count = 1; count <= 9; count++) {
     await arrive()
@@ -227,7 +253,12 @@ it('restores the start position on cancel and never commands 0', async () => {
   await land()
   await vi.waitFor(() => expect(controller.snapshot().samples).toHaveLength(2))
   await controller.stop()
-  expect(controller.snapshot()).toMatchObject({ phase: 'stopped', startPosition: 32842, currentPosition: 32842, restoredStart: true })
+  expect(controller.snapshot()).toMatchObject({
+    phase: 'stopped',
+    startPosition: 32842,
+    currentPosition: 32842,
+    restoredStart: true,
+  })
   expect(moves.at(-1)).toBe(32842)
   expect(moves).not.toContain(0)
 })
@@ -253,7 +284,12 @@ it('holds the current sample and lease through read recovery, then restores star
   })
   expect(released).not.toHaveBeenCalled()
   pending.onReadState('current')
-  expect(controller.snapshot()).toMatchObject({ captureReadState: 'current', activity: 'exposing', samples: prior, exposureStartedAt })
+  expect(controller.snapshot()).toMatchObject({
+    captureReadState: 'current',
+    activity: 'exposing',
+    samples: prior,
+    exposureStartedAt,
+  })
   expect(captures).toHaveLength(1)
   await land()
   await vi.waitFor(() => expect(captures).toHaveLength(1))

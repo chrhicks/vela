@@ -21,7 +21,9 @@ it('projects catalog stars through the camera basis and excludes stars behind it
   expect(brightest(renderSky([star], pose, options))).toEqual([50, 50])
   expect(brightest(renderSky([{ ...star, raDegrees: 2 }], pose, options))).toEqual([70, 50])
   expect(brightest(renderSky([{ ...star, decDegrees: 2 }], pose, options))).toEqual([50, 30])
-  expect(renderSky([{ ...star, raDegrees: 180 }], pose, options)).toEqual(renderSky([], pose, options))
+  expect(renderSky([{ ...star, raDegrees: 180 }], pose, options)).toEqual(
+    renderSky([], pose, options),
+  )
 })
 
 it('produces reproducible noise and an obscured frame without stars', () => {
@@ -29,7 +31,9 @@ it('produces reproducible noise and an obscured frame without stars', () => {
   const clear = renderSky(stars, pose, options)
   expect(clear).toEqual(renderSky(stars, pose, options))
   expect(clear[50 * options.width + 50]).toBe(32767)
-  expect(renderSky(stars, pose, { ...options, obscured: true })).toEqual(renderSky([], pose, options))
+  expect(renderSky(stars, pose, { ...options, obscured: true })).toEqual(
+    renderSky([], pose, options),
+  )
   expect(renderSky([], pose, { ...options, seed: 43 })).not.toEqual(renderSky([], pose, options))
 })
 
@@ -43,7 +47,6 @@ it('writes padded signed big-endian FITS pixels without pointing hints', () => {
   expect(() => writeFits(3, 2, new Uint16Array(4))).toThrow('dimensions')
   expect(() => writeFits(1, 1, Uint16Array.of(32768))).toThrow('signed 16-bit')
 })
-
 
 it('samples synthetic warm starlight in RGGB phase at the full sensor origin', () => {
   // This coordinate is deliberately assigned R:G:B = 1.6:0.8:0.4.
@@ -75,11 +78,14 @@ it('scales star signal with exposure and saturates at each sensor limit', () => 
 
     expect(signalAt(4) / signalAt(2)).toBeCloseTo(2, 2)
     expect(signalAt(0)).toBe(0)
-    expect(renderSky([star], pose, { ...options, sensor, exposureSeconds: 1000 })[5100])
-      .toBe(sensor === 'rggb' ? 65535 : 32767)
+    expect(renderSky([star], pose, { ...options, sensor, exposureSeconds: 1000 })[5100]).toBe(
+      sensor === 'rggb' ? 65535 : 32767,
+    )
   }
 
-  expect(renderSky([star], pose, options)).toEqual(renderSky([star], pose, { ...options, exposureSeconds: 2 }))
+  expect(renderSky([star], pose, options)).toEqual(
+    renderSky([star], pose, { ...options, exposureSeconds: 2 }),
+  )
 })
 
 it('produces identical sync and async pixels across stripe boundaries', async () => {
@@ -106,11 +112,19 @@ it('yields while generating FRA-size pixels and allows cancellation', async () =
   })
   await stopped
   expect(heartbeat).toBe(true)
-  await expect(renderSkyAsync([], pose, settings, controller.signal)).rejects.toMatchObject({ name: 'AbortError' })
+  await expect(renderSkyAsync([], pose, settings, controller.signal)).rejects.toMatchObject({
+    name: 'AbortError',
+  })
 })
 
 it('generates the full FRA frame without the previous area cap', async () => {
-  const pixels = await renderSkyAsync([], pose, { ...options, width: 6248, height: 4176, sensor: 'rggb' })
+  const pixels = await renderSkyAsync([], pose, {
+    ...options,
+    width: 6248,
+    height: 4176,
+    sensor: 'rggb',
+  })
+
   expect(pixels.length).toBe(26091648)
   expect(pixels[0]).toBeGreaterThanOrEqual(494)
   expect(pixels[pixels.length - 1]).toBeLessThanOrEqual(506)

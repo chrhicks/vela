@@ -9,19 +9,29 @@ export type DemoSkyTargetId = 'andromeda' | 'm13' | 'crescent' | 'low-target'
 // an observer's real location; see README.md for the specimen assumptions.
 const sampleLatitudeDegrees = 40
 
-const sampleTargets: Record<DemoSkyTargetId, { declinationDegrees: number; transitHour: number }> = {
-  andromeda: { declinationDegrees: 42, transitHour: 25 },
-  m13: { declinationDegrees: 25, transitHour: 18 },
-  crescent: { declinationDegrees: 26, transitHour: 24 },
-  'low-target': { declinationDegrees: -32, transitHour: 24 },
-}
+const sampleTargets: Record<DemoSkyTargetId, { declinationDegrees: number; transitHour: number }> =
+  {
+    andromeda: { declinationDegrees: 42, transitHour: 25 },
+    m13: { declinationDegrees: 25, transitHour: 18 },
+    crescent: { declinationDegrees: 26, transitHour: 24 },
+    'low-target': { declinationDegrees: -32, transitHour: 24 },
+  }
 
-const radians = (degrees: number) => degrees * Math.PI / 180
+const radians = (degrees: number) => (degrees * Math.PI) / 180
 
-const degrees = (radians: number) => radians * 180 / Math.PI
+const degrees = (radians: number) => (radians * 180) / Math.PI
 
-export function getSkySamples(targetId: string, startHour = 20, sampleCount = 49, stepMinutes = 10): SkyPathSample[] {
-  const target = sampleTargets[z.enum(['andromeda', 'm13', 'crescent', 'low-target']).catch('andromeda').parse(targetId)]
+export function getSkySamples(
+  targetId: string,
+  startHour = 20,
+  sampleCount = 49,
+  stepMinutes = 10,
+): SkyPathSample[] {
+  const target =
+    sampleTargets[
+      z.enum(['andromeda', 'm13', 'crescent', 'low-target']).catch('andromeda').parse(targetId)
+    ]
+
   const latitude = radians(sampleLatitudeDegrees)
   const declination = radians(target.declinationDegrees)
 
@@ -30,11 +40,13 @@ export function getSkySamples(targetId: string, startHour = 20, sampleCount = 49
     const hourAngle = radians((startHour + elapsedMinutes / 60 - target.transitHour) * 15)
     const east = -Math.cos(declination) * Math.sin(hourAngle)
 
-    const north = Math.sin(declination) * Math.cos(latitude)
-      - Math.cos(declination) * Math.cos(hourAngle) * Math.sin(latitude)
+    const north =
+      Math.sin(declination) * Math.cos(latitude) -
+      Math.cos(declination) * Math.cos(hourAngle) * Math.sin(latitude)
 
-    const up = Math.sin(declination) * Math.sin(latitude)
-      + Math.cos(declination) * Math.cos(hourAngle) * Math.cos(latitude)
+    const up =
+      Math.sin(declination) * Math.sin(latitude) +
+      Math.cos(declination) * Math.cos(hourAngle) * Math.cos(latitude)
 
     const clockMinutes = (startHour * 60 + elapsedMinutes) % (24 * 60)
 
@@ -73,14 +85,16 @@ export function getDemoHorizon(profileState: string): SkyPathHorizon | undefined
         altitudeDegrees: unknown ? null : demoSkylineAltitude(azimuthDegrees),
       }
     }),
-    wires: [Array.from({ length: 13 }, (_, index) => {
-      const fraction = index / 12
+    wires: [
+      Array.from({ length: 13 }, (_, index) => {
+        const fraction = index / 12
 
-      return {
-        azimuthDegrees: 90 + fraction * 60,
-        altitudeDegrees: 27 - 4 * Math.sin(fraction * Math.PI),
-      }
-    })],
+        return {
+          azimuthDegrees: 90 + fraction * 60,
+          altitudeDegrees: 27 - 4 * Math.sin(fraction * Math.PI),
+        }
+      }),
+    ],
   }
 }
 
@@ -89,23 +103,27 @@ export function getMoonSamples(phase = 'gibbous'): (SkyPathMoonSample | null)[] 
   function moonIllumination() {
     switch (phase) {
       case 'crescent':
-        return .22
+        return 0.22
       case 'full':
         return 1
       case 'new':
         return 0
       default:
-        return .68
+        return 0.68
     }
   }
 
   if (phase === 'none') return undefined
   const illuminationFraction = moonIllumination()
 
-  return Array.from({ length: 49 }, (_, index) => phase === 'unavailable' ? null : ({
-    azimuthDegrees: 180 + index * 2.5,
-    altitudeDegrees: 48 - index * 1.4,
-    illuminationFraction,
-    waxing: phase !== 'waning',
-  }))
+  return Array.from({ length: 49 }, (_, index) =>
+    phase === 'unavailable'
+      ? null
+      : {
+          azimuthDegrees: 180 + index * 2.5,
+          altitudeDegrees: 48 - index * 1.4,
+          illuminationFraction,
+          waxing: phase !== 'waning',
+        },
+  )
 }

@@ -3,7 +3,7 @@ import { AlpacaDiscoveryError } from '../error.js'
 import { createUdpScanner } from './udp-scanner.js'
 
 class FakeSocket {
-  readonly sends: Array<{ message: string, port: number, address: string }> = []
+  readonly sends: Array<{ message: string; port: number; address: string }> = []
   boundAddress?: string
   broadcastEnabled = false
   closed = false
@@ -37,12 +37,7 @@ class FakeSocket {
     this.broadcastEnabled = enabled
   }
 
-  send(
-    message: Uint8Array,
-    port: number,
-    address: string,
-    callback: (error?: Error) => void,
-  ) {
+  send(message: Uint8Array, port: number, address: string, callback: (error?: Error) => void) {
     this.sends.push({
       message: new TextDecoder().decode(message),
       port,
@@ -75,7 +70,7 @@ describe('IPv4 UDP scanner', () => {
     const sockets = [new FakeSocket(), new FakeSocket()]
 
     for (const socket of sockets) {
-      socket.onSend = (activeSocket) => {
+      socket.onSend = activeSocket => {
         activeSocket.emitMessage('not json', '192.168.4.104')
         activeSocket.emitMessage('[]', '192.168.4.104')
         activeSocket.emitMessage('null', '192.168.4.104')
@@ -97,9 +92,7 @@ describe('IPv4 UDP scanner', () => {
     const scan = scanner.scan({ durationMs: 1_000, attempts: 2 })
     await vi.advanceTimersByTimeAsync(1_000)
 
-    await expect(scan).resolves.toEqual([
-      { host: '192.168.4.104', port: 11111 },
-    ])
+    await expect(scan).resolves.toEqual([{ host: '192.168.4.104', port: 11111 }])
     expect(sockets[0]!.boundAddress).toBe('192.168.4.2')
     expect(sockets[1]!.boundAddress).toBe('10.0.0.2')
     expect(sockets[0]!.sends).toEqual([
@@ -107,7 +100,7 @@ describe('IPv4 UDP scanner', () => {
       { message: 'alpacadiscovery1', port: 32227, address: '192.168.4.255' },
     ])
     expect(sockets[1]!.sends[0]!.address).toBe('10.0.255.255')
-    expect(sockets.every((socket) => socket.broadcastEnabled && socket.closed)).toBe(true)
+    expect(sockets.every(socket => socket.broadcastEnabled && socket.closed)).toBe(true)
   })
 
   it('continues when one interface fails', async () => {
@@ -139,9 +132,7 @@ describe('IPv4 UDP scanner', () => {
     socket.failBind = true
 
     const scanner = createUdpScanner({
-      networkInterfaces: () => [
-        { address: '192.168.4.2', netmask: '255.255.255.0' },
-      ],
+      networkInterfaces: () => [{ address: '192.168.4.2', netmask: '255.255.255.0' }],
       createSocket: () => socket,
     })
 
@@ -180,9 +171,7 @@ describe('IPv4 UDP scanner', () => {
     const cancellation = new Error('scan cancelled')
 
     const scanner = createUdpScanner({
-      networkInterfaces: () => [
-        { address: '192.168.4.2', netmask: '255.255.255.0' },
-      ],
+      networkInterfaces: () => [{ address: '192.168.4.2', netmask: '255.255.255.0' }],
       createSocket: () => socket,
     })
 

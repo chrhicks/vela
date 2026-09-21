@@ -10,7 +10,18 @@ import { CaptureRunExposure } from './CaptureRunExposure'
 import '../components/Panel.capture.specimen.css'
 import './Panel.capture-runs.specimen.css'
 
-const phases = ['idle', 'exposing', 'reading', 'observation-interrupted', 'stopping', 'complete', 'stopped', 'failed', 'cleanup-uncertain', 'disconnected'] as const
+const phases = [
+  'idle',
+  'exposing',
+  'reading',
+  'observation-interrupted',
+  'stopping',
+  'complete',
+  'stopped',
+  'failed',
+  'cleanup-uncertain',
+  'disconnected',
+] as const
 
 type Props = Record<string, string | number | boolean>
 
@@ -25,17 +36,23 @@ function CameraMark() {
   )
 }
 
-function CaptureRunPreview({ props, onPropsChange }: {
+function CaptureRunPreview({
+  props,
+  onPropsChange,
+}: {
   props: Props
   onPropsChange?: (patch: Props) => void
 }) {
   const [localProps, setLocalProps] = useState(props)
   const values = onPropsChange ? props : localProps
 
-  const update = useCallback((patch: Props) => {
-    if (onPropsChange) onPropsChange(patch)
-    else setLocalProps(current => ({ ...current, ...patch }))
-  }, [onPropsChange])
+  const update = useCallback(
+    (patch: Props) => {
+      if (onPropsChange) onPropsChange(patch)
+      else setLocalProps(current => ({ ...current, ...patch }))
+    },
+    [onPropsChange],
+  )
 
   const screen = String(values.screen)
   const phase = z.enum(phases).parse(values.phase)
@@ -52,12 +69,23 @@ function CaptureRunPreview({ props, onPropsChange }: {
   const repeat = Boolean(values.repeat)
   const completed = Math.max(0, Math.floor(Number(values.completed) || 0))
   const frame = Math.max(0, Math.floor(Number(values.frame) || 0))
-  const conditions = z.enum(['changing', 'clear', 'haze', 'soft', 'streak']).default('changing').parse(values.conditions)
+
+  const conditions = z
+    .enum(['changing', 'clear', 'haze', 'soft', 'streak'])
+    .default('changing')
+    .parse(values.conditions)
+
   const statistics = String(values.statistics ?? 'measured')
-  const starCount = statistics === 'no-stars' ? 0 : conditions === 'haze' ? 78 : 128 + (frame % 7) * 3
+
+  const starCount =
+    statistics === 'no-stars' ? 0 : conditions === 'haze' ? 78 : 128 + (frame % 7) * 3
+
   const hfr = conditions === 'soft' ? 3.42 : 2.18 + (frame % 5) * 0.06
   const disconnected = phase === 'disconnected'
-  const validExposure = exposure.trim() !== '' && Number.isFinite(seconds) && seconds >= 0.1 && seconds <= 600
+
+  const validExposure =
+    exposure.trim() !== '' && Number.isFinite(seconds) && seconds >= 0.1 && seconds <= 600
+
   const [playing, setPlaying] = useState(false)
   const [observationRecovered, setObservationRecovered] = useState(false)
   const [fraction, setFraction] = useState(0)
@@ -112,37 +140,30 @@ function CaptureRunPreview({ props, onPropsChange }: {
     }
 
     if (phase === 'reading') {
-      const timer = window.setTimeout(() => {
-        setCapturedAt(Date.now())
-        setNow(Date.now())
-        setFraction(0)
-        setObservationRecovered(false)
+      const timer = window.setTimeout(
+        () => {
+          setCapturedAt(Date.now())
+          setNow(Date.now())
+          setFraction(0)
+          setObservationRecovered(false)
 
-        if (!repeat) setPlaying(false)
-        update({
-          phase: repeat ? 'exposing' : 'complete',
-          hasImage: true,
-          imageSeconds: seconds,
-          completed: completed + 1,
-          frame: frame + 1
-        })
-      }, observationRecovered ? 2000 : 800)
+          if (!repeat) setPlaying(false)
+          update({
+            phase: repeat ? 'exposing' : 'complete',
+            hasImage: true,
+            imageSeconds: seconds,
+            completed: completed + 1,
+            frame: frame + 1,
+          })
+        },
+        observationRecovered ? 2000 : 800,
+      )
 
       return () => window.clearTimeout(timer)
     }
 
     setPlaying(false)
-  }, [
-    phase,
-    playing,
-    seconds,
-    repeat,
-    completed,
-    frame,
-    stopOutcome,
-    observationRecovered,
-    update
-  ])
+  }, [phase, playing, seconds, repeat, completed, frame, stopOutcome, observationRecovered, update])
 
   useEffect(() => {
     if (previousScreen.current !== screen) heading.current?.focus()
@@ -221,26 +242,39 @@ function CaptureRunPreview({ props, onPropsChange }: {
     status = busy ? 'Capturing' : 'Connected'
   }
 
-  const alignmentHref = '?component=panel&specimen=panel-polar-alignment&prop.phase=setup&prop.example=near-aligned'
-  const autofocusHref = '?component=panel&specimen=panel-autofocus&prop.phase=setup&prop.example=current-focus'
+  const alignmentHref =
+    '?component=panel&specimen=panel-polar-alignment&prop.phase=setup&prop.example=near-aligned'
+
+  const autofocusHref =
+    '?component=panel&specimen=panel-autofocus&prop.phase=setup&prop.example=current-focus'
 
   const rigContext = (
     <details className="vela-capture-rig">
       <summary>
         <span>
-          <i data-offline={disconnected || observationInterrupted || cleanupUncertain || undefined} />
+          <i
+            data-offline={disconnected || observationInterrupted || cleanupUncertain || undefined}
+          />
           {disconnected
             ? 'Rig updates interrupted'
             : observationInterrupted
               ? 'Camera reads interrupted · server connected'
-              : cleanupUncertain ? 'Camera state unconfirmed' : 'Camera and mount connected'}
+              : cleanupUncertain
+                ? 'Camera state unconfirmed'
+                : 'Camera and mount connected'}
         </span>
         <span>Device details</span>
       </summary>
       <dl>
         <div>
           <dt>Simulator Color Camera</dt>
-          <dd>{disconnected ? 'Last known: connected' : busy || cleanupUncertain ? activity : 'Connected · idle'}</dd>
+          <dd>
+            {disconnected
+              ? 'Last known: connected'
+              : busy || cleanupUncertain
+                ? activity
+                : 'Connected · idle'}
+          </dd>
         </div>
         <div>
           <dt>Simulator Telescope</dt>
@@ -258,13 +292,32 @@ function CaptureRunPreview({ props, onPropsChange }: {
         <span>Observe</span>
       </header>
       <main className="vela-capture-main">
-        {screen === 'capture' && <Button className="vela-capture-back" tone="quiet" size="small" onClick={() => update({ screen: 'observe' })}>← Observe</Button>}
+        {screen === 'capture' && (
+          <Button
+            className="vela-capture-back"
+            tone="quiet"
+            size="small"
+            onClick={() => update({ screen: 'observe' })}
+          >
+            ← Observe
+          </Button>
+        )}
         <header className="vela-capture-heading">
           <div>
             <p>Offline rig</p>
-            <h1 ref={heading} tabIndex={-1}>{screen === 'capture' ? 'Capture' : 'Observe'}</h1>
+            <h1 ref={heading} tabIndex={-1}>
+              {screen === 'capture' ? 'Capture' : 'Observe'}
+            </h1>
           </div>
-          <Badge tone={disconnected || observationInterrupted || failed ? 'warning' : busy ? 'accent' : 'positive'}>
+          <Badge
+            tone={
+              disconnected || observationInterrupted || failed
+                ? 'warning'
+                : busy
+                  ? 'accent'
+                  : 'positive'
+            }
+          >
             {status}
           </Badge>
         </header>
@@ -286,7 +339,11 @@ function CaptureRunPreview({ props, onPropsChange }: {
             <div className="vela-capture-hub">
               <Panel className="vela-capture-entry" elevation="raised">
                 <div className="vela-capture-entry__preview">
-                  {hasImage ? <CaptureRunExposure frame={frame} conditions={conditions} /> : <CameraMark />}
+                  {hasImage ? (
+                    <CaptureRunExposure frame={frame} conditions={conditions} />
+                  ) : (
+                    <CameraMark />
+                  )}
                   <span>{hasImage ? 'Latest exposure' : 'See what your camera sees'}</span>
                 </div>
                 <div className="vela-capture-entry__body">
@@ -297,13 +354,19 @@ function CaptureRunPreview({ props, onPropsChange }: {
                       ? `${activity} · ${completed} completed`
                       : failed || disconnected || phase === 'stopped'
                         ? activity
-                        : hasImage ? `${imageSeconds} s · Color · ${age} s ago` : 'No image captured yet'}
+                        : hasImage
+                          ? `${imageSeconds} s · Color · ${age} s ago`
+                          : 'No image captured yet'}
                   </div>
-                  <Button size="large" tone="accent" onClick={() => update({ screen: 'capture' })}>{busy ? 'View capture' : 'Open capture'} →</Button>
+                  <Button size="large" tone="accent" onClick={() => update({ screen: 'capture' })}>
+                    {busy ? 'View capture' : 'Open capture'} →
+                  </Button>
                 </div>
               </Panel>
               <Panel className="vela-capture-alignment">
-                <div className="vela-capture-alignment__mark" aria-hidden="true">◎</div>
+                <div className="vela-capture-alignment__mark" aria-hidden="true">
+                  ◎
+                </div>
                 <h2>Polar alignment</h2>
                 <p>Measure your alignment and adjust the mount when you need to.</p>
                 <a href={alignmentHref}>
@@ -312,9 +375,14 @@ function CaptureRunPreview({ props, onPropsChange }: {
                 </a>
               </Panel>
               <Panel className="vela-capture-alignment">
-                <div className="vela-capture-alignment__mark" aria-hidden="true">V</div>
+                <div className="vela-capture-alignment__mark" aria-hidden="true">
+                  V
+                </div>
                 <h2>Autofocus</h2>
-                <p>Walk a small window around the current focuser position and watch the V-curve as shorts land.</p>
+                <p>
+                  Walk a small window around the current focuser position and watch the V-curve as
+                  shorts land.
+                </p>
                 <a href={autofocusHref}>
                   {'Open autofocus '}
                   <span aria-hidden="true">→</span>
@@ -344,7 +412,11 @@ function CaptureRunPreview({ props, onPropsChange }: {
                 <header>
                   <div>
                     <h2>Latest image</h2>
-                    <span>{hasImage ? `${age} s ago${busy || disconnected ? ' · Previous exposure' : ''}` : 'No exposure yet'}</span>
+                    <span>
+                      {hasImage
+                        ? `${age} s ago${busy || disconnected ? ' · Previous exposure' : ''}`
+                        : 'No exposure yet'}
+                    </span>
                   </div>
                   {hasImage && (
                     <div className="vela-capture-zoom" aria-label="Image scale">
@@ -369,19 +441,25 @@ function CaptureRunPreview({ props, onPropsChange }: {
                 </header>
                 <div
                   className="vela-capture-image__window"
-                  data-zoomed={hasImage && zoomed || undefined}
+                  data-zoomed={(hasImage && zoomed) || undefined}
                   ref={imageWindow}
                   tabIndex={hasImage && zoomed ? 0 : undefined}
                   role={hasImage && zoomed ? 'region' : undefined}
-                  aria-label={hasImage && zoomed ? 'Image at 100 percent. Scroll to inspect.' : undefined}
+                  aria-label={
+                    hasImage && zoomed ? 'Image at 100 percent. Scroll to inspect.' : undefined
+                  }
                 >
-                  {hasImage ? <CaptureRunExposure frame={frame} conditions={conditions} /> : (
+                  {hasImage ? (
+                    <CaptureRunExposure frame={frame} conditions={conditions} />
+                  ) : (
                     <div className="vela-capture-empty">
                       <CameraMark />
                       <h3>
                         {observationInterrupted
                           ? 'Waiting for your first image'
-                          : busy ? 'Taking your first exposure' : 'Your first image starts here'}
+                          : busy
+                            ? 'Taking your first exposure'
+                            : 'Your first image starts here'}
                       </h3>
                       <p>
                         {observationInterrupted
@@ -469,8 +547,7 @@ function CaptureRunPreview({ props, onPropsChange }: {
                     >
                       {stopping ? 'Stopping…' : repeat ? 'Stop run' : 'Stop exposure'}
                     </Button>
-                  )
-                  : (
+                  ) : (
                     <Button
                       size="large"
                       tone="accent"
@@ -484,26 +561,37 @@ function CaptureRunPreview({ props, onPropsChange }: {
                 {(busy || completed > 0 || phase === 'stopped' || failed) && (
                   <div className="vela-capture-run-count">
                     <strong>{completed}</strong>
-                    <span>{completed === 1 ? 'image completed' : 'images completed'}{disconnected ? ' · last known' : ''}</span>
+                    <span>
+                      {completed === 1 ? 'image completed' : 'images completed'}
+                      {disconnected ? ' · last known' : ''}
+                    </span>
                   </div>
                 )}
                 <div className="vela-capture-progress">
                   <div>
                     <strong role="status">{activity}</strong>
-                    {phase === 'exposing' && <span>{(seconds * progress).toFixed(1)} / {seconds} s</span>}
+                    {phase === 'exposing' && (
+                      <span>
+                        {(seconds * progress).toFixed(1)} / {seconds} s
+                      </span>
+                    )}
                   </div>
-                  {phase === 'exposing' && <progress value={progress} max="1" aria-label="Exposure progress" />}
+                  {phase === 'exposing' && (
+                    <progress value={progress} max="1" aria-label="Exposure progress" />
+                  )}
                   <p>{progressDetail}</p>
                 </div>
               </Panel>
-
             </div>
             {rigContext}
           </>
         )}
       </main>
       <footer className="vela-capture-prototype">
-        <p>Workshop only · Procedural exposure examples · 4 seconds per exposure, then receiving · No rig commands</p>
+        <p>
+          Workshop only · Procedural exposure examples · 4 seconds per exposure, then receiving · No
+          rig commands
+        </p>
         {(phase === 'exposing' || phase === 'reading') && (
           <Button
             size="small"
@@ -517,8 +605,15 @@ function CaptureRunPreview({ props, onPropsChange }: {
             Interrupt camera reads
           </Button>
         )}
-        {observationInterrupted && !playing && <Button size="small" tone="quiet" onClick={() => setPlaying(true)}>Play read recovery</Button>}
-        <p>Read interruptions last 12 seconds, then receive the same exposure. Stop result is set in the inspector.</p>
+        {observationInterrupted && !playing && (
+          <Button size="small" tone="quiet" onClick={() => setPlaying(true)}>
+            Play read recovery
+          </Button>
+        )}
+        <p>
+          Read interruptions last 12 seconds, then receive the same exposure. Stop result is set in
+          the inspector.
+        </p>
       </footer>
     </article>
   )
@@ -529,19 +624,32 @@ export const specimen: ComponentSpecimen = {
   componentName: 'Panel / Card',
   id: 'panel-capture-runs',
   name: 'Capture runs · Draft product example',
-  description: 'Repeated exposures with retained images, camera-read interruption and same-exposure recovery. Stop can confirm cleanup or leave an explicit failure. Inspector snapshots stay still until played; no server or hardware commands.',
+  description:
+    'Repeated exposures with retained images, camera-read interruption and same-exposure recovery. Stop can confirm cleanup or leave an explicit failure. Inspector snapshots stay still until played; no server or hardware commands.',
   controls: {
     screen: { type: 'select', label: 'View', options: ['observe', 'capture'] },
     phase: { type: 'select', label: 'Capture state', options: phases },
-    stopOutcome: { type: 'select', label: 'Simulated camera stop result', options: ['confirmed', 'uncertain'] },
+    stopOutcome: {
+      type: 'select',
+      label: 'Simulated camera stop result',
+      options: ['confirmed', 'uncertain'],
+    },
     hasImage: { type: 'boolean', label: 'Previous image available' },
     exposure: { type: 'text', label: 'Next exposure (seconds)' },
     imageSeconds: { type: 'text', label: 'Previous image exposure (seconds)' },
     repeat: { type: 'boolean', label: 'Repeat until stopped' },
     completed: { type: 'text', label: 'Images completed in run' },
     frame: { type: 'text', label: 'Example frame number' },
-    conditions: { type: 'select', label: 'Example sky', options: ['changing', 'clear', 'haze', 'soft', 'streak'] },
-    statistics: { type: 'select', label: 'Image measurements', options: ['measured', 'no-stars', 'unavailable'] },
+    conditions: {
+      type: 'select',
+      label: 'Example sky',
+      options: ['changing', 'clear', 'haze', 'soft', 'streak'],
+    },
+    statistics: {
+      type: 'select',
+      label: 'Image measurements',
+      options: ['measured', 'no-stars', 'unavailable'],
+    },
   },
   defaultProps: {
     screen: 'capture',
@@ -554,7 +662,9 @@ export const specimen: ComponentSpecimen = {
     completed: '0',
     frame: '0',
     conditions: 'changing',
-    statistics: 'measured'
+    statistics: 'measured',
   },
-  render: (props, onPropsChange) => <CaptureRunPreview props={props} {...(onPropsChange ? { onPropsChange } : {})} />,
+  render: (props, onPropsChange) => (
+    <CaptureRunPreview props={props} {...(onPropsChange ? { onPropsChange } : {})} />
+  ),
 }

@@ -19,17 +19,19 @@ describe('Rig detail API', () => {
       rigCatalog: createMemoryRigCatalog([record]),
       createInspector: () => ({
         async inspectDevices() {
-          return [{
-            providerDeviceId: 'camera-0',
-            kind: 'camera',
-            configuredName: 'Camera slot',
-            name: 'Main camera',
-            connection: 'connected',
-            telemetry: {
-              availability: 'complete',
-              values: { kind: 'camera', activity: 'idle' },
+          return [
+            {
+              providerDeviceId: 'camera-0',
+              kind: 'camera',
+              configuredName: 'Camera slot',
+              name: 'Main camera',
+              connection: 'connected',
+              telemetry: {
+                availability: 'complete',
+                values: { kind: 'camera', activity: 'idle' },
+              },
             },
-          }]
+          ]
         },
       }),
       now: () => new Date('2026-09-03T20:00:00.000Z'),

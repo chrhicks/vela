@@ -100,17 +100,19 @@ describe('Home Rig projection', () => {
           async listDevices() {
             if (source.id === rigB.id) throw new Error('offline')
 
-            return [{
-              id: 'rig-a-camera-b',
-              rigId: 'rig-a',
-              uniqueId: 'camera-b',
-              kind: 'camera',
-              name: 'Rig B camera',
-              driver: {},
-              connection: 'connected',
-              status: { state: 'unknown' },
-              observedAt: new Date('2026-09-02T20:00:00.000Z'),
-            }]
+            return [
+              {
+                id: 'rig-a-camera-b',
+                rigId: 'rig-a',
+                uniqueId: 'camera-b',
+                kind: 'camera',
+                name: 'Rig B camera',
+                driver: {},
+                connection: 'connected',
+                status: { state: 'unknown' },
+                observedAt: new Date('2026-09-02T20:00:00.000Z'),
+              },
+            ]
           },
         }
       },

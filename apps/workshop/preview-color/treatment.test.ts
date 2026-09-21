@@ -7,13 +7,21 @@ import { readFrame } from './read-frame.js'
 import type { BayerPattern } from '../../server/src/imaging/bayer.js'
 
 function frame(pattern: BayerPattern = 'rggb'): PreviewFrame {
-  const width = 128, height = 128
+  const width = 128,
+    height = 128
+
   const pixels = new Int32Array(width * height)
 
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
-      const channel = pattern[y % 2 * 2 + x % 2]!
-      const background = new Map([['r', 510], ['g', 530], ['b', 500]]).get(channel)!
+      const channel = pattern[(y % 2) * 2 + (x % 2)]!
+
+      const background = new Map([
+        ['r', 510],
+        ['g', 530],
+        ['b', 500],
+      ]).get(channel)!
+
       const redNebula = x > 70 && y > 30 && channel === 'r' ? 800 : 0
       const blueSource = x > 70 && y < 30 && channel === 'b' ? 800 : 0
       pixels[y * width + x] = background + redNebula + blueSource + Math.floor(x / 16)
@@ -24,7 +32,7 @@ function frame(pattern: BayerPattern = 'rggb'): PreviewFrame {
     width,
     height,
     pixels,
-    color: { kind: 'bayer', pattern }
+    color: { kind: 'bayer', pattern },
   }
 }
 
@@ -44,26 +52,28 @@ function pngPixels(png: Buffer) {
 }
 
 describe('workshop-only background treatment', () => {
-  it.each<BayerPattern>(['rggb', 'grbg', 'gbrg', 'bggr'])('removes additive tint without balancing away red and blue sources (%s)', async pattern => {
-    const input = frame(pattern)
-    const before = Array.from(input.pixels)
-    const result = await neutralPreviews(input)
-    expect(result.estimate.offsets).toEqual([10, 30, 0])
-    const displayed = pngPixels(result.native)
+  it.each<BayerPattern>(['rggb', 'grbg', 'gbrg', 'bggr'])(
+    'removes additive tint without balancing away red and blue sources (%s)',
+    async pattern => {
+      const input = frame(pattern)
+      const before = Array.from(input.pixels)
+      const result = await neutralPreviews(input)
+      expect(result.estimate.offsets).toEqual([10, 30, 0])
+      const displayed = pngPixels(result.native)
 
-    const rgbAt = (x: number, y: number) => [...displayed.subarray(
-      y * (128 * 3 + 1) + x * 3 + 1,
-      y * (128 * 3 + 1) + x * 3 + 4
-    )]
+      const rgbAt = (x: number, y: number) => [
+        ...displayed.subarray(y * (128 * 3 + 1) + x * 3 + 1, y * (128 * 3 + 1) + x * 3 + 4),
+      ]
 
-    expect(new Set(rgbAt(20, 20)).size).toBe(1)
-    const nebula = rgbAt(100, 100)
-    expect(nebula[0]! - nebula[1]!).toBeGreaterThan(150)
-    const blue = rgbAt(100, 20)
-    expect(blue[2]! - blue[1]!).toBeGreaterThan(150)
-    expect(rgbAt(0, 0)).toEqual([0, 0, 0])
-    expect(Array.from(input.pixels)).toEqual(before)
-  })
+      expect(new Set(rgbAt(20, 20)).size).toBe(1)
+      const nebula = rgbAt(100, 100)
+      expect(nebula[0]! - nebula[1]!).toBeGreaterThan(150)
+      const blue = rgbAt(100, 20)
+      expect(blue[2]! - blue[1]!).toBeGreaterThan(150)
+      expect(rgbAt(0, 0)).toEqual([0, 0, 0])
+      expect(Array.from(input.pixels)).toEqual(before)
+    },
+  )
 
   it('bounds a field-filling color rather than declaring its mean neutral', () => {
     const input = frame()
@@ -79,7 +89,7 @@ describe('workshop-only background treatment', () => {
       width: 64,
       height: 64,
       pixels,
-      color: { kind: 'mono' }
+      color: { kind: 'mono' },
     }
 
     const result = await neutralPreviews(mono)
@@ -88,10 +98,12 @@ describe('workshop-only background treatment', () => {
     expect(result.estimate.status).toContain('mono')
     const blank: PreviewFrame = { ...mono, color: { kind: 'bayer', pattern: 'rggb' } }
     expect(backgroundOffsets(blank, linkedRange(pixels)).offsets).toEqual([0, 0, 0])
-    expect(backgroundOffsets(
-      { ...blank, pixels: new Float64Array(pixels.length).fill(NaN) },
-      { black: 0, ceiling: 100 }
-    ).status).toContain('invalid')
+    expect(
+      backgroundOffsets(
+        { ...blank, pixels: new Float64Array(pixels.length).fill(NaN) },
+        { black: 0, ceiling: 100 },
+      ).status,
+    ).toContain('invalid')
   })
 
   it('averages the same displayed pixels for fitted derivatives', async () => {
@@ -99,11 +111,14 @@ describe('workshop-only background treatment', () => {
       width: 1601,
       height: 2,
       pixels: Int32Array.from({ length: 3202 }, (_, i) => i % 1000),
-      color: { kind: 'mono' }
+      color: { kind: 'mono' },
     }
 
     const result = await neutralPreviews(input)
-    const native = pngPixels(result.native), fit = pngPixels(result.fit)
+
+    const native = pngPixels(result.native),
+      fit = pngPixels(result.fit)
+
     expect(fit[1]).toBe(Math.round((native[1]! + native[2]! + native[1603]! + native[1604]!) / 4))
     expect(fit[801]).toBe(Math.round((native[1601]! + native[3203]!) / 2))
   })
@@ -116,7 +131,7 @@ describe('workshop-only background treatment', () => {
 
     const fits = await encodeCaptureFits(
       { ...input, capturedAt: '2026-09-15T03:00:00Z' },
-      { exposureSeconds: 180, cameraName: 'fixture' }
+      { exposureSeconds: 180, cameraName: 'fixture' },
     )
 
     const decoded = readFrame(fits)

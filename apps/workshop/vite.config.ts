@@ -19,7 +19,11 @@ const designsPath = resolve(workshopRoot, 'designs')
 
 const maxBodyBytes = 256 * 1024
 
-type PersistenceResponse = { session: WorkingSession | null } | { profiles: DesignProfile[] } | { profile: DesignProfile } | { error: string }
+type PersistenceResponse =
+  | { session: WorkingSession | null }
+  | { profiles: DesignProfile[] }
+  | { profile: DesignProfile }
+  | { error: string }
 
 async function readJson<T>(path: string, schema: z.ZodType<T>): Promise<T | null> {
   try {
@@ -69,7 +73,9 @@ function localPersistencePlugin(): Plugin {
 
         try {
           if (url.pathname === '/__workshop/session' && request.method === 'GET') {
-            return json(response, 200, { session: await readJson(sessionPath, workingSessionSchema) })
+            return json(response, 200, {
+              session: await readJson(sessionPath, workingSessionSchema),
+            })
           }
 
           if (url.pathname === '/__workshop/session' && request.method === 'PUT') {
@@ -81,7 +87,7 @@ function localPersistencePlugin(): Plugin {
 
           if (url.pathname === '/__workshop/profiles' && request.method === 'GET') {
             await mkdir(designsPath, { recursive: true })
-            const names = (await readdir(designsPath)).filter((name) => name.endsWith('.json')).sort()
+            const names = (await readdir(designsPath)).filter(name => name.endsWith('.json')).sort()
             const profiles = []
 
             for (const name of names) {
@@ -108,7 +114,9 @@ function localPersistencePlugin(): Plugin {
 
           return json(response, 404, { error: 'Unknown workshop persistence route' })
         } catch (error) {
-          return json(response, 400, { error: error instanceof Error ? error.message : 'Persistence error' })
+          return json(response, 400, {
+            error: error instanceof Error ? error.message : 'Persistence error',
+          })
         }
       })
     },

@@ -17,7 +17,8 @@ const catalogPath = process.env.VELA_STAR_CATALOG
 
 const solverPath = process.env.VELA_ASTAP
 
-if (!catalogPath || !solverPath) throw new Error('Set VELA_STAR_CATALOG and VELA_ASTAP; see README.md')
+if (!catalogPath || !solverPath)
+  throw new Error('Set VELA_STAR_CATALOG and VELA_ASTAP; see README.md')
 
 const output = resolve(process.env.VELA_SIM_OUTPUT ?? '.local/proof')
 
@@ -28,7 +29,9 @@ const stars = await loadCatalog(catalogPath)
 const reports = []
 
 for (const [name, altitudeArcsec, azimuthArcsec] of [
-  ['large', 480, -360], ['near', 12, -9], ['aligned', 0, 0],
+  ['large', 480, -360],
+  ['near', 12, -9],
+  ['aligned', 0, 0],
 ] as const) {
   const points: Vector[] = []
 
@@ -79,10 +82,13 @@ for (const [name, altitudeArcsec, azimuthArcsec] of [
   const altitude = Math.asin(axis[0] * Math.cos(latitude) + axis[2] * Math.sin(latitude))
   const azimuth = Math.atan2(axis[1], -axis[0] * Math.sin(latitude) + axis[2] * Math.cos(latitude))
   const measuredAltitude = (altitude / radians - 40) * 3600
-  const measuredAzimuth = azimuth / radians * 3600
-  const total = Math.atan2(Math.hypot(axis[0], axis[1]), axis[2]) / radians * 3600
+  const measuredAzimuth = (azimuth / radians) * 3600
+  const total = (Math.atan2(Math.hypot(axis[0], axis[1]), axis[2]) / radians) * 3600
 
-  if (Math.abs(measuredAltitude - altitudeArcsec) > 5 || Math.abs(measuredAzimuth - azimuthArcsec) > 5) {
+  if (
+    Math.abs(measuredAltitude - altitudeArcsec) > 5 ||
+    Math.abs(measuredAzimuth - azimuthArcsec) > 5
+  ) {
     throw new Error(`${name}: recovered axis exceeds the 5 arcsec synthetic component tolerance`)
   }
 
@@ -104,13 +110,20 @@ const pose = cameraPose({
   tracking: true,
 })
 
-await writeFile(obscuredPath, writeFits(1600, 1200, renderSky(stars, pose, {
-  width: 1600,
-  height: 1200,
-  fieldHeightDegrees: 3,
-  seed: 99,
-  obscured: true,
-})))
+await writeFile(
+  obscuredPath,
+  writeFits(
+    1600,
+    1200,
+    renderSky(stars, pose, {
+      width: 1600,
+      height: 1200,
+      fieldHeightDegrees: 3,
+      seed: 99,
+      obscured: true,
+    }),
+  ),
+)
 
 const obscured = await invokeSolver(obscuredPath, pose.direction)
 
@@ -118,7 +131,10 @@ if (obscured.code !== 1 || !obscured.stdout.includes('No solution found')) {
   throw new Error('Expected a genuine no-solution result for obscured sky')
 }
 
-await writeFile(join(output, 'results.json'), JSON.stringify({ reports, obscured: 'no solution' }, null, 2))
+await writeFile(
+  join(output, 'results.json'),
+  JSON.stringify({ reports, obscured: 'no solution' }, null, 2),
+)
 
 console.log(`Proof passed. Images, solver outputs and results: ${output}`)
 
@@ -127,14 +143,22 @@ async function solve(path: string, hint: Vector): Promise<Vector> {
 
   if (result.code !== 0) throw new Error(`ASTAP failed: ${result.stdout}`)
 
-  const values = Object.fromEntries((await readFile(path.replace(/\.fits$/, '.ini'), 'utf8'))
-    .split(/\r?\n/).filter(line => line.includes('=')).map(line => {
-      const index = line.indexOf('=')
+  const values = Object.fromEntries(
+    (await readFile(path.replace(/\.fits$/, '.ini'), 'utf8'))
+      .split(/\r?\n/)
+      .filter(line => line.includes('='))
+      .map(line => {
+        const index = line.indexOf('=')
 
-      return [line.slice(0, index).trim(), line.slice(index + 1).trim()]
-    }))
+        return [line.slice(0, index).trim(), line.slice(index + 1).trim()]
+      }),
+  )
 
-  if (values.PLTSOLVD !== 'T' || Number(values.CRPIX1) !== 800.5 || Number(values.CRPIX2) !== 600.5) {
+  if (
+    values.PLTSOLVD !== 'T' ||
+    Number(values.CRPIX1) !== 800.5 ||
+    Number(values.CRPIX2) !== 600.5
+  ) {
     throw new Error('Solver output does not describe the expected optical center')
   }
 
@@ -153,12 +177,18 @@ async function invokeSolver(path: string, hint: Vector) {
   const dec = Math.asin(hint[2]) / radians
 
   const args = [
-    '-f', path,
-    '-d', resolve(catalogPath!),
-    '-fov', '3',
-    '-ra', String(ra / 15 + 0.05),
-    '-spd', String(dec + 90.3),
-    '-r', '5',
+    '-f',
+    path,
+    '-d',
+    resolve(catalogPath!),
+    '-fov',
+    '3',
+    '-ra',
+    String(ra / 15 + 0.05),
+    '-spd',
+    String(dec + 90.3),
+    '-r',
+    '5',
   ]
 
   try {
@@ -167,15 +197,20 @@ async function invokeSolver(path: string, hint: Vector) {
 
     return { code: 0, stdout: result.stdout }
   } catch (error) {
-    const result = z.object({
-      code: z.number(),
-      stdout: z.string().optional(),
-      stderr: z.string().optional(),
-    }).safeParse(error)
+    const result = z
+      .object({
+        code: z.number(),
+        stdout: z.string().optional(),
+        stderr: z.string().optional(),
+      })
+      .safeParse(error)
 
     if (!result.success) throw error
     const failure = result.data
-    await writeFile(path.replace(/\.fits$/, '.log'), (failure.stdout ?? '') + (failure.stderr ?? ''))
+    await writeFile(
+      path.replace(/\.fits$/, '.log'),
+      (failure.stdout ?? '') + (failure.stderr ?? ''),
+    )
 
     return { code: failure.code, stdout: failure.stdout ?? '' }
   }

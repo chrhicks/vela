@@ -27,10 +27,14 @@ const idle: CaptureView = {
 }
 
 test.beforeEach(async ({ page }) => {
-  await page.route('**/api/web/navigation', route => route.fulfill({ json: { rigs: [], captures: [] } }))
+  await page.route('**/api/web/navigation', route =>
+    route.fulfill({ json: { rigs: [], captures: [] } }),
+  )
 })
 
-test('keeps uncertain temperature visible through incomplete reads and capture commands until the setting is observed', async ({ page }) => {
+test('keeps uncertain temperature visible through incomplete reads and capture commands until the setting is observed', async ({
+  page,
+}) => {
   let current = idle
   let commands = 0
   let reads = 0
@@ -46,7 +50,8 @@ test('keeps uncertain temperature visible through incomplete reads and capture c
     return route.fulfill({
       status: 409,
       json: {
-        error: 'The cooler command could not be confirmed. Check camera cooling before assuming it changed.',
+        error:
+          'The cooler command could not be confirmed. Check camera cooling before assuming it changed.',
       },
     })
   })
@@ -98,7 +103,9 @@ test('keeps uncertain temperature visible through incomplete reads and capture c
   expect(commands).toBe(1)
 })
 
-test('resolves an uncertain cooler switch from its fresh state without requiring a temperature setpoint', async ({ page }) => {
+test('resolves an uncertain cooler switch from its fresh state without requiring a temperature setpoint', async ({
+  page,
+}) => {
   let current = idle
   await page.route('**/api/web/rigs/rig-1/capture', route => route.fulfill({ json: current }))
   await page.route('**/api/rigs/rig-1/capture/cooling', route => {

@@ -9,13 +9,13 @@ export async function capturePreviews(
   width: number,
   height: number,
   pixels: ArrayLike<number>,
-  color: ImageColor = { kind: 'mono' }
+  color: ImageColor = { kind: 'mono' },
 ) {
   const sampleStride = Math.max(1, Math.floor(pixels.length / 200_000) | 1)
 
   const sample = Array.from(
     { length: Math.ceil(pixels.length / sampleStride) },
-    (_, i) => pixels[i * sampleStride]!
+    (_, i) => pixels[i * sampleStride]!,
   ).sort((a, b) => a - b)
 
   const blackPoint = sample[Math.floor(sample.length * 0.01)] ?? 0
@@ -29,9 +29,10 @@ export async function capturePreviews(
     if (y % 16 === 0) await setImmediate()
 
     for (let x = 0; x < width; x++) {
-      const rgb = color.kind === 'bayer'
-        ? bayerPixel(width, height, pixels, color.pattern, x, y)
-        : [pixels[y * width + x]!]
+      const rgb =
+        color.kind === 'bayer'
+          ? bayerPixel(width, height, pixels, color.pattern, x, y)
+          : [pixels[y * width + x]!]
 
       for (let channel = 0; channel < channels; channel++) {
         data[y * nativeStride + x * channels + channel + 1] = display(rgb[channel]!)

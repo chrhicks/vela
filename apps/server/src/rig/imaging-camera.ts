@@ -19,15 +19,16 @@ export function registerImagingCamera(
 
     if (!rig) return undefined
 
-    const cameras = detail.state === 'current'
-      ? detail.inspections
-        .filter(device => device.kind === 'camera')
-        .map(device => ({
-          id: device.providerDeviceId,
-          name: device.name?.trim() || null,
-          configuredName: device.configuredName,
-        }))
-      : []
+    const cameras =
+      detail.state === 'current'
+        ? detail.inspections
+            .filter(device => device.kind === 'camera')
+            .map(device => ({
+              id: device.providerDeviceId,
+              name: device.name?.trim() || null,
+              configuredName: device.configuredName,
+            }))
+        : []
 
     const selected = rig.imagingCamera
     const match = cameras.find(camera => camera.id === selected?.uniqueId)
@@ -55,43 +56,52 @@ export function registerImagingCamera(
     }
   }
 
-  app.get<{ Params: { rigId: string } }>('/api/web/rigs/:rigId/imaging-camera', async (request, reply) =>
-    await inspect(request.params.rigId) ?? reply.code(404).send({ error: 'Rig not found' }))
+  app.get<{ Params: { rigId: string } }>(
+    '/api/web/rigs/:rigId/imaging-camera',
+    async (request, reply) =>
+      (await inspect(request.params.rigId)) ?? reply.code(404).send({ error: 'Rig not found' }),
+  )
 
-  app.put<{ Params: { rigId: string } }>('/api/rigs/:rigId/imaging-camera', async (request, reply) => {
-    const parsed = z.strictObject({ id: z.string(), name: z.string() }).safeParse(request.body)
+  app.put<{ Params: { rigId: string } }>(
+    '/api/rigs/:rigId/imaging-camera',
+    async (request, reply) => {
+      const parsed = z.strictObject({ id: z.string(), name: z.string() }).safeParse(request.body)
 
-    if (!parsed.success) return reply.code(400).send({ error: 'Expected camera id and name.' })
-    const body = parsed.data
+      if (!parsed.success) return reply.code(400).send({ error: 'Expected camera id and name.' })
+      const body = parsed.data
 
-    const release = operations.acquire(request.params.rigId, 'imaging-camera')
+      const release = operations.acquire(request.params.rigId, 'imaging-camera')
 
-    if (!release) return reply.code(409).send({ error: 'Another Rig operation is in progress.' })
+      if (!release) return reply.code(409).send({ error: 'Another Rig operation is in progress.' })
 
-    try {
-      const view = await inspect(request.params.rigId)
+      try {
+        const view = await inspect(request.params.rigId)
 
-      if (!view) return reply.code(404).send({ error: 'Rig not found' })
-      const camera = view.cameras.find(camera => camera.id === body.id)
+        if (!view) return reply.code(404).send({ error: 'Rig not found' })
+        const camera = view.cameras.find(camera => camera.id === body.id)
 
-      if (!camera?.name || camera.name !== body.name) {
-        return reply.code(409).send({
-          error: 'Camera identity changed or is unavailable. Refresh and select it again.',
+        if (!camera?.name || camera.name !== body.name) {
+          return reply.code(409).send({
+            error: 'Camera identity changed or is unavailable. Refresh and select it again.',
+          })
+        }
+
+        const saved = await catalog.setImagingCamera(view.rigId, {
+          uniqueId: camera.id,
+          name: camera.name,
         })
+
+        if (!saved) return reply.code(404).send({ error: 'Rig not found' })
+
+        return {
+          ...view,
+          selected: { id: camera.id, name: camera.name },
+          state: 'ready',
+          editable: true,
+        }
+      } finally {
+        release()
       }
-
-      const saved = await catalog.setImagingCamera(view.rigId, { uniqueId: camera.id, name: camera.name })
-
-      if (!saved) return reply.code(404).send({ error: 'Rig not found' })
-
-      return {
-        ...view,
-        selected: { id: camera.id, name: camera.name },
-        state: 'ready',
-        editable: true,
-      }
-    } finally {
-      release()
-    }
-  })
+    },
+  )
 }

@@ -26,7 +26,9 @@ const setup: AutofocusView = {
   error: null,
 }
 
-test('setup starts from the current EAF position and never offers a home to 0', async ({ page }) => {
+test('setup starts from the current EAF position and never offers a home to 0', async ({
+  page,
+}) => {
   await page.route('**/api/web/rigs/rig-1/autofocus', route => route.fulfill({ json: setup }))
   await page.goto('/rigs/rig-1/observe/autofocus')
   await expect(page.getByRole('heading', { name: 'Autofocus' })).toBeVisible()
@@ -66,12 +68,14 @@ test('the V-curve grows as each short lands', async ({ page }) => {
     active = true
     activity = 'exposing'
     currentPosition = 33042
-    samples = [{
-      position: 33042,
-      detectedStars: 18,
-      hfrPixels: 5.42,
-      capturedAt: '2026-09-17T00:00:00.000Z',
-    }]
+    samples = [
+      {
+        position: 33042,
+        detectedStars: 18,
+        hfrPixels: 5.42,
+        capturedAt: '2026-09-17T00:00:00.000Z',
+      },
+    ]
     await route.fulfill({ json: view() })
     setTimeout(() => {
       currentPosition = 32992
@@ -98,9 +102,11 @@ test('the V-curve grows as each short lands', async ({ page }) => {
 })
 
 test('a window that would approach 0 does not start', async ({ page }) => {
-  await page.route('**/api/web/rigs/rig-1/autofocus', route => route.fulfill({
-    json: { ...setup, currentPosition: 80 },
-  }))
+  await page.route('**/api/web/rigs/rig-1/autofocus', route =>
+    route.fulfill({
+      json: { ...setup, currentPosition: 80 },
+    }),
+  )
   await page.goto('/rigs/rig-1/observe/autofocus')
   await expect(page.getByRole('button', { name: 'Window does not fit' })).toBeDisabled()
   await expect(page.getByText('Walk would approach a travel limit')).toBeVisible()
@@ -111,7 +117,8 @@ test('a travel-limit start result returns to setup instead of a disconnect', asy
   const aborted: AutofocusView = {
     ...setup,
     currentPosition: 0,
-    error: 'The focuser is already at a mechanical limit. Autofocus starts from the current position and will not command 0 or MaxStep.',
+    error:
+      'The focuser is already at a mechanical limit. Autofocus starts from the current position and will not command 0 or MaxStep.',
   }
 
   let current: AutofocusView = setup
@@ -129,7 +136,9 @@ test('a travel-limit start result returns to setup instead of a disconnect', asy
   await expect(page.locator('.vela-autofocus')).not.toContainText('Disconnected')
   await expect(page.locator('.vela-autofocus')).not.toContainText('Start position was not restored')
   await expect(page.locator('.vela-autofocus')).not.toContainText('Focus again')
-  await expect(page.locator('.vela-autofocus')).not.toContainText('Points appear as each short lands')
+  await expect(page.locator('.vela-autofocus')).not.toContainText(
+    'Points appear as each short lands',
+  )
   await expect(page.locator('.vela-af-facts')).toContainText('0')
   await expect(page.getByLabel('Step size')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Window does not fit' })).toBeDisabled()
@@ -144,13 +153,16 @@ test('an unrestored failure is not labeled as a travel limit', async ({ page }) 
     startPosition: 32842,
     currentPosition: 32992,
     restoredStart: false,
-    samples: [{
-      position: 32992,
-      detectedStars: 18,
-      hfrPixels: 4.1,
-      capturedAt: '2026-09-17T00:00:02.000Z',
-    }],
-    error: 'The focuser did not confirm return to the start position. Vela did not repeat the move.',
+    samples: [
+      {
+        position: 32992,
+        detectedStars: 18,
+        hfrPixels: 4.1,
+        capturedAt: '2026-09-17T00:00:02.000Z',
+      },
+    ],
+    error:
+      'The focuser did not confirm return to the start position. Vela did not repeat the move.',
   }
 
   await page.route('**/api/web/rigs/rig-1/autofocus', route => route.fulfill({ json: failed }))
@@ -158,9 +170,13 @@ test('an unrestored failure is not labeled as a travel limit', async ({ page }) 
   await expect(page.getByText('Start position was not restored')).toBeVisible()
   await expect(page.getByText('Walk failed · start was not restored')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Back to setup' })).toBeVisible()
-  await expect(page.locator('.vela-autofocus')).not.toContainText('Walk would approach a travel limit')
+  await expect(page.locator('.vela-autofocus')).not.toContainText(
+    'Walk would approach a travel limit',
+  )
   await expect(page.locator('.vela-autofocus')).not.toContainText('Disconnected')
-  await expect(page.locator('.vela-autofocus')).not.toContainText('Points appear as each short lands')
+  await expect(page.locator('.vela-autofocus')).not.toContainText(
+    'Points appear as each short lands',
+  )
   await page.getByRole('button', { name: 'Back to setup' }).click()
   await expect(page.getByLabel('Step size')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Start autofocus' })).toBeVisible()
@@ -176,12 +192,14 @@ test('a restored stop keeps the walk view and notice, then returns to setup', as
     startPosition: 32842,
     currentPosition: 32842,
     restoredStart: true,
-    samples: [{
-      position: 32942,
-      detectedStars: 22,
-      hfrPixels: 3.21,
-      capturedAt: '2026-09-17T00:00:04.000Z',
-    }],
+    samples: [
+      {
+        position: 32942,
+        detectedStars: 22,
+        hfrPixels: 3.21,
+        capturedAt: '2026-09-17T00:00:04.000Z',
+      },
+    ],
   }
 
   await page.route('**/api/web/rigs/rig-1/autofocus', route => route.fulfill({ json: stopped }))
@@ -204,12 +222,14 @@ test('focus again returns to setup instead of starting another walk', async ({ p
     active: false,
     startPosition: 32842,
     currentPosition: 32838,
-    samples: [{
-      position: 32642,
-      detectedStars: 40,
-      hfrPixels: 5.06,
-      capturedAt: '2026-09-17T00:00:10.000Z',
-    }],
+    samples: [
+      {
+        position: 32642,
+        detectedStars: 40,
+        hfrPixels: 5.06,
+        capturedAt: '2026-09-17T00:00:10.000Z',
+      },
+    ],
     fit: {
       position: 32838,
       p: 32838.2,
@@ -221,7 +241,9 @@ test('focus again returns to setup instead of starting another walk', async ({ p
   }
 
   await page.route('**/api/web/rigs/rig-1/autofocus', route => route.fulfill({ json: complete }))
-  await page.route('**/api/rigs/rig-1/autofocus/start', route => route.fulfill({ status: 500, json: { error: 'should not start' } }))
+  await page.route('**/api/rigs/rig-1/autofocus/start', route =>
+    route.fulfill({ status: 500, json: { error: 'should not start' } }),
+  )
   await page.goto('/rigs/rig-1/observe/autofocus')
   await expect(page.getByText('Fitted focus is ready')).toBeVisible()
   await expect(page.locator('.vela-af-readout')).toContainText('32838')

@@ -44,17 +44,21 @@ function detail() {
 
 describe('web View validation', () => {
   it('accepts the compact Home projection', () => {
-    expect(isHomeView({
-      rigs: [{
-        id: 'rig-1',
-        name: 'Backyard rig',
-        reachability: 'reachable',
-        lastSeenAt: observedAt,
-        connections: { total: 2, connected: 1, disconnected: 1, unavailable: 0 },
-        capabilities: ['forget'],
-      }],
-      refreshedAt: observedAt,
-    })).toBe(true)
+    expect(
+      isHomeView({
+        rigs: [
+          {
+            id: 'rig-1',
+            name: 'Backyard rig',
+            reachability: 'reachable',
+            lastSeenAt: observedAt,
+            connections: { total: 2, connected: 1, disconnected: 1, unavailable: 0 },
+            capabilities: ['forget'],
+          },
+        ],
+        refreshedAt: observedAt,
+      }),
+    ).toBe(true)
   })
 
   it('accepts representative partial and disconnected Rig detail', () => {
@@ -80,17 +84,21 @@ describe('web View validation', () => {
     offlineWithLiveDevices.state = 'offline'
     expect(isRigDetailView(offlineWithLiveDevices)).toBe(false)
 
-    expect(isHomeView({
-      rigs: [{
-        id: 'rig-1',
-        name: 'Offline rig',
-        reachability: 'unreachable',
-        lastSeenAt: observedAt,
-        connections: { total: 1, connected: 1, disconnected: 0, unavailable: 0 },
-        capabilities: ['forget'],
-      }],
-      refreshedAt: observedAt,
-    })).toBe(false)
+    expect(
+      isHomeView({
+        rigs: [
+          {
+            id: 'rig-1',
+            name: 'Offline rig',
+            reachability: 'unreachable',
+            lastSeenAt: observedAt,
+            connections: { total: 1, connected: 1, disconnected: 0, unavailable: 0 },
+            capabilities: ['forget'],
+          },
+        ],
+        refreshedAt: observedAt,
+      }),
+    ).toBe(false)
   })
 
   it('rejects duplicate identities and malformed dates', () => {
@@ -108,31 +116,37 @@ describe('web View validation', () => {
       capabilities: ['forget'],
     }
 
-    expect(isHomeView({
-      rigs: [validHomeRig, { ...validHomeRig }],
-      refreshedAt: observedAt,
-    })).toBe(false)
+    expect(
+      isHomeView({
+        rigs: [validHomeRig, { ...validHomeRig }],
+        refreshedAt: observedAt,
+      }),
+    ).toBe(false)
 
-    expect(isRigDetailView({
-      ...detail(),
-      connections: { total: 1, connected: 1, disconnected: 0, unavailable: 0 },
-      devices: [{
-        id: 'switch-0',
-        kind: 'switch',
-        name: 'Switch',
-        configuredName: 'Switch',
-        connection: 'connected',
-        observedAt,
-        status: {
-          availability: 'complete',
-          activity: 'reporting',
-          channels: [
-            { id: 0, name: 'One', value: 1 },
-            { id: 0, name: 'Duplicate', value: 2 },
-          ],
-        },
-      }],
-    })).toBe(false)
+    expect(
+      isRigDetailView({
+        ...detail(),
+        connections: { total: 1, connected: 1, disconnected: 0, unavailable: 0 },
+        devices: [
+          {
+            id: 'switch-0',
+            kind: 'switch',
+            name: 'Switch',
+            configuredName: 'Switch',
+            connection: 'connected',
+            observedAt,
+            status: {
+              availability: 'complete',
+              activity: 'reporting',
+              channels: [
+                { id: 0, name: 'One', value: 1 },
+                { id: 0, name: 'Duplicate', value: 2 },
+              ],
+            },
+          },
+        ],
+      }),
+    ).toBe(false)
 
     expect(isHomeView({ rigs: [], refreshedAt: 'yesterday' })).toBe(false)
   })

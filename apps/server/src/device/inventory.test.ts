@@ -11,13 +11,15 @@ describe('Rig device inventory', () => {
   it('maps normalized provider devices into server models and web projections', async () => {
     const provider = {
       async listDevices() {
-        return [{
-          providerDeviceId: 'camera-1',
-          kind: 'camera',
-          name: 'Main Camera',
-          connection: 'connected',
-          driver: { version: '1.2.3' },
-        }]
+        return [
+          {
+            providerDeviceId: 'camera-1',
+            kind: 'camera',
+            name: 'Main Camera',
+            connection: 'connected',
+            driver: { version: '1.2.3' },
+          },
+        ]
       },
     } satisfies Pick<AlpacaProvider, 'listDevices'>
 
@@ -30,16 +32,18 @@ describe('Rig device inventory', () => {
 
     const devices = await inventory.listDevices()
 
-    expect(devices).toEqual([{
-      id: 'rig-1-camera-1',
-      rigId: 'rig-1',
-      uniqueId: 'camera-1',
-      kind: 'camera',
-      name: 'Main Camera',
-      driver: { version: '1.2.3' },
-      connection: 'connected',
-      status: { state: 'unknown' },
-      observedAt,
-    }])
+    expect(devices).toEqual([
+      {
+        id: 'rig-1-camera-1',
+        rigId: 'rig-1',
+        uniqueId: 'camera-1',
+        kind: 'camera',
+        name: 'Main Camera',
+        driver: { version: '1.2.3' },
+        connection: 'connected',
+        status: { state: 'unknown' },
+        observedAt,
+      },
+    ])
   })
 })

@@ -18,9 +18,9 @@ export const specimen: ComponentSpecimen = {
     label: 'Start capture',
     tone: 'accent',
     size: 'medium',
-    disabled: false
+    disabled: false,
   },
-  render: (props) => (
+  render: props => (
     <Button
       disabled={Boolean(props.disabled)}
       size={z.enum(['small', 'medium', 'large']).parse(props.size)}

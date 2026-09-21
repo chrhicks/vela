@@ -26,24 +26,36 @@ function DialogPreview({ props, onPropsChange }: PreviewProps) {
       <div className="vela-dialog-specimen__background">
         <small>Primitive preview</small>
         <h2>Dialog anatomy</h2>
-        <p>The surrounding application owns the trigger and every piece of product content inside the dialog.</p>
-        <Button onClick={() => setOpen(true)} tone="accent">Open dialog</Button>
+        <p>
+          The surrounding application owns the trigger and every piece of product content inside the
+          dialog.
+        </p>
+        <Button onClick={() => setOpen(true)} tone="accent">
+          Open dialog
+        </Button>
       </div>
 
       <Dialog
         description={description}
-        footer={(
+        footer={
           <>
-            <Button onClick={() => setOpen(false)} tone="quiet">Cancel</Button>
-            <Button onClick={() => setOpen(false)} tone="accent">Confirm</Button>
+            <Button onClick={() => setOpen(false)} tone="quiet">
+              Cancel
+            </Button>
+            <Button onClick={() => setOpen(false)} tone="accent">
+              Confirm
+            </Button>
           </>
-        )}
+        }
         onDismiss={() => setOpen(false)}
         open={open}
         title={title}
       >
         <div className="vela-dialog-specimen__body">
-          <p>This content is supplied by the consuming feature. The primitive owns the modal shell, accessible labelling, dismissal, focus behavior, and responsive scrolling.</p>
+          <p>
+            This content is supplied by the consuming feature. The primitive owns the modal shell,
+            accessible labelling, dismissal, focus behavior, and responsive scrolling.
+          </p>
           <Input label="Example field" placeholder="Feature-owned value" />
           <dl className="vela-dialog-specimen__anatomy">
             <div>

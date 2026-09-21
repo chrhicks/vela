@@ -6,7 +6,7 @@ export const imageHeight = 1044
 
 export const fieldHeightDegrees = 3
 
-export const focalLengthMm = 4176 * 3.76 / (2000 * Math.tan(fieldHeightDegrees * Math.PI / 360))
+export const focalLengthMm = (4176 * 3.76) / (2000 * Math.tan((fieldHeightDegrees * Math.PI) / 360))
 
 export function cameraGeometry(resolution: 'fast' | 'full') {
   return resolution === 'full'

@@ -11,7 +11,7 @@ export function alignmentViewport(
 ) {
   const referenceX = (measurement.imageWidth - 1) / 2
   const referenceY = (measurement.imageHeight - 1) / 2
-  const arcsecPerPixel = measurement.fieldHeightDegrees * 3600 / measurement.imageHeight
+  const arcsecPerPixel = (measurement.fieldHeightDegrees * 3600) / measurement.imageHeight
   const dx = Math.abs(measurement.targetX - referenceX)
   const dy = Math.abs(measurement.targetY - referenceY)
   const minimumHeight = 240 / arcsecPerPixel
@@ -22,14 +22,18 @@ export function alignmentViewport(
     fit: Math.max(
       minimumHeight,
       dy * 1.5 + minimumHeight / 2,
-      dx * 1.5 / 1.6 + minimumHeight / 2,
+      (dx * 1.5) / 1.6 + minimumHeight / 2,
     ),
   }
 
   const height = heights[view]
   const width = view === 'full' ? measurement.imageWidth : height * 1.6
-  const centerX = view === 'full' ? measurement.imageWidth / 2 : (referenceX + measurement.targetX) / 2
-  const centerY = view === 'full' ? measurement.imageHeight / 2 : (referenceY + measurement.targetY) / 2
+
+  const centerX =
+    view === 'full' ? measurement.imageWidth / 2 : (referenceX + measurement.targetX) / 2
+
+  const centerY =
+    view === 'full' ? measurement.imageHeight / 2 : (referenceY + measurement.targetY) / 2
 
   return {
     left: centerX - width / 2,
@@ -38,10 +42,14 @@ export function alignmentViewport(
     height,
     referenceX,
     referenceY,
-    barArcsec: width * arcsecPerPixel / 5,
-    outsideImage: measurement.targetX < 0 || measurement.targetX > measurement.imageWidth - 1
-      || measurement.targetY < 0 || measurement.targetY > measurement.imageHeight - 1,
-    markersClipped: dx / 2 + width * 30 / 640 > width / 2 || dy / 2 + width * 30 / 640 > height / 2,
+    barArcsec: (width * arcsecPerPixel) / 5,
+    outsideImage:
+      measurement.targetX < 0 ||
+      measurement.targetX > measurement.imageWidth - 1 ||
+      measurement.targetY < 0 ||
+      measurement.targetY > measurement.imageHeight - 1,
+    markersClipped:
+      dx / 2 + (width * 30) / 640 > width / 2 || dy / 2 + (width * 30) / 640 > height / 2,
   }
 }
 

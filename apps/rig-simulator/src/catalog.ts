@@ -24,29 +24,40 @@ function angularDistance(
   const decA = a.decDegrees * radians
   const decB = b.decDegrees * radians
 
-  const haversine = Math.sin((decB - decA) / 2) ** 2
-    + Math.cos(decA) * Math.cos(decB) * Math.sin((b.raDegrees - a.raDegrees) * radians / 2) ** 2
+  const haversine =
+    Math.sin((decB - decA) / 2) ** 2 +
+    Math.cos(decA) * Math.cos(decB) * Math.sin(((b.raDegrees - a.raDegrees) * radians) / 2) ** 2
 
-  return 2 * Math.asin(Math.sqrt(Math.max(0, Math.min(1, haversine)))) / radians
+  return (2 * Math.asin(Math.sqrt(Math.max(0, Math.min(1, haversine))))) / radians
 }
 
 // Retain one padded field, not an all-sky object graph. Each cache miss owns its
 // reads, so cancelling one camera cannot cancel another camera's acquisition.
 export function createStarSource(directory: string): StarSource {
-  let cached: { field: StarField, stars: readonly Star[] } | undefined
+  let cached: { field: StarField; stars: readonly Star[] } | undefined
 
   return async (requested, signal) => {
     const field = { ...requested }
 
-    if (![field.raDegrees, field.decDegrees, field.radiusDegrees].every(Number.isFinite)
-        || field.raDegrees < 0 || field.raDegrees >= 360
-        || Math.abs(field.decDegrees) > 90 || field.radiusDegrees <= 0 || field.radiusDegrees > 180) {
-      throw new Error('Catalog field requires RA within 0–360°, declination within -90–90°, and radius within 0–180°')
+    if (
+      ![field.raDegrees, field.decDegrees, field.radiusDegrees].every(Number.isFinite) ||
+      field.raDegrees < 0 ||
+      field.raDegrees >= 360 ||
+      Math.abs(field.decDegrees) > 90 ||
+      field.radiusDegrees <= 0 ||
+      field.radiusDegrees > 180
+    ) {
+      throw new Error(
+        'Catalog field requires RA within 0–360°, declination within -90–90°, and radius within 0–180°',
+      )
     }
 
     signal?.throwIfAborted()
 
-    if (cached && angularDistance(field, cached.field) + field.radiusDegrees <= cached.field.radiusDegrees) {
+    if (
+      cached &&
+      angularDistance(field, cached.field) + field.radiusDegrees <= cached.field.radiusDegrees
+    ) {
       return cached.stars.filter(star => angularDistance(field, star) <= field.radiusDegrees)
     }
 
@@ -63,8 +74,11 @@ export function createStarSource(directory: string): StarSource {
       const tile = decodeD05(await readFile(join(directory, name), { signal }), name)
 
       for (const star of tile) {
-        if (Math.abs(star.decDegrees - padded.decDegrees) <= padded.radiusDegrees
-            && angularDistance(padded, star) <= padded.radiusDegrees) stars.push(star)
+        if (
+          Math.abs(star.decDegrees - padded.decDegrees) <= padded.radiusDegrees &&
+          angularDistance(padded, star) <= padded.radiusDegrees
+        )
+          stars.push(star)
       }
     }
 
@@ -116,10 +130,11 @@ export function decodeD05(data: Uint8Array, source = 'D05 tile'): Star[] {
     }
 
     if (decHigh === undefined) throw new Error(`${source}: star before D05 block header`)
-    const raDegrees = raRaw * 360 / 0xffffff
-    const decDegrees = (decHigh * 65536 + high * 256 + low) * 90 / 0x7fffff
+    const raDegrees = (raRaw * 360) / 0xffffff
+    const decDegrees = ((decHigh * 65536 + high * 256 + low) * 90) / 0x7fffff
 
-    if (Math.abs(decDegrees) > 90) throw new Error(`${source}: declination outside -90 to 90 degrees`)
+    if (Math.abs(decDegrees) > 90)
+      throw new Error(`${source}: declination outside -90 to 90 degrees`)
     stars.push({ raDegrees, decDegrees, magnitude })
   }
 
@@ -132,10 +147,18 @@ export async function loadCatalog(
 ): Promise<Star[]> {
   const { minRaDegrees, maxRaDegrees, minDecDegrees, maxDecDegrees } = bounds
 
-  if (![minRaDegrees, maxRaDegrees, minDecDegrees, maxDecDegrees].every(Number.isFinite)
-      || minRaDegrees < 0 || maxRaDegrees > 360 || minRaDegrees >= maxRaDegrees
-      || minDecDegrees < -90 || maxDecDegrees > 90 || minDecDegrees >= maxDecDegrees) {
-    throw new Error('Catalog bounds must be ordered RA within 0–360° and declination within -90–90°')
+  if (
+    ![minRaDegrees, maxRaDegrees, minDecDegrees, maxDecDegrees].every(Number.isFinite) ||
+    minRaDegrees < 0 ||
+    maxRaDegrees > 360 ||
+    minRaDegrees >= maxRaDegrees ||
+    minDecDegrees < -90 ||
+    maxDecDegrees > 90 ||
+    minDecDegrees >= maxDecDegrees
+  ) {
+    throw new Error(
+      'Catalog bounds must be ordered RA within 0–360° and declination within -90–90°',
+    )
   }
 
   const names = (await readdir(directory)).filter(name => /^d05_\d+\.1476$/i.test(name)).sort()
@@ -147,12 +170,18 @@ export async function loadCatalog(
     const tile = decodeD05(await readFile(join(directory, name)), name)
 
     for (const star of tile) {
-      if (star.raDegrees >= minRaDegrees && star.raDegrees <= maxRaDegrees
-          && star.decDegrees >= minDecDegrees && star.decDegrees <= maxDecDegrees) stars.push(star)
+      if (
+        star.raDegrees >= minRaDegrees &&
+        star.raDegrees <= maxRaDegrees &&
+        star.decDegrees >= minDecDegrees &&
+        star.decDegrees <= maxDecDegrees
+      )
+        stars.push(star)
     }
   }
 
-  if (stars.length === 0) throw new Error('D05 catalog contains no stars inside the simulator sky bounds')
+  if (stars.length === 0)
+    throw new Error('D05 catalog contains no stars inside the simulator sky bounds')
 
   return stars
 }

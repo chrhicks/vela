@@ -21,7 +21,10 @@ type Camera = {
 
 const dimensions = { fast: [1562, 1044], full: [6248, 4176] } as const
 
-function CamerasPreview({ props, onPropsChange }: {
+function CamerasPreview({
+  props,
+  onPropsChange,
+}: {
   props: Record<string, string | number | boolean>
   onPropsChange?: (patch: Record<string, string | number | boolean>) => void
 }) {
@@ -56,7 +59,11 @@ function CamerasPreview({ props, onPropsChange }: {
         <span>Workshop preview</span>
       </header>
       <p className="vela-sim-cameras-intro">Two cameras, one mount. Take exposures from Vela.</p>
-      {!available && <p role="status" className="vela-sim-cameras-warning">Simulator unavailable. Last-known state · 32 seconds ago. Reconnecting…</p>}
+      {!available && (
+        <p role="status" className="vela-sim-cameras-warning">
+          Simulator unavailable. Last-known state · 32 seconds ago. Reconnecting…
+        </p>
+      )}
       <div className="vela-sim-cameras-grid">
         <Panel title="Cameras" description="Choose each camera’s image size for the next exposure.">
           {cameras.map(camera => (
@@ -69,7 +76,9 @@ function CamerasPreview({ props, onPropsChange }: {
                 <h2>{camera.sensor === 'mono' ? 'Mono camera' : 'Color camera'}</h2>
                 <span>{camera.connected ? 'Connected' : 'Disconnected'}</span>
               </div>
-              <p className="vela-sim-camera-meta">Camera {camera.number} · {camera.sensor === 'mono' ? 'Monochrome' : 'RGGB sensor'}</p>
+              <p className="vela-sim-camera-meta">
+                Camera {camera.number} · {camera.sensor === 'mono' ? 'Monochrome' : 'RGGB sensor'}
+              </p>
               <Select
                 label={`${camera.sensor === 'mono' ? 'Mono' : 'Color'} image size`}
                 value={camera.resolution}
@@ -89,7 +98,9 @@ function CamerasPreview({ props, onPropsChange }: {
               <p className="vela-sim-camera-activity" role="status">
                 {camera.activity === 'exposing'
                   ? 'Exposing · image size locked until complete'
-                  : camera.imageReady ? 'Image ready' : 'Idle · no image ready'}
+                  : camera.imageReady
+                    ? 'Image ready'
+                    : 'Idle · no image ready'}
               </p>
             </section>
           ))}
@@ -120,7 +131,9 @@ function CamerasPreview({ props, onPropsChange }: {
                 ? 'Color camera is exposing. Mount adjustments are locked until the exposure completes.'
                 : 'Mount adjustments change the view for both cameras.'}
             </p>
-            <p className="vela-sim-cameras-note">Existing adjustment and reset controls continue here.</p>
+            <p className="vela-sim-cameras-note">
+              Existing adjustment and reset controls continue here.
+            </p>
           </Panel>
         </div>
       </div>
@@ -134,12 +147,13 @@ export const specimen: ComponentSpecimen = {
   componentName: 'Panel / Card',
   id: 'panel-simulator-cameras',
   name: 'Simulator cameras · Product example',
-  description: 'Two cameras sharing a mount and sky, with separate image sizes and honest exposure and unavailable states. Local fixtures only.',
+  description:
+    'Two cameras sharing a mount and sky, with separate image sizes and honest exposure and unavailable states. Local fixtures only.',
   controls: {
     state: {
       type: 'select',
       label: 'Camera state',
-      options: ['idle', 'exposing', 'image-ready', 'disconnected', 'unavailable']
+      options: ['idle', 'exposing', 'image-ready', 'disconnected', 'unavailable'],
     },
     mono: { type: 'select', label: 'Mono resolution', options: ['fast', 'full'] },
     color: { type: 'select', label: 'Color resolution', options: ['fast', 'full'] },
@@ -149,7 +163,9 @@ export const specimen: ComponentSpecimen = {
     state: 'idle',
     mono: 'full',
     color: 'full',
-    sky: 'clear'
+    sky: 'clear',
   },
-  render: (props, onPropsChange) => <CamerasPreview props={props} {...(onPropsChange ? { onPropsChange } : {})} />,
+  render: (props, onPropsChange) => (
+    <CamerasPreview props={props} {...(onPropsChange ? { onPropsChange } : {})} />
+  ),
 }

@@ -3,41 +3,53 @@ import { createAlpacaClient } from './client.js'
 
 afterEach(() => vi.useRealTimers())
 
-it.each(['application/json', 'application/imagebytes'])('bounds %s image transfer independently of ordinary reads', async contentType => {
-  vi.useFakeTimers()
+it.each(['application/json', 'application/imagebytes'])(
+  'bounds %s image transfer independently of ordinary reads',
+  async contentType => {
+    vi.useFakeTimers()
 
-  const fetch: typeof globalThis.fetch = async (_input, init) => {
-    return new Response(new ReadableStream({
-      start(controller) {
-        init!.signal!.addEventListener('abort', () => controller.error(init!.signal!.reason), { once: true })
-      },
-    }), { headers: { 'content-type': contentType } })
-  }
+    const fetch: typeof globalThis.fetch = async (_input, init) => {
+      return new Response(
+        new ReadableStream({
+          start(controller) {
+            init!.signal!.addEventListener('abort', () => controller.error(init!.signal!.reason), {
+              once: true,
+            })
+          },
+        }),
+        { headers: { 'content-type': contentType } },
+      )
+    }
 
-  const client = createAlpacaClient({
-    baseUrl: 'http://fake',
-    fetch,
-    requestTimeoutMs: 5_000,
-    imageTimeoutMs: 60_000,
-  })
+    const client = createAlpacaClient({
+      baseUrl: 'http://fake',
+      fetch,
+      requestTimeoutMs: 5_000,
+      imageTimeoutMs: 60_000,
+    })
 
-  const camera = {
-    DeviceName: 'Camera',
-    DeviceType: 'Camera',
-    DeviceNumber: 0,
-    UniqueID: 'camera',
-  }
+    const camera = {
+      DeviceName: 'Camera',
+      DeviceType: 'Camera',
+      DeviceNumber: 0,
+      UniqueID: 'camera',
+    }
 
-  let imageSettled = false
-  const image = client.image(camera).finally(() => { imageSettled = true })
-  const imageFailure = expect(image).rejects.toThrow('timed out after 60000ms')
-  const stateFailure = expect(client.connected(camera)).rejects.toThrow('timed out after 5000ms')
-  await vi.advanceTimersByTimeAsync(5_000)
-  await stateFailure
-  expect(imageSettled).toBe(false)
-  await vi.advanceTimersByTimeAsync(55_000)
-  await imageFailure
-})
+    let imageSettled = false
+
+    const image = client.image(camera).finally(() => {
+      imageSettled = true
+    })
+
+    const imageFailure = expect(image).rejects.toThrow('timed out after 60000ms')
+    const stateFailure = expect(client.connected(camera)).rejects.toThrow('timed out after 5000ms')
+    await vi.advanceTimersByTimeAsync(5_000)
+    await stateFailure
+    expect(imageSettled).toBe(false)
+    await vi.advanceTimersByTimeAsync(55_000)
+    await imageFailure
+  },
+)
 
 it('negotiates ImageBytes and uses the actual response Content-Type for JSON fallback', async () => {
   const camera = {
@@ -68,7 +80,9 @@ it('negotiates ImageBytes and uses the actual response Content-Type for JSON fal
 
     const fetch: typeof globalThis.fetch = async (_input, init) => {
       requests++
-      expect(new Headers(init?.headers).get('accept')).toBe('application/imagebytes, application/json;q=0.9')
+      expect(new Headers(init?.headers).get('accept')).toBe(
+        'application/imagebytes, application/json;q=0.9',
+      )
 
       return binary
         ? new Response(bytes, { headers: { 'content-type': 'Application/ImageBytes; version=1' } })
@@ -77,7 +91,9 @@ it('negotiates ImageBytes and uses the actual response Content-Type for JSON fal
 
     const client = createAlpacaClient({ baseUrl: 'http://fake', fetch })
     const result = await client.image(camera)
-    expect(result instanceof ArrayBuffer ? Array.from(new Uint8Array(result)) : result).toEqual(binary ? Array.from(new Uint8Array(bytes)) : json)
+    expect(result instanceof ArrayBuffer ? Array.from(new Uint8Array(result)) : result).toEqual(
+      binary ? Array.from(new Uint8Array(bytes)) : json,
+    )
     expect(requests).toBe(1)
   }
 })
@@ -92,22 +108,27 @@ it('rejects an unrecognized Content-Type and preserves a JSON protocol error', a
 
   const unsupported = createAlpacaClient({
     baseUrl: 'http://fake',
-    fetch: async () => new Response('binary?', {
-      headers: { 'content-type': 'application/octet-stream' },
-    }),
+    fetch: async () =>
+      new Response('binary?', {
+        headers: { 'content-type': 'application/octet-stream' },
+      }),
   })
 
   await expect(unsupported.image(camera)).rejects.toMatchObject({ reason: 'invalid-response' })
 
   const failed = createAlpacaClient({
     baseUrl: 'http://fake',
-    fetch: async () => Response.json({
-      ClientTransactionID: 0,
-      ServerTransactionID: 1,
-      ErrorNumber: 1025,
-      ErrorMessage: 'Camera disconnected',
-    }),
+    fetch: async () =>
+      Response.json({
+        ClientTransactionID: 0,
+        ServerTransactionID: 1,
+        ErrorNumber: 1025,
+        ErrorMessage: 'Camera disconnected',
+      }),
   })
 
-  await expect(failed.image(camera)).rejects.toMatchObject({ reason: 'protocol-error', errorNumber: 1025 })
+  await expect(failed.image(camera)).rejects.toMatchObject({
+    reason: 'protocol-error',
+    errorNumber: 1025,
+  })
 })

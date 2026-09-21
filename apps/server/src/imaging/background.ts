@@ -46,8 +46,8 @@ export function backgroundOffsets(frame: PreviewFrame, range: ReturnType<typeof 
       const stepX = Math.max(1, Math.floor(width / 8 / 16) | 1)
       const stepY = Math.max(1, Math.floor(height / 8 / 16) | 1)
 
-      for (let y = Math.floor(ty * height / 8); y < (ty + 1) * height / 8; y += stepY) {
-        for (let x = Math.floor(tx * width / 8); x < (tx + 1) * width / 8; x += stepX) {
+      for (let y = Math.floor((ty * height) / 8); y < ((ty + 1) * height) / 8; y += stepY) {
+        for (let x = Math.floor((tx * width) / 8); x < ((tx + 1) * width) / 8; x += stepX) {
           const rgb = bayerPixel(width, height, pixels, color.pattern, x, y)
 
           if (!rgb.every(Number.isFinite)) continue

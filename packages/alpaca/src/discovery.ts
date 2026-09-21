@@ -55,10 +55,7 @@ export function createAlpacaDiscovery({
   udpScanner = createNodeUdpScanner(),
 }: AlpacaDiscoveryOptions = {}): AlpacaDiscovery {
   async function scan(options: AlpacaScanOptions = {}): Promise<ReadonlyArray<AlpacaEndpoint>> {
-    const durationMs = positiveInteger(
-      options.durationMs ?? defaultScanDurationMs,
-      'Scan duration',
-    )
+    const durationMs = positiveInteger(options.durationMs ?? defaultScanDurationMs, 'Scan duration')
 
     const attempts = positiveInteger(options.attempts ?? defaultScanAttempts, 'Scan attempts')
 
@@ -66,7 +63,8 @@ export function createAlpacaDiscovery({
 
     if (options.signal !== undefined) request.signal = options.signal
 
-    if (options.interfaceAddresses !== undefined) request.interfaceAddresses = options.interfaceAddresses
+    if (options.interfaceAddresses !== undefined)
+      request.interfaceAddresses = options.interfaceAddresses
 
     return udpScanner.scan(request)
   }
@@ -93,13 +91,11 @@ export function createAlpacaDiscovery({
     const apiVersions = await client.apiVersions()
     const description = await client.serverDescription()
 
-    const configuredDevices = normalizeConfiguredDevices(
-      await client.configuredDevices(),
-    )
+    const configuredDevices = normalizeConfiguredDevices(await client.configuredDevices())
 
     rejectDuplicateDeviceIds(configuredDevices)
 
-    const devices: AlpacaInspectionDevice[] = configuredDevices.map((device) => {
+    const devices: AlpacaInspectionDevice[] = configuredDevices.map(device => {
       const providerDeviceId = stableDeviceId(device)
 
       const inspection: Mutable<AlpacaInspectionDevice> = {
@@ -119,7 +115,8 @@ export function createAlpacaDiscovery({
 
     if (description.Manufacturer !== undefined) server.manufacturer = description.Manufacturer
 
-    if (description.ManufacturerVersion !== undefined) server.manufacturerVersion = description.ManufacturerVersion
+    if (description.ManufacturerVersion !== undefined)
+      server.manufacturerVersion = description.ManufacturerVersion
 
     if (description.Location !== undefined) server.location = description.Location
 

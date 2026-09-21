@@ -4,11 +4,13 @@ export function previewAutofocusWindow(
   stepSize: number,
   offsetSteps: number,
   maxStep: number | null,
-): { fit: true, low: number, high: number } | { fit: false } {
-  if (position == null
-    || !Number.isSafeInteger(position)
-    || !Number.isSafeInteger(stepSize)
-    || !Number.isSafeInteger(offsetSteps)) {
+): { fit: true; low: number; high: number } | { fit: false } {
+  if (
+    position == null ||
+    !Number.isSafeInteger(position) ||
+    !Number.isSafeInteger(stepSize) ||
+    !Number.isSafeInteger(offsetSteps)
+  ) {
     return { fit: false }
   }
 
@@ -18,8 +20,10 @@ export function previewAutofocusWindow(
 
   if (position < 1 || low < 1) return { fit: false }
 
-  if (maxStep != null
-    && (!Number.isSafeInteger(maxStep) || position > maxStep - 1 || high > maxStep - 1)) {
+  if (
+    maxStep != null &&
+    (!Number.isSafeInteger(maxStep) || position > maxStep - 1 || high > maxStep - 1)
+  ) {
     return { fit: false }
   }
 

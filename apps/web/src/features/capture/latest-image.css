@@ -25,9 +25,16 @@
   color: var(--vela-text-muted);
   font-variant-numeric: tabular-nums;
 }
-.capture-image__zoom { display: flex; gap: 3px; }
-.capture-image__zoom .vela-button { min-height: 40px; }
-.capture-image__zoom .vela-button:hover:not(:disabled) { transform: none; }
+.capture-image__zoom {
+  display: flex;
+  gap: 3px;
+}
+.capture-image__zoom .vela-button {
+  min-height: 40px;
+}
+.capture-image__zoom .vela-button:hover:not(:disabled) {
+  transform: none;
+}
 .capture-image__window {
   width: 100%;
   aspect-ratio: 4 / 3;
@@ -39,9 +46,17 @@
   height: 100%;
   object-fit: contain;
 }
-.capture-image__window[data-zoomed] { overflow: auto; }
-.capture-image__window[data-zoomed] > img { max-width: none; margin: auto; }
-.capture-image__window:focus-visible { outline: 2px solid var(--vela-accent); outline-offset: -2px; }
+.capture-image__window[data-zoomed] {
+  overflow: auto;
+}
+.capture-image__window[data-zoomed] > img {
+  max-width: none;
+  margin: auto;
+}
+.capture-image__window:focus-visible {
+  outline: 2px solid var(--vela-accent);
+  outline-offset: -2px;
+}
 .capture-image__empty {
   min-height: 100%;
   box-sizing: border-box;
@@ -79,8 +94,12 @@
   font-size: 11px;
   border-top: 1px solid var(--vela-line);
 }
-.capture-image > footer i { margin: 0 5px; font-style: normal; }
-.capture-image__error, .capture-image__retention {
+.capture-image > footer i {
+  margin: 0 5px;
+  font-style: normal;
+}
+.capture-image__error,
+.capture-image__retention {
   margin: 0;
   padding: 12px 14px;
   font-size: 12px;
@@ -88,9 +107,14 @@
   color: var(--vela-warning);
   border-bottom: 1px solid var(--vela-line);
 }
-.capture-image__retention:not([data-failed]) { color: var(--vela-text-muted); }
+.capture-image__retention:not([data-failed]) {
+  color: var(--vela-text-muted);
+}
 
-.capture-image__statistics { padding: 12px 14px; border-top: 1px solid var(--vela-line); }
+.capture-image__statistics {
+  padding: 12px 14px;
+  border-top: 1px solid var(--vela-line);
+}
 .capture-image__statistics dl {
   display: grid;
   grid-template-columns: 1.3fr 1fr 1fr;

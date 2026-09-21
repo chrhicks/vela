@@ -50,8 +50,11 @@ function validatePath(path: string): void {
   const directory = Number(match[2])
   const pixel = Number(match[3])
 
-  if (!Number.isSafeInteger(pixel) || pixel >= 12 * 4 ** order
-    || directory !== Math.floor(pixel / 10000) * 10000) {
+  if (
+    !Number.isSafeInteger(pixel) ||
+    pixel >= 12 * 4 ** order ||
+    directory !== Math.floor(pixel / 10000) * 10000
+  ) {
     throw new RangeError('Invalid DSS2 HEALPix tile')
   }
 }
@@ -59,12 +62,20 @@ function validatePath(path: string): void {
 function thumbnailUrl(target: SurveyThumbnail): string {
   const { raDegrees, decDegrees, majorAxisArcminutes } = target
   const extent = majorAxisArcminutes ?? 30
-  const fov = target.fovDegrees ?? Math.min(5, Math.max(0.5, extent / 60 * 1.5))
+  const fov = target.fovDegrees ?? Math.min(5, Math.max(0.5, (extent / 60) * 1.5))
 
-  if (!Number.isFinite(raDegrees) || raDegrees < 0 || raDegrees >= 360
-    || !Number.isFinite(decDegrees) || Math.abs(decDegrees) > 90
-    || !Number.isFinite(fov) || fov < 0.5 || fov > 5
-    || !Number.isFinite(extent) || extent <= 0) {
+  if (
+    !Number.isFinite(raDegrees) ||
+    raDegrees < 0 ||
+    raDegrees >= 360 ||
+    !Number.isFinite(decDegrees) ||
+    Math.abs(decDegrees) > 90 ||
+    !Number.isFinite(fov) ||
+    fov < 0.5 ||
+    fov > 5 ||
+    !Number.isFinite(extent) ||
+    extent <= 0
+  ) {
     throw new RangeError('Invalid survey thumbnail coordinates or field of view')
   }
 
@@ -87,12 +98,20 @@ function thumbnailUrl(target: SurveyThumbnail): string {
 
 function validateBody(body: Buffer, contentType: SurveyImage['contentType']): void {
   if (contentType === 'image/jpeg') {
-    if (body.length < 4 || body[0] !== 0xff || body[1] !== 0xd8 || body[2] !== 0xff
-      || body[body.length - 2] !== 0xff || body[body.length - 1] !== 0xd9) {
+    if (
+      body.length < 4 ||
+      body[0] !== 0xff ||
+      body[1] !== 0xd8 ||
+      body[2] !== 0xff ||
+      body[body.length - 2] !== 0xff ||
+      body[body.length - 1] !== 0xd9
+    ) {
       throw new Error('DSS2 returned an invalid JPEG')
     }
-  } else if (!/^creator_did\s*=\s*ivo:\/\/CDS\/P\/DSS2\/color\s*$/m.test(body.toString())
-    || !/^obs_copyright\s*=/m.test(body.toString())) {
+  } else if (
+    !/^creator_did\s*=\s*ivo:\/\/CDS\/P\/DSS2\/color\s*$/m.test(body.toString()) ||
+    !/^obs_copyright\s*=/m.test(body.toString())
+  ) {
     throw new Error('DSS2 returned invalid survey properties')
   }
 }
@@ -111,7 +130,7 @@ export function createSurveyCache(options: SurveyCacheOptions = {}) {
   }
 
   const bodyLimit = Math.min(16 * 1024 * 1024, maxBytes - 512)
-  const entries = new Map<string, { bytes: number, used: number }>()
+  const entries = new Map<string, { bytes: number; used: number }>()
   const pending = new Map<string, Promise<SurveyImage>>()
   let totalBytes = 0
   // Disk bookkeeping is serialized; network reads remain independent.
@@ -119,7 +138,10 @@ export function createSurveyCache(options: SurveyCacheOptions = {}) {
 
   function onDisk<T>(operation: () => Promise<T>): Promise<T> {
     const result = diskQueue.then(operation)
-    diskQueue = result.then(() => {}, () => {})
+    diskQueue = result.then(
+      () => {},
+      () => {},
+    )
 
     return result
   }
@@ -133,7 +155,9 @@ export function createSurveyCache(options: SurveyCacheOptions = {}) {
   }
 
   async function evict(incoming = 0) {
-    for (const [name] of [...entries].sort((a, b) => a[1].used - b[1].used || a[0].localeCompare(b[0]))) {
+    for (const [name] of [...entries].sort(
+      (a, b) => a[1].used - b[1].used || a[0].localeCompare(b[0]),
+    )) {
       if (totalBytes + incoming <= maxBytes) break
       await remove(name)
     }
@@ -179,7 +203,10 @@ export function createSurveyCache(options: SurveyCacheOptions = {}) {
         const newline = bytes.indexOf(10)
 
         if (newline < 0 || newline > 2048) throw new Error('Invalid cache metadata')
-        const metadata = z.object({ key: z.literal(key) }).safeParse(JSON.parse(bytes.subarray(0, newline).toString()))
+
+        const metadata = z
+          .object({ key: z.literal(key) })
+          .safeParse(JSON.parse(bytes.subarray(0, newline).toString()))
 
         if (!metadata.success) throw new Error('Invalid cache key')
         const body = bytes.subarray(newline + 1)
@@ -271,7 +298,11 @@ export function createSurveyCache(options: SurveyCacheOptions = {}) {
     const existing = pending.get(url)
 
     if (existing) return existing
-    const work = load(url, contentType).finally(() => { pending.delete(url) })
+
+    const work = load(url, contentType).finally(() => {
+      pending.delete(url)
+    })
+
     pending.set(url, work)
 
     return work
@@ -292,64 +323,85 @@ export function createSurveyCache(options: SurveyCacheOptions = {}) {
 export type SurveyCache = ReturnType<typeof createSurveyCache>
 
 export function registerSurvey(app: FastifyInstance, cache: SurveyCache) {
-  app.get<{ Params: { '*': string } }>('/api/survey/dss2/*', {
-    schema: {
-      params: {
-        type: 'object',
-        required: ['*'],
-        properties: { '*': { type: 'string', maxLength: 100 } },
-      },
-    },
-  }, async (request, reply) => {
-    if (request.raw.url?.includes('?')) return reply.code(400).send({ error: 'Survey tile queries are unsupported' })
-
-    try {
-      const image = await cache.get(request.params['*'])
-
-      return reply.type(image.contentType).header('cache-control', 'public, max-age=86400')
-        .header('x-survey-source', SURVEY_ATTRIBUTION.source).send(image.body)
-    } catch (error) {
-      if (error instanceof RangeError) return reply.code(400).send({ error: error.message })
-      request.log.warn(error, 'Survey reference image unavailable')
-
-      return reply.code(503).send({ error: 'Survey reference is unavailable; cached areas remain available.' })
-    }
-  })
-  app.get<{ Querystring: { ra: number, dec: number, fov: number } }>('/api/survey/thumbnail', {
-    schema: {
-      querystring: {
-        type: 'object',
-        required: ['ra', 'dec', 'fov'],
-        additionalProperties: false,
-        properties: {
-          ra: { type: 'number', minimum: 0, exclusiveMaximum: 360 },
-          dec: { type: 'number', minimum: -90, maximum: 90 },
-          fov: { type: 'number', minimum: 0.5, maximum: 5 },
+  app.get<{ Params: { '*': string } }>(
+    '/api/survey/dss2/*',
+    {
+      schema: {
+        params: {
+          type: 'object',
+          required: ['*'],
+          properties: { '*': { type: 'string', maxLength: 100 } },
         },
       },
     },
-  }, async (request, reply) => {
-    const parameters = new URL(request.raw.url!, 'http://localhost').searchParams
+    async (request, reply) => {
+      if (request.raw.url?.includes('?'))
+        return reply.code(400).send({ error: 'Survey tile queries are unsupported' })
 
-    if ([...parameters.keys()].some((key) => !['ra', 'dec', 'fov'].includes(key))
-      || ['ra', 'dec', 'fov'].some((key) => parameters.getAll(key).length !== 1 || !parameters.get(key)?.trim())) {
-      return reply.code(400).send({ error: 'Invalid thumbnail parameters' })
-    }
+      try {
+        const image = await cache.get(request.params['*'])
 
-    try {
-      const image = await cache.thumbnail({
-        raDegrees: request.query.ra,
-        decDegrees: request.query.dec,
-        fovDegrees: request.query.fov,
-      })
+        return reply
+          .type(image.contentType)
+          .header('cache-control', 'public, max-age=86400')
+          .header('x-survey-source', SURVEY_ATTRIBUTION.source)
+          .send(image.body)
+      } catch (error) {
+        if (error instanceof RangeError) return reply.code(400).send({ error: error.message })
+        request.log.warn(error, 'Survey reference image unavailable')
 
-      return reply.type(image.contentType).header('cache-control', 'public, max-age=86400')
-        .header('x-survey-source', SURVEY_ATTRIBUTION.source).send(image.body)
-    } catch (error) {
-      if (error instanceof RangeError) return reply.code(400).send({ error: error.message })
-      request.log.warn(error, 'Survey thumbnail unavailable')
+        return reply
+          .code(503)
+          .send({ error: 'Survey reference is unavailable; cached areas remain available.' })
+      }
+    },
+  )
+  app.get<{ Querystring: { ra: number; dec: number; fov: number } }>(
+    '/api/survey/thumbnail',
+    {
+      schema: {
+        querystring: {
+          type: 'object',
+          required: ['ra', 'dec', 'fov'],
+          additionalProperties: false,
+          properties: {
+            ra: { type: 'number', minimum: 0, exclusiveMaximum: 360 },
+            dec: { type: 'number', minimum: -90, maximum: 90 },
+            fov: { type: 'number', minimum: 0.5, maximum: 5 },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const parameters = new URL(request.raw.url!, 'http://localhost').searchParams
 
-      return reply.code(503).send({ error: 'Survey thumbnail is unavailable.' })
-    }
-  })
+      if (
+        [...parameters.keys()].some(key => !['ra', 'dec', 'fov'].includes(key)) ||
+        ['ra', 'dec', 'fov'].some(
+          key => parameters.getAll(key).length !== 1 || !parameters.get(key)?.trim(),
+        )
+      ) {
+        return reply.code(400).send({ error: 'Invalid thumbnail parameters' })
+      }
+
+      try {
+        const image = await cache.thumbnail({
+          raDegrees: request.query.ra,
+          decDegrees: request.query.dec,
+          fovDegrees: request.query.fov,
+        })
+
+        return reply
+          .type(image.contentType)
+          .header('cache-control', 'public, max-age=86400')
+          .header('x-survey-source', SURVEY_ATTRIBUTION.source)
+          .send(image.body)
+      } catch (error) {
+        if (error instanceof RangeError) return reply.code(400).send({ error: error.message })
+        request.log.warn(error, 'Survey thumbnail unavailable')
+
+        return reply.code(503).send({ error: 'Survey thumbnail is unavailable.' })
+      }
+    },
+  )
 }

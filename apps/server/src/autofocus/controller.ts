@@ -28,7 +28,7 @@ export interface AutofocusFocuser {
   }>
   move(
     position: number,
-    window: { minPosition: number, maxPosition: number },
+    window: { minPosition: number; maxPosition: number },
     signal?: AbortSignal,
   ): Promise<{ position: number }>
   halt(): Promise<void>
@@ -65,7 +65,7 @@ export function createAutofocusController(
   let view: AutofocusView = emptyView(settings, DEFAULT_STEP_SIZE, DEFAULT_OFFSET_STEPS)
   let running: Promise<void> | undefined
   let cancellation: AbortController | undefined
-  let plannedReady: { resolve: () => void, reject: (error: Error) => void } | undefined
+  let plannedReady: { resolve: () => void; reject: (error: Error) => void } | undefined
 
   function patch(next: Partial<AutofocusView>) {
     view = { ...view, ...next }
@@ -95,7 +95,9 @@ export function createAutofocusController(
       }
     } catch {
       patch({ restoredStart: false, currentPosition: view.currentPosition })
-      throw new Error('The focuser did not confirm return to the start position. Vela did not repeat the move.')
+      throw new Error(
+        'The focuser did not confirm return to the start position. Vela did not repeat the move.',
+      )
     }
   }
 
@@ -114,24 +116,28 @@ export function createAutofocusController(
     })
     let capturePending = true
 
-    const frame = await camera.capture({
-      exposureSeconds,
-      signal,
-      onProgress(elapsedSeconds) {
-        if (capturePending && !signal.aborted) patch({ elapsedSeconds })
-      },
-      onReadState(captureReadState) {
-        if (capturePending && !signal.aborted) patch({ captureReadState })
-      },
-    }).finally(() => {
-      capturePending = false
-      patch({ captureReadState: 'current' })
-    })
+    const frame = await camera
+      .capture({
+        exposureSeconds,
+        signal,
+        onProgress(elapsedSeconds) {
+          if (capturePending && !signal.aborted) patch({ elapsedSeconds })
+        },
+        onReadState(captureReadState) {
+          if (capturePending && !signal.aborted) patch({ captureReadState })
+        },
+      })
+      .finally(() => {
+        capturePending = false
+        patch({ captureReadState: 'current' })
+      })
 
     patch({ activity: 'measuring', elapsedSeconds: exposureSeconds })
 
-    const stars = await measure(frame.width, frame.height, frame.pixels, frame.color)
-      .catch(() => ({ detectedStars: 0, medianHfrPixels: null }))
+    const stars = await measure(frame.width, frame.height, frame.pixels, frame.color).catch(() => ({
+      detectedStars: 0,
+      medianHfrPixels: null,
+    }))
 
     signal.throwIfAborted()
 
@@ -170,7 +176,7 @@ export function createAutofocusController(
     return arrived.position
   }
 
-  function abortStart(message: string, status?: { position: number, maxStep: number }) {
+  function abortStart(message: string, status?: { position: number; maxStep: number }) {
     patch({
       phase: 'setup',
       activity: 'idle',
@@ -264,7 +270,9 @@ export function createAutofocusController(
       const fit = bestFocus(view.samples)
 
       if (!fit)
-        throw new Error('The hyperbola did not find a focus inside the sampled window. Returning to the start position.')
+        throw new Error(
+          'The hyperbola did not find a focus inside the sampled window. Returning to the start position.',
+        )
       patch({ fit })
       signal.throwIfAborted()
       patch({ phase: 'confirming' })
@@ -294,11 +302,7 @@ export function createAutofocusController(
           phase: cancelled ? 'stopped' : 'failed',
           activity: 'idle',
           active: false,
-          error: cancelled
-            ? null
-            : error instanceof Error
-              ? error.message
-              : 'Autofocus failed',
+          error: cancelled ? null : error instanceof Error ? error.message : 'Autofocus failed',
           exposureStartedAt: null,
         })
       } catch (restoreError) {
@@ -307,7 +311,10 @@ export function createAutofocusController(
           activity: 'idle',
           active: false,
           restoredStart: false,
-          error: restoreError instanceof Error ? restoreError.message : 'Start position was not restored',
+          error:
+            restoreError instanceof Error
+              ? restoreError.message
+              : 'Start position was not restored',
           exposureStartedAt: null,
         })
       }
@@ -349,16 +356,24 @@ export function createAutofocusController(
       plannedReady = { resolve, reject }
     })
 
-    running = run(camera, focuser, stepSize, offsetSteps, exposureSeconds, cancellation.signal).finally(() => {
+    running = run(
+      camera,
+      focuser,
+      stepSize,
+      offsetSteps,
+      exposureSeconds,
+      cancellation.signal,
+    ).finally(() => {
       running = undefined
       patch({
         active: false,
         captureReadState: 'current',
-        activity: view.phase === 'complete'
-          ? 'idle'
-          : view.activity === 'stopping'
+        activity:
+          view.phase === 'complete'
             ? 'idle'
-            : view.activity,
+            : view.activity === 'stopping'
+              ? 'idle'
+              : view.activity,
       })
       onSettled?.()
     })
@@ -441,7 +456,10 @@ function bestFocus(samples: AutofocusSample[]): AutofocusFit | null {
   const measured = samples.filter(sample => sample.hfrPixels !== null)
 
   if (!measured.length) return null
-  const lowest = measured.reduce((best, sample) => sample.hfrPixels! < best.hfrPixels! ? sample : best)
+
+  const lowest = measured.reduce((best, sample) =>
+    sample.hfrPixels! < best.hfrPixels! ? sample : best,
+  )
 
   return {
     position,

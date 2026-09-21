@@ -51,7 +51,9 @@ export function useAutofocus(rigId: string) {
     const current = generation.current
 
     try {
-      const next = await api(`web/rigs/${encodeURIComponent(rigId)}/autofocus`, { signal: AbortSignal.timeout(5000) })
+      const next = await api(`web/rigs/${encodeURIComponent(rigId)}/autofocus`, {
+        signal: AbortSignal.timeout(5000),
+      })
 
       if (!isAutofocusView(next, rigId)) throw new Error('Invalid autofocus response')
 
@@ -59,7 +61,11 @@ export function useAutofocus(rigId: string) {
         setView(next)
         setOffline(false)
 
-        if (stopUnconfirmed.current && !next.active && ['stopped', 'failed', 'complete'].includes(next.phase)) {
+        if (
+          stopUnconfirmed.current &&
+          !next.active &&
+          ['stopped', 'failed', 'complete'].includes(next.phase)
+        ) {
           stopUnconfirmed.current = false
           setError(null)
         }
@@ -113,13 +119,18 @@ export function useAutofocus(rigId: string) {
         setOffline(false)
       }
     } catch (cause) {
-      const message = cause instanceof ApiError && cause.code
-        ? cause.code
-        : cause instanceof Error ? cause.message : 'Command response unavailable'
+      const message =
+        cause instanceof ApiError && cause.code
+          ? cause.code
+          : cause instanceof Error
+            ? cause.message
+            : 'Command response unavailable'
 
       if (alive.current) {
         stopUnconfirmed.current = action === 'stop'
-        setError(`${message}. The command was not repeated; check the current state before trying again.`)
+        setError(
+          `${message}. The command was not repeated; check the current state before trying again.`,
+        )
       }
 
       await read()
@@ -135,7 +146,8 @@ export function useAutofocus(rigId: string) {
     offline,
     pending,
     error,
-    start: (stepSize: number, exposureSeconds: number) => command('start', { stepSize, exposureSeconds }),
+    start: (stepSize: number, exposureSeconds: number) =>
+      command('start', { stepSize, exposureSeconds }),
     stop: () => command('stop'),
   }
 }

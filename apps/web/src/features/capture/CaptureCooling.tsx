@@ -13,13 +13,15 @@ function formatPower(value: number) {
 export function coolingSummary(cooling: CaptureCoolingView | null | undefined) {
   if (!cooling) return null
 
-  const sensor = cooling.sensorTemperatureC === undefined ? null : formatTemperature(cooling.sensorTemperatureC)
+  const sensor =
+    cooling.sensorTemperatureC === undefined ? null : formatTemperature(cooling.sensorTemperatureC)
 
   if (cooling.state === 'off') {
     return sensor ? `Cooler off · sensor ${sensor}` : 'Cooler off'
   }
 
-  const power = cooling.powerPercent === undefined ? null : ` · ${formatPower(cooling.powerPercent)} power`
+  const power =
+    cooling.powerPercent === undefined ? null : ` · ${formatPower(cooling.powerPercent)} power`
 
   return sensor ? `Cooler on · sensor ${sensor}${power ?? ''}` : `Cooler on${power ?? ''}`
 }
@@ -50,19 +52,24 @@ export function CaptureCooling({
   const [target, setTarget] = useState<string | null>(null)
   const requested = target ?? (cooling?.setpointC === undefined ? '' : String(cooling.setpointC))
   const setpoint = Number(requested)
-  const validTarget = requested.trim() !== '' && Number.isFinite(setpoint) && setpoint >= -80 && setpoint <= 50
+
+  const validTarget =
+    requested.trim() !== '' && Number.isFinite(setpoint) && setpoint >= -80 && setpoint <= 50
 
   let description
 
-  if (unconfirmed) description = 'Cooler command outcome unknown. Check the camera before assuming it changed.'
+  if (unconfirmed)
+    description = 'Cooler command outcome unknown. Check the camera before assuming it changed.'
   else if (pending) description = 'Confirming cooler state…'
   else if (!cooling) description = 'Check the camera before changing cooling.'
   else if (cooling.state === 'off') {
-    description = 'Cooler is off. A sensor near the requested temperature is not confirmation that cooling is running.'
+    description =
+      'Cooler is off. A sensor near the requested temperature is not confirmation that cooling is running.'
   } else if (cooling.powerPercent !== undefined) {
     description = 'Cooler is on. Power shows cooling effort, not a finished temperature.'
   } else {
-    description = 'Cooler is on. Sensor temperature is live; it is not a substitute for the cooler switch.'
+    description =
+      'Cooler is on. Sensor temperature is live; it is not a substitute for the cooler switch.'
   }
 
   return (
@@ -93,7 +100,9 @@ export function CaptureCooling({
             </div>
           )}
         </dl>
-      ) : <p>Cooling state is unavailable. Waiting for a fresh camera reading.</p>}
+      ) : (
+        <p>Cooling state is unavailable. Waiting for a fresh camera reading.</p>
+      )}
       <p>{description}</p>
       {cooling && (
         <>
@@ -105,11 +114,13 @@ export function CaptureCooling({
             onChange={event => onCooler(event.target.checked)}
           />
           {cooling.canSetTemperature && (
-            <form onSubmit={event => {
-              event.preventDefault()
+            <form
+              onSubmit={event => {
+                event.preventDefault()
 
-              if (validTarget) onSetpoint(setpoint)
-            }}>
+                if (validTarget) onSetpoint(setpoint)
+              }}
+            >
               <Input
                 label="Target temperature · °C"
                 type="number"
@@ -119,7 +130,11 @@ export function CaptureCooling({
                 value={requested}
                 disabled={disabled}
                 invalid={!validTarget}
-                message={validTarget ? 'Sets the requested temperature only. Turn the cooler on separately.' : 'Choose −80 to 50 °C.'}
+                message={
+                  validTarget
+                    ? 'Sets the requested temperature only. Turn the cooler on separately.'
+                    : 'Choose −80 to 50 °C.'
+                }
                 onChange={event => setTarget(event.target.value)}
               />
               <Button type="submit" disabled={disabled || !validTarget}>

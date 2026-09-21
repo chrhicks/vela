@@ -1,7 +1,4 @@
-import {
-  AlpacaProviderError,
-  type AlpacaDeviceConnectionResult,
-} from '@vela/alpaca'
+import { AlpacaProviderError, type AlpacaDeviceConnectionResult } from '@vela/alpaca'
 import type {
   ConnectRigDevicesResult,
   RigConnectionDeviceView,
@@ -20,16 +17,8 @@ import {
   type RigInspectionSource,
 } from '../device/inspection.js'
 import type { RigCatalog } from './catalog.js'
-import {
-  inspectRigDetail,
-  type InspectRigDetailResult,
-  type RigDetailOptions,
-} from './detail.js'
-import {
-  connectionDeviceView,
-  isConnectableDeviceKind,
-  rigObservationView,
-} from './observation.js'
+import { inspectRigDetail, type InspectRigDetailResult, type RigDetailOptions } from './detail.js'
+import { connectionDeviceView, isConnectableDeviceKind, rigObservationView } from './observation.js'
 
 export type LoadRigObservationResult =
   | { readonly state: 'found'; readonly view: RigObservationView }
@@ -142,8 +131,9 @@ export function createRigConnectionCoordinator({
 
       const candidates = connectionCandidates(detail)
 
-      const unavailableDevice = detail.inspections.find((device) =>
-        isConnectableDeviceKind(device.kind) && device.connection === 'unavailable')
+      const unavailableDevice = detail.inspections.find(
+        device => isConnectableDeviceKind(device.kind) && device.connection === 'unavailable',
+      )
 
       if (unavailableDevice !== undefined) {
         return {
@@ -260,9 +250,7 @@ export function createRigConnectionCoordinator({
     activeOperations.add(rigId)
 
     try {
-      return await catalog.forget(rigId)
-        ? { state: 'forgotten' }
-        : { state: 'not-found' }
+      return (await catalog.forget(rigId)) ? { state: 'forgotten' } : { state: 'not-found' }
     } finally {
       activeOperations.delete(rigId)
     }
@@ -287,9 +275,9 @@ export function createRigConnectionCoordinator({
 function connectionCandidates(
   detail: Extract<InspectRigDetailResult, { readonly state: 'current' }>,
 ): ReadonlyArray<ConnectionCandidate> {
-  const devicesById = new Map(detail.view.devices.map((device) => [device.id, device]))
+  const devicesById = new Map(detail.view.devices.map(device => [device.id, device]))
 
-  return detail.inspections.flatMap((inspection) => {
+  return detail.inspections.flatMap(inspection => {
     if (!isConnectableDeviceKind(inspection.kind) || inspection.connection !== 'disconnected') {
       return []
     }
@@ -300,10 +288,12 @@ function connectionCandidates(
       throw new Error(`Missing Rig device projection for ${inspection.providerDeviceId}`)
     }
 
-    return [{
-      providerDeviceId: inspection.providerDeviceId,
-      device: connectionDeviceView(device),
-    }]
+    return [
+      {
+        providerDeviceId: inspection.providerDeviceId,
+        device: connectionDeviceView(device),
+      },
+    ]
   })
 }
 
@@ -353,12 +343,10 @@ function resolvedUncertainResult(
   }
 
   if (refreshedDevice?.connection === 'connected') {
-    const resolvedConnections: readonly [
-      RigConnectionDeviceView,
-      ...RigConnectionDeviceView[],
-    ] = confirmedConnected.length === 0
-      ? [uncertain]
-      : [confirmedConnected[0]!, ...confirmedConnected.slice(1), uncertain]
+    const resolvedConnections: readonly [RigConnectionDeviceView, ...RigConnectionDeviceView[]] =
+      confirmedConnected.length === 0
+        ? [uncertain]
+        : [confirmedConnected[0]!, ...confirmedConnected.slice(1), uncertain]
 
     return notAttempted.length === 0
       ? {
@@ -390,11 +378,12 @@ function unavailableResult(
 ): ConnectRigDevicesResult {
   return {
     outcome: 'unavailable',
-    reason: detail.state === 'conflict'
-      ? 'identity-conflict'
-      : detail.reason === 'offline'
-        ? 'offline'
-        : 'device-state-unavailable',
+    reason:
+      detail.state === 'conflict'
+        ? 'identity-conflict'
+        : detail.reason === 'offline'
+          ? 'offline'
+          : 'device-state-unavailable',
     view: rigObservationView(detail.view),
   }
 }

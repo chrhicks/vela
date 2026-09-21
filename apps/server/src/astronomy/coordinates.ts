@@ -1,6 +1,17 @@
 import {
-  BaryState, Body, C_AUDAY, EquatorFromVector, MakeTime, Observer, ObserverState,
-  RotateVector, Rotation_EQD_EQJ, Rotation_EQJ_EQD, Spherical, Vector, VectorFromSphere,
+  BaryState,
+  Body,
+  C_AUDAY,
+  EquatorFromVector,
+  MakeTime,
+  Observer,
+  ObserverState,
+  RotateVector,
+  Rotation_EQD_EQJ,
+  Rotation_EQJ_EQD,
+  Spherical,
+  Vector,
+  VectorFromSphere,
 } from 'astronomy-engine'
 
 export interface EquatorialPosition {
@@ -16,7 +27,7 @@ export interface Site {
 
 const radians = Math.PI / 180
 
-const wrap = (degrees: number) => (degrees % 360 + 360) % 360
+const wrap = (degrees: number) => ((degrees % 360) + 360) % 360
 
 function vector(position: EquatorialPosition, date: Date) {
   return VectorFromSphere(new Spherical(position.decDegrees, position.raDegrees, 1), date)
@@ -45,7 +56,7 @@ function aberration(value: Vector, date: Date, site: Site, direction: 1 | -1) {
   const velocity = [earth.vx + observer.vx, earth.vy + observer.vy, earth.vz + observer.vz]
   const length = Math.hypot(value.x, value.y, value.z)
   const unit = [value.x / length, value.y / length, value.z / length]
-  const beta = velocity.map(v => v / C_AUDAY * direction)
+  const beta = velocity.map(v => (v / C_AUDAY) * direction)
   const dot = unit.reduce((sum, component, index) => sum + component * beta[index]!, 0)
 
   return new Vector(
@@ -67,7 +78,9 @@ export function toMount(
   if (frame !== 'topocentric')
     throw new Error(`Mount coordinate frame ${frame} is not supported for framing`)
 
-  return position(RotateVector(Rotation_EQJ_EQD(date), aberration(vector(positionJ2000, date), date, site, 1)))
+  return position(
+    RotateVector(Rotation_EQJ_EQD(date), aberration(vector(positionJ2000, date), date, site, 1)),
+  )
 }
 
 export function fromMount(
@@ -81,13 +94,18 @@ export function fromMount(
   if (frame !== 'topocentric')
     throw new Error(`Mount coordinate frame ${frame} is not supported for framing`)
 
-  return position(aberration(RotateVector(Rotation_EQD_EQJ(date), vector(mountPosition, date)), date, site, -1))
+  return position(
+    aberration(RotateVector(Rotation_EQD_EQJ(date), vector(mountPosition, date)), date, site, -1),
+  )
 }
 
 export function angularDistance(a: EquatorialPosition, b: EquatorialPosition): number {
   const dec1 = a.decDegrees * radians
   const dec2 = b.decDegrees * radians
-  const half = Math.sin((dec2 - dec1) / 2) ** 2 + Math.cos(dec1) * Math.cos(dec2) * Math.sin((b.raDegrees - a.raDegrees) * radians / 2) ** 2
 
-  return 2 * Math.asin(Math.sqrt(Math.max(0, Math.min(1, half)))) / radians
+  const half =
+    Math.sin((dec2 - dec1) / 2) ** 2 +
+    Math.cos(dec1) * Math.cos(dec2) * Math.sin(((b.raDegrees - a.raDegrees) * radians) / 2) ** 2
+
+  return (2 * Math.asin(Math.sqrt(Math.max(0, Math.min(1, half))))) / radians
 }

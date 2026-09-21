@@ -32,7 +32,10 @@ export function previewColorFixtures(workshopRoot: string): Plugin {
 
         try {
           const bytes = await readFile(resolve(workshopRoot, '.local/preview-color', file))
-          response.setHeader('Content-Type', file.endsWith('.png') ? 'image/png' : 'application/json')
+          response.setHeader(
+            'Content-Type',
+            file.endsWith('.png') ? 'image/png' : 'application/json',
+          )
           response.setHeader('Cache-Control', 'no-store')
           response.end(bytes)
         } catch (error) {

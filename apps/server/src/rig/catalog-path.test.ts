@@ -8,8 +8,6 @@ describe('Rig catalog path', () => {
     expect(resolveRigCatalogPath(undefined)).toBe(
       fileURLToPath(new URL('../../../../data/rigs.yaml', import.meta.url)),
     )
-    expect(resolveRigCatalogPath('local/rigs.yaml')).toBe(
-      resolve('local/rigs.yaml'),
-    )
+    expect(resolveRigCatalogPath('local/rigs.yaml')).toBe(resolve('local/rigs.yaml'))
   })
 })

@@ -8,7 +8,14 @@ import './capture-hub.css'
 
 export function CaptureHub({ rigId }: { rigId: string }) {
   const { view, offline } = useCapture(rigId)
-  const { loadedImage: image, loadedUrl, failed, loading } = useLoadedImage(view?.latestImage ?? null)
+
+  const {
+    loadedImage: image,
+    loadedUrl,
+    failed,
+    loading,
+  } = useLoadedImage(view?.latestImage ?? null)
+
   const [now, setNow] = useState(Date.now)
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000)
@@ -42,7 +49,13 @@ export function CaptureHub({ rigId }: { rigId: string }) {
           {image ? (
             <img src={loadedUrl} alt={`Latest completed exposure from ${image.cameraName}`} />
           ) : (
-            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+            <svg
+              viewBox="0 0 48 48"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              aria-hidden="true"
+            >
               <rect x="6" y="12" width="36" height="26" rx="5" />
               <path d="m15 12 3-5h12l3 5" />
               <circle cx="24" cy="25" r="8" />
@@ -55,11 +68,22 @@ export function CaptureHub({ rigId }: { rigId: string }) {
           <p>Capture images and inspect the latest exposure.</p>
           <div className="vela-capture-entry__status" role="status">
             {status}
-            {view?.active && <span>{view.completedCount} completed{offline ? ' · last known' : ''}</span>}
-            {coolingSummary(view?.cooling) && (
-              <span>{coolingSummary(view?.cooling)}{offline ? ' · last known' : ''}</span>
+            {view?.active && (
+              <span>
+                {view.completedCount} completed{offline ? ' · last known' : ''}
+              </span>
             )}
-            {image && <span>{image.exposureSeconds} s · {age} s ago</span>}
+            {coolingSummary(view?.cooling) && (
+              <span>
+                {coolingSummary(view?.cooling)}
+                {offline ? ' · last known' : ''}
+              </span>
+            )}
+            {image && (
+              <span>
+                {image.exposureSeconds} s · {age} s ago
+              </span>
+            )}
             {failed && <span>The latest image could not be loaded.</span>}
           </div>
           <Link className="vela-button" data-tone="accent" data-size="large" to={`${base}/capture`}>
@@ -73,24 +97,41 @@ export function CaptureHub({ rigId }: { rigId: string }) {
           <h2>Saved images</h2>
           <p>Your retained frames, ready to browse and take into your processing tools.</p>
           <div className="vela-capture-entry__status">
-            {view?.savedImageCount != null ? `${view.savedImageCount} images · ` : ''}Original FITS + preview{offline ? ' · Last known count' : ''}
+            {view?.savedImageCount != null ? `${view.savedImageCount} images · ` : ''}Original FITS
+            + preview{offline ? ' · Last known count' : ''}
           </div>
-          <Link className="vela-button" data-tone="neutral" data-size="medium" to={`${base}/saved-images`}>
+          <Link
+            className="vela-button"
+            data-tone="neutral"
+            data-size="medium"
+            to={`${base}/saved-images`}
+          >
             Browse saved images →
           </Link>
         </div>
       </Panel>
       <Panel className="vela-capture-alignment">
-        <div className="vela-capture-alignment__mark" aria-hidden="true">◎</div>
+        <div className="vela-capture-alignment__mark" aria-hidden="true">
+          ◎
+        </div>
         <h2>Polar alignment</h2>
         <p>Measure your alignment and adjust the mount when you need to.</p>
-        <Link to={`${base}/alignment`}>Open polar alignment <span aria-hidden="true">→</span></Link>
+        <Link to={`${base}/alignment`}>
+          Open polar alignment <span aria-hidden="true">→</span>
+        </Link>
       </Panel>
       <Panel className="vela-capture-alignment">
-        <div className="vela-capture-alignment__mark" aria-hidden="true">V</div>
+        <div className="vela-capture-alignment__mark" aria-hidden="true">
+          V
+        </div>
         <h2>Autofocus</h2>
-        <p>Walk a small window around the current focuser position and watch the V-curve as shorts land.</p>
-        <Link to={`${base}/autofocus`}>Open autofocus <span aria-hidden="true">→</span></Link>
+        <p>
+          Walk a small window around the current focuser position and watch the V-curve as shorts
+          land.
+        </p>
+        <Link to={`${base}/autofocus`}>
+          Open autofocus <span aria-hidden="true">→</span>
+        </Link>
       </Panel>
     </div>
   )

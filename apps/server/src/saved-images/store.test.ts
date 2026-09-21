@@ -7,7 +7,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CaptureImage } from '@vela/model/web'
 import { createMemorySavedImageStore, openFileSavedImageStore } from './store.js'
 
-
 const image: CaptureImage = {
   id: 'frame-1',
   imageUrl: '/temporary.png',
@@ -23,7 +22,11 @@ const image: CaptureImage = {
   saved: false,
 }
 
-const files = { fits: Buffer.from('original'), native: Buffer.from('preview'), fit: Buffer.from('small') }
+const files = {
+  fits: Buffer.from('original'),
+  native: Buffer.from('preview'),
+  fit: Buffer.from('small'),
+}
 
 const directories: string[] = []
 
@@ -40,35 +43,39 @@ afterEach(async () => {
 })
 
 describe('saved image store', () => {
-  it.each(['memory', 'file'])('%s preserves one artifact per rig/frame with isolated downloads', async kind => {
-    const store = kind === 'memory'
-      ? createMemorySavedImageStore()
-      : await openFileSavedImageStore(await temporary())
+  it.each(['memory', 'file'])(
+    '%s preserves one artifact per rig/frame with isolated downloads',
+    async kind => {
+      const store =
+        kind === 'memory'
+          ? createMemorySavedImageStore()
+          : await openFileSavedImageStore(await temporary())
 
-    const [first, duplicate] = await Promise.all([
-      store.save('rig/../one', image, files),
-      store.save('rig/../one', image, files),
-    ])
+      const [first, duplicate] = await Promise.all([
+        store.save('rig/../one', image, files),
+        store.save('rig/../one', image, files),
+      ])
 
-    expect(duplicate).toEqual(first)
-    expect(first).toMatchObject({ saved: true, rigId: 'rig/../one', id: image.id })
-    expect(first.imageUrl).toBe('/api/rigs/rig%2F..%2Fone/saved-images/frame-1/preview')
-    expect(first.fitImageUrl).toBe('/api/rigs/rig%2F..%2Fone/saved-images/frame-1/fit')
-    expect(await store.count('rig/../one')).toBe(1)
-    expect(await store.get('other-rig', image.id)).toBeUndefined()
-    expect(await store.file('other-rig', image.id, 'fits')).toBeUndefined()
-    expect(await store.file('rig/../one', image.id, 'fits')).toEqual(files.fits)
-    expect(await store.file('rig/../one', image.id, 'native')).toEqual(files.native)
-    expect(await store.file('rig/../one', image.id, 'fit')).toEqual(files.fit)
-    await store.save(
-      'rig/../one',
-      { ...image, id: '../next', capturedAt: '2026-09-05T20:00:00-04:00' },
-      { fits: files.fits, native: files.native },
-    )
-    expect((await store.list('rig/../one')).map(item => item.id)).toEqual(['../next', 'frame-1'])
-    expect((await store.get('rig/../one', '../next'))?.fitImageUrl).toBeUndefined()
-    expect(await store.file('rig/../one', '../next', 'fit')).toBeUndefined()
-  })
+      expect(duplicate).toEqual(first)
+      expect(first).toMatchObject({ saved: true, rigId: 'rig/../one', id: image.id })
+      expect(first.imageUrl).toBe('/api/rigs/rig%2F..%2Fone/saved-images/frame-1/preview')
+      expect(first.fitImageUrl).toBe('/api/rigs/rig%2F..%2Fone/saved-images/frame-1/fit')
+      expect(await store.count('rig/../one')).toBe(1)
+      expect(await store.get('other-rig', image.id)).toBeUndefined()
+      expect(await store.file('other-rig', image.id, 'fits')).toBeUndefined()
+      expect(await store.file('rig/../one', image.id, 'fits')).toEqual(files.fits)
+      expect(await store.file('rig/../one', image.id, 'native')).toEqual(files.native)
+      expect(await store.file('rig/../one', image.id, 'fit')).toEqual(files.fit)
+      await store.save(
+        'rig/../one',
+        { ...image, id: '../next', capturedAt: '2026-09-05T20:00:00-04:00' },
+        { fits: files.fits, native: files.native },
+      )
+      expect((await store.list('rig/../one')).map(item => item.id)).toEqual(['../next', 'frame-1'])
+      expect((await store.get('rig/../one', '../next'))?.fitImageUrl).toBeUndefined()
+      expect(await store.file('rig/../one', '../next', 'fit')).toBeUndefined()
+    },
+  )
 
   it('survives reopening, hides interrupted staging saves, and arbitrates independent concurrent stores', async () => {
     const root = await temporary()
@@ -107,8 +114,14 @@ describe('saved image store', () => {
     const realOpen = fs.open
     let announce!: () => void
     let fail!: (reason: Error) => void
-    const writing = new Promise<void>(resolve => { announce = resolve })
-    const sync = new Promise<void>((_, reject) => { fail = reject })
+
+    const writing = new Promise<void>(resolve => {
+      announce = resolve
+    })
+
+    const sync = new Promise<void>((_, reject) => {
+      fail = reject
+    })
 
     const openFile: typeof fs.open = async (...args) => {
       const handle = await realOpen(...args)

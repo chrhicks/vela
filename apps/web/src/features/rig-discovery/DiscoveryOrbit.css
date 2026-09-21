@@ -14,7 +14,7 @@
 }
 
 .rig-discovery-orbit__ring--outer {
-  inset: .35rem;
+  inset: 0.35rem;
 }
 
 .rig-discovery-orbit__ring--inner {
@@ -28,7 +28,8 @@
   display: grid;
   width: 4.5rem;
   height: 4.5rem;
-  border: var(--vela-border-width) solid color-mix(in oklch, var(--vela-accent) 54%, var(--vela-line));
+  border: var(--vela-border-width) solid
+    color-mix(in oklch, var(--vela-accent) 54%, var(--vela-line));
   border-radius: 50%;
   background: var(--vela-accent-surface);
   box-shadow: 0 0 2.5rem color-mix(in oklch, var(--vela-accent) 18%, transparent);
@@ -47,11 +48,11 @@
 .rig-discovery-orbit__signal {
   position: absolute;
   z-index: 3;
-  width: .4rem;
-  height: .4rem;
+  width: 0.4rem;
+  height: 0.4rem;
   border-radius: 50%;
   background: var(--vela-accent);
-  box-shadow: 0 0 .8rem var(--vela-accent);
+  box-shadow: 0 0 0.8rem var(--vela-accent);
 }
 
 .rig-discovery-orbit__signal--one {
@@ -60,15 +61,15 @@
 }
 
 .rig-discovery-orbit__signal--two {
-  right: .55rem;
+  right: 0.55rem;
   bottom: 3.4rem;
-  opacity: .65;
+  opacity: 0.65;
 }
 
 .rig-discovery-orbit__signal--three {
   bottom: 1.2rem;
   left: 2.1rem;
-  opacity: .38;
+  opacity: 0.38;
 }
 
 @container (max-width: 31rem) {
@@ -78,7 +79,7 @@
   }
 
   .rig-discovery-orbit__ring--outer {
-    inset: .25rem;
+    inset: 0.25rem;
   }
 
   .rig-discovery-orbit__ring--inner {

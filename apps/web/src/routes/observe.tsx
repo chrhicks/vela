@@ -45,28 +45,31 @@ function ObservationPage({ rigId }: { rigId: string }) {
     </Link>
   )
 
-  if (!view) return (
-    <section className="vela-rig-page">
-      {back}
-      {observation.error ? (
-        <div className="vela-rig-route-state" role="status">
-          <h1>{observation.error === 'not-found' ? 'Rig not found' : 'Could not load this Rig'}</h1>
-          <p>
-            {observation.error === 'not-found'
-              ? 'This Rig is no longer saved, or the address is incorrect.'
-              : 'Vela could not confirm the observation response. Check the server and try again.'}
-          </p>
-          {observation.error !== 'not-found' && (
-            <Button disabled={refreshing} onClick={() => void observation.refresh()}>
-              Try again
-            </Button>
-          )}
-        </div>
-      ) : (
-        <p role="status">Loading Rig readiness…</p>
-      )}
-    </section>
-  )
+  if (!view)
+    return (
+      <section className="vela-rig-page">
+        {back}
+        {observation.error ? (
+          <div className="vela-rig-route-state" role="status">
+            <h1>
+              {observation.error === 'not-found' ? 'Rig not found' : 'Could not load this Rig'}
+            </h1>
+            <p>
+              {observation.error === 'not-found'
+                ? 'This Rig is no longer saved, or the address is incorrect.'
+                : 'Vela could not confirm the observation response. Check the server and try again.'}
+            </p>
+            {observation.error !== 'not-found' && (
+              <Button disabled={refreshing} onClick={() => void observation.refresh()}>
+                Try again
+              </Button>
+            )}
+          </div>
+        ) : (
+          <p role="status">Loading Rig readiness…</p>
+        )}
+      </section>
+    )
 
   const busy = connecting || (!interrupted && view.connectionPreparation.state === 'in-progress')
   const presentation = readinessPresentation(view, connecting, interrupted)
@@ -96,7 +99,11 @@ function ObservationPage({ rigId }: { rigId: string }) {
       <details
         ref={readiness}
         className="capture-page__rig vela-capture-rig"
-        open={busy || uncertain || interrupted || view.connectionPreparation.state !== 'complete' ? true : undefined}
+        open={
+          busy || uncertain || interrupted || view.connectionPreparation.state !== 'complete'
+            ? true
+            : undefined
+        }
       >
         <summary ref={readinessSummary}>
           <span>
@@ -130,10 +137,16 @@ function ObservationPage({ rigId }: { rigId: string }) {
           >
             <div className="vela-observe-summary">
               <span aria-hidden="true" className="vela-observe-mark">
-                {uncertain || interrupted ? <span>!</span> : <ConnectionMark busy={busy} tone={presentation.tone} />}
+                {uncertain || interrupted ? (
+                  <span>!</span>
+                ) : (
+                  <ConnectionMark busy={busy} tone={presentation.tone} />
+                )}
               </span>
               <div role="status" aria-live="polite" aria-atomic="true">
-                <h3 ref={heading} tabIndex={-1}>{title}</h3>
+                <h3 ref={heading} tabIndex={-1}>
+                  {title}
+                </h3>
                 <p>
                   {uncertain && !busy
                     ? 'Check current Rig state before trying another connection. Vela has not repeated the command.'
@@ -143,7 +156,8 @@ function ObservationPage({ rigId }: { rigId: string }) {
             </div>
             {commandUnconfirmed && (
               <p className="vela-observe-warning">
-                The command response could not be confirmed. A fresh state check does not prove how that command ended.
+                The command response could not be confirmed. A fresh state check does not prove how
+                that command ended.
               </p>
             )}
             {interrupted && uncertain && (
@@ -152,7 +166,9 @@ function ObservationPage({ rigId }: { rigId: string }) {
             {result && <ConnectionResult result={result} />}
             <div className="vela-observe-actions">
               {busy ? (
-                <Button disabled aria-busy="true" size="large" tone="accent">Connecting devices…</Button>
+                <Button disabled aria-busy="true" size="large" tone="accent">
+                  Connecting devices…
+                </Button>
               ) : observation.canConnect ? (
                 <Button onClick={() => void observation.connect()} size="large" tone="accent">
                   {result?.outcome === 'partial' || result?.outcome === 'failed'
@@ -160,7 +176,10 @@ function ObservationPage({ rigId }: { rigId: string }) {
                     : 'Connect devices'}
                 </Button>
               ) : null}
-              <Button disabled={connecting || refreshing} onClick={() => void observation.refresh()}>
+              <Button
+                disabled={connecting || refreshing}
+                onClick={() => void observation.refresh()}
+              >
                 {refreshing ? 'Checking Rig…' : 'Check Rig again'}
               </Button>
             </div>
@@ -174,11 +193,19 @@ function ObservationPage({ rigId }: { rigId: string }) {
             <dl>
               <div>
                 <dt>Rig</dt>
-                <dd>{interrupted || busy ? 'Last known state' : rig.state === 'offline' ? 'Offline' : 'Reachable'}</dd>
+                <dd>
+                  {interrupted || busy
+                    ? 'Last known state'
+                    : rig.state === 'offline'
+                      ? 'Offline'
+                      : 'Reachable'}
+                </dd>
               </div>
               <div>
                 <dt>Device connections</dt>
-                <dd>{busy ? 'Status updating' : `${rig.connections.connected} confirmed connected`}</dd>
+                <dd>
+                  {busy ? 'Status updating' : `${rig.connections.connected} confirmed connected`}
+                </dd>
               </div>
               <div>
                 <dt>Other device states</dt>
@@ -189,7 +216,9 @@ function ObservationPage({ rigId }: { rigId: string }) {
                 </dd>
               </div>
             </dl>
-            <p>{rig.endpoint.host}:{rig.endpoint.port}</p>
+            <p>
+              {rig.endpoint.host}:{rig.endpoint.port}
+            </p>
             <p>Opening this workspace does not start an exposure or save an observation.</p>
           </Panel>
         </div>
@@ -209,23 +238,29 @@ function ObservationPage({ rigId }: { rigId: string }) {
 }
 
 function ConnectionResult({ result }: { result: ConnectRigDevicesResult }) {
-  if (result.outcome === 'unavailable') return (
-    <p className="vela-observe-warning">
-      Connection was unavailable: {{
-        'identity-conflict': 'the Rig identity changed.',
-        offline: 'the Rig was offline.',
-        'device-state-unavailable': 'device state could not be confirmed.',
-      }[result.reason]}
-    </p>
-  )
+  if (result.outcome === 'unavailable')
+    return (
+      <p className="vela-observe-warning">
+        Connection was unavailable:{' '}
+        {
+          {
+            'identity-conflict': 'the Rig identity changed.',
+            offline: 'the Rig was offline.',
+            'device-state-unavailable': 'device state could not be confirmed.',
+          }[result.reason]
+        }
+      </p>
+    )
 
-  if (result.outcome === 'complete') return (
-    <p>
-      Last connection attempt: {result.command === 'not-needed'
-        ? 'no connection commands were needed.'
-        : `${result.confirmedConnected.length} device connections confirmed.`}
-    </p>
-  )
+  if (result.outcome === 'complete')
+    return (
+      <p>
+        Last connection attempt:{' '}
+        {result.command === 'not-needed'
+          ? 'no connection commands were needed.'
+          : `${result.confirmedConnected.length} device connections confirmed.`}
+      </p>
+    )
 
   return (
     <section className="vela-observe-result" aria-label="Last connection attempt">
@@ -233,18 +268,24 @@ function ConnectionResult({ result }: { result: ConnectRigDevicesResult }) {
       <dl>
         <div>
           <dt>Confirmed connected</dt>
-          <dd>{result.confirmedConnected.map((device) => device.name).join(' · ') || 'None confirmed by this attempt'}</dd>
+          <dd>
+            {result.confirmedConnected.map(device => device.name).join(' · ') ||
+              'None confirmed by this attempt'}
+          </dd>
         </div>
         {'failed' in result && (
           <div>
             <dt>Connection failed</dt>
             <dd>
-              {result.failed.name} — {{
-                rejected: 'connection rejected',
-                'remained-disconnected': 'remained disconnected',
-                'device-not-found': 'device not found',
-                'connection-check-failed': 'connection check failed',
-              }[result.failed.reason]}
+              {result.failed.name} —{' '}
+              {
+                {
+                  rejected: 'connection rejected',
+                  'remained-disconnected': 'remained disconnected',
+                  'device-not-found': 'device not found',
+                  'connection-check-failed': 'connection check failed',
+                }[result.failed.reason]
+              }
             </dd>
           </div>
         )}
@@ -257,12 +298,15 @@ function ConnectionResult({ result }: { result: ConnectRigDevicesResult }) {
         {'stoppedAfter' in result && (
           <div>
             <dt>Stopped after</dt>
-            <dd>{result.stoppedAfter.name} — confirmed by a later state check; sequencing had already stopped.</dd>
+            <dd>
+              {result.stoppedAfter.name} — confirmed by a later state check; sequencing had already
+              stopped.
+            </dd>
           </div>
         )}
         <div>
           <dt>Not attempted</dt>
-          <dd>{result.notAttempted.map((device) => device.name).join(' · ') || 'None'}</dd>
+          <dd>{result.notAttempted.map(device => device.name).join(' · ') || 'None'}</dd>
         </div>
       </dl>
     </section>

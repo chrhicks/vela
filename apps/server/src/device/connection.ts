@@ -26,9 +26,11 @@ export function createRigDeviceConnector(
   rig: RigConnectionSource,
   options: RigDeviceConnectorOptions = {},
 ): RigDeviceConnector {
-  const provider = options.provider ?? createAlpacaProvider({
-    baseUrl: `http://${rig.endpoint.host}:${rig.endpoint.port}`,
-  })
+  const provider =
+    options.provider ??
+    createAlpacaProvider({
+      baseUrl: `http://${rig.endpoint.host}:${rig.endpoint.port}`,
+    })
 
   return {
     connectDevice: (providerDeviceId, connectionOptions) =>

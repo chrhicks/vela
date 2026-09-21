@@ -12,11 +12,7 @@ export function reportSummary(report: Report) {
   return `${report.status === 'complete' ? 'Complete' : 'Incomplete'} · ${count('error')} errors · ${count('warning')} warnings · ${count('information')} information`
 }
 
-function Evidence(props: {
-  citation: Citation
-  label: string
-  theme: ResolvedTheme
-}) {
+function Evidence(props: { citation: Citation; label: string; theme: ResolvedTheme }) {
   return (
     <>
       <text flexShrink={0} fg={props.theme.text.subdued} wrapMode="word">
@@ -55,28 +51,49 @@ export function ResultsPanel(props: {
     detail?.scrollTo(0)
     status?.scrollTo(0)
   })
-  const diagnostics = createMemo(() => props.report.diagnostics.toSorted((a, b) =>
-    ({ error: 0, warning: 1, information: 2 })[a.severity] - ({ error: 0, warning: 1, information: 2 })[b.severity]
-  ))
+  const diagnostics = createMemo(() =>
+    props.report.diagnostics.toSorted(
+      (a, b) =>
+        ({ error: 0, warning: 1, information: 2 })[a.severity] -
+        { error: 0, warning: 1, information: 2 }[b.severity],
+    ),
+  )
   const diagnostic = () => diagnostics()[index()]
   const stale = () => props.report.status === 'stale'
   const wide = () => props.width >= 100
   const detailOnly = () => !wide() && focus() === 'detail'
   const skipped = () => props.report.files.filter(file => file.skipped).length
-  const errors = () => props.report.files.filter(file => file.error).length + Number(Boolean(props.report.error))
-  const severityColor = (severity: string) => severity === 'error'
-    ? props.theme.text.feedback.error.default
-    : severity === 'warning'
-      ? props.theme.text.feedback.warning.default
-      : props.theme.text.default
+  const errors = () =>
+    props.report.files.filter(file => file.error).length + Number(Boolean(props.report.error))
+  const severityColor = (severity: string) =>
+    severity === 'error'
+      ? props.theme.text.feedback.error.default
+      : severity === 'warning'
+        ? props.theme.text.feedback.warning.default
+        : props.theme.text.default
 
   props.keymap.layer(() => ({
     mode: 'global',
     enabled: props.focused,
     commands: [
-      { bind: 'left', run: () => { setFocus('diagnostics') } },
-      { bind: 'right', run: () => { setFocus('detail') } },
-      { bind: 's', run: () => { setStatusView(value => !value) } },
+      {
+        bind: 'left',
+        run: () => {
+          setFocus('diagnostics')
+        },
+      },
+      {
+        bind: 'right',
+        run: () => {
+          setFocus('detail')
+        },
+      },
+      {
+        bind: 's',
+        run: () => {
+          setStatusView(value => !value)
+        },
+      },
     ],
   }))
 
@@ -104,11 +121,14 @@ export function ResultsPanel(props: {
           {reportSummary(props.report)}
         </text>
         <text fg={props.theme.text.subdued}>
-          Source snapshot · {new Date(props.report.time).toLocaleString()} · {props.report.files.length} files · {props.report.mode === 'files' ? 'whole files' : 'changes'}
+          Source snapshot · {new Date(props.report.time).toLocaleString()} ·{' '}
+          {props.report.files.length} files ·{' '}
+          {props.report.mode === 'files' ? 'whole files' : 'changes'}
         </text>
         <text fg={props.theme.text.subdued}>Model: {props.report.model}</text>
         <text fg={props.theme.text.subdued}>
-          Check status: {props.report.missingEvidence.length} missing context · {skipped()} skipped · {errors()} errors · S inspect
+          Check status: {props.report.missingEvidence.length} missing context · {skipped()} skipped
+          · {errors()} errors · S inspect
         </text>
         <Show when={stale()}>
           <text fg={props.theme.text.feedback.warning.default}>
@@ -154,7 +174,13 @@ export function ResultsPanel(props: {
                   minHeight={2}
                   flexShrink={0}
                 >
-                  <text fg={focus() === 'diagnostics' ? props.theme.text.default : props.theme.text.subdued}>
+                  <text
+                    fg={
+                      focus() === 'diagnostics'
+                        ? props.theme.text.default
+                        : props.theme.text.subdued
+                    }
+                  >
                     {stale() ? 'Diagnostics · unaccepted' : 'Diagnostics'}
                   </text>
                   <select
@@ -195,10 +221,17 @@ export function ResultsPanel(props: {
                     <>
                       <text
                         flexShrink={0}
-                        fg={stale() ? props.theme.text.feedback.warning.default : severityColor(value().severity)}
+                        fg={
+                          stale()
+                            ? props.theme.text.feedback.warning.default
+                            : severityColor(value().severity)
+                        }
                         wrapMode="word"
                       >
-                        <b>{stale() ? 'Unaccepted · ' : ''}{value().severity} · {value().message}</b>
+                        <b>
+                          {stale() ? 'Unaccepted · ' : ''}
+                          {value().severity} · {value().message}
+                        </b>
                       </text>
                       <text flexShrink={0} fg={props.theme.text.subdued} wrapMode="word">
                         Rule: {value().rule}
@@ -211,7 +244,9 @@ export function ResultsPanel(props: {
                       </text>
                       <Evidence citation={value().location} label="Evidence" theme={props.theme} />
                       <For each={value().related}>
-                        {citation => <Evidence citation={citation} label="Related" theme={props.theme} />}
+                        {citation => (
+                          <Evidence citation={citation} label="Related" theme={props.theme} />
+                        )}
                       </For>
                     </>
                   )}
@@ -260,25 +295,35 @@ export function ResultsPanel(props: {
           <For each={props.report.files}>
             {file => (
               <>
-                <text flexShrink={0} fg={props.theme.text.default} wrapMode="word">{file.path}</text>
+                <text flexShrink={0} fg={props.theme.text.default} wrapMode="word">
+                  {file.path}
+                </text>
                 <Show when={file.skipped}>
                   <text flexShrink={0} fg={props.theme.text.subdued} wrapMode="word">
                     Skipped: {file.skipped}
                   </text>
                 </Show>
                 <Show when={file.error}>
-                  <text flexShrink={0} fg={props.theme.text.feedback.warning.default} wrapMode="word">
+                  <text
+                    flexShrink={0}
+                    fg={props.theme.text.feedback.warning.default}
+                    wrapMode="word"
+                  >
                     Check error: {file.error}
                   </text>
                 </Show>
                 <Show when={!file.skipped && !file.error}>
-                  <text flexShrink={0} fg={props.theme.text.subdued}>Included in source snapshot</text>
+                  <text flexShrink={0} fg={props.theme.text.subdued}>
+                    Included in source snapshot
+                  </text>
                 </Show>
               </>
             )}
           </For>
           <Show when={!props.report.files.length}>
-            <text flexShrink={0} fg={props.theme.text.subdued}>No source files in this report.</text>
+            <text flexShrink={0} fg={props.theme.text.subdued}>
+              No source files in this report.
+            </text>
           </Show>
         </scrollbox>
       </Show>

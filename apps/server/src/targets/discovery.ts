@@ -1,6 +1,14 @@
 import {
-  Body, Equator, Horizon, MakeTime, Observer, RotateVector, Rotation_EQJ_EQD,
-  SearchAltitude, SiderealTime, Vector,
+  Body,
+  Equator,
+  Horizon,
+  MakeTime,
+  Observer,
+  RotateVector,
+  Rotation_EQJ_EQD,
+  SearchAltitude,
+  SiderealTime,
+  Vector,
 } from 'astronomy-engine'
 import type { TargetCategory, TargetFilterChoice, TargetOpportunity } from '@vela/model/web'
 import type { CatalogTarget } from './catalog/index.js'
@@ -53,33 +61,60 @@ const clamp = (value: number) => Math.max(-1, Math.min(1, value))
 // IC1396: https://science.nasa.gov/photojournal/dark-globule-in-ic-1396-irac/
 // California: https://www.spitzer.caltech.edu/image/ssc2020-10a-spitzer-california-nebula-mosaic
 // Heart/Soul and Orion/Flame identifications are documented at catalog/README.md.
-const categoryOverrides = new Map<string, TargetCategory>(Object.entries({
-  ic1396: 'emission',
-  ic1805: 'emission',
-  ic1848: 'emission',
-  ngc1499: 'emission',
-  ngc1976: 'emission',
-  ngc2024: 'emission',
-  ngc1432: 'reflection-dark',
-  ngc1435: 'reflection-dark',
-  ngc7023: 'reflection-dark',
-} satisfies Record<string, TargetCategory>))
+const categoryOverrides = new Map<string, TargetCategory>(
+  Object.entries({
+    ic1396: 'emission',
+    ic1805: 'emission',
+    ic1848: 'emission',
+    ngc1499: 'emission',
+    ngc1976: 'emission',
+    ngc2024: 'emission',
+    ngc1432: 'reflection-dark',
+    ngc1435: 'reflection-dark',
+    ngc7023: 'reflection-dark',
+  } satisfies Record<string, TargetCategory>),
+)
 
 // A small editorial nudge, not a whitelist or a brightness/magnitude surrogate.
 const showpieces = new Set([
-  'ngc0224', 'ngc0598', 'ngc1976', 'ngc2024', 'ngc1499', 'ngc6205',
-  'ngc6720', 'ngc6853', 'ngc6888', 'ngc6960', 'ngc6992', 'ngc7000',
-  'ngc7023', 'ngc7293', 'ngc7635', 'ic1396', 'ic1805', 'ic1848',
+  'ngc0224',
+  'ngc0598',
+  'ngc1976',
+  'ngc2024',
+  'ngc1499',
+  'ngc6205',
+  'ngc6720',
+  'ngc6853',
+  'ngc6888',
+  'ngc6960',
+  'ngc6992',
+  'ngc7000',
+  'ngc7023',
+  'ngc7293',
+  'ngc7635',
+  'ic1396',
+  'ic1805',
+  'ic1848',
 ])
 
 function description(target: CatalogTarget) {
   let category: TargetCategory = categoryOverrides.get(target.id) ?? 'other'
 
   if (!categoryOverrides.get(target.id)) {
-    if (['H II region', 'Emission nebula', 'Supernova remnant'].includes(target.type)) category = 'emission'
-    else if (['Reflection nebula', 'Dark nebula'].includes(target.type)) category = 'reflection-dark'
+    if (['H II region', 'Emission nebula', 'Supernova remnant'].includes(target.type))
+      category = 'emission'
+    else if (['Reflection nebula', 'Dark nebula'].includes(target.type))
+      category = 'reflection-dark'
     else if (target.type.startsWith('Galaxy')) category = 'galaxy'
-    else if (['Open cluster', 'Globular cluster', 'Association of stars', 'Star cluster and nebula'].includes(target.type)) category = 'cluster'
+    else if (
+      [
+        'Open cluster',
+        'Globular cluster',
+        'Association of stars',
+        'Star cluster and nebula',
+      ].includes(target.type)
+    )
+      category = 'cluster'
     else if (target.type === 'Planetary nebula') category = 'planetary'
   }
 
@@ -87,11 +122,12 @@ function description(target: CatalogTarget) {
   // do not establish emission-line suitability. https://www.optolong.com/cms/document/detail/id/250.html
   const mixed = target.type === 'Star cluster and nebula' && !categoryOverrides.get(target.id)
 
-  const filter: TargetFilterChoice = mixed || category === 'other'
-    ? 'uncertain'
-    : category === 'emission' || category === 'planetary'
-      ? 'dual-band'
-      : 'broadband'
+  const filter: TargetFilterChoice =
+    mixed || category === 'other'
+      ? 'uncertain'
+      : category === 'emission' || category === 'planetary'
+        ? 'dual-band'
+        : 'broadband'
 
   const filterReasons = {
     'dual-band': 'emission-lines',
@@ -119,13 +155,23 @@ function description(target: CatalogTarget) {
 }
 
 function usableSite(site: Site | null): site is Site {
-  return site !== null && Number.isFinite(site.latitudeDegrees) && Math.abs(site.latitudeDegrees) <= 90
-    && Number.isFinite(site.longitudeDegrees) && Math.abs(site.longitudeDegrees) <= 180
-    && (site.elevationMeters === undefined || Number.isFinite(site.elevationMeters))
+  return (
+    site !== null &&
+    Number.isFinite(site.latitudeDegrees) &&
+    Math.abs(site.latitudeDegrees) <= 90 &&
+    Number.isFinite(site.longitudeDegrees) &&
+    Math.abs(site.longitudeDegrees) <= 180 &&
+    (site.elevationMeters === undefined || Number.isFinite(site.elevationMeters))
+  )
 }
 
 function darkWindow(site: Site, now: Date): DiscoveryWindow | null {
-  const observer = new Observer(site.latitudeDegrees, site.longitudeDegrees, site.elevationMeters ?? 0)
+  const observer = new Observer(
+    site.latitudeDegrees,
+    site.longitudeDegrees,
+    site.elevationMeters ?? 0,
+  )
+
   const sun = Equator(Body.Sun, now, observer, true, true)
   const darkNow = Horizon(now, observer, sun.ra, sun.dec).altitude < -18
   const dusk = darkNow ? now : SearchAltitude(Body.Sun, observer, -1, now, 1, -18)?.date
@@ -136,15 +182,14 @@ function darkWindow(site: Site, now: Date): DiscoveryWindow | null {
   return {
     startsAt: dusk.toISOString(),
     endsAt: (dawn ?? new Date(dusk.getTime() + day)).toISOString(),
-    kind: !dawn
-      ? 'polar-night'
-      : darkNow
-        ? 'current-night'
-        : 'upcoming-night',
+    kind: !dawn ? 'polar-night' : darkNow ? 'current-night' : 'upcoming-night',
   }
 }
 
-interface SiderealSample { at: number, angle: number }
+interface SiderealSample {
+  at: number
+  angle: number
+}
 
 function siderealSamples(window: DiscoveryWindow, longitude: number): SiderealSample[] {
   const start = Date.parse(window.startsAt)
@@ -190,7 +235,10 @@ function altitude(
   cosLatitude: number,
   angle: number,
 ) {
-  return Math.asin(clamp(sinLatitude * z + cosLatitude * (x * Math.cos(angle) + y * Math.sin(angle)))) / radians
+  return (
+    Math.asin(clamp(sinLatitude * z + cosLatitude * (x * Math.cos(angle) + y * Math.sin(angle)))) /
+    radians
+  )
 }
 
 function opportunity(
@@ -207,21 +255,26 @@ function opportunity(
 
   if (base + amplitude <= threshold + 1e-12) return null
 
-  const halfArc = amplitude < 1e-12 || base - amplitude >= threshold
-    ? Math.PI
-    : Math.acos(clamp((threshold - base) / amplitude))
+  const halfArc =
+    amplitude < 1e-12 || base - amplitude >= threshold
+      ? Math.PI
+      : Math.acos(clamp((threshold - base) / amplitude))
 
   const first = samples[0]!
   const last = samples.at(-1)!
   const ra = Math.atan2(y, x)
   const currentAltitudeDegrees = altitude(x, y, z, sinLatitude, cosLatitude, currentAngle)
-  const intervals: Array<{ start: number, end: number, transit: number }> = []
+  const intervals: Array<{ start: number; end: number; transit: number }> = []
 
   if (halfArc === Math.PI) {
     const transit = ra + Math.ceil((first.angle - ra) / turn) * turn
     intervals.push({ start: first.angle, end: last.angle, transit })
   } else {
-    for (let cycle = Math.floor((first.angle - ra) / turn); cycle <= Math.ceil((last.angle - ra) / turn); cycle++) {
+    for (
+      let cycle = Math.floor((first.angle - ra) / turn);
+      cycle <= Math.ceil((last.angle - ra) / turn);
+      cycle++
+    ) {
       const transit = ra + cycle * turn
       const start = Math.max(first.angle, transit - halfArc)
       const end = Math.min(last.angle, transit + halfArc)
@@ -239,9 +292,10 @@ function opportunity(
     const peakAngle = Math.max(interval.start, Math.min(interval.end, interval.transit))
     // A circumpolar interval may end before the next transit: compare both edges too.
     const peakOptions = [peakAngle, interval.start, interval.end]
-    peakOptions.sort((a, b) =>
-      altitude(x, y, z, sinLatitude, cosLatitude, b)
-      - altitude(x, y, z, sinLatitude, cosLatitude, a) || a - b,
+    peakOptions.sort(
+      (a, b) =>
+        altitude(x, y, z, sinLatitude, cosLatitude, b) -
+          altitude(x, y, z, sinLatitude, cosLatitude, a) || a - b,
     )
     const bestAngle = peakOptions[0]!
     const bestAltitudeDegrees = altitude(x, y, z, sinLatitude, cosLatitude, bestAngle)
@@ -274,21 +328,21 @@ function opportunity(
  * precise target inspection still uses sky.ts. No weather, Moon penalty or obstruction policy.
  */
 export function discoverTargets({ targets, site, now }: DiscoveryInput): TargetDiscovery {
-  if (!Number.isFinite(now.getTime())) throw new RangeError('Discovery requires a valid current time')
+  if (!Number.isFinite(now.getTime()))
+    throw new RangeError('Discovery requires a valid current time')
   const validSite = usableSite(site) ? site : null
   const window = validSite ? darkWindow(validSite, now) : null
   const samples = window && validSite ? siderealSamples(window, validSite.longitudeDegrees) : null
 
-  const epoch = MakeTime(window
-    ? new Date((Date.parse(window.startsAt) + Date.parse(window.endsAt)) / 2)
-    : now)
+  const epoch = MakeTime(
+    window ? new Date((Date.parse(window.startsAt) + Date.parse(window.endsAt)) / 2) : now,
+  )
 
   const rotation = samples ? Rotation_EQJ_EQD(epoch) : null
   const latitude = (validSite?.latitudeDegrees ?? 0) * radians
 
-  const currentAngle = samples && validSite
-    ? (SiderealTime(now) * 15 + validSite.longitudeDegrees) * radians
-    : 0
+  const currentAngle =
+    samples && validSite ? (SiderealTime(now) * 15 + validSite.longitudeDegrees) * radians : 0
 
   const candidates = targets.map((target): DiscoveryCandidate => {
     const details = description(target)
@@ -298,20 +352,32 @@ export function discoverTargets({ targets, site, now }: DiscoveryInput): TargetD
       const ra = target.raDegrees * radians
       const dec = target.decDegrees * radians
 
-      const position = RotateVector(rotation, new Vector(
-        Math.cos(dec) * Math.cos(ra),
-        Math.cos(dec) * Math.sin(ra),
-        Math.sin(dec),
-        epoch,
-      ))
+      const position = RotateVector(
+        rotation,
+        new Vector(
+          Math.cos(dec) * Math.cos(ra),
+          Math.cos(dec) * Math.sin(ra),
+          Math.sin(dec),
+          epoch,
+        ),
+      )
 
-      available = opportunity(position, samples, Math.sin(latitude), Math.cos(latitude), currentAngle)
+      available = opportunity(
+        position,
+        samples,
+        Math.sin(latitude),
+        Math.cos(latitude),
+        currentAngle,
+      )
     }
 
     // Duration remains decisive: a nearly-set showpiece cannot outrank a long useful session
     // solely on its name. Four hours saturates this preference; size is not equipment fit.
     const timeWeight = available ? Math.sqrt(Math.min(1, available.usefulMinutes / 240)) : 1
-    const altitudeWeight = available ? 0.5 + 0.5 * Math.sin(available.bestAltitudeDegrees * radians) : 1
+
+    const altitudeWeight = available
+      ? 0.5 + 0.5 * Math.sin(available.bestAltitudeDegrees * radians)
+      : 1
 
     return {
       target,
@@ -324,16 +390,16 @@ export function discoverTargets({ targets, site, now }: DiscoveryInput): TargetD
     }
   })
 
-  candidates.sort((a, b) => Number(b.eligible) - Number(a.eligible) || b.score - a.score
-    || (a.target.id < b.target.id ? -1 : a.target.id > b.target.id ? 1 : 0))
+  candidates.sort(
+    (a, b) =>
+      Number(b.eligible) - Number(a.eligible) ||
+      b.score - a.score ||
+      (a.target.id < b.target.id ? -1 : a.target.id > b.target.id ? 1 : 0),
+  )
 
   return {
     observedAt: now.toISOString(),
-    status: !validSite
-      ? 'site-unavailable'
-      : !window
-        ? 'no-darkness'
-        : 'available',
+    status: !validSite ? 'site-unavailable' : !window ? 'no-darkness' : 'available',
     window,
     candidates,
   }

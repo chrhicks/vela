@@ -22,7 +22,7 @@ const view: FramingView = {
   camera: null,
   actual: null,
   centering: {
-    toleranceArcminutes: .5,
+    toleranceArcminutes: 0.5,
     maxCorrections: 4,
     correction: 1,
     outcome: 'working',

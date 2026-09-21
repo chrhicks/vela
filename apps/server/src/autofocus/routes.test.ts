@@ -24,11 +24,16 @@ const record = {
 
 const cleanups: Array<() => Promise<void>> = []
 
-afterEach(async () => { await Promise.all(cleanups.splice(0).map(cleanup => cleanup())) })
+afterEach(async () => {
+  await Promise.all(cleanups.splice(0).map(cleanup => cleanup()))
+})
 
 function deferred() {
   let resolve!: () => void
-  const promise = new Promise<void>(yes => { resolve = () => yes() })
+
+  const promise = new Promise<void>(yes => {
+    resolve = () => yes()
+  })
 
   return { promise, resolve }
 }
@@ -104,18 +109,24 @@ function setup(start = 32842, inventory = record.lastObservedInventory) {
 
       return focuser
     },
-    measure: async () => ({ detectedStars: 40, medianHfrPixels: hyperbola(position, 2.18, 95, 32838) }),
+    measure: async () => ({
+      detectedStars: 40,
+      medianHfrPixels: hyperbola(position, 2.18, 95, 32838),
+    }),
   })
 
-  cleanups.push(async () => { await app.close() })
+  cleanups.push(async () => {
+    await app.close()
+  })
 
   return {
     get: () => app.inject({ method: 'GET', url: '/api/web/rigs/fra/autofocus' }),
-    start: (body: { stepSize?: number, exposureSeconds?: number } = { stepSize: 50 }) => app.inject({
-      method: 'POST',
-      url: '/api/rigs/fra/autofocus/start',
-      payload: body,
-    }),
+    start: (body: { stepSize?: number; exposureSeconds?: number } = { stepSize: 50 }) =>
+      app.inject({
+        method: 'POST',
+        url: '/api/rigs/fra/autofocus/start',
+        payload: body,
+      }),
     stop: () => app.inject({ method: 'POST', url: '/api/rigs/fra/autofocus/stop', payload: {} }),
     land: async () => {
       await vi.waitFor(() => expect(captures.length).toBeGreaterThan(0))
@@ -125,7 +136,10 @@ function setup(start = 32842, inventory = record.lastObservedInventory) {
       const deadline = Date.now() + 8000
 
       while (Date.now() < deadline) {
-        if (!(await app.inject({ method: 'GET', url: '/api/web/rigs/fra/autofocus' })).json().active) return
+        if (
+          !(await app.inject({ method: 'GET', url: '/api/web/rigs/fra/autofocus' })).json().active
+        )
+          return
 
         if (captures.length) captures.shift()!.resolve()
         await new Promise(resolve => setTimeout(resolve, 5))
@@ -142,7 +156,12 @@ function setup(start = 32842, inventory = record.lastObservedInventory) {
 it('rejects malformed start bodies before acquiring the rig', async () => {
   const subject = setup()
 
-  for (const body of [{ stepSize: 0 }, { stepSize: 50.5 }, { exposureSeconds: 0 }, { extra: true }]) {
+  for (const body of [
+    { stepSize: 0 },
+    { stepSize: 50.5 },
+    { exposureSeconds: 0 },
+    { extra: true },
+  ]) {
     expect((await subject.start(body)).statusCode).toBe(400)
   }
 
@@ -160,7 +179,12 @@ it('publishes samples onto the live view as the walk runs', async () => {
   })
   const started = await subject.start({ stepSize: 50, exposureSeconds: 2 })
   expect(started.statusCode).toBe(200)
-  expect(started.json()).toMatchObject({ active: true, startPosition: 32842, phase: 'walking', samples: [] })
+  expect(started.json()).toMatchObject({
+    active: true,
+    startPosition: 32842,
+    phase: 'walking',
+    samples: [],
+  })
   await subject.land()
   await vi.waitFor(async () => {
     const view = (await subject.get()).json()

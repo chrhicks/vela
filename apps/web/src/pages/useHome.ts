@@ -1,5 +1,5 @@
-import { HomeContext } from "./HomeProvider"
-import { useContext } from "react"
+import { HomeContext } from './HomeProvider'
+import { useContext } from 'react'
 
 export function useHome() {
   const home = useContext(HomeContext)

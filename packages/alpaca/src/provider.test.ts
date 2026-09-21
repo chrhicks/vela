@@ -1,10 +1,6 @@
 import type { ResponseFixture } from './internal/test-fixtures.js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import {
-  AlpacaProviderError,
-  createAlpacaProvider,
-  type AlpacaDevice,
-} from './index.js'
+import { AlpacaProviderError, createAlpacaProvider, type AlpacaDevice } from './index.js'
 
 type RouteResult = ResponseFixture | Error | Response
 
@@ -22,7 +18,7 @@ function fakeFetch(
   routes: Record<string, RouteResult>,
   requests: string[] = [],
 ): typeof globalThis.fetch {
-  return async (input) => {
+  return async input => {
     const url = new URL(String(input))
     requests.push(url.pathname)
     const result = routes[url.pathname]
@@ -60,23 +56,26 @@ describe('createAlpacaProvider', () => {
 
     const provider = createAlpacaProvider({
       baseUrl: 'http://alpaca.test/',
-      fetch: fakeFetch({
-        '/management/v1/configureddevices': envelope([
-          configuredCamera,
-          {
-            DeviceName: 'Mystery device',
-            DeviceType: 'Video',
-            DeviceNumber: 2,
-            UniqueID: 'mystery-1',
-          },
-        ]),
-        '/api/v1/camera/0/connected': envelope(true),
-        '/api/v1/camera/0/driverinfo': envelope('Camera driver'),
-        '/api/v1/camera/0/driverversion': envelope('1.2.3'),
-        '/api/v1/video/2/connected': envelope(false),
-        '/api/v1/video/2/driverinfo': envelope('Video driver'),
-        '/api/v1/video/2/driverversion': envelope('2.0.0'),
-      }, requests),
+      fetch: fakeFetch(
+        {
+          '/management/v1/configureddevices': envelope([
+            configuredCamera,
+            {
+              DeviceName: 'Mystery device',
+              DeviceType: 'Video',
+              DeviceNumber: 2,
+              UniqueID: 'mystery-1',
+            },
+          ]),
+          '/api/v1/camera/0/connected': envelope(true),
+          '/api/v1/camera/0/driverinfo': envelope('Camera driver'),
+          '/api/v1/camera/0/driverversion': envelope('1.2.3'),
+          '/api/v1/video/2/connected': envelope(false),
+          '/api/v1/video/2/driverinfo': envelope('Video driver'),
+          '/api/v1/video/2/driverversion': envelope('2.0.0'),
+        },
+        requests,
+      ),
     })
 
     const devices = await provider.listDevices()
@@ -153,10 +152,12 @@ describe('createAlpacaProvider', () => {
     const provider = createAlpacaProvider({
       baseUrl: 'http://alpaca.test',
       fetch: fakeFetch({
-        '/management/v1/configureddevices': envelope([{
-          ...configuredCamera,
-          DeviceName: '   ',
-        }]),
+        '/management/v1/configureddevices': envelope([
+          {
+            ...configuredCamera,
+            DeviceName: '   ',
+          },
+        ]),
       }),
     })
 
@@ -187,12 +188,13 @@ describe('createAlpacaProvider', () => {
   it('times out a stalled management request', async () => {
     vi.useFakeTimers()
 
-    const fetch = vi.fn((_input: RequestInfo | URL, init?: RequestInit) =>
-      new Promise<Response>((_resolve, reject) => {
-        init?.signal?.addEventListener('abort', () => reject(init.signal?.reason), {
-          once: true,
-        })
-      }),
+    const fetch = vi.fn(
+      (_input: RequestInfo | URL, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(init.signal?.reason), {
+            once: true,
+          })
+        }),
     )
 
     const provider = createAlpacaProvider({

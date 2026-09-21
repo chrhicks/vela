@@ -2,11 +2,7 @@ import type { DiscoveryCandidateView, DiscoveryResultView } from '@vela/model/ri
 import { Button, Dialog } from '@vela/ui'
 import { useEffect, useRef, useState } from 'react'
 import { addRig, AddRigError } from './add-rig'
-import {
-  discoverRigs,
-  DiscoverRigsError,
-  type DiscoverRigsRequest,
-} from './discover-rigs'
+import { discoverRigs, DiscoverRigsError, type DiscoverRigsRequest } from './discover-rigs'
 import { DiscoveryOrbit } from './DiscoveryOrbit'
 import { DiscoveryResults } from './DiscoveryResults'
 import { DiscoveryScanner } from './DiscoveryScanner'
@@ -184,11 +180,7 @@ export default function RigDiscoveryDialog({ open, onAdded, onDismiss }: Props) 
     setDiscoveryState({ ...review, adding: true, error: undefined })
 
     try {
-      await addRig(
-        review.rigName.trim(),
-        review.candidate.endpoint,
-        controller.signal,
-      )
+      await addRig(review.rigName.trim(), review.candidate.endpoint, controller.signal)
 
       if (requestController.current !== controller) return
 
@@ -207,11 +199,12 @@ export default function RigDiscoveryDialog({ open, onAdded, onDismiss }: Props) 
     }
   }
 
-  const manualCanSubmit = discoveryState.view === 'manual'
-    && discoveryState.host.trim().length > 0
-    && Number.isInteger(Number(discoveryState.port))
-    && Number(discoveryState.port) >= 1
-    && Number(discoveryState.port) <= 65535
+  const manualCanSubmit =
+    discoveryState.view === 'manual' &&
+    discoveryState.host.trim().length > 0 &&
+    Number.isInteger(Number(discoveryState.port)) &&
+    Number(discoveryState.port) >= 1 &&
+    Number(discoveryState.port) <= 65535
 
   const footer = (() => {
     switch (discoveryState.view) {
@@ -229,7 +222,9 @@ export default function RigDiscoveryDialog({ open, onAdded, onDismiss }: Props) 
       case 'manual':
         return (
           <>
-            <Button onClick={() => setDiscoveryState({ view: 'start' })} tone="quiet">Back</Button>
+            <Button onClick={() => setDiscoveryState({ view: 'start' })} tone="quiet">
+              Back
+            </Button>
             <Button
               disabled={!manualCanSubmit}
               form={manualDiscoveryFormId}
@@ -241,25 +236,24 @@ export default function RigDiscoveryDialog({ open, onAdded, onDismiss }: Props) 
           </>
         )
       case 'scanning':
-        return <Button onClick={dismiss} tone="quiet">Cancel</Button>
+        return (
+          <Button onClick={dismiss} tone="quiet">
+            Cancel
+          </Button>
+        )
       case 'results':
         return (
           <>
             {discoveryState.request.mode === 'manual' ? (
-              <Button onClick={changeManualAddress} tone="quiet">Change address</Button>
+              <Button onClick={changeManualAddress} tone="quiet">
+                Change address
+              </Button>
             ) : (
-              <Button
-                onClick={() => void runDiscovery(discoveryState.request)}
-                tone="quiet"
-              >
+              <Button onClick={() => void runDiscovery(discoveryState.request)} tone="quiet">
                 Scan again
               </Button>
             )}
-            <Button
-              disabled={!discoveryState.selected}
-              onClick={reviewCandidate}
-              tone="accent"
-            >
+            <Button disabled={!discoveryState.selected} onClick={reviewCandidate} tone="accent">
               Review rig
             </Button>
           </>
@@ -267,11 +261,7 @@ export default function RigDiscoveryDialog({ open, onAdded, onDismiss }: Props) 
       case 'review':
         return (
           <>
-            <Button
-              disabled={discoveryState.adding}
-              onClick={returnToResults}
-              tone="quiet"
-            >
+            <Button disabled={discoveryState.adding} onClick={returnToResults} tone="quiet">
               Back
             </Button>
             <Button
@@ -286,16 +276,10 @@ export default function RigDiscoveryDialog({ open, onAdded, onDismiss }: Props) 
       case 'request-failed':
         return (
           <>
-            <Button
-              onClick={() => returnToRequest(discoveryState.request)}
-              tone="quiet"
-            >
+            <Button onClick={() => returnToRequest(discoveryState.request)} tone="quiet">
               Back
             </Button>
-            <Button
-              onClick={() => void runDiscovery(discoveryState.request)}
-              tone="accent"
-            >
+            <Button onClick={() => void runDiscovery(discoveryState.request)} tone="accent">
               Try again
             </Button>
           </>
@@ -354,8 +338,8 @@ function DiscoveryStart() {
     <div className="rig-discovery-start">
       <DiscoveryOrbit />
       <p>
-        Discovery reads Alpaca server information and configured device names. It does
-        not connect devices or move hardware.
+        Discovery reads Alpaca server information and configured device names. It does not connect
+        devices or move hardware.
       </p>
     </div>
   )
@@ -367,7 +351,9 @@ function DiscoveryProgress({ request }: { request: DiscoverRigsRequest }) {
   return (
     <div className="rig-discovery-progress" role="status">
       <DiscoveryScanner />
-      <strong>{manualEndpoint ? `Inspecting ${manualEndpoint}` : 'Scanning your local network'}</strong>
+      <strong>
+        {manualEndpoint ? `Inspecting ${manualEndpoint}` : 'Scanning your local network'}
+      </strong>
       <p>This usually takes only a few seconds.</p>
       <div className="rig-discovery-progress__steps">
         <span data-active="true">{manualEndpoint ? 'Contacting server' : 'Finding servers'}</span>
@@ -410,7 +396,8 @@ function discoveryCopy(state: DiscoveryState) {
     case 'start':
       return {
         title: 'Find your observatory rig',
-        description: 'Vela can look for Alpaca servers on this network or inspect an address you already know.',
+        description:
+          'Vela can look for Alpaca servers on this network or inspect an address you already know.',
       }
     case 'manual':
       return {
@@ -420,7 +407,8 @@ function discoveryCopy(state: DiscoveryState) {
     case 'scanning':
       return {
         title: state.request.mode === 'manual' ? 'Inspecting Alpaca address' : 'Looking for rigs',
-        description: 'Vela is reading server and device details. No hardware controls are being changed.',
+        description:
+          'Vela is reading server and device details. No hardware controls are being changed.',
       }
     case 'results':
       return {
@@ -435,7 +423,8 @@ function discoveryCopy(state: DiscoveryState) {
     case 'request-failed':
       return {
         title: 'Could not look for rigs',
-        description: 'Vela could not complete the request. No configuration or hardware was changed.',
+        description:
+          'Vela could not complete the request. No configuration or hardware was changed.',
       }
   }
 }

@@ -8,8 +8,15 @@ it('serves catalog identities at composition without hardware or storage queries
   const savedImages = createMemorySavedImageStore()
   const count = vi.spyOn(savedImages, 'count')
   const list = vi.spyOn(savedImages, 'list')
-  const createInspector = vi.fn(() => { throw new Error('Unexpected device inspection') })
-  const createInventory = vi.fn(() => { throw new Error('Unexpected inventory query') })
+
+  const createInspector = vi.fn(() => {
+    throw new Error('Unexpected device inspection')
+  })
+
+  const createInventory = vi.fn(() => {
+    throw new Error('Unexpected inventory query')
+  })
+
   const app = buildApp({ rigCatalog: catalog, savedImages, createInspector, createInventory })
 
   try {
@@ -29,7 +36,10 @@ it('serves catalog identities at composition without hardware or storage queries
     if (added.state !== 'added') throw new Error('Expected new Rig')
     const response = await app.inject('/api/web/navigation')
     expect(response.statusCode).toBe(200)
-    expect(response.json()).toEqual({ rigs: [{ id: added.rig.id, name: 'Offline Rig' }], captures: [] })
+    expect(response.json()).toEqual({
+      rigs: [{ id: added.rig.id, name: 'Offline Rig' }],
+      captures: [],
+    })
     expect(createInspector).not.toHaveBeenCalled()
     expect(createInventory).not.toHaveBeenCalled()
     expect(count).not.toHaveBeenCalled()

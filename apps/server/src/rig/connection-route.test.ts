@@ -77,12 +77,14 @@ describe('Rig connection API', () => {
   it('connects through one command and returns a refreshed semantic result', async () => {
     let camera = disconnectedCamera
 
-    const connectDevice = vi.fn(async (_id: string, options?: { readonly signal?: AbortSignal }) => {
-      expect(options?.signal).toBeInstanceOf(AbortSignal)
-      camera = connectedCamera
+    const connectDevice = vi.fn(
+      async (_id: string, options?: { readonly signal?: AbortSignal }) => {
+        expect(options?.signal).toBeInstanceOf(AbortSignal)
+        camera = connectedCamera
 
-      return { outcome: 'connected', command: 'requested' } as const
-    })
+        return { outcome: 'connected', command: 'requested' } as const
+      },
+    )
 
     const app = buildApp({
       rigCatalog: createMemoryRigCatalog([record]),
@@ -115,10 +117,12 @@ describe('Rig connection API', () => {
 
     const app = buildApp({
       rigCatalog: createMemoryRigCatalog([record]),
-      createInspector: createInspector(new AlpacaProviderError('Private network details', {
-        reason: 'transport',
-        endpoint: '/management/v1/configureddevices',
-      })),
+      createInspector: createInspector(
+        new AlpacaProviderError('Private network details', {
+          reason: 'transport',
+          endpoint: '/management/v1/configureddevices',
+        }),
+      ),
       createConnector: () => ({ connectDevice }),
       now,
     })
@@ -164,24 +168,30 @@ describe('Rig connection API', () => {
       return new Promise<{
         readonly outcome: 'uncertain'
         readonly reason: 'cancelled'
-      }>((resolve) => {
-        options.signal?.addEventListener('abort', () => {
-          resolve({ outcome: 'uncertain', reason: 'cancelled' })
-        }, { once: true })
+      }>(resolve => {
+        options.signal?.addEventListener(
+          'abort',
+          () => {
+            resolve({ outcome: 'uncertain', reason: 'cancelled' })
+          },
+          { once: true },
+        )
       })
     })
 
     const app = buildApp({
-      rigCatalog: createMemoryRigCatalog([{
-        ...record,
-        lastObservedInventory: {
-          ...record.lastObservedInventory,
-          devices: [
-            ...record.lastObservedInventory.devices,
-            { uniqueId: 'telescope-0', kind: 'telescope', name: 'Telescope slot' },
-          ],
+      rigCatalog: createMemoryRigCatalog([
+        {
+          ...record,
+          lastObservedInventory: {
+            ...record.lastObservedInventory,
+            devices: [
+              ...record.lastObservedInventory.devices,
+              { uniqueId: 'telescope-0', kind: 'telescope', name: 'Telescope slot' },
+            ],
+          },
         },
-      }]),
+      ]),
       createInspector: createInspector(devices, devices),
       createConnector: () => ({ connectDevice }),
       now,
@@ -193,16 +203,19 @@ describe('Rig connection API', () => {
 
       let connectionRequest: ReturnType<typeof httpRequest> | undefined
 
-      const requestClosed = new Promise<void>((resolve) => {
-        connectionRequest = httpRequest({
-          host: '127.0.0.1',
-          port: address.port,
-          method: 'POST',
-          path: '/api/rigs/rig-1/connections',
-        }, (response) => {
-          response.resume()
-          response.on('end', resolve)
-        })
+      const requestClosed = new Promise<void>(resolve => {
+        connectionRequest = httpRequest(
+          {
+            host: '127.0.0.1',
+            port: address.port,
+            method: 'POST',
+            path: '/api/rigs/rig-1/connections',
+          },
+          response => {
+            response.resume()
+            response.on('end', resolve)
+          },
+        )
         connectionRequest.on('error', () => resolve())
         connectionRequest.end()
       })
@@ -211,7 +224,7 @@ describe('Rig connection API', () => {
       connectionRequest?.destroy()
       await requestClosed
       await vi.waitFor(() => expect(requestSignals[0]?.aborted).toBe(true))
-      await new Promise((resolve) => setImmediate(resolve))
+      await new Promise(resolve => setImmediate(resolve))
 
       expect(connectDevice.mock.calls.map(([id]) => id)).toEqual(['camera-0'])
     } finally {
@@ -223,15 +236,18 @@ describe('Rig connection API', () => {
     let camera = disconnectedCamera
     let finish: (() => void) | undefined
 
-    const connectDevice = vi.fn(() => new Promise<{
-      readonly outcome: 'connected'
-      readonly command: 'requested'
-    }>((resolve) => {
-      finish = () => {
-        camera = connectedCamera
-        resolve({ outcome: 'connected', command: 'requested' })
-      }
-    }))
+    const connectDevice = vi.fn(
+      () =>
+        new Promise<{
+          readonly outcome: 'connected'
+          readonly command: 'requested'
+        }>(resolve => {
+          finish = () => {
+            camera = connectedCamera
+            resolve({ outcome: 'connected', command: 'requested' })
+          }
+        }),
+    )
 
     const app = buildApp({
       rigCatalog: createMemoryRigCatalog([record]),
