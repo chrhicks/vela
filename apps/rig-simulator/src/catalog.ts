@@ -17,7 +17,10 @@ export type StarSource = (field: StarField, signal?: AbortSignal) => Promise<rea
 
 const radians = Math.PI / 180
 
-function angularDistance(a: Pick<Star, 'raDegrees' | 'decDegrees'>, b: Pick<Star, 'raDegrees' | 'decDegrees'>) {
+function angularDistance(
+  a: Pick<Star, 'raDegrees' | 'decDegrees'>,
+  b: Pick<Star, 'raDegrees' | 'decDegrees'>,
+) {
   const decA = a.decDegrees * radians
   const decB = b.decDegrees * radians
 
@@ -67,7 +70,8 @@ export function createStarSource(directory: string): StarSource {
 
     signal?.throwIfAborted()
 
-    if (stars.length === 0) throw new Error('D05 catalog contains no stars around the requested simulator field')
+    if (stars.length === 0)
+      throw new Error('D05 catalog contains no stars around the requested simulator field')
     cached = { field: padded, stars }
 
     return stars.filter(star => angularDistance(field, star) <= field.radiusDegrees)
@@ -122,7 +126,10 @@ export function decodeD05(data: Uint8Array, source = 'D05 tile'): Star[] {
   return stars
 }
 
-export async function loadCatalog(directory: string, bounds: CatalogBounds = defaultCatalogBounds): Promise<Star[]> {
+export async function loadCatalog(
+  directory: string,
+  bounds: CatalogBounds = defaultCatalogBounds,
+): Promise<Star[]> {
   const { minRaDegrees, maxRaDegrees, minDecDegrees, maxDecDegrees } = bounds
 
   if (![minRaDegrees, maxRaDegrees, minDecDegrees, maxDecDegrees].every(Number.isFinite)

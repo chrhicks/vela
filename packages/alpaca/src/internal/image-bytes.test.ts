@@ -3,7 +3,12 @@ import { describe, expect, it } from 'vitest'
 import { imageBytesPixels } from './image-bytes.js'
 
 function imageBytes(type = 8, samples = [1, 256, 65535, 2, 40000, 3], dataStart = 44) {
-  const size = Match.value(type).pipe(Match.when(6, () => 1), Match.when(2, () => 4), Match.orElse(() => 2))
+  const size = Match.value(type).pipe(
+    Match.when(6, () => 1),
+    Match.when(2, () => 4),
+    Match.orElse(() => 2),
+  )
+
   const bytes = new ArrayBuffer(dataStart + samples.length * size)
   const view = new DataView(bytes)
   const header = [1, 0, 0, 0, dataStart, 2, type, 2, 2, 3, 0]
@@ -66,7 +71,9 @@ describe('ImageBytes rank-2 Int32 source images', () => {
     new Uint8Array(bytes, 44).set(message)
     expect(() => imageBytesPixels(bytes, 2, 3)).toThrow('Caméra indisponible')
 
-    try { imageBytesPixels(bytes, 2, 3) } catch (error) {
+    try {
+      imageBytesPixels(bytes, 2, 3)
+    } catch (error) {
       expect(error).toMatchObject({ reason: 'protocol-error', errorNumber: 1025 })
     }
 

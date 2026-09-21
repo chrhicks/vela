@@ -21,11 +21,41 @@ function pendingBody(contentType: string) {
 }
 
 const operations = [
-  { name: 'management inventory', path: '/management/v1/configureddevices', method: 'GET', contentType: 'application/json', run: (client: AlpacaClient) => client.configuredDevices() },
-  { name: 'ImageReady observation', path: '/api/v1/camera/0/imageready', method: 'GET', contentType: 'application/json', run: (client: AlpacaClient) => client.readBoolean(camera, 'imageready') },
-  { name: 'StartExposure acknowledgement', path: '/api/v1/camera/0/startexposure', method: 'PUT', contentType: 'application/json', run: (client: AlpacaClient) => client.command(camera, 'startexposure', { Duration: '1', Light: 'true' }) },
-  { name: 'JSON ImageArray', path: '/api/v1/camera/0/imagearray', method: 'GET', contentType: 'application/json', run: (client: AlpacaClient) => client.image(camera) },
-  { name: 'ImageBytes ImageArray', path: '/api/v1/camera/0/imagearray', method: 'GET', contentType: 'application/imagebytes', run: (client: AlpacaClient) => client.image(camera) },
+  {
+    name: 'management inventory',
+    path: '/management/v1/configureddevices',
+    method: 'GET',
+    contentType: 'application/json',
+    run: (client: AlpacaClient) => client.configuredDevices(),
+  },
+  {
+    name: 'ImageReady observation',
+    path: '/api/v1/camera/0/imageready',
+    method: 'GET',
+    contentType: 'application/json',
+    run: (client: AlpacaClient) => client.readBoolean(camera, 'imageready'),
+  },
+  {
+    name: 'StartExposure acknowledgement',
+    path: '/api/v1/camera/0/startexposure',
+    method: 'PUT',
+    contentType: 'application/json',
+    run: (client: AlpacaClient) => client.command(camera, 'startexposure', { Duration: '1', Light: 'true' }),
+  },
+  {
+    name: 'JSON ImageArray',
+    path: '/api/v1/camera/0/imagearray',
+    method: 'GET',
+    contentType: 'application/json',
+    run: (client: AlpacaClient) => client.image(camera),
+  },
+  {
+    name: 'ImageBytes ImageArray',
+    path: '/api/v1/camera/0/imagearray',
+    method: 'GET',
+    contentType: 'application/imagebytes',
+    run: (client: AlpacaClient) => client.image(camera),
+  },
 ]
 
 afterEach(() => {
@@ -103,7 +133,11 @@ it.each([
   { contentType: 'application/json', payload: JSON.stringify({ ...envelope, Type: 2, Rank: 3, Value: [[1]] }) },
   { contentType: 'application/imagebytes', payload: new Uint8Array(43) },
 ])('keeps malformed completed image data invalid ($contentType)', async ({ contentType, payload }) => {
-  const client = createAlpacaClient({ baseUrl: 'http://fake', fetch: async () => new Response(payload, { headers: { 'content-type': contentType } }) })
+  const client = createAlpacaClient({
+    baseUrl: 'http://fake',
+    fetch: async () => new Response(payload, { headers: { 'content-type': contentType } }),
+  })
+
   await expect(client.image(camera)).rejects.toMatchObject({ reason: 'invalid-response' })
 })
 
@@ -140,7 +174,13 @@ it('times out an ordinary read while its body is pending and preserves the abort
 
   const client = createAlpacaClient({ baseUrl: 'http://fake', fetch, requestTimeoutMs: 5_000 })
   const result = client.readBoolean(camera, 'imageready')
-  const failed = expect(result).rejects.toMatchObject({ reason: 'transport', message: expect.stringContaining('timed out after 5000ms'), cause: expect.objectContaining({ name: 'TimeoutError' }) })
+
+  const failed = expect(result).rejects.toMatchObject({
+    reason: 'transport',
+    message: expect.stringContaining('timed out after 5000ms'),
+    cause: expect.objectContaining({ name: 'TimeoutError' }),
+  })
+
   await body.started
   await vi.advanceTimersByTimeAsync(4_999)
   expect(requestSignal.aborted).toBe(false)

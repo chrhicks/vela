@@ -165,7 +165,9 @@ function scanInterface(
     }
 
     function onAbort() {
-      fail(options.signal === undefined ? undefined : (options.signal.reason ?? new DOMException('The operation was aborted', 'AbortError')))
+      fail(options.signal === undefined
+        ? undefined
+        : (options.signal.reason ?? new DOMException('The operation was aborted', 'AbortError')))
     }
 
     function sendDiscovery() {

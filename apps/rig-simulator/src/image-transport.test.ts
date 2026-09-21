@@ -3,7 +3,12 @@ import { afterEach, expect, it } from 'vitest'
 import { acceptsImageBytes, encodeImageBytes, imageJsonChunks } from './image-bytes.js'
 import { buildSimulator } from './service.js'
 
-const envelope = { ClientTransactionID: 4294967295, ServerTransactionID: 7, ErrorNumber: 0, ErrorMessage: '' }
+const envelope = {
+  ClientTransactionID: 4294967295,
+  ServerTransactionID: 7,
+  ErrorNumber: 0,
+  ErrorMessage: '',
+}
 
 it('serializes the same pixels as Int32-source UInt16 ImageBytes and JSON in X/Y order', async () => {
   const frame = { width: 3, height: 2, pixels: new Uint16Array([0, 1, 65535, 10, 11, 60000]) }
@@ -15,7 +20,12 @@ it('serializes the same pixels as Int32-source UInt16 ImageBytes and JSON in X/Y
   let json = ''
 
   for await (const chunk of imageJsonChunks(frame, envelope)) json += chunk
-  expect(JSON.parse(json)).toEqual({ ...envelope, Type: 2, Rank: 2, Value: [[0, 10], [1, 11], [65535, 60000]] })
+  expect(JSON.parse(json)).toEqual({
+    ...envelope,
+    Type: 2,
+    Rank: 2,
+    Value: [[0, 10], [1, 11], [65535, 60000]],
+  })
 })
 
 it('requires explicit nonzero ImageBytes acceptance', () => {
@@ -49,7 +59,11 @@ afterEach(async () => { await Promise.all(apps.splice(0).map(app => app.close())
 it('negotiates both cameras and preserves a completed frame across binary and JSON reads', async () => {
   const app = buildSimulator({ stars: [] })
 
-  for (const cameraNumber of [0, 1]) await app.inject({ method: 'PUT', url: '/simulator/camera', payload: { cameraNumber, resolution: 'fast' } })
+  for (const cameraNumber of [0, 1]) await app.inject({
+    method: 'PUT',
+    url: '/simulator/camera',
+    payload: { cameraNumber, resolution: 'fast' },
+  })
   apps.push(app)
 
   for (const number of [0, 1]) {
@@ -75,7 +89,13 @@ it('negotiates both cameras and preserves a completed frame across binary and JS
 it('validates all camera control fields before changing obstruction', async () => {
   const app = buildSimulator({ stars: [] })
   apps.push(app)
-  const response = await app.inject({ method: 'PUT', url: '/simulator/camera', payload: { obscured: true, cameraNumber: 5, resolution: 'full' } })
+
+  const response = await app.inject({
+    method: 'PUT',
+    url: '/simulator/camera',
+    payload: { obscured: true, cameraNumber: 5, resolution: 'full' },
+  })
+
   expect(response.statusCode).toBe(400)
   expect((await app.inject('/simulator/state')).json().obscured).toBe(false)
 })

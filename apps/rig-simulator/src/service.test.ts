@@ -17,8 +17,16 @@ async function setup() {
   await app.inject({ method: 'PUT', url: '/simulator/camera', payload: { resolution: 'fast' } })
   const get = async (device: string, member: string) => (await app.inject(`/api/v1/${device}/0/${member}`)).json()
 
-  const put = async (device: string, member: string, params: Record<string, string>) => (await app.inject({ method: 'PUT', url: `/api/v1/${device}/0/${member}`,
-    headers: { 'content-type': 'application/x-www-form-urlencoded' }, payload: new URLSearchParams(params).toString() })).json()
+  const put = async (
+    device: string,
+    member: string,
+    params: Record<string, string>,
+  ) => (await app.inject({
+    method: 'PUT',
+    url: `/api/v1/${device}/0/${member}`,
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    payload: new URLSearchParams(params).toString(),
+  })).json()
 
   return { app, stars, get, put, advance: (ms: number) => { time += ms } }
 }
@@ -90,9 +98,19 @@ describe('simulator Alpaca boundary', () => {
     expect(image.Value.length).toBe(imageWidth)
     expect(image.Value[0].length).toBe(imageHeight)
 
-    const expected = renderSky(stars, cameraPose({ latitudeDegrees: 40, altitudeErrorDegrees: 0,
-      azimuthErrorDegrees: 0, raAxisDegrees: 30, declinationDegrees: 60, elapsedSeconds: 0, tracking: true }),
-    { width: imageWidth, height: imageHeight, fieldHeightDegrees: 3, seed: 1 })
+    const expected = renderSky(
+      stars,
+      cameraPose({
+        latitudeDegrees: 40,
+        altitudeErrorDegrees: 0,
+        azimuthErrorDegrees: 0,
+        raAxisDegrees: 30,
+        declinationDegrees: 60,
+        elapsedSeconds: 0,
+        tracking: true,
+      }),
+      { width: imageWidth, height: imageHeight, fieldHeightDegrees: 3, seed: 1 },
+    )
 
     for (const [x, y] of [[0, 0], [781, 522], [899, 1000], [1561, 1043]]) {
       expect(image.Value[x!][y!]).toBe(expected[y! * imageWidth + x!]!)
@@ -111,15 +129,48 @@ describe('simulator Alpaca boundary', () => {
     const { app, get, put, advance } = await setup()
     await put('camera', 'connected', { Connected: 'true' })
     await put('camera', 'startexposure', { Duration: '10', Light: 'true' })
-    expect((await app.inject({ method: 'PUT', url: '/simulator/adjust', payload: { altitudeArcsec: 0, azimuthArcsec: 0 } })).statusCode).toBe(409)
-    const reset = await app.inject({ method: 'POST', url: '/simulator/reset', payload: { preset: 'near-aligned' } })
-    expect(reset.json()).toMatchObject({ altitudeArcsec: 12, azimuthArcsec: -9, cameraConnected: true, cameraActivity: 'idle', imageReady: false })
+    expect((await app.inject({
+      method: 'PUT',
+      url: '/simulator/adjust',
+      payload: { altitudeArcsec: 0, azimuthArcsec: 0 },
+    })).statusCode).toBe(409)
+
+    const reset = await app.inject({
+      method: 'POST',
+      url: '/simulator/reset',
+      payload: { preset: 'near-aligned' },
+    })
+
+    expect(reset.json()).toMatchObject({
+      altitudeArcsec: 12,
+      azimuthArcsec: -9,
+      cameraConnected: true,
+      cameraActivity: 'idle',
+      imageReady: false,
+    })
     advance(20000)
     expect((await get('camera', 'imageready')).Value).toBe(false)
-    expect((await app.inject({ method: 'PUT', url: '/simulator/adjust', payload: { altitudeArcsec: 9, azimuthArcsec: -4 } })).json()).toMatchObject({ altitudeArcsec: 9, azimuthArcsec: -4 })
-    expect((await app.inject({ method: 'PUT', url: '/simulator/adjust', payload: { altitudeArcsec: 20000, azimuthArcsec: 0 } })).statusCode).toBe(400)
-    expect((await app.inject({ method: 'POST', url: '/simulator/reset', payload: { preset: 'aligned' }, headers: { origin: 'https://untrusted.example' } })).statusCode).toBe(400)
-    expect((await app.inject({ method: 'PUT', url: '/simulator/camera', payload: { obscured: 'true' } })).statusCode).toBe(400)
+    expect((await app.inject({
+      method: 'PUT',
+      url: '/simulator/adjust',
+      payload: { altitudeArcsec: 9, azimuthArcsec: -4 },
+    })).json()).toMatchObject({ altitudeArcsec: 9, azimuthArcsec: -4 })
+    expect((await app.inject({
+      method: 'PUT',
+      url: '/simulator/adjust',
+      payload: { altitudeArcsec: 20000, azimuthArcsec: 0 },
+    })).statusCode).toBe(400)
+    expect((await app.inject({
+      method: 'POST',
+      url: '/simulator/reset',
+      payload: { preset: 'aligned' },
+      headers: { origin: 'https://untrusted.example' },
+    })).statusCode).toBe(400)
+    expect((await app.inject({
+      method: 'PUT',
+      url: '/simulator/camera',
+      payload: { obscured: 'true' },
+    })).statusCode).toBe(400)
   })
 
   it('moves RA over elapsed time, continues beyond the old catalog patch and refuses unsupported axes', async () => {
@@ -182,7 +233,11 @@ it('cover changes during exposure apply to the next frame while pending pixels r
   await app.inject({ method: 'POST', url: '/simulator/reset', payload: { preset: 'aligned' } })
   await put('camera', 'connected', { Connected: 'true' })
   await put('camera', 'startexposure', { Duration: '1', Light: 'true' })
-  expect((await app.inject({ method: 'PUT', url: '/simulator/camera', payload: { obscured: true } })).statusCode).toBe(200)
+  expect((await app.inject({
+    method: 'PUT',
+    url: '/simulator/camera',
+    payload: { obscured: true },
+  })).statusCode).toBe(200)
   advance(1000)
   expect((await get('camera', 'imagearray')).Value[781][522]).toBeGreaterThan(1000)
   await put('camera', 'startexposure', { Duration: '0', Light: 'true' })
@@ -251,7 +306,11 @@ it('starts both cameras at full resolution and reports native pixel geometry', a
     .toEqual([['full', 6248, 4176], ['full', 6248, 4176]])
 
   for (const number of [0, 1]) {
-    await app.inject({ method: 'PUT', url: `/api/v1/camera/${number}/connected`, payload: { Connected: true } })
+    await app.inject({
+      method: 'PUT',
+      url: `/api/v1/camera/${number}/connected`,
+      payload: { Connected: true },
+    })
     expect((await app.inject(`/api/v1/camera/${number}/pixelsizex`)).json().Value).toBe(3.76)
   }
 })

@@ -48,7 +48,12 @@ it('loads only D05 tiles and applies the configured sky bounds', async () => {
     const stars = await loadCatalog(directory)
     expect(stars).toHaveLength(1)
     expect(stars[0]!.raDegrees).toBeCloseTo(23, 4)
-    await expect(loadCatalog(directory, { minRaDegrees: 200, maxRaDegrees: 210, minDecDegrees: 0, maxDecDegrees: 10 })).rejects.toThrow('no stars')
+    await expect(loadCatalog(directory, {
+      minRaDegrees: 200,
+      maxRaDegrees: 210,
+      minDecDegrees: 0,
+      maxDecDegrees: 10,
+    })).rejects.toThrow('no stars')
   } finally {
     await rm(directory, { recursive: true, force: true })
   }

@@ -34,14 +34,43 @@ export type {
 
 export type { AlignmentView } from './alignment.js'
 
-export type { AutofocusActivity, AutofocusFit, AutofocusPhase, AutofocusSample, AutofocusView } from './autofocus.js'
+export type {
+  AutofocusActivity,
+  AutofocusFit,
+  AutofocusPhase,
+  AutofocusSample,
+  AutofocusView,
+} from './autofocus.js'
 
-export type { CaptureCoolingView, CaptureImage, CaptureImageStatistics, CapturePhase, CaptureView, SavedImage, SavedImagesView, SavedImageView } from './capture.js'
+export type {
+  CaptureCoolingView,
+  CaptureImage,
+  CaptureImageStatistics,
+  CapturePhase,
+  CaptureView,
+  SavedImage,
+  SavedImagesView,
+  SavedImageView,
+} from './capture.js'
 
 export type { ImagingCameraView } from './imaging-camera.js'
 
-export type { TargetPosition, TargetView, TargetSkyPath, TargetsView, FramingView, FramingCentering, FramingPointingSide } from './targets.js'
+export type {
+  TargetPosition,
+  TargetView,
+  TargetSkyPath,
+  TargetsView,
+  FramingView,
+  FramingCentering,
+  FramingPointingSide,
+} from './targets.js'
 
-export type { TargetCategory, TargetFilterChoice, TargetOpportunity, TargetDiscoveryItem, TargetDiscoveryView } from './targets.js'
+export type {
+  TargetCategory,
+  TargetFilterChoice,
+  TargetOpportunity,
+  TargetDiscoveryItem,
+  TargetDiscoveryView,
+} from './targets.js'
 
 export type { NavigationCapture, NavigationView } from './navigation.js'

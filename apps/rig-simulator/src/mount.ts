@@ -65,9 +65,14 @@ function rotate(v: Vector, axis: Vector, angle: number): Vector {
 }
 
 function validatePosition(position: MountPosition) {
-  for (const value of [position.latitudeDegrees, position.altitudeErrorDegrees,
-    position.azimuthErrorDegrees, position.raAxisDegrees, position.declinationDegrees,
-    position.elapsedSeconds]) {
+  for (const value of [
+    position.latitudeDegrees,
+    position.altitudeErrorDegrees,
+    position.azimuthErrorDegrees,
+    position.raAxisDegrees,
+    position.declinationDegrees,
+    position.elapsedSeconds,
+  ]) {
     if (!Number.isFinite(value)) throw new Error('Mount position must contain finite numbers')
   }
 

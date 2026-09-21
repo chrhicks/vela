@@ -17,9 +17,23 @@ export interface AutofocusFit {
   minSamplePosition: number
 }
 
-export type AutofocusPhase = 'setup' | 'walking' | 'fitting' | 'confirming' | 'complete' | 'stopped' | 'failed'
+export type AutofocusPhase =
+  | 'setup'
+  | 'walking'
+  | 'fitting'
+  | 'confirming'
+  | 'complete'
+  | 'stopped'
+  | 'failed'
 
-export type AutofocusActivity = 'idle' | 'moving' | 'exposing' | 'measuring' | 'fitting' | 'restoring' | 'stopping'
+export type AutofocusActivity =
+  | 'idle'
+  | 'moving'
+  | 'exposing'
+  | 'measuring'
+  | 'fitting'
+  | 'restoring'
+  | 'stopping'
 
 export interface AutofocusView {
   rigId: string
