@@ -8,6 +8,8 @@ export interface DialogProps extends Omit<HTMLAttributes<HTMLElement>, 'title'> 
   description?: string
   footer?: ReactNode
   dismissLabel?: string
+  /** Resolve the current opener on dismissal when a layout can replace its element. */
+  returnFocusId?: string
   onDismiss?: () => void
 }
 
@@ -17,6 +19,7 @@ export function Dialog({
   description,
   footer,
   dismissLabel = 'Close dialog',
+  returnFocusId,
   onDismiss,
   children,
   className = '',
@@ -44,7 +47,7 @@ export function Dialog({
       fallbackFocus: dialog,
       initialFocus: dialog,
       preventScroll: true,
-      setReturnFocus: returnFocus,
+      setReturnFocus: () => (returnFocusId ? document.getElementById(returnFocusId) : null) ?? returnFocus,
     })
 
     focusTrap.activate()
@@ -52,7 +55,7 @@ export function Dialog({
     return () => {
       focusTrap.deactivate()
     }
-  }, [open])
+  }, [open, returnFocusId])
 
   if (!open) return null
 
