@@ -104,10 +104,11 @@ export function createRetainedPreviews(openFile: typeof open) {
       const frame = await readRetainedFits(fits)
 
       if (
-        frame.width !== image.width
-        || frame.height !== image.height
-        || (frame.color.kind === 'mono' ? 'mono' : 'color') !== image.color
-      ) throw new Error('FITS does not match saved capture dimensions or color')
+        frame.width !== image.width ||
+        frame.height !== image.height ||
+        (frame.color.kind === 'mono' ? 'mono' : 'color') !== image.color
+      )
+        throw new Error('FITS does not match saved capture dimensions or color')
       const rendered = await capturePreviews(frame.width, frame.height, frame.pixels, frame.color)
       const parent = join(directory, 'previews')
       await mkdir(parent, { recursive: true })
@@ -144,8 +145,15 @@ export function createRetainedPreviews(openFile: typeof open) {
       const existing = pending.get(directory)
 
       if (existing) return existing
-      const operation = queue.then(() => refresh(directory, image)).finally(() => pending.delete(directory))
-      queue = operation.then(() => undefined, () => undefined)
+
+      const operation = queue
+        .then(() => refresh(directory, image))
+        .finally(() => pending.delete(directory))
+
+      queue = operation.then(
+        () => undefined,
+        () => undefined,
+      )
       pending.set(directory, operation)
 
       return operation

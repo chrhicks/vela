@@ -20,7 +20,12 @@ export type CameraCoolingCommandResult =
     }
   | {
       readonly outcome: 'failed'
-      readonly reason: 'device-not-found' | 'disconnected' | 'unsupported' | 'rejected' | 'not-confirmed'
+      readonly reason:
+        | 'device-not-found'
+        | 'disconnected'
+        | 'unsupported'
+        | 'rejected'
+        | 'not-confirmed'
       readonly message?: string
       readonly errorNumber?: number
     }
@@ -61,15 +66,24 @@ export function createAlpacaCameraCooling({
 
   const client = createAlpacaClient({ baseUrl, fetch, requestTimeoutMs })
 
-  async function camera(cameraId: string, signal?: AbortSignal): Promise<ConfiguredDevice | undefined> {
+  async function camera(
+    cameraId: string,
+    signal?: AbortSignal,
+  ): Promise<ConfiguredDevice | undefined> {
     signal?.throwIfAborted()
     const devices = await client.configuredDevices(signal)
     rejectDuplicateDeviceIds(devices)
 
-    return devices.find(candidate => stableDeviceId(candidate) === cameraId && candidate.DeviceType.toLowerCase() === 'camera')
+    return devices.find(
+      candidate =>
+        stableDeviceId(candidate) === cameraId && candidate.DeviceType.toLowerCase() === 'camera',
+    )
   }
 
-  async function observe(cameraId: string, signal?: AbortSignal): Promise<CameraCoolingObservation | undefined> {
+  async function observe(
+    cameraId: string,
+    signal?: AbortSignal,
+  ): Promise<CameraCoolingObservation | undefined> {
     const device = await camera(cameraId, signal)
 
     if (!device) return undefined
@@ -96,7 +110,8 @@ export function createAlpacaCameraCooling({
 
       if (!device) return { outcome: 'failed', reason: 'device-not-found' }
 
-      if (!(await client.connected(device, signal))) return { outcome: 'failed', reason: 'disconnected' }
+      if (!(await client.connected(device, signal)))
+        return { outcome: 'failed', reason: 'disconnected' }
 
       if (expectedCameraName !== undefined) {
         const name = await client.readString(device, 'name', signal)
@@ -131,7 +146,13 @@ export function createAlpacaCameraCooling({
       if (setpointC !== undefined) {
         const written = await writeAndVerify(
           device,
-          () => client.command(device, 'setccdtemperature', { SetCCDTemperature: String(setpointC) }, signal),
+          () =>
+            client.command(
+              device,
+              'setccdtemperature',
+              { SetCCDTemperature: String(setpointC) },
+              signal,
+            ),
           () => client.readNumber(device, 'setccdtemperature', signal),
           confirmed => Math.abs(confirmed - setpointC) <= setpointToleranceC,
           signal,
@@ -154,11 +175,12 @@ export function createAlpacaCameraCooling({
 
       const observation = await readObservation(client, device, signal)
 
-      if (!observation) return {
-        outcome: 'failed',
-        reason: 'not-confirmed',
-        message: 'The camera did not report cooler state after the command.',
-      }
+      if (!observation)
+        return {
+          outcome: 'failed',
+          reason: 'not-confirmed',
+          message: 'The camera did not report cooler state after the command.',
+        }
 
       if (coolerOn !== undefined && observation.state !== (coolerOn ? 'on' : 'off')) {
         return {
@@ -168,7 +190,11 @@ export function createAlpacaCameraCooling({
         }
       }
 
-      if (setpointC !== undefined && (observation.setpointC === undefined || Math.abs(observation.setpointC - setpointC) > setpointToleranceC)) {
+      if (
+        setpointC !== undefined &&
+        (observation.setpointC === undefined ||
+          Math.abs(observation.setpointC - setpointC) > setpointToleranceC)
+      ) {
         return {
           outcome: 'failed',
           reason: 'not-confirmed',
@@ -180,7 +206,11 @@ export function createAlpacaCameraCooling({
     } catch (error) {
       if (signal?.aborted) return { outcome: 'uncertain', reason: 'cancelled' }
 
-      if (error instanceof AlpacaProviderError && error.reason === 'protocol-error' && error.errorNumber !== undefined) {
+      if (
+        error instanceof AlpacaProviderError &&
+        error.reason === 'protocol-error' &&
+        error.errorNumber !== undefined
+      ) {
         return {
           outcome: 'failed',
           reason: 'rejected',
@@ -202,13 +232,20 @@ async function writeAndVerify<Value>(
   read: () => Promise<Value>,
   confirmed: (value: Value) => boolean,
   signal?: AbortSignal,
-): Promise<Extract<CameraCoolingCommandResult, { outcome: 'confirmed' }> | Exclude<CameraCoolingCommandResult, { outcome: 'confirmed' }>> {
+): Promise<
+  | Extract<CameraCoolingCommandResult, { outcome: 'confirmed' }>
+  | Exclude<CameraCoolingCommandResult, { outcome: 'confirmed' }>
+> {
   let writeOutcomeUnknown = false
 
   try {
     await write()
   } catch (error) {
-    if (error instanceof AlpacaProviderError && error.reason === 'protocol-error' && error.errorNumber !== undefined) {
+    if (
+      error instanceof AlpacaProviderError &&
+      error.reason === 'protocol-error' &&
+      error.errorNumber !== undefined
+    ) {
       return {
         outcome: 'failed',
         reason: 'rejected',
@@ -224,10 +261,11 @@ async function writeAndVerify<Value>(
   try {
     const value = await read()
 
-    if (confirmed(value)) return {
-      outcome: 'confirmed',
-      observation: { state: 'off', canSetTemperature: false, canGetPower: false },
-    }
+    if (confirmed(value))
+      return {
+        outcome: 'confirmed',
+        observation: { state: 'off', canSetTemperature: false, canGetPower: false },
+      }
 
     return writeOutcomeUnknown
       ? { outcome: 'uncertain', reason: 'write-outcome-unknown' }
@@ -251,7 +289,9 @@ async function readCapabilities(
   device: ConfiguredDevice,
   signal?: AbortSignal,
 ): Promise<CoolingCapabilities> {
-  const canSetTemperature = await optionalBoolean(client, device, 'cansetccdtemperature', signal) === true
+  const canSetTemperature =
+    (await optionalBoolean(client, device, 'cansetccdtemperature', signal)) === true
+
   const coolerOn = await optionalBoolean(client, device, 'cooleron', signal)
 
   return {
@@ -267,8 +307,10 @@ async function readObservation(
   device: ConfiguredDevice,
   signal?: AbortSignal,
 ): Promise<CameraCoolingObservation | undefined> {
-  const canSetTemperature = await optionalBoolean(client, device, 'cansetccdtemperature', signal) === true
-  const canGetPower = await optionalBoolean(client, device, 'cangetcoolerpower', signal) === true
+  const canSetTemperature =
+    (await optionalBoolean(client, device, 'cansetccdtemperature', signal)) === true
+
+  const canGetPower = (await optionalBoolean(client, device, 'cangetcoolerpower', signal)) === true
   const coolerOn = await optionalBoolean(client, device, 'cooleron', signal)
 
   if (coolerOn === undefined) return undefined
@@ -292,7 +334,12 @@ async function readObservation(
   if (canGetPower) {
     const powerPercent = await optionalNumber(client, device, 'coolerpower', signal)
 
-    if (powerPercent !== undefined && powerPercent >= 0 && powerPercent <= 100 && (coolerOn || powerPercent === 0)) {
+    if (
+      powerPercent !== undefined &&
+      powerPercent >= 0 &&
+      powerPercent <= 100 &&
+      (coolerOn || powerPercent === 0)
+    ) {
       observation.powerPercent = powerPercent
     }
   }

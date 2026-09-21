@@ -12,16 +12,19 @@ function emptyHome(): HomeView {
 
 function homeWithRig(reachability: 'reachable' | 'unreachable' = 'reachable'): HomeView {
   return {
-    rigs: [{
-      id: 'rig-1',
-      name: 'Backyard rig',
-      reachability,
-      lastSeenAt: inspectedAt,
-      connections: reachability === 'reachable'
-        ? { total: 1, connected: 1, disconnected: 0, unavailable: 0 }
-        : { total: 1, connected: 0, disconnected: 0, unavailable: 1 },
-      capabilities: ['forget'],
-    }],
+    rigs: [
+      {
+        id: 'rig-1',
+        name: 'Backyard rig',
+        reachability,
+        lastSeenAt: inspectedAt,
+        connections:
+          reachability === 'reachable'
+            ? { total: 1, connected: 1, disconnected: 0, unavailable: 0 }
+            : { total: 1, connected: 0, disconnected: 0, unavailable: 1 },
+        capabilities: ['forget'],
+      },
+    ],
     refreshedAt: inspectedAt,
   }
 }
@@ -35,8 +38,8 @@ async function fulfillJson<Body>(route: Route, body: Body, status = 200) {
 }
 
 async function useHome(page: Page, getHome: () => HomeView, delay = 0) {
-  await page.route('**/api/web/home', async (route) => {
-    if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay))
+  await page.route('**/api/web/home', async route => {
+    if (delay > 0) await new Promise(resolve => setTimeout(resolve, delay))
     await fulfillJson(route, getHome())
   })
 }
@@ -46,36 +49,40 @@ test('adds an explicitly selected new Rig from mixed discovery results', async (
   let addPayload: unknown
   let addAttempts = 0
   await useHome(page, () => home, 100)
-  await page.route('**/api/rigs/discovery', (route) => fulfillJson(route, {
-    candidates: [
-      {
-        endpoint,
-        server: { name: 'ASCOM Remote' },
-        inspectedAt,
-        devices: [{ kind: 'camera', name: 'Main camera' }],
-        disposition: { state: 'new' },
-      },
-      {
-        endpoint: { host: '192.168.4.105', port: 11111 },
-        server: { name: 'Known server' },
-        inspectedAt,
-        devices: [{ kind: 'camera', name: 'Known camera' }],
-        disposition: { state: 'already-added', rigId: 'rig-known' },
-      },
-      {
-        endpoint: { host: '192.168.4.106', port: 11111 },
-        server: { name: 'Conflicting server' },
-        inspectedAt,
-        devices: [{ kind: 'camera', name: 'Conflicting camera' }],
-        disposition: { state: 'conflict' },
-      },
-    ],
-    failures: [{
-      endpoint: { host: '192.168.4.107', port: 11111 },
-      reason: 'unreachable',
-    }],
-  }))
-  await page.route('**/api/rigs', async (route) => {
+  await page.route('**/api/rigs/discovery', route =>
+    fulfillJson(route, {
+      candidates: [
+        {
+          endpoint,
+          server: { name: 'ASCOM Remote' },
+          inspectedAt,
+          devices: [{ kind: 'camera', name: 'Main camera' }],
+          disposition: { state: 'new' },
+        },
+        {
+          endpoint: { host: '192.168.4.105', port: 11111 },
+          server: { name: 'Known server' },
+          inspectedAt,
+          devices: [{ kind: 'camera', name: 'Known camera' }],
+          disposition: { state: 'already-added', rigId: 'rig-known' },
+        },
+        {
+          endpoint: { host: '192.168.4.106', port: 11111 },
+          server: { name: 'Conflicting server' },
+          inspectedAt,
+          devices: [{ kind: 'camera', name: 'Conflicting camera' }],
+          disposition: { state: 'conflict' },
+        },
+      ],
+      failures: [
+        {
+          endpoint: { host: '192.168.4.107', port: 11111 },
+          reason: 'unreachable',
+        },
+      ],
+    }),
+  )
+  await page.route('**/api/rigs', async route => {
     addAttempts += 1
     addPayload = route.request().postDataJSON()
 
@@ -85,7 +92,7 @@ test('adds an explicitly selected new Rig from mixed discovery results', async (
       return
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 150))
+    await new Promise(resolve => setTimeout(resolve, 150))
     home = homeWithRig()
     await fulfillJson(route, { rigId: 'rig-1' }, 201)
   })
@@ -121,18 +128,20 @@ test('adds an explicitly selected new Rig from mixed discovery results', async (
 
 test('cancels stale scans and keeps useful discovery failures', async ({ page }) => {
   await useHome(page, emptyHome)
-  await page.route('**/api/rigs/discovery', async (route) => {
+  await page.route('**/api/rigs/discovery', async route => {
     const request = route.request().postDataJSON()
 
     if (request.mode === 'scan') {
-      await new Promise((resolve) => setTimeout(resolve, 300))
+      await new Promise(resolve => setTimeout(resolve, 300))
       await fulfillJson(route, {
-        candidates: [{
-          endpoint,
-          inspectedAt,
-          devices: [{ kind: 'camera', name: 'Late camera' }],
-          disposition: { state: 'new' },
-        }],
+        candidates: [
+          {
+            endpoint,
+            inspectedAt,
+            devices: [{ kind: 'camera', name: 'Late camera' }],
+            disposition: { state: 'new' },
+          },
+        ],
         failures: [],
       }).catch(() => {})
 
@@ -184,29 +193,31 @@ test('cancels stale scans and keeps useful discovery failures', async ({ page })
 
 test('explains results when no discovered candidate can be added', async ({ page }) => {
   await useHome(page, emptyHome)
-  await page.route('**/api/rigs/discovery', (route) => fulfillJson(route, {
-    candidates: [
-      {
-        endpoint,
-        inspectedAt,
-        devices: [{ kind: 'camera', name: 'Known camera' }],
-        disposition: { state: 'already-added', rigId: 'rig-1' },
-      },
-      {
-        endpoint: { host: '192.168.4.105', port: 11111 },
-        inspectedAt,
-        devices: [{ kind: 'camera', name: 'Legacy camera' }],
-        disposition: { state: 'ineligible', reason: 'no-stable-device-id' },
-      },
-      {
-        endpoint: { host: '192.168.4.106', port: 11111 },
-        inspectedAt,
-        devices: [{ kind: 'camera', name: 'Ambiguous camera' }],
-        disposition: { state: 'conflict' },
-      },
-    ],
-    failures: [],
-  }))
+  await page.route('**/api/rigs/discovery', route =>
+    fulfillJson(route, {
+      candidates: [
+        {
+          endpoint,
+          inspectedAt,
+          devices: [{ kind: 'camera', name: 'Known camera' }],
+          disposition: { state: 'already-added', rigId: 'rig-1' },
+        },
+        {
+          endpoint: { host: '192.168.4.105', port: 11111 },
+          inspectedAt,
+          devices: [{ kind: 'camera', name: 'Legacy camera' }],
+          disposition: { state: 'ineligible', reason: 'no-stable-device-id' },
+        },
+        {
+          endpoint: { host: '192.168.4.106', port: 11111 },
+          inspectedAt,
+          devices: [{ kind: 'camera', name: 'Ambiguous camera' }],
+          disposition: { state: 'conflict' },
+        },
+      ],
+      failures: [],
+    }),
+  )
 
   await page.goto('/')
   await page.getByRole('button', { name: 'Scan for rigs' }).click()
@@ -221,16 +232,18 @@ test('explains results when no discovered candidate can be added', async ({ page
 test('opens manual discovery from an existing Rig view', async ({ page }) => {
   await useHome(page, () => homeWithRig())
   let discoveryPayload: unknown
-  await page.route('**/api/rigs/discovery', async (route) => {
+  await page.route('**/api/rigs/discovery', async route => {
     discoveryPayload = route.request().postDataJSON()
     await fulfillJson(route, {
-      candidates: [{
-        endpoint: { host: '192.168.4.63', port: 32323 },
-        server: { name: 'ASCOM Alpaca' },
-        inspectedAt,
-        devices: [{ kind: 'camera', name: 'Seestar camera' }],
-        disposition: { state: 'new' },
-      }],
+      candidates: [
+        {
+          endpoint: { host: '192.168.4.63', port: 32323 },
+          server: { name: 'ASCOM Alpaca' },
+          inspectedAt,
+          devices: [{ kind: 'camera', name: 'Seestar camera' }],
+          disposition: { state: 'new' },
+        },
+      ],
       failures: [],
     })
   })
@@ -253,9 +266,9 @@ test('opens manual discovery from an existing Rig view', async ({ page }) => {
 
 test('validates Home responses and retries an initial failure', async ({ page }) => {
   let homeRequests = 0
-  await page.route('**/api/web/home', async (route) => {
+  await page.route('**/api/web/home', async route => {
     homeRequests += 1
-    await new Promise((resolve) => setTimeout(resolve, 75))
+    await new Promise(resolve => setTimeout(resolve, 75))
 
     if (homeRequests === 1) {
       await fulfillJson(route, { rigs: 'not-an-array', refreshedAt: inspectedAt })

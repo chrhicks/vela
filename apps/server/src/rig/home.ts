@@ -28,28 +28,30 @@ export async function loadHomeView(
 ): Promise<HomeView> {
   const records = await catalog.list()
 
-  const rigs = await Promise.all(records.map(async (record) => {
-    let devices: ReadonlyArray<ObservedRigDevice>
+  const rigs = await Promise.all(
+    records.map(async record => {
+      let devices: ReadonlyArray<ObservedRigDevice>
 
-    try {
-      devices = await createInventory(record).listDevices()
-    } catch (error) {
-      onUnavailable(record, error)
+      try {
+        devices = await createInventory(record).listDevices()
+      } catch (error) {
+        onUnavailable(record, error)
 
-      return lastKnownRig(record, 'unreachable')
-    }
+        return lastKnownRig(record, 'unreachable')
+      }
 
-    const inventory = observedInventory(devices, now)
-    const match = await catalog.observe(record.endpoint, inventory)
+      const inventory = observedInventory(devices, now)
+      const match = await catalog.observe(record.endpoint, inventory)
 
-    if (match.state !== 'known' || match.rigId !== record.id) {
-      onConflict(record)
+      if (match.state !== 'known' || match.rigId !== record.id) {
+        onConflict(record)
 
-      return lastKnownRig(record, 'unknown')
-    }
+        return lastKnownRig(record, 'unknown')
+      }
 
-    return reachableRig(record, devices, inventory.observedAt)
-  }))
+      return reachableRig(record, devices, inventory.observedAt)
+    }),
+  )
 
   return {
     rigs,
@@ -63,7 +65,7 @@ function observedInventory(
 ): ObservedRigInventory {
   return {
     observedAt: devices[0]?.observedAt.toISOString() ?? now().toISOString(),
-    devices: devices.map((device) => ({
+    devices: devices.map(device => ({
       uniqueId: device.uniqueId,
       kind: device.kind,
       name: device.name,
@@ -86,10 +88,7 @@ function reachableRig(
   }
 }
 
-function lastKnownRig(
-  record: RigCatalogRecord,
-  reachability: 'unreachable' | 'unknown',
-): RigView {
+function lastKnownRig(record: RigCatalogRecord, reachability: 'unreachable' | 'unknown'): RigView {
   return {
     id: record.id,
     name: record.name,

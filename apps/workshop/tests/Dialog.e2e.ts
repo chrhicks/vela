@@ -4,7 +4,8 @@ import type { Page } from '@playwright/test'
 // Modal previews intentionally make the workshop inspector inert. These helpers simulate
 // external session edits without weakening Dialog modality just for the test harness.
 function inspectorControl(page: Page, label: string, selector: 'input' | 'select') {
-  return page.locator('.control-field')
+  return page
+    .locator('.control-field')
     .filter({ has: page.getByText(label, { exact: true }) })
     .locator(selector)
 }
@@ -21,7 +22,9 @@ async function changeInputOutsideModal(page: Page, label: string, value: string)
   }, value)
 }
 
-test('gallery Dialog previews stay passive until opened and restore their trigger', async ({ page }) => {
+test('gallery Dialog previews stay passive until opened and restore their trigger', async ({
+  page,
+}) => {
   await page.goto('/gallery?component=dialog&specimen=dialog-primitive')
   await expect(page.getByRole('heading', { name: 'Initial primitive library' })).toBeVisible()
   await expect(page.getByRole('dialog')).toHaveCount(0)
@@ -53,7 +56,7 @@ test('modal focus includes summary and ignores hidden controls', async ({ page }
   await comparisonToggle.click({ force: true })
   await expect(comparisonToggle).not.toBeChecked()
 
-  await dialog.evaluate((element) => {
+  await dialog.evaluate(element => {
     const details = document.createElement('details')
     const summary = document.createElement('summary')
     summary.dataset.testid = 'injected-summary'
@@ -103,10 +106,14 @@ test('Dialog follows the simulated phone and comparison canvases', async ({ page
   expect(firstBox!.x + firstBox!.width).toBeLessThanOrEqual(secondBox!.x)
 })
 
-test('scan completion preserves newer props and cannot revive an abandoned scan', async ({ page }) => {
+test('scan completion preserves newer props and cannot revive an abandoned scan', async ({
+  page,
+}) => {
   await page.clock.install()
   await page.clock.pauseAt(new Date())
-  await page.goto('/?component=dialog&specimen=dialog-rig-discovery&prop.view=start&prop.scenario=mixed&prop.selected=false&prop.rigName=ASCOM%20Remote')
+  await page.goto(
+    '/?component=dialog&specimen=dialog-rig-discovery&prop.view=start&prop.scenario=mixed&prop.selected=false&prop.rigName=ASCOM%20Remote',
+  )
   await page.getByRole('button', { name: 'Scan for rigs' }).click()
   await expect(page.locator('.vela-discovery-scanning[role="status"]')).toBeVisible()
 

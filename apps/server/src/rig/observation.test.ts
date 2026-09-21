@@ -78,11 +78,13 @@ describe('Rig observation projection', () => {
   })
 
   it('offers connection only for disconnected device kinds Vela currently operates', () => {
-    const view = rigObservationView(rig([
-      device('camera', 'camera', 'disconnected'),
-      device('dome', 'dome', 'disconnected'),
-      device('unknown', 'unknown', 'disconnected'),
-    ]))
+    const view = rigObservationView(
+      rig([
+        device('camera', 'camera', 'disconnected'),
+        device('dome', 'dome', 'disconnected'),
+        device('unknown', 'unknown', 'disconnected'),
+      ]),
+    )
 
     expect(view.connectionPreparation).toEqual({
       state: 'available',
@@ -91,20 +93,23 @@ describe('Rig observation projection', () => {
   })
 
   it('calls preparation complete when only unsupported kinds remain disconnected', () => {
-    const view = rigObservationView(rig([
-      device('camera', 'camera', 'connected'),
-      device('dome', 'dome', 'disconnected'),
-      device('rotator', 'rotator', 'disconnected'),
-    ]))
+    const view = rigObservationView(
+      rig([
+        device('camera', 'camera', 'connected'),
+        device('dome', 'dome', 'disconnected'),
+        device('rotator', 'rotator', 'disconnected'),
+      ]),
+    )
 
     expect(view.connectionPreparation).toEqual({ state: 'complete', capabilities: [] })
   })
 
   it('makes preparation unavailable when supported state cannot be confirmed or the Rig is offline', () => {
-    expect(rigObservationView(rig([
-      device('camera', 'camera', 'unavailable'),
-      device('dome', 'dome', 'disconnected'),
-    ])).connectionPreparation).toEqual({ state: 'unavailable', capabilities: [] })
+    expect(
+      rigObservationView(
+        rig([device('camera', 'camera', 'unavailable'), device('dome', 'dome', 'disconnected')]),
+      ).connectionPreparation,
+    ).toEqual({ state: 'unavailable', capabilities: [] })
 
     expect(rigObservationView(rig([], 'offline')).connectionPreparation).toEqual({
       state: 'unavailable',
@@ -113,9 +118,7 @@ describe('Rig observation projection', () => {
   })
 
   it('projects server-owned progress without turning it into observing permission', () => {
-    const view = rigObservationView(rig([
-      device('camera', 'camera', 'disconnected'),
-    ]), true)
+    const view = rigObservationView(rig([device('camera', 'camera', 'disconnected')]), true)
 
     expect(view.connectionPreparation).toEqual({ state: 'in-progress', capabilities: [] })
     expect(view).not.toHaveProperty('canObserve')

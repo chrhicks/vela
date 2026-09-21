@@ -28,17 +28,33 @@ const view: AutofocusView = {
 }
 
 it('labels travel-limit aborts separately from unrestored failures', () => {
-  expect(autofocusActivity({
-    ...view,
-    phase: 'setup',
-    startPosition: null,
-    currentPosition: 80,
-    error: 'That step-size window would approach 0 or MaxStep. Choose a smaller step or start farther from the ends. Vela will not move.',
-  }, false)).toBe('Walk did not start')
-  expect(autofocusActivity({
-    ...view,
-    error: 'The focuser did not confirm return to the start position. Vela did not repeat the move.',
-  }, false)).toBe('Walk failed · start was not restored')
-  expect(autofocusActivity({ ...view, restoredStart: true, currentPosition: 32842, error: 'Hyperbola failed' }, false))
-    .toBe('Walk failed · start restored')
+  expect(
+    autofocusActivity(
+      {
+        ...view,
+        phase: 'setup',
+        startPosition: null,
+        currentPosition: 80,
+        error:
+          'That step-size window would approach 0 or MaxStep. Choose a smaller step or start farther from the ends. Vela will not move.',
+      },
+      false,
+    ),
+  ).toBe('Walk did not start')
+  expect(
+    autofocusActivity(
+      {
+        ...view,
+        error:
+          'The focuser did not confirm return to the start position. Vela did not repeat the move.',
+      },
+      false,
+    ),
+  ).toBe('Walk failed · start was not restored')
+  expect(
+    autofocusActivity(
+      { ...view, restoredStart: true, currentPosition: 32842, error: 'Hyperbola failed' },
+      false,
+    ),
+  ).toBe('Walk failed · start restored')
 })

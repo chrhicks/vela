@@ -13,15 +13,8 @@
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
     "exactOptionalPropertyTypes": true,
-    "types": [
-      "node"
-    ]
+    "types": ["node"]
   },
-  "include": [
-    "src"
-  ],
-  "exclude": [
-    "src/prove-http.ts",
-    "src/prove-framing.ts"
-  ]
+  "include": ["src"],
+  "exclude": ["src/prove-http.ts", "src/prove-framing.ts"]
 }

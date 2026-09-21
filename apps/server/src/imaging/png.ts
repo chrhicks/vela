@@ -8,17 +8,12 @@ const compress = promisify(deflate)
 const crcTable = Uint32Array.from({ length: 256 }, (_, byte) => {
   let crc = byte
 
-  for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ ((crc & 1) ? 0xedb88320 : 0)
+  for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0)
 
   return crc >>> 0
 })
 
-export async function encodePng(
-  width: number,
-  height: number,
-  channels: number,
-  data: Buffer,
-) {
+export async function encodePng(width: number, height: number, channels: number, data: Buffer) {
   const header = Buffer.alloc(13)
   header.writeUInt32BE(width, 0)
   header.writeUInt32BE(height, 4)

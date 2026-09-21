@@ -18,9 +18,11 @@ async function request<T>(url: string, schema: z.ZodType<T>, init?: RequestInit)
 
   if (!response.ok) {
     const failure = failureResponse.safeParse(value)
-    throw new Error(failure.success
-      ? failure.data.error ?? `Request failed: ${response.status}`
-      : `Request failed: ${response.status}`)
+    throw new Error(
+      failure.success
+        ? (failure.data.error ?? `Request failed: ${response.status}`)
+        : `Request failed: ${response.status}`,
+    )
   }
 
   return schema.parse(value)
@@ -43,9 +45,11 @@ export async function loadProfiles(): Promise<DesignProfile[]> {
 }
 
 export async function persistProfile(profile: DesignProfile): Promise<DesignProfile> {
-  return (await request(`/__workshop/profiles/${profile.id}`, profileResponse, {
-    method: 'PUT',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(profile),
-  })).profile
+  return (
+    await request(`/__workshop/profiles/${profile.id}`, profileResponse, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(profile),
+    })
+  ).profile
 }

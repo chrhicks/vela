@@ -20,8 +20,8 @@ describe('alignment display viewport', () => {
       const frame = { ...measurement, fieldHeightDegrees }
       const fit = alignmentViewport(frame, 'fit')
       const fine = alignmentViewport(frame, 'fine')
-      expect(fit.height / frame.imageHeight * fieldHeightDegrees * 60).toBeCloseTo(4)
-      expect(fine.height / frame.imageHeight * fieldHeightDegrees * 60).toBeCloseTo(1)
+      expect((fit.height / frame.imageHeight) * fieldHeightDegrees * 60).toBeCloseTo(4)
+      expect((fine.height / frame.imageHeight) * fieldHeightDegrees * 60).toBeCloseTo(1)
       expect(fine.barArcsec).toBeCloseTo(19.2)
       expect(fit.referenceX).toBe(799.5)
       expect(fit.referenceY).toBe(599.5)
@@ -29,13 +29,20 @@ describe('alignment display viewport', () => {
   })
 
   it('fits server-projected off-image targets in any direction without clamping them to the image', () => {
-    for (const [targetX, targetY] of [[-900, 599.5], [3000, 1900], [799.5, -2000]]) {
+    for (const [targetX, targetY] of [
+      [-900, 599.5],
+      [3000, 1900],
+      [799.5, -2000],
+    ]) {
       const frame = { ...measurement, targetX: targetX!, targetY: targetY! }
       const box = alignmentViewport(frame, 'fit')
       expect(box.outsideImage).toBe(true)
       expect(box.markersClipped).toBe(false)
 
-      for (const [x, y] of [[box.referenceX, box.referenceY], [frame.targetX, frame.targetY]]) {
+      for (const [x, y] of [
+        [box.referenceX, box.referenceY],
+        [frame.targetX, frame.targetY],
+      ]) {
         expect(x).toBeGreaterThan(box.left + box.width * 0.08)
         expect(x).toBeLessThan(box.left + box.width * 0.92)
         expect(y).toBeGreaterThan(box.top + box.height * 0.08)
@@ -55,6 +62,9 @@ describe('alignment display viewport', () => {
       height: 1200,
       outsideImage: false,
     })
-    expect(alignmentViewport(frame, 'fine')).toMatchObject({ outsideImage: false, markersClipped: true })
+    expect(alignmentViewport(frame, 'fine')).toMatchObject({
+      outsideImage: false,
+      markersClipped: true,
+    })
   })
 })

@@ -7,7 +7,7 @@ export async function createDisplayStretch(blackPoint: number, ceiling: number) 
   const transfer = (sample: number) => {
     const value = Math.max(0, (sample - blackPoint) / (ceiling - blackPoint))
 
-    return Math.min(255, Math.round(255 * Math.asinh(value * 10) / denominator))
+    return Math.min(255, Math.round((255 * Math.asinh(value * 10)) / denominator))
   }
 
   // Integer sensor samples and interior bilinear averages land on quarter steps.
@@ -16,13 +16,14 @@ export async function createDisplayStretch(blackPoint: number, ceiling: number) 
   const first = Math.ceil(blackPoint * 4)
   const size = Math.floor(ceiling * 4) - first + 1
 
-  const table = ceiling > blackPoint
-    && Number.isSafeInteger(first)
-    && Number.isSafeInteger(size)
-    && size > 0
-    && size <= 262_144
-    ? new Uint8Array(size)
-    : null
+  const table =
+    ceiling > blackPoint &&
+    Number.isSafeInteger(first) &&
+    Number.isSafeInteger(size) &&
+    size > 0 &&
+    size <= 262_144
+      ? new Uint8Array(size)
+      : null
 
   if (table) {
     for (let index = 0; index < table.length; index++) {

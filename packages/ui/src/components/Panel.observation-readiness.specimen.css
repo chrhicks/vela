@@ -9,10 +9,21 @@
   color: var(--vela-text);
   background-color: var(--vela-canvas);
   background-image:
-    radial-gradient(circle at 72% 4%, color-mix(in oklch, var(--vela-accent) 9%, transparent), transparent 27rem),
+    radial-gradient(
+      circle at 72% 4%,
+      color-mix(in oklch, var(--vela-accent) 9%, transparent),
+      transparent 27rem
+    ),
     linear-gradient(color-mix(in oklch, var(--vela-line) 22%, transparent) 1px, transparent 1px),
-    linear-gradient(90deg, color-mix(in oklch, var(--vela-line) 22%, transparent) 1px, transparent 1px);
-  background-size: auto, 3rem 3rem, 3rem 3rem;
+    linear-gradient(
+      90deg,
+      color-mix(in oklch, var(--vela-line) 22%, transparent) 1px,
+      transparent 1px
+    );
+  background-size:
+    auto,
+    3rem 3rem,
+    3rem 3rem;
   container-type: inline-size;
 }
 
@@ -41,18 +52,19 @@
   display: grid;
   width: 1.85rem;
   height: 1.85rem;
-  border: var(--vela-border-width) solid color-mix(in oklch, var(--vela-accent) 70%, var(--vela-line));
-  border-radius: calc(var(--vela-radius) * .7);
+  border: var(--vela-border-width) solid
+    color-mix(in oklch, var(--vela-accent) 70%, var(--vela-line));
+  border-radius: calc(var(--vela-radius) * 0.7);
   color: var(--vela-accent);
   background: var(--vela-accent-surface);
-  font-size: .74em;
+  font-size: 0.74em;
   font-weight: 780;
   place-items: center;
 }
 
 .vela-observation-shell__brand > strong {
-  font-size: .82em;
-  letter-spacing: .055em;
+  font-size: 0.82em;
+  letter-spacing: 0.055em;
 }
 
 .vela-observation-shell__header nav {
@@ -65,26 +77,26 @@
   display: grid;
   padding-inline: calc(var(--vela-space) * 2);
   color: var(--vela-text);
-  font-size: .74em;
+  font-size: 0.74em;
   font-weight: 630;
   place-items: center;
 }
 
-.vela-observation-shell__header nav span[data-active="true"]::after {
+.vela-observation-shell__header nav span[data-active='true']::after {
   position: absolute;
   right: calc(var(--vela-space) * 2);
   bottom: 0;
   left: calc(var(--vela-space) * 2);
   height: 2px;
   background: var(--vela-accent);
-  content: "";
+  content: '';
 }
 
 .vela-observation-shell__header > small {
   justify-self: end;
   color: var(--vela-text-muted);
-  font-size: .65em;
-  letter-spacing: .1em;
+  font-size: 0.65em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
@@ -113,22 +125,22 @@
 .vela-observe-hero > div:nth-child(2) > small,
 .vela-observe-section__heading small {
   color: var(--vela-accent);
-  font-size: .64em;
+  font-size: 0.64em;
   font-weight: 780;
-  letter-spacing: .13em;
+  letter-spacing: 0.13em;
 }
 
 .vela-observation-rig-hero h1 {
   margin: calc(var(--vela-space) * 1.25) 0 0;
   font-size: clamp(1.85em, 5cqi, 2.7em);
   font-weight: 740;
-  letter-spacing: -.04em;
+  letter-spacing: -0.04em;
 }
 
 .vela-observation-rig-hero > div:first-child > p {
   margin: calc(var(--vela-space) * 1.5) 0 0;
   color: var(--vela-text-muted);
-  font-size: .8em;
+  font-size: 0.8em;
 }
 
 .vela-observation-rig-hero > div:last-child {
@@ -139,14 +151,18 @@
 
 .vela-observation-rig-hero > div:last-child > span {
   color: var(--vela-text-muted);
-  font-size: .68em;
+  font-size: 0.68em;
 }
 
 .vela-observation-entry {
   overflow: hidden;
   border-color: color-mix(in oklch, var(--vela-accent) 44%, var(--vela-line));
   background:
-    radial-gradient(circle at 0% 50%, color-mix(in oklch, var(--vela-accent) 16%, transparent), transparent 14rem),
+    radial-gradient(
+      circle at 0% 50%,
+      color-mix(in oklch, var(--vela-accent) 16%, transparent),
+      transparent 14rem
+    ),
     var(--vela-surface-raised);
 }
 
@@ -163,7 +179,8 @@
   display: grid;
   width: 4rem;
   height: 4rem;
-  border: var(--vela-border-width) solid color-mix(in oklch, var(--vela-accent) 42%, var(--vela-line));
+  border: var(--vela-border-width) solid
+    color-mix(in oklch, var(--vela-accent) 42%, var(--vela-line));
   border-radius: 50%;
   color: var(--vela-accent);
   background: var(--vela-accent-surface);
@@ -181,16 +198,16 @@
 }
 
 .vela-observation-entry__copy h2 {
-  margin: calc(var(--vela-space) * .8) 0 0;
+  margin: calc(var(--vela-space) * 0.8) 0 0;
   font-size: 1.22em;
-  letter-spacing: -.02em;
+  letter-spacing: -0.02em;
 }
 
 .vela-observation-entry__copy p {
   max-width: 38rem;
   margin: calc(var(--vela-space) * 1.2) 0 0;
   color: var(--vela-text-muted);
-  font-size: .74em;
+  font-size: 0.74em;
   line-height: 1.55;
 }
 
@@ -202,9 +219,9 @@
 
 .vela-observation-equipment h2,
 .vela-observe-section__heading h2 {
-  margin: calc(var(--vela-space) * .75) 0 0;
+  margin: calc(var(--vela-space) * 0.75) 0 0;
   font-size: 1.15em;
-  letter-spacing: -.02em;
+  letter-spacing: -0.02em;
 }
 
 .vela-observation-equipment__grid {
@@ -219,37 +236,37 @@
 
 .vela-observation-equipment__grid .vela-panel__title {
   overflow: hidden;
-  font-size: .86em;
+  font-size: 0.86em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .vela-observation-equipment__grid .vela-panel__description {
-  font-size: .66em;
+  font-size: 0.66em;
 }
 
 .vela-observation-equipment__status {
   display: flex;
   align-items: center;
   gap: calc(var(--vela-space) * 1.5);
-  font-size: .7em;
+  font-size: 0.7em;
 }
 
 .vela-observation-equipment__status > span {
   color: var(--vela-positive);
-  font-size: .65em;
+  font-size: 0.65em;
 }
 
-.vela-observation-equipment__status[data-state="disconnected"] > span,
-.vela-observation-equipment__status[data-state="not-confirmed"] > span {
+.vela-observation-equipment__status[data-state='disconnected'] > span,
+.vela-observation-equipment__status[data-state='not-confirmed'] > span {
   color: var(--vela-warning);
 }
 
-.vela-observation-equipment__status[data-state="status-updating"] > span {
+.vela-observation-equipment__status[data-state='status-updating'] > span {
   color: var(--vela-accent);
 }
 
-.vela-observation-equipment__status[data-state="unavailable"] > span {
+.vela-observation-equipment__status[data-state='unavailable'] > span {
   color: var(--vela-danger);
 }
 
@@ -265,11 +282,11 @@
 
 .vela-observation-equipment__more strong {
   color: var(--vela-text);
-  font-size: .76em;
+  font-size: 0.76em;
 }
 
 .vela-observation-equipment__more span {
-  font-size: .64em;
+  font-size: 0.64em;
   line-height: 1.45;
 }
 
@@ -285,13 +302,13 @@
   margin: calc(var(--vela-space) * 1.1) 0 0;
   font-size: clamp(1.75em, 4.4cqi, 2.55em);
   font-weight: 740;
-  letter-spacing: -.04em;
+  letter-spacing: -0.04em;
 }
 
 .vela-observe-hero p {
   margin: calc(var(--vela-space) * 1.25) 0 0;
   color: var(--vela-text-muted);
-  font-size: .78em;
+  font-size: 0.78em;
 }
 
 .vela-observe-section {
@@ -308,12 +325,12 @@
 
 .vela-observe-section__heading > span {
   color: var(--vela-text-muted);
-  font-size: .66em;
+  font-size: 0.66em;
 }
 
 .vela-observe-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.45fr) minmax(16rem, .72fr);
+  grid-template-columns: minmax(0, 1.45fr) minmax(16rem, 0.72fr);
   align-items: start;
   gap: calc(var(--vela-space) * 3);
 }
@@ -323,17 +340,17 @@
   border-color: color-mix(in oklch, var(--vela-warning) 34%, var(--vela-line));
 }
 
-.vela-observe-readiness[data-state="ready"] {
+.vela-observe-readiness[data-state='ready'] {
   border-color: color-mix(in oklch, var(--vela-positive) 34%, var(--vela-line));
 }
 
-.vela-observe-readiness[data-state="offline"] {
+.vela-observe-readiness[data-state='offline'] {
   border-color: color-mix(in oklch, var(--vela-danger) 36%, var(--vela-line));
   background: color-mix(in oklch, var(--vela-surface) 86%, var(--vela-canvas));
   box-shadow: none;
 }
 
-.vela-observe-readiness[data-state="connecting"] {
+.vela-observe-readiness[data-state='connecting'] {
   border-color: color-mix(in oklch, var(--vela-accent) 48%, var(--vela-line));
 }
 
@@ -353,7 +370,8 @@
   display: grid;
   width: 3.45rem;
   height: 3.45rem;
-  border: var(--vela-border-width) solid color-mix(in oklch, var(--vela-warning) 44%, var(--vela-line));
+  border: var(--vela-border-width) solid
+    color-mix(in oklch, var(--vela-warning) 44%, var(--vela-line));
   border-radius: 50%;
   color: var(--vela-warning);
   background: color-mix(in oklch, var(--vela-warning) 10%, var(--vela-surface));
@@ -362,19 +380,19 @@
   place-items: center;
 }
 
-.vela-observe-readiness[data-state="ready"] .vela-observe-readiness__mark {
+.vela-observe-readiness[data-state='ready'] .vela-observe-readiness__mark {
   border-color: color-mix(in oklch, var(--vela-positive) 44%, var(--vela-line));
   color: var(--vela-positive);
   background: color-mix(in oklch, var(--vela-positive) 10%, var(--vela-surface));
 }
 
-.vela-observe-readiness[data-state="connecting"] .vela-observe-readiness__mark {
+.vela-observe-readiness[data-state='connecting'] .vela-observe-readiness__mark {
   border-color: color-mix(in oklch, var(--vela-accent) 44%, var(--vela-line));
   color: var(--vela-accent);
   background: var(--vela-accent-surface);
 }
 
-.vela-observe-readiness[data-state="offline"] .vela-observe-readiness__mark {
+.vela-observe-readiness[data-state='offline'] .vela-observe-readiness__mark {
   border-color: color-mix(in oklch, var(--vela-danger) 44%, var(--vela-line));
   color: var(--vela-danger);
   background: color-mix(in oklch, var(--vela-danger) 10%, var(--vela-surface));
@@ -392,7 +410,7 @@
 .vela-observe-readiness__summary h3 {
   margin: 0;
   font-size: 1.08em;
-  letter-spacing: -.015em;
+  letter-spacing: -0.015em;
 }
 
 .vela-observe-readiness__summary h3:focus {
@@ -404,7 +422,7 @@
 .vela-observe-readiness__summary p {
   margin: calc(var(--vela-space) * 1) 0 0;
   color: var(--vela-text-muted);
-  font-size: .74em;
+  font-size: 0.74em;
   line-height: 1.55;
 }
 
@@ -421,7 +439,7 @@
 .vela-observation-action-note {
   margin: 0;
   color: var(--vela-text-muted);
-  font-size: .68em;
+  font-size: 0.68em;
   line-height: 1.5;
 }
 
@@ -436,13 +454,13 @@
   margin: 0;
   overflow: hidden;
   border: var(--vela-border-width) solid var(--vela-line);
-  border-radius: calc(var(--vela-radius) * .75);
+  border-radius: calc(var(--vela-radius) * 0.75);
   background: color-mix(in oklch, var(--vela-canvas) 54%, var(--vela-surface));
 }
 
 .vela-observation-result > div {
   display: grid;
-  gap: calc(var(--vela-space) * .8);
+  gap: calc(var(--vela-space) * 0.8);
   padding: calc(var(--vela-space) * 2.5);
   border-right: var(--vela-border-width) solid var(--vela-line);
 }
@@ -453,22 +471,22 @@
 
 .vela-observation-result dt {
   color: var(--vela-text-muted);
-  font-size: .59em;
+  font-size: 0.59em;
 }
 
 .vela-observation-result dd {
   margin: 0;
-  font-size: .7em;
+  font-size: 0.7em;
   font-weight: 640;
   line-height: 1.35;
 }
 
 .vela-observe-facts .vela-panel__title {
-  font-size: .88em;
+  font-size: 0.88em;
 }
 
 .vela-observe-facts .vela-panel__description {
-  font-size: .64em;
+  font-size: 0.64em;
 }
 
 .vela-observe-facts > .vela-panel__body {
@@ -495,32 +513,32 @@
 
 .vela-observe-facts dt {
   color: var(--vela-text-muted);
-  font-size: .64em;
+  font-size: 0.64em;
 }
 
 .vela-observe-facts dd {
   margin: 0;
-  font-size: .66em;
+  font-size: 0.66em;
   font-weight: 680;
   text-align: right;
 }
 
-.vela-observe-facts dl > div[data-state="positive"] dd {
+.vela-observe-facts dl > div[data-state='positive'] dd {
   color: var(--vela-positive);
 }
 
-.vela-observe-facts dl > div[data-state="warning"] dd {
+.vela-observe-facts dl > div[data-state='warning'] dd {
   color: var(--vela-warning);
 }
 
-.vela-observe-facts dl > div[data-state="danger"] dd {
+.vela-observe-facts dl > div[data-state='danger'] dd {
   color: var(--vela-danger);
 }
 
 .vela-observe-facts > .vela-panel__body > p {
   margin: 0;
   color: var(--vela-text-muted);
-  font-size: .64em;
+  font-size: 0.64em;
   line-height: 1.5;
 }
 
@@ -544,7 +562,9 @@
 }
 
 @keyframes vela-observation-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @container (max-width: 47rem) {
@@ -574,7 +594,6 @@
   .vela-observe-grid {
     grid-template-columns: 1fr;
   }
-
 }
 
 @container (max-width: 31rem) {

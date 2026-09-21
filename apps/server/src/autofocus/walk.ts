@@ -16,12 +16,12 @@ export interface AutofocusWalkPlan {
 }
 
 export type AutofocusWalkPlanning =
-  | { ok: true, plan: AutofocusWalkPlan }
+  | { ok: true; plan: AutofocusWalkPlan }
   | {
-    ok: false
-    reason: 'start-at-limit' | 'window-hits-limit' | 'invalid'
-    message: string
-  }
+      ok: false
+      reason: 'start-at-limit' | 'window-hits-limit' | 'invalid'
+      message: string
+    }
 
 export function planStarHfrWalk(
   start: number,
@@ -29,7 +29,12 @@ export function planStarHfrWalk(
   offsetSteps: number,
   maxStep: number,
 ): AutofocusWalkPlanning {
-  if (!Number.isSafeInteger(start) || !Number.isSafeInteger(stepSize) || !Number.isSafeInteger(offsetSteps) || !Number.isSafeInteger(maxStep)) {
+  if (
+    !Number.isSafeInteger(start) ||
+    !Number.isSafeInteger(stepSize) ||
+    !Number.isSafeInteger(offsetSteps) ||
+    !Number.isSafeInteger(maxStep)
+  ) {
     return {
       ok: false,
       reason: 'invalid',
@@ -52,7 +57,8 @@ export function planStarHfrWalk(
     return {
       ok: false,
       reason: 'start-at-limit',
-      message: 'The focuser is already at a mechanical limit. Autofocus starts from the current position and will not command 0 or MaxStep.',
+      message:
+        'The focuser is already at a mechanical limit. Autofocus starts from the current position and will not command 0 or MaxStep.',
     }
   }
 
@@ -63,13 +69,15 @@ export function planStarHfrWalk(
     return {
       ok: false,
       reason: 'window-hits-limit',
-      message: 'That step-size window would approach 0 or MaxStep. Choose a smaller step or start farther from the ends. Vela will not move.',
+      message:
+        'That step-size window would approach 0 or MaxStep. Choose a smaller step or start farther from the ends. Vela will not move.',
     }
   }
 
   const positions: number[] = []
 
-  for (let position = maxPosition; position >= minPosition; position -= stepSize) positions.push(position)
+  for (let position = maxPosition; position >= minPosition; position -= stepSize)
+    positions.push(position)
 
   return {
     ok: true,
@@ -77,39 +85,58 @@ export function planStarHfrWalk(
   }
 }
 
-export function assertCommandedPosition(position: number, plan: AutofocusWalkPlan, extraMin?: number) {
+export function assertCommandedPosition(
+  position: number,
+  plan: AutofocusWalkPlan,
+  extraMin?: number,
+) {
   if (position === 0) {
-    throw new Error('Focuser position 0 is a mechanical stop, not a home. Vela will not command Move(0).')
+    throw new Error(
+      'Focuser position 0 is a mechanical stop, not a home. Vela will not command Move(0).',
+    )
   }
 
-  if (!Number.isSafeInteger(position) || position < MECHANICAL_END_MARGIN || position > plan.maxStep - MECHANICAL_END_MARGIN) {
-    throw new Error('That focuser move would approach a mechanical travel limit. Vela will not command it.')
+  if (
+    !Number.isSafeInteger(position) ||
+    position < MECHANICAL_END_MARGIN ||
+    position > plan.maxStep - MECHANICAL_END_MARGIN
+  ) {
+    throw new Error(
+      'That focuser move would approach a mechanical travel limit. Vela will not command it.',
+    )
   }
 
   const floor = extraMin ?? plan.minPosition
 
   if (position < floor || position > plan.maxPosition) {
-    throw new Error('That focuser move would leave the autofocus window around the starting position.')
+    throw new Error(
+      'That focuser move would leave the autofocus window around the starting position.',
+    )
   }
 }
 
 /** One or two extra inward samples to close a V whose minimum is still at the inner edge. */
 export function extraInwardPosition(
   plan: AutofocusWalkPlan,
-  samples: { position: number, hfrPixels: number | null }[],
+  samples: { position: number; hfrPixels: number | null }[],
 ): number | undefined {
   if (samples.length >= plan.positions.length + 2) return undefined
   const measured = samples.filter(sample => sample.hfrPixels !== null)
 
   if (!measured.length) return undefined
-  const lowest = measured.reduce((best, sample) => sample.hfrPixels! < best.hfrPixels! ? sample : best)
+
+  const lowest = measured.reduce((best, sample) =>
+    sample.hfrPixels! < best.hfrPixels! ? sample : best,
+  )
+
   const inner = Math.min(...samples.map(sample => sample.position))
 
   if (lowest.position !== inner) return undefined
   const next = inner - plan.stepSize
   const floor = plan.start - (plan.offsetSteps + 2) * plan.stepSize
 
-  if (next < MECHANICAL_END_MARGIN || next < floor || next > plan.maxStep - MECHANICAL_END_MARGIN) return undefined
+  if (next < MECHANICAL_END_MARGIN || next < floor || next > plan.maxStep - MECHANICAL_END_MARGIN)
+    return undefined
 
   return next
 }

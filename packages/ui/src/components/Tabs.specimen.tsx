@@ -23,10 +23,12 @@ export const specimen: ComponentSpecimen = {
             label: 'Status',
             content: (
               <div className="vela-specimen-copy">
-                <Badge marker={<i />} tone="positive">Connected</Badge>
+                <Badge marker={<i />} tone="positive">
+                  Connected
+                </Badge>
                 <p>Camera temperature is stable at −5.0 °C.</p>
               </div>
-            )
+            ),
           },
           {
             id: 'settings',
@@ -36,7 +38,7 @@ export const specimen: ComponentSpecimen = {
                 <strong>Gain 100 · Offset 50</strong>
                 <p>Applied to the next exposure.</p>
               </div>
-            )
+            ),
           },
           {
             id: 'history',
@@ -46,11 +48,11 @@ export const specimen: ComponentSpecimen = {
                 <strong>42 completed exposures</strong>
                 <p>Last frame completed 18 seconds ago.</p>
               </div>
-            )
+            ),
           },
         ]}
         size={z.enum(['small', 'medium']).parse(props.size)}
-        onValueChange={(selected) => onPropsChange?.({ selected })}
+        onValueChange={selected => onPropsChange?.({ selected })}
         value={String(props.selected)}
       />
     </div>

@@ -4,7 +4,11 @@ import { capturePreviews, type ImageColor } from '../imaging/preview.js'
 import { measureStars } from '../imaging/statistics.js'
 import { PREVIEW_VERSION } from '../imaging/background.js'
 import { encodeCaptureFits } from '../imaging/fits.js'
-import { createMemorySavedImageStore, type SavedImageStore, type SavedImageFiles } from '../saved-images/store.js'
+import {
+  createMemorySavedImageStore,
+  type SavedImageStore,
+  type SavedImageFiles,
+} from '../saved-images/store.js'
 
 export interface CaptureFrame {
   width: number
@@ -44,7 +48,7 @@ export interface CaptureRunOptions {
 }
 
 export function createCaptureController(
-  settings: { rigId: string, rigName: string },
+  settings: { rigId: string; rigName: string },
   now = Date.now,
   savedImages: SavedImageStore = createMemorySavedImageStore(),
 ) {
@@ -71,12 +75,15 @@ export function createCaptureController(
   let running: Promise<void> | undefined
   let cancellation: AbortController | undefined
 
-  const images = new Map<string, {
-    native: Buffer
-    fit: Buffer | undefined
-    fits?: Buffer
-    metadata: CaptureImage
-  }>()
+  const images = new Map<
+    string,
+    {
+      native: Buffer
+      fit: Buffer | undefined
+      fits?: Buffer
+      metadata: CaptureImage
+    }
+  >()
 
   function patch(next: Partial<CaptureView>) {
     view = { ...view, ...next }
@@ -128,20 +135,22 @@ export function createCaptureController(
         patch({ phase: 'exposing', elapsedSeconds: 0, captureReadState: 'current' })
         let capturePending = true
 
-        const frame = await camera.capture({
-          exposureSeconds,
-          signal,
-          onProgress(progress) {
-            if (capturePending && !signal.aborted)
-              patch({ phase: progress.phase, elapsedSeconds: progress.elapsedSeconds })
-          },
-          onReadState(captureReadState) {
-            if (capturePending && !signal.aborted) patch({ captureReadState })
-          },
-        }).finally(() => {
-          capturePending = false
-          patch({ captureReadState: 'current' })
-        })
+        const frame = await camera
+          .capture({
+            exposureSeconds,
+            signal,
+            onProgress(progress) {
+              if (capturePending && !signal.aborted)
+                patch({ phase: progress.phase, elapsedSeconds: progress.elapsedSeconds })
+            },
+            onReadState(captureReadState) {
+              if (capturePending && !signal.aborted) patch({ captureReadState })
+            },
+          })
+          .finally(() => {
+            capturePending = false
+            patch({ captureReadState: 'current' })
+          })
 
         // A completed acquisition wins a race with Stop: publish the actual result.
         if (!signal.aborted) patch({ phase: 'reading' })
@@ -178,7 +187,8 @@ export function createCaptureController(
           }
         }
 
-        if (frame.capturedAtSource) metadata = { ...metadata, capturedAtSource: frame.capturedAtSource }
+        if (frame.capturedAtSource)
+          metadata = { ...metadata, capturedAtSource: frame.capturedAtSource }
 
         images.set(id, { ...previews, fits, metadata })
 
@@ -194,7 +204,9 @@ export function createCaptureController(
           try {
             await keep(id)
           } catch (error) {
-            throw new Error(`Image could not be saved. Capture stopped; try keeping the latest image again. ${error instanceof Error ? error.message : 'Storage unavailable.'}`)
+            throw new Error(
+              `Image could not be saved. Capture stopped; try keeping the latest image again. ${error instanceof Error ? error.message : 'Storage unavailable.'}`,
+            )
           }
 
           patch({ phase: 'complete' })
@@ -202,7 +214,11 @@ export function createCaptureController(
       } while (repeat && !signal.aborted)
     } catch (error) {
       if (signal.aborted && error instanceof CaptureStoppedError) patch({ phase: 'stopped' })
-      else patch({ phase: 'failed', error: error instanceof Error ? error.message : 'Exposure failed' })
+      else
+        patch({
+          phase: 'failed',
+          error: error instanceof Error ? error.message : 'Exposure failed',
+        })
     } finally {
       patch({ active: false, captureReadState: 'current' })
     }
@@ -231,7 +247,14 @@ export function createCaptureController(
       error: null,
       captureReadState: 'current',
     })
-    running = acquire(exposureSeconds, cancellation.signal, camera, cameraName, repeat, saveFrames).finally(() => {
+    running = acquire(
+      exposureSeconds,
+      cancellation.signal,
+      camera,
+      cameraName,
+      repeat,
+      saveFrames,
+    ).finally(() => {
       running = undefined
       onSettled?.()
     })

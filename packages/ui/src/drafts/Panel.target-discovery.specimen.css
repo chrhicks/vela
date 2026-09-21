@@ -12,16 +12,19 @@
 }
 .vela-discovery-demo__eyebrow {
   color: var(--vela-accent);
-  font-size: .8em;
+  font-size: 0.8em;
   font-weight: 650;
 }
 .vela-discovery-demo h1 {
   margin: 0;
   font-size: clamp(1.45rem, 4cqi, 2rem);
   font-weight: 650;
-  letter-spacing: -.025em;
+  letter-spacing: -0.025em;
 }
-.vela-discovery-demo__header p:last-child { margin: 8px 0 0; color: var(--vela-text-muted); }
+.vela-discovery-demo__header p:last-child {
+  margin: 8px 0 0;
+  color: var(--vela-text-muted);
+}
 .vela-discovery-demo__snapshot {
   display: flex;
   justify-content: space-between;
@@ -29,7 +32,7 @@
   gap: 8px 20px;
   padding: 22px 0 16px;
   color: var(--vela-text-muted);
-  font-size: .75em;
+  font-size: 0.75em;
 }
 .vela-discovery-demo__filters {
   display: flex;
@@ -42,27 +45,35 @@
   background: var(--vela-surface);
   color: var(--vela-text-muted);
   font: inherit;
-  font-size: .8em;
+  font-size: 0.8em;
   padding: 8px 14px;
   cursor: pointer;
 }
-.vela-discovery-demo__filters button[aria-pressed=true] {
+.vela-discovery-demo__filters button[aria-pressed='true'] {
   color: var(--vela-text);
   background: var(--vela-surface-raised);
   border-color: var(--vela-accent);
 }
-.vela-discovery-demo__filters button:focus-visible { outline: 2px solid var(--vela-focus); outline-offset: 3px; }
+.vela-discovery-demo__filters button:focus-visible {
+  outline: 2px solid var(--vela-focus);
+  outline-offset: 3px;
+}
 .vela-discovery-demo__filter-note {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 6px;
-  font-size: .75em;
+  font-size: 0.75em;
   line-height: 1.6;
   color: var(--vela-text-muted);
   margin: 18px 0;
 }
-.vela-discovery-demo__filter-note strong { color: var(--vela-text); font-weight: 500; }
-.vela-discovery-demo__filter-note span { flex-basis: 100%; }
+.vela-discovery-demo__filter-note strong {
+  color: var(--vela-text);
+  font-weight: 500;
+}
+.vela-discovery-demo__filter-note span {
+  flex-basis: 100%;
+}
 .vela-discovery-demo__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -93,13 +104,15 @@
   color: var(--vela-text);
   background: var(--vela-surface);
   border-radius: var(--vela-radius);
-  font-size: .7em;
+  font-size: 0.7em;
 }
-.vela-discovery-demo__body { padding: 20px; }
+.vela-discovery-demo__body {
+  padding: 20px;
+}
 .vela-discovery-demo__catalog {
   margin: 0 0 6px;
   color: var(--vela-text-muted);
-  font-size: .75em;
+  font-size: 0.75em;
 }
 .vela-discovery-demo h2 {
   margin: 0 0 18px;
@@ -109,12 +122,18 @@
 .vela-discovery-demo__window {
   display: grid;
   gap: 5px;
-  font-size: .82em;
+  font-size: 0.82em;
 }
-.vela-discovery-demo__window strong { color: var(--vela-positive); font-weight: 550; }
-.vela-discovery-demo__window span, .vela-discovery-demo__reason { color: var(--vela-text-muted); }
+.vela-discovery-demo__window strong {
+  color: var(--vela-positive);
+  font-weight: 550;
+}
+.vela-discovery-demo__window span,
 .vela-discovery-demo__reason {
-  font-size: .8em;
+  color: var(--vela-text-muted);
+}
+.vela-discovery-demo__reason {
+  font-size: 0.8em;
   line-height: 1.6;
   min-height: 2.6em;
 }
@@ -122,37 +141,63 @@
   border-top: 1px solid var(--vela-line);
   margin: 18px 0;
   padding-top: 16px;
-  font-size: .76em;
+  font-size: 0.76em;
   line-height: 1.6;
 }
-.vela-discovery-demo__advice strong { font-weight: 550; }
-.vela-discovery-demo__advice p { margin: 4px 0 0; color: var(--vela-text-muted); }
-.vela-discovery-demo__body > .vela-button { width: 100%; justify-content: space-between; }
+.vela-discovery-demo__advice strong {
+  font-weight: 550;
+}
+.vela-discovery-demo__advice p {
+  margin: 4px 0 0;
+  color: var(--vela-text-muted);
+}
+.vela-discovery-demo__body > .vela-button {
+  width: 100%;
+  justify-content: space-between;
+}
 .vela-discovery-demo__body small {
   display: block;
   margin-top: 14px;
   color: var(--vela-text-muted);
-  font-size: .6em;
+  font-size: 0.6em;
   line-height: 1.5;
 }
-.vela-discovery-demo__body small a { color: inherit; }
+.vela-discovery-demo__body small a {
+  color: inherit;
+}
 .vela-discovery-demo__footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 10px;
   padding: 20px 0;
-  font-size: .8em;
+  font-size: 0.8em;
   color: var(--vela-text-muted);
 }
-.vela-discovery-demo__footer > div { display: flex; gap: 8px; }
-.vela-discovery-demo__selection { font-size: .8em; color: var(--vela-text-muted); }
+.vela-discovery-demo__footer > div {
+  display: flex;
+  gap: 8px;
+}
+.vela-discovery-demo__selection {
+  font-size: 0.8em;
+  color: var(--vela-text-muted);
+}
 @container (max-width: 580px) {
-  .vela-discovery-demo__grid { grid-template-columns: 1fr; }
-  .vela-discovery-demo__header { align-items: flex-start; }
-  .vela-discovery-demo__header > .vela-button { margin-top: 12px; }
-  .vela-discovery-demo__body { padding: 16px; }
-  .vela-discovery-demo__footer { flex-wrap: wrap; }
+  .vela-discovery-demo__grid {
+    grid-template-columns: 1fr;
+  }
+  .vela-discovery-demo__header {
+    align-items: flex-start;
+  }
+  .vela-discovery-demo__header > .vela-button {
+    margin-top: 12px;
+  }
+  .vela-discovery-demo__body {
+    padding: 16px;
+  }
+  .vela-discovery-demo__footer {
+    flex-wrap: wrap;
+  }
 }
 
 .vela-discovery-demo__search {
@@ -161,12 +206,15 @@
   align-items: flex-end;
   margin-bottom: 16px;
 }
-.vela-discovery-demo__search > .vela-field { flex: 1; min-width: 0; }
+.vela-discovery-demo__search > .vela-field {
+  flex: 1;
+  min-width: 0;
+}
 .vela-discovery-demo__search label {
   display: grid;
   gap: 5px;
   color: var(--vela-text-muted);
-  font-size: .75em;
+  font-size: 0.75em;
 }
 .vela-discovery-demo__search select {
   min-height: var(--vela-control-height);
@@ -189,8 +237,11 @@
 .vela-discovery-demo__empty {
   padding: 30px 0;
   color: var(--vela-text-muted);
-  font-size: .85em;
+  font-size: 0.85em;
 }
 @container (max-width: 580px) {
-  .vela-discovery-demo__search { flex-direction: column; align-items: stretch; }
+  .vela-discovery-demo__search {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }

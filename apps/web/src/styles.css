@@ -1,5 +1,5 @@
-@import "tailwindcss";
-@import "@vela/ui/styles.css";
+@import 'tailwindcss';
+@import '@vela/ui/styles.css';
 
 @theme inline {
   --color-ui-bg: var(--vela-canvas);
@@ -17,7 +17,9 @@
   --color-ui-focus: var(--vela-focus);
 }
 
-:root { color-scheme: dark; }
+:root {
+  color-scheme: dark;
+}
 
 html,
 body,

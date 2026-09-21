@@ -5,7 +5,7 @@ import { setImmediate } from 'node:timers/promises'
 import { backgroundOffsets, linkedRange } from './background.js'
 
 /** A display stretch at native dimensions; acquisition pixels remain unchanged. */
-export type ImageColor = { kind: 'mono' } | { kind: 'bayer', pattern: BayerPattern }
+export type ImageColor = { kind: 'mono' } | { kind: 'bayer'; pattern: BayerPattern }
 
 export async function previewPng(
   width: number,
@@ -80,9 +80,10 @@ async function stretch(
     if (y % 16 === 0) await setImmediate()
 
     for (let x = 0; x < width; x++) {
-      const rgb = color.kind === 'bayer'
-        ? bayerPixel(width, height, pixels, color.pattern, x, y)
-        : [pixels[y * width + x]!]
+      const rgb =
+        color.kind === 'bayer'
+          ? bayerPixel(width, height, pixels, color.pattern, x, y)
+          : [pixels[y * width + x]!]
 
       for (let channel = 0; channel < channels; channel++) {
         data[y * stride + x * channels + channel + 1] = display(rgb[channel]! - offsets[channel]!)

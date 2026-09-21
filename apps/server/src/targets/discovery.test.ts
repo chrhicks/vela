@@ -56,10 +56,15 @@ describe('target discovery', () => {
       expect(ineligible).toBe(false)
       expect(Date.parse(opportunity.startsAt)).toBeGreaterThanOrEqual(now.getTime())
       expect(Date.parse(opportunity.endsAt)).toBeLessThanOrEqual(Date.parse(result.window!.endsAt))
-      expect(Date.parse(opportunity.bestAt)).toBeGreaterThanOrEqual(Date.parse(opportunity.startsAt))
+      expect(Date.parse(opportunity.bestAt)).toBeGreaterThanOrEqual(
+        Date.parse(opportunity.startsAt),
+      )
       expect(Date.parse(opportunity.bestAt)).toBeLessThanOrEqual(Date.parse(opportunity.endsAt))
       expect(opportunity.usefulMinutes).toBeGreaterThan(0)
-      expect(opportunity.usefulMinutes).toBeCloseTo((Date.parse(opportunity.endsAt) - Date.parse(opportunity.startsAt)) / 60_000, 4)
+      expect(opportunity.usefulMinutes).toBeCloseTo(
+        (Date.parse(opportunity.endsAt) - Date.parse(opportunity.startsAt)) / 60_000,
+        4,
+      )
       expect(opportunity.bestAltitudeDegrees).toBeGreaterThanOrEqual(30 - 1e-8)
       expect(Number.isFinite(opportunity.currentAltitudeDegrees)).toBe(true)
     }
@@ -74,7 +79,11 @@ describe('target discovery', () => {
     const result = discoverTargets({ targets: listTargets(), site, now: date })
     expect(result.window?.kind).toBe('upcoming-night')
     expect(Date.parse(result.window!.startsAt)).toBeGreaterThan(date.getTime())
-    expect(result.candidates.some(candidate => candidate.eligible && candidate.opportunity!.currentAltitudeDegrees < 0)).toBe(true)
+    expect(
+      result.candidates.some(
+        candidate => candidate.eligible && candidate.opportunity!.currentAltitudeDegrees < 0,
+      ),
+    ).toBe(true)
   })
 
   it('matches precise altitude at useful interval edges and maxima across RA wrap and circumpolar targets', () => {
@@ -90,12 +99,17 @@ describe('target discovery', () => {
     for (const candidate of result.candidates) {
       const opportunity = candidate.opportunity!
       expect(opportunity).not.toBeNull()
-      expect(Math.abs(preciseAltitude(candidate.target, opportunity.bestAt) - opportunity.bestAltitudeDegrees)).toBeLessThan(0.02)
+      expect(
+        Math.abs(
+          preciseAltitude(candidate.target, opportunity.bestAt) - opportunity.bestAltitudeDegrees,
+        ),
+      ).toBeLessThan(0.02)
 
       for (const at of [opportunity.startsAt, opportunity.endsAt]) {
         expect(preciseAltitude(candidate.target, at)).toBeGreaterThan(29.98)
 
-        if (at !== result.window!.startsAt && at !== result.window!.endsAt) expect(preciseAltitude(candidate.target, at)).toBeCloseTo(30, 1)
+        if (at !== result.window!.startsAt && at !== result.window!.endsAt)
+          expect(preciseAltitude(candidate.target, at)).toBeCloseTo(30, 1)
       }
     }
   })
@@ -103,7 +117,12 @@ describe('target discovery', () => {
   it('finds a brief grazing transit between samples and excludes a target that never reaches 30 degrees', () => {
     const peak = new Date('2026-09-07T04:07:30Z')
     const raDegrees = (SiderealTime(peak) * 15 + site.longitudeDegrees + 360) % 360
-    const grazer = target('grazer', fromMount({ raDegrees, decDegrees: -19.99 }, 'topocentric', peak, site))
+
+    const grazer = target(
+      'grazer',
+      fromMount({ raDegrees, decDegrees: -19.99 }, 'topocentric', peak, site),
+    )
+
     const hidden = target('hidden', { decDegrees: -80 })
     const result = discoverTargets({ targets: [grazer, hidden], site, now })
     const opportunity = result.candidates[0]!.opportunity!
@@ -113,32 +132,41 @@ describe('target discovery', () => {
     expect(result.candidates[1]!.eligible).toBe(false)
   })
 
-  it.each([90, -90])('handles continuous darkness and finite altitudes at latitude %s', latitudeDegrees => {
-    const location = { ...site, latitudeDegrees }
-    const date = new Date(latitudeDegrees > 0 ? '2026-12-21T00:00:00Z' : '2026-06-21T00:00:00Z')
+  it.each([90, -90])(
+    'handles continuous darkness and finite altitudes at latitude %s',
+    latitudeDegrees => {
+      const location = { ...site, latitudeDegrees }
+      const date = new Date(latitudeDegrees > 0 ? '2026-12-21T00:00:00Z' : '2026-06-21T00:00:00Z')
 
-    const result = discoverTargets({
-      targets: [target('polar', { decDegrees: latitudeDegrees > 0 ? 60 : -60 })],
-      site: location,
-      now: date,
-    })
+      const result = discoverTargets({
+        targets: [target('polar', { decDegrees: latitudeDegrees > 0 ? 60 : -60 })],
+        site: location,
+        now: date,
+      })
 
-    expect(result.window?.kind).toBe('polar-night')
-    const opportunity = result.candidates[0]!.opportunity!
-    expect(opportunity.usefulMinutes).toBeCloseTo(1440, 6)
-    expect(Number.isFinite(opportunity.bestAltitudeDegrees)).toBe(true)
-    expect(Number.isFinite(opportunity.currentAltitudeDegrees)).toBe(true)
-  })
+      expect(result.window?.kind).toBe('polar-night')
+      const opportunity = result.candidates[0]!.opportunity!
+      expect(opportunity.usefulMinutes).toBeCloseTo(1440, 6)
+      expect(Number.isFinite(opportunity.bestAltitudeDegrees)).toBe(true)
+      expect(Number.isFinite(opportunity.currentAltitudeDegrees)).toBe(true)
+    },
+  )
 
   it('retains the searchable catalog without false recommendations when site or darkness is unavailable', () => {
     const targets = [target('b'), target('a')]
 
-    for (const location of [null, { ...site, latitudeDegrees: NaN }, { ...site, longitudeDegrees: 181 }]) {
+    for (const location of [
+      null,
+      { ...site, latitudeDegrees: NaN },
+      { ...site, longitudeDegrees: 181 },
+    ]) {
       const result = discoverTargets({ targets, site: location, now })
       expect(result.status).toBe('site-unavailable')
       expect(result.window).toBeNull()
       expect(result.candidates.map(candidate => candidate.target.id)).toEqual(['a', 'b'])
-      expect(result.candidates.every(candidate => !candidate.eligible && candidate.opportunity === null)).toBe(true)
+      expect(
+        result.candidates.every(candidate => !candidate.eligible && candidate.opportunity === null),
+      ).toBe(true)
     }
 
     const polarDay = discoverTargets({
@@ -153,19 +181,37 @@ describe('target discovery', () => {
   })
 
   it('distinguishes emission lines, continuum and uncertain mixed labels without inventing angular sizes', () => {
-    const records = ['ic1396', 'ic1805', 'ic1848', 'ngc1432', 'ngc1435', 'ngc7023', 'ngc0224', 'ngc6720'].map(id => getTarget(id)!)
-    const uncertain = target('mixed', { type: 'Star cluster and nebula', majorAxisArcminutes: null })
+    const records = [
+      'ic1396',
+      'ic1805',
+      'ic1848',
+      'ngc1432',
+      'ngc1435',
+      'ngc7023',
+      'ngc0224',
+      'ngc6720',
+    ].map(id => getTarget(id)!)
+
+    const uncertain = target('mixed', {
+      type: 'Star cluster and nebula',
+      majorAxisArcminutes: null,
+    })
+
     const result = discoverTargets({ targets: [...records, uncertain], site: null, now })
 
     for (const candidate of result.candidates) {
-      expect(candidate.filter).toBe(candidate.target.id === 'mixed'
-        ? 'uncertain'
-        : ['ngc1432', 'ngc1435', 'ngc7023', 'ngc0224'].includes(candidate.target.id)
-          ? 'broadband'
-          : 'dual-band')
+      expect(candidate.filter).toBe(
+        candidate.target.id === 'mixed'
+          ? 'uncertain'
+          : ['ngc1432', 'ngc1435', 'ngc7023', 'ngc0224'].includes(candidate.target.id)
+            ? 'broadband'
+            : 'dual-band',
+      )
     }
 
-    expect(result.candidates.find(candidate => candidate.target.id === 'mixed')!.target).toBe(uncertain)
+    expect(result.candidates.find(candidate => candidate.target.id === 'mixed')!.target).toBe(
+      uncertain,
+    )
     expect(uncertain.majorAxisArcminutes).toBeNull()
   })
 
@@ -179,11 +225,20 @@ describe('target discovery', () => {
       majorAxisArcminutes: 120,
     })
 
-    const sustained = target('ordinary', { ...fromMount({ raDegrees: lst, decDegrees: 40 }, 'topocentric', now, site) })
+    const sustained = target('ordinary', {
+      ...fromMount({ raDegrees: lst, decDegrees: 40 }, 'topocentric', now, site),
+    })
+
     const result = discoverTargets({ targets: [setting, sustained], site, now })
     expect(result.candidates.map(candidate => candidate.target.id)).toEqual(['ordinary', 'ngc1976'])
     expect(result.candidates[1]!.opportunity!.usefulMinutes).toBeLessThan(2)
-    const later = discoverTargets({ targets: [setting], site, now: new Date(now.getTime() + 300_000) })
+
+    const later = discoverTargets({
+      targets: [setting],
+      site,
+      now: new Date(now.getTime() + 300_000),
+    })
+
     expect(later.candidates[0]!.eligible).toBe(false)
   })
 

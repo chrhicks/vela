@@ -22,28 +22,30 @@ const saved: TargetDiscoveryView = {
   offset: 0,
   pageSize: 2,
   total: 6,
-  targets: [{
-    id: 'm31',
-    name: 'Andromeda Galaxy',
-    catalog: 'M31',
-    kind: 'Galaxy',
-    raDegrees: 10.6847,
-    decDegrees: 41.269,
-    sizeArcminutes: 178,
-    thumbnailUrl: '/api/survey/thumbnail?ra=10&dec=41&fov=3',
-    sky: null,
-    category: 'galaxy',
-    filterChoice: 'broadband',
-    filterReason: 'Broadband preserves the galaxy’s starlight.',
-    opportunity: {
-      startsAt: '2026-09-08T02:00:00.000Z',
-      endsAt: '2026-09-08T07:00:00.000Z',
-      usefulMinutes: 300,
-      bestAt: '2026-09-08T05:00:00.000Z',
-      bestAltitudeDegrees: 80,
-      currentAltitudeDegrees: 48,
+  targets: [
+    {
+      id: 'm31',
+      name: 'Andromeda Galaxy',
+      catalog: 'M31',
+      kind: 'Galaxy',
+      raDegrees: 10.6847,
+      decDegrees: 41.269,
+      sizeArcminutes: 178,
+      thumbnailUrl: '/api/survey/thumbnail?ra=10&dec=41&fov=3',
+      sky: null,
+      category: 'galaxy',
+      filterChoice: 'broadband',
+      filterReason: 'Broadband preserves the galaxy’s starlight.',
+      opportunity: {
+        startsAt: '2026-09-08T02:00:00.000Z',
+        endsAt: '2026-09-08T07:00:00.000Z',
+        usefulMinutes: 300,
+        bestAt: '2026-09-08T05:00:00.000Z',
+        bestAltitudeDegrees: 80,
+        currentAltitudeDegrees: 48,
+      },
     },
-  }],
+  ],
 }
 
 async function seed(page: Page) {
@@ -59,22 +61,19 @@ function response(url: URL, snapshotId = saved.snapshotId): TargetDiscoveryView 
     ...saved,
     snapshotId,
     query: url.searchParams.get('q') ?? '',
-    category: z.enum([
-      'all',
-      'emission',
-      'reflection-dark',
-      'galaxy',
-      'cluster',
-      'planetary',
-      'other',
-    ]).parse(url.searchParams.get('category') ?? 'all'),
-    filter: z.enum(['all', 'dual-band', 'broadband', 'uncertain'])
+    category: z
+      .enum(['all', 'emission', 'reflection-dark', 'galaxy', 'cluster', 'planetary', 'other'])
+      .parse(url.searchParams.get('category') ?? 'all'),
+    filter: z
+      .enum(['all', 'dual-band', 'broadband', 'uncertain'])
       .parse(url.searchParams.get('filter') ?? 'all'),
     offset: Number(url.searchParams.get('offset') ?? 0),
   }
 }
 
-test('saved suggestions paint on reload without recalculating, including on a phone', async ({ page }) => {
+test('saved suggestions paint on reload without recalculating, including on a phone', async ({
+  page,
+}) => {
   await seed(page)
   await page.setViewportSize({ width: 390, height: 844 })
   let requests = 0
@@ -93,7 +92,9 @@ test('saved suggestions paint on reload without recalculating, including on a ph
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
 })
 
-test('type, light preference and page preserve the calculation; Refresh resets the page and gets a new one', async ({ page }) => {
+test('type, light preference and page preserve the calculation; Refresh resets the page and gets a new one', async ({
+  page,
+}) => {
   await seed(page)
   const requests: URL[] = []
   await page.route('**/api/web/rigs/rig-1/target-discovery?*', route => {
@@ -112,38 +113,74 @@ test('type, light preference and page preserve the calculation; Refresh resets t
   await expect(page.getByRole('button', { name: 'Next', exact: true })).toBeEnabled()
   await page.getByRole('button', { name: 'Next', exact: true }).click()
   await expect(page.getByLabel('Target pages')).toContainText('3–4 of 6')
-  expect(requests.map(url => url.searchParams.get('snapshot'))).toEqual(['night-original', 'night-original', 'night-original'])
+  expect(requests.map(url => url.searchParams.get('snapshot'))).toEqual([
+    'night-original',
+    'night-original',
+    'night-original',
+  ])
   expect(requests[2]!.searchParams.get('offset')).toBe('2')
   await page.getByRole('button', { name: 'Refresh', exact: true }).click()
   await expect(page.getByLabel('Target pages')).toContainText('1–2 of 6')
   const refresh = requests.find(url => !url.searchParams.has('snapshot'))
   expect(refresh).toBeDefined()
-  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('vela:target-discovery:v1:rig-1')!).snapshotId)).toBe('night-refreshed')
-  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('vela:target-discovery:v1:rig-1')!).offset)).toBe(0)
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => JSON.parse(localStorage.getItem('vela:target-discovery:v1:rig-1')!).snapshotId,
+      ),
+    )
+    .toBe('night-refreshed')
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => JSON.parse(localStorage.getItem('vela:target-discovery:v1:rig-1')!).offset,
+      ),
+    )
+    .toBe(0)
   await expect(page.getByRole('button', { name: 'Next', exact: true })).toBeEnabled()
   await page.getByRole('button', { name: 'Next', exact: true }).click()
   await expect(page.getByLabel('Target pages')).toContainText('3–4 of 6')
   expect(requests.at(-1)!.searchParams.get('snapshot')).toBe('night-refreshed')
-  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('vela:target-discovery:v1:rig-1')!).offset)).toBe(2)
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => JSON.parse(localStorage.getItem('vela:target-discovery:v1:rig-1')!).offset,
+      ),
+    )
+    .toBe(2)
 })
 
 for (const status of [503, 410]) {
-  test(`${status} keeps the previous cards and tells the user the requested selection failed`, async ({ page }) => {
+  test(`${status} keeps the previous cards and tells the user the requested selection failed`, async ({
+    page,
+  }) => {
     await seed(page)
-    await page.route('**/api/web/rigs/rig-1/target-discovery?*', route => route.fulfill({ status, json: { error: 'Unavailable' } }))
+    await page.route('**/api/web/rigs/rig-1/target-discovery?*', route =>
+      route.fulfill({ status, json: { error: 'Unavailable' } }),
+    )
     await page.goto('/rigs/rig-1/observe/targets')
     await page.getByRole('button', { name: 'Emission nebulae', exact: true }).click()
-    await expect(page.getByRole('alert')).toContainText(status === 410 ? 'no longer available on the server' : 'Could not load these targets')
-    await expect(page.getByText('The cards below still show your previous selection.')).toBeVisible()
+    await expect(page.getByRole('alert')).toContainText(
+      status === 410 ? 'no longer available on the server' : 'Could not load these targets',
+    )
+    await expect(
+      page.getByText('The cards below still show your previous selection.'),
+    ).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Andromeda Galaxy' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled()
   })
 }
 
-test('returning to the saved selection cancels a pending page without leaving Refresh disabled', async ({ page }) => {
+test('returning to the saved selection cancels a pending page without leaving Refresh disabled', async ({
+  page,
+}) => {
   await seed(page)
   let release!: () => void
-  const gate = new Promise<void>(resolve => { release = resolve })
+
+  const gate = new Promise<void>(resolve => {
+    release = resolve
+  })
+
   let requested = false
   await page.route('**/api/web/rigs/rig-1/target-discovery?*', async route => {
     requested = true
@@ -158,14 +195,21 @@ test('returning to the saved selection cancels a pending page without leaving Re
   await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled()
   release()
   await expect(page.getByRole('heading', { name: 'Andromeda Galaxy' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'All objects', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('button', { name: 'All objects', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  )
 })
 
 for (const width of [1280, 390]) {
-  test(`page navigation moves to results but search, filters and refresh retain focus at ${width}px`, async ({ page }) => {
+  test(`page navigation moves to results but search, filters and refresh retain focus at ${width}px`, async ({
+    page,
+  }) => {
     await seed(page)
     await page.setViewportSize({ width, height: 844 })
-    await page.route('**/api/web/rigs/rig-1/target-discovery?*', route => route.fulfill({ json: response(new URL(route.request().url())) }))
+    await page.route('**/api/web/rigs/rig-1/target-discovery?*', route =>
+      route.fulfill({ json: response(new URL(route.request().url())) }),
+    )
     await page.goto('/rigs/rig-1/observe/targets')
     const results = page.locator('.vela-discovery__results')
     const search = page.getByRole('searchbox', { name: 'Find a target' })
@@ -214,7 +258,11 @@ for (const width of [1280, 390]) {
 test('a delayed page cannot steal focus after the user returns to search', async ({ page }) => {
   await seed(page)
   let release!: () => void
-  const gate = new Promise<void>(resolve => { release = resolve })
+
+  const gate = new Promise<void>(resolve => {
+    release = resolve
+  })
+
   await page.route('**/api/web/rigs/rig-1/target-discovery?*', async route => {
     const url = new URL(route.request().url())
 

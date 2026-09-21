@@ -1,5 +1,13 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { angularSeparationDegrees, horizonAt, horizonSectors, projectSky, visibleSkyPath, type HorizonPoint, type SkyCoordinate } from './sky-path-geometry'
+import {
+  angularSeparationDegrees,
+  horizonAt,
+  horizonSectors,
+  projectSky,
+  visibleSkyPath,
+  type HorizonPoint,
+  type SkyCoordinate,
+} from './sky-path-geometry'
 
 export type SkyLightPhase = 'daylight' | 'civil' | 'nautical' | 'astronomical' | 'night'
 
@@ -53,7 +61,7 @@ export function SkyPath({
   horizon,
   marginDegrees = 5,
   onMarginDegreesChange,
-  compact = false
+  compact = false,
 }: SkyPathProps) {
   const root = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(280)
@@ -83,7 +91,9 @@ export function SkyPath({
   const hasLight = samples.some(sample => sample.light !== undefined)
 
   const lightStatus = hasLight
-    ? selected?.light ? skyLightLabels[selected.light] : 'Light phase unavailable'
+    ? selected?.light
+      ? skyLightLabels[selected.light]
+      : 'Light phase unavailable'
     : undefined
 
   const moon = selected ? moonSamples?.[index] : undefined
@@ -103,7 +113,9 @@ export function SkyPath({
   const now = nowIndex === undefined ? undefined : samples[nowIndex]
   const margin = Number.isFinite(marginDegrees) ? Math.max(0, Math.min(30, marginDegrees)) : 5
   const sectors = horizon ? horizonSectors(horizon.points, margin, center, radius) : []
-  const localAltitude = selected && horizon ? horizonAt(horizon.points, selected.azimuthDegrees) : null
+
+  const localAltitude =
+    selected && horizon ? horizonAt(horizon.points, selected.azimuthDegrees) : null
 
   let selectedStatus: string
 
@@ -140,14 +152,13 @@ export function SkyPath({
       >
         <title id={`${id}-title`}>{targetName} through the night</title>
         <desc id={`${id}-description`}>
-          {'Overhead sky dome. North is up, east is left. Outer ring is altitude zero; center is altitude 90 degrees. '}
+          {
+            'Overhead sky dome. North is up, east is left. Outer ring is altitude zero; center is altitude 90 degrees. '
+          }
           {selected
             ? `${selected.label}, altitude ${selected.altitudeDegrees.toFixed(0)} degrees. ${selectedStatus}.`
-            : selectedStatus}
-          {' '}
-          {lightStatus}
-          {' '}
-          {moonStatus}
+            : selectedStatus}{' '}
+          {lightStatus} {moonStatus}
         </desc>
         <defs>
           <pattern
@@ -168,7 +179,9 @@ export function SkyPath({
               className={sector.unknown ? 'vela-sky-path__unknown' : 'vela-sky-path__silhouette'}
               fill={sector.unknown ? `url(#${id}-unknown)` : undefined}
             />
-            {!sector.unknown && margin > 0 && <path d={sector.band} className="vela-sky-path__margin" />}
+            {!sector.unknown && margin > 0 && (
+              <path d={sector.band} className="vela-sky-path__margin" />
+            )}
           </g>
         ))}
         {[0, 30, 60].map(altitude => (
@@ -176,7 +189,7 @@ export function SkyPath({
             key={altitude}
             cx={center}
             cy={center}
-            r={radius * (90 - altitude) / 90}
+            r={(radius * (90 - altitude)) / 90}
             className="vela-sky-path__grid"
           />
         ))}
@@ -202,14 +215,20 @@ export function SkyPath({
             className="vela-sky-path__wire"
           />
         ))}
-        {hasLight ? samples.slice(0, -1).map((sample, index) => (
-          <path
-            key={index}
-            d={visibleSkyPath([sample, samples[index + 1]!], center, radius)}
-            className="vela-sky-path__track vela-sky-path__light-track"
-            data-light={sample.light ?? 'unknown'}
-          />
-        )) : <path d={visibleSkyPath(samples, center, radius)} className="vela-sky-path__track" />}
+        {hasLight ? (
+          samples
+            .slice(0, -1)
+            .map((sample, index) => (
+              <path
+                key={index}
+                d={visibleSkyPath([sample, samples[index + 1]!], center, radius)}
+                className="vela-sky-path__track vela-sky-path__light-track"
+                data-light={sample.light ?? 'unknown'}
+              />
+            ))
+        ) : (
+          <path d={visibleSkyPath(samples, center, radius)} className="vela-sky-path__track" />
+        )}
         {labels.times.map(label => (
           <g key={label.sampleIndex}>
             <circle
@@ -219,19 +238,29 @@ export function SkyPath({
               className="vela-sky-path__hour"
               data-light={samples[label.sampleIndex]!.light}
             />
-            <text x={label.x} y={label.y} textAnchor="middle" className="vela-sky-path__time">{label.text}</text>
+            <text x={label.x} y={label.y} textAnchor="middle" className="vela-sky-path__time">
+              {label.text}
+            </text>
           </g>
         ))}
         {now && now.altitudeDegrees >= 0 && (
           <circle cx={point(now).x} cy={point(now).y} r="7" className="vela-sky-path__now" />
         )}
         {labels.now && (
-          <text x={labels.now.x} y={labels.now.y} textAnchor="middle" className="vela-sky-path__time">
+          <text
+            x={labels.now.x}
+            y={labels.now.y}
+            textAnchor="middle"
+            className="vela-sky-path__time"
+          >
             {nowLabel}
           </text>
         )}
         {moon && moon.altitudeDegrees >= 0 && (
-          <g className="vela-sky-path__moon" transform={`translate(${point(moon).x} ${point(moon).y})`}>
+          <g
+            className="vela-sky-path__moon"
+            transform={`translate(${point(moon).x} ${point(moon).y})`}
+          >
             <circle r="8" className="vela-sky-path__moon-disk" />
             <path
               d={moonPhasePath(moon.illuminationFraction)}
@@ -241,21 +270,36 @@ export function SkyPath({
           </g>
         )}
         {labels.moon && (
-          <text x={labels.moon.x} y={labels.moon.y} textAnchor="middle" className="vela-sky-path__moon-label">
+          <text
+            x={labels.moon.x}
+            y={labels.moon.y}
+            textAnchor="middle"
+            className="vela-sky-path__moon-label"
+          >
             Moon
           </text>
         )}
         {selected && selected.altitudeDegrees >= 0 && (
           <g>
-            <circle cx={point(selected).x} cy={point(selected).y} r="10" className="vela-sky-path__selection-halo" />
-            <circle cx={point(selected).x} cy={point(selected).y} r="4.5" className="vela-sky-path__selected" />
+            <circle
+              cx={point(selected).x}
+              cy={point(selected).y}
+              r="10"
+              className="vela-sky-path__selection-halo"
+            />
+            <circle
+              cx={point(selected).x}
+              cy={point(selected).y}
+              r="4.5"
+              className="vela-sky-path__selected"
+            />
           </g>
         )}
         {[
           ['N', center, 15],
           ['E', 12, center + 4],
           ['S', center, size - 7],
-          ['W', size - 12, center + 4]
+          ['W', size - 12, center + 4],
         ].map(([label, x, y]) => (
           <text key={label} x={x} y={y} textAnchor="middle" className="vela-sky-path__cardinal">
             {label}
@@ -277,7 +321,9 @@ export function SkyPath({
           {lightStatus}
         </p>
       )}
-      <label className="vela-sky-path__sr-only" htmlFor={`${id}-time`}>Preview time for {targetName}</label>
+      <label className="vela-sky-path__sr-only" htmlFor={`${id}-time`}>
+        Preview time for {targetName}
+      </label>
       <input
         id={`${id}-time`}
         className="vela-sky-path__range"
@@ -287,9 +333,11 @@ export function SkyPath({
         step="1"
         value={Math.max(0, index)}
         disabled={samples.length < 2}
-        aria-valuetext={selected
-          ? `${selected.label}, ${selected.altitudeDegrees.toFixed(0)} degrees altitude. ${selectedStatus}${lightStatus ? `. ${lightStatus}` : ''}${moonStatus ? `. ${moonStatus}` : ''}`
-          : 'No path samples'}
+        aria-valuetext={
+          selected
+            ? `${selected.label}, ${selected.altitudeDegrees.toFixed(0)} degrees altitude. ${selectedStatus}${lightStatus ? `. ${lightStatus}` : ''}${moonStatus ? `. ${moonStatus}` : ''}`
+            : 'No path samples'
+        }
         onChange={event => onSelectedIndexChange(Number(event.target.value))}
       />
       {samples.length > 0 && (
@@ -308,7 +356,10 @@ export function SkyPath({
           ))}
         </div>
       )}
-      <p className="vela-sky-path__status">{selectedStatus}{horizon?.state === 'uncalibrated' ? ' · Provisional horizon' : ''}</p>
+      <p className="vela-sky-path__status">
+        {selectedStatus}
+        {horizon?.state === 'uncalibrated' ? ' · Provisional horizon' : ''}
+      </p>
       {moonStatus && <p className="vela-sky-path__moon-status">{moonStatus}</p>}
       {horizon && (
         <>
@@ -351,20 +402,24 @@ export function SkyPath({
               onChange={event => onMarginDegreesChange(Number(event.target.value))}
             />
           )}
-          <p className="vela-sky-path__note">Margin follows the silhouette’s elevation; it does not measure wire clearance.{sectors.some(sector => sector.unknown) ? ' Hatched gaps have no known horizon height.' : ''}</p>
+          <p className="vela-sky-path__note">
+            Margin follows the silhouette’s elevation; it does not measure wire clearance.
+            {sectors.some(sector => sector.unknown)
+              ? ' Hatched gaps have no known horizon height.'
+              : ''}
+          </p>
         </>
       )}
     </div>
   )
 }
 
-
 type MapLabel = { text: string; x: number; y: number }
 
 type LabelBox = {
-  left: number;
-  right: number;
-  top: number;
+  left: number
+  right: number
+  top: number
   bottom: number
 }
 
@@ -377,16 +432,20 @@ function skyLabels(
   selected: SkyPathSample | undefined,
   moon: SkyPathMoonSample | null | undefined,
   size: number,
-  compact: boolean
+  compact: boolean,
 ) {
   const center = size / 2
   const radius = center - 27
   const occupied: LabelBox[] = []
 
-  const overlaps = (box: LabelBox) => occupied.some(other =>
-    box.left < other.right && box.right > other.left
-      && box.top < other.bottom && box.bottom > other.top
-  )
+  const overlaps = (box: LabelBox) =>
+    occupied.some(
+      other =>
+        box.left < other.right &&
+        box.right > other.left &&
+        box.top < other.bottom &&
+        box.bottom > other.top,
+    )
 
   for (const sample of [now, selected, moon]) {
     if (!sample || sample.altitudeDegrees < 0) continue
@@ -395,7 +454,7 @@ function skyLabels(
       left: x - 11,
       right: x + 11,
       top: y - 11,
-      bottom: y + 11
+      bottom: y + 11,
     })
   }
 
@@ -407,10 +466,16 @@ function skyLabels(
         left: position.x - halfWidth,
         right: position.x + halfWidth,
         top: position.y - 13,
-        bottom: position.y + 4
+        bottom: position.y + 4,
       }
 
-      if (box.left < 24 || box.right > size - 24 || box.top < 24 || box.bottom > size - 24 || overlaps(box))
+      if (
+        box.left < 24 ||
+        box.right > size - 24 ||
+        box.top < 24 ||
+        box.bottom > size - 24 ||
+        overlaps(box)
+      )
         continue
       occupied.push(box)
 
@@ -422,14 +487,18 @@ function skyLabels(
 
   function near(text: string, sample: SkyCoordinate, belowFirst = false) {
     const { x, y } = projectSky(sample, center, radius)
-    const vertical = [{ x, y: y - 16 }, { x, y: y + 26 }]
+
+    const vertical = [
+      { x, y: y - 16 },
+      { x, y: y + 26 },
+    ]
 
     if (belowFirst) vertical.reverse()
 
     return place(text, [
       ...vertical,
       { x: x - text.length * 3.5 - 16, y: y + 4 },
-      { x: x + text.length * 3.5 + 16, y: y + 4 }
+      { x: x + text.length * 3.5 + 16, y: y + 4 },
     ])
   }
 
@@ -437,13 +506,16 @@ function skyLabels(
   const moonLabel = moon && moon.altitudeDegrees >= 0 ? near('Moon', moon) : undefined
 
   const altitudes = [30, 60].flatMap(altitude => {
-    const y = center + radius * (90 - altitude) / 90 - 5
+    const y = center + (radius * (90 - altitude)) / 90 - 5
     const label = place(`${altitude}°`, [{ x: center + 16, y }])
 
     return label ? [label] : []
   })
 
-  const visible = samples.flatMap((sample, sampleIndex) => sample.altitudeDegrees >= 0 ? [{ sample, sampleIndex }] : [])
+  const visible = samples.flatMap((sample, sampleIndex) =>
+    sample.altitudeDegrees >= 0 ? [{ sample, sampleIndex }] : [],
+  )
+
   const wholeHours = visible.filter(({ sample }) => /(?:^|\s)\d{1,2}:00(?:\s|$)/.test(sample.label))
   const candidates = wholeHours.length ? wholeHours : visible
   const maximum = size < 340 || compact ? 3 : 7
@@ -451,7 +523,9 @@ function skyLabels(
   const times: (MapLabel & { sampleIndex: number })[] = []
 
   for (let index = 0; index < count; index += 1) {
-    const candidate = candidates[count === 1 ? 0 : Math.round(index * (candidates.length - 1) / (count - 1))]!
+    const candidate =
+      candidates[count === 1 ? 0 : Math.round((index * (candidates.length - 1)) / (count - 1))]!
+
     const label = near(candidate.sample.label, candidate.sample)
 
     if (label) times.push({ ...label, sampleIndex: candidate.sampleIndex })
@@ -461,7 +535,7 @@ function skyLabels(
     now: nowLabel,
     moon: moonLabel,
     altitudes,
-    times
+    times,
   }
 }
 
@@ -470,7 +544,9 @@ function skyLabels(
 function moonPhasePath(illuminationFraction: number) {
   const fraction = Math.max(0, Math.min(1, illuminationFraction))
   const terminatorRadius = Math.abs(1 - 2 * fraction) * 8
-  const terminator = terminatorRadius < .001 ? 'L0,-8' : `A${terminatorRadius},8 0 0 ${fraction < .5 ? 0 : 1} 0,-8`
+
+  const terminator =
+    terminatorRadius < 0.001 ? 'L0,-8' : `A${terminatorRadius},8 0 0 ${fraction < 0.5 ? 0 : 1} 0,-8`
 
   return `M0,-8 A8,8 0 0 1 0,8 ${terminator} Z`
 }

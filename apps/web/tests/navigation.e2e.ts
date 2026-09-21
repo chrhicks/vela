@@ -6,17 +6,19 @@ const initial: NavigationView = {
     { id: 'rig-1', name: 'Askar FRA 400' },
     { id: 'rig-2', name: 'Seestar S30' },
   ],
-  captures: [{
-    rigId: 'rig-1',
-    rigName: 'Askar FRA 400',
-    phase: 'exposing',
-    active: true,
-    captureReadState: 'current',
-    completedCount: 17,
-    elapsedSeconds: 18,
-    exposureSeconds: 60,
-    error: null,
-  }],
+  captures: [
+    {
+      rigId: 'rig-1',
+      rigName: 'Askar FRA 400',
+      phase: 'exposing',
+      active: true,
+      captureReadState: 'current',
+      completedCount: 17,
+      elapsedSeconds: 18,
+      exposureSeconds: 60,
+      error: null,
+    },
+  ],
 }
 
 for (const width of [1440, 390]) {
@@ -26,7 +28,9 @@ for (const width of [1440, 390]) {
       if (request.method() !== 'GET') writes.push(request.url())
     })
     await page.setViewportSize({ width, height: 900 })
-    await page.route('**/api/**', route => route.fulfill({ status: 503, json: { error: 'Unavailable' } }))
+    await page.route('**/api/**', route =>
+      route.fulfill({ status: 503, json: { error: 'Unavailable' } }),
+    )
     await page.route('**/api/web/navigation', route => route.fulfill({ json: initial }))
     await page.goto('/rigs/rig-1/observe/targets?q=M31&offset=24')
     const bar = page.locator('.vela-navigation')
@@ -50,14 +54,18 @@ for (const width of [1440, 390]) {
   })
 }
 
-test('activity reports loss, readout and confirmed end without inventing completion', async ({ page }) => {
+test('activity reports loss, readout and confirmed end without inventing completion', async ({
+  page,
+}) => {
   await page.clock.install()
   let view = structuredClone(initial)
   let unavailable = false
-  await page.route('**/api/**', route => route.fulfill({ status: 503, json: { error: 'Unavailable' } }))
-  await page.route('**/api/web/navigation', route => unavailable
-    ? route.fulfill({ status: 503, json: {} })
-    : route.fulfill({ json: view }))
+  await page.route('**/api/**', route =>
+    route.fulfill({ status: 503, json: { error: 'Unavailable' } }),
+  )
+  await page.route('**/api/web/navigation', route =>
+    unavailable ? route.fulfill({ status: 503, json: {} }) : route.fulfill({ json: view }),
+  )
   await page.goto('/rigs/rig-1/observe')
   const bar = page.locator('.vela-navigation')
   await expect(bar.locator('progress')).toHaveAttribute('value', '18')

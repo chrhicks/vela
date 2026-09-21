@@ -62,16 +62,18 @@ export function createRigDeviceInventory(
 ): RigDeviceInventory {
   const now = options.now ?? (() => new Date())
 
-  const provider = options.provider ?? createAlpacaProvider({
-    baseUrl: `http://${rig.endpoint.host}:${rig.endpoint.port}`,
-  })
+  const provider =
+    options.provider ??
+    createAlpacaProvider({
+      baseUrl: `http://${rig.endpoint.host}:${rig.endpoint.port}`,
+    })
 
   return {
     async listDevices() {
       const devices = await provider.listDevices()
       const observedAt = now()
 
-      return devices.map((device) => toObservedRigDevice(rig, device, observedAt))
+      return devices.map(device => toObservedRigDevice(rig, device, observedAt))
     },
   }
 }

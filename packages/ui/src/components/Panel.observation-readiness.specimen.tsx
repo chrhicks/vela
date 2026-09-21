@@ -9,7 +9,14 @@ const screens = ['rig', 'observe'] as const
 
 const rigs = ['askar', 'seestar'] as const
 
-const readinessStates = ['ready', 'disconnected', 'connecting', 'partial', 'uncertain', 'offline'] as const
+const readinessStates = [
+  'ready',
+  'disconnected',
+  'connecting',
+  'partial',
+  'uncertain',
+  'offline',
+] as const
 
 type Screen = (typeof screens)[number]
 
@@ -71,7 +78,10 @@ const seestar: RigFixture = {
   ],
   interruptedConnection: {
     confirmed: 'Camera · Focuser',
-    confirmedDevices: ['Seestar S30_chicks Telephoto Camera', 'Seestar S30_chicks Telephoto Focuser'],
+    confirmedDevices: [
+      'Seestar S30_chicks Telephoto Camera',
+      'Seestar S30_chicks Telephoto Focuser',
+    ],
     stoppedAt: 'Filter wheel',
     notAttempted: 'Telescope · Switch',
   },
@@ -117,7 +127,8 @@ function ObservationMark() {
 function ReadinessMark({ state }: { readonly state: ReadinessState }) {
   if (state === 'ready') return <span aria-hidden="true">✓</span>
 
-  if (state === 'connecting') return <span aria-hidden="true" className="vela-observation-spinner" />
+  if (state === 'connecting')
+    return <span aria-hidden="true" className="vela-observation-spinner" />
 
   if (state === 'offline') return <span aria-hidden="true">×</span>
 
@@ -146,7 +157,8 @@ function statePresentation(rig: RigFixture, state: ReadinessState) {
       badge: 'Needs connection',
       tone: 'warning' as const,
       title: 'Connect this Rig’s devices',
-      description: 'Vela can reach the Rig, but its devices are not yet ready to report their state.',
+      description:
+        'Vela can reach the Rig, but its devices are not yet ready to report their state.',
     }
   }
 
@@ -181,7 +193,8 @@ function statePresentation(rig: RigFixture, state: ReadinessState) {
     badge: 'Offline',
     tone: 'danger' as const,
     title: 'This Rig is offline',
-    description: 'Vela cannot reach its Alpaca server. Saved device identities remain available, but connection commands are not.',
+    description:
+      'Vela cannot reach its Alpaca server. Saved device identities remain available, but connection commands are not.',
   }
 }
 
@@ -202,9 +215,14 @@ function entryDeviceState(rig: RigFixture, state: ReadinessState, deviceName: st
 
   if (state === 'connecting') return 'Status updating'
 
-  if ((state === 'partial' || state === 'uncertain') && rig.interruptedConnection.confirmedDevices.includes(deviceName)) return 'Connected'
+  if (
+    (state === 'partial' || state === 'uncertain') &&
+    rig.interruptedConnection.confirmedDevices.includes(deviceName)
+  )
+    return 'Connected'
 
-  if (state === 'uncertain' && rig.interruptedConnection.stoppedDevice === deviceName) return 'Not confirmed'
+  if (state === 'uncertain' && rig.interruptedConnection.stoppedDevice === deviceName)
+    return 'Not confirmed'
 
   return 'Disconnected'
 }
@@ -246,7 +264,9 @@ function RigEntry({
           <p>{summary}</p>
         </div>
         <div>
-          <Badge marker={<i />} tone={reachable ? 'positive' : 'danger'}>{reachable ? 'Reachable' : 'Offline'}</Badge>
+          <Badge marker={<i />} tone={reachable ? 'positive' : 'danger'}>
+            {reachable ? 'Reachable' : 'Offline'}
+          </Badge>
           <span>{reachable ? 'Updated just now' : 'Last seen earlier today'}</span>
         </div>
       </header>
@@ -258,9 +278,14 @@ function RigEntry({
         <div className="vela-observation-entry__copy">
           <small>OBSERVATION WORKSPACE</small>
           <h2>Ready to use this Rig?</h2>
-          <p>Open a focused workspace for preparing and observing with {rig.name}. Entering it does not move hardware or begin an exposure.</p>
+          <p>
+            Open a focused workspace for preparing and observing with {rig.name}. Entering it does
+            not move hardware or begin an exposure.
+          </p>
         </div>
-        <Button onClick={onStart} size="large" tone="accent">Start observing</Button>
+        <Button onClick={onStart} size="large" tone="accent">
+          Start observing
+        </Button>
       </Panel>
 
       <section className="vela-observation-equipment" aria-labelledby="observation-equipment-title">
@@ -269,12 +294,20 @@ function RigEntry({
           <h2 id="observation-equipment-title">Devices</h2>
         </div>
         <div className="vela-observation-equipment__grid">
-          {rig.devices.map((device) => {
+          {rig.devices.map(device => {
             const deviceState = entryDeviceState(rig, state, device.name)
 
             return (
-              <Panel description={device.kind} elevation="raised" key={device.name} title={device.name}>
-                <div className="vela-observation-equipment__status" data-state={deviceState.toLowerCase().replace(' ', '-')}>
+              <Panel
+                description={device.kind}
+                elevation="raised"
+                key={device.name}
+                title={device.name}
+              >
+                <div
+                  className="vela-observation-equipment__status"
+                  data-state={deviceState.toLowerCase().replace(' ', '-')}
+                >
                   <span aria-hidden="true">●</span>
                   <strong>{deviceState}</strong>
                 </div>
@@ -291,7 +324,13 @@ function RigEntry({
   )
 }
 
-function ConnectionDetails({ rig, state }: { readonly rig: RigFixture; readonly state: ReadinessState }) {
+function ConnectionDetails({
+  rig,
+  state,
+}: {
+  readonly rig: RigFixture
+  readonly state: ReadinessState
+}) {
   if (state !== 'partial' && state !== 'uncertain') return null
 
   return (
@@ -324,14 +363,23 @@ function ReadinessAction({
   readonly state: ReadinessState
 }) {
   if (state === 'ready') {
-    return <p className="vela-observation-action-note">Live device state is available throughout this workspace.</p>
+    return (
+      <p className="vela-observation-action-note">
+        Live device state is available throughout this workspace.
+      </p>
+    )
   }
 
   if (state === 'disconnected') {
     return (
       <div className="vela-observation-action">
-        <Button onClick={onConnect} size="large" tone="accent">Connect devices</Button>
-        <p>Connects and confirms {rig.deviceCount} devices one at a time. It does not begin an exposure or move the Rig.</p>
+        <Button onClick={onConnect} size="large" tone="accent">
+          Connect devices
+        </Button>
+        <p>
+          Connects and confirms {rig.deviceCount} devices one at a time. It does not begin an
+          exposure or move the Rig.
+        </p>
       </div>
     )
   }
@@ -347,7 +395,10 @@ function ReadinessAction({
         >
           Connecting devices…
         </Button>
-        <p>Waiting for the Rig to confirm each connection. Vela will stop if a result cannot be established.</p>
+        <p>
+          Waiting for the Rig to confirm each connection. Vela will stop if a result cannot be
+          established.
+        </p>
       </div>
     )
   }
@@ -355,7 +406,9 @@ function ReadinessAction({
   if (state === 'partial') {
     return (
       <div className="vela-observation-action">
-        <Button onClick={onConnect} size="large" tone="accent">Try remaining devices</Button>
+        <Button onClick={onConnect} size="large" tone="accent">
+          Try remaining devices
+        </Button>
         <p>The failed connection was confirmed. Retrying requires this new explicit command.</p>
       </div>
     )
@@ -363,7 +416,9 @@ function ReadinessAction({
 
   return (
     <div className="vela-observation-action">
-      <Button onClick={onCheck} size="large" tone="neutral">Check Rig again</Button>
+      <Button onClick={onCheck} size="large" tone="neutral">
+        Check Rig again
+      </Button>
       <p>
         {state === 'uncertain'
           ? 'This only reads current state. Vela will not repeat the uncertain connection command.'
@@ -420,17 +475,22 @@ function ObservationWorkspace({
   const connected = connectedCount(rig, state)
   const serverState = state === 'offline' ? 'Offline' : 'Reachable'
 
-  const deviceState = connected === undefined
-    ? state === 'connecting' ? 'Connecting' : `${rig.deviceCount} known devices`
-    : state === 'uncertain'
-      ? `${connected} confirmed connected`
-      : `${connected} of ${rig.deviceCount} connected`
+  const deviceState =
+    connected === undefined
+      ? state === 'connecting'
+        ? 'Connecting'
+        : `${rig.deviceCount} known devices`
+      : state === 'uncertain'
+        ? `${connected} confirmed connected`
+        : `${connected} of ${rig.deviceCount} connected`
 
   const liveState = liveStatus()
 
   return (
     <main className="vela-observe-page">
-      <Button className="vela-observation-back" onClick={onBack} size="small" tone="quiet">← Rig details</Button>
+      <Button className="vela-observation-back" onClick={onBack} size="small" tone="quiet">
+        ← Rig details
+      </Button>
 
       <header className="vela-observe-hero">
         <div className="vela-observe-hero__mark">
@@ -441,7 +501,9 @@ function ObservationWorkspace({
           <h1>Observing with {rig.name}</h1>
           <p>Prepare this Rig and confirm what Vela can see before using it.</p>
         </div>
-        <Badge marker={<i />} tone={presentation.tone}>{presentation.badge}</Badge>
+        <Badge marker={<i />} tone={presentation.tone}>
+          {presentation.badge}
+        </Badge>
       </header>
 
       <section className="vela-observe-section" aria-labelledby="observation-readiness-title">
@@ -460,7 +522,9 @@ function ObservationWorkspace({
                 <ReadinessMark state={state} />
               </div>
               <div aria-atomic="true" aria-live="polite" role="status">
-                <h3 ref={statusHeadingRef} tabIndex={-1}>{presentation.title}</h3>
+                <h3 ref={statusHeadingRef} tabIndex={-1}>
+                  {presentation.title}
+                </h3>
                 <p>{presentation.description}</p>
               </div>
             </div>
@@ -513,10 +577,13 @@ function ObservationReadinessPreview({ props, onPropsChange }: PreviewProps) {
     onPropsChange?.(patch)
   }
 
-  useEffect(() => () => {
-    window.clearTimeout(timer.current)
-    window.cancelAnimationFrame(animationFrame.current ?? 0)
-  }, [])
+  useEffect(
+    () => () => {
+      window.clearTimeout(timer.current)
+      window.cancelAnimationFrame(animationFrame.current ?? 0)
+    },
+    [],
+  )
 
   useLayoutEffect(() => {
     const rigChanged = previousRig.current !== rigId
@@ -576,12 +643,15 @@ export const specimen: ComponentSpecimen = {
   componentName: 'Panel / Card',
   id: 'panel-observation-readiness',
   name: 'Observation readiness · Product example',
-  description: 'A non-exported product exploration for entering an observation workspace and explicitly preparing a chosen Rig.',
+  description:
+    'A non-exported product exploration for entering an observation workspace and explicitly preparing a chosen Rig.',
   controls: {
     screen: { type: 'select', label: 'Screen', options: screens },
     rig: { type: 'select', label: 'Rig', options: rigs },
     state: { type: 'select', label: 'Readiness', options: readinessStates },
   },
   defaultProps: { screen: 'observe', rig: 'seestar', state: 'disconnected' },
-  render: (props, onPropsChange) => <ObservationReadinessPreview onPropsChange={onPropsChange} props={props} />,
+  render: (props, onPropsChange) => (
+    <ObservationReadinessPreview onPropsChange={onPropsChange} props={props} />
+  ),
 }

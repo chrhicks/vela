@@ -15,11 +15,18 @@ function offset(value: number) {
   return `${Math.floor(absolute / 60) ? `${Math.floor(absolute / 60)}′ ` : ''}${absolute % 60}″`
 }
 
-function SimulatorPreview({ props, onPropsChange }: {
+function SimulatorPreview({
+  props,
+  onPropsChange,
+}: {
   props: Record<string, string | number | boolean>
   onPropsChange?: (patch: Record<string, string | number | boolean>) => void
 }) {
-  const initial = z.enum(['large-error', 'near-aligned', 'aligned']).catch('large-error').parse(props.example)
+  const initial = z
+    .enum(['large-error', 'near-aligned', 'aligned'])
+    .catch('large-error')
+    .parse(props.example)
+
   const [example, setExample] = useState(initial)
   const [altitude, setAltitude] = useState<number>(presets[initial]?.[0] ?? 480)
   const [azimuth, setAzimuth] = useState<number>(presets[initial]?.[1] ?? -360)
@@ -53,10 +60,15 @@ function SimulatorPreview({ props, onPropsChange }: {
 
     if (axis === 'altitude') setAltitude(update)
     else setAzimuth(update)
-    setNotice(`${axis === 'altitude' ? 'Altitude' : 'Azimuth'} adjusted · next exposure uses this position`)
+    setNotice(
+      `${axis === 'altitude' ? 'Altitude' : 'Azimuth'} adjusted · next exposure uses this position`,
+    )
   }
 
-  const valid = [draftAltitude, draftAzimuth].every(value => value.trim() !== '' && Number.isInteger(Number(value)) && Math.abs(Number(value)) <= 18000)
+  const valid = [draftAltitude, draftAzimuth].every(
+    value =>
+      value.trim() !== '' && Number.isInteger(Number(value)) && Math.abs(Number(value)) <= 18000,
+  )
 
   return (
     <article className="vela-sim-demo">
@@ -69,7 +81,10 @@ function SimulatorPreview({ props, onPropsChange }: {
       </header>
       <p className="vela-sim-intro">Adjust the rig here. Watch Vela respond in its own window.</p>
       <div className="vela-sim-layout">
-        <Panel title="Adjust the mount" description="These controls stand in for the mount’s adjustment knobs.">
+        <Panel
+          title="Adjust the mount"
+          description="These controls stand in for the mount’s adjustment knobs."
+        >
           <Select
             label="Adjustment per press"
             value={step}
@@ -86,10 +101,28 @@ function SimulatorPreview({ props, onPropsChange }: {
                 <span>Vertical</span>
               </div>
               <strong>{offset(altitude)}</strong>
-              <p>{altitude === 0 ? 'At the pole’s altitude' : altitude > 0 ? 'Above the pole' : 'Below the pole'}</p>
+              <p>
+                {altitude === 0
+                  ? 'At the pole’s altitude'
+                  : altitude > 0
+                    ? 'Above the pole'
+                    : 'Below the pole'}
+              </p>
               <div className="vela-sim-buttons">
-                <Button tone="neutral" disabled={altitude <= -18000} onClick={() => nudge('altitude', -1)}>↓ Lower</Button>
-                <Button tone="neutral" disabled={altitude >= 18000} onClick={() => nudge('altitude', 1)}>↑ Raise</Button>
+                <Button
+                  tone="neutral"
+                  disabled={altitude <= -18000}
+                  onClick={() => nudge('altitude', -1)}
+                >
+                  ↓ Lower
+                </Button>
+                <Button
+                  tone="neutral"
+                  disabled={altitude >= 18000}
+                  onClick={() => nudge('altitude', 1)}
+                >
+                  ↑ Raise
+                </Button>
               </div>
             </section>
             <section aria-label="Azimuth adjustment">
@@ -98,15 +131,33 @@ function SimulatorPreview({ props, onPropsChange }: {
                 <span>Horizontal</span>
               </div>
               <strong>{offset(azimuth)}</strong>
-              <p>{azimuth === 0 ? 'Pointing north' : azimuth > 0 ? 'East of north' : 'West of north'}</p>
+              <p>
+                {azimuth === 0 ? 'Pointing north' : azimuth > 0 ? 'East of north' : 'West of north'}
+              </p>
               <div className="vela-sim-buttons">
-                <Button tone="neutral" disabled={azimuth <= -18000} onClick={() => nudge('azimuth', -1)}>← West</Button>
-                <Button tone="neutral" disabled={azimuth >= 18000} onClick={() => nudge('azimuth', 1)}>East →</Button>
+                <Button
+                  tone="neutral"
+                  disabled={azimuth <= -18000}
+                  onClick={() => nudge('azimuth', -1)}
+                >
+                  ← West
+                </Button>
+                <Button
+                  tone="neutral"
+                  disabled={azimuth >= 18000}
+                  onClick={() => nudge('azimuth', 1)}
+                >
+                  East →
+                </Button>
               </div>
             </section>
           </div>
-          <p className="vela-sim-note">Actual simulated offsets, not Vela’s measured alignment error.</p>
-          <div className="vela-sim-status" role="status">{notice}</div>
+          <p className="vela-sim-note">
+            Actual simulated offsets, not Vela’s measured alignment error.
+          </p>
+          <div className="vela-sim-status" role="status">
+            {notice}
+          </div>
           <details className="vela-sim-details">
             <summary
               onClick={() => {
@@ -123,7 +174,8 @@ function SimulatorPreview({ props, onPropsChange }: {
                 const alt = Number(fields.get('altitude'))
                 const az = Number(fields.get('azimuth'))
 
-                if (![alt, az].every(value => Number.isInteger(value) && Math.abs(value) <= 18000)) return
+                if (![alt, az].every(value => Number.isInteger(value) && Math.abs(value) <= 18000))
+                  return
                 setAltitude(alt)
                 setAzimuth(az)
                 setNotice('Exact offsets applied · next exposure uses this position')
@@ -153,7 +205,9 @@ function SimulatorPreview({ props, onPropsChange }: {
                 onInput={event => setDraftAzimuth(event.currentTarget.value)}
                 message="Positive is east of north."
               />
-              <Button type="submit" tone="neutral" disabled={!valid}>Apply offsets</Button>
+              <Button type="submit" tone="neutral" disabled={!valid}>
+                Apply offsets
+              </Button>
             </form>
           </details>
         </Panel>
@@ -181,15 +235,24 @@ function SimulatorPreview({ props, onPropsChange }: {
             <Select
               label="Starting position"
               value={example}
-              onChange={event => setExample(z.enum(['large-error', 'near-aligned', 'aligned']).parse(event.target.value))}
+              onChange={event =>
+                setExample(
+                  z.enum(['large-error', 'near-aligned', 'aligned']).parse(event.target.value),
+                )
+              }
               options={[
                 { value: 'large-error', label: 'Large error' },
                 { value: 'near-aligned', label: 'Nearly aligned' },
                 { value: 'aligned', label: 'Aligned' },
               ]}
             />
-            <p className="vela-sim-note">Reset restores these offsets and clears the camera. Start a fresh alignment measurement in Vela afterward.</p>
-            <Button tone="neutral" onClick={reset}>Reset rig</Button>
+            <p className="vela-sim-note">
+              Reset restores these offsets and clears the camera. Start a fresh alignment
+              measurement in Vela afterward.
+            </p>
+            <Button tone="neutral" onClick={reset}>
+              Reset rig
+            </Button>
           </Panel>
         </div>
       </div>
@@ -203,11 +266,18 @@ export const specimen: ComponentSpecimen = {
   componentName: 'Panel / Card',
   id: 'panel-rig-simulator',
   name: 'Rig simulator · Product example',
-  description: 'Separate simulator controls for mount adjustments, obscured imagery and reset. Local interactive fixtures only; no hardware or simulator service connected. Offsets describe simulation truth, not measured alignment.',
+  description:
+    'Separate simulator controls for mount adjustments, obscured imagery and reset. Local interactive fixtures only; no hardware or simulator service connected. Offsets describe simulation truth, not measured alignment.',
   controls: {
-    example: { type: 'select', label: 'Starting example', options: ['large-error', 'near-aligned', 'aligned'] },
+    example: {
+      type: 'select',
+      label: 'Starting example',
+      options: ['large-error', 'near-aligned', 'aligned'],
+    },
     camera: { type: 'select', label: 'Camera view', options: ['clear', 'obscured'] },
   },
   defaultProps: { example: 'large-error', camera: 'clear' },
-  render: (props, onPropsChange) => <SimulatorPreview props={props} {...(onPropsChange ? { onPropsChange } : {})} />,
+  render: (props, onPropsChange) => (
+    <SimulatorPreview props={props} {...(onPropsChange ? { onPropsChange } : {})} />
+  ),
 }

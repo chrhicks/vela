@@ -12,7 +12,9 @@ export interface HyperbolaFit {
 
 /** HFR(x) = a · √(1 + ((x − p) / b)²). Points with y < 0.1 are ignored. */
 export function fitHyperbola(points: HyperbolaPoint[]): HyperbolaFit | null {
-  const data = points.filter(point => Number.isFinite(point.x) && Number.isFinite(point.y) && point.y >= 0.1)
+  const data = points.filter(
+    point => Number.isFinite(point.x) && Number.isFinite(point.y) && point.y >= 0.1,
+  )
 
   if (data.length < 5) return null
   const xs = data.map(point => point.x)
@@ -22,13 +24,15 @@ export function fitHyperbola(points: HyperbolaPoint[]): HyperbolaFit | null {
   const yMin = Math.min(...ys)
   const span = Math.max(xMax - xMin, 1)
 
-  let best: {
-    p: number
-    a: number
-    b: number
-    rSquared: number
-    rms: number
-  } | undefined
+  let best:
+    | {
+        p: number
+        a: number
+        b: number
+        rSquared: number
+        rms: number
+      }
+    | undefined
 
   function consider(p: number, a: number, b: number) {
     if (!(a > 0) || !(b > 0)) return
@@ -76,7 +80,8 @@ export function fitHyperbola(points: HyperbolaPoint[]): HyperbolaFit | null {
   const pHi = refined.p + Math.max(span / 80, 0.5)
   const pSteps = 41
 
-  for (let i = 0; i < pSteps; i++) consider(pLo + (i / (pSteps - 1)) * (pHi - pLo), refined.a, refined.b)
+  for (let i = 0; i < pSteps; i++)
+    consider(pLo + (i / (pSteps - 1)) * (pHi - pLo), refined.a, refined.b)
 
   return { p: best.p, a: best.a, b: best.b, rSquared: best.rSquared }
 }
@@ -99,7 +104,8 @@ function search(
     for (let ai = 0; ai < aSteps; ai++) {
       const a = aMin + (ai / Math.max(aSteps - 1, 1)) * (aMax - aMin)
 
-      for (let bi = 0; bi < bSteps; bi++) consider(p, a, bMin + (bi / Math.max(bSteps - 1, 1)) * (bMax - bMin))
+      for (let bi = 0; bi < bSteps; bi++)
+        consider(p, a, bMin + (bi / Math.max(bSteps - 1, 1)) * (bMax - bMin))
     }
   }
 }

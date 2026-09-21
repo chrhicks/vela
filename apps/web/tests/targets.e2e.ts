@@ -107,15 +107,19 @@ test('an untouched target and Reset frame send only the accepted slew fields', a
   await page.getByRole('button', { name: 'Reset frame' }).click()
   await page.getByRole('button', { name: 'Slew & check' }).click()
   await expect(page.getByText('Framing checked', { exact: true })).toBeVisible()
-  expect(submissions).toEqual(Array(2).fill({
-    targetId: target.id,
-    raDegrees: target.raDegrees,
-    decDegrees: target.decDegrees,
-    exposureSeconds: 2,
-  }))
+  expect(submissions).toEqual(
+    Array(2).fill({
+      targetId: target.id,
+      raDegrees: target.raDegrees,
+      decDegrees: target.decDegrees,
+      exposureSeconds: 2,
+    }),
+  )
 })
 
-test('catalog is paged and search updates use actual server results; missing site and image stay honest on mobile', async ({ page }) => {
+test('catalog is paged and search updates use actual server results; missing site and image stay honest on mobile', async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 390, height: 844 })
   const queries: string[] = []
   await page.route('**/api/web/rigs/rig-1/target-discovery?*', route => {
@@ -134,13 +138,15 @@ test('catalog is paged and search updates use actual server results; missing sit
       filter: params.get('filter') ?? 'all',
       offset: Number(params.get('offset')),
       pageSize: 24,
-      targets: [{
-        ...target,
-        category: 'galaxy',
-        filterChoice: 'broadband',
-        filterReason: 'Broadband preserves starlight.',
-        opportunity: null,
-      }],
+      targets: [
+        {
+          ...target,
+          category: 'galaxy',
+          filterChoice: 'broadband',
+          filterReason: 'Broadband preserves starlight.',
+          opportunity: null,
+        },
+      ],
       total: 25,
       site: null,
       siteUnavailableReason: 'Mount site is unavailable.',
@@ -150,17 +156,27 @@ test('catalog is paged and search updates use actual server results; missing sit
   await page.goto('/rigs/rig-1/observe/targets')
   await expect(page.getByRole('heading', { name: target.name })).toBeVisible()
   await expect(page.getByText('Reference image unavailable')).toBeVisible()
-  await expect(page.getByText('The mount’s site could not be read: Mount site is unavailable.')).toBeVisible()
+  await expect(
+    page.getByText('The mount’s site could not be read: Mount site is unavailable.'),
+  ).toBeVisible()
   await page.getByRole('button', { name: 'Next', exact: true }).click()
   await expect.poll(() => queries.some(q => q.includes('offset=24'))).toBe(true)
   await page.getByLabel('Find a target').fill('M31')
-  await expect.poll(() => queries.some(q =>
-    new URL(q).searchParams.get('q') === 'M31' && new URL(q).searchParams.get('offset') === '0',
-  )).toBe(true)
+  await expect
+    .poll(() =>
+      queries.some(
+        q =>
+          new URL(q).searchParams.get('q') === 'M31' &&
+          new URL(q).searchParams.get('offset') === '0',
+      ),
+    )
+    .toBe(true)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
 })
 
-test('ambiguous command is not repeated and requires explicit current state check', async ({ page }) => {
+test('ambiguous command is not repeated and requires explicit current state check', async ({
+  page,
+}) => {
   let commands = 0
   await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
   await page.route('**/api/web/rigs/rig-1/framing', route => respond(route, idle))
@@ -183,25 +199,33 @@ test('ambiguous command is not repeated and requires explicit current state chec
   await expect(page.getByText('Reference survey unavailable')).toBeVisible()
 })
 
-test('survey footprint uses projected coordinates and keyboard adjustment; tile requests stay same-origin', async ({ page, baseURL }) => {
+test('survey footprint uses projected coordinates and keyboard adjustment; tile requests stay same-origin', async ({
+  page,
+  baseURL,
+}) => {
   const errors: string[] = []
   const external: string[] = []
   page.on('pageerror', error => errors.push(error.message))
   page.on('request', request => {
-    if (request.url().startsWith('http') && new URL(request.url()).origin !== new URL(baseURL!).origin)
+    if (
+      request.url().startsWith('http') &&
+      new URL(request.url()).origin !== new URL(baseURL!).origin
+    )
       external.push(request.url())
   })
   await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
   await page.route('**/api/web/rigs/rig-1/framing', route => respond(route, idle))
-  await page.route('**/api/survey/dss2/**', route => route.request().url().endsWith('/properties')
-    ? route.fulfill({
-      contentType: 'text/plain',
-      body: 'dataproduct_type=image\nhips_order=9\nhips_tile_width=512\nhips_frame=equatorial\nhips_tile_format=jpeg\n',
-    })
-    : route.fulfill({
-      contentType: 'image/jpeg',
-      body: route.request().url().endsWith('Allsky.jpg') ? allsky : tile,
-    }))
+  await page.route('**/api/survey/dss2/**', route =>
+    route.request().url().endsWith('/properties')
+      ? route.fulfill({
+          contentType: 'text/plain',
+          body: 'dataproduct_type=image\nhips_order=9\nhips_tile_width=512\nhips_frame=equatorial\nhips_tile_format=jpeg\n',
+        })
+      : route.fulfill({
+          contentType: 'image/jpeg',
+          body: route.request().url().endsWith('Allsky.jpg') ? allsky : tile,
+        }),
+  )
   await page.goto('/rigs/rig-1/observe/targets/m31')
   const frame = page.getByRole('slider', { name: 'Camera frame position' })
   await expect(frame).toBeVisible({ timeout: 30000 })
@@ -241,7 +265,9 @@ test('survey footprint uses projected coordinates and keyboard adjustment; tile 
   expect(external).toEqual([])
 })
 
-test('checked framing offers centering, active operations lock edits, and stale state blocks commands', async ({ page }) => {
+test('checked framing offers centering, active operations lock edits, and stale state blocks commands', async ({
+  page,
+}) => {
   let state: FramingView = {
     ...idle,
     phase: 'checked',
@@ -268,7 +294,9 @@ test('checked framing offers centering, active operations lock edits, and stale 
   let corrections = 0
   let stops = 0
   await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
-  await page.route('**/api/web/rigs/rig-1/framing', route => offline ? route.abort() : respond(route, state))
+  await page.route('**/api/web/rigs/rig-1/framing', route =>
+    offline ? route.abort() : respond(route, state),
+  )
   await page.route('**/api/survey/**', route => route.abort())
   await page.route('**/api/rigs/rig-1/framing/center', route => {
     expect(route.request().postDataJSON()).toEqual({
@@ -305,7 +333,9 @@ test('checked framing offers centering, active operations lock edits, and stale 
   expect(corrections).toBe(1)
 })
 
-test('a rejected adjusted composition cannot inherit the prior framing check after recovery', async ({ page }) => {
+test('a rejected adjusted composition cannot inherit the prior framing check after recovery', async ({
+  page,
+}) => {
   let state: FramingView = {
     ...idle,
     phase: 'checked',
@@ -317,19 +347,22 @@ test('a rejected adjusted composition cannot inherit the prior framing check aft
 
   let rejectStart = true
   let commands = 0
-  let submitted: { raDegrees: number, decDegrees: number } | null = null
+  let submitted: { raDegrees: number; decDegrees: number } | null = null
   await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
-  await page.route('**/api/web/rigs/rig-1/framing', route => respond(route, { ...state, observedAt: new Date().toISOString() }))
+  await page.route('**/api/web/rigs/rig-1/framing', route =>
+    respond(route, { ...state, observedAt: new Date().toISOString() }),
+  )
   await page.route('**/api/survey/**', route => route.abort())
   await page.route('**/api/rigs/rig-1/framing/start', route => {
     commands++
     submitted = route.request().postDataJSON()
 
-    if (rejectStart) return route.fulfill({
-      status: 409,
-      contentType: 'application/json',
-      body: JSON.stringify({ error: 'Camera identity changed before framing.' }),
-    })
+    if (rejectStart)
+      return route.fulfill({
+        status: 409,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'Camera identity changed before framing.' }),
+      })
     state = {
       ...state,
       desired: submitted,
@@ -367,7 +400,9 @@ test('a rejected adjusted composition cannot inherit the prior framing check aft
   expect(commands).toBe(2)
 })
 
-test('an explicit read recovers a completed adjusted check after its command response is lost', async ({ page }) => {
+test('an explicit read recovers a completed adjusted check after its command response is lost', async ({
+  page,
+}) => {
   let state: FramingView = {
     ...idle,
     phase: 'checked',
@@ -378,7 +413,9 @@ test('an explicit read recovers a completed adjusted check after its command res
 
   let commands = 0
   await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
-  await page.route('**/api/web/rigs/rig-1/framing', route => respond(route, { ...state, observedAt: new Date().toISOString() }))
+  await page.route('**/api/web/rigs/rig-1/framing', route =>
+    respond(route, { ...state, observedAt: new Date().toISOString() }),
+  )
   await page.route('**/api/survey/**', route => route.abort())
   await page.route('**/api/rigs/rig-1/framing/start', route => {
     commands++
@@ -401,7 +438,9 @@ test('an explicit read recovers a completed adjusted check after its command res
 })
 
 for (const failureSource of ['command', 'poll'] as const) {
-  test(`precise framing error remains visible alongside recovery guidance after ${failureSource} failure`, async ({ page }) => {
+  test(`precise framing error remains visible alongside recovery guidance after ${failureSource} failure`, async ({
+    page,
+  }) => {
     let state: FramingView = {
       ...idle,
       targetId: target.id,
@@ -418,7 +457,9 @@ for (const failureSource of ['command', 'poll'] as const) {
     }
 
     await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
-    await page.route('**/api/web/rigs/rig-1/framing', route => respond(route, { ...state, observedAt: new Date().toISOString() }))
+    await page.route('**/api/web/rigs/rig-1/framing', route =>
+      respond(route, { ...state, observedAt: new Date().toISOString() }),
+    )
     await page.route('**/api/survey/**', route => route.abort())
     await page.route('**/api/rigs/rig-1/framing/stop', route => {
       state = failed
@@ -431,21 +472,36 @@ for (const failureSource of ['command', 'poll'] as const) {
     if (failureSource === 'command')
       await page.getByRole('button', { name: 'Stop framing' }).click()
     else state = failed
-    await expect(page.getByRole('alert').filter({ hasText: 'Telescope stop could not be confirmed' })).toBeVisible()
-    await expect(page.getByRole('alert').filter({ hasText: 'Inspect the reported state' })).toBeVisible()
+    await expect(
+      page.getByRole('alert').filter({ hasText: 'Telescope stop could not be confirmed' }),
+    ).toBeVisible()
+    await expect(
+      page.getByRole('alert').filter({ hasText: 'Inspect the reported state' }),
+    ).toBeVisible()
     await page.getByRole('button', { name: 'Check rig state' }).click()
     await expect(page.getByRole('button', { name: 'Slew & check' })).toBeEnabled()
-    await expect(page.getByRole('alert').filter({ hasText: 'Telescope stop could not be confirmed' })).toBeVisible()
+    await expect(
+      page.getByRole('alert').filter({ hasText: 'Telescope stop could not be confirmed' }),
+    ).toBeVisible()
   })
 }
 
-test('quiet polling leaves Check rig state enabled and an explicit check supersedes a slow poll', async ({ page }) => {
+test('quiet polling leaves Check rig state enabled and an explicit check supersedes a slow poll', async ({
+  page,
+}) => {
   let reads = 0
   let armed = false
   let releasePoll!: () => void
   let releaseCheck!: () => void
-  const pollHeld = new Promise<void>(resolve => { releasePoll = resolve })
-  const checkHeld = new Promise<void>(resolve => { releaseCheck = resolve })
+
+  const pollHeld = new Promise<void>(resolve => {
+    releasePoll = resolve
+  })
+
+  const checkHeld = new Promise<void>(resolve => {
+    releaseCheck = resolve
+  })
+
   await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
   await page.route('**/api/survey/**', route => route.abort())
   await page.route('**/api/web/rigs/rig-1/framing', async route => {
@@ -471,7 +527,9 @@ test('quiet polling leaves Check rig state enabled and an explicit check superse
   await expect(check).toBeEnabled()
 })
 
-test('Targets breadcrumb preserves search and results page through a detail reload', async ({ page }) => {
+test('Targets breadcrumb preserves search and results page through a detail reload', async ({
+  page,
+}) => {
   const queries: string[] = []
   await page.route('**/api/web/rigs/rig-1/target-discovery?*', route => {
     queries.push(route.request().url())
@@ -488,13 +546,15 @@ test('Targets breadcrumb preserves search and results page through a detail relo
       filter: 'all',
       offset: 24,
       pageSize: 12,
-      targets: [{
-        ...target,
-        category: 'galaxy',
-        filterChoice: 'broadband',
-        filterReason: 'Broadband preserves starlight.',
-        opportunity: null,
-      }],
+      targets: [
+        {
+          ...target,
+          category: 'galaxy',
+          filterChoice: 'broadband',
+          filterReason: 'Broadband preserves starlight.',
+          opportunity: null,
+        },
+      ],
       total: 49,
       site: null,
       siteUnavailableReason: 'Site unavailable',
@@ -518,7 +578,9 @@ test('Targets breadcrumb preserves search and results page through a detail relo
   expect(new URL(queries.at(-1)!).searchParams.get('offset')).toBe('24')
 })
 
-test('failure recovery preserves local drag, zoom and nudges while device commands remain blocked', async ({ page }) => {
+test('failure recovery preserves local drag, zoom and nudges while device commands remain blocked', async ({
+  page,
+}) => {
   let state: FramingView = {
     ...idle,
     active: true,
@@ -530,21 +592,25 @@ test('failure recovery preserves local drag, zoom and nudges while device comman
   let commands = 0
   let offline = false
   await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
-  await page.route('**/api/web/rigs/rig-1/framing', route => offline ? route.abort() : respond(route, state))
+  await page.route('**/api/web/rigs/rig-1/framing', route =>
+    offline ? route.abort() : respond(route, state),
+  )
   await page.route('**/api/rigs/rig-1/framing/*', route => {
     commands++
 
     return route.abort()
   })
-  await page.route('**/api/survey/dss2/**', route => route.request().url().endsWith('/properties')
-    ? route.fulfill({
-      contentType: 'text/plain',
-      body: 'dataproduct_type=image\nhips_order=9\nhips_tile_width=512\nhips_frame=equatorial\nhips_tile_format=jpeg\n',
-    })
-    : route.fulfill({
-      contentType: 'image/jpeg',
-      body: route.request().url().endsWith('Allsky.jpg') ? allsky : tile,
-    }))
+  await page.route('**/api/survey/dss2/**', route =>
+    route.request().url().endsWith('/properties')
+      ? route.fulfill({
+          contentType: 'text/plain',
+          body: 'dataproduct_type=image\nhips_order=9\nhips_tile_width=512\nhips_frame=equatorial\nhips_tile_format=jpeg\n',
+        })
+      : route.fulfill({
+          contentType: 'image/jpeg',
+          body: route.request().url().endsWith('Allsky.jpg') ? allsky : tile,
+        }),
+  )
   await page.goto('/rigs/rig-1/observe/targets/m31')
   const frame = page.getByRole('slider', { name: 'Camera frame position' })
   await expect(frame).toBeVisible()
@@ -557,7 +623,9 @@ test('failure recovery preserves local drag, zoom and nudges while device comman
     phase: 'failed',
     error: 'Telescope tracking change was not confirmed',
   }
-  await expect(page.getByRole('alert').filter({ hasText: 'Inspect the reported state' })).toBeVisible()
+  await expect(
+    page.getByRole('alert').filter({ hasText: 'Inspect the reported state' }),
+  ).toBeVisible()
   await expect(frame).toHaveAttribute('aria-disabled', 'false')
   await expect(page.getByRole('button', { name: 'Slew & check' })).toBeDisabled()
   await page.getByText('Optics settings', { exact: true }).click()
@@ -567,7 +635,9 @@ test('failure recovery preserves local drag, zoom and nudges while device comman
   const centerBefore = (await page.locator('.vela-target-cross').boundingBox())!
   await page.mouse.move(before.x + before.width / 2, before.y + before.height / 2)
   await page.mouse.down()
-  await page.mouse.move(before.x + before.width / 2 + 30, before.y + before.height / 2 + 20, { steps: 5 })
+  await page.mouse.move(before.x + before.width / 2 + 30, before.y + before.height / 2 + 20, {
+    steps: 5,
+  })
   await page.mouse.up()
   await expect(frame).not.toHaveAttribute('aria-valuetext', initial!)
   const centerAfter = (await page.locator('.vela-target-cross').boundingBox())!
@@ -596,7 +666,9 @@ test('failure recovery preserves local drag, zoom and nudges while device comman
   expect(commands).toBe(0)
 })
 
-test('an edited composition can center using its current coordinates and the last solved check', async ({ page }) => {
+test('an edited composition can center using its current coordinates and the last solved check', async ({
+  page,
+}) => {
   let state: FramingView = {
     ...idle,
     phase: 'checked',
@@ -619,16 +691,18 @@ test('an edited composition can center using its current coordinates and the las
     },
   }
 
-  let command: { checkId: string, raDegrees: number, decDegrees: number } | null = null
+  let command: { checkId: string; raDegrees: number; decDegrees: number } | null = null
   await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
   await page.route('**/api/web/rigs/rig-1/framing', route => respond(route, state))
   await page.route('**/api/survey/**', route => route.abort())
   await page.route('**/api/rigs/rig-1/framing/center', route => {
-    command = z.strictObject({
-      checkId: z.string(),
-      raDegrees: z.number(),
-      decDegrees: z.number(),
-    }).parse(route.request().postDataJSON())
+    command = z
+      .strictObject({
+        checkId: z.string(),
+        raDegrees: z.number(),
+        decDegrees: z.number(),
+      })
+      .parse(route.request().postDataJSON())
     state = {
       ...state,
       desired: { raDegrees: command.raDegrees, decDegrees: command.decDegrees },
@@ -653,7 +727,9 @@ test('an edited composition can center using its current coordinates and the las
   await expect(page.getByRole('link', { name: 'Continue to capture' })).toBeVisible()
 })
 
-test('a recoverable check keeps the edited destination and offers a fresh exposure without a slew', async ({ page }) => {
+test('a recoverable check keeps the edited destination and offers a fresh exposure without a slew', async ({
+  page,
+}) => {
   let state: FramingView = {
     ...idle,
     phase: 'needs-check',
@@ -663,27 +739,31 @@ test('a recoverable check keeps the edited destination and offers a fresh exposu
   }
 
   const commands: {
-    action: string,
+    action: string
     body: {
-      targetId: string,
-      raDegrees: number,
-      decDegrees: number,
-      exposureSeconds: number,
-    },
+      targetId: string
+      raDegrees: number
+      decDegrees: number
+      exposureSeconds: number
+    }
   }[] = []
 
   await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
-  await page.route('**/api/web/rigs/rig-1/framing', route => respond(route, { ...state, observedAt: new Date().toISOString() }))
+  await page.route('**/api/web/rigs/rig-1/framing', route =>
+    respond(route, { ...state, observedAt: new Date().toISOString() }),
+  )
   await page.route('**/api/survey/**', route => route.abort())
   await page.route('**/api/rigs/rig-1/framing/*', route => {
     commands.push({
       action: route.request().url().split('/').at(-1)!,
-      body: z.strictObject({
-        targetId: z.string(),
-        raDegrees: z.number(),
-        decDegrees: z.number(),
-        exposureSeconds: z.number(),
-      }).parse(route.request().postDataJSON()),
+      body: z
+        .strictObject({
+          targetId: z.string(),
+          raDegrees: z.number(),
+          decDegrees: z.number(),
+          exposureSeconds: z.number(),
+        })
+        .parse(route.request().postDataJSON()),
     })
     state = { ...state, active: false, phase: 'needs-check' }
 

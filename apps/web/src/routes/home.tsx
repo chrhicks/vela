@@ -43,21 +43,31 @@ export function Home() {
         ) : null}
       </div>
 
-      {error ? <p className="vela-rig-home__error" role="alert">{error}</p> : null}
+      {error ? (
+        <p className="vela-rig-home__error" role="alert">
+          {error}
+        </p>
+      ) : null}
 
       {home === undefined && loading ? (
-        <div aria-live="polite" className="vela-rig-home__loading">Loading Rigs…</div>
+        <div aria-live="polite" className="vela-rig-home__loading">
+          Loading Rigs…
+        </div>
       ) : home === undefined ? (
         <div className="vela-rig-route-state">
           <h2>Could not load your Rigs</h2>
           <p>Check the Vela server and try again.</p>
-          <Button disabled={loading} onClick={() => void refresh()}>Try again</Button>
+          <Button disabled={loading} onClick={() => void refresh()}>
+            Try again
+          </Button>
         </div>
       ) : home.rigs.length === 0 ? (
         <NoRigs onSetup={() => setDiscoveryOpen(true)} />
       ) : (
         <div className="vela-rig-home__grid">
-          {home.rigs.map((rig) => <RigCard key={rig.id} rig={rig} />)}
+          {home.rigs.map(rig => (
+            <RigCard key={rig.id} rig={rig} />
+          ))}
         </div>
       )}
 
@@ -73,9 +83,8 @@ export function Home() {
 function RigCard({ rig }: { readonly rig: RigView }) {
   const reachability = reachabilityBadge[rig.reachability]
 
-  const connectionState = rig.connections.connected === rig.connections.total
-    ? 'complete'
-    : 'attention'
+  const connectionState =
+    rig.connections.connected === rig.connections.total ? 'complete' : 'attention'
 
   return (
     <Link
@@ -92,7 +101,9 @@ function RigCard({ rig }: { readonly rig: RigView }) {
       <p className="vela-rig-summary__description">{rigDescription(rig)}</p>
       <div className="vela-rig-summary__footer">
         <span className="vela-rig-summary__connections" data-state={connectionState}>
-          <strong>{rig.connections.connected} of {rig.connections.total}</strong>
+          <strong>
+            {rig.connections.connected} of {rig.connections.total}
+          </strong>
           <small>devices connected</small>
         </span>
         <strong>
@@ -122,7 +133,9 @@ function NoRigs({ onSetup }: { readonly onSetup: () => void }) {
     <section className="vela-rig-home__empty">
       <h2>No Rigs configured</h2>
       <p>Set up the observatory you want Vela to monitor.</p>
-      <Button onClick={onSetup} tone="accent">Set up a rig</Button>
+      <Button onClick={onSetup} tone="accent">
+        Set up a rig
+      </Button>
     </section>
   )
 }

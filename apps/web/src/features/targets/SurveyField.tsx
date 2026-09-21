@@ -6,7 +6,14 @@ import { isPosition } from './validation'
 
 type Viewer = ReturnType<(typeof import('aladin-lite'))['default']['aladin']>
 
-export function SurveyField({ target, desired, camera, actual, locked, onChange }: {
+export function SurveyField({
+  target,
+  desired,
+  camera,
+  actual,
+  locked,
+  onChange,
+}: {
   target: TargetPosition
   desired: TargetPosition
   camera: FramingView['camera']
@@ -21,8 +28,10 @@ export function SurveyField({ target, desired, camera, actual, locked, onChange 
   const [failed, setFailed] = useState(false)
   const [revision, setRevision] = useState(0)
   const [attempt, setAttempt] = useState(0)
-  const drag = useRef<{ x: number, y: number, cx: number, cy: number } | null>(null)
-  useEffect(() => { if (locked) drag.current = null }, [locked])
+  const drag = useRef<{ x: number; y: number; cx: number; cy: number } | null>(null)
+  useEffect(() => {
+    if (locked) drag.current = null
+  }, [locked])
   const initialWidth = camera?.fieldWidthDegrees ?? 2
   const geometryInitialized = useRef(false)
 
@@ -37,7 +46,9 @@ export function SurveyField({ target, desired, camera, actual, locked, onChange 
     async function open() {
       try {
         // Probe the survey before displaying an empty field as if it were sky.
-        const response = await fetch('/api/survey/dss2/Norder3/Allsky.jpg', { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]) })
+        const response = await fetch('/api/survey/dss2/Norder3/Allsky.jpg', {
+          signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]),
+        })
 
         if (!response.ok) throw new Error('Survey unavailable')
         const bitmap = await createImageBitmap(await response.blob())
@@ -85,12 +96,17 @@ export function SurveyField({ target, desired, camera, actual, locked, onChange 
           showProjectionControl: false,
         })
         viewer.current = instance
-        const redraw = () => { if (!disposed) setRevision(r => r + 1) }
+
+        const redraw = () => {
+          if (!disposed) setRevision(r => r + 1)
+        }
 
         instance.on('positionChanged', redraw)
         instance.on('zoomChanged', redraw)
         setReady(true)
-      } catch { if (!disposed) setFailed(true) }
+      } catch {
+        if (!disposed) setFailed(true)
+      }
     }
 
     void open()
@@ -126,20 +142,22 @@ export function SurveyField({ target, desired, camera, actual, locked, onChange 
     const zoom = (event: WheelEvent) => {
       event.preventDefault()
       event.stopPropagation()
-      canvas.dispatchEvent(new WheelEvent('wheel', {
-        bubbles: true,
-        cancelable: true,
-        deltaX: event.deltaX,
-        deltaY: event.deltaY,
-        deltaZ: event.deltaZ,
-        deltaMode: event.deltaMode,
-        clientX: event.clientX,
-        clientY: event.clientY,
-        ctrlKey: event.ctrlKey,
-        shiftKey: event.shiftKey,
-        altKey: event.altKey,
-        metaKey: event.metaKey,
-      }))
+      canvas.dispatchEvent(
+        new WheelEvent('wheel', {
+          bubbles: true,
+          cancelable: true,
+          deltaX: event.deltaX,
+          deltaY: event.deltaY,
+          deltaZ: event.deltaZ,
+          deltaMode: event.deltaMode,
+          clientX: event.clientX,
+          clientY: event.clientY,
+          ctrlKey: event.ctrlKey,
+          shiftKey: event.shiftKey,
+          altKey: event.altKey,
+          metaKey: event.metaKey,
+        }),
+      )
     }
 
     element.addEventListener('wheel', zoom, { passive: false })
@@ -153,23 +171,32 @@ export function SurveyField({ target, desired, camera, actual, locked, onChange 
     try {
       const pixels = points.map(p => viewer.current!.world2pix(p.raDegrees, p.decDegrees))
 
-      return pixels.every(p => p && p.every(Number.isFinite)) ? pixels.map(p => p!.join(',')).join(' ') : ''
-    } catch { return '' }
+      return pixels.every(p => p && p.every(Number.isFinite))
+        ? pixels.map(p => p!.join(',')).join(' ')
+        : ''
+    } catch {
+      return ''
+    }
   }
 
   void revision
 
   const points = camera
-    ? project(frameCorners(
-        desired,
-        camera.fieldWidthDegrees,
-        camera.fieldHeightDegrees,
-        actual?.rotationDegrees ?? 0,
-      ))
+    ? project(
+        frameCorners(
+          desired,
+          camera.fieldWidthDegrees,
+          camera.fieldHeightDegrees,
+          actual?.rotationDegrees ?? 0,
+        ),
+      )
     : ''
 
   const actualPoints = actual ? project(actual.corners) : ''
-  const center = ready ? viewer.current?.world2pix(desired.raDegrees, desired.decDegrees) : undefined
+
+  const center = ready
+    ? viewer.current?.world2pix(desired.raDegrees, desired.decDegrees)
+    : undefined
 
   const move = (x: number, y: number) => {
     if (locked || !ready) return
@@ -183,11 +210,14 @@ export function SurveyField({ target, desired, camera, actual, locked, onChange 
   }
 
   const nudge = (east: number, north: number) => {
-    if (!locked && camera) onChange(offsetPosition(
-      desired,
-      east * camera.fieldWidthDegrees / 100,
-      north * camera.fieldHeightDegrees / 100,
-    ))
+    if (!locked && camera)
+      onChange(
+        offsetPosition(
+          desired,
+          (east * camera.fieldWidthDegrees) / 100,
+          (north * camera.fieldHeightDegrees) / 100,
+        ),
+      )
   }
 
   return (
@@ -197,19 +227,26 @@ export function SurveyField({ target, desired, camera, actual, locked, onChange 
         {!ready && (
           <div className="vela-target-survey-message" role="status">
             <strong>{failed ? 'Reference survey unavailable' : 'Loading reference survey…'}</strong>
-            <p>{failed
-              ? 'Your coordinates remain available. Check the survey connection to compose visually.'
-              : 'DSS2 color sky survey'}</p>
+            <p>
+              {failed
+                ? 'Your coordinates remain available. Check the survey connection to compose visually.'
+                : 'DSS2 color sky survey'}
+            </p>
             {failed && <Button onClick={() => setAttempt(a => a + 1)}>Retry survey</Button>}
           </div>
         )}
         {ready && (
-          <svg ref={overlay} className="vela-target-overlay" aria-label="Calibrated camera footprint" role="img">
+          <svg
+            ref={overlay}
+            className="vela-target-overlay"
+            aria-label="Calibrated camera footprint"
+            role="img"
+          >
             {points && (
               <path
                 className="vela-target-shade"
                 fillRule="evenodd"
-                d={`M0 0H10000V10000H0Z M${points.split(" ").join(" L")}Z`}
+                d={`M0 0H10000V10000H0Z M${points.split(' ').join(' L')}Z`}
               />
             )}
             {points && (
@@ -234,14 +271,21 @@ export function SurveyField({ target, desired, camera, actual, locked, onChange 
                   event.currentTarget.setPointerCapture(event.pointerId)
                 }}
                 onPointerMove={event => {
-                  if (drag.current) move(
-                    drag.current.cx + event.clientX - drag.current.x,
-                    drag.current.cy + event.clientY - drag.current.y,
-                  )
+                  if (drag.current)
+                    move(
+                      drag.current.cx + event.clientX - drag.current.x,
+                      drag.current.cy + event.clientY - drag.current.y,
+                    )
                 }}
-                onPointerUp={() => { drag.current = null }}
-                onPointerCancel={() => { drag.current = null }}
-                onLostPointerCapture={() => { drag.current = null }}
+                onPointerUp={() => {
+                  drag.current = null
+                }}
+                onPointerCancel={() => {
+                  drag.current = null
+                }}
+                onLostPointerCapture={() => {
+                  drag.current = null
+                }}
                 onKeyDown={event => {
                   const delta = {
                     ArrowLeft: [1, 0],
@@ -269,14 +313,32 @@ export function SurveyField({ target, desired, camera, actual, locked, onChange 
               </text>
             )}
             {actualPoints && (
-              <polygon className="vela-target-footprint vela-target-footprint--actual" points={actualPoints} />
+              <polygon
+                className="vela-target-footprint vela-target-footprint--actual"
+                points={actualPoints}
+              />
             )}
           </svg>
         )}
       </div>
       <footer>
-        <span>DSS2 color reference survey · <a href="https://github.com/cds-astro/aladin-lite/tree/v3.8.2" target="_blank" rel="noreferrer">Aladin Lite</a> · <a href="/third-party/aladin-lite-license.txt" target="_blank" rel="noreferrer">License</a></span>
-        <a href="https://archive.stsci.edu/dss/acknowledging.html" target="_blank" rel="noreferrer">Image credit ↗</a>
+        <span>
+          DSS2 color reference survey ·{' '}
+          <a
+            href="https://github.com/cds-astro/aladin-lite/tree/v3.8.2"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Aladin Lite
+          </a>{' '}
+          ·{' '}
+          <a href="/third-party/aladin-lite-license.txt" target="_blank" rel="noreferrer">
+            License
+          </a>
+        </span>
+        <a href="https://archive.stsci.edu/dss/acknowledging.html" target="_blank" rel="noreferrer">
+          Image credit ↗
+        </a>
       </footer>
       <div className="vela-target-adjustments">
         <div>
@@ -295,7 +357,12 @@ export function SurveyField({ target, desired, camera, actual, locked, onChange 
         </div>
         <div className="vela-target-nudges">
           <span>Move frame</span>
-          {[['←', 1, 0], ['→', -1, 0], ['↑', 0, 1], ['↓', 0, -1]].map(([label, east, north]) => (
+          {[
+            ['←', 1, 0],
+            ['→', -1, 0],
+            ['↑', 0, 1],
+            ['↓', 0, -1],
+          ].map(([label, east, north]) => (
             <Button
               key={String(label)}
               size="small"

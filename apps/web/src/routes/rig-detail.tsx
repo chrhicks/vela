@@ -47,9 +47,13 @@ export function RigDetail() {
   if (view === undefined) {
     return (
       <section className="vela-rig-page">
-        <Link className="vela-rig-page__back" to="/">← All rigs</Link>
+        <Link className="vela-rig-page__back" to="/">
+          ← All rigs
+        </Link>
         {initialError === undefined ? (
-          <div aria-live="polite" className="vela-rig-route-state">Loading Rig…</div>
+          <div aria-live="polite" className="vela-rig-route-state">
+            Loading Rig…
+          </div>
         ) : initialError === 'not-found' ? (
           <RouteMessage
             detail="This Rig is no longer saved in Vela, or the address is incorrect."
@@ -57,7 +61,11 @@ export function RigDetail() {
           />
         ) : (
           <RouteMessage
-            action={<Button disabled={refreshing} onClick={() => void refresh()}>Try again</Button>}
+            action={
+              <Button disabled={refreshing} onClick={() => void refresh()}>
+                Try again
+              </Button>
+            }
             detail="Vela could not load this Rig. Check the server and try again."
             title="Could not load this Rig"
           />
@@ -71,7 +79,9 @@ export function RigDetail() {
 
   return (
     <section className="vela-rig-page">
-      <Link className="vela-rig-page__back" to="/">← All rigs</Link>
+      <Link className="vela-rig-page__back" to="/">
+        ← All rigs
+      </Link>
 
       <header className="vela-rig-hero">
         <div>
@@ -80,7 +90,9 @@ export function RigDetail() {
           <p>{connectionSummary(view)}</p>
         </div>
         <div className="vela-rig-hero__status">
-          <Badge marker={<i />} tone={state.tone}>{state.label}</Badge>
+          <Badge marker={<i />} tone={state.tone}>
+            {state.label}
+          </Badge>
           <span>{freshnessLabel(view, interrupted)}</span>
           <IconButton
             aria-busy={refreshing}
@@ -144,10 +156,12 @@ export function RigDetail() {
           <span>Refreshes every 5 seconds</span>
         </div>
         {devices.length === 0 ? (
-          <p className="vela-rig-devices__empty">No devices are currently configured for this Rig.</p>
+          <p className="vela-rig-devices__empty">
+            No devices are currently configured for this Rig.
+          </p>
         ) : (
           <div className="vela-rig-device-grid">
-            {devices.map((device) => (
+            {devices.map(device => (
               <RigDeviceCard device={device} key={device.id} stale={interrupted} />
             ))}
           </div>
@@ -158,12 +172,14 @@ export function RigDetail() {
         <button
           aria-expanded={detailsOpen}
           className="vela-rig-details__summary"
-          onClick={() => setDetailsOpen((open) => !open)}
+          onClick={() => setDetailsOpen(open => !open)}
           type="button"
         >
           <span>
             <strong>Rig details</strong>
-            <small>{formatEndpoint(view)} · Added {formatDate(view.addedAt)}</small>
+            <small>
+              {formatEndpoint(view)} · Added {formatDate(view.addedAt)}
+            </small>
           </span>
           <i aria-hidden="true">⌄</i>
         </button>
@@ -207,7 +223,7 @@ export function RigDetail() {
 
       <Dialog
         description="This removes the saved Rig from Vela. It does not change the Alpaca server or any hardware."
-        footer={(
+        footer={
           <>
             <Button disabled={forgetting} onClick={() => setForgetOpen(false)} tone="quiet">
               Cancel
@@ -220,13 +236,17 @@ export function RigDetail() {
               {forgetting ? 'Forgetting…' : 'Forget rig'}
             </Button>
           </>
-        )}
+        }
         onDismiss={forgetting ? undefined : () => setForgetOpen(false)}
         open={forgetOpen}
         title={`Forget ${view.name}?`}
       >
         <p className="vela-rig-forget-copy">You can discover and add it again later.</p>
-        {forgetError ? <p className="vela-rig-forget-error" role="alert">{forgetError}</p> : null}
+        {forgetError ? (
+          <p className="vela-rig-forget-error" role="alert">
+            {forgetError}
+          </p>
+        ) : null}
       </Dialog>
     </section>
   )
@@ -304,11 +324,10 @@ function orderDevices(
   const ordered: RigDeviceDetailView[] = []
 
   for (const kind of kindOrder) {
-    ordered.push(...devices.filter((device) => device.kind === kind))
+    ordered.push(...devices.filter(device => device.kind === kind))
   }
 
-  ordered.push(...devices.filter((device) =>
-    !kindOrder.some((kind) => kind === device.kind)))
+  ordered.push(...devices.filter(device => !kindOrder.some(kind => kind === device.kind)))
 
   return ordered
 }

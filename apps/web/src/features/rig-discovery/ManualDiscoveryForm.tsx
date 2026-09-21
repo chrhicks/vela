@@ -25,7 +25,7 @@ export function ManualDiscoveryForm({
     <form
       className="rig-discovery-manual"
       id={manualDiscoveryFormId}
-      onSubmit={(event) => {
+      onSubmit={event => {
         event.preventDefault()
         onSubmit()
       }}
@@ -37,7 +37,7 @@ export function ManualDiscoveryForm({
           autoComplete="off"
           invalid={Boolean(error)}
           label="Host or IP address"
-          onChange={(event) => onHostChange(event.target.value)}
+          onChange={event => onHostChange(event.target.value)}
           placeholder="ascom-remote.local"
           required
           value={host}
@@ -47,18 +47,23 @@ export function ManualDiscoveryForm({
           label="Port"
           max={65535}
           min={1}
-          onChange={(event) => onPortChange(event.target.value)}
+          onChange={event => onPortChange(event.target.value)}
           pattern="[0-9]*"
           required
           value={port}
         />
       </div>
       {error ? (
-        <p data-tone="danger" id={manualDiscoveryHostErrorId} role="alert">{error}</p>
+        <p data-tone="danger" id={manualDiscoveryHostErrorId} role="alert">
+          {error}
+        </p>
       ) : (
         <p>
-          Vela will inspect <strong>{host.trim() || 'this host'}:{port || '11111'}</strong> using
-          the read-only Alpaca Management API.
+          Vela will inspect{' '}
+          <strong>
+            {host.trim() || 'this host'}:{port || '11111'}
+          </strong>{' '}
+          using the read-only Alpaca Management API.
         </p>
       )}
     </form>

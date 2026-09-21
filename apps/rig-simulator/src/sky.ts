@@ -18,7 +18,11 @@ const maximumPixels = 6248 * 4176
 
 const stripePixelBudget = 65536
 
-const syntheticColors = [[1.6, 0.8, 0.4], [1, 1, 1], [0.4, 0.9, 1.7]] as const
+const syntheticColors = [
+  [1.6, 0.8, 0.4],
+  [1, 1, 1],
+  [0.4, 0.9, 1.7],
+] as const
 
 // D05 supplies positions and magnitude, not RGB. These repeatable warm, neutral,
 // and cool assignments test color reconstruction; they are not measured colors.
@@ -79,19 +83,34 @@ function* renderStripes(
   const exposureScale = (options.exposureSeconds ?? 2) / 2
   const colorSensor = options.sensor === 'rggb'
 
-  if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1
-      || width > 6248 || height > 6248 || width * height > maximumPixels || !Number.isFinite(fieldHeightDegrees)
-      || fieldHeightDegrees <= 0 || fieldHeightDegrees >= 180
-      || !Number.isFinite(exposureScale) || exposureScale < 0
-      || (options.sensor !== undefined && options.sensor !== 'monochrome' && options.sensor !== 'rggb')) {
+  if (
+    !Number.isInteger(width) ||
+    !Number.isInteger(height) ||
+    width < 1 ||
+    height < 1 ||
+    width > 6248 ||
+    height > 6248 ||
+    width * height > maximumPixels ||
+    !Number.isFinite(fieldHeightDegrees) ||
+    fieldHeightDegrees <= 0 ||
+    fieldHeightDegrees >= 180 ||
+    !Number.isFinite(exposureScale) ||
+    exposureScale < 0 ||
+    (options.sensor !== undefined && options.sensor !== 'monochrome' && options.sensor !== 'rggb')
+  ) {
     throw new Error('Invalid sky image dimensions, field height, sensor or exposure')
   }
 
   // Only the final Uint16 frame scales with area. Float64 scratch stays bounded,
   // and preserves addition/rounding of the original mono renderer.
   const stripeRows = Math.max(1, Math.floor(stripePixelBudget / width))
-  const stripes: ProjectedStar[][] = Array.from({ length: Math.ceil(height / stripeRows) }, () => [])
-  const focalPixels = height / (2 * Math.tan(fieldHeightDegrees * Math.PI / 360))
+
+  const stripes: ProjectedStar[][] = Array.from(
+    { length: Math.ceil(height / stripeRows) },
+    () => [],
+  )
+
+  const focalPixels = height / (2 * Math.tan((fieldHeightDegrees * Math.PI) / 360))
   // Both cameras share focused optics. Color changes spectral response, not
   // star width; unnecessarily broad stars blend in crowded Milky Way fields.
   const sigma = 1.15
@@ -101,14 +120,10 @@ function* renderStripes(
     for (let index = 0; index < stars.length; index++) {
       if (index % 512 === 0) yield
       const star = stars[index]!
-      const ra = star.raDegrees * Math.PI / 180
-      const dec = star.decDegrees * Math.PI / 180
+      const ra = (star.raDegrees * Math.PI) / 180
+      const dec = (star.decDegrees * Math.PI) / 180
 
-      const direction = [
-        Math.cos(dec) * Math.cos(ra),
-        Math.cos(dec) * Math.sin(ra),
-        Math.sin(dec),
-      ]
+      const direction = [Math.cos(dec) * Math.cos(ra), Math.cos(dec) * Math.sin(ra), Math.sin(dec)]
 
       const dot = (axis: readonly number[]) =>
         direction[0]! * axis[0]! + direction[1]! * axis[1]! + direction[2]! * axis[2]!
@@ -116,16 +131,20 @@ function* renderStripes(
       const depth = dot(pose.direction)
 
       if (depth <= 0) continue
-      const x = (width - 1) / 2 + focalPixels * dot(pose.right) / depth
-      const y = (height - 1) / 2 - focalPixels * dot(pose.up) / depth
+      const x = (width - 1) / 2 + (focalPixels * dot(pose.right)) / depth
+      const y = (height - 1) / 2 - (focalPixels * dot(pose.up)) / depth
 
       if (x < -radius || y < -radius || x > width - 1 + radius || y > height - 1 + radius) continue
-      const peak = Math.min(100000, 12000 * Math.pow(10, -0.4 * (star.magnitude - 8))) * exposureScale
+
+      const peak =
+        Math.min(100000, 12000 * Math.pow(10, -0.4 * (star.magnitude - 8))) * exposureScale
+
       const projected = { x, y, peak, color: syntheticStarColor(star) }
       const firstStripe = Math.floor(Math.max(0, Math.ceil(y - radius)) / stripeRows)
       const lastStripe = Math.floor(Math.min(height - 1, Math.floor(y + radius)) / stripeRows)
 
-      for (let stripe = firstStripe; stripe <= lastStripe; stripe++) stripes[stripe]!.push(projected)
+      for (let stripe = firstStripe; stripe <= lastStripe; stripe++)
+        stripes[stripe]!.push(projected)
     }
   }
 
@@ -165,15 +184,19 @@ function* renderStripes(
         ) {
           const distanceSquared = (column - x) ** 2 + (row - y) ** 2
           // Full sensor origin (0,0): R G / G B. No debayering at this boundary.
-          const channel = row % 2 === 0 ? column % 2 : 1 + column % 2
+          const channel = row % 2 === 0 ? column % 2 : 1 + (column % 2)
           const transmission = colorSensor ? color[channel]! : 1
-          intensity[(row - firstRow) * width + column]! += peak * Math.exp(-distanceSquared / (2 * sigma ** 2)) * transmission
+          intensity[(row - firstRow) * width + column]! +=
+            peak * Math.exp(-distanceSquared / (2 * sigma ** 2)) * transmission
         }
       }
     }
 
     for (let index = 0; index < count; index++) {
-      pixels[firstRow * width + index] = Math.min(maximum, Math.max(0, Math.round(intensity[index]!)))
+      pixels[firstRow * width + index] = Math.min(
+        maximum,
+        Math.max(0, Math.round(intensity[index]!)),
+      )
     }
   }
 

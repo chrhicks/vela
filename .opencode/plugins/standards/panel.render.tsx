@@ -12,9 +12,10 @@ import { ResultsPanel } from './panel.tsx'
 import { reportSchema, type Report } from './rpc.ts'
 
 const theme = resolveThemeDocument(DEFAULT_THEME, 'dark')
-const explanation = 'The UI reports success after starting the request, before the device confirms completion. '
-  + 'The returned promise only acknowledges dispatch; it does not establish the physical outcome. '
-  + 'A later read can still report an interrupted exposure. The starting state must stay distinct from confirmed completion.'
+const explanation =
+  'The UI reports success after starting the request, before the device confirms completion. ' +
+  'The returned promise only acknowledges dispatch; it does not establish the physical outcome. ' +
+  'A later read can still report an interrupted exposure. The starting state must stay distinct from confirmed completion.'
 const report = Schema.decodeUnknownSync(reportSchema)({
   artifact: 'render-fixture.json',
   time: '2026-09-20T12:00:00Z',
@@ -53,18 +54,23 @@ const report = Schema.decodeUnknownSync(reportSchema)({
         quote: [
           'startExposure()',
           'publishSuccess()',
-          ...Array.from({ length: 12 }, (_, index) => `// device observation ${index + 1}: still pending`),
+          ...Array.from(
+            { length: 12 },
+            (_, index) => `// device observation ${index + 1}: still pending`,
+          ),
           'return unconfirmedResult',
         ].join('\n'),
         sha256: 'a'.repeat(64),
       },
-      related: [{
-        path: 'packages/alpaca/src/camera.ts',
-        startLine: 11,
-        endLine: 12,
-        quote: 'await dispatchExposure()\nreturn { dispatched: true }',
-        sha256: 'c'.repeat(64),
-      }],
+      related: [
+        {
+          path: 'packages/alpaca/src/camera.ts',
+          startLine: 11,
+          endLine: 12,
+          quote: 'await dispatchExposure()\nreturn { dispatched: true }',
+          sha256: 'c'.repeat(64),
+        },
+      ],
     },
     {
       rule: 'error_context.cause',
@@ -88,11 +94,13 @@ const incomplete: Report = {
   artifact: 'incomplete.json',
   status: 'incomplete',
   error: 'Review stopped before all source was checked.',
-  missingEvidence: [{
-    path: 'packages/alpaca/src/validation.ts',
-    reason: 'Adapter contract was not supplied.',
-    nextAction: 'Include the adapter validation contract in the next review.',
-  }],
+  missingEvidence: [
+    {
+      path: 'packages/alpaca/src/validation.ts',
+      reason: 'Adapter contract was not supplied.',
+      nextAction: 'Include the adapter validation contract in the next review.',
+    },
+  ],
   files: [
     ...report.files,
     { path: 'assets/image.png', skipped: 'Binary file excluded.' },
@@ -103,7 +111,10 @@ const incomplete: Report = {
 const output = fileURLToPath(new URL('../../.local/panel-render/', import.meta.url))
 await mkdir(output, { recursive: true })
 
-for (const [width, height] of [[120, 36], [72, 28]]) {
+for (const [width, height] of [
+  [120, 36],
+  [72, 28],
+]) {
   type Layer = {
     enabled: boolean
     commands: { bind: string; run: () => void }[]
@@ -111,7 +122,11 @@ for (const [width, height] of [[120, 36], [72, 28]]) {
   let layer: (() => Layer) | undefined
   // Only host section/view bindings are mocked. Selection and scrolling use
   // OpenTUI's actual input dispatcher and focus handling.
-  const keymap = { layer: (input: () => Layer) => { layer = input } } as unknown as Context['keymap']
+  const keymap = {
+    layer: (input: () => Layer) => {
+      layer = input
+    },
+  } as unknown as Context['keymap']
   const [currentReport, setReport] = createSignal(report)
   const screen = await testRender(
     () => (
@@ -136,12 +151,18 @@ for (const [width, height] of [[120, 36], [72, 28]]) {
     return text.replace(/[█▀▄]/g, ' ').replace(/\s+/g, ' ')
   }
   function includes(text: string, expected: string) {
-    assert.ok(normalized(text).includes(expected), `${width}x${height}: missing ${JSON.stringify(expected)}`)
+    assert.ok(
+      normalized(text).includes(expected),
+      `${width}x${height}: missing ${JSON.stringify(expected)}`,
+    )
   }
   function detailText(frame: string) {
     // The adjacent list must not be interleaved with wrapped detail text.
     return width >= 100
-      ? frame.split('\n').map(line => line.slice(Math.round((width - 2) * 0.48) + 2)).join('\n')
+      ? frame
+          .split('\n')
+          .map(line => line.slice(Math.round((width - 2) * 0.48) + 2))
+          .join('\n')
       : frame
   }
   async function command(bind: string) {
@@ -165,7 +186,7 @@ for (const [width, height] of [[120, 36], [72, 28]]) {
       frames.push(capture(`${label}: down ${step + 1}`))
       assert.ok(step < 119, 'Scrolling did not settle')
     }
-    return frames.map(frame => onlyDetail ? detailText(frame) : frame).join('\n')
+    return frames.map(frame => (onlyDetail ? detailText(frame) : frame)).join('\n')
   }
   async function show(next: Report, label: string) {
     setReport(next)
@@ -222,7 +243,10 @@ for (const [width, height] of [[120, 36], [72, 28]]) {
     includes(checkStatus, 'Review error: Review stopped before all source was checked.')
     includes(checkStatus, 'Missing context: packages/alpaca/src/validation.ts')
     includes(checkStatus, 'Reason: Adapter contract was not supplied.')
-    includes(checkStatus, 'Next action: Include the adapter validation contract in the next review.')
+    includes(
+      checkStatus,
+      'Next action: Include the adapter validation contract in the next review.',
+    )
     includes(checkStatus, 'Skipped: Binary file excluded.')
     includes(checkStatus, 'Check error: Source could not be read.')
     await command('s')
@@ -250,7 +274,9 @@ for (const [width, height] of [[120, 36], [72, 28]]) {
     includes(empty, 'No diagnostics from this review. This does not certify the source is correct.')
     await command('s')
     includes(capture('Status without files'), 'No source files in this report.')
-    console.log(`PASS diagnostics, evidence scrolling, separate status, incomplete and stale: ${width}x${height}`)
+    console.log(
+      `PASS diagnostics, evidence scrolling, separate status, incomplete and stale: ${width}x${height}`,
+    )
   } finally {
     capture('Final frame')
     await writeFile(`${output}/${width}x${height}.txt`, captures.join('\n\n'))

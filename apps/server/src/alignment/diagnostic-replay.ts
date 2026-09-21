@@ -3,16 +3,28 @@ import { constants } from 'node:fs'
 import { open } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Site } from '../astronomy/coordinates.js'
-import { diagnosticEntrySchema, diagnosticJournalName, maximumFitsBytes, maximumJournalBytes,
-  type DiagnosticEntry, type DiagnosticFrameEntry } from './diagnostic-schema.js'
-import { createAlignmentBaseline, measureAlignment, type AlignmentBaseline, type AlignmentMeasurement, type AlignmentSample } from './geometry.js'
+import {
+  diagnosticEntrySchema,
+  diagnosticJournalName,
+  maximumFitsBytes,
+  maximumJournalBytes,
+  type DiagnosticEntry,
+  type DiagnosticFrameEntry,
+} from './diagnostic-schema.js'
+import {
+  createAlignmentBaseline,
+  measureAlignment,
+  type AlignmentBaseline,
+  type AlignmentMeasurement,
+  type AlignmentSample,
+} from './geometry.js'
 import { physicalAlignmentSample } from './physical-coordinates.js'
 
 export interface AlignmentDiagnosticReplayReport {
   validation: 'production-math-reproducibility-only'
   runId: string
   mode: 'offline' | 'physical'
-  outcome: { phase: 'finished' | 'stopped' | 'failed' | 'incomplete', error: string | null }
+  outcome: { phase: 'finished' | 'stopped' | 'failed' | 'incomplete'; error: string | null }
   truncatedFinalLine: boolean
   counts: {
     frames: number
@@ -32,8 +44,13 @@ export interface AlignmentDiagnosticReplayReport {
 
 /** Re-executes recorded inputs through production mathematics. This neither runs
  * a solver nor independently validates the physical mount, sky, or measurement. */
-export async function replayAlignmentDiagnostics(directory: string): Promise<AlignmentDiagnosticReplayReport> {
-  const journal = (await readBoundedFile(join(directory, diagnosticJournalName), maximumJournalBytes)).toString('utf8')
+export async function replayAlignmentDiagnostics(
+  directory: string,
+): Promise<AlignmentDiagnosticReplayReport> {
+  const journal = (
+    await readBoundedFile(join(directory, diagnosticJournalName), maximumJournalBytes)
+  ).toString('utf8')
+
   const truncatedFinalLine = !journal.endsWith('\n')
   const lines = journal.split('\n')
   // A newline commits an entry. Even a parseable final object without it is incomplete.
@@ -83,25 +100,36 @@ export async function replayAlignmentDiagnostics(directory: string): Promise<Ali
       case 'frame': {
         validateFrame(entry, first.run.mode)
 
-        if (originalNames.has(entry.original.filename)) throw new Error('Alignment diagnostic original filename was reused')
+        if (originalNames.has(entry.original.filename))
+          throw new Error('Alignment diagnostic original filename was reused')
         originalNames.add(entry.original.filename)
 
         if (entry.evidence.phase === 'baseline') {
-          if (report.baseline || baselineFrames.length >= 3 || entry.evidence.position !== baselineFrames.length + 1) {
+          if (
+            report.baseline ||
+            baselineFrames.length >= 3 ||
+            entry.evidence.position !== baselineFrames.length + 1
+          ) {
             throw new Error('Alignment diagnostic baseline frames are out of order')
           }
 
           baselineFrames.push(entry)
         } else {
-          if (!report.baseline) throw new Error('Alignment diagnostic adjustment is missing its baseline')
+          if (!report.baseline)
+            throw new Error('Alignment diagnostic adjustment is missing its baseline')
           latestAdjustment = entry
         }
 
         if (entry.evidence.physical) {
           const { site } = entry.evidence.physical
-          const observingSite: Site = { latitudeDegrees: site.latitudeDegrees, longitudeDegrees: site.longitudeDegrees }
 
-          if (site.elevationMeters !== undefined) observingSite.elevationMeters = site.elevationMeters
+          const observingSite: Site = {
+            latitudeDegrees: site.latitudeDegrees,
+            longitudeDegrees: site.longitudeDegrees,
+          }
+
+          if (site.elevationMeters !== undefined)
+            observingSite.elevationMeters = site.elevationMeters
 
           const recomputed = physicalAlignmentSample(
             entry.evidence.solution,
@@ -130,8 +158,13 @@ export async function replayAlignmentDiagnostics(directory: string): Promise<Ali
       }
 
       case 'baseline': {
-        if (report.baseline || baselineFrames.length !== 3
-          || !entry.samples.every((sample, index) => sameSample(sample, baselineFrames[index]!.evidence.sample))) {
+        if (
+          report.baseline ||
+          baselineFrames.length !== 3 ||
+          !entry.samples.every((sample, index) =>
+            sameSample(sample, baselineFrames[index]!.evidence.sample),
+          )
+        ) {
           throw new Error('Alignment diagnostic baseline does not match its three solved frames')
         }
 
@@ -141,8 +174,14 @@ export async function replayAlignmentDiagnostics(directory: string): Promise<Ali
       }
 
       case 'measurement': {
-        if (!report.baseline || !latestFrame || !sameSample(entry.sample, latestFrame.evidence.sample)) {
-          throw new Error('Alignment diagnostic measurement is missing its baseline or solved frame')
+        if (
+          !report.baseline ||
+          !latestFrame ||
+          !sameSample(entry.sample, latestFrame.evidence.sample)
+        ) {
+          throw new Error(
+            'Alignment diagnostic measurement is missing its baseline or solved frame',
+          )
         }
 
         report.finalMeasurement = measureAlignment(report.baseline, entry.sample, entry.tracking)
@@ -152,16 +191,23 @@ export async function replayAlignmentDiagnostics(directory: string): Promise<Ali
       }
 
       case 'outcome':
-        if (entry.phase === 'finished' && !report.finalMeasurement) throw new Error('Finished alignment diagnostic has no measurement')
+        if (entry.phase === 'finished' && !report.finalMeasurement)
+          throw new Error('Finished alignment diagnostic has no measurement')
         outcome = entry
         break
     }
   }
 
   for (const frame of [...baselineFrames, ...(latestAdjustment ? [latestAdjustment] : [])]) {
-    const original = await readBoundedFile(join(directory, frame.original.filename), maximumFitsBytes)
+    const original = await readBoundedFile(
+      join(directory, frame.original.filename),
+      maximumFitsBytes,
+    )
 
-    if (original.length !== frame.original.bytes || createHash('sha256').update(original).digest('hex') !== frame.original.sha256) {
+    if (
+      original.length !== frame.original.bytes ||
+      createHash('sha256').update(original).digest('hex') !== frame.original.sha256
+    ) {
       throw new Error(`Alignment diagnostic original integrity failure: ${frame.original.filename}`)
     }
 
@@ -169,7 +215,8 @@ export async function replayAlignmentDiagnostics(directory: string): Promise<Ali
     report.counts.verifiedOriginals++
   }
 
-  if (outcome && !truncatedFinalLine) report.outcome = { phase: outcome.phase, error: outcome.error }
+  if (outcome && !truncatedFinalLine)
+    report.outcome = { phase: outcome.phase, error: outcome.error }
 
   return report
 }
@@ -178,9 +225,13 @@ function validateFrame(frame: DiagnosticFrameEntry, mode: 'physical' | 'offline'
   const { evidence, capture } = frame
   const { wcs } = evidence.solution
 
-  if (wcs.width !== capture.width || wcs.height !== capture.height || evidence.solution.capturedAt !== capture.capturedAt
-    || !frame.original.filename.startsWith(`${evidence.phase}-`)
-    || ![2, 4].some(bytesPerSample => fitsBytes(capture, bytesPerSample) === frame.original.bytes)) {
+  if (
+    wcs.width !== capture.width ||
+    wcs.height !== capture.height ||
+    evidence.solution.capturedAt !== capture.capturedAt ||
+    !frame.original.filename.startsWith(`${evidence.phase}-`) ||
+    ![2, 4].some(bytesPerSample => fitsBytes(capture, bytesPerSample) === frame.original.bytes)
+  ) {
     throw new Error('Alignment diagnostic frame dimensions, timing or original metadata disagree')
   }
 
@@ -194,15 +245,20 @@ function validateFrame(frame: DiagnosticFrameEntry, mode: 'physical' | 'offline'
 }
 
 function fitsBytes(capture: DiagnosticFrameEntry['capture'], bytesPerSample: number) {
-  return 2880 + Math.ceil(capture.width * capture.height * bytesPerSample / 2880) * 2880
+  return 2880 + Math.ceil((capture.width * capture.height * bytesPerSample) / 2880) * 2880
 }
 
 /** Check only Vela's two emitted primary-image layouts, not arbitrary FITS input.
  * Older adjustment files may have rotated out; retained files must agree with
  * their journal dimensions and exact encoding, as well as their size and hash. */
 function validateOriginalFits(original: Buffer, frame: DiagnosticFrameEntry) {
-  const cards = Array.from({ length: 36 }, (_, index) => original.toString('latin1', index * 80, (index + 1) * 80))
-  const numberCard = (key: string, value: number) => `${key.padEnd(8)}= ${String(value).padStart(20)}`.padEnd(80)
+  const cards = Array.from({ length: 36 }, (_, index) =>
+    original.toString('latin1', index * 80, (index + 1) * 80),
+  )
+
+  const numberCard = (key: string, value: number) =>
+    `${key.padEnd(8)}= ${String(value).padStart(20)}`.padEnd(80)
+
   const unsigned16 = cards[1] === numberCard('BITPIX', 16)
   const bytesPerSample = unsigned16 ? 2 : 4
 
@@ -216,27 +272,47 @@ function validateOriginalFits(original: Buffer, frame: DiagnosticFrameEntry) {
 
   const end = cards.indexOf('END'.padEnd(80))
 
-  if (required.some((card, index) => cards[index] !== card || cards.filter(other => other.slice(0, 8) === card.slice(0, 8)).length !== 1)
-    || end < required.length || cards.slice(end + 1).some(card => card !== ' '.repeat(80))
-    || fitsBytes(frame.capture, bytesPerSample) !== original.length) {
+  if (
+    required.some(
+      (card, index) =>
+        cards[index] !== card ||
+        cards.filter(other => other.slice(0, 8) === card.slice(0, 8)).length !== 1,
+    ) ||
+    end < required.length ||
+    cards.slice(end + 1).some(card => card !== ' '.repeat(80)) ||
+    fitsBytes(frame.capture, bytesPerSample) !== original.length
+  ) {
     throw new Error('Alignment diagnostic FITS layout or dimensions disagree with its journal')
   }
 
-  for (const [key, value] of [['BZERO', 32_768], ['BSCALE', 1]] as const) {
+  for (const [key, value] of [
+    ['BZERO', 32_768],
+    ['BSCALE', 1],
+  ] as const) {
     const scaling = cards.filter(card => card.slice(0, 8).trim() === key)
 
-    if (unsigned16 ? scaling.length !== 1 || scaling[0] !== numberCard(key, value) : scaling.length !== 0) {
+    if (
+      unsigned16
+        ? scaling.length !== 1 || scaling[0] !== numberCard(key, value)
+        : scaling.length !== 0
+    ) {
       throw new Error('Alignment diagnostic FITS has unsupported sample scaling')
     }
   }
 }
 
 function sameSample(a: AlignmentSample, b: AlignmentSample) {
-  return a.raDegrees === b.raDegrees && a.decDegrees === b.decDegrees
-    && a.siderealTimeDegrees === b.siderealTimeDegrees && a.capturedAt === b.capturedAt
+  return (
+    a.raDegrees === b.raDegrees &&
+    a.decDegrees === b.decDegrees &&
+    a.siderealTimeDegrees === b.siderealTimeDegrees &&
+    a.capturedAt === b.capturedAt
+  )
 }
 
-function angleDifference(a: number, b: number) { return Math.abs(((a - b + 540) % 360) - 180) }
+function angleDifference(a: number, b: number) {
+  return Math.abs(((a - b + 540) % 360) - 180)
+}
 
 function compareMeasurement(
   report: AlignmentDiagnosticReplayReport,
@@ -277,7 +353,8 @@ async function readBoundedFile(path: string, maximumBytes: number): Promise<Buff
       length += read.bytesRead
     }
 
-    if (length !== stat.size) throw new Error(`Alignment diagnostic file changed while reading: ${path}`)
+    if (length !== stat.size)
+      throw new Error(`Alignment diagnostic file changed while reading: ${path}`)
 
     return bytes.subarray(0, length)
   } finally {

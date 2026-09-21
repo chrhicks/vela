@@ -28,9 +28,14 @@ export function frameCorners(
   const rad = Math.PI / 180
   const angle = rotation * rad
 
-  return [[-1, 1], [1, 1], [1, -1], [-1, -1]].map(([sx, sy]) => {
-    const x = sx! * Math.tan(width * rad / 2)
-    const y = sy! * Math.tan(height * rad / 2)
+  return [
+    [-1, 1],
+    [1, 1],
+    [1, -1],
+    [-1, -1],
+  ].map(([sx, sy]) => {
+    const x = sx! * Math.tan((width * rad) / 2)
+    const y = sy! * Math.tan((height * rad) / 2)
 
     return offsetPosition(
       center,

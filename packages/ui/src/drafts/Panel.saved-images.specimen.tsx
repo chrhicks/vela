@@ -12,7 +12,13 @@ import './Panel.saved-images.specimen.css'
 
 type Props = Record<string, string | number | boolean>
 
-function SavedImagesPreview({ props, onPropsChange }: { props: Props, onPropsChange?: (patch: Props) => void }) {
+function SavedImagesPreview({
+  props,
+  onPropsChange,
+}: {
+  props: Props
+  onPropsChange?: (patch: Props) => void
+}) {
   function pageTitle() {
     switch (screen) {
       case 'observe':
@@ -29,21 +35,32 @@ function SavedImagesPreview({ props, onPropsChange }: { props: Props, onPropsCha
   function renderPageAction() {
     switch (screen) {
       case 'capture':
-        return <Button onClick={() => update({ screen: 'saved' })}>Saved images ({saved.length}) →</Button>
+        return (
+          <Button onClick={() => update({ screen: 'saved' })}>
+            Saved images ({saved.length}) →
+          </Button>
+        )
       case 'observe':
         return <Badge tone="positive">Connected</Badge>
       default:
-        return <span className="vela-saved-count">{saved.length} {saved.length === 1 ? 'image' : 'images'}</span>
+        return (
+          <span className="vela-saved-count">
+            {saved.length} {saved.length === 1 ? 'image' : 'images'}
+          </span>
+        )
     }
   }
 
   const [local, setLocal] = useState(props)
   const values = onPropsChange ? props : local
 
-  const update = useCallback((patch: Props) => {
-    if (onPropsChange) onPropsChange(patch)
-    else setLocal(current => ({ ...current, ...patch }))
-  }, [onPropsChange])
+  const update = useCallback(
+    (patch: Props) => {
+      if (onPropsChange) onPropsChange(patch)
+      else setLocal(current => ({ ...current, ...patch }))
+    },
+    [onPropsChange],
+  )
 
   const screen = String(values.screen)
   const state = String(values.state)
@@ -51,10 +68,24 @@ function SavedImagesPreview({ props, onPropsChange }: { props: Props, onPropsCha
   const hasImage = Boolean(values.hasImage)
   const frame = Math.max(5, Number(values.frame) || 5)
   const selected = Number(values.selected) || frame
-  const saved = String(values.saved).split(',').map(Number).filter(id => id > 0)
+
+  const saved = String(values.saved)
+    .split(',')
+    .map(Number)
+    .filter(id => id > 0)
+
   const isSaved = saved.includes(frame)
-  const exposures = Object.fromEntries(String(values.exposures ?? '').split(',').filter(Boolean).map(entry => entry.split(':')))
-  const exposureFor = (id: number) => exposures[id] ?? (id === frame ? String(values.imageSeconds) : '10')
+
+  const exposures = Object.fromEntries(
+    String(values.exposures ?? '')
+      .split(',')
+      .filter(Boolean)
+      .map(entry => entry.split(':')),
+  )
+
+  const exposureFor = (id: number) =>
+    exposures[id] ?? (id === frame ? String(values.imageSeconds) : '10')
+
   const seconds = Number(values.exposure)
   const validExposure = Number.isFinite(seconds) && seconds >= 0.1 && seconds <= 600
   const [playing, setPlaying] = useState(false)
@@ -79,7 +110,9 @@ function SavedImagesPreview({ props, onPropsChange }: { props: Props, onPropsCha
           ...exposures,
           [frame]: exposureFor(frame),
           [next]: String(seconds),
-        }).map(([id, duration]) => `${id}:${duration}`).join(','),
+        })
+          .map(([id, duration]) => `${id}:${duration}`)
+          .join(','),
         saved: values.saveFrames && !failed ? saveList(next) : String(values.saved),
         state: failed ? 'save-error' : values.repeat ? 'capturing' : 'idle',
       })
@@ -98,7 +131,7 @@ function SavedImagesPreview({ props, onPropsChange }: { props: Props, onPropsCha
     values.repeat,
     values.saved,
     values.exposures,
-    update
+    update,
   ])
 
   useEffect(() => {
@@ -168,7 +201,9 @@ function SavedImagesPreview({ props, onPropsChange }: { props: Props, onPropsCha
     <dl className="vela-saved-details">
       <div>
         <dt>Captured</dt>
-        <dd>{details(id)} · {time(id)}</dd>
+        <dd>
+          {details(id)} · {time(id)}
+        </dd>
       </div>
       <div>
         <dt>Camera</dt>
@@ -211,7 +246,9 @@ function SavedImagesPreview({ props, onPropsChange }: { props: Props, onPropsCha
         <header className="vela-capture-heading">
           <div>
             <p>Offline rig</p>
-            <h1 ref={heading} tabIndex={-1}>{pageTitle()}</h1>
+            <h1 ref={heading} tabIndex={-1}>
+              {pageTitle()}
+            </h1>
           </div>
           {renderPageAction()}
         </header>
@@ -231,15 +268,21 @@ function SavedImagesPreview({ props, onPropsChange }: { props: Props, onPropsCha
                 <div className="vela-capture-entry__body">
                   <h2>Capture</h2>
                   <p>Take exposures and inspect the latest image.</p>
-                  <div className="vela-capture-entry__status">{busy ? 'Capturing' : 'Ready for an exposure'}</div>
-                  <Button tone="accent" onClick={() => update({ screen: 'capture' })}>Open capture →</Button>
+                  <div className="vela-capture-entry__status">
+                    {busy ? 'Capturing' : 'Ready for an exposure'}
+                  </div>
+                  <Button tone="accent" onClick={() => update({ screen: 'capture' })}>
+                    Open capture →
+                  </Button>
                 </div>
               </Panel>
               <Panel className="vela-capture-entry">
                 <div className="vela-capture-entry__body">
                   <h2>Saved images</h2>
                   <p>Your retained frames, ready to browse and take into your processing tools.</p>
-                  <div className="vela-capture-entry__status">{saved.length} images · Original FITS + preview</div>
+                  <div className="vela-capture-entry__status">
+                    {saved.length} images · Original FITS + preview
+                  </div>
                   <Button onClick={() => update({ screen: 'saved' })}>Browse saved images →</Button>
                 </div>
               </Panel>
@@ -251,7 +294,10 @@ function SavedImagesPreview({ props, onPropsChange }: { props: Props, onPropsCha
             {state === 'save-error' && (
               <div className="vela-capture-warning" role="alert">
                 <strong>Image could not be saved</strong>
-                <p>Capture is stopped. This image is still available below. Check storage, then try keeping it again.</p>
+                <p>
+                  Capture is stopped. This image is still available below. Check storage, then try
+                  keeping it again.
+                </p>
               </div>
             )}
             <div className="vela-capture-layout">
@@ -259,26 +305,43 @@ function SavedImagesPreview({ props, onPropsChange }: { props: Props, onPropsCha
                 <header>
                   <div>
                     <h2>Latest image</h2>
-                    <span>{hasImage ? `${time(frame)}${busy ? ' · Previous exposure' : ''}` : 'No exposure yet'}</span>
+                    <span>
+                      {hasImage
+                        ? `${time(frame)}${busy ? ' · Previous exposure' : ''}`
+                        : 'No exposure yet'}
+                    </span>
                   </div>
-                  {hasImage && <div className="vela-saved-image-actions">{scaleControls}{isSaved ? <Badge tone="positive">Saved</Badge> : <Button size="small" onClick={keepImage}>Keep this image</Button>}</div>}
+                  {hasImage && (
+                    <div className="vela-saved-image-actions">
+                      {scaleControls}
+                      {isSaved ? (
+                        <Badge tone="positive">Saved</Badge>
+                      ) : (
+                        <Button size="small" onClick={keepImage}>
+                          Keep this image
+                        </Button>
+                      )}
+                    </div>
+                  )}
                 </header>
                 <div
                   className="vela-capture-image__window"
                   ref={imageWindow}
-                  data-zoomed={hasImage && zoomed || undefined}
+                  data-zoomed={(hasImage && zoomed) || undefined}
                   tabIndex={hasImage && zoomed ? 0 : undefined}
                   role={hasImage && zoomed ? 'region' : undefined}
-                  aria-label={hasImage && zoomed ? 'Image at 100 percent. Scroll to inspect.' : undefined}
+                  aria-label={
+                    hasImage && zoomed ? 'Image at 100 percent. Scroll to inspect.' : undefined
+                  }
                 >
-                  {hasImage
-                    ? image(frame)
-                    : (
-                      <div className="vela-capture-empty">
-                        <h3>Your first image starts here</h3>
-                        <p>Take an exposure to inspect it here.</p>
-                      </div>
-                    )}
+                  {hasImage ? (
+                    image(frame)
+                  ) : (
+                    <div className="vela-capture-empty">
+                      <h3>Your first image starts here</h3>
+                      <p>Take an exposure to inspect it here.</p>
+                    </div>
+                  )}
                 </div>
                 {hasImage && (
                   <>
@@ -351,7 +414,13 @@ function SavedImagesPreview({ props, onPropsChange }: { props: Props, onPropsCha
                 </div>
                 <div className="vela-capture-progress">
                   <div>
-                    <strong role="status">{busy ? 'Exposing' : state === 'save-error' ? 'Capture stopped' : 'Ready for an exposure'}</strong>
+                    <strong role="status">
+                      {busy
+                        ? 'Exposing'
+                        : state === 'save-error'
+                          ? 'Capture stopped'
+                          : 'Ready for an exposure'}
+                    </strong>
                   </div>
                   <p>
                     {values.saveFrames
@@ -365,46 +434,57 @@ function SavedImagesPreview({ props, onPropsChange }: { props: Props, onPropsCha
         )}
         {screen === 'saved' && (
           <>
-            <p className="vela-capture-intro">Original data and the preview you inspected, kept on your Vela server.</p>
+            <p className="vela-capture-intro">
+              Original data and the preview you inspected, kept on your Vela server.
+            </p>
             {saved.length === 0 ? (
               <Panel>
                 <div className="vela-saved-empty">
                   <h2>No saved images yet</h2>
-                  <p>Turn on Save frames before capturing, or keep an individual image when you see one worth saving.</p>
+                  <p>
+                    Turn on Save frames before capturing, or keep an individual image when you see
+                    one worth saving.
+                  </p>
                   <Button onClick={() => update({ screen: 'capture' })}>Open capture →</Button>
                 </div>
               </Panel>
-            ) : ['September 5, 2026', 'September 4, 2026'].map(date => {
-              const group = saved.filter(id => details(id) === date).sort((a, b) => b - a)
+            ) : (
+              ['September 5, 2026', 'September 4, 2026'].map(date => {
+                const group = saved.filter(id => details(id) === date).sort((a, b) => b - a)
 
-              return group.length > 0 && (
-                <section className="vela-saved-group" key={date}>
-                  <h2>
-                    {date}
-                    <span>{group.length} {group.length === 1 ? 'image' : 'images'}</span>
-                  </h2>
-                  <div className="vela-saved-grid">
-                    {group.map(id => (
-                      <button
-                        className="vela-saved-card"
-                        key={id}
-                        onClick={() => update({ screen: 'detail', selected: id })}
-                      >
-                        <div className="vela-saved-thumbnail">{image(id)}</div>
-                        <div className="vela-saved-card-copy">
-                          <strong>{time(id)}</strong>
-                          <span>{exposureFor(id)} s · Color</span>
-                          <small>
-                            {'FITS + preview '}
-                            <span aria-hidden="true">→</span>
-                          </small>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </section>
-              )
-            })}
+                return (
+                  group.length > 0 && (
+                    <section className="vela-saved-group" key={date}>
+                      <h2>
+                        {date}
+                        <span>
+                          {group.length} {group.length === 1 ? 'image' : 'images'}
+                        </span>
+                      </h2>
+                      <div className="vela-saved-grid">
+                        {group.map(id => (
+                          <button
+                            className="vela-saved-card"
+                            key={id}
+                            onClick={() => update({ screen: 'detail', selected: id })}
+                          >
+                            <div className="vela-saved-thumbnail">{image(id)}</div>
+                            <div className="vela-saved-card-copy">
+                              <strong>{time(id)}</strong>
+                              <span>{exposureFor(id)} s · Color</span>
+                              <small>
+                                {'FITS + preview '}
+                                <span aria-hidden="true">→</span>
+                              </small>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                  )
+                )
+              })
+            )}
           </>
         )}
         {screen === 'detail' && (
@@ -435,16 +515,25 @@ function SavedImagesPreview({ props, onPropsChange }: { props: Props, onPropsCha
             <Panel title="Image details">
               {imageDetails(selected)}
               <div className="vela-saved-downloads">
-                <Button tone="accent" onClick={() => download('Original FITS')}>Download FITS</Button>
+                <Button tone="accent" onClick={() => download('Original FITS')}>
+                  Download FITS
+                </Button>
                 <Button onClick={() => download('Preview PNG')}>Download preview</Button>
               </div>
-              <p className="vela-saved-help">Use the original FITS in Siril or your preferred processing tool.</p>
+              <p className="vela-saved-help">
+                Use the original FITS in Siril or your preferred processing tool.
+              </p>
             </Panel>
           </div>
         )}
-        <div className="vela-saved-notice" role="status">{notice}</div>
+        <div className="vela-saved-notice" role="status">
+          {notice}
+        </div>
       </main>
-      <footer className="vela-capture-prototype">Workshop only · Local image fixtures · 3 seconds per example exposure · No files saved or downloaded</footer>
+      <footer className="vela-capture-prototype">
+        Workshop only · Local image fixtures · 3 seconds per example exposure · No files saved or
+        downloaded
+      </footer>
     </article>
   )
 }
@@ -454,7 +543,8 @@ export const specimen: ComponentSpecimen = {
   componentName: 'Panel / Card',
   id: 'panel-saved-images',
   name: 'Saved images · Draft product example',
-  description: 'Keep a displayed exposure or save every frame, then browse the same per-rig collection. Local fixtures only; no server storage or file downloads.',
+  description:
+    'Keep a displayed exposure or save every frame, then browse the same per-rig collection. Local fixtures only; no server storage or file downloads.',
   controls: {
     screen: { type: 'select', label: 'View', options: ['observe', 'capture', 'saved', 'detail'] },
     state: { type: 'select', label: 'Capture state', options: ['idle', 'capturing', 'save-error'] },
@@ -481,7 +571,9 @@ export const specimen: ComponentSpecimen = {
     imageSeconds: '10',
     exposures: '',
     frame: 5,
-    selected: 4
+    selected: 4,
   },
-  render: (props, onPropsChange) => <SavedImagesPreview props={props} {...(onPropsChange ? { onPropsChange } : {})} />,
+  render: (props, onPropsChange) => (
+    <SavedImagesPreview props={props} {...(onPropsChange ? { onPropsChange } : {})} />
+  ),
 }

@@ -29,7 +29,8 @@ function sessionFromUrl(base: WorkingSession): WorkingSession {
 
   const context = params.get('context')
 
-  if (context === 'isolated' || context === 'form' || context === 'toolbar' || context === 'card') next.context = context
+  if (context === 'isolated' || context === 'form' || context === 'toolbar' || context === 'card')
+    next.context = context
   const viewport = Number(params.get('viewport'))
 
   if (viewport >= 320 && viewport <= 1600) next.viewport = viewport
@@ -49,7 +50,12 @@ function sessionFromUrl(base: WorkingSession): WorkingSession {
 }
 
 function slugify(value: string): string {
-  return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 64)
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '')
+    .slice(0, 64)
 }
 
 export function useWorkshop() {
@@ -67,7 +73,8 @@ export function useWorkshop() {
         const nextSession = sessionFromUrl(storedSession ?? DEFAULT_SESSION)
         const discovered = [DEFAULT_PROFILE, VELA_CURRENT_PROFILE, ...storedProfiles]
 
-        if (!discovered.some((profile) => profile.id === nextSession.profileId)) nextSession.profileId = DEFAULT_PROFILE.id
+        if (!discovered.some(profile => profile.id === nextSession.profileId))
+          nextSession.profileId = DEFAULT_PROFILE.id
         const specimen = findSpecimen(nextSession.componentId, nextSession.specimenId)
         nextSession.componentId = specimen.componentId
         nextSession.specimenId = specimen.id
@@ -77,7 +84,9 @@ export function useWorkshop() {
         setHydrated(true)
         setStatus(storedSession ? 'Session recovered from disk' : 'New local session')
       })
-      .catch((cause: unknown) => setStatus(cause instanceof Error ? cause.message : 'Unable to load workshop state'))
+      .catch((cause: unknown) =>
+        setStatus(cause instanceof Error ? cause.message : 'Unable to load workshop state'),
+      )
   }, [])
 
   useEffect(() => {
@@ -87,7 +96,9 @@ export function useWorkshop() {
       const persisted = { ...session, updatedAt: new Date().toISOString() }
       persistSession(persisted)
         .then(() => setStatus('Session recovered automatically'))
-        .catch((cause: unknown) => setStatus(cause instanceof Error ? cause.message : 'Session save failed'))
+        .catch((cause: unknown) =>
+          setStatus(cause instanceof Error ? cause.message : 'Session save failed'),
+        )
     }, 280)
     const params = new URLSearchParams()
     params.set('component', session.componentId)
@@ -97,13 +108,15 @@ export function useWorkshop() {
     params.set('context', session.context)
     params.set('viewport', String(session.viewport))
 
-    for (const [key, value] of Object.entries(session.props)) params.set(`prop.${key}`, String(value))
+    for (const [key, value] of Object.entries(session.props))
+      params.set(`prop.${key}`, String(value))
     window.history.replaceState(null, '', `${window.location.pathname}?${params}`)
 
     return () => window.clearTimeout(saveTimer.current)
   }, [hydrated, session])
 
-  const activeProfile = profiles.find((profile) => profile.id === session.profileId) ?? DEFAULT_PROFILE
+  const activeProfile =
+    profiles.find(profile => profile.id === session.profileId) ?? DEFAULT_PROFILE
 
   const theme = useMemo(
     () => resolveTheme(activeProfile, { ...session.unsavedOverrides, density: session.density }),
@@ -113,25 +126,28 @@ export function useWorkshop() {
   const specimen = findSpecimen(session.componentId, session.specimenId)
 
   const patchSession = useCallback((patch: SessionPatch) => {
-    setSession((current) => ({ ...current, ...patch, updatedAt: current.updatedAt }))
+    setSession(current => ({ ...current, ...patch, updatedAt: current.updatedAt }))
   }, [])
 
   const patchProps = useCallback((patch: Record<string, string | number | boolean>) => {
-    setSession((current) => ({
+    setSession(current => ({
       ...current,
       props: { ...current.props, ...patch },
       updatedAt: current.updatedAt,
     }))
   }, [])
 
-  const selectSpecimen = useCallback((componentId: string, specimenId: string) => {
-    const next = findSpecimen(componentId, specimenId)
-    patchSession({ componentId, specimenId, props: { ...next.defaultProps } })
-  }, [patchSession])
+  const selectSpecimen = useCallback(
+    (componentId: string, specimenId: string) => {
+      const next = findSpecimen(componentId, specimenId)
+      patchSession({ componentId, specimenId, props: { ...next.defaultProps } })
+    },
+    [patchSession],
+  )
 
   const editTheme = useCallback((patch: Partial<ThemeParameters>) => {
-    setSession((current) => {
-      setUndoStack((stack) => [...stack.slice(-39), current.unsavedOverrides])
+    setSession(current => {
+      setUndoStack(stack => [...stack.slice(-39), current.unsavedOverrides])
       setRedoStack([])
 
       return { ...current, unsavedOverrides: { ...current.unsavedOverrides, ...patch } }
@@ -142,8 +158,8 @@ export function useWorkshop() {
     const previous = undoStack.at(-1)
 
     if (!previous) return
-    setRedoStack((stack) => [session.unsavedOverrides, ...stack].slice(0, 40))
-    setUndoStack((stack) => stack.slice(0, -1))
+    setRedoStack(stack => [session.unsavedOverrides, ...stack].slice(0, 40))
+    setUndoStack(stack => stack.slice(0, -1))
     patchSession({ unsavedOverrides: previous })
   }, [patchSession, session.unsavedOverrides, undoStack])
 
@@ -151,24 +167,32 @@ export function useWorkshop() {
     const next = redoStack[0]
 
     if (!next) return
-    setUndoStack((stack) => [...stack, session.unsavedOverrides].slice(-40))
-    setRedoStack((stack) => stack.slice(1))
+    setUndoStack(stack => [...stack, session.unsavedOverrides].slice(-40))
+    setRedoStack(stack => stack.slice(1))
     patchSession({ unsavedOverrides: next })
   }, [patchSession, redoStack, session.unsavedOverrides])
 
-  const selectProfile = useCallback((profileId: string) => {
-    const profile = profiles.find((candidate) => candidate.id === profileId) ?? DEFAULT_PROFILE
-    const resolved = resolveTheme(profile)
-    setUndoStack([])
-    setRedoStack([])
-    patchSession({ profileId: profile.id, unsavedOverrides: {}, density: resolved.density })
-  }, [patchSession, profiles])
+  const selectProfile = useCallback(
+    (profileId: string) => {
+      const profile = profiles.find(candidate => candidate.id === profileId) ?? DEFAULT_PROFILE
+      const resolved = resolveTheme(profile)
+      setUndoStack([])
+      setRedoStack([])
+      patchSession({ profileId: profile.id, unsavedOverrides: {}, density: resolved.density })
+    },
+    [patchSession, profiles],
+  )
 
   const save = useCallback(async () => {
     if (activeProfile.readonly) return false
-    const next = { ...activeProfile, overrides: { ...activeProfile.overrides, ...session.unsavedOverrides } }
+
+    const next = {
+      ...activeProfile,
+      overrides: { ...activeProfile.overrides, ...session.unsavedOverrides },
+    }
+
     const saved = await persistProfile(next)
-    setProfiles((current) => current.map((profile) => profile.id === saved.id ? saved : profile))
+    setProfiles(current => current.map(profile => (profile.id === saved.id ? saved : profile)))
     patchSession({ unsavedOverrides: {} })
     setUndoStack([])
     setRedoStack([])
@@ -177,18 +201,26 @@ export function useWorkshop() {
     return true
   }, [activeProfile, patchSession, session.unsavedOverrides])
 
-  const saveAs = useCallback(async (name: string) => {
-    const id = slugify(name)
+  const saveAs = useCallback(
+    async (name: string) => {
+      const id = slugify(name)
 
-    if (!id) throw new Error('Profile name must contain a letter or number')
-    const next = makeProfile(id, name.trim(), { ...activeProfile.overrides, ...session.unsavedOverrides })
-    const saved = await persistProfile(next)
-    setProfiles((current) => [...current.filter((profile) => profile.id !== saved.id), saved])
-    patchSession({ profileId: saved.id, unsavedOverrides: {} })
-    setUndoStack([])
-    setRedoStack([])
-    setStatus(`Saved ${saved.name}`)
-  }, [activeProfile.overrides, patchSession, session.unsavedOverrides])
+      if (!id) throw new Error('Profile name must contain a letter or number')
+
+      const next = makeProfile(id, name.trim(), {
+        ...activeProfile.overrides,
+        ...session.unsavedOverrides,
+      })
+
+      const saved = await persistProfile(next)
+      setProfiles(current => [...current.filter(profile => profile.id !== saved.id), saved])
+      patchSession({ profileId: saved.id, unsavedOverrides: {} })
+      setUndoStack([])
+      setRedoStack([])
+      setStatus(`Saved ${saved.name}`)
+    },
+    [activeProfile.overrides, patchSession, session.unsavedOverrides],
+  )
 
   return {
     activeProfile,

@@ -3,7 +3,10 @@ import type { ComponentSpecimen } from '../themes'
 import { Badge } from './Badge'
 import { Button } from './Button'
 import { Panel } from './Panel'
-import { AlignmentImageInspection, alignmentInspectionFixtures } from './Panel.polar-alignment-inspection'
+import {
+  AlignmentImageInspection,
+  alignmentInspectionFixtures,
+} from './Panel.polar-alignment-inspection'
 import './Panel.polar-alignment.specimen.css'
 
 const examples = ['large-error', 'near-aligned', 'outside-image'] as const
@@ -25,67 +28,79 @@ const phases = [
   'retrying',
   'reconnecting',
   'stopped',
-  'finished'
+  'finished',
 ] as const
 
-const activityFrames = new Map<string, { label: string; age: string }>(Object.entries({
-  adjusting: { label: 'Alignment updated', age: 'Just now' },
-  exposing: { label: 'Exposing image', age: '7 s ago' },
-  waiting: { label: 'Exposing image', age: '7 s ago' },
-  debayering: { label: 'Debayering image…', age: '32 s ago' },
-  stretching: { label: 'Stretching image…', age: '33 s ago' },
-  solving: { label: 'Plate-solving…', age: '35 s ago' },
-  retrying: { label: 'Exposing another image', age: '1 min 7 s ago' },
-  reconnecting: { label: 'Device connection interrupted · Retrying…', age: '1 min 7 s ago' },
-  stopped: { label: 'Measurements stopped', age: 'At stop · 35 s old' },
-  finished: { label: 'Alignment ended by you', age: 'At finish · 2 s old' },
-}))
+const activityFrames = new Map<string, { label: string; age: string }>(
+  Object.entries({
+    adjusting: { label: 'Alignment updated', age: 'Just now' },
+    exposing: { label: 'Exposing image', age: '7 s ago' },
+    waiting: { label: 'Exposing image', age: '7 s ago' },
+    debayering: { label: 'Debayering image…', age: '32 s ago' },
+    stretching: { label: 'Stretching image…', age: '33 s ago' },
+    solving: { label: 'Plate-solving…', age: '35 s ago' },
+    retrying: { label: 'Exposing another image', age: '1 min 7 s ago' },
+    reconnecting: { label: 'Device connection interrupted · Retrying…', age: '1 min 7 s ago' },
+    stopped: { label: 'Measurements stopped', age: 'At stop · 35 s old' },
+    finished: { label: 'Alignment ended by you', age: 'At finish · 2 s old' },
+  }),
+)
 
-const measurementSteps = new Map<string, {
-  point: number;
-  solved: number;
-  label: string;
-  next: string
-}>(Object.entries({
-  'point-1': {
-    point: 1,
-    solved: 0,
-    label: 'Taking and solving the first image…',
-    next: 'moving-2'
-  },
-  'moving-2': {
-    point: 2,
-    solved: 1,
-    label: 'Moving to the second position…',
-    next: 'point-2'
-  },
-  'point-2': {
-    point: 2,
-    solved: 1,
-    label: 'Taking and solving the second image…',
-    next: 'moving-3'
-  },
-  'moving-3': {
-    point: 3,
-    solved: 2,
-    label: 'Moving to the third position…',
-    next: 'point-3'
-  },
-  'point-3': {
-    point: 3,
-    solved: 2,
-    label: 'Taking and solving the final image…',
-    next: 'adjusting'
-  },
-  'baseline-no-solution': {
-    point: 1,
-    solved: 0,
-    label: 'No solution for this exposure · Trying another image',
-    next: 'point-1'
-  },
-}))
+const measurementSteps = new Map<
+  string,
+  {
+    point: number
+    solved: number
+    label: string
+    next: string
+  }
+>(
+  Object.entries({
+    'point-1': {
+      point: 1,
+      solved: 0,
+      label: 'Taking and solving the first image…',
+      next: 'moving-2',
+    },
+    'moving-2': {
+      point: 2,
+      solved: 1,
+      label: 'Moving to the second position…',
+      next: 'point-2',
+    },
+    'point-2': {
+      point: 2,
+      solved: 1,
+      label: 'Taking and solving the second image…',
+      next: 'moving-3',
+    },
+    'moving-3': {
+      point: 3,
+      solved: 2,
+      label: 'Moving to the third position…',
+      next: 'point-3',
+    },
+    'point-3': {
+      point: 3,
+      solved: 2,
+      label: 'Taking and solving the final image…',
+      next: 'adjusting',
+    },
+    'baseline-no-solution': {
+      point: 1,
+      solved: 0,
+      label: 'No solution for this exposure · Trying another image',
+      next: 'point-1',
+    },
+  }),
+)
 
-function BaselinePreview({ phase, physical, onStart, onStop }: {
+function BaselinePreview({
+  phase,
+  physical,
+  onStart,
+  onStop,
+}: {
   readonly phase: string
   readonly physical: boolean
   readonly onStart: () => void
@@ -97,7 +112,13 @@ function BaselinePreview({ phase, physical, onStart, onStop }: {
   return (
     <div className="vela-polar-baseline">
       <Panel className="vela-polar-baseline__summary">
-        <h2>{step ? 'Measuring your alignment' : stopped ? 'Measurement stopped' : 'Find your starting alignment'}</h2>
+        <h2>
+          {step
+            ? 'Measuring your alignment'
+            : stopped
+              ? 'Measurement stopped'
+              : 'Find your starting alignment'}
+        </h2>
         <p>
           {step
             ? 'Keep the mount’s adjustment knobs still while Vela measures three positions.'
@@ -109,14 +130,24 @@ function BaselinePreview({ phase, physical, onStart, onStop }: {
           {[1, 2, 3].map(point => (
             <li
               key={point}
-              data-state={step && point <= step.solved ? 'done' : step?.point === point ? 'current' : 'pending'}
+              data-state={
+                step && point <= step.solved
+                  ? 'done'
+                  : step?.point === point
+                    ? 'current'
+                    : 'pending'
+              }
             >
               <span>{step && point <= step.solved ? '✓' : point}</span>
               <strong>Position {point}</strong>
               <small>
                 {step && point <= step.solved
                   ? 'Solved'
-                  : step?.point === point ? phase.startsWith('moving') ? 'Moving' : 'Measuring' : 'Not measured'}
+                  : step?.point === point
+                    ? phase.startsWith('moving')
+                      ? 'Moving'
+                      : 'Measuring'
+                    : 'Not measured'}
               </small>
             </li>
           ))}
@@ -148,9 +179,11 @@ function BaselinePreview({ phase, physical, onStart, onStop }: {
         {(step || stopped) && (
           <AlignmentImageInspection
             title={`Latest exposure · Position ${step?.point ?? 1}`}
-            status={phase === 'baseline-no-solution'
-              ? 'No solution · Exposure retained for inspection. No alignment result yet.'
-              : 'No alignment result yet'}
+            status={
+              phase === 'baseline-no-solution'
+                ? 'No solution · Exposure retained for inspection. No alignment result yet.'
+                : 'No alignment result yet'
+            }
           />
         )}
       </Panel>
@@ -170,13 +203,18 @@ function BaselinePreview({ phase, physical, onStart, onStop }: {
               ? 'Use sidereal tracking. Keep the mount’s adjustment knobs still until all three positions are measured. You can stop at any time.'
               : 'Leave room for the movement, and keep the adjustment knobs still until measurement finishes.'}
         </p>
-        <Button size="large" tone={step ? 'neutral' : 'accent'} onClick={step ? onStop : onStart}>{step ? 'Stop measurement' : stopped ? 'Start again' : 'Start measurement'}</Button>
+        <Button size="large" tone={step ? 'neutral' : 'accent'} onClick={step ? onStop : onStart}>
+          {step ? 'Stop measurement' : stopped ? 'Start again' : 'Start measurement'}
+        </Button>
       </div>
     </div>
   )
 }
 
-function AlignmentPreview({ props, onPropsChange }: {
+function AlignmentPreview({
+  props,
+  onPropsChange,
+}: {
   readonly props: Record<string, string | number | boolean>
   readonly onPropsChange?: (patch: Record<string, string | number | boolean>) => void
 }) {
@@ -248,14 +286,17 @@ function AlignmentPreview({ props, onPropsChange }: {
             <p>Rig preparation</p>
             <h1>Polar alignment</h1>
           </div>
-          <Badge tone={reconnecting ? 'warning' : inactive ? 'neutral' : 'accent'}>
-            {status}
-          </Badge>
+          <Badge tone={reconnecting ? 'warning' : inactive ? 'neutral' : 'accent'}>{status}</Badge>
         </header>
         {(retrying || reconnecting) && (
           <div className="vela-polar-solve-warning" role="alert">
-            <strong>{reconnecting ? 'Device connection interrupted' : 'Plate-solving failed'}</strong>
-            <p>{reconnecting ? 'Retrying automatically. ' : 'Trying another image. '}Showing the last successful solve.</p>
+            <strong>
+              {reconnecting ? 'Device connection interrupted' : 'Plate-solving failed'}
+            </strong>
+            <p>
+              {reconnecting ? 'Retrying automatically. ' : 'Trying another image. '}Showing the last
+              successful solve.
+            </p>
           </div>
         )}
         {baseline ? (
@@ -286,11 +327,15 @@ function AlignmentPreview({ props, onPropsChange }: {
               </div>
               <div className="vela-polar-activity" data-warning={retrying || undefined}>
                 <div className="vela-polar-activity__line" role="status">
-                  {busy ? <span className="vela-polar-activity__spinner" aria-hidden="true" /> : null}
+                  {busy ? (
+                    <span className="vela-polar-activity__spinner" aria-hidden="true" />
+                  ) : null}
                   <strong>{activity.label}</strong>
                   {exposing ? <span className="vela-polar-activity__time">5 / 30 s</span> : null}
                 </div>
-                {exposing ? <progress value={5} max={30} aria-label="Exposure progress in seconds" /> : null}
+                {exposing ? (
+                  <progress value={5} max={30} aria-label="Exposure progress in seconds" />
+                ) : null}
                 <div className="vela-polar-activity__age">
                   <span>Last alignment update</span>
                   <span>{activity.age}</span>
@@ -327,11 +372,17 @@ function AlignmentPreview({ props, onPropsChange }: {
                         : 'Adjust the mount’s knobs. Use the reticle and remaining error to decide when you’re done.'}
               </p>
               {inactive ? (
-                <Button tone="neutral" size="large" onClick={() => changePhase('setup')}>Measure again</Button>
+                <Button tone="neutral" size="large" onClick={() => changePhase('setup')}>
+                  Measure again
+                </Button>
               ) : (
                 <div>
-                  <Button tone="neutral" size="large" onClick={() => changePhase('stopped')}>Stop to reposition</Button>
-                  <Button tone="accent" size="large" onClick={() => changePhase('finished')}>Finish alignment</Button>
+                  <Button tone="neutral" size="large" onClick={() => changePhase('stopped')}>
+                    Stop to reposition
+                  </Button>
+                  <Button tone="accent" size="large" onClick={() => changePhase('finished')}>
+                    Finish alignment
+                  </Button>
                 </div>
               )}
             </div>
@@ -353,12 +404,15 @@ export const specimen: ComponentSpecimen = {
   componentName: 'Panel / Card',
   id: 'panel-polar-alignment',
   name: 'Polar alignment · Product example',
-  description: 'Approved alignment inspection design (September 21): initial fit-both, deliberate fine view, full frame and expanded/native inspection of the same exposure. Illustrative geometry on a bundled simulator image; not a real plate solution or independent accuracy evidence. Ages and retry states are fixed snapshots. Start plays an accelerated three-position preview; no hardware commands.',
+  description:
+    'Approved alignment inspection design (September 21): initial fit-both, deliberate fine view, full frame and expanded/native inspection of the same exposure. Illustrative geometry on a bundled simulator image; not a real plate solution or independent accuracy evidence. Ages and retry states are fixed snapshots. Start plays an accelerated three-position preview; no hardware commands.',
   controls: {
     mode: { type: 'select', label: 'Rig mode', options: ['offline', 'physical'] },
     example: { type: 'select', label: 'Alignment example', options: examples },
     phase: { type: 'select', label: 'Activity', options: phases },
   },
   defaultProps: { mode: 'offline', example: 'near-aligned', phase: 'setup' },
-  render: (props, onPropsChange) => <AlignmentPreview props={props} {...(onPropsChange ? { onPropsChange } : {})} />,
+  render: (props, onPropsChange) => (
+    <AlignmentPreview props={props} {...(onPropsChange ? { onPropsChange } : {})} />
+  ),
 }

@@ -37,60 +37,71 @@ export function useCapture(rigId: string) {
   const generation = useRef(0)
   const alive = useRef(false)
 
-  const read = useCallback(async (explicit = false) => {
-    if (!alive.current || writing.current) return
+  const read = useCallback(
+    async (explicit = false) => {
+      if (!alive.current || writing.current) return
 
-    if (request.current) {
-      if (!explicit) return
-      request.current.abort()
-      generation.current++
-    }
-
-    const controller = new AbortController()
-    const current = generation.current
-    request.current = controller
-    setRefreshing(true)
-
-    try {
-      const next = await api(`web/rigs/${encodeURIComponent(rigId)}/capture`, {
-        signal: AbortSignal.any([controller.signal, AbortSignal.timeout(5000)]),
-      })
-
-      if (!isCaptureView(next, rigId)) throw new Error('Invalid capture response')
-
-      if (!alive.current || current !== generation.current) return
-      const interruptedExposure = lastView.current?.active && next.phase === 'idle'
-      lastView.current = next
-      setView(next)
-      setOffline(false)
-
-      if (interruptedExposure) {
-        setCommandUnconfirmed(true)
-        setError('Vela no longer tracks the exposure that was active. Check capture state before starting another exposure.')
-      } else if (explicit && !next.active) {
-        setCommandUnconfirmed(false)
-        setError(null)
+      if (request.current) {
+        if (!explicit) return
+        request.current.abort()
+        generation.current++
       }
 
-      if (explicit && next.cooling && (unconfirmedCoolingField.current === 'coolerOn'
-        || (unconfirmedCoolingField.current === 'setpointC' && next.cooling.setpointC !== undefined))) {
-        unconfirmedCoolingField.current = null
-        setCoolingUnconfirmed(false)
-        setCoolingError(null)
-      }
-    } catch (cause) {
-      if (!alive.current || current !== generation.current) return
-      setOffline(true)
+      const controller = new AbortController()
+      const current = generation.current
+      request.current = controller
+      setRefreshing(true)
 
-      if (cause instanceof ApiError && cause.status === 404) setError('This Rig is no longer available.')
-    } finally {
-      if (request.current === controller) {
-        request.current = null
+      try {
+        const next = await api(`web/rigs/${encodeURIComponent(rigId)}/capture`, {
+          signal: AbortSignal.any([controller.signal, AbortSignal.timeout(5000)]),
+        })
 
-        if (alive.current && current === generation.current) setRefreshing(false)
+        if (!isCaptureView(next, rigId)) throw new Error('Invalid capture response')
+
+        if (!alive.current || current !== generation.current) return
+        const interruptedExposure = lastView.current?.active && next.phase === 'idle'
+        lastView.current = next
+        setView(next)
+        setOffline(false)
+
+        if (interruptedExposure) {
+          setCommandUnconfirmed(true)
+          setError(
+            'Vela no longer tracks the exposure that was active. Check capture state before starting another exposure.',
+          )
+        } else if (explicit && !next.active) {
+          setCommandUnconfirmed(false)
+          setError(null)
+        }
+
+        if (
+          explicit &&
+          next.cooling &&
+          (unconfirmedCoolingField.current === 'coolerOn' ||
+            (unconfirmedCoolingField.current === 'setpointC' &&
+              next.cooling.setpointC !== undefined))
+        ) {
+          unconfirmedCoolingField.current = null
+          setCoolingUnconfirmed(false)
+          setCoolingError(null)
+        }
+      } catch (cause) {
+        if (!alive.current || current !== generation.current) return
+        setOffline(true)
+
+        if (cause instanceof ApiError && cause.status === 404)
+          setError('This Rig is no longer available.')
+      } finally {
+        if (request.current === controller) {
+          request.current = null
+
+          if (alive.current && current === generation.current) setRefreshing(false)
+        }
       }
-    }
-  }, [rigId])
+    },
+    [rigId],
+  )
 
   useEffect(() => {
     alive.current = true
@@ -116,14 +127,29 @@ export function useCapture(rigId: string) {
     }
   }, [read])
 
-  const canStart = !!view?.enabled && !view.active && !offline && !pending && !coolingPending && !commandUnconfirmed
+  const canStart =
+    !!view?.enabled &&
+    !view.active &&
+    !offline &&
+    !pending &&
+    !coolingPending &&
+    !commandUnconfirmed
+
   const canStop = !!view?.active && view.phase !== 'stopping' && !offline && !pending
-  const canCool = !!view?.cooling && !view.active && !offline && !pending && !coolingPending && !coolingUnconfirmed && !commandUnconfirmed
+
+  const canCool =
+    !!view?.cooling &&
+    !view.active &&
+    !offline &&
+    !pending &&
+    !coolingPending &&
+    !coolingUnconfirmed &&
+    !commandUnconfirmed
 
   async function post(
     path: 'start' | 'stop' | 'cooling',
     body:
-      | { exposureSeconds: number, repeat: boolean, saveFrames: boolean }
+      | { exposureSeconds: number; repeat: boolean; saveFrames: boolean }
       | { coolerOn: boolean }
       | { setpointC: number }
       | Record<string, never>,
@@ -181,20 +207,27 @@ export function useCapture(rigId: string) {
       if (!alive.current || current !== generation.current) return
 
       if (path === 'cooling') {
-        const message = cause instanceof ApiError && cause.code
-          ? cause.code
-          : 'The cooler command could not be confirmed. Check camera cooling before assuming it changed.'
+        const message =
+          cause instanceof ApiError && cause.code
+            ? cause.code
+            : 'The cooler command could not be confirmed. Check camera cooling before assuming it changed.'
 
         setCoolingError(message)
         const uncertain = /could not be confirmed/i.test(message)
-        unconfirmedCoolingField.current = uncertain ? ('coolerOn' in body ? 'coolerOn' : 'setpointC') : null
+        unconfirmedCoolingField.current = uncertain
+          ? 'coolerOn' in body
+            ? 'coolerOn'
+            : 'setpointC'
+          : null
         setCoolingUnconfirmed(uncertain)
 
         return
       }
 
       setCommandUnconfirmed(true)
-      setError('The command response could not be confirmed. Check capture state before starting another exposure.')
+      setError(
+        'The command response could not be confirmed. Check capture state before starting another exposure.',
+      )
     } finally {
       if (request.current === controller) {
         request.current = null

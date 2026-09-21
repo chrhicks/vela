@@ -10,7 +10,7 @@ const frame = {
   height: 1200,
   arcsecPerPixel: 2,
   x: 800,
-  y: 600
+  y: 600,
 }
 
 export const alignmentInspectionFixtures = {
@@ -19,25 +19,25 @@ export const alignmentInspectionFixtures = {
     y: 478,
     total: '8′ 23″',
     azimuth: '7′ 20″',
-    altitude: '4′ 04″'
+    altitude: '4′ 04″',
   },
   'near-aligned': {
     x: 794.5,
     y: 595.5,
     total: '14″',
     azimuth: '11″',
-    altitude: '9″'
+    altitude: '9″',
   },
   'outside-image': {
     x: -220,
     y: 356,
     total: '34′ 58″',
     azimuth: '34′',
-    altitude: '8′ 08″'
+    altitude: '8′ 08″',
   },
 }
 
-type Target = typeof alignmentInspectionFixtures['large-error']
+type Target = (typeof alignmentInspectionFixtures)['large-error']
 
 type ImageView = 'fit' | 'fine' | 'full' | 'native'
 
@@ -48,17 +48,29 @@ const viewDescriptions: Record<ImageView, string> = {
   full: 'Full frame · 53.3′ × 40′',
 }
 
-function ImageCanvas({ target, view }: { readonly target: Target | undefined; readonly view: ImageView }) {
-  if (view === 'native') return (
-    <div className="vela-polar-native" tabIndex={0} role="region" aria-label="Native image, scroll to inspect">
-      <img
-        src={starField}
-        width={frame.width}
-        height={frame.height}
-        alt="Same illustrative exposure at one image pixel per CSS pixel"
-      />
-    </div>
-  )
+function ImageCanvas({
+  target,
+  view,
+}: {
+  readonly target: Target | undefined
+  readonly view: ImageView
+}) {
+  if (view === 'native')
+    return (
+      <div
+        className="vela-polar-native"
+        tabIndex={0}
+        role="region"
+        aria-label="Native image, scroll to inspect"
+      >
+        <img
+          src={starField}
+          width={frame.width}
+          height={frame.height}
+          alt="Same illustrative exposure at one image pixel per CSS pixel"
+        />
+      </div>
+    )
 
   const full = !target || view === 'full'
 
@@ -69,7 +81,7 @@ function ImageCanvas({ target, view }: { readonly target: Target | undefined; re
       : Math.max(
           120,
           Math.abs(target.y - frame.y) * 1.5 + 60,
-          (Math.abs(target.x - frame.x) * 1.5 + 96) / 1.6
+          (Math.abs(target.x - frame.x) * 1.5 + 96) / 1.6,
         )
 
   const width = full ? frame.width : height * 1.6
@@ -87,9 +99,11 @@ function ImageCanvas({ target, view }: { readonly target: Target | undefined; re
       <svg
         viewBox={`${left} ${top} ${width} ${height}`}
         role="img"
-        aria-label={target
-          ? 'Illustrative exposure with frame reference and correction target'
-          : 'Full baseline exposure, no alignment solution'}
+        aria-label={
+          target
+            ? 'Illustrative exposure with frame reference and correction target'
+            : 'Full baseline exposure, no alignment solution'
+        }
       >
         <image href={starField} width={frame.width} height={frame.height} />
         {target && (
@@ -109,7 +123,12 @@ function ImageCanvas({ target, view }: { readonly target: Target | undefined; re
               stroke="var(--vela-polar-reference)"
               strokeWidth={1.5 * scale}
             />
-            <g data-marker="target" fill="none" stroke="var(--vela-polar-target)" strokeWidth={1.4 * scale}>
+            <g
+              data-marker="target"
+              fill="none"
+              stroke="var(--vela-polar-target)"
+              strokeWidth={1.4 * scale}
+            >
               <circle cx={target.x} cy={target.y} r={16 * scale} />
               <path
                 d={`M${target.x - 30 * scale} ${target.y}h${20 * scale}m${20 * scale} 0h${20 * scale}M${target.x} ${target.y - 30 * scale}v${20 * scale}m0 ${20 * scale}v${20 * scale}`}
@@ -126,28 +145,57 @@ function ImageCanvas({ target, view }: { readonly target: Target | undefined; re
   )
 }
 
-function InspectionView({ target, status }: { readonly target: Target | undefined; readonly status: string }) {
+function InspectionView({
+  target,
+  status,
+}: {
+  readonly target: Target | undefined
+  readonly status: string
+}) {
   const [view, setView] = useState<ImageView>(target ? 'fit' : 'full')
-  const outside = target && (target.x < 0 || target.x > frame.width || target.y < 0 || target.y > frame.height)
-  const fineClips = target && (Math.abs(target.x - frame.x) > 40 || Math.abs(target.y - frame.y) > 22)
+
+  const outside =
+    target && (target.x < 0 || target.x > frame.width || target.y < 0 || target.y > frame.height)
+
+  const fineClips =
+    target && (Math.abs(target.x - frame.x) > 40 || Math.abs(target.y - frame.y) > 22)
 
   return (
     <div className="vela-polar-inspection">
       <div className="vela-polar-inspection-tools" aria-label="Image view">
         {target && (
           <>
-            <Button size="small" aria-pressed={view === 'fit'} onClick={() => setView('fit')}>Fit both</Button>
-            <Button size="small" aria-pressed={view === 'fine'} onClick={() => setView('fine')}>Fine · 1′</Button>
+            <Button size="small" aria-pressed={view === 'fit'} onClick={() => setView('fit')}>
+              Fit both
+            </Button>
+            <Button size="small" aria-pressed={view === 'fine'} onClick={() => setView('fine')}>
+              Fine · 1′
+            </Button>
           </>
         )}
-        <Button size="small" aria-pressed={view === 'full'} onClick={() => setView('full')}>Full frame</Button>
-        <Button size="small" aria-pressed={view === 'native'} onClick={() => setView('native')}>100%</Button>
+        <Button size="small" aria-pressed={view === 'full'} onClick={() => setView('full')}>
+          Full frame
+        </Button>
+        <Button size="small" aria-pressed={view === 'native'} onClick={() => setView('native')}>
+          100%
+        </Button>
       </div>
       <p className="vela-polar-inspection-status">{status}</p>
-      {outside && <p className="vela-polar-inspection-note">Target outside captured image · Blank area has no image data.</p>}
-      {view === 'fine' && fineClips && <p className="vela-polar-inspection-note">Markers outside this fine view. Use Fit both to see the correction.</p>}
+      {outside && (
+        <p className="vela-polar-inspection-note">
+          Target outside captured image · Blank area has no image data.
+        </p>
+      )}
+      {view === 'fine' && fineClips && (
+        <p className="vela-polar-inspection-note">
+          Markers outside this fine view. Use Fit both to see the correction.
+        </p>
+      )}
       <ImageCanvas target={target} view={view} />
-      <p className="vela-polar-inspection-meta">{viewDescriptions[view]}{view !== 'native' && ' · Illustrative angular scale'}</p>
+      <p className="vela-polar-inspection-meta">
+        {viewDescriptions[view]}
+        {view !== 'native' && ' · Illustrative angular scale'}
+      </p>
       {target && view !== 'native' && (
         <div className="vela-polar-inspection-legend">
           <span>
@@ -164,7 +212,11 @@ function InspectionView({ target, status }: { readonly target: Target | undefine
   )
 }
 
-export function AlignmentImageInspection({ target, title, status }: {
+export function AlignmentImageInspection({
+  target,
+  title,
+  status,
+}: {
   readonly target?: Target
   readonly title: string
   readonly status: string
@@ -175,7 +227,9 @@ export function AlignmentImageInspection({ target, title, status }: {
     <figure className="vela-polar-image">
       <div className="vela-polar-image-heading">
         <span>{title}</span>
-        <Button size="small" onClick={() => setExpanded(true)}>Enlarge image</Button>
+        <Button size="small" onClick={() => setExpanded(true)}>
+          Enlarge image
+        </Button>
       </div>
       <InspectionView target={target} status={status} />
       <figcaption>

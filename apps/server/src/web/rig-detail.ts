@@ -1,7 +1,4 @@
-import type {
-  AlpacaDeviceInspection,
-  AlpacaDeviceTelemetry,
-} from '@vela/alpaca'
+import type { AlpacaDeviceInspection, AlpacaDeviceTelemetry } from '@vela/alpaca'
 import type { DeviceKind } from '@vela/model/device'
 import type {
   RigCameraStatus,
@@ -25,10 +22,11 @@ interface ConnectedDeviceViewBase extends DeviceIdentity {
   readonly observedAt: string
 }
 
-type UnavailableDeviceViewBase = DeviceIdentity & (
-  | { readonly connection: 'disconnected'; readonly observedAt: string }
-  | { readonly connection: 'unavailable'; readonly observedAt?: string }
-)
+type UnavailableDeviceViewBase = DeviceIdentity &
+  (
+    | { readonly connection: 'disconnected'; readonly observedAt: string }
+    | { readonly connection: 'unavailable'; readonly observedAt?: string }
+  )
 
 export function currentDeviceView(
   rigId: string,
@@ -55,10 +53,7 @@ export function currentDeviceView(
     observedAt,
   } satisfies ConnectedDeviceViewBase
 
-  if (
-    !supportsRigDetail(inspection.kind)
-    || inspection.telemetry.availability === 'unavailable'
-  ) {
+  if (!supportsRigDetail(inspection.kind) || inspection.telemetry.availability === 'unavailable') {
     return unsupportedDeviceForKind(inspection.kind, base)
   }
 
@@ -116,10 +111,11 @@ function cameraStatus(
       : { availability: 'partial', activity: 'unknown' }
   }
 
-  const usefulCooling = telemetry.cooling !== undefined
-    && (telemetry.cooling.state === 'on'
-      || telemetry.cooling.setpointControl === true
-      || telemetry.cooling.powerReporting === true)
+  const usefulCooling =
+    telemetry.cooling !== undefined &&
+    (telemetry.cooling.state === 'on' ||
+      telemetry.cooling.setpointControl === true ||
+      telemetry.cooling.powerReporting === true)
 
   let status: RigCameraStatus = { availability, activity: telemetry.activity ?? 'unknown' }
 
@@ -127,9 +123,10 @@ function cameraStatus(
     status = { ...status, sensorTemperatureC: telemetry.sensorTemperatureC }
 
   if (usefulCooling && telemetry.cooling !== undefined) {
-    const cooling = telemetry.cooling.powerPercent === undefined
-      ? { state: telemetry.cooling.state }
-      : { state: telemetry.cooling.state, powerPercent: telemetry.cooling.powerPercent }
+    const cooling =
+      telemetry.cooling.powerPercent === undefined
+        ? { state: telemetry.cooling.state }
+        : { state: telemetry.cooling.state, powerPercent: telemetry.cooling.powerPercent }
 
     status = { ...status, cooling }
   }
@@ -156,21 +153,9 @@ function telescopeStatus(
   return {
     availability,
     activity: telescopeActivity(telemetry),
-    tracking: telemetry.tracking === undefined
-      ? 'unknown'
-      : telemetry.tracking
-        ? 'on'
-        : 'off',
-    parking: telemetry.parked === undefined
-      ? 'unknown'
-      : telemetry.parked
-        ? 'parked'
-        : 'unparked',
-    home: telemetry.atHome === undefined
-      ? 'unknown'
-      : telemetry.atHome
-        ? 'at-home'
-        : 'away',
+    tracking: telemetry.tracking === undefined ? 'unknown' : telemetry.tracking ? 'on' : 'off',
+    parking: telemetry.parked === undefined ? 'unknown' : telemetry.parked ? 'parked' : 'unparked',
+    home: telemetry.atHome === undefined ? 'unknown' : telemetry.atHome ? 'at-home' : 'away',
   }
 }
 
@@ -183,11 +168,8 @@ function telescopeActivity(
 
   if (telemetry.tracking === true) return 'tracking'
 
-  if (
-    telemetry.parked === false
-    && telemetry.slewing === false
-    && telemetry.tracking === false
-  ) return 'idle'
+  if (telemetry.parked === false && telemetry.slewing === false && telemetry.tracking === false)
+    return 'idle'
 
   return 'unknown'
 }
@@ -204,16 +186,13 @@ function focuserStatus(
 
   let status: RigFocuserStatus = {
     availability,
-    activity: telemetry.moving === undefined
-      ? 'unknown'
-      : telemetry.moving
-        ? 'moving'
-        : 'idle',
+    activity: telemetry.moving === undefined ? 'unknown' : telemetry.moving ? 'moving' : 'idle',
   }
 
   if (telemetry.position !== undefined) status = { ...status, position: telemetry.position }
 
-  if (telemetry.temperatureC !== undefined) status = { ...status, temperatureC: telemetry.temperatureC }
+  if (telemetry.temperatureC !== undefined)
+    status = { ...status, temperatureC: telemetry.temperatureC }
 
   return status
 }
@@ -230,11 +209,7 @@ function filterWheelStatus(
 
   let status: RigFilterWheelStatus = {
     availability,
-    activity: telemetry.moving === undefined
-      ? 'unknown'
-      : telemetry.moving
-        ? 'moving'
-        : 'idle',
+    activity: telemetry.moving === undefined ? 'unknown' : telemetry.moving ? 'moving' : 'idle',
   }
 
   if (telemetry.position !== undefined) status = { ...status, position: telemetry.position }
@@ -254,9 +229,10 @@ function conditionsStatus(
       : { availability: 'partial', activity: 'unknown' }
   }
 
-  const reporting = telemetry.temperatureC !== undefined
-    || telemetry.humidityPercent !== undefined
-    || telemetry.dewPointC !== undefined
+  const reporting =
+    telemetry.temperatureC !== undefined ||
+    telemetry.humidityPercent !== undefined ||
+    telemetry.dewPointC !== undefined
 
   if (!reporting && availability === 'complete') return { availability: 'unsupported' }
 
@@ -265,7 +241,8 @@ function conditionsStatus(
     activity: reporting ? 'reporting' : 'unknown',
   }
 
-  if (telemetry.temperatureC !== undefined) status = { ...status, temperatureC: telemetry.temperatureC }
+  if (telemetry.temperatureC !== undefined)
+    status = { ...status, temperatureC: telemetry.temperatureC }
 
   if (telemetry.humidityPercent !== undefined)
     status = { ...status, humidityPercent: telemetry.humidityPercent }
@@ -297,7 +274,10 @@ function switchStatus(
   if (telemetry.channels === undefined) return status
 
   const channels = telemetry.channels.map(channel => {
-    let view: NonNullable<RigSwitchStatus['channels']>[number] = { id: channel.id, name: channel.name }
+    let view: NonNullable<RigSwitchStatus['channels']>[number] = {
+      id: channel.id,
+      name: channel.name,
+    }
 
     if (channel.on !== undefined) view = { ...view, on: channel.on }
 
@@ -310,12 +290,14 @@ function switchStatus(
 }
 
 function supportsRigDetail(kind: DeviceKind): boolean {
-  return kind === 'camera'
-    || kind === 'telescope'
-    || kind === 'focuser'
-    || kind === 'filter-wheel'
-    || kind === 'observing-conditions'
-    || kind === 'switch'
+  return (
+    kind === 'camera' ||
+    kind === 'telescope' ||
+    kind === 'focuser' ||
+    kind === 'filter-wheel' ||
+    kind === 'observing-conditions' ||
+    kind === 'switch'
+  )
 }
 
 export function unavailableDeviceView(

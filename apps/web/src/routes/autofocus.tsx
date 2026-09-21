@@ -29,13 +29,16 @@ function AutofocusPage({ rigId }: { rigId: string }) {
     if (view?.active) setReturnedToSetup(false)
   }, [view?.active])
 
-  if (!view) return (
-    <section className="vela-rig-page">
-      {back}
-      <h1>Autofocus</h1>
-      <p role="status">{offline ? 'Autofocus state unavailable. Reconnecting…' : 'Loading autofocus…'}</p>
-    </section>
-  )
+  if (!view)
+    return (
+      <section className="vela-rig-page">
+        {back}
+        <h1>Autofocus</h1>
+        <p role="status">
+          {offline ? 'Autofocus state unavailable. Reconnecting…' : 'Loading autofocus…'}
+        </p>
+      </section>
+    )
 
   const step = Math.max(1, Math.floor(Number(stepSize) || 50))
   const disabled = pending || offline
@@ -44,11 +47,14 @@ function AutofocusPage({ rigId }: { rigId: string }) {
   const retrying = view.captureReadState === 'retrying'
   const latest = view.samples.at(-1)
 
-  const lowest = view.samples.reduce<AutofocusView['samples'][number] | undefined>((best, sample) => {
-    if (sample.hfrPixels === null) return best
+  const lowest = view.samples.reduce<AutofocusView['samples'][number] | undefined>(
+    (best, sample) => {
+      if (sample.hfrPixels === null) return best
 
-    return !best || best.hfrPixels === null || sample.hfrPixels < best.hfrPixels ? sample : best
-  }, undefined)
+      return !best || best.hfrPixels === null || sample.hfrPixels < best.hfrPixels ? sample : best
+    },
+    undefined,
+  )
 
   const window = previewAutofocusWindow(view.currentPosition, step, view.offsetSteps, view.maxStep)
   const travelBlocked = setup && view.currentPosition != null && !window.fit
@@ -60,7 +66,10 @@ function AutofocusPage({ rigId }: { rigId: string }) {
     notice = {
       role: 'alert' as const,
       title: 'Walk would approach a travel limit',
-      body: error || view.error || 'Vela stays at the current EAF position. It does not command 0 or MaxStep, and it will not start a window that cannot fit around start.',
+      body:
+        error ||
+        view.error ||
+        'Vela stays at the current EAF position. It does not command 0 or MaxStep, and it will not start a window that cannot fit around start.',
     }
   } else if (!setup && view.restoredStart && view.phase === 'stopped') {
     notice = {
@@ -72,14 +81,20 @@ function AutofocusPage({ rigId }: { rigId: string }) {
     notice = {
       role: 'status' as const,
       title: 'Start position was not restored',
-      body: error || view.error || 'The start position was not confirmed. Vela did not repeat the move.',
+      body:
+        error ||
+        view.error ||
+        'The start position was not confirmed. Vela did not repeat the move.',
     }
   } else if (error || view.error || (!view.enabled && view.unavailableReason)) {
     notice = {
       role: 'status' as const,
-      title: error && view.active
-        ? 'Command outcome unknown'
-        : error || (view.error && !isTravelLimitError(view.error)) ? 'Walk did not start' : 'Autofocus',
+      title:
+        error && view.active
+          ? 'Command outcome unknown'
+          : error || (view.error && !isTravelLimitError(view.error))
+            ? 'Walk did not start'
+            : 'Autofocus',
       body: error || view.error || view.unavailableReason,
     }
   } else if (retrying && !offline) {
@@ -92,9 +107,13 @@ function AutofocusPage({ rigId }: { rigId: string }) {
     notice = null
   }
 
-  const activity = offline ? 'Connection interrupted'
-    : error ? 'Command outcome unknown'
-      : pending ? 'Sending command…' : autofocusActivity(view, false)
+  const activity = offline
+    ? 'Connection interrupted'
+    : error
+      ? 'Command outcome unknown'
+      : pending
+        ? 'Sending command…'
+        : autofocusActivity(view, false)
 
   let badge
 
@@ -129,10 +148,20 @@ function AutofocusPage({ rigId }: { rigId: string }) {
           <h1>Autofocus</h1>
         </div>
         <Badge
-          tone={offline || error || retrying || view.phase === 'failed' || (!setup && view.phase === 'stopped') || (setup && travelBlocked)
-            ? 'warning'
-            : busy ? 'accent'
-              : view.phase === 'complete' && !setup ? 'positive' : 'neutral'}
+          tone={
+            offline ||
+            error ||
+            retrying ||
+            view.phase === 'failed' ||
+            (!setup && view.phase === 'stopped') ||
+            (setup && travelBlocked)
+              ? 'warning'
+              : busy
+                ? 'accent'
+                : view.phase === 'complete' && !setup
+                  ? 'positive'
+                  : 'neutral'
+          }
         >
           {badge}
         </Badge>
@@ -147,7 +176,11 @@ function AutofocusPage({ rigId }: { rigId: string }) {
         <div className="vela-af-setup">
           <Panel>
             <h2>Focus from where you are</h2>
-            <p>Vela will jump a little outward from the current EAF position, walk back through focus, and plot star size at each stop. Cancel returns here. Position 0 is a mechanical stop, not a home, and not backlash compensation off.</p>
+            <p>
+              Vela will jump a little outward from the current EAF position, walk back through
+              focus, and plot star size at each stop. Cancel returns here. Position 0 is a
+              mechanical stop, not a home, and not backlash compensation off.
+            </p>
             <dl className="vela-af-facts">
               <div>
                 <dt>Current position</dt>
@@ -170,7 +203,9 @@ function AutofocusPage({ rigId }: { rigId: string }) {
                 <dd>
                   {view.currentPosition == null
                     ? 'Around the current position'
-                    : window.fit ? `${window.low} → ${window.high}` : 'Does not fit around start'}
+                    : window.fit
+                      ? `${window.low} → ${window.high}`
+                      : 'Does not fit around start'}
                 </dd>
               </div>
             </dl>
@@ -186,8 +221,14 @@ function AutofocusPage({ rigId }: { rigId: string }) {
           </Panel>
           <div className="vela-af-next">
             <h3>Before you start</h3>
-            <p>Each point on the graph is one short exposure. You will see start, current position, and the fitted minimum once the hyperbola exists.</p>
-            <p>The walk stays inside a window around the current position. Vela will not command 0 or MaxStep.</p>
+            <p>
+              Each point on the graph is one short exposure. You will see start, current position,
+              and the fitted minimum once the hyperbola exists.
+            </p>
+            <p>
+              The walk stays inside a window around the current position. Vela will not command 0 or
+              MaxStep.
+            </p>
             <Button
               size="large"
               tone="accent"
@@ -302,7 +343,9 @@ function Walk({
         </dl>
         <div className="vela-af-activity">
           <div className="vela-af-activity__line" role="status">
-            {busy && !interrupted ? <span className="vela-af-activity__spinner" aria-hidden="true" /> : null}
+            {busy && !interrupted ? (
+              <span className="vela-af-activity__spinner" aria-hidden="true" />
+            ) : null}
             <strong>{activity}</strong>
           </div>
           <p>
@@ -313,7 +356,9 @@ function Walk({
           {latest && (
             <p>
               {'Last sample '}
-              <time dateTime={latest.capturedAt}>{new Date(latest.capturedAt).toLocaleTimeString()}</time>
+              <time dateTime={latest.capturedAt}>
+                {new Date(latest.capturedAt).toLocaleTimeString()}
+              </time>
             </p>
           )}
         </div>
@@ -329,9 +374,16 @@ function Walk({
                 : 'Points appear as each short lands. Stop restores the start position; Vela will not keep walking toward a limit.'}
         </p>
         {busy ? (
-          <Button size="large" disabled={disabled} onClick={onStop}>Stop and restore start</Button>
+          <Button size="large" disabled={disabled} onClick={onStop}>
+            Stop and restore start
+          </Button>
         ) : (
-          <Button size="large" tone="accent" disabled={disabled || !view.enabled} onClick={onBackToSetup}>
+          <Button
+            size="large"
+            tone="accent"
+            disabled={disabled || !view.enabled}
+            onClick={onBackToSetup}
+          >
             {view.phase === 'complete' ? 'Focus again' : 'Back to setup'}
           </Button>
         )}

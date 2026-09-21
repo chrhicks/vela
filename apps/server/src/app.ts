@@ -1,10 +1,6 @@
 import { z } from 'zod'
 import Fastify from 'fastify'
-import {
-  AlpacaProviderError,
-  createAlpacaDiscovery,
-  type AlpacaDiscovery,
-} from '@vela/alpaca'
+import { AlpacaProviderError, createAlpacaDiscovery, type AlpacaDiscovery } from '@vela/alpaca'
 import type { DiscoveryResultView } from '@vela/model/rig'
 import {
   createRigDeviceInventory,
@@ -21,10 +17,7 @@ import {
   type RigDeviceInspector,
   type RigInspectionSource,
 } from './device/inspection.js'
-import {
-  createMemoryRigCatalog,
-  type RigCatalog,
-} from './rig/catalog.js'
+import { createMemoryRigCatalog, type RigCatalog } from './rig/catalog.js'
 import {
   discoverRigs,
   parseDiscoverRigsInput,
@@ -135,7 +128,7 @@ export function buildApp({
 
       const response: DiscoveryResultView = {
         candidates: result.candidates,
-        failures: result.failures.map((failure) => failure.view),
+        failures: result.failures.map(failure => failure.view),
       }
 
       return response
@@ -213,19 +206,21 @@ export function buildApp({
     }
   })
 
-  app.get('/api/web/home', async (request) => loadHomeView(rigCatalog, {
-    createInventory,
-    now,
-    onConflict(rig) {
-      request.log.warn(
-        { rigId: rig.id },
-        'Known Rig identity conflicts with its current endpoint',
-      )
-    },
-    onUnavailable(rig, cause) {
-      request.log.warn({ err: cause, rigId: rig.id }, 'Known Rig is unavailable')
-    },
-  }))
+  app.get('/api/web/home', async request =>
+    loadHomeView(rigCatalog, {
+      createInventory,
+      now,
+      onConflict(rig) {
+        request.log.warn(
+          { rigId: rig.id },
+          'Known Rig identity conflicts with its current endpoint',
+        )
+      },
+      onUnavailable(rig, cause) {
+        request.log.warn({ err: cause, rigId: rig.id }, 'Known Rig is unavailable')
+      },
+    }),
+  )
 
   app.get<{ Params: { rigId: string } }>('/api/web/rigs/:rigId/observe', async (request, reply) => {
     const controller = new AbortController()
@@ -250,36 +245,39 @@ export function buildApp({
     }
   })
 
-  app.post<{ Params: { rigId: string } }>('/api/rigs/:rigId/connections', async (request, reply) => {
-    const release = operations.acquire(request.params.rigId, 'connection')
+  app.post<{ Params: { rigId: string } }>(
+    '/api/rigs/:rigId/connections',
+    async (request, reply) => {
+      const release = operations.acquire(request.params.rigId, 'connection')
 
-    if (!release) return reply.code(409).send({ error: 'rig-operation-in-progress' })
-    const controller = new AbortController()
-    const cancel = () => controller.abort(new Error('Connection requester disconnected'))
-    request.raw.on('aborted', cancel)
-    reply.raw.on('close', cancel)
+      if (!release) return reply.code(409).send({ error: 'rig-operation-in-progress' })
+      const controller = new AbortController()
+      const cancel = () => controller.abort(new Error('Connection requester disconnected'))
+      request.raw.on('aborted', cancel)
+      reply.raw.on('close', cancel)
 
-    try {
-      const operation = await rigConnections.connectDevices(request.params.rigId, {
-        ...rigConnectionLogging(request),
-        signal: controller.signal,
-      })
+      try {
+        const operation = await rigConnections.connectDevices(request.params.rigId, {
+          ...rigConnectionLogging(request),
+          signal: controller.signal,
+        })
 
-      if (operation.state === 'not-found') {
-        return reply.code(404).send({ error: 'rig-not-found' })
+        if (operation.state === 'not-found') {
+          return reply.code(404).send({ error: 'rig-not-found' })
+        }
+
+        if (operation.state === 'in-progress') {
+          return reply.code(409).send({ error: 'rig-operation-in-progress' })
+        }
+
+        return operation.result
+      } finally {
+        release()
+        request.raw.removeListener('aborted', cancel)
+        reply.raw.removeListener('close', cancel)
       }
-
-      if (operation.state === 'in-progress') {
-        return reply.code(409).send({ error: 'rig-operation-in-progress' })
-      }
-
-      return operation.result
-    } finally {
-      release()
-      request.raw.removeListener('aborted', cancel)
-      reply.raw.removeListener('close', cancel)
-    }
-  })
+    },
+  )
 
   app.get<{ Params: { rigId: string } }>('/api/web/rigs/:rigId', async (request, reply) => {
     const controller = new AbortController()
@@ -299,10 +297,7 @@ export function buildApp({
           )
         },
         onUnavailable(rig, state, cause) {
-          request.log.warn(
-            { err: cause, rigId: rig.id, state },
-            'Known Rig detail is unavailable',
-          )
+          request.log.warn({ err: cause, rigId: rig.id, state }, 'Known Rig detail is unavailable')
         },
       })
 
@@ -325,10 +320,7 @@ function rigConnectionLogging(
 ): Pick<RigConnectionRequestOptions, 'onConflict' | 'onProviderResult' | 'onUnavailable'> {
   return {
     onConflict(rig) {
-      request.log.warn(
-        { rigId: rig.id },
-        'Known Rig identity conflicts before device connection',
-      )
+      request.log.warn({ rigId: rig.id }, 'Known Rig identity conflicts before device connection')
     },
     onProviderResult(providerDeviceId, result) {
       if (!(result instanceof AlpacaProviderError) && result.outcome === 'connected') return
@@ -346,19 +338,21 @@ function rigConnectionLogging(
   }
 }
 
-const addRigRequestSchema = z.strictObject({
-  name: z.string().trim().min(1),
-  endpoint: manualDiscoverySchema.omit({ mode: true }),
-}).transform((value, context): AddRigRequest | typeof z.NEVER => {
-  const discoveryInput = parseDiscoverRigsInput({ ...value.endpoint, mode: 'manual' })
+const addRigRequestSchema = z
+  .strictObject({
+    name: z.string().trim().min(1),
+    endpoint: manualDiscoverySchema.omit({ mode: true }),
+  })
+  .transform((value, context): AddRigRequest | typeof z.NEVER => {
+    const discoveryInput = parseDiscoverRigsInput({ ...value.endpoint, mode: 'manual' })
 
-  if (discoveryInput?.mode !== 'manual') {
-    context.addIssue({ code: 'custom', message: 'Invalid Rig endpoint' })
+    if (discoveryInput?.mode !== 'manual') {
+      context.addIssue({ code: 'custom', message: 'Invalid Rig endpoint' })
 
-    return z.NEVER
-  }
+      return z.NEVER
+    }
 
-  return { name: value.name, endpoint: discoveryInput.endpoint }
-})
+    return { name: value.name, endpoint: discoveryInput.endpoint }
+  })
 
 const parseAddRigRequest = addRigRequestSchema.optional().catch(undefined).parse

@@ -2,10 +2,11 @@ import { expect, test, type Page, type Route } from '@playwright/test'
 import type { ImagingCameraView } from '@vela/model/web'
 import { observation } from './fixtures/observation'
 
-const respond = <Body>(route: Route, body: Body) => route.fulfill({
-  contentType: 'application/json',
-  body: JSON.stringify(body),
-})
+const respond = <Body>(route: Route, body: Body) =>
+  route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify(body),
+  })
 
 const cameras = [
   { id: 'main', name: 'ZWO ASI2600MC Pro', configuredName: 'ASI Camera (1)' },
@@ -20,39 +21,50 @@ const empty: ImagingCameraView = {
   editable: true,
 }
 
-const saved: ImagingCameraView = { ...empty, selected: { id: 'main', name: cameras[0]!.name }, state: 'ready' }
+const saved: ImagingCameraView = {
+  ...empty,
+  selected: { id: 'main', name: cameras[0]!.name },
+  state: 'ready',
+}
 
 async function observe(page: Page) {
-  await page.route('**/api/web/rigs/rig-1/observe', route => respond(route, observation('complete')))
-  await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, {
-    rigId: 'rig-1',
-    rigName: 'Seestar S30',
-    camera: null,
-    enabled: false,
-    unavailableReason: 'Choose an imaging camera.',
-    phase: 'idle',
-    active: false,
-    exposureSeconds: 2,
-    elapsedSeconds: 0,
-    error: null,
-    latestImage: null,
-    cooling: null,
-    captureReadState: 'current',
-    repeat: false,
-    saveFrames: false,
-    savedImageCount: 0,
-    completedCount: 0,
-  }))
+  await page.route('**/api/web/rigs/rig-1/observe', route =>
+    respond(route, observation('complete')),
+  )
+  await page.route('**/api/web/rigs/rig-1/capture', route =>
+    respond(route, {
+      rigId: 'rig-1',
+      rigName: 'Seestar S30',
+      camera: null,
+      enabled: false,
+      unavailableReason: 'Choose an imaging camera.',
+      phase: 'idle',
+      active: false,
+      exposureSeconds: 2,
+      elapsedSeconds: 0,
+      error: null,
+      latestImage: null,
+      cooling: null,
+      captureReadState: 'current',
+      repeat: false,
+      saveFrames: false,
+      savedImageCount: 0,
+      completedCount: 0,
+    }),
+  )
   await page.goto('/rigs/rig-1/observe')
 }
 
-test('remembers the server-confirmed choice after reload and rejects a late pre-save poll', async ({ page }) => {
+test('remembers the server-confirmed choice after reload and rejects a late pre-save poll', async ({
+  page,
+}) => {
   // Exercise the generation guard even when cancelling transport loses the race.
   await page.addInitScript(() => {
     const original = window.fetch
-    window.fetch = (input, init) => String(input).includes('/api/web/rigs/rig-1/imaging-camera')
-      ? original(input, { ...init, signal: null })
-      : original(input, init)
+    window.fetch = (input, init) =>
+      String(input).includes('/api/web/rigs/rig-1/imaging-camera')
+        ? original(input, { ...init, signal: null })
+        : original(input, init)
   })
   let current = empty
   let writes = 0
@@ -60,7 +72,11 @@ test('remembers the server-confirmed choice after reload and rejects a late pre-
   let held = false
   let released = false
   let release!: () => void
-  const waiting = new Promise<void>(resolve => { release = resolve })
+
+  const waiting = new Promise<void>(resolve => {
+    release = resolve
+  })
+
   await page.route('**/api/web/rigs/rig-1/imaging-camera', async route => {
     const snapshot = current
     const delayed = hold && !held
@@ -75,7 +91,11 @@ test('remembers the server-confirmed choice after reload and rejects a late pre-
     if (delayed) released = true
   })
   let finish!: () => void
-  const saving = new Promise<void>(resolve => { finish = resolve })
+
+  const saving = new Promise<void>(resolve => {
+    finish = resolve
+  })
+
   await page.route('**/api/rigs/rig-1/imaging-camera', async route => {
     writes++
     expect(route.request().postDataJSON()).toEqual(saved.selected)
@@ -102,10 +122,14 @@ test('remembers the server-confirmed choice after reload and rejects a late pre-
   expect(writes).toBe(1)
 })
 
-test('retains the saved camera offline and requires an explicit choice for changed identity', async ({ page }) => {
+test('retains the saved camera offline and requires an explicit choice for changed identity', async ({
+  page,
+}) => {
   let current = saved
   let offline = false
-  await page.route('**/api/web/rigs/rig-1/imaging-camera', route => offline ? route.abort() : respond(route, current))
+  await page.route('**/api/web/rigs/rig-1/imaging-camera', route =>
+    offline ? route.abort() : respond(route, current),
+  )
   await observe(page)
   const panel = page.getByRole('region', { name: 'Imaging camera', exact: true })
   await expect(panel.getByRole('button', { name: 'Change', exact: true })).toBeEnabled()
@@ -113,7 +137,11 @@ test('retains the saved camera offline and requires an explicit choice for chang
   await expect(panel.getByText(/Rig updates are interrupted/)).toBeVisible()
   await expect(panel.getByRole('button', { name: 'Change', exact: true })).toBeDisabled()
   await expect(panel.getByText('ZWO ASI2600MC Pro', { exact: true })).toBeVisible()
-  current = { ...saved, state: 'changed', cameras: [{ ...cameras[0]!, name: 'Replacement camera' }] }
+  current = {
+    ...saved,
+    state: 'changed',
+    cameras: [{ ...cameras[0]!, name: 'Replacement camera' }],
+  }
   offline = false
   await expect(panel.getByText(/now reports a different camera/)).toBeVisible()
   await panel.getByRole('button', { name: 'Change', exact: true }).click()
@@ -122,12 +150,18 @@ test('retains the saved camera offline and requires an explicit choice for chang
   await expect(panel.getByRole('button', { name: 'Use this camera' })).toBeEnabled()
 })
 
-test('reconciles a lost save response from persisted selection without replaying the write', async ({ page }) => {
+test('reconciles a lost save response from persisted selection without replaying the write', async ({
+  page,
+}) => {
   let current = empty
   let writes = 0
   let check = false
   let release!: () => void
-  const waiting = new Promise<void>(resolve => { release = resolve })
+
+  const waiting = new Promise<void>(resolve => {
+    release = resolve
+  })
+
   await page.route('**/api/web/rigs/rig-1/imaging-camera', async route => {
     if (writes) {
       check = true
@@ -154,7 +188,9 @@ test('reconciles a lost save response from persisted selection without replaying
   expect(writes).toBe(1)
 })
 
-test('an explicit check unlocks an unsaved uncertain choice without replaying it', async ({ page }) => {
+test('an explicit check unlocks an unsaved uncertain choice without replaying it', async ({
+  page,
+}) => {
   let current = empty
   let writes = 0
   await page.route('**/api/web/rigs/rig-1/imaging-camera', route => respond(route, current))

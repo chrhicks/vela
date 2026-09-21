@@ -7,7 +7,7 @@
 .vela-nav-demo__fixture {
   color: var(--vela-text-muted);
   margin: 0 0 12px;
-  font-size: .72em;
+  font-size: 0.72em;
 }
 .vela-nav-demo__app {
   border: 1px solid var(--vela-line);
@@ -24,28 +24,42 @@
   padding: 8px;
   max-width: 100%;
 }
-.vela-nav-demo a:focus-visible, .vela-nav-demo button:focus-visible, .vela-nav-demo select:focus-visible { outline: 2px solid var(--vela-focus); outline-offset: 3px; }
-.vela-nav-demo__content { padding: 36px; min-height: 430px; }
-.vela-nav-demo__heading { margin-bottom: 28px; }
+.vela-nav-demo a:focus-visible,
+.vela-nav-demo button:focus-visible,
+.vela-nav-demo select:focus-visible {
+  outline: 2px solid var(--vela-focus);
+  outline-offset: 3px;
+}
+.vela-nav-demo__content {
+  padding: 36px;
+  min-height: 430px;
+}
+.vela-nav-demo__heading {
+  margin-bottom: 28px;
+}
 .vela-nav-demo__heading p {
   margin: 0 0 8px;
   color: var(--vela-text-muted);
-  font-size: .75em;
+  font-size: 0.75em;
 }
 .vela-nav-demo h1 {
   font-size: 1.8em;
   font-weight: 550;
   line-height: 1.2;
   margin: 0 0 10px;
-  letter-spacing: -.025em;
+  letter-spacing: -0.025em;
 }
-.vela-nav-demo__heading > span { font-size: .85em; color: var(--vela-text-muted); }
+.vela-nav-demo__heading > span {
+  font-size: 0.85em;
+  color: var(--vela-text-muted);
+}
 .vela-nav-demo h2 {
   font-size: 1.05em;
   font-weight: 550;
   margin: 0 0 10px;
 }
-.vela-nav-demo__targets, .vela-nav-demo__rig-cards {
+.vela-nav-demo__targets,
+.vela-nav-demo__rig-cards {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 20px;
@@ -62,25 +76,33 @@
   aspect-ratio: 2;
   object-fit: cover;
 }
-.vela-nav-demo__targets article > div { padding: 18px; }
+.vela-nav-demo__targets article > div {
+  padding: 18px;
+}
 .vela-nav-demo__targets p {
   color: var(--vela-text-muted);
-  font-size: .7em;
+  font-size: 0.7em;
   margin: 0 0 6px;
 }
-.vela-nav-demo__targets a, .vela-nav-demo__secondary a, .vela-nav-demo__content .vela-panel a, .vela-nav-demo__back {
-  font-size: .8em;
+.vela-nav-demo__targets a,
+.vela-nav-demo__secondary a,
+.vela-nav-demo__content .vela-panel a,
+.vela-nav-demo__back {
+  font-size: 0.8em;
   color: var(--vela-text);
   text-underline-offset: 4px;
 }
 .vela-nav-demo__targets small {
   display: block;
-  font-size: .6em;
+  font-size: 0.6em;
   line-height: 1.45;
   color: var(--vela-text-muted);
   margin-top: 18px;
 }
-.vela-nav-demo__targets small a { font-size: inherit; color: inherit; }
+.vela-nav-demo__targets small a {
+  font-size: inherit;
+  color: inherit;
+}
 .vela-nav-demo__target-image {
   display: block;
   width: 100%;
@@ -88,17 +110,24 @@
   object-fit: cover;
   margin-top: 20px;
 }
-.vela-nav-demo__credit { font-size: .65em; color: var(--vela-text-muted); }
-.vela-nav-demo__credit a { color: inherit; }
-.vela-nav-demo__observe { max-width: 640px; }
+.vela-nav-demo__credit {
+  font-size: 0.65em;
+  color: var(--vela-text-muted);
+}
+.vela-nav-demo__credit a {
+  color: inherit;
+}
+.vela-nav-demo__observe {
+  max-width: 640px;
+}
 .vela-nav-demo__content .vela-panel p {
-  font-size: .85em;
+  font-size: 0.85em;
   line-height: 1.6;
   color: var(--vela-text-muted);
 }
 .vela-nav-demo__content .vela-panel strong {
   display: block;
-  font-size: .85em;
+  font-size: 0.85em;
   font-weight: 550;
   margin-block: 20px;
 }
@@ -132,24 +161,41 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: .78em;
+  font-size: 0.78em;
   color: var(--vela-text-muted);
 }
 .vela-nav-demo__try p {
   margin-bottom: 0;
-  font-size: .72em;
+  font-size: 0.72em;
   color: var(--vela-text-muted);
   line-height: 1.5;
 }
 @container vela-nav (max-width: 850px) {
-  .vela-nav-demo__content { padding: 24px; }
+  .vela-nav-demo__content {
+    padding: 24px;
+  }
 }
 @container vela-nav (max-width: 500px) {
-  .vela-nav-demo__content { padding: 22px 16px; }
-  .vela-nav-demo h1 { font-size: 1.5em; }
-  .vela-nav-demo__targets, .vela-nav-demo__rig-cards, .vela-nav-demo__capture { grid-template-columns: 1fr; }
-  .vela-nav-demo__try label { flex-wrap: wrap; }
+  .vela-nav-demo__content {
+    padding: 22px 16px;
+  }
+  .vela-nav-demo h1 {
+    font-size: 1.5em;
+  }
+  .vela-nav-demo__targets,
+  .vela-nav-demo__rig-cards,
+  .vela-nav-demo__capture {
+    grid-template-columns: 1fr;
+  }
+  .vela-nav-demo__try label {
+    flex-wrap: wrap;
+  }
 }
 
-.vela-nav-demo__try label + label { margin-top: 12px; }
-.vela-nav-demo__try input[type="range"] { accent-color: var(--vela-accent); max-width: 160px; }
+.vela-nav-demo__try label + label {
+  margin-top: 12px;
+}
+.vela-nav-demo__try input[type='range'] {
+  accent-color: var(--vela-accent);
+  max-width: 160px;
+}

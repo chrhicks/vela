@@ -22,7 +22,7 @@ describe('local target catalog', () => {
       expect(searchTargets(query!)[0]?.id, query).toBe(id)
     }
 
-    expect(searchTargets('Flame').map((target) => target.id)).not.toContain('ic0434')
+    expect(searchTargets('Flame').map(target => target.id)).not.toContain('ic0434')
     expect(getTarget('ic0434')?.catalogName).toBe('IC 434')
   })
 
@@ -57,7 +57,7 @@ describe('local target catalog', () => {
   it('bundles unique usable positions and protects the shared catalog from mutation', () => {
     const targets = listTargets()
     expect(targets.length).toBeGreaterThan(13000)
-    expect(new Set(targets.map((target) => target.id)).size).toBe(targets.length)
+    expect(new Set(targets.map(target => target.id)).size).toBe(targets.length)
 
     for (const target of targets) {
       expect(target.raDegrees).toBeGreaterThanOrEqual(0)

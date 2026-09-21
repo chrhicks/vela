@@ -1,4 +1,7 @@
-.vela-capture-hub { display: grid; gap: 16px; }
+.vela-capture-hub {
+  display: grid;
+  gap: 16px;
+}
 .vela-capture-hub h2 {
   margin: 0;
   font-size: 20px;
@@ -10,7 +13,10 @@
   line-height: 1.6;
   color: var(--vela-text-muted);
 }
-.vela-capture-entry .vela-panel__body { padding: 0; overflow: hidden; }
+.vela-capture-entry .vela-panel__body {
+  padding: 0;
+  overflow: hidden;
+}
 .vela-capture-entry__preview {
   position: relative;
   display: grid;
@@ -22,7 +28,10 @@
   color: var(--vela-text-muted);
   border-bottom: 1px solid var(--vela-line);
 }
-.vela-capture-entry__preview > svg { width: 42px; height: 42px; }
+.vela-capture-entry__preview > svg {
+  width: 42px;
+  height: 42px;
+}
 .vela-capture-entry__preview > img {
   position: absolute;
   inset: 0;
@@ -30,7 +39,9 @@
   height: 100%;
   object-fit: cover;
 }
-.vela-capture-entry__preview > span { font-size: 12px; }
+.vela-capture-entry__preview > span {
+  font-size: 12px;
+}
 .vela-capture-entry__preview:has(img) > span {
   position: absolute;
   bottom: 10px;
@@ -40,15 +51,21 @@
   border: 1px solid var(--vela-line);
   color: var(--vela-text);
 }
-.vela-capture-entry__body { padding: 20px; }
+.vela-capture-entry__body {
+  padding: 20px;
+}
 .vela-capture-entry__status {
   color: var(--vela-text-muted);
   font-size: 12px;
   margin: 18px 0 12px;
   font-variant-numeric: tabular-nums;
 }
-.vela-capture-entry__body > .vela-button { width: 100%; }
-.vela-capture-alignment .vela-panel__body { padding: 20px; }
+.vela-capture-entry__body > .vela-button {
+  width: 100%;
+}
+.vela-capture-alignment .vela-panel__body {
+  padding: 20px;
+}
 .vela-capture-alignment__mark {
   font-size: 30px;
   line-height: 1;
@@ -66,14 +83,34 @@
   text-decoration: none;
   border-top: 1px solid var(--vela-line);
 }
-.vela-capture-alignment a:hover { color: var(--vela-accent); }
-.vela-capture-alignment a:focus-visible, .vela-capture-rig summary:focus-visible { outline: 2px solid var(--vela-accent); outline-offset: 4px; }
+.vela-capture-alignment a:hover {
+  color: var(--vela-accent);
+}
+.vela-capture-alignment a:focus-visible,
+.vela-capture-rig summary:focus-visible {
+  outline: 2px solid var(--vela-accent);
+  outline-offset: 4px;
+}
 
-.vela-capture-entry__status > span { display: block; margin-top: 4px; }
-.vela-observe-hub { container-type: inline-size; }
-.vela-observe-hub .vela-capture-rig .vela-observe-section-heading { margin-top: 20px; }
-.vela-observe-hub > .vela-capture-intro { margin-bottom: 20px; }
+.vela-capture-entry__status > span {
+  display: block;
+  margin-top: 4px;
+}
+.vela-observe-hub {
+  container-type: inline-size;
+}
+.vela-observe-hub .vela-capture-rig .vela-observe-section-heading {
+  margin-top: 20px;
+}
+.vela-observe-hub > .vela-capture-intro {
+  margin-bottom: 20px;
+}
 @container (min-width: 680px) {
-  .vela-capture-hub { grid-template-columns: 1.4fr 1fr; gap: 20px; }
-  .vela-capture-alignment .vela-panel__body { padding: 24px; }
+  .vela-capture-hub {
+    grid-template-columns: 1.4fr 1fr;
+    gap: 20px;
+  }
+  .vela-capture-alignment .vela-panel__body {
+    padding: 24px;
+  }
 }

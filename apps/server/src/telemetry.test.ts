@@ -4,7 +4,13 @@ import { tmpdir } from 'node:os'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { context, propagation, trace } from '@opentelemetry/api'
 import { ExportResultCode, type ExportResult } from '@opentelemetry/core'
-import { InMemorySpanExporter, NodeTracerProvider, SimpleSpanProcessor, type ReadableSpan, type SpanExporter } from '@opentelemetry/sdk-trace-node'
+import {
+  InMemorySpanExporter,
+  NodeTracerProvider,
+  SimpleSpanProcessor,
+  type ReadableSpan,
+  type SpanExporter,
+} from '@opentelemetry/sdk-trace-node'
 import { createTraceFileExporter, startTelemetry } from './telemetry.js'
 
 const directories: string[] = []
@@ -14,7 +20,9 @@ afterEach(async () => {
   trace.disable()
   context.disable()
   propagation.disable()
-  await Promise.all(directories.splice(0).map(directory => rm(directory, { recursive: true, force: true })))
+  await Promise.all(
+    directories.splice(0).map(directory => rm(directory, { recursive: true, force: true })),
+  )
 })
 
 async function directory() {
@@ -40,7 +48,11 @@ async function span(name = 'alpaca.request'): Promise<ReadableSpan> {
 const exportSpans = (exporter: SpanExporter, spans: ReadableSpan[]) =>
   new Promise<ExportResult>(resolve => exporter.export(spans, resolve))
 
-const records = async (path: string) => (await readFile(path, 'utf8')).trim().split('\n').map(line => JSON.parse(line))
+const records = async (path: string) =>
+  (await readFile(path, 'utf8'))
+    .trim()
+    .split('\n')
+    .map(line => JSON.parse(line))
 
 describe('local tracing', () => {
   it('keeps detached children correlated and exports them while their run is still open', async () => {
@@ -48,7 +60,11 @@ describe('local tracing', () => {
     const telemetry = startTelemetry(file)
     const tracer = trace.getTracer('alignment-test')
     let release!: () => void
-    const gate = new Promise<void>(resolve => { release = resolve })
+
+    const gate = new Promise<void>(resolve => {
+      release = resolve
+    })
+
     let rootId = ''
 
     const running = tracer.startActiveSpan('alignment.run', async root => {
@@ -69,10 +85,10 @@ describe('local tracing', () => {
 
     try {
       // No explicit forceFlush: the one-second batch timer makes children live.
-      await vi.waitFor(
-        async () => expect(await records(file)).toHaveLength(1),
-        { timeout: 2500, interval: 50 },
-      )
+      await vi.waitFor(async () => expect(await records(file)).toHaveLength(1), {
+        timeout: 2500,
+        interval: 50,
+      })
       const [child] = await records(file)
       expect(child).toMatchObject({
         name: 'alpaca.request',
@@ -84,7 +100,10 @@ describe('local tracing', () => {
       expect(child.startTimeUnixNano).toMatch(/^\d+$/)
       root.end()
       await telemetry.shutdown()
-      expect((await records(file)).map(record => record.name)).toEqual(['alpaca.request', 'alignment.run'])
+      expect((await records(file)).map(record => record.name)).toEqual([
+        'alpaca.request',
+        'alignment.run',
+      ])
     } finally {
       root.end()
       await telemetry.shutdown()
@@ -97,8 +116,9 @@ describe('local tracing', () => {
     const exporter = createTraceFileExporter(file, { maxFileBytes: 1700, retainedFiles: 3 })
 
     for (let index = 0; index < 12; index++) {
-      expect((await exportSpans(exporter, [await span(`request-${index}`)])).code)
-        .toBe(ExportResultCode.SUCCESS)
+      expect((await exportSpans(exporter, [await span(`request-${index}`)])).code).toBe(
+        ExportResultCode.SUCCESS,
+      )
     }
 
     await exporter.shutdown()
@@ -124,7 +144,9 @@ describe('local tracing', () => {
     expect(results.some(result => result.code === ExportResultCode.FAILED)).toBe(true)
     expect(onError).toHaveBeenCalledTimes(1)
     await exporter.shutdown()
-    expect((await records(file)).length).toBe(results.filter(result => result.code === ExportResultCode.SUCCESS).length)
+    expect((await records(file)).length).toBe(
+      results.filter(result => result.code === ExportResultCode.SUCCESS).length,
+    )
   })
 
   it('reports filesystem failure once and isolates it from callers and shutdown', async () => {

@@ -37,15 +37,20 @@ export function useNavigation() {
         setState(previous => {
           // Keep following the same run across routes. If another rig is also
           // active, catalog order gives a stable fallback without inventing ownership.
-          const active = view.captures.find(capture => capture.active && capture.rigId === previous.activity?.rigId)
-            ?? view.captures.find(capture => capture.active)
+          const active =
+            view.captures.find(
+              capture => capture.active && capture.rigId === previous.activity?.rigId,
+            ) ?? view.captures.find(capture => capture.active)
 
           if (active) return { view, activity: active, offline: false, missing: false }
           const last = previous.activity
           const confirmed = view.captures.find(capture => capture.rigId === last?.rigId)
 
-          const disappeared = last && (last.active || previous.missing) && (!confirmed || confirmed.phase === 'idle')
-            && view.rigs.some(rig => rig.id === last.rigId)
+          const disappeared =
+            last &&
+            (last.active || previous.missing) &&
+            (!confirmed || confirmed.phase === 'idle') &&
+            view.rigs.some(rig => rig.id === last.rigId)
 
           if (disappeared) return { view, activity: last, offline: false, missing: true }
 

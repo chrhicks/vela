@@ -46,9 +46,8 @@ async function setup(openFile = open) {
   const { rig } = added
   const store = await openFileSavedImageStore(root, openFile)
 
-  const pixels = Int32Array.from(
-    { length: image.width * image.height },
-    (_, i) => (i % 2 + Math.floor(i / image.width) % 2) % 2 ? 530 : 500,
+  const pixels = Int32Array.from({ length: image.width * image.height }, (_, i) =>
+    ((i % 2) + (Math.floor(i / image.width) % 2)) % 2 ? 530 : 500,
   )
 
   const color = { kind: 'bayer', pattern: 'rggb' } as const
@@ -58,7 +57,12 @@ async function setup(openFile = open) {
     { exposureSeconds: image.exposureSeconds, cameraName: image.cameraName },
   )
 
-  const files = { fits, native: Buffer.from('first native bytes'), fit: Buffer.from('first fit bytes') }
+  const files = {
+    fits,
+    native: Buffer.from('first native bytes'),
+    fit: Buffer.from('first fit bytes'),
+  }
+
   await store.save(rig.id, image, files)
   const directory = join(root, digest(rig.id), digest(image.id))
 
@@ -98,15 +102,26 @@ it('lazily publishes a versioned native/fit pair, preserves every original byte/
   const reopened = await openFileSavedImageStore(subject.root)
   expect((await reopened.list(rig.id))[0]).toEqual(first)
   expect(await reopened.refreshPreview(rig.id, image.id)).toEqual(first)
-  const descriptor = JSON.parse(await readFile(join(directory, 'previews', PREVIEW_VERSION, 'manifest.json'), 'utf8'))
+
+  const descriptor = JSON.parse(
+    await readFile(join(directory, 'previews', PREVIEW_VERSION, 'manifest.json'), 'utf8'),
+  )
+
   expect(descriptor.fitsSha256).toBe(digest(files.fits))
 })
 
 it('shares an in-flight refresh, hides an incomplete pair and retains legacy after failed publication', async () => {
   let release!: () => void
   let started!: () => void
-  const paused = new Promise<void>(resolve => { release = resolve })
-  const writing = new Promise<void>(resolve => { started = resolve })
+
+  const paused = new Promise<void>(resolve => {
+    release = resolve
+  })
+
+  const writing = new Promise<void>(resolve => {
+    started = resolve
+  })
+
   let attempts = 0
 
   const openFile: typeof open = async (...args) => {
@@ -159,7 +174,10 @@ it('keeps unsupported originals viewable and pins old URLs while display/downloa
     expect((await app.inject(`${base}/preview`)).rawPayload).toEqual(original.rawPayload)
     expect((await app.inject(`${base}/fits`)).rawPayload).toEqual(files.fits)
     expect((await app.inject(`${base}/previews/future/preview`)).statusCode).toBe(404)
-    const failed = (await app.inject(`/api/web/rigs/${rig.id}/saved-images/unsupported`)).json().image
+
+    const failed = (await app.inject(`/api/web/rigs/${rig.id}/saved-images/unsupported`)).json()
+      .image
+
     expect(failed.previewRendering).toEqual({ status: 'unavailable' })
     expect((await app.inject(failed.imageUrl)).rawPayload).toEqual(files.native)
     expect((await app.inject(failed.previewDownloadUrl)).rawPayload).toEqual(files.native)
@@ -186,7 +204,9 @@ it('marks fresh captures current without storing a second copy of their already-
   expect(fresh.previewRendering?.status).toBe('current')
   const reopened = await openFileSavedImageStore(root)
   expect(await reopened.get(rig.id, 'fresh')).toEqual(fresh)
-  expect(await reopened.previewFile(rig.id, 'fresh', 'native')).toEqual(await reopened.file(rig.id, 'fresh', 'native'))
+  expect(await reopened.previewFile(rig.id, 'fresh', 'native')).toEqual(
+    await reopened.file(rig.id, 'fresh', 'native'),
+  )
   const freshDirectory = join(directory, '..', digest('fresh'), 'previews', PREVIEW_VERSION)
   expect(await readdir(freshDirectory)).toEqual(['manifest.json'])
 })

@@ -16,7 +16,8 @@ const diagnostic = {
   rule: 'error_context',
   severity: 'warning',
   message: 'Original failure is discarded',
-  explanation: 'The replacement error drops the device failure, preventing diagnosis of the capture boundary.',
+  explanation:
+    'The replacement error drops the device failure, preventing diagnosis of the capture boundary.',
   suggestion: 'Pass the original error as the cause.',
   location: {
     path: 'tracked.ts',
@@ -27,8 +28,8 @@ const diagnostic = {
   related: [{ path: 'contract.md', startLine: 1, endLine: 1, quote: context.trim() }],
 }
 type PromptInput = {
-  targets: { path: string, text: string, diff?: string }[]
-  context: { path: string, text: string }[]
+  targets: { path: string; text: string; diff?: string }[]
+  context: { path: string; text: string }[]
   codingStandards: string
   projectGuidance: string
 }
@@ -38,7 +39,7 @@ function inputFrom(prompt: string): PromptInput {
   return JSON.parse(prompt.split('\nINPUT\n')[1])
 }
 
-function reply(input: PromptInput, diagnostics = [] as typeof diagnostic[]) {
+function reply(input: PromptInput, diagnostics = [] as (typeof diagnostic)[]) {
   return JSON.stringify({
     reviewedPaths: input.targets.map(target => target.path),
     diagnostics,
@@ -62,7 +63,16 @@ async function fixture(t: { after: (fn: () => Promise<void>) => void }) {
   await writeFile(join(root, 'tracked.ts'), source)
   await writeFile(join(root, 'contract.md'), context)
   git('add', '.')
-  git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', 'commit', '--quiet', '-m', 'Fixture')
+  git(
+    '-c',
+    'user.name=Fixture',
+    '-c',
+    'user.email=fixture@example.test',
+    'commit',
+    '--quiet',
+    '-m',
+    'Fixture',
+  )
   return { root, git, standards }
 }
 
@@ -74,10 +84,8 @@ test('a real message-less Effect timeout remains incomplete through persistence 
     new AbortController().signal,
     {
       model: 'test-reviewer',
-      generate: (_prompt, signal) => Effect.runPromise(
-        Effect.never.pipe(Effect.timeout('5 millis')),
-        { signal },
-      ),
+      generate: (_prompt, signal) =>
+        Effect.runPromise(Effect.never.pipe(Effect.timeout('5 millis')), { signal }),
     },
   )
   assert.match(result.content, /Standards review · incomplete/)
@@ -148,30 +156,28 @@ test('changes mode supplies staged and untracked source together with the tracke
   git('add', 'tracked.ts')
   await writeFile(join(root, 'new.ts'), 'export const added = true\n')
   const inputs: PromptInput[] = []
-  const result = await checkStandards(
-    root,
-    {},
-    new AbortController().signal,
-    {
-      model: 'test-reviewer',
-      generate: async prompt => {
-        const input = inputFrom(prompt)
-        inputs.push(input)
-        return reply(input)
-      },
+  const result = await checkStandards(root, {}, new AbortController().signal, {
+    model: 'test-reviewer',
+    generate: async prompt => {
+      const input = inputFrom(prompt)
+      inputs.push(input)
+      return reply(input)
     },
-  )
+  })
   assert.equal(inputs.length, 1)
   assert.deepEqual(inputs[0].targets.map(target => target.path).sort(), ['new.ts', 'tracked.ts'])
   const tracked = inputs[0].targets.find(target => target.path === 'tracked.ts')!
   assert.equal(tracked.text, '1: export const changed = true\n2: ')
   assert.match(tracked.diff!, /\+export const changed = true/)
   assert.match(tracked.diff!, /-export function rethrow/)
-  assert.deepEqual(inputs[0].targets.find(target => target.path === 'new.ts'), {
-    path: 'new.ts',
-    scope: 'whole_file',
-    text: '1: export const added = true\n2: ',
-  })
+  assert.deepEqual(
+    inputs[0].targets.find(target => target.path === 'new.ts'),
+    {
+      path: 'new.ts',
+      scope: 'whole_file',
+      text: '1: export const added = true\n2: ',
+    },
+  )
   assert.equal((await readReport(result.artifact)).status, 'complete')
 })
 
@@ -233,11 +239,13 @@ test('a valid diagnostic is saved and projected exactly, including source-backed
   assert.deepEqual(report, saved.report)
   assert.equal(report.status, 'complete')
   assert.equal(report.model, 'test-reviewer')
-  assert.deepEqual(report.diagnostics, [{
-    ...diagnostic,
-    location: { ...diagnostic.location, sha256: hash(source) },
-    related: [{ ...diagnostic.related[0], sha256: hash(context) }],
-  }])
+  assert.deepEqual(report.diagnostics, [
+    {
+      ...diagnostic,
+      location: { ...diagnostic.location, sha256: hash(source) },
+      related: [{ ...diagnostic.related[0], sha256: hash(context) }],
+    },
+  ])
   assert.deepEqual(JSON.parse(saved.review.response).diagnostics, [diagnostic])
   assert.equal(result.content, formatReport(report))
   assert.match(result.content, /tracked.ts:2-2 · warning · error_context/)
@@ -254,7 +262,9 @@ test('model failure persists an incomplete review without accepted diagnostics',
     new AbortController().signal,
     {
       model: 'test-reviewer',
-      generate: async () => { throw new Error('Model unavailable') },
+      generate: async () => {
+        throw new Error('Model unavailable')
+      },
     },
   )
   const report = await readReport(result.artifact)
@@ -265,48 +275,13 @@ test('model failure persists an incomplete review without accepted diagnostics',
   assert.match(result.content, /Incomplete or stale review is not a clean check/)
 })
 
-test('aborting pending generation saves an incomplete artifact and rejects late valid output', { timeout: 10_000 }, async t => {
-  const { root } = await fixture(t)
-  const controller = new AbortController()
-  const started = Promise.withResolvers<AbortSignal>()
-  const finish = Promise.withResolvers<void>()
-  const checking = checkStandards(
-    root,
-    {
-      mode: 'files',
-      paths: ['tracked.ts'],
-      supportingPaths: ['contract.md'],
-    },
-    controller.signal,
-    {
-      model: 'test-reviewer',
-      generate: async (prompt, signal) => {
-        started.resolve(signal)
-        await finish.promise
-        return reply(inputFrom(prompt), [diagnostic])
-      },
-    },
-  )
-  const rejected = assert.rejects(checking, /Stopped test/)
-  const generationSignal = await started.promise
-  controller.abort(new Error('Stopped test'))
-  assert.equal(generationSignal.aborted, true)
-  finish.resolve()
-  await rejected
-  const directory = join(root, '.opencode/.local/standards')
-  const artifacts = await readdir(directory)
-  assert.equal(artifacts.length, 1)
-  const report = await readReport(join(directory, artifacts[0]))
-  assert.equal(report.status, 'incomplete')
-  assert.match(report.error!, /Stopped test/)
-  assert.deepEqual(report.diagnostics, [])
-  assert.deepEqual(report.missingEvidence, [])
-})
-
-for (const path of ['tracked.ts', 'contract.md', 'CODING_STANDARDS.md']) {
-  test(`editing ${path} during generation makes the returned review stale`, { timeout: 10_000 }, async t => {
+test(
+  'aborting pending generation saves an incomplete artifact and rejects late valid output',
+  { timeout: 10_000 },
+  async t => {
     const { root } = await fixture(t)
-    const started = Promise.withResolvers<void>()
+    const controller = new AbortController()
+    const started = Promise.withResolvers<AbortSignal>()
     const finish = Promise.withResolvers<void>()
     const checking = checkStandards(
       root,
@@ -315,27 +290,70 @@ for (const path of ['tracked.ts', 'contract.md', 'CODING_STANDARDS.md']) {
         paths: ['tracked.ts'],
         supportingPaths: ['contract.md'],
       },
-      new AbortController().signal,
+      controller.signal,
       {
         model: 'test-reviewer',
-        generate: async prompt => {
-          started.resolve()
+        generate: async (prompt, signal) => {
+          started.resolve(signal)
           await finish.promise
           return reply(inputFrom(prompt), [diagnostic])
         },
       },
     )
-    await started.promise
-    await writeFile(join(root, path), 'Edited during review\n')
+    const rejected = assert.rejects(checking, /Stopped test/)
+    const generationSignal = await started.promise
+    controller.abort(new Error('Stopped test'))
+    assert.equal(generationSignal.aborted, true)
     finish.resolve()
-    const result = await checking
-    const saved = JSON.parse(await readFile(result.artifact, 'utf8'))
-    assert.equal(saved.report.status, 'stale')
-    assert.ok(saved.report.error.includes(path))
-    assert.match(result.content, /Saved diagnostics are unaccepted/)
-    assert.match(result.content, /0 diagnostics/)
-    assert.ok(!result.content.includes(diagnostic.message))
-  })
+    await rejected
+    const directory = join(root, '.opencode/.local/standards')
+    const artifacts = await readdir(directory)
+    assert.equal(artifacts.length, 1)
+    const report = await readReport(join(directory, artifacts[0]))
+    assert.equal(report.status, 'incomplete')
+    assert.match(report.error!, /Stopped test/)
+    assert.deepEqual(report.diagnostics, [])
+    assert.deepEqual(report.missingEvidence, [])
+  },
+)
+
+for (const path of ['tracked.ts', 'contract.md', 'CODING_STANDARDS.md']) {
+  test(
+    `editing ${path} during generation makes the returned review stale`,
+    { timeout: 10_000 },
+    async t => {
+      const { root } = await fixture(t)
+      const started = Promise.withResolvers<void>()
+      const finish = Promise.withResolvers<void>()
+      const checking = checkStandards(
+        root,
+        {
+          mode: 'files',
+          paths: ['tracked.ts'],
+          supportingPaths: ['contract.md'],
+        },
+        new AbortController().signal,
+        {
+          model: 'test-reviewer',
+          generate: async prompt => {
+            started.resolve()
+            await finish.promise
+            return reply(inputFrom(prompt), [diagnostic])
+          },
+        },
+      )
+      await started.promise
+      await writeFile(join(root, path), 'Edited during review\n')
+      finish.resolve()
+      const result = await checking
+      const saved = JSON.parse(await readFile(result.artifact, 'utf8'))
+      assert.equal(saved.report.status, 'stale')
+      assert.ok(saved.report.error.includes(path))
+      assert.match(result.content, /Saved diagnostics are unaccepted/)
+      assert.match(result.content, /0 diagnostics/)
+      assert.ok(!result.content.includes(diagnostic.message))
+    },
+  )
 }
 
 for (const path of ['tracked.ts', 'AGENTS.md']) {
@@ -376,11 +394,12 @@ test('missing code evidence remains separate from a source-backed warning', asyn
     new AbortController().signal,
     {
       model: 'test-reviewer',
-      generate: async () => JSON.stringify({
-        reviewedPaths: ['tracked.ts'],
-        diagnostics: [diagnostic],
-        missingEvidence: [missing],
-      }),
+      generate: async () =>
+        JSON.stringify({
+          reviewedPaths: ['tracked.ts'],
+          diagnostics: [diagnostic],
+          missingEvidence: [missing],
+        }),
     },
   )
   const report = await readReport(result.artifact)
@@ -396,7 +415,10 @@ test('missing code evidence remains separate from a source-backed warning', asyn
 test('legacy JSON reports explain the legacy format and retain the raw artifact path', async t => {
   const { root } = await fixture(t)
   const artifact = join(root, 'legacy-report.json')
-  const original = JSON.stringify({ schemaVersion: 2, files: [{ path: 'tracked.ts', failed: ['error_context'] }] })
+  const original = JSON.stringify({
+    schemaVersion: 2,
+    files: [{ path: 'tracked.ts', failed: ['error_context'] }],
+  })
   await writeFile(artifact, original)
   const report = await readReport(artifact)
   assert.equal(report.status, 'incomplete')

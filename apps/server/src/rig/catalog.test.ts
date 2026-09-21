@@ -37,7 +37,7 @@ function inventory(
 ): ObservedRigInventory {
   return {
     observedAt,
-    devices: devices.map((device) => ({
+    devices: devices.map(device => ({
       uniqueId: device.uniqueId,
       kind: 'camera',
       name: device.name ?? device.uniqueId,
@@ -73,9 +73,17 @@ describe('file Rig catalog', () => {
       await writeFile(path, validCatalog)
       const catalog = await openFileRigCatalog(path)
       await expect(catalog.setFocalLength('rig-1', 400)).resolves.toBe(true)
-      await expect((await openFileRigCatalog(path)).get('rig-1')).resolves.toMatchObject({ focalLengthMm: 400 })
+      await expect((await openFileRigCatalog(path)).get('rig-1')).resolves.toMatchObject({
+        focalLengthMm: 400,
+      })
       await expect(catalog.setFocalLength('rig-1', 0)).rejects.toThrow('focal length')
-      await writeFile(path, validCatalog.replace('    name: Backyard rig', '    focalLengthMm: .nan\n    name: Backyard rig'))
+      await writeFile(
+        path,
+        validCatalog.replace(
+          '    name: Backyard rig',
+          '    focalLengthMm: .nan\n    name: Backyard rig',
+        ),
+      )
       await expect(openFileRigCatalog(path)).rejects.toThrow(RigCatalogFileError)
     } finally {
       await rm(dirname(path), { recursive: true, force: true })
@@ -92,11 +100,13 @@ describe('file Rig catalog', () => {
     })
 
     await expect(catalog.list()).resolves.toEqual([])
-    await expect(catalog.add({
-      name: 'Backyard rig',
-      endpoint: endpointA,
-      inventory: observed,
-    })).resolves.toEqual({
+    await expect(
+      catalog.add({
+        name: 'Backyard rig',
+        endpoint: endpointA,
+        inventory: observed,
+      }),
+    ).resolves.toEqual({
       state: 'added',
       rig: {
         id: 'rig-1',
@@ -108,13 +118,15 @@ describe('file Rig catalog', () => {
     })
 
     const reopened = await openFileRigCatalog(path)
-    await expect(reopened.list()).resolves.toEqual([{
-      id: 'rig-1',
-      name: 'Backyard rig',
-      endpoint: endpointA,
-      addedAt: '2026-09-02T20:01:00.000Z',
-      lastObservedInventory: observed,
-    }])
+    await expect(reopened.list()).resolves.toEqual([
+      {
+        id: 'rig-1',
+        name: 'Backyard rig',
+        endpoint: endpointA,
+        addedAt: '2026-09-02T20:01:00.000Z',
+        lastObservedInventory: observed,
+      },
+    ])
   })
 
   it('rejects malformed catalog data instead of replacing it', async () => {
@@ -153,10 +165,7 @@ describe('file Rig catalog', () => {
   it('rejects invalid observed inventory without corrupting the file', async () => {
     const path = await catalogPath()
 
-    const originalInventory = inventory(
-      '2026-09-02T20:00:00.000Z',
-      { uniqueId: 'camera-1' },
-    )
+    const originalInventory = inventory('2026-09-02T20:00:00.000Z', { uniqueId: 'camera-1' })
 
     const catalog = await openFileRigCatalog(path, { createId: () => 'rig-1' })
     await catalog.add({
@@ -165,16 +174,20 @@ describe('file Rig catalog', () => {
       inventory: originalInventory,
     })
 
-    await expect(catalog.observe(endpointA, {
-      observedAt: '2026-09-02T21:00:00.000Z',
-      devices: [
-        { uniqueId: 'camera-1', kind: 'camera', name: 'Main camera' },
-        { uniqueId: 'camera-1', kind: 'camera', name: 'Duplicate camera' },
-      ],
-    })).rejects.toBeInstanceOf(InvalidRigInventoryError)
-    await expect((await openFileRigCatalog(path)).list()).resolves.toMatchObject([{
-      lastObservedInventory: originalInventory,
-    }])
+    await expect(
+      catalog.observe(endpointA, {
+        observedAt: '2026-09-02T21:00:00.000Z',
+        devices: [
+          { uniqueId: 'camera-1', kind: 'camera', name: 'Main camera' },
+          { uniqueId: 'camera-1', kind: 'camera', name: 'Duplicate camera' },
+        ],
+      }),
+    ).rejects.toBeInstanceOf(InvalidRigInventoryError)
+    await expect((await openFileRigCatalog(path)).list()).resolves.toMatchObject([
+      {
+        lastObservedInventory: originalInventory,
+      },
+    ])
   })
 
   it('preserves saved state after a failed write and accepts the next change', async () => {
@@ -200,11 +213,13 @@ describe('file Rig catalog', () => {
       await rename(backup, path)
       await expect((await openFileRigCatalog(path)).list()).resolves.toEqual(original)
 
-      await expect(catalog.add({
-        name: 'Second rig',
-        endpoint: endpointB,
-        inventory: inventory('2026-09-02T20:01:00.000Z', { uniqueId: 'camera-2' }),
-      })).resolves.toMatchObject({ state: 'added', rig: { id: 'rig-2' } })
+      await expect(
+        catalog.add({
+          name: 'Second rig',
+          endpoint: endpointB,
+          inventory: inventory('2026-09-02T20:01:00.000Z', { uniqueId: 'camera-2' }),
+        }),
+      ).resolves.toMatchObject({ state: 'added', rig: { id: 'rig-2' } })
       const saved = await catalog.list()
       expect(saved.map(({ id }) => id)).toEqual(['rig-1', 'rig-2'])
       await expect((await openFileRigCatalog(path)).list()).resolves.toEqual(saved)
@@ -246,33 +261,39 @@ describe('Rig catalog reconciliation', () => {
       record('rig-b', endpointB, inventory('2026-09-01T20:00:00.000Z', { uniqueId: 'camera-b' })),
     ]
 
-    expect(matchRigCandidate(
-      records,
-      endpointA,
-      inventory('2026-09-02T20:00:00.000Z', { uniqueId: 'camera-a' }),
-    )).toEqual({
+    expect(
+      matchRigCandidate(
+        records,
+        endpointA,
+        inventory('2026-09-02T20:00:00.000Z', { uniqueId: 'camera-a' }),
+      ),
+    ).toEqual({
       state: 'known',
       rigId: 'rig-a',
       endpointChanged: false,
       inventoryChanged: false,
     })
 
-    expect(matchRigCandidate(
-      records,
-      { host: '192.168.4.120', port: 11111 },
-      inventory('2026-09-02T20:00:00.000Z', { uniqueId: 'camera-a' }),
-    )).toEqual({
+    expect(
+      matchRigCandidate(
+        records,
+        { host: '192.168.4.120', port: 11111 },
+        inventory('2026-09-02T20:00:00.000Z', { uniqueId: 'camera-a' }),
+      ),
+    ).toEqual({
       state: 'known',
       rigId: 'rig-a',
       endpointChanged: true,
       inventoryChanged: false,
     })
 
-    expect(matchRigCandidate(
-      records,
-      endpointA,
-      inventory('2026-09-02T20:00:00.000Z', { uniqueId: 'camera-b' }),
-    )).toEqual({ state: 'conflict', rigIds: ['rig-a', 'rig-b'] })
+    expect(
+      matchRigCandidate(
+        records,
+        endpointA,
+        inventory('2026-09-02T20:00:00.000Z', { uniqueId: 'camera-b' }),
+      ),
+    ).toEqual({ state: 'conflict', rigIds: ['rig-a', 'rig-b'] })
   })
 
   it('updates a known Rig snapshot and endpoint, prevents duplicate addition, and forgets it', async () => {
@@ -297,16 +318,20 @@ describe('Rig catalog reconciliation', () => {
       endpointChanged: true,
       inventoryChanged: true,
     })
-    await expect(catalog.list()).resolves.toEqual([{
-      ...original,
-      endpoint: nextEndpoint,
-      lastObservedInventory: nextInventory,
-    }])
-    await expect(catalog.add({
-      name: 'Duplicate',
-      endpoint: nextEndpoint,
-      inventory: nextInventory,
-    })).resolves.toEqual({ state: 'known', rigId: 'rig-a' })
+    await expect(catalog.list()).resolves.toEqual([
+      {
+        ...original,
+        endpoint: nextEndpoint,
+        lastObservedInventory: nextInventory,
+      },
+    ])
+    await expect(
+      catalog.add({
+        name: 'Duplicate',
+        endpoint: nextEndpoint,
+        inventory: nextInventory,
+      }),
+    ).resolves.toEqual({ state: 'known', rigId: 'rig-a' })
     await expect(catalog.get('rig-a')).resolves.toEqual({
       ...original,
       endpoint: nextEndpoint,
@@ -327,14 +352,12 @@ describe('Rig catalog reconciliation', () => {
 
     const catalog = createMemoryRigCatalog(records)
 
-    await expect(catalog.observe(
-      { host: '192.168.4.120', port: 11111 },
-      inventory(
-        '2026-09-02T20:00:00.000Z',
-        { uniqueId: 'camera-a' },
-        { uniqueId: 'camera-b' },
+    await expect(
+      catalog.observe(
+        { host: '192.168.4.120', port: 11111 },
+        inventory('2026-09-02T20:00:00.000Z', { uniqueId: 'camera-a' }, { uniqueId: 'camera-b' }),
       ),
-    )).resolves.toEqual({ state: 'conflict', rigIds: ['rig-a', 'rig-b'] })
+    ).resolves.toEqual({ state: 'conflict', rigIds: ['rig-a', 'rig-b'] })
     await expect(catalog.list()).resolves.toEqual(records)
   })
 })

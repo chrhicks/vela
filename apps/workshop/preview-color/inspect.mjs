@@ -29,33 +29,52 @@ try {
         await page.waitForFunction(() => {
           const images = [...document.querySelectorAll('.vela-preview-color img')]
 
-          return images.length === 2 && images.every(image => image.complete && image.naturalWidth > 0 && image.style.visibility === 'visible')
+          return (
+            images.length === 2 &&
+            images.every(
+              image =>
+                image.complete && image.naturalWidth > 0 && image.style.visibility === 'visible',
+            )
+          )
         })
 
         const geometry = await specimen.evaluate(element => ({
           width: element.getBoundingClientRect().width,
           scrollWidth: element.scrollWidth,
-          images: [...element.querySelectorAll('img')].map(image => ({ native: image.naturalWidth, displayed: image.getBoundingClientRect().width })),
+          images: [...element.querySelectorAll('img')].map(image => ({
+            native: image.naturalWidth,
+            displayed: image.getBoundingClientRect().width,
+          })),
         }))
 
-        assert.ok(geometry.scrollWidth <= geometry.width + 1, `Overflow at ${fixture}/${scale}/${viewport}`)
+        assert.ok(
+          geometry.scrollWidth <= geometry.width + 1,
+          `Overflow at ${fixture}/${scale}/${viewport}`,
+        )
         assert.equal(geometry.images[0].native, scale === 'native' ? 6248 : 1562)
 
         if (scale === 'native') {
           assert.equal(geometry.images[0].displayed, 6248)
-          await specimen.locator('.vela-preview-color__window').first().evaluate(element => {
-            element.scrollLeft = 1234
-            element.scrollTop = 567
-          })
+          await specimen
+            .locator('.vela-preview-color__window')
+            .first()
+            .evaluate(element => {
+              element.scrollLeft = 1234
+              element.scrollTop = 567
+            })
           await page.waitForFunction(() => {
             const windows = [...document.querySelectorAll('.vela-preview-color__window')]
 
-            return windows.every(element => element.scrollLeft === 1234 && element.scrollTop === 567)
+            return windows.every(
+              element => element.scrollLeft === 1234 && element.scrollTop === 567,
+            )
           })
           await specimen.getByRole('button', { name: 'Center image' }).click()
         }
 
-        await specimen.screenshot({ path: new URL(`${fixture}-${scale}-${viewport}.png`, output).pathname })
+        await specimen.screenshot({
+          path: new URL(`${fixture}-${scale}-${viewport}.png`, output).pathname,
+        })
         results.push({ fixture, scale, viewport, geometry, url })
       }
     }
@@ -66,8 +85,13 @@ try {
   const write = await page.request.post(`${base}/__preview-color/manifest.json`, { data: '{}' })
   assert.equal(write.status(), 404)
   assert.deepEqual(errors, [])
-  await writeFile(new URL('browser-results.json', output), JSON.stringify({ results, errors, readOnlyRoutes: 'pass' }, null, 2))
-  console.log(`Inspected ${results.length} rendered comparisons; native panning, overflow, image identity and read-only routes passed.`)
+  await writeFile(
+    new URL('browser-results.json', output),
+    JSON.stringify({ results, errors, readOnlyRoutes: 'pass' }, null, 2),
+  )
+  console.log(
+    `Inspected ${results.length} rendered comparisons; native panning, overflow, image identity and read-only routes passed.`,
+  )
 } catch (error) {
   console.error('Failed URL:', page.url(), errors)
   await page.screenshot({ path: new URL('failed-browser.png', output).pathname, fullPage: true })

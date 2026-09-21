@@ -109,13 +109,15 @@ const frameEntry = z.object({
     solution: position.extend({
       status: z.literal('solved'),
       capturedAt: timestamp,
-      wcs: position.extend({
-        width: positiveInteger,
-        height: positiveInteger,
-        referenceX: number,
-        referenceY: number,
-        cd: z.tuple([number, number, number, number]).readonly(),
-      }).refine(wcs => wcs.cd[0] * wcs.cd[3] - wcs.cd[1] * wcs.cd[2] !== 0, 'Singular WCS'),
+      wcs: position
+        .extend({
+          width: positiveInteger,
+          height: positiveInteger,
+          referenceX: number,
+          referenceY: number,
+          cd: z.tuple([number, number, number, number]).readonly(),
+        })
+        .refine(wcs => wcs.cd[0] * wcs.cd[3] - wcs.cd[1] * wcs.cd[2] !== 0, 'Singular WCS'),
     }),
     sample,
     hint: position,

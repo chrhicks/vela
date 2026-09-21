@@ -36,18 +36,18 @@ export function Dialog({
 
     if (!open || !layer || !dialog) return
 
-    const returnFocus = document.activeElement instanceof HTMLElement
-      ? document.activeElement
-      : document.body
+    const returnFocus =
+      document.activeElement instanceof HTMLElement ? document.activeElement : document.body
 
     const focusTrap = createFocusTrap(dialog, {
-      allowOutsideClick: (event) => event.target === layer,
+      allowOutsideClick: event => event.target === layer,
       delayInitialFocus: false,
       escapeDeactivates: false,
       fallbackFocus: dialog,
       initialFocus: dialog,
       preventScroll: true,
-      setReturnFocus: () => (returnFocusId ? document.getElementById(returnFocusId) : null) ?? returnFocus,
+      setReturnFocus: () =>
+        (returnFocusId ? document.getElementById(returnFocusId) : null) ?? returnFocus,
     })
 
     focusTrap.activate()
@@ -91,7 +91,12 @@ export function Dialog({
             {description ? <p id={descriptionId}>{description}</p> : null}
           </div>
           {onDismiss ? (
-            <button aria-label={dismissLabel} className="vela-dialog__close" onClick={onDismiss} type="button">
+            <button
+              aria-label={dismissLabel}
+              className="vela-dialog__close"
+              onClick={onDismiss}
+              type="button"
+            >
               <svg aria-hidden="true" fill="none" viewBox="0 0 20 20">
                 <path d="m5 5 10 10M15 5 5 15" />
               </svg>

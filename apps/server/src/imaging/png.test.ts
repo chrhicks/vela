@@ -9,7 +9,7 @@ function referenceCrc(bytes: Buffer) {
   for (const byte of bytes) {
     crc ^= byte
 
-    for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ ((crc & 1) ? 0xedb88320 : 0)
+    for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0)
   }
 
   return (crc ^ 0xffffffff) >>> 0

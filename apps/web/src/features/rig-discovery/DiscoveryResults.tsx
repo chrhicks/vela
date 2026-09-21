@@ -1,4 +1,8 @@
-import type { DiscoveryCandidateView, DiscoveryFailureView, DiscoveryResultView } from '@vela/model/rig'
+import type {
+  DiscoveryCandidateView,
+  DiscoveryFailureView,
+  DiscoveryResultView,
+} from '@vela/model/rig'
 import { Badge } from '@vela/ui'
 import type { DiscoverRigsRequest } from './discover-rigs'
 
@@ -9,37 +13,33 @@ interface Props {
   onSelectedChange(candidate: DiscoveryCandidateView | null): void
 }
 
-export function DiscoveryResults({
-  request,
-  result,
-  selected,
-  onSelectedChange,
-}: Props) {
+export function DiscoveryResults({ request, result, selected, onSelectedChange }: Props) {
   if (result.candidates.length === 0) {
     return (
       <div className="rig-discovery-results">
         <EmptyDiscoveryResult failures={result.failures} request={request} />
         <DiscoveryFailures
-          failures={result.failures.filter((failure) => failure.reason !== 'scan-failed')}
+          failures={result.failures.filter(failure => failure.reason !== 'scan-failed')}
         />
       </div>
     )
   }
 
   const selectableCandidates = result.candidates.filter(
-    (candidate) => candidate.disposition.state === 'new',
+    candidate => candidate.disposition.state === 'new',
   ).length
 
   return (
     <div className="rig-discovery-results">
       <div className="rig-discovery-results__summary">
         <strong>
-          {result.candidates.length} {result.candidates.length === 1 ? 'server' : 'servers'} inspected
+          {result.candidates.length} {result.candidates.length === 1 ? 'server' : 'servers'}{' '}
+          inspected
         </strong>
         <span>{selectableCandidates > 0 ? 'Select one to continue' : 'No rigs can be added'}</span>
       </div>
       <div className="rig-discovery-results__candidates">
-        {result.candidates.map((candidate) => (
+        {result.candidates.map(candidate => (
           <DiscoveryCandidate
             candidate={candidate}
             key={`${candidate.endpoint.host}:${candidate.endpoint.port}`}
@@ -76,7 +76,9 @@ function DiscoveryCandidate({
             {candidate.devices.length === 1 ? 'device' : 'devices'}
           </span>
         </div>
-        <Badge size="small" tone={presentation.tone}>{presentation.label}</Badge>
+        <Badge size="small" tone={presentation.tone}>
+          {presentation.label}
+        </Badge>
       </div>
       {candidate.devices.length > 0 ? (
         <div className="rig-discovery-candidate__devices">
@@ -88,7 +90,9 @@ function DiscoveryCandidate({
       ) : null}
       {presentation.detail ? <p>{presentation.detail}</p> : null}
       {candidate.disposition.state === 'new' ? (
-        <span className="rig-discovery-candidate__selection">{selected ? 'Selected' : 'Select'}</span>
+        <span className="rig-discovery-candidate__selection">
+          {selected ? 'Selected' : 'Select'}
+        </span>
       ) : null}
     </>
   )
@@ -117,14 +121,15 @@ function EmptyDiscoveryResult({
   failures: ReadonlyArray<DiscoveryFailureView>
   request: DiscoverRigsRequest
 }) {
-  const scanFailed = failures.some((failure) => failure.reason === 'scan-failed')
+  const scanFailed = failures.some(failure => failure.reason === 'scan-failed')
 
   if (request.mode === 'manual') {
     return (
       <div className="rig-discovery-message" data-tone="danger">
         <strong>Could not inspect this address</strong>
         <p>
-          Confirm the host and port, and check that the Alpaca server is running before trying again.
+          Confirm the host and port, and check that the Alpaca server is running before trying
+          again.
         </p>
       </div>
     )
@@ -154,7 +159,9 @@ function DiscoveryFailures({ failures }: { failures: ReadonlyArray<DiscoveryFail
       </strong>
       <ul>
         {failures.map((failure, index) => (
-          <li key={`${failure.endpoint?.host ?? failure.reason}-${failure.endpoint?.port ?? index}`}>
+          <li
+            key={`${failure.endpoint?.host ?? failure.reason}-${failure.endpoint?.port ?? index}`}
+          >
             {failure.endpoint ? `${failure.endpoint.host}:${failure.endpoint.port} · ` : ''}
             {failureReason(failure.reason)}
           </li>

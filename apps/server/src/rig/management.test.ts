@@ -1,9 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import {
-  AlpacaProviderError,
-  type AlpacaDiscovery,
-  type AlpacaInspection,
-} from '@vela/alpaca'
+import { AlpacaProviderError, type AlpacaDiscovery, type AlpacaInspection } from '@vela/alpaca'
 import { buildApp } from '../app.js'
 import { createMemoryRigCatalog } from './catalog.js'
 
@@ -20,12 +16,15 @@ function inspection(devices: AlpacaInspection['devices']): AlpacaInspection {
 
 describe('Rig management API', () => {
   it('re-inspects and adds a Rig once, then forgets it', async () => {
-    const inspect = vi.fn<AlpacaDiscovery['inspect']>()
-      .mockResolvedValue(inspection([{
-        providerDeviceId: 'camera-1',
-        kind: 'camera',
-        name: 'Main camera',
-      }]))
+    const inspect = vi.fn<AlpacaDiscovery['inspect']>().mockResolvedValue(
+      inspection([
+        {
+          providerDeviceId: 'camera-1',
+          kind: 'camera',
+          name: 'Main camera',
+        },
+      ]),
+    )
 
     const catalog = createMemoryRigCatalog([], {
       createId: () => 'rig-1',
@@ -52,16 +51,18 @@ describe('Rig management API', () => {
 
       expect(added.statusCode).toBe(201)
       expect(added.json()).toEqual({ rigId: 'rig-1' })
-      await expect(catalog.list()).resolves.toEqual([{
-        id: 'rig-1',
-        name: 'Backyard rig',
-        endpoint,
-        addedAt: '2026-09-02T20:00:00.000Z',
-        lastObservedInventory: {
-          observedAt: '2026-09-02T19:59:00.000Z',
-          devices: [{ uniqueId: 'camera-1', kind: 'camera', name: 'Main camera' }],
+      await expect(catalog.list()).resolves.toEqual([
+        {
+          id: 'rig-1',
+          name: 'Backyard rig',
+          endpoint,
+          addedAt: '2026-09-02T20:00:00.000Z',
+          lastObservedInventory: {
+            observedAt: '2026-09-02T19:59:00.000Z',
+            devices: [{ uniqueId: 'camera-1', kind: 'camera', name: 'Main camera' }],
+          },
         },
-      }])
+      ])
 
       const duplicate = await app.inject({
         method: 'POST',
@@ -82,7 +83,8 @@ describe('Rig management API', () => {
   })
 
   it('rejects invalid additions and candidates without a stable device ID', async () => {
-    const inspect = vi.fn<AlpacaDiscovery['inspect']>()
+    const inspect = vi
+      .fn<AlpacaDiscovery['inspect']>()
       .mockResolvedValue(inspection([{ kind: 'camera', name: 'Legacy camera' }]))
 
     const app = buildApp({

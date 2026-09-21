@@ -1,7 +1,12 @@
 import { randomUUID } from 'node:crypto'
 import { setTimeout as delay } from 'node:timers/promises'
 import { trace, SpanStatusCode, type Attributes } from '@opentelemetry/api'
-import type { FramingCentering, FramingPointingSide, FramingView, TargetPosition } from '@vela/model/web'
+import type {
+  FramingCentering,
+  FramingPointingSide,
+  FramingView,
+  TargetPosition,
+} from '@vela/model/web'
 import type { MonoFrame, PlateSolver } from '../plate-solving/solver.js'
 import { angularDistance, fromMount, plateCorners, toMount, type Site } from './sky.js'
 
@@ -42,7 +47,9 @@ export function mountSite(mount: FramingMount): Site {
 
   const site = { latitudeDegrees: mount.latitudeDegrees, longitudeDegrees: mount.longitudeDegrees }
 
-  return mount.elevationMeters === undefined ? site : { ...site, elevationMeters: mount.elevationMeters }
+  return mount.elevationMeters === undefined
+    ? site
+    : { ...site, elevationMeters: mount.elevationMeters }
 }
 
 function fixedPointing(mount: FramingMount) {
@@ -67,12 +74,17 @@ function isCheckCurrent(
   configuration: string,
   at: Date,
 ): boolean {
-  return !!check.actual && !!check.pointing
-    && check.configuration === configuration
-    && check.pointingSide === (mount.pierSide ?? 'unknown')
-    && mount.tracking && !mount.slewing && !mount.parked
-    && at.getTime() - Date.parse(check.actual.capturedAt) < 15 * 60_000
-    && angularDistance(fixedPointing(mount), check.pointing) < 0.02
+  return (
+    !!check.actual &&
+    !!check.pointing &&
+    check.configuration === configuration &&
+    check.pointingSide === (mount.pierSide ?? 'unknown') &&
+    mount.tracking &&
+    !mount.slewing &&
+    !mount.parked &&
+    at.getTime() - Date.parse(check.actual.capturedAt) < 15 * 60_000 &&
+    angularDistance(fixedPointing(mount), check.pointing) < 0.02
+  )
 }
 
 class FramingCheckNeeded extends Error {}
@@ -93,9 +105,22 @@ function recordFraming(name: string, attributes: Attributes) {
 /** One server-owned request. Every corrective movement earns a fresh solved check. */
 export function createFramingController(
   now = () => new Date(),
-  waitForMountObservation: (signal: AbortSignal) => Promise<void> = signal => delay(1000, undefined, { signal }),
+  waitForMountObservation: (signal: AbortSignal) => Promise<void> = signal =>
+    delay(1000, undefined, { signal }),
 ) {
-  let state: Pick<FramingView, 'phase' | 'captureReadState' | 'active' | 'desired' | 'targetId' | 'actual' | 'error' | 'exposureSeconds' | 'pointingSide' | 'centering'> = {
+  let state: Pick<
+    FramingView,
+    | 'phase'
+    | 'captureReadState'
+    | 'active'
+    | 'desired'
+    | 'targetId'
+    | 'actual'
+    | 'error'
+    | 'exposureSeconds'
+    | 'pointingSide'
+    | 'centering'
+  > = {
     phase: 'idle',
     active: false,
     desired: null,
@@ -132,10 +157,15 @@ export function createFramingController(
       const current = await observe(hardware, signal)
 
       if (current.parked || !current.tracking)
-        throw new FramingCheckNeeded('The mount is parked or tracking is off. Restore tracking, then choose Check current frame.')
+        throw new FramingCheckNeeded(
+          'The mount is parked or tracking is off. Restore tracking, then choose Check current frame.',
+        )
 
-      const stable = !current.slewing && (!previous || ((current.pierSide ?? 'unknown') === (previous.pierSide ?? 'unknown')
-        && angularDistance(fixedPointing(current), fixedPointing(previous)) < 0.02))
+      const stable =
+        !current.slewing &&
+        (!previous ||
+          ((current.pierSide ?? 'unknown') === (previous.pierSide ?? 'unknown') &&
+            angularDistance(fixedPointing(current), fixedPointing(previous)) < 0.02))
 
       stableReads = stable ? stableReads + 1 : 0
 
@@ -157,17 +187,23 @@ export function createFramingController(
   }
 
   function checkCurrent(mount: FramingMount, configuration: string): boolean {
-    return !state.active && state.phase === 'checked'
-      && isCheckCurrent(checkSnapshot(), mount, configuration, now())
+    return (
+      !state.active &&
+      state.phase === 'checked' &&
+      isCheckCurrent(checkSnapshot(), mount, configuration, now())
+    )
   }
 
   function canCenter(mount: FramingMount, configuration: string): boolean {
-    return checkCurrent(mount, configuration)
-      && state.centering?.outcome !== 'not-converging' && state.centering?.outcome !== 'limit-reached'
+    return (
+      checkCurrent(mount, configuration) &&
+      state.centering?.outcome !== 'not-converging' &&
+      state.centering?.outcome !== 'limit-reached'
+    )
   }
 
   async function measure(
-    input: { desired: TargetPosition, exposureSeconds: number, configuration: string },
+    input: { desired: TargetPosition; exposureSeconds: number; configuration: string },
     hardware: FramingHardware,
     solver: PlateSolver,
     signal: AbortSignal,
@@ -178,19 +214,21 @@ export function createFramingController(
       state = { ...state, phase: 'exposing', error: null, captureReadState: 'current' }
       let capturePending = true
 
-      const frame = await hardware.capture({
-        exposureSeconds: input.exposureSeconds,
-        signal,
-        onReadout() {
-          if (capturePending && !signal.aborted) state = { ...state, phase: 'downloading' }
-        },
-        onReadState(captureReadState) {
-          if (capturePending && !signal.aborted) state = { ...state, captureReadState }
-        },
-      }).finally(() => {
-        capturePending = false
-        state = { ...state, captureReadState: 'current' }
-      })
+      const frame = await hardware
+        .capture({
+          exposureSeconds: input.exposureSeconds,
+          signal,
+          onReadout() {
+            if (capturePending && !signal.aborted) state = { ...state, phase: 'downloading' }
+          },
+          onReadState(captureReadState) {
+            if (capturePending && !signal.aborted) state = { ...state, captureReadState }
+          },
+        })
+        .finally(() => {
+          capturePending = false
+          state = { ...state, captureReadState: 'current' }
+        })
 
       signal.throwIfAborted()
       state = { ...state, phase: 'solving' }
@@ -198,7 +236,9 @@ export function createFramingController(
       signal.throwIfAborted()
 
       if (solved.status !== 'solved')
-        throw new FramingCheckNeeded('This exposure could not be solved. Adjust the test exposure if needed, then choose Check current frame. Your composition is kept.')
+        throw new FramingCheckNeeded(
+          'This exposure could not be solved. Adjust the test exposure if needed, then choose Check current frame. Your composition is kept.',
+        )
 
       const actual = {
         checkId: randomUUID(),
@@ -206,7 +246,7 @@ export function createFramingController(
         decDegrees: solved.decDegrees,
         capturedAt: solved.capturedAt,
         corners: plateCorners(solved.wcs),
-        rotationDegrees: -Math.atan2(solved.wcs.cd[1], solved.wcs.cd[3]) * 180 / Math.PI,
+        rotationDegrees: (-Math.atan2(solved.wcs.cd[1], solved.wcs.cd[3]) * 180) / Math.PI,
         offsetArcminutes: angularDistance(input.desired, solved) * 60,
       }
 
@@ -227,8 +267,12 @@ export function createFramingController(
       const finalMount = await observe(hardware, signal)
       const changedDegrees = angularDistance(fixedPointing(finalMount), fixedPointing(landed))
 
-      const matches = !finalMount.parked && !finalMount.slewing && finalMount.tracking && changedDegrees < 0.02
-        && (finalMount.pierSide ?? 'unknown') === (landed.pierSide ?? 'unknown')
+      const matches =
+        !finalMount.parked &&
+        !finalMount.slewing &&
+        finalMount.tracking &&
+        changedDegrees < 0.02 &&
+        (finalMount.pierSide ?? 'unknown') === (landed.pierSide ?? 'unknown')
 
       recordFraming('framing.check-validation', {
         'framing.check.id': actual.checkId,
@@ -237,13 +281,17 @@ export function createFramingController(
         'framing.mount.changed_degrees': changedDegrees,
       })
 
-      if (finalMount.parked) throw new FramingCheckNeeded('The mount is parked. Unpark it and check the current frame before continuing.')
+      if (finalMount.parked)
+        throw new FramingCheckNeeded(
+          'The mount is parked. Unpark it and check the current frame before continuing.',
+        )
 
       if (!matches) {
         state = {
           ...state,
           phase: 'settling',
-          error: 'The mount’s position or pointing side changed during the check. Keeping the solved exposure and waiting for stable readings before another exposure.',
+          error:
+            'The mount’s position or pointing side changed during the check. Keeping the solved exposure and waiting for stable readings before another exposure.',
         }
         await waitForMountObservation(signal)
         continue
@@ -266,7 +314,13 @@ export function createFramingController(
     signal.throwIfAborted()
     state = { ...state, phase: 'slewing' }
     const convertedAt = now()
-    const driverPosition = toMount(destination, mount.coordinateSystem, convertedAt, mountSite(mount))
+
+    const driverPosition = toMount(
+      destination,
+      mount.coordinateSystem,
+      convertedAt,
+      mountSite(mount),
+    )
 
     if (!mount.tracking) await hardware.tracking(true, signal)
     signal.throwIfAborted()
@@ -281,7 +335,9 @@ export function createFramingController(
     })
     await hardware.slew(driverPosition, mount.coordinateSystem, signal)
     signal.throwIfAborted()
-    recordFraming('framing.move.completed', { 'framing.correction': state.centering?.correction ?? 0 })
+    recordFraming('framing.move.completed', {
+      'framing.correction': state.centering?.correction ?? 0,
+    })
   }
 
   function recordMeasurement(
@@ -358,132 +414,144 @@ export function createFramingController(
       'framing.max_corrections': maxCorrections,
     }
 
-    pending = trace.getTracer('vela.framing').startActiveSpan('framing.run', { attributes }, async span => {
-      recordFraming('framing.started', attributes)
+    pending = trace
+      .getTracer('vela.framing')
+      .startActiveSpan('framing.run', { attributes }, async span => {
+        recordFraming('framing.started', attributes)
 
-      try {
-        let mount = await observe(hardware, signal)
+        try {
+          let mount = await observe(hardware, signal)
 
-        if (mount.parked || mount.slewing) {
-          throw new FramingCheckNeeded(mount.parked
-            ? 'Unpark the mount, then choose Check current frame.'
-            : 'The mount is still moving. Wait for it to settle, then choose Check current frame.')
-        }
-
-        if (input.action !== 'center') {
-          if (input.action === 'start') await move(input.desired, mount, hardware, signal)
-          await measure(input, hardware, solver, signal)
-        } else {
-          if (!isCheckCurrent(previousCheck, mount, input.configuration, now())) {
-            throw new FramingCheckNeeded('The last exposure no longer matches the current rig state. Choose Check current frame before centering your composition.')
+          if (mount.parked || mount.slewing) {
+            throw new FramingCheckNeeded(
+              mount.parked
+                ? 'Unpark the mount, then choose Check current frame.'
+                : 'The mount is still moving. Wait for it to settle, then choose Check current frame.',
+            )
           }
 
-          let actual = {
-            ...previousCheck.actual!,
-            offsetArcminutes: angularDistance(previousCheck.actual!, input.desired) * 60,
-          }
-
-          const progress: FramingCentering = {
-            toleranceArcminutes,
-            maxCorrections,
-            correction: 0,
-            outcome: 'working',
-            measurements: [recordMeasurement(actual, 0)],
-          }
-
-          state = { ...state, actual, centering: progress }
-          recordFraming('framing.centering.baseline', {
-            'framing.check.id': actual.checkId,
-            'framing.solved.ra_degrees': actual.raDegrees,
-            'framing.solved.dec_degrees': actual.decDegrees,
-            'framing.solved.captured_at': actual.capturedAt,
-            'framing.solved.offset_arcminutes': actual.offsetArcminutes,
-            'framing.solved.rotation_degrees': actual.rotationDegrees,
-            'framing.pointing_side': checkedSide,
-            'framing.mount.before_centering': JSON.stringify(mount),
-          })
-          let consecutiveWorsenings = 0
-
-          while (progress.outcome === 'working') {
-            if (actual.offsetArcminutes > toleranceArcminutes) {
-              // A fresh observation must still match the solve used for this specific correction.
-              mount = await observe(hardware, signal)
-
-              if (!isCheckCurrent(checkSnapshot(), mount, input.configuration, now())) {
-                throw new FramingCheckNeeded('The mount changed after the last solve. Choose Check current frame before another correction.')
-              }
-
-              progress.correction++
-              state = { ...state, centering: progress }
-              await move(
-                correctedPointing(fixedPointing(mount), actual, input.desired),
-                mount,
-                hardware,
-                signal,
+          if (input.action !== 'center') {
+            if (input.action === 'start') await move(input.desired, mount, hardware, signal)
+            await measure(input, hardware, solver, signal)
+          } else {
+            if (!isCheckCurrent(previousCheck, mount, input.configuration, now())) {
+              throw new FramingCheckNeeded(
+                'The last exposure no longer matches the current rig state. Choose Check current frame before centering your composition.',
               )
             }
 
-            actual = (await measure(input, hardware, solver, signal)).actual
-            const measurement = recordMeasurement(actual, progress.correction, progress.measurements.at(-1))
-            consecutiveWorsenings = progress.correction > 0 && measurement.trend === 'worsened'
-              ? consecutiveWorsenings + 1
-              : 0
-            let outcome: FramingCentering['outcome'] = 'working'
+            let actual = {
+              ...previousCheck.actual!,
+              offsetArcminutes: angularDistance(previousCheck.actual!, input.desired) * 60,
+            }
 
-            if (actual.offsetArcminutes <= toleranceArcminutes) outcome = 'centered'
-            else if (consecutiveWorsenings >= 2) outcome = 'not-converging'
-            else if (progress.correction >= maxCorrections) outcome = 'limit-reached'
-            progress.outcome = outcome
-            progress.measurements.push(measurement)
-            state = { ...state, centering: progress }
-            recordFraming('framing.correction.measured', {
-              'framing.correction': progress.correction,
-              'framing.check.id': measurement.checkId,
-              'framing.offset_arcminutes': measurement.offsetArcminutes,
-              'framing.trend': measurement.trend,
-              'framing.pointing_side': measurement.pointingSide,
-              'framing.pointing_side_changed': measurement.pointingSideChanged,
-              'framing.outcome': outcome,
+            const progress: FramingCentering = {
+              toleranceArcminutes,
+              maxCorrections,
+              correction: 0,
+              outcome: 'working',
+              measurements: [recordMeasurement(actual, 0)],
+            }
+
+            state = { ...state, actual, centering: progress }
+            recordFraming('framing.centering.baseline', {
+              'framing.check.id': actual.checkId,
+              'framing.solved.ra_degrees': actual.raDegrees,
+              'framing.solved.dec_degrees': actual.decDegrees,
+              'framing.solved.captured_at': actual.capturedAt,
+              'framing.solved.offset_arcminutes': actual.offsetArcminutes,
+              'framing.solved.rotation_degrees': actual.rotationDegrees,
+              'framing.pointing_side': checkedSide,
+              'framing.mount.before_centering': JSON.stringify(mount),
             })
+            let consecutiveWorsenings = 0
+
+            while (progress.outcome === 'working') {
+              if (actual.offsetArcminutes > toleranceArcminutes) {
+                // A fresh observation must still match the solve used for this specific correction.
+                mount = await observe(hardware, signal)
+
+                if (!isCheckCurrent(checkSnapshot(), mount, input.configuration, now())) {
+                  throw new FramingCheckNeeded(
+                    'The mount changed after the last solve. Choose Check current frame before another correction.',
+                  )
+                }
+
+                progress.correction++
+                state = { ...state, centering: progress }
+                await move(
+                  correctedPointing(fixedPointing(mount), actual, input.desired),
+                  mount,
+                  hardware,
+                  signal,
+                )
+              }
+
+              actual = (await measure(input, hardware, solver, signal)).actual
+
+              const measurement = recordMeasurement(
+                actual,
+                progress.correction,
+                progress.measurements.at(-1),
+              )
+
+              consecutiveWorsenings =
+                progress.correction > 0 && measurement.trend === 'worsened'
+                  ? consecutiveWorsenings + 1
+                  : 0
+              let outcome: FramingCentering['outcome'] = 'working'
+
+              if (actual.offsetArcminutes <= toleranceArcminutes) outcome = 'centered'
+              else if (consecutiveWorsenings >= 2) outcome = 'not-converging'
+              else if (progress.correction >= maxCorrections) outcome = 'limit-reached'
+              progress.outcome = outcome
+              progress.measurements.push(measurement)
+              state = { ...state, centering: progress }
+              recordFraming('framing.correction.measured', {
+                'framing.correction': progress.correction,
+                'framing.check.id': measurement.checkId,
+                'framing.offset_arcminutes': measurement.offsetArcminutes,
+                'framing.trend': measurement.trend,
+                'framing.pointing_side': measurement.pointingSide,
+                'framing.pointing_side_changed': measurement.pointingSideChanged,
+                'framing.outcome': outcome,
+              })
+            }
           }
+
+          state = { ...state, phase: 'checked', error: null }
+        } catch (error) {
+          const cancelled = signal.aborted && error instanceof Error && error.name === 'AbortError'
+          state = {
+            ...state,
+            phase: cancelled
+              ? 'stopped'
+              : error instanceof FramingCheckNeeded
+                ? 'needs-check'
+                : 'failed',
+            error: cancelled ? null : error instanceof Error ? error.message : 'Framing failed',
+          }
+
+          if (state.centering)
+            state = { ...state, centering: { ...state.centering, outcome: 'interrupted' } }
+
+          if (!cancelled) {
+            span.setStatus({ code: SpanStatusCode.ERROR, message: state.error ?? 'Framing failed' })
+
+            if (error instanceof Error) span.recordException(error)
+          }
+        } finally {
+          state = { ...state, active: false, captureReadState: 'current' }
+          span.setAttributes({
+            'framing.phase': state.phase,
+            'framing.outcome': state.centering?.outcome ?? state.phase,
+            'framing.corrections': state.centering?.correction ?? 0,
+            'operation.cancelled': signal.aborted,
+          })
+          span.end()
+          release()
         }
-
-        state = { ...state, phase: 'checked', error: null }
-      } catch (error) {
-        const cancelled = signal.aborted && error instanceof Error && error.name === 'AbortError'
-        state = {
-          ...state,
-          phase: cancelled
-            ? 'stopped'
-            : error instanceof FramingCheckNeeded
-              ? 'needs-check'
-              : 'failed',
-          error: cancelled
-            ? null
-            : error instanceof Error
-              ? error.message
-              : 'Framing failed',
-        }
-
-        if (state.centering) state = { ...state, centering: { ...state.centering, outcome: 'interrupted' } }
-
-        if (!cancelled) {
-          span.setStatus({ code: SpanStatusCode.ERROR, message: state.error ?? 'Framing failed' })
-
-          if (error instanceof Error) span.recordException(error)
-        }
-      } finally {
-        state = { ...state, active: false, captureReadState: 'current' }
-        span.setAttributes({
-          'framing.phase': state.phase,
-          'framing.outcome': state.centering?.outcome ?? state.phase,
-          'framing.corrections': state.centering?.correction ?? 0,
-          'operation.cancelled': signal.aborted,
-        })
-        span.end()
-        release()
-      }
-    })
+      })
 
     return structuredClone(state)
   }
@@ -513,8 +581,8 @@ export function correctedPointing(
   desired: TargetPosition,
 ): TargetPosition {
   const toVector = (p: TargetPosition) => {
-    const ra = p.raDegrees * Math.PI / 180
-    const dec = p.decDegrees * Math.PI / 180
+    const ra = (p.raDegrees * Math.PI) / 180
+    const dec = (p.decDegrees * Math.PI) / 180
 
     return [Math.cos(dec) * Math.cos(ra), Math.cos(dec) * Math.sin(ra), Math.sin(dec)]
   }
@@ -532,13 +600,16 @@ export function correctedPointing(
   const cosine = a.reduce((sum, v, i) => sum + v * b[i]!, 0)
 
   if (1 + cosine <= 1e-12)
-    throw new FramingCheckNeeded('The composition is opposite the solved field, so its correction direction is ambiguous. Slew & check the new composition first.')
+    throw new FramingCheckNeeded(
+      'The composition is opposite the solved field, so its correction direction is ambiguous. Slew & check the new composition first.',
+    )
   const first = cross(axis, point)
   const second = cross(axis, first)
   const corrected = point.map((v, i) => v + first[i]! + second[i]! / (1 + cosine))
 
   return {
-    raDegrees: (Math.atan2(corrected[1]!, corrected[0]!) * 180 / Math.PI + 360) % 360,
-    decDegrees: Math.atan2(corrected[2]!, Math.hypot(corrected[0]!, corrected[1]!)) * 180 / Math.PI,
+    raDegrees: ((Math.atan2(corrected[1]!, corrected[0]!) * 180) / Math.PI + 360) % 360,
+    decDegrees:
+      (Math.atan2(corrected[2]!, Math.hypot(corrected[0]!, corrected[1]!)) * 180) / Math.PI,
   }
 }

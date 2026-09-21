@@ -40,7 +40,8 @@ export function imageBytesMetadata(bytes: ArrayBuffer): DataView {
 
   if (nonnegativeFields.some(value => value < 0)) invalid('Negative ImageBytes metadata value')
 
-  if (dataStart < metadataByteLength || dataStart > bytes.byteLength) invalid('Invalid ImageBytes data offset')
+  if (dataStart < metadataByteLength || dataStart > bytes.byteLength)
+    invalid('Invalid ImageBytes data offset')
 
   if (errorNumber !== 0) {
     let message: string
@@ -104,7 +105,8 @@ export function imageBytesPixels(bytes: ArrayBuffer, width: number, height: numb
       size = 2
       read = offset => view.getUint16(offset, true)
       break
-    default: invalid('Unsupported ImageBytes transmission element type')
+    default:
+      invalid('Unsupported ImageBytes transmission element type')
   }
 
   if (bytes.byteLength - dataStart !== width * height * size)

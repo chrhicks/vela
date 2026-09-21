@@ -13,21 +13,38 @@ export type Source = {
 
 const runFile = promisify(execFile)
 const maxFileBytes = 40_000
-const textExtensions = new Set(['.js', '.ts', '.jsx', '.tsx', '.mjs', '.cjs', '.mts', '.cts', '.md', '.txt', '.json', '.yaml', '.yml'])
+const textExtensions = new Set([
+  '.js',
+  '.ts',
+  '.jsx',
+  '.tsx',
+  '.mjs',
+  '.cjs',
+  '.mts',
+  '.cts',
+  '.md',
+  '.txt',
+  '.json',
+  '.yaml',
+  '.yml',
+])
 
 function forbiddenPath(path: string) {
-  return path.split(sep).some(part =>
-    /^(?:\.git|\.env(?:\..*)?|\.ssh|\.aws|\.gnupg|\.npmrc|\.netrc)$/i.test(part)
-    || /^(?:credentials?|secrets?)(?:[._-]|$)/i.test(part)
-    || /^(?:id_rsa|id_ed25519|service[-_]?account)(?:[._-]|$)/i.test(part)
-  )
+  return path
+    .split(sep)
+    .some(
+      part =>
+        /^(?:\.git|\.env(?:\..*)?|\.ssh|\.aws|\.gnupg|\.npmrc|\.netrc)$/i.test(part) ||
+        /^(?:credentials?|secrets?)(?:[._-]|$)/i.test(part) ||
+        /^(?:id_rsa|id_ed25519|service[-_]?account)(?:[._-]|$)/i.test(part),
+    )
 }
 
 export async function createEvidenceReader(root: string, signal: AbortSignal) {
   signal.throwIfAborted()
   const checkout = await realpath(root)
   signal.throwIfAborted()
-  const retained = new Map<string, { source: Source, dev: number, ino: number }>()
+  const retained = new Map<string, { source: Source; dev: number; ino: number }>()
 
   function localPath(path: string) {
     signal.throwIfAborted()
@@ -36,11 +53,11 @@ export async function createEvidenceReader(root: string, signal: AbortSignal) {
     }
     const name = relative(checkout, resolve(checkout, path))
     if (
-      name === '..'
-      || name.startsWith(`..${sep}`)
-      || isAbsolute(name)
-      || forbiddenPath(path)
-      || forbiddenPath(name)
+      name === '..' ||
+      name.startsWith(`..${sep}`) ||
+      isAbsolute(name) ||
+      forbiddenPath(path) ||
+      forbiddenPath(name)
     ) {
       throw new Error(`Evidence path is outside the allowed checkout context: ${path}`)
     }
@@ -82,8 +99,11 @@ export async function createEvidenceReader(root: string, signal: AbortSignal) {
     await allowedPath(name, absolute)
     signal.throwIfAborted()
     // NONBLOCK prevents a swapped-in FIFO from hanging open; NOFOLLOW rejects a final symlink.
-    const file = await open(absolute, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK)
-    let snapshot: { source: Source, dev: number, ino: number }
+    const file = await open(
+      absolute,
+      constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
+    )
+    let snapshot: { source: Source; dev: number; ino: number }
     try {
       signal.throwIfAborted()
       const before = await file.stat()
@@ -91,7 +111,7 @@ export async function createEvidenceReader(root: string, signal: AbortSignal) {
       if (!before.isFile()) throw new Error(`Evidence requires a regular text file: ${name}`)
       if (before.size > maxFileBytes) throw new Error(`Evidence file exceeds 40000 bytes: ${name}`)
       // Verify the opened object, not just its earlier pathname, across ancestor renames.
-      if (await realpath(`/proc/self/fd/${file.fd}`) !== absolute)
+      if ((await realpath(`/proc/self/fd/${file.fd}`)) !== absolute)
         throw new Error(`Evidence path changed while opening: ${name}`)
       signal.throwIfAborted()
       const bytes = Buffer.alloc(before.size)
@@ -108,14 +128,14 @@ export async function createEvidenceReader(root: string, signal: AbortSignal) {
       const after = await file.stat()
       signal.throwIfAborted()
       if (
-        length !== before.size
-        || after.size !== before.size
-        || after.mtimeMs !== before.mtimeMs
-        || after.ctimeMs !== before.ctimeMs
-        || current.isSymbolicLink()
-        || current.dev !== before.dev
-        || current.ino !== before.ino
-        || await realpath(`/proc/self/fd/${file.fd}`) !== absolute
+        length !== before.size ||
+        after.size !== before.size ||
+        after.mtimeMs !== before.mtimeMs ||
+        after.ctimeMs !== before.ctimeMs ||
+        current.isSymbolicLink() ||
+        current.dev !== before.dev ||
+        current.ino !== before.ino ||
+        (await realpath(`/proc/self/fd/${file.fd}`)) !== absolute
       ) {
         throw new Error(`Evidence source changed while reading: ${name}`)
       }
@@ -138,11 +158,12 @@ export async function createEvidenceReader(root: string, signal: AbortSignal) {
     }
     signal.throwIfAborted()
     const previous = retained.get(name)
-    if (previous && (
-      previous.source.sha256 !== snapshot.source.sha256
-      || previous.dev !== snapshot.dev
-      || previous.ino !== snapshot.ino
-    )) {
+    if (
+      previous &&
+      (previous.source.sha256 !== snapshot.source.sha256 ||
+        previous.dev !== snapshot.dev ||
+        previous.ino !== snapshot.ino)
+    ) {
       throw new Error(`Evidence source changed: ${name}`)
     }
     if (!previous) retained.set(name, snapshot)
@@ -161,7 +182,9 @@ export async function createEvidenceReader(root: string, signal: AbortSignal) {
           await read(path)
         } catch (error) {
           signal.throwIfAborted()
-          throw new Error(`Evidence source changed or became unavailable: ${path}`, { cause: error })
+          throw new Error(`Evidence source changed or became unavailable: ${path}`, {
+            cause: error,
+          })
         }
       }
     },

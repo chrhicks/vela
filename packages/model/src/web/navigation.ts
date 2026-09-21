@@ -14,7 +14,7 @@ export interface NavigationCapture {
 
 /** Catalog identities and known ephemeral runs, without device inspection. */
 export interface NavigationView {
-  rigs: { id: string, name: string }[]
+  rigs: { id: string; name: string }[]
   /** Includes terminal controllers; absence does not confirm a previous run ended. */
   captures: NavigationCapture[]
 }

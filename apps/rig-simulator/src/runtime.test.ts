@@ -55,7 +55,6 @@ describe('independent simulator cameras on a shared mount', () => {
   })
 })
 
-
 describe('coordinate slews and all-sky exposure snapshots', () => {
   it('takes the short RA path, interpolates Dec, arrives across a clock jump and keeps tracking', () => {
     let time = 0
@@ -86,15 +85,27 @@ describe('coordinate slews and all-sky exposure snapshots', () => {
     runtime.slewTo(6, 0)
     time = 1000
     runtime.stop()
-    expect(runtime.state()).toMatchObject({ slewing: false, rightAscensionHours: 4, declinationDegrees: 30 })
+    expect(runtime.state()).toMatchObject({
+      slewing: false,
+      rightAscensionHours: 4,
+      declinationDegrees: 30,
+    })
     runtime.slewTo(6, 0)
     time += 500
     runtime.connect('telescope', false)
     time += 100000
-    expect(runtime.state()).toMatchObject({ slewing: false, rightAscensionHours: 5, declinationDegrees: 15 })
+    expect(runtime.state()).toMatchObject({
+      slewing: false,
+      rightAscensionHours: 5,
+      declinationDegrees: 15,
+    })
     runtime.slewTo(12, -60)
     runtime.reset('aligned')
-    expect(runtime.state()).toMatchObject({ slewing: false, rightAscensionHours: 2, declinationDegrees: 60 })
+    expect(runtime.state()).toMatchObject({
+      slewing: false,
+      rightAscensionHours: 2,
+      declinationDegrees: 60,
+    })
   })
 
   it('rejects equatorial slews without tracking and drifts after tracking is disabled at rest', () => {
@@ -110,14 +121,15 @@ describe('coordinate slews and all-sky exposure snapshots', () => {
     time += 10000
     const state = runtime.state()
     expect(state).toMatchObject({ slewing: false, tracking: false, declinationDegrees: 0 })
-    expect(state.rightAscensionHours).toBeCloseTo(6 + 10 * 24 / 86164.0905, 10)
+    expect(state.rightAscensionHours).toBeCloseTo(6 + (10 * 24) / 86164.0905, 10)
   })
 
   it('prevents either camera exposing during motion and either exposure blocking motion', () => {
     const runtime = new SimulatorRuntime([], () => 0)
     runtime.slewTo(6, 0)
 
-    for (const number of [0, 1]) expect(() => runtime.startExposure(1, true, number)).toThrow('Stop mount movement')
+    for (const number of [0, 1])
+      expect(() => runtime.startExposure(1, true, number)).toThrow('Stop mount movement')
     expect(() => runtime.move(1)).toThrow('Stop coordinate slew')
     expect(() => runtime.slewTo(7, 0)).toThrow('Stop mount movement')
     runtime.stop()
@@ -133,11 +145,14 @@ describe('coordinate slews and all-sky exposure snapshots', () => {
     let time = 0
     const fields: { raDegrees: number; decDegrees: number; radiusDegrees: number }[] = []
 
-    const runtime = new SimulatorRuntime(async field => {
-      fields.push(field)
+    const runtime = new SimulatorRuntime(
+      async field => {
+        fields.push(field)
 
-      return []
-    }, () => time)
+        return []
+      },
+      () => time,
+    )
 
     runtime.slewTo(18.3, -13.8)
     time = 10000
@@ -166,11 +181,16 @@ describe('coordinate slews and all-sky exposure snapshots', () => {
     let release!: (stars: readonly []) => void
     let signal: AbortSignal | undefined
 
-    const runtime = new SimulatorRuntime((_field, inputSignal) => {
-      signal = inputSignal
+    const runtime = new SimulatorRuntime(
+      (_field, inputSignal) => {
+        signal = inputSignal
 
-      return new Promise(resolve => { release = resolve })
-    }, () => 0)
+        return new Promise(resolve => {
+          release = resolve
+        })
+      },
+      () => 0,
+    )
 
     runtime.startExposure(0, true)
     const pending = runtime.frame()

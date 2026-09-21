@@ -3,7 +3,9 @@ import { replayAlignmentDiagnostics } from '../apps/server/dist/alignment/diagno
 
 try {
   if (process.argv.length !== 3 || !process.argv[2]) {
-    throw new Error('Usage: node scripts/replay-alignment.mjs /path/to/trial-directory (build @vela/server first)')
+    throw new Error(
+      'Usage: node scripts/replay-alignment.mjs /path/to/trial-directory (build @vela/server first)',
+    )
   }
 
   const result = await replayAlignmentDiagnostics(resolve(process.argv[2]))

@@ -26,33 +26,41 @@ export async function checkStandards(
   directory: string,
   input: CheckInput,
   signal: AbortSignal,
-  reviewer: { model: string, generate: GenerateReview },
+  reviewer: { model: string; generate: GenerateReview },
 ) {
-  const git = async (...args: string[]) => (await exec('git', args, {
-    cwd: directory,
-    signal,
-    maxBuffer: 4 * 1024 * 1024,
-  })).stdout
+  const git = async (...args: string[]) =>
+    (
+      await exec('git', args, {
+        cwd: directory,
+        signal,
+        maxBuffer: 4 * 1024 * 1024,
+      })
+    ).stdout
   const root = await realpath((await git('rev-parse', '--show-toplevel')).trim())
   directory = root
 
   const mode = input.mode ?? 'changes'
   if (mode === 'files' && !input.paths?.length) throw new Error('File mode requires paths')
-  const base = (await git('rev-parse', '--verify', '--end-of-options', `${input.base ?? 'HEAD'}^{commit}`)).trim()
-  const paths = [...new Set(input.paths?.length
-    ? input.paths
-    : [
-      ...(await git('diff', '--name-only', '-z', base, '--')).split('\0'),
-      ...(await git('ls-files', '--others', '--exclude-standard', '-z')).split('\0'),
-    ].filter(Boolean)
-  )]
+  const base = (
+    await git('rev-parse', '--verify', '--end-of-options', `${input.base ?? 'HEAD'}^{commit}`)
+  ).trim()
+  const paths = [
+    ...new Set(
+      input.paths?.length
+        ? input.paths
+        : [
+            ...(await git('diff', '--name-only', '-z', base, '--')).split('\0'),
+            ...(await git('ls-files', '--others', '--exclude-standard', '-z')).split('\0'),
+          ].filter(Boolean),
+    ),
+  ]
   if (paths.length > 30 || (input.supportingPaths?.length ?? 0) > 30)
     throw new Error('Select at most 30 targets and 30 supporting paths per review')
 
   const artifact = join(root, '.opencode/.local/standards', `${randomUUID()}.json`)
   await mkdir(join(root, '.opencode/.local/standards'), { recursive: true })
   const reader = await createEvidenceReader(root, signal)
-  const files: { path: string, error?: string, skipped?: string }[] = []
+  const files: { path: string; error?: string; skipped?: string }[] = []
   let report: Report = {
     schemaVersion: 3,
     artifact,
@@ -77,7 +85,7 @@ export async function checkStandards(
     const targets: Target[] = []
     for (const path of paths) {
       signal.throwIfAborted()
-      const file: typeof files[number] = { path }
+      const file: (typeof files)[number] = { path }
       files.push(file)
       if (!/\.(?:[cm]?[jt]sx?)$/.test(path)) {
         file.skipped = 'Not JavaScript/TypeScript source'
@@ -92,8 +100,16 @@ export async function checkStandards(
         }
         const target: Target = { ...source }
         if (mode === 'changes') {
-          const diff = await git('diff', '--no-ext-diff', '--no-textconv', '--unified=8', base, '--', source.path)
-          if (!diff && await git('ls-tree', '--name-only', base, '--', source.path)) {
+          const diff = await git(
+            'diff',
+            '--no-ext-diff',
+            '--no-textconv',
+            '--unified=8',
+            base,
+            '--',
+            source.path,
+          )
+          if (!diff && (await git('ls-tree', '--name-only', base, '--', source.path))) {
             file.skipped = 'No changes against the selected base'
             continue
           }
@@ -107,7 +123,11 @@ export async function checkStandards(
     }
 
     if (targets.length) {
-      review = await reviewStandards({ targets, context, standards, guidance }, reviewer.generate, signal)
+      review = await reviewStandards(
+        { targets, context, standards, guidance },
+        reviewer.generate,
+        signal,
+      )
       report = {
         ...report,
         status: review.status,
@@ -131,14 +151,18 @@ export async function checkStandards(
   } finally {
     await writeFile(
       artifact,
-      JSON.stringify({
-        schemaVersion: 3,
-        root,
-        base,
-        report,
-        sources: reader.snapshots(),
-        review,
-      }, null, 2),
+      JSON.stringify(
+        {
+          schemaVersion: 3,
+          root,
+          base,
+          report,
+          sources: reader.snapshots(),
+          review,
+        },
+        null,
+        2,
+      ),
       { mode: 0o600 },
     )
   }

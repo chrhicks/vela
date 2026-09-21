@@ -10,9 +10,12 @@ import './saved-images.css'
 
 function previewLabel(image: SavedImage) {
   switch (image.previewRendering?.status) {
-    case 'legacy': return 'Original preview · open to refresh'
-    case 'unavailable': return 'Original preview · refresh unavailable'
-    default: return 'FITS + preview'
+    case 'legacy':
+      return 'Original preview · open to refresh'
+    case 'unavailable':
+      return 'Original preview · refresh unavailable'
+    default:
+      return 'FITS + preview'
   }
 }
 
@@ -22,7 +25,7 @@ export function SavedImages() {
   return <SavedImagesPage key={`${rigId}/${imageId ?? ''}`} rigId={rigId} imageId={imageId} />
 }
 
-function SavedImagesPage({ rigId, imageId }: { rigId: string, imageId?: string }) {
+function SavedImagesPage({ rigId, imageId }: { rigId: string; imageId?: string }) {
   const [view, setView] = useState<SavedImagesView | null>(null)
   const [image, setImage] = useState<SavedImage | null>(null)
   const [rigName, setRigName] = useState('')
@@ -60,11 +63,12 @@ function SavedImagesPage({ rigId, imageId }: { rigId: string, imageId?: string }
           setRigName(result.rigName)
         }
       } catch (cause) {
-        if (!controller.signal.aborted) setError(
-          cause instanceof ApiError && cause.status === 404
-            ? 'This saved image or Rig could not be found.'
-            : 'Saved images could not be loaded. Check that the Vela server is reachable, then try again.',
-        )
+        if (!controller.signal.aborted)
+          setError(
+            cause instanceof ApiError && cause.status === 404
+              ? 'This saved image or Rig could not be found.'
+              : 'Saved images could not be loaded. Check that the Vela server is reachable, then try again.',
+          )
       } finally {
         if (!controller.signal.aborted) setLoading(false)
       }
@@ -76,7 +80,9 @@ function SavedImagesPage({ rigId, imageId }: { rigId: string, imageId?: string }
   }, [rigId, imageId, attempt])
   const groups = new Map<string, SavedImage[]>()
 
-  for (const frame of [...(view?.images ?? [])].sort((a, b) => Date.parse(b.capturedAt) - Date.parse(a.capturedAt))) {
+  for (const frame of [...(view?.images ?? [])].sort(
+    (a, b) => Date.parse(b.capturedAt) - Date.parse(a.capturedAt),
+  )) {
     const day = new Date(frame.capturedAt).toLocaleDateString(undefined, {
       year: 'numeric',
       month: 'long',
@@ -110,7 +116,8 @@ function SavedImagesPage({ rigId, imageId }: { rigId: string, imageId?: string }
       )}
       {image?.previewRendering?.status === 'unavailable' && (
         <p role="status">
-          Preview refresh is unavailable. Showing the original preview; the original FITS is unchanged.
+          Preview refresh is unavailable. Showing the original preview; the original FITS is
+          unchanged.
         </p>
       )}
       {loading ? (
@@ -138,11 +145,15 @@ function SavedImagesPage({ rigId, imageId }: { rigId: string, imageId?: string }
               </div>
               <div>
                 <dt>Exposure</dt>
-                <dd>{image.exposureSeconds} s · {image.color === 'color' ? 'Color' : 'Mono'}</dd>
+                <dd>
+                  {image.exposureSeconds} s · {image.color === 'color' ? 'Color' : 'Mono'}
+                </dd>
               </div>
               <div>
                 <dt>Dimensions</dt>
-                <dd>{image.width} × {image.height}</dd>
+                <dd>
+                  {image.width} × {image.height}
+                </dd>
               </div>
               <div>
                 <dt>Stars · HFR</dt>
@@ -174,59 +185,76 @@ function SavedImagesPage({ rigId, imageId }: { rigId: string, imageId?: string }
               </a>
             </div>
             <p className="vela-saved-help">
-              The PNG download matches this display treatment at native resolution. Original FITS and the first saved PNG are preserved. Display color is not scientifically calibrated.
+              The PNG download matches this display treatment at native resolution. Original FITS
+              and the first saved PNG are preserved. Display color is not scientifically calibrated.
             </p>
           </Panel>
         </div>
-      ) : view && (
-        <>
-          <p className="vela-capture-intro">
-            Original data is preserved. Preview downloads match the displayed treatment. Open older images to refresh their previews.
-          </p>
-          {view.images.length === 0 ? (
-            <Panel>
-              <div className="vela-saved-empty">
-                <h2>No saved images yet</h2>
-                <p>Turn on Save frames before capturing, or keep an individual image when you see one worth saving.</p>
-                <Link className="vela-button" data-tone="neutral" data-size="medium" to={`${base}/capture`}>
-                  Open capture →
-                </Link>
-              </div>
-            </Panel>
-          ) : [...groups].map(([day, frames]) => (
-            <section className="vela-saved-group" key={day}>
-              <h2>
-                {day}
-                <span>{frames.length} {frames.length === 1 ? 'image' : 'images'}</span>
-              </h2>
-              <div className="vela-saved-grid">
-                {frames.map(frame => (
+      ) : (
+        view && (
+          <>
+            <p className="vela-capture-intro">
+              Original data is preserved. Preview downloads match the displayed treatment. Open
+              older images to refresh their previews.
+            </p>
+            {view.images.length === 0 ? (
+              <Panel>
+                <div className="vela-saved-empty">
+                  <h2>No saved images yet</h2>
+                  <p>
+                    Turn on Save frames before capturing, or keep an individual image when you see
+                    one worth saving.
+                  </p>
                   <Link
-                    className="vela-saved-card"
-                    key={frame.id}
-                    to={`${base}/saved-images/${encodeURIComponent(frame.id)}`}
+                    className="vela-button"
+                    data-tone="neutral"
+                    data-size="medium"
+                    to={`${base}/capture`}
                   >
-                    <div className="vela-saved-thumbnail">
-                      <img
-                        loading="lazy"
-                        src={frame.fitImageUrl ?? frame.imageUrl}
-                        alt={`${frame.exposureSeconds} second exposure from ${frame.cameraName}`}
-                      />
-                    </div>
-                    <div className="vela-saved-card-copy">
-                      <strong>{new Date(frame.capturedAt).toLocaleTimeString()}</strong>
-                      <span>{frame.exposureSeconds} s · {frame.color === 'color' ? 'Color' : 'Mono'}</span>
-                      <small>
-                        {previewLabel(frame)}{' '}
-                        <span aria-hidden="true">→</span>
-                      </small>
-                    </div>
+                    Open capture →
                   </Link>
-                ))}
-              </div>
-            </section>
-          ))}
-        </>
+                </div>
+              </Panel>
+            ) : (
+              [...groups].map(([day, frames]) => (
+                <section className="vela-saved-group" key={day}>
+                  <h2>
+                    {day}
+                    <span>
+                      {frames.length} {frames.length === 1 ? 'image' : 'images'}
+                    </span>
+                  </h2>
+                  <div className="vela-saved-grid">
+                    {frames.map(frame => (
+                      <Link
+                        className="vela-saved-card"
+                        key={frame.id}
+                        to={`${base}/saved-images/${encodeURIComponent(frame.id)}`}
+                      >
+                        <div className="vela-saved-thumbnail">
+                          <img
+                            loading="lazy"
+                            src={frame.fitImageUrl ?? frame.imageUrl}
+                            alt={`${frame.exposureSeconds} second exposure from ${frame.cameraName}`}
+                          />
+                        </div>
+                        <div className="vela-saved-card-copy">
+                          <strong>{new Date(frame.capturedAt).toLocaleTimeString()}</strong>
+                          <span>
+                            {frame.exposureSeconds} s · {frame.color === 'color' ? 'Color' : 'Mono'}
+                          </span>
+                          <small>
+                            {previewLabel(frame)} <span aria-hidden="true">→</span>
+                          </small>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </section>
+              ))
+            )}
+          </>
+        )
       )}
     </section>
   )

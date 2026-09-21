@@ -12,23 +12,27 @@ export async function encodeCaptureFits(
     capturedAtSource?: CaptureImage['capturedAtSource']
     color?: ImageColor
   },
-  metadata: { exposureSeconds: number, cameraName: string },
+  metadata: { exposureSeconds: number; cameraName: string },
 ): Promise<Buffer> {
   const { width, height, pixels } = frame
 
   if (
-    !Number.isSafeInteger(width)
-    || width < 1
-    || !Number.isSafeInteger(height)
-    || height < 1
-    || pixels.length !== width * height
+    !Number.isSafeInteger(width) ||
+    width < 1 ||
+    !Number.isSafeInteger(height) ||
+    height < 1 ||
+    pixels.length !== width * height
   ) {
     throw new Error('Cannot export FITS: image dimensions do not match its samples')
   }
 
   const start = new Date(frame.capturedAt)
 
-  if (!Number.isFinite(start.getTime()) || !Number.isFinite(metadata.exposureSeconds) || metadata.exposureSeconds < 0) {
+  if (
+    !Number.isFinite(start.getTime()) ||
+    !Number.isFinite(metadata.exposureSeconds) ||
+    metadata.exposureSeconds < 0
+  ) {
     throw new Error('Cannot export FITS: invalid exposure metadata')
   }
 
@@ -72,10 +76,19 @@ export async function encodeCaptureFits(
   }
 
   // The acquisition adapter already shifts this pattern to the image origin.
-  if (frame.color?.kind === 'bayer') cards.push(textCard('BAYERPAT', frame.color.pattern.toUpperCase()))
+  if (frame.color?.kind === 'bayer')
+    cards.push(textCard('BAYERPAT', frame.color.pattern.toUpperCase()))
   cards.push('END'.padEnd(80))
-  const header = Buffer.from(cards.join('').padEnd(Math.ceil(cards.length * 80 / 2880) * 2880), 'ascii')
-  const result = Buffer.alloc(header.length + Math.ceil(pixels.length * bytesPerSample / 2880) * 2880)
+
+  const header = Buffer.from(
+    cards.join('').padEnd(Math.ceil((cards.length * 80) / 2880) * 2880),
+    'ascii',
+  )
+
+  const result = Buffer.alloc(
+    header.length + Math.ceil((pixels.length * bytesPerSample) / 2880) * 2880,
+  )
+
   header.copy(result)
 
   for (let begin = 0; begin < pixels.length; begin += 65_536) {
