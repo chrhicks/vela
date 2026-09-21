@@ -119,6 +119,7 @@ export interface FramingView {
   } | null
   phase: 'idle' | 'slewing' | 'settling' | 'exposing' | 'downloading' | 'solving' | 'checked' | 'needs-check' | 'stopping' | 'stopped' | 'failed'
   active: boolean
+  /** Current readiness observation; unknown if inspection failed. Historical sides stay in measurements. */
   pointingSide: FramingPointingSide
   /** Present only with desired and targetId; measurements belong to that fixed composition. */
   centering: FramingCentering | null

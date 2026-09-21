@@ -95,7 +95,7 @@ export function registerTargets(app: FastifyInstance, catalog: RigCatalog, opera
     // check flags together after that await so every field describes one state.
     const controller = controllers.get(rig.id)
     const state = controller?.snapshot() ?? createFramingController(now).snapshot()
-    const view: FramingView = { ...state, rigId: rig.id, rigName: rig.name, observedAt: now().toISOString(), enabled: false, unavailableReason, focalLengthMm: rig.focalLengthMm ?? null, camera: null, canCenter: false, checkCurrent: false }
+    const view: FramingView = { ...state, rigId: rig.id, rigName: rig.name, observedAt: now().toISOString(), enabled: false, unavailableReason, focalLengthMm: rig.focalLengthMm ?? null, camera: null, canCenter: false, checkCurrent: false, pointingSide: 'unknown' }
 
     if (!ready) return view
     const owner = operations.owner(rig.id)

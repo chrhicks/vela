@@ -188,6 +188,7 @@ describe('target and framing HTTP boundary', () => {
 
   it.each([false, true])('reports a completed operation consistently when a pending readiness read fails: %s', async fails => {
     const subject = setup({ offsetDegrees: 0.1 })
+    subject.mount.pierSide = 'west'
     expect((await command(subject.app)).statusCode).toBe(200)
     await vi.waitFor(() => expect(subject.hardware.capture).toHaveBeenCalledTimes(1))
     const geometry = await subject.adapter.cameraGeometry({ cameraId: 'camera', expectedCameraName: 'Imaging camera' })
@@ -212,8 +213,30 @@ describe('target and framing HTTP boundary', () => {
       active: false, phase: 'checked', targetId: start.targetId,
       actual: { checkId: expect.any(String), capturedAt: stamp },
       checkCurrent: !fails, canCenter: !fails,
+      pointingSide: fails ? 'unknown' : 'west',
       unavailableReason: fails ? 'Camera inspection interrupted' : null,
     })
+  })
+
+  it('does not publish a retained pointing side as current after telescope inspection fails', async () => {
+    const subject = setup()
+    subject.mount.pierSide = 'west'
+    await command(subject.app, start, 'check')
+    await vi.waitFor(() => expect(subject.hardware.capture).toHaveBeenCalledTimes(1))
+    subject.complete()
+    await vi.waitFor(() => expect(subject.operations.owner('rig')).toBeUndefined())
+    const checked = (await subject.app.inject('/api/web/rigs/rig/framing')).json()
+    expect(checked.pointingSide).toBe('west')
+    vi.mocked(subject.adapter.telescopeStatus).mockRejectedValueOnce(new Error('Telescope status timed out'))
+    const unavailable = await subject.app.inject('/api/web/rigs/rig/framing')
+    expect(unavailable.statusCode).toBe(200)
+    expect(unavailable.json()).toMatchObject({
+      phase: 'checked', actual: checked.actual, pointingSide: 'unknown', checkCurrent: false, canCenter: false,
+      enabled: false, unavailableReason: 'Telescope status timed out',
+    })
+    expect((await subject.app.inject('/api/web/rigs/rig/framing')).json()).toMatchObject({ pointingSide: 'west', checkCurrent: true })
+    expect(subject.hardware.slew).not.toHaveBeenCalled()
+    expect(subject.hardware.capture).toHaveBeenCalledTimes(1)
   })
 
   it.each(['same target', 'different target'])('rejects an older browser check after another check of the %s', async target => {
