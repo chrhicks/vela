@@ -64,11 +64,13 @@ export function useSimulator() {
     setNotice('Applying change…')
 
     try {
-      accept(await request(path, {
-        method,
-        body: JSON.stringify(body),
-        headers: { 'Content-Type': 'application/json' },
-      }))
+      accept(
+        await request(path, {
+          method,
+          body: JSON.stringify(body),
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      )
       setNotice(success)
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Change was not confirmed.')
@@ -99,9 +101,11 @@ async function request(path: string, init: RequestInit = {}): Promise<SimulatorS
   if (!response.ok) {
     const error = await response.json().catch(() => undefined)
     const failure = z.object({ error: z.string() }).safeParse(error)
-    throw new Error(failure.success
-      ? failure.data.error
-      : 'Change was not confirmed. Check the current rig state.')
+    throw new Error(
+      failure.success
+        ? failure.data.error
+        : 'Change was not confirmed. Check the current rig state.',
+    )
   }
 
   const value: unknown = await response.json()
@@ -112,18 +116,22 @@ async function request(path: string, init: RequestInit = {}): Promise<SimulatorS
   return value
 }
 
-const cameraState = z.object({
-  number: z.number(),
-  connected: z.boolean(),
-  imageReady: z.boolean(),
-  activity: z.enum(['idle', 'exposing']),
-  resolution: z.enum(['fast', 'full']),
-  sensor: z.enum(['mono', 'rggb']),
-  width: z.number(),
-  height: z.number(),
-}).refine(camera =>
-  camera.width === cameraGeometry(camera.resolution).width
-  && camera.height === cameraGeometry(camera.resolution).height)
+const cameraState = z
+  .object({
+    number: z.number(),
+    connected: z.boolean(),
+    imageReady: z.boolean(),
+    activity: z.enum(['idle', 'exposing']),
+    resolution: z.enum(['fast', 'full']),
+    sensor: z.enum(['mono', 'rggb']),
+    width: z.number(),
+    height: z.number(),
+  })
+  .refine(
+    camera =>
+      camera.width === cameraGeometry(camera.resolution).width &&
+      camera.height === cameraGeometry(camera.resolution).height,
+  )
 
 const simulatorState = z.object({
   altitudeArcsec: z.number(),
@@ -139,8 +147,15 @@ const simulatorState = z.object({
   tracking: z.boolean(),
   slewing: z.boolean(),
   cameraActivity: z.enum(['idle', 'exposing']),
-  cameras: z.array(cameraState).length(2).refine(cameras => cameras.every((camera, number) =>
-    camera.number === number && camera.sensor === (number === 0 ? 'mono' : 'rggb'))),
+  cameras: z
+    .array(cameraState)
+    .length(2)
+    .refine(cameras =>
+      cameras.every(
+        (camera, number) =>
+          camera.number === number && camera.sensor === (number === 0 ? 'mono' : 'rggb'),
+      ),
+    ),
 }) satisfies z.ZodType<SimulatorState>
 
 function isState(value: unknown): value is SimulatorState {

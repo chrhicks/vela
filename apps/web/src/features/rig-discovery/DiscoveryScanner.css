@@ -14,7 +14,7 @@
   position: absolute;
   border: var(--vela-border-width) solid color-mix(in oklch, var(--vela-accent) 28%, transparent);
   border-radius: 50%;
-  content: "";
+  content: '';
 }
 
 .rig-discovery-scanner::before {
@@ -40,11 +40,11 @@
 .rig-discovery-scanner__signal {
   position: absolute;
   z-index: 3;
-  width: .38rem;
-  height: .38rem;
+  width: 0.38rem;
+  height: 0.38rem;
   border-radius: 50%;
   background: var(--vela-accent);
-  box-shadow: 0 0 .7rem var(--vela-accent);
+  box-shadow: 0 0 0.7rem var(--vela-accent);
 }
 
 .rig-discovery-scanner__signal--one {
@@ -55,13 +55,13 @@
 .rig-discovery-scanner__signal--two {
   right: 1.4rem;
   bottom: 2.2rem;
-  opacity: .7;
+  opacity: 0.7;
 }
 
 .rig-discovery-scanner__signal--three {
   bottom: 1.3rem;
   left: 2.3rem;
-  opacity: .45;
+  opacity: 0.45;
 }
 
 @keyframes rig-discovery-scan {

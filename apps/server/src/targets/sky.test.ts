@@ -40,11 +40,20 @@ const benchmarks = [
 ]
 
 describe('target sky coordinates', () => {
-  it.each(benchmarks)('matches independent apparent-place and altitude reference at $catalog', ({ catalog, apparent, altitude }) => {
-    expect(angularDistance(toMount(catalog, 'topocentric', date, site), apparent) * 3600).toBeLessThan(0.5)
-    expect(angularDistance(fromMount(apparent, 'topocentric', date, site), catalog) * 3600).toBeLessThan(0.5)
-    expect(Math.abs(skyPath(catalog, site, date).currentAltitudeDegrees - altitude) * 3600).toBeLessThan(0.5)
-  })
+  it.each(benchmarks)(
+    'matches independent apparent-place and altitude reference at $catalog',
+    ({ catalog, apparent, altitude }) => {
+      expect(
+        angularDistance(toMount(catalog, 'topocentric', date, site), apparent) * 3600,
+      ).toBeLessThan(0.5)
+      expect(
+        angularDistance(fromMount(apparent, 'topocentric', date, site), catalog) * 3600,
+      ).toBeLessThan(0.5)
+      expect(
+        Math.abs(skyPath(catalog, site, date).currentAltitudeDegrees - altitude) * 3600,
+      ).toBeLessThan(0.5)
+    },
+  )
 
   it.each([
     { raDegrees: 359.99, decDegrees: 89.99 },
@@ -54,7 +63,9 @@ describe('target sky coordinates', () => {
     const mount = toMount(catalog, 'topocentric', date, site)
     expect(mount.raDegrees).toBeGreaterThanOrEqual(0)
     expect(mount.raDegrees).toBeLessThan(360)
-    expect(angularDistance(fromMount(mount, 'topocentric', date, site), catalog) * 3600).toBeLessThan(0.01)
+    expect(
+      angularDistance(fromMount(mount, 'topocentric', date, site), catalog) * 3600,
+    ).toBeLessThan(0.01)
   })
 
   it('preserves J2000 coordinates and rejects unnamed or unsupported mount frames', () => {
@@ -67,7 +78,9 @@ describe('target sky coordinates', () => {
       expect(() => fromMount(catalog, frame, date, site)).toThrow('not supported')
     }
 
-    expect(angularDistance({ raDegrees: 359, decDegrees: 0 }, { raDegrees: 1, decDegrees: 0 })).toBeCloseTo(2, 10)
+    expect(
+      angularDistance({ raDegrees: 359, decDegrees: 0 }, { raDegrees: 1, decDegrees: 0 }),
+    ).toBeCloseTo(2, 10)
   })
 })
 
@@ -77,7 +90,10 @@ describe('target sky night', () => {
     const azimuths = [5.56350130287918, 74.13530018467179, 174.25467450209425, 285.543875717234]
 
     for (const [index, benchmark] of benchmarks.entries()) {
-      const sample = skyPath(benchmark.catalog, site, date).samples.find(sample => sample.at === date.toISOString())!
+      const sample = skyPath(benchmark.catalog, site, date).samples.find(
+        sample => sample.at === date.toISOString(),
+      )!
+
       expect(Math.abs(sample.azimuthDegrees - azimuths[index]!) * 3600).toBeLessThan(0.5)
     }
   })
@@ -92,7 +108,7 @@ describe('target sky night', () => {
 
     for (const [at, azimuth, altitude] of [
       ['2026-09-07T04:00:00.000Z', 34.392562, -17.794425],
-      ['2026-09-07T06:15:00.000Z', 58.190210, -0.122525],
+      ['2026-09-07T06:15:00.000Z', 58.19021, -0.122525],
     ] as const) {
       const moon = path.samples.find(sample => sample.at === at)!.moon
       expect(Math.abs(moon.azimuthDegrees - azimuth)).toBeLessThan(0.01)
@@ -134,9 +150,15 @@ describe('target sky night', () => {
     const window = path.aboveHorizonDuringDarkness[0]!
     expect(Date.parse(window.startsAt)).toBeLessThan(date.getTime())
     expect(Date.parse(window.endsAt)).toBeGreaterThan(date.getTime())
-    const visible = path.samples.filter(sample => sample.at >= window.startsAt && sample.at < window.endsAt)
+
+    const visible = path.samples.filter(
+      sample => sample.at >= window.startsAt && sample.at < window.endsAt,
+    )
+
     expect(visible.length).toBeGreaterThan(0)
-    expect(visible.every(sample => sample.altitudeDegrees > 0 && sample.sunAltitudeDegrees < -18)).toBe(true)
+    expect(
+      visible.every(sample => sample.altitudeDegrees > 0 && sample.sunAltitudeDegrees < -18),
+    ).toBe(true)
     expect(path.samples.some(sample => sample.sunAltitudeDegrees > 0)).toBe(true)
   })
 
@@ -157,7 +179,13 @@ describe('target sky night', () => {
 
   it('does not invent darkness during polar summer or visibility for a never-rising target', () => {
     const arctic = { latitudeDegrees: 80, longitudeDegrees: 20 }
-    const summer = skyPath({ raDegrees: 10, decDegrees: 85 }, arctic, new Date('2026-06-21T22:00:00Z'))
+
+    const summer = skyPath(
+      { raDegrees: 10, decDegrees: 85 },
+      arctic,
+      new Date('2026-06-21T22:00:00Z'),
+    )
+
     expect(summer.samples.every(sample => sample.sunAltitudeDegrees > 0)).toBe(true)
     expect(summer.aboveHorizonDuringDarkness).toEqual([])
     const southern = skyPath({ raDegrees: 10, decDegrees: -80 }, site, date)
@@ -167,7 +195,10 @@ describe('target sky night', () => {
 })
 
 describe('inverse plate projection', () => {
-  it.each([[-0.001, 0.0003, 0.0002, 0.001], [0.001, 0.0003, -0.0002, 0.001]] as const)('round trips rotated TAN plates for both parities: %j', (...cd) => {
+  it.each([
+    [-0.001, 0.0003, 0.0002, 0.001],
+    [0.001, 0.0003, -0.0002, 0.001],
+  ] as const)('round trips rotated TAN plates for both parities: %j', (...cd) => {
     const wcs: PlateWcs = {
       width: 1000,
       height: 800,
@@ -178,9 +209,17 @@ describe('inverse plate projection', () => {
       cd,
     }
 
-    expect(angularDistance(skyAtPixel(wcs, 499.5, 399.5), { raDegrees: 359.95, decDegrees: 82 })).toBeLessThan(1e-10)
+    expect(
+      angularDistance(skyAtPixel(wcs, 499.5, 399.5), { raDegrees: 359.95, decDegrees: 82 }),
+    ).toBeLessThan(1e-10)
 
-    for (const [x, y] of [[0, 0], [999, 799], [500, 100], [100, 700], [-0.5, 799.5]]) {
+    for (const [x, y] of [
+      [0, 0],
+      [999, 799],
+      [500, 100],
+      [100, 700],
+      [-0.5, 799.5],
+    ]) {
       const sky = skyAtPixel(wcs, x!, y!)
       expect(sky.raDegrees).toBeGreaterThanOrEqual(0)
       expect(sky.raDegrees).toBeLessThan(360)
@@ -193,7 +232,12 @@ describe('inverse plate projection', () => {
     const corners = plateCorners(wcs)
     expect(corners).toHaveLength(4)
 
-    for (const [index, [x, y]] of [[-0.5, -0.5], [999.5, -0.5], [999.5, 799.5], [-0.5, 799.5]].entries()) {
+    for (const [index, [x, y]] of [
+      [-0.5, -0.5],
+      [999.5, -0.5],
+      [999.5, 799.5],
+      [-0.5, 799.5],
+    ].entries()) {
       const pixel = projectSky(wcs, corners[index]!)!
       expect(pixel.x).toBeCloseTo(x!, 7)
       expect(pixel.y).toBeCloseTo(y!, 7)

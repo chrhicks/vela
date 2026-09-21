@@ -4,7 +4,11 @@ import { Badge, Button, Panel } from '@vela/ui'
 import { useEffect, useId, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { api } from '../lib/api'
-import { AlignmentImage, AlignmentImageDialog, type ExpandedAlignmentImage } from '../features/alignment/AlignmentImage'
+import {
+  AlignmentImage,
+  AlignmentImageDialog,
+  type ExpandedAlignmentImage,
+} from '../features/alignment/AlignmentImage'
 import './alignment.css'
 
 function useAlignment(rigId: string) {
@@ -20,10 +24,9 @@ function useAlignment(rigId: string) {
     const current = generation.current
 
     try {
-      const next = await api(
-        `web/rigs/${encodeURIComponent(rigId)}/alignment`,
-        { signal: AbortSignal.timeout(5000) },
-      )
+      const next = await api(`web/rigs/${encodeURIComponent(rigId)}/alignment`, {
+        signal: AbortSignal.timeout(5000),
+      })
 
       validateView(next, rigId)
 
@@ -79,9 +82,10 @@ function useAlignment(rigId: string) {
         setOffline(false)
       }
     } catch (cause) {
-      if (alive.current) setError(
-        `${cause instanceof Error ? cause.message : 'Command response unavailable'}. The command was not repeated; check the current state before trying again.`,
-      )
+      if (alive.current)
+        setError(
+          `${cause instanceof Error ? cause.message : 'Command response unavailable'}. The command was not repeated; check the current state before trying again.`,
+        )
       await read()
     } finally {
       writing.current = false
@@ -117,21 +121,39 @@ const alignmentSchema = z.object({
   cameraName: z.string().optional(),
   active: z.boolean(),
   phase: z.enum(['setup', 'baseline', 'adjusting', 'stopped', 'finished', 'failed']),
-  activity: z.enum(['idle', 'exposing', 'solving', 'homing', 'moving', 'waiting', 'retrying', 'stopping']),
+  activity: z.enum([
+    'idle',
+    'exposing',
+    'solving',
+    'homing',
+    'moving',
+    'waiting',
+    'retrying',
+    'stopping',
+  ]),
   position: z.number(),
   solvedPositions: z.number(),
   exposureSeconds: z.number().positive(),
-  measuredAt: z.string().refine(time => Number.isFinite(Date.parse(time))).nullable(),
-  exposureStartedAt: z.string().refine(time => Number.isFinite(Date.parse(time))).nullable(),
+  measuredAt: z
+    .string()
+    .refine(time => Number.isFinite(Date.parse(time)))
+    .nullable(),
+  exposureStartedAt: z
+    .string()
+    .refine(time => Number.isFinite(Date.parse(time)))
+    .nullable(),
   measurement: measurementSchema.nullable(),
-  preview: z.object({
-    imageUrl: z.string().startsWith('/api/'),
-    imageWidth: z.number().positive(),
-    imageHeight: z.number().positive(),
-    capturedAt: z.string().refine(time => Number.isFinite(Date.parse(time))),
-    capturedAtSource: z.enum(['camera', 'server-estimate']).optional(),
-    position: z.number(),
-  }).nullable().optional(),
+  preview: z
+    .object({
+      imageUrl: z.string().startsWith('/api/'),
+      imageWidth: z.number().positive(),
+      imageHeight: z.number().positive(),
+      capturedAt: z.string().refine(time => Number.isFinite(Date.parse(time))),
+      capturedAtSource: z.enum(['camera', 'server-estimate']).optional(),
+      position: z.number(),
+    })
+    .nullable()
+    .optional(),
 })
 
 /** Reject malformed state before it can be shown as a confirmed observation. */
@@ -247,13 +269,16 @@ function AlignmentPage({ rigId }: { rigId: string }) {
     </Link>
   )
 
-  if (!view) return (
-    <section className="vela-rig-page">
-      {back}
-      <h1>Polar alignment</h1>
-      <p role="status">{offline ? 'Alignment state unavailable. Reconnecting…' : 'Loading alignment…'}</p>
-    </section>
-  )
+  if (!view)
+    return (
+      <section className="vela-rig-page">
+        {back}
+        <h1>Polar alignment</h1>
+        <p role="status">
+          {offline ? 'Alignment state unavailable. Reconnecting…' : 'Loading alignment…'}
+        </p>
+      </section>
+    )
   const physical = view.mode === 'physical'
   const disabled = pending || offline
   const measurement = solved?.measurement ?? null
@@ -278,14 +303,16 @@ function AlignmentPage({ rigId }: { rigId: string }) {
       ? 'Each attempt homes, then moves to a consistent starting field at Dec +80°. Prepare a clear movement corridor: after a small direction check, Vela makes two continuous westward RA rotations of roughly 54° at 1° per second. Allow up to 120° total westward travel and 1° on either side for the direction check.'
       : 'Start with the simulator’s large-error preset and clear camera. Keep its offsets unchanged until all three positions are measured.'
 
-  const preparationInstruction = physical && !view.active
-    ? 'Use sidereal tracking. Keep the mount’s adjustment knobs still until all three positions are measured. You can stop at any time.'
-    : 'You can stop the measurement at any time.'
+  const preparationInstruction =
+    physical && !view.active
+      ? 'Use sidereal tracking. Keep the mount’s adjustment knobs still until all three positions are measured. You can stop at any time.'
+      : 'You can stop the measurement at any time.'
 
   let adjustmentInstruction
 
   if (retrying) {
-    adjustmentInstruction = 'Pause adjustments until a fresh measurement arrives. Vela is keeping your baseline and retrying automatically.'
+    adjustmentInstruction =
+      'Pause adjustments until a fresh measurement arrives. Vela is keeping your baseline and retrying automatically.'
   } else if (view.active) {
     adjustmentInstruction = physical
       ? 'Adjust the mount’s altitude and azimuth knobs. Use the reticle and remaining error to decide when you’re done.'
@@ -308,7 +335,9 @@ function AlignmentPage({ rigId }: { rigId: string }) {
         />
         <strong>{activity}</strong>
         {view.activity === 'exposing' && !offline && (
-          <span className="vela-polar-activity__time">{elapsed.toFixed(1)} / {view.exposureSeconds} s</span>
+          <span className="vela-polar-activity__time">
+            {elapsed.toFixed(1)} / {view.exposureSeconds} s
+          </span>
         )}
       </div>
       <progress
@@ -319,7 +348,10 @@ function AlignmentPage({ rigId }: { rigId: string }) {
       />
       <div className="vela-polar-activity__age">
         <span>Last alignment update</span>
-        <span>{age}{measurement?.capturedAtSource === 'server-estimate' ? ' · Estimated exposure start' : ''}</span>
+        <span>
+          {age}
+          {measurement?.capturedAtSource === 'server-estimate' ? ' · Estimated exposure start' : ''}
+        </span>
       </div>
       <p>
         {offline || retrying
@@ -339,11 +371,24 @@ function AlignmentPage({ rigId }: { rigId: string }) {
           <p>{view.rigName} · Rig preparation</p>
           <h1>Polar alignment</h1>
         </div>
-        <Badge tone={offline || retrying || view.phase === 'failed' ? 'warning' : view.active ? 'accent' : 'neutral'}>
-          {offline ? 'Disconnected'
-            : retrying ? 'Reconnecting'
-              : view.phase === 'setup' ? 'Not started'
-                : view.phase === 'baseline' ? 'Measuring' : view.phase}
+        <Badge
+          tone={
+            offline || retrying || view.phase === 'failed'
+              ? 'warning'
+              : view.active
+                ? 'accent'
+                : 'neutral'
+          }
+        >
+          {offline
+            ? 'Disconnected'
+            : retrying
+              ? 'Reconnecting'
+              : view.phase === 'setup'
+                ? 'Not started'
+                : view.phase === 'baseline'
+                  ? 'Measuring'
+                  : view.phase}
         </Badge>
       </header>
       {view.warning && (
@@ -352,18 +397,23 @@ function AlignmentPage({ rigId }: { rigId: string }) {
           <p>
             {retrying
               ? 'Retrying device reads automatically. Any pending exposure is kept; it is not restarted while reads retry. '
-              : view.active && !offline && view.activity !== 'stopping' ? 'Trying another image. ' : ''}
+              : view.active && !offline && view.activity !== 'stopping'
+                ? 'Trying another image. '
+                : ''}
             {measurement ? 'Showing the last successful solve.' : 'No alignment result yet.'}
           </p>
         </div>
       )}
       {imageError && (
         <p className="vela-polar-notice" role="status">
-          The latest solved image could not be loaded. Previous readings and overlay remain together.
+          The latest solved image could not be loaded. Previous readings and overlay remain
+          together.
         </p>
       )}
       {(error || view.error || !view.enabled) && (
-        <p className="vela-polar-notice" role="status">{error || view.error || view.unavailableReason}</p>
+        <p className="vela-polar-notice" role="status">
+          {error || view.error || view.unavailableReason}
+        </p>
       )}
       {baseline ? (
         <div className="vela-polar-baseline">
@@ -371,7 +421,9 @@ function AlignmentPage({ rigId }: { rigId: string }) {
             <h2>
               {view.active
                 ? 'Measuring your alignment'
-                : view.phase === 'setup' ? 'Find your starting alignment' : 'Measurement stopped'}
+                : view.phase === 'setup'
+                  ? 'Find your starting alignment'
+                  : 'Measurement stopped'}
             </h2>
             <p>
               {view.active
@@ -384,11 +436,17 @@ function AlignmentPage({ rigId }: { rigId: string }) {
                 const current = view.active && point === view.position
                 const state = solved ? 'done' : current ? 'current' : 'pending'
 
-                const status = solved ? 'Solved'
-                  : !current ? 'Not measured'
-                    : offline || retrying ? 'Observation interrupted'
-                      : view.activity === 'homing' ? 'Preparing starting field…'
-                        : view.activity === 'moving' ? 'Moving' : 'Measuring'
+                const status = solved
+                  ? 'Solved'
+                  : !current
+                    ? 'Not measured'
+                    : offline || retrying
+                      ? 'Observation interrupted'
+                      : view.activity === 'homing'
+                        ? 'Preparing starting field…'
+                        : view.activity === 'moving'
+                          ? 'Moving'
+                          : 'Measuring'
 
                 return (
                   <li key={point} data-state={state}>
@@ -399,11 +457,17 @@ function AlignmentPage({ rigId }: { rigId: string }) {
                 )
               })}
             </ol>
-            {view.active ? activityArea : (
+            {view.active ? (
+              activityArea
+            ) : (
               <dl className="vela-polar-setup-facts">
                 <div>
                   <dt>Camera</dt>
-                  <dd>{physical ? view.cameraName ?? 'No imaging camera configured' : 'Configured imaging camera'}</dd>
+                  <dd>
+                    {physical
+                      ? (view.cameraName ?? 'No imaging camera configured')
+                      : 'Configured imaging camera'}
+                  </dd>
                 </div>
                 <div>
                   <dt>Exposure</dt>
@@ -411,7 +475,9 @@ function AlignmentPage({ rigId }: { rigId: string }) {
                 </div>
                 <div>
                   <dt>Starting point</dt>
-                  <dd>{physical ? 'Dec +80° · consistent starting field' : 'Configured sky patch'}</dd>
+                  <dd>
+                    {physical ? 'Dec +80° · consistent starting field' : 'Configured sky patch'}
+                  </dd>
                 </div>
               </dl>
             )}
@@ -442,7 +508,11 @@ function AlignmentPage({ rigId }: { rigId: string }) {
               disabled={disabled || (!view.active && !view.enabled)}
               onClick={() => void command(view.active ? 'stop' : 'start')}
             >
-              {view.active ? 'Stop measurement' : view.phase === 'setup' ? 'Start measurement' : 'Start again'}
+              {view.active
+                ? 'Stop measurement'
+                : view.phase === 'setup'
+                  ? 'Start measurement'
+                  : 'Start again'}
             </Button>
           </div>
         </div>
@@ -456,13 +526,23 @@ function AlignmentPage({ rigId }: { rigId: string }) {
             <div className="vela-polar-directions" aria-label="Mount adjustment directions">
               <div>
                 <span>Azimuth · horizontal</span>
-                <strong>{measurement.azimuthArcsec >= 0 ? '←' : '→'} {angle(measurement.azimuthArcsec)}</strong>
-                <span>{!view.active || offline || retrying ? 'Last correction: ' : 'Move '}{measurement.azimuthArcsec >= 0 ? 'left' : 'right'}</span>
+                <strong>
+                  {measurement.azimuthArcsec >= 0 ? '←' : '→'} {angle(measurement.azimuthArcsec)}
+                </strong>
+                <span>
+                  {!view.active || offline || retrying ? 'Last correction: ' : 'Move '}
+                  {measurement.azimuthArcsec >= 0 ? 'left' : 'right'}
+                </span>
               </div>
               <div>
                 <span>Altitude · vertical</span>
-                <strong>{measurement.altitudeArcsec >= 0 ? '↓' : '↑'} {angle(measurement.altitudeArcsec)}</strong>
-                <span>{!view.active || offline || retrying ? 'Last correction: ' : 'Move '}{measurement.altitudeArcsec >= 0 ? 'down' : 'up'}</span>
+                <strong>
+                  {measurement.altitudeArcsec >= 0 ? '↓' : '↑'} {angle(measurement.altitudeArcsec)}
+                </strong>
+                <span>
+                  {!view.active || offline || retrying ? 'Last correction: ' : 'Move '}
+                  {measurement.altitudeArcsec >= 0 ? 'down' : 'up'}
+                </span>
               </div>
             </div>
             {activityArea}
@@ -477,7 +557,12 @@ function AlignmentPage({ rigId }: { rigId: string }) {
             }}
             readState={imageReadState}
             now={now}
-            retained={!view.active || imageError || view.activity !== 'waiting' || view.measurement?.imageUrl !== measurement.imageUrl}
+            retained={
+              !view.active ||
+              imageError ||
+              view.activity !== 'waiting' ||
+              view.measurement?.imageUrl !== measurement.imageUrl
+            }
             openerId={imageOpenerId}
             onEnlarge={setExpandedImage}
           />
@@ -488,12 +573,21 @@ function AlignmentPage({ rigId }: { rigId: string }) {
                 <Button size="large" disabled={disabled} onClick={() => void command('stop')}>
                   Stop to reposition
                 </Button>
-                <Button size="large" tone="accent" disabled={disabled} onClick={() => void command('finish')}>
+                <Button
+                  size="large"
+                  tone="accent"
+                  disabled={disabled}
+                  onClick={() => void command('finish')}
+                >
                   Finish alignment
                 </Button>
               </div>
             ) : (
-              <Button size="large" disabled={disabled || !view.enabled} onClick={() => void command('start')}>
+              <Button
+                size="large"
+                disabled={disabled || !view.enabled}
+                onClick={() => void command('start')}
+              >
                 Measure again
               </Button>
             )}

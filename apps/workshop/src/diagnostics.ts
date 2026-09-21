@@ -15,53 +15,63 @@ export interface SourceFinding {
 }
 
 const sourceModules = import.meta.glob<string>(
-  ['../../../packages/ui/src/{components,drafts}/*.{ts,tsx}', '../../../packages/ui/src/styles.css'],
+  [
+    '../../../packages/ui/src/{components,drafts}/*.{ts,tsx}',
+    '../../../packages/ui/src/styles.css',
+  ],
   { eager: true, query: '?raw', import: 'default' },
 )
 
-export const sourceFindings: SourceFinding[] = Object.entries(sourceModules).flatMap(([file, source]) => {
-  const values = source.match(/#[\da-f]{3,8}\b|(?:rgb|hsl|oklch)\([^)]*\)/gi) ?? []
+export const sourceFindings: SourceFinding[] = Object.entries(sourceModules).flatMap(
+  ([file, source]) => {
+    const values = source.match(/#[\da-f]{3,8}\b|(?:rgb|hsl|oklch)\([^)]*\)/gi) ?? []
 
-  return [...new Set(values)].map((value) => ({ file: file.split('/packages/ui/')[1] ?? file, value }))
-})
+    return [...new Set(values)].map(value => ({
+      file: file.split('/packages/ui/')[1] ?? file,
+      value,
+    }))
+  },
+)
 
 const pairs = [
   {
     id: 'body',
     label: 'Text / surface',
     foreground: 'text',
-    background: 'surface'
+    background: 'surface',
   },
   {
     id: 'muted',
     label: 'Muted text / surface',
     foreground: 'textMuted',
-    background: 'surface'
+    background: 'surface',
   },
   {
     id: 'accent',
     label: 'Accent text / accent',
     foreground: 'accentText',
-    background: 'accent'
+    background: 'accent',
   },
 ] as const
 
 export function contrastFindings(theme: ThemeParameters): ContrastFinding[] {
   const palette = referencePalette(theme)
 
-  return (['light', 'dark'] as const).flatMap((mode) => pairs.map((pair) => {
-    const foreground = palette[theme.semantic[mode][pair.foreground]]
-    const background = palette[theme.semantic[mode][pair.background]]
-    const ratio = contrastRatio(foreground, background)
+  return (['light', 'dark'] as const).flatMap(mode =>
+    pairs.map(pair => {
+      const foreground = palette[theme.semantic[mode][pair.foreground]]
+      const background = palette[theme.semantic[mode][pair.background]]
+      const ratio = contrastRatio(foreground, background)
 
-    return {
-      id: `${mode}-${pair.id}`,
-      label: pair.label,
-      mode,
-      ratio,
-      passes: ratio >= 4.5
-    }
-  }))
+      return {
+        id: `${mode}-${pair.id}`,
+        label: pair.label,
+        mode,
+        ratio,
+        passes: ratio >= 4.5,
+      }
+    }),
+  )
 }
 
 function contrastRatio(foreground: string, background: string): number {
@@ -77,7 +87,7 @@ function relativeLuminance(color: string): number {
   if (!match) return 0
   const lightness = Number(match[1])
   const chroma = Number(match[2])
-  const hue = Number(match[3]) * Math.PI / 180
+  const hue = (Number(match[3]) * Math.PI) / 180
   const a = chroma * Math.cos(hue)
   const b = chroma * Math.sin(hue)
   const lRoot = lightness + 0.3963377774 * a + 0.2158037573 * b

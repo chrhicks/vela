@@ -46,14 +46,15 @@ function metadata(rigId: string, image: CaptureImage, files: SavedImageFiles): S
 }
 
 function newest(images: SavedImage[]) {
-  return images.sort((a, b) =>
-    Date.parse(b.capturedAt) - Date.parse(a.capturedAt)
-    || Date.parse(b.savedAt) - Date.parse(a.savedAt),
+  return images.sort(
+    (a, b) =>
+      Date.parse(b.capturedAt) - Date.parse(a.capturedAt) ||
+      Date.parse(b.savedAt) - Date.parse(a.savedAt),
   )
 }
 
 export function createMemorySavedImageStore(): SavedImageStore {
-  const rigs = new Map<string, Map<string, { image: SavedImage, files: SavedImageFiles }>>()
+  const rigs = new Map<string, Map<string, { image: SavedImage; files: SavedImageFiles }>>()
 
   return {
     async save(rigId, image, files) {
@@ -69,11 +70,13 @@ export function createMemorySavedImageStore(): SavedImageStore {
       if (existing) return structuredClone(existing.image)
       const original = metadata(rigId, image, files)
 
-      const saved = files.previewVersion === PREVIEW_VERSION
-        ? currentPreview(original, !!files.fit)
-        : original
+      const saved =
+        files.previewVersion === PREVIEW_VERSION ? currentPreview(original, !!files.fit) : original
 
-      const copied: SavedImageFiles = { fits: Buffer.from(files.fits), native: Buffer.from(files.native) }
+      const copied: SavedImageFiles = {
+        fits: Buffer.from(files.fits),
+        native: Buffer.from(files.native),
+      }
 
       if (files.fit) copied.fit = Buffer.from(files.fit)
       rig.set(image.id, { image: saved, files: copied })
@@ -81,7 +84,9 @@ export function createMemorySavedImageStore(): SavedImageStore {
       return structuredClone(saved)
     },
     async list(rigId) {
-      return newest(Array.from(rigs.get(rigId)?.values() ?? [], item => structuredClone(item.image)))
+      return newest(
+        Array.from(rigs.get(rigId)?.values() ?? [], item => structuredClone(item.image)),
+      )
     },
     async count(rigId) {
       return rigs.get(rigId)?.size ?? 0
@@ -161,7 +166,8 @@ export async function openFileSavedImageStore(
       const saved = metadata(rigId, image, files)
 
       for (const kind of ['fits', 'native', 'fit'] as const) {
-        if (files[kind]) await writeDurable(join(temporary, filenames[kind]), files[kind]!, openFile)
+        if (files[kind])
+          await writeDurable(join(temporary, filenames[kind]), files[kind]!, openFile)
       }
 
       await writeDurable(join(temporary, 'metadata.json'), JSON.stringify(saved), openFile)
@@ -197,12 +203,14 @@ export async function openFileSavedImageStore(
 
       if (current) return current
 
-      const operation = save(rigId, image, files).catch(error => {
-        throw new Error(
-          `Could not save image ${image.id}: ${error instanceof Error ? error.message : String(error)}`,
-          { cause: error },
-        )
-      }).finally(() => pending.delete(key))
+      const operation = save(rigId, image, files)
+        .catch(error => {
+          throw new Error(
+            `Could not save image ${image.id}: ${error instanceof Error ? error.message : String(error)}`,
+            { cause: error },
+          )
+        })
+        .finally(() => pending.delete(key))
 
       pending.set(key, operation)
 
@@ -220,7 +228,7 @@ export async function openFileSavedImageStore(
       return image && previews.refresh(directory, image)
     },
     async previewFile(rigId, imageId, kind) {
-      if (!await get(rigId, imageId)) return undefined
+      if (!(await get(rigId, imageId))) return undefined
 
       return previews.file(imagePath(rigId, imageId), kind)
     },
@@ -238,7 +246,11 @@ function digest(id: string) {
   return createHash('sha256').update(id).digest('hex')
 }
 
-const fileErrorCode = z.object({ code: z.string() }).transform(error => error.code).optional().catch(undefined)
+const fileErrorCode = z
+  .object({ code: z.string() })
+  .transform(error => error.code)
+  .optional()
+  .catch(undefined)
 
 function missing(error: unknown): error is NodeJS.ErrnoException {
   return fileErrorCode.parse(error) === 'ENOENT'
@@ -260,14 +272,23 @@ async function readMetadata(
 
   const parsed = savedImageSchema.safeParse(JSON.parse(text))
 
-  if (!parsed.success || parsed.data.rigId !== rigId || (imageId !== undefined && parsed.data.id !== imageId)) {
+  if (
+    !parsed.success ||
+    parsed.data.rigId !== rigId ||
+    (imageId !== undefined && parsed.data.id !== imageId)
+  ) {
     throw new Error(`Invalid saved image metadata in ${directory}`)
   }
 
   const image = parsed.data
 
-  for (const filename of [filenames.fits, filenames.native, ...(image.fitImageUrl ? [filenames.fit] : [])]) {
-    if (!(await stat(join(directory, filename))).isFile()) throw new Error(`Missing saved image file ${filename}`)
+  for (const filename of [
+    filenames.fits,
+    filenames.native,
+    ...(image.fitImageUrl ? [filenames.fit] : []),
+  ]) {
+    if (!(await stat(join(directory, filename))).isFile())
+      throw new Error(`Missing saved image file ${filename}`)
   }
 
   // Reconstruct URLs rather than trusting persisted URLs as navigation targets.
@@ -286,33 +307,37 @@ async function readMetadata(
 
 const timestamp = z.string().refine(value => Number.isFinite(Date.parse(value)))
 
-const savedImageSchema = z.object({
-  id: z.string(),
-  rigId: z.string(),
-  saved: z.literal(true),
-  savedAt: timestamp,
-  capturedAt: timestamp,
-  receivedAt: timestamp,
-  capturedAtSource: z.enum(['camera', 'server-estimate']).optional(),
-  width: z.number().int().positive(),
-  height: z.number().int().positive(),
-  cameraName: z.string(),
-  exposureSeconds: z.number().nonnegative(),
-  color: z.enum(['mono', 'color']),
-  statistics: z.object({
-    detectedStars: z.number().int().nonnegative(),
-    medianHfrPixels: z.number().nonnegative().nullable(),
-  }).nullable(),
-  imageUrl: z.string(),
-  fitImageUrl: z.string().optional(),
-  fitsUrl: z.string(),
-  previewDownloadUrl: z.string(),
-}).transform(({ capturedAtSource, fitImageUrl, ...required }): SavedImage => {
-  let image: SavedImage = required
+const savedImageSchema = z
+  .object({
+    id: z.string(),
+    rigId: z.string(),
+    saved: z.literal(true),
+    savedAt: timestamp,
+    capturedAt: timestamp,
+    receivedAt: timestamp,
+    capturedAtSource: z.enum(['camera', 'server-estimate']).optional(),
+    width: z.number().int().positive(),
+    height: z.number().int().positive(),
+    cameraName: z.string(),
+    exposureSeconds: z.number().nonnegative(),
+    color: z.enum(['mono', 'color']),
+    statistics: z
+      .object({
+        detectedStars: z.number().int().nonnegative(),
+        medianHfrPixels: z.number().nonnegative().nullable(),
+      })
+      .nullable(),
+    imageUrl: z.string(),
+    fitImageUrl: z.string().optional(),
+    fitsUrl: z.string(),
+    previewDownloadUrl: z.string(),
+  })
+  .transform(({ capturedAtSource, fitImageUrl, ...required }): SavedImage => {
+    let image: SavedImage = required
 
-  if (capturedAtSource !== undefined) image = { ...image, capturedAtSource }
+    if (capturedAtSource !== undefined) image = { ...image, capturedAtSource }
 
-  if (fitImageUrl !== undefined) image = { ...image, fitImageUrl }
+    if (fitImageUrl !== undefined) image = { ...image, fitImageUrl }
 
-  return image
-})
+    return image
+  })

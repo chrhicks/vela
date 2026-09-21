@@ -1,10 +1,6 @@
 import type { ResponseFixture } from './internal/test-fixtures.js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import {
-  createAlpacaDiscovery,
-  type AlpacaEndpoint,
-  type AlpacaUdpScanner,
-} from './index.js'
+import { createAlpacaDiscovery, type AlpacaEndpoint, type AlpacaUdpScanner } from './index.js'
 
 type RouteResult = ResponseFixture | Error
 
@@ -22,7 +18,7 @@ function fakeFetch(
   routes: Record<string, RouteResult>,
   requests: string[] = [],
 ): typeof globalThis.fetch {
-  return async (input) => {
+  return async input => {
     const url = new URL(String(input))
     requests.push(url.pathname)
     const result = routes[url.pathname]
@@ -38,7 +34,7 @@ function fakeFetch(
 function deferred() {
   let resolve!: () => void
 
-  const promise = new Promise<void>((resolvePromise) => {
+  const promise = new Promise<void>(resolvePromise => {
     resolve = resolvePromise
   })
 
@@ -81,28 +77,31 @@ describe('createAlpacaDiscovery', () => {
   it('inspects Management API endpoints serially and normalizes the result', async () => {
     const requests: string[] = []
 
-    const fixtureFetch = fakeFetch({
-      '/management/apiversions': envelope([1]),
-      '/management/v1/description': envelope({
-        ServerName: 'ASCOM Remote Server',
-        Manufacturer: 'ASCOM Initiative',
-        ManufacturerVersion: '7.0',
-        Location: 'Observatory',
-      }),
-      '/management/v1/configureddevices': envelope([
-        {
-          DeviceName: ' Main Camera ',
-          DeviceType: 'Camera',
-          DeviceNumber: 0,
-          UniqueID: ' camera-1 ',
-        },
-        {
-          DeviceName: ' Legacy Device ',
-          DeviceType: 'Video',
-          DeviceNumber: 1,
-        },
-      ]),
-    }, requests)
+    const fixtureFetch = fakeFetch(
+      {
+        '/management/apiversions': envelope([1]),
+        '/management/v1/description': envelope({
+          ServerName: 'ASCOM Remote Server',
+          Manufacturer: 'ASCOM Initiative',
+          ManufacturerVersion: '7.0',
+          Location: 'Observatory',
+        }),
+        '/management/v1/configureddevices': envelope([
+          {
+            DeviceName: ' Main Camera ',
+            DeviceType: 'Camera',
+            DeviceNumber: 0,
+            UniqueID: ' camera-1 ',
+          },
+          {
+            DeviceName: ' Legacy Device ',
+            DeviceType: 'Video',
+            DeviceNumber: 1,
+          },
+        ]),
+      },
+      requests,
+    )
 
     const stages = Array.from({ length: 3 }, () => ({
       started: deferred(),
@@ -191,10 +190,13 @@ describe('createAlpacaDiscovery', () => {
   })
 
   it('rejects malformed Management API JSON', async () => {
-    const fetch = vi.fn(async () => new Response('{not json', {
-      status: 200,
-      headers: { 'content-type': 'application/json' },
-    }))
+    const fetch = vi.fn(
+      async () =>
+        new Response('{not json', {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+    )
 
     const discovery = createAlpacaDiscovery({ fetch })
 
@@ -222,12 +224,13 @@ describe('createAlpacaDiscovery', () => {
   it('times out stalled Management API requests', async () => {
     vi.useFakeTimers()
 
-    const fetch = vi.fn((_input: RequestInfo | URL, init?: RequestInit) =>
-      new Promise<Response>((_resolve, reject) => {
-        init?.signal?.addEventListener('abort', () => reject(init.signal?.reason), {
-          once: true,
-        })
-      }),
+    const fetch = vi.fn(
+      (_input: RequestInfo | URL, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(init.signal?.reason), {
+            once: true,
+          })
+        }),
     )
 
     const discovery = createAlpacaDiscovery({ fetch })
@@ -248,12 +251,13 @@ describe('createAlpacaDiscovery', () => {
     const cancellation = new Error('request cancelled')
     const controller = new AbortController()
 
-    const fetch = vi.fn((_input: RequestInfo | URL, init?: RequestInit) =>
-      new Promise<Response>((_resolve, reject) => {
-        init?.signal?.addEventListener('abort', () => reject(init.signal?.reason), {
-          once: true,
-        })
-      }),
+    const fetch = vi.fn(
+      (_input: RequestInfo | URL, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(init.signal?.reason), {
+            once: true,
+          })
+        }),
     )
 
     const discovery = createAlpacaDiscovery({ fetch })

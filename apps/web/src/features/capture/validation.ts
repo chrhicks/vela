@@ -1,30 +1,46 @@
 import { z } from 'zod'
-import type { CaptureImage, CaptureView, SavedImage, SavedImagesView, SavedImageView } from '@vela/model/web'
+import type {
+  CaptureImage,
+  CaptureView,
+  SavedImage,
+  SavedImagesView,
+  SavedImageView,
+} from '@vela/model/web'
 
 const text = z.string().refine(value => value.trim().length > 0)
 
-const timestamp = z.string().regex(/^\d{4}-\d{2}-\d{2}T.+Z$/).refine(value => Number.isFinite(Date.parse(value)))
+const timestamp = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}T.+Z$/)
+  .refine(value => Number.isFinite(Date.parse(value)))
 
-const statistics = z.object({
-  detectedStars: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
-  medianHfrPixels: z.number().positive().nullable(),
-}).refine(value => value.detectedStars === 0 ? value.medianHfrPixels === null : value.medianHfrPixels !== null).nullable()
+const statistics = z
+  .object({
+    detectedStars: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+    medianHfrPixels: z.number().positive().nullable(),
+  })
+  .refine(value =>
+    value.detectedStars === 0 ? value.medianHfrPixels === null : value.medianHfrPixels !== null,
+  )
+  .nullable()
 
-const captureImage = z.object({
-  id: text,
-  cameraName: text,
-  saved: z.boolean(),
-  imageUrl: z.string(),
-  fitImageUrl: z.string().optional(),
-  color: z.enum(['mono', 'color']),
-  width: z.number().refine(Number.isInteger).positive(),
-  height: z.number().refine(Number.isInteger).positive(),
-  exposureSeconds: z.number().min(0.1).max(600),
-  statistics,
-  capturedAtSource: z.enum(['camera', 'server-estimate']).optional(),
-  capturedAt: timestamp,
-  receivedAt: timestamp,
-}).refine(value => Date.parse(value.receivedAt) >= Date.parse(value.capturedAt))
+const captureImage = z
+  .object({
+    id: text,
+    cameraName: text,
+    saved: z.boolean(),
+    imageUrl: z.string(),
+    fitImageUrl: z.string().optional(),
+    color: z.enum(['mono', 'color']),
+    width: z.number().refine(Number.isInteger).positive(),
+    height: z.number().refine(Number.isInteger).positive(),
+    exposureSeconds: z.number().min(0.1).max(600),
+    statistics,
+    capturedAtSource: z.enum(['camera', 'server-estimate']).optional(),
+    capturedAt: timestamp,
+    receivedAt: timestamp,
+  })
+  .refine(value => Date.parse(value.receivedAt) >= Date.parse(value.capturedAt))
 
 const captureView = z.object({
   rigId: z.string(),
@@ -32,7 +48,16 @@ const captureView = z.object({
   camera: z.object({ name: text }).nullable(),
   enabled: z.boolean(),
   unavailableReason: text.nullable(),
-  phase: z.enum(['idle', 'exposing', 'reading', 'saving', 'stopping', 'complete', 'stopped', 'failed']),
+  phase: z.enum([
+    'idle',
+    'exposing',
+    'reading',
+    'saving',
+    'stopping',
+    'complete',
+    'stopped',
+    'failed',
+  ]),
   active: z.boolean(),
   captureReadState: z.enum(['current', 'retrying']),
   exposureSeconds: z.number().min(0).max(600),
@@ -43,13 +68,15 @@ const captureView = z.object({
   elapsedSeconds: z.number().nonnegative(),
   error: text.nullable(),
   latestImage: captureImage.nullable(),
-  cooling: z.object({
-    state: z.enum(['on', 'off']),
-    canSetTemperature: z.boolean(),
-    sensorTemperatureC: z.number().optional(),
-    setpointC: z.number().optional(),
-    powerPercent: z.number().min(0).max(100).optional(),
-  }).nullable(),
+  cooling: z
+    .object({
+      state: z.enum(['on', 'off']),
+      canSetTemperature: z.boolean(),
+      sensorTemperatureC: z.number().optional(),
+      setpointC: z.number().optional(),
+      powerPercent: z.number().min(0).max(100).optional(),
+    })
+    .nullable(),
 })
 
 export function isCaptureView(value: unknown, rigId: string): value is CaptureView {
@@ -58,10 +85,12 @@ export function isCaptureView(value: unknown, rigId: string): value is CaptureVi
   if (!result.success) return false
   const view = result.data
 
-  return view.rigId === rigId
-    && view.active === ['exposing', 'reading', 'saving', 'stopping'].includes(view.phase)
-    && (!view.active || view.exposureSeconds >= 0.1)
-    && (view.latestImage === null || isCaptureImage(view.latestImage, rigId))
+  return (
+    view.rigId === rigId &&
+    view.active === ['exposing', 'reading', 'saving', 'stopping'].includes(view.phase) &&
+    (!view.active || view.exposureSeconds >= 0.1) &&
+    (view.latestImage === null || isCaptureImage(view.latestImage, rigId))
+  )
 }
 
 function isCaptureImage(value: unknown, rigId: string): value is CaptureImage {
@@ -72,8 +101,10 @@ function isCaptureImage(value: unknown, rigId: string): value is CaptureImage {
   // Preview URLs belong to this rig and immutable image ID.
   const expected = `/api/rigs/${encodeURIComponent(rigId)}/capture/images/${encodeURIComponent(image.id)}`
 
-  return image.imageUrl === expected
-    && (image.fitImageUrl === undefined || image.fitImageUrl === `${expected}/fit`)
+  return (
+    image.imageUrl === expected &&
+    (image.fitImageUrl === undefined || image.fitImageUrl === `${expected}/fit`)
+  )
 }
 
 const savedImage = captureImage.safeExtend({
@@ -82,11 +113,13 @@ const savedImage = captureImage.safeExtend({
   savedAt: timestamp,
   fitsUrl: z.string(),
   previewDownloadUrl: z.string(),
-  previewRendering: z.discriminatedUnion('status', [
-    z.object({ status: z.literal('current'), version: z.literal('background-v1') }),
-    z.object({ status: z.literal('legacy') }),
-    z.object({ status: z.literal('unavailable') }),
-  ]).optional(),
+  previewRendering: z
+    .discriminatedUnion('status', [
+      z.object({ status: z.literal('current'), version: z.literal('background-v1') }),
+      z.object({ status: z.literal('legacy') }),
+      z.object({ status: z.literal('unavailable') }),
+    ])
+    .optional(),
 })
 
 export function isSavedImage(value: unknown, rigId: string): value is SavedImage {
@@ -95,12 +128,16 @@ export function isSavedImage(value: unknown, rigId: string): value is SavedImage
   if (!result.success || result.data.rigId !== rigId) return false
   const expected = `/api/rigs/${encodeURIComponent(rigId)}/saved-images/${encodeURIComponent(result.data.id)}`
   const rendering = result.data.previewRendering
-  const preview = rendering?.status === 'current' ? `${expected}/previews/${rendering.version}` : expected
 
-  return result.data.fitsUrl === `${expected}/fits`
-    && result.data.previewDownloadUrl === `${preview}/download-preview`
-    && result.data.imageUrl === `${preview}/preview`
-    && (result.data.fitImageUrl === undefined || result.data.fitImageUrl === `${preview}/fit`)
+  const preview =
+    rendering?.status === 'current' ? `${expected}/previews/${rendering.version}` : expected
+
+  return (
+    result.data.fitsUrl === `${expected}/fits` &&
+    result.data.previewDownloadUrl === `${preview}/download-preview` &&
+    result.data.imageUrl === `${preview}/preview` &&
+    (result.data.fitImageUrl === undefined || result.data.fitImageUrl === `${preview}/fit`)
+  )
 }
 
 const savedImagesView = z.object({
@@ -118,9 +155,12 @@ const savedImageView = z.object({
 export function isSavedImagesView(value: unknown, rigId: string): value is SavedImagesView {
   const result = savedImagesView.safeParse(value)
 
-  return result.success && result.data.rigId === rigId
-    && result.data.images.every(image => isSavedImage(image, rigId))
-    && new Set(result.data.images.map(image => image.id)).size === result.data.images.length
+  return (
+    result.success &&
+    result.data.rigId === rigId &&
+    result.data.images.every(image => isSavedImage(image, rigId)) &&
+    new Set(result.data.images.map(image => image.id)).size === result.data.images.length
+  )
 }
 
 export function isSavedImageView(value: unknown, rigId: string): value is SavedImageView {

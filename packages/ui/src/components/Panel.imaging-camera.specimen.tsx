@@ -13,7 +13,13 @@ const cameras = [
   { value: 'guide', label: 'ZWO ASI220MM Mini · ASI Camera (2)' },
 ]
 
-function ImagingCameraPreview({ props, onPropsChange }: { props: Props, onPropsChange?: (patch: Props) => void }) {
+function ImagingCameraPreview({
+  props,
+  onPropsChange,
+}: {
+  props: Props
+  onPropsChange?: (patch: Props) => void
+}) {
   function cameraNotice() {
     switch (state) {
       case 'offline':
@@ -31,7 +37,10 @@ function ImagingCameraPreview({ props, onPropsChange }: { props: Props, onPropsC
 
   const [local, setLocal] = useState(props)
   const values = onPropsChange ? props : local
-  const update = (patch: Props) => onPropsChange ? onPropsChange(patch) : setLocal(current => ({ ...current, ...patch }))
+
+  const update = (patch: Props) =>
+    onPropsChange ? onPropsChange(patch) : setLocal(current => ({ ...current, ...patch }))
+
   const saved = String(values.camera)
   const state = String(values.state)
   const editing = Boolean(values.editing) || saved === 'none'
@@ -57,7 +66,9 @@ function ImagingCameraPreview({ props, onPropsChange }: { props: Props, onPropsC
             <p>Askar FRA 400</p>
             <h1>Observe</h1>
           </div>
-          <Badge tone={state === 'offline' ? 'warning' : 'positive'}>{state === 'offline' ? 'Updates interrupted' : 'Connected'}</Badge>
+          <Badge tone={state === 'offline' ? 'warning' : 'positive'}>
+            {state === 'offline' ? 'Updates interrupted' : 'Connected'}
+          </Badge>
         </header>
         <p className="vela-imaging-intro">
           {state === 'offline'
@@ -85,7 +96,11 @@ function ImagingCameraPreview({ props, onPropsChange }: { props: Props, onPropsC
               </Button>
             )}
           </div>
-          {notice && <p className="vela-imaging-notice" role="status">{notice}</p>}
+          {notice && (
+            <p className="vela-imaging-notice" role="status">
+              {notice}
+            </p>
+          )}
           {editing && (
             <form
               className="vela-imaging-form"
@@ -107,7 +122,13 @@ function ImagingCameraPreview({ props, onPropsChange }: { props: Props, onPropsC
               />
               <p>Remembered for this rig. You can return here when your setup changes.</p>
               <div>
-                <Button tone="accent" type="submit" disabled={!choices.some(camera => camera.value === selected) || locked}>Use this camera</Button>
+                <Button
+                  tone="accent"
+                  type="submit"
+                  disabled={!choices.some(camera => camera.value === selected) || locked}
+                >
+                  Use this camera
+                </Button>
                 {saved !== 'none' && (
                   <Button
                     tone="quiet"
@@ -132,7 +153,9 @@ function ImagingCameraPreview({ props, onPropsChange }: { props: Props, onPropsC
                 ? 'Choose an imaging camera above to begin.'
                 : unavailable
                   ? 'Camera needs attention before capture.'
-                  : state === 'busy' ? 'Exposing · 12 / 30 s' : `${name} · Ready`}
+                  : state === 'busy'
+                    ? 'Exposing · 12 / 30 s'
+                    : `${name} · Ready`}
             </span>
             <Button
               tone="accent"
@@ -159,12 +182,19 @@ export const specimen: ComponentSpecimen = {
   componentName: 'Panel / Card',
   id: 'panel-imaging-camera',
   name: 'Imaging-camera setup · Product example',
-  description: 'Choose a camera once from Observe, then keep its identity visible as a compact saved setting. Includes missing, changed, offline and busy states. Local fixtures only.',
+  description:
+    'Choose a camera once from Observe, then keep its identity visible as a compact saved setting. Includes missing, changed, offline and busy states. Local fixtures only.',
   controls: {
     camera: { type: 'select', label: 'Saved camera', options: ['none', 'main', 'guide'] },
-    state: { type: 'select', label: 'Rig state', options: ['ready', 'busy', 'offline', 'missing', 'changed'] },
+    state: {
+      type: 'select',
+      label: 'Rig state',
+      options: ['ready', 'busy', 'offline', 'missing', 'changed'],
+    },
     editing: { type: 'boolean', label: 'Editing camera' },
   },
   defaultProps: { camera: 'none', state: 'ready', editing: false },
-  render: (props, onPropsChange) => <ImagingCameraPreview props={props} {...(onPropsChange ? { onPropsChange } : {})} />,
+  render: (props, onPropsChange) => (
+    <ImagingCameraPreview props={props} {...(onPropsChange ? { onPropsChange } : {})} />
+  ),
 }

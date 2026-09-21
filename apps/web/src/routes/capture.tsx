@@ -32,12 +32,14 @@ function CapturePage({ rigId }: { rigId: string }) {
 
   const exposureValue = view?.active
     ? String(view.exposureSeconds)
-    : exposure ?? String(view?.exposureSeconds ?? 2)
+    : (exposure ?? String(view?.exposureSeconds ?? 2))
 
-  const repeating = view?.active ? view.repeat : repeat ?? view?.repeat ?? true
-  const savingFrames = view?.active ? view.saveFrames : saveFrames ?? false
+  const repeating = view?.active ? view.repeat : (repeat ?? view?.repeat ?? true)
+  const savingFrames = view?.active ? view.saveFrames : (saveFrames ?? false)
   const seconds = Number(exposureValue)
-  const validExposure = exposureValue.trim() !== '' && Number.isFinite(seconds) && seconds >= 0.1 && seconds <= 600
+
+  const validExposure =
+    exposureValue.trim() !== '' && Number.isFinite(seconds) && seconds >= 0.1 && seconds <= 600
 
   const back = (
     <Link className="vela-rig-page__back" to={`/rigs/${encodeURIComponent(rigId)}/observe`}>
@@ -45,22 +47,25 @@ function CapturePage({ rigId }: { rigId: string }) {
     </Link>
   )
 
-  if (!view) return (
-    <section className="vela-rig-page capture-page">
-      {back}
-      <h1>Capture</h1>
-      {offline ? (
-        <div role="status">
-          <p>{error ?? 'Capture state is unavailable. Check that the Vela server is reachable.'}</p>
-          <Button disabled={refreshing} onClick={() => void capture.refresh()}>
-            Check capture state
-          </Button>
-        </div>
-      ) : (
-        <p role="status">Loading capture state…</p>
-      )}
-    </section>
-  )
+  if (!view)
+    return (
+      <section className="vela-rig-page capture-page">
+        {back}
+        <h1>Capture</h1>
+        {offline ? (
+          <div role="status">
+            <p>
+              {error ?? 'Capture state is unavailable. Check that the Vela server is reachable.'}
+            </p>
+            <Button disabled={refreshing} onClick={() => void capture.refresh()}>
+              Check capture state
+            </Button>
+          </div>
+        ) : (
+          <p role="status">Loading capture state…</p>
+        )}
+      </section>
+    )
 
   const busy = view.active || pending
   const retrying = view.captureReadState === 'retrying'
@@ -71,13 +76,18 @@ function CapturePage({ rigId }: { rigId: string }) {
       ? 'Command outcome unknown'
       : captureActivity(view, offline)
 
-  const showProgress = view.phase === 'exposing' && !retrying && !offline && !commandUnconfirmed && !pending
+  const showProgress =
+    view.phase === 'exposing' && !retrying && !offline && !commandUnconfirmed && !pending
 
-  const warning = error ?? (offline
-    ? 'Capture status is unknown. Waiting for the rig to reconnect.'
-    : view.error ?? view.unavailableReason ?? (retrying
-      ? `The server is connected, but camera reads are interrupted. Retrying reads for exposure ${view.completedCount + 1}; no new exposure will start while waiting.`
-      : null))
+  const warning =
+    error ??
+    (offline
+      ? 'Capture status is unknown. Waiting for the rig to reconnect.'
+      : (view.error ??
+        view.unavailableReason ??
+        (retrying
+          ? `The server is connected, but camera reads are interrupted. Retrying reads for exposure ${view.completedCount + 1}; no new exposure will start while waiting.`
+          : null)))
 
   let progressDescription
 
@@ -86,7 +96,8 @@ function CapturePage({ rigId }: { rigId: string }) {
   } else if (retrying) {
     progressDescription = `Exposure ${view.completedCount + 1} is still pending. Progress is unavailable. You can stop while reads retry.`
   } else if (view.phase === 'saving') {
-    progressDescription = 'Saving this image before the next exposure. Stop waits for this save to finish.'
+    progressDescription =
+      'Saving this image before the next exposure. Stop waits for this save to finish.'
   } else if (view.phase === 'stopping') {
     progressDescription = 'Waiting for the camera to confirm it has stopped.'
   } else if (busy) {
@@ -124,29 +135,48 @@ function CapturePage({ rigId }: { rigId: string }) {
           >
             Saved images{view.savedImageCount !== null ? ` (${view.savedImageCount})` : ''} →
           </Link>
-          <Badge tone={offline || commandUnconfirmed || retrying
-            ? 'warning'
-            : busy
-              ? 'accent'
-              : view.enabled ? 'positive' : 'neutral'}
+          <Badge
+            tone={
+              offline || commandUnconfirmed || retrying
+                ? 'warning'
+                : busy
+                  ? 'accent'
+                  : view.enabled
+                    ? 'positive'
+                    : 'neutral'
+            }
           >
-            {offline ? 'Last known'
-              : commandUnconfirmed ? 'Confirmation needed'
-                : retrying ? 'Awaiting camera'
-                  : busy ? 'Capturing'
-                    : view.enabled ? 'Connected' : 'Unavailable'}
+            {offline
+              ? 'Last known'
+              : commandUnconfirmed
+                ? 'Confirmation needed'
+                : retrying
+                  ? 'Awaiting camera'
+                  : busy
+                    ? 'Capturing'
+                    : view.enabled
+                      ? 'Connected'
+                      : 'Unavailable'}
           </Badge>
         </div>
       </header>
       {warning && (
         <div className="capture-page__warning" role="status">
           <strong>
-            {commandUnconfirmed ? 'Command outcome unknown'
-              : offline ? 'Connection interrupted'
-                : view.phase === 'failed' ? 'Capture stopped'
-                  : retrying ? 'Camera observation interrupted' : 'Capture unavailable'}
+            {commandUnconfirmed
+              ? 'Command outcome unknown'
+              : offline
+                ? 'Connection interrupted'
+                : view.phase === 'failed'
+                  ? 'Capture stopped'
+                  : retrying
+                    ? 'Camera observation interrupted'
+                    : 'Capture unavailable'}
           </strong>
-          <p>{warning}{view.latestImage ? ' The last image is kept below.' : ''}</p>
+          <p>
+            {warning}
+            {view.latestImage ? ' The last image is kept below.' : ''}
+          </p>
           {commandUnconfirmed && (
             <Button disabled={pending || refreshing} onClick={() => void capture.refresh()}>
               {refreshing ? 'Checking capture state…' : 'Check capture state'}
@@ -223,29 +253,46 @@ function CapturePage({ rigId }: { rigId: string }) {
                   disabled={!capture.canStop}
                   onClick={() => void capture.stop()}
                 >
-                  {pending ? 'Sending command…'
-                    : view.phase === 'stopping' ? 'Stopping capture…'
-                      : view.repeat ? 'Stop run' : 'Stop exposure'}
+                  {pending
+                    ? 'Sending command…'
+                    : view.phase === 'stopping'
+                      ? 'Stopping capture…'
+                      : view.repeat
+                        ? 'Stop run'
+                        : 'Stop exposure'}
                 </Button>
               ) : (
-                <Button type="submit" size="large" tone="accent" disabled={!capture.canStart || !validExposure}>
+                <Button
+                  type="submit"
+                  size="large"
+                  tone="accent"
+                  disabled={!capture.canStart || !validExposure}
+                >
                   {pending ? 'Sending command…' : repeating ? 'Start run' : 'Take exposure'}
                 </Button>
               )}
             </div>
           </form>
-          {(view.active || view.completedCount > 0 || view.phase === 'stopped' || view.phase === 'failed') && (
+          {(view.active ||
+            view.completedCount > 0 ||
+            view.phase === 'stopped' ||
+            view.phase === 'failed') && (
             <div className="capture-page__count">
               <strong>{view.completedCount}</strong>
               <span>
-                {view.completedCount === 1 ? 'image completed' : 'images completed'}{offline ? ' · last known' : ''}
+                {view.completedCount === 1 ? 'image completed' : 'images completed'}
+                {offline ? ' · last known' : ''}
               </span>
             </div>
           )}
           <div className="capture-page__progress">
             <div>
               <strong role="status">{activity}</strong>
-              {showProgress && <span>{view.elapsedSeconds.toFixed(1)} / {view.exposureSeconds} s</span>}
+              {showProgress && (
+                <span>
+                  {view.elapsedSeconds.toFixed(1)} / {view.exposureSeconds} s
+                </span>
+              )}
             </div>
             {showProgress && (
               <progress
@@ -262,16 +309,24 @@ function CapturePage({ rigId }: { rigId: string }) {
         <summary>
           <span>
             <i data-offline={offline || retrying || !view.enabled || undefined} />
-            {offline ? 'Rig updates interrupted'
-              : retrying ? 'Camera reads interrupted · server connected'
-                : view.camera ? view.camera.name : 'Camera unavailable'}
+            {offline
+              ? 'Rig updates interrupted'
+              : retrying
+                ? 'Camera reads interrupted · server connected'
+                : view.camera
+                  ? view.camera.name
+                  : 'Camera unavailable'}
           </span>
           <span>Device details</span>
         </summary>
         <p>
-          {offline ? 'Last known capture state'
-            : view.active ? activity
-              : view.enabled ? 'Camera ready for capture' : view.unavailableReason ?? 'Camera unavailable'}
+          {offline
+            ? 'Last known capture state'
+            : view.active
+              ? activity
+              : view.enabled
+                ? 'Camera ready for capture'
+                : (view.unavailableReason ?? 'Camera unavailable')}
         </p>
         <Link to={`/rigs/${encodeURIComponent(rigId)}`}>Open Rig details →</Link>
       </details>

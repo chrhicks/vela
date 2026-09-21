@@ -18,9 +18,18 @@ describe('autofocus walk window', () => {
 
   it('aborts before a window would approach 0 or MaxStep, including a start of 0', () => {
     expect(planStarHfrWalk(0, 50, 4, 60000)).toMatchObject({ ok: false, reason: 'start-at-limit' })
-    expect(planStarHfrWalk(80, 50, 4, 60000)).toMatchObject({ ok: false, reason: 'window-hits-limit' })
-    expect(planStarHfrWalk(59800, 50, 4, 60000)).toMatchObject({ ok: false, reason: 'window-hits-limit' })
-    expect(planStarHfrWalk(60000, 50, 4, 60000)).toMatchObject({ ok: false, reason: 'start-at-limit' })
+    expect(planStarHfrWalk(80, 50, 4, 60000)).toMatchObject({
+      ok: false,
+      reason: 'window-hits-limit',
+    })
+    expect(planStarHfrWalk(59800, 50, 4, 60000)).toMatchObject({
+      ok: false,
+      reason: 'window-hits-limit',
+    })
+    expect(planStarHfrWalk(60000, 50, 4, 60000)).toMatchObject({
+      ok: false,
+      reason: 'start-at-limit',
+    })
   })
 
   it('refuses Move(0) even if a caller asks', () => {
@@ -30,7 +39,9 @@ describe('autofocus walk window', () => {
     if (!planned.ok) return
     expect(() => assertCommandedPosition(0, planned.plan)).toThrow(/not a home/)
     expect(() => assertCommandedPosition(60000, planned.plan)).toThrow(/mechanical travel limit/)
-    expect(() => assertCommandedPosition(30000, planned.plan)).toThrow(/window around the starting position/)
+    expect(() => assertCommandedPosition(30000, planned.plan)).toThrow(
+      /window around the starting position/,
+    )
   })
 
   it('offers extra inward samples only while the V minimum is still at the inner edge', () => {

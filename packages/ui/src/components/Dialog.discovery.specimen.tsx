@@ -63,16 +63,26 @@ function DiscoveryDialogPreview({ props, onPropsChange }: PreviewProps) {
         return (
           <div className="vela-discovery-message" data-tone="danger">
             <strong>Network scan could not start</strong>
-            <p>Vela could not use this computer’s network interfaces. You can retry or enter the server address manually.</p>
-            <Button onClick={() => update({ view: 'manual' })} size="small">Enter address</Button>
+            <p>
+              Vela could not use this computer’s network interfaces. You can retry or enter the
+              server address manually.
+            </p>
+            <Button onClick={() => update({ view: 'manual' })} size="small">
+              Enter address
+            </Button>
           </div>
         )
       case 'empty':
         return (
           <div className="vela-discovery-message">
             <strong>No Alpaca servers found</strong>
-            <p>Confirm the server is running and that this device is on the same network, then scan again.</p>
-            <Button onClick={() => update({ view: 'manual' })} size="small">Enter address</Button>
+            <p>
+              Confirm the server is running and that this device is on the same network, then scan
+              again.
+            </p>
+            <Button onClick={() => update({ view: 'manual' })} size="small">
+              Enter address
+            </Button>
           </div>
         )
       default:
@@ -95,7 +105,9 @@ function DiscoveryDialogPreview({ props, onPropsChange }: PreviewProps) {
               <span className="vela-discovery-candidate__copy">
                 <span>
                   <strong>ASCOM Remote</strong>
-                  <Badge size="small" tone="positive">Eligible</Badge>
+                  <Badge size="small" tone="positive">
+                    Eligible
+                  </Badge>
                 </span>
                 <small>192.168.4.104:11111 · 6 devices</small>
                 <span className="vela-discovery-candidate__kinds">
@@ -105,7 +117,9 @@ function DiscoveryDialogPreview({ props, onPropsChange }: PreviewProps) {
                   <i>+2</i>
                 </span>
               </span>
-              <span className="vela-discovery-candidate__select">{selected ? 'Selected' : 'Select'}</span>
+              <span className="vela-discovery-candidate__select">
+                {selected ? 'Selected' : 'Select'}
+              </span>
             </button>
 
             {scenario === 'mixed' ? (
@@ -117,10 +131,14 @@ function DiscoveryDialogPreview({ props, onPropsChange }: PreviewProps) {
                   <span className="vela-discovery-candidate__copy">
                     <span>
                       <strong>Legacy Alpaca</strong>
-                      <Badge size="small" tone="warning">Unavailable</Badge>
+                      <Badge size="small" tone="warning">
+                        Unavailable
+                      </Badge>
                     </span>
                     <small>192.168.4.120:32323 · 1 device</small>
-                    <p>This server did not provide a stable device ID, so Vela cannot add it safely.</p>
+                    <p>
+                      This server did not provide a stable device ID, so Vela cannot add it safely.
+                    </p>
                   </span>
                 </article>
                 <div className="vela-discovery-partial">
@@ -185,7 +203,8 @@ function DiscoveryDialogPreview({ props, onPropsChange }: PreviewProps) {
   const copy = {
     start: {
       title: 'Find your observatory rig',
-      description: 'Vela can look for Alpaca servers on this network or inspect an address you already know.',
+      description:
+        'Vela can look for Alpaca servers on this network or inspect an address you already know.',
     },
     manual: {
       title: 'Enter an Alpaca address',
@@ -193,7 +212,8 @@ function DiscoveryDialogPreview({ props, onPropsChange }: PreviewProps) {
     },
     scanning: {
       title: 'Looking for rigs',
-      description: 'Vela is reading server and device details. No hardware controls are being changed.',
+      description:
+        'Vela is reading server and device details. No hardware controls are being changed.',
     },
     results: {
       title: 'Rigs on this network',
@@ -210,24 +230,44 @@ function DiscoveryDialogPreview({ props, onPropsChange }: PreviewProps) {
   if (view === 'manual') {
     footer = (
       <>
-        <Button onClick={() => update({ view: 'start' })} tone="quiet">Back</Button>
-        <Button onClick={beginScan} tone="accent">Inspect address</Button>
+        <Button onClick={() => update({ view: 'start' })} tone="quiet">
+          Back
+        </Button>
+        <Button onClick={beginScan} tone="accent">
+          Inspect address
+        </Button>
       </>
     )
   } else if (view === 'scanning') {
-    footer = <Button onClick={dismiss} tone="quiet">Cancel scan</Button>
+    footer = (
+      <Button onClick={dismiss} tone="quiet">
+        Cancel scan
+      </Button>
+    )
   } else if (view === 'results') {
     footer = (
       <>
-        <Button onClick={beginScan} tone="quiet">Scan again</Button>
-        <Button disabled={!canReview} onClick={() => update({ view: 'review' })} tone="accent">Review rig</Button>
+        <Button onClick={beginScan} tone="quiet">
+          Scan again
+        </Button>
+        <Button disabled={!canReview} onClick={() => update({ view: 'review' })} tone="accent">
+          Review rig
+        </Button>
       </>
     )
   } else if (view === 'review') {
     footer = (
       <>
-        <Button onClick={() => update({ view: 'results' })} tone="quiet">Back</Button>
-        <Button disabled={!canAdd} onClick={() => update({ view: 'complete', selected: false })} tone="accent">Add rig</Button>
+        <Button onClick={() => update({ view: 'results' })} tone="quiet">
+          Back
+        </Button>
+        <Button
+          disabled={!canAdd}
+          onClick={() => update({ view: 'complete', selected: false })}
+          tone="accent"
+        >
+          Add rig
+        </Button>
       </>
     )
   }
@@ -251,13 +291,19 @@ function DiscoveryDialogPreview({ props, onPropsChange }: PreviewProps) {
                 <h2>{rigName.trim() || 'Unnamed rig'}</h2>
                 <p>ASCOM Remote · 6 devices</p>
               </div>
-              <Badge marker={<i />} tone="positive">Ready</Badge>
+              <Badge marker={<i />} tone="positive">
+                Ready
+              </Badge>
             </div>
             <div className="vela-discovery-complete__devices">
-              {devices.slice(0, 4).map((device) => <span key={device.name}>{device.name}</span>)}
+              {devices.slice(0, 4).map(device => (
+                <span key={device.name}>{device.name}</span>
+              ))}
               <span>+2 more</span>
             </div>
-            <Button onClick={() => update({ view: 'start' })} tone="quiet">Find another rig</Button>
+            <Button onClick={() => update({ view: 'start' })} tone="quiet">
+              Find another rig
+            </Button>
           </section>
         ) : (
           <section className="vela-discovery-empty">
@@ -267,7 +313,9 @@ function DiscoveryDialogPreview({ props, onPropsChange }: PreviewProps) {
             <small>GET STARTED</small>
             <h1>No rig configured</h1>
             <p>Set up the observatory you want Vela to monitor and control.</p>
-            <Button onClick={() => update({ view: 'start' })} tone="accent">Set up a rig</Button>
+            <Button onClick={() => update({ view: 'start' })} tone="accent">
+              Set up a rig
+            </Button>
           </section>
         )}
       </main>
@@ -292,17 +340,24 @@ function DiscoveryDialogPreview({ props, onPropsChange }: PreviewProps) {
               <i className="vela-discovery-signal vela-discovery-signal--three" />
             </div>
             <div className="vela-discovery-start__actions">
-              <Button leadingIcon={<ScanIcon />} onClick={beginScan} size="large" tone="accent">Scan for rigs</Button>
-              <Button onClick={() => update({ view: 'manual' })} tone="quiet">Enter an address manually</Button>
+              <Button leadingIcon={<ScanIcon />} onClick={beginScan} size="large" tone="accent">
+                Scan for rigs
+              </Button>
+              <Button onClick={() => update({ view: 'manual' })} tone="quiet">
+                Enter an address manually
+              </Button>
             </div>
-            <p className="vela-discovery-note">Discovery reads Alpaca server information and configured device names. It does not connect devices or move hardware.</p>
+            <p className="vela-discovery-note">
+              Discovery reads Alpaca server information and configured device names. It does not
+              connect devices or move hardware.
+            </p>
           </div>
         ) : null}
 
         {view === 'manual' ? (
           <form
             className="vela-discovery-manual"
-            onSubmit={(event) => {
+            onSubmit={event => {
               event.preventDefault()
               beginScan()
             }}
@@ -310,15 +365,22 @@ function DiscoveryDialogPreview({ props, onPropsChange }: PreviewProps) {
             <div className="vela-discovery-manual__fields">
               <Input
                 label="Host or IP address"
-                onChange={(event) => setHost(event.target.value)}
+                onChange={event => setHost(event.target.value)}
                 placeholder="ascom-remote.local"
                 value={host}
               />
-              <Input inputMode="numeric" label="Port" onChange={(event) => setPort(event.target.value)} value={port} />
+              <Input
+                inputMode="numeric"
+                label="Port"
+                onChange={event => setPort(event.target.value)}
+                value={port}
+              />
             </div>
             <p>
               {'Vela will inspect '}
-              <strong>{host || 'this host'}:{port || '11111'}</strong>
+              <strong>
+                {host || 'this host'}:{port || '11111'}
+              </strong>
               {' using the read-only Alpaca Management API.'}
             </p>
           </form>
@@ -342,9 +404,7 @@ function DiscoveryDialogPreview({ props, onPropsChange }: PreviewProps) {
         ) : null}
 
         {view === 'results' ? (
-          <div className="vela-discovery-results">
-            {renderDiscoveryResults()}
-          </div>
+          <div className="vela-discovery-results">{renderDiscoveryResults()}</div>
         ) : null}
 
         {view === 'review' ? (
@@ -358,12 +418,14 @@ function DiscoveryDialogPreview({ props, onPropsChange }: PreviewProps) {
                 <strong>ASCOM Remote</strong>
                 <span>192.168.4.104:11111</span>
               </div>
-              <Badge size="small" tone="positive">Eligible</Badge>
+              <Badge size="small" tone="positive">
+                Eligible
+              </Badge>
             </section>
             <Input
               label="Rig name"
               message="Reported as ASCOM Remote. Keep this name or choose one that means more to you."
-              onChange={(event) => update({ rigName: event.target.value })}
+              onChange={event => update({ rigName: event.target.value })}
               value={rigName}
             />
             <section>
@@ -372,7 +434,7 @@ function DiscoveryDialogPreview({ props, onPropsChange }: PreviewProps) {
                 <span>6 found</span>
               </div>
               <ul className="vela-discovery-device-list">
-                {devices.map((device) => (
+                {devices.map(device => (
                   <li key={device.name}>
                     <span>{device.kind.slice(0, 1)}</span>
                     <p>
@@ -387,7 +449,9 @@ function DiscoveryDialogPreview({ props, onPropsChange }: PreviewProps) {
               <span>✓</span>
               <p>
                 <strong>Ready to add</strong>
-                <small>Adding this rig will not connect its devices or issue hardware commands.</small>
+                <small>
+                  Adding this rig will not connect its devices or issue hardware commands.
+                </small>
               </p>
             </div>
           </div>
@@ -413,7 +477,9 @@ export const specimen: ComponentSpecimen = {
     view: 'start',
     scenario: 'mixed',
     selected: false,
-    rigName: 'ASCOM Remote'
+    rigName: 'ASCOM Remote',
   },
-  render: (props, onPropsChange) => <DiscoveryDialogPreview onPropsChange={onPropsChange} props={props} />,
+  render: (props, onPropsChange) => (
+    <DiscoveryDialogPreview onPropsChange={onPropsChange} props={props} />
+  ),
 }

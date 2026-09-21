@@ -82,37 +82,31 @@ describe('@vela/model boundaries', () => {
     expectTypeOf<RigConnectionPreparation['state']>().toEqualTypeOf<
       'available' | 'complete' | 'in-progress' | 'unavailable'
     >()
-    expectTypeOf<Extract<
-      RigConnectionPreparation,
-      { readonly state: 'available' }
-    >['capabilities']>().toEqualTypeOf<readonly ['connect-devices']>()
+    expectTypeOf<
+      Extract<RigConnectionPreparation, { readonly state: 'available' }>['capabilities']
+    >().toEqualTypeOf<readonly ['connect-devices']>()
     expectTypeOf<RigObservationView['rig']>().toEqualTypeOf<RigDetailView>()
     expectTypeOf<ConnectRigDevicesResult['outcome']>().toEqualTypeOf<
       'complete' | 'failed' | 'partial' | 'uncertain' | 'unavailable'
     >()
 
-    expectTypeOf<Extract<
-      ConnectRigDevicesResult,
-      { readonly command: 'not-needed' }
-    >['confirmedConnected']>().toEqualTypeOf<readonly []>()
-    expectTypeOf<Extract<
-      ConnectRigDevicesResult,
-      { readonly outcome: 'failed' }
-    >['confirmedConnected']>().toEqualTypeOf<readonly []>()
-    expectTypeOf<Extract<
-      ConnectRigDevicesResult,
-      { readonly outcome: 'partial' }
-    >['confirmedConnected'][0]>().toEqualTypeOf<RigConnectionDeviceView>()
-    expectTypeOf<Extract<
-      ConnectRigDevicesResult,
-      { readonly outcome: 'failed' }
-    >['failed']['reason']>().toEqualTypeOf<
+    expectTypeOf<
+      Extract<ConnectRigDevicesResult, { readonly command: 'not-needed' }>['confirmedConnected']
+    >().toEqualTypeOf<readonly []>()
+    expectTypeOf<
+      Extract<ConnectRigDevicesResult, { readonly outcome: 'failed' }>['confirmedConnected']
+    >().toEqualTypeOf<readonly []>()
+    expectTypeOf<
+      Extract<ConnectRigDevicesResult, { readonly outcome: 'partial' }>['confirmedConnected'][0]
+    >().toEqualTypeOf<RigConnectionDeviceView>()
+    expectTypeOf<
+      Extract<ConnectRigDevicesResult, { readonly outcome: 'failed' }>['failed']['reason']
+    >().toEqualTypeOf<
       'connection-check-failed' | 'device-not-found' | 'rejected' | 'remained-disconnected'
     >()
-    expectTypeOf<Extract<
-      ConnectRigDevicesResult,
-      { readonly outcome: 'uncertain' }
-    >['uncertain']['reason']>().toEqualTypeOf<
+    expectTypeOf<
+      Extract<ConnectRigDevicesResult, { readonly outcome: 'uncertain' }>['uncertain']['reason']
+    >().toEqualTypeOf<
       'cancelled' | 'verification-timeout' | 'verification-unavailable' | 'write-outcome-unknown'
     >()
   })
@@ -137,12 +131,14 @@ describe('@vela/model boundaries', () => {
       exposureSeconds: 2,
       elapsedSeconds: 0.4,
       exposureStartedAt: '2026-09-17T00:00:00.000Z',
-      samples: [{
-        position: 33042,
-        detectedStars: 12,
-        hfrPixels: 5.1,
-        capturedAt: '2026-09-17T00:00:00.000Z',
-      }],
+      samples: [
+        {
+          position: 33042,
+          detectedStars: 12,
+          hfrPixels: 5.1,
+          capturedAt: '2026-09-17T00:00:00.000Z',
+        },
+      ],
       fit: null,
       restoredStart: false,
       error: null,
@@ -150,11 +146,13 @@ describe('@vela/model boundaries', () => {
 
     expectTypeOf(view).toMatchTypeOf<AutofocusView>()
     expectTypeOf<AutofocusView['startPosition']>().toEqualTypeOf<number | null>()
-    expectTypeOf<AutofocusView['samples']>().toMatchTypeOf<ReadonlyArray<{
-      position: number
-      detectedStars: number
-      hfrPixels: number | null
-      capturedAt: string
-    }>>()
+    expectTypeOf<AutofocusView['samples']>().toMatchTypeOf<
+      ReadonlyArray<{
+        position: number
+        detectedStars: number
+        hfrPixels: number | null
+        capturedAt: string
+      }>
+    >()
   })
 })

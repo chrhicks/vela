@@ -9,7 +9,7 @@ const trackingRates = ['sidereal', 'lunar', 'solar', 'king'] as const
 
 const coordinateSystems = ['other', 'topocentric', 'j2000', 'j2050', 'b1950'] as const
 
-export type AlpacaCoordinateSystem = typeof coordinateSystems[number] | 'unknown'
+export type AlpacaCoordinateSystem = (typeof coordinateSystems)[number] | 'unknown'
 
 export interface AlpacaCameraGeometry {
   cameraName: string
@@ -35,7 +35,7 @@ export interface AlpacaTelescopeStatus {
   longitudeDegrees?: number
   elevationMeters?: number
   tracking: boolean
-  trackingRate?: typeof trackingRates[number]
+  trackingRate?: (typeof trackingRates)[number]
   /** Offset from sidereal, in seconds of RA per sidereal second. */
   rightAscensionRateSecondsPerSiderealSecond?: number
   /** Offset from zero declination motion, in arcseconds per SI second. */
@@ -97,7 +97,12 @@ function validateNumber(
   endpoint: string,
   integer = false,
 ) {
-  if (!Number.isFinite(value) || value < minimum || value > maximum || (integer && !Number.isInteger(value))) {
+  if (
+    !Number.isFinite(value) ||
+    value < minimum ||
+    value > maximum ||
+    (integer && !Number.isInteger(value))
+  ) {
     invalid(`Invalid ${endpoint}`, endpoint)
   }
 
@@ -105,7 +110,11 @@ function validateNumber(
 }
 
 function unsupported(error: unknown): error is AlpacaProviderError {
-  return error instanceof AlpacaProviderError && error.reason === 'protocol-error' && error.errorNumber === 1024
+  return (
+    error instanceof AlpacaProviderError &&
+    error.reason === 'protocol-error' &&
+    error.errorNumber === 1024
+  )
 }
 
 export function createAlpacaFraming({
@@ -126,7 +135,10 @@ export function createAlpacaFraming({
     signal?.throwIfAborted()
     const devices = await client.configuredDevices(signal)
     rejectDuplicateDeviceIds(devices)
-    const found = devices.find(candidate => stableDeviceId(candidate) === id && candidate.DeviceType.toLowerCase() === kind)
+
+    const found = devices.find(
+      candidate => stableDeviceId(candidate) === id && candidate.DeviceType.toLowerCase() === kind,
+    )
 
     if (!found) throw new Error(`Configured ${kind} ${id} was not found`)
 
@@ -135,7 +147,10 @@ export function createAlpacaFraming({
     return found
   }
 
-  async function frame(telescope: ConfiguredDevice, signal?: AbortSignal): Promise<AlpacaCoordinateSystem> {
+  async function frame(
+    telescope: ConfiguredDevice,
+    signal?: AbortSignal,
+  ): Promise<AlpacaCoordinateSystem> {
     let value: number
 
     try {
@@ -147,7 +162,8 @@ export function createAlpacaFraming({
 
     const result = coordinateSystems[value]
 
-    if (!Number.isInteger(value) || result === undefined) invalid('Invalid equatorial coordinate system', 'equatorialsystem')
+    if (!Number.isInteger(value) || result === undefined)
+      invalid('Invalid equatorial coordinate system', 'equatorialsystem')
 
     return result
   }
@@ -160,7 +176,12 @@ export function createAlpacaFraming({
     signal?: AbortSignal,
   ) {
     try {
-      return validateNumber(await client.readNumber(telescope, property, signal), minimum, maximum, property)
+      return validateNumber(
+        await client.readNumber(telescope, property, signal),
+        minimum,
+        maximum,
+        property,
+      )
     } catch (error) {
       if (unsupported(error)) return undefined
       throw error
@@ -171,7 +192,8 @@ export function createAlpacaFraming({
     while (true) {
       signal.throwIfAborted()
 
-      if (!(await client.connected(telescope, signal))) throw new Error('Telescope disconnected before stop could be confirmed')
+      if (!(await client.connected(telescope, signal)))
+        throw new Error('Telescope disconnected before stop could be confirmed')
 
       if (!(await client.readBoolean(telescope, 'slewing', signal))) return
       await delay(pollIntervalMs, undefined, { signal })
@@ -208,15 +230,18 @@ export function createAlpacaFraming({
       if (!cameraName) invalid('Camera returned a blank operational name', 'name')
 
       if (expectedCameraName !== undefined && cameraName !== expectedCameraName.trim())
-        throw new Error('The camera in this driver slot has changed; select the imaging camera again')
+        throw new Error(
+          'The camera in this driver slot has changed; select the imaging camera again',
+        )
 
-      const number = async (property: string, minimum = 1, integer = true) => validateNumber(
-        await client.readNumber(camera, property, signal),
-        minimum,
-        2147483647,
-        property,
-        integer,
-      )
+      const number = async (property: string, minimum = 1, integer = true) =>
+        validateNumber(
+          await client.readNumber(camera, property, signal),
+          minimum,
+          2147483647,
+          property,
+          integer,
+        )
 
       const sensorWidthPixels = await number('cameraxsize')
       const sensorHeightPixels = await number('cameraysize')
@@ -229,7 +254,10 @@ export function createAlpacaFraming({
       const startX = await number('startx', 0)
       const startY = await number('starty', 0)
 
-      if ((startX + width) * binX > sensorWidthPixels || (startY + height) * binY > sensorHeightPixels)
+      if (
+        (startX + width) * binX > sensorWidthPixels ||
+        (startY + height) * binY > sensorHeightPixels
+      )
         invalid('Camera subframe exceeds the sensor', 'numx/numy/startx/starty')
 
       return {
@@ -249,10 +277,23 @@ export function createAlpacaFraming({
 
     async telescopeStatus(telescopeId, signal, options) {
       const telescope = await device(telescopeId, 'telescope', signal)
-      const ra = validateNumber(await client.readNumber(telescope, 'rightascension', signal), 0, 24, 'rightascension')
+
+      const ra = validateNumber(
+        await client.readNumber(telescope, 'rightascension', signal),
+        0,
+        24,
+        'rightascension',
+      )
 
       if (ra === 24) invalid('Right ascension must be less than 24 hours', 'rightascension')
-      const declinationDegrees = validateNumber(await client.readNumber(telescope, 'declination', signal), -90, 90, 'declination')
+
+      const declinationDegrees = validateNumber(
+        await client.readNumber(telescope, 'declination', signal),
+        -90,
+        90,
+        'declination',
+      )
+
       const coordinateSystem = await frame(telescope, signal)
       const latitudeDegrees = await optionalNumber(telescope, 'sitelatitude', -90, 90, signal)
       const longitudeDegrees = await optionalNumber(telescope, 'sitelongitude', -180, 180, signal)
@@ -270,10 +311,23 @@ export function createAlpacaFraming({
           observations.trackingRate = trackingRates[rate]!
         }
 
-        const raRate = await optionalNumber(telescope, 'rightascensionrate', -Infinity, Infinity, signal)
+        const raRate = await optionalNumber(
+          telescope,
+          'rightascensionrate',
+          -Infinity,
+          Infinity,
+          signal,
+        )
 
         if (raRate !== undefined) observations.rightAscensionRateSecondsPerSiderealSecond = raRate
-        const decRate = await optionalNumber(telescope, 'declinationrate', -Infinity, Infinity, signal)
+
+        const decRate = await optionalNumber(
+          telescope,
+          'declinationrate',
+          -Infinity,
+          Infinity,
+          signal,
+        )
 
         if (decRate !== undefined) observations.declinationRateArcsecondsPerSecond = decRate
       }
@@ -309,13 +363,16 @@ export function createAlpacaFraming({
       if (!Schema.is(Schema.Boolean)(tracking)) throw new RangeError('Tracking must be boolean')
       const telescope = await device(telescopeId, 'telescope', signal)
 
-      if (await client.readBoolean(telescope, 'tracking', signal) === tracking) return
+      if ((await client.readBoolean(telescope, 'tracking', signal)) === tracking) return
 
-      if (await client.readBoolean(telescope, 'atpark', signal)) throw new Error('Telescope is parked')
+      if (await client.readBoolean(telescope, 'atpark', signal))
+        throw new Error('Telescope is parked')
 
-      if (await client.readBoolean(telescope, 'slewing', signal)) throw new Error('Telescope is already moving')
+      if (await client.readBoolean(telescope, 'slewing', signal))
+        throw new Error('Telescope is already moving')
 
-      if (!(await client.readBoolean(telescope, 'cansettracking', signal))) throw new Error('Telescope cannot change tracking')
+      if (!(await client.readBoolean(telescope, 'cansettracking', signal)))
+        throw new Error('Telescope cannot change tracking')
       signal?.throwIfAborted()
       let commandError: unknown
 
@@ -328,16 +385,23 @@ export function createAlpacaFraming({
       // A lost setter response is resolved by observing the requested state,
       // never by replaying the write. Caller cancellation cannot cancel inspection.
       const confirmation = AbortSignal.timeout(requestTimeoutMs)
-      const commandDetail = commandError instanceof Error ? ` Setter reported: ${commandError.message}.` : ''
+
+      const commandDetail =
+        commandError instanceof Error ? ` Setter reported: ${commandError.message}.` : ''
 
       try {
         while (true) {
-          if (!(await client.connected(telescope, confirmation))) throw new Error('Telescope disconnected during tracking confirmation')
+          if (!(await client.connected(telescope, confirmation)))
+            throw new Error('Telescope disconnected during tracking confirmation')
 
-          if (await client.readBoolean(telescope, 'tracking', confirmation) === tracking) break
+          if ((await client.readBoolean(telescope, 'tracking', confirmation)) === tracking) break
 
           // A decoded rejection is stronger evidence than a delayed state read.
-          if (commandError instanceof AlpacaProviderError && commandError.reason === 'protocol-error' && commandError.errorNumber !== undefined) {
+          if (
+            commandError instanceof AlpacaProviderError &&
+            commandError.reason === 'protocol-error' &&
+            commandError.errorNumber !== undefined
+          ) {
             throw new Error('The telescope rejected the tracking change')
           }
 
@@ -346,42 +410,66 @@ export function createAlpacaFraming({
       } catch (error) {
         const detail = confirmation.aborted
           ? 'Requested tracking state was not observed before the confirmation deadline'
-          : error instanceof Error ? error.message : 'Tracking state inspection failed'
+          : error instanceof Error
+            ? error.message
+            : 'Tracking state inspection failed'
 
-        throw new Error(`Telescope tracking change was not confirmed. ${detail}.${commandDetail}`, { cause: error })
+        throw new Error(`Telescope tracking change was not confirmed. ${detail}.${commandDetail}`, {
+          cause: error,
+        })
       }
 
       signal?.throwIfAborted()
     },
 
-    async slew({ telescopeId, rightAscensionDegrees, declinationDegrees, coordinateSystem }, signal) {
-      if (!Number.isFinite(rightAscensionDegrees) || rightAscensionDegrees < 0 || rightAscensionDegrees >= 360
-        || !Number.isFinite(declinationDegrees) || Math.abs(declinationDegrees) > 90)
+    async slew(
+      { telescopeId, rightAscensionDegrees, declinationDegrees, coordinateSystem },
+      signal,
+    ) {
+      if (
+        !Number.isFinite(rightAscensionDegrees) ||
+        rightAscensionDegrees < 0 ||
+        rightAscensionDegrees >= 360 ||
+        !Number.isFinite(declinationDegrees) ||
+        Math.abs(declinationDegrees) > 90
+      )
         throw new RangeError('Invalid slew coordinates')
 
-      if (!coordinateSystems.some(system => system === coordinateSystem) || coordinateSystem === 'other')
+      if (
+        !coordinateSystems.some(system => system === coordinateSystem) ||
+        coordinateSystem === 'other'
+      )
         throw new Error('Slew requires a supported, explicit coordinate frame')
       const telescope = await device(telescopeId, 'telescope', signal)
 
-      if (await frame(telescope, signal) !== coordinateSystem)
+      if ((await frame(telescope, signal)) !== coordinateSystem)
         throw new Error('Slew coordinates do not match the telescope coordinate frame')
 
-      if (await client.readBoolean(telescope, 'atpark', signal)) throw new Error('Telescope is parked')
+      if (await client.readBoolean(telescope, 'atpark', signal))
+        throw new Error('Telescope is parked')
 
-      if (await client.readBoolean(telescope, 'slewing', signal)) throw new Error('Telescope is already moving')
+      if (await client.readBoolean(telescope, 'slewing', signal))
+        throw new Error('Telescope is already moving')
 
-      if (!(await client.readBoolean(telescope, 'canslewasync', signal))) throw new Error('Telescope cannot slew asynchronously')
+      if (!(await client.readBoolean(telescope, 'canslewasync', signal)))
+        throw new Error('Telescope cannot slew asynchronously')
 
-      if (!(await client.readBoolean(telescope, 'tracking', signal))) throw new Error('Equatorial slew requires tracking')
+      if (!(await client.readBoolean(telescope, 'tracking', signal)))
+        throw new Error('Equatorial slew requires tracking')
       signal?.throwIfAborted()
       const deadline = AbortSignal.timeout(slewTimeoutMs)
       const operationSignal = signal ? AbortSignal.any([signal, deadline]) : deadline
 
       try {
-        await client.command(telescope, 'slewtocoordinatesasync', {
-          RightAscension: String(rightAscensionDegrees / 15),
-          Declination: String(declinationDegrees),
-        }, operationSignal)
+        await client.command(
+          telescope,
+          'slewtocoordinatesasync',
+          {
+            RightAscension: String(rightAscensionDegrees / 15),
+            Declination: String(declinationDegrees),
+          },
+          operationSignal,
+        )
         await waitStopped(telescope, operationSignal)
       } catch (error) {
         // Any attempted write can leave physical movement behind, even when
@@ -396,11 +484,14 @@ export function createAlpacaFraming({
     async home(telescopeId, signal) {
       const telescope = await device(telescopeId, 'telescope', signal)
 
-      if (await client.readBoolean(telescope, 'atpark', signal)) throw new Error('Telescope is parked')
+      if (await client.readBoolean(telescope, 'atpark', signal))
+        throw new Error('Telescope is parked')
 
-      if (await client.readBoolean(telescope, 'slewing', signal)) throw new Error('Telescope is already moving')
+      if (await client.readBoolean(telescope, 'slewing', signal))
+        throw new Error('Telescope is already moving')
 
-      if (!(await client.readBoolean(telescope, 'canfindhome', signal))) throw new Error('Telescope cannot find home')
+      if (!(await client.readBoolean(telescope, 'canfindhome', signal)))
+        throw new Error('Telescope cannot find home')
       signal?.throwIfAborted()
       const deadline = AbortSignal.timeout(slewTimeoutMs)
       const operationSignal = signal ? AbortSignal.any([signal, deadline]) : deadline

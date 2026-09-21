@@ -1,6 +1,8 @@
-.vela-sky-path-specimen { width: min(100%, 44rem); }
+.vela-sky-path-specimen {
+  width: min(100%, 44rem);
+}
 .vela-sky-path-specimen__caption {
   margin: 0 0 calc(var(--vela-space) * 3);
   color: var(--vela-text-muted);
-  font-size: .85em;
+  font-size: 0.85em;
 }

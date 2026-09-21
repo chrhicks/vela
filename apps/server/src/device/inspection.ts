@@ -25,11 +25,13 @@ export function createRigDeviceInspector(
   rig: RigInspectionSource,
   options: RigDeviceInspectorOptions = {},
 ): RigDeviceInspector {
-  const provider = options.provider ?? createAlpacaProvider({
-    baseUrl: `http://${rig.endpoint.host}:${rig.endpoint.port}`,
-  })
+  const provider =
+    options.provider ??
+    createAlpacaProvider({
+      baseUrl: `http://${rig.endpoint.host}:${rig.endpoint.port}`,
+    })
 
   return {
-    inspectDevices: (inspectionOptions) => provider.inspectDevices(inspectionOptions),
+    inspectDevices: inspectionOptions => provider.inspectDevices(inspectionOptions),
   }
 }

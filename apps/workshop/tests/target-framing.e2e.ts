@@ -1,10 +1,16 @@
 import { expect, test } from '@playwright/test'
 
-const url = (width: number, props = '') => `/?component=panel&specimen=panel-target-framing&profile=vela-current&mode=dark&context=isolated&viewport=${width}${props}`
+const url = (width: number, props = '') =>
+  `/?component=panel&specimen=panel-target-framing&profile=vela-current&mode=dark&context=isolated&viewport=${width}${props}`
 
 test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 1700, height: 1400 })
-  await page.route('**/__workshop/**', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ session: null, profiles: [] }) }))
+  await page.route('**/__workshop/**', route =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ session: null, profiles: [] }),
+    }),
+  )
 })
 
 for (const width of [1040, 390]) {
@@ -38,7 +44,7 @@ for (const width of [1040, 390]) {
     const box = (await field.boundingBox())!
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
     await page.mouse.down()
-    await page.mouse.move(box.x + box.width * .6, box.y + box.height * .55, { steps: 4 })
+    await page.mouse.move(box.x + box.width * 0.6, box.y + box.height * 0.55, { steps: 4 })
     await page.mouse.up()
     expect(Number(await slider.inputValue())).toBeCloseTo(60, 0)
     expect(await page.evaluate(() => window.getSelection()?.isCollapsed)).toBe(true)

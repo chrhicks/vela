@@ -16,7 +16,7 @@ function originalBayerPixel(
 ) {
   const values = [0, 0, 0]
   const counts = [0, 0, 0]
-  const channelAt = (px: number, py: number) => 'rgb'.indexOf(pattern[(py % 2) * 2 + px % 2]!)
+  const channelAt = (px: number, py: number) => 'rgb'.indexOf(pattern[(py % 2) * 2 + (px % 2)]!)
   const ownChannel = channelAt(x, y)
   values[ownChannel] = pixels[y * width + x]!
   counts[ownChannel] = 1
@@ -41,38 +41,43 @@ function originalBayerPixel(
 }
 
 describe('Bayer interpolation', () => {
-  it.each(patterns)('preserves every pixel of the original %s interpolation across sensor phases and frame edges', (pattern) => {
-    // Width/height 1 exercise absent colors; 2 covers frames with no interior;
-    // larger odd/even frames exercise all four interior phases and edge phases.
-    const dimensions = [1, 2, 3, 4, 7, 8]
+  it.each(patterns)(
+    'preserves every pixel of the original %s interpolation across sensor phases and frame edges',
+    pattern => {
+      // Width/height 1 exercise absent colors; 2 covers frames with no interior;
+      // larger odd/even frames exercise all four interior phases and edge phases.
+      const dimensions = [1, 2, 3, 4, 7, 8]
 
-    const sampleSets = [
-      [0, 1, 7, 256, 1023, 32768, 65535, 912],
-      [-2147483648, 2147483647, -70001, 70003, -1, 0, 65536, 1073741824],
-    ]
+      const sampleSets = [
+        [0, 1, 7, 256, 1023, 32768, 65535, 912],
+        [-2147483648, 2147483647, -70001, 70003, -1, 0, 65536, 1073741824],
+      ]
 
-    for (const width of dimensions) {
-      for (const height of dimensions) {
-        for (const samples of sampleSets) {
-          const pixels = Int32Array.from(
-            { length: width * height },
-            (_, index) => samples[(index * 5 + Math.floor(index / width) * 3) % samples.length]!,
-          )
+      for (const width of dimensions) {
+        for (const height of dimensions) {
+          for (const samples of sampleSets) {
+            const pixels = Int32Array.from(
+              { length: width * height },
+              (_, index) => samples[(index * 5 + Math.floor(index / width) * 3) % samples.length]!,
+            )
 
-          const before = pixels.slice()
+            const before = pixels.slice()
 
-          for (let y = 0; y < height; y++) {
-            for (let x = 0; x < width; x++) {
-              expect(bayerPixel(width, height, pixels, pattern, x, y), `${width}x${height} at (${x}, ${y})`)
-                .toEqual(originalBayerPixel(width, height, pixels, pattern, x, y))
+            for (let y = 0; y < height; y++) {
+              for (let x = 0; x < width; x++) {
+                expect(
+                  bayerPixel(width, height, pixels, pattern, x, y),
+                  `${width}x${height} at (${x}, ${y})`,
+                ).toEqual(originalBayerPixel(width, height, pixels, pattern, x, y))
+              }
             }
-          }
 
-          expect(pixels).toEqual(before)
+            expect(pixels).toEqual(before)
+          }
         }
       }
-    }
-  })
+    },
+  )
 
   it('averages only available neighbors and uses the original sample when a color is absent', () => {
     expect(bayerPixel(2, 2, [1, 2, 4, 8], 'rggb', 0, 0)).toEqual([1, 3, 8])

@@ -57,7 +57,13 @@ test('rejects ignored and credential paths, outside paths, malformed paths, and 
   await writeFile(join(root, 'ignored.ts'), 'hidden')
   await writeFile(join(root, 'ignored/contract.md'), 'hidden')
   await writeFile(join(root, 'visible/source.ts'), 'visible')
-  for (const name of ['credentials.json', '.env.json', 'secrets.yaml', 'service-account.json', 'id_ed25519.txt']) {
+  for (const name of [
+    'credentials.json',
+    '.env.json',
+    'secrets.yaml',
+    'service-account.json',
+    'id_ed25519.txt',
+  ]) {
     await writeFile(join(root, name), 'hidden')
     await assert.rejects(reader.read(name), /outside the allowed/)
   }
@@ -150,24 +156,28 @@ test('applies the 40000-byte limit to every source without clipping or a cumulat
   await reader.validate()
 })
 
-test('rejects binary, invalid UTF-8, unsupported, directory, and FIFO sources without retaining them', { timeout: 5000 }, async t => {
-  const { root, reader } = await fixture(t)
-  await writeFile(join(root, 'binary.ts'), Buffer.from([97, 0, 98]))
-  await writeFile(join(root, 'invalid.ts'), Buffer.from([0xc3, 0x28]))
-  await writeFile(join(root, 'picture.svg'), '<svg/>')
-  await mkdir(join(root, 'directory.ts'))
-  execFileSync('mkfifo', [join(root, 'pipe.ts')])
-  for (const [path, error] of [
-    ['binary.ts', /binary/],
-    ['invalid.ts', /UTF-8/],
-    ['picture.svg', /Unsupported/],
-    ['directory.ts', /regular/],
-    ['pipe.ts', /regular/],
-  ] as const) {
-    await assert.rejects(reader.read(path), error)
-  }
-  assert.deepEqual(reader.snapshots(), [])
-})
+test(
+  'rejects binary, invalid UTF-8, unsupported, directory, and FIFO sources without retaining them',
+  { timeout: 5000 },
+  async t => {
+    const { root, reader } = await fixture(t)
+    await writeFile(join(root, 'binary.ts'), Buffer.from([97, 0, 98]))
+    await writeFile(join(root, 'invalid.ts'), Buffer.from([0xc3, 0x28]))
+    await writeFile(join(root, 'picture.svg'), '<svg/>')
+    await mkdir(join(root, 'directory.ts'))
+    execFileSync('mkfifo', [join(root, 'pipe.ts')])
+    for (const [path, error] of [
+      ['binary.ts', /binary/],
+      ['invalid.ts', /UTF-8/],
+      ['picture.svg', /Unsupported/],
+      ['directory.ts', /regular/],
+      ['pipe.ts', /regular/],
+    ] as const) {
+      await assert.rejects(reader.read(path), error)
+    }
+    assert.deepEqual(reader.snapshots(), [])
+  },
+)
 
 test('cancellation stops pending and subsequent access while preserving collected snapshots', async t => {
   const { root, reader, controller } = await fixture(t)

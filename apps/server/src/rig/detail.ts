@@ -1,7 +1,4 @@
-import {
-  AlpacaProviderError,
-  type AlpacaDeviceInspection,
-} from '@vela/alpaca'
+import { AlpacaProviderError, type AlpacaDeviceInspection } from '@vela/alpaca'
 import type { RigState } from '@vela/model/rig'
 import type { RigDetailView, RigDeviceDetailView } from '@vela/model/web'
 import {
@@ -10,16 +7,9 @@ import {
   type RigInspectionSource,
 } from '../device/inspection.js'
 import { summarizeDeviceConnections } from '../web/device.js'
-import {
-  currentDeviceView,
-  unavailableDeviceView,
-} from '../web/rig-detail.js'
+import { currentDeviceView, unavailableDeviceView } from '../web/rig-detail.js'
 import type { RigCatalog } from './catalog.js'
-import type {
-  ObservedDeviceRecord,
-  ObservedRigInventory,
-  RigCatalogRecord,
-} from './contracts.js'
+import type { ObservedDeviceRecord, ObservedRigInventory, RigCatalogRecord } from './contracts.js'
 
 export type LoadRigDetailResult =
   | { readonly state: 'found'; readonly view: RigDetailView }
@@ -100,8 +90,9 @@ export async function inspectRigDetail(
     }
   }
 
-  const devices = inspections.map((inspection) =>
-    currentDeviceView(record.id, inspection, refreshedAt))
+  const devices = inspections.map(inspection =>
+    currentDeviceView(record.id, inspection, refreshedAt),
+  )
 
   return {
     state: 'current',
@@ -128,17 +119,16 @@ export async function loadRigDetailView(
 ): Promise<LoadRigDetailResult> {
   const result = await inspectRigDetail(catalog, rigId, options)
 
-  return result.state === 'not-found'
-    ? result
-    : { state: 'found', view: result.view }
+  return result.state === 'not-found' ? result : { state: 'found', view: result.view }
 }
 
 function resolvedRigState(devices: ReadonlyArray<RigDeviceDetailView>): RigState {
-  const hasDeviceError = devices.some((device) =>
-    device.kind === 'camera'
-      && (device.status.availability === 'complete'
-        || device.status.availability === 'partial')
-      && device.status.activity === 'error')
+  const hasDeviceError = devices.some(
+    device =>
+      device.kind === 'camera' &&
+      (device.status.availability === 'complete' || device.status.availability === 'partial') &&
+      device.status.activity === 'error',
+  )
 
   return hasDeviceError ? 'needs-attention' : 'reachable'
 }
@@ -162,8 +152,9 @@ function lastKnownRigDetail(
   state: Exclude<RigState, 'reachable'>,
   refreshedAt: string,
 ): RigDetailView {
-  const devices = record.lastObservedInventory.devices.map((device) =>
-    unavailableDeviceView(record.id, device))
+  const devices = record.lastObservedInventory.devices.map(device =>
+    unavailableDeviceView(record.id, device),
+  )
 
   return {
     id: record.id,

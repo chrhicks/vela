@@ -137,12 +137,10 @@ describe('Alpaca device connection', () => {
   it('connects a Seestar-like device with the documented form-encoded setter and verifies it', async () => {
     const requests: RecordedRequest[] = []
 
-    const alpaca = provider([
-      inventory,
-      envelope(false),
-      methodEnvelope(),
-      envelope(true),
-    ], requests)
+    const alpaca = provider(
+      [inventory, envelope(false), methodEnvelope(), envelope(true)],
+      requests,
+    )
 
     const expected: AlpacaDeviceConnectionResult = { outcome: 'connected', command: 'requested' }
     await expect(alpaca.connectDevice('camera-1')).resolves.toEqual(expected)
@@ -230,11 +228,7 @@ describe('Alpaca device connection', () => {
       return Response.json(methodEnvelope(1025, 'Invalid connection request'))
     }
 
-    const alpaca = provider([
-      inventory,
-      envelope(false),
-      rejectThenCancel,
-    ])
+    const alpaca = provider([inventory, envelope(false), rejectThenCancel])
 
     await expect(alpaca.connectDevice('camera-1', { signal: controller.signal })).resolves.toEqual({
       outcome: 'failed',
@@ -286,12 +280,7 @@ describe('Alpaca device connection', () => {
   })
 
   it('reconciles an ambiguous write response when the device is observably connected', async () => {
-    const alpaca = provider([
-      inventory,
-      envelope(false),
-      {},
-      envelope(true),
-    ])
+    const alpaca = provider([inventory, envelope(false), {}, envelope(true)])
 
     await expect(alpaca.connectDevice('camera-1')).resolves.toEqual({
       outcome: 'connected',
@@ -331,13 +320,10 @@ describe('Alpaca device connection', () => {
     vi.useFakeTimers()
     const requests: RecordedRequest[] = []
 
-    const alpaca = provider([
-      inventory,
-      envelope(false),
-      stalledRequest,
-      envelope(false),
-      unsupportedConnecting,
-    ], requests)
+    const alpaca = provider(
+      [inventory, envelope(false), stalledRequest, envelope(false), unsupportedConnecting],
+      requests,
+    )
 
     const connection = alpaca.connectDevice('camera-1')
     await vi.advanceTimersByTimeAsync(20)
@@ -352,12 +338,7 @@ describe('Alpaca device connection', () => {
   it('reports unavailable verification when the post-write read receives no response', async () => {
     vi.useFakeTimers()
 
-    const alpaca = provider([
-      inventory,
-      envelope(false),
-      methodEnvelope(),
-      stalledRequest,
-    ])
+    const alpaca = provider([inventory, envelope(false), methodEnvelope(), stalledRequest])
 
     const connection = alpaca.connectDevice('camera-1')
     await vi.advanceTimersByTimeAsync(20)
@@ -374,7 +355,9 @@ describe('Alpaca device connection', () => {
     const requests: RecordedRequest[] = []
     const alpaca = provider([], requests)
 
-    await expect(alpaca.connectDevice('camera-1', { signal: controller.signal })).rejects.toMatchObject({
+    await expect(
+      alpaca.connectDevice('camera-1', { signal: controller.signal }),
+    ).rejects.toMatchObject({
       name: 'AbortError',
     })
     expect(requests).toHaveLength(0)
@@ -383,7 +366,7 @@ describe('Alpaca device connection', () => {
   it('reports uncertainty when cancellation occurs after a confirmed write', async () => {
     const controller = new AbortController()
 
-    const cancelDuringVerification: ResponseFactory = (signal) => {
+    const cancelDuringVerification: ResponseFactory = signal => {
       const request = stalledRequest(signal)
       queueMicrotask(() => controller.abort(new DOMException('Cancelled', 'AbortError')))
 
@@ -407,18 +390,14 @@ describe('Alpaca device connection', () => {
     const controller = new AbortController()
     const requests: RecordedRequest[] = []
 
-    const cancelDuringWrite: ResponseFactory = (signal) => {
+    const cancelDuringWrite: ResponseFactory = signal => {
       const request = stalledRequest(signal)
       queueMicrotask(() => controller.abort(new DOMException('Cancelled', 'AbortError')))
 
       return request
     }
 
-    const alpaca = provider([
-      inventory,
-      envelope(false),
-      cancelDuringWrite,
-    ], requests)
+    const alpaca = provider([inventory, envelope(false), cancelDuringWrite], requests)
 
     const connection = alpaca.connectDevice('camera-1', { signal: controller.signal })
 

@@ -1,6 +1,14 @@
 import { useState, type FormEvent } from 'react'
 import { createRoot } from 'react-dom/client'
-import { Button, Input, Panel, Select, VELA_CURRENT_PROFILE, resolveTheme, themeStyle } from '@vela/ui'
+import {
+  Button,
+  Input,
+  Panel,
+  Select,
+  VELA_CURRENT_PROFILE,
+  resolveTheme,
+  themeStyle,
+} from '@vela/ui'
 import { useSimulator } from './useSimulator'
 import '@vela/ui/styles.css'
 import './styles.css'
@@ -11,7 +19,13 @@ function angularOffset(value: number) {
   return `${seconds >= 60 ? `${Math.floor(seconds / 60)}′ ` : ''}${seconds % 60}″`
 }
 
-function Axis({ axis, value, step, disabled, adjust }: {
+function Axis({
+  axis,
+  value,
+  step,
+  disabled,
+  adjust,
+}: {
   axis: 'altitude' | 'azimuth'
   value: number
   step: number
@@ -27,26 +41,24 @@ function Axis({ axis, value, step, disabled, adjust }: {
         <span>{vertical ? 'Vertical' : 'Horizontal'}</span>
       </div>
       <strong>{angularOffset(value)}</strong>
-      <p>{vertical
-        ? value === 0
-          ? 'At the pole’s altitude'
-          : value > 0 ? 'Above the pole' : 'Below the pole'
-        : value === 0
-          ? 'Pointing north'
-          : value > 0 ? 'East of north' : 'West of north'}</p>
+      <p>
+        {vertical
+          ? value === 0
+            ? 'At the pole’s altitude'
+            : value > 0
+              ? 'Above the pole'
+              : 'Below the pole'
+          : value === 0
+            ? 'Pointing north'
+            : value > 0
+              ? 'East of north'
+              : 'West of north'}
+      </p>
       <div className="sim-buttons">
-        <Button
-          tone="neutral"
-          disabled={disabled || value <= -18000}
-          onClick={() => adjust(-step)}
-        >
+        <Button tone="neutral" disabled={disabled || value <= -18000} onClick={() => adjust(-step)}>
           {vertical ? '↓ Lower' : '← West'}
         </Button>
-        <Button
-          tone="neutral"
-          disabled={disabled || value >= 18000}
-          onClick={() => adjust(step)}
-        >
+        <Button tone="neutral" disabled={disabled || value >= 18000} onClick={() => adjust(step)}>
           {vertical ? '↑ Raise' : 'East →'}
         </Button>
       </div>
@@ -123,7 +135,9 @@ function Controls() {
         <p className="sim-intro">Adjust the rig here. Watch Vela respond in its own window.</p>
         <p className="sim-connection">
           Add rig in Vela: <strong>127.0.0.1:7850</strong>
-          {state ? ` · Mono ${state.cameras[0]?.connected ? 'connected' : 'disconnected'} · Color ${state.cameras[1]?.connected ? 'connected' : 'disconnected'} · Mount ${state.telescopeConnected ? 'connected' : 'disconnected'}` : ''}
+          {state
+            ? ` · Mono ${state.cameras[0]?.connected ? 'connected' : 'disconnected'} · Color ${state.cameras[1]?.connected ? 'connected' : 'disconnected'} · Mount ${state.telescopeConnected ? 'connected' : 'disconnected'}`
+            : ''}
         </p>
         {!available && (
           <p role="status" className="sim-notice">
@@ -134,7 +148,10 @@ function Controls() {
         )}
         {state && (
           <div className="sim-layout">
-            <Panel title="Adjust the mount" description="These controls stand in for the mount’s adjustment knobs.">
+            <Panel
+              title="Adjust the mount"
+              description="These controls stand in for the mount’s adjustment knobs."
+            >
               <Select
                 label="Adjustment per press"
                 value={step}
@@ -160,8 +177,12 @@ function Controls() {
                   adjust={adjustAzimuth}
                 />
               </div>
-              <p className="sim-note">Actual simulated offsets, not Vela’s measured alignment error.</p>
-              <div className="sim-status" role="status">{statusMessage}</div>
+              <p className="sim-note">
+                Actual simulated offsets, not Vela’s measured alignment error.
+              </p>
+              <div className="sim-status" role="status">
+                {statusMessage}
+              </div>
               <div className="sim-details">
                 <button
                   className="sim-summary"
@@ -202,7 +223,10 @@ function Controls() {
               </div>
             </Panel>
             <div className="sim-side">
-              <Panel title="Cameras" description="Choose each camera’s image size for the next exposure.">
+              <Panel
+                title="Cameras"
+                description="Choose each camera’s image size for the next exposure."
+              >
                 {state.cameras.map(camera => (
                   <section
                     className="sim-camera-row"
@@ -214,7 +238,8 @@ function Controls() {
                       <span>{camera.connected ? 'Connected' : 'Disconnected'}</span>
                     </div>
                     <p className="sim-camera-meta">
-                      Camera {camera.number} · {camera.sensor === 'mono' ? 'Monochrome' : 'RGGB sensor'}
+                      Camera {camera.number} ·{' '}
+                      {camera.sensor === 'mono' ? 'Monochrome' : 'RGGB sensor'}
                     </p>
                     <Select
                       label={`${camera.sensor === 'mono' ? 'Mono' : 'Color'} image size`}
@@ -224,22 +249,29 @@ function Controls() {
                         { value: 'fast', label: 'Fast · 1562 × 1044' },
                         { value: 'full', label: 'Full · 6248 × 4176' },
                       ]}
-                      onChange={event => void command(
-                        '/simulator/camera',
-                        'PUT',
-                        { cameraNumber: camera.number, resolution: event.target.value },
-                        `${camera.sensor === 'mono' ? 'Mono' : 'Color'} image size updated for the next exposure`,
-                      )}
+                      onChange={event =>
+                        void command(
+                          '/simulator/camera',
+                          'PUT',
+                          { cameraNumber: camera.number, resolution: event.target.value },
+                          `${camera.sensor === 'mono' ? 'Mono' : 'Color'} image size updated for the next exposure`,
+                        )
+                      }
                     />
                     <p className="sim-camera-activity" role="status">
                       {camera.activity === 'exposing'
                         ? 'Exposing · image size locked until complete'
-                        : camera.imageReady ? 'Image ready' : 'Idle · no image ready'}
+                        : camera.imageReady
+                          ? 'Image ready'
+                          : 'Idle · no image ready'}
                     </p>
                   </section>
                 ))}
               </Panel>
-              <Panel title="Shared sky" description="Both cameras see the same sky and mount position.">
+              <Panel
+                title="Shared sky"
+                description="Both cameras see the same sky and mount position."
+              >
                 <div className="sim-camera">
                   <strong>{state.obscured ? 'Obscured' : 'Clear sky'}</strong>
                   <p>
@@ -251,12 +283,14 @@ function Controls() {
                 <Button
                   tone="neutral"
                   disabled={blocked}
-                  onClick={() => void command(
-                    '/simulator/camera',
-                    'PUT',
-                    { obscured: !state.obscured },
-                    'Shared sky updated for the next exposure',
-                  )}
+                  onClick={() =>
+                    void command(
+                      '/simulator/camera',
+                      'PUT',
+                      { obscured: !state.obscured },
+                      'Shared sky updated for the next exposure',
+                    )
+                  }
                 >
                   {state.obscured ? 'Clear the sky' : 'Obscure the sky'}
                 </Button>
@@ -273,16 +307,21 @@ function Controls() {
                     { value: 'aligned', label: 'Aligned' },
                   ]}
                 />
-                <p className="sim-note">Reset stops current work, restores these offsets and clears the camera. Start a fresh alignment measurement in Vela afterward.</p>
+                <p className="sim-note">
+                  Reset stops current work, restores these offsets and clears the camera. Start a
+                  fresh alignment measurement in Vela afterward.
+                </p>
                 <Button
                   tone="neutral"
                   disabled={blocked}
-                  onClick={() => void command(
-                    '/simulator/reset',
-                    'POST',
-                    { preset },
-                    'Starting position restored · camera clear',
-                  )}
+                  onClick={() =>
+                    void command(
+                      '/simulator/reset',
+                      'POST',
+                      { preset },
+                      'Starting position restored · camera clear',
+                    )
+                  }
                 >
                   Reset rig
                 </Button>

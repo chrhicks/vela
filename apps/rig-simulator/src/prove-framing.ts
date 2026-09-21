@@ -20,7 +20,8 @@ const catalogPath = process.env.VELA_STAR_CATALOG
 
 const executable = process.env.VELA_ASTAP
 
-if (!catalogPath || !executable) throw new Error('Set VELA_STAR_CATALOG and VELA_ASTAP; see README.md')
+if (!catalogPath || !executable)
+  throw new Error('Set VELA_STAR_CATALOG and VELA_ASTAP; see README.md')
 
 const output = resolve(process.env.VELA_SIM_OUTPUT ?? '.local/framing-proof')
 
@@ -50,22 +51,24 @@ try {
 
   const devices = await provider.inspectDevices()
 
-  const catalog = createMemoryRigCatalog([{
-    id: 'proof',
-    name: 'Framing proof',
-    endpoint: { host: '127.0.0.1', port: Number(new URL(baseUrl).port) },
-    imagingCamera: { uniqueId: cameraId, name: 'Simulator Camera' },
-    focalLengthMm,
-    addedAt: new Date().toISOString(),
-    lastObservedInventory: {
-      observedAt: new Date().toISOString(),
-      devices: devices.map(device => ({
-        uniqueId: device.providerDeviceId,
-        kind: device.kind,
-        name: device.configuredName,
-      })),
+  const catalog = createMemoryRigCatalog([
+    {
+      id: 'proof',
+      name: 'Framing proof',
+      endpoint: { host: '127.0.0.1', port: Number(new URL(baseUrl).port) },
+      imagingCamera: { uniqueId: cameraId, name: 'Simulator Camera' },
+      focalLengthMm,
+      addedAt: new Date().toISOString(),
+      lastObservedInventory: {
+        observedAt: new Date().toISOString(),
+        devices: devices.map(device => ({
+          uniqueId: device.providerDeviceId,
+          kind: device.kind,
+          name: device.configuredName,
+        })),
+      },
     },
-  }])
+  ])
 
   const operations = createRigOperations()
   registerTargets(vela, catalog, operations, { solver: { executable, catalogPath } })
@@ -122,7 +125,8 @@ try {
 
       if (predicate(state)) return state
 
-      if (!state.active) throw new Error(`Framing ended unexpectedly: ${state.phase}: ${state.error}`)
+      if (!state.active)
+        throw new Error(`Framing ended unexpectedly: ${state.phase}: ${state.error}`)
       await delay(50)
     }
 
@@ -132,12 +136,13 @@ try {
   const start = (
     exposureSeconds = 2,
     position = { raDegrees: eagle.raDegrees, decDegrees: eagle.decDegrees },
-  ) => command('start', {
-    targetId: eagle.id,
-    raDegrees: position.raDegrees,
-    decDegrees: position.decDegrees,
-    exposureSeconds,
-  })
+  ) =>
+    command('start', {
+      targetId: eagle.id,
+      raDegrees: position.raDegrees,
+      decDegrees: position.decDegrees,
+      exposureSeconds,
+    })
 
   const finish = () => waitFor(state => !state.active)
 
@@ -158,14 +163,20 @@ try {
   await start()
   const firstState = await finish()
   const first = checked(firstState)
-  assert.equal(firstState.canCenter, true, 'The original polar error must produce a measurable miss')
+  assert.equal(
+    firstState.canCenter,
+    true,
+    'The original polar error must produce a measurable miss',
+  )
   const nominal = await mount.telescopeStatus(telescopeId)
   assert.ok(Math.abs(nominal.rightAscensionDegrees - eagle.raDegrees) < 1e-6)
   assert.ok(Math.abs(nominal.declinationDegrees - eagle.decDegrees) < 1e-6)
   await command('center', { checkId: first.checkId })
   const centered = checked(await finish())
-  assert.ok(centered.offsetArcminutes < 0.5 && centered.offsetArcminutes < first.offsetArcminutes / 5,
-    `Center must reduce the measured error: ${first.offsetArcminutes} → ${centered.offsetArcminutes}`)
+  assert.ok(
+    centered.offsetArcminutes < 0.5 && centered.offsetArcminutes < first.offsetArcminutes / 5,
+    `Center must reduce the measured error: ${first.offsetArcminutes} → ${centered.offsetArcminutes}`,
+  )
   reports.push({
     scenario: 'eagle-check-and-center',
     firstOffsetArcminutes: first.offsetArcminutes,
@@ -270,12 +281,18 @@ try {
   await command('center', { checkId: aged.checkId })
   const agedCentered = checked(await finish())
   assert.ok(agedCentered.offsetArcminutes < 0.5)
-  reports.push({ scenario: 'crescent-after-25-minutes', centeredOffsetArcminutes: agedCentered.offsetArcminutes })
+  reports.push({
+    scenario: 'crescent-after-25-minutes',
+    centeredOffsetArcminutes: agedCentered.offsetArcminutes,
+  })
 
   await catalog.setImagingCamera('proof', { uniqueId: cameraId, name: 'Simulator Camera' })
   await control('camera', { cameraNumber: 0, resolution: 'full' })
 
-  for (const position of [{ raDegrees: 359.9, decDegrees: 0 }, { raDegrees: 45, decDegrees: 89 }]) {
+  for (const position of [
+    { raDegrees: 359.9, decDegrees: 0 },
+    { raDegrees: 45, decDegrees: 89 },
+  ]) {
     await start(2, position)
     const result = checked(await finish())
     reports.push({

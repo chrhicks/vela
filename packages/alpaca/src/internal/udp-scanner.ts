@@ -2,11 +2,7 @@ import { createSocket as createNodeSocket } from 'node:dgram'
 import { networkInterfaces as readNodeNetworkInterfaces } from 'node:os'
 import { Schema, SchemaTransformation } from 'effect'
 import { AlpacaDiscoveryError } from '../error.js'
-import type {
-  AlpacaEndpoint,
-  AlpacaUdpScanner,
-  AlpacaUdpScanRequest,
-} from '../discovery-model.js'
+import type { AlpacaEndpoint, AlpacaUdpScanner, AlpacaUdpScanRequest } from '../discovery-model.js'
 
 const discoveryMessage = new TextEncoder().encode('alpacadiscovery1')
 
@@ -34,12 +30,7 @@ interface UdpSocket {
   onError(listener: (error: Error) => void): void
   bind(address: string): void
   setBroadcast(enabled: boolean): void
-  send(
-    message: Uint8Array,
-    port: number,
-    address: string,
-    callback: (error?: Error) => void,
-  ): void
+  send(message: Uint8Array, port: number, address: string, callback: (error?: Error) => void): void
   close(): void
 }
 
@@ -66,9 +57,7 @@ function parseIpv4(address: string): number | undefined {
 }
 
 function formatIpv4(value: number): string {
-  return [24, 16, 8, 0]
-    .map((shift) => String((value >>> shift) & 0xff))
-    .join('.')
+  return [24, 16, 8, 0].map(shift => String((value >>> shift) & 0xff)).join('.')
 }
 
 function broadcastAddress(networkInterface: Ipv4Interface): string | undefined {
@@ -165,14 +154,16 @@ function scanInterface(
     }
 
     function onAbort() {
-      fail(options.signal === undefined
-        ? undefined
-        : (options.signal.reason ?? new DOMException('The operation was aborted', 'AbortError')))
+      fail(
+        options.signal === undefined
+          ? undefined
+          : (options.signal.reason ?? new DOMException('The operation was aborted', 'AbortError')),
+      )
     }
 
     function sendDiscovery() {
       if (settled) return
-      socket.send(discoveryMessage, discoveryPort, broadcastTarget, (error) => {
+      socket.send(discoveryMessage, discoveryPort, broadcastTarget, error => {
         if (error !== undefined) fail(error)
       })
     }
@@ -233,12 +224,12 @@ export function createUdpScanner({
         throw new AlpacaDiscoveryError('Unable to enumerate IPv4 network interfaces', { cause })
       }
 
-      const selectedAddresses = options.interfaceAddresses === undefined
-        ? undefined
-        : new Set(options.interfaceAddresses)
+      const selectedAddresses =
+        options.interfaceAddresses === undefined ? undefined : new Set(options.interfaceAddresses)
 
-      const selectedInterfaces = availableInterfaces.filter((networkInterface) =>
-        selectedAddresses === undefined || selectedAddresses.has(networkInterface.address),
+      const selectedInterfaces = availableInterfaces.filter(
+        networkInterface =>
+          selectedAddresses === undefined || selectedAddresses.has(networkInterface.address),
       )
 
       if (selectedInterfaces.length === 0) {
@@ -246,13 +237,13 @@ export function createUdpScanner({
       }
 
       const results = await Promise.allSettled(
-        selectedInterfaces.map((networkInterface) =>
+        selectedInterfaces.map(networkInterface =>
           scanInterface(networkInterface, options, createSocket),
         ),
       )
 
       if (options.signal?.aborted) {
-        throw (options.signal.reason ?? new DOMException('The operation was aborted', 'AbortError'))
+        throw options.signal.reason ?? new DOMException('The operation was aborted', 'AbortError')
       }
 
       const successful = results.filter(
@@ -263,7 +254,7 @@ export function createUdpScanner({
       if (successful.length === 0) {
         throw new AlpacaDiscoveryError('Alpaca discovery failed on every IPv4 interface', {
           cause: new AggregateError(
-            results.map((result) => result.status === 'rejected' ? result.reason : undefined),
+            results.map(result => (result.status === 'rejected' ? result.reason : undefined)),
           ),
         })
       }
@@ -292,32 +283,34 @@ function nodeNetworkInterfaces(): ReadonlyArray<Ipv4Interface> {
     }
   }
 
-  return [...new Map(
-    interfaces.map((networkInterface) => [networkInterface.address, networkInterface]),
-  ).values()]
+  return [
+    ...new Map(
+      interfaces.map(networkInterface => [networkInterface.address, networkInterface]),
+    ).values(),
+  ]
 }
 
 function nodeSocket(): UdpSocket {
   const socket = createNodeSocket('udp4')
 
   return {
-    onListening: (listener) => {
+    onListening: listener => {
       socket.on('listening', listener)
     },
-    onMessage: (listener) => {
+    onMessage: listener => {
       socket.on('message', (message, remote) => listener(message, remote.address))
     },
-    onError: (listener) => {
+    onError: listener => {
       socket.on('error', listener)
     },
-    bind: (address) => {
+    bind: address => {
       socket.bind(0, address)
     },
-    setBroadcast: (enabled) => {
+    setBroadcast: enabled => {
       socket.setBroadcast(enabled)
     },
     send: (message, port, address, callback) => {
-      socket.send(message, port, address, (error) => callback(error ?? undefined))
+      socket.send(message, port, address, error => callback(error ?? undefined))
     },
     close: () => {
       socket.close()

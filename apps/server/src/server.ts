@@ -54,9 +54,15 @@ try {
       : resolve(dirname(rigCatalogPath), 'saved-images'),
   )
 
-  const targets = process.env.VELA_ASTAP && process.env.VELA_STAR_CATALOG
-    ? { solver: { executable: process.env.VELA_ASTAP, catalogPath: process.env.VELA_STAR_CATALOG } }
-    : {}
+  const targets =
+    process.env.VELA_ASTAP && process.env.VELA_STAR_CATALOG
+      ? {
+          solver: {
+            executable: process.env.VELA_ASTAP,
+            catalogPath: process.env.VELA_STAR_CATALOG,
+          },
+        }
+      : {}
 
   const surveyCache = createSurveyCache(
     process.env.VELA_SURVEY_CACHE_PATH

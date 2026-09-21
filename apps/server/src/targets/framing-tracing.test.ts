@@ -30,13 +30,22 @@ it('persists exact centering inputs and correlated evidence before and after com
 
   let moved = false
   let finishSolve!: () => void
-  const solveGate = new Promise<void>(resolve => { finishSolve = resolve })
+
+  const solveGate = new Promise<void>(resolve => {
+    finishSolve = resolve
+  })
+
   let enteredSolve!: () => void
-  const solving = new Promise<void>(resolve => { enteredSolve = resolve })
+
+  const solving = new Promise<void>(resolve => {
+    enteredSolve = resolve
+  })
 
   const hardware: FramingHardware = {
     status: async () => ({ ...mount }),
-    tracking: async enabled => { mount.tracking = enabled },
+    tracking: async enabled => {
+      mount.tracking = enabled
+    },
     slew: async position => {
       moved = true
       mount.rightAscensionDegrees = position.raDegrees
@@ -83,24 +92,36 @@ it('persists exact centering inputs and correlated evidence before and after com
     },
   }
 
-  const controller = createFramingController(() => new Date(at), async signal => { signal.throwIfAborted() })
-
-  const run = (action: 'check' | 'center') => new Promise<void>(resolve => controller.start(
-    {
-      desired,
-      targetId: 'ngc6992',
-      exposureSeconds: 20,
-      configuration: 'camera-geometry-and-focal-length',
-      action,
-      rigId: 'review-rig',
-      requestId: `request-${action}`,
+  const controller = createFramingController(
+    () => new Date(at),
+    async signal => {
+      signal.throwIfAborted()
     },
-    hardware,
-    solver,
-    resolve,
-  ))
+  )
 
-  const records = async () => (await readFile(path, 'utf8')).trim().split('\n').map(line => JSON.parse(line))
+  const run = (action: 'check' | 'center') =>
+    new Promise<void>(resolve =>
+      controller.start(
+        {
+          desired,
+          targetId: 'ngc6992',
+          exposureSeconds: 20,
+          configuration: 'camera-geometry-and-focal-length',
+          action,
+          rigId: 'review-rig',
+          requestId: `request-${action}`,
+        },
+        hardware,
+        solver,
+        resolve,
+      ),
+    )
+
+  const records = async () =>
+    (await readFile(path, 'utf8'))
+      .trim()
+      .split('\n')
+      .map(line => JSON.parse(line))
 
   try {
     await run('check')
@@ -108,7 +129,12 @@ it('persists exact centering inputs and correlated evidence before and after com
     await solving
     await telemetry.forceFlush()
     const live = await records()
-    const started = live.find(record => record.name === 'framing.started' && record.attributes['framing.action'] === 'center')!
+
+    const started = live.find(
+      record =>
+        record.name === 'framing.started' && record.attributes['framing.action'] === 'center',
+    )!
+
     expect(started.attributes).toMatchObject({
       'framing.desired.ra_degrees': desired.raDegrees,
       'framing.desired.dec_degrees': desired.decDegrees,
@@ -121,22 +147,37 @@ it('persists exact centering inputs and correlated evidence before and after com
     expect(JSON.parse(requested.attributes['framing.mount.before_move']).pierSide).toBe('west')
     const command = JSON.parse(requested.attributes['framing.command.driver'])
     expect(command.decDegrees).toBeCloseTo(desired.decDegrees - 42.4 / 60, 10)
-    expect(live.some(record => record.name === 'framing.run' && record.traceId === started.traceId)).toBe(false)
+    expect(
+      live.some(record => record.name === 'framing.run' && record.traceId === started.traceId),
+    ).toBe(false)
     finishSolve()
     await centering
     await telemetry.forceFlush()
     const saved = await records()
-    const solved = saved.find(record => record.name === 'framing.solved' && record.traceId === started.traceId)!
+
+    const solved = saved.find(
+      record => record.name === 'framing.solved' && record.traceId === started.traceId,
+    )!
+
     expect(JSON.parse(solved.attributes['framing.solved.wcs']).cd).toEqual(cd)
     expect(solved.attributes['image.captured_at_source']).toBe('server-estimate')
     expect(JSON.parse(solved.attributes['framing.mount.at_exposure']).pierSide).toBe('east')
-    expect(saved.find(record => record.name === 'framing.check-validation' && record.traceId === started.traceId)?.attributes['framing.check.current']).toBe(true)
-    expect(saved.find(record => record.name === 'framing.correction.measured')?.attributes).toMatchObject({
+    expect(
+      saved.find(
+        record => record.name === 'framing.check-validation' && record.traceId === started.traceId,
+      )?.attributes['framing.check.current'],
+    ).toBe(true)
+    expect(
+      saved.find(record => record.name === 'framing.correction.measured')?.attributes,
+    ).toMatchObject({
       'framing.pointing_side_changed': true,
       'framing.outcome': 'centered',
       'framing.offset_arcminutes': 0,
     })
-    expect(saved.find(record => record.name === 'framing.run' && record.traceId === started.traceId)?.attributes).toMatchObject({
+    expect(
+      saved.find(record => record.name === 'framing.run' && record.traceId === started.traceId)
+        ?.attributes,
+    ).toMatchObject({
       'framing.corrections': 1,
       'framing.phase': 'checked',
       'framing.outcome': 'centered',

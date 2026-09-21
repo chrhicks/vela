@@ -2,7 +2,13 @@ import { z } from 'zod'
 import type { CSSProperties } from 'react'
 import { DEFAULT_THEME_PARAMETERS, BASELINE_FINGERPRINT } from './defaults'
 import { RAMP_NAMES, RAMP_STEPS, SEMANTIC_TOKEN_KEYS } from './types'
-import type { DesignProfile, ReferenceToken, ThemeMode, ThemeParameters, WorkingSession } from './types'
+import type {
+  DesignProfile,
+  ReferenceToken,
+  ThemeMode,
+  ThemeParameters,
+  WorkingSession,
+} from './types'
 
 const fontStacks = {
   sans: 'Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
@@ -10,17 +16,35 @@ const fontStacks = {
   mono: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
 } as const
 
-export function resolveTheme(profile: DesignProfile, scratch: Partial<ThemeParameters> = {}): ThemeParameters {
+export function resolveTheme(
+  profile: DesignProfile,
+  scratch: Partial<ThemeParameters> = {},
+): ThemeParameters {
   return {
     ...DEFAULT_THEME_PARAMETERS,
     ...profile.overrides,
     ...scratch,
     semantic: scratch.semantic ?? profile.overrides.semantic ?? DEFAULT_THEME_PARAMETERS.semantic,
-    neutralLightness: scratch.neutralLightness ?? profile.overrides.neutralLightness ?? DEFAULT_THEME_PARAMETERS.neutralLightness,
-    accentLightness: scratch.accentLightness ?? profile.overrides.accentLightness ?? DEFAULT_THEME_PARAMETERS.accentLightness,
-    positiveLightness: scratch.positiveLightness ?? profile.overrides.positiveLightness ?? DEFAULT_THEME_PARAMETERS.positiveLightness,
-    warningLightness: scratch.warningLightness ?? profile.overrides.warningLightness ?? DEFAULT_THEME_PARAMETERS.warningLightness,
-    dangerLightness: scratch.dangerLightness ?? profile.overrides.dangerLightness ?? DEFAULT_THEME_PARAMETERS.dangerLightness,
+    neutralLightness:
+      scratch.neutralLightness ??
+      profile.overrides.neutralLightness ??
+      DEFAULT_THEME_PARAMETERS.neutralLightness,
+    accentLightness:
+      scratch.accentLightness ??
+      profile.overrides.accentLightness ??
+      DEFAULT_THEME_PARAMETERS.accentLightness,
+    positiveLightness:
+      scratch.positiveLightness ??
+      profile.overrides.positiveLightness ??
+      DEFAULT_THEME_PARAMETERS.positiveLightness,
+    warningLightness:
+      scratch.warningLightness ??
+      profile.overrides.warningLightness ??
+      DEFAULT_THEME_PARAMETERS.warningLightness,
+    dangerLightness:
+      scratch.dangerLightness ??
+      profile.overrides.dangerLightness ??
+      DEFAULT_THEME_PARAMETERS.dangerLightness,
   }
 }
 
@@ -66,14 +90,18 @@ export function themeStyle(theme: ThemeParameters, mode: ThemeMode): ThemeStyle 
   }
 
   for (const key of SEMANTIC_TOKEN_KEYS) {
-    const cssKey = key.replace(/[A-Z]/g, (value) => `-${value.toLowerCase()}`)
+    const cssKey = key.replace(/[A-Z]/g, value => `-${value.toLowerCase()}`)
     style[`--vela-${cssKey}`] = palette[semantic[key]]
   }
 
   return style
 }
 
-export function makeProfile(id: string, name: string, overrides: Partial<ThemeParameters>): DesignProfile {
+export function makeProfile(
+  id: string,
+  name: string,
+  overrides: Partial<ThemeParameters>,
+): DesignProfile {
   return {
     schemaVersion: 1,
     id,
@@ -87,7 +115,7 @@ export function makeProfile(id: string, name: string, overrides: Partial<ThemePa
 const referenceTokenSchema = z.templateLiteral([
   z.enum(RAMP_NAMES),
   '-',
-  z.enum(['50', '100', '200', '300', '400', '500', '600', '700', '800', '900', '950'])
+  z.enum(['50', '100', '200', '300', '400', '500', '600', '700', '800', '900', '950']),
 ])
 
 const semanticMappingSchema = z.object({
@@ -109,35 +137,37 @@ const semanticMappingSchema = z.object({
 
 const lightnessRampSchema = z.array(z.number().min(0).max(1)).length(RAMP_STEPS.length)
 
-export const themeOverridesSchema = z.strictObject({
-  neutralHue: z.number().optional(),
-  neutralChroma: z.number().optional(),
-  accentHue: z.number().optional(),
-  accentChroma: z.number().optional(),
-  positiveHue: z.number().optional(),
-  positiveChroma: z.number().optional(),
-  warningHue: z.number().optional(),
-  warningChroma: z.number().optional(),
-  dangerHue: z.number().optional(),
-  dangerChroma: z.number().optional(),
-  fontSize: z.number().optional(),
-  fontWeight: z.number().optional(),
-  lineHeight: z.number().optional(),
-  letterSpacing: z.number().optional(),
-  spacingUnit: z.number().optional(),
-  radius: z.number().optional(),
-  borderWidth: z.number().optional(),
-  controlHeight: z.number().optional(),
-  panelPadding: z.number().optional(),
-  density: z.number().optional(),
-  neutralLightness: lightnessRampSchema.optional(),
-  accentLightness: lightnessRampSchema.optional(),
-  positiveLightness: lightnessRampSchema.optional(),
-  warningLightness: lightnessRampSchema.optional(),
-  dangerLightness: lightnessRampSchema.optional(),
-  fontStack: z.enum(['sans', 'serif', 'mono']).optional(),
-  semantic: z.object({ light: semanticMappingSchema, dark: semanticMappingSchema }).optional(),
-}).refine(value => Object.values(value).every(entry => entry !== undefined))
+export const themeOverridesSchema = z
+  .strictObject({
+    neutralHue: z.number().optional(),
+    neutralChroma: z.number().optional(),
+    accentHue: z.number().optional(),
+    accentChroma: z.number().optional(),
+    positiveHue: z.number().optional(),
+    positiveChroma: z.number().optional(),
+    warningHue: z.number().optional(),
+    warningChroma: z.number().optional(),
+    dangerHue: z.number().optional(),
+    dangerChroma: z.number().optional(),
+    fontSize: z.number().optional(),
+    fontWeight: z.number().optional(),
+    lineHeight: z.number().optional(),
+    letterSpacing: z.number().optional(),
+    spacingUnit: z.number().optional(),
+    radius: z.number().optional(),
+    borderWidth: z.number().optional(),
+    controlHeight: z.number().optional(),
+    panelPadding: z.number().optional(),
+    density: z.number().optional(),
+    neutralLightness: lightnessRampSchema.optional(),
+    accentLightness: lightnessRampSchema.optional(),
+    positiveLightness: lightnessRampSchema.optional(),
+    warningLightness: lightnessRampSchema.optional(),
+    dangerLightness: lightnessRampSchema.optional(),
+    fontStack: z.enum(['sans', 'serif', 'mono']).optional(),
+    semantic: z.object({ light: semanticMappingSchema, dark: semanticMappingSchema }).optional(),
+  })
+  .refine(value => Object.values(value).every(entry => entry !== undefined))
 
 export const designProfileSchema = z.object({
   schemaVersion: z.literal(1),

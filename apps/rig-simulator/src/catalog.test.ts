@@ -7,11 +7,11 @@ import { createStarSource, decodeD05, loadCatalog } from './catalog.js'
 function tile(raDegrees: number, decDegrees: number, magnitude: number) {
   const data = Buffer.alloc(120)
   data[109] = 5
-  const decRaw = Math.round(decDegrees / 90 * 0x7fffff)
+  const decRaw = Math.round((decDegrees / 90) * 0x7fffff)
   data.writeUIntLE(0xffffff, 110, 3)
   data[113] = Math.floor(decRaw / 65536) + 128
   data[114] = Math.round(magnitude * 10 + 16)
-  data.writeUIntLE(Math.round(raDegrees / 360 * 0xffffff), 115, 3)
+  data.writeUIntLE(Math.round((raDegrees / 360) * 0xffffff), 115, 3)
   data.writeUInt16LE(decRaw & 0xffff, 118)
 
   return data
@@ -48,12 +48,14 @@ it('loads only D05 tiles and applies the configured sky bounds', async () => {
     const stars = await loadCatalog(directory)
     expect(stars).toHaveLength(1)
     expect(stars[0]!.raDegrees).toBeCloseTo(23, 4)
-    await expect(loadCatalog(directory, {
-      minRaDegrees: 200,
-      maxRaDegrees: 210,
-      minDecDegrees: 0,
-      maxDecDegrees: 10,
-    })).rejects.toThrow('no stars')
+    await expect(
+      loadCatalog(directory, {
+        minRaDegrees: 200,
+        maxRaDegrees: 210,
+        minDecDegrees: 0,
+        maxDecDegrees: 10,
+      }),
+    ).rejects.toThrow('no stars')
   } finally {
     await rm(directory, { recursive: true, force: true })
   }
@@ -71,8 +73,21 @@ async function withCatalog(run: (directory: string) => Promise<void>) {
 
 it('selects a spherical field across RA zero and both poles', async () => {
   await withCatalog(async directory => {
-    const positions = [[359.8, 0], [0.2, 0], [0.4, 0.4], [180, 89.8], [90, 89.8], [180, -89.8], [90, -89.8]]
-    await Promise.all(positions.map(([ra, dec], index) => writeFile(join(directory, `d05_${index}.1476`), tile(ra!, dec!, 10))))
+    const positions = [
+      [359.8, 0],
+      [0.2, 0],
+      [0.4, 0.4],
+      [180, 89.8],
+      [90, 89.8],
+      [180, -89.8],
+      [90, -89.8],
+    ]
+
+    await Promise.all(
+      positions.map(([ra, dec], index) =>
+        writeFile(join(directory, `d05_${index}.1476`), tile(ra!, dec!, 10)),
+      ),
+    )
     const source = createStarSource(directory)
     const equator = await source({ raDegrees: 0, decDegrees: 0, radiusDegrees: 0.5 })
     expect(equator.map(star => Math.round(star.raDegrees))).toEqual([360, 0])
@@ -93,7 +108,9 @@ it('reuses a padded region for nearby fields but filters each requested cone', a
     expect(await source({ raDegrees: 0, decDegrees: 0, radiusDegrees: 0.2 })).toHaveLength(0)
     await rm(path)
     expect(await source({ raDegrees: 0.8, decDegrees: 0, radiusDegrees: 0.2 })).toHaveLength(1)
-    await expect(source({ raDegrees: 10, decDegrees: 0, radiusDegrees: 0.2 })).rejects.toThrow('No ASTAP D05')
+    await expect(source({ raDegrees: 10, decDegrees: 0, radiusDegrees: 0.2 })).rejects.toThrow(
+      'No ASTAP D05',
+    )
     // A failed cache miss must not discard the previous successful field.
     expect(await source({ raDegrees: 0.8, decDegrees: 0, radiusDegrees: 0.2 })).toHaveLength(1)
   })
@@ -101,7 +118,11 @@ it('reuses a padded region for nearby fields but filters each requested cone', a
 
 it('cancels in-flight reads independently and leaves the source reusable', async () => {
   await withCatalog(async directory => {
-    await Promise.all(Array.from({ length: 20 }, (_, index) => writeFile(join(directory, `d05_${index}.1476`), tile(20, 0, 10))))
+    await Promise.all(
+      Array.from({ length: 20 }, (_, index) =>
+        writeFile(join(directory, `d05_${index}.1476`), tile(20, 0, 10)),
+      ),
+    )
     const source = createStarSource(directory)
     const field = { raDegrees: 20, decDegrees: 0, radiusDegrees: 1 }
     const controller = new AbortController()
@@ -137,9 +158,16 @@ it('rejects malformed field coordinates before accessing the catalog', async () 
   const field = { raDegrees: 20, decDegrees: 0, radiusDegrees: 1 }
 
   for (const invalid of [
-    { raDegrees: NaN }, { raDegrees: -1 }, { raDegrees: 360 },
-    { decDegrees: 91 }, { decDegrees: -91 }, { decDegrees: Infinity },
-    { radiusDegrees: 0 }, { radiusDegrees: -1 }, { radiusDegrees: 181 }, { radiusDegrees: NaN },
+    { raDegrees: NaN },
+    { raDegrees: -1 },
+    { raDegrees: 360 },
+    { decDegrees: 91 },
+    { decDegrees: -91 },
+    { decDegrees: Infinity },
+    { radiusDegrees: 0 },
+    { radiusDegrees: -1 },
+    { radiusDegrees: 181 },
+    { radiusDegrees: NaN },
   ]) {
     await expect(source({ ...field, ...invalid })).rejects.toThrow('Catalog field requires')
   }

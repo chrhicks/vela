@@ -1,19 +1,37 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { appendFile, mkdtemp, readFile, readdir, rm, symlink, truncate, unlink, writeFile } from 'node:fs/promises'
+import {
+  appendFile,
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  symlink,
+  truncate,
+  unlink,
+  writeFile,
+} from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { AlpacaFrame, AlpacaTelescopeStatus } from '@vela/alpaca'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createAlignmentDiagnostics, type AlignmentFrameEvidence } from './diagnostics.js'
 import { replayAlignmentDiagnostics } from './diagnostic-replay.js'
-import { diagnosticEntrySchema, diagnosticJournalName, maximumFitsBytes, maximumJournalBytes, type DiagnosticEntry } from './diagnostic-schema.js'
+import {
+  diagnosticEntrySchema,
+  diagnosticJournalName,
+  maximumFitsBytes,
+  maximumJournalBytes,
+  type DiagnosticEntry,
+} from './diagnostic-schema.js'
 import { createAlignmentBaseline, measureAlignment } from './geometry.js'
 import { physicalAlignmentSample } from './physical-coordinates.js'
 import { fixture } from './physical-fixture.js'
 
 const roots: string[] = []
 
-afterEach(async () => { await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))) })
+afterEach(async () => {
+  await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true })))
+})
 
 async function physicalTrial(
   phase?: 'finished' | 'stopped' | 'failed',
@@ -24,7 +42,10 @@ async function physicalTrial(
   const onError = vi.fn()
   const runId = randomUUID()
 
-  const run = (await createAlignmentDiagnostics(root, onError)({
+  const run = (await createAlignmentDiagnostics(
+    root,
+    onError,
+  )({
     runId,
     rigId: 'physical',
     rigName: 'Fixture rig',
@@ -37,13 +58,18 @@ async function physicalTrial(
 
   const reference = fixture.cases[1]!
 
-  const samples = reference.samples.map(capture => physicalAlignmentSample(
-    capture.solved,
-    { capturedAt: capture.capturedAt, exposureSeconds: 2 },
-    fixture.site,
-  ))
+  const samples = reference.samples.map(capture =>
+    physicalAlignmentSample(
+      capture.solved,
+      { capturedAt: capture.capturedAt, exposureSeconds: 2 },
+      fixture.site,
+    ),
+  )
 
-  const baseline = createAlignmentBaseline([samples[0]!, samples[1]!, samples[2]!], fixture.site.latitudeDegrees)
+  const baseline = createAlignmentBaseline(
+    [samples[0]!, samples[1]!, samples[2]!],
+    fixture.site.latitudeDegrees,
+  )
 
   const mount: AlpacaTelescopeStatus = {
     rightAscensionDegrees: 10,
@@ -74,9 +100,10 @@ async function physicalTrial(
     const frame: AlpacaFrame = {
       width,
       height: width,
-      pixels: format === 'small-signed32'
-        ? new Float64Array([frameSerial, 65535, -32768, 2_147_483_647])
-        : new Float64Array(width * width).fill(format === 'signed32' ? -1 : 1),
+      pixels:
+        format === 'small-signed32'
+          ? new Float64Array([frameSerial, 65535, -32768, 2_147_483_647])
+          : new Float64Array(width * width).fill(format === 'signed32' ? -1 : 1),
       capturedAt: input.capturedAt,
       capturedAtSource: 'server-estimate',
       color: format === 'small-signed32' ? { kind: 'bayer', pattern: 'gbrg' } : { kind: 'mono' },
@@ -132,8 +159,13 @@ async function physicalTrial(
     return { frame, evidence, sample }
   }
 
-  for (const [index, input] of reference.samples.entries()) await capture(input, 'baseline', index + 1)
-  await run.recordBaseline([samples[0]!, samples[1]!, samples[2]!], fixture.site.latitudeDegrees, baseline.measurement)
+  for (const [index, input] of reference.samples.entries())
+    await capture(input, 'baseline', index + 1)
+  await run.recordBaseline(
+    [samples[0]!, samples[1]!, samples[2]!],
+    fixture.site.latitudeDegrees,
+    baseline.measurement,
+  )
   await run.recordMeasurement(samples[2]!, measureAlignment(baseline, samples[2]!, true), mount)
   const adjusted = await capture(reference.adjusted, 'adjusting', 3)
   const measurement = measureAlignment(baseline, adjusted.sample, true)
@@ -146,7 +178,11 @@ async function physicalTrial(
   expect(onError).not.toHaveBeenCalled()
   const directory = join(root, (await readdir(root))[0]!)
   const journal = join(directory, diagnosticJournalName)
-  const entries = (await readFile(journal, 'utf8')).trimEnd().split('\n').map(line => diagnosticEntrySchema.parse(JSON.parse(line)))
+
+  const entries = (await readFile(journal, 'utf8'))
+    .trimEnd()
+    .split('\n')
+    .map(line => diagnosticEntrySchema.parse(JSON.parse(line)))
 
   return { directory, journal, entries, baseline, measurement, adjusted, runId }
 }
@@ -156,30 +192,37 @@ async function replaceEntries(journal: string, entries: DiagnosticEntry[]) {
 }
 
 describe('alignment diagnostic replay', () => {
-  it.each(['unsigned16', 'signed32'] as const)('replays production-recorded 32×32 mono %s frames across distinct padded sizes', async format => {
-    const trial = await physicalTrial('finished', format)
-    const frames = trial.entries.filter(entry => entry.type === 'frame')
-    expect(frames.map(frame => frame.original.bytes)).toEqual(Array(5).fill(format === 'unsigned16' ? 5760 : 8640))
-    const latest = await readFile(join(trial.directory, frames.at(-1)!.original.filename))
+  it.each(['unsigned16', 'signed32'] as const)(
+    'replays production-recorded 32×32 mono %s frames across distinct padded sizes',
+    async format => {
+      const trial = await physicalTrial('finished', format)
+      const frames = trial.entries.filter(entry => entry.type === 'frame')
+      expect(frames.map(frame => frame.original.bytes)).toEqual(
+        Array(5).fill(format === 'unsigned16' ? 5760 : 8640),
+      )
+      const latest = await readFile(join(trial.directory, frames.at(-1)!.original.filename))
 
-    const pixels = Array.from({ length: 1024 }, (_, index) => format === 'unsigned16'
-      ? latest.readInt16BE(2880 + index * 2) + 32_768
-      : latest.readInt32BE(2880 + index * 4))
+      const pixels = Array.from({ length: 1024 }, (_, index) =>
+        format === 'unsigned16'
+          ? latest.readInt16BE(2880 + index * 2) + 32_768
+          : latest.readInt32BE(2880 + index * 4),
+      )
 
-    expect(pixels).toEqual(Array(1024).fill(format === 'unsigned16' ? 1 : -1))
-    expect(await replayAlignmentDiagnostics(trial.directory)).toMatchObject({
-      counts: { frames: 5, measurements: 3, physicalFrames: 5, verifiedOriginals: 4 },
-      baseline: trial.baseline,
-      finalMeasurement: trial.measurement,
-      outcome: { phase: 'finished' },
-      maximumDiscrepancies: {
-        measurementArcsec: 0,
-        correctionTargetDegrees: 0,
-        physicalSampleDegrees: 0,
-        physicalSampleTimeMs: 0,
-      },
-    })
-  })
+      expect(pixels).toEqual(Array(1024).fill(format === 'unsigned16' ? 1 : -1))
+      expect(await replayAlignmentDiagnostics(trial.directory)).toMatchObject({
+        counts: { frames: 5, measurements: 3, physicalFrames: 5, verifiedOriginals: 4 },
+        baseline: trial.baseline,
+        finalMeasurement: trial.measurement,
+        outcome: { phase: 'finished' },
+        maximumDiscrepancies: {
+          measurementArcsec: 0,
+          correctionTargetDegrees: 0,
+          physicalSampleDegrees: 0,
+          physicalSampleTimeMs: 0,
+        },
+      })
+    },
+  )
 
   it('rejects unsupported or inconsistent FITS layouts even with updated journal hashes', async () => {
     const trial = await physicalTrial('finished', 'unsigned16')
@@ -210,7 +253,9 @@ describe('alignment diagnostic replay', () => {
       await writeFile(path, fits)
       first.original.sha256 = createHash('sha256').update(fits).digest('hex')
       await replaceEntries(trial.journal, trial.entries)
-      await expect(replayAlignmentDiagnostics(trial.directory)).rejects.toThrow('Alignment diagnostic FITS')
+      await expect(replayAlignmentDiagnostics(trial.directory)).rejects.toThrow(
+        'Alignment diagnostic FITS',
+      )
     }
 
     // Changing the dimensions in both journal locations still has to match the FITS header.
@@ -219,7 +264,9 @@ describe('alignment diagnostic replay', () => {
     first.capture.width = 31
     first.evidence.solution.wcs.width = 31
     await replaceEntries(trial.journal, trial.entries)
-    await expect(replayAlignmentDiagnostics(trial.directory)).rejects.toThrow('FITS layout or dimensions')
+    await expect(replayAlignmentDiagnostics(trial.directory)).rejects.toThrow(
+      'FITS layout or dimensions',
+    )
 
     first.capture.width = 32
     first.evidence.solution.wcs.width = 32
@@ -231,7 +278,9 @@ describe('alignment diagnostic replay', () => {
       first.original.bytes = bytes
       first.original.sha256 = createHash('sha256').update(fits).digest('hex')
       await replaceEntries(trial.journal, trial.entries)
-      await expect(replayAlignmentDiagnostics(trial.directory)).rejects.toThrow('original metadata disagree')
+      await expect(replayAlignmentDiagnostics(trial.directory)).rejects.toThrow(
+        'original metadata disagree',
+      )
     }
   })
 
@@ -248,7 +297,9 @@ describe('alignment diagnostic replay', () => {
       await writeFile(path, fits)
       first.original.sha256 = createHash('sha256').update(fits).digest('hex')
       await replaceEntries(trial.journal, trial.entries)
-      await expect(replayAlignmentDiagnostics(trial.directory)).rejects.toThrow('unsupported sample scaling')
+      await expect(replayAlignmentDiagnostics(trial.directory)).rejects.toThrow(
+        'unsupported sample scaling',
+      )
     }
   })
 
@@ -257,20 +308,28 @@ describe('alignment diagnostic replay', () => {
     const frames = trial.entries.filter(entry => entry.type === 'frame')
     expect(frames).toHaveLength(5)
     expect(frames[4]!.evidence).toEqual(trial.adjusted.evidence)
-    expect(Date.parse(frames[4]!.evidence.sample.capturedAt) - Date.parse(frames[4]!.capture.capturedAt)).toBe(1000)
+    expect(
+      Date.parse(frames[4]!.evidence.sample.capturedAt) - Date.parse(frames[4]!.capture.capturedAt),
+    ).toBe(1000)
     const fits = await readFile(join(trial.directory, frames[4]!.original.filename))
     const header = fits.subarray(0, 2880).toString('ascii')
     expect(frames[4]!.capture.capturedAt).toBe(trial.adjusted.frame.capturedAt)
     expect(header).toContain(new Date(trial.adjusted.frame.capturedAt).toISOString())
     expect(header).toContain('SERVER-ESTIMATE')
     expect(header).toContain('GBRG')
-    expect([0, 1, 2, 3].map(index => fits.readInt32BE(2880 + index * 4))).toEqual([5, 65535, -32768, 2_147_483_647])
+    expect([0, 1, 2, 3].map(index => fits.readInt32BE(2880 + index * 4))).toEqual([
+      5, 65535, -32768, 2_147_483_647,
+    ])
     const baselineFits = await readFile(join(trial.directory, frames[0]!.original.filename))
     expect(baselineFits.readInt32BE(2880)).toBe(1)
     const filenames = await readdir(trial.directory)
     expect(filenames.filter(name => name.endsWith('.fits'))).toHaveLength(4)
     expect(filenames).not.toContain(frames[3]!.original.filename)
-    expect(filenames).toEqual(expect.arrayContaining(frames.filter((_, index) => index !== 3).map(frame => frame.original.filename)))
+    expect(filenames).toEqual(
+      expect.arrayContaining(
+        frames.filter((_, index) => index !== 3).map(frame => frame.original.filename),
+      ),
+    )
 
     const report = await replayAlignmentDiagnostics(trial.directory)
     expect(report).toMatchObject({
@@ -288,23 +347,39 @@ describe('alignment diagnostic replay', () => {
         physicalSampleTimeMs: 0,
       },
     })
-    expect(Math.abs(report.baseline!.measurement.altitudeArcsec - fixture.cases[1]!.altitude)).toBeLessThan(1)
+    expect(
+      Math.abs(report.baseline!.measurement.altitudeArcsec - fixture.cases[1]!.altitude),
+    ).toBeLessThan(1)
   })
 
-  it.each(['stopped', 'failed', undefined] as const)('reports %s without implying a completed alignment trial', async phase => {
-    const trial = await physicalTrial(phase)
-    const report = await replayAlignmentDiagnostics(trial.directory)
-    expect(report.outcome).toEqual({ phase: phase ?? 'incomplete', error: phase === 'failed' ? 'Device read failed' : null })
-    expect(report.truncatedFinalLine).toBe(false)
-  })
+  it.each(['stopped', 'failed', undefined] as const)(
+    'reports %s without implying a completed alignment trial',
+    async phase => {
+      const trial = await physicalTrial(phase)
+      const report = await replayAlignmentDiagnostics(trial.directory)
+      expect(report.outcome).toEqual({
+        phase: phase ?? 'incomplete',
+        error: phase === 'failed' ? 'Device read failed' : null,
+      })
+      expect(report.truncatedFinalLine).toBe(false)
+    },
+  )
 
   it('ignores an uncommitted truncated final line but rejects complete malformed entries', async () => {
     const trial = await physicalTrial('finished')
     const journal = await readFile(trial.journal, 'utf8')
     await writeFile(trial.journal, journal.slice(0, -8))
-    expect(await replayAlignmentDiagnostics(trial.directory)).toMatchObject({ outcome: { phase: 'incomplete' }, truncatedFinalLine: true })
-    await writeFile(trial.journal, journal.slice(0, journal.lastIndexOf('{"type":"outcome"')) + '{broken}\n')
-    await expect(replayAlignmentDiagnostics(trial.directory)).rejects.toThrow('Invalid alignment diagnostic journal entry')
+    expect(await replayAlignmentDiagnostics(trial.directory)).toMatchObject({
+      outcome: { phase: 'incomplete' },
+      truncatedFinalLine: true,
+    })
+    await writeFile(
+      trial.journal,
+      journal.slice(0, journal.lastIndexOf('{"type":"outcome"')) + '{broken}\n',
+    )
+    await expect(replayAlignmentDiagnostics(trial.directory)).rejects.toThrow(
+      'Invalid alignment diagnostic journal entry',
+    )
   })
 
   it('reports numerical discrepancies rather than silently treating recorded results as recomputation', async () => {
@@ -315,7 +390,10 @@ describe('alignment diagnostic replay', () => {
     measurement.measurement.altitudeArcsec += 12
     measurement.measurement.correctionTarget.decDegrees += 0.5
     await replaceEntries(trial.journal, trial.entries)
-    expect((await replayAlignmentDiagnostics(trial.directory)).maximumDiscrepancies).toMatchObject({ measurementArcsec: 12, correctionTargetDegrees: 0.5 })
+    expect((await replayAlignmentDiagnostics(trial.directory)).maximumDiscrepancies).toMatchObject({
+      measurementArcsec: 12,
+      correctionTargetDegrees: 0.5,
+    })
     const run = trial.entries[0]!
 
     if (run.type !== 'run') throw new Error('Missing fixture run')
@@ -328,36 +406,48 @@ describe('alignment diagnostic replay', () => {
 
   it('rejects missing essential evidence and journal-supplied traversal paths', async () => {
     const trial = await physicalTrial('finished')
-    await replaceEntries(trial.journal, trial.entries.filter(entry => entry.type !== 'baseline'))
-    await expect(replayAlignmentDiagnostics(trial.directory)).rejects.toThrow('missing its baseline')
+    await replaceEntries(
+      trial.journal,
+      trial.entries.filter(entry => entry.type !== 'baseline'),
+    )
+    await expect(replayAlignmentDiagnostics(trial.directory)).rejects.toThrow(
+      'missing its baseline',
+    )
     const firstFrame = trial.entries.find(entry => entry.type === 'frame')!
 
     if (firstFrame.type !== 'frame') throw new Error('Missing fixture frame')
     const physical = firstFrame.evidence.physical
     delete firstFrame.evidence.physical
     await replaceEntries(trial.journal, trial.entries)
-    await expect(replayAlignmentDiagnostics(trial.directory)).rejects.toThrow('missing physical inputs')
+    await expect(replayAlignmentDiagnostics(trial.directory)).rejects.toThrow(
+      'missing physical inputs',
+    )
     firstFrame.evidence.physical = physical
     firstFrame.original.filename = '../outside.fits'
     await replaceEntries(trial.journal, trial.entries)
-    await expect(replayAlignmentDiagnostics(trial.directory)).rejects.toThrow('Invalid alignment diagnostic journal entry')
+    await expect(replayAlignmentDiagnostics(trial.directory)).rejects.toThrow(
+      'Invalid alignment diagnostic journal entry',
+    )
   })
 
-  it.each(['small-signed32', 'unsigned16'] as const)('rejects damaged, missing, symlinked, and oversized retained %s originals', async format => {
-    const trial = await physicalTrial('finished', format)
-    const latest = trial.entries.filter(entry => entry.type === 'frame').at(-1)!
-    const original = join(trial.directory, latest.original.filename)
-    const fits = await readFile(original)
-    fits[2880] = 1
-    await writeFile(original, fits)
-    await expect(replayAlignmentDiagnostics(trial.directory)).rejects.toThrow('integrity failure')
-    await truncate(original, maximumFitsBytes + 1)
-    await expect(replayAlignmentDiagnostics(trial.directory)).rejects.toThrow('size cap')
-    await unlink(original)
-    await expect(replayAlignmentDiagnostics(trial.directory)).rejects.toThrow('ENOENT')
-    await symlink(trial.journal, original)
-    await expect(replayAlignmentDiagnostics(trial.directory)).rejects.toThrow('ELOOP')
-  })
+  it.each(['small-signed32', 'unsigned16'] as const)(
+    'rejects damaged, missing, symlinked, and oversized retained %s originals',
+    async format => {
+      const trial = await physicalTrial('finished', format)
+      const latest = trial.entries.filter(entry => entry.type === 'frame').at(-1)!
+      const original = join(trial.directory, latest.original.filename)
+      const fits = await readFile(original)
+      fits[2880] = 1
+      await writeFile(original, fits)
+      await expect(replayAlignmentDiagnostics(trial.directory)).rejects.toThrow('integrity failure')
+      await truncate(original, maximumFitsBytes + 1)
+      await expect(replayAlignmentDiagnostics(trial.directory)).rejects.toThrow('size cap')
+      await unlink(original)
+      await expect(replayAlignmentDiagnostics(trial.directory)).rejects.toThrow('ENOENT')
+      await symlink(trial.journal, original)
+      await expect(replayAlignmentDiagnostics(trial.directory)).rejects.toThrow('ELOOP')
+    },
+  )
 
   it('caps external journals before reading and rejects entries after a final outcome', async () => {
     const trial = await physicalTrial('finished')

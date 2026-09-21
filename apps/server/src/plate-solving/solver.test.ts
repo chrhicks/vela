@@ -3,7 +3,11 @@ import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { afterEach, expect, it, vi } from 'vitest'
 import { trace, context } from '@opentelemetry/api'
-import { InMemorySpanExporter, NodeTracerProvider, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-node'
+import {
+  InMemorySpanExporter,
+  NodeTracerProvider,
+  SimpleSpanProcessor,
+} from '@opentelemetry/sdk-trace-node'
 import { createAstapSolver, projectSky } from './solver.js'
 
 const directories: string[] = []
@@ -21,7 +25,8 @@ const frame = {
 
 const hint = { raDegrees: 30, decDegrees: 60 }
 
-const ini = 'PLTSOLVD=T\nCRPIX1=1.5\nCRPIX2=1.5\nCRVAL1=30\nCRVAL2=60\nCD1_1=0.01\nCD1_2=0\nCD2_1=0\nCD2_2=-0.01\n'
+const ini =
+  'PLTSOLVD=T\nCRPIX1=1.5\nCRPIX2=1.5\nCRVAL1=30\nCRVAL2=60\nCD1_1=0.01\nCD1_2=0\nCD2_1=0\nCD2_2=-0.01\n'
 
 async function fixture(body: string, timeoutMs = 3000) {
   const root = await mkdtemp(join(tmpdir(), 'vela-solver-test-'))
@@ -69,7 +74,10 @@ it('treats only documented no-match exits as retryable, not missing databases or
     else await expect(result).resolves.toEqual({ status: 'no-solution' })
   }
 
-  const { solver } = await fixture(`fs.writeFileSync(path.replace('.fits','.ini'), ${JSON.stringify(ini.replace('CRVAL1=30', 'CRVAL1='))})`)
+  const { solver } = await fixture(
+    `fs.writeFileSync(path.replace('.fits','.ini'), ${JSON.stringify(ini.replace('CRVAL1=30', 'CRVAL1='))})`,
+  )
+
   await expect(solver.solve(frame, hint, new AbortController().signal)).rejects.toThrow('CRVAL1')
 })
 
@@ -89,7 +97,9 @@ it('cancels a running solver and removes its scratch directory after process ter
 
 it('bounds a hung executable and rejects bad frames before spawning it', async () => {
   const { solver, marker } = await fixture('setInterval(() => {}, 1000)', 100)
-  await expect(solver.solve({ ...frame, pixels: [1] }, hint, new AbortController().signal)).rejects.toThrow('image dimensions')
+  await expect(
+    solver.solve({ ...frame, pixels: [1] }, hint, new AbortController().signal),
+  ).rejects.toThrow('image dimensions')
   await expect(access(marker)).rejects.toThrow()
   await expect(solver.solve(frame, hint, new AbortController().signal)).rejects.toThrow('timed out')
   await expect(access(dirname(await readFile(marker, 'utf8')))).rejects.toThrow()
@@ -100,13 +110,14 @@ it('preserves negative acquisition samples and tells ASTAP to check a Bayer expo
 if (image.readInt32BE(2880) !== -40 || !image.subarray(0,2880).toString().includes("'GBRG'") || process.argv[process.argv.indexOf('-check') + 1] !== 'y') process.exit(16)
 fs.writeFileSync(path.replace('.fits','.ini'), ${JSON.stringify(ini)})`)
 
-  await expect(solver.solve(
-    { ...frame, pixels: [-40, 65535, 1, 2], color: { kind: 'bayer', pattern: 'gbrg' } },
-    hint,
-    new AbortController().signal,
-  )).resolves.toMatchObject({ status: 'solved' })
+  await expect(
+    solver.solve(
+      { ...frame, pixels: [-40, 65535, 1, 2], color: { kind: 'bayer', pattern: 'gbrg' } },
+      hint,
+      new AbortController().signal,
+    ),
+  ).resolves.toMatchObject({ status: 'solved' })
 })
-
 
 it('exports correlated ASTAP diagnostics without merging distinct no-solution causes or retaining unbounded output', async () => {
   const exporter = new InMemorySpanExporter()
@@ -114,7 +125,12 @@ it('exports correlated ASTAP diagnostics without merging distinct no-solution ca
   provider.register()
 
   try {
-    for (const [code, outcome] of [[0, 'solved'], [1, 'no-match'], [2, 'insufficient-stars'], [32, 'error']] as const) {
+    for (const [code, outcome] of [
+      [0, 'solved'],
+      [1, 'no-match'],
+      [2, 'insufficient-stars'],
+      [32, 'error'],
+    ] as const) {
       const { solver } = await fixture(`fs.writeFileSync(1, 'x'.repeat(5000) + 'stdout end')
 fs.writeFileSync(2, 'stderr detail')
 fs.writeFileSync(path.replace('.fits','.ini'), ${JSON.stringify(ini)})
@@ -125,7 +141,10 @@ process.exit(${code})`)
           const result = solver.solve(frame, hint, new AbortController().signal)
 
           if (code === 32) await expect(result).rejects.toThrow('exit code 32')
-          else await expect(result).resolves.toMatchObject({ status: code === 0 ? 'solved' : 'no-solution' })
+          else
+            await expect(result).resolves.toMatchObject({
+              status: code === 0 ? 'solved' : 'no-solution',
+            })
         } finally {
           parent.end()
         }
@@ -165,22 +184,36 @@ process.exit(${code})`)
   }
 })
 
-async function readAttempts(path: string): Promise<{ path: string, args: string[], hash: string }[]> {
-  return (await readFile(path, 'utf8')).trim().split('\n').map(line => JSON.parse(line))
+async function readAttempts(
+  path: string,
+): Promise<{ path: string; args: string[]; hash: string }[]> {
+  return (await readFile(path, 'utf8'))
+    .trim()
+    .split('\n')
+    .map(line => JSON.parse(line))
 }
 
 it('widens only the radius on the same image and stops at the first solution', async () => {
-  const { solver, attempts } = await fixture(`if (process.argv[process.argv.indexOf('-r') + 1] !== '30') process.exit(1)
+  const { solver, attempts } =
+    await fixture(`if (process.argv[process.argv.indexOf('-r') + 1] !== '30') process.exit(1)
 fs.writeFileSync(path.replace('.fits','.ini'), ${JSON.stringify(ini)})`)
 
-  await expect(solver.solve(frame, hint, new AbortController().signal)).resolves.toMatchObject({ status: 'solved' })
+  await expect(solver.solve(frame, hint, new AbortController().signal)).resolves.toMatchObject({
+    status: 'solved',
+  })
   const calls = await readAttempts(attempts)
   expect(calls.map(call => call.args[call.args.indexOf('-r') + 1])).toEqual(['10', '15', '30'])
   expect(new Set(calls.map(call => call.path)).size).toBe(1)
   expect(new Set(calls.map(call => call.hash)).size).toBe(1)
-  expect(new Set(calls.map(call => JSON.stringify(
-    call.args.map((arg, index, args) => args[index - 1] === '-r' ? 'radius' : arg),
-  ))).size).toBe(1)
+  expect(
+    new Set(
+      calls.map(call =>
+        JSON.stringify(
+          call.args.map((arg, index, args) => (args[index - 1] === '-r' ? 'radius' : arg)),
+        ),
+      ),
+    ).size,
+  ).toBe(1)
 })
 
 it('searches through the full sky for no-match but never retries insufficient stars or process errors', async () => {
@@ -191,7 +224,9 @@ it('searches through the full sky for no-match but never retries insufficient st
     if (code === 32) await expect(result).rejects.toThrow('exit code 32')
     else await expect(result).resolves.toEqual({ status: 'no-solution' })
     const calls = await readAttempts(attempts)
-    expect(calls.map(call => call.args[call.args.indexOf('-r') + 1])).toEqual(code === 1 ? ['10', '15', '30', '60', '120', '180'] : ['10'])
+    expect(calls.map(call => call.args[call.args.indexOf('-r') + 1])).toEqual(
+      code === 1 ? ['10', '15', '30', '60', '120', '180'] : ['10'],
+    )
   }
 })
 

@@ -1,7 +1,4 @@
-export type AlpacaProviderErrorReason =
-  | 'transport'
-  | 'invalid-response'
-  | 'protocol-error'
+export type AlpacaProviderErrorReason = 'transport' | 'invalid-response' | 'protocol-error'
 
 export interface AlpacaProviderErrorOptions {
   reason: AlpacaProviderErrorReason

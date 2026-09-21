@@ -25,9 +25,9 @@
 
 .vela-dialog-specimen__background small {
   color: var(--vela-accent);
-  font-size: .68em;
+  font-size: 0.68em;
   font-weight: 740;
-  letter-spacing: .1em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
@@ -40,7 +40,7 @@
   max-width: 28rem;
   margin: 0 0 calc(var(--vela-space) * 3);
   color: var(--vela-text-muted);
-  font-size: .84em;
+  font-size: 0.84em;
   line-height: 1.55;
 }
 
@@ -52,7 +52,7 @@
 .vela-dialog-specimen__body > p {
   margin: 0;
   color: var(--vela-text-muted);
-  font-size: .84em;
+  font-size: 0.84em;
   line-height: 1.55;
 }
 
@@ -65,7 +65,7 @@
 
 .vela-dialog-specimen__anatomy > div {
   display: grid;
-  gap: calc(var(--vela-space) * .75);
+  gap: calc(var(--vela-space) * 0.75);
   padding: calc(var(--vela-space) * 2.5);
   border: var(--vela-border-width) solid var(--vela-line);
   border-radius: var(--vela-radius);
@@ -74,17 +74,19 @@
 
 .vela-dialog-specimen__anatomy dt {
   color: var(--vela-text);
-  font-size: .76em;
+  font-size: 0.76em;
   font-weight: 680;
 }
 
 .vela-dialog-specimen__anatomy dd {
   margin: 0;
   color: var(--vela-text-muted);
-  font-size: .68em;
+  font-size: 0.68em;
   line-height: 1.4;
 }
 
 @container (max-width: 31rem) {
-  .vela-dialog-specimen__anatomy { grid-template-columns: 1fr; }
+  .vela-dialog-specimen__anatomy {
+    grid-template-columns: 1fr;
+  }
 }

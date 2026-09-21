@@ -18,15 +18,16 @@ export interface MountPosition {
 
 const radians = Math.PI / 180
 
-export const siderealRadiansPerSecond = 2 * Math.PI / 86164.0905
+export const siderealRadiansPerSecond = (2 * Math.PI) / 86164.0905
 
 /** Ideal rigid mount in a fixed equatorial frame; sidereal angle is zero at t=0. */
 export function cameraPose(position: MountPosition): CameraPose {
   validatePosition(position)
   const declination = position.declinationDegrees * radians
 
-  const spin = position.raAxisDegrees * radians
-    - (position.tracking ? position.elapsedSeconds * siderealRadiansPerSecond : 0)
+  const spin =
+    position.raAxisDegrees * radians -
+    (position.tracking ? position.elapsedSeconds * siderealRadiansPerSecond : 0)
 
   const transform = (vector: Vector) => toSky(rotate(vector, [0, 0, 1], spin), position)
 
@@ -76,9 +77,14 @@ function validatePosition(position: MountPosition) {
     if (!Number.isFinite(value)) throw new Error('Mount position must contain finite numbers')
   }
 
-  if (Math.abs(position.latitudeDegrees) > 90 || Math.abs(position.declinationDegrees) > 90
-    || Math.abs(position.altitudeErrorDegrees) > 5 || Math.abs(position.azimuthErrorDegrees) > 5
-    || position.elapsedSeconds < 0 || (position.tracking !== true && position.tracking !== false)) {
+  if (
+    Math.abs(position.latitudeDegrees) > 90 ||
+    Math.abs(position.declinationDegrees) > 90 ||
+    Math.abs(position.altitudeErrorDegrees) > 5 ||
+    Math.abs(position.azimuthErrorDegrees) > 5 ||
+    position.elapsedSeconds < 0 ||
+    (position.tracking !== true && position.tracking !== false)
+  ) {
     throw new Error('Mount position is outside the supported simulation range')
   }
 }

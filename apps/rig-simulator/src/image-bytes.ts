@@ -15,12 +15,20 @@ interface Envelope {
 
 // ImageBytes requires explicit client opt-in; ordinary browser */* stays JSON.
 export function acceptsImageBytes(accept: string | undefined) {
-  return accept?.split(',').some(item => {
-    const [type, ...parameters] = item.trim().toLowerCase().split(';')
-    const quality = parameters.find(value => value.trim().startsWith('q='))?.trim().slice(2)
+  return (
+    accept?.split(',').some(item => {
+      const [type, ...parameters] = item.trim().toLowerCase().split(';')
 
-    return type?.trim() === 'application/imagebytes' && (quality === undefined || Number(quality) > 0)
-  }) ?? false
+      const quality = parameters
+        .find(value => value.trim().startsWith('q='))
+        ?.trim()
+        .slice(2)
+
+      return (
+        type?.trim() === 'application/imagebytes' && (quality === undefined || Number(quality) > 0)
+      )
+    }) ?? false
+  )
 }
 
 /** ASCOM Alpaca API Reference §8: Int32 source, UInt16 wire, little endian, Y fastest. */
@@ -34,8 +42,17 @@ export async function encodeImageBytes(
   const bytes = Buffer.allocUnsafe(44 + width * height * 2)
 
   const metadata = [
-    1, 0, envelope.ClientTransactionID, envelope.ServerTransactionID,
-    44, 2, 8, 2, width, height, 0,
+    1,
+    0,
+    envelope.ClientTransactionID,
+    envelope.ServerTransactionID,
+    44,
+    2,
+    8,
+    2,
+    width,
+    height,
+    0,
   ]
 
   metadata.forEach((value, index) => bytes.writeUInt32LE(value, index * 4))
@@ -88,8 +105,17 @@ export function imageBytesError(envelope: Envelope) {
   const bytes = Buffer.alloc(44 + message.length)
 
   const metadata = [
-    1, envelope.ErrorNumber, envelope.ClientTransactionID, envelope.ServerTransactionID,
-    44, 0, 0, 0, 0, 0, 0,
+    1,
+    envelope.ErrorNumber,
+    envelope.ClientTransactionID,
+    envelope.ServerTransactionID,
+    44,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
   ]
 
   metadata.forEach((value, index) => bytes.writeUInt32LE(value, index * 4))

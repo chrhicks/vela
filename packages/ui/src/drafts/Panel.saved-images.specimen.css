@@ -1,5 +1,10 @@
-.vela-saved-count { font-size: 13px; color: var(--vela-text-muted); }
-.vela-saved-group { margin-top: 26px; }
+.vela-saved-count {
+  font-size: 13px;
+  color: var(--vela-text-muted);
+}
+.vela-saved-group {
+  margin-top: 26px;
+}
 .vela-saved-group > h2 {
   display: flex;
   flex-wrap: wrap;
@@ -32,8 +37,13 @@
   overflow: hidden;
   cursor: pointer;
 }
-.vela-saved-card:hover { border-color: var(--vela-accent); }
-.vela-saved-card:focus-visible { outline: 2px solid var(--vela-accent); outline-offset: 3px; }
+.vela-saved-card:hover {
+  border-color: var(--vela-accent);
+}
+.vela-saved-card:focus-visible {
+  outline: 2px solid var(--vela-accent);
+  outline-offset: 3px;
+}
 .vela-saved-thumbnail {
   aspect-ratio: 4 / 3;
   overflow: hidden;
@@ -55,7 +65,11 @@
   font-weight: 550;
   font-variant-numeric: tabular-nums;
 }
-.vela-saved-card-copy > span, .vela-saved-card-copy small { color: var(--vela-text-muted); font-size: 12px; }
+.vela-saved-card-copy > span,
+.vela-saved-card-copy small {
+  color: var(--vela-text-muted);
+  font-size: 12px;
+}
 .vela-saved-card-copy small {
   display: flex;
   justify-content: space-between;
@@ -88,7 +102,10 @@
   color: var(--vela-text-muted);
   margin: 14px 0 0;
 }
-.vela-saved-empty { padding: 36px 12px; text-align: center; }
+.vela-saved-empty {
+  padding: 36px 12px;
+  text-align: center;
+}
 .vela-saved-empty h2 {
   font-size: 18px;
   font-weight: 550;
@@ -106,13 +123,23 @@
   line-height: 1.6;
   color: var(--vela-text-muted);
 }
-.vela-saved-notice:not(:empty) { margin-top: 18px; }
+.vela-saved-notice:not(:empty) {
+  margin-top: 18px;
+}
 @container (min-width: 800px) {
-  .vela-saved-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+  .vela-saved-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+  }
 }
 @container (max-width: 420px) {
-  .vela-saved-demo .vela-capture-heading { align-items: start; flex-wrap: wrap; }
-  .vela-saved-card-copy { padding: 10px; }
+  .vela-saved-demo .vela-capture-heading {
+    align-items: start;
+    flex-wrap: wrap;
+  }
+  .vela-saved-card-copy {
+    padding: 10px;
+  }
 }
 .vela-saved-image-actions {
   display: flex;

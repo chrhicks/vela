@@ -3,14 +3,18 @@ import { useEffect, useState } from 'react'
 import { useImagingCamera } from './use-imaging-camera'
 import './imaging-camera.css'
 
-export function ImagingCamera({ rigId, interrupted, connecting }: {
+export function ImagingCamera({
+  rigId,
+  interrupted,
+  connecting,
+}: {
   rigId: string
   interrupted: boolean
   connecting: boolean
 }) {
   const camera = useImagingCamera(rigId)
   const [editing, setEditing] = useState(false)
-  const [choice, setChoice] = useState<{ id: string, name: string } | null>(null)
+  const [choice, setChoice] = useState<{ id: string; name: string } | null>(null)
   useEffect(() => {
     if (camera.confirmedSaves) {
       setEditing(false)
@@ -24,20 +28,27 @@ export function ImagingCamera({ rigId, interrupted, connecting }: {
   const expanded = editing || !selected
   const selectedSlot = view?.cameras.find(item => item.id === selected?.id)
   const draft = choice ?? selected
-  const validChoice = view?.cameras.find(item => item.id === draft?.id && item.name !== null && item.name === draft?.name)
+
+  const validChoice = view?.cameras.find(
+    item => item.id === draft?.id && item.name !== null && item.name === draft?.name,
+  )
 
   let notice
 
   if (offline) {
-    notice = 'Rig updates are interrupted. The saved camera is remembered; reconnect to check or change it.'
+    notice =
+      'Rig updates are interrupted. The saved camera is remembered; reconnect to check or change it.'
   } else if (view?.state === 'missing') {
-    notice = 'The saved camera is not in the rig’s current device list. Choose a camera or check its connection to the server.'
+    notice =
+      'The saved camera is not in the rig’s current device list. Choose a camera or check its connection to the server.'
   } else if (view?.state === 'changed') {
     notice = `${selectedSlot?.configuredName ?? 'The saved camera slot'} now reports a different camera. Check the driver setup, then confirm which camera to use.`
   } else if (view?.state === 'unavailable') {
-    notice = 'Camera identity is unavailable. The saved selection is remembered; check the rig connection and camera setup.'
+    notice =
+      'Camera identity is unavailable. The saved selection is remembered; check the rig connection and camera setup.'
   } else if (connecting || (view && !view.editable)) {
-    notice = 'Another rig operation is in progress. You can change the imaging camera when it finishes.'
+    notice =
+      'Another rig operation is in progress. You can change the imaging camera when it finishes.'
   } else {
     notice = null
   }
@@ -47,8 +58,15 @@ export function ImagingCamera({ rigId, interrupted, connecting }: {
       <div className="vela-imaging-camera__summary">
         <div>
           <h2>Imaging camera</h2>
-          <p>{selected?.name ?? (view ? 'Choose the camera Capture will use.' : 'Checking the saved camera…')}</p>
-          {selected && <small>{selectedSlot ? `${selectedSlot.configuredName} · ` : ''}Saved for this rig</small>}
+          <p>
+            {selected?.name ??
+              (view ? 'Choose the camera Capture will use.' : 'Checking the saved camera…')}
+          </p>
+          {selected && (
+            <small>
+              {selectedSlot ? `${selectedSlot.configuredName} · ` : ''}Saved for this rig
+            </small>
+          )}
         </div>
         {!expanded && (
           <Button
@@ -64,15 +82,24 @@ export function ImagingCamera({ rigId, interrupted, connecting }: {
           </Button>
         )}
       </div>
-      {notice && <p className="vela-imaging-camera__notice" role="status">{notice}</p>}
-      {camera.error && <p className="vela-imaging-camera__notice" role="status">{camera.error}</p>}
+      {notice && (
+        <p className="vela-imaging-camera__notice" role="status">
+          {notice}
+        </p>
+      )}
+      {camera.error && (
+        <p className="vela-imaging-camera__notice" role="status">
+          {camera.error}
+        </p>
+      )}
       {expanded && view && (
         <form
           className="vela-imaging-camera__form"
           onSubmit={event => {
             event.preventDefault()
 
-            if (!locked && validChoice?.name) void camera.save({ id: validChoice.id, name: validChoice.name })
+            if (!locked && validChoice?.name)
+              void camera.save({ id: validChoice.id, name: validChoice.name })
           }}
         >
           <Select
@@ -97,7 +124,12 @@ export function ImagingCamera({ rigId, interrupted, connecting }: {
           />
           <p>Remembered for this rig. You can return here when your setup changes.</p>
           <div className="vela-imaging-camera__actions">
-            <Button type="submit" tone="accent" disabled={locked || !validChoice} aria-busy={pending}>
+            <Button
+              type="submit"
+              tone="accent"
+              disabled={locked || !validChoice}
+              aria-busy={pending}
+            >
               {pending ? 'Saving camera…' : 'Use this camera'}
             </Button>
             {selected && (
@@ -117,7 +149,9 @@ export function ImagingCamera({ rigId, interrupted, connecting }: {
         </form>
       )}
       {(camera.error || (!view && offline)) && (
-        <Button tone="quiet" disabled={pending} onClick={() => void camera.refresh()}>Check saved camera</Button>
+        <Button tone="quiet" disabled={pending} onClick={() => void camera.refresh()}>
+          Check saved camera
+        </Button>
       )}
     </Panel>
   )

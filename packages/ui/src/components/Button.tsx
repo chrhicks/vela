@@ -15,7 +15,12 @@ export function Button({
   ...props
 }: ButtonProps) {
   return (
-    <button className={`vela-button ${className}`.trim()} data-size={size} data-tone={tone} {...props}>
+    <button
+      className={`vela-button ${className}`.trim()}
+      data-size={size}
+      data-tone={tone}
+      {...props}
+    >
       {leadingIcon}
       <span>{children}</span>
     </button>

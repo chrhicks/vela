@@ -295,7 +295,11 @@ function DeviceIcon({ kind }: { kind: DeviceKind }) {
     )
   }
 
-  return <svg aria-hidden="true" fill="none" viewBox="0 0 20 20">{drawing}</svg>
+  return (
+    <svg aria-hidden="true" fill="none" viewBox="0 0 20 20">
+      {drawing}
+    </svg>
+  )
 }
 
 function ShellHeader() {
@@ -328,7 +332,7 @@ function scenarioDevices(rig: RigFixture, scenario: Scenario): ReadonlyArray<Dev
   if (scenario === 'live') return rig.devices
 
   if (scenario === 'offline') {
-    return rig.devices.map((device) => ({
+    return rig.devices.map(device => ({
       id: device.id,
       kind: device.kind,
       kindLabel: device.kindLabel,
@@ -341,7 +345,7 @@ function scenarioDevices(rig: RigFixture, scenario: Scenario): ReadonlyArray<Dev
   }
 
   if (scenario === 'stale') {
-    return rig.devices.map((device) => ({ ...device, connection: 'last-known' }))
+    return rig.devices.map(device => ({ ...device, connection: 'last-known' }))
   }
 
   if (scenario === 'disconnected') return rig.devices.map(disconnectedDevice)
@@ -385,12 +389,18 @@ function DeviceCard({ device }: { device: DeviceFixture }) {
 
   return (
     <Panel
-      action={<Badge marker={<i />} size="small" tone={connection.tone}>{connection.label}</Badge>}
+      action={
+        <Badge marker={<i />} size="small" tone={connection.tone}>
+          {connection.label}
+        </Badge>
+      }
       className="vela-rig-device"
       data-connection={device.connection}
-      description={device.configuredName && device.configuredName !== device.name
-        ? `${device.kindLabel} · ${device.configuredName}`
-        : device.kindLabel}
+      description={
+        device.configuredName && device.configuredName !== device.name
+          ? `${device.kindLabel} · ${device.configuredName}`
+          : device.kindLabel
+      }
       elevation="raised"
       title={device.name}
     >
@@ -407,7 +417,7 @@ function DeviceCard({ device }: { device: DeviceFixture }) {
 
       {device.metrics.length > 0 ? (
         <dl className="vela-rig-device__metrics">
-          {device.metrics.map((metric) => (
+          {device.metrics.map(metric => (
             <div data-tone={metric.tone ?? 'normal'} key={metric.label}>
               <dt>{metric.label}</dt>
               <dd>{metric.value}</dd>
@@ -418,7 +428,7 @@ function DeviceCard({ device }: { device: DeviceFixture }) {
 
       {device.channels ? (
         <div className="vela-rig-device__channels">
-          {device.channels.map((channel) => (
+          {device.channels.map(channel => (
             <span key={channel.label}>
               <small>{channel.label}</small>
               <strong>{channel.value}</strong>
@@ -427,7 +437,9 @@ function DeviceCard({ device }: { device: DeviceFixture }) {
         </div>
       ) : null}
 
-      {noDetails ? <p className="vela-rig-device__empty">Detailed status is not available from this device.</p> : null}
+      {noDetails ? (
+        <p className="vela-rig-device__empty">Detailed status is not available from this device.</p>
+      ) : null}
     </Panel>
   )
 }
@@ -437,8 +449,8 @@ function countSummary(devices: ReadonlyArray<DeviceFixture>, scenario: Scenario)
 
   if (scenario === 'stale') return `${devices.length} devices · last update 42 seconds ago`
 
-  const connected = devices.filter((device) => device.connection === 'connected').length
-  const disconnected = devices.filter((device) => device.connection === 'disconnected').length
+  const connected = devices.filter(device => device.connection === 'connected').length
+  const disconnected = devices.filter(device => device.connection === 'disconnected').length
   const unavailable = devices.length - connected - disconnected
   const parts = [`${connected} of ${devices.length} devices connected`]
 
@@ -470,16 +482,16 @@ function HomeView({
       connected: 6,
       scenario: 'live' as const,
       state: 'Reachable',
-      tone: 'positive' as const
+      tone: 'positive' as const,
     },
     {
       rig: seestar,
       connected: 0,
       scenario: 'disconnected' as const,
       state: 'Reachable',
-      tone: 'positive' as const
+      tone: 'positive' as const,
     },
-  ].filter((card) => !forgottenRigs.has(card.rig.id))
+  ].filter(card => !forgottenRigs.has(card.rig.id))
 
   return (
     <main className="vela-rig-home">
@@ -489,7 +501,9 @@ function HomeView({
           <h1>Rigs</h1>
           <p>Choose a Rig to see what is connected and what it is doing.</p>
         </div>
-        <Button size="small" tone="accent">Add rig</Button>
+        <Button size="small" tone="accent">
+          Add rig
+        </Button>
       </div>
       {cards.length === 0 ? (
         <section className="vela-rig-home__empty">
@@ -499,7 +513,7 @@ function HomeView({
         </section>
       ) : (
         <div className="vela-rig-home__grid">
-          {cards.map((card) => (
+          {cards.map(card => (
             <button
               className="vela-rig-summary"
               key={card.rig.id}
@@ -508,7 +522,9 @@ function HomeView({
             >
               <span className="vela-rig-summary__heading">
                 <strong>{card.rig.name}</strong>
-                <Badge marker={<i />} size="small" tone={card.tone}>{card.state}</Badge>
+                <Badge marker={<i />} size="small" tone={card.tone}>
+                  {card.state}
+                </Badge>
               </span>
               <span className="vela-rig-summary__server">{card.rig.server}</span>
               <span className="vela-rig-summary__footer">
@@ -516,7 +532,9 @@ function HomeView({
                   className="vela-rig-summary__connections"
                   data-state={card.connected === card.rig.devices.length ? 'complete' : 'attention'}
                 >
-                  <strong>{card.connected} of {card.rig.devices.length}</strong>
+                  <strong>
+                    {card.connected} of {card.rig.devices.length}
+                  </strong>
                   <small>devices connected</small>
                 </span>
                 <strong>
@@ -532,13 +550,28 @@ function HomeView({
   )
 }
 
-function RigDetails({ open, rig, onToggle }: { open: boolean; rig: RigFixture; onToggle: () => void }) {
+function RigDetails({
+  open,
+  rig,
+  onToggle,
+}: {
+  open: boolean
+  rig: RigFixture
+  onToggle: () => void
+}) {
   return (
     <section className="vela-rig-details">
-      <button aria-expanded={open} className="vela-rig-details__summary" onClick={onToggle} type="button">
+      <button
+        aria-expanded={open}
+        className="vela-rig-details__summary"
+        onClick={onToggle}
+        type="button"
+      >
         <span>
           <strong>Rig details</strong>
-          <small>{rig.endpoint} · Added {rig.addedAt}</small>
+          <small>
+            {rig.endpoint} · Added {rig.addedAt}
+          </small>
         </span>
         <i aria-hidden="true">⌄</i>
       </button>
@@ -599,7 +632,9 @@ function RigView({
 
   return (
     <main className="vela-rig-page">
-      <Button className="vela-rig-page__back" onClick={onBack} size="small" tone="quiet">← All rigs</Button>
+      <Button className="vela-rig-page__back" onClick={onBack} size="small" tone="quiet">
+        ← All rigs
+      </Button>
 
       <header className="vela-rig-hero">
         <div>
@@ -608,23 +643,35 @@ function RigView({
           <p>{countSummary(devices, scenario)}</p>
         </div>
         <div className="vela-rig-hero__status">
-          <Badge marker={<i />} tone={status.tone}>{status.label}</Badge>
+          <Badge marker={<i />} tone={status.tone}>
+            {status.label}
+          </Badge>
           <span>{updateAge()}</span>
-          <IconButton icon={<RefreshIcon />} label="Refresh Rig" onClick={onRefresh} size="small" tone="quiet" />
+          <IconButton
+            icon={<RefreshIcon />}
+            label="Refresh Rig"
+            onClick={onRefresh}
+            size="small"
+            tone="quiet"
+          />
         </div>
       </header>
 
       {scenario === 'stale' ? (
         <div className="vela-rig-notice" data-tone="warning">
           <strong>Live updates are interrupted</strong>
-          <span>Showing the most recent values Vela received. They may no longer describe the Rig.</span>
+          <span>
+            Showing the most recent values Vela received. They may no longer describe the Rig.
+          </span>
         </div>
       ) : null}
 
       {scenario === 'offline' ? (
         <div className="vela-rig-notice" data-tone="danger">
           <strong>This Rig is offline</strong>
-          <span>Vela cannot reach {rig.endpoint}. Device names come from the last successful inventory.</span>
+          <span>
+            Vela cannot reach {rig.endpoint}. Device names come from the last successful inventory.
+          </span>
         </div>
       ) : null}
 
@@ -637,7 +684,9 @@ function RigView({
           <span>Refreshes every 5 seconds</span>
         </div>
         <div className="vela-rig-device-grid">
-          {devices.map((device) => <DeviceCard device={device} key={device.id} />)}
+          {devices.map(device => (
+            <DeviceCard device={device} key={device.id} />
+          ))}
         </div>
       </section>
 
@@ -648,7 +697,9 @@ function RigView({
           <strong>Remove this Rig from Vela</strong>
           <p>This only removes the saved Rig. It does not change the Alpaca server or hardware.</p>
         </div>
-        <Button className="vela-rig__forget-button" onClick={onForget} size="small" tone="quiet">Forget rig</Button>
+        <Button className="vela-rig__forget-button" onClick={onForget} size="small" tone="quiet">
+          Forget rig
+        </Button>
       </section>
     </main>
   )
@@ -674,7 +725,9 @@ function RigDetailPreview({ props, onPropsChange }: PreviewProps) {
       {effectiveScreen === 'home' ? (
         <HomeView
           forgottenRigs={forgottenRigs}
-          onOpen={(nextRig, nextScenario) => update({ screen: 'rig', rig: nextRig, scenario: nextScenario })}
+          onOpen={(nextRig, nextScenario) =>
+            update({ screen: 'rig', rig: nextRig, scenario: nextScenario })
+          }
         />
       ) : (
         <RigView
@@ -690,21 +743,23 @@ function RigDetailPreview({ props, onPropsChange }: PreviewProps) {
 
       <Dialog
         description="This removes the saved Rig from Vela. It does not change the Alpaca server or any hardware."
-        footer={(
+        footer={
           <>
-            <Button onClick={() => setForgetOpen(false)} tone="quiet">Cancel</Button>
+            <Button onClick={() => setForgetOpen(false)} tone="quiet">
+              Cancel
+            </Button>
             <Button
               className="vela-rig__confirm-forget"
               onClick={() => {
                 setForgetOpen(false)
-                setForgottenRigs((current) => new Set([...current, rig.id]))
+                setForgottenRigs(current => new Set([...current, rig.id]))
                 update({ screen: 'home' })
               }}
             >
               Forget rig
             </Button>
           </>
-        )}
+        }
         onDismiss={() => setForgetOpen(false)}
         open={forgetOpen}
         title={`Forget ${rig.name}?`}
@@ -720,7 +775,8 @@ export const specimen: ComponentSpecimen = {
   componentName: 'Panel / Card',
   id: 'panel-rig-detail',
   name: 'Rig overview · Product example',
-  description: 'A throwaway product prototype for clickable Rig summaries and kind-specific live device cards.',
+  description:
+    'A throwaway product prototype for clickable Rig summaries and kind-specific live device cards.',
   controls: {
     screen: { type: 'select', label: 'Screen', options: screens },
     rig: { type: 'select', label: 'Rig', options: rigs },
@@ -731,7 +787,9 @@ export const specimen: ComponentSpecimen = {
     screen: 'rig',
     rig: 'askar',
     scenario: 'live',
-    detailsOpen: false
+    detailsOpen: false,
   },
-  render: (props, onPropsChange) => <RigDetailPreview onPropsChange={onPropsChange} props={props} />,
+  render: (props, onPropsChange) => (
+    <RigDetailPreview onPropsChange={onPropsChange} props={props} />
+  ),
 }

@@ -14,7 +14,7 @@ const suggestions = [
     altitude: '72° now · near its highest',
     reason: 'High now, with a long stretch of useful sky ahead.',
     filter: 'L-Ultimate suits this emission nebula',
-    detail: 'Its Hα and O III light passes through your dual-band filter.'
+    detail: 'Its Hα and O III light passes through your dual-band filter.',
   },
   {
     ...targets[2]!,
@@ -23,7 +23,7 @@ const suggestions = [
     altitude: '48° now · rising',
     reason: 'Climbing into clearer sky for the rest of the night.',
     filter: 'Broadband is the better fit',
-    detail: 'L-Ultimate blocks much of this galaxy’s starlight.'
+    detail: 'L-Ultimate blocks much of this galaxy’s starlight.',
   },
   {
     ...targets[0]!,
@@ -32,11 +32,17 @@ const suggestions = [
     altitude: '39° now · setting',
     reason: 'A shorter opportunity: start soon to catch it higher.',
     filter: 'Broadband is the better fit',
-    detail: 'A cluster’s stars emit across the visible spectrum.'
+    detail: 'A cluster’s stars emit across the visible spectrum.',
   },
 ]
 
-function Discovery({ props, onPropsChange }: { props: Props; onPropsChange?: (patch: Props) => void }) {
+function Discovery({
+  props,
+  onPropsChange,
+}: {
+  props: Props
+  onPropsChange?: (patch: Props) => void
+}) {
   function suggestionStatus() {
     switch (values.state) {
       case 'cached':
@@ -50,14 +56,23 @@ function Discovery({ props, onPropsChange }: { props: Props; onPropsChange?: (pa
 
   const [local, setLocal] = useState(props)
   const values = onPropsChange ? props : local
-  const update = (patch: Props) => onPropsChange ? onPropsChange(patch) : setLocal(current => ({ ...current, ...patch }))
+
+  const update = (patch: Props) =>
+    onPropsChange ? onPropsChange(patch) : setLocal(current => ({ ...current, ...patch }))
+
   const filter = String(values.filter)
   const query = String(values.query ?? '').toLowerCase()
   const light = String(values.light ?? 'All light')
 
-  const matches = suggestions.filter(target => (filter === 'All objects' || target.family === filter)
-    && `${target.name} ${target.catalog}`.toLowerCase().includes(query)
-    && (light === 'All light' || (light === 'L-Ultimate subjects' ? target.family === 'Emission' : target.family !== 'Emission')))
+  const matches = suggestions.filter(
+    target =>
+      (filter === 'All objects' || target.family === filter) &&
+      `${target.name} ${target.catalog}`.toLowerCase().includes(query) &&
+      (light === 'All light' ||
+        (light === 'L-Ultimate subjects'
+          ? target.family === 'Emission'
+          : target.family !== 'Emission')),
+  )
 
   const page = Math.min(Number(values.page) || 0, Math.max(0, Math.ceil(matches.length / 2) - 1))
   const shown = matches.slice(page * 2, page * 2 + 2)
@@ -71,7 +86,14 @@ function Discovery({ props, onPropsChange }: { props: Props; onPropsChange?: (pa
           <h1>Find your next subject</h1>
           <p>Good opportunities from now until dawn.</p>
         </div>
-        <Button size="small" tone="quiet" disabled={refreshing} onClick={() => update({ state: 'fresh', page: 0 })}>{refreshing ? 'Refreshing…' : 'Refresh'}</Button>
+        <Button
+          size="small"
+          tone="quiet"
+          disabled={refreshing}
+          onClick={() => update({ state: 'fresh', page: 0 })}
+        >
+          {refreshing ? 'Refreshing…' : 'Refresh'}
+        </Button>
       </header>
       <div className="vela-discovery-demo__snapshot">
         <span>{suggestionStatus()}</span>
@@ -86,20 +108,26 @@ function Discovery({ props, onPropsChange }: { props: Props; onPropsChange?: (pa
         />
         <label>
           Light preference
-          <select value={light} onChange={event => update({ light: event.target.value, page: 0 })}>{['All light', 'L-Ultimate subjects', 'Broadband subjects'].map(option => <option key={option}>{option}</option>)}</select>
+          <select value={light} onChange={event => update({ light: event.target.value, page: 0 })}>
+            {['All light', 'L-Ultimate subjects', 'Broadband subjects'].map(option => (
+              <option key={option}>{option}</option>
+            ))}
+          </select>
         </label>
       </div>
       <nav className="vela-discovery-demo__filters" aria-label="Object type">
-        {['All objects', 'Emission', 'Reflection & dark', 'Galaxies', 'Clusters', 'Planetary'].map(kind => (
-          <button
-            key={kind}
-            type="button"
-            aria-pressed={filter === kind}
-            onClick={() => update({ filter: kind, page: 0 })}
-          >
-            {kind}
-          </button>
-        ))}
+        {['All objects', 'Emission', 'Reflection & dark', 'Galaxies', 'Clusters', 'Planetary'].map(
+          kind => (
+            <button
+              key={kind}
+              type="button"
+              aria-pressed={filter === kind}
+              onClick={() => update({ filter: kind, page: 0 })}
+            >
+              {kind}
+            </button>
+          ),
+        )}
       </nav>
       <p className="vela-discovery-demo__filter-note">
         {'Your filter: '}
@@ -134,17 +162,33 @@ function Discovery({ props, onPropsChange }: { props: Props; onPropsChange?: (pa
               </Button>
               <small>
                 {'Reference image · '}
-                <a href={target.source} target="_blank" rel="noreferrer">{target.credit}</a>
+                <a href={target.source} target="_blank" rel="noreferrer">
+                  {target.credit}
+                </a>
               </small>
             </div>
           </article>
         ))}
       </div>
-      {matches.length === 0 && <p className="vela-discovery-demo__empty">No sample suggestions match these filters. Try another object type or light preference.</p>}
+      {matches.length === 0 && (
+        <p className="vela-discovery-demo__empty">
+          No sample suggestions match these filters. Try another object type or light preference.
+        </p>
+      )}
       <footer className="vela-discovery-demo__footer">
-        <span>{matches.length ? page * 2 + 1 : 0}–{Math.min(page * 2 + 2, matches.length)} of {matches.length} suggestions</span>
+        <span>
+          {matches.length ? page * 2 + 1 : 0}–{Math.min(page * 2 + 2, matches.length)} of{' '}
+          {matches.length} suggestions
+        </span>
         <div>
-          <Button size="small" tone="quiet" disabled={page === 0} onClick={() => update({ page: page - 1 })}>Previous</Button>
+          <Button
+            size="small"
+            tone="quiet"
+            disabled={page === 0}
+            onClick={() => update({ page: page - 1 })}
+          >
+            Previous
+          </Button>
           <Button
             size="small"
             tone="quiet"
@@ -155,7 +199,11 @@ function Discovery({ props, onPropsChange }: { props: Props; onPropsChange?: (pa
           </Button>
         </div>
       </footer>
-      {Boolean(values.selected) && <p className="vela-discovery-demo__selection" role="status">{String(values.selected)} selected · the app opens its framing view here.</p>}
+      {Boolean(values.selected) && (
+        <p className="vela-discovery-demo__selection" role="status">
+          {String(values.selected)} selected · the app opens its framing view here.
+        </p>
+      )}
     </section>
   )
 }
@@ -165,18 +213,26 @@ export const specimen: ComponentSpecimen = {
   componentName: 'Panel / Card',
   id: 'panel-target-discovery',
   name: 'Target discovery · Product example',
-  description: 'Photographic suggestions for the remaining night, explicit refresh, stable pages and filter advice. Sample ranking; no live observing calculation.',
+  description:
+    'Photographic suggestions for the remaining night, explicit refresh, stable pages and filter advice. Sample ranking; no live observing calculation.',
   controls: {
     filter: {
       type: 'select',
       label: 'Object type',
-      options: ['All objects', 'Emission', 'Reflection & dark', 'Galaxies', 'Clusters', 'Planetary']
+      options: [
+        'All objects',
+        'Emission',
+        'Reflection & dark',
+        'Galaxies',
+        'Clusters',
+        'Planetary',
+      ],
     },
     query: { type: 'text', label: 'Search targets' },
     light: {
       type: 'select',
       label: 'Light preference',
-      options: ['All light', 'L-Ultimate subjects', 'Broadband subjects']
+      options: ['All light', 'L-Ultimate subjects', 'Broadband subjects'],
     },
     state: { type: 'select', label: 'Suggestions', options: ['cached', 'refreshing', 'fresh'] },
     page: { type: 'text', label: 'Page (zero based)' },
@@ -188,7 +244,9 @@ export const specimen: ComponentSpecimen = {
     light: 'All light',
     state: 'cached',
     page: 0,
-    selected: ''
+    selected: '',
   },
-  render: (props, onPropsChange) => <Discovery props={props} {...(onPropsChange ? { onPropsChange } : {})} />,
+  render: (props, onPropsChange) => (
+    <Discovery props={props} {...(onPropsChange ? { onPropsChange } : {})} />
+  ),
 }

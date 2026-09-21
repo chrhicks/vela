@@ -8,14 +8,16 @@ const endpoint = { host: '192.168.4.104', port: 11111 }
 
 function homeWithRig(): HomeView {
   return {
-    rigs: [{
-      id: 'rig-1',
-      name: 'Backyard rig',
-      reachability: 'reachable',
-      lastSeenAt: now,
-      connections: { total: 7, connected: 7, disconnected: 0, unavailable: 0 },
-      capabilities: ['forget'],
-    }],
+    rigs: [
+      {
+        id: 'rig-1',
+        name: 'Backyard rig',
+        reachability: 'reachable',
+        lastSeenAt: now,
+        connections: { total: 7, connected: 7, disconnected: 0, unavailable: 0 },
+        capabilities: ['forget'],
+      },
+    ],
     refreshedAt: now,
   }
 }
@@ -143,14 +145,16 @@ function offlineDetail(): RigDetailView {
     lastInventoryAt: now,
     refreshedAt: now,
     connections: { total: 1, connected: 0, disconnected: 0, unavailable: 1 },
-    devices: [{
-      id: 'offline-camera-0',
-      kind: 'camera',
-      name: 'Camera slot',
-      configuredName: 'Camera slot',
-      connection: 'unavailable',
-      status: { availability: 'unavailable' },
-    }],
+    devices: [
+      {
+        id: 'offline-camera-0',
+        kind: 'camera',
+        name: 'Camera slot',
+        configuredName: 'Camera slot',
+        connection: 'unavailable',
+        status: { availability: 'unavailable' },
+      },
+    ],
     capabilities: ['forget'],
   }
 }
@@ -164,12 +168,14 @@ async function fulfillJson<Body>(route: Route, body: Body, status = 200) {
 }
 
 async function useHome(page: Page, getHome: () => HomeView) {
-  await page.route('**/api/web/home', (route) => fulfillJson(route, getHome()))
+  await page.route('**/api/web/home', route => fulfillJson(route, getHome()))
 }
 
-test('navigates through the complete Rig card and renders ordered responsive detail', async ({ page }) => {
+test('navigates through the complete Rig card and renders ordered responsive detail', async ({
+  page,
+}) => {
   await useHome(page, homeWithRig)
-  await page.route('**/api/web/rigs/rig-1', (route) => fulfillJson(route, liveDetail()))
+  await page.route('**/api/web/rigs/rig-1', route => fulfillJson(route, liveDetail()))
 
   await page.goto('/')
   const rigLink = page.getByRole('link', { name: 'View Backyard rig' })
@@ -178,7 +184,9 @@ test('navigates through the complete Rig card and renders ordered responsive det
   await rigLink.click()
 
   await expect(page).toHaveURL(/\/rigs\/rig-1$/)
-  await expect(page.locator('.vela-navigation').getByRole('link', { name: 'Observe', exact: true })).toHaveAttribute('aria-current', 'page')
+  await expect(
+    page.locator('.vela-navigation').getByRole('link', { name: 'Observe', exact: true }),
+  ).toHaveAttribute('aria-current', 'page')
   await expect(page.getByRole('heading', { level: 1, name: 'Backyard rig' })).toBeVisible()
   await expect(page.locator('.vela-rig-device .vela-panel__title')).toHaveText([
     'Mount',
@@ -201,19 +209,32 @@ test('navigates through the complete Rig card and renders ordered responsive det
   await expect(page.getByText('192.168.4.104:11111', { exact: true })).toBeVisible()
 
   await page.setViewportSize({ width: 390, height: 844 })
-  await expect.poll(() => page.locator('.vela-rig-device-grid').evaluate((element) =>
-    getComputedStyle(element).gridTemplateColumns.split(' ').length)).toBe(1)
-  await expect.poll(() => page.locator('.vela-rig-device__metrics').first().evaluate((element) =>
-    getComputedStyle(element).gridTemplateColumns.split(' ').length)).toBe(2)
+  await expect
+    .poll(() =>
+      page
+        .locator('.vela-rig-device-grid')
+        .evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length),
+    )
+    .toBe(1)
+  await expect
+    .poll(() =>
+      page
+        .locator('.vela-rig-device__metrics')
+        .first()
+        .evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length),
+    )
+    .toBe(2)
 })
 
-test('shows active refresh, retains stale values, and resumes non-overlapping polling', async ({ page }) => {
+test('shows active refresh, retains stale values, and resumes non-overlapping polling', async ({
+  page,
+}) => {
   let requests = 0
-  await page.route('**/api/web/rigs/rig-1', async (route) => {
+  await page.route('**/api/web/rigs/rig-1', async route => {
     requests += 1
 
     if (requests === 2) {
-      await new Promise((resolve) => setTimeout(resolve, 5_500))
+      await new Promise(resolve => setTimeout(resolve, 5_500))
       await fulfillJson(route, { error: 'temporary' }, 503)
 
       return
@@ -247,7 +268,7 @@ test('shows active refresh, retains stale values, and resumes non-overlapping po
 
 test('pauses polling while hidden and refreshes immediately when visible', async ({ page }) => {
   let requests = 0
-  await page.route('**/api/web/rigs/rig-1', async (route) => {
+  await page.route('**/api/web/rigs/rig-1', async route => {
     requests += 1
     await fulfillJson(route, liveDetail())
   })
@@ -271,7 +292,7 @@ test('pauses polling while hidden and refreshes immediately when visible', async
 })
 
 test('distinguishes offline, unknown, and malformed fresh loads', async ({ page }) => {
-  await page.route('**/api/web/rigs/*', async (route) => {
+  await page.route('**/api/web/rigs/*', async route => {
     const path = new URL(route.request().url()).pathname
 
     if (path.endsWith('/offline')) {
@@ -299,9 +320,9 @@ test('distinguishes offline, unknown, and malformed fresh loads', async ({ page 
 test('forgets from the secondary management area and returns Home', async ({ page }) => {
   let forgotten = false
   let deleteRequests = 0
-  await useHome(page, () => forgotten ? { rigs: [], refreshedAt: now } : homeWithRig())
-  await page.route('**/api/web/rigs/rig-1', (route) => fulfillJson(route, liveDetail()))
-  await page.route('**/api/rigs/rig-1', async (route) => {
+  await useHome(page, () => (forgotten ? { rigs: [], refreshedAt: now } : homeWithRig()))
+  await page.route('**/api/web/rigs/rig-1', route => fulfillJson(route, liveDetail()))
+  await page.route('**/api/rigs/rig-1', async route => {
     deleteRequests += 1
     forgotten = true
     await route.fulfill({ status: 204, body: '' })

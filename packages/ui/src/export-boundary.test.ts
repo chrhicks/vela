@@ -4,7 +4,17 @@ import * as drafts from './drafts'
 
 describe('@vela/ui export boundaries', () => {
   it('exports the complete initial component baseline from the stable root', () => {
-    for (const name of ['Badge', 'Button', 'Checkbox', 'Dialog', 'IconButton', 'Input', 'Panel', 'Select', 'Tabs']) {
+    for (const name of [
+      'Badge',
+      'Button',
+      'Checkbox',
+      'Dialog',
+      'IconButton',
+      'Input',
+      'Panel',
+      'Select',
+      'Tabs',
+    ]) {
       expect(stable).toHaveProperty(name)
     }
   })

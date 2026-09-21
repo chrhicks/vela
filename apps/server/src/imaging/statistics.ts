@@ -2,9 +2,9 @@ import { setImmediate } from 'node:timers/promises'
 
 import type { ImageColor } from './preview.js'
 
-type Background = { level: number, noise: number }
+type Background = { level: number; noise: number }
 
-type Peak = { x: number, y: number }
+type Peak = { x: number; y: number }
 
 interface StarPolicy {
   aperture: number
@@ -63,13 +63,14 @@ export async function measureStars(
   policy: StarPolicy = capturePolicy,
 ) {
   if (
-    !Number.isInteger(width)
-    || !Number.isInteger(height)
-    || width < 1
-    || height < 1
-    || width * height > 50_000_000
-    || pixels.length !== width * height
-  ) throw new Error('Invalid image dimensions')
+    !Number.isInteger(width) ||
+    !Number.isInteger(height) ||
+    width < 1 ||
+    height < 1 ||
+    width * height > 50_000_000 ||
+    pixels.length !== width * height
+  )
+    throw new Error('Invalid image dimensions')
 
   // Every sample matters: invalid edges and unused Bayer pixels must not look starless.
   for (let index = 0; index < pixels.length; index++) {
@@ -85,7 +86,11 @@ export async function measureStars(
 
     return scale === 1
       ? pixels[index]!
-      : (pixels[index]! + pixels[index + 1]! + pixels[index + width]! + pixels[index + width + 1]!) / 4
+      : (pixels[index]! +
+          pixels[index + 1]! +
+          pixels[index + width]! +
+          pixels[index + width + 1]!) /
+          4
   }
 
   const columns = Math.floor(width / scale)
@@ -128,7 +133,8 @@ export async function measureStars(
           if (neighbor > value || (neighbor === value && (dy < 0 || (dy === 0 && dx < 0))))
             maximum = false
 
-          if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1 && neighbor > sky.level + 3 * sky.noise) support++
+          if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1 && neighbor > sky.level + 3 * sky.noise)
+            support++
         }
       }
 
@@ -255,7 +261,7 @@ function luminance(
   const value = (dx: number, dy: number) => pixels[(y + dy) * width + x + dx]!
 
   if (color.kind === 'mono') return value(0, 0)
-  const channel = color.pattern[(y % 2) * 2 + x % 2]!
+  const channel = color.pattern[(y % 2) * 2 + (x % 2)]!
   const center = value(0, 0)
 
   if (channel === 'g') {
@@ -284,12 +290,13 @@ function measureStar(
   const { aperture, patchRadius } = policy
 
   if (
-    ox <= patchRadius
-    || oy <= patchRadius
-    || ox >= width - patchRadius - 1
-    || oy >= height - patchRadius - 1
-  ) return null
-  const patch: { x: number, y: number, value: number }[] = []
+    ox <= patchRadius ||
+    oy <= patchRadius ||
+    ox >= width - patchRadius - 1 ||
+    oy >= height - patchRadius - 1
+  )
+    return null
+  const patch: { x: number; y: number; value: number }[] = []
   const annulus: number[] = []
 
   for (let y = -patchRadius; y <= patchRadius; y++) {

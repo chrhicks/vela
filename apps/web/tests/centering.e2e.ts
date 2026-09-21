@@ -72,16 +72,19 @@ async function rig(page: Page) {
   const commands: string[] = []
   const rig = { state: initial(), offline: false, stale: false, commands }
 
-  const response = () => JSON.stringify({
-    ...rig.state,
-    observedAt: new Date(Date.now() - (rig.stale ? 60000 : 0)).toISOString(),
-  })
+  const response = () =>
+    JSON.stringify({
+      ...rig.state,
+      observedAt: new Date(Date.now() - (rig.stale ? 60000 : 0)).toISOString(),
+    })
 
   await page.route('**/api/web/rigs/rig-1/targets/m31', route => route.fulfill({ json: target }))
   await page.route('**/api/survey/**', route => route.abort())
-  await page.route('**/api/web/rigs/rig-1/framing', route => rig.offline
-    ? route.abort()
-    : route.fulfill({ contentType: 'application/json', body: response() }))
+  await page.route('**/api/web/rigs/rig-1/framing', route =>
+    rig.offline
+      ? route.abort()
+      : route.fulfill({ contentType: 'application/json', body: response() }),
+  )
   await page.route('**/api/rigs/rig-1/framing/*', route => {
     const action = route.request().url().split('/').at(-1)!
     rig.commands.push(action)
@@ -99,7 +102,7 @@ async function rig(page: Page) {
         checkCurrent: false,
         canCenter: false,
         centering: {
-          toleranceArcminutes: .5,
+          toleranceArcminutes: 0.5,
           maxCorrections: 4,
           correction: 1,
           outcome: 'working',
@@ -132,7 +135,9 @@ async function rig(page: Page) {
 }
 
 for (const width of [1280, 390]) {
-  test(`fresh centering results replace pending feedback and composition edits discard success at ${width}px`, async ({ page }) => {
+  test(`fresh centering results replace pending feedback and composition edits discard success at ${width}px`, async ({
+    page,
+  }) => {
     await page.setViewportSize({ width, height: 1000 })
     const device = await rig(page)
     const status = page.locator('.vela-target-status')
@@ -144,7 +149,7 @@ for (const width of [1280, 390]) {
     await expect(status).toContainText('Receiving the image')
     device.state = { ...device.state, phase: 'solving' }
     await expect(status).toContainText('Measuring the new framing')
-    const final = sample(1, .35, 'within-tolerance')
+    const final = sample(1, 0.35, 'within-tolerance')
     device.state = {
       ...device.state,
       active: false,
@@ -161,7 +166,9 @@ for (const width of [1280, 390]) {
     }
     await expect(status).toContainText('Composition centered')
     await expect(page.locator('.vela-target-offset > strong')).toHaveText('0.35′')
-    await expect(page.getByRole('region', { name: 'Centering measurements' }).getByRole('listitem')).toHaveCount(2)
+    await expect(
+      page.getByRole('region', { name: 'Centering measurements' }).getByRole('listitem'),
+    ).toHaveCount(2)
     await expect(page.getByText('Within tolerance · side changed')).toBeVisible()
     await expect(page.getByText(/flip expected/i)).toHaveCount(0)
     await expect(page.locator('.vela-working-indicator')).toBeHidden()
@@ -181,19 +188,23 @@ for (const width of [1280, 390]) {
 }
 
 for (const outcome of ['not-converging', 'limit-reached'] as const) {
-  test(`${outcome} remains a checked result but requires a fresh Check before another Center`, async ({ page }) => {
+  test(`${outcome} remains a checked result but requires a fresh Check before another Center`, async ({
+    page,
+  }) => {
     const device = await rig(page)
     await page.getByRole('button', { name: 'Center composition', exact: true }).click()
-    await expect(page.locator('.vela-target-status')).toContainText('Taking a 20-second test exposure')
+    await expect(page.locator('.vela-target-status')).toContainText(
+      'Taking a 20-second test exposure',
+    )
     const offsets = outcome === 'not-converging' ? [42.4, 53.8, 67.1] : [42.4, 20, 10, 5, 2]
 
-    const measurements = offsets.map((offset, correction) => sample(
-      correction,
-      offset,
-      correction === 0
-        ? 'starting'
-        : outcome === 'not-converging' ? 'worsened' : 'improved',
-    ))
+    const measurements = offsets.map((offset, correction) =>
+      sample(
+        correction,
+        offset,
+        correction === 0 ? 'starting' : outcome === 'not-converging' ? 'worsened' : 'improved',
+      ),
+    )
 
     device.state = {
       ...device.state,
@@ -214,29 +225,49 @@ for (const outcome of ['not-converging', 'limit-reached'] as const) {
         ? 'Centering is not converging'
         : 'Centering correction limit reached',
     )
-    await expect(page.getByRole('button', { name: 'Center composition', exact: true })).toBeDisabled()
+    await expect(
+      page.getByRole('button', { name: 'Center composition', exact: true }),
+    ).toBeDisabled()
     await expect(page.getByRole('link', { name: 'Continue to capture' })).toBeVisible()
     await page.getByRole('button', { name: 'Check current frame', exact: true }).click()
-    await expect(page.locator('.vela-target-status')).toContainText('Taking a 20-second test exposure')
+    await expect(page.locator('.vela-target-status')).toContainText(
+      'Taking a 20-second test exposure',
+    )
     await expect(page.getByRole('region', { name: 'Centering measurements' })).toHaveCount(0)
-    device.state = { ...device.state, phase: 'checked', active: false, checkCurrent: true, canCenter: true }
-    await expect(page.getByRole('button', { name: 'Center composition', exact: true })).toBeEnabled()
+    device.state = {
+      ...device.state,
+      phase: 'checked',
+      active: false,
+      checkCurrent: true,
+      canCenter: true,
+    }
+    await expect(
+      page.getByRole('button', { name: 'Center composition', exact: true }),
+    ).toBeEnabled()
     expect(device.commands).toEqual(['center', 'check'])
   })
 }
 
-test('long exposure keeps Working visible, stale/offline reads remove activity, and Stop ends it without replay', async ({ page }) => {
+test('long exposure keeps Working visible, stale/offline reads remove activity, and Stop ends it without replay', async ({
+  page,
+}) => {
   const device = await rig(page)
   await page.getByRole('button', { name: 'Center composition', exact: true }).click()
   const activity = page.locator('.vela-working-indicator')
   await expect(activity).toBeVisible()
   await page.clock.install()
   await page.clock.fastForward(10000)
-  await expect(page.locator('.vela-target-status')).toContainText('Taking a 20-second test exposure')
+  await expect(page.locator('.vela-target-status')).toContainText(
+    'Taking a 20-second test exposure',
+  )
   await expect(activity).toBeVisible()
   await expect(page.getByRole('button', { name: 'Stop framing' })).toBeEnabled()
   await page.emulateMedia({ reducedMotion: 'reduce' })
-  expect(await activity.locator('.vela-working-indicator__shimmer').evaluate(element => getComputedStyle(element, '::after').animationName)).toBe('none')
+  expect(
+    await activity
+      .locator('.vela-working-indicator__shimmer')
+      .evaluate(element => getComputedStyle(element, '::after').animationName),
+  ).toBe('none')
   device.stale = true
   await expect(page.locator('.vela-target-status')).toContainText('Connection interrupted')
   await expect(activity).toBeHidden()
@@ -254,10 +285,16 @@ test('long exposure keeps Working visible, stale/offline reads remove activity, 
   expect(device.commands).toEqual(['center', 'stop'])
 })
 
-test('an uncertain centering response shows neither animation nor success until an explicit state check', async ({ page }) => {
+test('an uncertain centering response shows neither animation nor success until an explicit state check', async ({
+  page,
+}) => {
   const device = await rig(page)
   let release!: () => void
-  const held = new Promise<void>(resolve => { release = resolve })
+
+  const held = new Promise<void>(resolve => {
+    release = resolve
+  })
+
   await page.route('**/api/rigs/rig-1/framing/center', async route => {
     device.commands.push('center')
     device.state = { ...device.state, phase: 'exposing', active: true, checkCurrent: false }
@@ -277,9 +314,11 @@ test('an uncertain centering response shows neither animation nor success until 
   expect(device.commands).toEqual(['center'])
 })
 
-test('an already-close frame requires the fresh no-movement recheck to confirm centered', async ({ page }) => {
+test('an already-close frame requires the fresh no-movement recheck to confirm centered', async ({
+  page,
+}) => {
   const device = await rig(page)
-  const before = sample(0, .35, 'starting')
+  const before = sample(0, 0.35, 'starting')
   device.state = {
     ...device.state,
     active: true,
@@ -288,16 +327,18 @@ test('an already-close frame requires the fresh no-movement recheck to confirm c
     canCenter: false,
     actual: { ...device.state.actual!, ...before },
     centering: {
-      toleranceArcminutes: .5,
+      toleranceArcminutes: 0.5,
       maxCorrections: 4,
       correction: 0,
       outcome: 'working',
       measurements: [before],
     },
   }
-  await expect(page.locator('.vela-target-status')).toContainText('Checking the current frame before any correction')
+  await expect(page.locator('.vela-target-status')).toContainText(
+    'Checking the current frame before any correction',
+  )
   await expect(page.getByText('Composition centered', { exact: true })).toHaveCount(0)
-  const after = { ...sample(0, .4, 'within-tolerance'), checkId: 'fresh-no-movement-check' }
+  const after = { ...sample(0, 0.4, 'within-tolerance'), checkId: 'fresh-no-movement-check' }
   device.state = {
     ...device.state,
     active: false,

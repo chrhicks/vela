@@ -17,7 +17,10 @@ try {
     API_PROXY_TARGET: 'http://127.0.0.1:3001',
     VELA_LAN_HOST: process.env.VELA_LAN_HOST || 'polaris.local',
     VELA_RIG_CATALOG_PATH: resolve(root, process.env.VELA_RIG_CATALOG_PATH || 'data/rigs.yaml'),
-    VELA_SAVED_IMAGES_PATH: resolve(root, process.env.VELA_SAVED_IMAGES_PATH || 'data/saved-images'),
+    VELA_SAVED_IMAGES_PATH: resolve(
+      root,
+      process.env.VELA_SAVED_IMAGES_PATH || 'data/saved-images',
+    ),
   }
 
   for (const key of ['VELA_ASTAP', 'VELA_STAR_CATALOG']) {
@@ -69,9 +72,11 @@ try {
 function available(port, host) {
   return new Promise((resolveReady, reject) => {
     const server = createServer()
-    server.once('error', error => reject(new Error(
-      `Port ${port} is unavailable (${error.code}). Stop the existing server first.`,
-    )))
+    server.once('error', error =>
+      reject(
+        new Error(`Port ${port} is unavailable (${error.code}). Stop the existing server first.`),
+      ),
+    )
     server.listen({ port, host }, () => server.close(resolveReady))
   })
 }

@@ -1,7 +1,13 @@
 import * as statistics from '../imaging/statistics.js'
 import { expect, it, vi } from 'vitest'
 import { inflateSync } from 'node:zlib'
-import { CaptureStoppedError, createCaptureController, type CaptureCamera, type CaptureFrame, type CaptureRunOptions } from './controller.js'
+import {
+  CaptureStoppedError,
+  createCaptureController,
+  type CaptureCamera,
+  type CaptureFrame,
+  type CaptureRunOptions,
+} from './controller.js'
 import { createMemorySavedImageStore, type SavedImageStore } from '../saved-images/store.js'
 
 function deferred<T>() {
@@ -17,7 +23,9 @@ function deferred<T>() {
 }
 
 function setup(savedImages: SavedImageStore = createMemorySavedImageStore()) {
-  const requests: Array<Parameters<CaptureCamera['capture']>[0] & ReturnType<typeof deferred<CaptureFrame>>> = []
+  const requests: Array<
+    Parameters<CaptureCamera['capture']>[0] & ReturnType<typeof deferred<CaptureFrame>>
+  > = []
 
   const camera: CaptureCamera = {
     capture(input) {
@@ -36,7 +44,8 @@ function setup(savedImages: SavedImageStore = createMemorySavedImageStore()) {
 
   const controller = {
     ...actual,
-    start: (seconds: number, options: CaptureRunOptions = {}) => actual.start(seconds, camera, 'Main camera', options),
+    start: (seconds: number, options: CaptureRunOptions = {}) =>
+      actual.start(seconds, camera, 'Main camera', options),
   }
 
   const frame: CaptureFrame = {
@@ -60,12 +69,20 @@ function setup(savedImages: SavedImageStore = createMemorySavedImageStore()) {
 it('owns one pending exposure, publishes a native PNG only after acquisition, and releases its lease', async () => {
   const { controller, requests, frame } = setup()
   const settled = vi.fn(() => expect(controller.active()).toBe(false))
-  expect(await controller.start(10, { onSettled: settled })).toMatchObject({ active: true, phase: 'exposing', latestImage: null })
+  expect(await controller.start(10, { onSettled: settled })).toMatchObject({
+    active: true,
+    phase: 'exposing',
+    latestImage: null,
+  })
   expect(settled).not.toHaveBeenCalled()
   await expect(controller.start(20)).rejects.toThrow('already running')
   expect(requests).toHaveLength(1)
   requests[0]!.onProgress({ phase: 'exposing', elapsedSeconds: 3 })
-  expect(controller.snapshot()).toMatchObject({ phase: 'exposing', elapsedSeconds: 3, latestImage: null })
+  expect(controller.snapshot()).toMatchObject({
+    phase: 'exposing',
+    elapsedSeconds: 3,
+    latestImage: null,
+  })
   requests[0]!.onProgress({ phase: 'reading', elapsedSeconds: 10 })
   expect(controller.snapshot().phase).toBe('reading')
   requests[0]!.resolve(frame)
@@ -86,7 +103,9 @@ it('owns one pending exposure, publishes a native PNG only after acquisition, an
     },
   })
   const png = controller.image(view.latestImage!.id)!
-  expect(view.latestImage!.imageUrl).toBe(`/api/rigs/fra%20400/capture/images/${view.latestImage!.id}`)
+  expect(view.latestImage!.imageUrl).toBe(
+    `/api/rigs/fra%20400/capture/images/${view.latestImage!.id}`,
+  )
   expect(png.subarray(0, 8)).toEqual(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
   expect(png.readUInt32BE(16)).toBe(4)
   expect(png.readUInt32BE(20)).toBe(2)
@@ -98,10 +117,18 @@ it('retains the prior image and its metadata during a subsequent failed exposure
   const { controller, requests, complete } = setup()
   const previous = await complete()
   await controller.start(30)
-  expect(controller.snapshot()).toMatchObject({ active: true, exposureSeconds: 30, latestImage: previous })
+  expect(controller.snapshot()).toMatchObject({
+    active: true,
+    exposureSeconds: 30,
+    latestImage: previous,
+  })
   requests.at(-1)!.reject(new Error('Camera readout failed'))
   await vi.waitFor(() => expect(controller.active()).toBe(false))
-  expect(controller.snapshot()).toMatchObject({ phase: 'failed', error: 'Camera readout failed', latestImage: previous })
+  expect(controller.snapshot()).toMatchObject({
+    phase: 'failed',
+    error: 'Camera readout failed',
+    latestImage: previous,
+  })
   expect(controller.image(previous.id)).toBeDefined()
 })
 
@@ -151,38 +178,59 @@ it('keeps the same pending exposure, previous image and run lease through interr
 
 it.each([
   { rejection: new CaptureStoppedError(), phase: 'stopped', error: null },
-  { rejection: new Error('Camera cleanup unconfirmed'), phase: 'failed', error: 'Camera cleanup unconfirmed' },
-  { rejection: new DOMException('Unconfirmed abort', 'AbortError'), phase: 'failed', error: 'Unconfirmed abort' },
-])('waits for cleanup and reports $phase for $rejection.name', async ({ rejection, phase, error }) => {
-  const { controller, requests } = setup()
-  const released = vi.fn()
-  await controller.start(10, { onSettled: released })
-  requests[0]!.onReadState('retrying')
-  const stop = controller.stop()
-  let settled = false
-  void stop.then(() => { settled = true })
-  await Promise.resolve()
-  expect(requests[0]!.signal.aborted).toBe(true)
-  expect(settled).toBe(false)
-  expect(controller.snapshot()).toMatchObject({ phase: 'stopping', active: true, captureReadState: 'current' })
-  expect(released).not.toHaveBeenCalled()
-  requests[0]!.onReadState('retrying')
-  requests[0]!.onProgress({ phase: 'reading', elapsedSeconds: 10 })
-  expect(controller.snapshot().phase).toBe('stopping')
-  await expect(controller.start(10)).rejects.toThrow('already running')
-  requests[0]!.reject(rejection)
-  expect(await stop).toMatchObject({ phase, error, active: false, captureReadState: 'current' })
-  requests[0]!.onReadState('retrying')
-  expect(controller.snapshot().captureReadState).toBe('current')
-  expect(released).toHaveBeenCalledOnce()
-})
+  {
+    rejection: new Error('Camera cleanup unconfirmed'),
+    phase: 'failed',
+    error: 'Camera cleanup unconfirmed',
+  },
+  {
+    rejection: new DOMException('Unconfirmed abort', 'AbortError'),
+    phase: 'failed',
+    error: 'Unconfirmed abort',
+  },
+])(
+  'waits for cleanup and reports $phase for $rejection.name',
+  async ({ rejection, phase, error }) => {
+    const { controller, requests } = setup()
+    const released = vi.fn()
+    await controller.start(10, { onSettled: released })
+    requests[0]!.onReadState('retrying')
+    const stop = controller.stop()
+    let settled = false
+    void stop.then(() => {
+      settled = true
+    })
+    await Promise.resolve()
+    expect(requests[0]!.signal.aborted).toBe(true)
+    expect(settled).toBe(false)
+    expect(controller.snapshot()).toMatchObject({
+      phase: 'stopping',
+      active: true,
+      captureReadState: 'current',
+    })
+    expect(released).not.toHaveBeenCalled()
+    requests[0]!.onReadState('retrying')
+    requests[0]!.onProgress({ phase: 'reading', elapsedSeconds: 10 })
+    expect(controller.snapshot().phase).toBe('stopping')
+    await expect(controller.start(10)).rejects.toThrow('already running')
+    requests[0]!.reject(rejection)
+    expect(await stop).toMatchObject({ phase, error, active: false, captureReadState: 'current' })
+    requests[0]!.onReadState('retrying')
+    expect(controller.snapshot().captureReadState).toBe('current')
+    expect(released).toHaveBeenCalledOnce()
+  },
+)
 
 it('keeps an exposure that actually completed while Stop was being requested', async () => {
   const { controller, requests, frame } = setup()
   await controller.start(10)
   const stop = controller.stop()
   requests[0]!.resolve(frame)
-  expect(await stop).toMatchObject({ phase: 'complete', active: false, latestImage: { capturedAt: frame.capturedAt } })
+  expect(await stop).toMatchObject({
+    phase: 'complete',
+    active: false,
+    latestImage: { capturedAt: frame.capturedAt },
+  })
 })
 
 it('bounds image retention while preserving the newest image', async () => {
@@ -225,51 +273,73 @@ it('repeats completed exposures under one lease and keeps the last frame and cou
   expect(settled).not.toHaveBeenCalled()
   requests[1]!.reject(new Error('Readout failed'))
   await vi.waitFor(() => expect(controller.active()).toBe(false))
-  expect(controller.snapshot()).toMatchObject({ phase: 'failed', completedCount: 1, latestImage: previous, error: 'Readout failed' })
+  expect(controller.snapshot()).toMatchObject({
+    phase: 'failed',
+    completedCount: 1,
+    latestImage: previous,
+    error: 'Readout failed',
+  })
   expect(settled).toHaveBeenCalledOnce()
   await controller.start(20)
-  expect(controller.snapshot()).toMatchObject({ repeat: false, completedCount: 0, latestImage: previous })
+  expect(controller.snapshot()).toMatchObject({
+    repeat: false,
+    completedCount: 0,
+    latestImage: previous,
+  })
   const stopping = controller.stop()
   requests[2]!.reject(new CaptureStoppedError())
   await stopping
 })
 
-it.each(['readout', 'preview'] as const)('stops during %s without another exposure and publishes a frame that wins the race', async phase => {
-  const { controller, requests, frame } = setup()
-  const settled = vi.fn()
-  await controller.start(10, { onSettled: settled, repeat: true })
-  requests[0]!.onProgress({ phase: 'reading', elapsedSeconds: 10 })
+it.each(['readout', 'preview'] as const)(
+  'stops during %s without another exposure and publishes a frame that wins the race',
+  async phase => {
+    const { controller, requests, frame } = setup()
+    const settled = vi.fn()
+    await controller.start(10, { onSettled: settled, repeat: true })
+    requests[0]!.onProgress({ phase: 'reading', elapsedSeconds: 10 })
 
-  if (phase === 'preview') {
+    if (phase === 'preview') {
+      requests[0]!.resolve(frame)
+      // Acquisition has completed, while asynchronous PNG compression is pending.
+      await Promise.resolve()
+    }
+
+    expect(controller.snapshot().phase).toBe('reading')
+    const stopping = controller.stop()
+    expect(controller.snapshot()).toMatchObject({
+      phase: 'stopping',
+      active: true,
+      completedCount: 0,
+    })
+    expect(settled).not.toHaveBeenCalled()
     requests[0]!.resolve(frame)
-    // Acquisition has completed, while asynchronous PNG compression is pending.
-    await Promise.resolve()
-  }
-
-  expect(controller.snapshot().phase).toBe('reading')
-  const stopping = controller.stop()
-  expect(controller.snapshot()).toMatchObject({ phase: 'stopping', active: true, completedCount: 0 })
-  expect(settled).not.toHaveBeenCalled()
-  requests[0]!.resolve(frame)
-  expect(await stopping).toMatchObject({
-    phase: 'complete',
-    active: false,
-    completedCount: 1,
-    latestImage: { capturedAt: frame.capturedAt },
-  })
-  expect(requests).toHaveLength(1)
-  expect(settled).toHaveBeenCalledOnce()
-})
-
+    expect(await stopping).toMatchObject({
+      phase: 'complete',
+      active: false,
+      completedCount: 1,
+      latestImage: { capturedAt: frame.capturedAt },
+    })
+    expect(requests).toHaveLength(1)
+    expect(settled).toHaveBeenCalledOnce()
+  },
+)
 
 it('retains an acquired image when optional star analysis is unavailable', async () => {
-  const measure = vi.spyOn(statistics, 'measureStars').mockRejectedValueOnce(new Error('Analysis failed'))
+  const measure = vi
+    .spyOn(statistics, 'measureStars')
+    .mockRejectedValueOnce(new Error('Analysis failed'))
+
   const warning = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
   try {
     const { controller, complete } = setup()
     await complete()
-    expect(controller.snapshot()).toMatchObject({ phase: 'complete', completedCount: 1, latestImage: { statistics: null } })
+    expect(controller.snapshot()).toMatchObject({
+      phase: 'complete',
+      completedCount: 1,
+      latestImage: { statistics: null },
+    })
   } finally {
     measure.mockRestore()
     warning.mockRestore()
@@ -284,14 +354,20 @@ it('keeps the selected completed frame with exact data and preview without savin
   const saved = await controller.keep(selected.id)
   expect(saved).toMatchObject({ id: selected.id, exposureSeconds: 10, saved: true })
   expect(controller.snapshot().latestImage).toEqual(latest)
-  expect(await savedImages.file('fra 400', selected.id, 'native')).toEqual(controller.image(selected.id))
+  expect(await savedImages.file('fra 400', selected.id, 'native')).toEqual(
+    controller.image(selected.id),
+  )
   const fits = (await savedImages.file('fra 400', selected.id, 'fits'))!
   expect(fits.toString('ascii', 0, 2880)).toContain('BITPIX  =                   16')
   expect(fits.readInt16BE(2880 + 2) + 32_768).toBe(frame.pixels[1])
   expect((await controller.keep(selected.id))?.id).toBe(selected.id)
   await complete(30)
   expect(await savedImages.count('fra 400')).toBe(1)
-  expect(controller.snapshot()).toMatchObject({ saveFrames: false, savedImageCount: 1, latestImage: { saved: false } })
+  expect(controller.snapshot()).toMatchObject({
+    saveFrames: false,
+    savedImageCount: 1,
+    latestImage: { saved: false },
+  })
 })
 
 it('saves every repeated frame before exposing again, including a completed frame during Stop', async () => {
@@ -315,7 +391,11 @@ it('saves every repeated frame before exposing again, including a completed fram
   expect(controller.snapshot().latestImage?.saved).toBe(true)
   const stopping = controller.stop()
   requests[1]!.resolve(frame)
-  expect(await stopping).toMatchObject({ active: false, completedCount: 2, latestImage: { saved: true } })
+  expect(await stopping).toMatchObject({
+    active: false,
+    completedCount: 2,
+    latestImage: { saved: true },
+  })
   expect(await store.count('fra 400')).toBe(2)
 })
 
@@ -327,7 +407,11 @@ it('stops on an automatic save failure and retains that frame for an explicit re
   requests[0]!.resolve(frame)
   await vi.waitFor(() => expect(controller.active()).toBe(false))
   expect(requests).toHaveLength(1)
-  expect(controller.snapshot()).toMatchObject({ phase: 'failed', completedCount: 1, latestImage: { saved: false } })
+  expect(controller.snapshot()).toMatchObject({
+    phase: 'failed',
+    completedCount: 1,
+    latestImage: { saved: false },
+  })
   expect(controller.snapshot().error).toContain('Disk full')
   const id = controller.snapshot().latestImage!.id
   expect(await controller.keep(id)).toMatchObject({ id, saved: true })
@@ -353,8 +437,15 @@ it('preserves an estimated start in the published image, retained metadata and o
   requests[0]!.resolve({ ...frame, capturedAtSource: 'server-estimate' })
   await vi.waitFor(() => expect(controller.active()).toBe(false))
   const image = controller.snapshot().latestImage!
-  expect(image).toMatchObject({ capturedAt: frame.capturedAt, capturedAtSource: 'server-estimate', saved: true })
-  expect(await savedImages.get('fra 400', image.id)).toMatchObject({ capturedAt: frame.capturedAt, capturedAtSource: 'server-estimate' })
+  expect(image).toMatchObject({
+    capturedAt: frame.capturedAt,
+    capturedAtSource: 'server-estimate',
+    saved: true,
+  })
+  expect(await savedImages.get('fra 400', image.id)).toMatchObject({
+    capturedAt: frame.capturedAt,
+    capturedAtSource: 'server-estimate',
+  })
   const fits = (await savedImages.file('fra 400', image.id, 'fits'))!.toString('ascii', 0, 2880)
   expect(fits).toContain("DATE-OBS= '2026-09-05T16:00:00.000Z'")
   expect(fits).toContain("TIMESRC = 'SERVER-ESTIMATE'")

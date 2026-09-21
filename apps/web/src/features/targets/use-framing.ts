@@ -17,63 +17,77 @@ export function useFraming(rigId: string) {
   const generation = useRef(0)
   const alive = useRef(false)
 
-  const read = useCallback(async (explicit = false) => {
-    if (!alive.current || writing.current || explicitRead.current || (request.current && !explicit)) return
+  const read = useCallback(
+    async (explicit = false) => {
+      if (
+        !alive.current ||
+        writing.current ||
+        explicitRead.current ||
+        (request.current && !explicit)
+      )
+        return
 
-    // A deliberate check supersedes a quiet poll without exposing polling as
-    // button activity or allowing the cancelled response to overwrite it.
-    if (request.current) {
-      request.current.abort()
-      generation.current++
-    }
-
-    const controller = new AbortController()
-    const current = generation.current
-    request.current = controller
-    explicitRead.current = explicit
-    setRefreshing(explicit)
-
-    try {
-      const next = await api(`web/rigs/${encodeURIComponent(rigId)}/framing`, {
-        signal: AbortSignal.any([controller.signal, AbortSignal.timeout(5000)]),
-      })
-
-      if (!isFramingView(next, rigId) || Date.now() - Date.parse(next.observedAt) > 15000)
-        throw new Error('Invalid or stale framing response')
-
-      if (!alive.current || current !== generation.current) return
-      const interruptedExposure = lastView.current?.active && next.phase === 'idle'
-      const newlyFailed = next.phase === 'failed' && lastView.current?.phase !== 'failed'
-      lastView.current = next
-      setView(next)
-      setOffline(false)
-
-      if (interruptedExposure) {
-        setCommandUnconfirmed(true)
-        setError('Vela no longer tracks the exposure that was active. Check framing state before starting another exposure.')
-      } else if (newlyFailed && !explicit) {
-        setCommandUnconfirmed(true)
-        setError('The framing check failed. Inspect the reported state, then check rig state before another command.')
-      } else if (explicit) {
-        setCommandUnconfirmed(false)
-        setError(null)
+      // A deliberate check supersedes a quiet poll without exposing polling as
+      // button activity or allowing the cancelled response to overwrite it.
+      if (request.current) {
+        request.current.abort()
+        generation.current++
       }
 
-      return next
-    } catch (cause) {
-      if (!alive.current || current !== generation.current) return
-      setOffline(true)
+      const controller = new AbortController()
+      const current = generation.current
+      request.current = controller
+      explicitRead.current = explicit
+      setRefreshing(explicit)
 
-      if (cause instanceof ApiError && cause.status === 404) setError('This Rig is no longer available.')
-    } finally {
-      if (request.current === controller) {
-        request.current = null
-        explicitRead.current = false
+      try {
+        const next = await api(`web/rigs/${encodeURIComponent(rigId)}/framing`, {
+          signal: AbortSignal.any([controller.signal, AbortSignal.timeout(5000)]),
+        })
 
-        if (alive.current && current === generation.current) setRefreshing(false)
+        if (!isFramingView(next, rigId) || Date.now() - Date.parse(next.observedAt) > 15000)
+          throw new Error('Invalid or stale framing response')
+
+        if (!alive.current || current !== generation.current) return
+        const interruptedExposure = lastView.current?.active && next.phase === 'idle'
+        const newlyFailed = next.phase === 'failed' && lastView.current?.phase !== 'failed'
+        lastView.current = next
+        setView(next)
+        setOffline(false)
+
+        if (interruptedExposure) {
+          setCommandUnconfirmed(true)
+          setError(
+            'Vela no longer tracks the exposure that was active. Check framing state before starting another exposure.',
+          )
+        } else if (newlyFailed && !explicit) {
+          setCommandUnconfirmed(true)
+          setError(
+            'The framing check failed. Inspect the reported state, then check rig state before another command.',
+          )
+        } else if (explicit) {
+          setCommandUnconfirmed(false)
+          setError(null)
+        }
+
+        return next
+      } catch (cause) {
+        if (!alive.current || current !== generation.current) return
+        setOffline(true)
+
+        if (cause instanceof ApiError && cause.status === 404)
+          setError('This Rig is no longer available.')
+      } finally {
+        if (request.current === controller) {
+          request.current = null
+          explicitRead.current = false
+
+          if (alive.current && current === generation.current) setRefreshing(false)
+        }
       }
-    }
-  }, [rigId])
+    },
+    [rigId],
+  )
 
   useEffect(() => {
     alive.current = true
@@ -101,7 +115,9 @@ export function useFraming(rigId: string) {
   }, [read])
 
   const canStart = !!view?.enabled && !view.active && !offline && !pending && !commandUnconfirmed
-  const canStop = !!view?.active && view.phase !== 'stopping' && !offline && !pending && !commandUnconfirmed
+
+  const canStop =
+    !!view?.active && view.phase !== 'stopping' && !offline && !pending && !commandUnconfirmed
 
   async function command(
     action: 'start' | 'check' | 'stop' | 'center' | 'settings',
@@ -153,7 +169,9 @@ export function useFraming(rigId: string) {
 
       if (next.phase === 'failed') {
         setCommandUnconfirmed(true)
-        setError('The framing check failed. Inspect the reported state, then check rig state before another command.')
+        setError(
+          'The framing check failed. Inspect the reported state, then check rig state before another command.',
+        )
       }
 
       return next
@@ -161,7 +179,9 @@ export function useFraming(rigId: string) {
       if (!alive.current || current !== generation.current) return
       setCommandUnconfirmed(true)
       const detail = cause instanceof ApiError && cause.code ? `${cause.code} ` : ''
-      setError(`${detail}The command response could not be confirmed. Check framing state before starting another exposure.`)
+      setError(
+        `${detail}The command response could not be confirmed. Check framing state before starting another exposure.`,
+      )
     } finally {
       if (request.current === controller) {
         request.current = null
@@ -181,21 +201,29 @@ export function useFraming(rigId: string) {
     commandUnconfirmed,
     canStart,
     canStop,
-    start: ({ targetId, raDegrees, decDegrees, exposureSeconds }: {
+    start: ({
+      targetId,
+      raDegrees,
+      decDegrees,
+      exposureSeconds,
+    }: {
       targetId: string
       raDegrees: number
       decDegrees: number
       exposureSeconds: number
-    }) =>
-      command('start', { targetId, raDegrees, decDegrees, exposureSeconds }),
-    check: ({ targetId, raDegrees, decDegrees, exposureSeconds }: {
+    }) => command('start', { targetId, raDegrees, decDegrees, exposureSeconds }),
+    check: ({
+      targetId,
+      raDegrees,
+      decDegrees,
+      exposureSeconds,
+    }: {
       targetId: string
       raDegrees: number
       decDegrees: number
       exposureSeconds: number
-    }) =>
-      command('check', { targetId, raDegrees, decDegrees, exposureSeconds }),
-    center: ({ raDegrees, decDegrees }: { raDegrees: number, decDegrees: number }) =>
+    }) => command('check', { targetId, raDegrees, decDegrees, exposureSeconds }),
+    center: ({ raDegrees, decDegrees }: { raDegrees: number; decDegrees: number }) =>
       command('center', { checkId: view?.actual?.checkId, raDegrees, decDegrees }),
     settings: (focalLengthMm: number) => command('settings', { focalLengthMm }),
     stop: () => command('stop'),

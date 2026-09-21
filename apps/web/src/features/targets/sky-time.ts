@@ -6,7 +6,7 @@ export const skyTime = (at: string) =>
 export function skyWindow(sky: TargetSkyPath) {
   return sky.aboveHorizonDuringDarkness.length
     ? sky.aboveHorizonDuringDarkness
-      .map(w => `Approx. ${skyTime(w.startsAt)}–${skyTime(w.endsAt)}`)
-      .join(' · ')
+        .map(w => `Approx. ${skyTime(w.startsAt)}–${skyTime(w.endsAt)}`)
+        .join(' · ')
     : 'Not above horizon during darkness'
 }

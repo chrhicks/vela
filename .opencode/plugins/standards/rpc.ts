@@ -31,11 +31,13 @@ export const reportSchema = Schema.Struct({
   status: Schema.Literals(['complete', 'incomplete', 'stale']),
   diagnostics: Schema.Array(diagnosticSchema),
   missingEvidence: Schema.Array(missingEvidenceSchema),
-  files: Schema.Array(Schema.Struct({
-    path: Schema.String,
-    skipped: Schema.optional(Schema.String),
-    error: Schema.optional(Schema.String),
-  })),
+  files: Schema.Array(
+    Schema.Struct({
+      path: Schema.String,
+      skipped: Schema.optional(Schema.String),
+      error: Schema.optional(Schema.String),
+    }),
+  ),
   error: Schema.optional(Schema.String),
 })
 export type Report = typeof reportSchema.Type

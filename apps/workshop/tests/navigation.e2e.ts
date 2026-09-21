@@ -1,13 +1,22 @@
 import { expect, test } from '@playwright/test'
 
 for (const width of [1040, 390]) {
-  test(`navigation keeps rig context and returns to the right capture at ${width}px`, async ({ page }) => {
+  test(`navigation keeps rig context and returns to the right capture at ${width}px`, async ({
+    page,
+  }) => {
     await page.setViewportSize({ width: 1600, height: 1400 })
-    await page.route('**/__workshop/**', route => route.fulfill({ json: { session: null, profiles: [] } }))
-    await page.goto(`/?component=panel&specimen=panel-navigation&profile=vela-current&mode=dark&context=isolated&viewport=${width}`)
+    await page.route('**/__workshop/**', route =>
+      route.fulfill({ json: { session: null, profiles: [] } }),
+    )
+    await page.goto(
+      `/?component=panel&specimen=panel-navigation&profile=vela-current&mode=dark&context=isolated&viewport=${width}`,
+    )
     const demo = page.getByRole('region', { name: 'Navigation experiment' })
     const bar = demo.locator('header')
-    await expect(bar.getByRole('link', { name: 'Targets', exact: true })).toHaveAttribute('aria-current', 'page')
+    await expect(bar.getByRole('link', { name: 'Targets', exact: true })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
     await expect(bar.locator('progress')).toHaveAttribute('value', '18')
     await demo.getByRole('slider', { name: 'Sample exposure elapsed seconds' }).fill('60')
     await expect(bar.locator('progress')).toHaveAttribute('value', '60')
@@ -44,7 +53,10 @@ for (const width of [1040, 390]) {
     await demo.getByLabel('Try the bar with').selectOption('interrupted')
     await page.reload()
     await expect(bar.getByLabel('Viewing rig')).toHaveValue('seestar')
-    await expect(bar.getByRole('link', { name: 'Capture', exact: true })).toHaveAttribute('aria-current', 'page')
+    await expect(bar.getByRole('link', { name: 'Capture', exact: true })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
     await expect(bar.getByRole('link', { name: /Capture updates lost on Askar/ })).toBeVisible()
     await expect(demo.getByLabel('Try the bar with')).toHaveValue('interrupted')
   })

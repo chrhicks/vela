@@ -39,16 +39,17 @@ export function RigDeviceCard({
   const connection = connectionPresentation(device, stale)
   const presentation = devicePresentation(device)
 
-  const noDetails = presentation.metrics.length === 0
-    && (presentation.channels === undefined || presentation.channels.length === 0)
+  const noDetails =
+    presentation.metrics.length === 0 &&
+    (presentation.channels === undefined || presentation.channels.length === 0)
 
   return (
     <Panel
-      action={(
+      action={
         <Badge marker={<i />} size="small" tone={connection.tone}>
           {connection.label}
         </Badge>
-      )}
+      }
       className="vela-rig-device"
       data-connection={stale ? 'last-known' : device.connection}
       description={
@@ -72,7 +73,7 @@ export function RigDeviceCard({
 
       {presentation.metrics.length > 0 ? (
         <dl className="vela-rig-device__metrics">
-          {presentation.metrics.map((metric) => (
+          {presentation.metrics.map(metric => (
             <div data-tone={metric.tone ?? 'normal'} key={metric.label}>
               <dt>{metric.label}</dt>
               <dd>{metric.value}</dd>
@@ -83,12 +84,10 @@ export function RigDeviceCard({
 
       {presentation.channels && presentation.channels.length > 0 ? (
         <div className="vela-rig-device__channels">
-          {presentation.channels.map((channel) => (
+          {presentation.channels.map(channel => (
             <span key={channel.id}>
               <small>{channel.name}</small>
-              {channel.value === undefined ? null : (
-                <strong>{formatNumber(channel.value)}</strong>
-              )}
+              {channel.value === undefined ? null : <strong>{formatNumber(channel.value)}</strong>}
               {channel.on === undefined ? null : <em>{channel.on ? 'On' : 'Off'}</em>}
             </span>
           ))}
@@ -118,9 +117,10 @@ function devicePresentation(device: RigDeviceDetailView): DevicePresentation {
   if (device.status.availability === 'unavailable') {
     return {
       activity: device.connection === 'disconnected' ? 'Disconnected' : 'Status unavailable',
-      note: device.connection === 'disconnected'
-        ? 'Live status requires a device connection'
-        : 'No live information from this device',
+      note:
+        device.connection === 'disconnected'
+          ? 'Live status requires a device connection'
+          : 'No live information from this device',
       metrics: [],
     }
   }
@@ -137,9 +137,10 @@ function devicePresentation(device: RigDeviceDetailView): DevicePresentation {
     case 'camera':
       return {
         activity: titleCase(device.status.activity),
-        note: device.status.availability === 'partial'
-          ? 'Some values could not be read'
-          : cameraNote(device.status.activity),
+        note:
+          device.status.availability === 'partial'
+            ? 'Some values could not be read'
+            : cameraNote(device.status.activity),
         metrics: [
           optionalMetric('Sensor', device.status.sensorTemperatureC, formatTemperature),
           device.status.cooling === undefined
@@ -147,7 +148,8 @@ function devicePresentation(device: RigDeviceDetailView): DevicePresentation {
             : {
                 label: 'Cooler',
                 value: device.status.cooling.state === 'on' ? 'On' : 'Off',
-                tone: device.status.cooling.state === 'off' ? 'muted' as const : 'normal' as const,
+                tone:
+                  device.status.cooling.state === 'off' ? ('muted' as const) : ('normal' as const),
               },
           optionalMetric('Power', device.status.cooling?.powerPercent, formatPercentage),
         ].filter(isMetric),
@@ -155,9 +157,10 @@ function devicePresentation(device: RigDeviceDetailView): DevicePresentation {
     case 'telescope':
       return {
         activity: titleCase(device.status.activity),
-        note: device.status.availability === 'partial'
-          ? 'Some values could not be read'
-          : telescopeNote(device.status.tracking, device.status.home),
+        note:
+          device.status.availability === 'partial'
+            ? 'Some values could not be read'
+            : telescopeNote(device.status.tracking, device.status.home),
         metrics: [
           stateMetric('Tracking', device.status.tracking, { on: 'On', off: 'Off' }),
           stateMetric('Parked', device.status.parking, { parked: 'Yes', unparked: 'No' }),
@@ -167,11 +170,12 @@ function devicePresentation(device: RigDeviceDetailView): DevicePresentation {
     case 'focuser':
       return {
         activity: titleCase(device.status.activity),
-        note: device.status.availability === 'partial'
-          ? 'Some values could not be read'
-          : device.status.position === undefined
-            ? 'Position unavailable'
-            : 'Absolute position',
+        note:
+          device.status.availability === 'partial'
+            ? 'Some values could not be read'
+            : device.status.position === undefined
+              ? 'Position unavailable'
+              : 'Absolute position',
         metrics: [
           optionalMetric('Position', device.status.position, formatInteger),
           optionalMetric('Temperature', device.status.temperatureC, formatTemperature),
@@ -180,11 +184,12 @@ function devicePresentation(device: RigDeviceDetailView): DevicePresentation {
     case 'filter-wheel':
       return {
         activity: titleCase(device.status.activity),
-        note: device.status.availability === 'partial'
-          ? 'Some values could not be read'
-          : device.status.filterName === undefined
-            ? 'Selection unavailable'
-            : 'Filter selected',
+        note:
+          device.status.availability === 'partial'
+            ? 'Some values could not be read'
+            : device.status.filterName === undefined
+              ? 'Selection unavailable'
+              : 'Filter selected',
         metrics: [
           device.status.filterName === undefined
             ? optionalMetric(
@@ -200,9 +205,10 @@ function devicePresentation(device: RigDeviceDetailView): DevicePresentation {
     case 'observing-conditions':
       return {
         activity: titleCase(device.status.activity),
-        note: device.status.availability === 'partial'
-          ? 'Some values could not be read'
-          : 'Environment at the Rig',
+        note:
+          device.status.availability === 'partial'
+            ? 'Some values could not be read'
+            : 'Environment at the Rig',
         metrics: [
           optionalMetric('Temperature', device.status.temperatureC, formatTemperature),
           optionalMetric('Humidity', device.status.humidityPercent, formatPercentage),
@@ -212,9 +218,10 @@ function devicePresentation(device: RigDeviceDetailView): DevicePresentation {
     case 'switch': {
       const presentation: DevicePresentation = {
         activity: titleCase(device.status.activity),
-        note: device.status.availability === 'partial'
-          ? 'Some channels could not be read'
-          : 'Generic channel values',
+        note:
+          device.status.availability === 'partial'
+            ? 'Some channels could not be read'
+            : 'Generic channel values',
         metrics: [],
       }
 
@@ -316,5 +323,7 @@ function formatNumber(value: number): string {
 }
 
 function titleCase(value: string): string {
-  return value === 'unknown' ? 'Status unknown' : `${value.charAt(0).toUpperCase()}${value.slice(1)}`
+  return value === 'unknown'
+    ? 'Status unknown'
+    : `${value.charAt(0).toUpperCase()}${value.slice(1)}`
 }

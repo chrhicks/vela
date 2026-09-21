@@ -12,8 +12,17 @@ interface PreviewCanvasProps {
   onPropsChange: (patch: Record<string, string | number | boolean>) => void
 }
 
-function ContextFrame({ context, children }: { context: WorkingSession['context']; children: ReactNode }) {
-  const deviceOptions = [{ value: 'main', label: 'ASI2600MC Pro' }, { value: 'guide', label: 'ASI220MM Mini' }]
+function ContextFrame({
+  context,
+  children,
+}: {
+  context: WorkingSession['context']
+  children: ReactNode
+}) {
+  const deviceOptions = [
+    { value: 'main', label: 'ASI2600MC Pro' },
+    { value: 'guide', label: 'ASI220MM Mini' },
+  ]
 
   const moreIcon = (
     <svg fill="currentColor" stroke="none" viewBox="0 0 20 20">
@@ -27,12 +36,16 @@ function ContextFrame({ context, children }: { context: WorkingSession['context'
     return (
       <Panel
         description="Configure how the next sequence should begin."
-        footer={(
+        footer={
           <>
-            <Button size="small" tone="quiet">Cancel</Button>
-            <Button size="small" tone="accent">Apply</Button>
+            <Button size="small" tone="quiet">
+              Cancel
+            </Button>
+            <Button size="small" tone="accent">
+              Apply
+            </Button>
           </>
-        )}
+        }
         title="Sequence settings"
       >
         <Input label="Target" placeholder="NGC 7000" />
@@ -57,8 +70,12 @@ function ContextFrame({ context, children }: { context: WorkingSession['context'
           <strong>Capture</strong>
           <span>03:42 remaining</span>
         </div>
-        <Badge marker={<i />} size="small" tone="positive">Guiding</Badge>
-        <Button size="small" tone="quiet">Pause</Button>
+        <Badge marker={<i />} size="small" tone="positive">
+          Guiding
+        </Badge>
+        <Button size="small" tone="quiet">
+          Pause
+        </Button>
         <div className="context-toolbar__action">{children}</div>
         <IconButton icon={moreIcon} label="More actions" size="small" />
       </div>
@@ -68,7 +85,11 @@ function ContextFrame({ context, children }: { context: WorkingSession['context'
   if (context === 'card') {
     return (
       <Panel
-        action={<Badge marker={<i />} size="small" tone="positive">Connected</Badge>}
+        action={
+          <Badge marker={<i />} size="small" tone="positive">
+            Connected
+          </Badge>
+        }
         description="Camera, focuser, and filter wheel are ready."
         elevation="raised"
         title="Imaging train"
@@ -88,7 +109,7 @@ function ContextFrame({ context, children }: { context: WorkingSession['context'
                   </div>
                   <div className="context-focus">{children}</div>
                 </div>
-              )
+              ),
             },
             {
               id: 'settings',
@@ -101,8 +122,8 @@ function ContextFrame({ context, children }: { context: WorkingSession['context'
                     <p>Offset 50 · USB limit 40</p>
                   </div>
                 </div>
-              )
-            }
+              ),
+            },
           ]}
           size="small"
         />
@@ -119,23 +140,27 @@ function Preview({
   session,
   specimen,
   theme,
-  onPropsChange
+  onPropsChange,
 }: {
-  label: string;
-  mode: ThemeMode;
-  session: WorkingSession;
-  specimen: ComponentSpecimen;
-  theme: ThemeParameters;
+  label: string
+  mode: ThemeMode
+  session: WorkingSession
+  specimen: ComponentSpecimen
+  theme: ThemeParameters
   onPropsChange: (patch: Record<string, string | number | boolean>) => void
 }) {
   return (
     <section className="preview-column">
       <div className="preview-label">
         <span>{label}</span>
-        <span>{mode} · {Math.round(theme.density * 100)}%</span>
+        <span>
+          {mode} · {Math.round(theme.density * 100)}%
+        </span>
       </div>
       <div className="vela-theme preview-surface" data-mode={mode} style={themeStyle(theme, mode)}>
-        <ContextFrame context={session.context}>{specimen.render(session.props, onPropsChange)}</ContextFrame>
+        <ContextFrame context={session.context}>
+          {specimen.render(session.props, onPropsChange)}
+        </ContextFrame>
       </div>
     </section>
   )
@@ -147,7 +172,7 @@ export function PreviewCanvas({
   session,
   specimen,
   theme,
-  onPropsChange
+  onPropsChange,
 }: PreviewCanvasProps) {
   const baseline = resolveTheme(DEFAULT_PROFILE, { density: session.density })
 

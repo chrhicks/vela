@@ -6,7 +6,15 @@ import { Input } from './Input'
 import { Panel } from './Panel'
 import './Panel.autofocus.specimen.css'
 
-const phases = ['setup', 'sampling', 'fitting', 'complete', 'restoring', 'restored', 'travel-limit'] as const
+const phases = [
+  'setup',
+  'sampling',
+  'fitting',
+  'complete',
+  'restoring',
+  'restored',
+  'travel-limit',
+] as const
 
 const examples = ['current-focus', 'near-inward-limit'] as const
 
@@ -57,7 +65,7 @@ function minSample(samples: Sample[]) {
 
   if (!measured.length) return null
 
-  return measured.reduce((best, sample) => sample.hfr! < best.hfr! ? sample : best)
+  return measured.reduce((best, sample) => (sample.hfr! < best.hfr! ? sample : best))
 }
 
 function VCurve({
@@ -85,7 +93,14 @@ function VCurve({
   const xMin = window.low - pad
   const xMax = window.high + pad
   const hfrs = samples.map(sample => sample.hfr).filter((value): value is number => value !== null)
-  const yMax = Math.max(6, ...(hfrs.length ? hfrs : [hyperbola(window.high)]), fit ? hyperbola(window.high, fit.p, fit.a, fit.b) : 0) * 1.12
+
+  const yMax =
+    Math.max(
+      6,
+      ...(hfrs.length ? hfrs : [hyperbola(window.high)]),
+      fit ? hyperbola(window.high, fit.p, fit.a, fit.b) : 0,
+    ) * 1.12
+
   const x = (position: number) => left + ((position - xMin) / (xMax - xMin)) * plotWidth
   const y = (hfr: number) => top + (1 - hfr / yMax) * plotHeight
   const ticks = [window.low, start, window.high]
@@ -118,13 +133,25 @@ function VCurve({
         />
       ))}
       <line className="vela-af-axis" x1={left} y1={top} x2={left} y2={height - bottom} />
-      <line className="vela-af-axis" x1={left} y1={height - bottom} x2={width - right} y2={height - bottom} />
-      <text x={left} y={12}>HFR · px</text>
-      <text x={left + plotWidth / 2} y={height - 8} textAnchor="middle">Focuser position</text>
+      <line
+        className="vela-af-axis"
+        x1={left}
+        y1={height - bottom}
+        x2={width - right}
+        y2={height - bottom}
+      />
+      <text x={left} y={12}>
+        HFR · px
+      </text>
+      <text x={left + plotWidth / 2} y={height - 8} textAnchor="middle">
+        Focuser position
+      </text>
       {ticks.map(tick => (
         <g key={tick}>
           <line className="vela-af-grid" x1={x(tick)} x2={x(tick)} y1={top} y2={height - bottom} />
-          <text x={x(tick)} y={height - 22} textAnchor="middle">{tick}</text>
+          <text x={x(tick)} y={height - 22} textAnchor="middle">
+            {tick}
+          </text>
         </g>
       ))}
       <line className="vela-af-start" x1={x(start)} x2={x(start)} y1={top} y2={height - bottom} />
@@ -157,13 +184,22 @@ function VCurve({
         )
       })}
       {current !== null && latest && (
-        <text x={x(current)} y={Math.max(28, y(latest.hfr ?? yMax * 0.08) - 12)} textAnchor="middle">now</text>
+        <text
+          x={x(current)}
+          y={Math.max(28, y(latest.hfr ?? yMax * 0.08) - 12)}
+          textAnchor="middle"
+        >
+          now
+        </text>
       )}
     </svg>
   )
 }
 
-function AutofocusPreview({ props, onPropsChange }: {
+function AutofocusPreview({
+  props,
+  onPropsChange,
+}: {
   props: Props
   onPropsChange?: (patch: Props) => void
 }) {
@@ -229,23 +265,32 @@ function AutofocusPreview({ props, onPropsChange }: {
   const samples = allSamples.slice(0, snapshotCount)
   const fit = phase === 'complete' ? { p: FOCUS, a: MIN_HFR, b: CURVE_B } : null
 
-  const current = phase === 'complete' && fit
-    ? Math.round(fit.p)
-    : phase === 'restored' || phase === 'restoring' || phase === 'setup' || phase === 'travel-limit'
-      ? start
-      : samples.at(-1)?.position ?? start
+  const current =
+    phase === 'complete' && fit
+      ? Math.round(fit.p)
+      : phase === 'restored' ||
+          phase === 'restoring' ||
+          phase === 'setup' ||
+          phase === 'travel-limit'
+        ? start
+        : (samples.at(-1)?.position ?? start)
 
   const travelBlocked = !planned || phase === 'travel-limit' || example === 'near-inward-limit'
   const setup = phase === 'setup' || phase === 'travel-limit'
   const lowest = minSample(samples)
   const latest = samples.at(-1)
   const busy = phase === 'sampling' || phase === 'fitting' || phase === 'restoring'
-  const windowRange = planned ?? { low: Math.max(1, start - OFFSET * stepSize), high: start + OFFSET * stepSize }
+
+  const windowRange = planned ?? {
+    low: Math.max(1, start - OFFSET * stepSize),
+    high: start + OFFSET * stepSize,
+  }
 
   const activityLabels = {
-    sampling: activity === 'moving'
-      ? `Moving to ${planned?.positions[landed] ?? current}…`
-      : `Exposing at ${planned?.positions[landed] ?? current}…`,
+    sampling:
+      activity === 'moving'
+        ? `Moving to ${planned?.positions[landed] ?? current}…`
+        : `Exposing at ${planned?.positions[landed] ?? current}…`,
     fitting: 'Fitting the hyperbola…',
     restoring: `Restoring start ${start}…`,
     complete: 'Fitted focus is ready',
@@ -257,7 +302,8 @@ function AutofocusPreview({ props, onPropsChange }: {
   const activityLabel = activityLabels[phase]
 
   const settledGuidance = {
-    complete: 'The fitted minimum is an integer step inside the sampled window. The lowest sampled HFR is shown only for comparison.',
+    complete:
+      'The fitted minimum is an integer step inside the sampled window. The lowest sampled HFR is shown only for comparison.',
     restored: 'Start a new walk from the current position when you are ready.',
   }
 
@@ -300,7 +346,9 @@ function AutofocusPreview({ props, onPropsChange }: {
           <dt>Latest sample</dt>
           <dd>
             {latest
-              ? latest.hfr === null ? `${latest.position} · no stars` : `${latest.position} · ${latest.hfr.toFixed(2)} px`
+              ? latest.hfr === null
+                ? `${latest.position} · no stars`
+                : `${latest.position} · ${latest.hfr.toFixed(2)} px`
               : '—'}
           </dd>
         </div>
@@ -375,9 +423,15 @@ function AutofocusPreview({ props, onPropsChange }: {
             <h1>Autofocus</h1>
           </div>
           <Badge
-            tone={(setup && travelBlocked) || phase === 'restored'
-              ? 'warning'
-              : busy ? 'accent' : phase === 'complete' ? 'positive' : 'neutral'}
+            tone={
+              (setup && travelBlocked) || phase === 'restored'
+                ? 'warning'
+                : busy
+                  ? 'accent'
+                  : phase === 'complete'
+                    ? 'positive'
+                    : 'neutral'
+            }
           >
             {badge}
           </Badge>
@@ -385,20 +439,30 @@ function AutofocusPreview({ props, onPropsChange }: {
         {setup && travelBlocked && (
           <div className="vela-af-notice" role="alert">
             <strong>Walk would approach a travel limit</strong>
-            <p>Vela stays at the current EAF position. It does not command 0 or MaxStep, and it will not start a window that cannot fit around start.</p>
+            <p>
+              Vela stays at the current EAF position. It does not command 0 or MaxStep, and it will
+              not start a window that cannot fit around start.
+            </p>
           </div>
         )}
         {phase === 'restored' && (
           <div className="vela-af-notice" role="status">
             <strong>Start position restored</strong>
-            <p>The walk stopped before a fitted focus. The focuser is back at {start}, the position where this session began.</p>
+            <p>
+              The walk stopped before a fitted focus. The focuser is back at {start}, the position
+              where this session began.
+            </p>
           </div>
         )}
         {setup ? (
           <div className="vela-af-setup">
             <Panel>
               <h2>Focus from where you are</h2>
-              <p>Vela will jump a little outward from the current EAF position, walk back through focus, and plot star size at each stop. Cancel returns here. Position 0 is a mechanical stop, not a home, and not backlash compensation off.</p>
+              <p>
+                Vela will jump a little outward from the current EAF position, walk back through
+                focus, and plot star size at each stop. Cancel returns here. Position 0 is a
+                mechanical stop, not a home, and not backlash compensation off.
+              </p>
               <dl className="vela-af-facts">
                 <div>
                   <dt>Current position</dt>
@@ -410,7 +474,9 @@ function AutofocusPreview({ props, onPropsChange }: {
                 </div>
                 <div>
                   <dt>Window</dt>
-                  <dd>{planned ? `${planned.low} → ${planned.high}` : 'Does not fit around start'}</dd>
+                  <dd>
+                    {planned ? `${planned.low} → ${planned.high}` : 'Does not fit around start'}
+                  </dd>
                 </div>
               </dl>
               <Input
@@ -419,15 +485,27 @@ function AutofocusPreview({ props, onPropsChange }: {
                 min={1}
                 max={2000}
                 value={String(stepSize)}
-                onChange={event => update({ stepSize: String(Math.max(1, Math.floor(Number(event.target.value) || 1))) })}
+                onChange={event =>
+                  update({
+                    stepSize: String(Math.max(1, Math.floor(Number(event.target.value) || 1))),
+                  })
+                }
                 message="Steps between shorts. Large enough that HFR changes; small enough to stay inside the window."
               />
             </Panel>
             <div className="vela-af-next">
               <h3>Before you start</h3>
-              <p>Each point on the graph is one short exposure. You will see start, current position, and the fitted minimum once the hyperbola exists.</p>
-              <p>The walk stays inside a window around the current position. Vela will not command 0 or MaxStep.</p>
-              <Button size="large" tone="accent" disabled={travelBlocked} onClick={startWalk}>{travelBlocked ? 'Window does not fit' : 'Start autofocus'}</Button>
+              <p>
+                Each point on the graph is one short exposure. You will see start, current position,
+                and the fitted minimum once the hyperbola exists.
+              </p>
+              <p>
+                The walk stays inside a window around the current position. Vela will not command 0
+                or MaxStep.
+              </p>
+              <Button size="large" tone="accent" disabled={travelBlocked} onClick={startWalk}>
+                {travelBlocked ? 'Window does not fit' : 'Start autofocus'}
+              </Button>
             </div>
           </div>
         ) : (
@@ -465,7 +543,9 @@ function AutofocusPreview({ props, onPropsChange }: {
             </div>
           </div>
         )}
-        <footer className="vela-af-prototype">Workshop prototype · simulated shorts · no focuser commands</footer>
+        <footer className="vela-af-prototype">
+          Workshop prototype · simulated shorts · no focuser commands
+        </footer>
       </main>
     </article>
   )
@@ -476,12 +556,15 @@ export const specimen: ComponentSpecimen = {
   componentName: 'Panel / Card',
   id: 'panel-autofocus',
   name: 'Autofocus · Product example',
-  description: 'Observe one-shot Star-HFR walk with a live V-curve. Start plays simulated shorts so each (position, HFR) point appears as it lands, with start, current, and fitted-minimum readout. Illustrative FRA window around the current EAF position; no hardware moves, no Move(0). A window that cannot fit stays on setup with the command disabled. Backlash compensation is not shown as a device fact.',
+  description:
+    'Observe one-shot Star-HFR walk with a live V-curve. Start plays simulated shorts so each (position, HFR) point appears as it lands, with start, current, and fitted-minimum readout. Illustrative FRA window around the current EAF position; no hardware moves, no Move(0). A window that cannot fit stays on setup with the command disabled. Backlash compensation is not shown as a device fact.',
   controls: {
     example: { type: 'select', label: 'Starting place', options: examples },
     phase: { type: 'select', label: 'Activity', options: phases },
     stepSize: { type: 'select', label: 'Step size', options: stepSizes },
   },
   defaultProps: { example: 'current-focus', phase: 'setup', stepSize: '50' },
-  render: (props, onPropsChange) => <AutofocusPreview props={props} {...(onPropsChange ? { onPropsChange } : {})} />,
+  render: (props, onPropsChange) => (
+    <AutofocusPreview props={props} {...(onPropsChange ? { onPropsChange } : {})} />
+  ),
 }

@@ -26,15 +26,17 @@ const line = Schema.Int.check(Schema.isGreaterThanOrEqualTo(1))
 const citationSchema = Schema.Struct({ path: text, startLine: line, endLine: line, quote: text })
 const responseSchema = Schema.Struct({
   reviewedPaths: Schema.Array(text),
-  diagnostics: Schema.Array(Schema.Struct({
-    rule: text,
-    severity: Schema.Literals(['error', 'warning', 'information']),
-    message: text,
-    explanation: text,
-    suggestion: text,
-    location: citationSchema,
-    related: Schema.Array(citationSchema),
-  })),
+  diagnostics: Schema.Array(
+    Schema.Struct({
+      rule: text,
+      severity: Schema.Literals(['error', 'warning', 'information']),
+      message: text,
+      explanation: text,
+      suggestion: text,
+      location: citationSchema,
+      related: Schema.Array(citationSchema),
+    }),
+  ),
   missingEvidence: Schema.Array(Schema.Struct({ path: text, reason: text, nextAction: text })),
 })
 
@@ -50,7 +52,10 @@ Account for every supplied target in reviewedPaths exactly once, even when no di
 function numbered(source: Source) {
   return {
     path: source.path,
-    text: source.code.split('\n').map((text, index) => `${index + 1}: ${text}`).join('\n'),
+    text: source.code
+      .split('\n')
+      .map((text, index) => `${index + 1}: ${text}`)
+      .join('\n'),
   }
 }
 
@@ -83,7 +88,9 @@ export async function reviewStandards(
       context: input.context.map(numbered),
     })}`
     if (Buffer.byteLength(review.prompt) > 180_000)
-      throw new Error('Review input exceeds 180 KB; select a smaller batch or less supporting context')
+      throw new Error(
+        'Review input exceeds 180 KB; select a smaller batch or less supporting context',
+      )
 
     const response = await generate(review.prompt, signal)
     signal.throwIfAborted()
@@ -95,13 +102,20 @@ export async function reviewStandards(
       if (!remaining.delete(path)) throw new Error(`Unknown or repeated reviewed target: ${path}`)
     if (remaining.size) throw new Error(`Review omitted targets: ${[...remaining].join(', ')}`)
 
-    const sources = [...input.targets, ...input.context, input.standards, ...(input.guidance ? [input.guidance] : [])]
+    const sources = [
+      ...input.targets,
+      ...input.context,
+      input.standards,
+      ...(input.guidance ? [input.guidance] : []),
+    ]
     const diagnostics = answer.diagnostics.map(diagnostic => {
-      if (!Object.hasOwn(standards, diagnostic.rule)) throw new Error(`Unknown standards rule: ${diagnostic.rule}`)
+      if (!Object.hasOwn(standards, diagnostic.rule))
+        throw new Error(`Unknown standards rule: ${diagnostic.rule}`)
       const target = input.targets.find(target => target.path === diagnostic.location.path)
       if (!target) throw new Error('Diagnostic location is not a reviewed target')
       const location = validateCitation(diagnostic.location, sources)
-      if (!touchesChange(location, target.diff)) throw new Error('Diagnostic does not cite the reviewed change')
+      if (!touchesChange(location, target.diff))
+        throw new Error('Diagnostic does not cite the reviewed change')
       return {
         ...diagnostic,
         location,
@@ -117,7 +131,8 @@ export async function reviewStandards(
     review.status = answer.missingEvidence.length ? 'incomplete' : 'complete'
   } catch (error) {
     signal.throwIfAborted()
-    review.error = (error instanceof Error && error.message) || String(error) || 'Unknown review failure'
+    review.error =
+      (error instanceof Error && error.message) || String(error) || 'Unknown review failure'
   } finally {
     review.milliseconds = Math.round(performance.now() - started)
   }
@@ -128,18 +143,23 @@ function validateCitation(citation: typeof citationSchema.Type, sources: Source[
   const source = sources.find(source => source.path === citation.path)
   const lines = source?.code.split('\n') ?? []
   if (
-    !source
-    || citation.endLine < citation.startLine
-    || citation.endLine > lines.length
-    || !citation.quote.trim()
-    || lines.slice(citation.startLine - 1, citation.endLine).join('\n').trim() !== citation.quote.trim()
+    !source ||
+    citation.endLine < citation.startLine ||
+    citation.endLine > lines.length ||
+    !citation.quote.trim() ||
+    lines
+      .slice(citation.startLine - 1, citation.endLine)
+      .join('\n')
+      .trim() !== citation.quote.trim()
   ) {
-    throw new Error(`Unverified source citation: ${citation.path}:${citation.startLine}-${citation.endLine}`)
+    throw new Error(
+      `Unverified source citation: ${citation.path}:${citation.startLine}-${citation.endLine}`,
+    )
   }
   return { ...citation, sha256: source.sha256 }
 }
 
-function touchesChange(citation: { startLine: number, endLine: number }, diff?: string) {
+function touchesChange(citation: { startLine: number; endLine: number }, diff?: string) {
   if (!diff) return true
   let line = 0
   let deletionBoundary: number | undefined

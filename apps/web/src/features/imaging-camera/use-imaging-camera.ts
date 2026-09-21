@@ -31,36 +31,41 @@ export function useImagingCamera(rigId: string) {
     } else if (choice && checked && next.editable) {
       uncertainChoice.current = null
       setUnconfirmed(false)
-      setError('The requested camera is not the saved selection. The rig is available; choose a camera and save when ready.')
+      setError(
+        'The requested camera is not the saved selection. The rig is available; choose a camera and save when ready.',
+      )
     }
   }
 
-  const read = useCallback(async (checked = false) => {
-    if (checked && !writing.current) {
-      request.current?.abort()
-      request.current = null
-      generation.current++
-    }
+  const read = useCallback(
+    async (checked = false) => {
+      if (checked && !writing.current) {
+        request.current?.abort()
+        request.current = null
+        generation.current++
+      }
 
-    if (!alive.current || request.current) return
-    const controller = new AbortController()
-    const current = generation.current
-    request.current = controller
+      if (!alive.current || request.current) return
+      const controller = new AbortController()
+      const current = generation.current
+      request.current = controller
 
-    try {
-      const next = await api(`web/rigs/${encodeURIComponent(rigId)}/imaging-camera`, {
-        signal: AbortSignal.any([controller.signal, AbortSignal.timeout(5000)]),
-      })
+      try {
+        const next = await api(`web/rigs/${encodeURIComponent(rigId)}/imaging-camera`, {
+          signal: AbortSignal.any([controller.signal, AbortSignal.timeout(5000)]),
+        })
 
-      if (!isImagingCameraView(next, rigId)) throw new Error('Invalid camera response')
+        if (!isImagingCameraView(next, rigId)) throw new Error('Invalid camera response')
 
-      if (alive.current && generation.current === current) accept(next, checked)
-    } catch {
-      if (alive.current && generation.current === current) setOffline(true)
-    } finally {
-      if (request.current === controller) request.current = null
-    }
-  }, [rigId])
+        if (alive.current && generation.current === current) accept(next, checked)
+      } catch {
+        if (alive.current && generation.current === current) setOffline(true)
+      } finally {
+        if (request.current === controller) request.current = null
+      }
+    },
+    [rigId],
+  )
 
   useEffect(() => {
     alive.current = true
@@ -93,7 +98,8 @@ export function useImagingCamera(rigId: string) {
   }, [read])
 
   async function save(choice: Choice) {
-    if (!alive.current || writing.current || uncertainChoice.current || offline || !view?.editable) return
+    if (!alive.current || writing.current || uncertainChoice.current || offline || !view?.editable)
+      return
 
     if (!view.cameras.some(camera => camera.id === choice.id && camera.name === choice.name)) return
     request.current?.abort()
@@ -112,7 +118,11 @@ export function useImagingCamera(rigId: string) {
         signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]),
       })
 
-      if (!isImagingCameraView(next, rigId) || next.selected?.id !== choice.id || next.selected.name !== choice.name)
+      if (
+        !isImagingCameraView(next, rigId) ||
+        next.selected?.id !== choice.id ||
+        next.selected.name !== choice.name
+      )
         throw new Error('Unconfirmed selection')
 
       if (!alive.current || generation.current !== current) return
@@ -126,7 +136,9 @@ export function useImagingCamera(rigId: string) {
       } else {
         uncertainChoice.current = choice
         setUnconfirmed(true)
-        setError('The save response could not be confirmed. Checking the saved camera; Vela has not repeated the request.')
+        setError(
+          'The save response could not be confirmed. Checking the saved camera; Vela has not repeated the request.',
+        )
       }
     } finally {
       if (request.current === controller) {

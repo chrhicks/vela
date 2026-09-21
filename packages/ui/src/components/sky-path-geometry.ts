@@ -3,18 +3,20 @@ export type SkyCoordinate = { azimuthDegrees: number; altitudeDegrees: number }
 export type HorizonPoint = { azimuthDegrees: number; altitudeDegrees: number | null }
 
 export function projectSky(point: SkyCoordinate, center: number, radius: number) {
-  const angle = point.azimuthDegrees * Math.PI / 180
-  const distance = radius * (90 - point.altitudeDegrees) / 90
+  const angle = (point.azimuthDegrees * Math.PI) / 180
+  const distance = (radius * (90 - point.altitudeDegrees)) / 90
 
   return { x: center - Math.sin(angle) * distance, y: center - Math.cos(angle) * distance }
 }
 
 export function coordinatePath(points: readonly SkyCoordinate[], center: number, radius: number) {
-  return points.map((point, index) => {
-    const { x, y } = projectSky(point, center, radius)
+  return points
+    .map((point, index) => {
+      const { x, y } = projectSky(point, center, radius)
 
-    return `${index === 0 ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`
-  }).join(' ')
+      return `${index === 0 ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`
+    })
+    .join(' ')
 }
 
 // Clip rising/setting segments at altitude zero; a below-horizon sample must
@@ -31,7 +33,11 @@ export function visibleSkyPath(points: readonly SkyCoordinate[], center: number,
     if (first.altitudeDegrees < 0 || last.altitudeDegrees < 0) {
       const fraction = -first.altitudeDegrees / (last.altitudeDegrees - first.altitudeDegrees)
       const delta = ((last.azimuthDegrees - first.azimuthDegrees + 540) % 360) - 180
-      const crossing = { azimuthDegrees: first.azimuthDegrees + delta * fraction, altitudeDegrees: 0 }
+
+      const crossing = {
+        azimuthDegrees: first.azimuthDegrees + delta * fraction,
+        altitudeDegrees: 0,
+      }
 
       if (first.altitudeDegrees < 0) first = crossing
       else last = crossing
@@ -46,7 +52,8 @@ export function visibleSkyPath(points: readonly SkyCoordinate[], center: number,
 export function horizonAt(points: readonly HorizonPoint[], azimuthDegrees: number): number | null {
   if (points.length < 2) return null
 
-  const sorted = points.map(point => ({ ...point, azimuthDegrees: ((point.azimuthDegrees % 360) + 360) % 360 }))
+  const sorted = points
+    .map(point => ({ ...point, azimuthDegrees: ((point.azimuthDegrees % 360) + 360) % 360 }))
     .sort((a, b) => a.azimuthDegrees - b.azimuthDegrees)
 
   const azimuth = ((azimuthDegrees % 360) + 360) % 360
@@ -60,7 +67,11 @@ export function horizonAt(points: readonly HorizonPoint[], azimuthDegrees: numbe
     if (position < first.azimuthDegrees || position > end) continue
 
     if (first.altitudeDegrees === null || last.altitudeDegrees === null) return null
-    const fraction = end === first.azimuthDegrees ? 0 : (position - first.azimuthDegrees) / (end - first.azimuthDegrees)
+
+    const fraction =
+      end === first.azimuthDegrees
+        ? 0
+        : (position - first.azimuthDegrees) / (end - first.azimuthDegrees)
 
     return first.altitudeDegrees + fraction * (last.altitudeDegrees - first.altitudeDegrees)
   }
@@ -68,7 +79,12 @@ export function horizonAt(points: readonly HorizonPoint[], azimuthDegrees: numbe
   return null
 }
 
-export function horizonSectors(points: readonly HorizonPoint[], margin: number, center: number, radius: number) {
+export function horizonSectors(
+  points: readonly HorizonPoint[],
+  margin: number,
+  center: number,
+  radius: number,
+) {
   return Array.from({ length: 180 }, (_, index) => {
     const start = index * 2
     const end = start + 2
@@ -78,12 +94,17 @@ export function horizonSectors(points: readonly HorizonPoint[], margin: number, 
     const lower = [first ?? 12, last ?? 12].map(value => Math.max(0, Math.min(90, value)))
     const upper = lower.map(value => Math.min(90, value + margin))
 
-    const polygon = (bottom: number[], top: number[]) => coordinatePath([
-      { azimuthDegrees: start, altitudeDegrees: bottom[0]! },
-      { azimuthDegrees: end, altitudeDegrees: bottom[1]! },
-      { azimuthDegrees: end, altitudeDegrees: top[1]! },
-      { azimuthDegrees: start, altitudeDegrees: top[0]! },
-    ], center, radius) + ' Z'
+    const polygon = (bottom: number[], top: number[]) =>
+      coordinatePath(
+        [
+          { azimuthDegrees: start, altitudeDegrees: bottom[0]! },
+          { azimuthDegrees: end, altitudeDegrees: bottom[1]! },
+          { azimuthDegrees: end, altitudeDegrees: top[1]! },
+          { azimuthDegrees: start, altitudeDegrees: top[0]! },
+        ],
+        center,
+        radius,
+      ) + ' Z'
 
     return { unknown, silhouette: polygon([0, 0], lower), band: polygon(lower, upper) }
   })
@@ -95,9 +116,11 @@ export function angularSeparationDegrees(first: SkyCoordinate, second: SkyCoordi
   const firstAltitude = first.altitudeDegrees * radians
   const secondAltitude = second.altitudeDegrees * radians
 
-  const cosine = Math.sin(firstAltitude) * Math.sin(secondAltitude)
-    + Math.cos(firstAltitude) * Math.cos(secondAltitude)
-    * Math.cos((first.azimuthDegrees - second.azimuthDegrees) * radians)
+  const cosine =
+    Math.sin(firstAltitude) * Math.sin(secondAltitude) +
+    Math.cos(firstAltitude) *
+      Math.cos(secondAltitude) *
+      Math.cos((first.azimuthDegrees - second.azimuthDegrees) * radians)
 
   return Math.acos(Math.max(-1, Math.min(1, cosine))) / radians
 }
