@@ -213,6 +213,8 @@ Read nearby READMEs and durable design documents before changing a boundary. In 
 
 ## Working in the repository
 
+When preparing parallel task workspaces or managing Rift copies, read the [Rift workspace guide](docs/rift-workspaces.md) for setup, task isolation, and cleanup.
+
 Linear is available to agents for meaningful planned work, status, and review. Use it when it improves coordination rather than creating process for its own sake. The main project is **Vela - Main Development**.
 
 Keep durable guidance at its owning boundary instead of duplicating it across prompts. Use continuity to recover decisions and their reasons, not to inherit stale status. Keep durable preferences, scoped exceptions, experiments, and dated observations distinguishable. When a later clarification changes the meaning, supersede the earlier account and preserve enough provenance to understand why.
