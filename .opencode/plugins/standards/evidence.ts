@@ -5,16 +5,22 @@ import { lstat, open, realpath } from 'node:fs/promises'
 import { extname, isAbsolute, relative, resolve, sep } from 'node:path'
 import { promisify } from 'node:util'
 
-export type Source = { path: string, code: string, sha256: string }
+export type Source = {
+  path: string
+  code: string
+  sha256: string
+}
 
 const runFile = promisify(execFile)
 const maxFileBytes = 40_000
 const textExtensions = new Set(['.js', '.ts', '.jsx', '.tsx', '.mjs', '.cjs', '.mts', '.cts', '.md', '.txt', '.json', '.yaml', '.yml'])
 
 function forbiddenPath(path: string) {
-  return path.split(sep).some(part => /^(?:\.git|\.env(?:\..*)?|\.ssh|\.aws|\.gnupg|\.npmrc|\.netrc)$/i.test(part)
+  return path.split(sep).some(part =>
+    /^(?:\.git|\.env(?:\..*)?|\.ssh|\.aws|\.gnupg|\.npmrc|\.netrc)$/i.test(part)
     || /^(?:credentials?|secrets?)(?:[._-]|$)/i.test(part)
-    || /^(?:id_rsa|id_ed25519|service[-_]?account)(?:[._-]|$)/i.test(part))
+    || /^(?:id_rsa|id_ed25519|service[-_]?account)(?:[._-]|$)/i.test(part)
+  )
 }
 
 export async function createEvidenceReader(root: string, signal: AbortSignal) {
@@ -29,10 +35,17 @@ export async function createEvidenceReader(root: string, signal: AbortSignal) {
       throw new Error('Evidence paths must be nonempty checkout-relative paths')
     }
     const name = relative(checkout, resolve(checkout, path))
-    if (name === '..' || name.startsWith(`..${sep}`) || isAbsolute(name) || forbiddenPath(path) || forbiddenPath(name)) {
+    if (
+      name === '..'
+      || name.startsWith(`..${sep}`)
+      || isAbsolute(name)
+      || forbiddenPath(path)
+      || forbiddenPath(name)
+    ) {
       throw new Error(`Evidence path is outside the allowed checkout context: ${path}`)
     }
-    if (!textExtensions.has(extname(name).toLowerCase())) throw new Error(`Unsupported evidence text extension: ${name}`)
+    if (!textExtensions.has(extname(name).toLowerCase()))
+      throw new Error(`Unsupported evidence text extension: ${name}`)
     return name
   }
 
@@ -40,7 +53,10 @@ export async function createEvidenceReader(root: string, signal: AbortSignal) {
     signal.throwIfAborted()
     try {
       await runFile('git', ['check-ignore', '--no-index', '--quiet', '--', path], {
-        cwd: checkout, signal, timeout: 5000, maxBuffer: 4096,
+        cwd: checkout,
+        signal,
+        timeout: 5000,
+        maxBuffer: 4096,
       })
       signal.throwIfAborted()
       return true
@@ -75,7 +91,8 @@ export async function createEvidenceReader(root: string, signal: AbortSignal) {
       if (!before.isFile()) throw new Error(`Evidence requires a regular text file: ${name}`)
       if (before.size > maxFileBytes) throw new Error(`Evidence file exceeds 40000 bytes: ${name}`)
       // Verify the opened object, not just its earlier pathname, across ancestor renames.
-      if (await realpath(`/proc/self/fd/${file.fd}`) !== absolute) throw new Error(`Evidence path changed while opening: ${name}`)
+      if (await realpath(`/proc/self/fd/${file.fd}`) !== absolute)
+        throw new Error(`Evidence path changed while opening: ${name}`)
       signal.throwIfAborted()
       const bytes = Buffer.alloc(before.size)
       let length = 0
@@ -90,9 +107,16 @@ export async function createEvidenceReader(root: string, signal: AbortSignal) {
       const current = await lstat(absolute)
       const after = await file.stat()
       signal.throwIfAborted()
-      if (length !== before.size || after.size !== before.size || after.mtimeMs !== before.mtimeMs || after.ctimeMs !== before.ctimeMs
-        || current.isSymbolicLink() || current.dev !== before.dev || current.ino !== before.ino
-        || await realpath(`/proc/self/fd/${file.fd}`) !== absolute) {
+      if (
+        length !== before.size
+        || after.size !== before.size
+        || after.mtimeMs !== before.mtimeMs
+        || after.ctimeMs !== before.ctimeMs
+        || current.isSymbolicLink()
+        || current.dev !== before.dev
+        || current.ino !== before.ino
+        || await realpath(`/proc/self/fd/${file.fd}`) !== absolute
+      ) {
         throw new Error(`Evidence source changed while reading: ${name}`)
       }
       signal.throwIfAborted()
@@ -102,7 +126,8 @@ export async function createEvidenceReader(root: string, signal: AbortSignal) {
       } catch (error) {
         throw new Error(`Evidence is not UTF-8 text: ${name}`, { cause: error })
       }
-      if (/[\x00-\x08\x0b\x0e-\x1f\x7f]/.test(code)) throw new Error(`Evidence contains binary data: ${name}`)
+      if (/[\x00-\x08\x0b\x0e-\x1f\x7f]/.test(code))
+        throw new Error(`Evidence contains binary data: ${name}`)
       snapshot = {
         source: { path: name, code, sha256: createHash('sha256').update(bytes).digest('hex') },
         dev: before.dev,
@@ -113,7 +138,11 @@ export async function createEvidenceReader(root: string, signal: AbortSignal) {
     }
     signal.throwIfAborted()
     const previous = retained.get(name)
-    if (previous && (previous.source.sha256 !== snapshot.source.sha256 || previous.dev !== snapshot.dev || previous.ino !== snapshot.ino)) {
+    if (previous && (
+      previous.source.sha256 !== snapshot.source.sha256
+      || previous.dev !== snapshot.dev
+      || previous.ino !== snapshot.ino
+    )) {
       throw new Error(`Evidence source changed: ${name}`)
     }
     if (!previous) retained.set(name, snapshot)
