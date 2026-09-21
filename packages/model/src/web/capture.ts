@@ -65,6 +65,8 @@ export interface CaptureView {
   enabled: boolean
   unavailableReason: string | null
   phase: CapturePhase
+  /** Interrupted reads of the same exposure; current does not imply image completion. */
+  captureReadState: 'current' | 'retrying'
   active: boolean
   repeat: boolean
   saveFrames: boolean

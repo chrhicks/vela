@@ -34,6 +34,7 @@ const captureView = z.object({
   unavailableReason: text.nullable(),
   phase: z.enum(['idle', 'exposing', 'reading', 'saving', 'stopping', 'complete', 'stopped', 'failed']),
   active: z.boolean(),
+  captureReadState: z.enum(['current', 'retrying']),
   exposureSeconds: z.number().min(0).max(600),
   repeat: z.boolean(),
   completedCount: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),

@@ -20,11 +20,12 @@ function configuredCamera(settings: { endpoint: string, cameraId: string, expect
   const acquisition = createAlpacaAcquisition({ baseUrl: settings.endpoint })
 
   return {
-    async capture({ exposureSeconds, signal, onProgress }) {
+    async capture({ exposureSeconds, signal, onProgress, onReadState }) {
       try {
         return await acquisition.capture({
           cameraId: settings.cameraId, expectedCameraName: settings.expectedCameraName, exposureSeconds, signal,
           onProgress: elapsedSeconds => onProgress(elapsedSeconds),
+          onReadState,
         })
       } catch (error) {
         if (error instanceof AlpacaCaptureStoppedError) throw new AutofocusStoppedError()
@@ -74,6 +75,7 @@ export function registerAutofocus(
     const current = (): AutofocusView => controllers.get(rigId)?.snapshot() ?? {
       rigId, rigName: rig.name, enabled: false, unavailableReason: null, cameraName: null, focuserName: null,
       phase: 'setup', activity: 'idle', active: false, startPosition: null, currentPosition: null, maxStep: null,
+      captureReadState: 'current',
       stepSize: DEFAULT_STEP_SIZE, offsetSteps: DEFAULT_OFFSET_STEPS, exposureSeconds: 2, elapsedSeconds: 0,
       exposureStartedAt: null, samples: [], fit: null, restoredStart: false, error: null,
     }

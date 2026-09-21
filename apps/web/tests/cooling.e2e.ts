@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test'
 import type { CaptureView } from '@vela/model/web'
 
 const idle: CaptureView = {
+  captureReadState: 'current',
   rigId: 'rig-1', rigName: 'Cooling review', camera: { name: 'Main camera' }, enabled: true,
   unavailableReason: null, phase: 'idle', active: false, exposureSeconds: 2, elapsedSeconds: 0,
   error: null, saveFrames: false, savedImageCount: 0, latestImage: null, repeat: false, completedCount: 0,

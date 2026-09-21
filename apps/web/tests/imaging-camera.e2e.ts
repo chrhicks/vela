@@ -19,6 +19,7 @@ async function observe(page: Page) {
     rigId: 'rig-1', rigName: 'Seestar S30', camera: null, enabled: false,
     unavailableReason: 'Choose an imaging camera.', phase: 'idle', active: false,
     exposureSeconds: 2, elapsedSeconds: 0, error: null, latestImage: null, cooling: null,
+    captureReadState: 'current', repeat: false, saveFrames: false, savedImageCount: 0, completedCount: 0,
   }))
   await page.goto('/rigs/rig-1/observe')
 }

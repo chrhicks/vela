@@ -123,7 +123,7 @@ IDs through management inventory; device numbers and JSON wire shapes remain
 private. The server owns operation serialization and decides which rigs and
 coordinate frames its workflow supports.
 
-- `capture({ cameraId, exposureSeconds, signal, onProgress })` starts one light
+- `capture({ cameraId, exposureSeconds, signal, onProgress, onReadState })` starts one light
   exposure, observes `ImageReady`, and returns `{ width, height, pixels,
   capturedAt, color }`. Pixels are row-major `Float64Array`; the timestamp is UTC.
   `LastExposureStartTime` is optional in ASCOM. A blank value (observed on the
@@ -155,16 +155,37 @@ coordinate frames its workflow supports.
   still requires substantial transient memory for a full 26 MP camera. Image transfer has a separate 60-second
   timeout (`imageTimeoutMs`); ordinary device requests retain their 5-second
   default (`requestTimeoutMs`).
-- Optional `expectedCameraName` checks the fresh operational name immediately
-  before the exposure write. This detects a changed attached camera when a
+- Capture reads the mandatory [Camera.Name](https://ascom-standards.org/newdocs/camera.html#Camera.Name)
+  property immediately before the exposure write. ASCOM requires it to be
+  implemented and prohibits PropertyNotImplemented. Optional `expectedCameraName`
+  additionally compares that observed name to the selected camera. This detects a changed attached camera when a
   driver retains the same stable slot identity. A mismatch or missing name
   rejects without commanding or aborting that camera.
 - An already active camera is rejected before writing. A retained image with
   the same exposure timestamp is rejected as unconfirmed freshness; drivers
   with coarse timestamps may therefore require more spacing between captures.
-  Completion is bounded by exposure duration plus 60 seconds. Failed or
-  cancelled captures attempt an independent, bounded abort. A lost start
+  When the camera responds that its image is still incomplete after exposure
+  duration plus 60 seconds, acquisition fails. A completed image recovered after
+  a longer network interruption can still be retrieved after freshness checks.
+  Failed or cancelled captures attempt an independent, bounded abort. A lost start
   response never causes a second exposure command.
+- Once StartExposure is acknowledged, transport failures/timeouts during
+  readiness, camera-state, timestamp or image reads retain that same pending
+  exposure. Individual requests stay bounded; retries wait one second by default
+  (`readRetryIntervalMs`) and remain cancellable until reads recover or Stop.
+  `onReadState('retrying')` marks the interruption; `'current'` reports successful
+  observation again, not acquisition completion. Elapsed progress does not advance
+  through missing reads. Pre-start reads, decoded driver/HTTP rejections, malformed
+  responses, uncertain writes and abort cleanup are not retried by this loop.
+  Response-body timeouts are transport failures; non-timeout body-stream error
+  classification remains a separate transport follow-up.
+- Recovery rechecks the same stable camera slot, observed name, connection and
+  image dimensions/color before continuing. Changed slot/name ends with the
+  original exposure outcome unconfirmed, without aborting a replacement camera.
+  An unchanged Name is not proof that a driver restarted or physical camera was
+  never replaced. Ready and timestamp checks bracket image transfer, rejecting
+  lost/replaced images while retaining the original camera/server timestamp
+  provenance. No recovery resets the exposure's start time or sends another start.
 - A transport failure is exposed as `AlpacaCaptureRetryableError` only before
   any exposure write, or after an acknowledged start followed by a successful
   abort and confirmed idle camera. The original provider error is its `cause`.

@@ -76,6 +76,7 @@ const centering = z.object({
   && value.measurements.every(sample => sample.correction <= value.correction))
 
 const framing = z.object({
+  captureReadState: z.enum(['current', 'retrying']),
   rigId: z.string(), rigName: z.string(), enabled: z.boolean(), active: z.boolean(), canCenter: z.boolean(), checkCurrent: z.boolean(),
   observedAt: date, error: z.string().nullable(), unavailableReason: z.string().nullable(), targetId: z.string().nullable(), exposureSeconds: z.number(),
   phase: z.enum(['idle', 'slewing', 'settling', 'needs-check', 'exposing', 'downloading', 'solving', 'checked', 'stopping', 'stopped', 'failed']),
