@@ -11,19 +11,30 @@ import { DEFAULT_OFFSET_STEPS, DEFAULT_STEP_SIZE } from './walk.js'
 
 interface AutofocusRouteOptions {
   createInspector?: RigDetailOptions['createInspector']
-  createCamera?: (settings: { endpoint: string, cameraId: string, expectedCameraName: string }) => AutofocusCamera
+  createCamera?: (settings: {
+    endpoint: string
+    cameraId: string
+    expectedCameraName: string
+  }) => AutofocusCamera
   createFocuser?: (settings: { endpoint: string, focuserId: string }) => AutofocusFocuser
   measure?: typeof measureAutofocusStars
 }
 
-function configuredCamera(settings: { endpoint: string, cameraId: string, expectedCameraName: string }): AutofocusCamera {
+function configuredCamera(settings: {
+  endpoint: string
+  cameraId: string
+  expectedCameraName: string
+}): AutofocusCamera {
   const acquisition = createAlpacaAcquisition({ baseUrl: settings.endpoint })
 
   return {
     async capture({ exposureSeconds, signal, onProgress, onReadState }) {
       try {
         return await acquisition.capture({
-          cameraId: settings.cameraId, expectedCameraName: settings.expectedCameraName, exposureSeconds, signal,
+          cameraId: settings.cameraId,
+          expectedCameraName: settings.expectedCameraName,
+          exposureSeconds,
+          signal,
           onProgress: elapsedSeconds => onProgress(elapsedSeconds),
           onReadState,
         })
@@ -60,7 +71,12 @@ export function registerAutofocus(
   app: FastifyInstance,
   catalog: RigCatalog,
   operations: RigOperations,
-  { createInspector, createCamera = configuredCamera, createFocuser = configuredFocuser, measure }: AutofocusRouteOptions = {},
+  {
+    createInspector,
+    createCamera = configuredCamera,
+    createFocuser = configuredFocuser,
+    measure,
+  }: AutofocusRouteOptions = {},
 ) {
   const controllers = new Map<string, ReturnType<typeof createAutofocusController>>()
 
@@ -73,15 +89,38 @@ export function registerAutofocus(
     if (!rig) return {}
 
     const current = (): AutofocusView => controllers.get(rigId)?.snapshot() ?? {
-      rigId, rigName: rig.name, enabled: false, unavailableReason: null, cameraName: null, focuserName: null,
-      phase: 'setup', activity: 'idle', active: false, startPosition: null, currentPosition: null, maxStep: null,
+      rigId,
+      rigName: rig.name,
+      enabled: false,
+      unavailableReason: null,
+      cameraName: null,
+      focuserName: null,
+      phase: 'setup',
+      activity: 'idle',
+      active: false,
+      startPosition: null,
+      currentPosition: null,
+      maxStep: null,
       captureReadState: 'current',
-      stepSize: DEFAULT_STEP_SIZE, offsetSteps: DEFAULT_OFFSET_STEPS, exposureSeconds: 2, elapsedSeconds: 0,
-      exposureStartedAt: null, samples: [], fit: null, restoredStart: false, error: null,
+      stepSize: DEFAULT_STEP_SIZE,
+      offsetSteps: DEFAULT_OFFSET_STEPS,
+      exposureSeconds: 2,
+      elapsedSeconds: 0,
+      exposureStartedAt: null,
+      samples: [],
+      fit: null,
+      restoredStart: false,
+      error: null,
     }
 
     const unavailable = (reason: string, extras: Partial<AutofocusView> = {}) => ({
-      view: { ...current(), rigName: rig.name, enabled: false, unavailableReason: reason, ...extras },
+      view: {
+        ...current(),
+        rigName: rig.name,
+        enabled: false,
+        unavailableReason: reason,
+        ...extras,
+      },
     })
 
     if (!rig.imagingCamera) return unavailable('Choose an imaging camera on Observe before autofocus.')
@@ -91,8 +130,13 @@ export function registerAutofocus(
 
     if (detail.state === 'conflict') return unavailable('Rig identity needs attention before autofocus.')
 
-    if (detail.state === 'unavailable') return unavailable('Camera and focuser state is unavailable. Check the Rig connection.')
-    const camera = detail.inspections.find(device => device.providerDeviceId === rig.imagingCamera?.uniqueId && device.kind === 'camera')
+    if (detail.state === 'unavailable')
+      return unavailable('Camera and focuser state is unavailable. Check the Rig connection.')
+
+    const camera = detail.inspections.find(device =>
+      device.providerDeviceId === rig.imagingCamera?.uniqueId && device.kind === 'camera',
+    )
+
     const focusers = detail.inspections.filter(device => device.kind === 'focuser')
     const cameraView = { cameraName: rig.imagingCamera.name }
 
@@ -142,8 +186,13 @@ export function registerAutofocus(
 
     return {
       view: {
-        ...snapshot, rigName: rig.name, ...names, currentPosition: idlePosition, maxStep: idleMaxStep,
-        enabled: true, unavailableReason: null,
+        ...snapshot,
+        rigName: rig.name,
+        ...names,
+        currentPosition: idlePosition,
+        maxStep: idleMaxStep,
+        enabled: true,
+        unavailableReason: null,
       },
       devices: {
         endpoint: `http://${rig.endpoint.host}:${rig.endpoint.port}`,
@@ -187,9 +236,16 @@ export function registerAutofocus(
       let controller = controllers.get(view.rigId)
 
       if (!controller) {
-        controller = createAutofocusController({
-          rigId: view.rigId, rigName: view.rigName, cameraName: view.cameraName, focuserName: view.focuserName,
-        }, Date.now, measure ?? measureAutofocusStars)
+        controller = createAutofocusController(
+          {
+            rigId: view.rigId,
+            rigName: view.rigName,
+            cameraName: view.cameraName,
+            focuserName: view.focuserName,
+          },
+          Date.now,
+          measure ?? measureAutofocusStars,
+        )
         controllers.set(view.rigId, controller)
       }
 
@@ -202,7 +258,11 @@ export function registerAutofocus(
       if (parsed.data.exposureSeconds !== undefined) options.exposureSeconds = parsed.data.exposureSeconds
 
       const result = await controller.start(
-        createCamera({ endpoint: devices.endpoint, cameraId: devices.cameraId, expectedCameraName: view.cameraName }),
+        createCamera({
+          endpoint: devices.endpoint,
+          cameraId: devices.cameraId,
+          expectedCameraName: view.cameraName,
+        }),
         createFocuser({ endpoint: devices.endpoint, focuserId: devices.focuserId }),
         options,
       )
@@ -230,5 +290,7 @@ export function registerAutofocus(
     return view ?? reply.code(404).send({ error: 'Rig not found' })
   })
 
-  app.addHook('onClose', async () => { await Promise.all([...controllers.values()].map(controller => controller.stop())) })
+  app.addHook('onClose', async () => {
+    await Promise.all([...controllers.values()].map(controller => controller.stop()))
+  })
 }

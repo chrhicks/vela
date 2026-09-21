@@ -8,10 +8,13 @@ import type { AutofocusCamera, AutofocusFocuser } from './controller.js'
 import { hyperbola } from './hyperbola.js'
 
 const record = {
-  id: 'fra', name: 'FRA 400', endpoint: { host: '127.0.0.1', port: 11111 },
+  id: 'fra',
+  name: 'FRA 400',
+  endpoint: { host: '127.0.0.1', port: 11111 },
   imagingCamera: { uniqueId: 'camera', name: 'Main camera' },
   addedAt: '2026-09-01T20:00:00.000Z',
-  lastObservedInventory: { observedAt: '2026-09-01T20:00:00.000Z',
+  lastObservedInventory: {
+    observedAt: '2026-09-01T20:00:00.000Z',
     devices: [
       { uniqueId: 'camera', kind: 'camera' as const, name: 'Main camera' },
       { uniqueId: 'eaf', kind: 'focuser' as const, name: 'EAF' },
@@ -40,7 +43,9 @@ function setup(start = 32842, inventory = record.lastObservedInventory) {
   const captures: Array<ReturnType<typeof deferred>> = []
 
   const focuser: AutofocusFocuser = {
-    async status() { return { absolute: true, position, maxStep: 60000, moving: false } },
+    async status() {
+      return { absolute: true, position, maxStep: 60000, moving: false }
+    },
     async move(target) {
       expect(target).not.toBe(0)
       position = target
@@ -57,19 +62,42 @@ function setup(start = 32842, inventory = record.lastObservedInventory) {
       captures.push(gate)
       await gate.promise
 
-      return { width: 8, height: 8, pixels: new Float64Array(64), capturedAt: '2026-09-17T00:00:00.000Z', color: { kind: 'mono' } }
+      return {
+        width: 8,
+        height: 8,
+        pixels: new Float64Array(64),
+        capturedAt: '2026-09-17T00:00:00.000Z',
+        color: { kind: 'mono' },
+      }
     },
   }
 
   registerAutofocus(app, catalog, operations, {
-    createInspector: () => ({ async inspectDevices(): Promise<ReadonlyArray<AlpacaDeviceInspection>> {
-      return [
-        { providerDeviceId: 'camera', kind: 'camera', configuredName: 'Camera', name: 'Main camera', connection: 'connected',
-          telemetry: { availability: 'complete', values: { kind: 'camera', activity: 'idle' } } },
-        { providerDeviceId: 'eaf', kind: 'focuser', configuredName: 'EAF', name: 'EAF', connection: 'connected',
-          telemetry: { availability: 'complete', values: { kind: 'focuser', position, moving: false, maxStep: 60000 } } },
-      ]
-    } }),
+    createInspector: () => ({
+      async inspectDevices(): Promise<ReadonlyArray<AlpacaDeviceInspection>> {
+        return [
+          {
+            providerDeviceId: 'camera',
+            kind: 'camera',
+            configuredName: 'Camera',
+            name: 'Main camera',
+            connection: 'connected',
+            telemetry: { availability: 'complete', values: { kind: 'camera', activity: 'idle' } },
+          },
+          {
+            providerDeviceId: 'eaf',
+            kind: 'focuser',
+            configuredName: 'EAF',
+            name: 'EAF',
+            connection: 'connected',
+            telemetry: {
+              availability: 'complete',
+              values: { kind: 'focuser', position, moving: false, maxStep: 60000 },
+            },
+          },
+        ]
+      },
+    }),
     createCamera: () => camera,
     createFocuser: settings => {
       focuserIds.push(settings.focuserId)
@@ -83,7 +111,11 @@ function setup(start = 32842, inventory = record.lastObservedInventory) {
 
   return {
     get: () => app.inject({ method: 'GET', url: '/api/web/rigs/fra/autofocus' }),
-    start: (body: { stepSize?: number, exposureSeconds?: number } = { stepSize: 50 }) => app.inject({ method: 'POST', url: '/api/rigs/fra/autofocus/start', payload: body }),
+    start: (body: { stepSize?: number, exposureSeconds?: number } = { stepSize: 50 }) => app.inject({
+      method: 'POST',
+      url: '/api/rigs/fra/autofocus/start',
+      payload: body,
+    }),
     stop: () => app.inject({ method: 'POST', url: '/api/rigs/fra/autofocus/stop', payload: {} }),
     land: async () => {
       await vi.waitFor(() => expect(captures.length).toBeGreaterThan(0))
@@ -101,7 +133,9 @@ function setup(start = 32842, inventory = record.lastObservedInventory) {
 
       throw new Error('Autofocus walk did not finish')
     },
-    operations, moves, focuserIds,
+    operations,
+    moves,
+    focuserIds,
   }
 }
 
@@ -117,7 +151,13 @@ it('rejects malformed start bodies before acquiring the rig', async () => {
 
 it('publishes samples onto the live view as the walk runs', async () => {
   const subject = setup()
-  expect((await subject.get()).json()).toMatchObject({ enabled: true, samples: [], startPosition: null, currentPosition: 32842, maxStep: 60000 })
+  expect((await subject.get()).json()).toMatchObject({
+    enabled: true,
+    samples: [],
+    startPosition: null,
+    currentPosition: 32842,
+    maxStep: 60000,
+  })
   const started = await subject.start({ stepSize: 50, exposureSeconds: 2 })
   expect(started.statusCode).toBe(200)
   expect(started.json()).toMatchObject({ active: true, startPosition: 32842, phase: 'walking', samples: [] })
@@ -141,7 +181,13 @@ it('returns to setup for a travel-limit start without moving', async () => {
   const subject = setup(80)
   const started = await subject.start({ stepSize: 50, exposureSeconds: 2 })
   expect(started.statusCode).toBe(200)
-  expect(started.json()).toMatchObject({ phase: 'setup', active: false, startPosition: null, currentPosition: 80, restoredStart: false })
+  expect(started.json()).toMatchObject({
+    phase: 'setup',
+    active: false,
+    startPosition: null,
+    currentPosition: 80,
+    restoredStart: false,
+  })
   expect(started.json().error).toMatch(/MaxStep|0/)
   expect(subject.moves).toEqual([])
 })

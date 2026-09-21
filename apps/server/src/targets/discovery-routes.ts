@@ -24,7 +24,11 @@ const reasons = {
   'mixed-or-unknown': 'Start with broadband. This catalog classification does not establish a useful Hα / O III signal.',
 }
 
-export function registerTargetDiscovery(app: FastifyInstance, catalog: RigCatalog, boundary: DiscoveryBoundary) {
+export function registerTargetDiscovery(
+  app: FastifyInstance,
+  catalog: RigCatalog,
+  boundary: DiscoveryBoundary,
+) {
   type Snapshot = Awaited<ReturnType<typeof createSnapshot>>
 
   const snapshots = new Map<string, Snapshot>()
@@ -33,11 +37,26 @@ export function registerTargetDiscovery(app: FastifyInstance, catalog: RigCatalo
     const location = await boundary.siteView(rig)
     const at = boundary.now()
 
-    return { rigId: rig.id, ...location, at, calculation: discoverTargets({ targets: listTargets(), site: location.site, now: at }) }
+    return {
+      rigId: rig.id,
+      ...location,
+      at,
+      calculation: discoverTargets({ targets: listTargets(), site: location.site, now: at }),
+    }
   }
 
-  app.get<{ Params: { rigId: string }, Querystring: { snapshot?: string, q?: string, category?: string, filter?: string, offset?: string } }>(
-    '/api/web/rigs/:rigId/target-discovery', async (request, reply) => {
+  app.get<{
+    Params: { rigId: string }
+    Querystring: {
+      snapshot?: string
+      q?: string
+      category?: string
+      filter?: string
+      offset?: string
+    }
+  }>(
+    '/api/web/rigs/:rigId/target-discovery',
+    async (request, reply) => {
       const rig = await catalog.get(request.params.rigId)
 
       if (!rig) return reply.code(404).send({ error: 'Rig not found' })
@@ -74,24 +93,45 @@ export function registerTargetDiscovery(app: FastifyInstance, catalog: RigCatalo
 
       const matches = snapshot.calculation.candidates.filter(candidate => {
         const target = candidate.target
-        const matchesQuery = !key || [...target.aliases, target.catalogName, target.commonName ?? '', target.type].some(value => normalizeCatalogName(value).includes(key))
+
+        const matchesQuery = !key || [
+          ...target.aliases,
+          target.catalogName,
+          target.commonName ?? '',
+          target.type,
+        ].some(value => normalizeCatalogName(value).includes(key))
 
         return matchesQuery && (Boolean(key) || snapshot.calculation.status === 'site-unavailable' || candidate.eligible)
           && (category === 'all' || candidate.category === category) && (filter === 'all' || candidate.filter === filter)
       })
 
       const pageSize = 12
-      const pageOffset = matches.length ? Math.min(offset, Math.floor((matches.length - 1) / pageSize) * pageSize) : 0
+
+      const pageOffset = matches.length
+        ? Math.min(offset, Math.floor((matches.length - 1) / pageSize) * pageSize)
+        : 0
 
       const view: TargetDiscoveryView = {
-        rigId: rig.id, rigName: rig.name, snapshotId: snapshotId!, calculatedAt: snapshot.at.toISOString(),
-        status: snapshot.calculation.status, night: snapshot.calculation.window,
-        site: snapshot.site, siteUnavailableReason: snapshot.siteUnavailableReason,
-        query, category, filter,
-        offset: pageOffset, pageSize, total: matches.length,
+        rigId: rig.id,
+        rigName: rig.name,
+        snapshotId: snapshotId!,
+        calculatedAt: snapshot.at.toISOString(),
+        status: snapshot.calculation.status,
+        night: snapshot.calculation.window,
+        site: snapshot.site,
+        siteUnavailableReason: snapshot.siteUnavailableReason,
+        query,
+        category,
+        filter,
+        offset: pageOffset,
+        pageSize,
+        total: matches.length,
         targets: matches.slice(pageOffset, pageOffset + pageSize).map(candidate => ({
-          ...boundary.targetView(candidate.target, snapshot.site, snapshot.at), category: candidate.category,
-          filterChoice: candidate.filter, filterReason: reasons[candidate.filterReason], opportunity: candidate.opportunity,
+          ...boundary.targetView(candidate.target, snapshot.site, snapshot.at),
+          category: candidate.category,
+          filterChoice: candidate.filter,
+          filterReason: reasons[candidate.filterReason],
+          opportunity: candidate.opportunity,
         })),
       }
 

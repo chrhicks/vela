@@ -9,11 +9,29 @@ export function normalizeCatalogName(value: string): string {
 }
 
 const targets: readonly CatalogTarget[] = Object.freeze(catalogRows.map((row) => {
-  const [id, catalogName, commonName, aliases, raDegrees, decDegrees, type,
-    majorAxisArcminutes, minorAxisArcminutes] = row
+  const [
+    id,
+    catalogName,
+    commonName,
+    aliases,
+    raDegrees,
+    decDegrees,
+    type,
+    majorAxisArcminutes,
+    minorAxisArcminutes,
+  ] = row
 
-  return Object.freeze({ id, catalogName, commonName, aliases: Object.freeze(aliases),
-    raDegrees, decDegrees, type, majorAxisArcminutes, minorAxisArcminutes })
+  return Object.freeze({
+    id,
+    catalogName,
+    commonName,
+    aliases: Object.freeze(aliases),
+    raDegrees,
+    decDegrees,
+    type,
+    majorAxisArcminutes,
+    minorAxisArcminutes,
+  })
 }))
 
 const byId = new Map(targets.map((target) => [target.id, target]))

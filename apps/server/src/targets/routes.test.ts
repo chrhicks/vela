@@ -11,16 +11,27 @@ import { registerTargets, type TargetOptions } from './routes.js'
 const stamp = '2026-09-07T22:00:00.000Z'
 
 const record: RigCatalogRecord = {
-  id: 'rig', name: 'Test rig', endpoint: { host: 'rig.local', port: 11111 },
-  addedAt: stamp, focalLengthMm: 400,
+  id: 'rig',
+  name: 'Test rig',
+  endpoint: { host: 'rig.local', port: 11111 },
+  addedAt: stamp,
+  focalLengthMm: 400,
   imagingCamera: { uniqueId: 'camera', name: 'Imaging camera' },
-  lastObservedInventory: { observedAt: stamp, devices: [
-    { uniqueId: 'camera', kind: 'camera', name: 'Camera slot' },
-    { uniqueId: 'mount', kind: 'telescope', name: 'Mount slot' },
-  ] },
+  lastObservedInventory: {
+    observedAt: stamp,
+    devices: [
+      { uniqueId: 'camera', kind: 'camera', name: 'Camera slot' },
+      { uniqueId: 'mount', kind: 'telescope', name: 'Mount slot' },
+    ],
+  },
 }
 
-const start = { targetId: 'ngc6205', raDegrees: 250.42345833, decDegrees: 36.46130556, exposureSeconds: 2 }
+const start = {
+  targetId: 'ngc6205',
+  raDegrees: 250.42345833,
+  decDegrees: 36.46130556,
+  exposureSeconds: 2,
+}
 
 const apps: ReturnType<typeof Fastify>[] = []
 
@@ -31,48 +42,94 @@ function setup(settings: { record?: RigCatalogRecord, solver?: boolean, offsetDe
   const operations = createRigOperations()
 
   const mount: AlpacaTelescopeStatus = {
-    rightAscensionDegrees: start.raDegrees, declinationDegrees: start.decDegrees,
-    coordinateSystem: 'j2000', latitudeDegrees: 40, longitudeDegrees: -75, elevationMeters: 100,
-    tracking: true, slewing: false, parked: false, observedAt: stamp,
+    rightAscensionDegrees: start.raDegrees,
+    declinationDegrees: start.decDegrees,
+    coordinateSystem: 'j2000',
+    latitudeDegrees: 40,
+    longitudeDegrees: -75,
+    elevationMeters: 100,
+    tracking: true,
+    slewing: false,
+    parked: false,
+    observedAt: stamp,
   }
 
   const inspections: AlpacaDeviceInspection[] = [
-    { providerDeviceId: 'camera', kind: 'camera', configuredName: 'Camera slot', name: 'Imaging camera',
-      connection: 'connected', telemetry: { availability: 'complete', values: { kind: 'camera', activity: 'idle' } } },
-    { providerDeviceId: 'mount', kind: 'telescope', configuredName: 'Mount slot', name: 'Mount',
-      connection: 'connected', telemetry: { availability: 'unavailable' } },
+    {
+      providerDeviceId: 'camera',
+      kind: 'camera',
+      configuredName: 'Camera slot',
+      name: 'Imaging camera',
+      connection: 'connected',
+      telemetry: { availability: 'complete', values: { kind: 'camera', activity: 'idle' } },
+    },
+    {
+      providerDeviceId: 'mount',
+      kind: 'telescope',
+      configuredName: 'Mount slot',
+      name: 'Mount',
+      connection: 'connected',
+      telemetry: { availability: 'unavailable' },
+    },
   ]
 
   const adapter: AlpacaFraming = {
     home: vi.fn(),
-    cameraGeometry: vi.fn(async () => ({ cameraName: 'Imaging camera', sensorWidthPixels: 1000,
-      sensorHeightPixels: 800, pixelWidthMicrons: 3.76, pixelHeightMicrons: 3.76,
-      binX: 1, binY: 1, width: 1000, height: 800, startX: 0, startY: 0 })),
+    cameraGeometry: vi.fn(async () => ({
+      cameraName: 'Imaging camera',
+      sensorWidthPixels: 1000,
+      sensorHeightPixels: 800,
+      pixelWidthMicrons: 3.76,
+      pixelHeightMicrons: 3.76,
+      binX: 1,
+      binY: 1,
+      width: 1000,
+      height: 800,
+      startX: 0,
+      startY: 0,
+    })),
     telescopeStatus: vi.fn(async () => ({ ...mount })),
-    slew: vi.fn(async () => {}), setTracking: vi.fn(async () => {}), abortTelescope: vi.fn(async () => {}),
+    slew: vi.fn(async () => {}),
+    setTracking: vi.fn(async () => {}),
+    abortTelescope: vi.fn(async () => {}),
   }
 
   let completeCapture!: (frame: MonoFrame) => void
 
   const hardware: FramingHardware = {
     status: vi.fn(async () => ({ ...mount })),
-    tracking: vi.fn(async () => {}), slew: vi.fn(async () => {}),
+    tracking: vi.fn(async () => {}),
+    slew: vi.fn(async () => {}),
     capture: vi.fn<FramingHardware['capture']>(({ signal }) => new Promise<MonoFrame>((resolve, reject) => {
       completeCapture = resolve
       signal.addEventListener('abort', () => reject(signal.reason), { once: true })
     })),
   }
 
-  const solver: PlateSolver = { solve: vi.fn<PlateSolver['solve']>(async (frame) => ({
-    status: 'solved', raDegrees: start.raDegrees - (settings.offsetDegrees ?? 0), decDegrees: start.decDegrees, capturedAt: frame.capturedAt,
-    wcs: { width: 1000, height: 800, referenceX: 500.5, referenceY: 400.5,
-      raDegrees: start.raDegrees, decDegrees: start.decDegrees, cd: [-0.001, 0, 0, 0.001] },
-  })) }
+  const solver: PlateSolver = {
+    solve: vi.fn<PlateSolver['solve']>(async (frame) => ({
+      status: 'solved',
+      raDegrees: start.raDegrees - (settings.offsetDegrees ?? 0),
+      decDegrees: start.decDegrees,
+      capturedAt: frame.capturedAt,
+      wcs: {
+        width: 1000,
+        height: 800,
+        referenceX: 500.5,
+        referenceY: 400.5,
+        raDegrees: start.raDegrees,
+        decDegrees: start.decDegrees,
+        cd: [-0.001, 0, 0, 0.001],
+      },
+    })),
+  }
 
   const options: TargetOptions = {
-    createAdapter: () => adapter, createHardware: () => hardware,
+    createAdapter: () => adapter,
+    createHardware: () => hardware,
     createInspector: () => ({ inspectDevices: async () => inspections }),
-    now: () => new Date(stamp), waitForMountObservation: async signal => { signal.throwIfAborted() },
+    now: () => new Date(stamp),
+    waitForMountObservation: async signal => { signal.throwIfAborted() },
   }
 
   if (settings.solver !== false) options.createSolver = () => solver
@@ -85,22 +142,48 @@ function setup(settings: { record?: RigCatalogRecord, solver?: boolean, offsetDe
     return app
   }
 
-  return { app: createApp(), createApp, catalog, operations, inspections, adapter, hardware, mount, solver,
-    complete: () => completeCapture({ width: 1000, height: 800, pixels: [], capturedAt: stamp }) }
+  return {
+    app: createApp(),
+    createApp,
+    catalog,
+    operations,
+    inspections,
+    adapter,
+    hardware,
+    mount,
+    solver,
+    complete: () => completeCapture({ width: 1000, height: 800, pixels: [], capturedAt: stamp }),
+  }
 }
 
-function command(app: ReturnType<typeof Fastify>, body: InjectOptions['payload'] | null = start, name = 'start') {
-  return app.inject({ method: 'POST', url: `/api/rigs/rig/framing/${name}`, payload: JSON.stringify(body),
-    headers: { 'content-type': 'application/json' } })
+function command(
+  app: ReturnType<typeof Fastify>,
+  body: InjectOptions['payload'] | null = start,
+  name = 'start',
+) {
+  return app.inject({
+    method: 'POST',
+    url: `/api/rigs/rig/framing/${name}`,
+    payload: JSON.stringify(body),
+    headers: { 'content-type': 'application/json' },
+  })
 }
 
 describe('target and framing HTTP boundary', () => {
   it('rejects malformed commands and settings without starting hardware work', async () => {
     const subject = setup()
 
-    for (const body of [null, [], {}, { ...start, targetId: 'unknown' }, { ...start, raDegrees: 360 },
-      { ...start, decDegrees: -91 }, { ...start, exposureSeconds: '2' }, { ...start, exposureSeconds: 61 },
-      { ...start, surprise: true }]) {
+    for (const body of [
+      null,
+      [],
+      {},
+      { ...start, targetId: 'unknown' },
+      { ...start, raDegrees: 360 },
+      { ...start, decDegrees: -91 },
+      { ...start, exposureSeconds: '2' },
+      { ...start, exposureSeconds: 61 },
+      { ...start, surprise: true },
+    ]) {
       expect((await command(subject.app, body)).statusCode).toBe(400)
     }
 
@@ -142,8 +225,12 @@ describe('target and framing HTTP boundary', () => {
 
       if (failure === 'disconnected') subject.inspections[0] = { ...subject.inspections[0]!, connection: 'disconnected' }
 
-      if (failure === 'busy') subject.inspections[0] = { ...subject.inspections[0]!,
-        telemetry: { availability: 'complete', values: { kind: 'camera', activity: 'exposing' } } }
+      if (failure === 'busy') {
+        subject.inspections[0] = {
+          ...subject.inspections[0]!,
+          telemetry: { availability: 'complete', values: { kind: 'camera', activity: 'exposing' } },
+        }
+      }
 
       if (failure === 'site') delete subject.mount.latitudeDegrees
       const result = await command(subject.app)
@@ -166,7 +253,9 @@ describe('target and framing HTTP boundary', () => {
       expect(subject.hardware.slew).not.toHaveBeenCalled()
       expect(subject.operations.owner('rig')).toBe('capture')
       expect((await subject.catalog.get('rig'))?.focalLengthMm).toBe(400)
-    } finally { release() }
+    } finally {
+      release()
+    }
   })
 
   it('keeps the active check server-owned across browser reconnects and rejects duplicate starts', async () => {
@@ -210,9 +299,12 @@ describe('target and framing HTTP boundary', () => {
     await vi.waitFor(() => expect(subject.operations.owner('rig')).toBeUndefined())
     release()
     expect(await response).toMatchObject({
-      active: false, phase: 'checked', targetId: start.targetId,
+      active: false,
+      phase: 'checked',
+      targetId: start.targetId,
       actual: { checkId: expect.any(String), capturedAt: stamp },
-      checkCurrent: !fails, canCenter: !fails,
+      checkCurrent: !fails,
+      canCenter: !fails,
       pointingSide: fails ? 'unknown' : 'west',
       unavailableReason: fails ? 'Camera inspection interrupted' : null,
     })
@@ -231,8 +323,13 @@ describe('target and framing HTTP boundary', () => {
     const unavailable = await subject.app.inject('/api/web/rigs/rig/framing')
     expect(unavailable.statusCode).toBe(200)
     expect(unavailable.json()).toMatchObject({
-      phase: 'checked', actual: checked.actual, pointingSide: 'unknown', checkCurrent: false, canCenter: false,
-      enabled: false, unavailableReason: 'Telescope status timed out',
+      phase: 'checked',
+      actual: checked.actual,
+      pointingSide: 'unknown',
+      checkCurrent: false,
+      canCenter: false,
+      enabled: false,
+      unavailableReason: 'Telescope status timed out',
     })
     expect((await subject.app.inject('/api/web/rigs/rig/framing')).json()).toMatchObject({ pointingSide: 'west', checkCurrent: true })
     expect(subject.hardware.slew).not.toHaveBeenCalled()
@@ -252,13 +349,26 @@ describe('target and framing HTTP boundary', () => {
     }
 
     const older = await check(start, 1)
-    const latest = await check(target === 'same target' ? start : { ...start, targetId: 'ngc2024', raDegrees: start.raDegrees + 0.1 }, 2)
+
+    const latest = await check(
+      target === 'same target'
+        ? start
+        : { ...start, targetId: 'ngc2024', raDegrees: start.raDegrees + 0.1 },
+      2,
+    )
+
     expect(older.actual.checkId).toEqual(expect.any(String))
     expect(latest.actual.checkId).not.toBe(older.actual.checkId)
     // Captures may share a timestamp; their identities must still be distinct.
     expect(latest.actual.capturedAt).toBe(older.actual.capturedAt)
     expect(latest.canCenter).toBe(true)
-    const rejected = await command(subject.app, { checkId: older.actual.checkId, raDegrees: start.raDegrees, decDegrees: start.decDegrees }, 'center')
+
+    const rejected = await command(
+      subject.app,
+      { checkId: older.actual.checkId, raDegrees: start.raDegrees, decDegrees: start.decDegrees },
+      'center',
+    )
+
     expect(rejected.statusCode, rejected.body).toBe(409)
     expect(rejected.json().error).toContain('check has changed')
     expect(subject.hardware.slew).toHaveBeenCalledTimes(2)
@@ -273,7 +383,12 @@ describe('target and framing HTTP boundary', () => {
       return solved.status === 'solved' ? { ...solved, raDegrees: start.raDegrees + 0.2 } : solved
     }
 
-    const accepted = await command(subject.app, { checkId: latest.actual.checkId, raDegrees: start.raDegrees + 0.2, decDegrees: start.decDegrees }, 'center')
+    const accepted = await command(
+      subject.app,
+      { checkId: latest.actual.checkId, raDegrees: start.raDegrees + 0.2, decDegrees: start.decDegrees },
+      'center',
+    )
+
     expect(accepted.statusCode, accepted.body).toBe(200)
     await vi.waitFor(() => expect(subject.hardware.capture).toHaveBeenCalledTimes(3))
     expect(subject.hardware.slew).toHaveBeenCalledTimes(3)
@@ -294,7 +409,10 @@ describe('target and framing HTTP boundary', () => {
     expect(subject.hardware.slew).not.toHaveBeenCalled()
     expect(subject.hardware.tracking).not.toHaveBeenCalled()
     expect((await subject.app.inject('/api/web/rigs/rig/framing')).json()).toMatchObject({
-      phase: 'checked', desired: { raDegrees: edited.raDegrees, decDegrees: edited.decDegrees }, checkCurrent: true, canCenter: true,
+      phase: 'checked',
+      desired: { raDegrees: edited.raDegrees, decDegrees: edited.decDegrees },
+      checkCurrent: true,
+      canCenter: true,
     })
   })
 
@@ -306,7 +424,9 @@ describe('target and framing HTTP boundary', () => {
     subject.solver.solve = async (...args) => {
       const solved = await originalSolve(...args)
 
-      return solved.status === 'solved' ? { ...solved, decDegrees: start.decDegrees + offsets[Math.min(solvedCount++, 2)]! / 60 } : solved
+      return solved.status === 'solved'
+        ? { ...solved, decDegrees: start.decDegrees + offsets[Math.min(solvedCount++, 2)]! / 60 }
+        : solved
     }
 
     await command(subject.app, start, 'check')

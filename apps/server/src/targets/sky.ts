@@ -25,7 +25,12 @@ export function skyAtPixel(wcs: PlateWcs, x: number, y: number): TargetPosition 
 }
 
 export function plateCorners(wcs: PlateWcs): TargetPosition[] {
-  return [[-0.5, -0.5], [wcs.width - 0.5, -0.5], [wcs.width - 0.5, wcs.height - 0.5], [-0.5, wcs.height - 0.5]].map(([x, y]) => skyAtPixel(wcs, x!, y!))
+  return [
+    [-0.5, -0.5],
+    [wcs.width - 0.5, -0.5],
+    [wcs.width - 0.5, wcs.height - 0.5],
+    [-0.5, wcs.height - 0.5],
+  ].map(([x, y]) => skyAtPixel(wcs, x!, y!))
 }
 
 export function skyPath(target: TargetPosition, site: Site, now: Date): TargetSkyPath {
@@ -85,8 +90,12 @@ export function skyPath(target: TargetPosition, site: Site, now: Date): TargetSk
   }
 
   return {
-    observedAt: now.toISOString(), startsAt: samples[0]!.at, endsAt: samples.at(-1)!.at,
-    samples, currentAltitudeDegrees: horizontal(now).altitude, highestAltitudeDegrees: Math.max(...samples.map(sample => sample.altitudeDegrees)),
+    observedAt: now.toISOString(),
+    startsAt: samples[0]!.at,
+    endsAt: samples.at(-1)!.at,
+    samples,
+    currentAltitudeDegrees: horizontal(now).altitude,
+    highestAltitudeDegrees: Math.max(...samples.map(sample => sample.altitudeDegrees)),
     aboveHorizonDuringDarkness: windows,
   }
 }

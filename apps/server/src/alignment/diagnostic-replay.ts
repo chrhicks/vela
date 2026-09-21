@@ -14,7 +14,12 @@ export interface AlignmentDiagnosticReplayReport {
   mode: 'offline' | 'physical'
   outcome: { phase: 'finished' | 'stopped' | 'failed' | 'incomplete', error: string | null }
   truncatedFinalLine: boolean
-  counts: { frames: number, measurements: number, physicalFrames: number, verifiedOriginals: number }
+  counts: {
+    frames: number
+    measurements: number
+    physicalFrames: number
+    verifiedOriginals: number
+  }
   baseline: AlignmentBaseline | null
   finalMeasurement: AlignmentMeasurement | null
   maximumDiscrepancies: {
@@ -35,7 +40,9 @@ export async function replayAlignmentDiagnostics(directory: string): Promise<Ali
   lines.pop()
 
   const entries = lines.map((line, index) => {
-    try { return diagnosticEntrySchema.parse(JSON.parse(line)) } catch (error) {
+    try {
+      return diagnosticEntrySchema.parse(JSON.parse(line))
+    } catch (error) {
       throw new Error(`Invalid alignment diagnostic journal entry ${index + 1}`, { cause: error })
     }
   })
@@ -45,11 +52,20 @@ export async function replayAlignmentDiagnostics(directory: string): Promise<Ali
   if (first?.type !== 'run') throw new Error('Alignment diagnostic journal is missing run metadata')
 
   const report: AlignmentDiagnosticReplayReport = {
-    validation: 'production-math-reproducibility-only', runId: first.run.runId, mode: first.run.mode,
-    outcome: { phase: 'incomplete', error: null }, truncatedFinalLine,
+    validation: 'production-math-reproducibility-only',
+    runId: first.run.runId,
+    mode: first.run.mode,
+    outcome: { phase: 'incomplete', error: null },
+    truncatedFinalLine,
     counts: { frames: 0, measurements: 0, physicalFrames: 0, verifiedOriginals: 0 },
-    baseline: null, finalMeasurement: null,
-    maximumDiscrepancies: { measurementArcsec: 0, correctionTargetDegrees: 0, physicalSampleDegrees: 0, physicalSampleTimeMs: 0 },
+    baseline: null,
+    finalMeasurement: null,
+    maximumDiscrepancies: {
+      measurementArcsec: 0,
+      correctionTargetDegrees: 0,
+      physicalSampleDegrees: 0,
+      physicalSampleTimeMs: 0,
+    },
   }
 
   const baselineFrames: DiagnosticFrameEntry[] = []
@@ -87,16 +103,24 @@ export async function replayAlignmentDiagnostics(directory: string): Promise<Ali
 
           if (site.elevationMeters !== undefined) observingSite.elevationMeters = site.elevationMeters
 
-          const recomputed = physicalAlignmentSample(entry.evidence.solution,
-            { capturedAt: entry.capture.capturedAt, exposureSeconds: first.run.exposureSeconds }, observingSite)
+          const recomputed = physicalAlignmentSample(
+            entry.evidence.solution,
+            { capturedAt: entry.capture.capturedAt, exposureSeconds: first.run.exposureSeconds },
+            observingSite,
+          )
 
           const recorded = entry.evidence.sample
           const discrepancies = report.maximumDiscrepancies
-          discrepancies.physicalSampleDegrees = Math.max(discrepancies.physicalSampleDegrees,
-            angleDifference(recomputed.raDegrees, recorded.raDegrees), Math.abs(recomputed.decDegrees - recorded.decDegrees),
-            angleDifference(recomputed.siderealTimeDegrees, recorded.siderealTimeDegrees))
-          discrepancies.physicalSampleTimeMs = Math.max(discrepancies.physicalSampleTimeMs,
-            Math.abs(Date.parse(recomputed.capturedAt) - Date.parse(recorded.capturedAt)))
+          discrepancies.physicalSampleDegrees = Math.max(
+            discrepancies.physicalSampleDegrees,
+            angleDifference(recomputed.raDegrees, recorded.raDegrees),
+            Math.abs(recomputed.decDegrees - recorded.decDegrees),
+            angleDifference(recomputed.siderealTimeDegrees, recorded.siderealTimeDegrees),
+          )
+          discrepancies.physicalSampleTimeMs = Math.max(
+            discrepancies.physicalSampleTimeMs,
+            Math.abs(Date.parse(recomputed.capturedAt) - Date.parse(recorded.capturedAt)),
+          )
           report.counts.physicalFrames++
         }
 
@@ -182,8 +206,13 @@ function validateOriginalFits(original: Buffer, frame: DiagnosticFrameEntry) {
   const unsigned16 = cards[1] === numberCard('BITPIX', 16)
   const bytesPerSample = unsigned16 ? 2 : 4
 
-  const required = ['SIMPLE  =                    T'.padEnd(80), numberCard('BITPIX', unsigned16 ? 16 : 32),
-    numberCard('NAXIS', 2), numberCard('NAXIS1', frame.capture.width), numberCard('NAXIS2', frame.capture.height)]
+  const required = [
+    'SIMPLE  =                    T'.padEnd(80),
+    numberCard('BITPIX', unsigned16 ? 16 : 32),
+    numberCard('NAXIS', 2),
+    numberCard('NAXIS1', frame.capture.width),
+    numberCard('NAXIS2', frame.capture.height),
+  ]
 
   const end = cards.indexOf('END'.padEnd(80))
 
@@ -209,14 +238,23 @@ function sameSample(a: AlignmentSample, b: AlignmentSample) {
 
 function angleDifference(a: number, b: number) { return Math.abs(((a - b + 540) % 360) - 180) }
 
-function compareMeasurement(report: AlignmentDiagnosticReplayReport, actual: AlignmentMeasurement, recorded: AlignmentMeasurement) {
+function compareMeasurement(
+  report: AlignmentDiagnosticReplayReport,
+  actual: AlignmentMeasurement,
+  recorded: AlignmentMeasurement,
+) {
   const discrepancies = report.maximumDiscrepancies
-  discrepancies.measurementArcsec = Math.max(discrepancies.measurementArcsec,
-    Math.abs(actual.altitudeArcsec - recorded.altitudeArcsec), Math.abs(actual.azimuthArcsec - recorded.azimuthArcsec),
-    Math.abs(actual.totalArcsec - recorded.totalArcsec))
-  discrepancies.correctionTargetDegrees = Math.max(discrepancies.correctionTargetDegrees,
+  discrepancies.measurementArcsec = Math.max(
+    discrepancies.measurementArcsec,
+    Math.abs(actual.altitudeArcsec - recorded.altitudeArcsec),
+    Math.abs(actual.azimuthArcsec - recorded.azimuthArcsec),
+    Math.abs(actual.totalArcsec - recorded.totalArcsec),
+  )
+  discrepancies.correctionTargetDegrees = Math.max(
+    discrepancies.correctionTargetDegrees,
     angleDifference(actual.correctionTarget.raDegrees, recorded.correctionTarget.raDegrees),
-    Math.abs(actual.correctionTarget.decDegrees - recorded.correctionTarget.decDegrees))
+    Math.abs(actual.correctionTarget.decDegrees - recorded.correctionTarget.decDegrees),
+  )
 }
 
 async function readBoundedFile(path: string, maximumBytes: number): Promise<Buffer> {
@@ -227,7 +265,8 @@ async function readBoundedFile(path: string, maximumBytes: number): Promise<Buff
   try {
     const stat = await file.stat()
 
-    if (!stat.isFile() || stat.size > maximumBytes) throw new Error(`Alignment diagnostic file is not regular or exceeds its size cap: ${path}`)
+    if (!stat.isFile() || stat.size > maximumBytes)
+      throw new Error(`Alignment diagnostic file is not regular or exceeds its size cap: ${path}`)
     const bytes = Buffer.alloc(stat.size + 1)
     let length = 0
 

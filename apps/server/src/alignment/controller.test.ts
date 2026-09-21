@@ -18,8 +18,15 @@ function deferred<T>() {
   return { promise, resolve, reject }
 }
 
-const settings = { endpoint: 'http://simulator', cameraId: 'camera', telescopeId: 'mount',
-  executable: '/unused', catalogPath: '/unused', exposureSeconds: 1, fieldHeightDegrees: 3 }
+const settings = {
+  endpoint: 'http://simulator',
+  cameraId: 'camera',
+  telescopeId: 'mount',
+  executable: '/unused',
+  catalogPath: '/unused',
+  exposureSeconds: 1,
+  fieldHeightDegrees: 3,
+}
 
 const stops: Array<ReturnType<typeof createAlignmentController>['stop']> = []
 
@@ -40,15 +47,28 @@ function setup() {
 
   const hardware: AlpacaAcquisition = {
     rotateRightAscension: async () => { throw new Error('Unexpected physical rotation') },
-    async pointing() { return { rightAscensionDegrees: ra, declinationDegrees: dec,
-      siderealTimeDegrees: ((exposures + 1) * 360 / 86164.0905 + siderealOffset + 360) % 360, latitudeDegrees: 40, tracking: true, coordinateSystem } },
+    async pointing() {
+      return {
+        rightAscensionDegrees: ra,
+        declinationDegrees: dec,
+        siderealTimeDegrees: ((exposures + 1) * 360 / 86164.0905 + siderealOffset + 360) % 360,
+        latitudeDegrees: 40,
+        tracking: true,
+        coordinateSystem,
+      }
+    },
     async capture({ signal }) {
       exposures++
 
       if (captureOverride) return captureOverride(signal!)
 
-      return { width: 4, height: 4, pixels: new Float64Array([0, 500, 300, 100, ...Array(12).fill(0)]),
-        capturedAt: new Date(1_700_000_000_000 + exposures * 1000).toISOString(), color: { kind: 'mono' } }
+      return {
+        width: 4,
+        height: 4,
+        pixels: new Float64Array([0, 500, 300, 100, ...Array(12).fill(0)]),
+        capturedAt: new Date(1_700_000_000_000 + exposures * 1000).toISOString(),
+        color: { kind: 'mono' },
+      }
     },
     async move(_id, rate, duration) {
       moves++
@@ -68,7 +88,15 @@ function setup() {
     },
   }
 
-  const controller = createAlignmentController({ mode: 'offline', settings, hardware, solver, waitForNextExposure: cadence.wait, now: () => 1_700_000_000_000 + (exposures + 1) * 1000 })
+  const controller = createAlignmentController({
+    mode: 'offline',
+    settings,
+    hardware,
+    solver,
+    waitForNextExposure: cadence.wait,
+    now: () => 1_700_000_000_000 + (exposures + 1) * 1000,
+  })
+
   stops.push(() => controller.stop())
 
   async function nextSolve() {
@@ -78,10 +106,21 @@ function setup() {
   }
 
   function solve(request: Awaited<ReturnType<typeof nextSolve>>, decDegrees = 60) {
-    request.result.resolve({ status: 'solved', capturedAt: request.frame.capturedAt,
-      raDegrees: request.hint.raDegrees, decDegrees,
-      wcs: { width: 4, height: 4, referenceX: 2.5, referenceY: 2.5,
-        raDegrees: request.hint.raDegrees, decDegrees, cd: [0.01, 0, 0, -0.01] } })
+    request.result.resolve({
+      status: 'solved',
+      capturedAt: request.frame.capturedAt,
+      raDegrees: request.hint.raDegrees,
+      decDegrees,
+      wcs: {
+        width: 4,
+        height: 4,
+        referenceX: 2.5,
+        referenceY: 2.5,
+        raDegrees: request.hint.raDegrees,
+        decDegrees,
+        cd: [0.01, 0, 0, -0.01],
+      },
+    })
   }
 
   async function baseline() {
@@ -91,14 +130,21 @@ function setup() {
     await vi.waitFor(() => expect(controller.snapshot().measurement).not.toBeNull())
   }
 
-  return { controller, nextSolve, solve, baseline, exposures: () => exposures, moves: () => moves,
+  return {
+    controller,
+    nextSolve,
+    solve,
+    baseline,
+    exposures: () => exposures,
+    moves: () => moves,
     setPointing: (position: { ra: number, dec: number, frame: typeof coordinateSystem }) => {
       ra = position.ra
       dec = position.dec
       coordinateSystem = position.frame
     },
     resetSidereal: () => { siderealOffset -= 10 },
-    setCapture: (capture: typeof captureOverride) => { captureOverride = capture } }
+    setCapture: (capture: typeof captureOverride) => { captureOverride = capture },
+  }
 }
 
 it('rejects another start while acquisition remains active', async () => {
@@ -163,7 +209,9 @@ it.each([false, true])('waits for exposure cleanup before stopping and preserves
   expect(aborted).toBe(true)
   expect(settled).toBe(false)
   expect(subject.controller.snapshot()).toMatchObject({ active: true, activity: 'stopping' })
-  cleanup.reject(failCleanup ? new Error('Camera did not confirm exposure stopped') : new DOMException('Stopped', 'AbortError'))
+  cleanup.reject(failCleanup
+    ? new Error('Camera did not confirm exposure stopped')
+    : new DOMException('Stopped', 'AbortError'))
   const result = await stop
   expect(result.active).toBe(false)
   expect(result.phase).toBe(failCleanup ? 'failed' : 'stopped')

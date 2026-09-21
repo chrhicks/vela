@@ -21,20 +21,55 @@ async function temporaryRoot() {
 }
 
 const info: AlignmentDiagnosticRunInfo = {
-  runId: randomUUID(), rigId: 'rig', rigName: 'Offline rig', mode: 'offline',
-  cameraId: 'camera', telescopeId: 'mount', cameraName: 'Camera', exposureSeconds: 2,
+  runId: randomUUID(),
+  rigId: 'rig',
+  rigName: 'Offline rig',
+  mode: 'offline',
+  cameraId: 'camera',
+  telescopeId: 'mount',
+  cameraName: 'Camera',
+  exposureSeconds: 2,
 }
 
 const capturedAt = '2026-09-20T03:00:00.123Z'
 
-const frame: AlpacaFrame = { width: 2, height: 2, pixels: new Float64Array([0, 65535, -1, 2_147_483_647]), capturedAt, color: { kind: 'mono' } }
+const frame: AlpacaFrame = {
+  width: 2,
+  height: 2,
+  pixels: new Float64Array([0, 65535, -1, 2_147_483_647]),
+  capturedAt,
+  color: { kind: 'mono' },
+}
 
 const evidence: AlignmentFrameEvidence = {
-  phase: 'baseline', position: 1, hint: { raDegrees: 10, decDegrees: 60 }, fieldHeightDegrees: 3,
+  phase: 'baseline',
+  position: 1,
+  hint: { raDegrees: 10, decDegrees: 60 },
+  fieldHeightDegrees: 3,
   sample: { raDegrees: 10, decDegrees: 60, siderealTimeDegrees: 0, capturedAt },
-  solution: { status: 'solved', raDegrees: 10, decDegrees: 60, capturedAt,
-    wcs: { width: 2, height: 2, referenceX: 1.5, referenceY: 1.5, raDegrees: 10, decDegrees: 60, cd: [-0.01, 0, 0, 0.01] } },
-  offlinePointing: { rightAscensionDegrees: 10, declinationDegrees: 60, siderealTimeDegrees: 0, latitudeDegrees: 40, tracking: true, coordinateSystem: 'j2000' },
+  solution: {
+    status: 'solved',
+    raDegrees: 10,
+    decDegrees: 60,
+    capturedAt,
+    wcs: {
+      width: 2,
+      height: 2,
+      referenceX: 1.5,
+      referenceY: 1.5,
+      raDegrees: 10,
+      decDegrees: 60,
+      cd: [-0.01, 0, 0, 0.01],
+    },
+  },
+  offlinePointing: {
+    rightAscensionDegrees: 10,
+    declinationDegrees: 60,
+    siderealTimeDegrees: 0,
+    latitudeDegrees: 40,
+    tracking: true,
+    coordinateSystem: 'j2000',
+  },
 }
 
 describe('bounded alignment diagnostic recording', () => {
@@ -45,12 +80,22 @@ describe('bounded alignment diagnostic recording', () => {
     const run = (await create(info))!
 
     const samples: [AlignmentSample, AlignmentSample, AlignmentSample] = [
-      { ...evidence.sample, raDegrees: 10 }, { ...evidence.sample, raDegrees: 28 }, { ...evidence.sample, raDegrees: 46 },
+      { ...evidence.sample, raDegrees: 10 },
+      { ...evidence.sample, raDegrees: 28 },
+      { ...evidence.sample, raDegrees: 46 },
     ]
 
     for (const [index, sample] of samples.entries()) {
-      await run.recordFrame(frame, { ...evidence, position: index + 1, sample,
-        solution: { ...evidence.solution, raDegrees: sample.raDegrees, wcs: { ...evidence.solution.wcs, raDegrees: sample.raDegrees } } })
+      await run.recordFrame(frame, {
+        ...evidence,
+        position: index + 1,
+        sample,
+        solution: {
+          ...evidence.solution,
+          raDegrees: sample.raDegrees,
+          wcs: { ...evidence.solution.wcs, raDegrees: sample.raDegrees },
+        },
+      })
     }
 
     const baseline = createAlignmentBaseline(samples, 40)
@@ -60,14 +105,20 @@ describe('bounded alignment diagnostic recording', () => {
     await run.finish({ phase: 'finished', error: null })
     const firstDirectory = (await readdir(root))[0]!
     expect(await replayAlignmentDiagnostics(join(root, firstDirectory))).toMatchObject({
-      mode: 'offline', baseline, finalMeasurement: measurement, outcome: { phase: 'finished' },
+      mode: 'offline',
+      baseline,
+      finalMeasurement: measurement,
+      outcome: { phase: 'finished' },
       counts: { frames: 3, measurements: 1, physicalFrames: 0, verifiedOriginals: 3 },
     })
     const earlyStop = (await create(info))!
     await earlyStop.finish({ phase: 'stopped', error: null })
     const secondDirectory = (await readdir(root)).find(name => name !== firstDirectory)!
     expect(await replayAlignmentDiagnostics(join(root, secondDirectory))).toMatchObject({
-      outcome: { phase: 'stopped' }, baseline: null, finalMeasurement: null, counts: { frames: 0, measurements: 0 },
+      outcome: { phase: 'stopped' },
+      baseline: null,
+      finalMeasurement: null,
+      counts: { frames: 0, measurements: 0 },
     })
     expect(onError).not.toHaveBeenCalled()
   })

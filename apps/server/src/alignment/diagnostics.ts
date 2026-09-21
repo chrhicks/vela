@@ -26,14 +26,27 @@ export type AlignmentFrameEvidence = {
   sample: AlignmentSample
   hint: SkyPosition
   fieldHeightDegrees: number
-  physical?: { site: Site, camera: AlpacaCameraGeometry, before: AlpacaTelescopeStatus, after: AlpacaTelescopeStatus }
+  physical?: {
+    site: Site
+    camera: AlpacaCameraGeometry
+    before: AlpacaTelescopeStatus
+    after: AlpacaTelescopeStatus
+  }
   offlinePointing?: AlpacaPointing
 }
 
 export interface AlignmentDiagnosticRun {
   recordFrame(frame: AlpacaFrame, evidence: AlignmentFrameEvidence): Promise<void>
-  recordBaseline(samples: readonly [AlignmentSample, AlignmentSample, AlignmentSample], latitudeDegrees: number, measurement: AlignmentMeasurement): Promise<void>
-  recordMeasurement(sample: AlignmentSample, measurement: AlignmentMeasurement, mount?: AlpacaTelescopeStatus): Promise<void>
+  recordBaseline(
+    samples: readonly [AlignmentSample, AlignmentSample, AlignmentSample],
+    latitudeDegrees: number,
+    measurement: AlignmentMeasurement,
+  ): Promise<void>
+  recordMeasurement(
+    sample: AlignmentSample,
+    measurement: AlignmentMeasurement,
+    mount?: AlpacaTelescopeStatus,
+  ): Promise<void>
   finish(outcome: { phase: 'finished' | 'stopped' | 'failed', error: string | null }): Promise<void>
 }
 
@@ -41,7 +54,10 @@ export type AlignmentDiagnosticsFactory = (run: AlignmentDiagnosticRunInfo) => P
 
 /** Opt-in evidence only. The controller awaits each call sequentially; a recording
  * failure disables this run without changing the outcome of any rig operation. */
-export function createAlignmentDiagnostics(root: string, onError: (error: Error) => void): AlignmentDiagnosticsFactory {
+export function createAlignmentDiagnostics(
+  root: string,
+  onError: (error: Error) => void,
+): AlignmentDiagnosticsFactory {
   return async run => {
     let disabled = false
     let journalBytes = 0
@@ -62,7 +78,9 @@ export function createAlignmentDiagnostics(root: string, onError: (error: Error)
     async function record(work: () => Promise<void>) {
       if (disabled) return
 
-      try { await work() } catch (error) {
+      try {
+        await work()
+      } catch (error) {
         disable(error instanceof Error ? error : new Error('Alignment diagnostic recording failed', { cause: error }))
       }
     }
@@ -96,14 +114,25 @@ export function createAlignmentDiagnostics(root: string, onError: (error: Error)
             throw new Error('Alignment diagnostic FITS exceeds 128 MiB or has invalid dimensions')
           }
 
-          if (evidence.phase === 'baseline' && baselineFrames >= 3) throw new Error('Alignment diagnostics already has three baseline originals')
+          if (evidence.phase === 'baseline' && baselineFrames >= 3)
+            throw new Error('Alignment diagnostics already has three baseline originals')
           const fits = await encodeCaptureFits(frame, run)
           const filename = `${evidence.phase}-${randomUUID()}.fits`
           await writeFile(join(directory, filename), fits, { flag: 'wx' })
           await append({
-            type: 'frame', original: { filename, bytes: fits.length, sha256: createHash('sha256').update(fits).digest('hex') },
-            capture: { width: frame.width, height: frame.height, capturedAt: frame.capturedAt,
-              capturedAtSource: frame.capturedAtSource ?? 'camera', color: frame.color },
+            type: 'frame',
+            original: {
+              filename,
+              bytes: fits.length,
+              sha256: createHash('sha256').update(fits).digest('hex'),
+            },
+            capture: {
+              width: frame.width,
+              height: frame.height,
+              capturedAt: frame.capturedAt,
+              capturedAtSource: frame.capturedAtSource ?? 'camera',
+              color: frame.color,
+            },
             evidence,
           })
 
@@ -116,9 +145,20 @@ export function createAlignmentDiagnostics(root: string, onError: (error: Error)
             if (previous) await unlink(join(directory, previous))
           }
         }),
-        recordBaseline: (samples, latitudeDegrees, measurement) => record(() => append({ type: 'baseline', samples, latitudeDegrees, measurement })),
+        recordBaseline: (samples, latitudeDegrees, measurement) => record(() => append({
+          type: 'baseline',
+          samples,
+          latitudeDegrees,
+          measurement,
+        })),
         // Both current alignment modes measure with sidereal tracking enabled.
-        recordMeasurement: (sample, measurement, mount) => record(() => append({ type: 'measurement', sample, measurement, tracking: true, mount })),
+        recordMeasurement: (sample, measurement, mount) => record(() => append({
+          type: 'measurement',
+          sample,
+          measurement,
+          tracking: true,
+          mount,
+        })),
         finish: outcome => record(async () => {
           await append({ type: 'outcome', ...outcome })
           disabled = true
