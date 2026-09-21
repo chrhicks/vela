@@ -5,7 +5,10 @@ export type AlignmentMeasurement = NonNullable<AlignmentView['measurement']>
 export type AlignmentImageView = 'fit' | 'fine' | 'full' | 'native'
 
 /** Display geometry only: the server already projected the correction through WCS. */
-export function alignmentViewport(measurement: AlignmentMeasurement, view: Exclude<AlignmentImageView, 'native'>) {
+export function alignmentViewport(
+  measurement: AlignmentMeasurement,
+  view: Exclude<AlignmentImageView, 'native'>,
+) {
   const referenceX = (measurement.imageWidth - 1) / 2
   const referenceY = (measurement.imageHeight - 1) / 2
   const arcsecPerPixel = measurement.fieldHeightDegrees * 3600 / measurement.imageHeight
@@ -16,7 +19,11 @@ export function alignmentViewport(measurement: AlignmentMeasurement, view: Exclu
   const heights = {
     full: measurement.imageHeight,
     fine: 60 / arcsecPerPixel,
-    fit: Math.max(minimumHeight, dy * 1.5 + minimumHeight / 2, dx * 1.5 / 1.6 + minimumHeight / 2),
+    fit: Math.max(
+      minimumHeight,
+      dy * 1.5 + minimumHeight / 2,
+      dx * 1.5 / 1.6 + minimumHeight / 2,
+    ),
   }
 
   const height = heights[view]
@@ -25,7 +32,12 @@ export function alignmentViewport(measurement: AlignmentMeasurement, view: Exclu
   const centerY = view === 'full' ? measurement.imageHeight / 2 : (referenceY + measurement.targetY) / 2
 
   return {
-    left: centerX - width / 2, top: centerY - height / 2, width, height, referenceX, referenceY,
+    left: centerX - width / 2,
+    top: centerY - height / 2,
+    width,
+    height,
+    referenceX,
+    referenceY,
     barArcsec: width * arcsecPerPixel / 5,
     outsideImage: measurement.targetX < 0 || measurement.targetX > measurement.imageWidth - 1
       || measurement.targetY < 0 || measurement.targetY > measurement.imageHeight - 1,

@@ -82,7 +82,12 @@ export function useAutofocus(rigId: string) {
 
     void poll()
 
-    return () => { disposed = true; alive.current = false; generation.current++; clearTimeout(timer) }
+    return () => {
+      disposed = true
+      alive.current = false
+      generation.current++
+      clearTimeout(timer)
+    }
   }, [rigId])
 
   async function command(action: 'start' | 'stop', body: Record<string, number> = {}) {
@@ -95,14 +100,18 @@ export function useAutofocus(rigId: string) {
 
     try {
       const result = await api(`rigs/${encodeURIComponent(rigId)}/autofocus/${action}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(action === 'start' ? body : {}),
         signal: AbortSignal.timeout(15000),
       })
 
       if (!isAutofocusView(result, rigId)) throw new Error('Invalid autofocus response')
 
-      if (alive.current) { setView(result); setOffline(false) }
+      if (alive.current) {
+        setView(result)
+        setOffline(false)
+      }
     } catch (cause) {
       const message = cause instanceof ApiError && cause.code
         ? cause.code
@@ -121,5 +130,12 @@ export function useAutofocus(rigId: string) {
     }
   }
 
-  return { view, offline, pending, error, start: (stepSize: number, exposureSeconds: number) => command('start', { stepSize, exposureSeconds }), stop: () => command('stop') }
+  return {
+    view,
+    offline,
+    pending,
+    error,
+    start: (stepSize: number, exposureSeconds: number) => command('start', { stepSize, exposureSeconds }),
+    stop: () => command('stop'),
+  }
 }

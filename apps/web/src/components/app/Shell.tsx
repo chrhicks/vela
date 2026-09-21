@@ -5,7 +5,6 @@ import { AppNavigation } from '../../features/navigation/AppNavigation'
 const theme = resolveTheme(VELA_CURRENT_PROFILE)
 
 export default function Shell() {
-
   return (
     <div
       className="vela-theme min-h-screen"
@@ -13,7 +12,9 @@ export default function Shell() {
       style={themeStyle(theme, 'dark')}
     >
       <AppNavigation />
-      <main><Outlet /></main>
+      <main>
+        <Outlet />
+      </main>
       <footer />
     </div>
   )

@@ -73,7 +73,9 @@ export function useImagingCamera(rigId: string) {
       if (!disposed) timer = setTimeout(poll, 2000)
     }
 
-    const visible = () => { if (!document.hidden) void read() }
+    const visible = () => {
+      if (!document.hidden) void read()
+    }
 
     document.addEventListener('visibilitychange', visible)
     void poll()
@@ -104,11 +106,14 @@ export function useImagingCamera(rigId: string) {
 
     try {
       const next = await api(`rigs/${encodeURIComponent(rigId)}/imaging-camera`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(choice),
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(choice),
         signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]),
       })
 
-      if (!isImagingCameraView(next, rigId) || next.selected?.id !== choice.id || next.selected.name !== choice.name) throw new Error('Unconfirmed selection')
+      if (!isImagingCameraView(next, rigId) || next.selected?.id !== choice.id || next.selected.name !== choice.name)
+        throw new Error('Unconfirmed selection')
 
       if (!alive.current || generation.current !== current) return
       accept(next)
@@ -136,5 +141,14 @@ export function useImagingCamera(rigId: string) {
     }
   }
 
-  return { view, offline, pending, error, unconfirmed, confirmedSaves, save, refresh: () => read(true) }
+  return {
+    view,
+    offline,
+    pending,
+    error,
+    unconfirmed,
+    confirmedSaves,
+    save,
+    refresh: () => read(true),
+  }
 }

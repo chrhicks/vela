@@ -12,40 +12,87 @@ const isoDate = z.string().refine(value => {
   return !Number.isNaN(date.getTime()) && date.toISOString() === value
 })
 
-export const deviceKindSchema = z.enum(['camera', 'cover-calibrator', 'dome', 'filter-wheel', 'focuser', 'observing-conditions', 'rotator', 'safety-monitor', 'switch', 'telescope', 'unknown'])
+export const deviceKindSchema = z.enum([
+  'camera',
+  'cover-calibrator',
+  'dome',
+  'filter-wheel',
+  'focuser',
+  'observing-conditions',
+  'rotator',
+  'safety-monitor',
+  'switch',
+  'telescope',
+  'unknown',
+])
 
 const capabilities = z.array(z.literal('forget'))
 
 const count = z.number().refine(Number.isInteger).nonnegative()
 
-const connections = z.object({ total: count, connected: count, disconnected: count, unavailable: count })
+const connections = z.object({
+  total: count,
+  connected: count,
+  disconnected: count,
+  unavailable: count,
+})
   .refine(value => value.total === value.connected + value.disconnected + value.unavailable)
 
-const endpoint = z.object({ host: canonicalText, port: z.number().refine(Number.isInteger).min(1).max(65535) })
+const endpoint = z.object({
+  host: canonicalText,
+  port: z.number().refine(Number.isInteger).min(1).max(65535),
+})
 
 const availability = z.enum(['complete', 'partial'])
 
 const percentage = z.number().min(0).max(100)
 
 const cameraStatus = z.object({
-  availability, activity: z.enum(['idle', 'waiting', 'exposing', 'reading', 'downloading', 'error', 'unknown']),
-  sensorTemperatureC: z.number().optional(), cooling: z.object({ state: z.enum(['on', 'off']), powerPercent: percentage.optional() }).optional(),
+  availability,
+  activity: z.enum(['idle', 'waiting', 'exposing', 'reading', 'downloading', 'error', 'unknown']),
+  sensorTemperatureC: z.number().optional(),
+  cooling: z.object({ state: z.enum(['on', 'off']), powerPercent: percentage.optional() }).optional(),
 })
 
 const telescopeStatus = z.object({
-  availability, activity: z.enum(['idle', 'tracking', 'slewing', 'parked', 'unknown']),
-  tracking: z.enum(['on', 'off', 'unknown']), parking: z.enum(['parked', 'unparked', 'unknown']), home: z.enum(['at-home', 'away', 'unknown']),
+  availability,
+  activity: z.enum(['idle', 'tracking', 'slewing', 'parked', 'unknown']),
+  tracking: z.enum(['on', 'off', 'unknown']),
+  parking: z.enum(['parked', 'unparked', 'unknown']),
+  home: z.enum(['at-home', 'away', 'unknown']),
 })
 
-const focuserStatus = z.object({ availability, activity: z.enum(['idle', 'moving', 'unknown']), position: count.optional(), temperatureC: z.number().optional() })
+const focuserStatus = z.object({
+  availability,
+  activity: z.enum(['idle', 'moving', 'unknown']),
+  position: count.optional(),
+  temperatureC: z.number().optional(),
+})
 
-const filterWheelStatus = z.object({ availability, activity: z.enum(['idle', 'moving', 'unknown']), position: z.number().refine(Number.isInteger).min(-1).optional(), filterName: text.optional() })
+const filterWheelStatus = z.object({
+  availability,
+  activity: z.enum(['idle', 'moving', 'unknown']),
+  position: z.number().refine(Number.isInteger).min(-1).optional(),
+  filterName: text.optional(),
+})
 
-const conditionsStatus = z.object({ availability, activity: z.enum(['reporting', 'unknown']), temperatureC: z.number().optional(), humidityPercent: percentage.optional(), dewPointC: z.number().optional() })
+const conditionsStatus = z.object({
+  availability,
+  activity: z.enum(['reporting', 'unknown']),
+  temperatureC: z.number().optional(),
+  humidityPercent: percentage.optional(),
+  dewPointC: z.number().optional(),
+})
 
 const switchStatus = z.object({
-  availability, activity: z.enum(['reporting', 'unknown']),
-  channels: z.array(z.object({ id: count, name: text, on: z.boolean().optional(), value: z.number().optional() }))
+  availability,
+  activity: z.enum(['reporting', 'unknown']),
+  channels: z.array(z.object({
+    id: count,
+    name: text,
+    on: z.boolean().optional(),
+    value: z.number().optional(),
+  }))
     .refine(channels => new Set(channels.map(channel => channel.id)).size === channels.length).optional(),
 })
 
@@ -56,8 +103,18 @@ const connected = identity.extend({ connection: z.literal('connected'), observed
 const unavailableStatus = z.object({ availability: z.literal('unavailable') })
 
 const device = z.union([
-  identity.extend({ kind: deviceKindSchema, connection: z.literal('disconnected'), observedAt: isoDate, status: unavailableStatus }),
-  identity.extend({ kind: deviceKindSchema, connection: z.literal('unavailable'), observedAt: isoDate.optional(), status: unavailableStatus }),
+  identity.extend({
+    kind: deviceKindSchema,
+    connection: z.literal('disconnected'),
+    observedAt: isoDate,
+    status: unavailableStatus,
+  }),
+  identity.extend({
+    kind: deviceKindSchema,
+    connection: z.literal('unavailable'),
+    observedAt: isoDate.optional(),
+    status: unavailableStatus,
+  }),
   connected.extend({ kind: deviceKindSchema, status: z.object({ availability: z.literal('unsupported') }) }),
   connected.extend({ kind: z.literal('camera'), status: cameraStatus }),
   connected.extend({ kind: z.literal('telescope'), status: telescopeStatus }),
@@ -72,8 +129,16 @@ function allConnectionsUnavailable(summary: RigDeviceConnectionSummary): boolean
 }
 
 export const rigDetailSchema = z.object({
-  id: canonicalText, name: text, state: z.enum(['reachable', 'offline', 'needs-attention']), endpoint,
-  addedAt: isoDate, lastInventoryAt: isoDate, refreshedAt: isoDate, connections, devices: z.array(device), capabilities,
+  id: canonicalText,
+  name: text,
+  state: z.enum(['reachable', 'offline', 'needs-attention']),
+  endpoint,
+  addedAt: isoDate,
+  lastInventoryAt: isoDate,
+  refreshedAt: isoDate,
+  connections,
+  devices: z.array(device),
+  capabilities,
 }).refine(value => {
   const summary = value.connections
 
@@ -86,7 +151,12 @@ export const rigDetailSchema = z.object({
 })
 
 const rig = z.object({
-  id: canonicalText, name: text, reachability: z.enum(['reachable', 'unreachable', 'unknown']), lastSeenAt: isoDate.optional(), connections, capabilities,
+  id: canonicalText,
+  name: text,
+  reachability: z.enum(['reachable', 'unreachable', 'unknown']),
+  lastSeenAt: isoDate.optional(),
+  connections,
+  capabilities,
 }).refine(value => value.reachability === 'reachable' || allConnectionsUnavailable(value.connections))
 
 const home = z.object({ rigs: z.array(rig), refreshedAt: isoDate })

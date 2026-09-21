@@ -52,63 +52,89 @@ export function CaptureCooling({
   const setpoint = Number(requested)
   const validTarget = requested.trim() !== '' && Number.isFinite(setpoint) && setpoint >= -80 && setpoint <= 50
 
-  return <section className="capture-page__cooling" aria-label="Camera cooling">
-    <h3>Cooling</h3>
-    {cooling ? <dl>
-      <div>
-        <dt>Cooler</dt>
-        <dd data-state={cooling.state}>{cooling.state === 'on' ? 'On' : 'Off'}</dd>
-      </div>
-      {cooling.sensorTemperatureC !== undefined && <div>
-        <dt>Sensor</dt>
-        <dd>{formatTemperature(cooling.sensorTemperatureC)}</dd>
-      </div>}
-      {cooling.setpointC !== undefined && <div>
-        <dt>Requested</dt>
-        <dd>{formatTemperature(cooling.setpointC)}</dd>
-      </div>}
-      {cooling.powerPercent !== undefined && <div>
-        <dt>Power</dt>
-        <dd>{formatPower(cooling.powerPercent)}</dd>
-      </div>}
-    </dl> : <p>Cooling state is unavailable. Waiting for a fresh camera reading.</p>}
-    <p>
-      {unconfirmed ? 'Cooler command outcome unknown. Check the camera before assuming it changed.'
-        : pending ? 'Confirming cooler state…'
-          : !cooling ? 'Check the camera before changing cooling.'
-          : cooling.state === 'off'
-            ? 'Cooler is off. A sensor near the requested temperature is not confirmation that cooling is running.'
-            : cooling.powerPercent !== undefined
-              ? 'Cooler is on. Power shows cooling effort, not a finished temperature.'
-              : 'Cooler is on. Sensor temperature is live; it is not a substitute for the cooler switch.'}
-    </p>
-    {cooling && <><Checkbox
-      label="Cooler on"
-      description="Vela does not turn this on by itself."
-      checked={cooling.state === 'on'}
-      disabled={disabled}
-      onChange={event => onCooler(event.target.checked)}
-    />
-    {cooling.canSetTemperature && <form onSubmit={event => {
-      event.preventDefault()
+  let description
 
-      if (validTarget) onSetpoint(setpoint)
-    }}>
-      <Input
-        label="Target temperature · °C"
-        type="number"
-        min="-80"
-        max="50"
-        step="0.1"
-        value={requested}
-        disabled={disabled}
-        invalid={!validTarget}
-        message={validTarget ? 'Sets the requested temperature only. Turn the cooler on separately.' : 'Choose −80 to 50 °C.'}
-        onChange={event => setTarget(event.target.value)}
-      />
-      <Button type="submit" disabled={disabled || !validTarget}>{pending ? 'Confirming…' : 'Set temperature'}</Button>
-    </form>}</>}
-    {error && <p role="status">{error}</p>}
-    {unconfirmed && onCheck && <Button type="button" disabled={pending || checking || runActive} onClick={onCheck}>Check camera cooling</Button>}
-  </section>
+  if (unconfirmed) description = 'Cooler command outcome unknown. Check the camera before assuming it changed.'
+  else if (pending) description = 'Confirming cooler state…'
+  else if (!cooling) description = 'Check the camera before changing cooling.'
+  else if (cooling.state === 'off') {
+    description = 'Cooler is off. A sensor near the requested temperature is not confirmation that cooling is running.'
+  } else if (cooling.powerPercent !== undefined) {
+    description = 'Cooler is on. Power shows cooling effort, not a finished temperature.'
+  } else {
+    description = 'Cooler is on. Sensor temperature is live; it is not a substitute for the cooler switch.'
+  }
+
+  return (
+    <section className="capture-page__cooling" aria-label="Camera cooling">
+      <h3>Cooling</h3>
+      {cooling ? (
+        <dl>
+          <div>
+            <dt>Cooler</dt>
+            <dd data-state={cooling.state}>{cooling.state === 'on' ? 'On' : 'Off'}</dd>
+          </div>
+          {cooling.sensorTemperatureC !== undefined && (
+            <div>
+              <dt>Sensor</dt>
+              <dd>{formatTemperature(cooling.sensorTemperatureC)}</dd>
+            </div>
+          )}
+          {cooling.setpointC !== undefined && (
+            <div>
+              <dt>Requested</dt>
+              <dd>{formatTemperature(cooling.setpointC)}</dd>
+            </div>
+          )}
+          {cooling.powerPercent !== undefined && (
+            <div>
+              <dt>Power</dt>
+              <dd>{formatPower(cooling.powerPercent)}</dd>
+            </div>
+          )}
+        </dl>
+      ) : <p>Cooling state is unavailable. Waiting for a fresh camera reading.</p>}
+      <p>{description}</p>
+      {cooling && (
+        <>
+          <Checkbox
+            label="Cooler on"
+            description="Vela does not turn this on by itself."
+            checked={cooling.state === 'on'}
+            disabled={disabled}
+            onChange={event => onCooler(event.target.checked)}
+          />
+          {cooling.canSetTemperature && (
+            <form onSubmit={event => {
+              event.preventDefault()
+
+              if (validTarget) onSetpoint(setpoint)
+            }}>
+              <Input
+                label="Target temperature · °C"
+                type="number"
+                min="-80"
+                max="50"
+                step="0.1"
+                value={requested}
+                disabled={disabled}
+                invalid={!validTarget}
+                message={validTarget ? 'Sets the requested temperature only. Turn the cooler on separately.' : 'Choose −80 to 50 °C.'}
+                onChange={event => setTarget(event.target.value)}
+              />
+              <Button type="submit" disabled={disabled || !validTarget}>
+                {pending ? 'Confirming…' : 'Set temperature'}
+              </Button>
+            </form>
+          )}
+        </>
+      )}
+      {error && <p role="status">{error}</p>}
+      {unconfirmed && onCheck && (
+        <Button type="button" disabled={pending || checking || runActive} onClick={onCheck}>
+          Check camera cooling
+        </Button>
+      )}
+    </section>
+  )
 }

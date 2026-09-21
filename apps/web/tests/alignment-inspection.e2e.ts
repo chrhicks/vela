@@ -2,7 +2,10 @@ import { expect, test } from '@playwright/test'
 import type { AlignmentView } from '@vela/model/web'
 import { fileURLToPath } from 'node:url'
 
-const imagePath = fileURLToPath(new URL('../../../packages/ui/src/components/fixtures/capture-star-field.png', import.meta.url))
+const imagePath = fileURLToPath(new URL(
+  '../../../packages/ui/src/components/fixtures/capture-star-field.png',
+  import.meta.url,
+))
 
 const capturedAt = '2026-09-21T01:00:00Z'
 
@@ -10,13 +13,33 @@ const imageUrl = '/api/alignment-inspection-original.png'
 
 function initialView(): AlignmentView {
   return {
-    rigId: 'rig-1', rigName: 'Askar FRA 400 · inspection fixture', mode: 'physical',
-    enabled: true, unavailableReason: null, phase: 'adjusting', activity: 'waiting', active: true,
-    position: 3, solvedPositions: 3, exposureSeconds: 2, exposureStartedAt: null,
-    measuredAt: capturedAt, warning: null, error: null,
-    measurement: { imageUrl, imageWidth: 1600, imageHeight: 1200, fieldHeightDegrees: 2,
-      capturedAtSource: 'server-estimate', totalArcsec: 503, azimuthArcsec: -440, altitudeArcsec: -244,
-      targetX: 726.1667, targetY: 558.8333 },
+    rigId: 'rig-1',
+    rigName: 'Askar FRA 400 · inspection fixture',
+    mode: 'physical',
+    enabled: true,
+    unavailableReason: null,
+    phase: 'adjusting',
+    activity: 'waiting',
+    active: true,
+    position: 3,
+    solvedPositions: 3,
+    exposureSeconds: 2,
+    exposureStartedAt: null,
+    measuredAt: capturedAt,
+    warning: null,
+    error: null,
+    measurement: {
+      imageUrl,
+      imageWidth: 1600,
+      imageHeight: 1200,
+      fieldHeightDegrees: 2,
+      capturedAtSource: 'server-estimate',
+      totalArcsec: 503,
+      azimuthArcsec: -440,
+      altitudeArcsec: -244,
+      targetX: 726.1667,
+      targetY: 558.8333,
+    },
   }
 }
 
@@ -42,8 +65,15 @@ for (const width of [390, 1040]) {
     await page.screenshot({ path: `test-results/alignment-production-${width}-large.png`, fullPage: true })
 
     for (const [name, targetX, targetY] of [['near', 801.3333, 601], ['outside', -300, 599.5]] as const) {
-      state.measurement = { ...state.measurement!, targetX, targetY, imageUrl: `/api/alignment-inspection-${name}.png`,
-        totalArcsec: name === 'near' ? 14 : 6597, azimuthArcsec: name === 'near' ? -11 : -6597, altitudeArcsec: name === 'near' ? -9 : 0 }
+      state.measurement = {
+        ...state.measurement!,
+        targetX,
+        targetY,
+        imageUrl: `/api/alignment-inspection-${name}.png`,
+        totalArcsec: name === 'near' ? 14 : 6597,
+        azimuthArcsec: name === 'near' ? -11 : -6597,
+        altitudeArcsec: name === 'near' ? -9 : 0,
+      }
       await expect(inspection.locator('[data-marker="target"] circle')).toHaveAttribute('cx', String(targetX))
       await expect(inspection.getByRole('button', { name: 'Fit both', exact: true })).toHaveAttribute('aria-pressed', 'true')
       expect(await inspection.getByRole('img').evaluate(element => {
@@ -51,7 +81,9 @@ for (const width of [390, 1040]) {
 
         const box = element.viewBox.baseVal
 
-        return [...element.querySelectorAll('circle')].every(marker => marker.cx.baseVal.value > box.x && marker.cx.baseVal.value < box.x + box.width)
+        return [...element.querySelectorAll('circle')].every(marker =>
+          marker.cx.baseVal.value > box.x && marker.cx.baseVal.value < box.x + box.width,
+        )
       })).toBe(true)
       await page.screenshot({ path: `test-results/alignment-production-${width}-${name}.png`, fullPage: true })
     }
@@ -97,9 +129,23 @@ for (const width of [390, 1040]) {
     await page.setViewportSize({ width, height: 1100 })
     await page.clock.setFixedTime(new Date('2026-09-21T01:00:08Z'))
     const state = initialView()
-    Object.assign(state, { phase: 'baseline', measurement: null, measuredAt: null, position: 3,
-      solvedPositions: 2, warning: 'No plate-solve solution', activity: 'exposing',
-      preview: { imageUrl, imageWidth: 1600, imageHeight: 1200, capturedAt, capturedAtSource: 'camera', position: 3 } })
+    Object.assign(state, {
+      phase: 'baseline',
+      measurement: null,
+      measuredAt: null,
+      position: 3,
+      solvedPositions: 2,
+      warning: 'No plate-solve solution',
+      activity: 'exposing',
+      preview: {
+        imageUrl,
+        imageWidth: 1600,
+        imageHeight: 1200,
+        capturedAt,
+        capturedAtSource: 'camera',
+        position: 3,
+      },
+    })
     const writes: string[] = []
     await page.route('**/api/**', route => {
       if (route.request().method() !== 'GET') writes.push(route.request().url())

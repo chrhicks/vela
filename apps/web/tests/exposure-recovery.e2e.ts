@@ -7,24 +7,66 @@ const capturedAt = '2026-09-21T01:00:00.000Z'
 
 const imageUrl = '/api/rigs/rig-1/capture/images/retained'
 
-const preview = readFileSync(new URL('../../../packages/ui/src/components/fixtures/capture-star-field.png', import.meta.url))
+const preview = readFileSync(new URL(
+  '../../../packages/ui/src/components/fixtures/capture-star-field.png',
+  import.meta.url,
+))
 
 const capture: CaptureView = {
-  rigId: 'rig-1', rigName: 'Recovery simulator', camera: { name: 'Simulator Camera' }, enabled: true,
-  unavailableReason: null, phase: 'exposing', active: true, captureReadState: 'current',
-  exposureSeconds: 30, elapsedSeconds: 8, repeat: true, completedCount: 7,
-  saveFrames: false, savedImageCount: 0, error: null, cooling: null,
-  latestImage: { id: 'retained', saved: false, imageUrl, width: 1600, height: 1200,
-    exposureSeconds: 2, capturedAt, receivedAt: '2026-09-21T01:00:03.000Z', cameraName: 'Simulator Camera',
-    color: 'mono', statistics: { detectedStars: 12, medianHfrPixels: 2.35 } },
+  rigId: 'rig-1',
+  rigName: 'Recovery simulator',
+  camera: { name: 'Simulator Camera' },
+  enabled: true,
+  unavailableReason: null,
+  phase: 'exposing',
+  active: true,
+  captureReadState: 'current',
+  exposureSeconds: 30,
+  elapsedSeconds: 8,
+  repeat: true,
+  completedCount: 7,
+  saveFrames: false,
+  savedImageCount: 0,
+  error: null,
+  cooling: null,
+  latestImage: {
+    id: 'retained',
+    saved: false,
+    imageUrl,
+    width: 1600,
+    height: 1200,
+    exposureSeconds: 2,
+    capturedAt,
+    receivedAt: '2026-09-21T01:00:03.000Z',
+    cameraName: 'Simulator Camera',
+    color: 'mono',
+    statistics: { detectedStars: 12, medianHfrPixels: 2.35 },
+  },
 }
 
 const autofocus: AutofocusView = {
-  rigId: 'rig-1', rigName: 'Recovery simulator', enabled: true, unavailableReason: null,
-  cameraName: 'Simulator Camera', focuserName: 'Simulator Focuser', phase: 'walking', activity: 'exposing', active: true,
-  captureReadState: 'current', startPosition: 32842, currentPosition: 33042, maxStep: 60000, stepSize: 50, offsetSteps: 4,
-  exposureSeconds: 2, elapsedSeconds: .4, exposureStartedAt: capturedAt,
-  samples: [{ position: 33042, detectedStars: 12, hfrPixels: 5.1, capturedAt }], fit: null, restoredStart: false, error: null,
+  rigId: 'rig-1',
+  rigName: 'Recovery simulator',
+  enabled: true,
+  unavailableReason: null,
+  cameraName: 'Simulator Camera',
+  focuserName: 'Simulator Focuser',
+  phase: 'walking',
+  activity: 'exposing',
+  active: true,
+  captureReadState: 'current',
+  startPosition: 32842,
+  currentPosition: 33042,
+  maxStep: 60000,
+  stepSize: 50,
+  offsetSteps: 4,
+  exposureSeconds: 2,
+  elapsedSeconds: .4,
+  exposureStartedAt: capturedAt,
+  samples: [{ position: 33042, detectedStars: 12, hfrPixels: 5.1, capturedAt }],
+  fit: null,
+  restoredStart: false,
+  error: null,
 }
 
 test.beforeEach(async ({ page }) => {
@@ -74,8 +116,15 @@ test('an uncertain autofocus Stop retains priority until polling confirms restor
   await expect(page.locator('.vela-af-activity__spinner')).toHaveCount(0)
   await expect(page.getByText('now', { exact: true })).toHaveCount(0)
   await expect(page.locator('.vela-af-readout time')).toHaveAttribute('datetime', capturedAt)
-  state = { ...state, active: false, phase: 'stopped', activity: 'idle', captureReadState: 'current',
-    currentPosition: state.startPosition, restoredStart: true }
+  state = {
+    ...state,
+    active: false,
+    phase: 'stopped',
+    activity: 'idle',
+    captureReadState: 'current',
+    currentPosition: state.startPosition,
+    restoredStart: true,
+  }
   await expect(page.locator('.vela-af-notice')).toContainText('Start position restored')
   await expect(page.locator('.vela-af-heading')).toContainText('Restored')
   await expect(page.locator('.vela-af-heading')).not.toContainText('Confirmation needed')
@@ -93,9 +142,12 @@ for (const width of [1280, 390]) {
     let offline = false
     const commands: string[] = []
     await page.route('**/api/web/rigs/rig-1/capture', route => offline ? route.abort() : route.fulfill({ json: state }))
-    await page.route('**/api/web/navigation', route => offline ? route.abort() : route.fulfill({ json: {
-      rigs: [{ id: state.rigId, name: state.rigName }], captures: [state],
-    } }))
+    await page.route('**/api/web/navigation', route => offline ? route.abort() : route.fulfill({
+      json: {
+        rigs: [{ id: state.rigId, name: state.rigName }],
+        captures: [state],
+      },
+    }))
     await page.route('**/api/web/rigs/rig-1/observe', route => route.fulfill({ json: observation('complete') }))
     await page.route('**/api/rigs/rig-1/capture/*', route => {
       commands.push(route.request().url().split('/').at(-1)!)
@@ -148,7 +200,13 @@ for (const width of [1280, 390]) {
     await expect(page.locator('.capture-page__warning')).toContainText('Command outcome unknown')
     await expect(page.locator('.capture-page__heading')).toContainText('Confirmation needed')
     await expect(progress.getByRole('progressbar')).toHaveCount(0)
-    state = { ...state, captureReadState: 'current', active: false, phase: 'failed', error: 'Camera stop could not be confirmed. Check the camera before starting another run.' }
+    state = {
+      ...state,
+      captureReadState: 'current',
+      active: false,
+      phase: 'failed',
+      error: 'Camera stop could not be confirmed. Check the camera before starting another run.',
+    }
     await expect(page.getByRole('button', { name: 'Start run', exact: true })).toBeDisabled()
     await expect(image.getByRole('img')).toHaveAttribute('src', imageUrl)
     await page.getByRole('button', { name: 'Check capture state', exact: true }).click()
@@ -159,26 +217,93 @@ for (const width of [1280, 390]) {
   test(`framing retries keep the solved footprint/history and resume without claiming centered at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 1000 })
     await page.clock.setFixedTime(new Date(capturedAt))
-    const target: TargetView = { id: 'm31', name: 'Andromeda Galaxy', catalog: 'M31', kind: 'Galaxy', raDegrees: 10.6847, decDegrees: 41.269, sizeArcminutes: 178, thumbnailUrl: '/api/targets/m31/thumbnail', sky: null }
+
+    const target: TargetView = {
+      id: 'm31',
+      name: 'Andromeda Galaxy',
+      catalog: 'M31',
+      kind: 'Galaxy',
+      raDegrees: 10.6847,
+      decDegrees: 41.269,
+      sizeArcminutes: 178,
+      thumbnailUrl: '/api/targets/m31/thumbnail',
+      sky: null,
+    }
 
     let state: FramingView = {
-      rigId: 'rig-1', rigName: 'Recovery simulator', enabled: true, unavailableReason: null, observedAt: capturedAt,
-      phase: 'downloading', active: true, captureReadState: 'current', focalLengthMm: 400, exposureSeconds: 20,
-      camera: { name: 'Simulator Camera', width: 3000, height: 2000, fieldWidthDegrees: 3, fieldHeightDegrees: 2 },
-      desired: target, targetId: target.id, error: null, canCenter: false, checkCurrent: false, pointingSide: 'east',
-      actual: { ...target, checkId: 'last-check', capturedAt, rotationDegrees: 32, offsetArcminutes: 2.4,
-        corners: [{ raDegrees: 9, decDegrees: 40 }, { raDegrees: 11, decDegrees: 40 }, { raDegrees: 11, decDegrees: 42 }, { raDegrees: 9, decDegrees: 42 }] },
-      centering: { correction: 1, maxCorrections: 4, toleranceArcminutes: .5, outcome: 'working', measurements: [
-        { correction: 0, checkId: 'last-check', capturedAt, rotationDegrees: 32, offsetArcminutes: 2.4, pointingSide: 'east', pointingSideChanged: false, trend: 'starting' },
-      ] },
+      rigId: 'rig-1',
+      rigName: 'Recovery simulator',
+      enabled: true,
+      unavailableReason: null,
+      observedAt: capturedAt,
+      phase: 'downloading',
+      active: true,
+      captureReadState: 'current',
+      focalLengthMm: 400,
+      exposureSeconds: 20,
+      camera: {
+        name: 'Simulator Camera',
+        width: 3000,
+        height: 2000,
+        fieldWidthDegrees: 3,
+        fieldHeightDegrees: 2,
+      },
+      desired: target,
+      targetId: target.id,
+      error: null,
+      canCenter: false,
+      checkCurrent: false,
+      pointingSide: 'east',
+      actual: {
+        ...target,
+        checkId: 'last-check',
+        capturedAt,
+        rotationDegrees: 32,
+        offsetArcminutes: 2.4,
+        corners: [
+          { raDegrees: 9, decDegrees: 40 },
+          { raDegrees: 11, decDegrees: 40 },
+          { raDegrees: 11, decDegrees: 42 },
+          { raDegrees: 9, decDegrees: 42 },
+        ],
+      },
+      centering: {
+        correction: 1,
+        maxCorrections: 4,
+        toleranceArcminutes: .5,
+        outcome: 'working',
+        measurements: [
+          {
+            correction: 0,
+            checkId: 'last-check',
+            capturedAt,
+            rotationDegrees: 32,
+            offsetArcminutes: 2.4,
+            pointingSide: 'east',
+            pointingSideChanged: false,
+            trend: 'starting',
+          },
+        ],
+      },
     }
 
     let offline = false
     const commands: string[] = []
     await page.route('**/api/web/rigs/rig-1/targets/m31', route => route.fulfill({ json: target }))
     await page.route('**/api/survey/dss2/**', route => route.request().url().endsWith('/properties')
-      ? route.fulfill({ contentType: 'text/plain', body: 'dataproduct_type=image\nhips_order=9\nhips_tile_width=512\nhips_frame=equatorial\nhips_tile_format=jpeg\n' })
-      : route.fulfill({ contentType: 'image/jpeg', body: readFileSync(new URL(route.request().url().endsWith('Allsky.jpg') ? './fixtures/survey-allsky.jpg' : './fixtures/survey-tile.jpg', import.meta.url)) }))
+      ? route.fulfill({
+        contentType: 'text/plain',
+        body: 'dataproduct_type=image\nhips_order=9\nhips_tile_width=512\nhips_frame=equatorial\nhips_tile_format=jpeg\n',
+      })
+      : route.fulfill({
+        contentType: 'image/jpeg',
+        body: readFileSync(new URL(
+          route.request().url().endsWith('Allsky.jpg')
+            ? './fixtures/survey-allsky.jpg'
+            : './fixtures/survey-tile.jpg',
+          import.meta.url,
+        )),
+      }))
     await page.route('**/api/web/rigs/rig-1/framing', route => offline ? route.abort() : route.fulfill({ json: state }))
     await page.route('**/api/rigs/rig-1/framing/*', route => {
       commands.push(route.request().url().split('/').at(-1)!)
@@ -195,7 +320,9 @@ for (const width of [1280, 390]) {
       if (!(element instanceof SVGPolygonElement) || !element.ownerSVGElement) return false
       const bounds = element.ownerSVGElement.getBoundingClientRect()
 
-      return Array.from(element.points).every(point => point.x >= 0 && point.x <= bounds.width && point.y >= 0 && point.y <= bounds.height)
+      return Array.from(element.points).every(point =>
+        point.x >= 0 && point.x <= bounds.width && point.y >= 0 && point.y <= bounds.height,
+      )
     })).toBe(true)
     const corners = await footprint.getAttribute('points')
     const measurementTime = page.getByText(/^Test exposure /)
@@ -271,7 +398,13 @@ for (const width of [1280, 390]) {
     await expect(page.locator('.vela-af-heading')).toContainText('Awaiting camera')
     await page.getByRole('button', { name: 'Stop and restore start' }).click()
     await expect(page.locator('.vela-af-activity')).toContainText('Restoring start 32842')
-    state = { ...state, phase: 'failed', active: false, activity: 'idle', error: 'The focuser did not confirm return to the start position. Vela did not repeat the move.' }
+    state = {
+      ...state,
+      phase: 'failed',
+      active: false,
+      activity: 'idle',
+      error: 'The focuser did not confirm return to the start position. Vela did not repeat the move.',
+    }
     await expect(page.locator('.vela-af-notice')).toContainText('Start position was not restored')
     await expect(sample).toHaveCount(1)
     await expect(page.locator('.vela-af-readout time')).toHaveAttribute('datetime', capturedAt)
@@ -283,17 +416,43 @@ for (const width of [1280, 390]) {
     await page.clock.setFixedTime(new Date('2026-09-21T01:00:08.000Z'))
 
     let state: AlignmentView = {
-      rigId: 'rig-1', rigName: 'Recovery simulator', mode: 'offline', enabled: true, unavailableReason: null,
-      phase: 'baseline', activity: 'exposing', active: true, position: 2, solvedPositions: 1,
-      exposureSeconds: 20, exposureStartedAt: capturedAt, measuredAt: null, measurement: null, error: null, warning: null,
-      preview: { imageUrl, imageWidth: 1600, imageHeight: 1200, capturedAt, position: 1 },
+      rigId: 'rig-1',
+      rigName: 'Recovery simulator',
+      mode: 'offline',
+      enabled: true,
+      unavailableReason: null,
+      phase: 'baseline',
+      activity: 'exposing',
+      active: true,
+      position: 2,
+      solvedPositions: 1,
+      exposureSeconds: 20,
+      exposureStartedAt: capturedAt,
+      measuredAt: null,
+      measurement: null,
+      error: null,
+      warning: null,
+      preview: {
+        imageUrl,
+        imageWidth: 1600,
+        imageHeight: 1200,
+        capturedAt,
+        position: 1,
+      },
     }
 
     const commands: string[] = []
     await page.route('**/api/web/rigs/rig-1/alignment', route => route.fulfill({ json: state }))
     await page.route('**/api/rigs/rig-1/alignment/*', route => {
       commands.push(route.request().url().split('/').at(-1)!)
-      state = { ...state, phase: 'failed', active: false, activity: 'idle', warning: null, error: 'Camera stop could not be confirmed. The command was not repeated.' }
+      state = {
+        ...state,
+        phase: 'failed',
+        active: false,
+        activity: 'idle',
+        warning: null,
+        error: 'Camera stop could not be confirmed. The command was not repeated.',
+      }
 
       return route.fulfill({ json: state })
     })
@@ -301,7 +460,12 @@ for (const width of [1280, 390]) {
     await expect(page.getByRole('progressbar')).toBeVisible()
     const baseline = page.getByRole('img', { name: 'Latest camera exposure at baseline position 1' })
     await expect(baseline).toBeVisible()
-    state = { ...state, activity: 'retrying', exposureStartedAt: null, warning: 'Device connection interrupted. Retrying automatically.' }
+    state = {
+      ...state,
+      activity: 'retrying',
+      exposureStartedAt: null,
+      warning: 'Device connection interrupted. Retrying automatically.',
+    }
     await expect(page.getByRole('alert')).toContainText('Any pending exposure is kept; it is not restarted while reads retry')
     await expect(page.getByRole('progressbar')).toBeHidden()
     await expect(page.locator('.vela-polar-activity__spinner')).toBeHidden()
@@ -314,10 +478,25 @@ for (const width of [1280, 390]) {
     state = { ...state, activity: 'solving', warning: null }
     await expect(page.locator('.vela-polar-activity')).toContainText('Plate-solving')
     await expect(page.locator('time')).toHaveAttribute('datetime', capturedAt)
-    state = { ...state, phase: 'adjusting', activity: 'retrying', solvedPositions: 3, measuredAt: capturedAt,
+    state = {
+      ...state,
+      phase: 'adjusting',
+      activity: 'retrying',
+      solvedPositions: 3,
+      measuredAt: capturedAt,
       warning: 'Device connection interrupted. Retrying automatically.',
-      measurement: { altitudeArcsec: 9, azimuthArcsec: 11, totalArcsec: 14, targetX: 310, targetY: 190,
-        imageWidth: 1600, imageHeight: 1200, fieldHeightDegrees: 1, imageUrl } }
+      measurement: {
+        altitudeArcsec: 9,
+        azimuthArcsec: 11,
+        totalArcsec: 14,
+        targetX: 310,
+        targetY: 190,
+        imageWidth: 1600,
+        imageHeight: 1200,
+        fieldHeightDegrees: 1,
+        imageUrl,
+      },
+    }
     await expect(page.locator('.vela-polar-total')).toContainText('14″')
     await expect(page.getByText(/Pause adjustments until a fresh measurement arrives/)).toBeVisible()
     await expect(page.getByRole('img', { name: /alignment target/ })).toBeVisible()
