@@ -18,7 +18,9 @@ async function request<T>(url: string, schema: z.ZodType<T>, init?: RequestInit)
 
   if (!response.ok) {
     const failure = failureResponse.safeParse(value)
-    throw new Error(failure.success ? failure.data.error ?? `Request failed: ${response.status}` : `Request failed: ${response.status}`)
+    throw new Error(failure.success
+      ? failure.data.error ?? `Request failed: ${response.status}`
+      : `Request failed: ${response.status}`)
   }
 
   return schema.parse(value)

@@ -6,8 +6,12 @@ import { corpus } from './corpus.js'
 export function previewColorFixtures(workshopRoot: string): Plugin {
   const files = new Set(['manifest.json'])
 
-  for (const fixture of corpus) for (const treatment of ['current', 'neutral']) for (const scale of ['native', 'fit']) {
-    files.add(`${fixture.key}-${treatment}-${scale}.png`)
+  for (const fixture of corpus) {
+    for (const treatment of ['current', 'neutral']) {
+      for (const scale of ['native', 'fit']) {
+        files.add(`${fixture.key}-${treatment}-${scale}.png`)
+      }
+    }
   }
 
   return {

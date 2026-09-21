@@ -84,7 +84,11 @@ export function makeProfile(id: string, name: string, overrides: Partial<ThemePa
   }
 }
 
-const referenceTokenSchema = z.templateLiteral([z.enum(RAMP_NAMES), '-', z.enum(['50', '100', '200', '300', '400', '500', '600', '700', '800', '900', '950'])])
+const referenceTokenSchema = z.templateLiteral([
+  z.enum(RAMP_NAMES),
+  '-',
+  z.enum(['50', '100', '200', '300', '400', '500', '600', '700', '800', '900', '950'])
+])
 
 const semanticMappingSchema = z.object({
   canvas: referenceTokenSchema,

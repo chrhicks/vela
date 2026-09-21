@@ -13,7 +13,12 @@ export const specimen: ComponentSpecimen = {
     invalid: { type: 'boolean', label: 'Invalid' },
     disabled: { type: 'boolean', label: 'Disabled' },
   },
-  defaultProps: { label: 'Right ascension', placeholder: '20h 58m 17s', invalid: false, disabled: false },
+  defaultProps: {
+    label: 'Right ascension',
+    placeholder: '20h 58m 17s',
+    invalid: false,
+    disabled: false
+  },
   render: (props) => (
     <div style={{ width: 'min(100%, 22rem)' }}>
       <Input

@@ -6,14 +6,22 @@ export interface CheckboxProps extends Omit<InputHTMLAttributes<HTMLInputElement
   description?: ReactNode
 }
 
-export function Checkbox({ label, description, className = '', id, ...props }: CheckboxProps) {
+export function Checkbox({
+  label,
+  description,
+  className = '',
+  id,
+  ...props
+}: CheckboxProps) {
   const generatedId = useId()
   const checkboxId = id ?? `vela-checkbox-${generatedId.replace(/:/g, '')}`
 
   return (
     <label className={`vela-checkbox ${className}`.trim()} htmlFor={checkboxId}>
       <input {...props} id={checkboxId} type="checkbox" />
-      <span className="vela-checkbox__control"><i /></span>
+      <span className="vela-checkbox__control">
+        <i />
+      </span>
       <span className="vela-checkbox__copy">
         <strong>{label}</strong>
         {description ? <small>{description}</small> : null}

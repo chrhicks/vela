@@ -13,7 +13,12 @@ export const specimen: ComponentSpecimen = {
     disabled: { type: 'boolean', label: 'Disabled' },
     description: { type: 'boolean', label: 'Description' },
   },
-  defaultProps: { label: 'Warm camera when complete', checked: true, disabled: false, description: true },
+  defaultProps: {
+    label: 'Warm camera when complete',
+    checked: true,
+    disabled: false,
+    description: true
+  },
   render: (props, onPropsChange) => (
     <Checkbox
       checked={Boolean(props.checked)}

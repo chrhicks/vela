@@ -14,9 +14,18 @@ export const specimen: ComponentSpecimen = {
     size: { type: 'select', label: 'Size', options: ['small', 'medium', 'large'] },
     disabled: { type: 'boolean', label: 'Disabled' },
   },
-  defaultProps: { label: 'Start capture', tone: 'accent', size: 'medium', disabled: false },
+  defaultProps: {
+    label: 'Start capture',
+    tone: 'accent',
+    size: 'medium',
+    disabled: false
+  },
   render: (props) => (
-    <Button disabled={Boolean(props.disabled)} size={z.enum(['small', 'medium', 'large']).parse(props.size)} tone={z.enum(['neutral', 'accent', 'quiet']).parse(props.tone)}>
+    <Button
+      disabled={Boolean(props.disabled)}
+      size={z.enum(['small', 'medium', 'large']).parse(props.size)}
+      tone={z.enum(['neutral', 'accent', 'quiet']).parse(props.tone)}
+    >
       {String(props.label)}
     </Button>
   ),

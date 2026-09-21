@@ -24,7 +24,12 @@ export const specimen: ComponentSpecimen = {
     size: { type: 'select', label: 'Size', options: ['small', 'medium', 'large'] },
     disabled: { type: 'boolean', label: 'Disabled' },
   },
-  defaultProps: { label: 'Start exposure', tone: 'neutral', size: 'medium', disabled: false },
+  defaultProps: {
+    label: 'Start exposure',
+    tone: 'neutral',
+    size: 'medium',
+    disabled: false
+  },
   render: (props) => (
     <IconButton
       disabled={Boolean(props.disabled)}

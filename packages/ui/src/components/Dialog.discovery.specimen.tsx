@@ -61,55 +61,79 @@ function DiscoveryDialogPreview({ props, onPropsChange }: PreviewProps) {
     switch (scenario) {
       case 'scan-failed':
         return (
-              <div className="vela-discovery-message" data-tone="danger">
-                <strong>Network scan could not start</strong>
-                <p>Vela could not use this computer’s network interfaces. You can retry or enter the server address manually.</p>
-                <Button onClick={() => update({ view: 'manual' })} size="small">Enter address</Button>
-              </div>
-            )
+          <div className="vela-discovery-message" data-tone="danger">
+            <strong>Network scan could not start</strong>
+            <p>Vela could not use this computer’s network interfaces. You can retry or enter the server address manually.</p>
+            <Button onClick={() => update({ view: 'manual' })} size="small">Enter address</Button>
+          </div>
+        )
       case 'empty':
         return (
-              <div className="vela-discovery-message">
-                <strong>No Alpaca servers found</strong>
-                <p>Confirm the server is running and that this device is on the same network, then scan again.</p>
-                <Button onClick={() => update({ view: 'manual' })} size="small">Enter address</Button>
-              </div>
-            )
+          <div className="vela-discovery-message">
+            <strong>No Alpaca servers found</strong>
+            <p>Confirm the server is running and that this device is on the same network, then scan again.</p>
+            <Button onClick={() => update({ view: 'manual' })} size="small">Enter address</Button>
+          </div>
+        )
       default:
         return (
-              <>
-                <div className="vela-discovery-results__summary"><span>{scenario === 'single' ? '1 server found' : '2 servers found'}</span><small>Select one to continue</small></div>
-                <button
-                  aria-pressed={selected}
-                  className="vela-discovery-candidate"
-                  data-selected={selected}
-                  onClick={() => update({ selected: !selected })}
-                  type="button"
-                >
-                  <span className="vela-discovery-candidate__mark"><TelescopeMark /></span>
-                  <span className="vela-discovery-candidate__copy">
-                    <span><strong>ASCOM Remote</strong><Badge size="small" tone="positive">Eligible</Badge></span>
-                    <small>192.168.4.104:11111 · 6 devices</small>
-                    <span className="vela-discovery-candidate__kinds"><i>Mount</i><i>2 cameras</i><i>Focuser</i><i>+2</i></span>
-                  </span>
-                  <span className="vela-discovery-candidate__select">{selected ? 'Selected' : 'Select'}</span>
-                </button>
+          <>
+            <div className="vela-discovery-results__summary">
+              <span>{scenario === 'single' ? '1 server found' : '2 servers found'}</span>
+              <small>Select one to continue</small>
+            </div>
+            <button
+              aria-pressed={selected}
+              className="vela-discovery-candidate"
+              data-selected={selected}
+              onClick={() => update({ selected: !selected })}
+              type="button"
+            >
+              <span className="vela-discovery-candidate__mark">
+                <TelescopeMark />
+              </span>
+              <span className="vela-discovery-candidate__copy">
+                <span>
+                  <strong>ASCOM Remote</strong>
+                  <Badge size="small" tone="positive">Eligible</Badge>
+                </span>
+                <small>192.168.4.104:11111 · 6 devices</small>
+                <span className="vela-discovery-candidate__kinds">
+                  <i>Mount</i>
+                  <i>2 cameras</i>
+                  <i>Focuser</i>
+                  <i>+2</i>
+                </span>
+              </span>
+              <span className="vela-discovery-candidate__select">{selected ? 'Selected' : 'Select'}</span>
+            </button>
 
-                {scenario === 'mixed' ? (
-                  <>
-                    <article className="vela-discovery-candidate" data-disabled="true">
-                      <span className="vela-discovery-candidate__mark"><TelescopeMark /></span>
-                      <span className="vela-discovery-candidate__copy">
-                        <span><strong>Legacy Alpaca</strong><Badge size="small" tone="warning">Unavailable</Badge></span>
-                        <small>192.168.4.120:32323 · 1 device</small>
-                        <p>This server did not provide a stable device ID, so Vela cannot add it safely.</p>
-                      </span>
-                    </article>
-                    <div className="vela-discovery-partial"><span>!</span><p><strong>One server could not be inspected</strong><small>192.168.4.121:11111 did not respond.</small></p></div>
-                  </>
-                ) : null}
+            {scenario === 'mixed' ? (
+              <>
+                <article className="vela-discovery-candidate" data-disabled="true">
+                  <span className="vela-discovery-candidate__mark">
+                    <TelescopeMark />
+                  </span>
+                  <span className="vela-discovery-candidate__copy">
+                    <span>
+                      <strong>Legacy Alpaca</strong>
+                      <Badge size="small" tone="warning">Unavailable</Badge>
+                    </span>
+                    <small>192.168.4.120:32323 · 1 device</small>
+                    <p>This server did not provide a stable device ID, so Vela cannot add it safely.</p>
+                  </span>
+                </article>
+                <div className="vela-discovery-partial">
+                  <span>!</span>
+                  <p>
+                    <strong>One server could not be inspected</strong>
+                    <small>192.168.4.121:11111 did not respond.</small>
+                  </p>
+                </div>
               </>
-            )
+            ) : null}
+          </>
+        )
     }
   }
 
@@ -211,7 +235,10 @@ function DiscoveryDialogPreview({ props, onPropsChange }: PreviewProps) {
   return (
     <div className="vela-discovery-demo">
       <header className="vela-discovery-shell__header">
-        <div className="vela-discovery-shell__brand"><span>V</span><strong>Vela</strong></div>
+        <div className="vela-discovery-shell__brand">
+          <span>V</span>
+          <strong>Vela</strong>
+        </div>
         <small>Observatory control</small>
       </header>
 
@@ -219,7 +246,11 @@ function DiscoveryDialogPreview({ props, onPropsChange }: PreviewProps) {
         {view === 'complete' ? (
           <section className="vela-discovery-complete">
             <div className="vela-discovery-complete__heading">
-              <div><small>YOUR RIG</small><h2>{rigName.trim() || 'Unnamed rig'}</h2><p>ASCOM Remote · 6 devices</p></div>
+              <div>
+                <small>YOUR RIG</small>
+                <h2>{rigName.trim() || 'Unnamed rig'}</h2>
+                <p>ASCOM Remote · 6 devices</p>
+              </div>
               <Badge marker={<i />} tone="positive">Ready</Badge>
             </div>
             <div className="vela-discovery-complete__devices">
@@ -230,7 +261,9 @@ function DiscoveryDialogPreview({ props, onPropsChange }: PreviewProps) {
           </section>
         ) : (
           <section className="vela-discovery-empty">
-            <div className="vela-discovery-empty__mark"><TelescopeMark /></div>
+            <div className="vela-discovery-empty__mark">
+              <TelescopeMark />
+            </div>
             <small>GET STARTED</small>
             <h1>No rig configured</h1>
             <p>Set up the observatory you want Vela to monitor and control.</p>
@@ -251,7 +284,9 @@ function DiscoveryDialogPreview({ props, onPropsChange }: PreviewProps) {
             <div className="vela-discovery-start__visual">
               <span className="vela-discovery-orbit vela-discovery-orbit--outer" />
               <span className="vela-discovery-orbit vela-discovery-orbit--inner" />
-              <span className="vela-discovery-start__telescope"><TelescopeMark /></span>
+              <span className="vela-discovery-start__telescope">
+                <TelescopeMark />
+              </span>
               <i className="vela-discovery-signal vela-discovery-signal--one" />
               <i className="vela-discovery-signal vela-discovery-signal--two" />
               <i className="vela-discovery-signal vela-discovery-signal--three" />
@@ -273,19 +308,38 @@ function DiscoveryDialogPreview({ props, onPropsChange }: PreviewProps) {
             }}
           >
             <div className="vela-discovery-manual__fields">
-              <Input label="Host or IP address" onChange={(event) => setHost(event.target.value)} placeholder="ascom-remote.local" value={host} />
+              <Input
+                label="Host or IP address"
+                onChange={(event) => setHost(event.target.value)}
+                placeholder="ascom-remote.local"
+                value={host}
+              />
               <Input inputMode="numeric" label="Port" onChange={(event) => setPort(event.target.value)} value={port} />
             </div>
-            <p>Vela will inspect <strong>{host || 'this host'}:{port || '11111'}</strong> using the read-only Alpaca Management API.</p>
+            <p>
+              Vela will inspect
+              {' '}
+              <strong>{host || 'this host'}:{port || '11111'}</strong>
+              {' '}
+              using the read-only Alpaca Management API.
+            </p>
           </form>
         ) : null}
 
         {view === 'scanning' ? (
           <div className="vela-discovery-scanning" role="status">
-            <div className="vela-discovery-scanner"><span /><i /><i /><i /></div>
+            <div className="vela-discovery-scanner">
+              <span />
+              <i />
+              <i />
+              <i />
+            </div>
             <strong>Scanning your local network</strong>
             <p>This usually takes only a few seconds.</p>
-            <div className="vela-discovery-scanning__steps"><span data-active="true">Finding servers</span><span>Inspecting devices</span></div>
+            <div className="vela-discovery-scanning__steps">
+              <span data-active="true">Finding servers</span>
+              <span>Inspecting devices</span>
+            </div>
           </div>
         ) : null}
 
@@ -298,8 +352,14 @@ function DiscoveryDialogPreview({ props, onPropsChange }: PreviewProps) {
         {view === 'review' ? (
           <div className="vela-discovery-review">
             <section className="vela-discovery-review__server">
-              <span className="vela-discovery-candidate__mark"><TelescopeMark /></span>
-              <div><small>ALPACA SERVER</small><strong>ASCOM Remote</strong><span>192.168.4.104:11111</span></div>
+              <span className="vela-discovery-candidate__mark">
+                <TelescopeMark />
+              </span>
+              <div>
+                <small>ALPACA SERVER</small>
+                <strong>ASCOM Remote</strong>
+                <span>192.168.4.104:11111</span>
+              </div>
               <Badge size="small" tone="positive">Eligible</Badge>
             </section>
             <Input
@@ -309,14 +369,29 @@ function DiscoveryDialogPreview({ props, onPropsChange }: PreviewProps) {
               value={rigName}
             />
             <section>
-              <div className="vela-discovery-review__label"><strong>Configured devices</strong><span>6 found</span></div>
+              <div className="vela-discovery-review__label">
+                <strong>Configured devices</strong>
+                <span>6 found</span>
+              </div>
               <ul className="vela-discovery-device-list">
                 {devices.map((device) => (
-                  <li key={device.name}><span>{device.kind.slice(0, 1)}</span><p><strong>{device.name}</strong><small>{device.kind}</small></p></li>
+                  <li key={device.name}>
+                    <span>{device.kind.slice(0, 1)}</span>
+                    <p>
+                      <strong>{device.name}</strong>
+                      <small>{device.kind}</small>
+                    </p>
+                  </li>
                 ))}
               </ul>
             </section>
-            <div className="vela-discovery-review__notice"><span>✓</span><p><strong>Ready to add</strong><small>Adding this rig will not connect its devices or issue hardware commands.</small></p></div>
+            <div className="vela-discovery-review__notice">
+              <span>✓</span>
+              <p>
+                <strong>Ready to add</strong>
+                <small>Adding this rig will not connect its devices or issue hardware commands.</small>
+              </p>
+            </div>
           </div>
         ) : null}
       </Dialog>
@@ -336,6 +411,11 @@ export const specimen: ComponentSpecimen = {
     selected: { type: 'boolean', label: 'Candidate selected' },
     rigName: { type: 'text', label: 'Rig name' },
   },
-  defaultProps: { view: 'start', scenario: 'mixed', selected: false, rigName: 'ASCOM Remote' },
+  defaultProps: {
+    view: 'start',
+    scenario: 'mixed',
+    selected: false,
+    rigName: 'ASCOM Remote'
+  },
   render: (props, onPropsChange) => <DiscoveryDialogPreview onPropsChange={onPropsChange} props={props} />,
 }

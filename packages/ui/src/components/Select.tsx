@@ -14,7 +14,15 @@ export interface SelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement
   options: readonly SelectOption[]
 }
 
-export function Select({ label, message, invalid = false, options, className = '', id, ...props }: SelectProps) {
+export function Select({
+  label,
+  message,
+  invalid = false,
+  options,
+  className = '',
+  id,
+  ...props
+}: SelectProps) {
   const generatedId = useId()
   const selectId = id ?? `vela-select-${generatedId.replace(/:/g, '')}`
 
