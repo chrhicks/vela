@@ -6,8 +6,10 @@ star catalog and camera field height. A solve returns either a checked WCS and
 fixed catalog center, or the documented no-solution outcome. Process, catalog,
 malformed WCS and cleanup failures remain errors.
 
-The existing imaging FITS encoder preserves signed acquisition samples and
-origin-adjusted Bayer metadata. Bayer input enables ASTAP's `-check` option.
+The shared [imaging FITS encoder](../imaging/README.md#lossless-fits-interchange)
+uses lossless unsigned 16-bit storage when all samples fit, otherwise signed
+32-bit, preserving acquisition samples and origin-adjusted Bayer metadata.
+Bayer input enables ASTAP's `-check` option.
 Each solve owns a scratch directory and waits for process termination before
 removal. Search starts at 10° around the hint, then expands to 15°, 30°, 60°,
 120° and 180° only after ASTAP exit 1 (no match). The first small expansion

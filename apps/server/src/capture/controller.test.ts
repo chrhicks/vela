@@ -197,7 +197,8 @@ it('keeps the selected completed frame with exact data and preview without savin
   expect(controller.snapshot().latestImage).toEqual(latest)
   expect(await savedImages.file('fra 400', selected.id, 'native')).toEqual(controller.image(selected.id))
   const fits = (await savedImages.file('fra 400', selected.id, 'fits'))!
-  expect(fits.readInt32BE(2880 + 4)).toBe(frame.pixels[1])
+  expect(fits.toString('ascii', 0, 2880)).toContain('BITPIX  =                   16')
+  expect(fits.readInt16BE(2880 + 2) + 32_768).toBe(frame.pixels[1])
   expect((await controller.keep(selected.id))?.id).toBe(selected.id)
   await complete(30)
   expect(await savedImages.count('fra 400')).toBe(1)
