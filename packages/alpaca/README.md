@@ -58,8 +58,12 @@ configured identities, connection state, and driver metadata. Operational
 inventory fails as an invalid response if any configured device lacks a stable
 ID or usable name, preventing an incomplete response from replacing a known
 Rig's durable identity inventory. A received non-successful HTTP response is a
-protocol error, distinct from a transport failure where the server did not
-respond.
+protocol error, distinct from a transport failure before headers or while
+consuming the response body. Body-stream failures preserve the original cause;
+completed bodies with invalid JSON, schema, or ImageBytes remain invalid
+responses. Unsupported image Content-Type is an explicit invalid response.
+Request timeouts cover body transfer, and caller cancellation retains its reason.
+This classification does not itself retry a read or replay a command.
 
 `inspectDevices({ signal })` is the separate read-only detail operation. It reads the operational device name and the small kind-specific status set Vela currently uses for cameras, telescopes, focusers, filter wheels, observing conditions, and switches. Explicitly unsupported properties are omitted. Other individual read failures produce partial telemetry without hiding the device, while endpoint-level inventory failure rejects the operation. A disconnected device retains its identity without triggering predictable telemetry failures.
 
