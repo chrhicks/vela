@@ -1,32 +1,34 @@
 import { Rpc } from '@opencode/plugin/rpc'
 import { Schema } from 'effect'
 
-const finding = Schema.Struct({
-  id: Schema.String,
-  verdict: Schema.String,
-  probability: Schema.Number,
-  confidence: Schema.optional(Schema.Number),
-  question: Schema.String,
-  probabilities: Schema.Record(Schema.String, Schema.Number),
+export const citationSchema = Schema.Struct({
+  path: Schema.String, startLine: Schema.Int, endLine: Schema.Int, quote: Schema.String, sha256: Schema.String,
 })
-const file = Schema.Struct({
-  path: Schema.String,
-  failed: Schema.Array(Schema.String),
-  inconclusive: Schema.Array(Schema.String),
-  skipped: Schema.optional(Schema.String),
-  error: Schema.optional(Schema.String),
-  applicability: Schema.Record(Schema.String, Schema.Number),
-  checks: Schema.Array(finding),
+export const diagnosticSchema = Schema.Struct({
+  rule: Schema.String,
+  severity: Schema.Literals(['error', 'warning', 'information']),
+  message: Schema.String,
+  explanation: Schema.String,
+  suggestion: Schema.String,
+  location: citationSchema,
+  related: Schema.Array(citationSchema),
 })
+export const missingEvidenceSchema = Schema.Struct({ path: Schema.String, reason: Schema.String, nextAction: Schema.String })
 export const reportSchema = Schema.Struct({
+  schemaVersion: Schema.Number,
   artifact: Schema.String,
   time: Schema.String,
-  mode: Schema.String,
-  threshold: Schema.Number,
-  files: Schema.Array(file),
+  mode: Schema.Literals(['files', 'changes']),
+  model: Schema.String,
+  status: Schema.Literals(['complete', 'incomplete', 'stale']),
+  diagnostics: Schema.Array(diagnosticSchema),
+  missingEvidence: Schema.Array(missingEvidenceSchema),
+  files: Schema.Array(Schema.Struct({ path: Schema.String, skipped: Schema.optional(Schema.String), error: Schema.optional(Schema.String) })),
+  error: Schema.optional(Schema.String),
 })
 export type Report = typeof reportSchema.Type
-export type ReportFile = typeof file.Type
+export type Diagnostic = typeof diagnosticSchema.Type
+export type Citation = typeof citationSchema.Type
 
 export const StandardsResults = Rpc.define({
   id: 'vela.standards.results',
@@ -36,7 +38,5 @@ export const StandardsResults = Rpc.define({
       output: Schema.toStandardSchemaV1(Schema.NullOr(reportSchema)),
     },
   },
-  events: {
-    updated: { schema: Schema.toStandardSchemaV1(Schema.Struct({ sessionID: Schema.String })) },
-  },
+  events: { updated: { schema: Schema.toStandardSchemaV1(Schema.Struct({ sessionID: Schema.String })) } },
 })
