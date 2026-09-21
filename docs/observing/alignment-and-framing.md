@@ -1,5 +1,10 @@
 # Before the next Veil session: alignment and centering
 
+> **Dated investigation with later evidence updates.** See [current follow-up
+> status](README.md). Centering shipped in #73; its original one-shot proposal and
+> unresolved choice below are superseded. Polar physical accuracy and alignment
+> image inspection remain open.
+
 [Back to the field review](2026-09-14-first-light.md).
 
 **September 20 follow-up:** [offline replay findings](2026-09-20-alignment-replay.md)

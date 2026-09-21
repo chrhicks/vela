@@ -1,5 +1,10 @@
 # Imaging and processing
 
+> **Historical source audit.** See [current follow-up status](README.md). Cooling
+> controls and one-shot autofocus have since shipped; their proposed/deferred
+> status and the cooling ownership question below are superseded. Preview tint,
+> FITS compatibility and metric-explanation follow-ups remain open.
+
 [Back to the field review](2026-09-14-first-light.md).
 
 Dated source/evidence audit: September 15, 2026, PR #59 head `34a62367`. Planning only; no application changes, hardware access or new tests. Code links point to that revision. Local `data/` references belong to the original checkout and are Git-ignored. Existing boundary READMEs remain authoritative.
