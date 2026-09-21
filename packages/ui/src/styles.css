@@ -14,6 +14,16 @@
   src: url('./fonts/InterVariable-Italic.woff2') format('woff2');
 }
 
+.vela-working-indicator { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; color: var(--vela-accent); font-size: .85em; }
+.vela-working-indicator[data-working="false"] { visibility: hidden; }
+.vela-working-indicator__shimmer { position: relative; flex: 1; height: 4px; overflow: hidden; border-radius: var(--vela-radius); background: color-mix(in srgb, var(--vela-accent) 15%, transparent); }
+.vela-working-indicator__shimmer::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, var(--vela-accent), transparent); transform: translateX(-100%); }
+.vela-working-indicator[data-working="true"] .vela-working-indicator__shimmer::after { animation: vela-working 1.8s ease-in-out infinite; }
+@keyframes vela-working { to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) {
+  .vela-working-indicator[data-working="true"] .vela-working-indicator__shimmer::after { animation: none; transform: none; }
+}
+
 .vela-theme {
   color: var(--vela-text);
   background: var(--vela-canvas);

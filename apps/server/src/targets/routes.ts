@@ -62,7 +62,7 @@ export function registerTargets(app: FastifyInstance, catalog: RigCatalog, opera
 
     const [geometry, mount] = await Promise.all([
       device.cameraGeometry({ cameraId: rig.imagingCamera.uniqueId, expectedCameraName: rig.imagingCamera.name }),
-      device.telescopeStatus(telescopeId),
+      device.telescopeStatus(telescopeId, undefined, { includePointingSide: true }),
     ])
 
     const site = mountSite(mount)
@@ -95,7 +95,7 @@ export function registerTargets(app: FastifyInstance, catalog: RigCatalog, opera
     // check flags together after that await so every field describes one state.
     const controller = controllers.get(rig.id)
     const state = controller?.snapshot() ?? createFramingController(now).snapshot()
-    const view: FramingView = { ...state, rigId: rig.id, rigName: rig.name, observedAt: now().toISOString(), enabled: false, unavailableReason, focalLengthMm: rig.focalLengthMm ?? null, camera: null, canCenter: false, checkCurrent: false }
+    const view: FramingView = { ...state, rigId: rig.id, rigName: rig.name, observedAt: now().toISOString(), enabled: false, unavailableReason, focalLengthMm: rig.focalLengthMm ?? null, camera: null, canCenter: false, checkCurrent: false, pointingSide: 'unknown' }
 
     if (!ready) return view
     const owner = operations.owner(rig.id)
@@ -105,7 +105,7 @@ export function registerTargets(app: FastifyInstance, catalog: RigCatalog, opera
         : ready.mount.slewing && !state.active ? 'The mount is already moving.'
           : !options.solver && !options.createSolver ? 'Plate solving is not configured on the Vela server.' : null
 
-    return { ...view, camera: ready.camera, enabled: !reason, unavailableReason: reason,
+    return { ...view, camera: ready.camera, enabled: !reason, unavailableReason: reason, pointingSide: ready.mount.pierSide ?? 'unknown',
       checkCurrent: !reason && (controller?.checkCurrent(ready.mount, ready.configuration) ?? false),
       canCenter: !reason && (controller?.canCenter(ready.mount, ready.configuration) ?? false) }
   }
@@ -243,7 +243,7 @@ export function registerTargets(app: FastifyInstance, catalog: RigCatalog, opera
       const hardware = options.createHardware?.(rig, ready.telescopeId) ?? configuredHardware(rig, ready.telescopeId, adapter(rig))
       controller.start({ desired, targetId: action.command === 'center' ? previous.targetId! : action.body.targetId,
         exposureSeconds: action.command === 'center' ? previous.exposureSeconds : action.body.exposureSeconds,
-        configuration: ready.configuration, action: action.command }, hardware, solver, release)
+        configuration: ready.configuration, action: action.command, rigId, requestId: request.id }, hardware, solver, release)
       started = true
 
       return framingView(rig)
@@ -258,14 +258,14 @@ function configuredHardware(rig: RigCatalogRecord, telescopeId: string, adapter:
   const acquisition = createAlpacaAcquisition({ baseUrl: `http://${rig.endpoint.host}:${rig.endpoint.port}` })
 
   return {
-    status: signal => adapter.telescopeStatus(telescopeId, signal),
+    status: signal => adapter.telescopeStatus(telescopeId, signal, { includePointingSide: true }),
     tracking: (enabled, signal) => adapter.setTracking(telescopeId, enabled, signal),
     slew: (position, frame, signal) => {
       if (frame !== 'j2000' && frame !== 'topocentric') throw new Error('Unsupported mount coordinate frame')
 
       return adapter.slew({ telescopeId, rightAscensionDegrees: position.raDegrees, declinationDegrees: position.decDegrees, coordinateSystem: frame }, signal)
     },
-    capture: (exposureSeconds, signal) => acquisition.capture({ cameraId: rig.imagingCamera!.uniqueId, expectedCameraName: rig.imagingCamera!.name, exposureSeconds, signal }),
+    capture: (exposureSeconds, signal, onReadout) => acquisition.capture({ cameraId: rig.imagingCamera!.uniqueId, expectedCameraName: rig.imagingCamera!.name, exposureSeconds, signal, onReadout: () => onReadout?.() }),
   }
 }
 

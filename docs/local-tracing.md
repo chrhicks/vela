@@ -54,6 +54,40 @@ the rig PC. Compare idle and motion-time reads before assigning a cause. Tracing
 also cannot guarantee immediate physical stopping: the event loop, transport and
 remote driver all contribute to the command outcome.
 
+## Centering and framing evidence
+
+Framing uses the same configured journal. `framing.run` records rig/request/run
+IDs, action, target, exact desired J2000 position, exposure settings, configuration,
+tolerance and correction limit. A completed `framing.started` marker exports
+these while the operation is still active. All device and ASTAP descendants share
+the run's trace ID; `framing.check.id` joins the original solve to a later centering
+request even when those requests have different trace IDs.
+
+- `framing.centering.baseline`: starting solved center, time, orientation, distance
+  to this request's desired center, pointing side and observed mount state.
+- `framing.move.requested`: exact computed J2000 command, converted driver command
+  and coordinate system/epoch, full pre-command mount readings, correction number and
+  source check ID. `framing.move.completed` means the adapter confirmed completion;
+  the later solve determines accuracy. Missing completion is not success or permission
+  to replay the write.
+- `framing.solved`: full-precision solved center, timestamp and its camera/server-estimate
+  provenance, color layout, offset, orientation,
+  WCS (including CD matrix/parity and reference pixels), and mount readings at exposure.
+- `framing.check-validation`: post-exposure readings and whether the solve still
+  matches the mount. Rejected checks are retained as evidence but never authorize
+  another correction.
+- `framing.correction.measured`: check ID, before/after comparison through ordered
+  measurements, observed side change, and convergence outcome. The parent run records
+  final phase/outcome, correction count, cancellation and failures.
+
+These short records are exported during work, rather than only at the end. The
+rotation, queue and crash limits above still apply: preserve the trace files after
+a trial you want to investigate. **Raw framing exposure pixels/FITS are not retained
+by tracing.** The numerical record supports reconstructing the pointing correction
+and its WCS, but rerunning source-image solving or judging image quality needs the
+original images. Alignment's separately enabled FITS bundles cover alignment,
+not framing.
+
 ## Plate-solver failures
 
 Inspect `astap.solve` spans beneath the alignment solve step for the overall

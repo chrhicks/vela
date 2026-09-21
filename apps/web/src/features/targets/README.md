@@ -25,7 +25,15 @@ start. Last-known state survives transport interruption and device commands rema
 blocked. Local composition edits stay available during recovery; an active or
 pending framing operation pauses them, and a checked composition requires the
 explicit Adjust composition action. A centering action identifies the displayed
-solved check and requests one server-owned correction and recheck.
+solved check and requests server-owned automatic centering: at most four
+corrections, each measured by a fresh solve, stopping within 0.5′ or after two
+consecutive worsening measurements. Start remains one Slew & check; Check current
+frame never moves the mount. Centering progress belongs to its fixed desired
+composition and is hidden when that composition is edited. A centered outcome
+requires a current matching solved check. WorkingIndicator is active only while
+server-confirmed activity is reachable; offline or uncertain commands retain
+measurements without implying current hardware activity. A nonconverging result
+remains a valid checked frame, but needs an explicit new Check before centering.
 
 Aladin attribution: retain the renderer’s linked CDS logo and the footer credit.
 The npm manifest lists GPL-3; the distributed LICENSE is LGPL-3.0 and incorporates

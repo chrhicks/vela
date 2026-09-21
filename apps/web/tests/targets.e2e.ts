@@ -14,7 +14,7 @@ const respond = <Body>(route: Route, body: Body) => {
 
 const target: TargetView = { id: 'm31', name: 'Andromeda Galaxy', catalog: 'M31', kind: 'Galaxy', raDegrees: 10.6847, decDegrees: 41.269, sizeArcminutes: 178, thumbnailUrl: '/api/targets/m31/thumbnail', sky: null }
 
-const idle: FramingView = { rigId: 'rig-1', rigName: 'Test rig', enabled: true, unavailableReason: null, observedAt: new Date().toISOString(), focalLengthMm: 400, camera: { name: 'Test camera', width: 3000, height: 2000, fieldWidthDegrees: 3, fieldHeightDegrees: 2 }, phase: 'idle', active: false, desired: null, targetId: null, actual: null, error: null, exposureSeconds: 2, canCenter: false, checkCurrent: false }
+const idle: FramingView = { rigId: 'rig-1', rigName: 'Test rig', enabled: true, unavailableReason: null, observedAt: new Date().toISOString(), focalLengthMm: 400, camera: { name: 'Test camera', width: 3000, height: 2000, fieldWidthDegrees: 3, fieldHeightDegrees: 2 }, phase: 'idle', active: false, desired: null, targetId: null, actual: null, error: null, exposureSeconds: 2, canCenter: false, checkCurrent: false, pointingSide: 'unknown', centering: null }
 
 const allsky = readFileSync(new URL('./fixtures/survey-allsky.jpg', import.meta.url))
 
@@ -142,7 +142,7 @@ test('survey footprint uses projected coordinates and keyboard adjustment; tile 
   expect(external).toEqual([])
 })
 
-test('checked framing offers one correction, active operations lock edits, and stale state blocks commands', async ({ page }) => {
+test('checked framing offers centering, active operations lock edits, and stale state blocks commands', async ({ page }) => {
   let state: FramingView = { ...idle, phase: 'checked', checkCurrent: true, desired: target, targetId: target.id, canCenter: true, actual: { ...target, checkId: 'displayed-check', capturedAt: new Date().toISOString(), rotationDegrees: 32, offsetArcminutes: 2.4, corners: [{ raDegrees: 9, decDegrees: 40 }, { raDegrees: 11, decDegrees: 40 }, { raDegrees: 11, decDegrees: 42 }, { raDegrees: 9, decDegrees: 42 }] } }
   let offline = false, corrections = 0, stops = 0
   await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
@@ -163,14 +163,14 @@ test('checked framing offers one correction, active operations lock edits, and s
   })
   await page.goto('/rigs/rig-1/observe/targets/m31')
   await expect(page.getByRole('link', { name: 'Continue to capture' })).toBeVisible()
-  await page.getByRole('button', { name: 'Center & recheck' }).click()
+  await page.getByRole('button', { name: 'Center composition' }).click()
   await expect(page.getByRole('button', { name: 'Stop framing' })).toBeEnabled()
   await expect(page.getByRole('button', { name: 'Reset frame' })).toBeDisabled()
   expect(corrections).toBe(1)
   offline = true
   await expect(page.getByText('Connection interrupted · last known state')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Stop framing' })).toBeDisabled()
-  await expect(page.getByText('Last check offset: 2.40′.', { exact: false })).toBeVisible()
+  await expect(page.locator('.vela-target-offset > strong')).toHaveText('2.40′')
   offline = false
   await expect(page.getByRole('button', { name: 'Stop framing' })).toBeEnabled()
   await page.getByRole('button', { name: 'Stop framing' }).click()
@@ -353,6 +353,7 @@ test('failure recovery preserves local drag, zoom and nudges while device comman
   await expect(page.getByRole('button', { name: 'Slew & check' })).toBeDisabled()
   await page.getByText('Optics settings', { exact: true }).click()
   await expect(page.getByRole('button', { name: 'Save focal length' })).toBeDisabled()
+  await frame.scrollIntoViewIfNeeded()
   const before = (await frame.boundingBox())!
   const centerBefore = (await page.locator('.vela-target-cross').boundingBox())!
   await page.mouse.move(before.x + before.width / 2, before.y + before.height / 2)
@@ -402,7 +403,7 @@ test('an edited composition can center using its current coordinates and the las
   await page.getByRole('button', { name: 'Adjust composition' }).click()
   await page.getByRole('button', { name: 'Move frame →' }).click()
   await expect(page.getByRole('link', { name: 'Continue to capture' })).toHaveCount(0)
-  await page.getByRole('button', { name: 'Center & recheck' }).click()
+  await page.getByRole('button', { name: 'Center composition' }).click()
   await expect(page.getByText('Waiting for the mount to settle', { exact: true })).toBeVisible()
   expect(command?.checkId).toBe('usable-check')
   expect(command?.raDegrees).not.toBe(target.raDegrees)

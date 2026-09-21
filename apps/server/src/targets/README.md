@@ -1,7 +1,7 @@
 # Targets and framing
 
 This capability serves an offline target catalog, reference survey images and
-one explicit slew/exposure/solve operation. `app.ts` composes its routes with
+explicit framing checks and bounded automatic centering. `app.ts` composes its routes with
 the shared rig operation lease. A capture run, connection change, or another
 framing request cannot take that lease until device work and cleanup finish.
 
@@ -45,16 +45,44 @@ does not park the mount or turn tracking off. Failed cleanup remains a failure.
 No physical write is automatically replayed.
 
 Centering is a separate user command, bound to the exact solved-check ID and the
-current edited composition coordinates. It applies one measured sky rotation to
-the current mount pointing, then repeats the exposure and check. It never syncs
-the mount model or automatically repeats a corrective movement. A check older
-than 15 minutes, changed optics/camera geometry, or changed mount pointing or
+current edited composition coordinates. One request refines automatically until
+the solved center is within **0.5′**, with at most **four corrective movements**.
+Two consecutive corrections that increase the measured distance stop the loop.
+An unchanged offset consumes an attempt without counting as improvement or worsening.
+The starting offset and every result are calculated against that request's fixed
+desired center, including when the user edited the composition since the last check.
+
+Each correction applies the last measured sky rotation to the current mount
+pointing, then settles, exposes and solves again before calculating another move.
+It never syncs the mount model or replays a failed or uncertain command. A check older
+than 15 minutes, changed optics/camera geometry, changed pointing side, mount pointing or
 tracking cannot authorize a correction. Editing the destination does not invalidate
 an otherwise current measurement. There is no fixed 2° correction cutoff: the
 vector rotation supports large displacements, with the antipodal ambiguity rejected
 explicitly. One observed pointing offset does not guarantee correction accuracy
-elsewhere in the sky; each explicit correction is checked with a fresh exposure.
-An offset within 0.5′ skips movement and just rechecks.
+elsewhere in the sky; each correction is checked with a fresh exposure.
+An initial offset within 0.5′ skips movement and rechecks before reporting success.
+
+Framing requests the adapter's narrow optional pointing-side observation, not its
+alignment rate observations. Unsupported/indeterminate side remains `unknown`;
+it is never inferred from the target or image rotation. A changed side during a
+movement is reported with that movement's fresh solved measurement. A change
+during an exposure discards that measurement's authority to command and rechecks
+without another slew. There is no predicted destination side or forced flip.
+
+The ephemeral view retains bounded measurement summaries: check ID, time, offset,
+rotation, observed side, comparison and correction number. `phase: checked` means
+a valid current solve, while `centering.outcome` distinguishes centered, limit
+reached and non-convergence. The last two outcomes require an explicit new check
+before another centering request. Downloading is published from acquisition's
+actual readout callback. Browser loss does not stop the server-owned loop; Stop
+holds the rig lease until cleanup confirms completion.
+
+When `VELA_TRACE_PATH` is enabled, [framing tracing](../../../../docs/local-tracing.md#centering-and-framing-evidence)
+persists exact desired/solved positions, WCS, pre/post mount readings, commands and
+per-correction outcomes under one trace. Completed child records are available
+before the operation finishes. This is numerical evidence; framing FITS pixels
+are not retained. Save the rotating journal after a trial that needs investigation.
 
 **Check current frame** takes an exposure and solves the current field without a
 slew or tracking change. Use it to establish a fresh measurement after a rejected

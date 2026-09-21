@@ -188,6 +188,7 @@ describe('target and framing HTTP boundary', () => {
 
   it.each([false, true])('reports a completed operation consistently when a pending readiness read fails: %s', async fails => {
     const subject = setup({ offsetDegrees: 0.1 })
+    subject.mount.pierSide = 'west'
     expect((await command(subject.app)).statusCode).toBe(200)
     await vi.waitFor(() => expect(subject.hardware.capture).toHaveBeenCalledTimes(1))
     const geometry = await subject.adapter.cameraGeometry({ cameraId: 'camera', expectedCameraName: 'Imaging camera' })
@@ -212,8 +213,30 @@ describe('target and framing HTTP boundary', () => {
       active: false, phase: 'checked', targetId: start.targetId,
       actual: { checkId: expect.any(String), capturedAt: stamp },
       checkCurrent: !fails, canCenter: !fails,
+      pointingSide: fails ? 'unknown' : 'west',
       unavailableReason: fails ? 'Camera inspection interrupted' : null,
     })
+  })
+
+  it('does not publish a retained pointing side as current after telescope inspection fails', async () => {
+    const subject = setup()
+    subject.mount.pierSide = 'west'
+    await command(subject.app, start, 'check')
+    await vi.waitFor(() => expect(subject.hardware.capture).toHaveBeenCalledTimes(1))
+    subject.complete()
+    await vi.waitFor(() => expect(subject.operations.owner('rig')).toBeUndefined())
+    const checked = (await subject.app.inject('/api/web/rigs/rig/framing')).json()
+    expect(checked.pointingSide).toBe('west')
+    vi.mocked(subject.adapter.telescopeStatus).mockRejectedValueOnce(new Error('Telescope status timed out'))
+    const unavailable = await subject.app.inject('/api/web/rigs/rig/framing')
+    expect(unavailable.statusCode).toBe(200)
+    expect(unavailable.json()).toMatchObject({
+      phase: 'checked', actual: checked.actual, pointingSide: 'unknown', checkCurrent: false, canCenter: false,
+      enabled: false, unavailableReason: 'Telescope status timed out',
+    })
+    expect((await subject.app.inject('/api/web/rigs/rig/framing')).json()).toMatchObject({ pointingSide: 'west', checkCurrent: true })
+    expect(subject.hardware.slew).not.toHaveBeenCalled()
+    expect(subject.hardware.capture).toHaveBeenCalledTimes(1)
   })
 
   it.each(['same target', 'different target'])('rejects an older browser check after another check of the %s', async target => {
@@ -243,6 +266,13 @@ describe('target and framing HTTP boundary', () => {
     expect(subject.operations.owner('rig')).toBeUndefined()
     expect((await subject.app.inject('/api/web/rigs/rig/framing')).json().actual.checkId).toBe(latest.actual.checkId)
 
+    const originalSolve = subject.solver.solve
+    subject.solver.solve = async (...args) => {
+      const solved = await originalSolve(...args)
+
+      return solved.status === 'solved' ? { ...solved, raDegrees: start.raDegrees + 0.2 } : solved
+    }
+
     const accepted = await command(subject.app, { checkId: latest.actual.checkId, raDegrees: start.raDegrees + 0.2, decDegrees: start.decDegrees }, 'center')
     expect(accepted.statusCode, accepted.body).toBe(200)
     await vi.waitFor(() => expect(subject.hardware.capture).toHaveBeenCalledTimes(3))
@@ -266,6 +296,44 @@ describe('target and framing HTTP boundary', () => {
     expect((await subject.app.inject('/api/web/rigs/rig/framing')).json()).toMatchObject({
       phase: 'checked', desired: { raDegrees: edited.raDegrees, decDegrees: edited.decDegrees }, checkCurrent: true, canCenter: true,
     })
+  })
+
+  it('keeps the lease across refinements and requires a new check after non-convergence', async () => {
+    const subject = setup()
+    const offsets = [42.4, 53.8, 67.1]
+    let solvedCount = 0
+    const originalSolve = subject.solver.solve
+    subject.solver.solve = async (...args) => {
+      const solved = await originalSolve(...args)
+
+      return solved.status === 'solved' ? { ...solved, decDegrees: start.decDegrees + offsets[Math.min(solvedCount++, 2)]! / 60 } : solved
+    }
+
+    await command(subject.app, start, 'check')
+    await vi.waitFor(() => expect(subject.hardware.capture).toHaveBeenCalledTimes(1))
+    subject.complete()
+    await vi.waitFor(() => expect(subject.operations.owner('rig')).toBeUndefined())
+    const checked = (await subject.app.inject('/api/web/rigs/rig/framing')).json()
+    const body = { checkId: checked.actual.checkId, raDegrees: start.raDegrees, decDegrees: start.decDegrees }
+    expect((await command(subject.app, body, 'center')).statusCode).toBe(200)
+    await vi.waitFor(() => expect(subject.hardware.capture).toHaveBeenCalledTimes(2))
+    subject.complete()
+    await vi.waitFor(() => expect(subject.hardware.capture).toHaveBeenCalledTimes(3))
+    expect(subject.operations.owner('rig')).toBe('framing')
+    expect((await command(subject.app, body, 'center')).statusCode).toBe(409)
+    const active = (await subject.app.inject('/api/web/rigs/rig/framing')).json()
+    expect(active).toMatchObject({ active: true, centering: { correction: 2, outcome: 'working' } })
+    subject.complete()
+    await vi.waitFor(() => expect(subject.operations.owner('rig')).toBeUndefined())
+    const final = (await subject.app.inject('/api/web/rigs/rig/framing')).json()
+    expect(final).toMatchObject({ phase: 'checked', checkCurrent: true, canCenter: false, centering: { outcome: 'not-converging' } })
+    expect((await command(subject.app, { ...body, checkId: final.actual.checkId }, 'center')).statusCode).toBe(409)
+    expect(subject.hardware.slew).toHaveBeenCalledTimes(2)
+    expect((await command(subject.app, start, 'check')).statusCode).toBe(200)
+    await vi.waitFor(() => expect(subject.hardware.capture).toHaveBeenCalledTimes(4))
+    subject.complete()
+    await vi.waitFor(() => expect(subject.operations.owner('rig')).toBeUndefined())
+    expect((await subject.app.inject('/api/web/rigs/rig/framing')).json()).toMatchObject({ canCenter: true, centering: null })
   })
 
   it('serves real catalog identity without inventing a site and rejects malformed searches', async () => {

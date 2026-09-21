@@ -7,6 +7,24 @@ record recovered Codex outputs, missing baseline inputs, positive-corridor regre
 coverage and the quantitative disagreement with later drift. The physical cause
 remains unresolved. The source audit below remains the September 15 account.
 
+**September 21 centering decision (CHI-192):** Chris approved the automatic-centering
+workshop, then explicitly authorized application implementation: one request refines
+from fresh solves until ≤0.5′, at most four corrections, stopping after two
+consecutive worsening results. Adopt the approved Working + shimmer cue in this
+flow, with a static reduced-motion version; wider app adoption is separate.
+This supersedes the one-correction-first proposal and unresolved centering choice
+below. Start remains Slew & check; Check current frame never moves. Optional observed
+pointing side explains a transition without predicting or forcing a flip.
+Independent verification and application browser acceptance still precede merge;
+clear-sky physical accuracy validation remains separate from simulator evidence.
+
+The read-only ASTROPC follow-up matched Vela's correction to ASCOM transaction
+90407 at local 22:12:44–22:13:15. West at 21:47:20 and East at 22:24:22 bracket
+that slew; together with the image rotation this is the best-supported flip window,
+not an exact transition timestamp or proof of the cause of worsening. The previous
+NINA attribution was unsupported. Retained excerpts and clock reconciliation live
+in `data/alignment-diagnostics/astropc-20260920/flip-timing-local-evidence.md`.
+
 Read-only source/evidence audit, 2026-09-15. Checkout `34a6236` (PR #59 head recorded in the observing findings). No hardware access, application edits, or test runs. Anchors below refer to this checkout. PR merge/acceptance status must be checked separately; an implementation present here is not a new proposed fix.
 
 [Browse the audited source](https://github.com/chrhicks/vela/tree/34a62367f605212d5b317d163109e6047388d2e0). Local `data/` evidence paths are resolved from the original checkout and are not committed.

@@ -8,6 +8,7 @@ import { SkyInspection } from '../features/targets/SkyInspection'
 import { SurveyField } from '../features/targets/SurveyField'
 import { useFraming } from '../features/targets/use-framing'
 import { TargetBrowser } from '../features/targets/TargetBrowser'
+import { arcminutes, CenteringProgress, FramingStatus } from '../features/targets/CenteringFeedback'
 import './targets.css'
 
 export function Targets() {
@@ -67,10 +68,8 @@ function TargetComposition({ rigId, targetId }: { rigId: string, targetId: strin
   const locked = !!view?.active || pending || checked
   const settingsLocked = locked || offline || commandUnconfirmed
   const actual = matching ? view?.actual ?? null : null
-
-  const status = offline ? 'Connection interrupted · last known state' : pending ? 'Sending command…' : !view ? 'Loading rig state…' : commandUnconfirmed && !view.active ? 'Check rig state before continuing' : {
-    idle: 'Ready to frame', slewing: 'Slewing to composition', settling: 'Waiting for the mount to settle', 'needs-check': 'Ready to check the current frame', exposing: 'Taking test exposure', solving: 'Solving test exposure', checked: checked ? 'Framing checked' : 'Composition not checked', stopping: 'Stopping framing', stopped: 'Framing stopped', failed: 'Framing not confirmed',
-  }[view.phase]
+  const centering = sameComposition && !adjusting ? view?.centering ?? null : null
+  const currentMeasurement = checked && !offline && !commandUnconfirmed && !pending
 
   const exposure = Number(seconds), focal = Number(focalLength)
 
@@ -114,37 +113,19 @@ function TargetComposition({ rigId, targetId }: { rigId: string, targetId: strin
         <SurveyField target={target} desired={position} camera={view?.camera ?? null} actual={actual} locked={locked} onChange={setDesired} />
       </section>
       <aside className="vela-target-sidebar">
-        <SkyInspection sky={target.sky} targetName={target.name} stale={skyStale} />
         <Panel title="Your composition">
-          <p className="vela-target-description">{target.kind}{target.sizeArcminutes !== null ? ` · ${target.sizeArcminutes}′ across` : ''}</p>
-          <dl className="vela-target-details"><div><dt>Camera</dt><dd>{view?.camera?.name ?? 'Unavailable'}</dd></div><div><dt>Orientation</dt><dd>{actual ? `${actual.rotationDegrees.toFixed(1)}° last measured` : 'Assumed north-up · not measured'}</dd></div><div><dt>Center (J2000)</dt><dd>{position.raDegrees.toFixed(4)}°, {position.decDegrees.toFixed(4)}°</dd></div>{view?.camera && <div><dt>Field of view</dt><dd>{view.camera.fieldWidthDegrees.toFixed(2)}° × {view.camera.fieldHeightDegrees.toFixed(2)}°</dd></div>}</dl>
-          <details className="vela-target-settings" open={!view?.focalLengthMm}>
-            <summary>Optics settings</summary>
-            <Input
-              label="Effective focal length (mm)"
-              type="number"
-              min="10"
-              max="20000"
-              value={focalLength}
-              disabled={settingsLocked}
-              onChange={e => setFocalLength(e.target.value)}
-            />
-            <Button
-              disabled={settingsLocked || !view || !Number.isFinite(focal) || focal < 10 || focal > 20000}
-              onClick={() => void framing.settings(focal)}
-            >
-              Save focal length
-            </Button>
-          </details>
+          <FramingStatus view={view} checked={checked} centering={centering} offline={offline} pending={pending} commandUnconfirmed={commandUnconfirmed} />
+          {actual && sameComposition && !adjusting && <div className="vela-target-offset">
+            <span>{currentMeasurement ? 'Measured distance from center' : 'Last solved distance · current framing unmeasured'}</span>
+            <strong>{arcminutes(actual.offsetArcminutes)}</strong>
+            {centering && <span>{centering.measurements[0] && `Started at ${arcminutes(centering.measurements[0].offsetArcminutes)} · `}goal ≤ {arcminutes(centering.toleranceArcminutes)}</span>}
+          </div>}
+          <dl className="vela-target-facts"><div><dt>Exposure</dt><dd>{view?.exposureSeconds ?? seconds} s</dd></div><div><dt>Mount pointing side</dt><dd>{offline ? 'Last known: ' : ''}{{ east: 'East', west: 'West', unknown: 'Unknown' }[view?.pointingSide ?? 'unknown']}</dd></div></dl>
           <div className="vela-target-command">
-            <strong role="status">{status}</strong>
-            {view && <p>State checked {new Date(view.observedAt).toLocaleTimeString()}</p>}
             {view?.error && <p role="alert">{view.error}</p>}
             {error && <p role="alert">{error}</p>}
             {view?.unavailableReason && <p>{view.unavailableReason}</p>}
             {view?.active && !matching && <p>A framing check for another target is active on this rig.</p>}
-            {actual && !checked && <p>This is the last solved exposure. Run a new framing check before continuing to capture.</p>}
-            {actual && <p>Last check offset: {actual.offsetArcminutes.toFixed(2)}′. Test exposure {new Date(actual.capturedAt).toLocaleTimeString()}.</p>}
             {view?.active ? (
               <Button disabled={!framing.canStop} onClick={() => void framing.stop()}>
                 Stop framing
@@ -156,9 +137,9 @@ function TargetComposition({ rigId, targetId }: { rigId: string, targetId: strin
                   disabled={!framing.canStart || !view.canCenter}
                   onClick={() => void centerFraming()}
                 >
-                  Center & recheck
+                  Center composition
                 </Button>
-                <p>One measured pointing correction, followed by another test exposure.</p>
+                <p>Automatically refine to within 0.5′, using a fresh solve after each correction. At most four corrections; stop after two worsening results.</p>
                 <Button disabled={pending} onClick={() => setAdjusting(true)}>
                   Adjust composition
                 </Button>
@@ -172,9 +153,9 @@ function TargetComposition({ rigId, targetId }: { rigId: string, targetId: strin
               <>
                 {matching && view?.canCenter && actual && <>
                   <Button tone="accent" disabled={!framing.canStart} onClick={() => void centerFraming()}>
-                    Center & recheck
+                    Center composition
                   </Button>
-                  <p>Move to your edited composition using the last measured pointing correction.</p>
+                  <p>Automatically center your edited composition, measuring after every correction.</p>
                 </>}
                 <Input
                   label="Test exposure (seconds)"
@@ -201,12 +182,37 @@ function TargetComposition({ rigId, targetId }: { rigId: string, targetId: strin
               </Button>
               <p>Take a test exposure at the current position without moving the mount.</p>
             </>}
+            {view && <p>State checked {new Date(view.observedAt).toLocaleTimeString()}</p>}
+            {actual && !checked && !view?.active && <p>This is the last solved exposure. Run a new framing check before continuing to capture.</p>}
+            {actual && <p>Test exposure {new Date(actual.capturedAt).toLocaleTimeString()}.{!sameComposition || adjusting ? ' Measured against the previous composition.' : ''}</p>}
             <Button tone="quiet" disabled={pending || framing.refreshing} onClick={refreshFraming}>
               Check rig state
             </Button>
           </div>
+          <p className="vela-target-description">{target.kind}{target.sizeArcminutes !== null ? ` · ${target.sizeArcminutes}′ across` : ''}</p>
+          <dl className="vela-target-details"><div><dt>Camera</dt><dd>{view?.camera?.name ?? 'Unavailable'}</dd></div><div><dt>Orientation</dt><dd>{actual ? `${actual.rotationDegrees.toFixed(1)}° last measured` : 'Assumed north-up · not measured'}</dd></div><div><dt>Center (J2000)</dt><dd>{position.raDegrees.toFixed(4)}°, {position.decDegrees.toFixed(4)}°</dd></div>{view?.camera && <div><dt>Field of view</dt><dd>{view.camera.fieldWidthDegrees.toFixed(2)}° × {view.camera.fieldHeightDegrees.toFixed(2)}°</dd></div>}</dl>
+          <details className="vela-target-settings" open={!view?.focalLengthMm}>
+            <summary>Optics settings</summary>
+            <Input
+              label="Effective focal length (mm)"
+              type="number"
+              min="10"
+              max="20000"
+              value={focalLength}
+              disabled={settingsLocked}
+              onChange={e => setFocalLength(e.target.value)}
+            />
+            <Button
+              disabled={settingsLocked || !view || !Number.isFinite(focal) || focal < 10 || focal > 20000}
+              onClick={() => void framing.settings(focal)}
+            >
+              Save focal length
+            </Button>
+          </details>
         </Panel>
       </aside>
+      {centering && <CenteringProgress centering={centering} current={currentMeasurement} />}
+      <div className="vela-target-sky-context"><SkyInspection sky={target.sky} targetName={target.name} stale={skyStale} /></div>
     </div>
   </>
 }

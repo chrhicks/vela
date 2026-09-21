@@ -14,8 +14,10 @@ function observatory(requestTimeoutMs = 100) {
   }
 
   const writes: { operation: string; parameters: URLSearchParams }[] = []
+  const requests: { method: string; path: string }[] = []
   const unsupported = new Set<string>()
   const errors = new Map<string, number>()
+  const transportFailures = new Set<string>()
   let started!: () => void
   const whenStarted = new Promise<void>(resolve => { started = resolve })
 
@@ -26,8 +28,12 @@ function observatory(requestTimeoutMs = 100) {
 
   const fetch: typeof globalThis.fetch = async (input, init) => {
     init?.signal?.throwIfAborted()
-    const operation = new URL(String(input)).pathname.split('/').at(-1)!
+    const path = new URL(String(input)).pathname
+    requests.push({ method: init?.method ?? 'GET', path })
+    const operation = path.split('/').at(-1)!
     const envelope = (Value?: ResponseFixture, ErrorNumber = 0) => Response.json({ ClientTransactionID: 0, ServerTransactionID: 1, ErrorNumber, ErrorMessage: '', Value })
+
+    if (transportFailures.has(operation)) throw new TypeError('Device unreachable')
 
     if (operation === 'configureddevices') return envelope([
       { DeviceName: 'Camera', DeviceType: 'Camera', DeviceNumber: 7, UniqueID: 'camera-id' },
@@ -88,7 +94,7 @@ function observatory(requestTimeoutMs = 100) {
 
   const framing = createAlpacaFraming({ baseUrl: 'http://fake', fetch, requestTimeoutMs, pollIntervalMs: 1, slewTimeoutMs: 100 })
 
-  return { framing, values, writes, unsupported, errors, state, whenStarted }
+  return { framing, values, writes, requests, unsupported, errors, transportFailures, state, whenStarted }
 }
 
 const target = { telescopeId: 'mount-id', rightAscensionDegrees: 45, declinationDegrees: 25, coordinateSystem: 'topocentric' as const }
@@ -195,6 +201,58 @@ describe('framing boundary', () => {
     expect((await fake.framing.telescopeStatus('mount-id')).coordinateSystem).toBe('other')
     fake.values.sitelatitude = 91
     await expect(fake.framing.telescopeStatus('mount-id')).rejects.toThrow('sitelatitude')
+  })
+
+  // ASCOM Telescope.SideOfPier and PierSide define an optional read with
+  // pierUnknown=-1, pierEast=0 (normal), pierWest=1 (through the pole).
+  // https://ascom-standards.org/newdocs/telescope.html#Telescope.SideOfPier
+  it.each([[-1, 'unknown'], [0, 'east'], [1, 'west']] as const)('reads only the requested pointing side and normalizes %s to %s', async (sideofpier, pierSide) => {
+    const fake = observatory()
+    fake.values.sideofpier = sideofpier
+    const ordinary = await fake.framing.telescopeStatus('mount-id')
+    expect(ordinary).not.toHaveProperty('pierSide')
+    expect(fake.requests.every(request => request.method === 'GET')).toBe(true)
+    expect(fake.requests.some(request => request.path.endsWith('/sideofpier'))).toBe(false)
+    const ordinaryRequests = fake.requests.splice(0)
+
+    const status = await fake.framing.telescopeStatus('mount-id', undefined, { includePointingSide: true })
+
+    expect(status).toMatchObject({ pierSide })
+    expect(status).not.toHaveProperty('trackingRate')
+    expect(status).not.toHaveProperty('rightAscensionRateSecondsPerSiderealSecond')
+    expect(status).not.toHaveProperty('declinationRateArcsecondsPerSecond')
+    expect(fake.requests).toEqual([...ordinaryRequests, { method: 'GET', path: '/api/v1/telescope/3/sideofpier' }])
+    expect(fake.writes).toEqual([])
+  })
+
+  it('reads pointing side once when both options request it, retaining alignment rates', async () => {
+    const fake = observatory()
+    Object.assign(fake.values, { trackingrate: 2, rightascensionrate: -0.25, declinationrate: 1.5, sideofpier: 1 })
+    const status = await fake.framing.telescopeStatus('mount-id', undefined, { includeAlignmentObservations: true, includePointingSide: true })
+    expect(status).toMatchObject({ trackingRate: 'solar', rightAscensionRateSecondsPerSiderealSecond: -0.25, declinationRateArcsecondsPerSecond: 1.5, pierSide: 'west' })
+    expect(fake.requests.filter(request => request.path.endsWith('/sideofpier'))).toEqual([{ method: 'GET', path: '/api/v1/telescope/3/sideofpier' }])
+  })
+
+  it('omits unsupported pointing side rather than substituting the unknown sentinel', async () => {
+    const fake = observatory()
+    fake.unsupported.add('sideofpier')
+    const status = await fake.framing.telescopeStatus('mount-id', undefined, { includePointingSide: true })
+    expect(status).not.toHaveProperty('pierSide')
+  })
+
+  it.each([undefined, null, '-1', -2, 2, 0.5])('rejects missing or malformed pointing side %s', async sideofpier => {
+    const fake = observatory()
+    fake.values.sideofpier = sideofpier
+    await expect(fake.framing.telescopeStatus('mount-id', undefined, { includePointingSide: true })).rejects.toMatchObject({ reason: 'invalid-response' })
+  })
+
+  it('preserves driver and transport failures instead of omitting unavailable pointing side', async () => {
+    const fake = observatory()
+    fake.errors.set('sideofpier', 1280)
+    await expect(fake.framing.telescopeStatus('mount-id', undefined, { includePointingSide: true })).rejects.toMatchObject({ reason: 'protocol-error', errorNumber: 1280, endpoint: '/api/v1/telescope/3/sideofpier' })
+    fake.errors.clear()
+    fake.transportFailures.add('sideofpier')
+    await expect(fake.framing.telescopeStatus('mount-id', undefined, { includePointingSide: true })).rejects.toMatchObject({ reason: 'transport', endpoint: '/api/v1/telescope/3/sideofpier' })
   })
 
   it.each([0, 1, 2, 3])('normalizes alignment observations with tracking mode %s', async trackingrate => {

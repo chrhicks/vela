@@ -93,6 +93,11 @@ solve phase, requested center, camera field size and timestamped solved footprin
 `checkCurrent` distinguishes a current check from a preserved older exposure;
 `canCenter` is the server's separate correction precondition. Neither contract
 contains a device protocol, coordinate conversion or durable observing plan.
+Framing's optional centering operation contains at most four corrective movements
+and their bounded solved-measurement summaries. It separates a valid checked frame
+from a confirmed within-tolerance result, non-convergence, exhausted corrections,
+or interruption. Every summary compares the same requested composition. Pointing
+side is observed or explicitly unknown; download phase comes from image readout.
 
 NavigationView combines catalog identities with small snapshots of known capture
 controllers, including terminal phases. An absent controller does not confirm
