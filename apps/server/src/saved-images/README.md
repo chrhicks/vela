@@ -1,6 +1,6 @@
 # Saved images
 
-This boundary retains a completed acquisition as original signed 32-bit FITS,
+This boundary retains a completed acquisition as original lossless integer FITS,
 the native processed PNG, an optional smaller PNG, and image metadata. It stores
 artifacts, not capture runs. A repeated save of the same rig/frame returns the
 existing artifact, including when manual and automatic saving overlap.
@@ -18,6 +18,9 @@ as `TOP-DOWN`, and the acquisition adapter's already origin-adjusted Bayer patte
 when present. It does not stretch, debayer, calibrate, or guess sensor metadata.
 Preview downloads are separately processed display images. Large FITS encoding
 yields between batches so the server can continue serving device/status work.
+The shared [imaging encoder](../imaging/README.md#lossless-fits-interchange) uses
+unsigned 16-bit FITS when all samples fit, otherwise signed 32-bit. Existing
+retained originals and their download bytes are never converted in place.
 
 The memory implementation has the same API for isolated application tests. The
 production composition must open the file implementation at its persistent data

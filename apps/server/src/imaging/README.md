@@ -1,5 +1,27 @@
 # Capture image processing
 
+## Lossless FITS interchange
+
+`fits.ts` is the shared encoder for captured originals, plate-solver inputs and
+retained alignment diagnostics.
+It validates every sample as a signed 32-bit integer. If all samples are in
+0–65535, it writes `BITPIX=16`, `BZERO=32768`, `BSCALE=1`, with big-endian signed
+storage of `sample - 32768`. Otherwise it writes `BITPIX=32` signed big-endian
+samples without scaling cards. Negative and greater-than-65535 values remain
+exact; nonfinite, fractional and out-of-range values are rejected.
+
+Selection depends on representability, not inferred sensor bit depth. Neither
+path rescales ADU values, clamps, reverses rows, debayers or mutates acquisition
+samples. Both validation and writing yield between batches, and header/data
+padding remains FITS-compliant. Exposure time, UTC start and its provenance,
+camera, `ROWORDER=TOP-DOWN` and origin-adjusted Bayer pattern are preserved.
+
+Already-retained FITS originals are immutable and are not rewritten. Future
+retained-preview readers must support both Vela encodings above and apply the
+unsigned offset exactly once; preview treatment must not alter original samples.
+
+## Display previews and measurements
+
 Preview stretching and star measurements consume linear acquisition samples;
 measurements never use the stretched PNG. Both finish before a completed image
 and its metadata are published. Star-analysis failure leaves the acquired image

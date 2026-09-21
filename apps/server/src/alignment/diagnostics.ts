@@ -87,11 +87,12 @@ export function createAlignmentDiagnostics(root: string, onError: (error: Error)
 
       return {
         recordFrame: (frame, evidence) => record(async () => {
-          // encodeCaptureFits uses one 2880-byte header and padded signed-int32 samples.
+          // Bound allocation before scanning pixels, using the larger signed-32
+          // encoding. Unsigned-16 output can be smaller; journal the actual size.
           const pixels = frame.width * frame.height
-          const bytes = 2880 + Math.ceil(pixels * 4 / 2880) * 2880
+          const maximumEncodedBytes = 2880 + Math.ceil(pixels * 4 / 2880) * 2880
 
-          if (!Number.isSafeInteger(pixels) || pixels <= 0 || bytes > maximumFitsBytes) {
+          if (!Number.isSafeInteger(pixels) || pixels <= 0 || maximumEncodedBytes > maximumFitsBytes) {
             throw new Error('Alignment diagnostic FITS exceeds 128 MiB or has invalid dimensions')
           }
 

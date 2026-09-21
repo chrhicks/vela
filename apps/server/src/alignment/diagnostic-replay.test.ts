@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { appendFile, mkdtemp, readFile, readdir, rm, symlink, truncate, unlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -15,7 +15,7 @@ const roots: string[] = []
 
 afterEach(async () => { await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))) })
 
-async function physicalTrial(phase?: 'finished' | 'stopped' | 'failed') {
+async function physicalTrial(phase?: 'finished' | 'stopped' | 'failed', format: 'small-signed32' | 'signed32' | 'unsigned16' = 'small-signed32') {
   const root = await mkdtemp(join(tmpdir(), 'vela-diagnostic-replay-test-'))
   roots.push(root)
   const onError = vi.fn()
@@ -42,9 +42,13 @@ async function physicalTrial(phase?: 'finished' | 'stopped' | 'failed') {
   async function capture(input: typeof reference.adjusted, phase: 'baseline' | 'adjusting', position: number) {
     frameSerial++
 
+    const width = format === 'small-signed32' ? 2 : 32
+
     const frame: AlpacaFrame = {
-      width: 2, height: 2, pixels: new Float64Array([frameSerial, 65535, -32768, 2_147_483_647]),
-      capturedAt: input.capturedAt, capturedAtSource: 'server-estimate', color: { kind: 'bayer', pattern: 'gbrg' },
+      width, height: width, pixels: format === 'small-signed32'
+        ? new Float64Array([frameSerial, 65535, -32768, 2_147_483_647]) : new Float64Array(width * width).fill(format === 'signed32' ? -1 : 1),
+      capturedAt: input.capturedAt, capturedAtSource: 'server-estimate',
+      color: format === 'small-signed32' ? { kind: 'bayer', pattern: 'gbrg' } : { kind: 'mono' },
     }
 
     const sample = physicalAlignmentSample(input.solved, { capturedAt: input.capturedAt, exposureSeconds: 2 }, fixture.site)
@@ -52,9 +56,9 @@ async function physicalTrial(phase?: 'finished' | 'stopped' | 'failed') {
     const evidence: AlignmentFrameEvidence = {
       phase, position, sample, hint: input.solved, fieldHeightDegrees: 3,
       solution: { status: 'solved', ...input.solved, capturedAt: input.capturedAt,
-        wcs: { width: 2, height: 2, referenceX: 1.25, referenceY: 1.75, ...input.solved, cd: [0.00043, 0.00032, 0.00032, -0.00043] } },
+        wcs: { width, height: width, referenceX: 1.25, referenceY: 1.75, ...input.solved, cd: [0.00043, 0.00032, 0.00032, -0.00043] } },
       physical: { site: fixture.site, before: mount, after: { ...mount, observedAt: sample.capturedAt },
-        camera: { cameraName: 'Fixture camera', sensorWidthPixels: 8, sensorHeightPixels: 8, width: 2, height: 2,
+        camera: { cameraName: 'Fixture camera', sensorWidthPixels: width * 4, sensorHeightPixels: width * 4, width, height: width,
           pixelWidthMicrons: 3.76, pixelHeightMicrons: 3.76, binX: 2, binY: 2, startX: 1, startY: 1 } },
     }
 
@@ -87,6 +91,94 @@ async function replaceEntries(journal: string, entries: DiagnosticEntry[]) {
 }
 
 describe('alignment diagnostic replay', () => {
+  it.each(['unsigned16', 'signed32'] as const)('replays production-recorded 32×32 mono %s frames across distinct padded sizes', async format => {
+    const trial = await physicalTrial('finished', format)
+    const frames = trial.entries.filter(entry => entry.type === 'frame')
+    expect(frames.map(frame => frame.original.bytes)).toEqual(Array(5).fill(format === 'unsigned16' ? 5760 : 8640))
+    const latest = await readFile(join(trial.directory, frames.at(-1)!.original.filename))
+
+    const pixels = Array.from({ length: 1024 }, (_, index) => format === 'unsigned16'
+      ? latest.readInt16BE(2880 + index * 2) + 32_768 : latest.readInt32BE(2880 + index * 4))
+
+    expect(pixels).toEqual(Array(1024).fill(format === 'unsigned16' ? 1 : -1))
+    expect(await replayAlignmentDiagnostics(trial.directory)).toMatchObject({
+      counts: { frames: 5, measurements: 3, physicalFrames: 5, verifiedOriginals: 4 },
+      baseline: trial.baseline, finalMeasurement: trial.measurement, outcome: { phase: 'finished' },
+      maximumDiscrepancies: { measurementArcsec: 0, correctionTargetDegrees: 0, physicalSampleDegrees: 0, physicalSampleTimeMs: 0 },
+    })
+  })
+
+  it('rejects unsupported or inconsistent FITS layouts even with updated journal hashes', async () => {
+    const trial = await physicalTrial('finished', 'unsigned16')
+    const first = trial.entries.find(entry => entry.type === 'frame')!
+    const path = join(trial.directory, first.original.filename)
+    const original = await readFile(path)
+
+    const replaceCard = (key: string, value: string) => {
+      const fits = Buffer.from(original)
+      const offset = original.toString('ascii', 0, 2880).indexOf(key.padEnd(8))
+      fits.write(value.padEnd(80), offset, 80, 'ascii')
+
+      return fits
+    }
+
+    for (const [key, card] of [
+      ['BITPIX', 'BITPIX  =                   32'],
+      ['BITPIX', 'BITPIX  =                  -16'],
+      ['NAXIS1', 'NAXIS1  =                   31'],
+      ['BZERO', 'BZERO   =                    0'],
+      ['BSCALE', 'BSCALE  =                    2'],
+      ['BZERO', ''],
+      ['BSCALE', 'BZERO   =                32768'],
+      ['DATE-OBS', 'BITPIX  =                   16'],
+      ['END', 'NAXIS1  =                   32'],
+    ] as const) {
+      const fits = replaceCard(key, card)
+      await writeFile(path, fits)
+      first.original.sha256 = createHash('sha256').update(fits).digest('hex')
+      await replaceEntries(trial.journal, trial.entries)
+      await expect(replayAlignmentDiagnostics(trial.directory)).rejects.toThrow('Alignment diagnostic FITS')
+    }
+
+    // Changing the dimensions in both journal locations still has to match the FITS header.
+    await writeFile(path, original)
+    first.original.sha256 = createHash('sha256').update(original).digest('hex')
+    first.capture.width = 31
+    first.evidence.solution.wcs.width = 31
+    await replaceEntries(trial.journal, trial.entries)
+    await expect(replayAlignmentDiagnostics(trial.directory)).rejects.toThrow('FITS layout or dimensions')
+
+    first.capture.width = 32
+    first.evidence.solution.wcs.width = 32
+
+    for (const bytes of [79, 2880, 5761]) {
+      const fits = Buffer.alloc(bytes)
+      original.copy(fits)
+      await writeFile(path, fits)
+      first.original.bytes = bytes
+      first.original.sha256 = createHash('sha256').update(fits).digest('hex')
+      await replaceEntries(trial.journal, trial.entries)
+      await expect(replayAlignmentDiagnostics(trial.directory)).rejects.toThrow('original metadata disagree')
+    }
+  })
+
+  it('rejects scaling cards on signed-32 originals even when their size and hash match', async () => {
+    const trial = await physicalTrial('finished', 'signed32')
+    const first = trial.entries.find(entry => entry.type === 'frame')!
+    const path = join(trial.directory, first.original.filename)
+    const original = await readFile(path)
+    const offset = original.toString('ascii', 0, 2880).indexOf('DATE-OBS')
+
+    for (const card of ['BZERO   =                32768', 'BSCALE  =                    1']) {
+      const fits = Buffer.from(original)
+      fits.write(card.padEnd(80), offset, 80, 'ascii')
+      await writeFile(path, fits)
+      first.original.sha256 = createHash('sha256').update(fits).digest('hex')
+      await replaceEntries(trial.journal, trial.entries)
+      await expect(replayAlignmentDiagnostics(trial.directory)).rejects.toThrow('unsupported sample scaling')
+    }
+  })
+
   it('reproduces physical math and retains exact pixels, start provenance, midpoint, WCS, and only the latest adjustment original', async () => {
     const trial = await physicalTrial('finished')
     const frames = trial.entries.filter(entry => entry.type === 'frame')
@@ -167,8 +259,8 @@ describe('alignment diagnostic replay', () => {
     await expect(replayAlignmentDiagnostics(trial.directory)).rejects.toThrow('Invalid alignment diagnostic journal entry')
   })
 
-  it('rejects damaged, missing, symlinked, and oversized retained originals', async () => {
-    const trial = await physicalTrial('finished')
+  it.each(['small-signed32', 'unsigned16'] as const)('rejects damaged, missing, symlinked, and oversized retained %s originals', async format => {
+    const trial = await physicalTrial('finished', format)
     const latest = trial.entries.filter(entry => entry.type === 'frame').at(-1)!
     const original = join(trial.directory, latest.original.filename)
     const fits = await readFile(original)

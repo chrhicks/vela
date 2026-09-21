@@ -19,24 +19,7 @@ export async function encodeCaptureFits(
     throw new Error('Cannot export FITS: invalid exposure metadata')
   }
 
-  const cards = [
-    card('SIMPLE', 'T'.padStart(20)), numberCard('BITPIX', 32), numberCard('NAXIS', 2),
-    numberCard('NAXIS1', width), numberCard('NAXIS2', height),
-    textCard('DATE-OBS', start.toISOString()), numberCard('EXPTIME', metadata.exposureSeconds),
-    textCard('INSTRUME', metadata.cameraName), textCard('ROWORDER', 'TOP-DOWN'),
-  ]
-
-  if (frame.capturedAtSource === 'server-estimate') {
-    cards.push(textCard('TIMESRC', 'SERVER-ESTIMATE'))
-    cards.push('COMMENT DATE-OBS estimated from server UTC before StartExposure.'.padEnd(80))
-  }
-
-  // The acquisition adapter already shifts this pattern to the image origin.
-  if (frame.color?.kind === 'bayer') cards.push(textCard('BAYERPAT', frame.color.pattern.toUpperCase()))
-  cards.push('END'.padEnd(80))
-  const header = Buffer.from(cards.join('').padEnd(Math.ceil(cards.length * 80 / 2880) * 2880), 'ascii')
-  const result = Buffer.alloc(header.length + Math.ceil(pixels.length * 4 / 2880) * 2880)
-  header.copy(result)
+  let unsigned16 = true
 
   for (let begin = 0; begin < pixels.length; begin += 65_536) {
     const end = Math.min(begin + 65_536, pixels.length)
@@ -48,7 +31,43 @@ export async function encodeCaptureFits(
         throw new Error('Cannot export FITS: samples must be signed 32-bit integers')
       }
 
-      result.writeInt32BE(value, header.length + i * 4)
+      if (value < 0 || value > 65_535) unsigned16 = false
+    }
+
+    await setImmediate()
+  }
+
+  const bytesPerSample = unsigned16 ? 2 : 4
+
+  const cards = [
+    card('SIMPLE', 'T'.padStart(20)), numberCard('BITPIX', bytesPerSample * 8), numberCard('NAXIS', 2),
+    numberCard('NAXIS1', width), numberCard('NAXIS2', height),
+    textCard('DATE-OBS', start.toISOString()), numberCard('EXPTIME', metadata.exposureSeconds),
+    textCard('INSTRUME', metadata.cameraName), textCard('ROWORDER', 'TOP-DOWN'),
+  ]
+
+  if (unsigned16) cards.push(numberCard('BZERO', 32_768), numberCard('BSCALE', 1))
+
+  if (frame.capturedAtSource === 'server-estimate') {
+    cards.push(textCard('TIMESRC', 'SERVER-ESTIMATE'))
+    cards.push('COMMENT DATE-OBS estimated from server UTC before StartExposure.'.padEnd(80))
+  }
+
+  // The acquisition adapter already shifts this pattern to the image origin.
+  if (frame.color?.kind === 'bayer') cards.push(textCard('BAYERPAT', frame.color.pattern.toUpperCase()))
+  cards.push('END'.padEnd(80))
+  const header = Buffer.from(cards.join('').padEnd(Math.ceil(cards.length * 80 / 2880) * 2880), 'ascii')
+  const result = Buffer.alloc(header.length + Math.ceil(pixels.length * bytesPerSample / 2880) * 2880)
+  header.copy(result)
+
+  for (let begin = 0; begin < pixels.length; begin += 65_536) {
+    const end = Math.min(begin + 65_536, pixels.length)
+
+    for (let i = begin; i < end; i++) {
+      const value = pixels[i]!
+
+      if (unsigned16) result.writeInt16BE(value - 32_768, header.length + i * 2)
+      else result.writeInt32BE(value, header.length + i * 4)
     }
 
     await setImmediate()
