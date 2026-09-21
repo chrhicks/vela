@@ -1,8 +1,12 @@
 # First light: September 14–15, 2026
 
+> **Historical field review.** See [current follow-up status](README.md) for shipped
+> work, remaining implementation and field validation. Pending-PR statements and
+> proposed next steps below describe the September 15 review, not today's status.
+
 We collected **53 completed post-focus, 180-second exposures** of the Veil. Seven were excluded after image inspection and pairwise star-profile checks, leaving **46 frames / 138 minutes** in the final selected stack. All originals remain intact. That is a useful result from a difficult night, and a reason to make the next session easier.
 
-This is a dated field review and implementation proposal, prepared September 15. It covers the local findings log, including its later overnight additions. It does not authorize the proposed features or establish physical accuracy from software tests. Preparation is tracked in [CHI-186](https://linear.app/chicks/issue/CHI-186/prepare-the-next-veil-session-from-september-14-field-findings). Task status belongs in Linear; capability contracts remain in their owning READMEs.
+This is a dated field review and implementation proposal, prepared September 15. It covers the local findings log, including its later overnight additions. It does not authorize the proposed features or establish physical accuracy from software tests. Preparation was delivered in [CHI-186](https://linear.app/chicks/issue/CHI-186/prepare-the-next-veil-session-from-september-14-field-findings). The [status index](README.md) tracks each follow-up's disposition and links delivery tickets; active task status belongs in Linear and capability contracts remain in their owning READMEs.
 
 ## Start here
 

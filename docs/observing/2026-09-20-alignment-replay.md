@@ -1,5 +1,9 @@
 # September 20: offline follow-up to FRA polar alignment
 
+> **Dated evidence report.** See [current follow-up status](README.md) for remaining
+> work. Diagnostic recording/replay shipped in #71; independent physical accuracy
+> validation remains open.
+
 [Field review](2026-09-14-first-light.md) · [Alignment investigation plan](alignment-and-framing.md)
 
 ## Result

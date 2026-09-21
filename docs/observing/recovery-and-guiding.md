@@ -1,5 +1,9 @@
 # Recovery, artifact retention, and guiding evidence
 
+> **Historical source audit.** See [current follow-up status](README.md) for the
+> remaining recovery slices and field investigations. Source line numbers below
+> refer to the audited revision, not current `main`.
+
 [Back to the field review](2026-09-14-first-light.md).
 
 Dated source audit: September 15, 2026, PR #59 head `34a62367`. Code anchors refer to that revision; proposed changes below are not implemented.

@@ -73,7 +73,7 @@ The typed browser API client is in `apps/web/src/lib/api.ts`. Browser-safe value
 
 ## Observing lessons
 
-- [September 14–15 first light: findings and next-session preparation](docs/observing/2026-09-14-first-light.md)
+- [Field-test follow-ups: current status and remaining work](docs/observing/README.md)
 
 ## Star catalogue
 
