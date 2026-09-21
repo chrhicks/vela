@@ -77,7 +77,9 @@ describe('file Rig catalog', () => {
       await expect(catalog.setFocalLength('rig-1', 0)).rejects.toThrow('focal length')
       await writeFile(path, validCatalog.replace('    name: Backyard rig', '    focalLengthMm: .nan\n    name: Backyard rig'))
       await expect(openFileRigCatalog(path)).rejects.toThrow(RigCatalogFileError)
-    } finally { await rm(dirname(path), { recursive: true, force: true }) }
+    } finally {
+      await rm(dirname(path), { recursive: true, force: true })
+    }
   })
 
   it('starts empty when the file is missing and survives a restart after the first add', async () => {

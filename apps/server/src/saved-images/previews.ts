@@ -9,7 +9,8 @@ import { MAX_RETAINED_FITS_BYTES, readRetainedFits } from '../imaging/read-retai
 import { syncDirectory, writeDurable } from './durable-files.js'
 
 const descriptorSchema = z.object({
-  source: z.enum(['original', 'derived']), fit: z.boolean(),
+  source: z.enum(['original', 'derived']),
+  fit: z.boolean(),
   fitsSha256: z.string().regex(/^[a-f0-9]{64}$/),
 })
 
@@ -20,16 +21,31 @@ const sha256 = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex
 export function currentPreview(image: SavedImage, fit: boolean): SavedImage {
   const base = `/api/rigs/${encodeURIComponent(image.rigId)}/saved-images/${encodeURIComponent(image.id)}/previews/${PREVIEW_VERSION}`
   const { fitImageUrl: _fit, ...original } = image
-  const current: SavedImage = { ...original, imageUrl: `${base}/preview`, previewDownloadUrl: `${base}/download-preview`, previewRendering: { status: 'current', version: PREVIEW_VERSION } }
+
+  const current: SavedImage = {
+    ...original,
+    imageUrl: `${base}/preview`,
+    previewDownloadUrl: `${base}/download-preview`,
+    previewRendering: { status: 'current', version: PREVIEW_VERSION },
+  }
 
   return fit ? { ...current, fitImageUrl: `${base}/fit` } : current
 }
 
 /** Called inside a new save's unpublished staging directory; first PNG already uses this renderer. */
-export async function markCurrentPreview(directory: string, fits: Buffer, fit: boolean, openFile: typeof open) {
+export async function markCurrentPreview(
+  directory: string,
+  fits: Buffer,
+  fit: boolean,
+  openFile: typeof open,
+) {
   const destination = versionDirectory(directory)
   await mkdir(destination, { recursive: true })
-  await writeDurable(join(destination, 'manifest.json'), JSON.stringify({ source: 'original', fit, fitsSha256: sha256(fits) }), openFile)
+  await writeDurable(
+    join(destination, 'manifest.json'),
+    JSON.stringify({ source: 'original', fit, fitsSha256: sha256(fits) }),
+    openFile,
+  )
   await syncDirectory(destination)
   await syncDirectory(join(directory, 'previews'))
 }
@@ -66,7 +82,9 @@ export function createRetainedPreviews(openFile: typeof open) {
     try {
       const current = await descriptor(directory)
 
-      return current ? currentPreview(image, current.fit) : { ...image, previewRendering: { status: 'legacy' } }
+      return current
+        ? currentPreview(image, current.fit)
+        : { ...image, previewRendering: { status: 'legacy' } }
     } catch {
       return { ...image, previewRendering: { status: 'unavailable' } }
     }
@@ -80,11 +98,16 @@ export function createRetainedPreviews(openFile: typeof open) {
       const fitsPath = join(directory, 'original.fits')
       const info = await stat(fitsPath)
 
-      if (!info.isFile() || info.size > MAX_RETAINED_FITS_BYTES) throw new Error('Original FITS exceeds preview limits')
+      if (!info.isFile() || info.size > MAX_RETAINED_FITS_BYTES)
+        throw new Error('Original FITS exceeds preview limits')
       const fits = await readFile(fitsPath)
       const frame = await readRetainedFits(fits)
 
-      if (frame.width !== image.width || frame.height !== image.height || (frame.color.kind === 'mono' ? 'mono' : 'color') !== image.color) throw new Error('FITS does not match saved capture dimensions or color')
+      if (
+        frame.width !== image.width
+        || frame.height !== image.height
+        || (frame.color.kind === 'mono' ? 'mono' : 'color') !== image.color
+      ) throw new Error('FITS does not match saved capture dimensions or color')
       const rendered = await capturePreviews(frame.width, frame.height, frame.pixels, frame.color)
       const parent = join(directory, 'previews')
       await mkdir(parent, { recursive: true })
@@ -95,7 +118,11 @@ export function createRetainedPreviews(openFile: typeof open) {
         await writeDurable(join(temporary, 'preview.png'), rendered.native, openFile)
 
         if (rendered.fit) await writeDurable(join(temporary, 'fit.png'), rendered.fit, openFile)
-        await writeDurable(join(temporary, 'manifest.json'), JSON.stringify({ source: 'derived', fit: !!rendered.fit, fitsSha256: sha256(fits) }), openFile)
+        await writeDurable(
+          join(temporary, 'manifest.json'),
+          JSON.stringify({ source: 'derived', fit: !!rendered.fit, fitsSha256: sha256(fits) }),
+          openFile,
+        )
         await syncDirectory(temporary)
         await rename(temporary, versionDirectory(directory))
         await syncDirectory(parent)

@@ -6,7 +6,14 @@ const patterns: BayerPattern[] = ['rggb', 'grbg', 'gbrg', 'bggr']
 // Preserve the pre-optimization neighborhood algorithm as an independent oracle.
 // Its traversal, in-frame averaging, and absent-channel fallback define the pixels
 // the faster phase-specific implementation must continue to produce exactly.
-function originalBayerPixel(width: number, height: number, pixels: ArrayLike<number>, pattern: BayerPattern, x: number, y: number) {
+function originalBayerPixel(
+  width: number,
+  height: number,
+  pixels: ArrayLike<number>,
+  pattern: BayerPattern,
+  x: number,
+  y: number,
+) {
   const values = [0, 0, 0]
   const counts = [0, 0, 0]
   const channelAt = (px: number, py: number) => 'rgb'.indexOf(pattern[(py % 2) * 2 + px % 2]!)
@@ -16,7 +23,8 @@ function originalBayerPixel(width: number, height: number, pixels: ArrayLike<num
 
   for (let dy = -1; dy <= 1; dy++) {
     for (let dx = -1; dx <= 1; dx++) {
-      const px = x + dx, py = y + dy
+      const px = x + dx
+      const py = y + dy
 
       if (px < 0 || py < 0 || px >= width || py >= height) continue
       const channel = channelAt(px, py)
@@ -27,7 +35,9 @@ function originalBayerPixel(width: number, height: number, pixels: ArrayLike<num
     }
   }
 
-  return values.map((value, channel) => counts[channel] ? value / counts[channel]! : pixels[y * width + x]!)
+  return values.map((value, channel) =>
+    counts[channel] ? value / counts[channel]! : pixels[y * width + x]!,
+  )
 }
 
 describe('Bayer interpolation', () => {
@@ -41,17 +51,25 @@ describe('Bayer interpolation', () => {
       [-2147483648, 2147483647, -70001, 70003, -1, 0, 65536, 1073741824],
     ]
 
-    for (const width of dimensions) for (const height of dimensions) {
-      for (const samples of sampleSets) {
-        const pixels = Int32Array.from({ length: width * height }, (_, index) => samples[(index * 5 + Math.floor(index / width) * 3) % samples.length]!)
-        const before = pixels.slice()
+    for (const width of dimensions) {
+      for (const height of dimensions) {
+        for (const samples of sampleSets) {
+          const pixels = Int32Array.from(
+            { length: width * height },
+            (_, index) => samples[(index * 5 + Math.floor(index / width) * 3) % samples.length]!,
+          )
 
-        for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
-          expect(bayerPixel(width, height, pixels, pattern, x, y), `${width}x${height} at (${x}, ${y})`)
-            .toEqual(originalBayerPixel(width, height, pixels, pattern, x, y))
+          const before = pixels.slice()
+
+          for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+              expect(bayerPixel(width, height, pixels, pattern, x, y), `${width}x${height} at (${x}, ${y})`)
+                .toEqual(originalBayerPixel(width, height, pixels, pattern, x, y))
+            }
+          }
+
+          expect(pixels).toEqual(before)
         }
-
-        expect(pixels).toEqual(before)
       }
     }
   })

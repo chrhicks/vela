@@ -4,13 +4,26 @@ import { readRetainedFits } from './read-retained-fits.js'
 // Independent FITS construction: not the production encoder under test in the other workstream.
 function fixture(bitpix: 16 | 32, samples: number[], extra: string[] = []) {
   const card = (key: string, value: string) => `${key.padEnd(8)}= ${value}`.padEnd(80)
-  const cards = [card('SIMPLE', 'T'), card('BITPIX', String(bitpix)), card('NAXIS', '2'), card('NAXIS1', '2'), card('NAXIS2', '2'), card('ROWORDER', "'TOP-DOWN'"), card('BAYERPAT', "'GRBG'"), ...extra]
+
+  const cards = [
+    card('SIMPLE', 'T'),
+    card('BITPIX', String(bitpix)),
+    card('NAXIS', '2'),
+    card('NAXIS1', '2'),
+    card('NAXIS2', '2'),
+    card('ROWORDER', "'TOP-DOWN'"),
+    card('BAYERPAT', "'GRBG'"),
+    ...extra,
+  ]
 
   if (bitpix === 16) cards.push(card('BZERO', '32768'), card('BSCALE', '1'))
   const bytes = Buffer.alloc(5760)
   bytes.fill(32, 0, 2880)
   bytes.write([...cards, 'END'.padEnd(80)].join(''))
-  samples.forEach((value, i) => bitpix === 16 ? bytes.writeInt16BE(value - 32768, 2880 + i * 2) : bytes.writeInt32BE(value, 2880 + i * 4))
+  samples.forEach((value, i) => bitpix === 16
+    ? bytes.writeInt16BE(value - 32768, 2880 + i * 2)
+    : bytes.writeInt32BE(value, 2880 + i * 4),
+  )
 
   return bytes
 }

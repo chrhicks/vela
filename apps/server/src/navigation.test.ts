@@ -16,8 +16,12 @@ it('serves catalog identities at composition without hardware or storage queries
     expect((await app.inject('/api/web/navigation')).json()).toEqual({ rigs: [], captures: [] })
 
     const added = await catalog.add({
-      name: 'Offline Rig', endpoint: { host: 'offline.local', port: 11111 },
-      inventory: { observedAt: '2026-09-01T20:00:00.000Z', devices: [{ uniqueId: 'camera', kind: 'camera', name: 'Camera' }] },
+      name: 'Offline Rig',
+      endpoint: { host: 'offline.local', port: 11111 },
+      inventory: {
+        observedAt: '2026-09-01T20:00:00.000Z',
+        devices: [{ uniqueId: 'camera', kind: 'camera', name: 'Camera' }],
+      },
     })
 
     expect(added.state).toBe('added')
