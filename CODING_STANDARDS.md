@@ -13,18 +13,151 @@ Code is Vela's primary documentation. A reader should understand ordinary behavi
 - Keep functions and modules focused enough to reason about locally.
 - Push protocol, framework, and vendor complexity behind narrow boundaries.
 - Isolate warranted sophistication so callers use a simple interface.
-- Do not compress code merely to make it shorter.
+- Prefer visible structure over fewer lines or tokens. Neither a shorter file nor a longer one is inherently more readable.
 
 If an area requires repeated cross-file tracing to explain, inspect the architecture before adding comments or another abstraction.
 
 ## Formatting
 
-- Indent with two spaces; do not use tabs.
-- Omit semicolons unless syntax requires one.
-- Follow the established style in the file being changed.
-- Keep unrelated formatting changes out of focused work.
+Keep simple units compact. Expand code when doing so makes its fields, actions,
+decisions, or hierarchy easier to see. Readability is the goal, not fewer lines
+or more lines.
 
-Do not add a formatter, linter, Git hook, or CI check solely to enforce these preferences unless Chris asks for one.
+Preserve local domain names, APIs, and architectural patterns. Use these
+formatting defaults for new and edited code even when nearby code is denser;
+existing layout is not the formatting standard. Apply them to the logical block
+being changed, without unrelated file-wide cleanup.
+
+### Basic layout
+
+- Indent with two spaces; do not use tabs.
+- Omit semicolons unless syntax requires one. Do not use semicolons to pack
+  multiple statements onto one line.
+- Use blank lines to separate meaningful steps or groups. Keep closely related
+  bindings together; do not separate every statement mechanically.
+- Judge wrapping by length and complexity. Do not fill lines to a target width
+  or expand every expression merely for consistency.
+
+### Parameters, arguments, objects, types, and arrays
+
+- Keep short function signatures and calls on one line. Around two or three
+  substantial parameters or arguments, consider their combined length and
+  expand when that makes them easier to scan.
+- When a parameter or argument list is expanded, put each item on its own line
+  and the closing parenthesis on a separate line. An object argument may keep
+  its delimiters with the call, as in `capture({ ... })`.
+- Give substantial object literals, types, and destructuring patterns one field
+  per line. Small nested objects can remain inline inside an expanded object.
+- Keep small, easily absorbed objects inline. Field count alone does not decide
+  the layout: shorthand values are lighter to read than calculations or nested
+  expressions.
+- Apply the same principle to arrays: keep small, cohesive lists inline, and
+  expand substantial lists to one item per line. Long React hook dependency
+  arrays should put each dependency on its own line; short ones can stay inline.
+
+```ts
+const previewSize = { width: 960, height: 640 }
+
+return { title, canStop, countLabel }
+```
+
+```ts
+return {
+  elapsedSeconds,
+  remainingSeconds,
+  fraction: Math.min(1, elapsedSeconds / exposureSeconds)
+}
+```
+
+### Guards and callback bodies
+
+- Short terminal guards may stay inline without braces. For a longer guard,
+  put its action on the next indented line. Use braced blocks for multiple
+  statements and for branches that group workflow actions.
+- Keep simple expression callbacks inline. Expand callbacks that perform
+  multiple actions, with one statement per line.
+
+```ts
+if (startedAt === null) return null
+
+if (exposureSeconds <= 0)
+  throw new Error('Exposure duration must be positive')
+```
+
+```ts
+const cameraNames = cameras.map(camera => camera.name)
+```
+
+```ts
+onProgress(progress) {
+  latestProgress = progress
+  publishProgress(progress)
+}
+```
+
+### JSX
+
+- Wrap multiline returned JSX in parentheses and indent the markup inside them.
+- Put nested and sibling elements on separate lines so the hierarchy is visible.
+  Short leaf elements can stay on one line.
+- Keep short prop lists inline. Expand long prop lists to one prop per line;
+  put the closing `>` or `/>` on its own line when the opening tag is expanded.
+- For substantial conditional markup, keep the condition together and wrap the
+  JSX in parentheses on subsequent lines. A short condition and short element
+  can remain inline.
+- Use blank lines between meaningful visual groups rather than between every
+  element.
+
+```tsx
+return (
+  <section className="capture-summary" aria-label="Current capture">
+    <header>
+      <h2>{activity.rigName}</h2>
+      <span>{activity.status}</span>
+    </header>
+
+    {activity.progress && !activity.interrupted && (
+      <progress
+        value={activity.progress.value}
+        max={activity.progress.max}
+        aria-label="Exposure progress"
+      />
+    )}
+
+    {activity.interrupted && <p>Showing the last confirmed state.</p>}
+  </section>
+)
+```
+
+### Conditional expressions
+
+- Keep a short ternary for a simple choice. If the binding makes the line long,
+  the expression may begin on the next indented line.
+- A short ternary chain can remain an expression when its precedence is easy
+  to follow. When wrapping it, put `?` and `:` branches on separate lines and
+  indent each further decision to show the nesting.
+- Keep chains to one or two decisions. Three decision levels are a code smell:
+  prefer explicit branches rather than merely wrapping the chain over more
+  lines. Even two decisions should become branches if the expression is hard
+  to follow.
+
+```ts
+const countLabel =
+  view.completedCount === 1 ? '1 image' : `${view.completedCount} images`
+
+const title = view.interrupted
+  ? 'Readings interrupted'
+  : view.active
+    ? 'Capturing'
+    : 'Ready'
+```
+
+Do not add comments, redundant variables, wrapper functions, or abstractions
+merely to make code appear more expansive. First make the existing structure
+easy to read.
+
+Do not add a formatter, linter, Git hook, or CI check solely to enforce these
+preferences unless Chris asks for one.
 
 ## Types and boundaries
 
