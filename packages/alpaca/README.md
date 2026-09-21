@@ -177,8 +177,8 @@ coordinate frames its workflow supports.
   observation again, not acquisition completion. Elapsed progress does not advance
   through missing reads. Pre-start reads, decoded driver/HTTP rejections, malformed
   responses, uncertain writes and abort cleanup are not retried by this loop.
-  Response-body timeouts are transport failures; non-timeout body-stream error
-  classification remains a separate transport follow-up.
+  Response-body timeouts and stream termination are transport failures, including
+  after headers arrive. Completed malformed payloads remain invalid responses.
 - Recovery rechecks the same stable camera slot, observed name, connection and
   image dimensions/color before continuing. Changed slot/name ends with the
   original exposure outcome unconfirmed, without aborting a replacement camera.
