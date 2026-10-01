@@ -71,7 +71,21 @@ Open [Explore sky access](http://127.0.0.1:5174/?component=panel&specimen=panel-
 UI typecheck, workshop build and lint pass. Native-browser inspection confirmed
 the nine-card desktop layout, selected-subject icon/dialog and dismissal, and
 phone selection scroll/focus without horizontal overflow. These are workshop
-checks; this proposal has not changed the application.
+checks. Chris approved this faithful Explore-only proposal on 2026-10-01.
+
+### Explore adoption
+
+Explore now places the approved SVG IconButton beside the selected subject's
+Through the night heading and opens the existing production sky inspection in
+the approved 560px dialog. The redundant sky panel is removed from the bottom
+facts disclosure. Real server samples, Moon positions, light phases and stale
+feedback remain in use. Framing and the other audit proposals remain deferred.
+
+Focused browser checks cover direct access, subject changes, scrub-time retention,
+dismissal/focus restoration, interrupted data and bounds at 1280px and 390px,
+alongside existing discovery and framing-sky regression coverage. Web build and
+lint pass. Independent verification and Chris's application acceptance follow
+the workshop approval separately.
 
 ### Earlier exploratory composition
 

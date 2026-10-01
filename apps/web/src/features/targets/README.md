@@ -54,10 +54,13 @@ are generated Vela test fixtures, never application assets.
 `SkyInspection` adopts the promoted SkyPath primitive in Through the night.
 The server supplies target azimuth/altitude and topocentric Moon positions at
 matching 15-minute timestamps. The browser formats local time and retains the
-selected timestamp across refreshes and compact/expanded views. A new night
+selected timestamp across refreshes and compact/expanded views. A new subject or night
 resets selection. The view reports daylight/twilight/darkness for the selected
 sample and keeps the last calculation explicitly marked during interruption.
-The expanded dialog is portaled inside the app theme, outside the framing
+Explore opens the sky directly from the icon beside the selected subject’s
+Through the night heading, using the approved `Panel.explore-sky` composition.
+Subject facts retain catalog and imaging advice; framing keeps its compact sky
+with an expanded view. The dialog is portaled inside the app theme, outside the framing
 container, with background interaction disabled until dismissal.
 
 No local obstruction profile is currently loaded. The geometric dome explicitly
