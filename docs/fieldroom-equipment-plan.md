@@ -1,7 +1,7 @@
 # Equipment, Home, and rig onboarding
 
-Status: implementation and focused checks complete; independent verification
-and the final parent visual gate are pending. Work began after Photographs
+Status: accepted as an intermediate slice after independent **OK** at
+`a50c6bb` and the final parent visual comparison on 2026-10-01. Work began after Photographs
 passed independent OK at `99195ae` and visual acceptance in `58fb7e4`.
 
 ## Scope and visual authority
@@ -342,7 +342,7 @@ last-seen observations, since its projection provides neither endpoints nor
 selected-camera identity. These are factual substitutions to the source, not
 new fields. The empty-catalog shell shows “No rig added” only after a successful
 current navigation read. Workshop screenshots and geometry are retained under
-`/tmp/vela-equipment-workshop/`; production verification remains outstanding.
+`/tmp/vela-equipment-workshop/`; production evidence is retained in the acceptance directory linked below.
 
 Production comparison found two concrete adoption differences and corrected
 them before independent review. Home's copied specimen minimum height added
@@ -384,8 +384,16 @@ Independent review of `7aa5bf2` returned **BLOCK**: the new Add/Forget saved-sta
 checks disabled dismissal while awaiting reads with no deadlines. Both now use
 five-second read deadlines. Focused stalled-request regressions prove controls
 recover, uncertainty and drafts remain, a later explicit check can succeed, and
-the Add/DELETE write count stays one. No automatic retry was introduced. A fresh
-independent verdict is required for the corrected head before visual acceptance.
+the Add/DELETE write count stays one. No automatic retry was introduced. The fresh
+independent review returned **OK** at `a50c6bb`, with no findings. It ran all 911
+project tests/builds, 108 app browser checks, 46 workshop checks and four Python
+checks. The parent then reran 26 reference/onboarding rendering checks and four
+supplemental interruption/Forget checks, and inspected desktop, intermediate and
+phone results in both palettes against frozen references and accepted specimens.
+The slice is accepted under the intermediate-review authorization; Chris’s final
+whole-app acceptance remains pending. [Retained evidence and reproduction](visual-evidence/fieldroom/equipment-home/README.md)
+distinguish native DOM observations from project-harness raster evidence. No
+production code changed after the OK verdict.
 
 ## Settled implementation refinements
 

@@ -1,0 +1,30 @@
+import { test, expect } from '@playwright/test'
+import { openEquipmentScene } from './fixtures/fieldroom/browser'
+
+for (const mode of ['light', 'dark'] as const) {
+  for (const width of [1440, 390]) {
+    test(`Equipment supplemental ${mode} ${width}`, async ({ page }) => {
+      await page.setViewportSize({ width, height: width === 390 ? 782 : 921 })
+      const { scene } = await openEquipmentScene(page, mode === 'dark' ? 'equipment-dark' : 'equipment-connected')
+      await page.getByRole('button', { name: 'Show ZWO ASI2600MC Pro details', exact: true }).click()
+      await expect(page.getByText('38%', { exact: true })).toBeVisible()
+      scene.setDetailFailure(503)
+      await page.getByRole('button', { name: 'Refresh state', exact: true }).click()
+      await expect(page.getByText(/last known/i).first()).toBeVisible()
+      await page.evaluate(() => document.fonts.ready)
+      await page.mouse.move(0, 0)
+      await page.screenshot({ path: `/tmp/vela-equipment-interrupted-${mode}-${width}.png`, fullPage: true })
+      scene.setDetailFailure(null)
+      await page.getByRole('button', { name: 'Refresh state', exact: true }).click()
+      await expect(page.getByText(/last known/i)).toHaveCount(0)
+      await page.getByText('Rig details', { exact: true }).click()
+      await page.getByRole('button', { name: 'Forget rig', exact: true }).click()
+      const dialog = page.getByRole('dialog')
+      await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused()
+      await page.evaluate(async () => { await Promise.all(document.getAnimations().filter(a => a.effect?.getComputedTiming().iterations !== Infinity).map(a => a.finished.catch(() => {}))) })
+      await page.screenshot({ path: `/tmp/vela-equipment-forget-${mode}-${width}.png`, fullPage: false })
+      expect(scene.writes).toEqual([])
+      expect(scene.unknownRequests).toEqual([])
+    })
+  }
+}
