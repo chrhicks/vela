@@ -47,3 +47,61 @@ Appearance is opened through its actual navigation control. Image held/native,
 expiry, pending Keep, and new-image arrival transitions are exercised through the
 focused `image-inspection.e2e.ts` scenarios. Their test responses remain scoped
 to those transitions instead of adding a general fixture scripting engine.
+
+## Explore, framing and preparation
+
+`scenes.ts` is the small registry used by the same review server. `explore.ts`
+adds real-route catalog, framing and preparation scenes. Requests include their
+query strings, so search, filter and page-size behavior reaches the fixture
+boundary. `ReviewResponse.resource` selects only an exact entry in `resources.ts`;
+there is no arbitrary filesystem lookup. Unknown API routes return failures and
+never fall through to Vite's development proxy or an observatory adapter.
+
+Explore uses the pinned Crescent, Andromeda and M13 photographs already owned by
+`packages/ui/src/drafts/target-framing`. Rigless Explore sends no rig reads and
+omits every sky/site/opportunity field. Named scenes include missing site,
+no astronomical darkness, empty results, unavailable reference images, expired
+snapshot and interrupted reads. Fixture coordinates and sky samples are illustrative
+contract data; they do not estimate a site from the browser or host.
+
+Framing uses production Aladin and its real projection/footprint interaction.
+`survey-manifest.json` pins the exact DSS2 HiPS resources needed by the desktop
+and compact Crescent scenes. Nine resources came from the existing Vela survey
+cache; five missing compact-view order-3 tiles were downloaded individually from
+the same fixed CDS survey on 2026-10-01. They retain exact JPEG bytes and source
+URLs, with SHA-256 verified by both the development server and browser tests.
+The retained `survey/properties` carries STScI/NASA image copyright and CDS credit.
+Survey metadata is ODbL-1.0; see the retained source properties and the application's
+survey attribution. No gray synthetic tile replaces the actual sky, and no network
+fallback supplies missing review tiles. Aladin's optional `Moc.fits` probe returns
+404, consistent with production's supported-path boundary; it is not an image tile.
+Panning beyond the pinned region can leave high-resolution tiles unavailable.
+
+The framing-preview resource serves the unchanged source Crescent photograph with
+its real 1280×1224 dimensions and JPEG MIME type under a mocked acquisition URL.
+It is explicitly labeled as a reference/mock exposure, never represented as newly
+captured hardware data. Framing exposes separate solved, newer-unsolved, obsolete,
+read-retrying, centering, interrupted and preview-unavailable scenes. The unsolved
+scene retains the older footprint but supplies the newer acquisition's own image
+and null solved-check ID.
+
+Preparation scenes start with no active capture. The remembered imaging camera
+has a second available choice; changing the selection alone sends no command.
+Camera save, capture Start and cooling mutate only that session. Failed save,
+uncertain Start and uncertain cooling have distinct scenes; state-inspection GETs
+do not replay writes. The normal preparation scene's 10-second exposure,
+21:06:18 timestamp, 842 stars / 2.1px HFR and −8.6°C / −10°C / 62% cooling are
+explicit illustrative source fixtures. The old check is marked non-current,
+while the preview keeps its exact acquisition association and Temporary status.
+No saved framing artifact is claimed. `preparation-unframed` exercises absent
+preview state rather than copying the latest capture into that region.
+
+`fieldroom-explore.e2e.ts` and `preparation.e2e.ts` exercise real route behavior at
+1440px and 390px in both palettes. Captures await font loading, decoded images and
+finite control animations; Aladin captures additionally wait for exact tile
+requests, the real solved footprint and completed rendering frames. They emit
+`/tmp/vela-{explore,framing,preparation}-{light,dark}-{1440,390}.png`; framing also
+records the requested resource list beside each PNG. Preparation tests cover
+unsaved-camera Start blocking, failed save, exact subject handoff on accepted
+Start, no navigation/replay after an uncertain Start, independent cooling,
+Appearance draft/pixel preservation and Fit/native pan/enlargement return focus.

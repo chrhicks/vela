@@ -1,6 +1,6 @@
 # Targets and framing
 
-The target routes adopt the approved target/framing workshop composition. The
+The target routes adopt the approved Fieldroom Explore/framing composition. The
 catalog, site-based sky paths, calibrated camera dimensions, and operation
 state arrive from the server. The browser owns unsaved composition offsets and
 survey navigation. It never derives observatory readiness from device telemetry.
@@ -76,7 +76,9 @@ Both compact and expanded views share the same phases and selected time.
 
 ## Discovery browsing
 
-`TargetBrowser` adopts the Target discovery workshop specimen. `use-discovery`
+`TargetBrowser` presents three catalog cards, a selected-subject summary and an
+explicit Frame this subject link. View subject changes selection only; it never
+slews. `use-discovery`
 restores the last validated page from localStorage per rig, immediately and
 without a background recalculation. Type, optical preference, search and page
 requests share the server snapshot. Refresh deliberately replaces that snapshot
@@ -88,3 +90,28 @@ could not load. Expired server snapshots require explicit Refresh. Storage
 failures do not prevent browsing. Search/filter/page choices travel in the detail
 link so returning from framing preserves the discovery context. The cache owns
 no rig control state.
+
+
+Fieldroom requests three results per page. Stored pages with another page size
+are ignored rather than painted under the new presentation. Search/type/filter,
+page and selected subject travel in URL state; the displayed result remains
+associated with its confirmed query when a replacement request fails.
+
+`/explore` uses a separate rig-less catalog projection and no observing-site
+values. Reference imagery, intrinsic dimensions/classification and optical-filter
+advice remain available. A rig is required for a framing command or a sky window;
+browsing alone never commands hardware. The existing operational route retains
+its frozen site/time snapshot and explicit Update sky.
+
+`FramingExposure` shows the exact temporary framing acquisition, independent of
+whether a position could be solved. Nullable check identity never lends a newer
+unsolved preview the authority of an earlier WCS. It uses the shared image
+inspection mechanism, with real fitted/native resources and no Capture Keep or
+Saved claim. Image retries are exact GETs, not new exposures. Missing native bytes
+leave already loaded pixels visible. Source statistics come from that exposure;
+unavailable analysis is not zero stars.
+
+Continue to capture keeps its exact current-check/target/composition guards and
+opens `/observe?target=…` for preparation. Starting remains a separate explicit
+command. Detailed sky inspection, centering history and frame nudges are retained
+in progressive disclosures; reference-view reset/zoom never edits composition.

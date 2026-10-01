@@ -62,6 +62,9 @@ export type {
   TargetSkyPath,
   TargetsView,
   FramingView,
+  FramingPreview,
+  TargetCatalogItem,
+  TargetCatalogView,
   FramingCentering,
   FramingPointingSide,
 } from './targets.js'

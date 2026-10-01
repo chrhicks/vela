@@ -16,13 +16,13 @@ export function savedDiscovery(rigId: string): TargetDiscoveryView | null {
   try {
     const value: unknown = JSON.parse(localStorage.getItem(key(rigId)) ?? 'null')
 
-    return isTargetDiscovery(value, rigId) ? value : null
+    return isTargetDiscovery(value, rigId) && value.pageSize === 3 ? value : null
   } catch {
     return null
   }
 }
 
-export function selectionOf(view: TargetDiscoveryView): DiscoverySelection {
+export function selectionOf(view: DiscoverySelection): DiscoverySelection {
   return {
     query: view.query,
     category: view.category,
@@ -54,7 +54,8 @@ export function useDiscovery(rigId: string, selection: DiscoverySelection) {
       existing.query === query &&
       existing.category === category &&
       existing.filter === filter &&
-      existing.offset === offset
+      existing.offset === offset &&
+      existing.pageSize === 3
     ) {
       setLoading(false)
       setError(null)
@@ -64,7 +65,14 @@ export function useDiscovery(rigId: string, selection: DiscoverySelection) {
 
     const controller = new AbortController()
     const version = ++requestVersion.current
-    const params = new URLSearchParams({ q: query, category, filter, offset: String(offset) })
+
+    const params = new URLSearchParams({
+      q: query,
+      category,
+      filter,
+      offset: String(offset),
+      pageSize: '3',
+    })
 
     if (!refreshed && snapshot.current) params.set('snapshot', snapshot.current)
     setLoading(true)
@@ -72,8 +80,9 @@ export function useDiscovery(rigId: string, selection: DiscoverySelection) {
     void api(`web/rigs/${encodeURIComponent(rigId)}/target-discovery?${params}`, {
       signal: AbortSignal.any([controller.signal, AbortSignal.timeout(30000)]),
     })
-      .then(next => {
-        if (!isTargetDiscovery(next, rigId)) throw new Error('Invalid discovery response')
+      .then((next) => {
+        if (!isTargetDiscovery(next, rigId) || next.pageSize !== 3)
+          throw new Error('Invalid discovery response')
 
         if (controller.signal.aborted || version !== requestVersion.current) return
         snapshot.current = next.snapshotId
@@ -88,14 +97,14 @@ export function useDiscovery(rigId: string, selection: DiscoverySelection) {
           /* Browsing remains available when storage is full or disabled. */
         }
       })
-      .catch(cause => {
+      .catch((cause) => {
         if (controller.signal.aborted || version !== requestVersion.current) return
         setError(
           cause instanceof ApiError && cause.status === 410
-            ? 'This saved calculation is no longer available on the server. Refresh to calculate from now.'
+            ? 'This saved calculation is no longer available on the server. Update sky to calculate from now.'
             : current.current
-              ? 'Could not load these targets. Your last result is still here; try Refresh when the connection returns.'
-              : 'Could not load targets. Try Refresh when the connection returns.',
+              ? 'Could not load these targets. Your last result is still here; try Update sky when the connection returns.'
+              : 'Could not load targets. Try Update sky when the connection returns.',
         )
       })
       .finally(() => {
@@ -107,7 +116,7 @@ export function useDiscovery(rigId: string, selection: DiscoverySelection) {
 
   const refresh = useCallback(() => {
     needsRefresh.current = true
-    setRefreshVersion(value => value + 1)
+    setRefreshVersion((value) => value + 1)
   }, [])
 
   return { view, loading, error, saved, refresh }

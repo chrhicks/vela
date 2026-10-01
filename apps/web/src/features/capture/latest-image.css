@@ -189,12 +189,12 @@
   aspect-ratio: 886 / 560;
   background: var(--vela-surface);
 }
-.capture-image--fieldroom .capture-image__window[data-zoomed] {
+.capture-image__window[data-zoomed] {
   cursor: grab;
   touch-action: none;
   overscroll-behavior: contain;
 }
-.capture-image--fieldroom .capture-image__window[data-zoomed]:active {
+.capture-image__window[data-zoomed]:active {
   cursor: grabbing;
 }
 .capture-image__metadata {

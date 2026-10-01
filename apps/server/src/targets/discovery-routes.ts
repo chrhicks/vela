@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { randomUUID } from 'node:crypto'
 import type { FastifyInstance } from 'fastify'
-import type { TargetDiscoveryView, TargetView } from '@vela/model/web'
+import type { TargetCatalogView, TargetDiscoveryView, TargetView } from '@vela/model/web'
 import type { RigCatalog } from '../rig/catalog.js'
 import type { RigCatalogRecord } from '../rig/contracts.js'
 import { listTargets, normalizeCatalogName, type CatalogTarget } from './catalog/index.js'
@@ -58,6 +58,28 @@ export function registerTargetDiscovery(
     }
   }
 
+  app.get('/api/web/target-catalog', async (request, reply) => {
+    const parsed = querySchema.safeParse(request.query)
+
+    if (!parsed.success) return reply.code(400).send({ error: 'Invalid catalog request' })
+    const { q: query, category, filter } = parsed.data
+    const calculation = discoverTargets({ targets: listTargets(), site: null, now: boundary.now() })
+
+    const page = catalogPage(calculation, parsed.data, target =>
+      boundary.targetView(target, null, boundary.now()),
+    )
+
+    const view: TargetCatalogView = {
+      query,
+      category,
+      filter,
+      ...page,
+      targets: page.targets.map(({ sky: _sky, opportunity: _opportunity, ...target }) => target),
+    }
+
+    return view
+  })
+
   app.get<{
     Params: { rigId: string }
     Querystring: {
@@ -66,29 +88,20 @@ export function registerTargetDiscovery(
       category?: string
       filter?: string
       offset?: string
+      pageSize?: string
     }
   }>('/api/web/rigs/:rigId/target-discovery', async (request, reply) => {
     const rig = await catalog.get(request.params.rigId)
 
     if (!rig) return reply.code(404).send({ error: 'Rig not found' })
 
-    const parsed = z
-      .object({
-        q: z.string().trim().max(100).default(''),
-        category: z.enum(categories).default('all'),
-        filter: z.enum(filters).default('all'),
-        offset: z.string().default('0').transform(Number).pipe(z.number().int().min(0).max(15000)),
-        snapshot: z
-          .string()
-          .regex(/^[0-9a-f-]{36}$/)
-          .optional(),
-      })
-      .catchall(z.string())
+    const parsed = querySchema
+      .extend({ snapshot: z.string().regex(/^[0-9a-f-]{36}$/).optional() })
       .safeParse(request.query)
 
     if (!parsed.success) return reply.code(400).send({ error: 'Invalid discovery request' })
     const values = parsed.data
-    const { q: query, category, filter, offset } = values
+    const { q: query, category, filter } = values
 
     let snapshotId = values.snapshot
     let snapshot = snapshotId ? snapshots.get(snapshotId) : undefined
@@ -108,32 +121,9 @@ export function registerTargetDiscovery(
       while (snapshots.size > 12) snapshots.delete(snapshots.keys().next().value!)
     }
 
-    const key = normalizeCatalogName(query)
-
-    const matches = snapshot.calculation.candidates.filter(candidate => {
-      const target = candidate.target
-
-      const matchesQuery =
-        !key ||
-        [...target.aliases, target.catalogName, target.commonName ?? '', target.type].some(value =>
-          normalizeCatalogName(value).includes(key),
-        )
-
-      return (
-        matchesQuery &&
-        (Boolean(key) ||
-          snapshot.calculation.status === 'site-unavailable' ||
-          candidate.eligible) &&
-        (category === 'all' || candidate.category === category) &&
-        (filter === 'all' || candidate.filter === filter)
-      )
-    })
-
-    const pageSize = 12
-
-    const pageOffset = matches.length
-      ? Math.min(offset, Math.floor((matches.length - 1) / pageSize) * pageSize)
-      : 0
+    const page = catalogPage(snapshot.calculation, values, target =>
+      boundary.targetView(target, snapshot.site, snapshot.at),
+    )
 
     const view: TargetDiscoveryView = {
       rigId: rig.id,
@@ -147,18 +137,58 @@ export function registerTargetDiscovery(
       query,
       category,
       filter,
-      offset: pageOffset,
-      pageSize,
-      total: matches.length,
-      targets: matches.slice(pageOffset, pageOffset + pageSize).map(candidate => ({
-        ...boundary.targetView(candidate.target, snapshot.site, snapshot.at),
-        category: candidate.category,
-        filterChoice: candidate.filter,
-        filterReason: reasons[candidate.filterReason],
-        opportunity: candidate.opportunity,
-      })),
+      ...page,
     }
 
     return view
   })
+}
+
+const querySchema = z.object({
+  q: z.string().trim().max(100).default(''),
+  category: z.enum(categories).default('all'),
+  filter: z.enum(filters).default('all'),
+  offset: z.string().default('0').transform(Number).pipe(z.number().int().min(0).max(15000)),
+  pageSize: z.string().default('12').transform(Number).pipe(z.number().int().min(1).max(12)),
+}).catchall(z.string())
+
+function catalogPage(
+  calculation: ReturnType<typeof discoverTargets>,
+  { q: query, category, filter, offset, pageSize }: z.infer<typeof querySchema>,
+  targetView: (target: CatalogTarget) => TargetView,
+) {
+  const key = normalizeCatalogName(query)
+
+  const matches = calculation.candidates.filter(candidate => {
+    const target = candidate.target
+
+    const matchesQuery = !key ||
+      [...target.aliases, target.catalogName, target.commonName ?? '', target.type].some(value =>
+        normalizeCatalogName(value).includes(key),
+      )
+
+    return (
+      matchesQuery &&
+      (Boolean(key) || calculation.status === 'site-unavailable' || candidate.eligible) &&
+      (category === 'all' || candidate.category === category) &&
+      (filter === 'all' || candidate.filter === filter)
+    )
+  })
+
+  const pageOffset = matches.length
+    ? Math.min(offset, Math.floor((matches.length - 1) / pageSize) * pageSize)
+    : 0
+
+  return {
+    offset: pageOffset,
+    pageSize,
+    total: matches.length,
+    targets: matches.slice(pageOffset, pageOffset + pageSize).map(candidate => ({
+      ...targetView(candidate.target),
+      category: candidate.category,
+      filterChoice: candidate.filter,
+      filterReason: reasons[candidate.filterReason],
+      opportunity: candidate.opportunity,
+    })),
+  }
 }

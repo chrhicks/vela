@@ -147,14 +147,16 @@ Keep 46px text buttons, 44px icon controls, bounded touch panning, and wrapping 
 
 Use the accepted semantic palette for both modes: canvas, surface surround, active selection, ordinary/control borders, text, focus, and action colors. Image bytes and geometry stay the same. Do not recolor or filter astronomical pixels for dark mode. Compare dark behavior using the accepted token system; there is no separate frozen dark Photographs composition among these three source boards.
 
-## Implementation order after the Tonight gate
+## Implementation order after the Explore/framing/preparation gate
 
 1. Record this slice's agreed selection/disclosure/compact decisions and source geometry at the owning Photographs plan. Evaluate compact and fallback compositions in the workshop, without reopening established native-inspection behavior.
 2. Extract the narrow inspection mechanism while preserving Tonight's current composition and tests. Do not fold Photos layout assumptions into Tonight or framing assumptions into capture contracts.
 3. Introduce independent collection/detail reads and a rig-stable page owner; retain existing paths and browser navigation. Implement row selection, six-at-a-time earlier disclosure, and atomic resource/version transitions.
 4. Compose the source three columns with real retained metadata, actual preview/file URLs, contextual fallback, and owner-specific image chrome. Remove displaced saved-grid/Panel layout and route-level `capture.css` coupling rather than accumulating overrides.
 5. Add deterministic Photographs scenes to the existing development-only review registry/runtime: current/legacy/fallback, empty, selected missing, list failure with direct detail success, long preparation, fit/native failure, many dates, and direct link to an older revealed item. Reference imagery stays labeled fixture data and uses the frozen local bytes.
-6. Run focused checks, prepare a clean review head, obtain independent OK, then open the actual reachable gallery states for Chris's acceptance. Update owning READMEs/adoption evidence only with actual outcomes. No merge or later slice before the governing gate.
+6. Run focused checks, prepare a clean review head, obtain independent OK, then perform the parent’s explicit comparison of the actual reachable gallery
+   against Paper, under Chris’s intermediate self-acceptance authorization.
+   Chris accepts the final whole-application experience. Update owning READMEs/adoption evidence only with actual outcomes. No merge or later slice before the governing gate.
 
 ## Focused proof and evidence
 

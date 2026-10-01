@@ -13,7 +13,7 @@ environmental safety policy exists. Darkness means Sun below −18°. The paths
 and displayed windows are sampled at 15-minute intervals and are approximate.
 Morning after astronomical dawn selects the coming night; before dawn retains
 the active night. Polar day/night and unavailable site data remain explicit.
-The current altitude and azimuth are calculated at `observedAt`, separately from
+The current altitude, azimuth and topocentric Moon separation are calculated at `observedAt`, separately from
 the sampled night span, which can begin hours in the future. Current direction
 must not be inferred from the nearest night sample.
 Every sample includes target azimuth and the Moon's topocentric azimuth and
@@ -91,7 +91,7 @@ cleanup as failure. Callbacks from cancelled or settled captures are ignored.
 When `VELA_TRACE_PATH` is enabled, [framing tracing](../../../../docs/local-tracing.md#centering-and-framing-evidence)
 persists exact desired/solved positions, WCS, pre/post mount readings, commands and
 per-correction outcomes under one trace. Completed child records are available
-before the operation finishes. This is numerical evidence; framing FITS pixels
+before the operation finishes. This is numerical evidence; original framing FITS pixels
 are not retained. Save the rotating journal after a trial that needs investigation.
 
 **Check current frame** takes an exposure and solves the current field without a
@@ -146,3 +146,36 @@ Filter advice distinguishes Hα/O III emission from broadband starlight. Chris's
 Optolong L-Ultimate has dual 3nm passbands; recommendations never infer that it is
 installed. Mixed or unspecified catalog types receive conservative broadband
 guidance. No filter or device command is issued by browsing.
+
+## Temporary framing exposure inspection
+
+Every framing acquisition runs solving, display rendering and linear-sample star
+analysis on the same samples. Rendering and analysis are independently fallible;
+neither failure changes a successful solve or requests another exposure. The
+operation awaits all consumers before releasing samples. Stop aborts publication
+and waits for these consumers, so a late completion cannot replace a later check.
+
+`FramingView.preview` describes the most recent completed acquisition separately
+from `actual`, the most recent solved footprint. A new no-solution image has its
+own acquisition ID and null check ID while the older footprint remains visible.
+The camera name is the selected camera confirmed by readiness, exposure duration
+is the requested value, and timestamp/source come from acquisition (legacy omitted
+source means camera-reported). A check ID is assigned only by solving those exact
+samples. Nullable resource URLs mean rendering failed; nullable statistics mean
+analysis failed. Zero detected stars remains a valid measurement.
+
+Each controller retains at most three fitted/native PNG pairs in memory. Exact
+acquisition-ID GETs never touch hardware and return 404 for missing or expired
+resources. The immutable URL always means the same image; when the renderer does
+not need to downsample, Fit and Native serve the same native PNG. Restart loses
+these resources. No FITS retention, capture identity or Saved status is implied.
+
+## Catalog-only browsing
+
+`GET /api/web/target-catalog` shares validated query, category, filter and page
+projection with rig discovery. It ranks pinned catalog facts using `site: null`
+and performs no rig lookup or adapter access. Its separate `TargetCatalogView`
+contains no site, sky, opportunity, snapshot or rig identity. Both endpoints accept
+`pageSize` from 1 through 12 (default 12); page size never changes a rig discovery
+snapshot's site/time. Major and minor catalog dimensions retain their own nullable
+facts rather than inventing an extent for unknown values.

@@ -136,6 +136,7 @@ function NoRigs({ onSetup }: { readonly onSetup: () => void }) {
       <Button onClick={onSetup} tone="accent">
         Set up a rig
       </Button>
+      <Link className="vela-button" to="/explore">Explore the sky</Link>
     </section>
   )
 }

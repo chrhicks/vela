@@ -80,10 +80,10 @@ export function AppNavigation() {
         </>
       }
       links={rigId ? [
-        { label: 'Tonight', ...routeLink(`${base}/observe/capture`), current: pathname === `${base}/observe/capture` },
+        { label: 'Tonight', ...routeLink(`${base}/observe/capture`), current: pathname === `${base}/observe/capture` || pathname === `${base}/observe` },
         { label: 'Explore the sky', ...routeLink(`${base}/observe/targets${targetSearch}`), current: inTargets },
         { label: 'Photographs', ...routeLink(`${base}/observe/saved-images`), current: pathname.startsWith(`${base}/observe/saved-images`) },
-      ] : []}
+      ] : [{ label: 'Explore the sky', ...routeLink('/explore'), current: pathname === '/explore' }]}
       {...activityProps}
     />
   )

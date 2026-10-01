@@ -212,6 +212,7 @@ export function registerTargets(
       raDegrees: target.raDegrees,
       decDegrees: target.decDegrees,
       sizeArcminutes: target.majorAxisArcminutes,
+      minorSizeArcminutes: target.minorAxisArcminutes,
       thumbnailUrl: `/api/survey/thumbnail?ra=${target.raDegrees}&dec=${target.decDegrees}&fov=${fov}`,
       sky: site ? skyPath(target, site, at) : null,
     }
@@ -290,6 +291,21 @@ export function registerTargets(
 
     return rig ? framingView(rig) : reply.code(404).send({ error: 'Rig not found' })
   })
+  app.get<{ Params: { rigId: string; id: string; size: string } }>(
+    '/api/web/rigs/:rigId/framing/previews/:id/:size.png',
+    async (request, reply) => {
+      const { rigId, id, size } = request.params
+
+      if (size !== 'fit' && size !== 'native')
+        return reply.code(404).send({ error: 'Framing preview not found' })
+      const rig = await catalog.get(rigId)
+      const bytes = rig ? controllers.get(rigId)?.preview(id, size) : undefined
+
+      if (!bytes) return reply.code(404).send({ error: 'This temporary framing preview is no longer available.' })
+
+      return reply.header('Cache-Control', 'private, max-age=31536000, immutable').type('image/png').send(bytes)
+    },
+  )
   app.put<{ Params: { rigId: string } }>(
     '/api/rigs/:rigId/framing/settings',
     async (request, reply) => {
@@ -415,6 +431,7 @@ export function registerTargets(
             configuration: ready.configuration,
             action: action.command,
             rigId,
+            cameraName: ready.camera.name,
             requestId: request.id,
           },
           hardware,

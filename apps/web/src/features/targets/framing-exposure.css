@@ -1,0 +1,137 @@
+.framing-exposure {
+  min-width: 0;
+  align-self: start;
+  border: 1px solid var(--vela-line);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--vela-surface);
+}
+.framing-exposure > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 54px;
+  padding: 0 18px;
+  gap: 12px;
+}
+.framing-exposure > header > div:first-child {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.framing-exposure h2 {
+  margin: 0;
+  font: 500 14px/20px var(--vela-font);
+}
+.framing-exposure time {
+  color: var(--vela-text-muted);
+  font: 400 14px/20px var(--vela-font);
+}
+.framing-exposure__controls,
+.framing-exposure__controls > div {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.framing-exposure__controls [aria-pressed='true'] {
+  background: var(--vela-accent-surface);
+  font-weight: 600;
+}
+.framing-exposure .capture-image__window {
+  aspect-ratio: 886 / 560;
+}
+.framing-exposure__metadata {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 70px;
+  gap: 6px;
+  padding: 8px 20px;
+  color: var(--vela-text-muted);
+  font: 400 14px/20px var(--vela-font);
+}
+.framing-exposure__metadata > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.framing-exposure__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 24px;
+}
+.framing-exposure__hfr {
+  white-space: pre-wrap;
+}
+.framing-exposure__status:empty {
+  display: none;
+}
+.framing-exposure__status p {
+  margin: 0;
+  padding: 12px 20px;
+  font-size: 14px;
+  line-height: 20px;
+}
+.framing-exposure--compact {
+  border: 0;
+  background: transparent;
+  overflow: visible;
+}
+.framing-exposure--compact > header {
+  padding: 0;
+  min-height: 44px;
+  margin-bottom: 12px;
+}
+.framing-exposure--compact h2 {
+  font: 500 16px/24px var(--vela-font);
+}
+.framing-exposure--compact time {
+  display: none;
+}
+.framing-exposure--compact .capture-image__window {
+  height: 124px;
+  aspect-ratio: auto;
+  border-radius: 6px;
+  background: var(--vela-surface);
+}
+.framing-exposure__caption {
+  margin: 8px 0 0;
+  font: 400 14px/20px var(--vela-font);
+  color: var(--vela-text-muted);
+}
+@media (max-width: 700px) {
+  .framing-exposure > header {
+    flex-wrap: wrap;
+    padding: 10px 12px;
+    gap: 6px;
+  }
+  .framing-exposure .capture-image__window {
+    aspect-ratio: 4 / 3;
+  }
+  .framing-exposure__metadata > div {
+    flex-wrap: wrap;
+  }
+  .framing-exposure--compact > header {
+    padding: 0;
+  }
+}
+
+/* 03.2's compact header is a top-aligned label and inspection link. */
+.framing-exposure--compact > header {
+  align-items: flex-start;
+}
+.framing-exposure--compact h2 {
+  font: 500 15px/20px var(--vela-font);
+}
+.framing-exposure--compact > header .vela-button {
+  align-items: flex-start;
+  min-height: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.framing-exposure--compact .framing-exposure__caption {
+  margin-top: 12px;
+}

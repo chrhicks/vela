@@ -21,13 +21,25 @@ and state composed from stable `@vela/ui` primitives. The production wording
 must remain accurate for unsupported devices and partial telemetry as well as
 the specimen's simple fixtures.
 
-Observe is the activity hub. Preparation details collapse when complete; Capture,
-Autofocus, and Polar alignment remain prominent entry points. The Capture tile
-reads the same server-owned capture projection as the Capture page, preserving
-the last loaded image with its metadata. Autofocus opens a one-shot Star-HFR
-walk around the current focuser position. Preparation and capture availability
-remain separate facts; completing device connection does not imply capture
-support.
+Observe now composes Fieldroom capture preparation: the selected subject,
+last matching temporary framing exposure, capture settings, confirmed camera
+cooling and equipment context. One `useCapture` owns Start and cooling; the old
+CaptureHub is removed. Existing active capture opens Tonight instead of starting
+a second run. Framing Continue carries explicit target intent but takes no image.
+Only a confirmed successful Start response navigates to Tonight; uncertain or
+failed responses remain here with explicit state inspection and no replay.
 
-The imaging-camera setting sits between preparation and activities. Its saved
-identity comes from the rig catalog; see [imaging camera](../imaging-camera/README.md).
+`RigReadiness` preserves device connection and result semantics when preparation
+is incomplete, interrupted or has a connection outcome to explain. Successful
+connection is still not permission for every observing activity. Autofocus,
+Polar alignment and Equipment remain explicit links.
+
+Camera selection is a browser draft until the existing ID-and-name save boundary
+confirms it. Start remains unavailable for a changed unsaved camera. A confirmed
+selection triggers a readiness read, never a capture command. Cooling switch and
+setpoint are distinct commands; a sensor near its requested value is not proof
+that the cooler is on. Capture can start while confirmed cooling continues.
+
+The equipment footer shares the same selected-camera cooling projection as its
+controls and the shared rig observation for focuser state. See
+[imaging camera](../imaging-camera/README.md) for configuration-write reconciliation.
