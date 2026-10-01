@@ -38,6 +38,7 @@ const dateTime = (at: string) =>
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
+    hour12: false,
   })
 
 const direction = (degrees: number) =>

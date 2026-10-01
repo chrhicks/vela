@@ -62,12 +62,14 @@
   overflow: hidden;
 }
 .vela-discovery__card[data-selected='true'] {
-  border-color: var(--vela-text-muted);
-  box-shadow: inset 0 0 0 1px var(--vela-text-muted);
+  border: 2px solid var(--vela-text-muted);
 }
 .vela-discovery__image {
   height: 227px;
   background: var(--vela-surface);
+}
+.vela-discovery__card[data-selected='true'] .vela-discovery__image {
+  height: 226px;
 }
 .vela-discovery__image img {
   display: block;

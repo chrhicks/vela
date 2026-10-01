@@ -252,16 +252,23 @@ function TargetComposition({ rigId, targetId }: { rigId: string; targetId: strin
             compact
           />
           <div className="vela-target-command">
-            <Input
-              label="Test exposure (seconds)"
-              type="number"
-              min="0.1"
-              max="60"
-              step="0.1"
-              value={seconds}
-              disabled={!!view?.active || pending}
-              onChange={(event) => setSeconds(event.target.value)}
-            />
+            <div className="vela-target-exposure">
+              <label htmlFor="framing-exposure-seconds">Test exposure</label>
+              <div className="vela-target-exposure__input">
+                <Input
+                  id="framing-exposure-seconds"
+                  aria-label="Test exposure (seconds)"
+                  type="number"
+                  min="0.1"
+                  max="60"
+                  step="0.1"
+                  value={seconds}
+                  disabled={!!view?.active || pending}
+                  onChange={(event) => setSeconds(event.target.value)}
+                />
+                <span aria-hidden="true">seconds</span>
+              </div>
+            </div>
             {!view?.active && (
               <>
                 {!checked && (
@@ -311,7 +318,7 @@ function TargetComposition({ rigId, targetId }: { rigId: string; targetId: strin
       <footer className="vela-target-context">
         <span>
           {view
-            ? `State checked ${new Date(view.observedAt).toLocaleTimeString()}`
+            ? `State checked ${new Date(view.observedAt).toLocaleTimeString([], { hour12: false })}`
             : 'Reading rig state'}
         </span>
         <span>
@@ -368,7 +375,7 @@ function TargetComposition({ rigId, targetId }: { rigId: string; targetId: strin
           </dl>
           {actual && (
             <p>
-              Test exposure {new Date(actual.capturedAt).toLocaleTimeString()}.
+              Test exposure {new Date(actual.capturedAt).toLocaleTimeString([], { hour12: false })}.
               {!sameComposition || adjusting ? ' Measured against the previous composition.' : ''}
             </p>
           )}

@@ -50,7 +50,12 @@ export function FramingExposure({
         </Button>
       </div>
       {!expanded && (
-        <IconButton id={openerId} label="Enlarge test exposure" icon="↗" onClick={expand} />
+        <IconButton
+          id={openerId}
+          label="Enlarge test exposure"
+          icon={<span className="framing-exposure__enlarge-icon" aria-hidden="true">↗</span>}
+          onClick={expand}
+        />
       )}
     </div>
   )
