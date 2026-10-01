@@ -50,7 +50,7 @@ export function NavigationBar({
             aria-label="Vela · all rigs"
             onClick={home.onClick}
           >
-            V<span>ela</span>
+            vela
           </a>
         </div>
         {links.length > 0 && (
@@ -68,6 +68,7 @@ export function NavigationBar({
           </nav>
         )}
         <div className="vela-navigation__context">
+          {utility && <div className="vela-navigation__utility">{utility}</div>}
           <label className="vela-navigation__rig">
             <span className="vela-navigation__sr-only">Viewing rig</span>
             <select value={currentRigId} onChange={event => onRigChange(event.target.value)}>
@@ -105,7 +106,6 @@ export function NavigationBar({
               )}
             </a>
           )}
-          {utility}
         </div>
       </header>
     </div>

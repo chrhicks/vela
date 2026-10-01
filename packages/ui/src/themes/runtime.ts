@@ -99,6 +99,7 @@ export function semanticPalette(
     warningSurface: palette[mode === 'light' ? 'warning-100' : 'warning-900'],
     dangerSurface: palette[mode === 'light' ? 'danger-100' : 'danger-900'],
     pendingSurface: base.surface,
+    progressTrack: base.line,
     ...theme.colorOverrides?.[mode],
   }
 }

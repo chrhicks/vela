@@ -68,6 +68,7 @@ describe('theme resolution', () => {
       dangerSurface: '#EBDCD4',
       danger: '#8B4838',
       pendingSurface: '#E5E3D7',
+      progressTrack: '#B7C2A7',
     })
     expect(semanticPalette(theme, 'dark')).toMatchObject({
       canvas: '#141715',
@@ -82,6 +83,7 @@ describe('theme resolution', () => {
       dangerSurface: '#3B2925',
       danger: '#E2B09B',
       pendingSurface: '#263127',
+      progressTrack: '#4A5847',
     })
   })
 
@@ -115,6 +117,7 @@ describe('theme resolution', () => {
     expect(fieldroom['--vela-overlay-radius']).toBe('8px')
     expect(fieldroom['--vela-focus-offset']).toBe('3px')
     expect(fieldroom['--vela-pending-surface']).toBe('#E5E3D7')
+    expect(fieldroom['--vela-progress-track']).toBe('#B7C2A7')
 
     const legacy = resolveTheme(VELA_CURRENT_PROFILE)
     const legacyStyle = themeStyle(legacy, 'dark')

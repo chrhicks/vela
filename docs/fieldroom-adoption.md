@@ -185,6 +185,34 @@ first-ink offsets agree: dialog title 31px/body 30px, primary action 20px,
 input value 16px. Paper’s fractional border quantization does not justify
 subtracting a pixel from each component’s declared padding.
 
+The first foundation target, `1818874`, received independent **OK** with no
+findings. The verifier ran 24 focused tests, 50 workshop browser tests, two web
+theme tests, lint and all three affected builds; checked 44 reference hashes and
+dimensions; and left the checkout clean. The required parent visual pass then
+found differences that code/behavior checks did not establish:
+
+- The first bundled Barlow release was 1.422, while Paper used Google Fonts’
+  1.408. “Start capture” shaped to 85.005px versus 87.48px at 15px/500.
+  The assets now pin the matching licensed version; no tracking compensation
+  was added. Space Grotesk 2.000 matches both version and sampled advances.
+- Navigation still retained the old wordmark casing, 36px brand gap and a quiet
+  rig selector. These now match lowercase `vela`, 56px brand gap, 24px links,
+  Appearance/context before the rig selector with 20px gaps, and the 46px field
+  recipe. Routes and observed connection state remain caller-owned.
+- The capture-card specimen now demonstrates the actual four-group source
+  anatomy, active fill, 20/22px insets, borderless surface, and exact progress
+  track colors (`#B7C2A7` / `#4A5847`). The earlier generic example was insufficient
+  evidence for that source exception.
+- The source Forget confirmation has Cancel and Forget without an extra close
+  icon. Dialog now allows that concrete presentation while preserving its
+  default close control elsewhere. Cancel-first and focus wrapping still pass.
+
+The corrected target awaits renewed independent review and final comparison.
+Affected reruns passed: 24 focused unit tests, six Dialog/foundation browser
+tests, two navigation browser tests, lint, and UI/web builds. These corrections
+are why intermediate slice acceptance includes actual browser comparison after
+an independent code/behavior verdict.
+
 ## 3. Tonight and Appearance vertical slice
 
 Status: planned; waits for foundations.

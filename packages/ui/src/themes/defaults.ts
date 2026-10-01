@@ -142,6 +142,7 @@ export const FIELDROOM_PROFILE: DesignProfile = {
         dangerSurface: '#EBDCD4',
         danger: '#8B4838',
         pendingSurface: '#E5E3D7',
+        progressTrack: '#B7C2A7',
       },
       dark: {
         canvas: '#141715',
@@ -163,6 +164,7 @@ export const FIELDROOM_PROFILE: DesignProfile = {
         dangerSurface: '#3B2925',
         danger: '#E2B09B',
         pendingSurface: '#263127',
+        progressTrack: '#4A5847',
       },
     },
   },

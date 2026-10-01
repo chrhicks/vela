@@ -1,0 +1,15 @@
+.vela-navigation-specimen__connection {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  color: var(--vela-text-muted);
+  font: 400 14px/20px var(--vela-font);
+}
+.vela-navigation-specimen__connection i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.vela-navigation-specimen__connection[data-state='interrupted'] { color: var(--vela-warning); }

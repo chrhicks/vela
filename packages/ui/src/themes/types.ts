@@ -36,6 +36,7 @@ export const SEMANTIC_COLOR_KEYS = [
   'warningSurface',
   'dangerSurface',
   'pendingSurface',
+  'progressTrack',
 ] as const
 
 export type SemanticColorKey = (typeof SEMANTIC_COLOR_KEYS)[number]
