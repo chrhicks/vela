@@ -8,13 +8,21 @@ import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 const root = resolve(process.cwd(), '../..')
+
 const archive = resolve(root, 'docs/visual-reference/vela-current')
+
 const timestamp = '2026-09-21T01:00:08.000Z'
+
 const capturedAt = '2026-09-21T01:00:00.000Z'
+
 const sourceSha = '15c2bbe19770ef55ed2d6aa830fb833a19216ae4'
+
 const hash = (path: string) => createHash('sha256').update(readFileSync(path)).digest('hex')
+
 const imageSource = 'packages/ui/src/components/fixtures/capture-star-field.png'
+
 const imageUrl = '/api/rigs/rig-1/capture/images/retained'
+
 const rig = {
   id: 'rig-1', name: 'Askar FRA 400', state: 'reachable',
   endpoint: { host: 'alpaca.local', port: 11111 },
@@ -30,6 +38,7 @@ const rig = {
       status: { availability: 'complete', activity: 'tracking', tracking: 'on', parking: 'unparked', home: 'away' } },
   ],
 }
+
 const capture = {
   rigId: 'rig-1', rigName: rig.name, camera: { name: 'ZWO ASI2600MC Pro' },
   enabled: true, unavailableReason: null, phase: 'exposing', active: true,
@@ -40,7 +49,8 @@ const capture = {
     exposureSeconds: 180, capturedAt, receivedAt: '2026-09-21T01:00:03.000Z',
     cameraName: 'ZWO ASI2600MC Pro', color: 'mono', statistics: { detectedStars: 842, medianHfrPixels: 2.1 } },
 }
-const fixtures: Record<string, unknown> = {
+
+const fixtures = {
   '/api/web/navigation': { rigs: [{ id: 'rig-1', name: rig.name }], captures: [{ rigId: 'rig-1', rigName: rig.name,
     phase: 'exposing', active: true, captureReadState: 'current', completedCount: 12, elapsedSeconds: 96, exposureSeconds: 180, error: null }] },
   '/api/web/rigs/rig-1': rig,
@@ -58,6 +68,7 @@ const fixtures: Record<string, unknown> = {
       targetX: 726.1667, targetY: 558.8333 },
   },
 }
+
 const scenes = [
   { id: 'capture-desktop', route: '/rigs/rig-1/observe/capture', width: 1440, height: 900, ready: '.capture-page__controls' },
   { id: 'equipment-desktop', route: '/rigs/rig-1', width: 1440, height: 900, ready: '.vela-rig-device' },
@@ -75,9 +86,11 @@ test('freeze the legacy Vela Current production-route appearance', async ({ page
   const tokenStyle = themeStyle(theme, 'dark')
   writeFileSync(resolve(archive, 'theme.json'), JSON.stringify({ profile: VELA_CURRENT_PROFILE, resolved: theme,
     mode: 'dark', density: 1, cssTokens: tokenStyle, lightCssTokens: themeStyle(theme, 'light') }, null, 2) + '\n')
+
   const sourceFiles = ['packages/ui/src/styles.css', 'packages/ui/src/themes/defaults.ts', 'packages/ui/src/themes/runtime.ts',
     'packages/ui/src/fonts/InterVariable.woff2', 'packages/ui/src/fonts/InterVariable-Italic.woff2',
     'apps/web/src/styles.css', 'apps/web/src/main.tsx']
+
   const sourceHashes = Object.fromEntries(sourceFiles.map(path => [path, hash(resolve(root, path))]))
   const writes: string[] = [], unmapped = new Set<string>(), errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
@@ -85,16 +98,23 @@ test('freeze the legacy Vela Current production-route appearance', async ({ page
   await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' })
   await page.route('**/api/**', route => {
     const path = new URL(route.request().url()).pathname
+
     if (route.request().method() !== 'GET') {
       writes.push(path)
+
       return route.fulfill({ status: 405, json: { error: 'Read-only archive fixture' } })
     }
+
     if (path === imageUrl) return route.fulfill({ contentType: 'image/png', path: resolve(archive, 'assets/capture-star-field.png') })
-    if (fixtures[path]) return route.fulfill({ json: fixtures[path] })
+    const fixture = Object.entries(fixtures).find(([key]) => key === path)?.[1]
+
+    if (fixture) return route.fulfill({ json: fixture })
     unmapped.add(path)
+
     return route.fulfill({ status: 503, json: { error: 'No archive fixture for this request' } })
   })
   const results = []
+
   for (const scene of scenes) {
     await page.setViewportSize({ width: scene.width, height: scene.height })
     await page.goto(scene.route)
@@ -104,16 +124,20 @@ test('freeze the legacy Vela Current production-route appearance', async ({ page
       await Promise.all([...document.images].map(image => image.decode().catch(() => undefined)))
     })
     await expect(page.locator('.vela-theme')).toBeVisible()
+
     const tokens = await page.locator('.vela-theme').evaluate((element, names) => {
       const style = getComputedStyle(element)
+
       return Object.fromEntries(names.map(name => [name, style.getPropertyValue(name).trim()]))
     }, Object.keys(tokenStyle))
+
     expect(tokens).toEqual(tokenStyle)
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
     await page.screenshot({ path: resolve(archive, `${scene.id}.png`), fullPage: true, animations: 'disabled' })
     results.push({ ...scene, png: `${scene.id}.png`, sha256: hash(resolve(archive, `${scene.id}.png`)),
       pageSize: await page.evaluate(() => ({ width: document.documentElement.scrollWidth, height: document.documentElement.scrollHeight })) })
   }
+
   expect(writes).toEqual([])
   expect([...unmapped]).toEqual([])
   expect(errors).toEqual([])

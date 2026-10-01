@@ -191,6 +191,9 @@ Status: planned; implemented alongside the slices that need them.
   catalog; represent unavailable facts explicitly instead of inventing them or
   adding runtime enrichment. Preserve existing retained-image validity.
 
+The [capability plan](fieldroom-capture-capabilities-plan.md) records concrete
+owners, identity/lifetime invariants, and focused transition tests before edits.
+
 ### Verification and exit
 
 Tests for new state transitions, image/metadata identity, stale or expired image
