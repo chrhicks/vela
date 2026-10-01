@@ -1,5 +1,5 @@
 import { useId, useRef, useState } from 'react'
-import { Button, Dialog, Input, NavigationBar, Panel, SkyPath } from '../components'
+import { Button, Dialog, IconButton, Input, NavigationBar, Panel, SkyPath } from '../components'
 import { getMoonSamples, getSkySamples } from '../components/sky-path/fixtures'
 import type { ComponentSpecimen } from '../themes'
 import { targets } from './target-framing/fixtures'
@@ -17,6 +17,18 @@ const samples = getSkySamples('crescent').map((sample, index) => ({
 }))
 
 const moon = getMoonSamples()
+
+function SkyPathIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 19h18M4 15a8 8 0 0 1 10-9" />
+      <path d="m17 3 1.1 2.9L21 7l-2.9 1.1L17 11l-1.1-2.9L13 7l2.9-1.1Z" />
+      <path d="M20 13v2" />
+      <circle cx="4" cy="15" r="1.5" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
 
 function SkyContext({ props, onPropsChange }: {
   props: Props
@@ -93,7 +105,7 @@ function SkyContext({ props, onPropsChange }: {
               <div className="vela-sky-context__summary">
                 <div><span>Sample observing window</span><strong>20:00–04:00</strong></div>
                 <div><span>Highest in the sky</span><strong>76° at 00:00</strong></div>
-                <Button onClick={showSky}>View sky path</Button>
+                <IconButton label="View sky path" icon={<SkyPathIcon />} onClick={showSky} />
                 <Button tone="accent" onClick={() => update({ view: 'Framing' })}>Frame this target</Button>
               </div>
               <details><summary>Subject facts & imaging advice</summary><p>Emission nebula · A dual-band filter can isolate its hydrogen and oxygen emission. Reference photograph and sky geometry are illustrative.</p></details>
@@ -104,7 +116,7 @@ function SkyContext({ props, onPropsChange }: {
             <div className="vela-sky-context__summary vela-sky-context__summary--top">
               <div><span>Sample observing window</span><strong>20:00–04:00</strong></div>
               <div><span>Highest in the sky</span><strong>76° at 00:00</strong></div>
-              <Button onClick={showSky}>View sky path ↓</Button>
+              <IconButton label="View sky path" icon={<SkyPathIcon />} onClick={showSky} />
             </div>
             <div className="vela-sky-context__framing">
               <section className="vela-sky-context__composition" aria-label="Frame composition">
