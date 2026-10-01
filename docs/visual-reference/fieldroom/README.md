@@ -13,6 +13,9 @@ regression baselines or evidence that production behavior already exists.
 - [Previous appearance](../vela-current/README.md): separately frozen browser output.
 
 The initial snapshot contains 24 application boards and 16 system boards.
+The later [Autofocus supplement](autofocus-design.md) adds four separate boards
+with its own [manifest](autofocus-manifest.json) and design values; the original
+manifest remains immutable.
 Some app boards are state sheets rather than single routes. Desktop references
 have their actual content height, including 921px, 965px, and 989px screens.
 Phone boards are 390 × 844 with a 62px mock OS strip; compare production content

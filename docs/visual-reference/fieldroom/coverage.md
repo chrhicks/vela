@@ -129,11 +129,17 @@ connectivity are separate scenes even when both retain old imagery.
   supported command. Existing observation preparation connects devices through
   server-owned sequencing; do not wire the label to a different scope silently.
   Resolve wording or a deliberately scoped capability in that slice's plan.
-- **Autofocus follow-up:** the production Autofocus route has no frozen Fieldroom
-  screen. Add and freeze an approved Autofocus reference before changing that
-  feature's presentation. Reserve `autofocus-ready`, `autofocus-running`,
-  `autofocus-result` and `autofocus-interrupted` for its future coverage; these
-  are explicitly unmapped until that reference exists.
+- **Autofocus supplement:** four additional references now cover the existing
+  capability, with a separate [manifest](autofocus-manifest.json) and
+  [design values](autofocus-reference-fixtures.json). These are not recorded
+  hardware observations. See the [design record](autofocus-design.md).
+
+| Supplement | Reference / dimensions | Future scene |
+| --- | --- | --- |
+| 03.23 setup / `48X-0` | [Setup](app/03-23.png), 1440×900 | `autofocus-ready` |
+| 03.24 walking / `48Y-0` | [Walking](app/03-24.png), 1440×900 | `autofocus-running` |
+| 03.25 phone walking / `48Z-0` | [Phone](app/03-25.png), 390×844; app 390×782 | `autofocus-phone-running` |
+| 03.26 outcomes / `490-0` | [State sheet](app/03-26.png), 1440×1100 | `autofocus-interrupted`, `autofocus-result`, `autofocus-restored`, `autofocus-invalid-window`, `autofocus-restore-unconfirmed`, `autofocus-offline` |
 
 ## System-board coverage
 
