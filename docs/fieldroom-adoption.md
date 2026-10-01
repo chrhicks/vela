@@ -312,6 +312,11 @@ Status: planned; each sub-slice gets its own detailed plan and gate before work.
 | Equipment / rig setup | rig-detail, home, rig-discovery | 03.5, 03.8, 03.12–03.15 |
 | Polar alignment / autofocus | alignment, autofocus | 03.6–03.7, phone Appearance, added Autofocus reference |
 
+Concrete plans: [Explore, framing, preparation](fieldroom-explore-plan.md),
+[Photographs](fieldroom-photographs-plan.md), and
+[Equipment/Home/onboarding](fieldroom-equipment-plan.md). Alignment/autofocus
+will receive its concrete plan before its implementation begins.
+
 Each slice includes loading, empty, pending, unavailable, interrupted, error,
 and confirmed states where reachable. Both palettes use the same geometry and
 image pixels. Remove displaced presentation code as ownership moves; avoid a

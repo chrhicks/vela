@@ -241,3 +241,29 @@ The review runtime also forces its own `/api` and Fieldroom config, so an existi
 local VITE_API_URL cannot bypass its fixture HTTP boundary. Captures remain
 mock/illustrative and visibly identified. Runtime starting instructions are in
 `apps/web/tests/fixtures/fieldroom/README.md`.
+
+### Independent review and final-comparison corrections
+
+Independent review at `a4905c0` returned BLOCK for two state bugs. The corrected
+`2d4395d` checkpoint received OK: the footer consumes selected-camera capture
+cooling, and current direction uses server-calculated azimuth at `observedAt`,
+not a potentially future night sample. The reviewer ran the full project check
+(865 tests and workspace builds), 57 browser tests and four Python tests. These
+are fixture checks; no hardware was operated.
+
+The subsequent whole-route comparison found presentation corrections: image
+facts use the source's muted color and three-space Star size separator. The
+connection dot has an explicit 10px circle, avoiding OS fallback-glyph sizing.
+Appearance follows its source anchor gap (desktop 10px, compact 2px), while
+retaining viewport-fit behavior. Tonight's four theme/width checks now capture
+the open panel and assert decoded-image identity, source URL, unchanged image
+bounds and focus return across a palette change. Wait for the actual entrance
+animation before interacting: an immediate Playwright `.check()` during that
+animation caused a pre-pointer scroll; waiting preserves the exact scroll/bounds
+assertions without changing production focus behavior.
+
+The affected application suites passed 20 checks; the shared Appearance suite
+passed five. UI/web builds and lint passed. These corrections require a renewed
+independent review and then a final comparison of the settled revision before
+this slice is accepted. The written Explore/framing and Photographs plans do
+not begin their implementations.

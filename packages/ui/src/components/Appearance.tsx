@@ -51,12 +51,13 @@ export function Appearance({
       const rightEdge = Math.min(window.innerWidth, bounds?.right ?? window.innerWidth) - 20
       const width = Math.min(360, rightEdge - leftEdge)
       const left = Math.max(leftEdge, Math.min(anchor.right - width, rightEdge - width))
-      const below = window.innerHeight - anchor.bottom - 24
-      const above = anchor.top - 24
+      const gap = width < 360 ? 2 : 10
+      const below = window.innerHeight - anchor.bottom - gap - 20
+      const above = anchor.top - gap - 20
       const naturalHeight = (panelRef.current?.scrollHeight ?? 360) + 2
       const placeAbove = below < Math.min(naturalHeight, 200) && above > below
       const maxHeight = Math.max(0, placeAbove ? above : below)
-      const top = placeAbove ? anchor.top - Math.min(naturalHeight, maxHeight) - 4 : anchor.bottom + 4
+      const top = placeAbove ? anchor.top - Math.min(naturalHeight, maxHeight) - gap : anchor.bottom + gap
       const rootBounds = root.getBoundingClientRect()
       setPlacement({ width, left: left - rootBounds.left, top: top - rootBounds.top, maxHeight })
     }

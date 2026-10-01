@@ -76,7 +76,7 @@ export function AppNavigation() {
             systemMode={appearance.systemMode}
             persistence={appearance.persistence}
           />
-          {connection && <span className="vela-app__connection" data-connected={connection === 'Connected'}>● {connection}</span>}
+          {connection && <span className="vela-app__connection" data-connected={connection === 'Connected'}><span className="vela-app__connection-dot" aria-hidden="true">●</span> {connection}</span>}
         </>
       }
       links={rigId ? [
