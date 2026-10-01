@@ -93,10 +93,13 @@ weights. Keep Inter assets for reference profiles. Update the font README.
 Confirmed/healthy status uses the existing forest/action family with an explicit
 label or mark; do not invent a vivid green semantic palette. Resolve `positive`
 consistently from that family. Pending and unavailable controls use the muted
-surface/text recipes depicted in DS.05/DS.15, preserving readable labels and
-nearby explanations; inspect their source styles before transcribing a color
-that is not separately labeled on the board. Do not implement unavailable state
-by lowering the opacity of the entire control.
+recipes inspected in DS.05/DS.15: light uses surface `#E5E3D7`, divider
+`#C4CBBE`, and secondary text `#50614F` for both. Dark unavailable uses surface
+`#1C241E`; dark pending uses active surface `#263127`; both use divider
+`#3C483E` and secondary text `#A8B4A7`. Add a concrete optional `pendingSurface`
+override if needed to preserve this paired recipe without mode-specific feature
+CSS. Do not lower whole-control opacity; preserve readable labels and nearby
+explanations.
 
 DS.14 changes interface colors, never astronomical image pixels. Keep paired
 mode geometry, font roles, spacing, and image framing identical.
@@ -139,8 +142,8 @@ keep prose proportional. A page heading must not inherit subject tracking.
 | Dialog typography | Page-title 28/36; explanation 16/24; actions 15/20 |
 | Focus | 2 outline with 3 clear offset; remains visible with invalid or pending state; no layout shift |
 | Invalid input | 2 error edge and specific message; keep outside dimensions fixed |
-| Overlay elevation | x0 / y16 / blur64 / spread0; light ink at 20%; dark black at 40% |
-| Modal backdrop | Light ink at 18%; use the frozen dark overlay reference for its paired value; no backdrop blur |
+| Overlay elevation | x0 / y16 / blur64 / spread0; light ink at 20%; dark dialog black at 20% (DS.15), dark Appearance black at 40% (03.20) |
+| Modal backdrop | Light ink at 18%; dark uses black at 40% as an implementation choice because no paired backdrop specimen exists; no backdrop blur |
 
 Use the small spacing vocabulary 4, 8, 12, 16, 20, 24, 28, 32, 36, 48.
 Keep intentional measured exceptions such as 10px checkbox gaps and 22px source
