@@ -98,6 +98,11 @@
   border-radius: 6px;
   background: var(--vela-surface);
 }
+.framing-exposure--compact .capture-image__window:has(.capture-image__empty) {
+  height: auto;
+  min-height: 124px;
+  aspect-ratio: auto;
+}
 .framing-exposure__caption {
   margin: 8px 0 0;
   font: 400 14px/20px var(--vela-font);

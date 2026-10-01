@@ -20,8 +20,8 @@ const saved: TargetDiscoveryView = {
   category: 'all',
   filter: 'all',
   offset: 0,
-  pageSize: 3,
-  total: 9,
+  pageSize: 9,
+  total: 27,
   targets: [
     {
       id: 'm31',
@@ -120,7 +120,7 @@ test('type, light preference and page preserve the calculation; Refresh resets t
     'night-original',
     'night-original',
   ])
-  expect(requests[2]!.searchParams.get('offset')).toBe('3')
+  expect(requests[2]!.searchParams.get('offset')).toBe('9')
   await page.getByRole('button', { name: 'Update sky', exact: true }).click()
   await expect(page.getByLabel('Target pages')).toContainText('Page 1 of 3')
   const refresh = requests.find((url) => !url.searchParams.has('snapshot'))
@@ -149,7 +149,7 @@ test('type, light preference and page preserve the calculation; Refresh resets t
         () => JSON.parse(localStorage.getItem('vela:target-discovery:v1:rig-1')!).offset,
       ),
     )
-    .toBe(3)
+    .toBe(9)
 })
 
 for (const status of [503, 410]) {
@@ -269,7 +269,7 @@ test('a delayed page cannot steal focus after the user returns to search', async
   await page.route('**/api/web/rigs/rig-1/target-discovery?*', async (route) => {
     const url = new URL(route.request().url())
 
-    if (url.searchParams.get('offset') === '3') await gate
+    if (url.searchParams.get('offset') === '9') await gate
     await route.fulfill({ json: response(url) }).catch(() => {})
   })
   await page.goto('/rigs/rig-1/observe/targets')
@@ -285,10 +285,10 @@ test('a delayed page cannot steal focus after the user returns to search', async
   await expect(search).toBeFocused()
 })
 
-test('a twelve-card saved page is not reused for the three-card Explore presentation', async ({
+test('a three-card saved page is not reused for the nine-card Explore presentation', async ({
   page,
 }) => {
-  await seed(page, { ...saved, pageSize: 12 })
+  await seed(page, { ...saved, pageSize: 3 })
   const requests: URL[] = []
   await page.route('**/api/web/rigs/rig-1/target-discovery?*', (route) => {
     const url = new URL(route.request().url())
@@ -299,7 +299,7 @@ test('a twelve-card saved page is not reused for the three-card Explore presenta
   await page.goto('/rigs/rig-1/observe/targets')
   await expect(page.getByRole('heading', { name: 'Andromeda Galaxy' }).first()).toBeVisible()
   expect(requests.length).toBeGreaterThan(0)
-  expect(requests.every((url) => url.searchParams.get('pageSize') === '3')).toBe(true)
+  expect(requests.every((url) => url.searchParams.get('pageSize') === '9')).toBe(true)
   expect(requests.every((url) => !url.searchParams.has('snapshot'))).toBe(true)
 })
 
@@ -351,3 +351,44 @@ test('clearing empty-result filters preserves the search term', async ({ page })
   await expect(page.getByRole('combobox', { name: 'Imaging filter' })).toHaveValue('all')
   expect(new URL(page.url()).searchParams.get('q')).toBe('Orion')
 })
+
+for (const route of ['/explore', '/rigs/rig-1/observe/targets']) {
+  test(`Explore displays nine subjects and advances by nine at ${route}`, async ({ page }) => {
+    const subjects = Array.from({ length: 11 }, (_, index) => ({
+      ...saved.targets[0]!,
+      id: `subject-${index}`,
+      name: `Subject ${index + 1}`,
+    }))
+
+    await seed(page, { ...saved, pageSize: 3 })
+    await page.route('**/api/web/**', async request => {
+      const url = new URL(request.request().url())
+
+      if (!/target-catalog|target-discovery/.test(url.pathname)) return request.fallback()
+      const offset = Number(url.searchParams.get('offset'))
+      const pageSize = Number(url.searchParams.get('pageSize'))
+
+      const next = {
+        ...response(url),
+        pageSize,
+        total: subjects.length,
+        targets: subjects.slice(offset, offset + pageSize),
+      }
+
+      const catalog = {
+        query: next.query, category: next.category, filter: next.filter,
+        offset, pageSize, total: next.total,
+        targets: next.targets.map(({ sky: _sky, opportunity: _opportunity, ...target }) => target),
+      }
+
+      await request.fulfill({ json: route === '/explore' ? catalog : next })
+    })
+    await page.goto(route)
+    await expect(page.locator('.vela-discovery__card')).toHaveCount(9)
+    await expect(page.locator('.vela-discovery__results')).toContainText('Showing 9 of 11 subjects')
+    await page.getByRole('button', { name: 'Next subjects →', exact: true }).click()
+    await expect(page).toHaveURL(/offset=9/)
+    await expect(page.locator('.vela-discovery__card')).toHaveCount(2)
+    await expect(page.locator('.vela-discovery__card').first()).toContainText('Subject 10')
+  })
+}

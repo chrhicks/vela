@@ -16,7 +16,7 @@ export function savedDiscovery(rigId: string): TargetDiscoveryView | null {
   try {
     const value: unknown = JSON.parse(localStorage.getItem(key(rigId)) ?? 'null')
 
-    return isTargetDiscovery(value, rigId) && value.pageSize === 3 ? value : null
+    return isTargetDiscovery(value, rigId) && value.pageSize === 9 ? value : null
   } catch {
     return null
   }
@@ -55,7 +55,7 @@ export function useDiscovery(rigId: string, selection: DiscoverySelection) {
       existing.category === category &&
       existing.filter === filter &&
       existing.offset === offset &&
-      existing.pageSize === 3
+      existing.pageSize === 9
     ) {
       setLoading(false)
       setError(null)
@@ -71,7 +71,7 @@ export function useDiscovery(rigId: string, selection: DiscoverySelection) {
       category,
       filter,
       offset: String(offset),
-      pageSize: '3',
+      pageSize: '9',
     })
 
     if (!refreshed && snapshot.current) params.set('snapshot', snapshot.current)
@@ -81,7 +81,7 @@ export function useDiscovery(rigId: string, selection: DiscoverySelection) {
       signal: AbortSignal.any([controller.signal, AbortSignal.timeout(30000)]),
     })
       .then((next) => {
-        if (!isTargetDiscovery(next, rigId) || next.pageSize !== 3)
+        if (!isTargetDiscovery(next, rigId) || next.pageSize !== 9)
           throw new Error('Invalid discovery response')
 
         if (controller.signal.aborted || version !== requestVersion.current) return
