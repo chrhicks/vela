@@ -312,7 +312,7 @@ function AlignmentPage({ rigId }: { rigId: string }) {
   const retrying = view.activity === 'retrying'
   const interrupted = offline || retrying
   const imageReadState = offline ? 'offline' : retrying ? 'retrying' : 'current'
-  const lastCorrection = !view.active || interrupted || imageError || endUnconfirmed
+  const lastCorrection = !view.active || interrupted || imageError || endUnconfirmed || pending
 
   const nextInstruction = view.active
     ? 'After the third solve, the adjustment view will show your alignment error and the target reticle.'
@@ -327,7 +327,7 @@ function AlignmentPage({ rigId }: { rigId: string }) {
 
   let adjustmentInstruction
 
-  if (interrupted || imageError || endUnconfirmed) {
+  if (interrupted || imageError || endUnconfirmed || pending) {
     adjustmentInstruction = 'Baseline retained. Wait for a fresh measurement before adjusting.'
   } else if (view.active) {
     adjustmentInstruction = physical
@@ -347,7 +347,10 @@ function AlignmentPage({ rigId }: { rigId: string }) {
     ? 'Baseline set · New measurements arriving'
     : 'Last measurement kept for reference'
 
-  if (endUnconfirmed) {
+  if (pending) {
+    statusTitle = 'Sending command…'
+    statusDetail = 'Waiting for Vela to confirm the command'
+  } else if (endUnconfirmed) {
     statusTitle = 'Command outcome unknown'
     statusDetail = 'Waiting for a confirmed session state'
   } else if (interrupted) {
@@ -365,10 +368,10 @@ function AlignmentPage({ rigId }: { rigId: string }) {
         {view.active && !interrupted && (
           <span className="vela-polar-activity__spinner" aria-hidden="true" />
         )}
-        <strong>{activity}</strong>
+        <strong>{pending ? 'Sending command…' : activity}</strong>
       </div>
       <p>{view.solvedPositions} of 3 positions solved · Alignment error not yet available</p>
-      {view.activity === 'exposing' && !interrupted && (
+      {view.activity === 'exposing' && !interrupted && !pending && (
         <p>{elapsed.toFixed(1)} / {view.exposureSeconds} seconds</p>
       )}
     </div>
@@ -512,7 +515,7 @@ function AlignmentPage({ rigId }: { rigId: string }) {
             role="status"
           >
             <strong>
-              {view.active && !interrupted && !endUnconfirmed && (
+              {view.active && !interrupted && !endUnconfirmed && !pending && (
                 <i className="vela-polar-status-dot" aria-hidden="true" />
               )}
               {statusTitle}
@@ -594,7 +597,7 @@ function AlignmentPage({ rigId }: { rigId: string }) {
               </Button>
             )}
           </div>
-          {view.activity === 'exposing' && !interrupted && (
+          {view.activity === 'exposing' && !interrupted && !pending && (
             <p className="vela-polar-operation-detail">
               Exposure in progress · {elapsed.toFixed(1)} / {view.exposureSeconds} seconds
             </p>

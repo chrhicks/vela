@@ -55,8 +55,8 @@ export const alignmentMeasurement: NonNullable<AlignmentView['measurement']> = {
   imageHeight: 1200,
   // Illustrative projected coordinates in a north-up 1-degree-high field.
   // Preserve the real viewport math; never copy Paper's decorative reticle positions.
-  targetX: 800 + 23 / 3,
-  targetY: 600 - 30 / 3,
+  targetX: 799.5 + 23 / 3,
+  targetY: 599.5 - 30 / 3,
   fieldHeightDegrees: 1,
 }
 

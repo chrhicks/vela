@@ -13,6 +13,9 @@ describe('Fieldroom alignment scene boundary', () => {
     expect(createHash('sha256').update(image).digest('hex')).toBe(alignmentResource.sha256)
     expect([image.readUInt32BE(16), image.readUInt32BE(20)]).toEqual([1600, 1200])
     expect(alignmentAdjusting.measurement?.imageWidth).toBe(1600)
+    // The declared north-up fixture uses pixel-center coordinates at 3 arcsec/pixel.
+    expect(alignmentAdjusting.measurement!.targetX - 799.5).toBeCloseTo(23 / 3)
+    expect(alignmentAdjusting.measurement!.targetY - 599.5).toBeCloseTo(-30 / 3)
     expect(alignmentAdjusting.measurement?.imageHeight).toBe(1200)
     expect(alignmentAdjusting.measurement?.capturedAtSource).toBe('server-estimate')
   })
