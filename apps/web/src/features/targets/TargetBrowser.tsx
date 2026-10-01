@@ -452,8 +452,11 @@ function ExploreSubjects({
             {sky ? (
               <>
                 <div className="vela-discovery__altitude">
-                  <strong>{Math.round(sky.currentAltitudeDegrees)}°</strong>
-                  <span>above the horizon at {skyTime(sky.observedAt)}</span>
+                  <strong>{Math.round(Math.abs(sky.currentAltitudeDegrees))}°</strong>
+                  <span>
+                    {sky.currentAltitudeDegrees < 0 ? 'below' : 'above'} the horizon at{' '}
+                    {skyTime(sky.observedAt)}
+                  </span>
                 </div>
                 <AltitudeTrace sky={sky} stale={saved || !!error} variant="explore" />
                 <dl>
