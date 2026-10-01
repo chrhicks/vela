@@ -37,7 +37,7 @@ export function Home() {
           <p>Choose a Rig to see what is connected and what it is doing.</p>
         </div>
         {home && home.rigs.length > 0 ? (
-          <Button onClick={() => setDiscoveryOpen(true)} size="small" tone="accent">
+          <Button onClick={() => setDiscoveryOpen(true)} tone="accent">
             Add rig
           </Button>
         ) : null}

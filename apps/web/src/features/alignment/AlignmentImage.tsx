@@ -203,18 +203,18 @@ function InspectionView({
       <div className="vela-polar-inspection-tools" aria-label="Image view">
         {frame.solution && (
           <>
-            <Button size="small" aria-pressed={view === 'fit'} onClick={() => setView('fit')}>
+            <Button aria-pressed={view === 'fit'} onClick={() => setView('fit')}>
               Fit both
             </Button>
-            <Button size="small" aria-pressed={view === 'fine'} onClick={() => setView('fine')}>
+            <Button aria-pressed={view === 'fine'} onClick={() => setView('fine')}>
               Fine · 1′
             </Button>
           </>
         )}
-        <Button size="small" aria-pressed={view === 'full'} onClick={() => setView('full')}>
+        <Button aria-pressed={view === 'full'} onClick={() => setView('full')}>
           Full frame
         </Button>
-        <Button size="small" aria-pressed={view === 'native'} onClick={() => setView('native')}>
+        <Button aria-pressed={view === 'native'} onClick={() => setView('native')}>
           100%
         </Button>
       </div>
@@ -272,7 +272,7 @@ export function AlignmentImage({
     <figure className="vela-polar-image">
       <div className="vela-polar-image-heading">
         <span>{frame.title}</span>
-        <Button id={openerId} size="small" onClick={() => onEnlarge({ frame, noSolution })}>
+        <Button id={openerId} onClick={() => onEnlarge({ frame, noSolution })}>
           Enlarge image
         </Button>
       </div>

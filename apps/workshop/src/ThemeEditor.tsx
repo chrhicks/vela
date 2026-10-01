@@ -1,5 +1,5 @@
-import { RAMP_STEPS, SEMANTIC_TOKEN_KEYS, referencePalette } from '@vela/ui/themes'
-import type { RampName, ReferenceToken, ThemeMode, ThemeParameters } from '@vela/ui/themes'
+import { RAMP_STEPS, SEMANTIC_TOKEN_KEYS, SEMANTIC_COLOR_KEYS, referencePalette } from '@vela/ui/themes'
+import type { FontStack, RampName, ReferenceToken, SemanticColorKey, ThemeMode, ThemeParameters } from '@vela/ui/themes'
 
 interface ThemeEditorProps {
   mode: ThemeMode
@@ -39,6 +39,8 @@ function RangeField({ label, min, max, step, value, onChange, suffix = '' }: Ran
 
 export function ThemeEditor({ mode, theme, onEdit }: ThemeEditorProps) {
   const palette = referencePalette(theme)
+  const overrides = theme.colorOverrides?.[mode] ?? {}
+  const fontChoices: FontStack[] = ['sans', 'serif', 'mono', 'barlow', 'space-grotesk']
   // SAFETY: referencePalette constructs only ReferenceToken keys from the fixed ramps.
   const referenceTokens = Object.keys(palette) as ReferenceToken[]
 
@@ -58,8 +60,36 @@ export function ThemeEditor({ mode, theme, onEdit }: ThemeEditorProps) {
     })
   }
 
+  function editColor(key: SemanticColorKey, value: string) {
+    onEdit({ colorOverrides: { ...theme.colorOverrides, [mode]: { ...overrides, [key]: value } } })
+  }
+
+  function useGeneratedColor(key: SemanticColorKey) {
+    const next = { ...overrides }
+    delete next[key]
+    onEdit({ colorOverrides: { ...theme.colorOverrides, [mode]: next } })
+  }
+
   return (
     <div className="inspector-sections">
+      {Object.keys(overrides).length ? (
+        <details open>
+          <summary>Exact colors · {mode}</summary>
+          <div className="inspector-section">
+            <p>These colors override the generated ramps for this mode. Ramp changes do not change an overridden color.</p>
+            {SEMANTIC_COLOR_KEYS.map(key => overrides[key] ? (
+              <div className="control-field" key={key}>
+                <span>{key.replace(/[A-Z]/g, value => ` ${value.toLowerCase()}`)}</span>
+                <div className="select-with-swatch">
+                  <input aria-label={`${key} exact color`} type="color" value={overrides[key]} onChange={event => editColor(key, event.target.value)} />
+                  <code>{overrides[key]}</code>
+                  <button type="button" onClick={() => useGeneratedColor(key)}>Use generated</button>
+                </div>
+              </div>
+            ) : null)}
+          </div>
+        </details>
+      ) : null}
       <details open>
         <summary>Reference color</summary>
         <div className="inspector-section">
@@ -195,8 +225,10 @@ export function ThemeEditor({ mode, theme, onEdit }: ThemeEditorProps) {
             <label className="control-field" key={key}>
               <span>{key.replace(/[A-Z]/g, value => ` ${value.toLowerCase()}`)}</span>
               <div className="select-with-swatch">
-                <i style={{ background: palette[theme.semantic[mode][key]] }} />
+                <i style={{ background: overrides[key] ?? palette[theme.semantic[mode][key]] }} />
                 <select
+                  disabled={Boolean(overrides[key])}
+                  title={overrides[key] ? `Exact color ${overrides[key]} overrides this ramp mapping` : undefined}
                   onChange={event => {
                     const token = referenceTokens.find(token => token === event.target.value)
 
@@ -209,6 +241,7 @@ export function ThemeEditor({ mode, theme, onEdit }: ThemeEditorProps) {
                   ))}
                 </select>
               </div>
+              {overrides[key] ? <small>Exact color: {overrides[key]}</small> : null}
             </label>
           ))}
         </div>
@@ -218,19 +251,34 @@ export function ThemeEditor({ mode, theme, onEdit }: ThemeEditorProps) {
         <summary>Typography & geometry</summary>
         <div className="inspector-section">
           <label className="control-field">
-            <span>Font stack</span>
+            <span>Body font</span>
             <select
               onChange={event => {
-                const fontStack = event.target.value
+                const fontStack = fontChoices.find(choice => choice === event.target.value)
 
-                if (fontStack === 'sans' || fontStack === 'serif' || fontStack === 'mono')
-                  onEdit({ fontStack })
+                if (fontStack) onEdit({ fontStack })
               }}
               value={theme.fontStack}
             >
               <option value="sans">System sans</option>
               <option value="serif">System serif</option>
               <option value="mono">System mono</option>
+              <option value="barlow">Barlow</option>
+              <option value="space-grotesk">Space Grotesk</option>
+            </select>
+          </label>
+          <label className="control-field">
+            <span>Heading font</span>
+            <select value={theme.headingFontStack ?? theme.fontStack} onChange={event => {
+              const headingFontStack = fontChoices.find(choice => choice === event.target.value)
+
+              if (headingFontStack) onEdit({ headingFontStack })
+            }}>
+              <option value="sans">System sans</option>
+              <option value="serif">System serif</option>
+              <option value="mono">System mono</option>
+              <option value="barlow">Barlow</option>
+              <option value="space-grotesk">Space Grotesk</option>
             </select>
           </label>
           <RangeField

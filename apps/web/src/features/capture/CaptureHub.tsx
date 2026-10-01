@@ -86,7 +86,7 @@ export function CaptureHub({ rigId }: { rigId: string }) {
             )}
             {failed && <span>The latest image could not be loaded.</span>}
           </div>
-          <Link className="vela-button" data-tone="accent" data-size="large" to={`${base}/capture`}>
+          <Link className="vela-button" data-tone="accent" to={`${base}/capture`}>
             {view?.active ? 'View capture' : 'Open capture'} →
           </Link>
         </div>
@@ -103,7 +103,6 @@ export function CaptureHub({ rigId }: { rigId: string }) {
           <Link
             className="vela-button"
             data-tone="neutral"
-            data-size="medium"
             to={`${base}/saved-images`}
           >
             Browse saved images →

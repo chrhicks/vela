@@ -4,7 +4,7 @@ export type RampStep = (typeof RAMP_STEPS)[number]
 
 export type ThemeMode = 'light' | 'dark'
 
-export type FontStack = 'sans' | 'serif' | 'mono'
+export type FontStack = 'sans' | 'serif' | 'mono' | 'barlow' | 'space-grotesk'
 
 export const RAMP_NAMES = ['neutral', 'accent', 'positive', 'warning', 'danger'] as const
 
@@ -29,6 +29,19 @@ export const SEMANTIC_TOKEN_KEYS = [
 
 export type SemanticTokenKey = (typeof SEMANTIC_TOKEN_KEYS)[number]
 
+export const SEMANTIC_COLOR_KEYS = [
+  ...SEMANTIC_TOKEN_KEYS,
+  'accentHover',
+  'accentPressed',
+  'warningSurface',
+  'dangerSurface',
+  'pendingSurface',
+] as const
+
+export type SemanticColorKey = (typeof SEMANTIC_COLOR_KEYS)[number]
+
+export type ColorOverrides = Partial<Record<ThemeMode, Partial<Record<SemanticColorKey, string>>>>
+
 export type ReferenceToken = `${RampName}-${RampStep}`
 
 export type SemanticMapping = Record<SemanticTokenKey, ReferenceToken>
@@ -50,6 +63,7 @@ export interface ThemeParameters {
   warningLightness: number[]
   dangerLightness: number[]
   fontStack: FontStack
+  headingFontStack?: FontStack
   fontSize: number
   fontWeight: number
   lineHeight: number
@@ -59,8 +73,16 @@ export interface ThemeParameters {
   borderWidth: number
   controlHeight: number
   panelPadding: number
+  iconTarget?: number
+  cardRadius?: number
+  overlayRadius?: number
+  fieldInset?: number
+  buttonInset?: number
+  overlayPadding?: number
+  focusOffset?: number
   density: number
   semantic: Record<ThemeMode, SemanticMapping>
+  colorOverrides?: ColorOverrides
 }
 
 export interface DesignProfile {

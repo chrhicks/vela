@@ -166,11 +166,11 @@ function ObservationPage({ rigId }: { rigId: string }) {
             {result && <ConnectionResult result={result} />}
             <div className="vela-observe-actions">
               {busy ? (
-                <Button disabled aria-busy="true" size="large" tone="accent">
+                <Button disabled aria-busy="true" tone="accent">
                   Connecting devices…
                 </Button>
               ) : observation.canConnect ? (
-                <Button onClick={() => void observation.connect()} size="large" tone="accent">
+                <Button onClick={() => void observation.connect()} tone="accent">
                   {result?.outcome === 'partial' || result?.outcome === 'failed'
                     ? 'Try remaining devices'
                     : 'Connect devices'}

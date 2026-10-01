@@ -503,7 +503,6 @@ function AlignmentPage({ rigId }: { rigId: string }) {
             <p>{nextInstruction}</p>
             <p>{preparationInstruction}</p>
             <Button
-              size="large"
               tone={view.active ? 'neutral' : 'accent'}
               disabled={disabled || (!view.active && !view.enabled)}
               onClick={() => void command(view.active ? 'stop' : 'start')}
@@ -570,11 +569,10 @@ function AlignmentPage({ rigId }: { rigId: string }) {
             <p>{adjustmentInstruction}</p>
             {view.active ? (
               <div>
-                <Button size="large" disabled={disabled} onClick={() => void command('stop')}>
+                <Button disabled={disabled} onClick={() => void command('stop')}>
                   Stop to reposition
                 </Button>
                 <Button
-                  size="large"
                   tone="accent"
                   disabled={disabled}
                   onClick={() => void command('finish')}
@@ -584,7 +582,6 @@ function AlignmentPage({ rigId }: { rigId: string }) {
               </div>
             ) : (
               <Button
-                size="large"
                 disabled={disabled || !view.enabled}
                 onClick={() => void command('start')}
               >

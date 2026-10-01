@@ -230,7 +230,6 @@ function AutofocusPage({ rigId }: { rigId: string }) {
               MaxStep.
             </p>
             <Button
-              size="large"
               tone="accent"
               disabled={disabled || !view.enabled || travelBlocked}
               onClick={() => void start(step, view.exposureSeconds || 2)}
@@ -374,12 +373,11 @@ function Walk({
                 : 'Points appear as each short lands. Stop restores the start position; Vela will not keep walking toward a limit.'}
         </p>
         {busy ? (
-          <Button size="large" disabled={disabled} onClick={onStop}>
+          <Button disabled={disabled} onClick={onStop}>
             Stop and restore start
           </Button>
         ) : (
           <Button
-            size="large"
             tone="accent"
             disabled={disabled || !view.enabled}
             onClick={onBackToSetup}
