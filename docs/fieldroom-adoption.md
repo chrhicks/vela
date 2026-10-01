@@ -58,7 +58,7 @@ font, crop, or content errors behind a broad screenshot tolerance.
 
 ## 1. Freeze references and establish coverage
 
-Status: in progress.
+Status: reference baseline frozen; independent review pending.
 
 ### Plan
 
@@ -82,7 +82,28 @@ No production styling changes until the old appearance has been captured.
 
 ### Actual / deviations / evidence
 
-Pending.
+The initial reference commit is `ed9de33`. Forty 1x Paper exports (24 app,
+16 system) are recorded in the hash/dimension manifest. All forty files were
+checked against the manifest. The coverage map assigns every app board to
+named production-route fixture scenes and separates state sheets from routes.
+
+Four previous-appearance screenshots, exact intercepted fixtures, both token
+mappings, source hashes, and a guarded reproduction recipe are archived.
+The focused capture run passed, and the captured desktop and phone output was
+visually inspected. This is browser-fixture evidence, not device evidence.
+
+Actual full-content heights are preserved: Frame and Prepare 989px, Equipment
+921px, interrupted Tonight 965px. Phone application crops are 390 × 782 after
+excluding the 62px mock OS strip. The local reference photographs have hashes
+and a link to their existing license/credit record.
+
+The missing Autofocus reference is being drawn as a separate supplement with
+its own [before-work plan](visual-reference/fieldroom/autofocus-design.md).
+It must be frozen before Autofocus adoption; it does not change the immutable
+initial reference set or block unrelated shared foundation recipes.
+
+Draft delivery PR: https://github.com/chrhicks/vela/pull/86. Independent review
+and reference acceptance are still pending; no production styles have changed.
 
 ## 2. Shared Fieldroom foundations
 
@@ -104,6 +125,11 @@ Status: planned; waits for legacy capture.
   reuse modal Dialog semantics for an attached non-modal popover.
 - Update theme validation, workshop profile selection, diagnostics, and
   documentation together. No migration engine for obsolete scratch artifacts.
+
+The [foundations plan](fieldroom-foundations-plan.md) specifies exact recipes,
+file ownership, integration order, tests, and browser acceptance before edits.
+The later [application appearance plan](fieldroom-appearance-plan.md) keeps
+configuration and browser persistence separate from the shared UI primitive.
 
 ### Verification and exit
 

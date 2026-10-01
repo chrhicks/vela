@@ -27,6 +27,8 @@ must remain fixture data, never fabricated operational state.
 The exposure illustration is the existing local Crescent image at
 `packages/ui/src/drafts/target-framing/crescent.jpg`. Related Andromeda and M13
 assets live beside it. Operational imagery comes from actual capture endpoints.
+The [fixture image credits and licenses](../../../packages/ui/src/drafts/target-framing/README.md)
+apply to the photographs reproduced in these design exports.
 The old simulator star field is retained in the previous-appearance archive.
 Asset hashes are in [assets.json](assets.json); font installation and licensing
 are recorded at their owning `packages/ui/src/fonts/README.md` boundary during
