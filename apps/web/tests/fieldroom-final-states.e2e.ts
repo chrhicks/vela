@@ -165,6 +165,7 @@ for (const mode of ['light', 'dark'] as const) {
     await expect(
       page.getByText('Loading photographs…', { exact: true }),
     ).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Loading saved photographs', exact: true })).toBeVisible()
     await expect(
       page.getByRole('region', { name: 'Photographs list' }).getByRole('link'),
     ).toHaveCount(0)

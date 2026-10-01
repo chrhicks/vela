@@ -23,6 +23,8 @@ function Photographs({ props, onPropsChange }: {
   const selected = Math.max(0, Math.min(11, Number(values.selected) || 0))
   const revealed = Math.max(selected + 1, Number(values.revealed) || 6)
   const unavailable = values.preview === 'unavailable'
+  const collection = values.collection ?? 'current'
+  const hasCollection = collection === 'current'
   const list = useRef<HTMLHeadingElement>(null)
   const viewer = useRef<HTMLElement>(null)
   const [notice, setNotice] = useState('')
@@ -43,14 +45,15 @@ function Photographs({ props, onPropsChange }: {
       />
       <header className="vela-photographs-demo__heading">
         <h1>Photographs</h1>
-        <span>Askar FRA 400 · 12 saved images</span>
+        <span>Askar FRA 400{hasCollection ? ' · 12 saved images' : ''}</span>
         <p>Available even when the rig is disconnected</p>
       </header>
-      <div className="vela-photographs-demo__jump">
+      {hasCollection && <div className="vela-photographs-demo__jump">
         <span>Selected · {times[selected]}</span>
         <Button onClick={() => { list.current?.focus(); list.current?.scrollIntoView({ block: 'start' }) }}>Jump to photographs ↓</Button>
-      </div>
+      </div>}
       <main className="vela-photographs-demo__layout">
+        {hasCollection ? <>
         <section className="vela-photographs-demo__list" aria-label="Saved photographs">
           <header><h2 ref={list} tabIndex={-1}>30 September 2026</h2><span>Newest first</span></header>
           <div className="vela-photographs-demo__rows">
@@ -110,6 +113,41 @@ function Photographs({ props, onPropsChange }: {
             {!unavailable && <p>The FITS file retains the original capture data.</p>}
           </div>
         </section>
+        </> : (
+          <section
+            className="vela-photographs-demo__collection-state"
+            aria-label="Photographs collection state"
+            aria-busy={collection === 'loading'}
+          >
+            <p className="vela-photographs-demo__context">
+              Photographs · {collection === 'loading' ? 'Loading' : 'Askar FRA 400'}
+            </p>
+            <div className="vela-photographs-demo__collection-copy">
+              <h2>
+                {collection === 'loading'
+                  ? 'Loading saved photographs'
+                  : 'No saved photographs yet'}
+              </h2>
+              <p className="vela-photographs-demo__collection-message">
+                {collection === 'loading'
+                  ? 'Fetching this rig’s saved images. Your hardware does not need to be connected.'
+                  : 'Turn on Save frames before capturing, or use Keep to retain an exposure.'}
+              </p>
+            </div>
+            <div className="vela-photographs-demo__collection-action">
+              {collection === 'loading' ? (
+                <p role="status">Loading photographs…</p>
+              ) : (
+                <Button
+                  tone="accent"
+                  onClick={() => setNotice('Workshop example: open Tonight. No observing command is sent.')}
+                >
+                  Open Tonight →
+                </Button>
+              )}
+            </div>
+          </section>
+        )}
       </main>
       {notice && <p role="status" className="vela-photographs-demo__notice">{notice}</p>}
       <footer className="vela-photographs-demo__footer"><span>Saved images belong to this rig. Select another rig to browse its photographs.</span><span>Design study · Sample image metadata</span></footer>
@@ -120,12 +158,13 @@ function Photographs({ props, onPropsChange }: {
 export const specimen: ComponentSpecimen = {
   componentId: 'panel', componentName: 'Panel / Card', id: 'fieldroom-photographs',
   name: 'Photographs · Fieldroom product example',
-  description: 'Source 03.4 composition, compact selection flow and 03.14 preserved-preview fallback. Local Crescent reference; inspection controls explain their existing application behavior. No network reads or downloads.',
+  description: 'Source 03.4 composition, 03.9 collection loading/empty, compact selection flow and 03.14 preserved-preview fallback. Local Crescent reference; inspection controls explain their existing application behavior. No network reads or downloads.',
   controls: {
+    collection: { type: 'select', label: 'Collection state', options: ['current', 'loading', 'empty'] },
     preview: { type: 'select', label: 'Preview treatment', options: ['current', 'unavailable'] },
     selected: { type: 'select', label: 'Selected photograph (newest = 0)', options: times.map((_, index) => String(index)) },
     revealed: { type: 'select', label: 'Revealed photographs', options: ['6', '12'] },
   },
-  defaultProps: { preview: 'current', selected: 0, revealed: 6 },
+  defaultProps: { collection: 'current', preview: 'current', selected: 0, revealed: 6 },
   render: (props, onPropsChange) => <Photographs props={props} {...(onPropsChange ? { onPropsChange } : {})} />,
 }

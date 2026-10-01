@@ -29,7 +29,8 @@ for (const width of [1440, 768, 390]) {
 
         const geometry = await page.evaluate(
           selectors => ({
-            viewport: { width: innerWidth, height: innerHeight, dpr: devicePixelRatio },
+            viewport: { width: innerWidth, height: innerHeight, dpr: devicePixelRatio, scrollX, scrollY },
+            coordinateSpace: 'document',
             mode: document.documentElement.dataset.mode,
             elements: selectors.flatMap(selector =>
               Array.from(document.querySelectorAll(selector)).map(element => {
@@ -38,8 +39,8 @@ for (const width of [1440, 768, 390]) {
 
                 return {
                   selector,
-                  x: rect.x,
-                  y: rect.y,
+                  x: rect.x + scrollX,
+                  y: rect.y + scrollY,
                   width: rect.width,
                   height: rect.height,
                   font: style.font,

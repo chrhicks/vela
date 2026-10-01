@@ -84,10 +84,19 @@ function PhotographsPage({ rigId, imageId }: { rigId: string; imageId?: string }
           }}>Jump to photographs ↓</Button>
         </div>
       )}
-      <div className="photographs__layout">
+      <div
+        className="photographs__layout"
+        data-unselected={(!imageId && images.length === 0) || undefined}
+      >
         <section className="photographs__list" aria-label="Photographs list">
           {images.length === 0 && <h2 className="photographs__list-title" tabIndex={-1} ref={listHeading}>Photographs list</h2>}
-          {collection.loading && <p role="status">Loading photographs…</p>}
+          {collection.loading && (
+            images.length === 0 ? (
+              <CollectionState state="loading" rigId={rigId} rigName={rigName} />
+            ) : (
+              <p role="status">Loading photographs…</p>
+            )
+          )}
           {collection.error && (
             <div className="photographs__read-status" role="status">
               <p>{collection.error}</p>
@@ -142,14 +151,8 @@ function PhotographsPage({ rigId, imageId }: { rigId: string; imageId?: string }
               )}
             </>
           )}
-          {collection.view && images.length === 0 && (
-            <div className="photographs__read-status">
-              <h3>No saved photographs yet</h3>
-              <p>Turn on Save frames before capturing, or use Keep to retain an exposure.</p>
-              <Link className="vela-button" data-tone="neutral" to={`/rigs/${encodeURIComponent(rigId)}/observe/capture`}>
-                Open Tonight →
-              </Link>
-            </div>
+          {!collection.loading && collection.view && images.length === 0 && (
+            <CollectionState state="empty" rigId={rigId} rigName={rigName} />
           )}
         </section>
         {image ? (
@@ -183,5 +186,51 @@ function PhotographsPage({ rigId, imageId }: { rigId: string; imageId?: string }
         Saved images belong to this rig. Select another rig to browse its photographs.
       </footer>
     </article>
+  )
+}
+
+function CollectionState({
+  state,
+  rigId,
+  rigName,
+}: {
+  state: 'loading' | 'empty'
+  rigId: string
+  rigName?: string
+}) {
+  const loading = state === 'loading'
+  const context = loading ? 'Loading' : rigName
+
+  return (
+    <section
+      className="photographs__collection-state"
+      aria-label="Photographs collection state"
+      aria-busy={loading}
+    >
+      <p className="photographs__context">
+        Photographs{context ? ` · ${context}` : ''}
+      </p>
+      <div className="photographs__collection-copy">
+        <h2>{loading ? 'Loading saved photographs' : 'No saved photographs yet'}</h2>
+        <p className="photographs__collection-message">
+          {loading
+            ? 'Fetching this rig’s saved images. Your hardware does not need to be connected.'
+            : 'Turn on Save frames before capturing, or use Keep to retain an exposure.'}
+        </p>
+      </div>
+      <div className="photographs__collection-action">
+        {loading ? (
+          <p role="status">Loading photographs…</p>
+        ) : (
+          <Link
+            className="vela-button"
+            data-tone="accent"
+            to={`/rigs/${encodeURIComponent(rigId)}/observe/capture`}
+          >
+            Open Tonight →
+          </Link>
+        )}
+      </div>
+    </section>
   )
 }
