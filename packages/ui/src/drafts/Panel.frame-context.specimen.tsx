@@ -187,7 +187,7 @@ function FrameContext({ props, onPropsChange }: {
                 </dl>
                 <p>Automatic centering uses a fresh solve after each correction, to within 0.5′. At most four corrections; stop after two worsening results.</p>
                 <p>State snapshot · Oct 1, {time(target.sky.observedAt)}</p>
-                <Button tone="quiet" onClick={() => update({ notice: 'Workshop snapshot: no live rig state is requested.' })}>Check rig state</Button>
+                <Button onClick={() => update({ notice: 'Workshop snapshot: no live rig state is requested.' })}>Check rig state</Button>
               </details>
             </section>
             <section className="vela-frame-context__exposure" aria-label="Last test exposure">
