@@ -393,4 +393,24 @@ post-review comparison and final clean commit must be recorded before inviting C
 
 ### Actual / deviations / evidence
 
-Pending.
+The first whole-route rendering pass passed 46 cases across Tonight, Explore,
+framing, capture preparation, Photographs, Equipment, Home and onboarding. The
+shared/preparation run passed 94 of 96 cases; the two failures were an older
+theme test still selecting the removed device Panel. Updating it to assert the
+current imaging-setup surface, device separator and section typography retained
+its token/geometry intent; both cases passed.
+
+A read-only coverage audit mapped the original planned scene names to actual
+registry aliases and scripted browser sequences. It identified missing combined
+evidence for archive loading, capture transition continuity, touch panning and
+route-specific interaction states. Nine supplemental cases now pass: held
+collection loading versus empty, first-image capture through readout/save/repeat
+and confirmed stopping, selected disconnected camera, Home rest/hover/pressed,
+reduced-motion dialog and enlargement behavior, persistent capture errors across
+disclosure, and real Chromium touch input reaching both horizontal image clamps.
+The [coverage map](visual-reference/fieldroom/coverage.md) records the actual
+fixtures and owning tests. No production behavior defect was found by these cases.
+
+The preparation comparison found and corrected a 4px Autofocus setup card-height
+mismatch through the workshop. The final settled head is receiving renewed
+independent review before the last visual acceptance and Chris's handoff.

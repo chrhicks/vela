@@ -21,7 +21,7 @@ for (const width of [1040, 390]) {
       }),
     )
     await page.goto('/rigs/rig-1')
-    const panel = page.locator('.vela-rig-device').first()
+    const panel = page.locator('.equipment__setup')
     await expect(panel).toBeVisible()
 
     // A shared component can still drift when its app shell selects a different
@@ -38,11 +38,12 @@ for (const width of [1040, 390]) {
       `${theme.radius}px`,
     )
     await expect(panel).toHaveCSS('border-radius', '6px')
-    await expect(panel).toHaveCSS('border-top-width', `${theme.borderWidth}px`)
-    await expect(panel).toHaveCSS('border-top-style', 'solid')
-    await expect(panel.locator('.vela-panel__title')).toHaveCSS(
+    const device = page.locator('.equipment__device').first()
+    await expect(device).toHaveCSS('border-top-width', `${theme.borderWidth}px`)
+    await expect(device).toHaveCSS('border-top-style', 'solid')
+    await expect(panel.getByRole('heading', { name: 'Imaging setup' })).toHaveCSS(
       'font-size',
-      `${theme.fontSize * 0.96}px`,
+      '24px',
     )
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),

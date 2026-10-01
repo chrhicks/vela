@@ -241,3 +241,13 @@ checks including the new controlled pending response passed. Full `pnpm check`
 passed. The synthetic alignment fixture also now uses the viewport's true
 pixel-center convention,799.5/599.5, for its declared north-up projected coordinates;
 five fixture checks passed after that correction.
+
+The fresh reviewer returned **OK**, no findings, at `db7a5e8`: 921 project tests,
+133 application browser cases, 19 workshop cases and four Python tests passed.
+The subsequent parent source comparison found the setup ready card was 100px
+high rather than the source's 96px. Its two text rows need an 8px gap, not the
+walking status card's 12px gap. The parent corrected and inspected the workshop
+first, then adopted that single scoped rule in the route. Nine workshop cases
+and 85 Alignment/Autofocus/theme cases passed. The main route matrices now also
+emit measured geometry next to their captures. This correction is receiving a
+fresh independent review before the final acceptance comparison.

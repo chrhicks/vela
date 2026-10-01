@@ -1,9 +1,10 @@
 # Fieldroom reference coverage
 
-This is the planned production-route coverage for the frozen export in
+This records the planned and implemented production-route coverage for the frozen export in
 [manifest.json](manifest.json), governed by [the adoption plan](../../fieldroom-adoption.md).
-Scene names below reserve deterministic future fixtures; they do not claim those
-fixtures or the redesigned routes are implemented. The manifest contains 40 boards:
+The original scene names below preserve the planning vocabulary. The actual
+fixture and browser-test mapping follows at the end; a different fixture name
+does not imply a missing state. The main manifest contains 40 boards:
 24 application references on Paper `p-1-0` and 16 system references on `p-3-0`.
 Paper's numbered screen names, rather than its internal page IDs, identify them here.
 
@@ -102,7 +103,11 @@ cleanup behavior. Appearance switching must preserve both the operational state
 and any held image/viewport. Camera-read interruption and loss of browser/server
 connectivity are separate scenes even when both retain old imagery.
 
-## Capability dependencies and recorded substitutions
+## Original capability requirements and recorded substitutions
+
+These requirements describe the capability gaps at the reference freeze, before
+adoption. Their implementation and validation are recorded in the owning slice
+plans and the actual coverage map below.
 
 - **Subject and totals:** Tonight needs server-owned capture subject intent,
   per-run saved count and collected exposure duration. Existing archive
@@ -149,3 +154,53 @@ and files remain in the manifest. The foundations slice must map their color,
 type, controls, surfaces, geometry, dialogs, responsive behavior, inspection,
 overlays, feedback and appearance states to workshop/browser evidence. Application
 coverage above does not substitute for that primitive-level verification.
+
+## Actual fixture and browser coverage
+
+The registry is `apps/web/tests/fixtures/fieldroom/scenes.ts`. Browser tests below
+are relative to `apps/web/tests`; their controlled response sequences supply the
+transient states that are not static registry scenes. Registry scenes are available
+through `http://127.0.0.1:5176/__review/scene/<name>` when the review server is running.
+Choose a scene from `/__review` to change workflows: its session serves only that
+fixture's contracts, deliberately rejecting requests outside the selected scene.
+
+| Frozen reference | Actual registry scenes / route evidence |
+| --- | --- |
+| 03.0, 04 | `tonight-light`, `tonight-dark`; paired desktop/phone captures in `tonight.e2e.ts` |
+| 03.1 | `explore-light`, `explore-dark`; `fieldroom-explore.e2e.ts` |
+| 03.2 | `framing-light`, `framing-dark`; real Aladin with pinned DSS tiles and separate test-exposure pixels in `fieldroom-explore.e2e.ts` |
+| 03.3 | `preparation-light`, `preparation-dark`; `preparation.e2e.ts` |
+| 03.4 | `photographs-light`, `photographs-dark`; combined collection/selected detail in `photographs.e2e.ts` |
+| 03.5 | `equipment-connected`; light/dark at 1440/900/390 in `fieldroom-equipment.e2e.ts` |
+| 03.6, 03.7 | `alignment-phone-adjusting`, `alignment-phone-read-interrupted`; both palettes at 1440/768/390 in `fieldroom-alignment.e2e.ts` |
+| 03.8 | `home-no-rigs`; `fieldroom-equipment.e2e.ts` |
+| 03.10 | `tonight-interrupted`; `tonight.e2e.ts` and capture reconnection cases |
+| 03.12, 03.15 | `rig-discovery-review`, `rig-address-validation-phone`; actual dialogs in `rig-onboarding.e2e.ts` |
+| 03.19, 03.20 | System resolution is scripted in `tonight.e2e.ts` through the real Appearance control; `appearance.e2e.ts` adds storage and draft-preservation behavior |
+| 03.21, 03.22 | `appearance-phone-light`, `appearance-phone-dark`; `fieldroom-alignment.e2e.ts` opens the actual compact popover |
+| 03.23–03.26 | `autofocus-ready`, `autofocus-running`/`autofocus-phone-running`, `autofocus-interrupted`, `autofocus-result`, `autofocus-restored`, `autofocus-invalid-window`, `autofocus-restore-unconfirmed`, `autofocus-offline`; `fieldroom-autofocus.e2e.ts` |
+
+| State / interaction sheet | Actual controlled evidence |
+| --- | --- |
+| 03.9 empty/loading | `tonight-idle`, `explore-empty`, `photographs-empty`; empty-result filter cases in `targets.e2e.ts`; survey failure in `targets.e2e.ts`; `fieldroom-final-states.e2e.ts` holds the archive collection request, distinguishes loading from empty, then resolves it. The same file captures no-image and first-exposure states in both palettes. |
+| 03.11 recovery | `tonight-camera-retry`, `tonight-save-failed`, `tonight-preview-failed` in `tonight.e2e.ts`; uncertain Start and server restart in `capture.e2e.ts`; `framing-unsolved` and newer-unsolved/older-solved pairing in `fieldroom-explore.e2e.ts`; cross-feature retention in `exposure-recovery.e2e.ts`. |
+| 03.13 dialogs | `rig-address-unreachable`, `rig-discovery-empty`, `rig-forget-dialog`; `rig-onboarding.e2e.ts`, `rig-detail.e2e.ts`, and Equipment's retained visual recipe. |
+| 03.14 edge states | Expired held native exposure in `image-inspection.e2e.ts`; `framing-obsolete` and stale/rejected checks in `targets.e2e.ts`; `equipment-camera-disconnected` captured/asserted in `fieldroom-final-states.e2e.ts`; `photographs-fallback` and exact original-preview/download behavior in `photographs.e2e.ts`. |
+| 03.16 capture transitions | `fieldroom-final-states.e2e.ts` holds Start/Stop responses and explicitly advances exposure → readout → publish/save → repeated exposure → stopping → confirmed stopped, retaining the image and checking exact writes. `capture.e2e.ts` adds uncertain Stop/restart reconciliation. |
+| 03.17 inspection | `image-inspection.e2e.ts` covers held identity, arrival, Show latest, native retry, exact-image Keep, mouse/keyboard pan, wheel clamping, enlargement and focus return. `photographs.e2e.ts` covers saved-image inspection. `fieldroom-final-states.e2e.ts` uses Chromium touch input to reach both horizontal clamps while preserving the same decoded native image. |
+| 03.18 interaction | Home rest/hover/pressed and reduced-motion dialog dismissal/focus return in `fieldroom-final-states.e2e.ts`; Capture error remains visible through disclosure changes and reduced-motion enlargement. Onboarding tests cover pending/failure/success. `rig-detail.e2e.ts` covers Forget cancellation, dismissal and pending protection; workshop Dialog/foundations cases cover keyboard trapping. |
+
+Additional preparation states are explicit: Alignment setup/baseline/no-solution,
+stopped/finished/unavailable, pending/unknown Stop and Finish, failed next image and
+short-phone access; Autofocus moving/measuring/fitting/confirming/no-stars,
+stopping/restoring/unknown Stop, and retained samples during read interruption.
+These are covered by `fieldroom-alignment.e2e.ts`, `alignment.e2e.ts`,
+`alignment-inspection.e2e.ts`, `fieldroom-autofocus.e2e.ts`, `autofocus.e2e.ts`, and
+`exposure-recovery.e2e.ts`. Appearance and preparation-navigation cases verify
+shared composition without issuing physical commands.
+
+DS.01–DS.16 map to the source-backed workshop foundation, navigation, control,
+dialog, image-inspection, feedback and Appearance specimens. Their measured
+acceptance is retained in [foundation evidence](../../visual-evidence/fieldroom/foundations/README.md).
+Owning slice evidence records exact source substitutions and responsive extensions;
+static UI fixtures do not establish physical device outcomes.
