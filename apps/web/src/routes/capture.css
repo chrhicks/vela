@@ -87,8 +87,18 @@
   line-height: 20px;
 }
 .tonight-capture__heading strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-size: 15px;
   font-weight: 500;
+}
+.tonight-capture__dot {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 10px;
+  border-radius: 50%;
+  background: currentColor;
 }
 .tonight-capture__remaining {
   display: flex;

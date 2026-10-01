@@ -267,3 +267,13 @@ passed five. UI/web builds and lint passed. These corrections require a renewed
 independent review and then a final comparison of the settled revision before
 this slice is accepted. The written Explore/framing and Photographs plans do
 not begin their implementations.
+
+Renewed review at `80d9dd7` returned **OK**, with 865 project tests, lint,
+workspace builds, 20 application browser checks, seven workshop checks and four
+Python tests passing. The parent then inspected both palettes at desktop/phone,
+the paired Appearance panels, and interrupted Tonight against the frozen source.
+The remaining capture-status bullet used a platform fallback glyph smaller than
+Paper's rendered 10px circle. It now uses a decorative 10px circle with the source
+text gap, preserving the accessible Capturing status. Ten affected Tonight browser
+checks and lint passed after this correction. A final independent check and
+comparison remain required before acceptance.

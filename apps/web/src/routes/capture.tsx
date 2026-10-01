@@ -204,7 +204,9 @@ function CapturePage({ rigId }: { rigId: string }) {
                 </div>
               )}
               <div className="tonight-capture__heading">
-                <strong role="status">{showProgress ? '● Capturing' : activity}</strong>
+                <strong role="status">
+                  {showProgress ? <><span className="tonight-capture__dot" aria-hidden="true" />Capturing</> : activity}
+                </strong>
                 {view.active && <span>Exposure {view.completedCount + 1}</span>}
               </div>
               {view.active ? (
