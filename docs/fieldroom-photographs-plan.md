@@ -1,6 +1,31 @@
 # Fieldroom Photographs
 
-Status: accepted at `99195ae` after independent OK and the parent’s final visual comparison. Explore/framing/preparation passed independent OK and its final visual comparison at `8906518`; acceptance is recorded in `0f23355`. Photographs has now passed its implementation gate.
+Historical initial slice: accepted at `99195ae` after independent OK and the parent’s final visual comparison. Explore/framing/preparation passed independent OK and its final visual comparison at `8906518`; acceptance is recorded in `0f23355`. Photographs has now passed its implementation gate.
+
+## Current adoption: Nights and Targets
+
+On October 1, Chris approved the `photograph-library` workshop proposal and
+requested production adoption. This supersedes the dated-list layout, automatic
+newest selection and six-row disclosure described in the historical plan below.
+The accepted flow is Nights / Targets → group with complementary filter →
+selected photograph with return and Newer/Older navigation. Search and navigation
+context belong in the URL; existing image deep links remain authoritative.
+
+The browser groups immutable capture timestamps from noon to the following noon
+in the server-projected IANA timezone. Vela currently has no observatory timezone
+setting: both collection and detail provide the server's runtime zone, which is
+explicitly labeled Vela server time and used consistently on every browser.
+Target groups use recorded subject identity, with No recorded target for legacy
+or unassigned captures. No sessions, metadata rewriting, tagging or new archive
+storage are introduced. Existing inspection, failure handling and exact original
+and display downloads remain intact. Server collection reads still return all
+metadata and do not render thumbnails on demand.
+
+The live approved specimen is the visual authority for this revision. The owning
+[Photographs README](../apps/web/src/features/photographs/README.md) describes the
+current route and state boundaries. [Library visual evidence](visual-evidence/fieldroom/photograph-library/README.md) records the comparison; current independent verification and Chris’s implementation acceptance are tracked in PR #86.
+
+## Historical initial composition
 
 ## Outcome and boundary
 
@@ -341,21 +366,19 @@ reference run passed 46. [Final retained evidence](visual-evidence/fieldroom/fin
 includes the nine captures and their hashes. Chris's whole-application acceptance
 remains the merge gate.
 
-## October 1 library workshop proposal
+## October 1 library workshop approval
 
 Chris's live review reopened archive navigation: six-row disclosure makes finding
 another observing night awkward. Nights and targets are equally useful starting
 points for him. The separate `photograph-library` Panel specimen explores equal
 Nights / Targets tabs, searchable group cards, a group's photograph grid, a
 cross-filter (target within night or night within target), and selected-photo
-inspection with newer/older navigation. The current application's Photographs
-behavior remains unchanged pending workshop agreement.
+inspection with newer/older navigation. Chris approved this design and authorized application adoption.
 
 The specimen uses 64 invented records over four nights and repeated bundled
-reference images. Its noon-to-noon local observing-night boundary is a proposed
-presentation rule, not a saved session or capture run. Production metadata has
-capture timestamps and optional intended subject, but no observing timezone,
-night key or session ID; timezone semantics need agreement before adoption.
+reference images. Its noon-to-noon local observing-night boundary is a presentation rule, not a
+saved session or capture run. Production capture metadata is unchanged; the
+collection/detail viewing contracts now explicitly provide Vela server time.
 Unknown subjects stay visible as No recorded target rather than being inferred
 from the pixels. Real archive paging and retained-image rendering remain separate
 boundary concerns; this prototype does not change either server behavior.

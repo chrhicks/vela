@@ -554,6 +554,7 @@ test('saved collection opens a retained image and original downloads without cam
     respond(route, {
       rigId: 'rig-1',
       rigName: 'Offline rig',
+      timeZone: 'America/New_York',
       images: [saved],
     }),
   )
@@ -561,6 +562,7 @@ test('saved collection opens a retained image and original downloads without cam
     respond(route, {
       rigId: 'rig-1',
       rigName: 'Offline rig',
+      timeZone: 'America/New_York',
       image: saved,
     }),
   )
@@ -569,9 +571,10 @@ test('saved collection opens a retained image and original downloads without cam
   )
   await page.goto('/rigs/rig-1/observe/saved-images')
   await expect(page.getByRole('heading', { name: 'Photographs', exact: true })).toBeVisible()
-  await expect(page).toHaveURL(/\/saved-images\/frame-1$/)
-  await expect(page.getByRole('region', { name: 'Photographs list' }).getByRole('link'))
-    .toHaveAttribute('aria-current', /^(page|true)$/)
+  await expect(page).toHaveURL(/\/saved-images$/)
+  await page.getByRole('region', { name: 'Photograph library' }).getByRole('link').first().click()
+  await page.getByRole('region', { name: 'Photographs in group' }).getByRole('link').click()
+  await expect(page).toHaveURL(/\/saved-images\/frame-1\?/)
   await expect(page.getByRole('region', { name: 'Saved preview' }).getByRole('img')).toBeVisible()
   await expect(page.getByRole('link', { name: /Download original FITS/ })).toHaveAttribute(
     'href',
@@ -673,7 +676,7 @@ test('labels estimated starts on the loaded capture and saved image detail', asy
   }
 
   await page.route('**/api/web/rigs/rig-1/saved-images/frame-1', route =>
-    respond(route, { rigId: 'rig-1', rigName: 'Offline rig', image }),
+    respond(route, { rigId: 'rig-1', rigName: 'Offline rig', timeZone: 'America/New_York', image }),
   )
   await page.route(`**${image.imageUrl}`, route =>
     route.fulfill({ contentType: 'image/png', body: preview }),

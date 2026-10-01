@@ -8,6 +8,8 @@ export function registerSavedImages(
   catalog: RigCatalog,
   store: SavedImageStore,
 ) {
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
+
   app.get<{ Params: { rigId: string } }>(
     '/api/web/rigs/:rigId/saved-images',
     async (request, reply) => {
@@ -17,7 +19,7 @@ export function registerSavedImages(
       if (!rig) return reply.code(404).send({ error: 'Rig not found' })
 
       try {
-        return { rigId: rig.id, rigName: rig.name, images: await store.list(rig.id) }
+        return { rigId: rig.id, rigName: rig.name, timeZone, images: await store.list(rig.id) }
       } catch (error) {
         request.log.error(error, 'Could not read saved images')
 
@@ -41,7 +43,7 @@ export function registerSavedImages(
         const image = await store.refreshPreview(rigId, imageId)
 
         return image
-          ? { rigId, rigName: rig.name, image }
+          ? { rigId, rigName: rig.name, timeZone, image }
           : reply.code(404).send({ error: 'Saved image not found' })
       } catch (error) {
         request.log.error(error, 'Could not read saved image')

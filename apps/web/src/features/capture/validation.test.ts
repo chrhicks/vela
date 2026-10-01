@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { CaptureView } from '@vela/model/web'
-import { isCaptureView, isSavedImage, isSavedImagesView } from './validation'
+import { isCaptureView, isSavedImage, isSavedImageView, isSavedImagesView } from './validation'
 
 const view: CaptureView = {
   captureReadState: 'current',
@@ -120,12 +120,12 @@ it('validates confirmed retention and exact same-origin download resources', () 
     expect(isSavedImage({ ...savedImage, ...patch }, 'rig-1')).toBe(false)
   }
 
-  expect(isSavedImagesView({ rigId: 'rig-1', rigName: 'Rig', images: [savedImage] }, 'rig-1')).toBe(
+  expect(isSavedImagesView({ rigId: 'rig-1', rigName: 'Rig', timeZone: 'America/New_York', images: [savedImage] }, 'rig-1')).toBe(
     true,
   )
   expect(
     isSavedImagesView(
-      { rigId: 'rig-1', rigName: 'Rig', images: [savedImage, savedImage] },
+      { rigId: 'rig-1', rigName: 'Rig', timeZone: 'America/New_York', images: [savedImage, savedImage] },
       'rig-1',
     ),
   ).toBe(false)
@@ -184,7 +184,7 @@ it('pins native, fit and download to one declared renderer version and rejects m
   }
 
   expect(isSavedImage(current, 'rig-1')).toBe(true)
-  expect(isSavedImagesView({ rigId: 'rig-1', rigName: 'Rig', images: [current] }, 'rig-1')).toBe(
+  expect(isSavedImagesView({ rigId: 'rig-1', rigName: 'Rig', timeZone: 'America/New_York', images: [current] }, 'rig-1')).toBe(
     true,
   )
 
@@ -213,4 +213,14 @@ it('requires run intent and valid totals while accepting legacy images without i
     { integrationSeconds: -1 }, { integrationSeconds: Infinity }, { integrationSeconds: undefined },
     { latestImage: { ...view.latestImage, subject: { ...subject, name: '' } } },
   ]) expect(isCaptureView({ ...view, ...patch }, 'rig-1')).toBe(false)
+})
+
+
+it('requires a usable, explicit time zone for both saved-image projections', () => {
+  for (const timeZone of [undefined, '', 'not-a-zone', 42]) {
+    expect(isSavedImagesView({ rigId: 'rig-1', rigName: 'Rig', timeZone, images: [savedImage] }, 'rig-1')).toBe(false)
+    expect(isSavedImageView({ rigId: 'rig-1', rigName: 'Rig', timeZone, image: savedImage }, 'rig-1')).toBe(false)
+  }
+
+  expect(isSavedImageView({ rigId: 'rig-1', rigName: 'Rig', timeZone: 'UTC', image: savedImage }, 'rig-1')).toBe(true)
 })

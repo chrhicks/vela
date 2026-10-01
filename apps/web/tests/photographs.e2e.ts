@@ -11,7 +11,9 @@ const collectionPath = '/api/web/rigs/fra400/saved-images'
 
 const preview = (page: Page) => page.getByRole('region', { name: 'Saved preview', exact: true })
 
-const list = (page: Page) => page.getByRole('region', { name: 'Photographs list', exact: true })
+const library = (page: Page) => page.getByRole('region', { name: 'Photograph library', exact: true })
+
+const list = (page: Page) => page.getByRole('region', { name: 'Photographs in group', exact: true })
 
 const details = (page: Page) => page.getByRole('region', { name: 'Exposure details', exact: true })
 
@@ -20,7 +22,7 @@ const originalDownload = (page: Page) => page.getByRole('link', { name: /Downloa
 const displayDownload = (page: Page) => page.getByRole('link', { name: /Download (?:display|original preview) PNG/i })
 
 function row(page: Page, id: string) {
-  return list(page).locator(`a[href="${photographsBase}/${encodeURIComponent(id)}"]`)
+  return list(page).locator(`a[href^="${photographsBase}/${encodeURIComponent(id)}?"]`)
 }
 
 function deferred() {
@@ -48,11 +50,10 @@ async function settledRendering(page: Page) {
 }
 
 async function expectSelected(page: Page, image: SavedImage) {
-  await expect(page).toHaveURL(new RegExp(`/saved-images/${image.id}$`))
+  await expect(page).toHaveURL(new RegExp(`/saved-images/${image.id}(?:\\?|$)`))
   await expect(preview(page).getByRole('img')).toHaveAttribute('src', image.fitImageUrl ?? image.imageUrl)
   await expect(originalDownload(page)).toHaveAttribute('href', image.fitsUrl)
   await expect(displayDownload(page)).toHaveAttribute('href', image.previewDownloadUrl)
-  await expect(row(page, image.id)).toHaveAttribute('aria-current', /^(page|true)$/)
 }
 
 async function viewportPosition(viewport: Locator) {
@@ -61,28 +62,27 @@ async function viewportPosition(viewport: Locator) {
 
 for (const mode of ['light', 'dark'] as const) {
   for (const width of [1440, 390]) {
-    test(`Photographs ${mode} keeps the source composition and uncropped reference at ${width}`, async ({ page }) => {
+    test(`Photographs ${mode} library and uncropped inspection fit at ${width}`, async ({ page }) => {
       await page.setViewportSize({ width, height: width === 1440 ? 900 : 782 })
       const { scene } = await openPhotographsScene(page, `photographs-${mode}`)
       const image = scene.images()[0]!
       await expect(page.getByRole('heading', { name: 'Photographs', exact: true })).toBeVisible()
       await expect(page.getByRole('main')).toHaveCount(1)
+      await expect(library(page)).toBeVisible()
+      await expect(preview(page)).toHaveCount(0)
+      expect(scene.detailReads).toEqual([])
+      await library(page).getByRole('link').first().click()
+      await expect(list(page).getByRole('link')).toHaveCount(12)
+      await row(page, image.id).click()
       await expectSelected(page, image)
-      await expect(list(page).getByRole('link')).toHaveCount(6)
-      await expect(page.getByRole('button', { name: 'Show 6 earlier images', exact: true })).toBeVisible()
       await expect(details(page)).toContainText('180')
       await expect(details(page)).toContainText('1280 × 1224')
       await expect(details(page)).toContainText('842')
-      await expect(preview(page)).toContainText('Image 12 of 12')
       await expect(page.locator('html')).toHaveAttribute('data-mode', mode)
-      await expect(preview(page)).toHaveCount(1)
       await settledRendering(page)
 
       const geometry = {
-        list: await list(page).boundingBox(),
-        row: await list(page).getByRole('link').first().boundingBox(),
         viewer: await preview(page).boundingBox(),
-        toolbar: await preview(page).locator('header').boundingBox(),
         viewport: await preview(page).locator('.capture-image__window').boundingBox(),
         image: await preview(page).getByRole('img').boundingBox(),
         details: await details(page).boundingBox(),
@@ -97,23 +97,8 @@ for (const mode of ['light', 'dark'] as const) {
       expect(geometry.image!.width).toBeLessThanOrEqual(geometry.viewport!.width + 1)
       expect(geometry.image!.height).toBeLessThanOrEqual(geometry.viewport!.height + 1)
 
-      if (width === 1440) {
-        expect(geometry.list!.x).toBe(36)
-        expect(geometry.list!.width).toBe(260)
-        expect(geometry.list!.y).toBe(172)
-        expect(geometry.row!.height).toBe(85)
-        expect(geometry.viewer!.x).toBe(320)
-        expect(geometry.viewer!.width).toBe(736)
-        expect(geometry.viewer!.height).toBe(644)
-        expect(geometry.toolbar!.height).toBe(54)
-        expect(geometry.viewport!.height).toBe(532)
-        expect(geometry.details!.x).toBe(1080)
-        expect(geometry.details!.width).toBe(324)
-      } else {
-        expect(geometry.viewer!.y).toBeLessThan(geometry.details!.y)
-        expect(geometry.details!.y).toBeLessThan(geometry.list!.y)
-      }
-
+      if (width === 1440) expect(geometry.details!.x).toBeGreaterThan(geometry.viewer!.x)
+      else expect(geometry.viewer!.y).toBeLessThan(geometry.details!.y)
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
       writeFileSync(`/tmp/vela-photographs-${mode}-${width}-geometry.json`, JSON.stringify(geometry, null, 2))
       await page.screenshot({ path: `/tmp/vela-photographs-${mode}-${width}.png`, fullPage: true })
@@ -122,32 +107,36 @@ for (const mode of ['light', 'dark'] as const) {
   }
 }
 
-test('newest canonical selection and Back/Forward keep the collection and expose each exact photograph', async ({ page }) => {
-  await page.route('**/history-origin', route => route.fulfill({ contentType: 'text/html', body: '<title>History origin</title>' }))
-  await page.goto('/history-origin')
+test('library, group and exact photograph survive Back/Forward without reloading the collection', async ({ page }) => {
   const { scene, requests } = await openPhotographsScene(page, 'photographs-light')
   const [newest, previous] = scene.images()
-  await expectSelected(page, newest!)
+  await expect(library(page)).toBeVisible()
+  expect(scene.detailReads).toEqual([])
   const collectionReads = requests.filter(request => request === `GET ${collectionPath}`).length
-  await list(page).evaluate(element => element.setAttribute('data-collection-owner', 'retained'))
-  await row(page, previous!.id).click()
+  await library(page).getByRole('link').first().click()
+  const groupUrl = page.url()
+  await row(page, newest!.id).click()
+  await expectSelected(page, newest!)
+  await page.getByRole('link', { name: /Older/ }).click()
   await expectSelected(page, previous!)
-  await expect(preview(page)).toContainText('Image 11 of 12')
   await page.goBack()
   await expectSelected(page, newest!)
+  await page.goBack()
+  await expect(page).toHaveURL(groupUrl)
+  await expect(list(page).getByRole('link')).toHaveCount(12)
+  await page.goBack()
+  await expect(page).toHaveURL(new RegExp(`${photographsBase}$`))
+  await expect(library(page)).toBeVisible()
   await page.goForward()
-  await expectSelected(page, previous!)
-  await expect(list(page)).toHaveAttribute('data-collection-owner', 'retained')
-  expect(requests.filter(request => request === `GET ${collectionPath}`)).toHaveLength(collectionReads)
-  await page.goBack()
+  await page.goForward()
   await expectSelected(page, newest!)
-  await page.goBack()
-  await expect(page).toHaveURL(/\/history-origin$/)
+  expect(requests.filter(request => request === `GET ${collectionPath}`)).toHaveLength(collectionReads)
 })
 
-test('earlier disclosure and Appearance preserve selected native pixels, pan and detail ownership', async ({ page }) => {
+test('Appearance preserves selected native pixels, pan and detail ownership', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
   const { scene } = await openPhotographsScene(page, 'photographs-light')
+  await page.goto(`${photographsBase}/${scene.images()[0]!.id}`)
   const selected = scene.images()[0]!
   await expectSelected(page, selected)
   await preview(page).getByRole('button', { name: '100%', exact: true }).click()
@@ -161,17 +150,6 @@ test('earlier disclosure and Appearance preserve selected native pixels, pan and
   const pixels = await native.getByRole('img').getAttribute('src')
   const detailReads = [...scene.detailReads]
   const selectedUrl = page.url()
-  await page.getByRole('button', { name: 'Show 6 earlier images', exact: true }).click()
-  await expect(list(page).getByRole('link')).toHaveCount(12)
-  await expect(page.getByRole('button', { name: /Show .* earlier images/ })).toHaveCount(0)
-  expect(await list(page).evaluate(element => {
-    const focused = document.activeElement
-
-    return focused instanceof HTMLElement && element.contains(focused) && focused.matches('h1, h2, h3, h4, h5, h6, [role="heading"]') && focused.tabIndex === -1
-  })).toBe(true)
-  await expect(native.getByRole('img')).toHaveAttribute('src', pixels!)
-  expect(await viewportPosition(native)).toEqual(position)
-  expect(scene.detailReads).toEqual(detailReads)
   await page.getByRole('button', { name: 'Appearance', exact: true }).click()
   await page.getByRole('dialog', { name: 'Appearance', exact: true }).evaluate(element =>
     Promise.all(element.getAnimations()
@@ -188,13 +166,11 @@ test('earlier disclosure and Appearance preserve selected native pixels, pan and
   await expect(displayDownload(page)).toHaveAttribute('href', selected.previewDownloadUrl)
 })
 
-test('an older direct link reveals its selected row across dates without opening neighboring details', async ({ page }) => {
+test('an older direct link opens exact pixels across dates without opening neighboring details', async ({ page }) => {
   const { scene } = await openPhotographsScene(page, 'photographs-older-link')
   const selected = scene.images().find(image => image.id === scene.selectedId)!
   await expectSelected(page, selected)
-  await expect(row(page, selected.id)).toBeInViewport()
-  expect(await list(page).getByRole('link').count()).toBeGreaterThanOrEqual(20)
-  await expect(preview(page)).toContainText('Image 5 of 24')
+  await expect(page.getByRole('link', { name: /Night of/ })).toBeVisible()
   expect(scene.detailReads.length).toBeGreaterThan(0)
   expect(scene.detailReads.every(id => id === selected.id)).toBe(true)
 })
@@ -211,28 +187,30 @@ test('a direct photograph remains usable while collection and rig telemetry fail
   const detailReads = [...scene.detailReads]
   scene.setCollectionFailure(false)
   await page.getByRole('button', { name: 'Retry photographs', exact: true }).click()
-  await expect(row(page, selected.id)).toHaveAttribute('aria-current', /^(page|true)$/)
+  await expect(page.getByRole('link', { name: /Night of/ })).toBeVisible()
   await expect(preview(page).getByRole('img')).toHaveAttribute('data-direct-pixels', 'retained')
   expect(scene.detailReads).toEqual(detailReads)
   expect(requests.every(request => request.startsWith('GET '))).toBe(true)
   expect(requests.some(request => /\/capture|\/imaging-camera|\/framing/.test(request))).toBe(false)
 })
 
-test('an explicit missing image never falls back to newest and another row remains usable', async ({ page }) => {
+test('an explicit missing image never falls back to newest and another photograph remains usable', async ({ page }) => {
   const { scene } = await openPhotographsScene(page, 'photographs-selected-missing')
   await expect(page.getByRole('button', { name: 'Retry selected photograph', exact: true })).toBeVisible()
-  await expect(list(page).getByRole('link')).toHaveCount(6)
   await expect(page).toHaveURL(/\/saved-images\/missing-saved-image$/)
   await expect(preview(page).getByRole('img')).toHaveCount(0)
   await expect(originalDownload(page)).toHaveCount(0)
   expect(scene.detailReads.every(id => id === 'missing-saved-image')).toBe(true)
   const available = scene.images()[1]!
+  await page.getByRole('link', { name: /All (nights|targets)/ }).click()
+  await library(page).getByRole('link').first().click()
   await row(page, available.id).click()
   await expectSelected(page, available)
 })
 
 test('slow selected detail A cannot replace B after its response arrives late', async ({ page }) => {
   const { scene } = await openPhotographsScene(page, 'photographs-light')
+  await page.goto(`${photographsBase}/${scene.images()[0]!.id}`)
   await expectSelected(page, scene.images()[0]!)
   const slow = scene.images()[2]!
   const next = scene.images()[1]!
@@ -246,12 +224,14 @@ test('slow selected detail A cannot replace B after its response arrives late', 
     await route.fulfill({ status: response.status, json: response.json })
     finished.resolve()
   })
-  await row(page, slow.id).click()
+  await page.getByRole('link', { name: /Older/ }).click()
+  await expectSelected(page, next)
+  await page.getByRole('link', { name: /Older/ }).click()
   await started.promise
-  await expect(page).toHaveURL(new RegExp(`/saved-images/${slow.id}$`))
+  await expect(page).toHaveURL(new RegExp(`/saved-images/${slow.id}(?:\\?|$)`))
   await expect(preview(page).getByRole('img')).toHaveCount(0)
   await expect(originalDownload(page)).toHaveCount(0)
-  await row(page, next.id).click()
+  await page.goBack()
   await expectSelected(page, next)
   await preview(page).getByRole('img').evaluate(element => element.setAttribute('data-selected-pixels', 'B'))
   release.resolve()
@@ -270,7 +250,6 @@ test('opening one legacy photograph publishes only its matching display version 
   await expect(originalDownload(page)).toHaveAttribute('href', `${original}/fits`)
   expect(scene.images().filter(image => image.previewRendering?.status === 'current').map(image => image.id)).toEqual([id])
   expect(scene.detailReads.every(imageId => imageId === id)).toBe(true)
-  await expect(list(page).getByRole('link')).toHaveCount(6)
   expect(scene.fileReads.filter(path => path.includes('/previews/background-v1/')).every(path => path.includes(`/${id}/`))).toBe(true)
 })
 
@@ -333,10 +312,10 @@ test('fitted-preview failure leaves saved facts and FITS usable and retries with
   expect(scene.detailReads).toEqual(detailReads)
 })
 
-test('detail retry is independent from the retained list and names the same selected image', async ({ page }) => {
+test('detail retry is independent from the retained collection and names the same selected image', async ({ page }) => {
   const { scene, requests } = await openPhotographsScene(page, 'photographs-detail-failed')
   const selected = scene.images()[0]!
-  await expect(list(page).getByRole('link')).toHaveCount(6)
+  await expect(page.getByRole('link', { name: /Night of/ })).toBeVisible()
   const collectionReads = requests.filter(request => request === `GET ${collectionPath}`).length
   const retry = page.getByRole('button', { name: 'Retry selected photograph', exact: true })
   await expect(retry).toBeVisible()
@@ -382,6 +361,10 @@ test('switching rigs opens the new collection without carrying a foreign selecte
   expect(requests.some(request => request.includes('/api/web/rigs/seestar/saved-images/'))).toBe(false)
   expect(scene.unknownRequests).toEqual([])
   await selector.selectOption('fra400')
+  await expect(library(page)).toBeVisible()
+  await expect(preview(page)).toHaveCount(0)
+  await library(page).getByRole('link').first().click()
+  await row(page, selected.id).click()
   await expectSelected(page, selected)
   await expect(preview(page).getByRole('button', { name: 'Fit', exact: true })).toHaveAttribute('aria-pressed', 'true')
   await expect(preview(page).getByRole('button', { name: '100%', exact: true })).toHaveAttribute('aria-pressed', 'false')
@@ -390,6 +373,7 @@ test('switching rigs opens the new collection without carrying a foreign selecte
 test('enlarging a saved photograph preserves native pixels and restores selected pan and focus on return', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
   const { scene } = await openPhotographsScene(page, 'photographs-light')
+  await page.goto(`${photographsBase}/${scene.images()[0]!.id}`)
   await expectSelected(page, scene.images()[0]!)
   await preview(page).getByRole('button', { name: '100%', exact: true }).click()
   const native = preview(page).getByRole('region', { name: /Image at 100 percent/ })
@@ -417,4 +401,97 @@ test('enlarging a saved photograph preserves native pixels and restores selected
   expect(await viewportPosition(native)).toEqual(position)
   expect(page.url()).toBe(selectedUrl)
   expect(scene.detailReads).toEqual(detailReads)
+})
+
+for (const width of [1440, 390]) {
+  test(`Nights and Targets cross-filter the library and preserve browse context at ${width}`, async ({ page }) => {
+    await page.setViewportSize({ width, height: width === 390 ? 782 : 900 })
+    const { scene } = await openPhotographsScene(page, 'photographs-library')
+    await expect(library(page).getByRole('link')).toHaveCount(4)
+    await expect(library(page)).toContainText('4 nights · 24 photographs')
+    const nightSearch = page.getByRole('searchbox', { name: 'Find a night or target', exact: true })
+    await nightSearch.fill('September')
+    await expect(library(page).getByRole('link')).toHaveCount(4)
+    await nightSearch.fill('')
+    expect(scene.detailReads).toEqual([])
+    await library(page).getByRole('link').first().click()
+    await expect(page).toHaveURL(/browse=nights&group=2026-09-30/)
+    await expect(list(page).getByRole('link')).toHaveCount(6)
+    await expect(list(page)).toContainText('following morning')
+    await page.getByRole('combobox', { name: /Target/i }).selectOption('target:m31')
+    await expect(list(page).getByRole('link')).toHaveCount(2)
+    await expect(list(page)).toContainText('Andromeda Galaxy')
+    const filteredNightUrl = page.url()
+    await page.reload()
+    await expect(page).toHaveURL(filteredNightUrl)
+    await expect(list(page).getByRole('link')).toHaveCount(2)
+    await expect(page.getByRole('combobox', { name: /Target/i })).toHaveValue('target:m31')
+    const selected = scene.images()[1]!
+    await row(page, selected.id).click()
+    await expectSelected(page, selected)
+    await expect(preview(page)).toContainText('Image 1 of 2')
+    await page.getByRole('link', { name: /Night of/ }).click()
+    await expect(page).toHaveURL(filteredNightUrl)
+    await expect(list(page).getByRole('link')).toHaveCount(2)
+    await page.getByRole('link', { name: /All (nights|targets)/ }).click()
+    await page.getByRole('tab', { name: 'Targets', exact: true }).click()
+    await expect(library(page).getByRole('link')).toHaveCount(3)
+    await expect(library(page)).toContainText('3 targets · 24 photographs')
+    const search = page.getByRole('searchbox', { name: 'Find a target', exact: true })
+    await search.fill('M31')
+    await expect(library(page).getByRole('link')).toHaveCount(1)
+    await library(page).getByRole('link').click()
+    await expect(list(page).getByRole('link')).toHaveCount(8)
+    await page.getByRole('combobox', { name: /Night/i }).selectOption('2026-09-28')
+    await expect(list(page).getByRole('link')).toHaveCount(2)
+    const targetGroupUrl = page.url()
+    await list(page).getByRole('link').first().click()
+    await expect(preview(page)).toBeVisible()
+    await page.getByRole('link', { name: /Andromeda Galaxy/ }).click()
+    await expect(page).toHaveURL(targetGroupUrl)
+    await page.getByRole('link', { name: /All (nights|targets)/ }).click()
+    await expect(search).toHaveValue('M31')
+    await search.fill('not-a-recorded-target')
+    await expect(library(page)).toContainText('No matching targets')
+    await expect(library(page).getByRole('link')).toHaveCount(0)
+    await search.fill('')
+    await library(page).getByRole('link', { name: /No recorded target/ }).click()
+    await expect(list(page).getByRole('link')).toHaveCount(8)
+    await expect(list(page).getByRole('link').first()).toHaveAccessibleName(/Open No recorded target/)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    expect(scene.unknownRequests).toEqual([])
+  })
+}
+
+test('a direct photograph stays truthful when absent from the current collection listing', async ({ page }) => {
+  const { scene } = await openPhotographsScene(page, 'photographs-light')
+  const selected = scene.images()[0]!
+  await page.route(`**${collectionPath}`, route => route.fulfill({
+    json: { rigId: 'fra400', rigName: 'Askar FRA 400', timeZone: reviewTimezone, images: [] },
+  }))
+  await page.goto(`${photographsBase}/${selected.id}`)
+  await expectSelected(page, selected)
+  await expect(page.getByText('No photographs in the current collection listing.')).toBeVisible()
+  await expect(page.getByText('No saved photographs yet', { exact: true })).toHaveCount(0)
+  await expect(preview(page)).not.toContainText(/Image \d+ of \d+/)
+  await expect(originalDownload(page)).toHaveAttribute('href', selected.fitsUrl)
+  expect(scene.detailReads.every(id => id === selected.id)).toBe(true)
+})
+
+test.describe('remote browser timezone', () => {
+  test.use({ timezoneId: 'Asia/Tokyo' })
+
+  test('night membership and captured times follow the Vela server timezone', async ({ page }) => {
+    const { scene } = await openPhotographsScene(page, 'photographs-library')
+    await expect(library(page).getByRole('link')).toHaveCount(4)
+    await library(page).getByRole('link').first().click()
+    await expect(page).toHaveURL(/group=2026-09-30/)
+    const selected = scene.images()[0]!
+    await expect(row(page, selected.id)).toHaveAccessibleName(/1 Oct 2026, 01:39:08/)
+    await expect(row(page, selected.id)).toContainText('following morning')
+    await row(page, selected.id).click()
+    await expectSelected(page, selected)
+    await expect(details(page)).toContainText('1 Oct 2026 · 01:39:08')
+    await expect(page.getByText('Vela server time · America/New_York', { exact: true })).toBeVisible()
+  })
 })

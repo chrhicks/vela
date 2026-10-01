@@ -91,7 +91,10 @@ original data and preview. `cooling` is confirmed CoolerOn plus optional sensor
 temperature, requested setpoint and power; a near-setpoint sensor is not cooler-on.
 Null cooling means the imaging camera does not report cooler state. SavedImage and SavedImagesView describe durable artifacts
 and their download resources separately from the ephemeral capture run. Neither
-contract represents a durable sequence or resumable execution.
+contract represents a durable sequence or resumable execution. Collection and
+detail projections carry `timeZone`, the Vela server's system time zone for
+consistent library dates and night grouping across browser locations. This is a
+view convention, not a durable observing-session or observatory-zone setting.
 
 Target views carry fixed J2000 catalog positions, reference-image resources and
 server-calculated sky paths. Framing views expose the ephemeral slew/exposure/

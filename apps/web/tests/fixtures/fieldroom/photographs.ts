@@ -6,7 +6,7 @@ export const photographsScenes = [
   'photographs-empty', 'photographs-selected-missing', 'photographs-collection-failed',
   'photographs-preparing', 'photographs-detail-failed', 'photographs-fit-failed',
   'photographs-native-failed', 'photographs-native-missing', 'photographs-many-dates',
-  'photographs-older-link', 'photographs-rig-switch',
+  'photographs-older-link', 'photographs-rig-switch', 'photographs-library',
 ] as const
 
 export type PhotographsScene = (typeof photographsScenes)[number]
@@ -38,7 +38,7 @@ function withRendering(image: SavedImage, rendering: Rendering): SavedImage {
   }
 }
 
-/** Source's six visible times are 186 seconds apart; older rows continue that illustrative cadence. */
+/** Exposures are 186 seconds apart within each illustrative observing night. */
 function photograph(index: number, total: number, manyDates: boolean): SavedImage {
   const day = manyDates ? Math.floor(index / 6) : 0
   const withinDay = manyDates ? index % 6 : index
@@ -62,9 +62,26 @@ function photograph(index: number, total: number, manyDates: boolean): SavedImag
 
 /** Static retained artifacts; only a selected detail read can publish its illustrative refreshed treatment. */
 export function createPhotographsScene(name: PhotographsScene) {
-  const manyDates = name === 'photographs-many-dates' || name === 'photographs-older-link'
+  const manyDates = name === 'photographs-many-dates' || name === 'photographs-older-link' || name === 'photographs-library'
   const total = name === 'photographs-empty' ? 0 : manyDates ? 24 : 12
   let images = Array.from({ length: total }, (_, index) => photograph(index, total, manyDates))
+
+  if (name === 'photographs-library') {
+    const subjects = [subject, { targetId: 'm31', name: 'Andromeda Galaxy', catalog: 'M31' }, undefined]
+
+    images = images.map((image, index) => ({
+      ...image,
+      subject: subjects[index % subjects.length],
+    }))
+    // Keep the latest night's following-morning exposure with the previous evening.
+    images[0] = {
+      ...images[0]!,
+      capturedAt: '2026-10-01T05:39:08.000Z',
+      receivedAt: '2026-10-01T05:42:08.000Z',
+      savedAt: '2026-10-01T05:42:09.000Z',
+    }
+  }
+
   const publishedCurrent = new Set(images.map(image => image.id))
 
   let selectedId = images[0]?.id
@@ -107,7 +124,7 @@ export function createPhotographsScene(name: PhotographsScene) {
   const navigation: NavigationView = { rigs: [{ id: rig.id, name: rig.name }], captures: [] }
 
   if (name === 'photographs-rig-switch') navigation.rigs.push({ id: 'seestar', name: 'Seestar review rig' })
-  const direct = !['photographs-light', 'photographs-dark', 'photographs-empty', 'photographs-many-dates'].includes(name)
+  const direct = !['photographs-light', 'photographs-dark', 'photographs-empty', 'photographs-many-dates', 'photographs-library'].includes(name)
 
   function respond(method: string, pathname: string, _body?: Record<string, never>): ReviewResponse {
     if (method === 'GET' && pathname === '/api/web/navigation') return { status: 200, json: navigation }
@@ -116,7 +133,7 @@ export function createPhotographsScene(name: PhotographsScene) {
       if (pathname === '/api/web/rigs/seestar') return { status: 200, json: { ...rig, id: 'seestar', name: 'Seestar review rig' } }
 
       if (pathname === '/api/web/rigs/seestar/saved-images') {
-        const view: SavedImagesView = { rigId: 'seestar', rigName: 'Seestar review rig', images: [] }
+        const view: SavedImagesView = { timeZone: reviewTimezone, rigId: 'seestar', rigName: 'Seestar review rig', images: [] }
 
         return { status: 200, json: view }
       }
@@ -130,7 +147,7 @@ export function createPhotographsScene(name: PhotographsScene) {
 
     if (method === 'GET' && pathname === collectionPath) {
       if (collectionFailed) return { status: 503, json: { error: 'Review collection unavailable' } }
-      const view: SavedImagesView = { rigId: rig.id, rigName: rig.name, images: structuredClone(images) }
+      const view: SavedImagesView = { timeZone: reviewTimezone, rigId: rig.id, rigName: rig.name, images: structuredClone(images) }
 
       return { status: 200, json: view }
     }
@@ -152,7 +169,7 @@ export function createPhotographsScene(name: PhotographsScene) {
 
       if (image.previewRendering?.status === 'current') publishedCurrent.add(id)
       images = images.map(item => item.id === id ? image : item)
-      const view: SavedImageView = { rigId: rig.id, rigName: rig.name, image }
+      const view: SavedImageView = { timeZone: reviewTimezone, rigId: rig.id, rigName: rig.name, image }
       const delayMs = detailDelays.get(id)
 
       return delayMs ? { status: 200, json: view, delayMs } : { status: 200, json: view }
@@ -190,7 +207,7 @@ export function createPhotographsScene(name: PhotographsScene) {
   }
 
   return {
-    name, time: photographsTime, timezone: reviewTimezone, image: referenceImage,
+    name, time: name === 'photographs-library' ? '2026-10-01T06:00:00.000Z' : photographsTime, timezone: reviewTimezone, image: referenceImage,
     appearance: name === 'photographs-dark' ? 'dark' : 'light',
     route: direct && selectedId ? `${photographsBase}/${selectedId}` : photographsBase,
     selectedId, detailReads, fileReads, unknownRequests, respond,

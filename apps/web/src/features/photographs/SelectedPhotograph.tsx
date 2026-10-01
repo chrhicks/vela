@@ -1,14 +1,17 @@
 import type { SavedImage } from '@vela/model/web'
 import { Button, IconButton } from '@vela/ui'
-import { useId, useRef, useState, type RefObject } from 'react'
+import { useId, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { ImageEnlargement, ImageViewport } from '../image-inspection/ImageViewport'
 import { useImageInspection } from '../image-inspection/useImageInspection'
 import { photographDate, photographTime } from './format'
 
-export function SelectedPhotograph({ image, rigId, position, viewerRef }: {
+export function SelectedPhotograph({ image, rigId, position, viewerRef, timeZone, night, navigation }: {
   image: SavedImage
   rigId: string
   position: string | null
+  timeZone: string
+  night: string
+  navigation?: ReactNode
   viewerRef: RefObject<HTMLElement | null>
 }) {
   const inspection = useImageInspection(image, { scope: `photograph:${rigId}:${image.id}` })
@@ -87,7 +90,7 @@ export function SelectedPhotograph({ image, rigId, position, viewerRef }: {
   const caption = (
     <footer className="photographs__caption">
       <span>Saved exposure · {original ? 'Original preview' : 'Display preview'}</span>
-      {position && <span>{position}</span>}
+      {position && (expanded || !navigation) && <span>{position}</span>}
     </footer>
   )
 
@@ -108,11 +111,11 @@ export function SelectedPhotograph({ image, rigId, position, viewerRef }: {
       >
         <header>
           <time dateTime={displayed.capturedAt}>
-            {photographDate(displayed.capturedAt, false)} · {photographTime(displayed.capturedAt)}
+            {photographDate(displayed.capturedAt, false, timeZone)} · {photographTime(displayed.capturedAt, timeZone)}
           </time>
           {!expanded && tools}
         </header>
-        {!expanded && <>{viewport}{caption}{status}</>}
+        {!expanded && <>{viewport}{caption}{status}{navigation}</>}
         <ImageEnlargement
           open={expanded}
           onDismiss={() => setExpanded(false)}
@@ -130,14 +133,15 @@ export function SelectedPhotograph({ image, rigId, position, viewerRef }: {
       </section>
       <section className="photographs__details" aria-label="Exposure details">
         <header>
-          <h2>Exposure details</h2>
-          <p>Saved on this Vela server</p>
+          <h2>{displayed.subject?.name ?? 'No recorded target'}</h2>
+          <p>{displayed.subject?.catalog ?? 'Saved on this Vela server'}</p>
         </header>
         <dl>
+          <div><dt>Observing night</dt><dd>{night}</dd></div>
           <div>
             <dt>Captured</dt>
             <dd>
-              {photographDate(displayed.capturedAt)} · {photographTime(displayed.capturedAt)}
+              {photographDate(displayed.capturedAt, true, timeZone)} · {photographTime(displayed.capturedAt, timeZone)}
               {displayed.capturedAtSource === 'server-estimate' && ' · Start time estimated'}
             </dd>
           </div>

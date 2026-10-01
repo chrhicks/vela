@@ -34,9 +34,7 @@ for (const width of [1440, 390]) {
 
         if (state === 'loading') {
           await expect(
-            page
-              .getByRole('region', { name: 'Saved preview', exact: true })
-              .getByRole('img'),
+            page.getByRole('region', { name: 'Photograph library', exact: true }),
           ).toBeVisible()
           await page.route(`**${collectionPath}`, async route => {
             await gate.promise
@@ -170,9 +168,7 @@ for (const width of [1440, 390]) {
         if (state === 'loading') {
           await expect(card).toHaveCount(0)
           await expect(
-            page
-              .getByRole('region', { name: 'Saved preview', exact: true })
-              .getByRole('img'),
+            page.getByRole('region', { name: 'Photograph library', exact: true }),
           ).toBeVisible()
         }
 
@@ -182,12 +178,13 @@ for (const width of [1440, 390]) {
   }
 }
 
-test('held collection uses its sidebar while a directly selected photograph remains independent', async ({
+test('held collection leaves a directly selected photograph independent', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
   const { scene } = await openPhotographsScene(page, 'photographs-light')
   const selected = scene.images()[0]!
+  await page.goto(`${photographsBase}/${selected.id}`)
 
   const preview = page.getByRole('region', {
     name: 'Saved preview',
@@ -209,13 +206,8 @@ test('held collection uses its sidebar while a directly selected photograph rema
   })
   await page.goto(`${photographsBase}/${selected.id}`)
 
-  const card = page.getByRole('region', {
-    name: 'Photographs collection state',
-  })
-
-  await expect(
-    card.getByRole('heading', { name: 'Loading saved photographs' }),
-  ).toBeVisible()
+  const loading = page.getByText('Loading photographs…', { exact: true })
+  await expect(loading).toBeVisible()
   await expect(preview.getByRole('img')).toHaveAttribute(
     'src',
     selected.fitImageUrl!,
@@ -223,7 +215,6 @@ test('held collection uses its sidebar while a directly selected photograph rema
   await expect(
     page.getByRole('link', { name: 'Download original FITS ↓', exact: true }),
   ).toHaveAttribute('href', selected.fitsUrl)
-  expect((await card.boundingBox())!.width).toBe(260)
   const heldDetailReads = scene.detailReads.slice(readsBefore)
   expect(heldDetailReads.length).toBeGreaterThan(0)
   expect(heldDetailReads.every(id => id === selected.id)).toBe(true)
@@ -237,10 +228,8 @@ test('held collection uses its sidebar while a directly selected photograph rema
     animations: 'disabled',
   })
   gate.resolve()
-  await expect(card).toHaveCount(0)
-  await expect(
-    page.getByRole('region', { name: 'Photographs list' }).getByRole('link'),
-  ).toHaveCount(6)
+  await expect(loading).toHaveCount(0)
+  await expect(page.getByRole('link', { name: /Night of/ })).toBeVisible()
   await expect(preview.getByRole('img')).toHaveAttribute('src', pixelsBefore!)
   await expect(page).toHaveURL(`${photographsBase}/${selected.id}`)
   expect(scene.detailReads.slice(readsBefore)).toEqual(heldDetailReads)
