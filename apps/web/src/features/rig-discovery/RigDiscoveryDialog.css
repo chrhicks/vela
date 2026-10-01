@@ -1,103 +1,232 @@
-.rig-discovery-start,
-.rig-discovery-progress {
-  display: grid;
-  justify-items: center;
-  text-align: center;
-}
-
-.rig-discovery-start {
-  min-height: 100%;
-  align-content: center;
-  gap: calc(var(--vela-space) * 5);
-}
-
-.rig-discovery-start > p {
-  max-width: 31rem;
-  margin: 0;
-  color: var(--vela-text-muted);
-  font-size: 0.82em;
-  line-height: 1.55;
-}
-
-.rig-discovery-manual {
-  display: grid;
-  gap: calc(var(--vela-space) * 4);
-}
-
-.rig-discovery-manual__fields {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 8rem;
-  gap: calc(var(--vela-space) * 3);
-}
-
-.rig-discovery-manual > p {
-  margin: 0;
-  padding: calc(var(--vela-space) * 3);
-  border: var(--vela-border-width) solid var(--vela-line);
-  border-radius: var(--vela-radius);
-  color: var(--vela-text-muted);
-  background: var(--vela-surface);
-  font-size: 0.8em;
-  line-height: 1.5;
-}
-
-.rig-discovery-manual > p strong {
-  color: var(--vela-text);
-  font-weight: 620;
-}
-
-.rig-discovery-manual > p[data-tone='danger'] {
-  border-color: color-mix(in oklch, var(--vela-danger) 42%, var(--vela-line));
-  color: var(--vela-danger);
-  background: color-mix(in oklch, var(--vela-danger) 7%, var(--vela-surface));
-}
-
-.rig-discovery-progress {
-  min-height: 20rem;
-  align-content: center;
-}
-
-.rig-discovery-progress > strong {
-  font-size: 0.95em;
-}
-
-.rig-discovery-progress > p {
-  margin: calc(var(--vela-space) * 1.5) 0 calc(var(--vela-space) * 5);
-  color: var(--vela-text-muted);
-  font-size: 0.8em;
-}
-
-.rig-discovery-progress__steps {
-  display: flex;
-  gap: calc(var(--vela-space) * 4);
-  color: var(--vela-text-muted);
-  font-size: 0.7em;
-}
-
-.rig-discovery-progress__steps span {
+.vela-rig-onboarding-dialog {
   position: relative;
-  padding-left: calc(var(--vela-space) * 3);
+  width: min(100%, 624px);
+  padding: 28px;
+  gap: 12px;
+  font: 400 16px/24px var(--vela-font);
+  letter-spacing: normal;
 }
-
-.rig-discovery-progress__steps span::before {
+.vela-rig-onboarding-dialog :where(p, h3, ul) {
+  margin: 0;
+}
+.vela-rig-onboarding-dialog .vela-dialog__body {
+  scrollbar-gutter: auto;
+}
+.vela-rig-onboarding-dialog[data-caption='true'] > .vela-dialog__header {
+  padding-top: 22px;
+}
+.vela-rig-onboarding__context {
   position: absolute;
-  top: 50%;
-  left: 0;
-  width: 0.45rem;
-  height: 0.45rem;
-  border-radius: 50%;
-  background: var(--vela-line-strong);
-  content: '';
-  transform: translateY(-50%);
+  top: 28px;
+  left: 28px;
+  right: 28px;
+  color: var(--vela-text-muted);
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+}
+.vela-rig-onboarding__content {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: break-word;
+}
+.vela-rig-onboarding__compact-title,
+.vela-rig-onboarding__compact-bar {
+  display: none;
+}
+.vela-rig-onboarding__endpoint {
+  margin-top: 8px !important;
+  color: var(--vela-text-muted);
+  font-size: 14px;
+  line-height: 20px;
+}
+.vela-rig-onboarding__device-count {
+  margin-top: 18px !important;
+  margin-bottom: 12px !important;
+  color: var(--vela-text-muted);
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+}
+.vela-rig-onboarding__devices {
+  padding: 0;
+  list-style: none;
+}
+.vela-rig-onboarding__devices li {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  min-height: 49px;
+  padding: 12px 0;
+  border-top: 1px solid var(--vela-line);
+}
+.vela-rig-onboarding__devices li > span:last-child {
+  color: var(--vela-text-muted);
+}
+.vela-rig-onboarding__review-consequence {
+  margin-top: 18px !important;
+  color: var(--vela-text-muted);
+}
+.vela-rig-onboarding__footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 24px;
 }
 
-.rig-discovery-progress__steps span[data-active='true'] {
-  color: var(--vela-text);
+.vela-rig-onboarding__intro {
+  color: var(--vela-text-muted);
+}
+.vela-rig-onboarding__address-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 128px;
+  gap: 12px;
+  margin-top: 22px;
+}
+.vela-rig-onboarding__address-fields .vela-field {
+  gap: 10px;
+  align-content: start;
+}
+.vela-rig-onboarding__address-fields .vela-field__message {
+  white-space: pre-line;
+  font-size: 14px;
+  line-height: 20px;
+}
+.vela-rig-onboarding__address-help {
+  margin-top: 16px !important;
+  color: var(--vela-text-muted);
+  font-size: 14px;
+  line-height: 20px;
+}
+.vela-rig-onboarding__address-actions {
+  display: flex;
+  flex-direction: row-reverse;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 26px;
+}
+.vela-rig-onboarding__consequence {
+  margin-top: 22px !important;
+  color: var(--vela-text-muted);
+  font-size: 14px;
+  line-height: 20px;
+}
+.vela-rig-onboarding__warning {
+  display: grid;
+  gap: 12px;
+  padding: 20px;
+  margin-top: 20px;
+  background: var(--vela-warning-surface);
+  border-left: 2px solid var(--vela-warning);
+  border-radius: 6px;
+}
+.vela-rig-onboarding__warning strong {
+  color: var(--vela-warning);
+  font-weight: 500;
+}
+.vela-rig-onboarding__warning details {
+  margin-top: 8px;
+}
+.vela-rig-onboarding__warning summary {
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
-.rig-discovery-progress__steps span[data-active='true']::before {
-  background: var(--vela-accent);
-  box-shadow: 0 0 0.5rem var(--vela-accent);
+
+@media (width < 700px) {
+  .vela-dialog-layer:has(> .vela-rig-onboarding-dialog) {
+    padding: 0;
+  }
+  .vela-rig-onboarding-dialog {
+    display: block;
+    width: 100%;
+    height: 100%;
+    max-height: 100%;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: var(--vela-canvas);
+    animation: none;
+  }
+  .vela-rig-onboarding-dialog > .vela-dialog__header {
+    display: none;
+  }
+  .vela-rig-onboarding-dialog > .vela-dialog__body {
+    height: 100%;
+  }
+  .vela-rig-onboarding__compact-bar {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 60px;
+    padding: 0 20px;
+    border-bottom: 1px solid var(--vela-line);
+    background: var(--vela-canvas);
+  }
+  .vela-rig-onboarding__compact-bar > span {
+    font: 400 24px/30px var(--vela-font-heading);
+  }
+  .vela-rig-onboarding__compact-bar > button {
+    min-height: 44px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--vela-text);
+    font: 500 15px/20px var(--vela-font);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+  .vela-rig-onboarding__compact-bar > button:focus-visible {
+    outline: 2px solid var(--vela-focus);
+    outline-offset: 3px;
+  }
+  .vela-rig-onboarding__content {
+    padding: 24px 20px;
+  }
+  .vela-rig-onboarding__compact-title {
+    display: block;
+    font: 400 28px/34px var(--vela-font-heading);
+    margin-bottom: 14px !important;
+  }
+  .vela-rig-onboarding__context {
+    position: static;
+    margin-bottom: 10px !important;
+  }
+  .vela-rig-onboarding__address-fields {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  .vela-rig-onboarding__address-actions {
+    flex-direction: column;
+  }
+  .vela-rig-onboarding__address-help {
+    margin-top: 12px !important;
+  }
+  .vela-rig-onboarding__footer {
+    flex-wrap: wrap;
+  }
+  .vela-rig-onboarding__devices li {
+    flex-wrap: wrap;
+    gap: 4px 16px;
+  }
+
+}
+
+.vela-dialog-layer:has(> .vela-rig-onboarding-dialog) {
+  align-items: start;
+  padding-top: min(128px, 20vh);
+}
+@media (width < 700px) {
+  .vela-dialog-layer:has(> .vela-rig-onboarding-dialog) {
+    padding: 0;
+  }
 }
 
 .rig-discovery-results {
@@ -144,13 +273,12 @@ button.rig-discovery-candidate {
   transition:
     border-color 120ms ease,
     background-color 120ms ease,
-    transform 120ms ease;
+    color 120ms ease;
 }
 
 button.rig-discovery-candidate:hover {
   border-color: var(--vela-line-strong);
   background: color-mix(in oklch, var(--vela-surface-raised) 70%, var(--vela-surface));
-  transform: translateY(-1px);
 }
 
 button.rig-discovery-candidate:focus-visible {
@@ -218,44 +346,10 @@ button.rig-discovery-candidate:focus-visible {
 
 .rig-discovery-message {
   display: grid;
-  min-height: 17rem;
-  align-content: center;
-  justify-items: center;
-  gap: calc(var(--vela-space) * 2.5);
-  padding: calc(var(--vela-space) * 6);
-  border: var(--vela-border-width) dashed var(--vela-line-strong);
-  border-radius: calc(var(--vela-radius) * 1.1);
-  text-align: center;
+  gap: 12px;
 }
-
-.rig-discovery-message::before {
-  display: grid;
-  width: 3rem;
-  height: 3rem;
-  border: var(--vela-border-width) solid var(--vela-line-strong);
-  border-radius: 50%;
-  color: var(--vela-text-muted);
-  content: '?';
-  font-weight: 760;
-  place-items: center;
-}
-
-.rig-discovery-message[data-tone='danger']::before {
-  border-color: color-mix(in oklch, var(--vela-danger) 56%, var(--vela-line));
-  color: var(--vela-danger);
-  content: '!';
-}
-
-.rig-discovery-message > strong {
-  font-size: 0.92em;
-}
-
 .rig-discovery-message > p {
-  max-width: 27rem;
-  margin: 0;
   color: var(--vela-text-muted);
-  font-size: 0.78em;
-  line-height: 1.5;
 }
 
 .rig-discovery-failures {
@@ -284,158 +378,20 @@ button.rig-discovery-candidate:focus-visible {
   line-height: 1.4;
 }
 
-.rig-discovery-review {
-  display: grid;
-  gap: calc(var(--vela-space) * 4);
+.rig-discovery-start p,
+.rig-discovery-progress p {
+  color: var(--vela-text-muted);
 }
-
-.rig-discovery-review__server {
+.rig-discovery-progress {
+  display: grid;
+  gap: 12px;
+}
+.rig-discovery-progress__steps {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: calc(var(--vela-space) * 3);
-  padding: calc(var(--vela-space) * 3);
-  border: var(--vela-border-width) solid var(--vela-line);
-  border-radius: var(--vela-radius);
-  background: var(--vela-surface);
+  gap: 24px;
 }
 
-.rig-discovery-review__server > div {
-  display: grid;
-  min-width: 0;
-  gap: calc(var(--vela-space) * 0.65);
-}
-
-.rig-discovery-review__server small {
-  color: var(--vela-accent);
-  font-size: 0.62em;
-  font-weight: 760;
-  letter-spacing: 0.09em;
-}
-
-.rig-discovery-review__server strong {
-  overflow: hidden;
-  font-size: 0.9em;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.rig-discovery-review__server span {
-  color: var(--vela-text-muted);
-  font-size: 0.72em;
-}
-
-.rig-discovery-review__heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: calc(var(--vela-space) * 2);
-  font-size: 0.8em;
-}
-
-.rig-discovery-review__heading span {
-  color: var(--vela-text-muted);
-}
-
-.rig-discovery-review__devices {
-  display: grid;
-  margin: 0;
-  padding: 0;
-  border: var(--vela-border-width) solid var(--vela-line);
-  border-radius: var(--vela-radius);
-  background: var(--vela-surface);
-  list-style: none;
-}
-
-.rig-discovery-review__devices li {
-  display: grid;
-  min-height: 3.2rem;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: calc(var(--vela-space) * 2.5);
-  padding: 0 calc(var(--vela-space) * 3);
-  border-bottom: var(--vela-border-width) solid var(--vela-line);
-}
-
-.rig-discovery-review__devices li:last-child {
-  border-bottom: 0;
-}
-
-.rig-discovery-review__devices li > span {
-  display: grid;
-  width: 1.7rem;
-  height: 1.7rem;
-  border: var(--vela-border-width) solid var(--vela-line);
-  border-radius: calc(var(--vela-radius) * 0.7);
-  color: var(--vela-accent);
-  background: var(--vela-canvas);
-  font-size: 0.68em;
-  font-weight: 720;
-  place-items: center;
-}
-
-.rig-discovery-review__devices p {
-  display: grid;
-  gap: calc(var(--vela-space) * 0.5);
-  margin: 0;
-}
-
-.rig-discovery-review__devices strong {
-  overflow: hidden;
-  font-size: 0.78em;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.rig-discovery-review__devices small {
-  color: var(--vela-text-muted);
-  font-size: 0.66em;
-}
-
-.rig-discovery-review__error {
-  padding: calc(var(--vela-space) * 2.5) calc(var(--vela-space) * 3);
-  border: var(--vela-border-width) solid
-    color-mix(in oklch, var(--vela-danger) 42%, var(--vela-line));
-  border-radius: var(--vela-radius);
-  color: var(--vela-danger);
-  background: color-mix(in oklch, var(--vela-danger) 7%, var(--vela-surface));
-  font-size: 0.74em;
-  line-height: 1.45;
-}
-
-.rig-discovery-review__notice {
-  display: grid;
-  gap: calc(var(--vela-space) * 0.8);
-  padding: calc(var(--vela-space) * 2.5) calc(var(--vela-space) * 3);
-  border: var(--vela-border-width) solid
-    color-mix(in oklch, var(--vela-accent) 30%, var(--vela-line));
-  border-radius: var(--vela-radius);
-  background: color-mix(in oklch, var(--vela-accent) 7%, var(--vela-surface));
-}
-
-.rig-discovery-review__notice strong {
-  font-size: 0.78em;
-}
-
-.rig-discovery-review__notice p {
-  margin: 0;
-  color: var(--vela-text-muted);
-  font-size: 0.72em;
-  line-height: 1.45;
-}
-
-@container (max-width: 31rem) {
-  .rig-discovery-manual__fields {
-    grid-template-columns: 1fr;
-  }
-
-  .rig-discovery-progress__steps {
-    display: grid;
-    gap: calc(var(--vela-space) * 2);
-  }
-
-  .rig-discovery-results__summary {
-    align-items: flex-start;
-    flex-direction: column;
-  }
+.vela-rig-onboarding-dialog[data-entry='true'] .vela-rig-onboarding__footer {
+  justify-content: flex-start;
+  margin-top: 18px;
 }

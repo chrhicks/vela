@@ -4,6 +4,7 @@ import type { ImagingCameraView } from '@vela/model/web'
 import type { RigCatalog } from './catalog.js'
 import type { RigOperations } from './operations.js'
 import { inspectRigDetail, type RigDetailOptions } from './detail.js'
+import { rigDeviceId } from '../web/rig-detail.js'
 
 export function registerImagingCamera(
   app: FastifyInstance,
@@ -47,11 +48,14 @@ export function registerImagingCamera(
       return 'ready'
     }
 
+    const state = selectionState()
+
     return {
       rigId,
       cameras,
       selected: selected ? { id: selected.uniqueId, name: selected.name } : null,
-      state: selectionState(),
+      selectedDeviceId: state === 'ready' && match ? rigDeviceId(rigId, match.id) : null,
+      state,
       editable: detail.state === 'current' && !operations.owner(rigId),
     }
   }
@@ -96,6 +100,7 @@ export function registerImagingCamera(
         return {
           ...view,
           selected: { id: camera.id, name: camera.name },
+          selectedDeviceId: rigDeviceId(view.rigId, camera.id),
           state: 'ready',
           editable: true,
         }

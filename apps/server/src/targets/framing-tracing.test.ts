@@ -109,6 +109,7 @@ it('persists exact centering inputs and correlated evidence before and after com
           configuration: 'camera-geometry-and-focal-length',
           action,
           rigId: 'review-rig',
+          cameraName: 'Camera',
           requestId: `request-${action}`,
         },
         hardware,

@@ -1,0 +1,61 @@
+{
+  "reviewedCommit": "032c8b1",
+  "source": "apps/web/tests/tonight.e2e.ts",
+  "deviceScaleFactor": 1,
+  "records": [
+    {
+      "path": "tonight-dark-1440.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "10ec4c382eade6df071f92cc336ab152782721fad33ad5c34c9f91f59c376aac"
+    },
+    {
+      "path": "tonight-dark-390.png",
+      "width": 390,
+      "height": 1578,
+      "sha256": "939cf2570991122717765d4b92223f1e9586ecef36339e2e3297b20038d8cc52"
+    },
+    {
+      "path": "tonight-dark-appearance-1440.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "7c2d3c0d8b02a56bd69c91192e9ad5f9cd10120c7538bd9fbf72e8fe069b85e2"
+    },
+    {
+      "path": "tonight-dark-appearance-390.png",
+      "width": 390,
+      "height": 1578,
+      "sha256": "718a46cb8e44c77cedd15a66c81fe1d404c79b0824f251d72e2480394c555ba9"
+    },
+    {
+      "path": "tonight-interrupted-1440.png",
+      "width": 1440,
+      "height": 965,
+      "sha256": "acdf5be3539944595fd82c522532448c23b11fe5e4c6baa8cb20075ce7367e05"
+    },
+    {
+      "path": "tonight-light-1440.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "be2f0129d16f60ffffc1b2f5acb034de885655b29eead3e6dec370a55b81753c"
+    },
+    {
+      "path": "tonight-light-390.png",
+      "width": 390,
+      "height": 1578,
+      "sha256": "8b6764545c3085ec3b45e789118b2bf516ecc390fbefa570c7dd5124a53f844e"
+    },
+    {
+      "path": "tonight-light-appearance-1440.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "ad4b4ba6d050af875e628eee0344449ea3879990564b5c3fcf65976a27b4fb32"
+    },
+    {
+      "path": "tonight-light-appearance-390.png",
+      "width": 390,
+      "height": 1578,
+      "sha256": "96c78d32c3518b4c3671e32806e1fdf5e627dbb9ab0c598de3d81d943102afb2"
+    }
+  ]
+}

@@ -87,7 +87,6 @@ function Discovery({
           <p>Good opportunities from now until dawn.</p>
         </div>
         <Button
-          size="small"
           tone="quiet"
           disabled={refreshing}
           onClick={() => update({ state: 'fresh', page: 0 })}
@@ -182,7 +181,6 @@ function Discovery({
         </span>
         <div>
           <Button
-            size="small"
             tone="quiet"
             disabled={page === 0}
             onClick={() => update({ page: page - 1 })}
@@ -190,7 +188,6 @@ function Discovery({
             Previous
           </Button>
           <Button
-            size="small"
             tone="quiet"
             disabled={(page + 1) * 2 >= matches.length}
             onClick={() => update({ page: page + 1 })}

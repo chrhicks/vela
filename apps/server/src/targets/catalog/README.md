@@ -9,7 +9,10 @@ use stable ID order. An empty search returns the first catalog entries, not
 observing recommendations. Search limits are integers from 1 through 200.
 
 Positions are J2000 equatorial degrees. Source major/minor axes are arcminutes;
-missing sizes stay null. Sizes are catalog measurements of differing provenance,
+missing sizes stay null. The pinned `Const` field expands to `constellation` names,
+including OpenNGC's `Se1` (Serpens Caput) and `Se2` (Serpens Cauda); missing
+constellations remain null and unknown codes fail generation. Distance is absent
+from this projection and is not inferred from angular size. Sizes are catalog measurements of differing provenance,
 not guaranteed photographic nebula boundaries. Heart and Soul keep the source
 cluster-and-nebula positions and extents. There is no visibility ranking, online
 resolver, ephemeris, planning model, or runtime network dependency here.

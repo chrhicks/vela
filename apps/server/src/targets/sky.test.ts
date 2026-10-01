@@ -90,7 +90,10 @@ describe('target sky night', () => {
     const azimuths = [5.56350130287918, 74.13530018467179, 174.25467450209425, 285.543875717234]
 
     for (const [index, benchmark] of benchmarks.entries()) {
-      const sample = skyPath(benchmark.catalog, site, date).samples.find(
+      const path = skyPath(benchmark.catalog, site, date)
+      expect(Math.abs(path.currentAzimuthDegrees - azimuths[index]!) * 3600).toBeLessThan(0.5)
+
+      const sample = path.samples.find(
         sample => sample.at === date.toISOString(),
       )!
 
@@ -119,6 +122,29 @@ describe('target sky night', () => {
     expect(Math.abs(moon.illuminationFraction - 0.1948491)).toBeLessThan(0.0001)
     expect(path.samples.some(sample => sample.moon.altitudeDegrees > 0)).toBe(true)
     expect(path.samples.some(sample => sample.moon.altitudeDegrees < 0)).toBe(true)
+  })
+
+  it('calculates current Moon separation in the same observer frame and at the exact observation time', () => {
+    // Independent ERFA target az/el and JPL Moon az/el already pinned above.
+    const reference = angularDistance(
+      { raDegrees: 74.13530018467179, decDegrees: benchmarks[1]!.altitude },
+      { raDegrees: 34.392562, decDegrees: -17.794425 },
+    )
+
+    expect(skyPath(benchmarks[1]!.catalog, site, date).currentMoonSeparationDegrees).toBeCloseTo(reference, 2)
+    const offGrid = new Date('2026-09-07T12:07:13Z')
+    const path = skyPath(benchmarks[1]!.catalog, site, offGrid)
+    expect(path.samples.every(sample => sample.at !== offGrid.toISOString())).toBe(true)
+
+    const nearest = path.samples.reduce((a, b) =>
+      Math.abs(Date.parse(a.at) - offGrid.getTime()) < Math.abs(Date.parse(b.at) - offGrid.getTime()) ? a : b)
+
+    const sampledSeparation = angularDistance(
+      { raDegrees: nearest.azimuthDegrees, decDegrees: nearest.altitudeDegrees },
+      { raDegrees: nearest.moon.azimuthDegrees, decDegrees: nearest.moon.altitudeDegrees },
+    )
+
+    expect(Math.abs(path.currentMoonSeparationDegrees - sampledSeparation)).toBeGreaterThan(0.1)
   })
 
   it.each([

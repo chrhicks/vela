@@ -1,9 +1,9 @@
 # Imaging camera
 
-Observe composes the approved camera-selection design from stable Panel, Select,
-and Button primitives. The server projects camera identities, the remembered
-selection, identity problems, and whether editing is available. Selecting a
-camera saves rig configuration; it does not connect the camera or establish
+Preparation composes the saved camera as a Select with an explicit Use this
+camera action when the draft differs. Equipment can use the standalone
+ImagingCamera presentation over the same hook. The server projects camera identities, the remembered
+selection, identity problems, and whether editing is available. Explicitly saving a camera choice changes rig configuration; it does not connect the camera or establish
 capture readiness.
 
 The browser retains the last confirmed selection when reads fail, and preserves
@@ -12,3 +12,12 @@ new choice. A save supersedes older reads. Polls pause while hidden and during
 writes; leaving the page invalidates pending results. A lost write response is
 never replayed. A subsequent GET can confirm that the requested identity is now
 persisted, which is sufficient for this configuration operation.
+
+Equipment composes `ImagingSetup` with the same camera hook and the narrow
+`useFocalLengthSettings` capability. Both drafts are validated before writing;
+only changed settings are submitted, camera first. The camera save returns a
+typed confirmed/rejected/unconfirmed/unavailable result while retaining
+`confirmedSaves` for Preparation. A non-confirmed result stops the composition;
+a confirmed camera remains saved if the focal-length write fails. Drafts retain
+ID and reported name across reads and partial results. Checking saved setup is
+read-only and never repeats either write.

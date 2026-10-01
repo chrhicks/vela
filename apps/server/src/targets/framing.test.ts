@@ -111,6 +111,8 @@ function workshop(
       {
         desired: input.desired ?? desired,
         targetId: 'target',
+        rigId: 'rig',
+        cameraName: 'Camera',
         exposureSeconds: 2,
         configuration: input.configuration ?? 'camera+mount+focal-length',
         action: input.check ? 'check' : input.center ? 'center' : 'start',

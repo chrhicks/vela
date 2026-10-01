@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import type { CaptureImage, CaptureView } from '@vela/model/web'
+import type { CaptureImage, CaptureSubject, CaptureView } from '@vela/model/web'
 import { capturePreviews, type ImageColor } from '../imaging/preview.js'
 import { measureStars } from '../imaging/statistics.js'
 import { PREVIEW_VERSION } from '../imaging/background.js'
@@ -42,6 +42,7 @@ export class CaptureStoppedError extends Error {
 }
 
 export interface CaptureRunOptions {
+  subject?: CaptureSubject | null
   onSettled?: () => void
   repeat?: boolean
   saveFrames?: boolean
@@ -65,6 +66,9 @@ export function createCaptureController(
     saveFrames: false,
     savedImageCount: 0,
     completedCount: 0,
+    subject: null,
+    savedCount: 0,
+    integrationSeconds: 0,
     exposureSeconds: 2,
     elapsedSeconds: 0,
     error: null,
@@ -72,12 +76,14 @@ export function createCaptureController(
     cooling: null,
   }
 
+  let generation = 0
   let running: Promise<void> | undefined
   let cancellation: AbortController | undefined
 
   const images = new Map<
     string,
     {
+      generation: number
       native: Buffer
       fit: Buffer | undefined
       fits?: Buffer
@@ -115,7 +121,12 @@ export function createCaptureController(
       image.metadata = { ...image.metadata, saved: true }
       // Saved files are now owned by the archive; release the temporary raw copy.
       delete image.fits
-      const next = { savedImageCount: (view.savedImageCount ?? 0) + 1 }
+
+      const next = {
+        savedImageCount: (view.savedImageCount ?? 0) + 1,
+        savedCount: view.savedCount + (image.generation === generation ? 1 : 0),
+      }
+
       patch(view.latestImage?.id === imageId ? { ...next, latestImage: image.metadata } : next)
     }
 
@@ -129,6 +140,8 @@ export function createCaptureController(
     cameraName: string,
     repeat: boolean,
     saveFrames: boolean,
+    subject: CaptureSubject | null,
+    runGeneration: number,
   ) {
     try {
       do {
@@ -168,6 +181,7 @@ export function createCaptureController(
 
         let metadata: CaptureImage = {
           id,
+          subject,
           imageUrl: `/api/rigs/${encodeURIComponent(settings.rigId)}/capture/images/${id}`,
           width: frame.width,
           height: frame.height,
@@ -190,12 +204,13 @@ export function createCaptureController(
         if (frame.capturedAtSource)
           metadata = { ...metadata, capturedAtSource: frame.capturedAtSource }
 
-        images.set(id, { ...previews, fits, metadata })
+        images.set(id, { ...previews, fits, metadata, generation: runGeneration })
 
         while (images.size > 3) images.delete(images.keys().next().value!)
         patch({
           phase: saveFrames ? 'saving' : 'complete',
           completedCount: view.completedCount + 1,
+          integrationSeconds: view.integrationSeconds + exposureSeconds,
           elapsedSeconds: exposureSeconds,
           latestImage: metadata,
         })
@@ -228,12 +243,14 @@ export function createCaptureController(
     exposureSeconds: number,
     camera: CaptureCamera,
     cameraName: string,
-    { onSettled, repeat = false, saveFrames = false }: CaptureRunOptions = {},
+    { onSettled, repeat = false, saveFrames = false, subject = null }: CaptureRunOptions = {},
   ) {
     if (running) throw new Error('An exposure is already running')
 
     if (!Number.isFinite(exposureSeconds) || exposureSeconds <= 0)
       throw new Error('Exposure duration must be positive')
+    const runSubject = subject ? Object.freeze({ ...subject }) : null
+    const runGeneration = ++generation
     cancellation = new AbortController()
     patch({
       camera: { name: cameraName },
@@ -242,6 +259,9 @@ export function createCaptureController(
       repeat,
       saveFrames,
       completedCount: 0,
+      subject: runSubject,
+      savedCount: 0,
+      integrationSeconds: 0,
       exposureSeconds,
       elapsedSeconds: 0,
       error: null,
@@ -254,6 +274,8 @@ export function createCaptureController(
       cameraName,
       repeat,
       saveFrames,
+      runSubject,
+      runGeneration,
     ).finally(() => {
       running = undefined
       onSettled?.()

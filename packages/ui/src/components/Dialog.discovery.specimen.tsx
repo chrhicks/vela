@@ -67,7 +67,7 @@ function DiscoveryDialogPreview({ props, onPropsChange }: PreviewProps) {
               Vela could not use this computer’s network interfaces. You can retry or enter the
               server address manually.
             </p>
-            <Button onClick={() => update({ view: 'manual' })} size="small">
+            <Button onClick={() => update({ view: 'manual' })}>
               Enter address
             </Button>
           </div>
@@ -80,7 +80,7 @@ function DiscoveryDialogPreview({ props, onPropsChange }: PreviewProps) {
               Confirm the server is running and that this device is on the same network, then scan
               again.
             </p>
-            <Button onClick={() => update({ view: 'manual' })} size="small">
+            <Button onClick={() => update({ view: 'manual' })}>
               Enter address
             </Button>
           </div>
@@ -340,7 +340,7 @@ function DiscoveryDialogPreview({ props, onPropsChange }: PreviewProps) {
               <i className="vela-discovery-signal vela-discovery-signal--three" />
             </div>
             <div className="vela-discovery-start__actions">
-              <Button leadingIcon={<ScanIcon />} onClick={beginScan} size="large" tone="accent">
+              <Button leadingIcon={<ScanIcon />} onClick={beginScan} tone="accent">
                 Scan for rigs
               </Button>
               <Button onClick={() => update({ view: 'manual' })} tone="quiet">

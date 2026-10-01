@@ -1,7 +1,7 @@
 import { Body, Equator, Horizon, Illumination, MoonPhase, Observer } from 'astronomy-engine'
 import type { TargetPosition, TargetSkyPath } from '@vela/model/web'
 import type { PlateWcs } from '../plate-solving/solver.js'
-import { toMount, type Site } from '../astronomy/coordinates.js'
+import { angularDistance, toMount, type Site } from '../astronomy/coordinates.js'
 
 export { angularDistance, fromMount, toMount, type Site } from '../astronomy/coordinates.js'
 
@@ -97,12 +97,18 @@ export function skyPath(target: TargetPosition, site: Site, now: Date): TargetSk
     }
   }
 
+  const current = horizontal(now)
+  const moonNow = Equator(Body.Moon, now, observer, true, true)
+  const apparentNow = toMount(target, 'topocentric', now, site)
+
   return {
     observedAt: now.toISOString(),
     startsAt: samples[0]!.at,
     endsAt: samples.at(-1)!.at,
     samples,
-    currentAltitudeDegrees: horizontal(now).altitude,
+    currentMoonSeparationDegrees: angularDistance(apparentNow, { raDegrees: moonNow.ra * 15, decDegrees: moonNow.dec }),
+    currentAltitudeDegrees: current.altitude,
+    currentAzimuthDegrees: current.azimuth,
     highestAltitudeDegrees: Math.max(...samples.map(sample => sample.altitudeDegrees)),
     aboveHorizonDuringDarkness: windows,
   }

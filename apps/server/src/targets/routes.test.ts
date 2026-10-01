@@ -5,6 +5,7 @@ import { createMemoryRigCatalog } from '../rig/catalog.js'
 import type { RigCatalogRecord } from '../rig/contracts.js'
 import { createRigOperations } from '../rig/operations.js'
 import type { MonoFrame, PlateSolver } from '../plate-solving/solver.js'
+import type { FramingView } from '@vela/model/web'
 import type { FramingHardware } from './framing.js'
 import { registerTargets, type TargetOptions } from './routes.js'
 
@@ -561,6 +562,7 @@ describe('target and framing HTTP boundary', () => {
     expect(target.json()).toMatchObject({
       id: 'ngc6205',
       catalog: 'NGC 6205',
+      constellation: 'Hercules',
       sky: null,
       raDegrees: start.raDegrees,
     })
@@ -581,10 +583,16 @@ describe('frozen target discovery HTTP boundary', () => {
     const firstResponse = await subject.app.inject('/api/web/rigs/rig/target-discovery')
     expect(firstResponse.statusCode).toBe(200)
     const first = firstResponse.json()
+    expect(first.pageSize).toBe(12)
     expect(first.total).toBeGreaterThan(first.pageSize)
     expect(first.targets).toHaveLength(first.pageSize)
     expect(first.targets.every((target: { opportunity: unknown }) => target.opportunity)).toBe(true)
     expect(first.calculatedAt).toBe(stamp)
+    const small = (await subject.app.inject(`/api/web/rigs/rig/target-discovery?snapshot=${first.snapshotId}&pageSize=3`)).json()
+    expect(small.targets).toHaveLength(3)
+    expect(small.targets).toEqual(first.targets.slice(0, 3))
+    expect(small.snapshotId).toBe(first.snapshotId)
+    expect(small.calculatedAt).toBe(first.calculatedAt)
     subject.mount.latitudeDegrees = -40
 
     const next = (
@@ -652,10 +660,69 @@ describe('frozen target discovery HTTP boundary', () => {
       'offset=0.1',
       'q=a&q=b',
       'snapshot=no',
+      'pageSize=0',
+      'pageSize=13',
+      'pageSize=2.5',
     ]) {
       expect(
         (await subject.app.inject(`/api/web/rigs/rig/target-discovery?${query}`)).statusCode,
       ).toBe(400)
     }
   })
+})
+
+it('browses the pinned catalog without any rig or device access', async () => {
+  const app = Fastify()
+  apps.push(app)
+  const catalog = createMemoryRigCatalog([])
+  const get = vi.spyOn(catalog, 'get').mockRejectedValue(new Error('No rig reads permitted'))
+  const createAdapter = vi.fn(() => { throw new Error('No devices permitted') })
+  registerTargets(app, catalog, createRigOperations(), { createAdapter })
+  const first = await app.inject('/api/web/target-catalog?pageSize=3')
+  expect(first.statusCode).toBe(200)
+  expect(first.json().targets).toHaveLength(3)
+  expect(first.json()).not.toHaveProperty('site')
+  expect(first.json()).not.toHaveProperty('rigId')
+  expect(first.json().targets[0]).not.toHaveProperty('sky')
+  expect(first.json().targets[0]).not.toHaveProperty('opportunity')
+  const second = await app.inject('/api/web/target-catalog?pageSize=3&offset=3')
+  expect(second.json().targets.map((v: { id: string }) => v.id)).not.toEqual(first.json().targets.map((v: { id: string }) => v.id))
+  const alias = await app.inject('/api/web/target-catalog?q=M31')
+  expect(alias.json().targets[0]).toMatchObject({ id: 'ngc0224', minorSizeArcminutes: expect.any(Number) })
+  const galaxies = await app.inject('/api/web/target-catalog?q=Galaxy&category=galaxy&filter=broadband&pageSize=3')
+  expect(galaxies.json().targets).toHaveLength(3)
+
+  for (const query of ['pageSize=0', 'pageSize=13', 'pageSize=1.5', 'pageSize=NaN', 'offset=-1', 'category=unknown', 'filter=unknown']) {
+    expect((await app.inject(`/api/web/target-catalog?${query}`)).statusCode).toBe(400)
+  }
+
+  expect(get).not.toHaveBeenCalled()
+  expect(createAdapter).not.toHaveBeenCalled()
+})
+
+it('serves exact framing PNG resources without reacquisition and reports missing IDs', async () => {
+  const s = setup()
+  await command(s.app, start, 'check')
+  await vi.waitFor(() => expect(s.hardware.capture).toHaveBeenCalledTimes(1))
+  s.complete()
+  let view!: FramingView
+  await vi.waitFor(async () => {
+    view = (await s.app.inject('/api/web/rigs/rig/framing')).json()
+    expect(view.phase).toBe('checked')
+  })
+  expect(view.preview!.checkId).toBe(view.actual!.checkId)
+  expect(view.preview).not.toHaveProperty('pixels')
+  expect(view.preview).not.toHaveProperty('fits')
+  const first = await s.app.inject(view.preview!.previewUrl!)
+  const native = await s.app.inject(view.preview!.nativePreviewUrl!)
+  const retry = await s.app.inject(view.preview!.previewUrl!)
+  expect(first.statusCode).toBe(200)
+  expect(first.headers['content-type']).toContain('image/png')
+  expect(first.rawPayload.subarray(0, 8)).toEqual(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
+  expect(retry.rawPayload).toEqual(first.rawPayload)
+  expect(native.statusCode).toBe(200)
+  expect((await s.app.inject('/api/web/rigs/rig/framing/previews/expired/native.png')).statusCode).toBe(404)
+  expect((await s.app.inject(view.preview!.previewUrl!.replace('/rig/', '/missing/'))).statusCode).toBe(404)
+  expect(s.hardware.capture).toHaveBeenCalledTimes(1)
+  expect(s.hardware.slew).not.toHaveBeenCalled()
 })

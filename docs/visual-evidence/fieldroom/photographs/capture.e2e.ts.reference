@@ -1,0 +1,33 @@
+import { test, expect } from '@playwright/test'
+import { openPhotographsScene } from './fixtures/fieldroom/browser'
+import { reviewTimezone } from './fixtures/fieldroom/tonight'
+
+test.use({ timezoneId: reviewTimezone })
+for (const mode of ['light', 'dark']) {
+  for (const width of [1440, 900, 390]) {
+    for (const fallback of [false, true]) {
+      test(`visual ${mode} ${width} ${fallback}`, async ({ page }) => {
+        await page.setViewportSize({ width, height: width === 390 ? 782 : 900 })
+        await openPhotographsScene(page, fallback ? 'photographs-fallback' : `photographs-${mode}`)
+        await expect(page.getByRole('region', { name: 'Saved preview', exact: true }).getByRole('img')).toBeVisible()
+        if (fallback && mode === 'dark') {
+          await page.getByRole('button', { name: 'Appearance', exact: true }).click()
+          await page.getByRole('radio', { name: 'Dark', exact: true }).check()
+          await page.keyboard.press('Escape')
+          await expect(page.getByRole('dialog')).toHaveCount(0)
+        }
+        await expect(page.locator('html')).toHaveAttribute('data-mode', mode)
+        await expect(page.getByRole('button', { name: '100%', exact: true })).toBeEnabled()
+        await page.getByRole('heading', { name: 'Photographs', exact: true }).click()
+        await page.evaluate(async () => {
+          await document.fonts.ready
+          await Promise.all(Array.from(document.images).map(image => { image.loading = 'eager'; return image.decode() }))
+          await Promise.all(document.getAnimations().filter(a => a.effect?.getComputedTiming().iterations !== Infinity).map(a => a.finished.catch(() => {})))
+          await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+        })
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+        await page.screenshot({ path: `/tmp/vela-photographs-accepted-${mode}-${width}-${fallback ? 'fallback' : 'current'}.png`, fullPage: true })
+      })
+    }
+  }
+}

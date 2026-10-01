@@ -97,7 +97,7 @@ export function useAutofocus(rigId: string) {
   }, [rigId])
 
   async function command(action: 'start' | 'stop', body: Record<string, number> = {}) {
-    if (writing.current || offline) return
+    if (writing.current || offline || stopUnconfirmed.current) return
     writing.current = true
     stopUnconfirmed.current = false
     generation.current++
@@ -146,6 +146,7 @@ export function useAutofocus(rigId: string) {
     offline,
     pending,
     error,
+    stopUnconfirmed: stopUnconfirmed.current,
     start: (stepSize: number, exposureSeconds: number) =>
       command('start', { stepSize, exposureSeconds }),
     stop: () => command('stop'),

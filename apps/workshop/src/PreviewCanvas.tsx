@@ -38,10 +38,10 @@ function ContextFrame({
         description="Configure how the next sequence should begin."
         footer={
           <>
-            <Button size="small" tone="quiet">
+            <Button tone="quiet">
               Cancel
             </Button>
-            <Button size="small" tone="accent">
+            <Button tone="accent">
               Apply
             </Button>
           </>
@@ -73,11 +73,11 @@ function ContextFrame({
         <Badge marker={<i />} size="small" tone="positive">
           Guiding
         </Badge>
-        <Button size="small" tone="quiet">
+        <Button tone="quiet">
           Pause
         </Button>
         <div className="context-toolbar__action">{children}</div>
-        <IconButton icon={moreIcon} label="More actions" size="small" />
+        <IconButton icon={moreIcon} label="More actions" />
       </div>
     )
   }
@@ -125,7 +125,6 @@ function ContextFrame({
               ),
             },
           ]}
-          size="small"
         />
       </Panel>
     )

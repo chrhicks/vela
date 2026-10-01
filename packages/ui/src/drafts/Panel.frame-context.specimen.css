@@ -1,0 +1,98 @@
+.vela-frame-context {
+  container: frame-context / inline-size;
+  width: 100%;
+  min-width: 0;
+  background: var(--vela-canvas);
+  color: var(--vela-text);
+  font: 400 16px/24px var(--vela-font);
+}
+.vela-frame-context * { box-sizing: border-box; }
+.vela-frame-context > .vela-navigation { padding-inline: 36px; }
+.vela-frame-context .vela-navigation__utility { color: var(--vela-text-muted); font-size: 14px; }
+.vela-frame-context__main { padding: 28px 36px 24px; }
+.vela-frame-context__heading { display: flex; align-items: center; gap: 28px; margin: -2px 0 22px; }
+.vela-frame-context__heading > a { color: var(--vela-text); font-size: 15px; font-weight: 500; text-underline-offset: 3px; flex: none; }
+.vela-frame-context__heading h1 { font: 400 28px/36px var(--vela-font-heading); margin: 0; }
+.vela-frame-context__heading p { margin: 4px 0 0; color: var(--vela-text-muted); font-size: 14px; line-height: 20px; }
+.vela-frame-context__sky-access { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+.vela-frame-context__sky-access > div { display: grid; gap: 2px; font-size: 14px; line-height: 20px; }
+.vela-frame-context__sky-access small { font-size: 12px; color: var(--vela-text-muted); }
+.vela-frame-context__sky-access svg { width: 22px; height: 22px; }
+.vela-frame-context__sky-access .vela-icon-button { flex: none; }
+.vela-frame-context__layout { display: grid; grid-template-columns: minmax(0, 888fr) minmax(0, 452fr); align-items: start; gap: 28px; }
+.vela-frame-context__composition { min-width: 0; border: 1px solid var(--vela-line); border-radius: 6px; overflow: hidden; background: var(--vela-surface); }
+.vela-frame-context__toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; min-height: 54px; padding: 0 18px; gap: 8px; font-size: 14px; line-height: 20px; }
+.vela-frame-context__toolbar > div { display: flex; align-items: center; gap: 8px; }
+.vela-frame-context__toolbar .vela-button[aria-label] { min-height: 44px; width: 44px; padding: 0; font-size: 20px; }
+.vela-frame-context__field { position: relative; height: 520px; overflow: hidden; background: var(--vela-image-background, #111); }
+.vela-frame-context__field > img { width: 100%; height: 100%; object-fit: cover; display: block; user-select: none; pointer-events: none; }
+.vela-frame-context__legend, .vela-frame-context__hint { position: absolute; z-index: 2; color: #f1eee5; background: #293c36; padding: 10px 14px; left: 18px; font-size: 14px; line-height: 20px; pointer-events: none; }
+.vela-frame-context__legend { top: 16px; display: flex; gap: 20px; flex-wrap: wrap; }
+.vela-frame-context__legend > span { color: #e5d6a1; }
+.vela-frame-context__hint { bottom: 16px; }
+.vela-frame-context__footprint, .vela-frame-context__solved { position: absolute; transform: translate(-50%, -50%); aspect-ratio: 6248 / 4176; border: 2px solid #f1eee5; color: #f1eee5; }
+.vela-frame-context__footprint { display: grid; place-items: center; cursor: grab; touch-action: none; user-select: none; }
+.vela-frame-context__footprint:active { cursor: grabbing; }
+.vela-frame-context__footprint:focus-visible { outline: 2px solid #f1eee5; outline-offset: 3px; }
+.vela-frame-context__footprint > span { font-size: 22px; text-shadow: 0 0 3px #111810; }
+.vela-frame-context__solved { border-style: dashed; border-color: #ccb768; pointer-events: none; }
+.vela-frame-context__composition > footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding: 18px; color: var(--vela-text-muted); font-size: 14px; line-height: 20px; }
+.vela-frame-context__composition a { color: var(--vela-text); }
+.vela-frame-context details { font-size: 14px; line-height: 20px; }
+.vela-frame-context summary { cursor: pointer; min-height: 44px; align-content: center; }
+.vela-frame-context__adjustments { margin: 0 18px; }
+.vela-frame-context__control-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin: 12px 0; }
+.vela-frame-context__control-row strong { font-weight: 500; }
+.vela-frame-context__nudges { display: flex; gap: 8px; }
+.vela-frame-context__nudges .vela-button { width: 44px; padding: 0; }
+.vela-frame-context__optics { border-top: 1px solid var(--vela-line); padding-bottom: 12px; }
+.vela-frame-context__optics > .vela-button { margin-top: 12px; }
+.vela-frame-context__sidebar { display: grid; gap: 18px; min-width: 0; }
+.vela-frame-context__result { display: grid; gap: 12px; padding: 24px; border-radius: 6px; background: var(--vela-surface); }
+.vela-frame-context__result > strong { font-size: 15px; line-height: 20px; font-weight: 500; }
+.vela-frame-context__result[data-current='true'] { background: var(--vela-accent-surface); }
+.vela-frame-context__result details { border-top: 1px solid var(--vela-line); padding-top: 4px; }
+.vela-frame-context__result details p { color: var(--vela-text-muted); }
+.vela-frame-context__result details p + p { margin-top: 12px; }
+.vela-frame-context__result details > .vela-button { margin-top: 16px; }
+.vela-frame-context__result dl { display: grid; gap: 12px; margin: 8px 0 20px; }
+.vela-frame-context__result dl > div { display: flex; justify-content: space-between; gap: 12px; }
+.vela-frame-context__result dt { color: var(--vela-text-muted); }
+.vela-frame-context__result dd { margin: 0; text-align: right; }
+.vela-frame-context__offset { display: flex; align-items: baseline; flex-wrap: wrap; gap: 14px; }
+.vela-frame-context__offset > strong { font: 400 46px/56px var(--vela-font-heading); letter-spacing: -2px; }
+.vela-frame-context__offset > span { font-size: 14px; line-height: 20px; }
+.vela-frame-context__exposure { min-width: 0; }
+.vela-frame-context__exposure h2 { font-size: 15px; line-height: 20px; font-weight: 500; margin: 0 0 12px; }
+.vela-frame-context__exposure > div { min-height: 210px; display: grid; justify-items: center; align-content: center; padding: 24px; text-align: center; background: var(--vela-surface); border: 1px solid var(--vela-line); border-radius: 6px; color: var(--vela-text-muted); }
+.vela-frame-context__exposure svg { width: 42px; height: 36px; margin-bottom: 10px; }
+.vela-frame-context__exposure h3 { font-size: 16px; line-height: 24px; font-weight: 500; margin: 0 0 6px; color: var(--vela-text); }
+.vela-frame-context__exposure p { margin: 0; max-width: 30ch; font-size: 14px; line-height: 20px; }
+.vela-frame-context__commands { display: grid; gap: 10px; }
+.vela-frame-context__commands p { margin: 0; color: var(--vela-text-muted); font-size: 14px; line-height: 20px; }
+.vela-frame-context__seconds { display: grid; grid-template-columns: 156px minmax(0, 1fr); align-items: center; gap: 14px; margin-bottom: 8px; font-size: 14px; }
+.vela-frame-context__seconds > div { position: relative; min-width: 0; }
+.vela-frame-context__seconds input { padding-right: 82px; }
+.vela-frame-context__seconds > div > span { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: var(--vela-text-muted); pointer-events: none; }
+.vela-frame-context__continue { display: flex; flex-wrap: wrap; gap: 10px; border-top: 1px solid var(--vela-line); padding-top: 14px; margin-top: 8px; }
+.vela-frame-context__notice { margin: 0; padding: 14px; background: var(--vela-accent-surface); font-size: 14px; line-height: 20px; }
+.vela-frame-context__context { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 22px 0 0; color: var(--vela-text-muted); font-size: 14px; line-height: 20px; }
+.vela-frame-context__dialog { max-width: 560px; }
+.vela-frame-context__dialog-note { margin: 18px 0 0; font-size: 12px; color: var(--vela-text-muted); }
+@container frame-context (max-width: 1050px) {
+  .vela-frame-context__layout { grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; }
+  .vela-frame-context__field { height: 440px; }
+  .vela-frame-context__heading { flex-wrap: wrap; gap: 12px 20px; }
+  .vela-frame-context__sky-access { margin-left: 0; }
+}
+@container frame-context (max-width: 760px) {
+  .vela-frame-context > .vela-navigation { padding-inline: 20px; }
+  .vela-frame-context__main { padding: 20px; }
+  .vela-frame-context__heading > a { width: 100%; }
+  .vela-frame-context__heading h1 { font-size: 26px; line-height: 34px; }
+  .vela-frame-context__layout { grid-template-columns: 1fr; }
+  .vela-frame-context__field { height: 360px; }
+  .vela-frame-context__toolbar { padding: 8px 12px; }
+  .vela-frame-context__seconds { grid-template-columns: 140px minmax(0, 1fr); gap: 10px; }
+  .vela-frame-context__hint { left: 12px; right: 12px; padding: 10px; }
+}

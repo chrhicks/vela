@@ -1,135 +1,26 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Badge, Button } from '@vela/ui'
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { Badge, Button, IconButton } from '@vela/ui'
 import type { CaptureImage } from '@vela/model/web'
 import './latest-image.css'
 import { api, ApiError } from '../../lib/api'
 import { isSavedImage } from './validation'
+import { useLoadedPixels } from '../image-inspection/useLoadedPixels'
+import { useImageInspection } from '../image-inspection/useImageInspection'
+import { ImageViewport, ImageEnlargement } from '../image-inspection/ImageViewport'
 
 export type { CaptureImage } from '@vela/model/web'
 
-// Commit the frame and its metadata together only after the browser has loaded it.
+// Compatibility for legacy capture/saved consumers. New viewers supply an explicit scope.
 export function useLoadedImage(image: CaptureImage | null, native = false) {
-  const [loaded, setLoaded] = useState<{ image: CaptureImage; url: string } | null>(null)
-  const [failed, setFailed] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const id = image?.id
-  const url = native ? image?.imageUrl : (image?.fitImageUrl ?? image?.imageUrl)
-
-  type Request = { image: CaptureImage; url: string; native: boolean }
-
-  const latest = useRef<Request | null>(null)
-  const inFlight = useRef<{ cancel: () => void } | null>(null)
-  const scope = useRef<string | undefined>(undefined)
-
-  useEffect(
-    () => () => {
-      latest.current = null
-      inFlight.current?.cancel()
-      inFlight.current = null
-    },
-    [],
-  )
-
-  useEffect(() => {
-    // Native image URLs share a Rig-specific directory. Never keep a different Rig's image.
-    const nextScope = image?.imageUrl.slice(0, image.imageUrl.lastIndexOf('/'))
-
-    if (!image || nextScope !== scope.current) {
-      inFlight.current?.cancel()
-      inFlight.current = null
-      setLoaded(null)
-      setLoading(false)
-      setFailed(false)
-    }
-
-    scope.current = nextScope
-    latest.current = image ? { image, url: url!, native } : null
-
-    if (!latest.current || inFlight.current) return
-
-    function load(frame: Request) {
-      let cancelled = false
-      let attempt = 0
-      let timer: number | undefined
-      let timeout: number | undefined
-      let candidate: HTMLImageElement | undefined
-
-      function detach() {
-        window.clearTimeout(timeout)
-
-        if (candidate) {
-          candidate.onload = null
-          candidate.onerror = null
-        }
-      }
-
-      inFlight.current = {
-        cancel() {
-          cancelled = true
-          window.clearTimeout(timer)
-          detach()
-        },
-      }
-      setLoading(true)
-      setFailed(false)
-
-      function settled(success: boolean) {
-        if (cancelled) return
-        detach()
-        inFlight.current = null
-
-        if (success) setLoaded({ image: frame.image, url: frame.url })
-        const next = latest.current
-
-        if (next && (next.image.id !== frame.image.id || next.url !== frame.url)) {
-          // Complete useful work, then skip intermediate arrivals and load the newest.
-          load(next)
-        } else {
-          setLoading(false)
-          setFailed(!success)
-        }
-      }
-
-      function attemptLoad() {
-        candidate = new Image()
-        const current = candidate
-
-        function failedAttempt() {
-          detach()
-
-          if (cancelled) return
-
-          if (attempt < 2) timer = window.setTimeout(attemptLoad, ++attempt * 1500)
-          else settled(false)
-        }
-
-        current.onload = () => settled(true)
-        current.onerror = failedAttempt
-        timeout = window.setTimeout(failedAttempt, frame.native ? 60_000 : 15_000)
-        current.src = frame.url
-      }
-
-      attemptLoad()
-    }
-
-    load(latest.current)
-    // Immutable IDs and URLs prevent telemetry polls restarting a request.
-  }, [id, url, native])
-
-  useEffect(() => {
-    if (image?.saved)
-      setLoaded(current =>
-        current?.image.id === image.id && !current.image.saved
-          ? { ...current, image: { ...current.image, saved: true } }
-          : current,
-      )
-  }, [id, image?.saved, loaded?.image.id])
+  const scope = image?.imageUrl.split('/').slice(0, 4).join('/') ?? 'capture'
+  const result = useLoadedPixels(image, scope, native)
+  const loadedImage = result.loadedImage
 
   return {
-    loadedImage: image ? (loaded?.image ?? null) : null,
-    loadedUrl: image ? loaded?.url : undefined,
-    loading,
-    failed,
+    ...result,
+    loadedImage: loadedImage && image?.id === loadedImage.id && image.saved
+      ? { ...loadedImage, saved: true }
+      : loadedImage,
   }
 }
 
@@ -144,7 +35,20 @@ export function CameraMark() {
   )
 }
 
-export function LatestImage({
+type LatestImageProps = {
+  rigId?: string
+  savedDetail?: boolean
+  fieldroom?: boolean
+  image: CaptureImage | null
+  busy: boolean
+  interrupted: boolean
+}
+
+export function LatestImage(props: LatestImageProps) {
+  return props.fieldroom ? <FieldroomLatestImage {...props} /> : <LegacyLatestImage {...props} />
+}
+
+function LegacyLatestImage({
   image,
   busy,
   interrupted,
@@ -221,7 +125,6 @@ export function LatestImage({
           <div className="capture-image__actions">
             <div className="capture-image__zoom" role="group" aria-label="Image scale">
               <Button
-                size="small"
                 tone={nativeVisible ? 'quiet' : 'neutral'}
                 aria-pressed={!nativeVisible}
                 onClick={() => setZoomed(false)}
@@ -229,7 +132,6 @@ export function LatestImage({
                 Fit
               </Button>
               <Button
-                size="small"
                 tone={nativeVisible ? 'neutral' : 'quiet'}
                 aria-pressed={nativeVisible}
                 onClick={() => setZoomed(true)}
@@ -242,7 +144,6 @@ export function LatestImage({
             ) : (
               rigId && (
                 <Button
-                  size="small"
                   disabled={retention.pending}
                   onClick={() => void retention.keep(frame)}
                 >
@@ -377,7 +278,7 @@ function retentionMessage(result: KeepResult, keep: (image: KeptFrame) => Promis
             Image from {time}: {result.error}
           </p>
           {result.retryable && (
-            <Button size="small" onClick={() => void keep(result.image)}>
+            <Button onClick={() => void keep(result.image)}>
               Retry saving image
             </Button>
           )}
@@ -426,4 +327,194 @@ function useImageRetention(rigId: string | undefined) {
   }
 
   return { result, pending: result?.status === 'saving', keep }
+}
+
+function FieldroomLatestImage({ image, busy, interrupted, rigId, savedDetail = false }: LatestImageProps) {
+  const inspection = useImageInspection(image, { scope: `capture:${rigId ?? ''}` })
+  const { fitted, held, frame, native, nativeVisible, nativeRequested, showLatest, showFit, showNative, hold } = inspection
+  const [expanded, setExpanded] = useState(false)
+  const [inlineHeight, setInlineHeight] = useState<number>()
+  const root = useRef<HTMLElement>(null)
+  const openerId = useId()
+  const detailsId = useId()
+  const [detailsOpen, setDetailsOpen] = useState(false)
+  const [now, setNow] = useState(Date.now)
+  const lastKnown = interrupted && !savedDetail && !!frame
+  const hfr = frame?.statistics?.medianHfrPixels
+  const expired = native.result?.state === 'missing'
+  const retention = useImageRetention(rigId)
+
+  const saved = !!frame && (savedDetail || frame.saved ||
+    (image?.id === frame.id && image.saved) ||
+    (retention.result?.image.id === frame.id && retention.result.status === 'saved'))
+
+  const keepExpired = retention.result?.status === 'failed' &&
+    retention.result.image.id === frame?.id && !retention.result.retryable
+
+  useEffect(() => {
+    if (!lastKnown) return
+    setNow(Date.now())
+    const timer = window.setInterval(() => setNow(Date.now()), 1000)
+
+    return () => window.clearInterval(timer)
+  }, [lastKnown, frame?.receivedAt])
+
+  const seconds = frame ? Math.max(0, Math.floor((now - Date.parse(frame.receivedAt)) / 1000)) : 0
+
+  const age = seconds < 60
+    ? `${seconds} s ago`
+    : seconds < 3600
+      ? `${Math.floor(seconds / 60)} min ago`
+      : `${Math.floor(seconds / 3600)} h ago`
+
+  useEffect(() => { setExpanded(false) }, [rigId])
+
+  const tools = (
+    <div className="capture-image__actions">
+      <div className="capture-image__zoom" role="group" aria-label="Image scale">
+        <Button tone="neutral" aria-pressed={!nativeVisible}
+          onClick={showFit}>Fit</Button>
+        <Button tone="neutral" aria-pressed={nativeVisible}
+          disabled={(expired || keepExpired) && native.result?.state !== 'ready'}
+          onClick={showNative}>100%</Button>
+      </div>
+      <IconButton
+        label="Image details"
+        tone="quiet"
+        aria-expanded={detailsOpen}
+        aria-controls={detailsId}
+        onClick={() => setDetailsOpen(value => !value)}
+        icon={(
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" aria-hidden="true">
+            <circle cx="10" cy="10" r="7" />
+            <path d="M10 9v5m0-9v1" />
+          </svg>
+        )}
+      />
+      {!expanded && (
+        <Button id={openerId} aria-label="Enlarge image" className="capture-image__enlarge"
+          onClick={() => {
+            // Keep the inline card's extent while its one viewer moves to the portal.
+            setInlineHeight(root.current?.getBoundingClientRect().height)
+            hold()
+            setExpanded(true)
+          }}>
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" aria-hidden="true">
+            <path d="M5 15 15 5M6 5h9v9" />
+          </svg>
+        </Button>
+      )}
+    </div>
+  )
+
+  const viewport = (
+    <ImageViewport inspection={inspection} expanded={expanded} layoutKey={lastKnown ? 'interrupted' : 'current'}
+      alt={frame ? `${frame.exposureSeconds} second exposure from ${frame.cameraName}` : ''}
+      empty={(
+        <div className="capture-image__empty">
+          <CameraMark />
+          <h3>{fitted.loading ? 'Loading your exposure' : busy ? 'Taking your first exposure' : 'Your first image starts here'}</h3>
+          <p>{interrupted ? 'Exposure progress is unavailable.' : 'The image will appear when it is received.'}</p>
+        </div>
+      )} />
+  )
+
+  const status = (
+    <>
+      {held && (
+        <div className="capture-image__inspection-status" role="status">
+          <span>{image?.id !== held.image.id ? 'A newer exposure is available.' : 'Holding this exposure for inspection.'}</span>
+          <Button onClick={showLatest}>Show latest</Button>
+        </div>
+      )}
+      {nativeRequested && native.result?.state === 'loading' && (
+        <p className="capture-image__error" role="status">Loading full-resolution image… The fitted preview stays visible.</p>
+      )}
+      {native.result?.state === 'failed' && (
+        <div className="capture-image__error" role="status">
+          The full-resolution image could not be loaded. The fitted preview is kept.
+          <Button onClick={native.retry}>Retry full-resolution image</Button>
+        </div>
+      )}
+      {(expired || keepExpired) && (
+        <p className="capture-image__error" role="status">This exposure has expired from the camera cache. Loaded pixels remain available; native loading and Keep are unavailable.</p>
+      )}
+      {!held && fitted.failed && (
+        <div className="capture-image__error" role="status">
+          The latest image could not be loaded. {frame ? 'The previous exposure is kept.' : 'No image is available.'}
+          <Button onClick={fitted.retry}>Retry image</Button>
+        </div>
+      )}
+      {retention.result && (retention.result.image.id !== frame?.id || retention.result.status === 'failed') && (
+        <div className="capture-image__retention" role="status" data-failed={retention.result.status === 'failed' || undefined}>
+          {retentionMessage(retention.result, retention.keep)}
+        </div>
+      )}
+    </>
+  )
+
+  const metadata = frame && (
+    <>
+      <div className="capture-image__metadata">
+        <div className="capture-image__caption">
+          {frame.cameraName}
+        </div>
+        <div className="capture-image__facts">
+          <span>{frame.exposureSeconds} s · {frame.color === 'color' ? 'Color' : 'Mono'} exposure</span>
+          <span className="capture-image__star-size" title="Median half-flux radius in native image pixels">
+            Star size{'   '}{hfr == null ? '—' : Number(hfr.toFixed(2))} px HFR
+          </span>
+          <span>{frame.statistics ? `${frame.statistics.detectedStars} stars` : 'Star measurements unavailable'}</span>
+        </div>
+        {saved ? (
+          <span className="capture-image__saved">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
+              <path d="m3 8 3 3 7-7" />
+            </svg>
+            Saved
+          </span>
+        ) : rigId && (
+          <Button className="capture-image__keep" disabled={retention.pending || expired || keepExpired}
+            onClick={() => void retention.keep(frame)}>
+            {retention.pending && retention.result?.image.id === frame.id ? 'Saving…' : 'Keep'}
+          </Button>
+        )}
+      </div>
+      <div className="capture-image__details" id={detailsId} hidden={!detailsOpen}>
+        <h3>Image details</h3>
+        <dl>
+          {frame.subject && <div><dt>Chosen subject</dt><dd>{frame.subject.name} · {frame.subject.catalog}</dd></div>}
+          <div><dt>Dimensions</dt><dd>{frame.width} × {frame.height}</dd></div>
+          <div><dt>Exposure started{frame.capturedAtSource === 'server-estimate' ? ' (estimated)' : ''}</dt><dd>{new Date(frame.capturedAt).toLocaleString()}</dd></div>
+          <div><dt>Display</dt><dd>{nativeVisible ? '100% · One image pixel per CSS pixel' : 'Fitted · Display stretched'}</dd></div>
+        </dl>
+      </div>
+    </>
+  )
+
+  return (
+    <section ref={root} className="capture-image capture-image--fieldroom"
+      style={expanded ? { minHeight: inlineHeight, boxSizing: 'border-box' } : undefined}
+      data-interrupted={lastKnown || undefined} aria-label={savedDetail ? 'Saved preview' : 'Latest image'}>
+      <header>
+        <div className="capture-image__heading">
+          <h2>{savedDetail ? 'Saved exposure' : lastKnown ? 'Last received exposure' : 'Latest exposure'}</h2>
+          <span title={frame ? `Received ${new Date(frame.receivedAt).toLocaleString()}` : undefined}>
+            {frame ? new Date(frame.receivedAt).toLocaleTimeString(undefined, {
+              hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+            }) : 'No exposure yet'}
+            {lastKnown && ` · ${age}`}
+          </span>
+        </div>
+        {frame && !expanded && tools}
+      </header>
+      {!expanded && <>{status}{viewport}{metadata}</>}
+      <ImageEnlargement open={expanded} rootRef={root} title="Exposure inspection"
+        returnFocusId={openerId} onDismiss={() => setExpanded(false)}>
+        <div className="capture-image capture-image--fieldroom">
+          {tools}{status}{viewport}{metadata}
+        </div>
+      </ImageEnlargement>
+    </section>
+  )
 }

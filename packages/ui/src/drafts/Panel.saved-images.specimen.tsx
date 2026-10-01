@@ -151,7 +151,6 @@ function SavedImagesPreview({
   const scaleControls = (
     <div className="vela-capture-zoom" aria-label="Image scale">
       <Button
-        size="small"
         tone={zoomed ? 'quiet' : 'neutral'}
         aria-pressed={!zoomed}
         onClick={() => setZoomed(false)}
@@ -159,7 +158,6 @@ function SavedImagesPreview({
         Fit
       </Button>
       <Button
-        size="small"
         tone={zoomed ? 'neutral' : 'quiet'}
         aria-pressed={zoomed}
         onClick={() => setZoomed(true)}
@@ -236,7 +234,6 @@ function SavedImagesPreview({
           <Button
             className="vela-capture-back"
             tone="quiet"
-            size="small"
             onClick={() => update({ screen: screen === 'detail' ? 'saved' : 'observe' })}
           >
             {'← '}
@@ -317,7 +314,7 @@ function SavedImagesPreview({
                       {isSaved ? (
                         <Badge tone="positive">Saved</Badge>
                       ) : (
-                        <Button size="small" onClick={keepImage}>
+                        <Button onClick={keepImage}>
                           Keep this image
                         </Button>
                       )}
@@ -401,7 +398,6 @@ function SavedImagesPreview({
                 />
                 <div className="vela-capture-command">
                   <Button
-                    size="large"
                     tone={busy ? 'neutral' : 'accent'}
                     disabled={!busy && !validExposure}
                     onClick={() => {

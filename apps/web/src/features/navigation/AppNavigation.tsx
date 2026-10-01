@@ -1,11 +1,23 @@
 import type { NavigationCapture } from '@vela/model/web'
-import { NavigationBar, type NavigationActivity, type NavigationBarProps } from '@vela/ui'
+import {
+  Appearance,
+  NavigationBar,
+  type NavigationActivity,
+  type NavigationBarProps,
+} from '@vela/ui'
 import type { MouseEvent } from 'react'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { matchPath, useLocation, useNavigate } from 'react-router'
+import { useAppearance } from '../../appearance/AppearanceProvider'
+import { useRigObservation } from '../rig-detail/RigContext'
+import { rigConnectionLabel } from './rig-connection'
 import { useNavigation } from './use-navigation'
 
 export function AppNavigation() {
+  const appearance = useAppearance()
+  const [appearanceOpen, setAppearanceOpen] = useState(false)
+  const rig = useRigObservation()
+  const connection = rig ? rigConnectionLabel(rig) : undefined
   const { pathname, search } = useLocation()
   const navigate = useNavigate()
   const { view, activity, offline, missing } = useNavigation()
@@ -13,18 +25,16 @@ export function AppNavigation() {
   const base = rigId ? `/rigs/${encodeURIComponent(rigId)}` : ''
   const targets = useRef(new Map<string, string>())
   const inTargets = pathname.startsWith(`${base}/observe/targets`)
+  const inPhotographs = pathname.startsWith(`${base}/observe/saved-images`)
+
+  const inPreparation =
+    pathname === `${base}/observe/alignment` || pathname === `${base}/observe/autofocus`
 
   useEffect(() => {
     if (rigId && inTargets) targets.current.set(rigId, search)
   }, [rigId, inTargets, search])
 
   const targetSearch = inTargets ? search : (targets.current.get(rigId) ?? '')
-
-  const currentPage = inTargets
-    ? 'Targets'
-    : pathname.startsWith(`${base}/observe/capture`)
-      ? 'Capture'
-      : 'Observe'
 
   const routeLink = (href: string) => ({
     href,
@@ -43,7 +53,11 @@ export function AppNavigation() {
 
   const activityProps: Pick<NavigationBarProps, 'activity'> = {}
 
-  if (activity && presentation) {
+  // Tonight already shows this rig's full capture state. Keep the navigation
+  // indicator when observing other pages or another rig.
+  const showingActiveCapture = activity?.rigId === rigId && pathname === `${base}/observe/capture`
+
+  if (activity && presentation && !showingActiveCapture) {
     const current: NavigationActivity = {
       ...routeLink(`/rigs/${encodeURIComponent(activity.rigId)}/observe/capture`),
       label: `${activity.rigName}. ${activity.completedCount} captured. ${presentation.status}. ${presentation.interrupted ? 'Last known count. Current outcome unknown. ' : ''}Open capture.`,
@@ -60,27 +74,75 @@ export function AppNavigation() {
       home={routeLink('/')}
       rigs={rigs}
       currentRigId={rigId}
-      onRigChange={id => navigate(id ? `/rigs/${encodeURIComponent(id)}/observe` : '/')}
+      {...(inPreparation
+        ? {
+            compact: {
+              back: { label: '← Tonight', ...routeLink(`${base}/observe/capture`) },
+              label: rig?.view?.name ?? rigs.find(item => item.id === rigId)?.name ?? 'Current rig',
+            },
+          }
+        : {})}
+      onRigChange={id =>
+        navigate(
+          id
+            ? `/rigs/${encodeURIComponent(id)}/observe/${inPhotographs ? 'saved-images' : 'capture'}`
+            : '/',
+        )
+      }
+      actions={
+        <Appearance
+          open={appearanceOpen}
+          onOpenChange={setAppearanceOpen}
+          value={appearance.preference}
+          onValueChange={appearance.setPreference}
+          systemMode={appearance.systemMode}
+          persistence={appearance.persistence}
+        />
+      }
+      utility={
+        <>
+          {connection && (
+            <span className="vela-app__connection" data-connected={connection === 'Connected'}>
+              <span className="vela-app__connection-dot" aria-hidden="true">
+                ●
+              </span>{' '}
+              {connection}
+            </span>
+          )}
+          {!rigId && view?.rigs.length === 0 && !offline && !missing && (
+            <span className="vela-app__connection">No rig added</span>
+          )}
+        </>
+      }
       links={
         rigId
           ? [
               {
-                label: 'Observe',
-                ...routeLink(`${base}/observe`),
-                current: currentPage === 'Observe',
-              },
-              {
-                label: 'Targets',
-                ...routeLink(`${base}/observe/targets${targetSearch}`),
-                current: currentPage === 'Targets',
-              },
-              {
-                label: 'Capture',
+                label: 'Tonight',
                 ...routeLink(`${base}/observe/capture`),
-                current: currentPage === 'Capture',
+                current:
+                  pathname === `${base}/observe/capture` ||
+                  pathname === `${base}/observe` ||
+                  inPreparation,
+              },
+              {
+                label: 'Explore the sky',
+                ...routeLink(`${base}/observe/targets${targetSearch}`),
+                current: inTargets,
+              },
+              {
+                label: 'Photographs',
+                ...routeLink(`${base}/observe/saved-images`),
+                current: inPhotographs,
               },
             ]
-          : []
+          : [
+              {
+                label: 'Explore the sky',
+                ...routeLink('/explore'),
+                current: pathname === '/explore',
+              },
+            ]
       }
       {...activityProps}
     />

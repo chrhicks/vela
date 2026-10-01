@@ -17,10 +17,12 @@ const target: TargetView = {
   id: 'm31',
   name: 'Andromeda Galaxy',
   catalog: 'M31',
+  constellation: null,
   kind: 'Galaxy',
   raDegrees: 10.6847,
   decDegrees: 41.269,
   sizeArcminutes: 178,
+  minorSizeArcminutes: 63,
   thumbnailUrl: '/api/targets/m31/thumbnail',
   sky: null,
 }
@@ -44,6 +46,7 @@ const idle: FramingView = {
   captureReadState: 'current',
   desired: null,
   targetId: null,
+  preview: null,
   actual: null,
   error: null,
   exposureSeconds: 2,
@@ -60,10 +63,10 @@ const tile = readFileSync(new URL('./fixtures/survey-tile.jpg', import.meta.url)
 test('an untouched target and Reset frame send only the accepted slew fields', async ({ page }) => {
   let state = { ...idle }
   const submissions: unknown[] = []
-  await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
-  await page.route('**/api/web/rigs/rig-1/framing', route => respond(route, state))
-  await page.route('**/api/survey/**', route => route.abort())
-  await page.route('**/api/rigs/rig-1/framing/start', route => {
+  await page.route('**/api/web/rigs/rig-1/targets/m31', (route) => respond(route, target))
+  await page.route('**/api/web/rigs/rig-1/framing', (route) => respond(route, state))
+  await page.route('**/api/survey/**', (route) => route.abort())
+  await page.route('**/api/rigs/rig-1/framing/start', (route) => {
     const body = route.request().postDataJSON()
     submissions.push(body)
 
@@ -100,13 +103,15 @@ test('an untouched target and Reset frame send only the accepted slew fields', a
     return respond(route, state)
   })
   await page.goto('/rigs/rig-1/observe/targets/m31')
+  await page.getByText('Frame position & controls', { exact: true }).click()
+  await page.getByText('Framing details & state', { exact: true }).click()
   await page.getByRole('button', { name: 'Slew & check' }).click()
-  await expect(page.getByText('Framing checked', { exact: true })).toBeVisible()
+  await expect(page.getByText('Test frame solved', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Adjust composition' }).click()
   await page.getByRole('button', { name: 'Move frame →' }).click()
   await page.getByRole('button', { name: 'Reset frame' }).click()
   await page.getByRole('button', { name: 'Slew & check' }).click()
-  await expect(page.getByText('Framing checked', { exact: true })).toBeVisible()
+  await expect(page.getByText('Test frame solved', { exact: true })).toBeVisible()
   expect(submissions).toEqual(
     Array(2).fill({
       targetId: target.id,
@@ -122,7 +127,7 @@ test('catalog is paged and search updates use actual server results; missing sit
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   const queries: string[] = []
-  await page.route('**/api/web/rigs/rig-1/target-discovery?*', route => {
+  await page.route('**/api/web/rigs/rig-1/target-discovery?*', (route) => {
     queries.push(route.request().url())
     const params = new URL(route.request().url()).searchParams
 
@@ -137,7 +142,7 @@ test('catalog is paged and search updates use actual server results; missing sit
       category: params.get('category') ?? 'all',
       filter: params.get('filter') ?? 'all',
       offset: Number(params.get('offset')),
-      pageSize: 24,
+      pageSize: 9,
       targets: [
         {
           ...target,
@@ -152,20 +157,20 @@ test('catalog is paged and search updates use actual server results; missing sit
       siteUnavailableReason: 'Mount site is unavailable.',
     })
   })
-  await page.route('**/api/targets/*/thumbnail', route => route.abort())
+  await page.route('**/api/targets/*/thumbnail', (route) => route.abort())
   await page.goto('/rigs/rig-1/observe/targets')
-  await expect(page.getByRole('heading', { name: target.name })).toBeVisible()
+  await expect(page.getByRole('heading', { name: target.name }).first()).toBeVisible()
   await expect(page.getByText('Reference image unavailable')).toBeVisible()
   await expect(
     page.getByText('The mount’s site could not be read: Mount site is unavailable.'),
   ).toBeVisible()
-  await page.getByRole('button', { name: 'Next', exact: true }).click()
-  await expect.poll(() => queries.some(q => q.includes('offset=24'))).toBe(true)
+  await page.getByRole('button', { name: 'Next subjects →', exact: true }).click()
+  await expect.poll(() => queries.some((q) => q.includes('offset=9'))).toBe(true)
   await page.getByLabel('Find a target').fill('M31')
   await expect
     .poll(() =>
       queries.some(
-        q =>
+        (q) =>
           new URL(q).searchParams.get('q') === 'M31' &&
           new URL(q).searchParams.get('offset') === '0',
       ),
@@ -178,15 +183,17 @@ test('ambiguous command is not repeated and requires explicit current state chec
   page,
 }) => {
   let commands = 0
-  await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
-  await page.route('**/api/web/rigs/rig-1/framing', route => respond(route, idle))
-  await page.route('**/api/survey/**', route => route.abort())
-  await page.route('**/api/rigs/rig-1/framing/start', route => {
+  await page.route('**/api/web/rigs/rig-1/targets/m31', (route) => respond(route, target))
+  await page.route('**/api/web/rigs/rig-1/framing', (route) => respond(route, idle))
+  await page.route('**/api/survey/**', (route) => route.abort())
+  await page.route('**/api/rigs/rig-1/framing/start', (route) => {
     commands++
 
     return route.abort()
   })
   await page.goto('/rigs/rig-1/observe/targets/m31')
+  await page.getByText('Frame position & controls', { exact: true }).click()
+  await page.getByText('Framing details & state', { exact: true }).click()
   await expect(page.getByRole('button', { name: 'Slew & check' })).toBeEnabled()
   await page.getByRole('button', { name: 'Slew & check' }).click()
   await expect(page.getByRole('alert')).toContainText('could not be confirmed')
@@ -205,17 +212,17 @@ test('survey footprint uses projected coordinates and keyboard adjustment; tile 
 }) => {
   const errors: string[] = []
   const external: string[] = []
-  page.on('pageerror', error => errors.push(error.message))
-  page.on('request', request => {
+  page.on('pageerror', (error) => errors.push(error.message))
+  page.on('request', (request) => {
     if (
       request.url().startsWith('http') &&
       new URL(request.url()).origin !== new URL(baseURL!).origin
     )
       external.push(request.url())
   })
-  await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
-  await page.route('**/api/web/rigs/rig-1/framing', route => respond(route, idle))
-  await page.route('**/api/survey/dss2/**', route =>
+  await page.route('**/api/web/rigs/rig-1/targets/m31', (route) => respond(route, target))
+  await page.route('**/api/web/rigs/rig-1/framing', (route) => respond(route, idle))
+  await page.route('**/api/survey/dss2/**', (route) =>
     route.request().url().endsWith('/properties')
       ? route.fulfill({
           contentType: 'text/plain',
@@ -227,6 +234,8 @@ test('survey footprint uses projected coordinates and keyboard adjustment; tile 
         }),
   )
   await page.goto('/rigs/rig-1/observe/targets/m31')
+  await page.getByText('Frame position & controls', { exact: true }).click()
+  await page.getByText('Framing details & state', { exact: true }).click()
   const frame = page.getByRole('slider', { name: 'Camera frame position' })
   await expect(frame).toBeVisible({ timeout: 30000 })
   const original = await frame.getAttribute('points')
@@ -293,12 +302,12 @@ test('checked framing offers centering, active operations lock edits, and stale 
   let offline = false
   let corrections = 0
   let stops = 0
-  await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
-  await page.route('**/api/web/rigs/rig-1/framing', route =>
+  await page.route('**/api/web/rigs/rig-1/targets/m31', (route) => respond(route, target))
+  await page.route('**/api/web/rigs/rig-1/framing', (route) =>
     offline ? route.abort() : respond(route, state),
   )
-  await page.route('**/api/survey/**', route => route.abort())
-  await page.route('**/api/rigs/rig-1/framing/center', route => {
+  await page.route('**/api/survey/**', (route) => route.abort())
+  await page.route('**/api/rigs/rig-1/framing/center', (route) => {
     expect(route.request().postDataJSON()).toEqual({
       checkId: 'displayed-check',
       raDegrees: target.raDegrees,
@@ -309,14 +318,20 @@ test('checked framing offers centering, active operations lock edits, and stale 
 
     return respond(route, state)
   })
-  await page.route('**/api/rigs/rig-1/framing/stop', route => {
+  await page.route('**/api/rigs/rig-1/framing/stop', (route) => {
     stops++
     state = { ...state, phase: 'stopped', active: false }
 
     return respond(route, state)
   })
   await page.goto('/rigs/rig-1/observe/targets/m31')
+  await page.getByText('Frame position & controls', { exact: true }).click()
+  await page.getByText('Framing details & state', { exact: true }).click()
   await expect(page.getByRole('link', { name: 'Continue to capture' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Continue to capture' })).toHaveAttribute(
+    'href',
+    '/rigs/rig-1/observe?target=m31',
+  )
   await page.getByRole('button', { name: 'Center composition' }).click()
   await expect(page.getByRole('button', { name: 'Stop framing' })).toBeEnabled()
   await expect(page.getByRole('button', { name: 'Reset frame' })).toBeDisabled()
@@ -348,12 +363,12 @@ test('a rejected adjusted composition cannot inherit the prior framing check aft
   let rejectStart = true
   let commands = 0
   let submitted: { raDegrees: number; decDegrees: number } | null = null
-  await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
-  await page.route('**/api/web/rigs/rig-1/framing', route =>
+  await page.route('**/api/web/rigs/rig-1/targets/m31', (route) => respond(route, target))
+  await page.route('**/api/web/rigs/rig-1/framing', (route) =>
     respond(route, { ...state, observedAt: new Date().toISOString() }),
   )
-  await page.route('**/api/survey/**', route => route.abort())
-  await page.route('**/api/rigs/rig-1/framing/start', route => {
+  await page.route('**/api/survey/**', (route) => route.abort())
+  await page.route('**/api/rigs/rig-1/framing/start', (route) => {
     commands++
     submitted = route.request().postDataJSON()
 
@@ -375,6 +390,8 @@ test('a rejected adjusted composition cannot inherit the prior framing check aft
     return respond(route, state)
   })
   await page.goto('/rigs/rig-1/observe/targets/m31')
+  await page.getByText('Frame position & controls', { exact: true }).click()
+  await page.getByText('Framing details & state', { exact: true }).click()
   await expect(page.getByRole('link', { name: 'Continue to capture' })).toBeVisible()
   await page.getByRole('button', { name: 'Adjust composition' }).click()
   await page.getByRole('button', { name: 'Move frame →' }).click()
@@ -388,7 +405,7 @@ test('a rejected adjusted composition cannot inherit the prior framing check aft
   await expect(page.getByRole('button', { name: 'Slew & check' })).toBeEnabled()
   await expect(composition).toHaveText(editedCoordinates)
   await expect(page.getByRole('link', { name: 'Continue to capture' })).toHaveCount(0)
-  await expect(page.getByText('Framing checked', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('Test frame solved', { exact: true })).toHaveCount(0)
   await expect(page.getByText('Composition not checked', { exact: true })).toBeVisible()
   expect(commands).toBe(1)
   expect(submitted?.raDegrees).not.toBe(target.raDegrees)
@@ -412,12 +429,12 @@ test('an explicit read recovers a completed adjusted check after its command res
   }
 
   let commands = 0
-  await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
-  await page.route('**/api/web/rigs/rig-1/framing', route =>
+  await page.route('**/api/web/rigs/rig-1/targets/m31', (route) => respond(route, target))
+  await page.route('**/api/web/rigs/rig-1/framing', (route) =>
     respond(route, { ...state, observedAt: new Date().toISOString() }),
   )
-  await page.route('**/api/survey/**', route => route.abort())
-  await page.route('**/api/rigs/rig-1/framing/start', route => {
+  await page.route('**/api/survey/**', (route) => route.abort())
+  await page.route('**/api/rigs/rig-1/framing/start', (route) => {
     commands++
     const input = route.request().postDataJSON()
     state = { ...state, desired: { raDegrees: input.raDegrees, decDegrees: input.decDegrees } }
@@ -425,6 +442,8 @@ test('an explicit read recovers a completed adjusted check after its command res
     return route.abort()
   })
   await page.goto('/rigs/rig-1/observe/targets/m31')
+  await page.getByText('Frame position & controls', { exact: true }).click()
+  await page.getByText('Framing details & state', { exact: true }).click()
   await expect(page.getByRole('link', { name: 'Continue to capture' })).toBeVisible()
   await page.getByRole('button', { name: 'Adjust composition' }).click()
   await page.getByRole('button', { name: 'Move frame →' }).click()
@@ -432,7 +451,7 @@ test('an explicit read recovers a completed adjusted check after its command res
   await expect(page.getByRole('alert')).toContainText('could not be confirmed')
   await expect(page.getByRole('link', { name: 'Continue to capture' })).toHaveCount(0)
   await page.getByRole('button', { name: 'Check rig state' }).click()
-  await expect(page.getByText('Framing checked', { exact: true })).toBeVisible()
+  await expect(page.getByText('Test frame solved', { exact: true })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Continue to capture' })).toBeVisible()
   expect(commands).toBe(1)
 })
@@ -456,17 +475,19 @@ for (const failureSource of ['command', 'poll'] as const) {
       error: 'Telescope stop could not be confirmed',
     }
 
-    await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
-    await page.route('**/api/web/rigs/rig-1/framing', route =>
+    await page.route('**/api/web/rigs/rig-1/targets/m31', (route) => respond(route, target))
+    await page.route('**/api/web/rigs/rig-1/framing', (route) =>
       respond(route, { ...state, observedAt: new Date().toISOString() }),
     )
-    await page.route('**/api/survey/**', route => route.abort())
-    await page.route('**/api/rigs/rig-1/framing/stop', route => {
+    await page.route('**/api/survey/**', (route) => route.abort())
+    await page.route('**/api/rigs/rig-1/framing/stop', (route) => {
       state = failed
 
       return respond(route, { ...state, observedAt: new Date().toISOString() })
     })
     await page.goto('/rigs/rig-1/observe/targets/m31')
+    await page.getByText('Frame position & controls', { exact: true }).click()
+    await page.getByText('Framing details & state', { exact: true }).click()
     await expect(page.getByRole('button', { name: 'Stop framing' })).toBeEnabled()
 
     if (failureSource === 'command')
@@ -494,17 +515,17 @@ test('quiet polling leaves Check rig state enabled and an explicit check superse
   let releasePoll!: () => void
   let releaseCheck!: () => void
 
-  const pollHeld = new Promise<void>(resolve => {
+  const pollHeld = new Promise<void>((resolve) => {
     releasePoll = resolve
   })
 
-  const checkHeld = new Promise<void>(resolve => {
+  const checkHeld = new Promise<void>((resolve) => {
     releaseCheck = resolve
   })
 
-  await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
-  await page.route('**/api/survey/**', route => route.abort())
-  await page.route('**/api/web/rigs/rig-1/framing', async route => {
+  await page.route('**/api/web/rigs/rig-1/targets/m31', (route) => respond(route, target))
+  await page.route('**/api/survey/**', (route) => route.abort())
+  await page.route('**/api/web/rigs/rig-1/framing', async (route) => {
     const read = armed ? ++reads : 0
 
     if (read === 1) await pollHeld
@@ -513,6 +534,8 @@ test('quiet polling leaves Check rig state enabled and an explicit check superse
     await respond(route, { ...idle, observedAt: new Date().toISOString() })
   })
   await page.goto('/rigs/rig-1/observe/targets/m31')
+  await page.getByText('Frame position & controls', { exact: true }).click()
+  await page.getByText('Framing details & state', { exact: true }).click()
   const check = page.getByRole('button', { name: 'Check rig state' })
   await expect(page.getByRole('button', { name: 'Slew & check' })).toBeEnabled()
   armed = true
@@ -531,7 +554,7 @@ test('Targets breadcrumb preserves search and results page through a detail relo
   page,
 }) => {
   const queries: string[] = []
-  await page.route('**/api/web/rigs/rig-1/target-discovery?*', route => {
+  await page.route('**/api/web/rigs/rig-1/target-discovery?*', (route) => {
     queries.push(route.request().url())
 
     return respond(route, {
@@ -545,7 +568,7 @@ test('Targets breadcrumb preserves search and results page through a detail relo
       category: 'all',
       filter: 'all',
       offset: 24,
-      pageSize: 12,
+      pageSize: 9,
       targets: [
         {
           ...target,
@@ -560,20 +583,20 @@ test('Targets breadcrumb preserves search and results page through a detail relo
       siteUnavailableReason: 'Site unavailable',
     })
   })
-  await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
-  await page.route('**/api/web/rigs/rig-1/framing', route => respond(route, idle))
-  await page.route('**/api/targets/*/thumbnail', route => route.abort())
-  await page.route('**/api/survey/**', route => route.abort())
+  await page.route('**/api/web/rigs/rig-1/targets/m31', (route) => respond(route, target))
+  await page.route('**/api/web/rigs/rig-1/framing', (route) => respond(route, idle))
+  await page.route('**/api/targets/*/thumbnail', (route) => route.abort())
+  await page.route('**/api/survey/**', (route) => route.abort())
   await page.goto('/rigs/rig-1/observe/targets?q=galaxy&offset=24')
   await expect(page.getByLabel('Find a target')).toHaveValue('galaxy')
-  await page.getByRole('link', { name: 'Explore target', exact: true }).click()
+  await page.getByRole('link', { name: 'Frame this subject →', exact: true }).click()
   await expect(page).toHaveURL(/targets\/m31\?/)
   await page.reload()
-  await page.getByRole('link', { name: '← Targets', exact: true }).click()
+  await page.getByRole('link', { name: '← Explore the sky', exact: true }).click()
   expect(new URL(page.url()).searchParams.get('q')).toBe('galaxy')
   expect(new URL(page.url()).searchParams.get('offset')).toBe('24')
   await expect(page.getByLabel('Find a target')).toHaveValue('galaxy')
-  await expect(page.getByText('25–36 of 49')).toBeVisible()
+  await expect(page.getByText('Page 3 of 6')).toBeVisible()
   expect(new URL(queries.at(-1)!).searchParams.get('q')).toBe('galaxy')
   expect(new URL(queries.at(-1)!).searchParams.get('offset')).toBe('24')
 })
@@ -591,16 +614,16 @@ test('failure recovery preserves local drag, zoom and nudges while device comman
 
   let commands = 0
   let offline = false
-  await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
-  await page.route('**/api/web/rigs/rig-1/framing', route =>
+  await page.route('**/api/web/rigs/rig-1/targets/m31', (route) => respond(route, target))
+  await page.route('**/api/web/rigs/rig-1/framing', (route) =>
     offline ? route.abort() : respond(route, state),
   )
-  await page.route('**/api/rigs/rig-1/framing/*', route => {
+  await page.route('**/api/rigs/rig-1/framing/*', (route) => {
     commands++
 
     return route.abort()
   })
-  await page.route('**/api/survey/dss2/**', route =>
+  await page.route('**/api/survey/dss2/**', (route) =>
     route.request().url().endsWith('/properties')
       ? route.fulfill({
           contentType: 'text/plain',
@@ -612,10 +635,12 @@ test('failure recovery preserves local drag, zoom and nudges while device comman
         }),
   )
   await page.goto('/rigs/rig-1/observe/targets/m31')
+  await page.getByText('Frame position & controls', { exact: true }).click()
+  await page.getByText('Framing details & state', { exact: true }).click()
   const frame = page.getByRole('slider', { name: 'Camera frame position' })
   await expect(frame).toBeVisible()
   await expect(frame).toHaveAttribute('aria-disabled', 'true')
-  await expect(page.getByText('Framing in progress · editing paused')).toBeVisible()
+  await expect(page.getByText('Composition editing paused')).toBeVisible()
   const initial = await frame.getAttribute('aria-valuetext')
   state = {
     ...state,
@@ -628,6 +653,12 @@ test('failure recovery preserves local drag, zoom and nudges while device comman
   ).toBeVisible()
   await expect(frame).toHaveAttribute('aria-disabled', 'false')
   await expect(page.getByRole('button', { name: 'Slew & check' })).toBeDisabled()
+  const adjustments = page.locator('.vela-target-adjustments')
+
+  if ((await adjustments.getAttribute('open')) === null) {
+    await adjustments.locator('summary').first().click()
+  }
+
   await page.getByText('Optics settings', { exact: true }).click()
   await expect(page.getByRole('button', { name: 'Save focal length' })).toBeDisabled()
   await frame.scrollIntoViewIfNeeded()
@@ -692,10 +723,10 @@ test('an edited composition can center using its current coordinates and the las
   }
 
   let command: { checkId: string; raDegrees: number; decDegrees: number } | null = null
-  await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
-  await page.route('**/api/web/rigs/rig-1/framing', route => respond(route, state))
-  await page.route('**/api/survey/**', route => route.abort())
-  await page.route('**/api/rigs/rig-1/framing/center', route => {
+  await page.route('**/api/web/rigs/rig-1/targets/m31', (route) => respond(route, target))
+  await page.route('**/api/web/rigs/rig-1/framing', (route) => respond(route, state))
+  await page.route('**/api/survey/**', (route) => route.abort())
+  await page.route('**/api/rigs/rig-1/framing/center', (route) => {
     command = z
       .strictObject({
         checkId: z.string(),
@@ -715,6 +746,8 @@ test('an edited composition can center using its current coordinates and the las
     return respond(route, state)
   })
   await page.goto('/rigs/rig-1/observe/targets/m31')
+  await page.getByText('Frame position & controls', { exact: true }).click()
+  await page.getByText('Framing details & state', { exact: true }).click()
   await page.getByRole('button', { name: 'Adjust composition' }).click()
   await page.getByRole('button', { name: 'Move frame →' }).click()
   await expect(page.getByRole('link', { name: 'Continue to capture' })).toHaveCount(0)
@@ -748,12 +781,12 @@ test('a recoverable check keeps the edited destination and offers a fresh exposu
     }
   }[] = []
 
-  await page.route('**/api/web/rigs/rig-1/targets/m31', route => respond(route, target))
-  await page.route('**/api/web/rigs/rig-1/framing', route =>
+  await page.route('**/api/web/rigs/rig-1/targets/m31', (route) => respond(route, target))
+  await page.route('**/api/web/rigs/rig-1/framing', (route) =>
     respond(route, { ...state, observedAt: new Date().toISOString() }),
   )
-  await page.route('**/api/survey/**', route => route.abort())
-  await page.route('**/api/rigs/rig-1/framing/*', route => {
+  await page.route('**/api/survey/**', (route) => route.abort())
+  await page.route('**/api/rigs/rig-1/framing/*', (route) => {
     commands.push({
       action: route.request().url().split('/').at(-1)!,
       body: z
@@ -770,6 +803,8 @@ test('a recoverable check keeps the edited destination and offers a fresh exposu
     return respond(route, state)
   })
   await page.goto('/rigs/rig-1/observe/targets/m31')
+  await page.getByText('Frame position & controls', { exact: true }).click()
+  await page.getByText('Framing details & state', { exact: true }).click()
   await expect(page.getByRole('button', { name: 'Check current frame', exact: true })).toBeEnabled()
   await page.getByRole('button', { name: 'Move frame →' }).click()
   const coordinates = await page.locator('.vela-target-details').textContent()

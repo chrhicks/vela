@@ -1,0 +1,150 @@
+{
+  "viewport": {
+    "width": 1440,
+    "height": 921
+  },
+  "main": {
+    "x": 0,
+    "y": 88,
+    "width": 1440,
+    "height": 833,
+    "top": 88,
+    "right": 1440,
+    "bottom": 921,
+    "left": 0
+  },
+  "heading": {
+    "x": 36,
+    "y": 119,
+    "width": 102.234375,
+    "height": 34,
+    "top": 119,
+    "right": 138.234375,
+    "bottom": 153,
+    "left": 36
+  },
+  "content": [
+    {
+      "className": "equipment",
+      "bounds": {
+        "x": 0,
+        "y": 88,
+        "width": 1440,
+        "height": 833,
+        "top": 88,
+        "right": 1440,
+        "bottom": 921,
+        "left": 0
+      }
+    },
+    {
+      "className": "equipment__readiness",
+      "bounds": {
+        "x": 36,
+        "y": 182,
+        "width": 888,
+        "height": 106,
+        "top": 182,
+        "right": 924,
+        "bottom": 288,
+        "left": 36
+      }
+    },
+    {
+      "className": "equipment__devices",
+      "bounds": {
+        "x": 36,
+        "y": 288,
+        "width": 888,
+        "height": 482,
+        "top": 288,
+        "right": 924,
+        "bottom": 770,
+        "left": 36
+      }
+    },
+    {
+      "className": "equipment__device",
+      "bounds": {
+        "x": 36,
+        "y": 370,
+        "width": 888,
+        "height": 100,
+        "top": 370,
+        "right": 924,
+        "bottom": 470,
+        "left": 36
+      }
+    },
+    {
+      "className": "equipment__device",
+      "bounds": {
+        "x": 36,
+        "y": 470,
+        "width": 888,
+        "height": 100,
+        "top": 470,
+        "right": 924,
+        "bottom": 570,
+        "left": 36
+      }
+    },
+    {
+      "className": "equipment__device",
+      "bounds": {
+        "x": 36,
+        "y": 570,
+        "width": 888,
+        "height": 100,
+        "top": 570,
+        "right": 924,
+        "bottom": 670,
+        "left": 36
+      }
+    },
+    {
+      "className": "equipment__device",
+      "bounds": {
+        "x": 36,
+        "y": 670,
+        "width": 888,
+        "height": 100,
+        "top": 670,
+        "right": 924,
+        "bottom": 770,
+        "left": 36
+      }
+    },
+    {
+      "className": "equipment__setup",
+      "bounds": {
+        "x": 952,
+        "y": 182,
+        "width": 452,
+        "height": 679,
+        "top": 182,
+        "right": 1404,
+        "bottom": 861,
+        "left": 952
+      }
+    },
+    {
+      "className": "equipment__preparation",
+      "bounds": {
+        "x": 36,
+        "y": 770,
+        "width": 888,
+        "height": 91,
+        "top": 770,
+        "right": 924,
+        "bottom": 861,
+        "left": 36
+      }
+    }
+  ],
+  "fonts": {
+    "heading": "\"Space Grotesk\", ui-sans-serif, sans-serif",
+    "body": "-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", Arial, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\""
+  },
+  "overflow": false
+}

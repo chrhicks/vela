@@ -19,14 +19,14 @@ export function DiscoveryResults({ request, result, selected, onSelectedChange }
       <div className="rig-discovery-results">
         <EmptyDiscoveryResult failures={result.failures} request={request} />
         <DiscoveryFailures
-          failures={result.failures.filter(failure => failure.reason !== 'scan-failed')}
+          failures={result.failures.filter((failure) => failure.reason !== 'scan-failed')}
         />
       </div>
     )
   }
 
   const selectableCandidates = result.candidates.filter(
-    candidate => candidate.disposition.state === 'new',
+    (candidate) => candidate.disposition.state === 'new',
   ).length
 
   return (
@@ -39,7 +39,7 @@ export function DiscoveryResults({ request, result, selected, onSelectedChange }
         <span>{selectableCandidates > 0 ? 'Select one to continue' : 'No rigs can be added'}</span>
       </div>
       <div className="rig-discovery-results__candidates">
-        {result.candidates.map(candidate => (
+        {result.candidates.map((candidate) => (
           <DiscoveryCandidate
             candidate={candidate}
             key={`${candidate.endpoint.host}:${candidate.endpoint.port}`}
@@ -121,7 +121,7 @@ function EmptyDiscoveryResult({
   failures: ReadonlyArray<DiscoveryFailureView>
   request: DiscoverRigsRequest
 }) {
-  const scanFailed = failures.some(failure => failure.reason === 'scan-failed')
+  const scanFailed = failures.some((failure) => failure.reason === 'scan-failed')
 
   if (request.mode === 'manual') {
     return (
@@ -137,11 +137,11 @@ function EmptyDiscoveryResult({
 
   return (
     <div className="rig-discovery-message" data-tone={scanFailed ? 'danger' : 'neutral'}>
-      <strong>{scanFailed ? 'Network scan could not start' : 'No Alpaca servers found'}</strong>
+      {scanFailed && <strong>Network scan could not start</strong>}
       <p>
         {scanFailed
           ? 'Vela could not use this computer’s network interfaces. You can try again without changing any hardware.'
-          : 'Confirm the Alpaca server is running and that this computer is on the same network, then scan again.'}
+          : 'Make sure the ALPACA server is running on the local network, or enter its address directly.'}
       </p>
     </div>
   )

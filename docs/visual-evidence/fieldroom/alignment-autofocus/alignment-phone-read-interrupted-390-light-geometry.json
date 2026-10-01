@@ -1,0 +1,90 @@
+{
+  "viewport": {
+    "width": 390,
+    "height": 782,
+    "dpr": 1,
+    "scrollX": 0,
+    "scrollY": 0
+  },
+  "coordinateSpace": "document",
+  "mode": "light",
+  "elements": [
+    {
+      "selector": "h1",
+      "x": 20,
+      "y": 60,
+      "width": 209.671875,
+      "height": 36,
+      "font": "28px / 36px \"Space Grotesk\", ui-sans-serif, sans-serif",
+      "gap": "normal",
+      "color": "rgb(41, 60, 54)",
+      "background": "rgba(0, 0, 0, 0)"
+    },
+    {
+      "selector": ".vela-polar-layout",
+      "x": 20,
+      "y": 108,
+      "width": 350,
+      "height": 656,
+      "font": "16px / 24px Barlow, ui-sans-serif, sans-serif",
+      "gap": "12px",
+      "color": "rgb(41, 60, 54)",
+      "background": "rgba(0, 0, 0, 0)"
+    },
+    {
+      "selector": ".vela-polar-status",
+      "x": 20,
+      "y": 108,
+      "width": 350,
+      "height": 72,
+      "font": "16px / 24px Barlow, ui-sans-serif, sans-serif",
+      "gap": "8px",
+      "color": "rgb(114, 83, 46)",
+      "background": "rgb(236, 225, 205)"
+    },
+    {
+      "selector": ".vela-polar-total",
+      "x": 20,
+      "y": 192,
+      "width": 350,
+      "height": 56,
+      "font": "16px / 24px Barlow, ui-sans-serif, sans-serif",
+      "gap": "normal",
+      "color": "rgb(41, 60, 54)",
+      "background": "rgba(0, 0, 0, 0)"
+    },
+    {
+      "selector": ".vela-polar-image",
+      "x": 20,
+      "y": 260,
+      "width": 350,
+      "height": 318,
+      "font": "16px / 24px Barlow, ui-sans-serif, sans-serif",
+      "gap": "normal",
+      "color": "rgb(41, 60, 54)",
+      "background": "rgba(0, 0, 0, 0)"
+    },
+    {
+      "selector": ".vela-polar-actions",
+      "x": 20,
+      "y": 658,
+      "width": 350,
+      "height": 106,
+      "font": "16px / 24px Barlow, ui-sans-serif, sans-serif",
+      "gap": "normal",
+      "color": "rgb(41, 60, 54)",
+      "background": "rgba(0, 0, 0, 0)"
+    },
+    {
+      "selector": ".vela-polar-image svg",
+      "x": 20,
+      "y": 260,
+      "width": 350,
+      "height": 196,
+      "font": "16px / 24px Barlow, ui-sans-serif, sans-serif",
+      "gap": "normal",
+      "color": "rgb(41, 60, 54)",
+      "background": "rgba(0, 0, 0, 0)"
+    }
+  ]
+}

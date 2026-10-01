@@ -283,7 +283,7 @@ function RigEntry({
             not move hardware or begin an exposure.
           </p>
         </div>
-        <Button onClick={onStart} size="large" tone="accent">
+        <Button onClick={onStart} tone="accent">
           Start observing
         </Button>
       </Panel>
@@ -373,7 +373,7 @@ function ReadinessAction({
   if (state === 'disconnected') {
     return (
       <div className="vela-observation-action">
-        <Button onClick={onConnect} size="large" tone="accent">
+        <Button onClick={onConnect} tone="accent">
           Connect devices
         </Button>
         <p>
@@ -390,7 +390,6 @@ function ReadinessAction({
         <Button
           disabled
           leadingIcon={<span aria-hidden="true" className="vela-observation-button-spinner" />}
-          size="large"
           tone="accent"
         >
           Connecting devices…
@@ -406,7 +405,7 @@ function ReadinessAction({
   if (state === 'partial') {
     return (
       <div className="vela-observation-action">
-        <Button onClick={onConnect} size="large" tone="accent">
+        <Button onClick={onConnect} tone="accent">
           Try remaining devices
         </Button>
         <p>The failed connection was confirmed. Retrying requires this new explicit command.</p>
@@ -416,7 +415,7 @@ function ReadinessAction({
 
   return (
     <div className="vela-observation-action">
-      <Button onClick={onCheck} size="large" tone="neutral">
+      <Button onClick={onCheck} tone="neutral">
         Check Rig again
       </Button>
       <p>
@@ -488,7 +487,7 @@ function ObservationWorkspace({
 
   return (
     <main className="vela-observe-page">
-      <Button className="vela-observation-back" onClick={onBack} size="small" tone="quiet">
+      <Button className="vela-observation-back" onClick={onBack} tone="quiet">
         ← Rig details
       </Button>
 

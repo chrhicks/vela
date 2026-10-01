@@ -36,7 +36,7 @@ Open `http://127.0.0.1:5174` for the focused workbench or `http://127.0.0.1:5174
 - Editable paired light and dark semantic mappings
 - Typography, geometry, density, prop, context, and viewport controls
 - Baseline comparison
-- Focused contrast diagnostics and a literal-color source audit
+- Focused contrast diagnostics for resolved hex and OKLCH colors, including action states, warning/error surfaces, focus and control edges, plus a literal-color source audit
 - Stable component/specimen URLs and Copy Context
 - Automatic ignored session recovery
 - Explicit tracked design-profile Save and Save As
@@ -57,7 +57,7 @@ The Vite development server exposes a local-only persistence boundary:
 
 - `.local/session.json` is ignored recovery state and updates automatically.
 - `designs/*.json` contains tracked named design profiles and changes only through Save or Save As.
-- Built-in `Vela UI Default` and `Vela Current` profiles are read-only references.
+- Built-in `Fieldroom`, `Vela UI Default`, and `Vela Current` profiles are read-only references. Fresh sessions start in Fieldroom/light; recovered sessions keep their selected profile and mode.
 - A named profile whose baseline fingerprint differs from the current package default is identified as baseline drift; it is never rebased automatically.
 
 The boundary accepts only the fixed session and profile routes, validates payload shape, restricts profile IDs, limits request size, and writes atomically. It is not a general filesystem API.
@@ -76,3 +76,33 @@ apps/workshop/.local/         ignored recovery state
 All current components, including Dialog and SkyPath, are exported from the `@vela/ui` root. The `@vela/ui/drafts` component API is currently empty. SkyPath’s stable primitive specimen and the draft target-framing product example share non-exported, invented sample paths and optional horizon states; no private observing-site data is bundled. SkyPath renders supplied coordinates and does not calculate ephemerides or load observing-site data.
 
 See the [operations guide](../../docs/component-workshop-operations.md) for adding drafts, authoring interactive specimens, persistence, targeted browser proof, manual promotion, and later one-at-a-time Vela adoption.
+
+## Fieldroom and Appearance
+
+Fieldroom is the shared/workshop design authority. Production application
+adoption is tracked separately in [the adoption plan](../../docs/fieldroom-adoption.md).
+Use Fieldroom in the matching light or dark mode at density 1 for reference
+comparisons. The two older profiles remain named token references; shared
+component changes are not a promise to freeze their historical rendering.
+
+The theme inspector distinguishes exact per-mode color overrides from generated
+ramps. Exact colors have a color picker and **Use generated** action. A semantic
+ramp selector is disabled while that color has an exact override; deleting an
+override restores its generated mapping for the current mode only. Body and
+heading families can be selected independently.
+
+Open `/?component=appearance&specimen=appearance-primitive&profile=fieldroom`
+for the controlled, non-modal Appearance specimen. Its controls exercise System
+resolving light/dark, explicit Light/Dark, and saved/visit-only copy. The selected
+radio receives focus, arrows change selection without closing, and Escape or
+Close returns focus to the trigger. Tab can leave the panel; outside interaction
+dismisses without stealing focus or consuming the action. Preview mode remains
+explicitly controlled by the workshop, independent of this mocked preference.
+The shared component does not read storage or browser color preferences.
+
+Focused checks:
+
+```sh
+pnpm exec vitest run apps/workshop/src/diagnostics.test.ts
+pnpm --filter @vela/workshop exec playwright test tests/Appearance.e2e.ts
+```

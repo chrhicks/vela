@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { AlignmentView } from '@vela/model/web'
-import { Badge, Button, Panel } from '@vela/ui'
+import { Button, Panel } from '@vela/ui'
 import { useEffect, useId, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { api } from '../lib/api'
@@ -18,6 +18,7 @@ function useAlignment(rigId: string) {
   const [error, setError] = useState<string | null>(null)
   const generation = useRef(0)
   const writing = useRef(false)
+  const endUnconfirmed = useRef(false)
   const alive = useRef(false)
 
   async function read() {
@@ -33,6 +34,15 @@ function useAlignment(rigId: string) {
       if (alive.current && current === generation.current) {
         setView(next)
         setOffline(false)
+
+        if (
+          endUnconfirmed.current &&
+          !next.active &&
+          ['stopped', 'finished', 'failed'].includes(next.phase)
+        ) {
+          endUnconfirmed.current = false
+          setError(null)
+        }
       }
     } catch {
       if (alive.current && current === generation.current) setOffline(true)
@@ -61,7 +71,8 @@ function useAlignment(rigId: string) {
   }, [rigId])
 
   async function command(action: 'start' | 'stop' | 'finish') {
-    if (writing.current || offline) return
+    if (writing.current || offline || endUnconfirmed.current || view?.activity === 'stopping')
+      return
     writing.current = true
     generation.current++
     setPending(true)
@@ -82,6 +93,8 @@ function useAlignment(rigId: string) {
         setOffline(false)
       }
     } catch (cause) {
+      if (action !== 'start') endUnconfirmed.current = true
+
       if (alive.current)
         setError(
           `${cause instanceof Error ? cause.message : 'Command response unavailable'}. The command was not repeated; check the current state before trying again.`,
@@ -94,7 +107,7 @@ function useAlignment(rigId: string) {
     }
   }
 
-  return { view, offline, pending, error, command }
+  return { view, offline, pending, error, endUnconfirmed: endUnconfirmed.current, command }
 }
 
 const measurementSchema = z.object({
@@ -252,7 +265,7 @@ export function Alignment() {
 }
 
 function AlignmentPage({ rigId }: { rigId: string }) {
-  const { view, offline, pending, error, command } = useAlignment(rigId)
+  const { view, offline, pending, error, endUnconfirmed, command } = useAlignment(rigId)
   const { solved, imageError } = useSolvedMeasurement(view)
   const [now, setNow] = useState(Date.now())
   const [expandedImage, setExpandedImage] = useState<ExpandedAlignmentImage | null>(null)
@@ -264,23 +277,25 @@ function AlignmentPage({ rigId }: { rigId: string }) {
   }, [])
 
   const back = (
-    <Link className="vela-rig-page__back" to={`/rigs/${encodeURIComponent(rigId)}/observe`}>
-      ← Observe
+    <Link className="vela-polar-back" to={`/rigs/${encodeURIComponent(rigId)}/observe/capture`}>
+      ← Tonight
     </Link>
   )
 
   if (!view)
     return (
-      <section className="vela-rig-page">
-        {back}
-        <h1>Polar alignment</h1>
+      <section className="vela-alignment">
+        <header className="vela-polar-heading">
+          {back}
+          <h1>Polar alignment</h1>
+        </header>
         <p role="status">
           {offline ? 'Alignment state unavailable. Reconnecting…' : 'Loading alignment…'}
         </p>
       </section>
     )
   const physical = view.mode === 'physical'
-  const disabled = pending || offline
+  const disabled = pending || offline || endUnconfirmed || view.activity === 'stopping'
   const measurement = solved?.measurement ?? null
   const baseline = !measurement || view.phase === 'baseline'
 
@@ -290,12 +305,14 @@ function AlignmentPage({ rigId }: { rigId: string }) {
 
   // The controller publishes the solved frame's exposure start as measuredAt, not solve completion.
   const age = solved?.measuredAt
-    ? `${Math.max(0, Math.floor((now - Date.parse(solved.measuredAt)) / 1000))} s ago`
+    ? `${Math.max(0, Math.floor((now - Date.parse(solved.measuredAt)) / 1000))} seconds ago`
     : 'Not measured'
 
   const activity = alignmentActivity(view, offline)
   const retrying = view.activity === 'retrying'
+  const interrupted = offline || retrying
   const imageReadState = offline ? 'offline' : retrying ? 'retrying' : 'current'
+  const lastCorrection = !view.active || interrupted || imageError || endUnconfirmed || pending
 
   const nextInstruction = view.active
     ? 'After the third solve, the adjustment view will show your alignment error and the target reticle.'
@@ -310,96 +327,68 @@ function AlignmentPage({ rigId }: { rigId: string }) {
 
   let adjustmentInstruction
 
-  if (retrying) {
-    adjustmentInstruction =
-      'Pause adjustments until a fresh measurement arrives. Vela is keeping your baseline and retrying automatically.'
+  if (interrupted || imageError || endUnconfirmed || pending) {
+    adjustmentInstruction = 'Baseline retained. Wait for a fresh measurement before adjusting.'
   } else if (view.active) {
     adjustmentInstruction = physical
-      ? 'Adjust the mount’s altitude and azimuth knobs. Use the reticle and remaining error to decide when you’re done.'
-      : 'Adjust the simulator’s offsets. Use the reticle and remaining error to decide when you’re done.'
+      ? 'Adjust the mount manually, then wait for a fresh measurement.'
+      : 'Adjust the simulator’s offsets, then wait for a fresh measurement.'
   } else if (view.phase === 'finished') {
     adjustmentInstruction = 'Your final measurement is kept here for reference.'
   } else {
     adjustmentInstruction = physical
-      ? 'Prepare the rig and clear movement corridor again, then measure a fresh baseline.'
+      ? 'Reposition the rig, then measure a fresh baseline before adjusting again.'
       : 'Reset or reposition the simulator, then measure a fresh baseline.'
+  }
+
+  let statusTitle = activity
+
+  let statusDetail = view.active
+    ? 'Baseline set · New measurements arriving'
+    : 'Last measurement kept for reference'
+
+  if (pending) {
+    statusTitle = 'Sending command…'
+    statusDetail = 'Waiting for Vela to confirm the command'
+  } else if (endUnconfirmed) {
+    statusTitle = 'Command outcome unknown'
+    statusDetail = 'Waiting for a confirmed session state'
+  } else if (interrupted) {
+    statusTitle = 'Measurements interrupted'
+    statusDetail = offline
+      ? 'Pause adjustments · Reconnecting to Vela'
+      : 'Pause adjustments · Retrying camera reads'
+  } else if (view.active && view.activity === 'waiting') {
+    statusTitle = `Adjusting · Updated ${age}`
   }
 
   const activityArea = (
     <div className="vela-polar-activity">
       <div className="vela-polar-activity__line" role="status">
-        <span
-          className="vela-polar-activity__spinner"
-          style={{ visibility: view.active && !offline && !retrying ? 'visible' : 'hidden' }}
-          aria-hidden="true"
-        />
-        <strong>{activity}</strong>
-        {view.activity === 'exposing' && !offline && (
-          <span className="vela-polar-activity__time">
-            {elapsed.toFixed(1)} / {view.exposureSeconds} s
-          </span>
+        {view.active && !interrupted && (
+          <span className="vela-polar-activity__spinner" aria-hidden="true" />
         )}
+        <strong>{pending ? 'Sending command…' : activity}</strong>
       </div>
-      <progress
-        style={{ visibility: view.activity === 'exposing' && !offline ? 'visible' : 'hidden' }}
-        value={elapsed}
-        max={view.exposureSeconds}
-        aria-label="Exposure progress in seconds"
-      />
-      <div className="vela-polar-activity__age">
-        <span>Last alignment update</span>
-        <span>
-          {age}
-          {measurement?.capturedAtSource === 'server-estimate' ? ' · Estimated exposure start' : ''}
-        </span>
-      </div>
-      <p>
-        {offline || retrying
-          ? 'Readings and overlay are last known. Reconnecting…'
-          : view.active
-            ? 'Wait for a fresh alignment update after each adjustment.'
-            : 'Readings and overlay are from the last successful solve.'}
-      </p>
+      <p>{view.solvedPositions} of 3 positions solved · Alignment error not yet available</p>
+      {view.activity === 'exposing' && !interrupted && !pending && (
+        <p>{elapsed.toFixed(1)} / {view.exposureSeconds} seconds</p>
+      )}
     </div>
   )
 
   return (
-    <section className="vela-rig-page vela-alignment" data-pending={pending || undefined}>
-      {back}
+    <section className="vela-alignment" data-pending={pending || undefined}>
       <header className="vela-polar-heading">
-        <div>
-          <p>{view.rigName} · Rig preparation</p>
-          <h1>Polar alignment</h1>
-        </div>
-        <Badge
-          tone={
-            offline || retrying || view.phase === 'failed'
-              ? 'warning'
-              : view.active
-                ? 'accent'
-                : 'neutral'
-          }
-        >
-          {offline
-            ? 'Disconnected'
-            : retrying
-              ? 'Reconnecting'
-              : view.phase === 'setup'
-                ? 'Not started'
-                : view.phase === 'baseline'
-                  ? 'Measuring'
-                  : view.phase}
-        </Badge>
+        {back}
+        <h1>Polar alignment</h1>
+        <span>{view.rigName} · Rig preparation</span>
       </header>
-      {view.warning && (
+      {view.warning && !retrying && (
         <div className="vela-polar-solve-warning" role="alert">
-          <strong>{retrying ? 'Device connection interrupted' : 'Plate-solving failed'}</strong>
+          <strong>Plate-solving failed</strong>
           <p>
-            {retrying
-              ? 'Retrying device reads automatically. Any pending exposure is kept; it is not restarted while reads retry. '
-              : view.active && !offline && view.activity !== 'stopping'
-                ? 'Trying another image. '
-                : ''}
+            {view.active && !offline && view.activity !== 'stopping' ? 'Trying another image. ' : ''}
             {measurement ? 'Showing the last successful solve.' : 'No alignment result yet.'}
           </p>
         </div>
@@ -481,6 +470,11 @@ function AlignmentPage({ rigId }: { rigId: string }) {
                 </div>
               </dl>
             )}
+            {view.active && (
+              <Button disabled={disabled} onClick={() => void command('stop')}>
+                Stop measurement
+              </Button>
+            )}
             {view.preview && (
               <AlignmentImage
                 frame={{
@@ -502,51 +496,46 @@ function AlignmentPage({ rigId }: { rigId: string }) {
             <h3>{view.active ? 'What happens next' : 'Before you start'}</h3>
             <p>{nextInstruction}</p>
             <p>{preparationInstruction}</p>
-            <Button
-              size="large"
-              tone={view.active ? 'neutral' : 'accent'}
-              disabled={disabled || (!view.active && !view.enabled)}
-              onClick={() => void command(view.active ? 'stop' : 'start')}
-            >
-              {view.active
-                ? 'Stop measurement'
-                : view.phase === 'setup'
-                  ? 'Start measurement'
-                  : 'Start again'}
-            </Button>
+            {!view.active && (
+              <Button
+                tone="accent"
+                disabled={disabled || !view.enabled}
+                onClick={() => void command('start')}
+              >
+                {view.phase === 'setup' ? 'Start measurement' : 'Start again'}
+              </Button>
+            )}
           </div>
         </div>
       ) : (
         <div className="vela-polar-layout">
-          <Panel className="vela-polar-readings">
-            <div className="vela-polar-total">
+          <div
+            className="vela-polar-status"
+            data-warning={interrupted || endUnconfirmed || undefined}
+            role="status"
+          >
+            <strong>
+              {view.active && !interrupted && !endUnconfirmed && !pending && (
+                <i className="vela-polar-status-dot" aria-hidden="true" />
+              )}
+              {statusTitle}
+            </strong>
+            <span>{statusDetail}</span>
+          </div>
+          <div className="vela-polar-total">
+            <div>
               <span>Last measured error</span>
-              <strong>{angle(measurement.totalArcsec)}</strong>
+              <span>
+                {solved?.measuredAt ? (
+                  <time dateTime={solved.measuredAt}>
+                    {new Date(solved.measuredAt).toLocaleTimeString('en-GB')}
+                  </time>
+                ) : 'Time unavailable'}
+                {lastCorrection ? ` · ${age}` : ''}
+              </span>
             </div>
-            <div className="vela-polar-directions" aria-label="Mount adjustment directions">
-              <div>
-                <span>Azimuth · horizontal</span>
-                <strong>
-                  {measurement.azimuthArcsec >= 0 ? '←' : '→'} {angle(measurement.azimuthArcsec)}
-                </strong>
-                <span>
-                  {!view.active || offline || retrying ? 'Last correction: ' : 'Move '}
-                  {measurement.azimuthArcsec >= 0 ? 'left' : 'right'}
-                </span>
-              </div>
-              <div>
-                <span>Altitude · vertical</span>
-                <strong>
-                  {measurement.altitudeArcsec >= 0 ? '↓' : '↑'} {angle(measurement.altitudeArcsec)}
-                </strong>
-                <span>
-                  {!view.active || offline || retrying ? 'Last correction: ' : 'Move '}
-                  {measurement.altitudeArcsec >= 0 ? 'down' : 'up'}
-                </span>
-              </div>
-            </div>
-            {activityArea}
-          </Panel>
+            <strong>{angle(measurement.totalArcsec)}</strong>
+          </div>
           <AlignmentImage
             frame={{
               ...measurement,
@@ -566,25 +555,41 @@ function AlignmentPage({ rigId }: { rigId: string }) {
             openerId={imageOpenerId}
             onEnlarge={setExpandedImage}
           />
+          <div className="vela-polar-directions" aria-label="Mount adjustment directions">
+            <div>
+              <span>Azimuth · horizontal</span>
+              <strong>
+                {lastCorrection ? 'Last: ' : measurement.azimuthArcsec >= 0 ? '← Move ' : '→ Move '}
+                {measurement.azimuthArcsec >= 0 ? 'left' : 'right'} {angle(measurement.azimuthArcsec)}
+              </strong>
+            </div>
+            <div>
+              <span>Altitude · vertical</span>
+              <strong>
+                {lastCorrection ? 'Last: ' : measurement.altitudeArcsec >= 0 ? '↓ Move ' : '↑ Move '}
+                {measurement.altitudeArcsec >= 0 ? 'down' : 'up'} {angle(measurement.altitudeArcsec)}
+              </strong>
+            </div>
+          </div>
           <div className="vela-polar-actions">
             <p>{adjustmentInstruction}</p>
             {view.active ? (
-              <div>
-                <Button size="large" disabled={disabled} onClick={() => void command('stop')}>
-                  Stop to reposition
+              <div data-interrupted={interrupted || undefined}>
+                <Button disabled={disabled} onClick={() => void command('stop')}>
+                  {interrupted ? 'Stop session' : 'Stop'}
                 </Button>
-                <Button
-                  size="large"
-                  tone="accent"
-                  disabled={disabled}
-                  onClick={() => void command('finish')}
-                >
-                  Finish alignment
-                </Button>
+                {!interrupted && (
+                  <Button
+                    tone="accent"
+                    disabled={disabled}
+                    onClick={() => void command('finish')}
+                  >
+                    Finish alignment
+                  </Button>
+                )}
               </div>
             ) : (
               <Button
-                size="large"
                 disabled={disabled || !view.enabled}
                 onClick={() => void command('start')}
               >
@@ -592,6 +597,11 @@ function AlignmentPage({ rigId }: { rigId: string }) {
               </Button>
             )}
           </div>
+          {view.activity === 'exposing' && !interrupted && !pending && (
+            <p className="vela-polar-operation-detail">
+              Exposure in progress · {elapsed.toFixed(1)} / {view.exposureSeconds} seconds
+            </p>
+          )}
         </div>
       )}
       <AlignmentImageDialog

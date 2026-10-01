@@ -6,10 +6,12 @@ const target: TargetView = {
   id: 'm31',
   name: 'Andromeda Galaxy',
   catalog: 'M31',
+  constellation: null,
   kind: 'Galaxy',
   raDegrees: 10.6847,
   decDegrees: 41.269,
   sizeArcminutes: 178,
+  minorSizeArcminutes: 63,
   thumbnailUrl: '/api/targets/m31/thumbnail',
   sky: null,
 }
@@ -46,6 +48,7 @@ function initial(): FramingView {
       fieldHeightDegrees: 2,
     },
     phase: 'checked',
+    preview: null,
     active: false,
     desired: target,
     targetId: target.id,
@@ -78,14 +81,14 @@ async function rig(page: Page) {
       observedAt: new Date(Date.now() - (rig.stale ? 60000 : 0)).toISOString(),
     })
 
-  await page.route('**/api/web/rigs/rig-1/targets/m31', route => route.fulfill({ json: target }))
-  await page.route('**/api/survey/**', route => route.abort())
-  await page.route('**/api/web/rigs/rig-1/framing', route =>
+  await page.route('**/api/web/rigs/rig-1/targets/m31', (route) => route.fulfill({ json: target }))
+  await page.route('**/api/survey/**', (route) => route.abort())
+  await page.route('**/api/web/rigs/rig-1/framing', (route) =>
     rig.offline
       ? route.abort()
       : route.fulfill({ contentType: 'application/json', body: response() }),
   )
-  await page.route('**/api/rigs/rig-1/framing/*', route => {
+  await page.route('**/api/rigs/rig-1/framing/*', (route) => {
     const action = route.request().url().split('/').at(-1)!
     rig.commands.push(action)
 
@@ -129,6 +132,8 @@ async function rig(page: Page) {
     return route.fulfill({ contentType: 'application/json', body: response() })
   })
   await page.goto('/rigs/rig-1/observe/targets/m31')
+  await page.getByText('Frame position & controls', { exact: true }).click()
+  await page.getByText('Framing details & state', { exact: true }).click()
   await expect(page.getByRole('button', { name: 'Center composition', exact: true })).toBeEnabled()
 
   return rig
@@ -266,7 +271,7 @@ test('long exposure keeps Working visible, stale/offline reads remove activity, 
   expect(
     await activity
       .locator('.vela-working-indicator__shimmer')
-      .evaluate(element => getComputedStyle(element, '::after').animationName),
+      .evaluate((element) => getComputedStyle(element, '::after').animationName),
   ).toBe('none')
   device.stale = true
   await expect(page.locator('.vela-target-status')).toContainText('Connection interrupted')
@@ -291,11 +296,11 @@ test('an uncertain centering response shows neither animation nor success until 
   const device = await rig(page)
   let release!: () => void
 
-  const held = new Promise<void>(resolve => {
+  const held = new Promise<void>((resolve) => {
     release = resolve
   })
 
-  await page.route('**/api/rigs/rig-1/framing/center', async route => {
+  await page.route('**/api/rigs/rig-1/framing/center', async (route) => {
     device.commands.push('center')
     device.state = { ...device.state, phase: 'exposing', active: true, checkCurrent: false }
     await held

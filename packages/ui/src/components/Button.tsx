@@ -2,13 +2,15 @@ import type { ButtonHTMLAttributes, ReactNode } from 'react'
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   tone?: 'neutral' | 'accent' | 'quiet'
-  size?: 'small' | 'medium' | 'large'
+  pending?: boolean
   leadingIcon?: ReactNode
 }
 
 export function Button({
   tone = 'neutral',
-  size = 'medium',
+  pending = false,
+  disabled,
+  onClick,
   leadingIcon,
   children,
   className = '',
@@ -17,9 +19,20 @@ export function Button({
   return (
     <button
       className={`vela-button ${className}`.trim()}
-      data-size={size}
       data-tone={tone}
       {...props}
+      disabled={disabled}
+      aria-busy={pending || props['aria-busy']}
+      aria-disabled={pending || disabled || props['aria-disabled']}
+      onClick={event => {
+        if (pending) {
+          event.preventDefault()
+
+          return
+        }
+
+        onClick?.(event)
+      }}
     >
       {leadingIcon}
       <span>{children}</span>

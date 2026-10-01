@@ -2,6 +2,8 @@
 export interface ImagingCameraView {
   rigId: string
   selected: { id: string; name: string } | null
+  /** Rig-detail identity when the saved camera matches the currently reported identity. */
+  selectedDeviceId: string | null
   cameras: ReadonlyArray<{
     id: string
     name: string | null

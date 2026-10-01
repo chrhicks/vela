@@ -71,3 +71,10 @@ describe('local target catalog', () => {
     expect(Object.isFrozen(targets[0]?.aliases)).toBe(true)
   })
 })
+
+
+it('retains expanded pinned constellation facts including Serpens subdivisions', () => {
+  expect(getTarget('ngc0224')?.constellation).toBe('Andromeda')
+  expect(getTarget('ngc5904')?.constellation).toBe('Serpens Caput')
+  expect(getTarget('ngc6611')?.constellation).toBe('Serpens Cauda')
+})

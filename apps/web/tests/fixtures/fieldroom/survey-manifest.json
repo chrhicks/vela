@@ -1,0 +1,100 @@
+[
+  {
+    "resource": "survey:Norder3/Allsky.jpg",
+    "path": "apps/web/tests/fixtures/fieldroom/survey/Norder3/Allsky.jpg",
+    "contentType": "image/jpeg",
+    "sha256": "9c9434b990fc6cc661cc17171cf52805fdb8679515b7c884abed914d5a6054dd",
+    "source": "https://alasky.cds.unistra.fr/DSS/DSSColor/Norder3/Allsky.jpg"
+  },
+  {
+    "resource": "survey:Norder3/Dir0/Npix225.jpg",
+    "path": "apps/web/tests/fixtures/fieldroom/survey/Norder3/Dir0/Npix225.jpg",
+    "contentType": "image/jpeg",
+    "sha256": "fd42d508ba1e229eeecf052da6f0c3d60b684cfa5a202fc6fdf202679f5b5853",
+    "source": "https://alasky.cds.unistra.fr/DSS/DSSColor/Norder3/Dir0/Npix225.jpg"
+  },
+  {
+    "resource": "survey:Norder3/Dir0/Npix228.jpg",
+    "path": "apps/web/tests/fixtures/fieldroom/survey/Norder3/Dir0/Npix228.jpg",
+    "contentType": "image/jpeg",
+    "sha256": "d41b87ddf95ddc254ddc3dbebd1ad8492ff2fda71e8547b82c87dd4393b1ecf5",
+    "source": "https://alasky.cds.unistra.fr/DSS/DSSColor/Norder3/Dir0/Npix228.jpg"
+  },
+  {
+    "resource": "survey:Norder3/Dir0/Npix229.jpg",
+    "path": "apps/web/tests/fixtures/fieldroom/survey/Norder3/Dir0/Npix229.jpg",
+    "contentType": "image/jpeg",
+    "sha256": "cd601314474bebebe10cb3a31a52d168029b9b8918ee27047ddd87076a043716",
+    "source": "https://alasky.cds.unistra.fr/DSS/DSSColor/Norder3/Dir0/Npix229.jpg"
+  },
+  {
+    "resource": "survey:Norder3/Dir0/Npix230.jpg",
+    "path": "apps/web/tests/fixtures/fieldroom/survey/Norder3/Dir0/Npix230.jpg",
+    "contentType": "image/jpeg",
+    "sha256": "727e5d1ff386bf502b5b7553968d9332cdc7b0979d284b573c1a4f79ea778863",
+    "source": "https://alasky.cds.unistra.fr/DSS/DSSColor/Norder3/Dir0/Npix230.jpg"
+  },
+  {
+    "resource": "survey:Norder3/Dir0/Npix231.jpg",
+    "path": "apps/web/tests/fixtures/fieldroom/survey/Norder3/Dir0/Npix231.jpg",
+    "contentType": "image/jpeg",
+    "sha256": "1aa8f7e3625b7c5215f87a41895a6fe6829d9c53fc50ba6065f80fef0a2c1bb1",
+    "source": "https://alasky.cds.unistra.fr/DSS/DSSColor/Norder3/Dir0/Npix231.jpg"
+  },
+  {
+    "resource": "survey:Norder4/Dir0/Npix913.jpg",
+    "path": "apps/web/tests/fixtures/fieldroom/survey/Norder4/Dir0/Npix913.jpg",
+    "contentType": "image/jpeg",
+    "sha256": "693ee305af018eaa77312399a16a20e8288e321273e1ebcd9fd2caa046df77d7",
+    "source": "https://alasky.cds.unistra.fr/DSS/DSSColor/Norder4/Dir0/Npix913.jpg"
+  },
+  {
+    "resource": "survey:Norder4/Dir0/Npix914.jpg",
+    "path": "apps/web/tests/fixtures/fieldroom/survey/Norder4/Dir0/Npix914.jpg",
+    "contentType": "image/jpeg",
+    "sha256": "5d1d2365c1821e664070a0104538acca6c9c5f9a6e502e7fe43ff9f0ba6667ec",
+    "source": "https://alasky.cds.unistra.fr/DSS/DSSColor/Norder4/Dir0/Npix914.jpg"
+  },
+  {
+    "resource": "survey:Norder4/Dir0/Npix915.jpg",
+    "path": "apps/web/tests/fixtures/fieldroom/survey/Norder4/Dir0/Npix915.jpg",
+    "contentType": "image/jpeg",
+    "sha256": "bb52cbbf54897f160b23a48f508fcf696d60cb116223ea8625864798a02ea062",
+    "source": "https://alasky.cds.unistra.fr/DSS/DSSColor/Norder4/Dir0/Npix915.jpg"
+  },
+  {
+    "resource": "survey:Norder4/Dir0/Npix916.jpg",
+    "path": "apps/web/tests/fixtures/fieldroom/survey/Norder4/Dir0/Npix916.jpg",
+    "contentType": "image/jpeg",
+    "sha256": "c2754a2aabff48473ece3a2bf905cf940dc64a2506a9c4e78aee118d8d261f25",
+    "source": "https://alasky.cds.unistra.fr/DSS/DSSColor/Norder4/Dir0/Npix916.jpg"
+  },
+  {
+    "resource": "survey:Norder4/Dir0/Npix918.jpg",
+    "path": "apps/web/tests/fixtures/fieldroom/survey/Norder4/Dir0/Npix918.jpg",
+    "contentType": "image/jpeg",
+    "sha256": "906a4511d8a673217ccfecc853e391119d72e79defb44bd869d4f24e9efff2b5",
+    "source": "https://alasky.cds.unistra.fr/DSS/DSSColor/Norder4/Dir0/Npix918.jpg"
+  },
+  {
+    "resource": "survey:Norder4/Dir0/Npix920.jpg",
+    "path": "apps/web/tests/fixtures/fieldroom/survey/Norder4/Dir0/Npix920.jpg",
+    "contentType": "image/jpeg",
+    "sha256": "513294bf735cdd83cdf3ff2da0240cd812410a043f0fdc7b475d08428786fcff",
+    "source": "https://alasky.cds.unistra.fr/DSS/DSSColor/Norder4/Dir0/Npix920.jpg"
+  },
+  {
+    "resource": "survey:Norder4/Dir0/Npix921.jpg",
+    "path": "apps/web/tests/fixtures/fieldroom/survey/Norder4/Dir0/Npix921.jpg",
+    "contentType": "image/jpeg",
+    "sha256": "d412c508b24ff62290436b08c074f8882013c12002d60b044a10bb8c5ff7eb8c",
+    "source": "https://alasky.cds.unistra.fr/DSS/DSSColor/Norder4/Dir0/Npix921.jpg"
+  },
+  {
+    "resource": "survey:properties",
+    "path": "apps/web/tests/fixtures/fieldroom/survey/properties",
+    "contentType": "text/plain",
+    "sha256": "464c6de690685769187e1e99d87c425b6d4a0273096436c4e53e3e5b1071ccd8",
+    "source": "https://alasky.cds.unistra.fr/DSS/DSSColor/properties"
+  }
+]

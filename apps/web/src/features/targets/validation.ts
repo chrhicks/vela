@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import type {
   FramingView,
+  TargetCatalogView,
   TargetDiscoveryView,
   TargetPosition,
   TargetView,
@@ -31,6 +32,8 @@ const sky = z
     observedAt: date,
     startsAt: date,
     endsAt: date,
+    currentMoonSeparationDegrees: z.number().min(0).max(180),
+    currentAzimuthDegrees: z.number().min(0).lt(360),
     currentAltitudeDegrees: z.number(),
     highestAltitudeDegrees: z.number(),
     samples: z.array(horizontal.extend({ at: date, moon, sunAltitudeDegrees: z.number() })).min(2),
@@ -54,7 +57,9 @@ const target = position.extend({
   name: z.string(),
   catalog: z.string(),
   kind: z.string(),
-  sizeArcminutes: z.number().nullable(),
+  constellation: z.string().trim().min(1).nullable(),
+  sizeArcminutes: z.number().positive().nullable(),
+  minorSizeArcminutes: z.number().positive().nullable(),
   thumbnailUrl: z.string().startsWith('/api/'),
   sky: sky.nullable(),
 })
@@ -98,6 +103,37 @@ const discovery = targets.extend({
     }),
   ),
 })
+
+const catalog = z.object({
+  query: z.string(),
+  category: z.union([z.literal('all'), category]),
+  filter: z.union([z.literal('all'), filter]),
+  offset: z.number().int().nonnegative(),
+  pageSize: z.number().int().min(1).max(12),
+  total: z.number().int().nonnegative(),
+  targets: z.array(target.omit({ sky: true }).extend({
+    category, filterChoice: filter, filterReason: z.string(),
+  }).strict()),
+}).strict()
+
+const preview = z.object({
+  id: z.string().min(1),
+  rigId: z.string().min(1),
+  targetId: z.string().min(1),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+  exposureSeconds: z.number().positive(),
+  cameraName: z.string().min(1),
+  capturedAt: date,
+  capturedAtSource: z.enum(['camera', 'server-estimate']),
+  checkId: z.string().min(1).nullable(),
+  previewUrl: z.string().startsWith('/api/').nullable(),
+  nativePreviewUrl: z.string().startsWith('/api/').nullable(),
+  statistics: z.object({
+    detectedStars: z.number().int().nonnegative(),
+    medianHfrPixels: z.number().positive().nullable(),
+  }).nullable(),
+}).refine(value => (value.previewUrl === null) === (value.nativePreviewUrl === null))
 
 const pointingSide = z.enum(['east', 'west', 'unknown'])
 
@@ -167,6 +203,7 @@ const framing = z
         fieldHeightDegrees: z.number().positive(),
       })
       .nullable(),
+    preview: preview.nullable(),
     actual: position
       .extend({
         checkId: z.string().min(1),
@@ -178,6 +215,8 @@ const framing = z
       .nullable(),
   })
   .refine(value => value.centering === null || (value.desired !== null && !!value.targetId))
+  .refine(value => value.preview === null ||
+    (value.preview.rigId === value.rigId && value.preview.targetId === value.targetId))
 
 export function isPosition(value: unknown): value is TargetPosition {
   return position.safeParse(value).success
@@ -203,4 +242,8 @@ export function isFramingView(value: unknown, rigId: string): value is FramingVi
   const result = framing.safeParse(value)
 
   return result.success && result.data.rigId === rigId
+}
+
+export function isTargetCatalog(value: unknown): value is TargetCatalogView {
+  return catalog.safeParse(value).success
 }

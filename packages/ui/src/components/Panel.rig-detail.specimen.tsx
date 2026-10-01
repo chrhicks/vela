@@ -501,7 +501,7 @@ function HomeView({
           <h1>Rigs</h1>
           <p>Choose a Rig to see what is connected and what it is doing.</p>
         </div>
-        <Button size="small" tone="accent">
+        <Button tone="accent">
           Add rig
         </Button>
       </div>
@@ -632,7 +632,7 @@ function RigView({
 
   return (
     <main className="vela-rig-page">
-      <Button className="vela-rig-page__back" onClick={onBack} size="small" tone="quiet">
+      <Button className="vela-rig-page__back" onClick={onBack} tone="quiet">
         ← All rigs
       </Button>
 
@@ -651,7 +651,6 @@ function RigView({
             icon={<RefreshIcon />}
             label="Refresh Rig"
             onClick={onRefresh}
-            size="small"
             tone="quiet"
           />
         </div>
@@ -697,7 +696,7 @@ function RigView({
           <strong>Remove this Rig from Vela</strong>
           <p>This only removes the saved Rig. It does not change the Alpaca server or hardware.</p>
         </div>
-        <Button className="vela-rig__forget-button" onClick={onForget} size="small" tone="quiet">
+        <Button className="vela-rig__forget-button" onClick={onForget} tone="quiet">
           Forget rig
         </Button>
       </section>
