@@ -351,3 +351,32 @@
 .vela-discovery__subject .tonight-sky__trace circle {
   fill: var(--vela-accent);
 }
+
+.vela-discovery__subject-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.vela-discovery__subject-heading p {
+  margin: 0;
+  color: var(--vela-text-muted);
+  font-size: 14px;
+  line-height: 20px;
+}
+.vela-discovery__subject-heading > div {
+  flex: none;
+}
+.vela-discovery__subject-heading svg {
+  width: 22px;
+  height: 22px;
+}
+.vela-discovery__sky-dialog {
+  max-width: 560px;
+}
+.vela-discovery__sky-note {
+  margin: 18px 0 0;
+  font-size: 12px;
+  color: var(--vela-text-muted);
+}

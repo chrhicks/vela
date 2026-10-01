@@ -7,6 +7,45 @@ import { reviewTimezone } from './fixtures/fieldroom/tonight'
 
 test.use({ timezoneId: reviewTimezone })
 
+for (const width of [1280, 390]) {
+  test(`Explore opens the selected subject sky directly and restores browsing at ${width}`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 })
+    const { scene } = await openExploreScene(page, 'explore-dark')
+    const subject = page.locator('.vela-discovery__subject')
+    const trigger = subject.getByRole('button', { name: 'View sky path', exact: true })
+    const dialog = page.getByRole('dialog')
+
+    await trigger.click()
+    await expect(dialog).toHaveAccessibleName('The Crescent Nebula · Through the night')
+    await expect(page.locator('.vela-theme > main')).toHaveAttribute('inert', '')
+    await dialog.getByRole('slider').fill('5')
+    expect(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
+    expect(await dialog.evaluate(element => element.getBoundingClientRect().width)).toBeLessThanOrEqual(560)
+    await page.keyboard.press('Escape')
+    await expect(dialog).toHaveCount(0)
+    await expect(trigger).toBeFocused()
+    await expect(page.locator('.vela-theme > main')).not.toHaveAttribute('inert', '')
+    await trigger.click()
+    await expect(dialog.getByRole('slider')).toHaveValue('5')
+    await dialog.getByRole('button', { name: 'Close sky view' }).click()
+
+    await page.locator('.vela-discovery__card').nth(1).getByRole('button').click()
+    await trigger.click()
+    await expect(dialog).toHaveAccessibleName('Andromeda Galaxy · Through the night')
+    await expect(dialog.getByRole('slider')).not.toHaveValue('5')
+    await page.keyboard.press('Escape')
+
+    await page.route('**/api/web/rigs/fra400/target-discovery?*', route => route.abort())
+    await page.getByRole('button', { name: 'Update sky', exact: true }).click()
+    await expect(page.getByRole('alert')).toBeVisible()
+    await trigger.click()
+    await expect(dialog.getByText('Sky updates interrupted · last calculation shown.')).toBeVisible()
+    await page.keyboard.press('Escape')
+    expect(scene.commands).toEqual([])
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  })
+}
+
 for (const mode of ['light', 'dark'] as const) {
   for (const width of [1440, 390]) {
     test(`Explore ${mode} keeps three reference subjects and real selection actions at ${width}`, async ({

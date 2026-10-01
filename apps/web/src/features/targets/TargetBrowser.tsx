@@ -448,9 +448,18 @@ function ExploreSubjects({
             className="vela-discovery__subject"
             aria-label={`${selected.name} details`}
           >
-            <p>
-              {selected.name} · {sky ? 'Through the night' : 'Subject details'}
-            </p>
+            <div className="vela-discovery__subject-heading">
+              <p>{selected.name} · {sky ? 'Through the night' : 'Subject details'}</p>
+              {sky && (
+                <SkyInspection
+                  key={selected.id}
+                  sky={sky}
+                  targetName={selected.name}
+                  stale={saved || !!error}
+                  presentation="icon"
+                />
+              )}
+            </div>
             {sky ? (
               <>
                 <div className="vela-discovery__altitude">
@@ -556,7 +565,6 @@ function ExploreSubjects({
           <p>Distance unavailable.</p>
           <p>{selected.filterReason}</p>
           <p>Filter advice is for imaging. Installation is not detected.</p>
-          {sky && <SkyInspection sky={sky} targetName={selected.name} stale={saved || !!error} />}
         </details>
       )}
       <details className="vela-discovery__method">
