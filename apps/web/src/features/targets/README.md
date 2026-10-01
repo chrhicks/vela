@@ -76,7 +76,7 @@ Both compact and expanded views share the same phases and selected time.
 
 ## Discovery browsing
 
-`TargetBrowser` presents three catalog cards, a selected-subject summary and an
+`TargetBrowser` presents nine catalog cards, a selected-subject summary and an
 explicit Frame this subject link. View subject changes selection only; it never
 slews. `use-discovery`
 restores the last validated page from localStorage per rig, immediately and
@@ -92,7 +92,7 @@ link so returning from framing preserves the discovery context. The cache owns
 no rig control state.
 
 
-Fieldroom requests three results per page. Stored pages with another page size
+Fieldroom requests nine results per page. Stored pages with another page size
 are ignored rather than painted under the new presentation. Search/type/filter,
 page and selected subject travel in URL state; the displayed result remains
 associated with its confirmed query when a replacement request fails.
