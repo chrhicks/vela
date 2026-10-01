@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { createExploreScene, type ExploreScene } from './explore'
+import { createPhotographsScene, type PhotographsScene } from './photographs'
 import { reviewResources } from './resources'
 
 const resources = new Map(reviewResources.map(resource => {
@@ -41,4 +42,37 @@ export async function openExploreScene(page: Page, name: ExploreScene) {
   await page.goto(scene.route)
 
   return { scene, requests, missingResources }
+}
+
+
+export async function openPhotographsScene(page: Page, name: PhotographsScene) {
+  const scene = createPhotographsScene(name)
+  const requests: string[] = []
+  await page.clock.setFixedTime(new Date(scene.time))
+  await page.addInitScript(mode => localStorage.setItem('vela.appearance', mode), scene.appearance)
+  await page.route('**/api/**', async route => {
+    const request = route.request()
+    const url = new URL(request.url())
+    requests.push(`${request.method()} ${url.pathname}${url.search}`)
+
+    const result = scene.respond(request.method(), `${url.pathname}${url.search}`,
+      request.postData() ? request.postDataJSON() : undefined)
+
+    if (result.delayMs !== undefined) {
+      if (!Number.isInteger(result.delayMs) || result.delayMs < 0 || result.delayMs > 60_000)
+        throw new RangeError('Review response delay must be from 0 through 60000 milliseconds')
+      await new Promise(resolve => setTimeout(resolve, result.delayMs))
+    }
+
+    const resource = result.resource ? resources.get(result.resource) : undefined
+
+    if (result.resource && !resource) throw new Error(`Unmapped review resource ${result.resource}`)
+
+    return resource
+      ? route.fulfill({ status: result.status, contentType: resource.contentType, body: resource.body })
+      : route.fulfill({ status: result.status, json: result.json })
+  })
+  await page.goto(scene.route)
+
+  return { scene, requests }
 }

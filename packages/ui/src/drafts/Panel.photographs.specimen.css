@@ -1,0 +1,70 @@
+.vela-photographs-demo { container: photographs / inline-size; width: 100%; min-width: 0; background: var(--vela-canvas); color: var(--vela-text); font: 400 16px/24px var(--vela-font); }
+.vela-photographs-demo .vela-navigation__bar { padding-inline: 36px; }
+.vela-photographs-demo .vela-navigation__utility { font-size: 14px; color: var(--vela-text-muted); }
+.vela-photographs-demo :where(h1, h2, h3, p, dl, dd) { margin: 0; }
+.vela-photographs-demo * { box-sizing: border-box; }
+.vela-photographs-demo__heading { display: flex; align-items: baseline; gap: 24px; padding: 26px 36px 24px; }
+.vela-photographs-demo__heading h1 { font: 400 28px/34px var(--vela-font-heading); }
+.vela-photographs-demo__heading > span, .vela-photographs-demo__heading p { font-size: 14px; line-height: 20px; color: var(--vela-text-muted); }
+.vela-photographs-demo__heading p { margin-left: auto; }
+.vela-photographs-demo__layout { display: grid; grid-template-columns: 260px minmax(0, 1fr) 324px; gap: 24px; padding: 0 36px; align-items: start; }
+.vela-photographs-demo__list { display: grid; gap: 10px; min-width: 0; }
+.vela-photographs-demo__list > header { display: flex; justify-content: space-between; gap: 8px; padding-bottom: 4px; color: var(--vela-text-muted); font-size: 14px; line-height: 20px; }
+.vela-photographs-demo__list h2 { font: inherit; }
+.vela-photographs-demo__rows { display: grid; gap: 10px; max-height: 560px; overflow-y: auto; }
+.vela-photographs-demo__rows a { display: grid; grid-template-columns: 64px minmax(0, 1fr) 12px; align-items: center; gap: 14px; min-height: 85px; padding: 10px; border: 1px solid var(--vela-line); border-radius: 6px; text-decoration: none; color: var(--vela-text); }
+.vela-photographs-demo__rows a[aria-current] { background: var(--vela-accent-surface); border-color: var(--vela-line-strong); }
+.vela-photographs-demo__rows img { width: 64px; height: 62px; object-fit: cover; border-radius: 2px; }
+.vela-photographs-demo__rows a > span:nth-child(2) { display: grid; gap: 8px; }
+.vela-photographs-demo__rows strong { font-weight: 400; }
+.vela-photographs-demo__rows a[aria-current] strong { font-weight: 500; }
+.vela-photographs-demo__rows small { font-size: 14px; line-height: 20px; color: var(--vela-text-muted); }
+.vela-photographs-demo :focus-visible { outline: 2px solid var(--vela-focus); outline-offset: 2px; }
+.vela-photographs-demo__viewer { min-width: 0; min-height: 644px; border: 1px solid var(--vela-line); border-radius: 6px; background: var(--vela-surface); overflow: hidden; }
+.vela-photographs-demo__viewer > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; height: 54px; padding: 0 18px; font-size: 14px; line-height: 20px; }
+.vela-photographs-demo__viewer > header > div { display: flex; gap: 8px; }
+.vela-photographs-demo__fit { background: var(--vela-accent-surface); }
+.vela-photographs-demo__enlarge.vela-button { width: 44px; height: 44px; min-height: 44px; padding: 0; font-size: 22px; }
+.vela-photographs-demo__pixels { height: 532px; display: flex; justify-content: center; align-items: center; }
+.vela-photographs-demo__pixels img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.vela-photographs-demo__viewer > footer { display: flex; justify-content: space-between; gap: 16px; padding: 16px 18px; font-size: 14px; line-height: 20px; color: var(--vela-text-muted); }
+.vela-photographs-demo__viewer > footer > span:last-child { white-space: nowrap; }
+.vela-photographs-demo__details { display: grid; gap: 20px; min-width: 0; }
+.vela-photographs-demo__details > header { display: grid; gap: 8px; padding-bottom: 16px; border-bottom: 1px solid var(--vela-line); }
+.vela-photographs-demo__details h2, .vela-photographs-demo__fallback h3 { font: 400 24px/30px var(--vela-font-heading); }
+.vela-photographs-demo__details > header p, .vela-photographs-demo__downloads > p { color: var(--vela-text-muted); font-size: 14px; line-height: 20px; }
+.vela-photographs-demo__details dl { display: grid; gap: 20px; }
+.vela-photographs-demo__details dl > div { display: grid; gap: 7px; }
+.vela-photographs-demo__details dt { color: var(--vela-text-muted); font-size: 14px; line-height: 20px; }
+.vela-photographs-demo__downloads { display: grid; gap: 10px; border-top: 1px solid var(--vela-line); padding-top: 16px; }
+.vela-photographs-demo__fallback { display: grid; gap: 14px; padding: 24px; background: var(--vela-surface); border: 1px solid var(--vela-line); border-radius: 6px; }
+.vela-photographs-demo__fallback > p { color: var(--vela-text-muted); }
+.vela-photographs-demo__fallback .vela-photographs-demo__context { text-transform: uppercase; font-size: 12px; line-height: 16px; letter-spacing: 1.2px; }
+.vela-photographs-demo__fallback .vela-button { padding-inline: 12px; margin-top: 10px; }
+.vela-photographs-demo__footer { display: flex; justify-content: space-between; gap: 20px; padding: 24px 36px; color: var(--vela-text-muted); font-size: 14px; line-height: 20px; }
+.vela-photographs-demo__notice { padding: 16px 36px 0; color: var(--vela-text-muted); font-size: 14px; }
+.vela-photographs-demo__jump { display: none; }
+@container photographs (width < 1200px) {
+  .vela-photographs-demo__layout { grid-template-columns: 260px minmax(0, 1fr); }
+  .vela-photographs-demo__details { grid-column: 2; }
+  .vela-photographs-demo__list { grid-row: 1 / 3; }
+  .vela-photographs-demo__viewer { min-height: 0; }
+  .vela-photographs-demo__pixels { height: auto; aspect-ratio: 734 / 532; }
+  .vela-photographs-demo__heading { flex-wrap: wrap; gap: 8px 24px; }
+  .vela-photographs-demo__heading p { flex-basis: 100%; margin: 0; }
+  .vela-photographs-demo__viewer > header { height: auto; min-height: 54px; flex-wrap: wrap; padding-block: 4px; }
+  .vela-photographs-demo__viewer > footer { flex-wrap: wrap; gap: 8px; }
+}
+@container photographs (width < 700px) {
+  .vela-photographs-demo .vela-navigation__bar { padding-inline: 20px; }
+  .vela-photographs-demo__heading { padding: 24px 20px 16px; }
+  .vela-photographs-demo__layout { display: flex; flex-direction: column; padding: 0 20px; }
+  .vela-photographs-demo__layout > section { width: 100%; }
+  .vela-photographs-demo__viewer { order: 0; }
+  .vela-photographs-demo__details { order: 1; }
+  .vela-photographs-demo__list { order: 2; }
+  .vela-photographs-demo__jump { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 0 20px 16px; color: var(--vela-text-muted); font-size: 14px; }
+  .vela-photographs-demo__viewer > header { padding-inline: 12px; }
+  .vela-photographs-demo__rows { max-height: none; }
+  .vela-photographs-demo__footer { flex-direction: column; padding: 24px 20px; gap: 8px; }
+}

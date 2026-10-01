@@ -1,6 +1,6 @@
 # Fieldroom Photographs
 
-Status: planned. Prepared from read-only source inspection; implement after the Explore/framing/preparation slice completes its independent review and final comparison gate in [Fieldroom adoption](fieldroom-adoption.md). No application implementation is claimed by this plan.
+Status: production composition and focused checks complete; independent review and final visual comparison pending. Explore/framing/preparation passed independent OK and its final visual comparison at `8906518`; acceptance is recorded in `0f23355`. Photographs has not yet passed its implementation gate.
 
 ## Outcome and boundary
 
@@ -172,3 +172,101 @@ Use the accepted semantic palette for both modes: canvas, surface surround, acti
 ## Items for the parent to settle before execution
 
 The source establishes desktop composition and inspection behavior. It does not settle the collection URL's default-selection canonicalization, the exact compact list/detail order, or how a 672px fallback state-sheet card fits the 324px detail column. The proposals above are deliberately small and should be confirmed in the slice/workshop alignment, not treated as already approved source pixels. Six-at-a-time reveal is a UI disclosure bound; it must not be represented as a server scalability feature.
+
+## Execution decisions and current ownership
+
+The parent settles the proposed newest-image canonical deep link and six-row
+disclosure within the approved slice. Explicit selected links remain
+authoritative; no missing-image fallback. Keep both current URLs, preferably
+one optional-image route definition if needed to preserve the collection owner.
+The collection owner is keyed only by rig; the selected viewer is keyed by image
+and declared pixel URLs. A renderer-version replacement explicitly resets that
+selected viewer to Fit with its matching metadata/placeholder. This chooses the
+permitted clear-before-publication behavior and avoids a hidden held legacy
+version without a gallery “Show latest” action.
+
+The shell's rig selector keeps Photographs context only when already browsing
+this collection: it opens the new rig's collection URL, dropping the selected
+image identity. Other routes retain the established Tonight destination. This
+narrow exception makes the source's “Select another rig to browse its
+photographs” footer true without carrying a foreign image ID between rigs.
+
+The planned extraction is already complete in
+`apps/web/src/features/image-inspection/` from the preceding slice. Reuse its
+generic `ImagePixels`, `useImageInspection`, native reader, `ImageViewport` and
+`ImageEnlargement`; do not repeat the extraction or copy its interaction state.
+Owner chrome may be small direct JSX. The existing shared viewport imports
+capture CSS; move only common mechanism styles if required, preserving Tonight
+and framing through their existing regressions. This is not permission to
+restructure unrelated viewers.
+
+Workshop evaluation owns a new non-exported product example and local specimen
+CSS. It settles preview-first/details-next/list-last at phone width, an explicit
+list jump and selected-row indicator, a useful middle-width arrangement, and
+the fallback notice inside the detail column. Render both palettes and current/
+fallback states before application composition. The parent accepts this
+intermediate design under Chris's execution instruction.
+
+Implementation ownership is bounded: route/composition and selected inspection
+under `apps/web/src/routes/saved-images.*` and a small web-local Photographs
+feature boundary if necessary; route registration in `main.tsx`; independent
+fixture scenes under `apps/web/tests/fixtures/fieldroom/photographs.ts` with the
+existing registry; gallery-specific real-route behavior checks in a new test
+file, with existing capture gallery selectors updated only to equivalent
+behavior. Parent owns this plan, adoption evidence and final integration. No
+server or model change is planned.
+
+Before review, verify cancellation and late A/B responses, direct detail during
+list failure, six-row reveal/focus, URL history and rig changes, exact preview
+version/download association, fit/native failures, compact layout and palette/
+enlargement preservation. Then follow the same independent-OK and final visual
+comparison gate. Planned versus actual results will be appended from evidence.
+
+## Workshop evaluation actual
+
+The non-exported `Panel.photographs.specimen.tsx` and colocated CSS reproduce
+the source desktop columns and demonstrate compact selection/fallback behavior.
+Thirteen workshop browser checks and the UI build passed. Parent inspection of
+all twelve light/dark/current/fallback renders at 1440, 900 and 390px accepted
+the three-column source composition, list+viewer/details middle layout, and
+preview-first phone flow. The first phone pass used 18px outside insets; these
+were corrected to the application's 20px compact spacing before acceptance.
+All five affected phone/interaction checks passed and the parent inspected the
+four corrected phone renders.
+
+Native workshop inspection confirmed one viewer and one original-FITS action
+in fallback. Jump to photographs focused the dated list heading; selecting a
+different row updated its selected marker/caption and focused the viewer.
+The final reveal removes its exhausted button and focuses the list heading.
+Only those explicit actions move focus; initial rendering and theme changes do
+not. The fallback notice grows naturally below the detail facts instead of
+clipping inside the source's state-sheet rectangle. Its caption names the
+original preview and its PNG action follows that treatment.
+
+The specimen is a composition reference, not exported production behavior.
+Its controls demonstrate scale/enlargement with explicit workshop feedback;
+the real application reuses the already verified shared inspection mechanism.
+The source-backed example is reachable at
+`http://127.0.0.1:5174/?component=panel&specimen=fieldroom-photographs&profile=fieldroom&mode=light&context=isolated&viewport=1506&prop.preview=current`.
+The workbench's 66px canvas surround means viewport parameters 1506/966/456
+produce actual specimen widths 1440/900/390. Set `preview=unavailable` for the
+fallback composition. Native snapshot export remains unavailable; deterministic
+workshop PNGs provided the visual evidence.
+
+Independent list/detail read hooks are implemented without camera dependencies.
+The shared viewport and dialog styles were moved to their image-inspection owner
+without changing geometry; all 29 existing image-inspection, preparation and
+Tonight browser checks pass. Fifteen deterministic Photographs fixture scenes
+cover the planned boundary states. Their download FITS is a clearly labeled
+synthetic 1280×1224 zero-data artifact, not the original of the reference JPEG;
+resource hashes and response schemas were checked. Preview fixture URLs serve
+the pinned JPEG intentionally, and do not establish production PNG encoding.
+Application integration passes 19 Photographs browser checks, two existing saved-image
+regressions and four navigation checks. Repository lint and web/UI builds pass.
+The gallery checks cover independent failures and retries, delayed selection,
+renderer versions, earlier disclosure, history, rig changes, compact layout,
+palette/native pan preservation and enlargement focus. Browser checks assert
+matching download anchors; a separate actual HTTP GET through the review runtime
+returned the synthetic FITS with the expected content type, 3,136,320 bytes and
+pinned SHA-256. This does not claim an operating-system disk-write test.
+Independent review and the final post-review visual comparison remain pending.

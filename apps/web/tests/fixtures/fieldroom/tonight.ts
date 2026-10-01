@@ -162,7 +162,7 @@ export const tonightScenes = [
 
 export type TonightScene = (typeof tonightScenes)[number]
 
-export type ReviewResponse = { status: number; json?: unknown; image?: true; resource?: string }
+export type ReviewResponse = { status: number; json?: unknown; image?: true; resource?: string; delayMs?: number }
 
 /** Each review session owns its counters and commands. Unknown endpoints never hit hardware. */
 export function createTonightScene(name: TonightScene) {

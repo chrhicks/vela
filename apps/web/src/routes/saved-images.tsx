@@ -1,258 +1,187 @@
-import type { SavedImage, SavedImagesView } from '@vela/model/web'
-import { Button, Panel } from '@vela/ui'
-import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router'
-import { api, ApiError } from '../lib/api'
-import { isSavedImageView, isSavedImagesView } from '../features/capture/validation'
-import { LatestImage } from '../features/capture/LatestImage'
-import './capture.css'
+import type { SavedImage } from '@vela/model/web'
+import { Button } from '@vela/ui'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router'
+import { SelectedPhotograph } from '../features/photographs/SelectedPhotograph'
+import { useSavedImage, useSavedImages } from '../features/photographs/use-saved-images'
+import { photographDay, photographTime } from '../features/photographs/format'
+import { pixelIdentity } from '../features/image-inspection/image-pixels'
 import './saved-images.css'
-
-function previewLabel(image: SavedImage) {
-  switch (image.previewRendering?.status) {
-    case 'legacy':
-      return 'Original preview · open to refresh'
-    case 'unavailable':
-      return 'Original preview · refresh unavailable'
-    default:
-      return 'FITS + preview'
-  }
-}
 
 export function SavedImages() {
   const { rigId = '', imageId } = useParams()
 
-  return <SavedImagesPage key={`${rigId}/${imageId ?? ''}`} rigId={rigId} imageId={imageId} />
+  return <PhotographsPage key={rigId} rigId={rigId} imageId={imageId} />
 }
 
-function SavedImagesPage({ rigId, imageId }: { rigId: string; imageId?: string }) {
-  const [view, setView] = useState<SavedImagesView | null>(null)
-  const [image, setImage] = useState<SavedImage | null>(null)
-  const [rigName, setRigName] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [attempt, setAttempt] = useState(0)
-  const [loading, setLoading] = useState(true)
-  const base = `/rigs/${encodeURIComponent(rigId)}/observe`
+function PhotographsPage({ rigId, imageId }: { rigId: string; imageId?: string }) {
+  const collection = useSavedImages(rigId)
+  const selected = useSavedImage(rigId, imageId)
+  const navigate = useNavigate()
+  const [revealed, setRevealed] = useState(6)
+  const listHeading = useRef<HTMLHeadingElement>(null)
+  const rows = useRef<HTMLDivElement>(null)
+  const viewer = useRef<HTMLElement>(null)
+  const requestedFocus = useRef<string | null>(null)
+  const base = `/rigs/${encodeURIComponent(rigId)}/observe/saved-images`
+  const image = selected.view?.image
+  const images = collection.view?.images ?? []
+  const selectedIndex = images.findIndex(item => item.id === imageId)
+  const visibleCount = Math.max(revealed, Math.ceil((selectedIndex + 1) / 6) * 6)
+  const rigName = selected.view?.rigName ?? collection.view?.rigName
+  const position = selectedIndex < 0 ? null : `Image ${images.length - selectedIndex} of ${images.length}`
+
   useEffect(() => {
-    const controller = new AbortController()
-    setLoading(true)
-    setError(null)
+    if (!imageId && images[0])
+      void navigate(`${base}/${encodeURIComponent(images[0].id)}`, { replace: true })
+  }, [imageId, images, base, navigate])
 
-    async function load() {
-      try {
-        const result = await api(
-          `web/rigs/${encodeURIComponent(rigId)}/saved-images${imageId ? `/${encodeURIComponent(imageId)}` : ''}`,
-          {
-            signal: AbortSignal.any([
-              controller.signal,
-              AbortSignal.timeout(imageId ? 120_000 : 10_000),
-            ]),
-          },
-        )
+  useEffect(() => {
+    if (visibleCount > revealed) setRevealed(visibleCount)
 
-        if (controller.signal.aborted) return
+    if (selectedIndex < 6 || requestedFocus.current === imageId) return
 
-        if (imageId) {
-          if (!isSavedImageView(result, rigId) || result.image.id !== imageId)
-            throw new Error('Invalid saved image')
-          setImage(result.image)
-          setRigName(result.rigName)
-        } else {
-          if (!isSavedImagesView(result, rigId)) throw new Error('Invalid saved images')
-          setView(result)
-          setRigName(result.rigName)
-        }
-      } catch (cause) {
-        if (!controller.signal.aborted)
-          setError(
-            cause instanceof ApiError && cause.status === 404
-              ? 'This saved image or Rig could not be found.'
-              : 'Saved images could not be loaded. Check that the Vela server is reachable, then try again.',
-          )
-      } finally {
-        if (!controller.signal.aborted) setLoading(false)
-      }
-    }
+    rows.current?.querySelector('[aria-current]')?.scrollIntoView({ block: 'nearest' })
+  }, [imageId, selectedIndex, visibleCount, revealed])
 
-    void load()
+  useEffect(() => {
+    if (!imageId || requestedFocus.current !== imageId) return
+    viewer.current?.focus({ preventScroll: true })
+    viewer.current?.scrollIntoView({ block: 'nearest' })
 
-    return () => controller.abort()
-  }, [rigId, imageId, attempt])
+    if (selected.view || selected.error) requestedFocus.current = null
+  }, [imageId, selected.view, selected.error])
+
   const groups = new Map<string, SavedImage[]>()
 
-  for (const frame of [...(view?.images ?? [])].sort(
-    (a, b) => Date.parse(b.capturedAt) - Date.parse(a.capturedAt),
-  )) {
-    const day = new Date(frame.capturedAt).toLocaleDateString(undefined, {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    })
-
-    groups.set(day, [...(groups.get(day) ?? []), frame])
+  for (const listed of images.slice(0, visibleCount)) {
+    const frame = image?.id === listed.id ? image : listed
+    const day = photographDay(frame.capturedAt)
+    const group = groups.get(day) ?? []
+    group.push(frame)
+    groups.set(day, group)
   }
 
+  const nextReveal = Math.min(6, images.length - visibleCount)
+
   return (
-    <section className="vela-rig-page capture-page saved-images-page">
-      <Link className="vela-rig-page__back" to={imageId ? `${base}/saved-images` : base}>
-        ← {imageId ? 'Saved images' : 'Observe'}
-      </Link>
-      <header className="capture-page__heading">
-        <div>
-          {rigName && <p>{rigName}</p>}
-          <h1>{imageId ? 'Saved image' : 'Saved images'}</h1>
-        </div>
-        {view && (
-          <span className="vela-saved-count">
-            {view.images.length} {view.images.length === 1 ? 'image' : 'images'}
+    <article className="photographs">
+      <header className="photographs__heading">
+        <h1>Photographs</h1>
+        {rigName && (
+          <span>
+            {rigName}{collection.view && ` · ${images.length} saved ${images.length === 1 ? 'image' : 'images'}`}
           </span>
         )}
+        <p>Available even when the rig is disconnected</p>
       </header>
-
-      {loading && imageId && (
-        <p className="vela-saved-help">
-          Preparing the display preview from the retained original may take a moment.
-        </p>
-      )}
-      {image?.previewRendering?.status === 'unavailable' && (
-        <p role="status">
-          Preview refresh is unavailable. Showing the original preview; the original FITS is
-          unchanged.
-        </p>
-      )}
-      {loading ? (
-        <p role="status">Loading saved {imageId ? 'image' : 'images'}…</p>
-      ) : error ? (
-        <div role="status">
-          <p>{error}</p>
-          <Button onClick={() => setAttempt(value => value + 1)}>Try again</Button>
+      {imageId && (
+        <div className="photographs__jump">
+          <span>{image ? `Selected · ${photographTime(image.capturedAt)}` : 'Selected photograph'}</span>
+          <Button onClick={() => {
+            listHeading.current?.focus({ preventScroll: true })
+            listHeading.current?.scrollIntoView({ block: 'start' })
+          }}>Jump to photographs ↓</Button>
         </div>
-      ) : image ? (
-        <div className="capture-page__layout">
-          <LatestImage image={image} busy={false} interrupted={false} savedDetail />
-          <Panel title="Image details">
-            <dl className="vela-saved-details">
-              <div>
-                <dt>Captured</dt>
-                <dd>
-                  {new Date(image.capturedAt).toLocaleString()}
-                  {image.capturedAtSource === 'server-estimate' && ' · Start time estimated'}
-                </dd>
-              </div>
-              <div>
-                <dt>Camera</dt>
-                <dd>{image.cameraName}</dd>
-              </div>
-              <div>
-                <dt>Exposure</dt>
-                <dd>
-                  {image.exposureSeconds} s · {image.color === 'color' ? 'Color' : 'Mono'}
-                </dd>
-              </div>
-              <div>
-                <dt>Dimensions</dt>
-                <dd>
-                  {image.width} × {image.height}
-                </dd>
-              </div>
-              <div>
-                <dt>Stars · HFR</dt>
-                <dd>
-                  {image.statistics
-                    ? `${image.statistics.detectedStars} stars · ${image.statistics.medianHfrPixels?.toFixed(2) ?? '—'} px`
-                    : 'Measurements unavailable'}
-                </dd>
-              </div>
-            </dl>
-            <div className="vela-saved-downloads">
-              <a
-                className="vela-button"
-                data-tone="accent"
-                href={image.fitsUrl}
-                download
-              >
-                Download FITS
-              </a>
-              <a
-                className="vela-button"
-                data-tone="neutral"
-                href={image.previewDownloadUrl}
-                download
-              >
-                Download preview
-              </a>
+      )}
+      <div className="photographs__layout">
+        <section className="photographs__list" aria-label="Photographs list">
+          {images.length === 0 && <h2 className="photographs__list-title" tabIndex={-1} ref={listHeading}>Photographs list</h2>}
+          {collection.loading && <p role="status">Loading photographs…</p>}
+          {collection.error && (
+            <div className="photographs__read-status" role="status">
+              <p>{collection.error}</p>
+              <Button onClick={collection.refresh}>Retry photographs</Button>
             </div>
-            <p className="vela-saved-help">
-              The PNG download matches this display treatment at native resolution. Original FITS
-              and the first saved PNG are preserved. Display color is not scientifically calibrated.
-            </p>
-          </Panel>
-        </div>
-      ) : (
-        view && (
-          <>
-            <p className="vela-capture-intro">
-              Original data is preserved. Preview downloads match the displayed treatment. Open
-              older images to refresh their previews.
-            </p>
-            {view.images.length === 0 ? (
-              <Panel>
-                <div className="vela-saved-empty">
-                  <h2>No saved images yet</h2>
-                  <p>
-                    Turn on Save frames before capturing, or keep an individual image when you see
-                    one worth saving.
-                  </p>
-                  <Link
-                    className="vela-button"
-                    data-tone="neutral"
-                    to={`${base}/capture`}
-                  >
-                    Open capture →
-                  </Link>
-                </div>
-              </Panel>
-            ) : (
-              [...groups].map(([day, frames]) => (
-                <section className="vela-saved-group" key={day}>
-                  <h2>
-                    {day}
-                    <span>
-                      {frames.length} {frames.length === 1 ? 'image' : 'images'}
-                    </span>
-                  </h2>
-                  <div className="vela-saved-grid">
+          )}
+          {images.length > 0 && (
+            <>
+              <div className="photographs__rows" ref={rows}>
+                {[...groups].map(([day, frames], groupIndex) => (
+                  <section className="photographs__day" key={day}>
+                    <header>
+                      <h2 ref={groupIndex === 0 ? listHeading : undefined} tabIndex={-1}>{day}</h2>
+                      {groupIndex === 0 && <span>Newest first</span>}
+                    </header>
                     {frames.map(frame => (
                       <Link
-                        className="vela-saved-card"
                         key={frame.id}
-                        to={`${base}/saved-images/${encodeURIComponent(frame.id)}`}
+                        to={`${base}/${encodeURIComponent(frame.id)}`}
+                        aria-current={frame.id === imageId ? 'true' : undefined}
+                        data-original={frame.previewRendering?.status !== 'current' || undefined}
+                        onClick={event => {
+                          if (event.button !== 0 || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return
+                          requestedFocus.current = frame.id
+
+                          if (frame.id === imageId) {
+                            viewer.current?.focus({ preventScroll: true })
+                            viewer.current?.scrollIntoView({ block: 'nearest' })
+
+                            if (selected.view || selected.error) requestedFocus.current = null
+                          }
+                        }}
                       >
-                        <div className="vela-saved-thumbnail">
-                          <img
-                            loading="lazy"
-                            src={frame.fitImageUrl ?? frame.imageUrl}
-                            alt={`${frame.exposureSeconds} second exposure from ${frame.cameraName}`}
-                          />
-                        </div>
-                        <div className="vela-saved-card-copy">
-                          <strong>{new Date(frame.capturedAt).toLocaleTimeString()}</strong>
-                          <span>
-                            {frame.exposureSeconds} s · {frame.color === 'color' ? 'Color' : 'Mono'}
-                          </span>
-                          <small>
-                            {previewLabel(frame)} <span aria-hidden="true">→</span>
-                          </small>
-                        </div>
+                        <img src={frame.fitImageUrl ?? frame.imageUrl} alt="" loading="lazy" />
+                        <span>
+                          <strong>{photographTime(frame.capturedAt)}</strong>
+                          <small>{frame.exposureSeconds} s · {frame.color === 'color' ? 'Color' : 'Mono'}</small>
+                          {frame.previewRendering?.status !== 'current' && <small>Original preview</small>}
+                        </span>
+                        <span aria-hidden="true">{frame.id === imageId ? '→' : ''}</span>
                       </Link>
                     ))}
-                  </div>
-                </section>
-              ))
-            )}
-          </>
-        )
-      )}
-    </section>
+                  </section>
+                ))}
+              </div>
+              {nextReveal > 0 && (
+                <Button onClick={() => {
+                  setRevealed(visibleCount + nextReveal)
+
+                  if (nextReveal === images.length - visibleCount) listHeading.current?.focus()
+                }}>Show {nextReveal} earlier images</Button>
+              )}
+            </>
+          )}
+          {collection.view && images.length === 0 && (
+            <div className="photographs__read-status">
+              <h3>No saved photographs yet</h3>
+              <p>Turn on Save frames before capturing, or use Keep to retain an exposure.</p>
+              <Link className="vela-button" data-tone="neutral" to={`/rigs/${encodeURIComponent(rigId)}/observe/capture`}>
+                Open Tonight →
+              </Link>
+            </div>
+          )}
+        </section>
+        {image ? (
+          <SelectedPhotograph
+            key={pixelIdentity(image)}
+            image={image}
+            rigId={rigId}
+            position={position}
+            viewerRef={viewer}
+          />
+        ) : imageId ? (
+          <section className="photographs__viewer photographs__pending" aria-label="Saved preview" tabIndex={-1} ref={viewer}>
+            <div className="photographs__read-status" role="status">
+              {selected.loading ? (
+                <>
+                  <h2>Preparing selected photograph</h2>
+                  <p>Preparing the display preview from the retained original may take a moment.</p>
+                </>
+              ) : (
+                <>
+                  <h2>Selected photograph unavailable</h2>
+                  <p>{selected.error}</p>
+                  <Button onClick={selected.refresh}>Retry selected photograph</Button>
+                </>
+              )}
+            </div>
+          </section>
+        ) : null}
+      </div>
+      <footer className="photographs__footer">
+        Saved images belong to this rig. Select another rig to browse its photographs.
+      </footer>
+    </article>
   )
 }

@@ -568,14 +568,16 @@ test('saved collection opens a retained image and original downloads without cam
     route.fulfill({ contentType: 'image/png', body: preview }),
   )
   await page.goto('/rigs/rig-1/observe/saved-images')
-  await expect(page.getByRole('heading', { name: 'Saved images', exact: true })).toBeVisible()
-  await page.locator('.vela-saved-card').click()
+  await expect(page.getByRole('heading', { name: 'Photographs', exact: true })).toBeVisible()
+  await expect(page).toHaveURL(/\/saved-images\/frame-1$/)
+  await expect(page.getByRole('region', { name: 'Photographs list' }).getByRole('link'))
+    .toHaveAttribute('aria-current', /^(page|true)$/)
   await expect(page.getByRole('region', { name: 'Saved preview' }).getByRole('img')).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Download FITS' })).toHaveAttribute(
+  await expect(page.getByRole('link', { name: /Download original FITS/ })).toHaveAttribute(
     'href',
     saved.fitsUrl,
   )
-  await expect(page.getByRole('link', { name: 'Download preview' })).toHaveAttribute(
+  await expect(page.getByRole('link', { name: /Download (?:display|original preview) PNG/ })).toHaveAttribute(
     'href',
     saved.previewDownloadUrl,
   )
@@ -677,11 +679,8 @@ test('labels estimated starts on the loaded capture and saved image detail', asy
     route.fulfill({ contentType: 'image/png', body: preview }),
   )
   await page.goto('/rigs/rig-1/observe/saved-images/frame-1')
-  await expect(
-    page
-      .getByRole('region', { name: 'Saved preview' })
-      .getByText('Start time estimated', { exact: true }),
-  ).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Exposure details' }))
+    .toContainText('Start time estimated')
 })
 
 test('shows cooler off when the sensor is near the requested temperature and turns it on only when asked', async ({

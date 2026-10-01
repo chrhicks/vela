@@ -95,6 +95,12 @@ const server = createHttpServer(async (request, response) => {
         input ? JSON.parse(input) : undefined,
       )
 
+      if (result.delayMs !== undefined) {
+        if (!Number.isInteger(result.delayMs) || result.delayMs < 0 || result.delayMs > 60_000)
+          throw new RangeError('Review response delay must be from 0 through 60000 milliseconds')
+        await new Promise(resolve => setTimeout(resolve, result.delayMs))
+      }
+
       const resourceId = result.resource ?? (result.image ? 'crescent' : undefined)
       const resource = resourceId ? resources.get(resourceId) : undefined
 
