@@ -124,6 +124,7 @@ export const reviewTarget: TargetView = {
     observedAt: reviewTime,
     startsAt: new Date(start).toISOString(),
     endsAt: new Date(start + 6 * 3600000).toISOString(),
+    currentAzimuthDegrees: 270,
     currentAltitudeDegrees: 68,
     highestAltitudeDegrees: 74,
     aboveHorizonDuringDarkness: [

@@ -5,6 +5,7 @@ import {
   createTonightScene,
   referenceImage,
   reviewCapture,
+  reviewRig,
   reviewTarget,
   reviewTime,
   reviewTimezone,
@@ -164,4 +165,56 @@ test('pending target choice cannot relabel an active run and theme changes prese
   await expect
     .poll(() => starts)
     .toEqual([{ exposureSeconds: 42, repeat: true, saveFrames: false, targetId: 'next' }])
+})
+
+
+test('Tonight uses capture-camera cooling and current sky direction instead of inventory order or future samples', async ({ page }) => {
+  const scene = createTonightScene('tonight-light')
+  let coolingAvailable = true
+  await page.route('**/api/**', (route) => {
+    const pathname = new URL(route.request().url()).pathname
+
+    if (pathname === '/api/web/rigs/fra400')
+      return route.fulfill({ json: {
+        ...reviewRig,
+        devices: [{
+          ...reviewRig.devices[0],
+          id: 'guide-camera',
+          configuredName: 'Guide camera',
+          name: 'Guide camera',
+          status: {
+            availability: 'complete',
+            activity: 'idle',
+            sensorTemperatureC: 25,
+            cooling: { state: 'off' },
+          },
+        }, ...reviewRig.devices],
+        connections: { total: 4, connected: 4, disconnected: 0, unavailable: 0 },
+      } })
+
+    if (pathname.endsWith('/capture'))
+      return route.fulfill({ json: { ...reviewCapture, cooling: coolingAvailable ? reviewCapture.cooling : null } })
+
+    if (pathname.endsWith('/targets/ngc6888'))
+      return route.fulfill({ json: {
+        ...reviewTarget,
+        sky: { ...reviewTarget.sky!, currentAzimuthDegrees: 5.5,
+          observedAt: '2026-09-29T18:00:00.000Z',
+          samples: reviewTarget.sky!.samples.map(sample => ({ ...sample, azimuthDegrees: 45 })),
+        },
+      } })
+    const response = scene.respond(route.request().method(), pathname)
+
+    return response.image
+      ? route.fulfill({ contentType: 'image/jpeg', body: reference })
+      : route.fulfill({ status: response.status, json: response.json })
+  })
+  await page.goto(scene.route)
+  await expect(page.locator('.tonight-equipment')).toContainText('-10.0°C · Cooler on')
+  await expect(page.locator('.tonight-equipment')).not.toContainText('25.0°C')
+  await expect(page.locator('.tonight-sky')).toContainText('Northern sky')
+  await expect(page.locator('.tonight-sky')).not.toContainText('Northeastern')
+  coolingAvailable = false
+  await expect(page.locator('.tonight-equipment')).toContainText('Temperature / cooling unavailable')
+  await expect(page.locator('.tonight-equipment')).not.toContainText('25.0°C')
 })

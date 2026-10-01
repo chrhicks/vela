@@ -96,3 +96,9 @@ astronomy overlays. The shared Dialog restores focus to Enlarge image. Cache
 expiry (native GET 404/410 or Keep 410) leaves the loaded image visible and marks
 unavailable operations. Dimensions and acquisition timestamps remain in Image
 details; the primary metadata describes the displayed exposure and measured stars.
+
+Tonight's camera-temperature/cooler summary consumes `CaptureView.cooling`, the
+same selected-camera projection as the cooling controls. Inventory order and
+camera names do not identify the imaging camera. Missing cooling is unavailable;
+it never falls back to another camera's measurements. Its last-known label follows
+the capture connection/uncertain-cooling state independently of rig inventory.

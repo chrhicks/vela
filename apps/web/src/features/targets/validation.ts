@@ -31,6 +31,7 @@ const sky = z
     observedAt: date,
     startsAt: date,
     endsAt: date,
+    currentAzimuthDegrees: z.number().min(0).lt(360),
     currentAltitudeDegrees: z.number(),
     highestAltitudeDegrees: z.number(),
     samples: z.array(horizontal.extend({ at: date, moon, sunAltitudeDegrees: z.number() })).min(2),

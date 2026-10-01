@@ -90,7 +90,10 @@ describe('target sky night', () => {
     const azimuths = [5.56350130287918, 74.13530018467179, 174.25467450209425, 285.543875717234]
 
     for (const [index, benchmark] of benchmarks.entries()) {
-      const sample = skyPath(benchmark.catalog, site, date).samples.find(
+      const path = skyPath(benchmark.catalog, site, date)
+      expect(Math.abs(path.currentAzimuthDegrees - azimuths[index]!) * 3600).toBeLessThan(0.5)
+
+      const sample = path.samples.find(
         sample => sample.at === date.toISOString(),
       )!
 
