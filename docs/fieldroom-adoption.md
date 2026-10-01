@@ -309,7 +309,7 @@ Nothing in this checkpoint adds durable capture sequences or run recovery.
 
 ## 5. Remaining application slices
 
-Status: Explore/framing/preparation implemented, awaiting its gate; later slices planned.
+Status: Explore/framing/preparation accepted at `8906518`; later slices planned.
 
 | Slice | Production owners | Paper coverage |
 | --- | --- | --- |
@@ -330,8 +330,12 @@ growing layer of overrides. Preserve all existing operational capabilities.
 
 ### Actual / deviations / evidence
 
-Explore/framing/preparation implementation and preliminary evidence are recorded
-in its owning plan. Independent review and final comparison remain pending.
+Explore/framing/preparation passed independent **OK** at `8906518`, then the
+parent completed the final paired comparison of all three routes at desktop
+and compact widths. The owning plan and
+[retained acceptance evidence](visual-evidence/fieldroom/explore-preparation/README.md)
+record actual geometry, source substitutions and browser limitations. All 22
+post-review route checks passed. Photographs is next.
 
 ## 6. Whole-application verification and handoff
 

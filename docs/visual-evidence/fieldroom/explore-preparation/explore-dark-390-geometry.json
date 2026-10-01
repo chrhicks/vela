@@ -1,0 +1,82 @@
+{
+  "header": {
+    "x": 20,
+    "y": 202,
+    "width": 350,
+    "height": 88,
+    "top": 202,
+    "right": 370,
+    "bottom": 290,
+    "left": 20
+  },
+  "controls": {
+    "x": 20,
+    "y": 310,
+    "width": 350,
+    "height": 166,
+    "top": 310,
+    "right": 370,
+    "bottom": 476,
+    "left": 20
+  },
+  "cards": {
+    "x": 20,
+    "y": 538,
+    "width": 350,
+    "height": 1462,
+    "top": 538,
+    "right": 370,
+    "bottom": 2000,
+    "left": 20
+  },
+  "card": {
+    "x": 20,
+    "y": 538,
+    "width": 350,
+    "height": 478,
+    "top": 538,
+    "right": 370,
+    "bottom": 1016,
+    "left": 20
+  },
+  "photograph": {
+    "x": 22,
+    "y": 540,
+    "width": 346,
+    "height": 227,
+    "top": 540,
+    "right": 368,
+    "bottom": 767,
+    "left": 22
+  },
+  "summary": {
+    "x": 20,
+    "y": 2020,
+    "width": 350,
+    "height": 548,
+    "top": 2020,
+    "right": 370,
+    "bottom": 2568,
+    "left": 20
+  },
+  "trace": {
+    "x": 42,
+    "y": 2146,
+    "width": 306,
+    "height": 196,
+    "top": 2146,
+    "right": 348,
+    "bottom": 2342,
+    "left": 42
+  },
+  "footer": {
+    "x": 20,
+    "y": 2592,
+    "width": 350,
+    "height": 84,
+    "top": 2592,
+    "right": 370,
+    "bottom": 2676,
+    "left": 20
+  }
+}
