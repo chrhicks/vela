@@ -17,6 +17,7 @@ const target: TargetView = {
   id: 'm31',
   name: 'Andromeda Galaxy',
   catalog: 'M31',
+  constellation: null,
   kind: 'Galaxy',
   raDegrees: 10.6847,
   decDegrees: 41.269,
@@ -317,6 +318,9 @@ test('checked framing offers centering, active operations lock edits, and stale 
   })
   await page.goto('/rigs/rig-1/observe/targets/m31')
   await expect(page.getByRole('link', { name: 'Continue to capture' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Continue to capture' })).toHaveAttribute(
+    'href', '/rigs/rig-1/observe/capture?target=m31',
+  )
   await page.getByRole('button', { name: 'Center composition' }).click()
   await expect(page.getByRole('button', { name: 'Stop framing' })).toBeEnabled()
   await expect(page.getByRole('button', { name: 'Reset frame' })).toBeDisabled()

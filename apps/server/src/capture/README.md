@@ -58,8 +58,19 @@ prevents another exposure; it waits for that acquisition and preview to settle. 
 on the current camera being ready for another exposure.
 
 The HTTP boundary accepts exposureSeconds from 0.1 through 600 and optional
-boolean repeat and saveFrames. Omitting repeat retains the single-exposure API behavior; the web
-interface explicitly requests repetition by default. Runs and counts are ephemeral,
+boolean repeat and saveFrames, plus an optional targetId. The injected subject
+lookup resolves that ID before acquiring the Rig lease or inspecting hardware.
+Unknown IDs are rejected. Omitting repeat retains the single-exposure API behavior; the web
+interface explicitly requests repetition by default. The server snapshots `subject` as target ID, name and catalog identity; targetless
+starts explicitly use null. This is chosen intent, never proof of pointing. Each
+image receives that snapshot, so later selections cannot relabel a retained frame.
+
+`savedCount` counts unique images retained from the current or most recent run;
+`integrationSeconds` sums only published exposure durations. Both reset on an
+accepted start along with `completedCount`. A private generation on cached frames
+keeps an older run's Keep completion from incrementing the new run's saved count.
+Concurrent manual/automatic Keep counts once after archive confirmation. The
+archive-wide `savedImageCount` remains separate. Runs and counts are ephemeral,
 with no durable sequence or resumption after server restart. saveFrames defaults
 to false. When enabled, each completed image is published and saved before another
 exposure starts. The saving phase remains active and keeps the Rig lease; Stop

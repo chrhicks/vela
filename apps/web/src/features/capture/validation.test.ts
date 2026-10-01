@@ -18,6 +18,9 @@ const view: CaptureView = {
   savedImageCount: 0,
   repeat: true,
   completedCount: 1,
+  subject: null,
+  savedCount: 0,
+  integrationSeconds: 2,
   cooling: null,
   latestImage: {
     id: 'frame-1',
@@ -196,4 +199,18 @@ it('pins native, fit and download to one declared renderer version and rejects m
   expect(
     isSavedImage({ ...savedImage, previewRendering: { status: 'unavailable' } }, 'rig-1'),
   ).toBe(true)
+})
+
+
+it('requires run intent and valid totals while accepting legacy images without intent', () => {
+  expect(isCaptureView(view, 'rig-1')).toBe(true)
+  const subject = { targetId: 'ngc0224', name: 'Andromeda Galaxy', catalog: 'NGC 224' }
+  expect(isCaptureView({ ...view, subject, latestImage: { ...view.latestImage, subject } }, 'rig-1')).toBe(true)
+
+  for (const patch of [
+    { subject: undefined }, { subject: { ...subject, targetId: '' } },
+    { savedCount: -1 }, { savedCount: 0.5 }, { savedCount: undefined },
+    { integrationSeconds: -1 }, { integrationSeconds: Infinity }, { integrationSeconds: undefined },
+    { latestImage: { ...view.latestImage, subject: { ...subject, name: '' } } },
+  ]) expect(isCaptureView({ ...view, ...patch }, 'rig-1')).toBe(false)
 })

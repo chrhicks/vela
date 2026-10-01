@@ -7,7 +7,10 @@ form edits, Fit/100% presentation and loaded-image state.
 
 `useCapture` serializes commands and polls current state. A deliberate command
 supersedes a pending GET; request generations prevent its late result from
-replacing the newer state. A missing or invalid command response is never
+replacing the newer state. Start accepts an optional selected target ID; the server
+returns its fixed `subject` intent snapshot. `savedCount` and `integrationSeconds`
+are server-owned per-run totals; `savedImageCount` still describes the archive.
+Image subject metadata may be absent on legacy artifacts. A missing or invalid command response is never
 replayed. Starting again requires an explicit read confirming no active exposure.
 
 `useLoadedImage` preloads each immutable image URL and commits its metadata with
@@ -77,3 +80,19 @@ capture facts. Opening a legacy detail may take time to prepare its bounded
 display derivative; collection loading does not initiate archive-wide work.
 Downloads match the displayed treatment at native resolution; originals remain
 preserved. Capture's live image IDs are already immutable per new acquisition.
+
+## Fieldroom inspection
+
+Tonight opts into the Fieldroom image presentation with `LatestImage.fieldroom`.
+Fit follows the bounded latest-image loader. Entering 100% or enlargement holds
+the currently decoded fitted frame and its metadata. The independent native GET
+loads and decodes that exact identity; a failed read keeps the fitted pixels and
+offers an explicit same-resource retry. Show latest releases the hold and returns
+to Fit. New arrivals cannot rename the held image or redirect its Keep request.
+
+The viewer owns native scale and bounded scroll coordinates across dialog entry
+and dismissal. Pointer/touch drag and arrow keys pan the native pixels, with no
+astronomy overlays. The shared Dialog restores focus to Enlarge image. Cache
+expiry (native GET 404/410 or Keep 410) leaves the loaded image visible and marks
+unavailable operations. Dimensions and acquisition timestamps remain in Image
+details; the primary metadata describes the displayed exposure and measured stars.

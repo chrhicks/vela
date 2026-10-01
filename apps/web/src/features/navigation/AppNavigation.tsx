@@ -1,11 +1,18 @@
 import type { NavigationCapture } from '@vela/model/web'
-import { NavigationBar, type NavigationActivity, type NavigationBarProps } from '@vela/ui'
+import { Appearance, NavigationBar, type NavigationActivity, type NavigationBarProps } from '@vela/ui'
 import type { MouseEvent } from 'react'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { matchPath, useLocation, useNavigate } from 'react-router'
+import { useAppearance } from '../../appearance/AppearanceProvider'
+import { useRigObservation } from '../rig-detail/RigContext'
+import { rigConnectionLabel } from './rig-connection'
 import { useNavigation } from './use-navigation'
 
 export function AppNavigation() {
+  const appearance = useAppearance()
+  const [appearanceOpen, setAppearanceOpen] = useState(false)
+  const rig = useRigObservation()
+  const connection = rig ? rigConnectionLabel(rig) : undefined
   const { pathname, search } = useLocation()
   const navigate = useNavigate()
   const { view, activity, offline, missing } = useNavigation()
@@ -19,12 +26,6 @@ export function AppNavigation() {
   }, [rigId, inTargets, search])
 
   const targetSearch = inTargets ? search : (targets.current.get(rigId) ?? '')
-
-  const currentPage = inTargets
-    ? 'Targets'
-    : pathname.startsWith(`${base}/observe/capture`)
-      ? 'Capture'
-      : 'Observe'
 
   const routeLink = (href: string) => ({
     href,
@@ -43,7 +44,11 @@ export function AppNavigation() {
 
   const activityProps: Pick<NavigationBarProps, 'activity'> = {}
 
-  if (activity && presentation) {
+  // Tonight already shows this rig's full capture state. Keep the navigation
+  // indicator when observing other pages or another rig.
+  const showingActiveCapture = activity?.rigId === rigId && pathname === `${base}/observe/capture`
+
+  if (activity && presentation && !showingActiveCapture) {
     const current: NavigationActivity = {
       ...routeLink(`/rigs/${encodeURIComponent(activity.rigId)}/observe/capture`),
       label: `${activity.rigName}. ${activity.completedCount} captured. ${presentation.status}. ${presentation.interrupted ? 'Last known count. Current outcome unknown. ' : ''}Open capture.`,
@@ -60,28 +65,25 @@ export function AppNavigation() {
       home={routeLink('/')}
       rigs={rigs}
       currentRigId={rigId}
-      onRigChange={id => navigate(id ? `/rigs/${encodeURIComponent(id)}/observe` : '/')}
-      links={
-        rigId
-          ? [
-              {
-                label: 'Observe',
-                ...routeLink(`${base}/observe`),
-                current: currentPage === 'Observe',
-              },
-              {
-                label: 'Targets',
-                ...routeLink(`${base}/observe/targets${targetSearch}`),
-                current: currentPage === 'Targets',
-              },
-              {
-                label: 'Capture',
-                ...routeLink(`${base}/observe/capture`),
-                current: currentPage === 'Capture',
-              },
-            ]
-          : []
+      onRigChange={id => navigate(id ? `/rigs/${encodeURIComponent(id)}/observe/capture` : '/')}
+      utility={
+        <>
+          <Appearance
+            open={appearanceOpen}
+            onOpenChange={setAppearanceOpen}
+            value={appearance.preference}
+            onValueChange={appearance.setPreference}
+            systemMode={appearance.systemMode}
+            persistence={appearance.persistence}
+          />
+          {connection && <span className="vela-app__connection" data-connected={connection === 'Connected'}>● {connection}</span>}
+        </>
       }
+      links={rigId ? [
+        { label: 'Tonight', ...routeLink(`${base}/observe/capture`), current: pathname === `${base}/observe/capture` },
+        { label: 'Explore the sky', ...routeLink(`${base}/observe/targets${targetSearch}`), current: inTargets },
+        { label: 'Photographs', ...routeLink(`${base}/observe/saved-images`), current: pathname.startsWith(`${base}/observe/saved-images`) },
+      ] : []}
       {...activityProps}
     />
   )

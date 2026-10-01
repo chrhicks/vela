@@ -49,6 +49,9 @@ async function observe(page: Page) {
       repeat: false,
       saveFrames: false,
       savedImageCount: 0,
+      subject: null,
+      savedCount: 0,
+      integrationSeconds: 0,
       completedCount: 0,
     }),
   )

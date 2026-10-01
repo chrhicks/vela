@@ -1,14 +1,15 @@
 import { expect, test } from '@playwright/test'
-import { VELA_CURRENT_PROFILE, resolveTheme, themeStyle } from '@vela/ui/themes'
+import { FIELDROOM_PROFILE, resolveTheme, themeStyle } from '@vela/ui/themes'
 import { observation } from './fixtures/observation'
 import type { CaptureView } from '@vela/model/web'
 
-const theme = resolveTheme(VELA_CURRENT_PROFILE)
+const theme = resolveTheme(FIELDROOM_PROFILE)
 
 const tokens = themeStyle(theme, 'dark')
 
 for (const width of [1040, 390]) {
   test(`preserves shared theme tokens and geometry in the app at ${width}px`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'dark' })
     await page.setViewportSize({ width, height: 900 })
     await page.route('**/api/web/navigation', route =>
       route.fulfill({ json: { rigs: [{ id: 'rig-1', name: observation().rig.name }], captures: [] } }),
@@ -65,6 +66,7 @@ for (const width of [1040, 390]) {
       repeat: false,
       completedCount: 0,
       cooling: null,
+      subject: null, savedCount: 0, integrationSeconds: 0,
     }
 
     await page.route('**/api/web/rigs/rig-1/capture', route =>
@@ -78,12 +80,9 @@ for (const width of [1040, 390]) {
     // specificity rule and shrink the specimen's command to the base size.
     await expect(page.getByRole('button', { name: 'Take exposure' })).toHaveCSS(
       'min-height',
-      '44px',
+      '46px',
     )
-    await expect(page.locator('.capture-page__controls .vela-panel__header')).toHaveCSS(
-      'border-bottom-width',
-      '0px',
-    )
+    await expect(page.locator('.tonight-capture')).toHaveCSS('border-radius', '6px')
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true)

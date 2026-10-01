@@ -15,6 +15,14 @@ import { Capture } from './routes/capture'
 import { Shell } from './components/app'
 import { HomeProvider } from './pages/HomeProvider'
 
+import { readAppConfig } from './config'
+import { createBrowserAppearance, applyRootAppearance } from './appearance/browser-appearance'
+import { AppearanceProvider } from './appearance/AppearanceProvider'
+
+const config = readAppConfig({ VITE_THEME: import.meta.env.VITE_THEME })
+
+const appearance = createBrowserAppearance(window, mode => applyRootAppearance(document, config.theme, mode))
+
 const router = createBrowserRouter([
   {
     path: '/',
@@ -43,6 +51,8 @@ const router = createBrowserRouter([
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <RouterProvider router={router} />
+    <AppearanceProvider appearance={appearance}>
+      <RouterProvider router={router} />
+    </AppearanceProvider>
   </StrictMode>,
 )

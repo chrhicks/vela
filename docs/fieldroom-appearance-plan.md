@@ -1,6 +1,6 @@
 # Fieldroom application appearance
 
-Planned before implementation; part of the Tonight slice in
+Implementation scoped before application edits; part of the Tonight slice in
 [Fieldroom adoption](fieldroom-adoption.md). Shared tokens and the non-modal
 Appearance control belong to the foundations slice. This plan covers the web
 application's configuration and browser state, independently of astronomy state.
@@ -57,4 +57,20 @@ accepting this work.
 
 ## Actual results
 
-Pending.
+Application wiring now lives in `apps/web/src/config.ts`, `appearance/`, and the
+Shell/navigation composition. `fieldroom` is the default; `vela-current` is an
+explicit token reference. Root variables, browser chrome, and color scheme are
+applied before route DOM appears. The browser owns the preference and its media
+listener; storage failures keep the selected mode for the visit.
+
+Focused unit coverage checks configuration rejection, stored-value validation,
+blocked reads, failed writes, explicit override, live System resolution, and
+listener cleanup. `apps/web/tests/appearance.e2e.ts` exercises production routes
+at 1440px and 390px: root colors, System and explicit modes, focus and dismissal,
+search DOM/value retention, and blocked storage. The existing navigation suite
+retains active-run identity, interrupted updates, and target-query handoff under
+the new labels and rig-selection destination.
+
+Whole-Tonight image/form retention evidence, independent verification, and the
+final Paper visual comparison remain part of the parent slice gate. These
+focused checks do not claim that gate is complete.

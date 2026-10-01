@@ -17,10 +17,6 @@
   --color-ui-focus: var(--vela-focus);
 }
 
-:root {
-  color-scheme: dark;
-}
-
 html,
 body,
 #root {
@@ -41,4 +37,14 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+body { background: var(--vela-canvas); color: var(--vela-text); }
+.vela-app > .vela-navigation { width: 100%; margin: 0; padding-inline: 36px; }
+.vela-app__connection { color: var(--vela-text-muted); font: 400 14px/20px var(--vela-font); white-space: nowrap; }
+.vela-app > .vela-navigation { position: relative; }
+.vela-app > .vela-navigation::after { content: ""; position: absolute; bottom: 0; left: 0; right: 0; height: 1px; background: var(--vela-line); }
+.vela-app > .vela-navigation .vela-navigation__bar { border-bottom: 0; }
+@media (max-width: 700px) {
+  .vela-app > .vela-navigation { padding-inline: 20px; }
 }

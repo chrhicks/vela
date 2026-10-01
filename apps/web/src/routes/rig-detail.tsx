@@ -1,10 +1,10 @@
 import type { RigDetailView, RigDeviceDetailView } from '@vela/model/web'
 import { Badge, Button, Dialog, IconButton, Panel } from '@vela/ui'
 import { useState, type ReactNode } from 'react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { RefreshIcon } from '../components/ui/icons'
 import { RigDeviceCard } from '../features/rig-detail/RigDeviceCard'
-import { useRigDetail } from '../features/rig-detail/use-rig-detail'
+import { useRigObservation } from '../features/rig-detail/RigContext'
 import { forgetRig } from '../features/rig-management/forget-rig'
 import { ObservationMark } from '../features/observation/ObservationMark'
 import './observe.css'
@@ -19,9 +19,8 @@ const kindOrder = [
 ] as const
 
 export function RigDetail() {
-  const { rigId = '' } = useParams()
   const navigate = useNavigate()
-  const { view, refreshing, interrupted, initialError, refresh } = useRigDetail(rigId)
+  const { view, refreshing, interrupted, initialError, refresh } = useRigObservation()!
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [forgetOpen, setForgetOpen] = useState(false)
   const [forgetting, setForgetting] = useState(false)

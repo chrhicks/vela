@@ -158,4 +158,86 @@ composition with real projections.
 
 ## Actual outcome
 
-Pending.
+Implemented; the clean-commit independent review and final comparison gate remain
+pending. The current capture route is Tonight, with the chosen subject, actual
+per-run published integration/saved totals, sampled sky projection, and shared
+observed equipment. `targets.tsx` carries the selected target through its existing
+Continue link. The capture controller snapshots intent before acquisition; an
+old image's Keep completion cannot increment a newer run's totals.
+
+Application configuration selects Fieldroom by default. Browser appearance is
+resolved before the first route DOM, follows System changes unless overridden,
+and reports persistence failure without resetting the route. Rig observation is
+composed once per rig under Shell; RigDetail and Tonight consume it. Navigation
+retains capture activity on other pages/rigs; Tonight omits its duplicate activity
+chip because the full state is already in the page.
+
+`LatestImage` supplies held/native/enlarged inspection, exact-image retry/Keep,
+expiry feedback, and focus/pan preservation. Its existing other consumers remain
+available until their scheduled adoption. The reference-fit photograph retains
+all its actual pixels and aspect ratio. A 44px details button in the toolbar
+exposes image dimensions, start provenance, subject intent, and display facts;
+this is the small additional affordance needed for existing acquisition details.
+The normal two-row metadata composition stays 70px high.
+
+Cooling remains an explicit operation. Its footer text action expands the existing
+controls below the footer, using the reference's right-side supporting area.
+This avoids adding a permanently visible row that caused a native desktop
+scrollbar and reduced the specified image/column widths. Normal desktop content
+fits 1440×900; expanded forms and feedback may extend the page naturally.
+
+The standalone development server is `scripts/review-fieldroom.mts` (`.mts` is
+required because the repository root is not an ESM package). It and the route
+browser tests share `tests/fixtures/fieldroom/tonight.ts`. The registry verifies
+reference-image hashes, scopes command state per review session, rejects unknown
+API requests, and fixes the date while letting timers execute. Its README records
+scene response order and timezone. This is deterministic fixture evidence, not
+physical-device evidence.
+
+Preliminary browser measurements: DPR1 card 888×686; toolbar54, fitted image560,
+metadata70; active card452×214. Native DPR1.5 uses the same declared geometry but
+quantizes 1px borders to 2/3px (image outer height685.75 from responsive image
+sizing). Native viewport width is1440 with no page scrollbar in the normal state.
+Final measurements/screenshots after independent review will replace this
+preliminary status in the adoption log.
+
+Focused checks include 93 capture/model/catalog/target tests; six config/appearance
+unit tests; image transitions; theme geometry; appearance/navigation; and Tonight
+subject, totals, compact reflow, and failure separation. Full browser coverage is
+being settled after deliberate presentation expectation changes. Build/lint and
+final exact counts are recorded at the review checkpoint.
+
+### Interrupted-view correction before review
+
+The preliminary implementation retained the previous top-of-page warning banner.
+Direct comparison with 03.10 showed that this moved the image and subject away
+from their approved positions. Replace the active capture card in-place with the
+24px-inset warning card: caption16, section title30, body24, detail20, 16px groups,
+and a46px reconnect/details action row. Keep read-only last-confirmed facts and
+paced automatic reconnection; no disabled command substitutes for confirmed state.
+The image changes to Last received exposure plus its real receipt age. Source
+03.10 keeps the686px outer card while using536px pixels,24px caption,70px facts.
+Implement this explicit state recipe and test that loss does not shift the image
+origin or issue a command. Connection age is a local browser observation, never
+fabricated from the sample's illustrative48s caption.
+
+### Settled verification checkpoint
+
+The full web run exercised127 scenarios. Its ten stale presentation expectations
+were corrected; affected suites then passed, including the two navigation
+expectations changed by removing Tonight's duplicate activity chip. Subsequent
+interruption and overlay corrections were rechecked with the affected capture,
+recovery, sky, cooling, Tonight, and six image-inspection scenarios. All existing
+127 cases and three added image cases have passed across these runs; this is not
+a claim that every case was rerun after every local typography change.
+
+Final focused unit/controller selection:61 passed (capture/controller/routes,
+saved metadata/catalog/capture validation, config/appearance). Earlier scoped
+model/target checks contributed34 target tests and4 model runtime checks, plus
+model typechecking. Model/server/web builds and repository lint passed; the
+existing Aladin bundle-size advisory remains. No hardware was operated.
+
+The review runtime also forces its own `/api` and Fieldroom config, so an existing
+local VITE_API_URL cannot bypass its fixture HTTP boundary. Captures remain
+mock/illustrative and visibly identified. Runtime starting instructions are in
+`apps/web/tests/fixtures/fieldroom/README.md`.

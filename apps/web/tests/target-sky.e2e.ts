@@ -41,6 +41,7 @@ const target: TargetView = {
   id: 'm31',
   name: 'Andromeda Galaxy',
   catalog: 'M31',
+  constellation: null,
   kind: 'Galaxy',
   raDegrees: 10.6847,
   decDegrees: 41.269,
@@ -86,7 +87,7 @@ for (const width of [1440, 390]) {
     expect(colors).toHaveLength(5)
     await expect(
       sidebar.locator('.vela-sky-path__light-track[data-light="night"]').first(),
-    ).toHaveCSS('stroke', 'rgb(99, 214, 239)')
+    ).toHaveCSS('stroke', 'rgb(24, 140, 165)')
     await expect(sidebar.getByText(/Light boundaries approximate/)).toBeVisible()
     await time.fill('23')
     const expand = page.getByRole('button', { name: 'Expand sky view' })

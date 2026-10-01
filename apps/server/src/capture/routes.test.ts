@@ -53,6 +53,7 @@ function deferred<T>() {
 function setup(
   selection: { uniqueId: string; name: string } | null = record.imagingCamera,
   options: {
+    lookupSubject?: NonNullable<Parameters<typeof registerCapture>[3]>['lookupSubject']
     cooling?: {
       state: 'on' | 'off'
       setpointControl?: boolean
@@ -133,6 +134,8 @@ function setup(
       }
     },
   }
+
+  if (options.lookupSubject) captureOptions.lookupSubject = options.lookupSubject
 
   if (options.createCooling) captureOptions.createCooling = options.createCooling
 
@@ -635,4 +638,25 @@ it('holds an exclusive cooling lease through confirmation and rejects other cool
   expect((await subject.start()).statusCode).toBe(200)
   expect((await cool(false)).statusCode).toBe(409)
   expect(commands).toHaveLength(1)
+})
+
+
+it('rejects malformed and unknown subjects before device inspection or acquiring the rig lease', async () => {
+  const subject = { targetId: 'ngc0224', name: 'Andromeda Galaxy', catalog: 'NGC 224' }
+  const lookupSubject = vi.fn((id: string) => id === subject.targetId ? subject : undefined)
+  const { start, operations, captures, inspections, bindings } = setup(record.imagingCamera, { lookupSubject })
+  const acquire = vi.spyOn(operations, 'acquire')
+
+  for (const targetId of ['', '   ', 42, null, 'missing']) {
+    expect((await start({ exposureSeconds: 10, targetId })).statusCode).toBe(400)
+  }
+
+  expect(acquire).not.toHaveBeenCalled()
+  expect(inspections()).toBe(0)
+  expect(bindings).toEqual([])
+  expect(captures).toEqual([])
+  const response = await start({ exposureSeconds: 10, targetId: subject.targetId })
+  expect(response.statusCode).toBe(200)
+  expect(response.json()).toMatchObject({ subject, savedCount: 0, integrationSeconds: 0 })
+  expect(captures).toHaveLength(1)
 })
