@@ -325,7 +325,6 @@ function CenteringExample({ scenario }: { scenario: Scenario }) {
         </section>
         <Button
           tone="quiet"
-          size="small"
           aria-expanded={expanded}
           onClick={() => setExpanded(value => !value)}
         >

@@ -168,7 +168,6 @@ function SavedImagesPage({ rigId, imageId }: { rigId: string; imageId?: string }
               <a
                 className="vela-button"
                 data-tone="accent"
-                data-size="medium"
                 href={image.fitsUrl}
                 download
               >
@@ -177,7 +176,6 @@ function SavedImagesPage({ rigId, imageId }: { rigId: string; imageId?: string }
               <a
                 className="vela-button"
                 data-tone="neutral"
-                data-size="medium"
                 href={image.previewDownloadUrl}
                 download
               >
@@ -208,7 +206,6 @@ function SavedImagesPage({ rigId, imageId }: { rigId: string; imageId?: string }
                   <Link
                     className="vela-button"
                     data-tone="neutral"
-                    data-size="medium"
                     to={`${base}/capture`}
                   >
                     Open capture →

@@ -503,7 +503,7 @@ function AutofocusPreview({
                 The walk stays inside a window around the current position. Vela will not command 0
                 or MaxStep.
               </p>
-              <Button size="large" tone="accent" disabled={travelBlocked} onClick={startWalk}>
+              <Button tone="accent" disabled={travelBlocked} onClick={startWalk}>
                 {travelBlocked ? 'Window does not fit' : 'Start autofocus'}
               </Button>
             </div>
@@ -520,7 +520,6 @@ function AutofocusPreview({
               </p>
               {busy ? (
                 <Button
-                  size="large"
                   onClick={() => {
                     setPlaying(false)
                     update({ phase: 'restored' })
@@ -530,7 +529,6 @@ function AutofocusPreview({
                 </Button>
               ) : (
                 <Button
-                  size="large"
                   tone="accent"
                   onClick={() => {
                     setLanded(0)

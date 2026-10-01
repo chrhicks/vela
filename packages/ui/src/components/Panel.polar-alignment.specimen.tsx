@@ -203,7 +203,7 @@ function BaselinePreview({
               ? 'Use sidereal tracking. Keep the mount’s adjustment knobs still until all three positions are measured. You can stop at any time.'
               : 'Leave room for the movement, and keep the adjustment knobs still until measurement finishes.'}
         </p>
-        <Button size="large" tone={step ? 'neutral' : 'accent'} onClick={step ? onStop : onStart}>
+        <Button tone={step ? 'neutral' : 'accent'} onClick={step ? onStop : onStart}>
           {step ? 'Stop measurement' : stopped ? 'Start again' : 'Start measurement'}
         </Button>
       </div>
@@ -372,15 +372,15 @@ function AlignmentPreview({
                         : 'Adjust the mount’s knobs. Use the reticle and remaining error to decide when you’re done.'}
               </p>
               {inactive ? (
-                <Button tone="neutral" size="large" onClick={() => changePhase('setup')}>
+                <Button tone="neutral" onClick={() => changePhase('setup')}>
                   Measure again
                 </Button>
               ) : (
                 <div>
-                  <Button tone="neutral" size="large" onClick={() => changePhase('stopped')}>
+                  <Button tone="neutral" onClick={() => changePhase('stopped')}>
                     Stop to reposition
                   </Button>
-                  <Button tone="accent" size="large" onClick={() => changePhase('finished')}>
+                  <Button tone="accent" onClick={() => changePhase('finished')}>
                     Finish alignment
                   </Button>
                 </div>

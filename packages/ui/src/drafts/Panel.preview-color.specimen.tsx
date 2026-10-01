@@ -53,7 +53,7 @@ function PreviewPair({ fixture, scale }: { fixture: Fixture; scale: string }) {
       {native && (
         <div className="vela-preview-color__native-tools">
           <span>1 image pixel = 1 CSS pixel · scroll either view to pan both</span>
-          <Button size="small" onClick={center}>
+          <Button onClick={center}>
             Center image
           </Button>
         </div>
@@ -185,7 +185,6 @@ function PreviewColor({
             ([value, label]) => (
               <Button
                 key={value}
-                size="small"
                 aria-pressed={scale === value}
                 tone={scale === value ? 'neutral' : 'quiet'}
                 onClick={() => update({ scale: value })}

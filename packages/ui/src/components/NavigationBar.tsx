@@ -1,4 +1,4 @@
-import type { MouseEventHandler } from 'react'
+import type { MouseEventHandler, ReactNode } from 'react'
 
 export interface NavigationLink {
   href: string
@@ -27,6 +27,7 @@ export interface NavigationBarProps {
   currentRigId: string
   onRigChange: (id: string) => void
   links: readonly NavigationLink[]
+  utility?: ReactNode
   activity?: NavigationActivity
 }
 
@@ -37,6 +38,7 @@ export function NavigationBar({
   onRigChange,
   links,
   activity,
+  utility,
 }: NavigationBarProps) {
   return (
     <div className="vela-navigation">
@@ -50,17 +52,6 @@ export function NavigationBar({
           >
             V<span>ela</span>
           </a>
-          <span className="vela-navigation__divider" aria-hidden="true" />
-          <label className="vela-navigation__rig">
-            <span className="vela-navigation__sr-only">Viewing rig</span>
-            <select value={currentRigId} onChange={event => onRigChange(event.target.value)}>
-              {rigs.map(rig => (
-                <option value={rig.id} key={rig.id}>
-                  {rig.name}
-                </option>
-              ))}
-            </select>
-          </label>
         </div>
         {links.length > 0 && (
           <nav aria-label="Observing pages" className="vela-navigation__pages">
@@ -76,33 +67,46 @@ export function NavigationBar({
             ))}
           </nav>
         )}
-        {activity && (
-          <a
-            className="vela-navigation__activity"
-            href={activity.href}
-            onClick={activity.onClick}
-            data-interrupted={activity.interrupted || undefined}
-            aria-label={activity.label}
-          >
-            <span className="vela-navigation__capture-summary">
-              <span>
-                {activity.rigName && <small>{activity.rigName} · </small>}
-                {activity.completedCount} captured
+        <div className="vela-navigation__context">
+          <label className="vela-navigation__rig">
+            <span className="vela-navigation__sr-only">Viewing rig</span>
+            <select value={currentRigId} onChange={event => onRigChange(event.target.value)}>
+              {rigs.map(rig => (
+                <option value={rig.id} key={rig.id}>
+                  {rig.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          {activity && (
+            <a
+              className="vela-navigation__activity"
+              href={activity.href}
+              onClick={activity.onClick}
+              data-interrupted={activity.interrupted || undefined}
+              aria-label={activity.label}
+            >
+              <span className="vela-navigation__capture-summary">
+                <span>
+                  {activity.rigName && <small>{activity.rigName} · </small>}
+                  {activity.completedCount} captured
+                </span>
+                <small>{activity.status}</small>
               </span>
-              <small>{activity.status}</small>
-            </span>
-            {activity.progress && !activity.interrupted && (
-              <progress
-                value={activity.progress.value}
-                max={activity.progress.max}
-                aria-hidden="true"
-              />
-            )}
-            {activity.note && (
-              <span className="vela-navigation__capture-note">{activity.note}</span>
-            )}
-          </a>
-        )}
+              {activity.progress && !activity.interrupted && (
+                <progress
+                  value={activity.progress.value}
+                  max={activity.progress.max}
+                  aria-hidden="true"
+                />
+              )}
+              {activity.note && (
+                <span className="vela-navigation__capture-note">{activity.note}</span>
+              )}
+            </a>
+          )}
+          {utility}
+        </div>
       </header>
     </div>
   )

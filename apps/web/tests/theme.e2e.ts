@@ -8,8 +8,11 @@ const theme = resolveTheme(VELA_CURRENT_PROFILE)
 const tokens = themeStyle(theme, 'dark')
 
 for (const width of [1040, 390]) {
-  test(`preserves the adopted workshop theme in the app at ${width}px`, async ({ page }) => {
+  test(`preserves shared theme tokens and geometry in the app at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 })
+    await page.route('**/api/web/navigation', route =>
+      route.fulfill({ json: { rigs: [{ id: 'rig-1', name: observation().rig.name }], captures: [] } }),
+    )
     await page.route('**/api/web/rigs/rig-1', route =>
       route.fulfill({
         contentType: 'application/json',
@@ -33,7 +36,7 @@ for (const width of [1040, 390]) {
       'border-radius',
       `${theme.radius}px`,
     )
-    await expect(panel).toHaveCSS('border-radius', `${theme.radius * 1.25}px`)
+    await expect(panel).toHaveCSS('border-radius', '6px')
     await expect(panel).toHaveCSS('border-top-width', `${theme.borderWidth}px`)
     await expect(panel).toHaveCSS('border-top-style', 'solid')
     await expect(panel.locator('.vela-panel__title')).toHaveCSS(

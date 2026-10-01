@@ -102,7 +102,6 @@ export function RigDetail() {
             icon={<RefreshIcon />}
             label={refreshing ? 'Refreshing Rig' : 'Refresh Rig'}
             onClick={() => void refresh()}
-            size="small"
             tone="quiet"
             type="button"
           />
@@ -120,7 +119,6 @@ export function RigDetail() {
         </div>
         <Button
           tone="accent"
-          size="large"
           onClick={() => navigate(`/rigs/${encodeURIComponent(view.id)}/observe`)}
         >
           Start observing
@@ -213,7 +211,6 @@ export function RigDetail() {
               setForgetError(undefined)
               setForgetOpen(true)
             }}
-            size="small"
             tone="quiet"
           >
             Forget rig

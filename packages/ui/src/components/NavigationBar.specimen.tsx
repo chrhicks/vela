@@ -1,5 +1,15 @@
+import { useState } from 'react'
+import { Appearance } from './Appearance'
+import type { AppearancePreference } from './Appearance'
 import { NavigationBar, type NavigationActivity, type NavigationBarProps } from './NavigationBar'
 import type { ComponentSpecimen } from '../themes'
+
+function NavigationAppearance() {
+  const [open, setOpen] = useState(false)
+  const [value, setValue] = useState<AppearancePreference>('system')
+
+  return <Appearance open={open} onOpenChange={setOpen} value={value} onValueChange={setValue} systemMode="light" persistence="visit" />
+}
 
 export const specimen: ComponentSpecimen = {
   componentId: 'navigation-bar',
@@ -86,6 +96,7 @@ export const specimen: ComponentSpecimen = {
                 },
               }))
         }
+        utility={<NavigationAppearance />}
         {...navigation}
       />
     )

@@ -296,7 +296,6 @@ function CaptureRunPreview({
           <Button
             className="vela-capture-back"
             tone="quiet"
-            size="small"
             onClick={() => update({ screen: 'observe' })}
           >
             ← Observe
@@ -358,7 +357,7 @@ function CaptureRunPreview({
                           ? `${imageSeconds} s · Color · ${age} s ago`
                           : 'No image captured yet'}
                   </div>
-                  <Button size="large" tone="accent" onClick={() => update({ screen: 'capture' })}>
+                  <Button tone="accent" onClick={() => update({ screen: 'capture' })}>
                     {busy ? 'View capture' : 'Open capture'} →
                   </Button>
                 </div>
@@ -421,7 +420,6 @@ function CaptureRunPreview({
                   {hasImage && (
                     <div className="vela-capture-zoom" aria-label="Image scale">
                       <Button
-                        size="small"
                         tone={zoomed ? 'quiet' : 'neutral'}
                         aria-pressed={!zoomed}
                         onClick={() => setZoomed(false)}
@@ -429,7 +427,6 @@ function CaptureRunPreview({
                         Fit
                       </Button>
                       <Button
-                        size="small"
                         tone={zoomed ? 'neutral' : 'quiet'}
                         aria-pressed={zoomed}
                         onClick={() => setZoomed(true)}
@@ -538,7 +535,6 @@ function CaptureRunPreview({
                 <div className="vela-capture-command">
                   {busy ? (
                     <Button
-                      size="large"
                       disabled={stopping}
                       onClick={() => {
                         setPlaying(true)
@@ -549,7 +545,6 @@ function CaptureRunPreview({
                     </Button>
                   ) : (
                     <Button
-                      size="large"
                       tone="accent"
                       disabled={disconnected || cleanupUncertain || !validExposure}
                       onClick={startCapture}
@@ -594,7 +589,6 @@ function CaptureRunPreview({
         </p>
         {(phase === 'exposing' || phase === 'reading') && (
           <Button
-            size="small"
             tone="quiet"
             onClick={() => {
               setObservationRecovered(false)
@@ -606,7 +600,7 @@ function CaptureRunPreview({
           </Button>
         )}
         {observationInterrupted && !playing && (
-          <Button size="small" tone="quiet" onClick={() => setPlaying(true)}>
+          <Button tone="quiet" onClick={() => setPlaying(true)}>
             Play read recovery
           </Button>
         )}

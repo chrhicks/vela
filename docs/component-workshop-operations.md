@@ -9,14 +9,17 @@ Follow [AGENTS.md](../AGENTS.md#working-with-chris) for collaboration, authoriza
 ## Application visual authority
 
 The approved workshop specimen and profile define the design; `@vela/ui` owns
-its shared implementation, and `apps/web` adopts it. The application's adopted
-profile is `VELA_CURRENT_PROFILE` (**Vela Current**) from `@vela/ui/themes`.
-The app shell and a fresh workshop session both select it. `DEFAULT_PROFILE`
-(**Vela UI Default**) remains the library baseline for comparison, not the
-application's active theme.
+its shared implementation, and `apps/web` adopts it. **Fieldroom** is the shared
+and workshop authority; fresh workshop sessions use Fieldroom/light. Production
+application adoption is in progress under the [Fieldroom adoption plan](fieldroom-adoption.md);
+the application shell retains its previous profile until that application slice.
+`DEFAULT_PROFILE` (**Vela UI Default**) and `VELA_CURRENT_PROFILE` (**Vela Current**)
+remain named token references. The archived screenshots preserve their previous
+appearance; shared components do not maintain a second legacy stylesheet.
 
-When comparing a specimen with the app, use Vela Current, dark mode, density 1,
-and no unsaved profile overrides. Match the relevant state and content width.
+For Fieldroom comparisons, select Fieldroom, the reference's light or dark mode,
+density 1, and no unsaved profile overrides. Match state, content width, and
+reference crop. An existing recovered session may retain a different profile.
 The workshop's surrounding editor is not part of the specimen's design.
 
 Keep approved shared geometry and styling in `@vela/ui`; app feature styles may
@@ -28,8 +31,8 @@ state or different content, rather than an app-only restyling.
 
 Load shared UI styles before importing feature modules and their composition
 styles in each runtime. Equal-specificity rules depend on that order: for
-example, the capture specimen's 44px command button must override the shared
-large-button minimum height in both workshop and app.
+example, a specimen's composition must not be displaced by a later shared rule.
+Approved 46px text controls and 44px icon targets belong in shared primitives.
 
 Workshop scratch changes and alternate profiles remain exploratory until
 explicitly adopted; the application does not read workshop session files.
@@ -87,14 +90,14 @@ git diff --check
 
 Run the relevant existing test files for shared artifact validation, local persistence, token resolution, or stable-versus-draft exports when those behaviors are affected. Full `pnpm test` and `pnpm build` are appropriate when the change crosses enough workspace boundaries to warrant them, not as a default for every specimen edit.
 
-Dialog behavior also has a focused Chromium suite because modal focus, dismissal, and restoration depend on browser behavior. Install its browser once, then run it with:
+Dialog and Appearance behavior also have focused Chromium suites because modal focus, dismissal, and restoration depend on browser behavior. Install its browser once, then run it with:
 
 ```sh
 pnpm --filter @vela/workshop exec playwright install chromium
 pnpm --filter @vela/workshop test:browser
 ```
 
-The suite starts the workshop itself and checks passive gallery previews, modal focus containment and restoration, dismissal, simulated responsive and comparison canvases, and asynchronous specimen state updates.
+The suite starts the workshop itself and checks passive gallery previews, modal focus containment and restoration, dismissal, simulated responsive and comparison canvases, and asynchronous specimen state updates. Appearance checks cover radio selection, non-modal focus, outside actions, phone bounds, reduced motion, and saved/visit-only copy.
 
 ## Add a draft component
 
@@ -149,10 +152,10 @@ Theme adjustments remain in `unsavedOverrides` until Save or Save As is chosen:
 
 - **Save** deliberately updates the selected tracked profile.
 - **Save As** creates or replaces a named profile under `apps/workshop/designs/`.
-- Read-only `Vela UI Default` and `Vela Current` profiles cannot be overwritten.
+- Read-only `Fieldroom`, `Vela UI Default`, and `Vela Current` profiles cannot be overwritten.
 - A fingerprint mismatch is shown as baseline drift. The workshop never rebases a profile automatically.
 
-The local server validates schema version, IDs, primitive props, modes, contexts, viewport bounds, reference ramps, semantic mappings, and theme override keys. Writes are size-limited and atomic. It is not a general filesystem API.
+The local server validates schema version, IDs, primitive props, modes, contexts, viewport bounds, reference ramps, semantic mappings, and theme override keys. The editor shows explicit per-mode colors separately from ramps; Use generated removes an exact color for that mode. Contrast diagnostics inspect the resolved colors, including exact hex values. Writes are size-limited and atomic. It is not a general filesystem API.
 
 ## Use stable URLs and Copy Context
 
@@ -201,7 +204,7 @@ Promotion makes a component available; adoption uses it in the agreed feature. K
 
 1. Run and visually inspect the approved product example at the relevant states, pace, and widths before implementation. Use the [application visual authority](#application-visual-authority) settings to compare like with like.
 2. Import stable primitives from `@vela/ui`. Compose the feature from web-owned state, copy, domain markup, and assets, following the [primitive and product-example boundaries](#pair-primitive-anatomy-with-product-examples). Promote a new primitive when concrete reuse establishes a useful contract.
-3. Use the application's adopted Vela Current profile and existing `@vela/ui/styles.css` entry point. Keep shared style loading ahead of feature composition styles; resolve missing tokens at their owning boundary rather than adding a parallel theme adapter.
+3. Use the application's explicitly adopted profile and existing `@vela/ui/styles.css` entry point; follow the Fieldroom plan while that adoption is in progress. Keep shared style loading ahead of feature composition styles; resolve missing tokens at their owning boundary rather than adding a parallel theme adapter.
 4. Compare the implemented feature with the running specimen. Preserve its hierarchy, typography, borders, artwork, and interaction feel while keeping wording honest for real operational states. Verify the changed behavior in the actual application context.
 5. Prepare the running product and concrete acceptance scenarios through the [delivery workflow](../AGENTS.md#verification-browser-review-and-merge).
 

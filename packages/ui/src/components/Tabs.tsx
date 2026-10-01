@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import type { HTMLAttributes, ReactNode } from 'react'
 
 export interface TabItem {
@@ -12,7 +12,6 @@ export interface TabsProps extends Omit<HTMLAttributes<HTMLDivElement>, 'onChang
   value?: string
   defaultValue?: string
   onValueChange?: (value: string) => void
-  size?: 'small' | 'medium'
 }
 
 export function Tabs({
@@ -20,10 +19,11 @@ export function Tabs({
   value,
   defaultValue,
   onValueChange,
-  size = 'medium',
   className = '',
   ...props
 }: TabsProps) {
+  const id = useId()
+  const buttons = useRef<Array<HTMLButtonElement | null>>([])
   const fallback = defaultValue ?? items[0]?.id ?? ''
   const [internalValue, setInternalValue] = useState(fallback)
   const selectedValue = value ?? internalValue
@@ -35,11 +35,29 @@ export function Tabs({
   }
 
   return (
-    <div className={`vela-tabs ${className}`.trim()} data-size={size} {...props}>
-      <div className="vela-tabs__list">
-        {items.map(item => (
+    <div className={`vela-tabs ${className}`.trim()} {...props}>
+      <div className="vela-tabs__list" role="tablist">
+        {items.map((item, index) => (
           <button
+            role="tab"
+            id={`${id}-tab-${item.id}`}
+            aria-controls={`${id}-panel-${item.id}`}
+            aria-selected={item.id === selected?.id}
+            tabIndex={item.id === selected?.id ? 0 : -1}
+            ref={element => { buttons.current[index] = element }}
             data-active={item.id === selected?.id}
+            onKeyDown={event => {
+              let next = index
+
+              if (event.key === 'ArrowRight') next = (index + 1) % items.length
+              else if (event.key === 'ArrowLeft') next = (index + items.length - 1) % items.length
+              else if (event.key === 'Home') next = 0
+              else if (event.key === 'End') next = items.length - 1
+              else return
+              event.preventDefault()
+              select(items[next]!.id)
+              buttons.current[next]?.focus()
+            }}
             key={item.id}
             onClick={() => select(item.id)}
             type="button"
@@ -48,7 +66,11 @@ export function Tabs({
           </button>
         ))}
       </div>
-      {selected ? <div className="vela-tabs__panel">{selected.content}</div> : null}
+      {selected ? (
+        <div className="vela-tabs__panel" role="tabpanel" id={`${id}-panel-${selected.id}`} aria-labelledby={`${id}-tab-${selected.id}`} tabIndex={0}>
+          {selected.content}
+        </div>
+      ) : null}
     </div>
   )
 }

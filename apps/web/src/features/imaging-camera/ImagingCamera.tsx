@@ -71,7 +71,6 @@ export function ImagingCamera({
         {!expanded && (
           <Button
             tone="quiet"
-            size="small"
             disabled={locked}
             onClick={() => {
               setChoice(null)

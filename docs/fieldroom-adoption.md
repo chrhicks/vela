@@ -144,7 +144,46 @@ comparison to DS.01–DS.16 before app composition work starts.
 
 ### Actual / deviations / evidence
 
-Pending.
+Implemented in the shared resolver and stable primitives; awaiting fresh
+independent review and the final browser comparison before acceptance.
+
+Fieldroom adds explicit semantic overrides within the existing profile resolver,
+including pending, hover, pressed, warning, and error colors. The workshop uses
+Fieldroom/light by default and exposes overridden colors honestly in its editor
+and contrast diagnostics. Locally bundled Barlow and Space Grotesk include license
+and pinned-source provenance. Existing named profiles remain token references.
+
+Stable controls now use the planned geometry and typography. The old Button,
+IconButton, and Tabs size options were removed because they conflict with the
+single approved recipe; consumers were updated mechanically. This includes web
+call sites but does not adopt the application layouts ahead of Phase 3. Pending
+buttons retain focus and suppress duplicate activation. Field messages are linked
+for assistive technology, tabs support keyboard navigation, and Dialog can enter
+Cancel first while retaining containment and focus restoration.
+
+The controlled Appearance primitive handles non-modal keyboard/outside dismissal,
+compact placement, and radio selection. Browser persistence and System resolution
+remain Phase 3 responsibilities. Its workshop specimen uses the workshop palette
+controls; changing a specimen radio demonstrates selection without taking over the
+workshop’s independently scoped theme.
+
+Focused checks: 17 theme runtime tests, 5 package export-boundary tests, and 2
+contrast-diagnostics tests passed together. Eight Dialog/navigation/foundation
+browser checks and five Appearance browser checks passed in Chromium. UI,
+workshop, and web builds passed during integration; final settled lint and any
+changed checks are recorded with review evidence below.
+
+Preliminary measurements confirmed text controls 46px, icon/tab targets 44px,
+checkbox label targets at least 44px, and the loaded font families and weights.
+Dialog measured 640px wide with 28px inset, 18px groups, 8px radius, and the paired
+raised surface. These are integration observations, not slice acceptance. Final
+review target, comparison artifacts, and verdict remain pending.
+
+A source/browser inset audit retained the declared Dialog 28px, button 18px,
+and field 14px padding with true 1px CSS borders. Frozen-reference and browser
+first-ink offsets agree: dialog title 31px/body 30px, primary action 20px,
+input value 16px. Paper’s fractional border quantization does not justify
+subtracting a pixel from each component’s declared padding.
 
 ## 3. Tonight and Appearance vertical slice
 

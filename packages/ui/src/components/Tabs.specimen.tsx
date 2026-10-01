@@ -1,4 +1,3 @@
-import { z } from 'zod'
 import type { ComponentSpecimen } from '../themes'
 import { Badge } from './Badge'
 import { Tabs } from './Tabs'
@@ -11,9 +10,8 @@ export const specimen: ComponentSpecimen = {
   description: 'A compact in-house switcher with controlled or internal selection.',
   controls: {
     selected: { type: 'select', label: 'Selected', options: ['status', 'settings', 'history'] },
-    size: { type: 'select', label: 'Size', options: ['small', 'medium'] },
   },
-  defaultProps: { selected: 'status', size: 'medium' },
+  defaultProps: { selected: 'status' },
   render: (props, onPropsChange) => (
     <div style={{ width: 'min(100%, 34rem)' }}>
       <Tabs
@@ -51,7 +49,6 @@ export const specimen: ComponentSpecimen = {
             ),
           },
         ]}
-        size={z.enum(['small', 'medium']).parse(props.size)}
         onValueChange={selected => onPropsChange?.({ selected })}
         value={String(props.selected)}
       />

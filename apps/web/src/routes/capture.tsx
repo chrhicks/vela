@@ -130,7 +130,6 @@ function CapturePage({ rigId }: { rigId: string }) {
           <Link
             className="vela-button"
             data-tone="neutral"
-            data-size="medium"
             to={`/rigs/${encodeURIComponent(rigId)}/observe/saved-images`}
           >
             Saved images{view.savedImageCount !== null ? ` (${view.savedImageCount})` : ''} →
@@ -249,7 +248,6 @@ function CapturePage({ rigId }: { rigId: string }) {
               {view.active ? (
                 <Button
                   type="button"
-                  size="large"
                   disabled={!capture.canStop}
                   onClick={() => void capture.stop()}
                 >
@@ -264,7 +262,6 @@ function CapturePage({ rigId }: { rigId: string }) {
               ) : (
                 <Button
                   type="submit"
-                  size="large"
                   tone="accent"
                   disabled={!capture.canStart || !validExposure}
                 >

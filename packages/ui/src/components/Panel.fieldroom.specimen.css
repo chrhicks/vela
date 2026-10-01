@@ -1,0 +1,17 @@
+.vela-fieldroom-specimen { display: grid; width: 100%; gap: 28px; }
+.vela-fieldroom-specimen :where(h1, h2, p) { margin: 0; }
+.vela-fieldroom-specimen > header { display: grid; gap: 12px; }
+.vela-fieldroom-specimen__type,
+.vela-fieldroom-specimen__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 24px; }
+.vela-fieldroom-specimen__type > div { display: grid; align-content: start; gap: 8px; }
+.vela-fieldroom-specimen__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.vela-fieldroom-specimen__capture,
+.vela-fieldroom-specimen__notice { display: grid; align-content: start; justify-items: start; gap: 16px; border: 1px solid var(--vela-line); border-radius: var(--vela-card-radius); background: var(--vela-surface); }
+.vela-fieldroom-specimen__capture { padding: 20px 22px; }
+.vela-fieldroom-specimen__notice { padding: 24px; }
+.vela-fieldroom-specimen__notice[data-tone='warning'] { background: var(--vela-warning-surface); }
+.vela-fieldroom-specimen__notice[data-tone='warning'] > .vela-type-caption { color: var(--vela-warning); }
+.vela-fieldroom-specimen__notice[data-tone='danger'] { background: var(--vela-danger-surface); }
+.vela-fieldroom-specimen__notice[data-tone='danger'] > .vela-type-caption { color: var(--vela-danger); }
+.vela-fieldroom-specimen__notice > .vela-button { margin-top: 12px; }
+.vela-fieldroom-specimen > .vela-button { justify-self: start; }

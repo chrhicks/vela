@@ -61,10 +61,10 @@ export const compositions: CompositionDefinition[] = [
         description="Configure how the next sequence should begin."
         footer={
           <>
-            <Button size="small" tone="quiet">
+            <Button tone="quiet">
               Cancel
             </Button>
-            <Button size="small" tone="accent">
+            <Button tone="accent">
               Apply
             </Button>
           </>
@@ -97,10 +97,10 @@ export const compositions: CompositionDefinition[] = [
         <Badge marker={<i />} size="small" tone="positive">
           Guiding
         </Badge>
-        <Button size="small" tone="quiet">
+        <Button tone="quiet">
           Pause
         </Button>
-        <IconButton icon={<MoreIcon />} label="More actions" size="small" />
+        <IconButton icon={<MoreIcon />} label="More actions" />
       </div>
     ),
   },
@@ -150,7 +150,6 @@ export const compositions: CompositionDefinition[] = [
               ),
             },
           ]}
-          size="small"
         />
       </Panel>
     ),

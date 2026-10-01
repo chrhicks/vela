@@ -1,0 +1,32 @@
+import { expect, test } from '@playwright/test'
+
+test('pending commands keep focus and prevent another request; tabs support arrow navigation', async ({ page }) => {
+  await page.goto('/?component=panel&specimen=fieldroom-foundations&profile=fieldroom')
+  const specimen = page.locator('.vela-fieldroom-specimen')
+  const start = specimen.getByRole('button', { name: 'Start capture', exact: true }).first()
+  await start.click()
+  const pending = specimen.getByRole('button', { name: 'Starting…' })
+  await expect(pending).toHaveAttribute('aria-busy', 'true')
+  await expect(pending).toBeFocused()
+  await page.keyboard.press('Enter')
+  await page.keyboard.press('Space')
+  await expect(specimen.getByText(/1 local requests/)).toBeVisible()
+  await specimen.getByRole('tab', { name: 'Overview' }).focus()
+  await page.keyboard.press('ArrowRight')
+  await expect(specimen.getByRole('tab', { name: 'Details' })).toBeFocused()
+  await expect(specimen.getByRole('tab', { name: 'Details' })).toHaveAttribute('aria-selected', 'true')
+})
+
+test('forget confirmation enters Cancel, contains focus and returns to opener', async ({ page }) => {
+  await page.goto('/?component=panel&specimen=fieldroom-foundations&profile=fieldroom')
+  const opener = page.getByRole('button', { name: 'Open forget confirmation' })
+  await opener.click()
+  const dialog = page.getByRole('dialog', { name: 'Forget Askar FRA 400?' })
+  await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeFocused()
+  await dialog.getByRole('button', { name: 'Forget rig' }).focus()
+  await page.keyboard.press('Tab')
+  await expect(dialog.getByRole('button', { name: 'Close dialog' })).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(dialog).toHaveCount(0)
+  await expect(opener).toBeFocused()
+})

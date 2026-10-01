@@ -1,4 +1,4 @@
-import { referencePalette } from '@vela/ui/themes'
+import { semanticPalette } from '@vela/ui/themes'
 import type { ThemeMode, ThemeParameters } from '@vela/ui/themes'
 
 export interface ContrastFinding {
@@ -34,33 +34,27 @@ export const sourceFindings: SourceFinding[] = Object.entries(sourceModules).fla
 )
 
 const pairs = [
-  {
-    id: 'body',
-    label: 'Text / surface',
-    foreground: 'text',
-    background: 'surface',
-  },
-  {
-    id: 'muted',
-    label: 'Muted text / surface',
-    foreground: 'textMuted',
-    background: 'surface',
-  },
-  {
-    id: 'accent',
-    label: 'Accent text / accent',
-    foreground: 'accentText',
-    background: 'accent',
-  },
+  { id: 'body', label: 'Text / surface', foreground: 'text', background: 'surface', minimum: 4.5 },
+  { id: 'canvas', label: 'Text / canvas', foreground: 'text', background: 'canvas', minimum: 4.5 },
+  { id: 'raised', label: 'Text / raised surface', foreground: 'text', background: 'surfaceRaised', minimum: 4.5 },
+  { id: 'muted', label: 'Muted text / surface', foreground: 'textMuted', background: 'surface', minimum: 4.5 },
+  { id: 'muted-canvas', label: 'Muted text / canvas', foreground: 'textMuted', background: 'canvas', minimum: 4.5 },
+  { id: 'muted-raised', label: 'Muted text / raised surface', foreground: 'textMuted', background: 'surfaceRaised', minimum: 4.5 },
+  { id: 'accent', label: 'Action text / action', foreground: 'accentText', background: 'accent', minimum: 4.5 },
+  { id: 'accent-hover', label: 'Action text / hover', foreground: 'accentText', background: 'accentHover', minimum: 4.5 },
+  { id: 'accent-pressed', label: 'Action text / pressed', foreground: 'accentText', background: 'accentPressed', minimum: 4.5 },
+  { id: 'warning', label: 'Warning text / warning surface', foreground: 'warning', background: 'warningSurface', minimum: 4.5 },
+  { id: 'danger', label: 'Error text / error surface', foreground: 'danger', background: 'dangerSurface', minimum: 4.5 },
+  { id: 'focus', label: 'Focus / canvas', foreground: 'focus', background: 'canvas', minimum: 3 },
+  { id: 'control', label: 'Control edge / raised surface', foreground: 'lineStrong', background: 'surfaceRaised', minimum: 3 },
 ] as const
 
 export function contrastFindings(theme: ThemeParameters): ContrastFinding[] {
-  const palette = referencePalette(theme)
-
   return (['light', 'dark'] as const).flatMap(mode =>
     pairs.map(pair => {
-      const foreground = palette[theme.semantic[mode][pair.foreground]]
-      const background = palette[theme.semantic[mode][pair.background]]
+      const palette = semanticPalette(theme, mode)
+      const foreground = palette[pair.foreground]
+      const background = palette[pair.background]
       const ratio = contrastRatio(foreground, background)
 
       return {
@@ -68,13 +62,13 @@ export function contrastFindings(theme: ThemeParameters): ContrastFinding[] {
         label: pair.label,
         mode,
         ratio,
-        passes: ratio >= 4.5,
+        passes: ratio >= pair.minimum,
       }
     }),
   )
 }
 
-function contrastRatio(foreground: string, background: string): number {
+export function contrastRatio(foreground: string, background: string): number {
   const light = Math.max(relativeLuminance(foreground), relativeLuminance(background))
   const dark = Math.min(relativeLuminance(foreground), relativeLuminance(background))
 
@@ -82,9 +76,19 @@ function contrastRatio(foreground: string, background: string): number {
 }
 
 function relativeLuminance(color: string): number {
+  if (/^#[\da-f]{6}$/i.test(color)) {
+    const channels = [1, 3, 5].map(index => {
+      const channel = Number.parseInt(color.slice(index, index + 2), 16) / 255
+
+      return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4
+    })
+
+    return 0.2126 * channels[0]! + 0.7152 * channels[1]! + 0.0722 * channels[2]!
+  }
+
   const match = color.match(/oklch\(([\d.]+) ([\d.]+) ([\d.-]+)\)/)
 
-  if (!match) return 0
+  if (!match) throw new Error(`Unsupported resolved color: ${color}`)
   const lightness = Number(match[1])
   const chroma = Number(match[2])
   const hue = (Number(match[3]) * Math.PI) / 180

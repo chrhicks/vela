@@ -221,7 +221,6 @@ export function LatestImage({
           <div className="capture-image__actions">
             <div className="capture-image__zoom" role="group" aria-label="Image scale">
               <Button
-                size="small"
                 tone={nativeVisible ? 'quiet' : 'neutral'}
                 aria-pressed={!nativeVisible}
                 onClick={() => setZoomed(false)}
@@ -229,7 +228,6 @@ export function LatestImage({
                 Fit
               </Button>
               <Button
-                size="small"
                 tone={nativeVisible ? 'neutral' : 'quiet'}
                 aria-pressed={nativeVisible}
                 onClick={() => setZoomed(true)}
@@ -242,7 +240,6 @@ export function LatestImage({
             ) : (
               rigId && (
                 <Button
-                  size="small"
                   disabled={retention.pending}
                   onClick={() => void retention.keep(frame)}
                 >
@@ -377,7 +374,7 @@ function retentionMessage(result: KeepResult, keep: (image: KeptFrame) => Promis
             Image from {time}: {result.error}
           </p>
           {result.retryable && (
-            <Button size="small" onClick={() => void keep(result.image)}>
+            <Button onClick={() => void keep(result.image)}>
               Retry saving image
             </Button>
           )}

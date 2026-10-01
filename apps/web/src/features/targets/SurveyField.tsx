@@ -344,7 +344,6 @@ export function SurveyField({
         <div>
           <strong>Camera orientation stays fixed</strong>
           <Button
-            size="small"
             tone="quiet"
             disabled={locked}
             onClick={() => {
@@ -365,7 +364,6 @@ export function SurveyField({
           ].map(([label, east, north]) => (
             <Button
               key={String(label)}
-              size="small"
               disabled={locked || !camera}
               aria-label={`Move frame ${label}`}
               onClick={() => nudge(Number(east), Number(north))}
@@ -377,14 +375,12 @@ export function SurveyField({
         <div>
           <span>Drag sky to pan · scroll to zoom</span>
           <Button
-            size="small"
             disabled={!ready}
             onClick={() => viewer.current?.setFoV(viewer.current.getFov()[0] / 1.5)}
           >
             Zoom in
           </Button>
           <Button
-            size="small"
             disabled={!ready}
             onClick={() => viewer.current?.setFoV(Math.min(90, viewer.current.getFov()[0] * 1.5))}
           >

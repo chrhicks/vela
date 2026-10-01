@@ -5,6 +5,7 @@ import * as drafts from './drafts'
 describe('@vela/ui export boundaries', () => {
   it('exports the complete initial component baseline from the stable root', () => {
     for (const name of [
+      'Appearance',
       'Badge',
       'Button',
       'Checkbox',
@@ -29,6 +30,7 @@ describe('@vela/ui export boundaries', () => {
   })
 
   it('removes promoted components from the draft boundary', () => {
+    expect(drafts).not.toHaveProperty('Appearance')
     expect(drafts).not.toHaveProperty('Dialog')
     expect(drafts).not.toHaveProperty('SkyPath')
   })

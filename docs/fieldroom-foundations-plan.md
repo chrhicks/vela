@@ -1,8 +1,9 @@
 # Fieldroom foundations implementation plan
 
-Status: planned. Production changes wait for the Step 1 reference gate in
-[fieldroom-adoption.md](fieldroom-adoption.md). This document expands its second
-slice; it does not record implementation or verification as complete.
+Status: implemented; independent review and final browser acceptance pending.
+The Step 1 reference gate in [fieldroom-adoption.md](fieldroom-adoption.md) passed
+before implementation. This document preserves the second slice’s before-work
+plan; measured results and deviations are recorded in the adoption document.
 
 Source inspection baseline: `15c2bbe19770ef55ed2d6aa830fb833a19216ae4`.
 Visual authority: frozen [DS.01–DS.16](visual-reference/fieldroom/system/),
@@ -289,3 +290,33 @@ browser pass, and deviations from this plan in the adoption document. Preserve
 frozen Paper images unchanged. Do not claim the slice complete from token values
 or successful compilation alone. Unresolved palette, font, crop, or geometry
 differences remain work; anti-aliasing differences are recorded separately.
+
+## Appearance geometry reconciliation
+
+The first visual estimate of a 338px Paper popover omitted its border extent.
+Precise source inspection of DS.16 node `45R-0` resolves the discrepancy:
+
+- Source CSS declares width 360, padding 20, border 1, and group gaps 12.
+  Content heights are header 44, label 20, option stack 154, and footer 44.
+  At normal browser CSS sizing the total is **340px**: 40 padding + 2 border
+  + 44 + 20 + 154 + 44 + 36 gaps.
+- Paper reports logical bounds **360 × 339.328125**, content width
+  **318.65625**, and an approximately **20.667px** world-coordinate inset.
+  Its declared 1px border is quantized to approximately two-thirds of a
+  logical pixel in that measured canvas. DS.05 corroborates this: button
+  `25N-0` has width 125.328125 for an 88px text box, two 18px paddings, and
+  the same declared border. These measurements describe Paper's rendering,
+  not a different padding requirement.
+- The matching 03.19 panel `3YF-0` exports at **360 × 339** at 1x. Raster
+  extent is distinct from logical layout. The browser keeps the declared
+  **20px padding and actual 1px border**, measuring **360 × 340**; the
+  **0.671875px** difference from Paper's measured logical height is recorded
+  as border quantization. No fractional CSS or compensating padding is used.
+- Source option rows (`3YL-0` and siblings) specify **10px radio-to-text gap**.
+  The implementation was corrected from 12 to 10. This is separate from the
+  unchanged **8px gap between option rows**.
+
+Both browser palettes retain 44px header/close targets and 46px desktop option
+rows, Barlow body text, and Space Grotesk heading text. The compact System row
+remains 64px. The Appearance browser suite checks keyboard/outside dismissal,
+focus return, compact bounds, reduced motion, and placement above a low anchor.

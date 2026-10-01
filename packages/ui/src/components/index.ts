@@ -21,3 +21,7 @@ export * from './SkyPath'
 export * from './NavigationBar'
 
 export * from './WorkingIndicator'
+
+export { Appearance } from './Appearance'
+
+export type { AppearancePreference, AppearanceProps } from './Appearance'

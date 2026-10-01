@@ -21,13 +21,11 @@ export const specimen: ComponentSpecimen = {
   controls: {
     label: { type: 'text', label: 'Label' },
     tone: { type: 'select', label: 'Tone', options: ['neutral', 'accent', 'quiet'] },
-    size: { type: 'select', label: 'Size', options: ['small', 'medium', 'large'] },
     disabled: { type: 'boolean', label: 'Disabled' },
   },
   defaultProps: {
     label: 'Start exposure',
     tone: 'neutral',
-    size: 'medium',
     disabled: false,
   },
   render: props => (
@@ -35,7 +33,6 @@ export const specimen: ComponentSpecimen = {
       disabled={Boolean(props.disabled)}
       icon={<CaptureIcon />}
       label={String(props.label)}
-      size={z.enum(['small', 'medium', 'large']).parse(props.size)}
       tone={z.enum(['neutral', 'accent', 'quiet']).parse(props.tone)}
     />
   ),

@@ -24,11 +24,13 @@ export function Input({
       <input
         {...props}
         className={`vela-input ${className}`.trim()}
+        aria-invalid={invalid || undefined}
+        aria-describedby={[props['aria-describedby'], message ? `${inputId}-message` : undefined].filter(Boolean).join(' ') || undefined}
         data-invalid={invalid}
         id={inputId}
       />
       {message ? (
-        <span className="vela-field__message" data-invalid={invalid}>
+        <span id={`${inputId}-message`} className="vela-field__message" data-invalid={invalid}>
           {message}
         </span>
       ) : null}

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   DEFAULT_PROFILE,
+  FIELDROOM_PROFILE,
   DEFAULT_SESSION,
   VELA_CURRENT_PROFILE,
   makeProfile,
@@ -60,7 +61,7 @@ function slugify(value: string): string {
 
 export function useWorkshop() {
   const [session, setSession] = useState<WorkingSession>(DEFAULT_SESSION)
-  const [profiles, setProfiles] = useState<DesignProfile[]>([DEFAULT_PROFILE, VELA_CURRENT_PROFILE])
+  const [profiles, setProfiles] = useState<DesignProfile[]>([FIELDROOM_PROFILE, DEFAULT_PROFILE, VELA_CURRENT_PROFILE])
   const [hydrated, setHydrated] = useState(false)
   const [status, setStatus] = useState('Loading local workspace…')
   const [undoStack, setUndoStack] = useState<Partial<ThemeParameters>[]>([])
@@ -71,10 +72,10 @@ export function useWorkshop() {
     Promise.all([loadSession(), loadProfiles()])
       .then(([storedSession, storedProfiles]) => {
         const nextSession = sessionFromUrl(storedSession ?? DEFAULT_SESSION)
-        const discovered = [DEFAULT_PROFILE, VELA_CURRENT_PROFILE, ...storedProfiles]
+        const discovered = [FIELDROOM_PROFILE, DEFAULT_PROFILE, VELA_CURRENT_PROFILE, ...storedProfiles]
 
         if (!discovered.some(profile => profile.id === nextSession.profileId))
-          nextSession.profileId = DEFAULT_PROFILE.id
+          nextSession.profileId = FIELDROOM_PROFILE.id
         const specimen = findSpecimen(nextSession.componentId, nextSession.specimenId)
         nextSession.componentId = specimen.componentId
         nextSession.specimenId = specimen.id
@@ -116,7 +117,7 @@ export function useWorkshop() {
   }, [hydrated, session])
 
   const activeProfile =
-    profiles.find(profile => profile.id === session.profileId) ?? DEFAULT_PROFILE
+    profiles.find(profile => profile.id === session.profileId) ?? FIELDROOM_PROFILE
 
   const theme = useMemo(
     () => resolveTheme(activeProfile, { ...session.unsavedOverrides, density: session.density }),
@@ -174,7 +175,7 @@ export function useWorkshop() {
 
   const selectProfile = useCallback(
     (profileId: string) => {
-      const profile = profiles.find(candidate => candidate.id === profileId) ?? DEFAULT_PROFILE
+      const profile = profiles.find(candidate => candidate.id === profileId) ?? FIELDROOM_PROFILE
       const resolved = resolveTheme(profile)
       setUndoStack([])
       setRedoStack([])
