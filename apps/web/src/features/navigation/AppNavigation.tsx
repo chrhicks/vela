@@ -20,6 +20,7 @@ export function AppNavigation() {
   const base = rigId ? `/rigs/${encodeURIComponent(rigId)}` : ''
   const targets = useRef(new Map<string, string>())
   const inTargets = pathname.startsWith(`${base}/observe/targets`)
+  const inPhotographs = pathname.startsWith(`${base}/observe/saved-images`)
 
   useEffect(() => {
     if (rigId && inTargets) targets.current.set(rigId, search)
@@ -65,7 +66,9 @@ export function AppNavigation() {
       home={routeLink('/')}
       rigs={rigs}
       currentRigId={rigId}
-      onRigChange={id => navigate(id ? `/rigs/${encodeURIComponent(id)}/observe/capture` : '/')}
+      onRigChange={id => navigate(id
+        ? `/rigs/${encodeURIComponent(id)}/observe/${inPhotographs ? 'saved-images' : 'capture'}`
+        : '/')}
       utility={
         <>
           <Appearance
@@ -82,7 +85,7 @@ export function AppNavigation() {
       links={rigId ? [
         { label: 'Tonight', ...routeLink(`${base}/observe/capture`), current: pathname === `${base}/observe/capture` || pathname === `${base}/observe` },
         { label: 'Explore the sky', ...routeLink(`${base}/observe/targets${targetSearch}`), current: inTargets },
-        { label: 'Photographs', ...routeLink(`${base}/observe/saved-images`), current: pathname.startsWith(`${base}/observe/saved-images`) },
+        { label: 'Photographs', ...routeLink(`${base}/observe/saved-images`), current: inPhotographs },
       ] : [{ label: 'Explore the sky', ...routeLink('/explore'), current: pathname === '/explore' }]}
       {...activityProps}
     />

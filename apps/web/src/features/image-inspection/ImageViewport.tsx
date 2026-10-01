@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefO
 import { createPortal } from 'react-dom'
 import { Dialog } from '@vela/ui'
 import type { ImageInspection } from './useImageInspection'
-import '../capture/latest-image.css'
+import './image-inspection.css'
 
 export function ImageViewport({ inspection, alt, empty, expanded = false, layoutKey }: {
   inspection: ImageInspection

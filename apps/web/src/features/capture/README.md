@@ -65,9 +65,10 @@ warning. A fresh setting resolves uncertainty even if it differs from the reques
 value; the interface shows the observed state rather than claiming the write won.
 
 Saved images are available at the per-rig `/observe/saved-images` route independently
-of camera readiness. The dated collection and detail page validate retained-image
-metadata and exact same-origin download resources. They use the approved workshop
-layout with real preview URLs and native download links for FITS and preview PNG.
+of camera readiness. [Photographs](../photographs/README.md) owns the dated
+collection and selected-image composition, validating retained metadata and exact
+same-origin download resources. Capture owns retention actions; browsing uses
+real preview URLs and native download links for FITS and preview PNG.
 
 Manual-save feedback is owned by the image viewer rather than a keyed frame
 button. A new exposure may replace displayed pixels while an earlier save is
@@ -112,8 +113,8 @@ snapshot publishes atomically with decoded pixels. Its resource identity include
 both fitted/native URLs as well as acquisition ID, so a saved renderer version
 cannot inherit another version's native read result. Owners explicitly supply a
 scope (for capture, the rig); URL directory shape never determines reset behavior.
-A selected saved-image owner should reset inspection on deliberate selection,
-without remounting the collection.
+Photographs resets selected inspection on deliberate selection or renderer
+replacement without remounting its collection.
 
 The shared mechanism owns hold/native/pan state and themed portal focus, inert,
 and body-scroll restoration. Feature owners supply image descriptions, chrome,
