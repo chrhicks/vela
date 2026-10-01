@@ -277,3 +277,9 @@ Paper's rendered 10px circle. It now uses a decorative 10px circle with the sour
 text gap, preserving the accessible Capturing status. Ten affected Tonight browser
 checks and lint passed after this correction. A final independent check and
 comparison remain required before acceptance.
+
+Final review of `032c8b1` returned **OK** with no findings. Full project checks
+(865 tests, lint and builds), 48 app browser checks, seven workshop checks and
+four Python tests passed. The parent then completed the final paired comparison
+and native DOM inspection. [Acceptance evidence](visual-evidence/fieldroom/tonight/README.md)
+retains the nine screenshots and source-aware deviations. This slice is accepted.

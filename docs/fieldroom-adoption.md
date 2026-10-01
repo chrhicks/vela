@@ -222,7 +222,7 @@ application-owned checks. Phase 2 is accepted; Phase 3 may begin.
 
 ## 3. Tonight and Appearance vertical slice
 
-Status: implemented; independent review corrections in progress.
+Status: accepted at `032c8b1` after independent OK and final browser comparison.
 
 ### Plan
 
@@ -261,8 +261,13 @@ the capture projection's selected-camera cooling, including its own stale state.
 The sky boundary projects azimuth at `observedAt` alongside current altitude;
 night samples remain for the trace. Regression coverage includes a warmer guide
 camera first in inventory, unavailable selected-camera cooling, and a future
-sample pointing in a different direction. Renewed independent review and final
-visual acceptance are pending.
+sample pointing in a different direction. Renewed independent reviews at `2d4395d`, `80d9dd7`, and `032c8b1` returned
+**OK**. The final reviewed checkpoint passed 865 project tests and builds, 48
+application browser checks, seven workshop checks and four Python tests. The
+parent completed the final paired desktop/phone and interruption comparison,
+including Appearance and unchanged fitted/native imagery. [Retained evidence](visual-evidence/fieldroom/tonight/README.md)
+records source substitutions, exact bounds, and the native screenshot-tool
+limitation. Tonight/Appearance is accepted; Explore/framing/preparation may begin.
 
 ## 4. Required capability additions
 
@@ -314,8 +319,8 @@ Status: planned; each sub-slice gets its own detailed plan and gate before work.
 
 Concrete plans: [Explore, framing, preparation](fieldroom-explore-plan.md),
 [Photographs](fieldroom-photographs-plan.md), and
-[Equipment/Home/onboarding](fieldroom-equipment-plan.md). Alignment/autofocus
-will receive its concrete plan before its implementation begins.
+[Equipment/Home/onboarding](fieldroom-equipment-plan.md). The [alignment/autofocus plan](fieldroom-alignment-plan.md) records the last
+slice before its implementation begins.
 
 Each slice includes loading, empty, pending, unavailable, interrupted, error,
 and confirmed states where reachable. Both palettes use the same geometry and
