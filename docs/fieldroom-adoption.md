@@ -58,7 +58,7 @@ font, crop, or content errors behind a broad screenshot tolerance.
 
 ## 1. Freeze references and establish coverage
 
-Status: reference baseline frozen; independent review pending.
+Status: initial reference checkpoint accepted.
 
 ### Plan
 
@@ -97,17 +97,22 @@ Actual full-content heights are preserved: Frame and Prepare 989px, Equipment
 excluding the 62px mock OS strip. The local reference photographs have hashes
 and a link to their existing license/credit record.
 
-The missing Autofocus reference is being drawn as a separate supplement with
+The missing Autofocus reference was drawn as a separate supplement with
 its own [before-work plan](visual-reference/fieldroom/autofocus-design.md).
-It must be frozen before Autofocus adoption; it does not change the immutable
-initial reference set or block unrelated shared foundation recipes.
+Its four PNGs and design values have a separate manifest; it does not change
+the immutable initial reference set. Parent visual inspection corrected a
+start-position graph label before the supplement was frozen. Its production
+behavior will be independently verified with the Autofocus slice.
 
-Draft delivery PR: https://github.com/chrhicks/vela/pull/86. Independent review
-and reference acceptance are still pending; no production styles have changed.
+Draft delivery PR: https://github.com/chrhicks/vela/pull/86. Fresh independent
+review of `5257da9` returned **OK** after correcting the archive recipe's typing
+and spacing. `pnpm lint` passed. The final reference pass confirmed frozen
+dimensions, hashes, legacy desktop/phone output, and the corrected supplement.
+This accepts reference preparation only; no production appearance is attested.
 
 ## 2. Shared Fieldroom foundations
 
-Status: planned; waits for legacy capture.
+Status: in progress after the accepted reference checkpoint.
 
 ### Plan
 

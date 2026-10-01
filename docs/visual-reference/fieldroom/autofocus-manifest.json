@@ -1,0 +1,57 @@
+{
+  "fileId": "01M3SATFK7ZW5ZCBPFSWD6XS91",
+  "exportedAt": "2026-10-01T01:48:45.384968+00:00",
+  "scale": "1x",
+  "records": [
+    {
+      "nodeId": "48X-0",
+      "name": "03.23 / Autofocus \u2014 setup",
+      "pageId": "p-1-0",
+      "path": "app/03-23.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "f648c229d2b5329334d4f103a8032be0826640627cedc792d9033224ca6d585a",
+      "appCrop": null,
+      "kind": "application"
+    },
+    {
+      "nodeId": "48Y-0",
+      "name": "03.24 / Autofocus \u2014 walking",
+      "pageId": "p-1-0",
+      "path": "app/03-24.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "f44b9683a9296adbd3d7751e2068395eaee822fed0a364d896bdc9f6ddaacb47",
+      "appCrop": null,
+      "kind": "application",
+      "exportedAt": "2026-10-01T01:50:02.234705+00:00"
+    },
+    {
+      "nodeId": "48Z-0",
+      "name": "03.25 / Autofocus \u2014 phone walking",
+      "pageId": "p-1-0",
+      "path": "app/03-25.png",
+      "width": 390,
+      "height": 844,
+      "sha256": "2623695bf2ca4d5dcbe2fcf8ac1ff1f98b1b6e17a228283add332b8280f01570",
+      "appCrop": {
+        "x": 0,
+        "y": 62,
+        "width": 390,
+        "height": 782
+      },
+      "kind": "application"
+    },
+    {
+      "nodeId": "490-0",
+      "name": "03.26 / Autofocus \u2014 outcomes",
+      "pageId": "p-1-0",
+      "path": "app/03-26.png",
+      "width": 1440,
+      "height": 1100,
+      "sha256": "efb2c014a242bf417456d01ba28aa4af625fa910f51d18589ff66a23f2c7753b",
+      "appCrop": null,
+      "kind": "component-states"
+    }
+  ]
+}

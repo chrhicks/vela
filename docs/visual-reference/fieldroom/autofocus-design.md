@@ -7,8 +7,8 @@ capability. This work creates new Paper boards only; existing approved boards
 and production code remain unchanged.
 
 Authority: [Fieldroom adoption](../../fieldroom-adoption.md), the finalized
-Paper system, and the current [browser presentation contract](../../../apps/web/src/features/autofocus/README.md)
-and [server contract](../../../apps/server/src/autofocus/README.md).
+Paper system, and the current [browser presentation contract](../../../../apps/web/src/features/autofocus/README.md)
+and [server contract](../../../../apps/server/src/autofocus/README.md).
 The current route and hook were inspected before planning this reference.
 
 ### Proposed boards
@@ -73,4 +73,35 @@ slice gate; these drawings do not establish production implementation evidence.
 
 ## Actual result
 
-Pending.
+Four new boards were created on the unused y=7700 row and exported at 1x.
+The original approved boards and original export manifest were not edited.
+
+| Board | Paper node | Export | Dimensions |
+| --- | --- | --- | --- |
+| Setup | `48X-0` | [03-23.png](app/03-23.png) | 1440 × 900 |
+| Walking | `48Y-0` | [03-24.png](app/03-24.png) | 1440 × 900 |
+| Phone walking | `48Z-0` | [03-25.png](app/03-25.png) | 390 × 844 |
+| Outcomes | `490-0` | [03-26.png](app/03-26.png) | 1440 × 1100 |
+
+The outcome sheet includes the five planned states plus browser connection
+loss, applying the existing offline precedence described above. It is a
+component-state reference, not a full application screen. The phone export
+contains a 62px mock OS status bar; its app comparison crop is 390 × 782.
+
+[The supplement manifest](autofocus-manifest.json) records source IDs,
+dimensions, crop, export time and hashes. [The design values](autofocus-reference-fixtures.json)
+record the exact sample data and outcome numbers; these are designed examples,
+not observations of the rig and not a runnable API fixture. Application parity
+fixtures must project these values through the actual contracts.
+
+All four exported PNGs were inspected visually at native size. Text fits,
+measured points match the values, the walking view has no premature fit, and
+the 46px Stop control remains fully visible on phone. The retry, offline and
+restoration cards distinguish retained observations from confirmed outcomes.
+This establishes design/export QA only; independent verification and production
+browser comparison remain subsequent adoption gates.
+
+Parent visual review clarified the walking chart annotation: the dashed line
+is labeled **Start 32,842**, matching the legend and its x coordinate. The
+current position remains **32,792** in the activity panel. The corrected
+03.24 export was inspected again and its supplement hash refreshed.

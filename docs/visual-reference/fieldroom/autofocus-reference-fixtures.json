@@ -1,0 +1,74 @@
+{
+  "description": "Deterministic design values, not recorded device observations or a runtime API fixture.",
+  "rig": "Askar FRA 400",
+  "camera": "ZWO ASI2600MC Pro",
+  "focuser": "ZWO EAF",
+  "startPosition": 32842,
+  "stepSize": 50,
+  "offsetSteps": 4,
+  "exposureDuration": 2,
+  "maxStep": 60000,
+  "window": {
+    "minimum": 32642,
+    "maximum": 33042
+  },
+  "walking": {
+    "phase": "walking",
+    "activity": "exposing",
+    "currentPosition": 32792,
+    "fit": null,
+    "lastSampleTime": "21:03:10",
+    "samples": [
+      {
+        "position": 33042,
+        "hfr": 5.1
+      },
+      {
+        "position": 32992,
+        "hfr": 4.4
+      },
+      {
+        "position": 32942,
+        "hfr": 3.65
+      },
+      {
+        "position": 32892,
+        "hfr": 2.95
+      },
+      {
+        "position": 32842,
+        "hfr": 2.45
+      }
+    ]
+  },
+  "outcomes": {
+    "completed": {
+      "confirmedPosition": 32788,
+      "fittedMinimum": 32788,
+      "lowestMeasuredSamplePosition": 32792
+    },
+    "stopped": {
+      "confirmedPosition": 32842
+    },
+    "travelLimit": {
+      "currentPosition": 150,
+      "stepSize": 50,
+      "windowMinimum": -50,
+      "windowMaximum": 350,
+      "startEnabled": false
+    },
+    "failedRestore": {
+      "restored": false,
+      "targetPosition": 32842
+    },
+    "retryingRead": {
+      "captureReadState": "retrying",
+      "retainedWalkingSamples": true,
+      "serverConnected": true
+    },
+    "offline": {
+      "serverConnected": false,
+      "stopEnabled": false
+    }
+  }
+}
