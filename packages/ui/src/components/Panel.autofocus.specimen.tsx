@@ -1,19 +1,23 @@
 import { useEffect, useState } from 'react'
 import type { ComponentSpecimen } from '../themes'
-import { Badge } from './Badge'
 import { Button } from './Button'
 import { Input } from './Input'
-import { Panel } from './Panel'
+import { PreparationSpecimenHeader } from './Panel.polar-alignment-inspection'
+import './Panel.polar-alignment.specimen.css'
 import './Panel.autofocus.specimen.css'
 
 const phases = [
   'setup',
   'sampling',
   'fitting',
+  'confirming',
   'complete',
   'restoring',
   'restored',
   'travel-limit',
+  'interrupted',
+  'offline',
+  'restore-unconfirmed',
 ] as const
 
 const examples = ['current-focus', 'near-inward-limit'] as const
@@ -26,171 +30,170 @@ const FRA_MAX = 60000
 
 const OFFSET = 4
 
-const FOCUS = 32838
+const FOCUS = 32788
 
 const MIN_HFR = 2.18
 
-const CURVE_B = 95
+const CURVE_B = 120
+
+const referenceHfr = [5.1, 4.4, 3.65, 2.95, 2.45, 2.18, 2.48, 3.05, 3.75]
 
 type Props = Record<string, string | number | boolean>
 
 interface Sample {
   position: number
-  hfr: number | null
+  hfr: number
 }
 
-function hyperbola(position: number, p = FOCUS, a = MIN_HFR, b = CURVE_B) {
-  return a * Math.sqrt(1 + ((position - p) / b) ** 2)
-}
+const number = (value: number) => value.toLocaleString('en-US')
 
-function walkPositions(start: number, stepSize: number, maxStep = FRA_MAX) {
-  const high = start + OFFSET * stepSize
-  const low = start - OFFSET * stepSize
-
-  if (start < 1 || start > maxStep - 1 || low < 1 || high > maxStep - 1) return null
-
-  const positions: number[] = []
-
-  for (let position = high; position >= low; position -= stepSize) positions.push(position)
-
-  return { positions, low, high }
-}
-
-function samplesFor(positions: number[]): Sample[] {
-  return positions.map(position => ({ position, hfr: hyperbola(position) }))
-}
-
-function minSample(samples: Sample[]) {
-  const measured = samples.filter(sample => sample.hfr !== null)
-
-  if (!measured.length) return null
-
-  return measured.reduce((best, sample) => (sample.hfr! < best.hfr! ? sample : best))
-}
+const hyperbola = (position: number) =>
+  MIN_HFR * Math.sqrt(1 + ((position - FOCUS) / CURVE_B) ** 2)
 
 function VCurve({
   start,
-  current,
-  window,
+  low,
+  high,
   samples,
   fit,
+  compact = false,
 }: {
   start: number
-  current: number | null
-  window: { low: number; high: number }
+  low: number
+  high: number
   samples: Sample[]
-  fit: { p: number; a: number; b: number } | null
+  fit: boolean
+  compact?: boolean
 }) {
-  const width = 640
-  const height = 280
-  const left = 48
-  const right = 18
-  const top = 16
-  const bottom = 44
-  const plotWidth = width - left - right
-  const plotHeight = height - top - bottom
-  const pad = Math.max(window.high - window.low, 1) * 0.08
-  const xMin = window.low - pad
-  const xMax = window.high + pad
-  const hfrs = samples.map(sample => sample.hfr).filter((value): value is number => value !== null)
+  const width = compact ? 320 : 838
+  const height = compact ? 146 : 280
+  const left = compact ? 32 : 64
+  const right = compact ? 14 : 24
+  const top = compact ? 18 : 32
+  const bottom = compact ? 32 : 56
+  const pad = (high - low) * 0.08
 
-  const yMax =
-    Math.max(
-      6,
-      ...(hfrs.length ? hfrs : [hyperbola(window.high)]),
-      fit ? hyperbola(window.high, fit.p, fit.a, fit.b) : 0,
-    ) * 1.12
+  const x = (value: number) =>
+    left +
+    ((value - low + pad) / (high - low + pad * 2)) * (width - left - right)
 
-  const x = (position: number) => left + ((position - xMin) / (xMax - xMin)) * plotWidth
-  const y = (hfr: number) => top + (1 - hfr / yMax) * plotHeight
-  const ticks = [window.low, start, window.high]
-  const latest = samples.at(-1)
-  const lowest = minSample(samples)
+  const max = Math.max(
+    6,
+    Math.ceil(
+      Math.max(
+        ...samples.map((sample) => sample.hfr),
+        fit ? hyperbola(high) : 0,
+      ) / 2,
+    ) * 2,
+  )
 
-  const curve = fit
-    ? Array.from({ length: 49 }, (_, index) => {
-        const position = xMin + (index / 48) * (xMax - xMin)
+  const y = (value: number) => top + (1 - value / max) * (height - top - bottom)
 
-        return `${index === 0 ? 'M' : 'L'}${x(position).toFixed(1)} ${y(hyperbola(position, fit.p, fit.a, fit.b)).toFixed(1)}`
-      }).join(' ')
-    : ''
+  const lowest = samples.length
+    ? samples.reduce((a, b) => (a.hfr < b.hfr ? a : b))
+    : null
+
+  const curve = Array.from({ length: 49 }, (_, index) => {
+    const position = low - pad + (index / 48) * (high - low + 2 * pad)
+
+    return `${index ? 'L' : 'M'}${x(position)} ${y(hyperbola(position))}`
+  }).join(' ')
 
   return (
     <svg
-      className="vela-af-chart"
+      className={`vela-af-chart ${compact ? 'vela-af-chart--compact' : 'vela-af-chart--desktop'}`}
       viewBox={`0 0 ${width} ${height}`}
       role="img"
       aria-label="Autofocus V-curve of focuser position versus star HFR"
     >
-      {[0.25, 0.5, 0.75, 1].map(fraction => (
-        <line
-          key={fraction}
-          className="vela-af-grid"
-          x1={left}
-          x2={width - right}
-          y1={y(yMax * fraction)}
-          y2={y(yMax * fraction)}
-        />
-      ))}
-      <line className="vela-af-axis" x1={left} y1={top} x2={left} y2={height - bottom} />
-      <line
-        className="vela-af-axis"
-        x1={left}
-        y1={height - bottom}
-        x2={width - right}
-        y2={height - bottom}
-      />
-      <text x={left} y={12}>
-        HFR · px
-      </text>
-      <text x={left + plotWidth / 2} y={height - 8} textAnchor="middle">
-        Focuser position
-      </text>
-      {ticks.map(tick => (
-        <g key={tick}>
-          <line className="vela-af-grid" x1={x(tick)} x2={x(tick)} y1={top} y2={height - bottom} />
-          <text x={x(tick)} y={height - 22} textAnchor="middle">
-            {tick}
+      {(compact ? [0, 0.5, 1] : [0, 1 / 3, 2 / 3, 1]).map((fraction) => (
+        <g key={fraction}>
+          <line
+            className="vela-af-grid"
+            x1={left}
+            x2={width - right}
+            y1={y(fraction * max)}
+            y2={y(fraction * max)}
+          />
+          <text x={left - 20} y={y(fraction * max) + 5} textAnchor="end">
+            {Number((fraction * max).toFixed(1))}
           </text>
         </g>
       ))}
-      <line className="vela-af-start" x1={x(start)} x2={x(start)} y1={top} y2={height - bottom} />
-      {fit && (
-        <line
-          className="vela-af-fit-line"
-          x1={x(Math.round(fit.p))}
-          x2={x(Math.round(fit.p))}
-          y1={top}
-          y2={height - bottom}
-        />
-      )}
-      {curve && <path className="vela-af-hyperbola" d={curve} />}
-      {lowest && lowest.hfr !== null && (
-        <circle className="vela-af-min-sample" cx={x(lowest.position)} cy={y(lowest.hfr)} r="8" />
-      )}
-      {samples.map((sample, index) => {
-        const hfr = sample.hfr ?? yMax * 0.08
-
-        return (
-          <circle
-            key={sample.position}
-            className="vela-af-point"
-            data-latest={index === samples.length - 1 || undefined}
-            data-empty={sample.hfr === null || undefined}
-            cx={x(sample.position)}
-            cy={y(hfr)}
-            r={index === samples.length - 1 ? 5 : 4}
-          />
-        )
-      })}
-      {current !== null && latest && (
+      <path
+        className="vela-af-axis"
+        d={`M${left} ${top}V${height - bottom}H${width - right}`}
+      />
+      <line
+        className="vela-af-start"
+        x1={x(start)}
+        x2={x(start)}
+        y1={top}
+        y2={height - bottom}
+      />
+      {[low, start, high].map((value) => (
         <text
-          x={x(current)}
-          y={Math.max(28, y(latest.hfr ?? yMax * 0.08) - 12)}
+          key={value}
+          x={x(value)}
+          y={height - (compact ? 7 : 31)}
           textAnchor="middle"
         >
-          now
+          {number(value)}
         </text>
+      ))}
+      {!compact && (
+        <>
+          <text x={left} y={17}>
+            HFR · px
+          </text>
+          <text x={x(start)} y={17} textAnchor="middle">
+            Start {number(start)}
+          </text>
+          <text
+            x={(left + width - right) / 2}
+            y={height - 5}
+            textAnchor="middle"
+          >
+            Focuser position
+          </text>
+        </>
+      )}
+      {fit && (
+        <>
+          <path className="vela-af-hyperbola" d={curve} />
+          <line
+            className="vela-af-fit-line"
+            x1={x(FOCUS)}
+            x2={x(FOCUS)}
+            y1={top}
+            y2={height - bottom}
+          />
+        </>
+      )}
+      {samples.map((sample, index) => (
+        <circle
+          key={sample.position}
+          className="vela-af-point"
+          cx={x(sample.position)}
+          cy={y(sample.hfr)}
+          r={
+            compact
+              ? index === samples.length - 1
+                ? 4.5
+                : 4
+              : index === samples.length - 1
+                ? 6
+                : 5
+          }
+        />
+      ))}
+      {lowest && (
+        <circle
+          className="vela-af-min-sample"
+          cx={x(lowest.position)}
+          cy={y(lowest.hfr)}
+          r={compact ? 8 : 10}
+        />
       )}
     </svg>
   )
@@ -205,344 +208,559 @@ function AutofocusPreview({
 }) {
   const [local, setLocal] = useState(props)
   const values = onPropsChange ? props : local
-  const example = String(values.example ?? 'current-focus')
-  const start = example === 'near-inward-limit' ? 80 : FRA_START
-  const stepSize = Math.max(1, Math.floor(Number(values.stepSize) || 50))
-  const phase = phases.find(candidate => candidate === values.phase) ?? 'setup'
-  const planned = walkPositions(start, stepSize)
-  const plannedCount = planned?.positions.length ?? 0
-  const allSamples = planned ? samplesFor(planned.positions) : []
+  const phase = phases.find((value) => value === values.phase) ?? 'setup'
+
+  const start =
+    phase === 'travel-limit' || values.example === 'near-inward-limit'
+      ? 150
+      : FRA_START
+
+  const step = Math.max(1, Math.floor(Number(values.stepSize) || 50))
+  const low = start - OFFSET * step
+  const high = start + OFFSET * step
+  const setup = phase === 'setup' || phase === 'travel-limit'
+  const blocked = low < 1 || high >= FRA_MAX || phase === 'travel-limit'
+  const interrupted = phase === 'interrupted'
+  const offline = phase === 'offline'
+  const complete = phase === 'complete'
+  const failed = phase === 'restore-unconfirmed'
+  const stopped = phase === 'restored'
+  const restoring = phase === 'restoring'
+  const active = !setup && !complete && !failed && !stopped
   const [playing, setPlaying] = useState(false)
   const [landed, setLanded] = useState(0)
-  const [activity, setActivity] = useState<'moving' | 'exposing'>('moving')
+  const [walkStarted, setWalkStarted] = useState(false)
+  const [activity, setActivity] = useState<'moving' | 'exposing'>('exposing')
 
-  function update(patch: Props) {
-    if (onPropsChange) onPropsChange(patch)
-    else setLocal(current => ({ ...current, ...patch }))
-  }
+  const update = (patch: Props) =>
+    onPropsChange
+      ? onPropsChange(patch)
+      : setLocal((value) => ({ ...value, ...patch }))
 
   useEffect(() => {
-    if (!playing || phase !== 'sampling' || !planned) return
+    if (!playing || phase !== 'sampling') return
 
-    if (landed >= plannedCount) {
-      setPlaying(false)
+    if (landed >= 9) {
       update({ phase: 'fitting' })
 
       return
     }
 
     setActivity('moving')
-    const move = window.setTimeout(() => setActivity('exposing'), 380)
-    const land = window.setTimeout(() => setLanded(count => count + 1), 900)
+    const moving = window.setTimeout(() => setActivity('exposing'), 380)
+
+    const capture = window.setTimeout(
+      () => setLanded((value) => value + 1),
+      900,
+    )
 
     return () => {
-      window.clearTimeout(move)
-      window.clearTimeout(land)
+      clearTimeout(moving)
+      clearTimeout(capture)
     }
-  }, [playing, phase, landed, plannedCount])
-
+  }, [playing, phase, landed])
   useEffect(() => {
-    if (phase !== 'fitting') return
-    const finish = window.setTimeout(() => update({ phase: 'complete' }), 700)
+    if (!['fitting', 'confirming', 'restoring'].includes(phase) || !playing)
+      return
 
-    return () => window.clearTimeout(finish)
-  }, [phase])
+    const next = new Map([
+      ['fitting', 'confirming'],
+      ['restoring', 'restored'],
+      ['confirming', 'complete'],
+    ]).get(phase)
 
-  let snapshotCount: number
+    if (!next) return
+    const timer = window.setTimeout(() => update({ phase: next }), 900)
 
-  if (phase === 'setup' || phase === 'travel-limit') {
-    snapshotCount = 0
-  } else if (playing) {
-    snapshotCount = landed
-  } else if (phase === 'sampling') {
-    snapshotCount = Math.min(4, allSamples.length)
-  } else if (phase === 'restoring' || phase === 'restored') {
-    snapshotCount = landed > 0 ? landed : Math.min(3, allSamples.length)
-  } else {
-    snapshotCount = allSamples.length
-  }
+    return () => clearTimeout(timer)
+  }, [phase, playing])
 
-  const samples = allSamples.slice(0, snapshotCount)
-  const fit = phase === 'complete' ? { p: FOCUS, a: MIN_HFR, b: CURVE_B } : null
+  const count = setup
+    ? 0
+    : walkStarted && !complete && phase !== 'fitting' && phase !== 'confirming'
+      ? landed
+      : complete || phase === 'fitting' || phase === 'confirming'
+        ? 9
+        : 5
 
-  const current =
-    phase === 'complete' && fit
-      ? Math.round(fit.p)
-      : phase === 'restored' ||
-          phase === 'restoring' ||
-          phase === 'setup' ||
-          phase === 'travel-limit'
-        ? start
-        : (samples.at(-1)?.position ?? start)
+  const samples = Array.from({ length: count }, (_, index) => ({
+    position: high - index * step,
+    hfr:
+      step === 50 && start === FRA_START
+        ? referenceHfr[index]!
+        : hyperbola(high - index * step),
+  }))
 
-  const travelBlocked = !planned || phase === 'travel-limit' || example === 'near-inward-limit'
-  const setup = phase === 'setup' || phase === 'travel-limit'
-  const lowest = minSample(samples)
   const latest = samples.at(-1)
-  const busy = phase === 'sampling' || phase === 'fitting' || phase === 'restoring'
 
-  const windowRange = planned ?? {
-    low: Math.max(1, start - OFFSET * stepSize),
-    high: start + OFFSET * stepSize,
+  const lowest = samples.length
+    ? samples.reduce((a, b) => (a.hfr < b.hfr ? a : b))
+    : null
+
+  const current = stopped
+    ? start
+    : complete || phase === 'confirming'
+      ? FOCUS
+      : restoring
+        ? start
+        : high - Math.min(count, 8) * step
+
+  const fit = complete || phase === 'confirming'
+
+  const badge = offline
+    ? 'Connection interrupted'
+    : interrupted
+      ? 'Camera observation interrupted'
+      : failed
+        ? 'Start position not confirmed'
+        : stopped
+          ? 'Start position restored'
+          : restoring
+            ? 'Restoring start…'
+            : complete
+              ? 'Focus confirmed'
+              : phase === 'fitting'
+                ? 'Fitting'
+                : phase === 'confirming'
+                  ? 'Confirming'
+                  : setup
+                    ? blocked
+                      ? 'Walk would approach a travel limit'
+                      : 'Ready to start'
+                    : 'Walking'
+
+  const action = () => {
+    if (active) {
+      setPlaying(true)
+      update({ phase: 'restoring' })
+    } else {
+      setPlaying(false)
+      setLanded(0)
+      setWalkStarted(false)
+      update({ phase: 'setup' })
+    }
   }
 
-  const activityLabels = {
-    sampling:
-      activity === 'moving'
-        ? `Moving to ${planned?.positions[landed] ?? current}…`
-        : `Exposing at ${planned?.positions[landed] ?? current}…`,
-    fitting: 'Fitting the hyperbola…',
-    restoring: `Restoring start ${start}…`,
-    complete: 'Fitted focus is ready',
-    restored: 'Walk stopped · start restored',
-    setup: 'Ready to start from the current position',
-    'travel-limit': 'Ready to start from the current position',
+  const actionLabel = active
+    ? 'Stop and restore start'
+    : complete
+      ? 'Focus again'
+      : 'Back to setup'
+
+  const outcomeByPhase = {
+    interrupted: {
+      eyebrow: 'Camera read retry',
+      title: 'Waiting for the same exposure',
+      body: 'Samples and the last sample time stay visible. The focuser does not advance while camera reads retry.',
+      fact: `Last sample 21:03:10 · ${count} measured samples`,
+      footer: 'Server connected · Stop remains available',
+      tone: 'warning',
+    },
+    complete: {
+      eyebrow: 'Confirmed completion',
+      title: 'Fitted focus is ready',
+      body: `Focuser position ${number(FOCUS)} is confirmed. The fitted minimum and lowest measured sample remain distinct.`,
+      fact: `Fitted focus ${number(FOCUS)} · Lowest sample ${number(lowest?.position ?? start)}`,
+      footer: 'Return to setup before another walk',
+      tone: 'active',
+    },
+    restored: {
+      eyebrow: 'Confirmed stop',
+      title: 'Start position restored',
+      body: `The walk stopped before a fitted focus. The focuser is back at ${number(start)}, where this session began.`,
+      fact: `Stopped · Current position ${number(start)}`,
+      footer: 'Retain the curve and completed samples',
+      tone: 'active',
+    },
+    'restore-unconfirmed': {
+      eyebrow: 'Restoration failed',
+      title: 'Start position not confirmed',
+      body: `The run failed and return to ${number(start)} was not confirmed. Vela did not repeat the move. Retain the measured curve.`,
+      fact: 'Current position is the last received reading',
+      footer: 'Action availability follows the server state',
+      tone: 'danger',
+    },
+    offline: {
+      eyebrow: 'Browser connection lost',
+      title: 'Autofocus state is unknown',
+      body: 'Keep the last received curve and readings. Hide live activity while reconnecting; do not present a successful stop.',
+      fact: 'Last sample 21:03:10 · Readings interrupted',
+      footer: 'Unavailable until the server can be reached',
+      tone: 'warning',
+    },
   }
 
-  const activityLabel = activityLabels[phase]
+  const outcome =
+    setup && blocked
+      ? {
+          eyebrow: 'Setup · Travel limit',
+          title: 'Window does not fit',
+          body: `At position ${number(start)}, step size ${step} would put this window across a mechanical limit. Adjust the step size before starting.`,
+          fact: 'Position 0 and MaxStep are mechanical limits',
+          footer: 'No movement commanded · Stay in setup',
+          tone: 'warning',
+        }
+      : Object.entries(outcomeByPhase).find(
+          ([candidate]) => candidate === phase,
+        )?.[1]
 
-  const settledGuidance = {
-    complete:
-      'The fitted minimum is an integer step inside the sampled window. The lowest sampled HFR is shown only for comparison.',
-    restored: 'Start a new walk from the current position when you are ready.',
-  }
-
-  let badge: string
-
-  if (setup) {
-    badge = travelBlocked ? 'Blocked' : 'Not started'
-  } else if (phase === 'sampling') {
-    badge = 'Walking'
-  } else if (phase === 'fitting') {
-    badge = 'Fitting'
-  } else if (phase === 'complete') {
-    badge = 'Complete'
-  } else if (phase === 'restoring') {
-    badge = 'Restoring'
-  } else {
-    badge = 'Restored'
-  }
-
-  function startWalk() {
-    if (travelBlocked) return
-
-    setLanded(0)
-    setPlaying(true)
-    update({ phase: 'sampling' })
-  }
-
-  const readout = (
-    <Panel className="vela-af-readout">
-      <dl>
-        <div>
-          <dt>Start</dt>
-          <dd>{start}</dd>
-        </div>
-        <div>
-          <dt>Current</dt>
-          <dd>{current}</dd>
-        </div>
-        <div>
-          <dt>Latest sample</dt>
-          <dd>
-            {latest
-              ? latest.hfr === null
-                ? `${latest.position} · no stars`
-                : `${latest.position} · ${latest.hfr.toFixed(2)} px`
-              : '—'}
-          </dd>
-        </div>
-        <div>
-          <dt>Fitted focus</dt>
-          <dd>{fit ? Math.round(fit.p) : '—'}</dd>
-        </div>
-        <div>
-          <dt>Min-sample</dt>
-          <dd>{lowest ? lowest.position : '—'}</dd>
-        </div>
-      </dl>
-      <div className="vela-af-activity">
-        <div className="vela-af-activity__line" role="status">
-          {busy ? <span className="vela-af-activity__spinner" aria-hidden="true" /> : null}
-          <strong>{activityLabel}</strong>
-        </div>
-        <p>
-          {samples.length
-            ? `${samples.length} of ${allSamples.length || OFFSET * 2 + 1} shorts on the curve.`
-            : 'No samples yet. The graph fills as each short exposure lands.'}
-        </p>
-      </div>
-    </Panel>
+  const outcomeCard = outcome && (
+    <section
+      className="vela-af-outcome"
+      data-tone={outcome.tone}
+      role={failed || blocked ? 'alert' : 'status'}
+    >
+      <p className="vela-af-outcome-eyebrow">{outcome.eyebrow}</p>
+      <h2>{outcome.title}</h2>
+      <p className="vela-af-outcome-body">{outcome.body}</p>
+      <p className="vela-af-outcome-fact">{outcome.fact}</p>
+      <Button disabled={offline || blocked} onClick={action}>
+        {blocked ? 'Window does not fit' : actionLabel}
+      </Button>
+      <p className="vela-af-outcome-footer">{outcome.footer}</p>
+    </section>
   )
 
-  const chart = (
-    <Panel className="vela-af-chart-panel">
-      <div className="vela-af-chart-heading">
-        <span>Star HFR as the focuser walks</span>
-        <span>Window around start · not a home to 0</span>
-      </div>
-      <VCurve
-        start={start}
-        current={phase === 'setup' || phase === 'travel-limit' ? start : current}
-        window={windowRange}
-        samples={samples}
-        fit={fit}
-      />
-      <div className="vela-af-legend">
-        <span>
-          <i data-kind="start" />
-          {' Start'}
-        </span>
-        <span>
-          <i data-kind="sample" />
-          {' Sample'}
-        </span>
-        <span>
-          <i data-kind="curve" />
-          {' Hyperbola'}
-        </span>
-        <span>
-          <i data-kind="fit" />
-          {' Fitted minimum'}
-        </span>
-      </div>
-    </Panel>
+  const actionButton = (
+    <Button tone="accent" disabled={offline || restoring} onClick={action}>
+      {restoring ? 'Restoring start…' : actionLabel}
+    </Button>
   )
 
   return (
-    <article className="vela-af-demo">
-      <header className="vela-af-shell">
-        <strong>Vela</strong>
-        <span>Askar FRA 400</span>
-        <span>Observe</span>
-      </header>
+    <article className="vela-af-demo vela-theme">
+      <PreparationSpecimenHeader />
       <main className="vela-af-main">
         <header className="vela-af-heading">
-          <div>
-            <p>Rig preparation</p>
-            <h1>Autofocus</h1>
-          </div>
-          <Badge
-            tone={
-              (setup && travelBlocked) || phase === 'restored'
-                ? 'warning'
-                : busy
-                  ? 'accent'
-                  : phase === 'complete'
-                    ? 'positive'
-                    : 'neutral'
-            }
-          >
-            {badge}
-          </Badge>
+          <a href="#tonight" onClick={(event) => event.preventDefault()}>
+            ← Tonight
+          </a>
+          <h1>Autofocus</h1>
+          <span>Askar FRA 400 · Rig preparation</span>
         </header>
-        {setup && travelBlocked && (
-          <div className="vela-af-notice" role="alert">
-            <strong>Walk would approach a travel limit</strong>
-            <p>
-              Vela stays at the current EAF position. It does not command 0 or MaxStep, and it will
-              not start a window that cannot fit around start.
-            </p>
-          </div>
-        )}
-        {phase === 'restored' && (
-          <div className="vela-af-notice" role="status">
-            <strong>Start position restored</strong>
-            <p>
-              The walk stopped before a fitted focus. The focuser is back at {start}, the position
-              where this session began.
-            </p>
-          </div>
-        )}
         {setup ? (
           <div className="vela-af-setup">
-            <Panel>
+            <section className="vela-af-chart-panel">
               <h2>Focus from where you are</h2>
-              <p>
-                Vela will jump a little outward from the current EAF position, walk back through
-                focus, and plot star size at each stop. Cancel returns here. Position 0 is a
-                mechanical stop, not a home, and not backlash compensation off.
+              <p className="vela-af-intro">
+                Vela samples star size in a small window around the current
+                position, then fits the curve to find focus.
               </p>
-              <dl className="vela-af-facts">
+              <svg
+                className="vela-af-window vela-af-window--desktop"
+                viewBox="0 0 838 210"
+                role="img"
+                aria-label="Planned focuser window around the current position"
+              >
+                <rect x="56" y="69" width="726" height="40" rx="4" />
+                <path className="vela-af-window-axis" d="M56 89H782" />
+                <path
+                  className="vela-af-window-direction"
+                  d="M782 42H56M56 42l8-5M56 42l8 5"
+                />
+                {Array.from({ length: 9 }, (_, index) => (
+                  <path
+                    className="vela-af-window-axis"
+                    key={index}
+                    d={`M${56 + index * 90.75} 79v20`}
+                  />
+                ))}
+                <path className="vela-af-window-direction" d="M419 60v62" />
+                <circle cx="419" cy="89" r="6" />
+                <text x="419" y="22" textAnchor="middle">
+                  Samples walk inward after the outward start
+                </text>
+                <text
+                  className="vela-af-window-value"
+                  x="56"
+                  y="147"
+                  textAnchor="middle"
+                >
+                  {number(low)}
+                </text>
+                <text
+                  className="vela-af-window-value"
+                  x="419"
+                  y="147"
+                  textAnchor="middle"
+                >
+                  {number(start)}
+                </text>
+                <text
+                  className="vela-af-window-value"
+                  x="782"
+                  y="147"
+                  textAnchor="middle"
+                >
+                  {number(high)}
+                </text>
+                <text x="419" y="174" textAnchor="middle">
+                  Current position · session start
+                </text>
+                <text x="782" y="174" textAnchor="middle">
+                  First sample
+                </text>
+              </svg>
+              <svg
+                className="vela-af-window vela-af-window--compact"
+                viewBox="0 0 320 120"
+                role="img"
+                aria-label={`Planned window ${number(low)} to ${number(high)}. Current position and session start ${number(start)}. First sample ${number(high)}, then samples walk inward.`}
+              >
+                <text x="160" y="14" textAnchor="middle">
+                  Samples walk inward
+                </text>
+                <path
+                  className="vela-af-window-direction"
+                  d="M288 28H32M32 28l7-4M32 28l7 4"
+                />
+                <rect x="32" y="42" width="256" height="28" rx="4" />
+                <path className="vela-af-window-axis" d="M32 56H288" />
+                {Array.from({ length: 9 }, (_, index) => (
+                  <path
+                    className="vela-af-window-axis"
+                    key={index}
+                    d={`M${32 + index * 32} 49v14`}
+                  />
+                ))}
+                <path className="vela-af-window-direction" d="M160 38v36" />
+                <circle cx="160" cy="56" r="4" />
+                {[low, start, high].map((value, index) => (
+                  <text
+                    className="vela-af-window-value"
+                    key={value}
+                    x={32 + index * 128}
+                    y="92"
+                    textAnchor="middle"
+                  >
+                    {number(value)}
+                  </text>
+                ))}
+                <text x="160" y="114" textAnchor="middle">
+                  Current / start
+                </text>
+                <text x="320" y="114" textAnchor="end">
+                  First sample
+                </text>
+              </svg>
+              <dl className="vela-af-window-facts">
                 <div>
-                  <dt>Current position</dt>
-                  <dd>{start}</dd>
-                </div>
-                <div>
-                  <dt>MaxStep</dt>
-                  <dd>{FRA_MAX}</dd>
-                </div>
-                <div>
-                  <dt>Window</dt>
+                  <dt>Planned window</dt>
                   <dd>
-                    {planned ? `${planned.low} → ${planned.high}` : 'Does not fit around start'}
+                    {number(low)} – {number(high)}
                   </dd>
                 </div>
+                <div>
+                  <dt>Short exposure</dt>
+                  <dd>2 seconds per sample</dd>
+                </div>
+                <div>
+                  <dt>Samples before fitting</dt>
+                  <dd>9 planned</dd>
+                </div>
               </dl>
-              <Input
-                label="Step size"
-                type="number"
-                min={1}
-                max={2000}
-                value={String(stepSize)}
-                onChange={event =>
-                  update({
-                    stepSize: String(Math.max(1, Math.floor(Number(event.target.value) || 1))),
-                  })
-                }
-                message="Steps between shorts. Large enough that HFR changes; small enough to stay inside the window."
-              />
-            </Panel>
-            <div className="vela-af-next">
-              <h3>Before you start</h3>
-              <p>
-                Each point on the graph is one short exposure. You will see start, current position,
-                and the fitted minimum once the hyperbola exists.
+              <p className="vela-af-panel-note">
+                Position 0 and MaxStep are mechanical limits. Vela will not
+                command either limit.
               </p>
-              <p>
-                The walk stays inside a window around the current position. Vela will not command 0
-                or MaxStep.
-              </p>
-              <Button tone="accent" disabled={travelBlocked} onClick={startWalk}>
-                {travelBlocked ? 'Window does not fit' : 'Start autofocus'}
-              </Button>
-            </div>
+            </section>
+            <aside className="vela-af-side">
+              {blocked ? (
+                outcomeCard
+              ) : (
+                <div className="vela-af-status vela-af-ready" role="status">
+                  <strong>
+                    <i className="vela-af-status-dot" aria-hidden="true" />
+                    Ready to start
+                  </strong>
+                  <p>Camera and focuser are available.</p>
+                </div>
+              )}
+              <dl className="vela-af-facts">
+                <div>
+                  <dt>Imaging camera</dt>
+                  <dd>ZWO ASI2600MC Pro</dd>
+                </div>
+                <div>
+                  <dt>Focuser</dt>
+                  <dd>ZWO EAF</dd>
+                </div>
+                <div>
+                  <dt>Maximum position · MaxStep</dt>
+                  <dd>{number(FRA_MAX)}</dd>
+                </div>
+              </dl>
+              <div className="vela-af-step">
+                <Input
+                  label="Step size"
+                  type="number"
+                  min={1}
+                  max={2000}
+                  value={String(step)}
+                  onChange={(event) => update({ stepSize: event.target.value })}
+                  message="Distance between samples. Keep the window inside the focuser’s travel."
+                />
+                <span className="vela-af-step-suffix" aria-hidden="true">
+                  steps
+                </span>
+              </div>
+              {!blocked && (
+                <>
+                  <Button
+                    tone="accent"
+                    onClick={() => {
+                      setLanded(0)
+                      setWalkStarted(true)
+                      setPlaying(true)
+                      update({ phase: 'sampling' })
+                    }}
+                  >
+                    Start autofocus
+                  </Button>
+                  <p className="vela-af-support">
+                    Stop during the walk requests a return to the starting
+                    position.
+                  </p>
+                </>
+              )}
+            </aside>
           </div>
         ) : (
           <div className="vela-af-layout">
-            {chart}
-            {readout}
-            <div className="vela-af-actions">
-              <p>
-                {phase === 'complete' || phase === 'restored'
-                  ? settledGuidance[phase]
-                  : 'Points appear as each short lands. Stop restores the start position; Vela will not keep walking toward a limit.'}
+            <section className="vela-af-chart-panel">
+              <h2>Star size through the walk</h2>
+              <p className="vela-af-support vela-af-chart-intro">
+                Each point is one completed exposure. Lower HFR means smaller
+                measured stars.
               </p>
-              {busy ? (
-                <Button
-                  onClick={() => {
-                    setPlaying(false)
-                    update({ phase: 'restored' })
-                  }}
-                >
-                  Stop and restore start
-                </Button>
-              ) : (
-                <Button
-                  tone="accent"
-                  onClick={() => {
-                    setLanded(0)
-                    update({ phase: 'setup' })
-                  }}
-                >
-                  {phase === 'complete' ? 'Focus again' : 'Back to setup'}
-                </Button>
-              )}
-            </div>
+              <p className="vela-af-mobile-label">Star HFR · px</p>
+              <VCurve
+                start={start}
+                low={low}
+                high={high}
+                samples={samples}
+                fit={fit}
+              />
+              <VCurve
+                start={start}
+                low={low}
+                high={high}
+                samples={samples}
+                fit={fit}
+                compact
+              />
+              <p className="vela-af-mobile-label">
+                Focuser position ·{' '}
+                {fit ? 'Fitted curve' : 'No fitted curve yet'}
+              </p>
+              <div className="vela-af-legend">
+                <span>
+                  <i className="vela-af-legend-sample" aria-hidden="true" />
+                  Measured sample
+                </span>
+                <span>
+                  <i className="vela-af-legend-start" aria-hidden="true" />
+                  Start position
+                </span>
+                <span>
+                  <i className="vela-af-legend-lowest" aria-hidden="true" />
+                  Lowest measured sample
+                </span>
+              </div>
+              <p className="vela-af-panel-note">
+                {fit
+                  ? 'Fitted focus and the lowest measured sample are separate results.'
+                  : 'No fitted curve yet. The fitted minimum appears only after the server completes the fit.'}
+              </p>
+            </section>
+            {outcomeCard || (
+              <div className="vela-af-status" role="status">
+                <div className="vela-af-status-line">
+                  <strong>
+                    {phase === 'sampling' && (
+                      <i className="vela-af-status-dot" aria-hidden="true" />
+                    )}
+                    {badge}
+                  </strong>
+                  <span>{count} of 9 samples</span>
+                </div>
+                <p className="vela-af-desktop-activity">
+                  {phase === 'sampling'
+                    ? activity === 'moving'
+                      ? 'Moving to next position'
+                      : 'Exposing at current position'
+                    : badge}
+                </p>
+                <p className="vela-af-mobile-activity">
+                  {phase === 'sampling'
+                    ? `${activity === 'moving' ? 'Moving to' : 'Exposing at'} ${number(current)}…`
+                    : badge}
+                </p>
+                <strong className="vela-af-current">{number(current)}</strong>
+                <p className="vela-af-support vela-af-exposure">
+                  {phase === 'sampling' ? (
+                    <>
+                      2-second exposure
+                      <span> · Waiting for the next sample</span>
+                    </>
+                  ) : (
+                    'Waiting for confirmation'
+                  )}
+                </p>
+                <div className="vela-af-desktop-action">{actionButton}</div>
+              </div>
+            )}
+            <dl className="vela-af-readout">
+              <div>
+                <dt>Start position</dt>
+                <dd>{number(start)}</dd>
+              </div>
+              <div>
+                <dt>Latest sample</dt>
+                <dd>
+                  {latest
+                    ? `${number(latest.position)} · ${latest.hfr.toFixed(2)} px`
+                    : '—'}
+                </dd>
+              </div>
+              <div className="vela-af-desktop-fact">
+                <dt>Fitted focus</dt>
+                <dd>{fit ? number(FOCUS) : '—'}</dd>
+              </div>
+              <div className="vela-af-desktop-fact">
+                <dt>Lowest measured sample</dt>
+                <dd>{lowest ? number(lowest.position) : '—'}</dd>
+              </div>
+              <div className="vela-af-mobile-fact">
+                <dt>Last sample</dt>
+                <dd>{latest ? '21:03:10' : '—'}</dd>
+              </div>
+            </dl>
+            {!outcome && (
+              <div className="vela-af-actions">
+                <p className="vela-af-desktop-help">
+                  Last sample {latest ? '21:03:10' : 'unavailable'}. Stop
+                  requests a return to {number(start)}; the result is shown when
+                  confirmed.
+                </p>
+                <p className="vela-af-mobile-help">
+                  Stop ends the walk and requests a return to the start
+                  position.
+                </p>
+                <div className="vela-af-mobile-action">{actionButton}</div>
+              </div>
+            )}
           </div>
         )}
         <footer className="vela-af-prototype">
-          Workshop prototype · simulated shorts · no focuser commands
+          <span>
+            {setup
+              ? 'Window is checked before movement.'
+              : `Step ${step} · Window ${number(low)}–${number(high)}`}
+          </span>
+          <span>
+            Workshop prototype · simulated shorts · no focuser commands
+          </span>
         </footer>
       </main>
     </article>
@@ -555,7 +773,7 @@ export const specimen: ComponentSpecimen = {
   id: 'panel-autofocus',
   name: 'Autofocus · Product example',
   description:
-    'Observe one-shot Star-HFR walk with a live V-curve. Start plays simulated shorts so each (position, HFR) point appears as it lands, with start, current, and fitted-minimum readout. Illustrative FRA window around the current EAF position; no hardware moves, no Move(0). A window that cannot fit stays on setup with the command disabled. Backlash compensation is not shown as a device fact.',
+    'Fieldroom one-shot Star-HFR walk. Fixed Paper samples, an accelerated interactive walk, explicit camera-read interruption and confirmed versus unconfirmed restoration. No device commands or backlash claims. Appearance radios demonstrate selection; workshop palette remains independently controlled.',
   controls: {
     example: { type: 'select', label: 'Starting place', options: examples },
     phase: { type: 'select', label: 'Activity', options: phases },
@@ -563,6 +781,9 @@ export const specimen: ComponentSpecimen = {
   },
   defaultProps: { example: 'current-focus', phase: 'setup', stepSize: '50' },
   render: (props, onPropsChange) => (
-    <AutofocusPreview props={props} {...(onPropsChange ? { onPropsChange } : {})} />
+    <AutofocusPreview
+      props={props}
+      {...(onPropsChange ? { onPropsChange } : {})}
+    />
   ),
 }

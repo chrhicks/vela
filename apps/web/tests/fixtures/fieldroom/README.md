@@ -209,3 +209,102 @@ projection guards and checks connection result contracts, separate settings
 outcomes, ambiguous Add/Forget inspection, and blocked unknown routes. These are
 fixture-boundary checks; rendered behavior and visual comparisons remain the
 responsibility of the real-route browser scenarios.
+
+## Polar alignment and autofocus
+
+`alignment.ts` and `autofocus.ts` provide scene constructors for the existing
+`/rigs/fra400/observe/alignment` and `/rigs/fra400/observe/autofocus` routes.
+Their exported scene-name arrays are the registry integration points. Both expose
+`respond(method, pathname, body)`, `snapshot()`, `setView(fullProjection)`,
+`setReadFailure(statusOrNull)`, `setCommandOutcome(command, outcome)`,
+`setDelay(milliseconds)`, `reads`, `writes`, and `unknownRequests`.
+Snapshots and response payloads are cloned, so test mutations and delayed older
+responses cannot change the session's newer state. Delay is bounded to 60 seconds.
+There are no automatic timers advancing samples or moving devices: transition
+checks explicitly publish the next complete projection through `setView`.
+
+Every request is handled locally. Each constructor allows only its exact feature
+GET/command paths, navigation, and the selected rig/observation shell reads.
+Unknown methods, foreign rig IDs and undeclared resource URLs return 501 and are
+recorded. Shell facts reuse the Equipment contract fixture; navigation advertises
+no concurrent capture. Offline scenes provide two initial feature responses, then
+503, allowing StrictMode's initial cancelled read while establishing retained
+state. `setReadFailure(null)` ends that interruption. The shell remains reachable:
+these scenes prove interrupted feature polling, not loss of every server endpoint.
+
+Command outcomes are `confirmed`, `rejected`, `pending`, `unconfirmed`, and
+`unconfirmed-active`. Pending Stop stays active/stopping until explicitly advanced.
+`unconfirmed` applies the completed change but loses its response; a GET can resolve
+it. `unconfirmed-active` loses the response while Stop remains unresolved and
+active. The named Stop-unconfirmed scenes use this latter outcome. Repeated GETs
+must not be mistaken for restored/stopped confirmation or cause another POST.
+Publish a terminal state explicitly to test eventual resolution. Neither Stop
+variant fabricates a new exposure or autofocus sample.
+
+Alignment names cover the four frozen phone/Appearance references, setup,
+unavailable/loading, baseline homing/moving/exposing/solving, unsolved baseline,
+offline retained solve, image failure, Stop pending/unknown, stopped/finished,
+and enlarged baseline. `alignment-enlarged-baseline` starts with an unsolved
+preview; after opening enlargement, publish `alignmentAdjusting` with `setView`
+to exercise retained inspection across baseline completion. New preview and
+measurement URLs declared by `setView` are registered to the same static bytes;
+previous declared URLs remain available to a pinned viewer. This finite test
+script registry is not a production image-retention policy.
+
+The exported `alignmentResource` descriptor is the exact resource to register
+with the shared HTTP/browser resource handler:
+
+- Discriminator: `alignment-star-field`; MIME: `image/png`.
+- Source: `packages/ui/src/components/fixtures/capture-star-field.png`.
+- Native size: 1600×1200; SHA-256:
+  `32fc1935092d3d98768c18e21c94829f6134262524cd302133bbf1f269099f4c`.
+- Provenance: the existing [workshop image README](../../../../../packages/ui/src/components/fixtures/README.md)
+  records a two-second local simulator exposure on 2026-09-05, generated from
+  the locally provisioned D05 catalog and stretched by Vela. No physical rig was
+  used. This is not a survey tile, a newly acquired image, or a measured solution
+  for the review timestamp.
+
+Alignment API metadata identifies the image as review/simulator data. The
+01:02:14Z exposure timestamp is a declared **server-estimated review timestamp**,
+not the PNG's historical acquisition time. North-up projected target coordinates
+are illustrative contract values: native optical center (800,600), target
+(807.6667,590), one-degree field height, azimuth −23″ and altitude −30″. The
+production contract exposes projected coordinates, not a full WCS; fixtures do
+not claim a measured WCS for these pixels. Existing viewport mathematics must
+consume those values without replacing them with Paper's decorative coordinates.
+The image dimensions, measurement timestamp and coordinates travel together.
+The standard clock is `2026-10-01T01:02:16Z` (two-second age); the read-interrupted
+clock is `2026-10-01T01:02:59Z` (45-second age). Both use America/New_York.
+`setImageFailure(url, statusOrNull)` affects only that exact image GET, allowing a
+new-image failure while the earlier loaded image stays valid, then explicit retry
+without an acquisition command.
+
+`appearance-phone-light` and `appearance-phone-dark` seed `appearance: system`
+and declare `colorScheme: light | dark` independently. The browser helper must
+emulate that media preference before navigation and open the real Appearance
+control through an interaction. It must not replace System with an explicit mode.
+Normal alignment/autofocus scenes begin in light and can exercise the real
+appearance control to inspect dark without resetting fixture state.
+
+Autofocus names use the adoption-plan names: ready, running, phone-running,
+interrupted, result, restored, invalid-window, restore-unconfirmed and offline;
+additional scenes cover moving/measuring/fitting/confirming, no stars, Stop
+pending/restoring/unknown. They provide complete valid `AutofocusView` values,
+not design JSON masquerading as an API response. Start is 32,842; the first five
+source sample pairs are retained exactly; current position 32,792 is separate
+from the last measured point 32,842. Last sample time is 21:03:10 local. The
+walking clock is `2026-10-01T01:03:12Z`; result/fitting/confirmation clocks are
+01:03:34Z, after the ninth sample. These timestamps, star counts, later samples
+and fit parameters are explicit synthetic fixture facts. The fit's command
+position 32,788 differs from the lowest measured position 32,792. No image
+resource is needed for autofocus, and no hypothetical fit is supplied while
+walking. The invalid window at current position 150 rejects Start. Confirmed
+restoration alone sets `restoredStart`; the failed-restore scene keeps it false
+and preserves the last known position and samples.
+
+The two adjacent `.test.ts` files check resource hash/native dimensions,
+measurement ages and image associations, frozen autofocus values, production
+autofocus validation, valid-window Start, no read-driven advancement, restoration
+and lost-response semantics, isolation/delays, and strict unknown request tracking.
+These checks establish fixture integrity. They do not establish rendered parity,
+physical alignment accuracy, or actual EAF restoration.

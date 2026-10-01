@@ -29,6 +29,8 @@ export interface NavigationBarProps {
   links: readonly NavigationLink[]
   utility?: ReactNode
   activity?: NavigationActivity
+  /** A focused task may replace the full phone navigation with a return link and context. */
+  compact?: { back: NavigationLink; label: string }
 }
 
 export function NavigationBar({
@@ -39,11 +41,21 @@ export function NavigationBar({
   links,
   activity,
   utility,
+  compact,
 }: NavigationBarProps) {
   return (
-    <div className="vela-navigation">
+    <div className="vela-navigation" data-compact={compact ? true : undefined}>
       <header className="vela-navigation__bar">
         <div className="vela-navigation__context">
+          {compact && (
+            <a
+              className="vela-navigation__back"
+              href={compact.back.href}
+              onClick={compact.back.onClick}
+            >
+              {compact.back.label}
+            </a>
+          )}
           <a
             className="vela-navigation__brand"
             href={home.href}
@@ -68,7 +80,12 @@ export function NavigationBar({
           </nav>
         )}
         <div className="vela-navigation__context">
-          {utility && <div className="vela-navigation__utility">{utility}</div>}
+          {(utility || compact) && (
+            <div className="vela-navigation__utility">
+              {compact && <span className="vela-navigation__compact-label">{compact.label}</span>}
+              {utility}
+            </div>
+          )}
           <label className="vela-navigation__rig">
             <span className="vela-navigation__sr-only">Viewing rig</span>
             <select value={currentRigId} onChange={event => onRigChange(event.target.value)}>

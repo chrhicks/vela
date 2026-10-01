@@ -13,3 +13,7 @@
   background: currentColor;
 }
 .vela-navigation-specimen__connection[data-state='interrupted'] { color: var(--vela-warning); }
+
+@container vela-navigation (max-width: 600px) {
+  .vela-navigation[data-compact] .vela-navigation-specimen__connection { display: none; }
+}

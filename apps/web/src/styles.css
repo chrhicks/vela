@@ -49,3 +49,7 @@ body { background: var(--vela-canvas); color: var(--vela-text); }
 @media (max-width: 700px) {
   .vela-app > .vela-navigation { padding-inline: 20px; }
 }
+
+@container vela-navigation (max-width: 600px) {
+  .vela-navigation[data-compact] .vela-app__connection { display: none; }
+}

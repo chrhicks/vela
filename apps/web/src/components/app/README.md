@@ -10,3 +10,9 @@ Tonight consume its explicit `useRigObservation` contract. Home has no rig
 provider and never requests an empty rig ID. Switching routes within the same
 rig preserves the observation; switching rigs resets it. Connection preparation
 continues to own its own command outcomes.
+
+Alignment and autofocus contribute a compact navigation context on phones:
+Tonight return link, current rig name, and the existing Appearance control.
+The same control remains mounted across breakpoints; the full navigation stays
+available on desktop. Other active capture state remains reachable in a separate
+compact row rather than disappearing during preparation.

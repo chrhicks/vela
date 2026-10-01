@@ -32,6 +32,7 @@ export const specimen: ComponentSpecimen = {
   description:
     'Rig context, page links and optional capture activity. Callers own destinations, current state and progress.',
   controls: {
+    compact: { type: 'boolean', label: 'Focused phone task' },
     rig: { type: 'select', label: 'Viewing rig', options: ['askar', 'seestar', 'all'] },
     page: { type: 'select', label: 'Current page', options: ['tonight', 'explore', 'photographs'] },
     connection: { type: 'select', label: 'Connection', options: ['connected', 'interrupted', 'offline'] },
@@ -41,7 +42,7 @@ export const specimen: ComponentSpecimen = {
       options: ['exposing', 'reading', 'interrupted', 'none'],
     },
   },
-  defaultProps: { rig: 'askar', page: 'tonight', connection: 'connected', activity: 'none' },
+  defaultProps: { compact: false, rig: 'askar', page: 'tonight', connection: 'connected', activity: 'none' },
   render: (props, onPropsChange) => {
     const navigation: Pick<NavigationBarProps, 'activity'> = {}
 
@@ -96,6 +97,10 @@ export const specimen: ComponentSpecimen = {
           { id: 'seestar', name: 'Seestar S30' },
         ]}
         currentRigId={String(props.rig)}
+        {...(props.compact ? { compact: {
+          back: { href: '#tonight', label: '← Tonight', onClick: event => event.preventDefault() },
+          label: props.rig === 'seestar' ? 'Seestar S30' : 'Askar FRA 400',
+        } } : {})}
         onRigChange={rig => onPropsChange?.({ rig })}
         links={
           props.rig === 'all'
