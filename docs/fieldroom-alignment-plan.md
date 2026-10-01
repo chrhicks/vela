@@ -1,6 +1,6 @@
 # Fieldroom polar alignment and autofocus adoption
 
-Draft prepared from the current source, frozen references and read-only Paper JSX on 2026-10-01. This is a before-work plan, not implementation or verification evidence. No tracked files changed. Governing scope and slice gate: `docs/fieldroom-adoption.md`. Parent accepts intermediate slices; Chris retains final application acceptance.
+Implementation preparation began after Equipment/Home passed independent OK at `a50c6bb` and final visual acceptance in `b51a1eb`. The plan was refreshed against current route owners, frozen references and prior decisions on 2026-10-01. Governing scope and slice gate: `docs/fieldroom-adoption.md`. Parent accepts intermediate slices; Chris retains final application acceptance.
 
 ## Scope and ordering
 
@@ -115,3 +115,24 @@ Autofocus fixture values derive from `autofocus-reference-fixtures.json` but mus
 ## Planned versus actual
 
 Pending implementation. Record final files, checks/counts, commit/verdict, live review runtime, native screenshots/DOM measurements and each deviation above. No hardware operations or browser automation were performed to prepare this draft.
+
+
+### Execution refresh before adoption
+
+Existing source confirms no new model/server capability is needed. First settle
+Fieldroom workshop compositions for both workflows, including the missing desktop
+alignment design and secondary inspection access. Parent compares actual specimen
+renders before either production route is adopted. Deterministic scene preparation
+may run independently. Root owns shared navigation and integration; workshop and
+fixture work have separate owners. Both production routes remain separate bounded
+units within this final adoption slice.
+
+Compact preparation uses the existing single Appearance state and a 48px header
+with Tonight and current rig name. Desktop retains the main navigation; capture
+activity on another rig stays reachable. Do not create a second theme store or
+reset session/inspection state when opening Appearance or crossing a breakpoint.
+Interrupted alignment must give past-tense corrections and pause guidance for both
+camera-read retries and browser disconnect, preserving the exact loaded solve.
+The optional estimated-exposure provenance remains in inspection details, rather
+than lengthening the compact primary error summary. No new device writes are
+authorized by these presentation changes.
