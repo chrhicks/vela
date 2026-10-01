@@ -10,10 +10,10 @@
 .vela-sky-context__heading p, .vela-sky-context__actions p, .vela-sky-context__footer, .vela-sky-context__selected-copy p, .vela-sky-context__night p { color: var(--vela-text-muted); font-size: 14px; }
 .vela-sky-context__summary { display: flex; align-items: center; flex-wrap: wrap; gap: 20px 40px; }
 .vela-sky-context__summary > div { display: grid; gap: 2px; }
-.vela-sky-context__summary span, .vela-sky-context__night-facts span { color: var(--vela-text-muted); font-size: 13px; }
+.vela-sky-context__summary > div > span, .vela-sky-context__night-facts > div > span { color: var(--vela-text-muted); font-size: 13px; }
 .vela-sky-context__summary strong { font-weight: 500; }
 .vela-sky-context__summary--top { padding: 16px 20px; background: var(--vela-surface); border: 1px solid var(--vela-line); border-radius: 6px; margin-bottom: 24px; }
-.vela-sky-context__summary--top .vela-button { margin-left: auto; }
+.vela-sky-context__summary--top .vela-icon-button { margin-left: auto; }
 .vela-sky-context__framing { display: grid; grid-template-columns: minmax(0, 2fr) minmax(250px, 1fr); gap: 28px; align-items: start; }
 .vela-sky-context__composition { min-width: 0; overflow: hidden; border: 1px solid var(--vela-line); border-radius: 6px; background: var(--vela-surface); }
 .vela-sky-context__composition > header, .vela-sky-context__composition > footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; }
@@ -80,7 +80,7 @@
   .vela-sky-context .vela-navigation__bar { padding-inline: 16px; }
   .vela-sky-context__heading, .vela-sky-context__night > header { align-items: start; flex-direction: column; }
   .vela-sky-context__summary { gap: 16px; }
-  .vela-sky-context__summary--top .vela-button { margin-left: 0; }
+  .vela-sky-context__summary--top .vela-icon-button { margin-left: 0; }
   .vela-sky-context__framing { grid-template-columns: minmax(0,1fr); }
   .vela-sky-context__composition > header { flex-wrap: wrap; gap: 4px; }
   .vela-sky-context__actions { gap: 12px; }
