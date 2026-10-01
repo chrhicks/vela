@@ -1,5 +1,7 @@
 # Fieldroom polar alignment and autofocus adoption
 
+Status: accepted as an intermediate slice at `00b1564` after independent OK and final source comparison. Chris’s whole-application acceptance remains outstanding.
+
 Implementation preparation began after Equipment/Home passed independent OK at `a50c6bb` and final visual acceptance in `b51a1eb`. The plan was refreshed against current route owners, frozen references and prior decisions on 2026-10-01. Governing scope and slice gate: `docs/fieldroom-adoption.md`. Parent accepts intermediate slices; Chris retains final application acceptance.
 
 ## Scope and ordering
@@ -256,3 +258,21 @@ The final capture recipes now explicitly pin America/New_York, matching their
 fixture declarations, instead of inheriting the workstation's timezone. This
 changes no current pixels but makes the retained 24-hour sample times reproducible
 on another machine.
+
+### Final preparation acceptance
+
+The settled `00b1564` target received independent **OK**, no findings: full
+`pnpm check` with 921 tests, 208 app browser cases, 25 workshop cases and four
+Python checks passed. The custom verifier service hit capacity; a fresh agent
+following the tracked verifier policy completed the review without conversation
+history. Parent then reran all 83 Fieldroom preparation cases and compared the
+actual routes to the frozen phone, appearance and Autofocus sources plus the
+approved workshop extensions. The corrected 96px ready card is confirmed in both
+the project browser and native shared browser.
+
+[Retained evidence](visual-evidence/fieldroom/alignment-autofocus/README.md) contains
+74 PNGs, 60 geometry records, exact reproduction, source substitutions and evidence
+limits. Main states cover 1440/768/390px in both palettes; baseline and operational
+phone states, readable compact diagrams, restoration outcomes and Appearance are
+included. Preparation is accepted; final whole-app review proceeds. No hardware
+commands were issued, and fixture evidence does not establish physical outcomes.
