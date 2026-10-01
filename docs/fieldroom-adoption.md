@@ -350,7 +350,7 @@ post-verdict browser cases and final parent comparison. Its
 
 ## 6. Whole-application verification and handoff
 
-Status: final whole-application review; a collection-state presentation correction is in progress before the final handoff.
+Status: implementation and agent visual acceptance complete at `cd404b8`; ready for Chris’s final browser acceptance before merge.
 
 ### Plan
 
@@ -434,3 +434,25 @@ recipe now records document coordinates and scroll offsets for full-page capture
 all 30 light/dark pairs have equal positions, dimensions, fonts and gaps. Sixty
 reference-rendering checks passed after that evidence-only correction. The final
 code and evidence are ready for independent review.
+
+
+Final independent review returned **OK**, no findings, at `cd404b8`: `pnpm check`
+(921 tests/builds), 170 application browser checks, seven workshop checks and four
+Python tests passed. The preceding workshop persistence note was resolved by
+isolating foundation-test session/profile reads; 15 affected checks passed.
+
+The post-verdict final pass passed 77 cases (46 reference renders and 31 shared/
+state checks). The parent accepted all new Photographs collection cards against
+03.9 and the approved workshop, then inspected the supplemental states and main
+capture differences. Of 64 main captures, 51 are byte-identical to prior accepted
+artifacts; the other 13 have only sparse edge rasterization differences of at most
+2/255 per channel. No layout, wrapping, crop or content regressions were found.
+The final manifest retains 88 capture records with hashes and explicit prior
+artifact links; all 44 frozen source hashes/dimensions remain unchanged.
+
+[The whole-application evidence index](visual-evidence/fieldroom/README.md) links
+each slice, final comparisons, actual scene coverage, reproduction commands and
+browser limitations. The shared browser is open to Tonight on the isolated
+review runtime, with fonts, decoded image, expected state and no horizontal
+overflow confirmed. Implementation is complete; Chris's browser acceptance is
+the remaining merge gate. No physical-device outcome is claimed by these checks.
