@@ -1,5 +1,11 @@
 import { expect, test } from '@playwright/test'
 
+// Keep behavioral checks independent of the developer's recovered workbench.
+test.beforeEach(async ({ page }) => {
+  await page.route('**/__workshop/session', route => route.fulfill({ json: { session: null } }))
+  await page.route('**/__workshop/profiles', route => route.fulfill({ json: { profiles: [] } }))
+})
+
 test('pending commands keep focus and prevent another request; tabs support arrow navigation', async ({ page }) => {
   await page.goto('/?component=panel&specimen=fieldroom-foundations&profile=fieldroom')
   const specimen = page.locator('.vela-fieldroom-specimen')
