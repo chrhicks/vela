@@ -1,139 +1,26 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
-import { Badge, Button, Dialog, IconButton } from '@vela/ui'
+import { Badge, Button, IconButton } from '@vela/ui'
 import type { CaptureImage } from '@vela/model/web'
 import './latest-image.css'
 import { api, ApiError } from '../../lib/api'
 import { isSavedImage } from './validation'
-import { useNativeImage } from './useNativeImage'
+import { useLoadedPixels } from '../image-inspection/useLoadedPixels'
+import { useImageInspection } from '../image-inspection/useImageInspection'
+import { ImageViewport, ImageEnlargement } from '../image-inspection/ImageViewport'
 
 export type { CaptureImage } from '@vela/model/web'
 
-// Commit the frame and its metadata together only after the browser has loaded it.
+// Compatibility for legacy capture/saved consumers. New viewers supply an explicit scope.
 export function useLoadedImage(image: CaptureImage | null, native = false) {
-  const [loaded, setLoaded] = useState<{ image: CaptureImage; url: string } | null>(null)
-  const [failed, setFailed] = useState(false)
-  const [attemptKey, setAttemptKey] = useState(0)
-  const [loading, setLoading] = useState(false)
-  const id = image?.id
-  const url = native ? image?.imageUrl : (image?.fitImageUrl ?? image?.imageUrl)
-
-  type Request = { image: CaptureImage; url: string; native: boolean }
-
-  const latest = useRef<Request | null>(null)
-  const inFlight = useRef<{ cancel: () => void } | null>(null)
-  const scope = useRef<string | undefined>(undefined)
-
-  useEffect(
-    () => () => {
-      latest.current = null
-      inFlight.current?.cancel()
-      inFlight.current = null
-    },
-    [],
-  )
-
-  useEffect(() => {
-    // Native image URLs share a Rig-specific directory. Never keep a different Rig's image.
-    const nextScope = image?.imageUrl.slice(0, image.imageUrl.lastIndexOf('/'))
-
-    if (!image || nextScope !== scope.current) {
-      inFlight.current?.cancel()
-      inFlight.current = null
-      setLoaded(null)
-      setLoading(false)
-      setFailed(false)
-    }
-
-    scope.current = nextScope
-    latest.current = image ? { image, url: url!, native } : null
-
-    if (!latest.current || inFlight.current) return
-
-    function load(frame: Request) {
-      let cancelled = false
-      let attempt = 0
-      let timer: number | undefined
-      let timeout: number | undefined
-      let candidate: HTMLImageElement | undefined
-
-      function detach() {
-        window.clearTimeout(timeout)
-
-        if (candidate) {
-          candidate.onload = null
-          candidate.onerror = null
-        }
-      }
-
-      inFlight.current = {
-        cancel() {
-          cancelled = true
-          window.clearTimeout(timer)
-          detach()
-        },
-      }
-      setLoading(true)
-      setFailed(false)
-
-      function settled(success: boolean) {
-        if (cancelled) return
-        detach()
-        inFlight.current = null
-
-        if (success) setLoaded({ image: frame.image, url: frame.url })
-        const next = latest.current
-
-        if (next && (next.image.id !== frame.image.id || next.url !== frame.url)) {
-          // Complete useful work, then skip intermediate arrivals and load the newest.
-          load(next)
-        } else {
-          setLoading(false)
-          setFailed(!success)
-        }
-      }
-
-      function attemptLoad() {
-        candidate = new Image()
-        const current = candidate
-
-        function failedAttempt() {
-          detach()
-
-          if (cancelled) return
-
-          if (attempt < 2) timer = window.setTimeout(attemptLoad, ++attempt * 1500)
-          else settled(false)
-        }
-
-        current.onload = () => settled(true)
-        current.onerror = failedAttempt
-        timeout = window.setTimeout(failedAttempt, frame.native ? 60_000 : 15_000)
-        current.src = frame.url
-      }
-
-      attemptLoad()
-    }
-
-    load(latest.current)
-    // Immutable IDs and URLs prevent telemetry polls restarting a request.
-  }, [id, url, native, attemptKey])
-
-  useEffect(() => {
-    if (image?.saved)
-      setLoaded(current =>
-        current?.image.id === image.id && !current.image.saved
-          ? { ...current, image: { ...current.image, saved: true } }
-          : current,
-      )
-  }, [id, image?.saved, loaded?.image.id])
+  const scope = image?.imageUrl.split('/').slice(0, 4).join('/') ?? 'capture'
+  const result = useLoadedPixels(image, scope, native)
+  const loadedImage = result.loadedImage
 
   return {
-    loadedImage: image ? (loaded?.image ?? null) : null,
-    loadedUrl: image ? loaded?.url : undefined,
-    loading,
-    failed,
-    retry: () => setAttemptKey(value => value + 1),
+    ...result,
+    loadedImage: loadedImage && image?.id === loadedImage.id && image.saved
+      ? { ...loadedImage, saved: true }
+      : loadedImage,
   }
 }
 
@@ -443,28 +330,19 @@ function useImageRetention(rigId: string | undefined) {
 }
 
 function FieldroomLatestImage({ image, busy, interrupted, rigId, savedDetail = false }: LatestImageProps) {
-  const fitted = useLoadedImage(image)
-  const [held, setHeld] = useState<{ image: CaptureImage; url: string } | null>(null)
-  const [mode, setMode] = useState<'fit' | 'native'>('fit')
-  const [nativeRequested, setNativeRequested] = useState(false)
+  const inspection = useImageInspection(image, { scope: `capture:${rigId ?? ''}` })
+  const { fitted, held, frame, native, nativeVisible, nativeRequested, showLatest, showFit, showNative, hold } = inspection
   const [expanded, setExpanded] = useState(false)
+  const [inlineHeight, setInlineHeight] = useState<number>()
   const root = useRef<HTMLElement>(null)
-  const [overlayHost, setOverlayHost] = useState<Element | null>(null)
   const openerId = useId()
   const detailsId = useId()
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [now, setNow] = useState(Date.now)
-  const frame = held?.image ?? fitted.loadedImage
   const lastKnown = interrupted && !savedDetail && !!frame
-  const fitUrl = held?.url ?? fitted.loadedUrl
   const hfr = frame?.statistics?.medianHfrPixels
-  const native = useNativeImage(held?.image ?? null, nativeRequested)
-  const nativeVisible = mode === 'native' && native.result?.state === 'ready'
-  const expired = native.result?.state === 'expired'
+  const expired = native.result?.state === 'missing'
   const retention = useImageRetention(rigId)
-  const windowRef = useRef<HTMLDivElement>(null)
-  const pan = useRef<{ x: number; y: number } | null>(null)
-  const drag = useRef<{ x: number; y: number; left: number; top: number } | null>(null)
 
   const saved = !!frame && (savedDetail || frame.saved ||
     (image?.id === frame.id && image.saved) ||
@@ -489,66 +367,16 @@ function FieldroomLatestImage({ image, busy, interrupted, rigId, savedDetail = f
       ? `${Math.floor(seconds / 60)} min ago`
       : `${Math.floor(seconds / 3600)} h ago`
 
-  useEffect(() => {
-    setOverlayHost(root.current?.closest('.vela-theme') ?? null)
-  }, [])
-
-  useEffect(() => {
-    if (!expanded || !overlayHost) return
-
-    // The app theme owns the overlay, outside the route's fixed containing block.
-    const background = Array.from(overlayHost.children).filter(
-      (element): element is HTMLElement =>
-        element instanceof HTMLElement && !element.hasAttribute('data-image-overlay'),
-    )
-
-    const previousInert = background.map(element => element.inert)
-    const previousOverflow = document.body.style.overflow
-    background.forEach(element => { element.inert = true })
-    document.body.style.overflow = 'hidden'
-
-    return () => {
-      background.forEach((element, index) => { element.inert = previousInert[index]! })
-      document.body.style.overflow = previousOverflow
-    }
-  }, [expanded, overlayHost])
-
-  function hold() {
-    if (!held && frame && fitUrl) setHeld({ image: frame, url: fitUrl })
-  }
-
-  function showLatest() {
-    setMode('fit')
-    setNativeRequested(false)
-    setHeld(null)
-    pan.current = null
-  }
-
-  useEffect(() => {
-    showLatest()
-    setExpanded(false)
-  }, [rigId])
-
-  useLayoutEffect(() => {
-    const viewport = windowRef.current
-
-    if (!viewport) return
-    viewport.scrollLeft = nativeVisible
-      ? Math.max(0, (pan.current?.x ?? viewport.scrollWidth / 2) - viewport.clientWidth / 2)
-      : 0
-    viewport.scrollTop = nativeVisible
-      ? Math.max(0, (pan.current?.y ?? viewport.scrollHeight / 2) - viewport.clientHeight / 2)
-      : 0
-  }, [expanded, nativeVisible, frame?.id, lastKnown])
+  useEffect(() => { setExpanded(false) }, [rigId])
 
   const tools = (
     <div className="capture-image__actions">
       <div className="capture-image__zoom" role="group" aria-label="Image scale">
         <Button tone="neutral" aria-pressed={!nativeVisible}
-          onClick={() => setMode('fit')}>Fit</Button>
+          onClick={showFit}>Fit</Button>
         <Button tone="neutral" aria-pressed={nativeVisible}
           disabled={(expired || keepExpired) && native.result?.state !== 'ready'}
-          onClick={() => { hold(); setMode('native'); setNativeRequested(true) }}>100%</Button>
+          onClick={showNative}>100%</Button>
       </div>
       <IconButton
         label="Image details"
@@ -565,7 +393,12 @@ function FieldroomLatestImage({ image, busy, interrupted, rigId, savedDetail = f
       />
       {!expanded && (
         <Button id={openerId} aria-label="Enlarge image" className="capture-image__enlarge"
-          onClick={() => { hold(); setExpanded(true) }}>
+          onClick={() => {
+            // Keep the inline card's extent while its one viewer moves to the portal.
+            setInlineHeight(root.current?.getBoundingClientRect().height)
+            hold()
+            setExpanded(true)
+          }}>
           <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" aria-hidden="true">
             <path d="M5 15 15 5M6 5h9v9" />
           </svg>
@@ -575,55 +408,15 @@ function FieldroomLatestImage({ image, busy, interrupted, rigId, savedDetail = f
   )
 
   const viewport = (
-    <div className="capture-image__window" data-zoomed={nativeVisible || undefined}
-      ref={windowRef} tabIndex={nativeVisible ? 0 : undefined}
-      role={nativeVisible ? 'region' : undefined}
-      aria-label={nativeVisible ? 'Image at 100 percent. Drag or use arrow keys to inspect.' : undefined}
-      onScroll={event => {
-        if (nativeVisible) pan.current = {
-          x: event.currentTarget.scrollLeft + event.currentTarget.clientWidth / 2,
-          y: event.currentTarget.scrollTop + event.currentTarget.clientHeight / 2,
-        }
-      }}
-      onKeyDown={event => {
-        if (!nativeVisible) return
-
-        const steps = new Map<string, readonly [number, number]>([
-          ['ArrowLeft', [-80, 0]], ['ArrowRight', [80, 0]],
-          ['ArrowUp', [0, -80]], ['ArrowDown', [0, 80]],
-        ])
-
-        const step = steps.get(event.key)
-
-        if (!step) return
-        event.preventDefault()
-        event.currentTarget.scrollBy(step[0], step[1])
-      }}
-      onPointerDown={event => {
-        if (!nativeVisible || event.button !== 0) return
-        event.currentTarget.setPointerCapture(event.pointerId)
-        drag.current = { x: event.clientX, y: event.clientY, left: event.currentTarget.scrollLeft, top: event.currentTarget.scrollTop }
-      }}
-      onPointerMove={event => {
-        if (!drag.current) return
-        event.currentTarget.scrollLeft = drag.current.left + drag.current.x - event.clientX
-        event.currentTarget.scrollTop = drag.current.top + drag.current.y - event.clientY
-      }}
-      onPointerUp={() => { drag.current = null }}
-      onPointerCancel={() => { drag.current = null }}
-    >
-      {frame ? (
-        <img src={nativeVisible ? native.result?.url : fitUrl} width={frame.width} height={frame.height}
-          style={nativeVisible ? { width: frame.width, height: frame.height } : undefined}
-          draggable={false} alt={`${frame.exposureSeconds} second exposure from ${frame.cameraName}`} />
-      ) : (
+    <ImageViewport inspection={inspection} expanded={expanded} layoutKey={lastKnown ? 'interrupted' : 'current'}
+      alt={frame ? `${frame.exposureSeconds} second exposure from ${frame.cameraName}` : ''}
+      empty={(
         <div className="capture-image__empty">
           <CameraMark />
           <h3>{fitted.loading ? 'Loading your exposure' : busy ? 'Taking your first exposure' : 'Your first image starts here'}</h3>
           <p>{interrupted ? 'Exposure progress is unavailable.' : 'The image will appear when it is received.'}</p>
         </div>
-      )}
-    </div>
+      )} />
   )
 
   const status = (
@@ -701,6 +494,7 @@ function FieldroomLatestImage({ image, busy, interrupted, rigId, savedDetail = f
 
   return (
     <section ref={root} className="capture-image capture-image--fieldroom"
+      style={expanded ? { minHeight: inlineHeight, boxSizing: 'border-box' } : undefined}
       data-interrupted={lastKnown || undefined} aria-label={savedDetail ? 'Saved preview' : 'Latest image'}>
       <header>
         <div className="capture-image__heading">
@@ -715,17 +509,12 @@ function FieldroomLatestImage({ image, busy, interrupted, rigId, savedDetail = f
         {frame && !expanded && tools}
       </header>
       {!expanded && <>{status}{viewport}{metadata}</>}
-      {expanded && overlayHost && createPortal(
-        <div data-image-overlay>
-          <Dialog open title="Exposure inspection" returnFocusId={openerId}
-            onDismiss={() => setExpanded(false)} className="capture-image-dialog">
-            <div className="capture-image capture-image--fieldroom">
-              {tools}{status}{viewport}{metadata}
-            </div>
-          </Dialog>
-        </div>,
-        overlayHost,
-      )}
+      <ImageEnlargement open={expanded} rootRef={root} title="Exposure inspection"
+        returnFocusId={openerId} onDismiss={() => setExpanded(false)}>
+        <div className="capture-image capture-image--fieldroom">
+          {tools}{status}{viewport}{metadata}
+        </div>
+      </ImageEnlargement>
     </section>
   )
 }

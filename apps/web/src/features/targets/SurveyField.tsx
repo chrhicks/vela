@@ -12,6 +12,7 @@ export function SurveyField({
   camera,
   actual,
   locked,
+  focalLengthMm,
   onChange,
 }: {
   target: TargetPosition
@@ -19,6 +20,7 @@ export function SurveyField({
   camera: FramingView['camera']
   actual: FramingView['actual']
   locked: boolean
+  focalLengthMm: number | null
   onChange: (position: TargetPosition) => void
 }) {
   const host = useRef<HTMLDivElement>(null)
@@ -98,7 +100,7 @@ export function SurveyField({
         viewer.current = instance
 
         const redraw = () => {
-          if (!disposed) setRevision(r => r + 1)
+          if (!disposed) setRevision((r) => r + 1)
         }
 
         instance.on('positionChanged', redraw)
@@ -110,7 +112,7 @@ export function SurveyField({
     }
 
     void open()
-    const resize = new ResizeObserver(() => setRevision(r => r + 1))
+    const resize = new ResizeObserver(() => setRevision((r) => r + 1))
 
     if (host.current) resize.observe(host.current)
 
@@ -169,10 +171,10 @@ export function SurveyField({
     if (!ready || !viewer.current) return ''
 
     try {
-      const pixels = points.map(p => viewer.current!.world2pix(p.raDegrees, p.decDegrees))
+      const pixels = points.map((p) => viewer.current!.world2pix(p.raDegrees, p.decDegrees))
 
-      return pixels.every(p => p && p.every(Number.isFinite))
-        ? pixels.map(p => p!.join(',')).join(' ')
+      return pixels.every((p) => p && p.every(Number.isFinite))
+        ? pixels.map((p) => p!.join(',')).join(' ')
         : ''
     } catch {
       return ''
@@ -222,6 +224,35 @@ export function SurveyField({
 
   return (
     <>
+      <header className="vela-target-survey-toolbar">
+        <span>Reference sky · Desired composition</span>
+        <div>
+          <Button
+            aria-label="Zoom out"
+            disabled={!ready}
+            onClick={() => viewer.current?.setFoV(Math.min(90, viewer.current.getFov()[0] * 1.5))}
+          >
+            −
+          </Button>
+          <Button
+            aria-label="Zoom in"
+            disabled={!ready}
+            onClick={() => viewer.current?.setFoV(viewer.current.getFov()[0] / 1.5)}
+          >
+            +
+          </Button>
+          <Button
+            tone="quiet"
+            disabled={!ready}
+            onClick={() => {
+              viewer.current?.gotoRaDec(target.raDegrees, target.decDegrees)
+              viewer.current?.setFoV(Math.min(90, initialWidth * 2.2))
+            }}
+          >
+            Reset view
+          </Button>
+        </div>
+      </header>
       <div className="vela-target-field" data-disabled={locked}>
         <div className="vela-target-survey" ref={host} aria-label="Interactive DSS2 sky survey" />
         {!ready && (
@@ -232,8 +263,19 @@ export function SurveyField({
                 ? 'Your coordinates remain available. Check the survey connection to compose visually.'
                 : 'DSS2 color sky survey'}
             </p>
-            {failed && <Button onClick={() => setAttempt(a => a + 1)}>Retry survey</Button>}
+            {failed && <Button onClick={() => setAttempt((a) => a + 1)}>Retry survey</Button>}
           </div>
+        )}
+        {ready && (
+          <>
+            <div className="vela-target-field-legend">
+              <span>□ Desired frame</span>
+              {actual && <span>┄ Last solved frame</span>}
+            </div>
+            <div className="vela-target-field-hint">
+              {locked ? 'Composition editing paused' : 'Drag the frame to adjust composition'}
+            </div>
+          </>
         )}
         {ready && (
           <svg
@@ -258,7 +300,7 @@ export function SurveyField({
                 aria-label="Camera frame position"
                 aria-valuetext={`RA ${desired.raDegrees.toFixed(4)}, Dec ${desired.decDegrees.toFixed(4)} degrees`}
                 aria-disabled={locked}
-                onPointerDown={event => {
+                onPointerDown={(event) => {
                   if (locked || event.button !== 0 || !center) return
                   event.preventDefault()
                   event.stopPropagation()
@@ -270,7 +312,7 @@ export function SurveyField({
                   }
                   event.currentTarget.setPointerCapture(event.pointerId)
                 }}
-                onPointerMove={event => {
+                onPointerMove={(event) => {
                   if (drag.current)
                     move(
                       drag.current.cx + event.clientX - drag.current.x,
@@ -286,7 +328,7 @@ export function SurveyField({
                 onLostPointerCapture={() => {
                   drag.current = null
                 }}
-                onKeyDown={event => {
+                onKeyDown={(event) => {
                   const delta = {
                     ArrowLeft: [1, 0],
                     ArrowRight: [-1, 0],
@@ -323,6 +365,9 @@ export function SurveyField({
       </div>
       <footer>
         <span>
+          Field from camera geometry{focalLengthMm ? ` · Focal length ${focalLengthMm} mm` : ''}
+        </span>
+        <span>
           DSS2 color reference survey ·{' '}
           <a
             href="https://github.com/cds-astro/aladin-lite/tree/v3.8.2"
@@ -340,7 +385,8 @@ export function SurveyField({
           Image credit ↗
         </a>
       </footer>
-      <div className="vela-target-adjustments">
+      <details className="vela-target-adjustments">
+        <summary>Frame position & controls</summary>
         <div>
           <strong>Camera orientation stays fixed</strong>
           <Button
@@ -372,22 +418,8 @@ export function SurveyField({
             </Button>
           ))}
         </div>
-        <div>
-          <span>Drag sky to pan · scroll to zoom</span>
-          <Button
-            disabled={!ready}
-            onClick={() => viewer.current?.setFoV(viewer.current.getFov()[0] / 1.5)}
-          >
-            Zoom in
-          </Button>
-          <Button
-            disabled={!ready}
-            onClick={() => viewer.current?.setFoV(Math.min(90, viewer.current.getFov()[0] * 1.5))}
-          >
-            Zoom out
-          </Button>
-        </div>
-      </div>
+        <p>Drag sky to pan · scroll to zoom. View controls do not move the mount.</p>
+      </details>
     </>
   )
 }

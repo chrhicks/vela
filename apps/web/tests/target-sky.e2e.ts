@@ -32,6 +32,7 @@ const sky: TargetSkyPath = {
   startsAt: samples[0]!.at,
   endsAt: samples.at(-1)!.at,
   samples,
+  currentMoonSeparationDegrees: 84,
   currentAzimuthDegrees: samples[18]!.azimuthDegrees,
   currentAltitudeDegrees: samples[18]!.altitudeDegrees,
   highestAltitudeDegrees: 55,
@@ -47,6 +48,7 @@ const target: TargetView = {
   raDegrees: 10.6847,
   decDegrees: 41.269,
   sizeArcminutes: 178,
+  minorSizeArcminutes: 63,
   thumbnailUrl: '/api/targets/m31/thumbnail',
   sky,
 }
@@ -55,13 +57,18 @@ for (const width of [1440, 390]) {
   test(`real app sky inspection shares time and restores focus at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 })
     const commands: string[] = []
-    page.on('request', request => {
+    page.on('request', (request) => {
       if (request.method() !== 'GET') commands.push(request.url())
     })
-    await page.route('**/api/web/rigs/rig-1/targets/m31', route => route.fulfill({ json: target }))
-    await page.route('**/api/web/rigs/rig-1/framing', route => route.abort())
-    await page.route('**/api/survey/**', route => route.abort())
+    await page.route('**/api/web/rigs/rig-1/targets/m31', (route) =>
+      route.fulfill({ json: target }),
+    )
+    await page.route('**/api/web/rigs/rig-1/framing', (route) => route.abort())
+    await page.route('**/api/survey/**', (route) => route.abort())
     await page.goto('/rigs/rig-1/observe/targets/m31')
+    await page.getByText('Frame position & controls', { exact: true }).click()
+    await page.getByText('Framing details & state', { exact: true }).click()
+    await page.locator('.vela-target-sky-context > summary').click()
     const sidebar = page.locator('.vela-target-sky-context')
     const time = sidebar.getByRole('slider', { name: 'Preview time for Andromeda Galaxy' })
     await expect(
@@ -83,7 +90,7 @@ for (const width of [1440, 390]) {
 
     const colors = await sidebar
       .locator('.vela-sky-path__light-track')
-      .evaluateAll(paths => [...new Set(paths.map(path => getComputedStyle(path).stroke))])
+      .evaluateAll((paths) => [...new Set(paths.map((path) => getComputedStyle(path).stroke))])
 
     expect(colors).toHaveLength(5)
     await expect(
@@ -99,7 +106,9 @@ for (const width of [1440, 390]) {
     await expect(page.locator('.vela-theme > main')).toHaveAttribute('inert', '')
     await dialog.getByRole('slider').fill('30')
     await expect(dialog.locator('.vela-sky-path__moon-status')).toHaveText('Moon below horizon')
-    expect(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
+    expect(await dialog.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
+      true,
+    )
     await page.keyboard.press('Escape')
     await expect(dialog).toHaveCount(0)
     await expect(time).toHaveValue('30')
@@ -115,12 +124,15 @@ test('interrupted sky updates keep the selected time and label the old calculati
 }) => {
   await page.clock.install()
   let interrupted = false
-  await page.route('**/api/web/rigs/rig-1/targets/m31', route =>
+  await page.route('**/api/web/rigs/rig-1/targets/m31', (route) =>
     interrupted ? route.abort() : route.fulfill({ json: target }),
   )
-  await page.route('**/api/web/rigs/rig-1/framing', route => route.abort())
-  await page.route('**/api/survey/**', route => route.abort())
+  await page.route('**/api/web/rigs/rig-1/framing', (route) => route.abort())
+  await page.route('**/api/survey/**', (route) => route.abort())
   await page.goto('/rigs/rig-1/observe/targets/m31')
+  await page.getByText('Frame position & controls', { exact: true }).click()
+  await page.getByText('Framing details & state', { exact: true }).click()
+  await page.locator('.vela-target-sky-context > summary').click()
   const time = page.getByRole('slider', { name: 'Preview time for Andromeda Galaxy' })
   await time.fill('22')
   interrupted = true
@@ -133,12 +145,15 @@ test('interrupted sky updates keep the selected time and label the old calculati
 })
 
 test('missing site does not invent a sky or Moon', async ({ page }) => {
-  await page.route('**/api/web/rigs/rig-1/targets/m31', route =>
+  await page.route('**/api/web/rigs/rig-1/targets/m31', (route) =>
     route.fulfill({ json: { ...target, sky: null } }),
   )
-  await page.route('**/api/web/rigs/rig-1/framing', route => route.abort())
-  await page.route('**/api/survey/**', route => route.abort())
+  await page.route('**/api/web/rigs/rig-1/framing', (route) => route.abort())
+  await page.route('**/api/survey/**', (route) => route.abort())
   await page.goto('/rigs/rig-1/observe/targets/m31')
+  await page.getByText('Frame position & controls', { exact: true }).click()
+  await page.getByText('Framing details & state', { exact: true }).click()
+  await page.locator('.vela-target-sky-context > summary').click()
   await expect(page.getByText('Site unavailable · sky path unknown')).toBeVisible()
   await expect(page.locator('.vela-sky-path')).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Expand sky view' })).toHaveCount(0)

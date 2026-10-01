@@ -119,12 +119,14 @@ export const reviewTarget: TargetView = {
   raDegrees: 303.027,
   decDegrees: 38.355,
   sizeArcminutes: 18,
+  minorSizeArcminutes: 12,
   thumbnailUrl: '/api/rigs/fra400/capture/images/review-frame-12/fit',
   sky: {
     observedAt: reviewTime,
     startsAt: new Date(start).toISOString(),
     endsAt: new Date(start + 6 * 3600000).toISOString(),
     currentAzimuthDegrees: 270,
+    currentMoonSeparationDegrees: 112,
     currentAltitudeDegrees: 68,
     highestAltitudeDegrees: 74,
     aboveHorizonDuringDarkness: [
@@ -160,7 +162,7 @@ export const tonightScenes = [
 
 export type TonightScene = (typeof tonightScenes)[number]
 
-export type ReviewResponse = { status: number; json?: unknown; image?: true }
+export type ReviewResponse = { status: number; json?: unknown; image?: true; resource?: string }
 
 /** Each review session owns its counters and commands. Unknown endpoints never hit hardware. */
 export function createTonightScene(name: TonightScene) {

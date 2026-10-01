@@ -212,14 +212,20 @@ for (const width of [1280, 390]) {
     await screenshot(page, 'capture', width)
     await page.goto('/rigs/rig-1/observe')
     await expect(navigation).toContainText('Awaiting camera')
-    const hub = page.locator('.vela-capture-entry').first()
-    await expect(hub).toContainText('Retrying reads for the same exposure')
-    await expect(hub).toContainText('7 completed')
-    await expect(hub).toContainText('2 s · 60 s ago')
-    await expect(hub.getByRole('img')).toHaveAttribute('src', imageUrl)
+    const preparation = page.getByRole('region', { name: 'Prepare a capture' })
+    await expect(preparation.getByRole('form', { name: 'Capture settings' })).toContainText('Camera observation interrupted')
+    await expect(navigation).toContainText('7 captured')
+    await expect(preparation.getByRole('region', { name: 'Last test exposure' })).toContainText('No test exposure yet')
+    await expect(preparation.getByRole('img')).toHaveCount(0)
+    expect(commands).toEqual([])
     await screenshot(page, 'observe', width)
-    await page.getByRole('link', { name: 'View capture' }).click()
+    await page.getByRole('link', { name: 'Open active capture →', exact: true }).click()
     await expect(page.locator('.tonight-capture__heading')).toContainText('Camera observation interrupted')
+    await expect(progress).toContainText('Exposure 8')
+    await expect(image.getByRole('img')).toHaveAttribute('src', imageUrl)
+    await expect(image.getByRole('img')).toHaveAttribute('alt', '2 second exposure from Simulator Camera')
+    await expect(image.locator('.capture-image__heading > span')).toHaveText(/^\d{2}:\d{2}:\d{2} · 1 min ago$/)
+    expect(commands).toEqual([])
     offline = true
     await expect(page.locator('.capture-page__warning')).toContainText('Connection interrupted')
     await expect(page.getByRole('button', { name: 'Stop capture', exact: true })).toHaveCount(0)
@@ -268,11 +274,13 @@ for (const width of [1280, 390]) {
       raDegrees: 10.6847,
       decDegrees: 41.269,
       sizeArcminutes: 178,
+      minorSizeArcminutes: 63,
       thumbnailUrl: '/api/targets/m31/thumbnail',
       sky: null,
     }
 
     let state: FramingView = {
+      preview: null,
       rigId: 'rig-1',
       rigName: 'Recovery simulator',
       enabled: true,
@@ -378,7 +386,8 @@ for (const width of [1280, 390]) {
       )
       .toBe(true)
     const corners = await footprint.getAttribute('points')
-    const measurementTime = page.getByText(/^Test exposure /)
+    await page.getByText('Framing details & state', { exact: true }).click()
+    const measurementTime = page.locator('p').filter({ hasText: /^Test exposure / })
     const timeText = await measurementTime.textContent()
     const history = page.getByRole('region', { name: 'Centering measurements' })
     const historyText = await history.textContent()

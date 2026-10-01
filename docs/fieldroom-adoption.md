@@ -303,12 +303,13 @@ which visual slice consumes each addition.
 Subject snapshots, per-run saved/integration totals, held/native image inspection,
 exact-image Keep/retry/expiry, and catalog constellations were implemented with
 Tonight. Focused checks cover the new contracts and deferred acquisition/save
-races. Framing exposure preview remains scheduled with its consuming slice.
+races. Framing exposure preview is now implemented with its consuming slice and awaits
+that slice’s independent and visual gate.
 Nothing in this checkpoint adds durable capture sequences or run recovery.
 
 ## 5. Remaining application slices
 
-Status: planned; each sub-slice gets its own detailed plan and gate before work.
+Status: Explore/framing/preparation implemented, awaiting its gate; later slices planned.
 
 | Slice | Production owners | Paper coverage |
 | --- | --- | --- |
@@ -329,7 +330,8 @@ growing layer of overrides. Preserve all existing operational capabilities.
 
 ### Actual / deviations / evidence
 
-Pending.
+Explore/framing/preparation implementation and preliminary evidence are recorded
+in its owning plan. Independent review and final comparison remain pending.
 
 ## 6. Whole-application verification and handoff
 

@@ -1,9 +1,9 @@
 # Imaging camera
 
-Observe composes the approved camera-selection design from stable Panel, Select,
-and Button primitives. The server projects camera identities, the remembered
-selection, identity problems, and whether editing is available. Selecting a
-camera saves rig configuration; it does not connect the camera or establish
+Preparation composes the saved camera as a Select with an explicit Use this
+camera action when the draft differs. Equipment can use the standalone
+ImagingCamera presentation over the same hook. The server projects camera identities, the remembered
+selection, identity problems, and whether editing is available. Explicitly saving a camera choice changes rig configuration; it does not connect the camera or establish
 capture readiness.
 
 The browser retains the last confirmed selection when reads fail, and preserves

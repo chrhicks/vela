@@ -9,6 +9,8 @@ import type {
   RigDeviceDetailView,
   RigObservationView,
   AutofocusView,
+  TargetCatalogView,
+  FramingPreview,
 } from '../src/web/index.js'
 
 describe('@vela/model boundaries', () => {
@@ -155,4 +157,13 @@ describe('@vela/model boundaries', () => {
       }>
     >()
   })
+})
+
+it('keeps rigless catalog and temporary framing previews separate from operational identity', () => {
+  expectTypeOf<TargetCatalogView>().not.toHaveProperty('rigId')
+  expectTypeOf<TargetCatalogView['targets'][number]>().not.toHaveProperty('sky')
+  expectTypeOf<TargetCatalogView['targets'][number]>().not.toHaveProperty('opportunity')
+  expectTypeOf<FramingPreview['checkId']>().toEqualTypeOf<string | null>()
+  expectTypeOf<FramingPreview>().not.toHaveProperty('saved')
+  expectTypeOf<FramingPreview>().not.toHaveProperty('pixels')
 })

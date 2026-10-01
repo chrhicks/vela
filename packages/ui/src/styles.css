@@ -925,3 +925,52 @@
 .vela-appearance__panel[data-compact="true"] .vela-appearance__footer { gap: 4px; padding-top: 16px; border-top: 1px solid var(--vela-line); }
 @keyframes vela-appearance-reveal { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) { .vela-appearance__panel { animation: none; } }
+
+.vela-switch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--vela-radius);
+  background: transparent;
+  cursor: pointer;
+}
+.vela-switch__track {
+  display: flex;
+  align-items: center;
+  width: 40px;
+  height: 24px;
+  padding: 3px;
+  border-radius: 24px;
+  background: var(--vela-line-strong);
+}
+.vela-switch__track > span {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--vela-canvas);
+}
+.vela-switch[aria-checked='true'] .vela-switch__track {
+  justify-content: flex-end;
+  background: var(--vela-accent);
+}
+.vela-switch[aria-checked='true'] .vela-switch__track > span {
+  background: var(--vela-accent-text);
+}
+.vela-switch:focus-visible {
+  outline: 2px solid var(--vela-focus);
+  outline-offset: 3px;
+}
+.vela-switch:disabled {
+  cursor: not-allowed;
+}
+.vela-switch:disabled .vela-switch__track {
+  background: var(--vela-line);
+}
+.vela-switch[aria-busy='true'] {
+  cursor: progress;
+}

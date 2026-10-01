@@ -4,20 +4,22 @@ import { readFile } from 'node:fs/promises'
 import { createHash, randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { createServer as createViteServer } from '../apps/web/node_modules/vite/dist/node/index.js'
-import {
-  createTonightScene,
-  tonightScenes,
-  referenceImage,
-} from '../apps/web/tests/fixtures/fieldroom/tonight.js'
+import { createReviewScene, reviewScenes } from '../apps/web/tests/fixtures/fieldroom/scenes.js'
+import { reviewResources } from '../apps/web/tests/fixtures/fieldroom/resources.js'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
 
-const image = await readFile(`${root}${referenceImage.path}`)
+const resources = new Map<string, { body: Buffer; contentType: string }>()
 
-if (createHash('sha256').update(image).digest('hex') !== referenceImage.sha256)
-  throw new Error('Review image does not match frozen reference')
+for (const resource of reviewResources) {
+  const body = await readFile(`${root}${resource.path}`)
 
-const sessions = new Map<string, ReturnType<typeof createTonightScene>>()
+  if (createHash('sha256').update(body).digest('hex') !== resource.sha256)
+    throw new Error(`Review resource does not match its pinned hash: ${resource.resource}`)
+  resources.set(resource.resource, { body, contentType: resource.contentType })
+}
+
+const sessions = new Map<string, NonNullable<ReturnType<typeof createReviewScene>>>()
 
 const sessionId = (cookie: string | undefined) =>
   cookie
@@ -40,13 +42,13 @@ const server = createHttpServer(async (request, response) => {
   try {
     const url = new URL(request.url ?? '/', 'http://127.0.0.1:5176')
 
-    const sceneName = tonightScenes.find(
+    const sceneName = reviewScenes.find(
       (name) => name === url.pathname.slice('/__review/scene/'.length),
     )
 
     if (url.pathname.startsWith('/__review/scene/') && sceneName) {
       const id = randomUUID()
-      const scene = createTonightScene(sceneName)
+      const scene = createReviewScene(sceneName)!
       sessions.set(id, scene)
 
       // Bounded local review sessions; a fresh index selection always resets state.
@@ -65,7 +67,7 @@ const server = createHttpServer(async (request, response) => {
       response
         .writeHead(200, { 'Content-Type': 'text/html' })
         .end(
-          `<title>Fieldroom review</title><h1>Fieldroom review scenes</h1><p>Real application routes. Fixture API only; no hardware. Choose a scene to reset its state.</p><ul>${tonightScenes.map((name) => `<li><a href="/__review/scene/${name}">${name}</a></li>`).join('')}</ul>`,
+          `<title>Fieldroom review</title><h1>Fieldroom review scenes</h1><p>Real application routes. Fixture API only; no hardware. Choose a scene to reset its state.</p><ul>${reviewScenes.map((name) => `<li><a href="/__review/scene/${name}">${name}</a></li>`).join('')}</ul>`,
         )
 
       return
@@ -89,16 +91,20 @@ const server = createHttpServer(async (request, response) => {
 
       const result = scene.respond(
         request.method ?? 'GET',
-        url.pathname,
+        `${url.pathname}${url.search}`,
         input ? JSON.parse(input) : undefined,
       )
 
+      const resourceId = result.resource ?? (result.image ? 'crescent' : undefined)
+      const resource = resourceId ? resources.get(resourceId) : undefined
+
+      if (resourceId && !resource) throw new Error(`Unknown review resource: ${resourceId}`)
       response
         .writeHead(result.status, {
-          'Content-Type': result.image ? 'image/jpeg' : 'application/json',
+          'Content-Type': resource?.contentType ?? 'application/json',
           'Cache-Control': 'no-store',
         })
-        .end(result.image ? image : JSON.stringify(result.json))
+        .end(resource ? resource.body : JSON.stringify(result.json))
 
       return
     }

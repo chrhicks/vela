@@ -3,6 +3,7 @@ import type { Page, Route } from '@playwright/test'
 import type { CaptureImage, CaptureView } from '@vela/model/web'
 import { readFileSync } from 'node:fs'
 import { observation } from './fixtures/observation'
+import { openExploreScene } from './fixtures/fieldroom/browser'
 
 const pixels = readFileSync(new URL('../../../packages/ui/src/components/fixtures/capture-star-field.png', import.meta.url))
 
@@ -187,9 +188,13 @@ for (const width of [1440, 390]) {
     await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(0)
     const previousOverflow = await page.evaluate(() => document.body.style.overflow)
     const opener = image.getByRole('button', { name: 'Enlarge image' })
+    const inlineHeight = await image.evaluate(element => element.getBoundingClientRect().height)
+    const scrollBefore = await page.evaluate(() => scrollY)
     await opener.click()
     const dialog = page.getByRole('dialog', { name: 'Exposure inspection' })
     await expect(dialog).toBeVisible()
+    expect(await page.locator('.capture-image[aria-label="Latest image"]').evaluate(element => element.getBoundingClientRect().height)).toBe(inlineHeight)
+    expect(await page.evaluate(() => scrollY)).toBe(scrollBefore)
     const layer = page.locator('[data-image-overlay] .vela-dialog-layer')
     const rect = await layer.boundingBox()
     expect(rect).toEqual({ x: 0, y: 0, width, height: 600 })
@@ -204,6 +209,7 @@ for (const width of [1440, 390]) {
     await expect(opener).toBeFocused()
     expect(await background.evaluateAll(elements => elements.every(element => !element.hasAttribute('inert')))).toBe(true)
     expect(await page.evaluate(() => document.body.style.overflow)).toBe(previousOverflow)
+    expect(await page.evaluate(() => scrollY)).toBe(scrollBefore)
   })
 }
 
@@ -227,4 +233,86 @@ test('interrupted reads age the retained exposure without replacing its pixels o
   await expect(image.getByRole('heading', { name: 'Latest exposure', exact: true })).toBeVisible()
   await expect(image).not.toHaveAttribute('data-interrupted')
   await expect(image.getByRole('img')).toHaveAttribute('data-retained-pixels', 'original')
+})
+
+test('shared inspection keeps a complete renderer version until replacement pixels decode', async ({ page }) => {
+  let release!: () => void
+  const gate = new Promise<void>(resolve => { release = resolve })
+  const nativeReads: string[] = []
+  await page.route('**/pixels/**', async route => {
+    const path = new URL(route.request().url()).pathname
+
+    if (path === '/pixels/current/fit') await gate
+
+    if (path.endsWith('/native')) nativeReads.push(path)
+    await route.fulfill({ contentType: 'image/png', body: pixels })
+  })
+  await page.route('**/inspection-test', route => route.fulfill({ contentType: 'text/html', body:
+    `<div id="root"></div><script type="module">
+      import RefreshRuntime from '/@react-refresh'
+      RefreshRuntime.injectIntoGlobalHook(window)
+      window.$RefreshReg$ = () => {}
+      window.$RefreshSig$ = () => type => type
+      window.__vite_plugin_react_preamble_installed__ = true
+    </script><script type="module" src="/tests/fixtures/image-inspection.tsx"></script>`,
+  }))
+  await page.goto('/inspection-test')
+  await expect(page.getByRole('img')).toHaveAttribute('src', '/pixels/legacy/fit')
+  await page.getByRole('button', { name: 'Change version' }).click()
+  await expect(page.getByRole('img')).toHaveAttribute('alt', 'Original preview')
+  await page.getByRole('button', { name: 'Native', exact: true }).click()
+  await expect(page.getByText('ready', { exact: true })).toBeVisible()
+  expect(nativeReads).toEqual(['/pixels/legacy/native'])
+  release()
+  await expect(page.getByRole('img')).toHaveAttribute('alt', 'Original preview')
+  await page.getByRole('button', { name: 'Release hold' }).click()
+  await expect(page.getByRole('img')).toHaveAttribute('src', '/pixels/current/fit')
+  await expect(page.getByRole('img')).toHaveAttribute('alt', 'Current preview')
+  await page.getByRole('button', { name: 'Native', exact: true }).click()
+  await expect(page.getByText('ready', { exact: true })).toBeVisible()
+  expect(nativeReads).toEqual(['/pixels/legacy/native', '/pixels/current/native'])
+})
+
+
+test('enlarged vertical wheel panning preserves the clamped horizontal inspection center', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 989 })
+  const { scene } = await openExploreScene(page, 'preparation-light')
+  const preview = page.getByRole('region', { name: 'Last test exposure', exact: true })
+  const inline = preview.locator('.capture-image__window')
+  await expect(inline.locator('img')).toBeVisible()
+  await preview.getByRole('button', { name: '100%', exact: true }).click()
+  await expect(inline).toHaveAttribute('data-zoomed', 'true')
+  const initialLeft = await inline.evaluate(element => element.scrollLeft)
+  await inline.focus()
+  await page.keyboard.press('ArrowRight')
+  await expect.poll(() => inline.evaluate(element => element.scrollLeft)).toBe(initialLeft + 80)
+  const desiredX = await inline.evaluate(element => element.scrollLeft + element.clientWidth / 2)
+  await preview.getByRole('button', { name: 'Enlarge test exposure', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Inspect test exposure', exact: true })
+  const enlarged = dialog.locator('.capture-image__window')
+  await expect(dialog).toBeVisible()
+  await dialog.evaluate(async element => {
+    await Promise.all(element.getAnimations({ subtree: true }).filter(animation =>
+      animation.effect?.getComputedTiming().iterations !== Infinity,
+    ).map(animation => animation.finished.catch(() => {})))
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+  })
+  expect(await enlarged.evaluate(element => element.scrollWidth === element.clientWidth)).toBe(true)
+  const initialTop = await enlarged.evaluate(element => element.scrollTop)
+  await enlarged.hover()
+  await page.mouse.wheel(0, 80)
+  await expect.poll(() => enlarged.evaluate(element => element.scrollTop)).toBeGreaterThan(initialTop)
+  const desiredY = await enlarged.evaluate(element => element.scrollTop + element.clientHeight / 2)
+  await page.keyboard.press('Escape')
+  await expect(preview.getByRole('button', { name: 'Enlarge test exposure', exact: true })).toBeFocused()
+
+  const restored = await inline.evaluate(element => ({
+    x: element.scrollLeft + element.clientWidth / 2,
+    y: element.scrollTop + element.clientHeight / 2,
+  }))
+
+  expect(restored.x).toBe(desiredX)
+  // Odd and even viewport heights may round a half-pixel center differently.
+  expect(Math.abs(restored.y - desiredY)).toBeLessThanOrEqual(0.5)
+  expect(scene.commands).toEqual([])
 })

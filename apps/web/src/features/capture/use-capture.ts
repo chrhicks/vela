@@ -207,6 +207,8 @@ export function useCapture(rigId: string) {
         setCoolingUnconfirmed(false)
         setCoolingError(null)
       }
+
+      return next
     } catch (cause) {
       if (!alive.current || current !== generation.current) return
 

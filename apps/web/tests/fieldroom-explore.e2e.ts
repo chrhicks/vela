@@ -1,0 +1,179 @@
+import { expect, test } from '@playwright/test'
+import { writeFileSync } from 'node:fs'
+import { openExploreScene } from './fixtures/fieldroom/browser'
+import { reviewTimezone } from './fixtures/fieldroom/tonight'
+
+test.use({ timezoneId: reviewTimezone })
+
+for (const mode of ['light', 'dark'] as const) {
+  for (const width of [1440, 390]) {
+    test(`Explore ${mode} keeps three reference subjects and real selection actions at ${width}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: width === 1440 ? 900 : 782 })
+      const { scene } = await openExploreScene(page, `explore-${mode}`)
+      await expect(page.getByRole('heading', { name: 'Explore the sky' })).toBeVisible()
+      await expect(page.locator('.vela-discovery__card')).toHaveCount(3)
+      await expect(page.locator('.vela-discovery__card img')).toHaveCount(3)
+      await page.evaluate(async () => {
+        await document.fonts.ready
+        await Promise.all(Array.from(document.images).map((image) => image.decode()))
+        await Promise.all(
+          document
+            .getAnimations()
+            .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity)
+            .map((animation) => animation.finished.catch(() => {})),
+        )
+      })
+
+      const geometry = await page.evaluate(() =>
+        Object.fromEntries(
+          [
+            ['header', '.vela-discovery__header'],
+            ['controls', '.vela-discovery__controls'],
+            ['cards', '.vela-discovery__grid'],
+            ['card', '.vela-discovery__card'],
+            ['photograph', '.vela-discovery__image'],
+            ['summary', '.vela-discovery__subject'],
+            ['trace', '.vela-discovery__subject .tonight-sky__trace'],
+            ['footer', '.vela-discovery__footer'],
+          ].map(([name, selector]) => [
+            name,
+            document.querySelector(selector!)!.getBoundingClientRect().toJSON(),
+          ]),
+        ),
+      )
+
+      writeFileSync(
+        `/tmp/vela-explore-${mode}-${width}-geometry.json`,
+        JSON.stringify(geometry, null, 2),
+      )
+
+      if (width === 1440) {
+        expect(geometry.controls.x).toBe(36)
+        expect(geometry.controls.y).toBe(180)
+        expect(geometry.controls.height).toBe(46)
+        expect(geometry.cards.y).toBe(288)
+        expect(geometry.photograph.height).toBe(227)
+        expect(geometry.summary.x).toBeCloseTo(978, 0)
+        expect(geometry.summary.y).toBe(250)
+        expect(geometry.summary.width).toBeCloseTo(426, 0)
+      }
+
+      await page.screenshot({ path: `/tmp/vela-explore-${mode}-${width}.png`, fullPage: true })
+      expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(
+        false,
+      )
+      await page.locator('.vela-discovery__card').nth(1).getByRole('button').click()
+      await expect(page.locator('.vela-discovery__subject')).toContainText('Andromeda Galaxy')
+
+      if (width === 390) await expect(page.locator('.vela-discovery__subject')).toBeFocused()
+      expect(scene.commands).toEqual([])
+      await page.getByRole('link', { name: 'Frame this subject' }).click()
+      await expect(page).toHaveURL(/\/targets\/ngc0224/)
+      expect(scene.commands).toEqual([])
+    })
+  }
+}
+
+test('rigless Explore can search and inspect with no rig API requests or sky claims', async ({
+  page,
+}) => {
+  const { scene, requests } = await openExploreScene(page, 'explore-no-rig')
+  await expect(page.locator('.vela-discovery__card')).toHaveCount(3)
+  await expect(page.getByText(/sky timing requires/i)).toBeVisible()
+  await page.getByRole('searchbox').fill('M31')
+  await expect(page.locator('.vela-discovery__card')).toHaveCount(1)
+  await expect(page.getByRole('heading', { name: 'Andromeda Galaxy' }).first()).toBeVisible()
+  await expect(page.getByRole('button', { name: /Slew|Check current frame/ })).toHaveCount(0)
+  expect(requests.some((request) => /\/api\/(?:web\/)?rigs\//.test(request))).toBe(false)
+  expect(scene.commands).toEqual([])
+  expect(scene.unknownRequests).toEqual([])
+})
+
+for (const mode of ['light', 'dark'] as const) {
+  for (const width of [1440, 390]) {
+    test(`Framing ${mode} renders actual Aladin from pinned DSS tiles and its own test preview at ${width}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: width === 1440 ? 989 : 782 })
+      const { scene, missingResources, requests } = await openExploreScene(page, `framing-${mode}`)
+      await expect(page.getByRole('heading', { name: /Frame/ }).first()).toBeVisible()
+      await expect(page.locator('.framing-exposure img')).toBeVisible()
+      await expect(page.getByRole('link', { name: 'Continue to capture' })).toBeEnabled()
+      await expect(page.locator('.aladin-container canvas').first()).toBeVisible()
+      await expect(page.locator('.vela-target-footprint--actual')).toBeVisible()
+      await expect
+        .poll(() => requests.filter((request) => /Norder\d\/Dir/.test(request)).length)
+        .toBeGreaterThan(0)
+      await page.waitForLoadState('networkidle')
+      await page.evaluate(async () => {
+        await document.fonts.ready
+        await Promise.all(Array.from(document.images).map((image) => image.decode()))
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+      })
+
+      const geometry = await page.evaluate(() =>
+        Object.fromEntries(
+          [
+            ['heading', '.vela-target-heading'],
+            ['layout', '.vela-target-layout'],
+            ['surveyCard', '.vela-target-composition'],
+            ['toolbar', '.vela-target-survey-toolbar'],
+            ['survey', '.vela-target-field'],
+            ['result', '.vela-target-result'],
+            ['preview', '.framing-exposure .capture-image__window'],
+            ['footer', '.vela-target-context'],
+          ].map(([name, selector]) => [
+            name,
+            document.querySelector(selector!)!.getBoundingClientRect().toJSON(),
+          ]),
+        ),
+      )
+
+      writeFileSync(
+        `/tmp/vela-framing-${mode}-${width}-geometry.json`,
+        JSON.stringify(geometry, null, 2),
+      )
+
+      if (width === 1440) {
+        expect(geometry.layout.x).toBe(36)
+        expect(geometry.layout.y).toBe(180)
+        expect(geometry.surveyCard.width).toBeCloseTo(888, 0)
+        expect(geometry.result.x).toBeCloseTo(952, 0)
+        expect(geometry.result.width).toBeCloseTo(452, 0)
+        expect(geometry.toolbar.height).toBe(54)
+        expect(geometry.survey.height).toBe(520)
+        expect(geometry.preview.height).toBe(124)
+      }
+
+      await page.screenshot({ path: `/tmp/vela-framing-${mode}-${width}.png`, fullPage: true })
+      writeFileSync(
+        `/tmp/vela-framing-${mode}-${width}-resources.json`,
+        JSON.stringify(
+          requests.filter((request) => request.includes('/api/survey/')),
+          null,
+          2,
+        ),
+      )
+      expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(
+        false,
+      )
+      expect(missingResources).toEqual([])
+      expect(scene.commands).toEqual([])
+      await page.getByRole('link', { name: 'Continue to capture' }).click()
+      await expect(page).toHaveURL(/\/observe\?target=ngc6888/)
+    })
+  }
+}
+
+test('a newer unsolved exposure retains its own preview beside the older solved footprint', async ({
+  page,
+}) => {
+  const { scene, requests } = await openExploreScene(page, 'framing-unsolved')
+  await expect(page.locator('.framing-exposure img')).toBeVisible()
+  await expect(page.locator('.framing-exposure')).toContainText('No solved position')
+  await expect(page.getByRole('link', { name: 'Continue to capture' })).toHaveCount(0)
+  expect(requests.some((request) => request.includes('/review-test-2/fit.png'))).toBe(true)
+  expect(scene.commands).toEqual([])
+})

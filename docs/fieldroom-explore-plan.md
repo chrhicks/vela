@@ -1,7 +1,7 @@
 # Explore, framing, and preparation
 
-Status: planned. Implement only after Tonight/Appearance completes the independent
-review and final comparison gate in [Fieldroom adoption](fieldroom-adoption.md).
+Status: implemented; independent review and final visual acceptance pending.
+Tonight/Appearance passed its gate at `032c8b1` before this slice began.
 The parent accepts the concrete decisions below within the already approved
 required feature work; no new execution permission is needed.
 
@@ -383,5 +383,65 @@ Equipment implementation. Their written plans can be prepared in advance.
 
 ## Actual outcomes
 
-Planning only. Record the actual files, contracts, tests, substitutions, independent
-verdict and final browser comparison before accepting this slice.
+The implementation follows the planned route and capability boundaries:
+
+- `TargetBrowser` shares card/filter presentation between rig discovery and the
+  narrow catalog hook. Discovery requests three items and keeps snapshot/cache
+  compatibility; `/explore` uses the catalog-only API without device reads.
+  The catalog endpoint and small helpers live in `discovery-routes.ts`, avoiding
+  a new route module for one closely related read.
+- `FramingView.preview` retains a separate acquisition ID and nullable check ID.
+  Solve, PNG rendering and star analysis consume the same acquired samples;
+  independent failures remain independent. Three exact fit/native pairs are
+  cached per controller. Cancellation is checked before publication, and raw
+  samples are released after consumers settle. No FITS retention was added.
+- `FramingExposure` supplies framing-specific identity and actions over the new
+  shared `image-inspection` primitive. Capture retains its own Keep semantics.
+  Exact resource tuples include renderer URLs, and enlargement preserves the
+  inline owner's height, native pan and return focus.
+- Preparation replaces `CaptureHub` and composes a single capture command hook.
+  Camera selection requires explicit confirmed save. Only a confirmed Start
+  response navigates to Tonight. Uncertain results remain available for explicit
+  inspection; cooling commands remain separate. Connection details were retained
+  in `RigReadiness`, and equipment presentation is shared with Tonight.
+- A controlled accessible Switch was added and inspected in the workshop, with
+  observed checked state, pending focus retention and a 44px target.
+
+The production-route review registry supplies paired palettes and deterministic
+scenes with local hashed photographs and DSS HiPS resources. Aladin renders the
+actual survey tiles; no static image replaces the survey renderer. Unknown API
+requests fail within the fixture. These are browser-fixture observations; no
+physical-device validation was performed in this slice.
+
+Deliberate source substitutions: temporary framing images say **Temporary**,
+not Saved; unavailable catalog distances remain unavailable; current Moon
+separation and azimuth come from the same observed instant. Altitude traces use
+linear measured axes and calculated samples, with no invented obstruction line.
+The Paper sky/frame illustration cannot prescribe real survey reprojection or
+WCS geometry. The real catalog name “Great Hercules Cluster” wraps at the source’s 24/30
+heading size, adding 30px to the shared card row compared with Paper’s shorter
+“Hercules Cluster.” The source-sized card anatomy is otherwise retained.
+Compact layouts stack the desktop regions because these routes
+have no frozen full phone composition. Additional operational details remain
+available through disclosure instead of being removed to match a quiet sample.
+
+Settled project checks pass: 876 tests in 89 files plus model contract checks,
+repository lint and all production builds. The Switch workshop checks pass
+keyboard activation, source geometry and pending focus/observed-state retention.
+Focused browser coverage includes catalog/preview contracts, existing framing
+commands and retry guards, image identity and enlargement, camera save failures,
+uncertain Start, independent cooling and paired layout states. The full 157-case browser regression run passed 152 checks and exposed four
+displaced recovery-test selectors plus one real native-pan restoration defect.
+All nine recovery checks pass after adapting selectors to the preparation
+handoff and opening the actual framing disclosure before inspecting its history.
+The shared viewer now remembers the desired image center separately from the
+browser’s clamped layout position, updates only intentionally moved axes, and
+restores that center on resize. The exact preparation regression passes after
+waiting for dialog/scroll settlement; it previously could pass by closing before
+the delayed scroll event. The final combined rerun passes all 28 affected checks: nine recovery, eight
+image-inspection and eleven preparation tests. Final repository lint, web build
+and whitespace checks pass. This establishes all 157 original browser cases
+across the full run and affected rerun, plus the new axis-preservation regression;
+it is not a claim that the original full run was failure-free.
+Independent verdict and retained final browser comparison follow before this
+slice can be accepted.
