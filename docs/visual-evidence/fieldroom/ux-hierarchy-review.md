@@ -87,6 +87,26 @@ alongside existing discovery and framing-sky regression coverage. Web build and
 lint pass. Independent verification and Chris's application acceptance follow
 the workshop approval separately.
 
+### Frame-only proposal
+
+Chris accepted the implemented Explore interaction and requested Frame next.
+The **Frame context** proposal preserves the actual North America Nebula Frame
+page: navigation, survey field, desired camera rectangle, framing status, last
+test exposure and command column. It brings the approved sky icon/dialog beside
+the heading, places framing details with the result, and nests optics settings
+inside Frame position & controls. The detached supplementary footer is removed.
+
+Open [Frame context](http://127.0.0.1:5174/?component=panel&specimen=panel-frame-context&profile=fieldroom&mode=dark&context=isolated&viewport=1280).
+Its bundled DSS2 cutout matches the live page's initial reference field; sky
+samples are the existing static Explore fixture. Dragging, optics changes and
+checks are local demonstrations. No fixture is imported into the application,
+and this proposal does not change production framing or operate devices.
+UI typecheck, workshop build and lint pass. Native-browser review covers desktop
+dark and phone light, dialog opening/time scrubbing/dismissal, both relocated
+disclosures, and explicitly simulated check feedback. The phone composition
+stacks without horizontal overflow, and the exposure input retains its value
+and units without overlap. Design approval and application adoption are pending.
+
 ### Earlier exploratory composition
 
 [Sky context & framing](http://127.0.0.1:5174/?component=panel&specimen=panel-sky-context&profile=fieldroom&mode=light&context=isolated&viewport=1280)
