@@ -226,3 +226,18 @@ checks, repository lint, and UI/web/workshop builds passed. One combined browser
 run lost its shared Vite process and reported connection-refused failures; the
 29 affected route/navigation cases passed after starting a parent-owned persistent
 server. This was test-environment evidence, not a successful application run.
+
+The pre-handoff coverage audit found the older `exposure-recovery.e2e.ts` still
+using displaced presentation selectors. Its semantic updates retained the actual
+recovery assertions and exposed a real pending-feedback mismatch: during a Stop
+POST, Autofocus's read-retry card still said Stop remained available. Pending now
+has visible first priority (“Sending command…”), retaining samples and time without
+claiming restoration. Alignment likewise displays pending intent, pauses elapsed
+feedback and uses past-tense corrections. The first independent invocation was
+interrupted before a verdict so this correction receives a fresh complete review.
+Seventeen combined autofocus/recovery checks passed (10 existing autofocus, five
+preparation recovery, two unchanged capture recovery); four alignment end-command
+checks including the new controlled pending response passed. Full `pnpm check`
+passed. The synthetic alignment fixture also now uses the viewport's true
+pixel-center convention,799.5/599.5, for its declared north-up projected coordinates;
+five fixture checks passed after that correction.

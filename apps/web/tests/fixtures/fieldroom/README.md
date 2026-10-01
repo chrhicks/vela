@@ -267,8 +267,8 @@ with the shared HTTP/browser resource handler:
 Alignment API metadata identifies the image as review/simulator data. The
 01:02:14Z exposure timestamp is a declared **server-estimated review timestamp**,
 not the PNG's historical acquisition time. North-up projected target coordinates
-are illustrative contract values: native optical center (800,600), target
-(807.6667,590), one-degree field height, azimuth −23″ and altitude −30″. The
+are illustrative contract values: native optical center (799.5,599.5), target
+(807.1667,589.5), one-degree field height, azimuth −23″ and altitude −30″. The
 production contract exposes projected coordinates, not a full WCS; fixtures do
 not claim a measured WCS for these pixels. Existing viewport mathematics must
 consume those values without replacing them with Paper's decorative coordinates.

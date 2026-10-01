@@ -95,6 +95,7 @@ function AutofocusPage({ rigId }: { rigId: string }) {
   }, undefined)
 
   const outcome = autofocusOutcome(view, {
+    pending,
     offline,
     error,
     setup,
@@ -465,6 +466,7 @@ function OutcomeCard({
 function autofocusOutcome(
   view: AutofocusView,
   state: {
+    pending: boolean
     offline: boolean
     error: string | null
     setup: boolean
@@ -474,7 +476,17 @@ function autofocusOutcome(
     lowest: AutofocusView['samples'][number] | undefined
   },
 ): Outcome | null {
-  const { offline, error, setup, travelBlocked, step, latest, lowest } = state
+  const { pending, offline, error, setup, travelBlocked, step, latest, lowest } = state
+
+  if (pending)
+    return {
+      eyebrow: 'Command pending',
+      title: 'Sending command…',
+      body: 'The last received samples and position are retained while Vela waits for the server response.',
+      fact: `Last sample ${sampleTime(latest)} · ${view.samples.length} measured samples`,
+      footer: 'Waiting for server confirmation',
+      tone: 'active',
+    }
 
   if (offline)
     return {

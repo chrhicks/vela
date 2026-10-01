@@ -185,3 +185,26 @@ test('short narrow alignment screen keeps Stop reachable without horizontal over
   await expect(stop).toBeInViewport()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
 })
+
+
+test('pending alignment Stop shows command intent while retaining the last measurement', async ({ page }) => {
+  const { scene } = await openAlignmentScene(page, 'alignment-phone-adjusting')
+  await expect(page.locator('.vela-polar-total strong')).toHaveText('38″')
+  let release!: () => void
+  const responseGate = new Promise<void>(resolve => { release = resolve })
+  await page.route('**/api/rigs/fra400/alignment/stop', async route => {
+    const result = scene.respond('POST', '/api/rigs/fra400/alignment/stop', {})
+    await responseGate
+    await route.fulfill({ status: result.status, json: result.json })
+  })
+  await page.getByRole('button', { name: 'Stop', exact: true }).click()
+  await expect(page.locator('.vela-polar-status')).toContainText('Sending command…')
+  await expect(page.locator('.vela-polar-total strong')).toHaveText('38″')
+  await expect(page.locator('.vela-polar-directions')).toContainText('Last: right')
+  await expect(page.getByRole('button', { name: 'Stop', exact: true })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Finish alignment', exact: true })).toBeDisabled()
+  expect(scene.writes).toHaveLength(1)
+  release()
+  await expect(page.getByRole('button', { name: 'Measure again', exact: true })).toBeEnabled()
+  expect(scene.writes).toHaveLength(1)
+})

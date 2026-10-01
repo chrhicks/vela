@@ -347,7 +347,7 @@ Alignment/autofocus is the remaining route-adoption slice.
 
 ## 6. Whole-application verification and handoff
 
-Status: planned.
+Status: final review preparation; final preparation-slice verification remains a prerequisite.
 
 ### Plan
 
@@ -366,6 +366,30 @@ Status: planned.
 - Obtain final independent **OK**, prepare the reachable app with review data
   and relevant devices, and give Chris concrete acceptance scenarios. Wait for
   his acceptance before merge.
+
+### Concrete final checks
+
+After the last slice receives independent OK and visual acceptance, run the existing
+real-route reference cases together: `tonight.e2e.ts`, `fieldroom-explore.e2e.ts`,
+`preparation.e2e.ts`, `photographs.e2e.ts`, `fieldroom-equipment.e2e.ts` and
+`rig-onboarding.e2e.ts`. Select their paired rendering cases; preserve the existing
+functional verification rather than inventing another feature harness. Include
+navigation, application theme and Appearance checks to cover shared composition.
+The preparation slice contributes its reviewed alignment/autofocus matrix.
+
+Inspect the resulting whole-route captures against frozen sources and the accepted
+slice evidence, including both palettes and compact widths. Check all44 frozen
+source hashes/dimensions. Record final screenshots, checks, fixture substitutions
+and any native-browser limitations in the owning evidence directories, with a
+whole-application index linking them. Update the original planned-scene coverage
+with the actual fixture/test mapping; names may differ, observable coverage may not.
+
+Use the parent-owned persistent web runtime on5175 for checks and the deterministic
+review server on5176 for the handoff. Open the actual Tonight scene in the shared
+browser and confirm rendered state. Supply direct scene links for other workflows
+because each review session intentionally serves only its selected contract fixture.
+Keep this review server isolated from physical devices. The independent verdict,
+post-review comparison and final clean commit must be recorded before inviting Chris.
 
 ### Actual / deviations / evidence
 
