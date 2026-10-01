@@ -49,7 +49,7 @@ function SkyContext({ props, onPropsChange }: {
   const sky = (
     <SkyPath
       samples={samples}
-      moonSamples={moon}
+      {...(moon ? { moonSamples: moon } : {})}
       targetName={target.name}
       selectedIndex={skyIndex}
       onSelectedIndexChange={index => update({ skyIndex: index })}
