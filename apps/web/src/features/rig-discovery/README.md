@@ -26,6 +26,8 @@ explicit read-only discovery inspection of the exact reviewed endpoint:
 No check replays Add. A confirmed Add hands off to Home, which closes the dialog
 before refreshing. Refresh failure preserves the previous catalog and does not
 turn the confirmed write into a failed Add.
+Saved-state inspection has a five-second read deadline. A timeout retains the
+unknown outcome and edited name, restores dismissal, and permits another check.
 
 The scoped Dialog treatment follows the approved Fieldroom workshop: 624px
 review at desktop and a full-height compact address flow. Shared Dialog retains

@@ -272,7 +272,11 @@ export default function RigDiscoveryDialog({ open, onAdded, onDismiss }: Props) 
 
     try {
       const request: DiscoverRigsRequest = { mode: 'manual', ...review.candidate.endpoint }
-      const result = await discoverRigs(request, controller.signal)
+
+      const result = await discoverRigs(request, AbortSignal.any([
+        controller.signal,
+        AbortSignal.timeout(5000),
+      ]))
 
       if (requestController.current !== controller) return
 

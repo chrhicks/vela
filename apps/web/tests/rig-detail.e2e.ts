@@ -409,3 +409,37 @@ test('unknown Forget requires catalog inspection across dismissal and never repe
   expect(deletes).toBe(1)
   expect(reads).toBe(3)
 })
+
+test('a stalled Forget check permits dismissal without forgetting the unknown outcome', async ({ page }) => {
+  let deletes = 0
+  let reads = 0
+  await page.route('**/api/web/home', async route => {
+    reads++
+
+    if (reads === 1) return
+
+    await fulfillJson(route, { rigs: [], refreshedAt: now })
+  })
+  await page.route('**/api/web/rigs/rig-1', route => fulfillJson(route, liveDetail()))
+  await page.route('**/api/rigs/rig-1', async route => {
+    deletes++
+    await route.abort('connectionreset')
+  })
+  await page.goto('/rigs/rig-1')
+  await page.locator('.equipment__rig-details summary').click()
+  const opener = page.getByRole('button', { name: 'Forget rig', exact: true })
+  await opener.click()
+  const dialog = page.getByRole('dialog', { name: 'Forget Backyard rig?' })
+  await dialog.getByRole('button', { name: 'Forget rig', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Check saved rigs' }).click()
+  await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeDisabled()
+  await expect(dialog.getByRole('alert')).toContainText('could not be checked', { timeout: 8000 })
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await opener.click()
+  await expect(dialog.getByRole('button', { name: 'Forget rig', exact: true })).toHaveCount(0)
+  await dialog.getByRole('button', { name: 'Check saved rigs' }).click()
+  await expect(page).toHaveURL(/\/$/)
+  await expect(page.getByRole('heading', { name: 'Connect your first rig' })).toBeVisible()
+  expect(deletes).toBe(1)
+  expect(reads).toBe(3)
+})

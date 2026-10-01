@@ -409,6 +409,38 @@ for (const failure of ['transport', 'malformed'] as const) {
   })
 }
 
+test('a stalled saved-rig check restores controls and preserves the unknown Add outcome', async ({ page }) => {
+  await useHome(page, emptyHome)
+  let inspections = 0
+  let adds = 0
+  await page.route('**/api/rigs/discovery', async route => {
+    inspections++
+
+    if (inspections === 2) return
+
+    await fulfillJson(route, {
+      candidates: [discoveryCandidate(inspections === 1 ? 'new' : 'already-added')],
+      failures: [],
+    })
+  })
+  await page.route('**/api/rigs', async route => {
+    adds++
+    await route.abort('connectionreset')
+  })
+  await openReview(page)
+  await page.getByRole('button', { name: 'Add rig', exact: true }).click()
+  await page.getByRole('button', { name: 'Check saved rig', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Checking saved rig…' })).toBeDisabled()
+  await expect(page.getByRole('alert')).toContainText('still unknown', { timeout: 8000 })
+  await expect(page.getByRole('button', { name: 'Add rig', exact: true })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Close dialog' })).toBeEnabled()
+  await expect(page.getByLabel('Rig name')).toHaveValue('My observatory')
+  await page.getByRole('button', { name: 'Check saved rig', exact: true }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  expect(adds).toBe(1)
+  expect(inspections).toBe(3)
+})
+
 test('retains review and address drafts through Back, and keeps confirmed add after failed Home refresh', async ({
   page,
 }) => {
