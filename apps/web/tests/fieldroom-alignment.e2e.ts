@@ -1,7 +1,10 @@
 import { expect, test } from '@playwright/test'
 import { writeFileSync } from 'node:fs'
+import { reviewTimezone } from './fixtures/fieldroom/tonight'
 import { openAlignmentScene } from './fixtures/fieldroom/browser'
 import type { AlignmentScene } from './fixtures/fieldroom/alignment'
+
+test.use({ timezoneId: reviewTimezone })
 
 for (const width of [1440, 768, 390]) {
   for (const mode of ['light', 'dark'] as const) {
