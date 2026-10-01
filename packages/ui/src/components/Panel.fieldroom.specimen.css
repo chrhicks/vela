@@ -7,7 +7,16 @@
 .vela-fieldroom-specimen__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .vela-fieldroom-specimen__capture,
 .vela-fieldroom-specimen__notice { display: grid; align-content: start; justify-items: start; gap: 16px; border: 1px solid var(--vela-line); border-radius: var(--vela-card-radius); background: var(--vela-surface); }
-.vela-fieldroom-specimen__capture { padding: 20px 22px; }
+.vela-fieldroom-specimen__capture { box-sizing: border-box; grid-column: 1 / -1; justify-items: stretch; width: min(452px, 100%); padding: 20px 22px; border: 0; background: var(--vela-accent-surface); }
+.vela-fieldroom-specimen__capture-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+.vela-fieldroom-specimen__stop-mark { display: block; flex: none; width: 9px; height: 9px; background: currentColor; }
+.vela-fieldroom-specimen__reading { display: flex; align-items: baseline; gap: 16px; }
+.vela-fieldroom-specimen__reading > .vela-type-supporting { color: var(--vela-text-muted); }
+.vela-fieldroom-specimen__capture progress { appearance: none; display: block; width: 100%; height: 4px; border: 0; background: var(--vela-progress-track); }
+.vela-fieldroom-specimen__capture progress::-webkit-progress-bar { background: var(--vela-progress-track); }
+.vela-fieldroom-specimen__capture progress::-webkit-progress-value { background: var(--vela-text-muted); }
+.vela-fieldroom-specimen__capture progress::-moz-progress-bar { background: var(--vela-text-muted); }
+@container (width < 440px) { .vela-fieldroom-specimen__capture-row { flex-wrap: wrap; } }
 .vela-fieldroom-specimen__notice { padding: 24px; }
 .vela-fieldroom-specimen__notice[data-tone='warning'] { background: var(--vela-warning-surface); }
 .vela-fieldroom-specimen__notice[data-tone='warning'] > .vela-type-caption { color: var(--vela-warning); }

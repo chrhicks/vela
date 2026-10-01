@@ -25,7 +25,7 @@ test('forget confirmation enters Cancel, contains focus and returns to opener', 
   await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeFocused()
   await dialog.getByRole('button', { name: 'Forget rig' }).focus()
   await page.keyboard.press('Tab')
-  await expect(dialog.getByRole('button', { name: 'Close dialog' })).toBeFocused()
+  await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeFocused()
   await page.keyboard.press('Escape')
   await expect(dialog).toHaveCount(0)
   await expect(opener).toBeFocused()

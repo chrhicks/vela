@@ -58,9 +58,19 @@ function FieldroomFoundations() {
 
       <section className="vela-fieldroom-specimen__grid" aria-label="Surfaces and state">
         <article className="vela-fieldroom-specimen__capture">
-          <h2 className="vela-type-section">Capture</h2>
-          <p className="vela-type-body">Source card: 20px block, 22px inline, 16px between groups.</p>
-          <Button tone="accent">Start capture</Button>
+          <div className="vela-fieldroom-specimen__capture-row">
+            <span className="vela-type-control">● Capturing</span>
+            <span className="vela-type-supporting">Exposure 13</span>
+          </div>
+          <div className="vela-fieldroom-specimen__reading">
+            <span className="vela-type-metric">01:24</span>
+            <span className="vela-type-supporting">left in this exposure</span>
+          </div>
+          <progress aria-label="Example exposure progress" value={0.54} max={1} />
+          <div className="vela-fieldroom-specimen__capture-row">
+            <p className="vela-type-supporting">12 saved · 36 min collected<br />Repeats until you stop</p>
+            <Button tone="accent" leadingIcon={<i aria-hidden="true" className="vela-fieldroom-specimen__stop-mark" />}>Stop capture</Button>
+          </div>
         </article>
         <article className="vela-fieldroom-specimen__notice" data-tone="warning">
           <span className="vela-type-caption">Interrupted</span>
@@ -81,6 +91,7 @@ function FieldroomFoundations() {
         title="Forget Askar FRA 400?"
         description="Remove this rig’s saved configuration from Vela. This does not change its ALPACA server or hardware. You can discover and add it again later."
         initialFocusId={cancelId}
+        showCloseButton={false}
         onDismiss={() => setDialogOpen(false)}
         footer={<><Button id={cancelId} onClick={() => setDialogOpen(false)}>Cancel</Button><Button tone="accent" onClick={() => setDialogOpen(false)}>Forget rig</Button></>}
       />

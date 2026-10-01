@@ -7,6 +7,7 @@ export interface DialogProps extends Omit<HTMLAttributes<HTMLElement>, 'title'> 
   title: string
   description?: string
   footer?: ReactNode
+  showCloseButton?: boolean
   dismissLabel?: string
   /** Resolve the current opener on dismissal when a layout can replace its element. */
   returnFocusId?: string
@@ -21,6 +22,7 @@ export function Dialog({
   description,
   footer,
   dismissLabel = 'Close dialog',
+  showCloseButton = true,
   returnFocusId,
   initialFocusId,
   onDismiss,
@@ -94,7 +96,7 @@ export function Dialog({
             <h2 id={titleId}>{title}</h2>
             {description ? <p id={descriptionId}>{description}</p> : null}
           </div>
-          {onDismiss ? (
+          {onDismiss && showCloseButton ? (
             <button
               aria-label={dismissLabel}
               className="vela-dialog__close"
