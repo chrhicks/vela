@@ -134,7 +134,6 @@ async function rig(page: Page) {
   await page.goto('/rigs/rig-1/observe/targets/m31')
   await page.getByText('Frame position & controls', { exact: true }).click()
   await page.getByText('Framing details & state', { exact: true }).click()
-  await page.locator('.vela-target-sky-context > summary').click()
   await expect(page.getByRole('button', { name: 'Center composition', exact: true })).toBeEnabled()
 
   return rig

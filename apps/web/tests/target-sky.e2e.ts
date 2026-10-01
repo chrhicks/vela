@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import type { TargetSkyPath, TargetView } from '@vela/model/web'
+import { reviewFraming } from './fixtures/fieldroom/explore'
 
 const start = Date.UTC(2026, 8, 8, 16)
 
@@ -66,10 +67,9 @@ for (const width of [1440, 390]) {
     await page.route('**/api/web/rigs/rig-1/framing', (route) => route.abort())
     await page.route('**/api/survey/**', (route) => route.abort())
     await page.goto('/rigs/rig-1/observe/targets/m31')
-    await page.getByText('Frame position & controls', { exact: true }).click()
-    await page.getByText('Framing details & state', { exact: true }).click()
-    await page.locator('.vela-target-sky-context > summary').click()
-    const sidebar = page.locator('.vela-target-sky-context')
+    const trigger = page.getByRole('button', { name: 'View sky path', exact: true })
+    await trigger.click()
+    const sidebar = page.getByRole('dialog')
     const time = sidebar.getByRole('slider', { name: 'Preview time for Andromeda Galaxy' })
     await expect(
       sidebar.getByText('Local obstructions not included', { exact: true }),
@@ -98,8 +98,9 @@ for (const width of [1440, 390]) {
     ).toHaveCSS('stroke', 'rgb(24, 140, 165)')
     await expect(sidebar.getByText(/Light boundaries approximate/)).toBeVisible()
     await time.fill('23')
-    const expand = page.getByRole('button', { name: 'Expand sky view' })
-    await expand.click()
+    await page.keyboard.press('Escape')
+    await expect(trigger).toBeFocused()
+    await trigger.click()
     const dialog = page.getByRole('dialog')
     await expect(dialog.getByRole('slider')).toHaveValue('23')
     await expect(dialog.locator('.vela-sky-path__light-status')).toHaveText('Astronomical darkness')
@@ -111,10 +112,11 @@ for (const width of [1440, 390]) {
     )
     await page.keyboard.press('Escape')
     await expect(dialog).toHaveCount(0)
-    await expect(time).toHaveValue('30')
-    await expect(expand).toBeFocused()
+    await expect(trigger).toBeFocused()
     await expect(page.locator('.vela-theme > main')).not.toHaveAttribute('inert', '')
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    await trigger.click()
+    await expect(dialog.getByRole('slider')).toHaveValue('30')
     expect(commands).toEqual([])
   })
 }
@@ -130,14 +132,12 @@ test('interrupted sky updates keep the selected time and label the old calculati
   await page.route('**/api/web/rigs/rig-1/framing', (route) => route.abort())
   await page.route('**/api/survey/**', (route) => route.abort())
   await page.goto('/rigs/rig-1/observe/targets/m31')
-  await page.getByText('Frame position & controls', { exact: true }).click()
-  await page.getByText('Framing details & state', { exact: true }).click()
-  await page.locator('.vela-target-sky-context > summary').click()
+  await page.getByRole('button', { name: 'View sky path', exact: true }).click()
   const time = page.getByRole('slider', { name: 'Preview time for Andromeda Galaxy' })
   await time.fill('22')
   interrupted = true
   await page.clock.fastForward(61000)
-  await expect(page.getByText('Sky updates interrupted · last calculation shown.')).toBeVisible()
+  await expect(page.getByRole('dialog').getByText('Sky updates interrupted · last calculation shown.')).toBeVisible()
   await expect(time).toHaveValue('22')
   await expect(page.locator('.vela-sky-path__light-status')).toHaveText('Astronomical darkness')
   await expect(page.locator('.vela-sky-path__map').getByText('Last', { exact: true })).toBeVisible()
@@ -151,10 +151,52 @@ test('missing site does not invent a sky or Moon', async ({ page }) => {
   await page.route('**/api/web/rigs/rig-1/framing', (route) => route.abort())
   await page.route('**/api/survey/**', (route) => route.abort())
   await page.goto('/rigs/rig-1/observe/targets/m31')
-  await page.getByText('Frame position & controls', { exact: true }).click()
-  await page.getByText('Framing details & state', { exact: true }).click()
-  await page.locator('.vela-target-sky-context > summary').click()
+
   await expect(page.getByText('Site unavailable · sky path unknown')).toBeVisible()
   await expect(page.locator('.vela-sky-path')).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'Expand sky view' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'View sky path' })).toHaveCount(0)
+})
+
+// Tonight links directly to sky inspection before the target request has finished.
+test('sky deep link waits for target data and dismiss stays closed across refresh and reload', async ({ page }) => {
+  await page.clock.install()
+  let releaseTarget!: () => void
+  const targetReady = new Promise<void>(resolve => { releaseTarget = resolve })
+  let releaseFraming!: () => void
+  const framingReady = new Promise<void>(resolve => { releaseFraming = resolve })
+  let targetRequests = 0
+  await page.route('**/api/web/rigs/rig-1/targets/m31', async route => {
+    targetRequests += 1
+    await targetReady
+    await route.fulfill({ json: target })
+  })
+  await page.route('**/api/web/rigs/rig-1/framing', async route => {
+    await framingReady
+    await route.fulfill({ json: { ...reviewFraming, rigId: 'rig-1', preview: null, observedAt: new Date().toISOString() } })
+  })
+  await page.route('**/api/survey/**', route => route.abort())
+  await page.goto('/rigs/rig-1/observe/targets/m31#sky')
+  await expect.poll(() => targetRequests).toBeGreaterThan(0)
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  releaseTarget()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog).toBeVisible()
+  await expect(dialog.getByRole('slider')).toHaveValue('18')
+  await dialog.getByRole('slider').focus()
+  releaseFraming()
+  await expect(page.getByText('ASI2600MC Pro', { exact: true })).toBeAttached()
+  await expect(dialog.getByRole('slider')).toBeFocused()
+  await dialog.getByRole('button', { name: 'Close sky view' }).click()
+  await expect(dialog).toHaveCount(0)
+  await expect(page).not.toHaveURL(/#sky$/)
+  const previousTargetRequests = targetRequests
+
+  await page.clock.fastForward(61000)
+  await expect.poll(() => targetRequests).toBeGreaterThan(previousTargetRequests)
+  await expect(dialog).toHaveCount(0)
+  await page.reload()
+  await expect(page.getByRole('button', { name: 'View sky path', exact: true })).toBeVisible()
+  await expect(dialog).toHaveCount(0)
+  await page.goto('/rigs/rig-1/observe/targets/m31#sky')
+  await expect(dialog).toBeVisible()
 })

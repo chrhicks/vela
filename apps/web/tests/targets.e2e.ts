@@ -105,7 +105,6 @@ test('an untouched target and Reset frame send only the accepted slew fields', a
   await page.goto('/rigs/rig-1/observe/targets/m31')
   await page.getByText('Frame position & controls', { exact: true }).click()
   await page.getByText('Framing details & state', { exact: true }).click()
-  await page.locator('.vela-target-sky-context > summary').click()
   await page.getByRole('button', { name: 'Slew & check' }).click()
   await expect(page.getByText('Test frame solved', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Adjust composition' }).click()
@@ -195,7 +194,6 @@ test('ambiguous command is not repeated and requires explicit current state chec
   await page.goto('/rigs/rig-1/observe/targets/m31')
   await page.getByText('Frame position & controls', { exact: true }).click()
   await page.getByText('Framing details & state', { exact: true }).click()
-  await page.locator('.vela-target-sky-context > summary').click()
   await expect(page.getByRole('button', { name: 'Slew & check' })).toBeEnabled()
   await page.getByRole('button', { name: 'Slew & check' }).click()
   await expect(page.getByRole('alert')).toContainText('could not be confirmed')
@@ -238,7 +236,6 @@ test('survey footprint uses projected coordinates and keyboard adjustment; tile 
   await page.goto('/rigs/rig-1/observe/targets/m31')
   await page.getByText('Frame position & controls', { exact: true }).click()
   await page.getByText('Framing details & state', { exact: true }).click()
-  await page.locator('.vela-target-sky-context > summary').click()
   const frame = page.getByRole('slider', { name: 'Camera frame position' })
   await expect(frame).toBeVisible({ timeout: 30000 })
   const original = await frame.getAttribute('points')
@@ -330,7 +327,6 @@ test('checked framing offers centering, active operations lock edits, and stale 
   await page.goto('/rigs/rig-1/observe/targets/m31')
   await page.getByText('Frame position & controls', { exact: true }).click()
   await page.getByText('Framing details & state', { exact: true }).click()
-  await page.locator('.vela-target-sky-context > summary').click()
   await expect(page.getByRole('link', { name: 'Continue to capture' })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Continue to capture' })).toHaveAttribute(
     'href',
@@ -396,7 +392,6 @@ test('a rejected adjusted composition cannot inherit the prior framing check aft
   await page.goto('/rigs/rig-1/observe/targets/m31')
   await page.getByText('Frame position & controls', { exact: true }).click()
   await page.getByText('Framing details & state', { exact: true }).click()
-  await page.locator('.vela-target-sky-context > summary').click()
   await expect(page.getByRole('link', { name: 'Continue to capture' })).toBeVisible()
   await page.getByRole('button', { name: 'Adjust composition' }).click()
   await page.getByRole('button', { name: 'Move frame →' }).click()
@@ -449,7 +444,6 @@ test('an explicit read recovers a completed adjusted check after its command res
   await page.goto('/rigs/rig-1/observe/targets/m31')
   await page.getByText('Frame position & controls', { exact: true }).click()
   await page.getByText('Framing details & state', { exact: true }).click()
-  await page.locator('.vela-target-sky-context > summary').click()
   await expect(page.getByRole('link', { name: 'Continue to capture' })).toBeVisible()
   await page.getByRole('button', { name: 'Adjust composition' }).click()
   await page.getByRole('button', { name: 'Move frame →' }).click()
@@ -494,7 +488,6 @@ for (const failureSource of ['command', 'poll'] as const) {
     await page.goto('/rigs/rig-1/observe/targets/m31')
     await page.getByText('Frame position & controls', { exact: true }).click()
     await page.getByText('Framing details & state', { exact: true }).click()
-    await page.locator('.vela-target-sky-context > summary').click()
     await expect(page.getByRole('button', { name: 'Stop framing' })).toBeEnabled()
 
     if (failureSource === 'command')
@@ -543,7 +536,6 @@ test('quiet polling leaves Check rig state enabled and an explicit check superse
   await page.goto('/rigs/rig-1/observe/targets/m31')
   await page.getByText('Frame position & controls', { exact: true }).click()
   await page.getByText('Framing details & state', { exact: true }).click()
-  await page.locator('.vela-target-sky-context > summary').click()
   const check = page.getByRole('button', { name: 'Check rig state' })
   await expect(page.getByRole('button', { name: 'Slew & check' })).toBeEnabled()
   armed = true
@@ -645,7 +637,6 @@ test('failure recovery preserves local drag, zoom and nudges while device comman
   await page.goto('/rigs/rig-1/observe/targets/m31')
   await page.getByText('Frame position & controls', { exact: true }).click()
   await page.getByText('Framing details & state', { exact: true }).click()
-  await page.locator('.vela-target-sky-context > summary').click()
   const frame = page.getByRole('slider', { name: 'Camera frame position' })
   await expect(frame).toBeVisible()
   await expect(frame).toHaveAttribute('aria-disabled', 'true')
@@ -662,6 +653,12 @@ test('failure recovery preserves local drag, zoom and nudges while device comman
   ).toBeVisible()
   await expect(frame).toHaveAttribute('aria-disabled', 'false')
   await expect(page.getByRole('button', { name: 'Slew & check' })).toBeDisabled()
+  const adjustments = page.locator('.vela-target-adjustments')
+
+  if ((await adjustments.getAttribute('open')) === null) {
+    await adjustments.locator('summary').first().click()
+  }
+
   await page.getByText('Optics settings', { exact: true }).click()
   await expect(page.getByRole('button', { name: 'Save focal length' })).toBeDisabled()
   await frame.scrollIntoViewIfNeeded()
@@ -751,7 +748,6 @@ test('an edited composition can center using its current coordinates and the las
   await page.goto('/rigs/rig-1/observe/targets/m31')
   await page.getByText('Frame position & controls', { exact: true }).click()
   await page.getByText('Framing details & state', { exact: true }).click()
-  await page.locator('.vela-target-sky-context > summary').click()
   await page.getByRole('button', { name: 'Adjust composition' }).click()
   await page.getByRole('button', { name: 'Move frame →' }).click()
   await expect(page.getByRole('link', { name: 'Continue to capture' })).toHaveCount(0)
@@ -809,7 +805,6 @@ test('a recoverable check keeps the edited destination and offers a fresh exposu
   await page.goto('/rigs/rig-1/observe/targets/m31')
   await page.getByText('Frame position & controls', { exact: true }).click()
   await page.getByText('Framing details & state', { exact: true }).click()
-  await page.locator('.vela-target-sky-context > summary').click()
   await expect(page.getByRole('button', { name: 'Check current frame', exact: true })).toBeEnabled()
   await page.getByRole('button', { name: 'Move frame →' }).click()
   const coordinates = await page.locator('.vela-target-details').textContent()

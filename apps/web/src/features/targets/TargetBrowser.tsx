@@ -456,7 +456,6 @@ function ExploreSubjects({
                   sky={sky}
                   targetName={selected.name}
                   stale={saved || !!error}
-                  presentation="icon"
                 />
               )}
             </div>

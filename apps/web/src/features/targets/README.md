@@ -54,13 +54,17 @@ are generated Vela test fixtures, never application assets.
 `SkyInspection` adopts the promoted SkyPath primitive in Through the night.
 The server supplies target azimuth/altitude and topocentric Moon positions at
 matching 15-minute timestamps. The browser formats local time and retains the
-selected timestamp across refreshes and compact/expanded views. A new subject or night
+selected timestamp across refreshes and dialog dismissal. A new subject or night
 resets selection. The view reports daylight/twilight/darkness for the selected
 sample and keeps the last calculation explicitly marked during interruption.
 Explore opens the sky directly from the icon beside the selected subject’s
 Through the night heading, using the approved `Panel.explore-sky` composition.
-Subject facts retain catalog and imaging advice; framing keeps its compact sky
-with an expanded view. The dialog is portaled inside the app theme, outside the framing
+Subject facts retain catalog and imaging advice. Frame keeps a compact sky
+summary beside its heading and opens the same sky dialog directly from its icon.
+A `#sky` link opens the dialog after target data arrives; dismissal removes the
+hash so background refreshes do not reopen it. Framing details and state belong
+inside the result card. Optics settings sit inside Frame position & controls;
+`SurveyField` accepts the route-owned settings content without owning rig commands. The dialog is portaled inside the app theme, outside the framing
 container, with background interaction disabled until dismissal.
 
 No local obstruction profile is currently loaded. The geometric dome explicitly
@@ -75,7 +79,7 @@ the twilight limits. The zero-degree boundary is a geometric convention, not
 a refracted upper-limb sunrise/sunset prediction. Light colors, legend and
 selected-phase text come from the approved Light windows specimen. Phase
 changes follow the existing 15-minute samples and are explicitly approximate.
-Both compact and expanded views share the same phases and selected time.
+Explore and Frame share the same phase presentation.
 
 ## Discovery browsing
 
