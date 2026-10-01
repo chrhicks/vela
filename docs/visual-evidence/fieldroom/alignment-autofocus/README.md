@@ -37,7 +37,10 @@ above before this acceptance. No preparation implementation changed afterward.
   320×120 diagram with readable 14px labels, instead of shrinking desktop labels.
 - At 768px the shared shell reflows, setup becomes one column and the running
   chart/summary use the available columns. Font and geometry records accompany
-  every main capture. No horizontal overflow was observed.
+  every main capture. All 30 light/dark pairs have identical measured positions,
+  dimensions, fonts and gaps. Coordinates are relative to the document, matching
+  full-page screenshots; each record also preserves the browser scroll offset.
+  No horizontal overflow was observed.
 
 The parent inspected frozen 03.6/03.7, 03.21/03.22 and 03.23–03.26 alongside the
 actual route and approved workshop treatments, including baseline, no-solution,

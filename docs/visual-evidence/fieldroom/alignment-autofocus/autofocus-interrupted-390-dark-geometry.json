@@ -2,14 +2,17 @@
   "viewport": {
     "width": 390,
     "height": 782,
-    "dpr": 1
+    "dpr": 1,
+    "scrollX": 0,
+    "scrollY": 22
   },
+  "coordinateSpace": "document",
   "mode": "dark",
   "elements": [
     {
       "selector": "h1",
       "x": 20,
-      "y": 38,
+      "y": 60,
       "width": 141.546875,
       "height": 36,
       "font": "28px / 36px \"Space Grotesk\", ui-sans-serif, sans-serif",
@@ -20,7 +23,7 @@
     {
       "selector": ".vela-af-chart-panel",
       "x": 20,
-      "y": 442,
+      "y": 464,
       "width": 350,
       "height": 232,
       "font": "16px / 24px Barlow, ui-sans-serif, sans-serif",
@@ -31,7 +34,7 @@
     {
       "selector": ".vela-af-outcome",
       "x": 20,
-      "y": 86,
+      "y": 108,
       "width": 350,
       "height": 344,
       "font": "16px / 24px Barlow, ui-sans-serif, sans-serif",
@@ -42,7 +45,7 @@
     {
       "selector": ".vela-af-chart",
       "x": 35,
-      "y": 485,
+      "y": 507,
       "width": 320,
       "height": 146,
       "font": "16px / 24px Barlow, ui-sans-serif, sans-serif",

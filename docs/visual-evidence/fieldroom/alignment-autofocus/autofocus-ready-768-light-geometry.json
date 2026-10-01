@@ -2,8 +2,11 @@
   "viewport": {
     "width": 768,
     "height": 900,
-    "dpr": 1
+    "dpr": 1,
+    "scrollX": 0,
+    "scrollY": 0
   },
+  "coordinateSpace": "document",
   "mode": "light",
   "elements": [
     {

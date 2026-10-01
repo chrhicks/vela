@@ -425,3 +425,12 @@ exposed a visual omission in Photographs loading/empty states relative to 03.9.
 Its owning plan now records a bounded workshop-first correction; normal gallery
 and fallback layout remain unchanged. Final acceptance waits for that correction
 to receive independent review and the final comparison.
+
+The Photographs state-card correction is implemented after parent workshop
+approval. Its eight paired desktop/phone captures, selected-detail independence,
+existing gallery behavior and supplemental final states pass (37 route cases),
+with 21 workshop cases, scoped lint and web build. The preparation geometry
+recipe now records document coordinates and scroll offsets for full-page captures;
+all 30 light/dark pairs have equal positions, dimensions, fonts and gaps. Sixty
+reference-rendering checks passed after that evidence-only correction. The final
+code and evidence are ready for independent review.

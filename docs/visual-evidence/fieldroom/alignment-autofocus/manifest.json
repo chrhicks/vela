@@ -8,420 +8,480 @@
       "sha256": "f970ba458969edbe33f9a6894460629bcedaeda499f8fac40092068435b83110",
       "width": 1440,
       "height": 933,
-      "geometry": "alignment-phone-adjusting-1440-light-geometry.json"
+      "geometry": "alignment-phone-adjusting-1440-light-geometry.json",
+      "geometrySha256": "d2dbaa69e1b19c3e1ffa3e46e2e48f449e89d5781d9d5f1a8bb39c9248f1fedb"
     },
     {
       "path": "alignment-phone-adjusting-1440-dark.png",
       "sha256": "e34b1bfa1762533112ed4d7c1e5a60e84ea150b876e0ced6dc0077c0aee4bab0",
       "width": 1440,
       "height": 933,
-      "geometry": "alignment-phone-adjusting-1440-dark-geometry.json"
+      "geometry": "alignment-phone-adjusting-1440-dark-geometry.json",
+      "geometrySha256": "1f8f63d658a12f2abc7d5c0f80879f70a40f8659f3151d662cda0304710d95d1"
     },
     {
       "path": "alignment-phone-adjusting-768-light.png",
       "sha256": "8a3c24aa68a0d51bacd21d4b313259c42c0bec6393b575c23b295d1c713ce824",
       "width": 768,
       "height": 1197,
-      "geometry": "alignment-phone-adjusting-768-light-geometry.json"
+      "geometry": "alignment-phone-adjusting-768-light-geometry.json",
+      "geometrySha256": "5f685eb7f5be85317e44bad9ed25630426c9516db37c483dc2e2b674f9f89376"
     },
     {
       "path": "alignment-phone-adjusting-768-dark.png",
       "sha256": "dd0fb84533a54bd326b5104cd41596b203deacd323f462556e5a0786cc98a6cc",
       "width": 768,
       "height": 1197,
-      "geometry": "alignment-phone-adjusting-768-dark-geometry.json"
+      "geometry": "alignment-phone-adjusting-768-dark-geometry.json",
+      "geometrySha256": "04f5e0d30917fcb07f0ef713a13ae6ecdf6960d457c24fe6fbd7107afbdb15fd"
     },
     {
       "path": "alignment-phone-adjusting-390-light.png",
       "sha256": "a4b144528cc135fd9b7a78f2e88af26d45645544f3b07e2b1deb7cec6a8fccb8",
       "width": 390,
       "height": 840,
-      "geometry": "alignment-phone-adjusting-390-light-geometry.json"
+      "geometry": "alignment-phone-adjusting-390-light-geometry.json",
+      "geometrySha256": "29f3bebbb70819018723aec6f9c3df582304224c7b2b11e2bfbc33fd6766df2e"
     },
     {
       "path": "alignment-phone-adjusting-390-dark.png",
       "sha256": "0bd54e3043f433d567af0ac5ecbbd4a029002192228ebc1e56c4c2f6e5c7b349",
       "width": 390,
       "height": 840,
-      "geometry": "alignment-phone-adjusting-390-dark-geometry.json"
+      "geometry": "alignment-phone-adjusting-390-dark-geometry.json",
+      "geometrySha256": "1c528b3ab4d3af2620cf719172d5e4db874141e238db328225b34c07f7fc99a8"
     },
     {
       "path": "alignment-phone-read-interrupted-1440-light.png",
       "sha256": "080d0863bb2020716a89363167bd75712864862234c835fa0937682faee65f82",
       "width": 1440,
       "height": 933,
-      "geometry": "alignment-phone-read-interrupted-1440-light-geometry.json"
+      "geometry": "alignment-phone-read-interrupted-1440-light-geometry.json",
+      "geometrySha256": "7c24639eacd04a7f1b38c2b73f1c5c139efe874b6c1c7c06c287dec69f40c3a0"
     },
     {
       "path": "alignment-phone-read-interrupted-1440-dark.png",
       "sha256": "f2f7b33ebe7ea46c625b79df79d9479e9ef2f0ad659805151a3d460b371d36b9",
       "width": 1440,
       "height": 933,
-      "geometry": "alignment-phone-read-interrupted-1440-dark-geometry.json"
+      "geometry": "alignment-phone-read-interrupted-1440-dark-geometry.json",
+      "geometrySha256": "9a7dd3a016783d5c227bf86b2ae0ef91dca7a074c4187056b2c3cde80373259e"
     },
     {
       "path": "alignment-phone-read-interrupted-768-light.png",
       "sha256": "c61556d55239651e2f767f6daf4e814423f6536149a72be9551c3f3c3b7b399d",
       "width": 768,
       "height": 1197,
-      "geometry": "alignment-phone-read-interrupted-768-light-geometry.json"
+      "geometry": "alignment-phone-read-interrupted-768-light-geometry.json",
+      "geometrySha256": "53f8c71f0664c11a0a3bb7fe1172ea678e7bdcd91fd0dd83bb32781e973326d1"
     },
     {
       "path": "alignment-phone-read-interrupted-768-dark.png",
       "sha256": "497b604021ff5fb35d233185639a0394c09aab42a5dcd30677fd43b8ee206ebf",
       "width": 768,
       "height": 1197,
-      "geometry": "alignment-phone-read-interrupted-768-dark-geometry.json"
+      "geometry": "alignment-phone-read-interrupted-768-dark-geometry.json",
+      "geometrySha256": "678adaa7d812bd5ab615503ab3bbdd615ebdedaac3c2fb7fd6813a0989a07d1c"
     },
     {
       "path": "alignment-phone-read-interrupted-390-light.png",
       "sha256": "6555bb1b56555fed084edd29c1caeb6025330201a68ae277d279512da59256b8",
       "width": 390,
       "height": 840,
-      "geometry": "alignment-phone-read-interrupted-390-light-geometry.json"
+      "geometry": "alignment-phone-read-interrupted-390-light-geometry.json",
+      "geometrySha256": "1f5f44390cd44946682d9b1422af7736ef63c4d6a24e05967eed680e3b90511b"
     },
     {
       "path": "alignment-phone-read-interrupted-390-dark.png",
       "sha256": "592ee4a439ea45b3ce5384edd5967b514b0e5777b4ad42f4c4090ab4e4093ac5",
       "width": 390,
       "height": 840,
-      "geometry": "alignment-phone-read-interrupted-390-dark-geometry.json"
+      "geometry": "alignment-phone-read-interrupted-390-dark-geometry.json",
+      "geometrySha256": "6ab18c5e81ddf8babc9a958e1ba286bce7b2dfcc9fb9593e3a9cbb5f9c1e3d88"
     },
     {
       "path": "autofocus-ready-1440-light.png",
       "sha256": "4f860ed2efb12c0a9cfa86ad2229cc8e420630ba47391598b33324f9dfd747c0",
       "width": 1440,
       "height": 900,
-      "geometry": "autofocus-ready-1440-light-geometry.json"
+      "geometry": "autofocus-ready-1440-light-geometry.json",
+      "geometrySha256": "a62d6f15c0bc7be9c50d0e30ea0497770fea4a59d579f770a03d5b9a0c3b3a1f"
     },
     {
       "path": "autofocus-ready-1440-dark.png",
       "sha256": "3c7503b067456ce737c174a53c776743126d3d594db02a6113058a2ef46afa69",
       "width": 1440,
       "height": 900,
-      "geometry": "autofocus-ready-1440-dark-geometry.json"
+      "geometry": "autofocus-ready-1440-dark-geometry.json",
+      "geometrySha256": "50575f3a6a931f96ff14ed113ebd27bb248b23b40ac29fd081cca3772f102df7"
     },
     {
       "path": "autofocus-ready-768-light.png",
       "sha256": "aa71caac5834e088dfcf0848d8ac7548622fc4e041587b9a90dcb6dd49438ad7",
       "width": 768,
       "height": 1434,
-      "geometry": "autofocus-ready-768-light-geometry.json"
+      "geometry": "autofocus-ready-768-light-geometry.json",
+      "geometrySha256": "67f061c5074c89b2dd8077592e37ae2183518d53e7d3f87143ac9756149e915a"
     },
     {
       "path": "autofocus-ready-768-dark.png",
       "sha256": "edf7c4ba2f5a47153cba63bdc265ff6a07166a96ca1f2764500480288d07093f",
       "width": 768,
       "height": 1434,
-      "geometry": "autofocus-ready-768-dark-geometry.json"
+      "geometry": "autofocus-ready-768-dark-geometry.json",
+      "geometrySha256": "438464866e0edd44042fedfb2dd8420dcc0e9198e55cbdccdd2ee1bf6a3c6a32"
     },
     {
       "path": "autofocus-ready-390-light.png",
       "sha256": "9fc9ab243c0bcca0e2376614c3851bf5031aeffd9c96f67908b9bbdbca6c8644",
       "width": 390,
       "height": 1282,
-      "geometry": "autofocus-ready-390-light-geometry.json"
+      "geometry": "autofocus-ready-390-light-geometry.json",
+      "geometrySha256": "8787fe9594d9a733545d1a227f0c0c99bc4c697fefcafa70a36442adb573d500"
     },
     {
       "path": "autofocus-ready-390-dark.png",
       "sha256": "e74c10af2dec9d94ca02cbff8efc0c6d58ce3082b905ebd0b93c733e9cf743d8",
       "width": 390,
       "height": 1282,
-      "geometry": "autofocus-ready-390-dark-geometry.json"
+      "geometry": "autofocus-ready-390-dark-geometry.json",
+      "geometrySha256": "bfc46b2c52426b4ddc85dea3af160fa334872727cd90026c2516c3a582916e60"
     },
     {
       "path": "autofocus-running-1440-light.png",
       "sha256": "6c01fb06a51c54205d54e0fa5ed03a0567c659995157fe7ef51be9cba1dea76e",
       "width": 1440,
       "height": 900,
-      "geometry": "autofocus-running-1440-light-geometry.json"
+      "geometry": "autofocus-running-1440-light-geometry.json",
+      "geometrySha256": "569f6904ff05ace6f734f1e9524bf3e08cea6239ea349b83178e1ea14d6303aa"
     },
     {
       "path": "autofocus-running-1440-dark.png",
       "sha256": "421c5dc81c9a077f0a21c683419f60b7092f176ac51eee12a5181129fbcae6e7",
       "width": 1440,
       "height": 900,
-      "geometry": "autofocus-running-1440-dark-geometry.json"
+      "geometry": "autofocus-running-1440-dark-geometry.json",
+      "geometrySha256": "67357de8346d53ebb052abd09ff29b31191ec06e81cd43f380f7f435ac160ac8"
     },
     {
       "path": "autofocus-running-768-light.png",
       "sha256": "8ad0541bc1da86dc2e5ae8356d037b2214b4392610683639701070956c4b9568",
       "width": 768,
       "height": 900,
-      "geometry": "autofocus-running-768-light-geometry.json"
+      "geometry": "autofocus-running-768-light-geometry.json",
+      "geometrySha256": "91932cb6d5af505cc41411ce0a7a9036dfb564ada486889dbb6d667721341fd3"
     },
     {
       "path": "autofocus-running-768-dark.png",
       "sha256": "dfbf274e724b5a9a1614722416e0c5882a7419aa916dd6beea65f27019aba625",
       "width": 768,
       "height": 900,
-      "geometry": "autofocus-running-768-dark-geometry.json"
+      "geometry": "autofocus-running-768-dark-geometry.json",
+      "geometrySha256": "5057a6f80c297d9933677e7486478254457e0024b04ce9dc3b335c48195b1dd5"
     },
     {
       "path": "autofocus-running-390-light.png",
       "sha256": "ee3e96380c85c31913694bbd57f8dd935c2a187bd98b696155adf495a7ff4ba7",
       "width": 390,
       "height": 782,
-      "geometry": "autofocus-running-390-light-geometry.json"
+      "geometry": "autofocus-running-390-light-geometry.json",
+      "geometrySha256": "5b83986af5ab2097a7c13d51a85addcb50d5dcc9041c07ebb283eca9f9ba1557"
     },
     {
       "path": "autofocus-running-390-dark.png",
       "sha256": "c47e8f709c3282817908193167bbba6d0201b89dde1b48f39e7534e88887897c",
       "width": 390,
       "height": 782,
-      "geometry": "autofocus-running-390-dark-geometry.json"
+      "geometry": "autofocus-running-390-dark-geometry.json",
+      "geometrySha256": "1dccc3fbdbd89923fe56ba4f3b18d9486b00375f37cb0be53b97adc8e58f0e09"
     },
     {
       "path": "autofocus-interrupted-1440-light.png",
       "sha256": "ac532dc5adc1317162d27e8ecfbe6eaf2d8cdd615416c85faaf1ffcab8e4a5fa",
       "width": 1440,
       "height": 900,
-      "geometry": "autofocus-interrupted-1440-light-geometry.json"
+      "geometry": "autofocus-interrupted-1440-light-geometry.json",
+      "geometrySha256": "c5647ae2b07697fbef5d659402b5d3dbb4ce93cfe4aaf694f610dd1d003d671e"
     },
     {
       "path": "autofocus-interrupted-1440-dark.png",
       "sha256": "e1f8be883f0775f20972f94350adc871432351862f8688701fbf3266bb5ebc9e",
       "width": 1440,
       "height": 900,
-      "geometry": "autofocus-interrupted-1440-dark-geometry.json"
+      "geometry": "autofocus-interrupted-1440-dark-geometry.json",
+      "geometrySha256": "72f661d4f128b8f45f15b1f5860f09c184722e87181452d6a2da0c89f07d09a1"
     },
     {
       "path": "autofocus-interrupted-768-light.png",
       "sha256": "afb627621bb73f69b604fb0db62946dbdb70b0ec51e47b077d5fd60b460d4d50",
       "width": 768,
       "height": 954,
-      "geometry": "autofocus-interrupted-768-light-geometry.json"
+      "geometry": "autofocus-interrupted-768-light-geometry.json",
+      "geometrySha256": "ed0ccc1b57feb01e5598326f81ca8c1eedbe999a41d87a758128ed910a2028f1"
     },
     {
       "path": "autofocus-interrupted-768-dark.png",
       "sha256": "259359cf558d972a1188db777293efc16800ce63069b5c2cd33b8f5560f97317",
       "width": 768,
       "height": 954,
-      "geometry": "autofocus-interrupted-768-dark-geometry.json"
+      "geometry": "autofocus-interrupted-768-dark-geometry.json",
+      "geometrySha256": "be5b2f98313148dd5bc52b3796a59d0f78ee96d85537d2b2a69a6c88df139690"
     },
     {
       "path": "autofocus-interrupted-390-light.png",
       "sha256": "f42d7db5433066d0017f6c3b3849228357cdd305345611256f04668308483288",
       "width": 390,
       "height": 804,
-      "geometry": "autofocus-interrupted-390-light-geometry.json"
+      "geometry": "autofocus-interrupted-390-light-geometry.json",
+      "geometrySha256": "1e16a790baff68baba5dbf7977a4242258a805f0be5270bf4a09ee75f9ffffd1"
     },
     {
       "path": "autofocus-interrupted-390-dark.png",
       "sha256": "96d4e5e0a1b625b19821eda1e03ce4272b5196097fa320a57d1f16cb3879055f",
       "width": 390,
       "height": 804,
-      "geometry": "autofocus-interrupted-390-dark-geometry.json"
+      "geometry": "autofocus-interrupted-390-dark-geometry.json",
+      "geometrySha256": "c94f49c8cdcdba0df677ad21978bb63c0a25c14593be809161a1452e177ce0db"
     },
     {
       "path": "autofocus-result-1440-light.png",
       "sha256": "f52f26c3096bc0e87f20a86b4ae9329ec71c7783e5877c2237b38084d20ea38b",
       "width": 1440,
       "height": 900,
-      "geometry": "autofocus-result-1440-light-geometry.json"
+      "geometry": "autofocus-result-1440-light-geometry.json",
+      "geometrySha256": "934b37f068e3d80e934879c6622815617942de27a8812124fe045180ba5ecd60"
     },
     {
       "path": "autofocus-result-1440-dark.png",
       "sha256": "90760d17c8ed0e30c0f428e39f48e8f2a7dc175f3f92b54db799dd8cc055e7a4",
       "width": 1440,
       "height": 900,
-      "geometry": "autofocus-result-1440-dark-geometry.json"
+      "geometry": "autofocus-result-1440-dark-geometry.json",
+      "geometrySha256": "f434504c6b8bdd3498941e799dc589e744e1dc38c5007d31642e78642cd4fc4e"
     },
     {
       "path": "autofocus-result-768-light.png",
       "sha256": "dce0ed173ec5036e45b047c945a5d15291a27f78282eb707722569f5c9b78e7e",
       "width": 768,
       "height": 934,
-      "geometry": "autofocus-result-768-light-geometry.json"
+      "geometry": "autofocus-result-768-light-geometry.json",
+      "geometrySha256": "0cb81f78c9b7f6b52ba3f444d97cd808ff85cd6b6c3580eeaa0e49990d185f83"
     },
     {
       "path": "autofocus-result-768-dark.png",
       "sha256": "ca8db23b1c69fa63dee73ff70381eac4c8402e68a55317e5130a6438ac07d884",
       "width": 768,
       "height": 934,
-      "geometry": "autofocus-result-768-dark-geometry.json"
+      "geometry": "autofocus-result-768-dark-geometry.json",
+      "geometrySha256": "a09dec7d9b0e1781d5ffe5a0839da586ac93213e959a324df931cf0b98cf5ade"
     },
     {
       "path": "autofocus-result-390-light.png",
       "sha256": "b6ef262f35a23d82fd02aa87250698abeb217030767c4b0b2b3985f2d12c229b",
       "width": 390,
       "height": 782,
-      "geometry": "autofocus-result-390-light-geometry.json"
+      "geometry": "autofocus-result-390-light-geometry.json",
+      "geometrySha256": "39e25a38fb57f62736be090a68f07664a43dbc0edd0ea1a73a6f0efe2218edf2"
     },
     {
       "path": "autofocus-result-390-dark.png",
       "sha256": "9a89658195415c7999c2e8f1ce2d02507ea2837f41e5245aee5235cb10548aa0",
       "width": 390,
       "height": 782,
-      "geometry": "autofocus-result-390-dark-geometry.json"
+      "geometry": "autofocus-result-390-dark-geometry.json",
+      "geometrySha256": "ff5b93356459a7a72c00dc1b370ace2807de91bc891e8200561a6414a10896e3"
     },
     {
       "path": "autofocus-restored-1440-light.png",
       "sha256": "46b601db53f786037279ce3e64b552d95de754112986954e28a633358ef35654",
       "width": 1440,
       "height": 900,
-      "geometry": "autofocus-restored-1440-light-geometry.json"
+      "geometry": "autofocus-restored-1440-light-geometry.json",
+      "geometrySha256": "934b37f068e3d80e934879c6622815617942de27a8812124fe045180ba5ecd60"
     },
     {
       "path": "autofocus-restored-1440-dark.png",
       "sha256": "88f671f165aa110bc8cc93afdbd909fde8e1e8576127550b70c054f767bd513e",
       "width": 1440,
       "height": 900,
-      "geometry": "autofocus-restored-1440-dark-geometry.json"
+      "geometry": "autofocus-restored-1440-dark-geometry.json",
+      "geometrySha256": "f434504c6b8bdd3498941e799dc589e744e1dc38c5007d31642e78642cd4fc4e"
     },
     {
       "path": "autofocus-restored-768-light.png",
       "sha256": "9135765f7f677fa27848c570eab091ea0432b6f4b84a316623efa1be08c41731",
       "width": 768,
       "height": 934,
-      "geometry": "autofocus-restored-768-light-geometry.json"
+      "geometry": "autofocus-restored-768-light-geometry.json",
+      "geometrySha256": "0cb81f78c9b7f6b52ba3f444d97cd808ff85cd6b6c3580eeaa0e49990d185f83"
     },
     {
       "path": "autofocus-restored-768-dark.png",
       "sha256": "67ee49818fea97a88e7a212daa5c42d2b2800fca9b6eb8b8f25d0bd86583bc65",
       "width": 768,
       "height": 934,
-      "geometry": "autofocus-restored-768-dark-geometry.json"
+      "geometry": "autofocus-restored-768-dark-geometry.json",
+      "geometrySha256": "a09dec7d9b0e1781d5ffe5a0839da586ac93213e959a324df931cf0b98cf5ade"
     },
     {
       "path": "autofocus-restored-390-light.png",
       "sha256": "1168749a5da7b38cb355a2abd77b5e7397809b3af6cea4033087c48f76567977",
       "width": 390,
       "height": 782,
-      "geometry": "autofocus-restored-390-light-geometry.json"
+      "geometry": "autofocus-restored-390-light-geometry.json",
+      "geometrySha256": "39e25a38fb57f62736be090a68f07664a43dbc0edd0ea1a73a6f0efe2218edf2"
     },
     {
       "path": "autofocus-restored-390-dark.png",
       "sha256": "f60d535536d317604731dd1762b5ed691478ef23ac1b756af55eb7192df65402",
       "width": 390,
       "height": 782,
-      "geometry": "autofocus-restored-390-dark-geometry.json"
+      "geometry": "autofocus-restored-390-dark-geometry.json",
+      "geometrySha256": "ff5b93356459a7a72c00dc1b370ace2807de91bc891e8200561a6414a10896e3"
     },
     {
       "path": "autofocus-invalid-window-1440-light.png",
       "sha256": "334b9cc0cb64bf8c4b78d807bcdcbbbc0f7466e6b0f87e3d44f196e704adb576",
       "width": 1440,
       "height": 973,
-      "geometry": "autofocus-invalid-window-1440-light-geometry.json"
+      "geometry": "autofocus-invalid-window-1440-light-geometry.json",
+      "geometrySha256": "d90f02ae9adfeae4fe34bd872c572efe34d6109e1a6846fdb6a2218eae9dd5a0"
     },
     {
       "path": "autofocus-invalid-window-1440-dark.png",
       "sha256": "981f8a831ec949c2f8545fa249782fad268dc20f584f9c841b86ee655d1427a2",
       "width": 1440,
       "height": 973,
-      "geometry": "autofocus-invalid-window-1440-dark-geometry.json"
+      "geometry": "autofocus-invalid-window-1440-dark-geometry.json",
+      "geometrySha256": "c79a054f4e781f1d921e4a6b8c4d6a22a613dbb034c4f89f7be36b819a174e8c"
     },
     {
       "path": "autofocus-invalid-window-768-light.png",
       "sha256": "59d52795bc5af52851cff2cfb5910553aa37b609ec4b84c02b328dca9a48a82e",
       "width": 768,
       "height": 1596,
-      "geometry": "autofocus-invalid-window-768-light-geometry.json"
+      "geometry": "autofocus-invalid-window-768-light-geometry.json",
+      "geometrySha256": "31d13b31433e7f39237b6cb3b9978759362bd85a042f2768cc6d21bfdc7864c3"
     },
     {
       "path": "autofocus-invalid-window-768-dark.png",
       "sha256": "4fb1250c39292abfc95b6bb917b82e7ab245c708e2bb2d670d4b8f7be470a141",
       "width": 768,
       "height": 1596,
-      "geometry": "autofocus-invalid-window-768-dark-geometry.json"
+      "geometry": "autofocus-invalid-window-768-dark-geometry.json",
+      "geometrySha256": "43559b107646e73662e9e395e15ff6ac0923d5d4c45b32548f1f82fde2475e2e"
     },
     {
       "path": "autofocus-invalid-window-390-light.png",
       "sha256": "4b632045b67f27a126cf5bd94b87051f97841822fe3bd88750bece3925e35aff",
       "width": 390,
       "height": 1394,
-      "geometry": "autofocus-invalid-window-390-light-geometry.json"
+      "geometry": "autofocus-invalid-window-390-light-geometry.json",
+      "geometrySha256": "324efdf1b65280560117c185463e659180aed2f88bf9224fff1704e4bb9091ef"
     },
     {
       "path": "autofocus-invalid-window-390-dark.png",
       "sha256": "88c42e24564f9f830724d2b672cd9e38faf705f251809976a98e6ba03bedf009",
       "width": 390,
       "height": 1394,
-      "geometry": "autofocus-invalid-window-390-dark-geometry.json"
+      "geometry": "autofocus-invalid-window-390-dark-geometry.json",
+      "geometrySha256": "bb85aa8a7aa816c207a34afc6c6964cc1f0318a416187a3c743c952c89d04ad5"
     },
     {
       "path": "autofocus-restore-unconfirmed-1440-light.png",
       "sha256": "1083e382f09c9a83b5b8f1b186259d237f9137a7100b412ab28e85b0a48d71f4",
       "width": 1440,
       "height": 900,
-      "geometry": "autofocus-restore-unconfirmed-1440-light-geometry.json"
+      "geometry": "autofocus-restore-unconfirmed-1440-light-geometry.json",
+      "geometrySha256": "e1f549e395ac6dd70d949fd12670c556280bdd534fcfbe10e99bb894f53dbf6e"
     },
     {
       "path": "autofocus-restore-unconfirmed-1440-dark.png",
       "sha256": "deb1fe5d221c6e05bb7b9634be8ddd66252aa4f30e4f49ebc52101aa33452771",
       "width": 1440,
       "height": 900,
-      "geometry": "autofocus-restore-unconfirmed-1440-dark-geometry.json"
+      "geometry": "autofocus-restore-unconfirmed-1440-dark-geometry.json",
+      "geometrySha256": "346c2d3a8dea40561face22f98df4fdb36e25d56012c2bebd68bcd65f8dda071"
     },
     {
       "path": "autofocus-restore-unconfirmed-768-light.png",
       "sha256": "9cff1e0e41a74bb6fa9abd9cf095ec650c8a9831ea0071b2d3361381490997e2",
       "width": 768,
       "height": 930,
-      "geometry": "autofocus-restore-unconfirmed-768-light-geometry.json"
+      "geometry": "autofocus-restore-unconfirmed-768-light-geometry.json",
+      "geometrySha256": "1e9719e07f387e168fe7de666594e07442ff08738e6e459de5728b170ded0fdf"
     },
     {
       "path": "autofocus-restore-unconfirmed-768-dark.png",
       "sha256": "0ceca9478aa4e340364aa41bb19d81600f99f949f7a9db520dba07532b5cc764",
       "width": 768,
       "height": 930,
-      "geometry": "autofocus-restore-unconfirmed-768-dark-geometry.json"
+      "geometry": "autofocus-restore-unconfirmed-768-dark-geometry.json",
+      "geometrySha256": "065acbcb301842e5893c24beb89d944a339627f19cac8c57980c9b56c4fe30f7"
     },
     {
       "path": "autofocus-restore-unconfirmed-390-light.png",
       "sha256": "256a68f7e2400a743cc4ec9607353087d094d7ccf39158ec887736da09bbad77",
       "width": 390,
       "height": 804,
-      "geometry": "autofocus-restore-unconfirmed-390-light-geometry.json"
+      "geometry": "autofocus-restore-unconfirmed-390-light-geometry.json",
+      "geometrySha256": "71aebb6508b94eb8ae658f9fae5b702daa61df2e3e41909b971a64a842092a66"
     },
     {
       "path": "autofocus-restore-unconfirmed-390-dark.png",
       "sha256": "41ec190e47a7faf7749d9bb9e8e2106d76259d2c32caa97a539b9b6d405d41ea",
       "width": 390,
       "height": 804,
-      "geometry": "autofocus-restore-unconfirmed-390-dark-geometry.json"
+      "geometry": "autofocus-restore-unconfirmed-390-dark-geometry.json",
+      "geometrySha256": "3d4eeae5721e4d0efd84bc152f9db06bf47d2a78b4f7af01c552511c12cec6d1"
     },
     {
       "path": "autofocus-offline-1440-light.png",
       "sha256": "4c798aa89706b1195a1413abf4a0c34a85842aaa7097420bd02247a11698e494",
       "width": 1440,
       "height": 900,
-      "geometry": "autofocus-offline-1440-light-geometry.json"
+      "geometry": "autofocus-offline-1440-light-geometry.json",
+      "geometrySha256": "c5647ae2b07697fbef5d659402b5d3dbb4ce93cfe4aaf694f610dd1d003d671e"
     },
     {
       "path": "autofocus-offline-1440-dark.png",
       "sha256": "97e01e784da5a25aed793dd61c4d8bde9afe477ea5ca32e7175294b731c65e5b",
       "width": 1440,
       "height": 900,
-      "geometry": "autofocus-offline-1440-dark-geometry.json"
+      "geometry": "autofocus-offline-1440-dark-geometry.json",
+      "geometrySha256": "72f661d4f128b8f45f15b1f5860f09c184722e87181452d6a2da0c89f07d09a1"
     },
     {
       "path": "autofocus-offline-768-light.png",
       "sha256": "91de81e5c1d5072829160cdd2ac10b3f3b8bd6aed9bc77274e774c6ec455c062",
       "width": 768,
       "height": 954,
-      "geometry": "autofocus-offline-768-light-geometry.json"
+      "geometry": "autofocus-offline-768-light-geometry.json",
+      "geometrySha256": "ed0ccc1b57feb01e5598326f81ca8c1eedbe999a41d87a758128ed910a2028f1"
     },
     {
       "path": "autofocus-offline-768-dark.png",
       "sha256": "a780fcc79adf848b688a2d16e070c1eac07427003e8227d7f45de21be34169cf",
       "width": 768,
       "height": 954,
-      "geometry": "autofocus-offline-768-dark-geometry.json"
+      "geometry": "autofocus-offline-768-dark-geometry.json",
+      "geometrySha256": "f3beb0d5f1a565ddea88cc29f71b49cc645212cb9c1c1f9561b1c4dd69241551"
     },
     {
       "path": "autofocus-offline-390-light.png",
       "sha256": "739769b33e45f8abb5aa27f393a0dfaaef3978aeb00d6a4d28ade474525bd22a",
       "width": 390,
       "height": 804,
-      "geometry": "autofocus-offline-390-light-geometry.json"
+      "geometry": "autofocus-offline-390-light-geometry.json",
+      "geometrySha256": "1e16a790baff68baba5dbf7977a4242258a805f0be5270bf4a09ee75f9ffffd1"
     },
     {
       "path": "autofocus-offline-390-dark.png",
       "sha256": "ba0104e54ae01dfe59479ca0a1a9d90ccd7891bda4255aa299a77701c2d21695",
       "width": 390,
       "height": 804,
-      "geometry": "autofocus-offline-390-dark-geometry.json"
+      "geometry": "autofocus-offline-390-dark-geometry.json",
+      "geometrySha256": "39d0fde0b9ff6a92deee222c46cda8190e5f616045c26099b5bd24bd3c247ad8"
     },
     {
       "path": "alignment-setup-390.png",
@@ -507,5 +567,6 @@
       "width": 390,
       "height": 840
     }
-  ]
+  ],
+  "geometryCoordinateSpace": "document"
 }

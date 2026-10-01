@@ -315,3 +315,18 @@ explicit loading text and empty heading semantics where compatible with the
 source. Verify held loading→resolved collection, empty→Tonight navigation, and
 direct-detail independence. Retain paired route captures after fresh independent
 OK and the final source comparison.
+
+The parent inspected the actual workshop loading/empty cards in light/dark at
+1440/390px against 03.9 and approved the source anatomy. Eight new workshop checks
+and 13 existing gallery/fallback checks passed. Production now uses a narrow
+owning-route collection-state component; only an unselected collection spans the
+vacant columns. A direct-linked photograph keeps its viewer and detail while the
+loading card fits the existing 260px list column. No hook or API behavior changed.
+
+Nine new route checks (eight paired matrix states plus direct-detail independence),
+19 existing Photographs cases and nine final-state cases pass. Scoped lint and
+web build pass. The direct-detail case preserves the same image DOM node and
+checks that releasing collection loading causes no extra detail read. The parent
+also corrected inherited text-rendering only on the new card to match the
+workshop's exact Barlow wraps; populated-gallery typography is untouched.
+Independent verification and final post-verdict comparison are next.
