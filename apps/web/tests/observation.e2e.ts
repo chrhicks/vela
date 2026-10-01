@@ -41,6 +41,7 @@ test.beforeEach(async ({ page }) => {
       editable: true,
       state: 'unselected',
       selected: null,
+      selectedDeviceId: null,
       cameras: [],
     }),
   )

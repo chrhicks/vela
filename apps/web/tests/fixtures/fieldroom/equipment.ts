@@ -38,7 +38,7 @@ interface ReviewCommand {
 
 type ReviewPayload = ReviewResponse['json']
 
-const identity = (id: string, name: string) => ({ id, name, configuredName: name, observedAt: reviewTime })
+const identity = (id: string, name: string) => ({ id: `fra400-${id}`, name, configuredName: name, observedAt: reviewTime })
 
 export const equipmentRig: RigDetailView = {
   id: 'fra400', name: 'Askar FRA 400', state: 'reachable',
@@ -130,15 +130,15 @@ export function createEquipmentScene(name: EquipmentScene) {
   let homeReads = 0
 
   let camera: ImagingCameraView = { rigId: rig.id,
-    selected: { id: 'camera', name: 'ZWO ASI2600MC Pro' },
-    cameras: rig.devices.filter(device => device.kind === 'camera').map(({ id, name: cameraName, configuredName }) => ({ id, name: cameraName, configuredName })),
+    selected: { id: 'camera', name: 'ZWO ASI2600MC Pro' }, selectedDeviceId: 'fra400-camera',
+    cameras: rig.devices.filter(device => device.kind === 'camera').map(({ id, name: cameraName, configuredName }) => ({ id: id.slice(`${rig.id}-`.length), name: cameraName, configuredName })),
     state: 'ready', editable: name !== 'equipment-camera-busy' }
 
   let framing: FramingView = { ...structuredClone(reviewFraming), phase: 'idle', active: false,
     actual: null, preview: null, desired: null, targetId: null, canCenter: false, checkCurrent: false }
 
   if (name === 'equipment-camera-changed') {
-    camera = { ...camera, state: 'changed', cameras: camera.cameras.map(choice => choice.id === 'camera' ? { ...choice, name: 'Replacement camera' } : choice) }
+    camera = { ...camera, state: 'changed', selectedDeviceId: null, cameras: camera.cameras.map(choice => choice.id === 'camera' ? { ...choice, name: 'Replacement camera' } : choice) }
   }
 
   if (name === 'equipment-camera-disconnected' || name.startsWith('equipment-connect-')) {
@@ -272,7 +272,7 @@ export function createEquipmentScene(name: EquipmentScene) {
       const selected = camera.cameras.find(choice => choice.id === body?.id && choice.name === body?.name)
 
       if (!selected?.name || !camera.editable) return reject('camera')
-      camera = { ...camera, selected: { id: selected.id, name: selected.name }, state: 'ready' }
+      camera = { ...camera, selected: { id: selected.id, name: selected.name }, selectedDeviceId: `${rig.id}-${selected.id}`, state: 'ready' }
 
       return saveResponse('camera', camera)
     }

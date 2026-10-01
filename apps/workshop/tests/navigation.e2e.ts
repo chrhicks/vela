@@ -61,3 +61,26 @@ for (const width of [1040, 390]) {
     await expect(demo.getByLabel('Try the bar with')).toHaveValue('interrupted')
   })
 }
+
+for (const compact of [false, true]) {
+  test(`appearance follows rig context in the ${compact ? 'focused' : 'full'} phone header`, async ({ page }) => {
+    await page.setViewportSize({ width: 1600, height: 1000 })
+    await page.route('**/__workshop/**', route => route.fulfill({ json: { session: null, profiles: [] } }))
+    await page.goto(`/?component=navigation-bar&specimen=navigation-bar-anatomy&profile=fieldroom&mode=light&context=isolated&viewport=390&prop.compact=${compact}`)
+    const bar = page.locator('.vela-navigation')
+    const trigger = bar.getByRole('button', { name: 'Appearance', exact: true })
+    await expect(trigger).toHaveCount(1)
+    const context = compact ? bar.locator('.vela-navigation__compact-label') : bar.getByRole('combobox', { name: 'Viewing rig' })
+    const contextBounds = await context.boundingBox()
+    const triggerBounds = await trigger.boundingBox()
+    expect(triggerBounds!.x).toBeGreaterThanOrEqual(contextBounds!.x + contextBounds!.width)
+    expect(Math.abs(triggerBounds!.y + triggerBounds!.height / 2 - contextBounds!.y - contextBounds!.height / 2)).toBeLessThan(2)
+    expect(await bar.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
+
+    if (compact) await expect(bar.getByRole('combobox', { name: 'Viewing rig' })).toBeHidden()
+    await trigger.click()
+    await expect(page.getByRole('dialog', { name: 'Appearance', exact: true })).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(trigger).toBeFocused()
+  })
+}

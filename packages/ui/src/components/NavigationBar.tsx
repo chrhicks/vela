@@ -28,6 +28,8 @@ export interface NavigationBarProps {
   onRigChange: (id: string) => void
   links: readonly NavigationLink[]
   utility?: ReactNode
+  /** Controls placed immediately after the rig selector. */
+  actions?: ReactNode
   activity?: NavigationActivity
   /** A focused task may replace the full phone navigation with a return link and context. */
   compact?: { back: NavigationLink; label: string }
@@ -41,6 +43,7 @@ export function NavigationBar({
   links,
   activity,
   utility,
+  actions,
   compact,
 }: NavigationBarProps) {
   return (
@@ -86,16 +89,19 @@ export function NavigationBar({
               {utility}
             </div>
           )}
-          <label className="vela-navigation__rig">
-            <span className="vela-navigation__sr-only">Viewing rig</span>
-            <select value={currentRigId} onChange={event => onRigChange(event.target.value)}>
-              {rigs.map(rig => (
-                <option value={rig.id} key={rig.id}>
-                  {rig.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="vela-navigation__rig-controls">
+            <label className="vela-navigation__rig">
+              <span className="vela-navigation__sr-only">Viewing rig</span>
+              <select value={currentRigId} onChange={event => onRigChange(event.target.value)}>
+                {rigs.map(rig => (
+                  <option value={rig.id} key={rig.id}>
+                    {rig.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {actions && <div className="vela-navigation__actions">{actions}</div>}
+          </div>
           {activity && (
             <a
               className="vela-navigation__activity"

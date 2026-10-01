@@ -3,8 +3,10 @@
 The shell's keyed `RigObservationProvider` owns the only rig-detail poller.
 Equipment consumes that observation, preserving last-known telemetry when a
 read fails and exposing each device's complete supported metrics in a disclosure.
-The saved imaging camera sorts first only when both its ID and reported name
-match; mount/focuser, other cameras and other device kinds follow.
+The saved imaging camera sorts first only when the camera projection's
+`selectedDeviceId` and reported name match a rig-detail device. The server resolves
+this association: saved selection IDs and rig-detail IDs have different scopes.
+Mount/focuser, other cameras and other device kinds follow.
 
 Connection eligibility and command outcomes come from `useObservation`, not
 from device cards. Equipment reuses `ConnectionResult` for per-device outcomes

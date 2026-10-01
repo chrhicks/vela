@@ -89,16 +89,18 @@ export function AppNavigation() {
             : '/',
         )
       }
+      actions={
+        <Appearance
+          open={appearanceOpen}
+          onOpenChange={setAppearanceOpen}
+          value={appearance.preference}
+          onValueChange={appearance.setPreference}
+          systemMode={appearance.systemMode}
+          persistence={appearance.persistence}
+        />
+      }
       utility={
         <>
-          <Appearance
-            open={appearanceOpen}
-            onOpenChange={setAppearanceOpen}
-            value={appearance.preference}
-            onValueChange={appearance.setPreference}
-            systemMode={appearance.systemMode}
-            persistence={appearance.persistence}
-          />
           {connection && (
             <span className="vela-app__connection" data-connected={connection === 'Connected'}>
               <span className="vela-app__connection-dot" aria-hidden="true">

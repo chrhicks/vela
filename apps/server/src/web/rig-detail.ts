@@ -17,6 +17,10 @@ interface DeviceIdentity {
   readonly configuredName: string
 }
 
+export function rigDeviceId(rigId: string, providerDeviceId: string): string {
+  return `${rigId}-${providerDeviceId}`
+}
+
 interface ConnectedDeviceViewBase extends DeviceIdentity {
   readonly connection: 'connected'
   readonly observedAt: string
@@ -34,7 +38,7 @@ export function currentDeviceView(
   observedAt: string,
 ): RigDeviceDetailView {
   const identity = {
-    id: `${rigId}-${inspection.providerDeviceId}`,
+    id: rigDeviceId(rigId, inspection.providerDeviceId),
     name: inspection.name,
     configuredName: inspection.configuredName,
   }
@@ -305,7 +309,7 @@ export function unavailableDeviceView(
   device: ObservedDeviceRecord,
 ): RigDeviceDetailView {
   return unavailableDeviceForKind(device.kind, {
-    id: `${rigId}-${device.uniqueId}`,
+    id: rigDeviceId(rigId, device.uniqueId),
     name: device.name,
     configuredName: device.name,
     connection: 'unavailable',

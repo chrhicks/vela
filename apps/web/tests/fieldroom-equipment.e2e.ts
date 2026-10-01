@@ -12,6 +12,27 @@ const focalPath = '/api/rigs/fra400/framing/settings'
 
 const otherCamera = { id: 'other-camera', name: 'ZWO ASI220MM Mini' }
 
+test('Equipment matches the saved imaging camera through its rig-detail identity', async ({ page }) => {
+  const { scene } = await openEquipmentScene(page, 'equipment-connected')
+  const { camera, rig } = scene.snapshot()
+  expect(camera.selected?.id).toBe('camera')
+  expect(camera.selectedDeviceId).toBe('fra400-camera')
+  expect(rig.devices.find(device => device.id === camera.selectedDeviceId)?.name).toBe(camera.selected?.name)
+  scene.setRig({ ...rig, devices: [...rig.devices].reverse() })
+  await page.getByRole('button', { name: 'Refresh state', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Imaging camera connected', exact: true })).toBeVisible()
+  const equipment = page.getByRole('region', { name: 'Equipment', exact: true })
+  const main = equipment.getByRole('region', { name: 'ZWO ASI2600MC Pro', exact: true })
+  await expect(main).toContainText('Camera · Main camera')
+  await expect(equipment.getByRole('region').first()).toHaveAccessibleName('ZWO ASI2600MC Pro')
+  await expect(equipment.getByRole('region', { name: 'ZWO ASI220MM Mini', exact: true })).toContainText('Other camera')
+
+  scene.setCamera({ ...camera, state: 'changed', selectedDeviceId: null })
+  await expect(main).toContainText('Other camera · Not used for imaging')
+  await expect(page.getByRole('heading', { name: 'Imaging camera connected', exact: true })).toHaveCount(0)
+  expect(scene.writes).toEqual([])
+})
+
 async function editSetup(page: Page) {
   await page.getByRole('combobox', { name: 'Imaging camera', exact: true }).selectOption(otherCamera.id)
   await page.getByRole('spinbutton', { name: 'Effective focal length', exact: true }).fill('500')

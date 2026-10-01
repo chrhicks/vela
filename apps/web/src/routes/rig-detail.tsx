@@ -112,7 +112,7 @@ function Equipment({ rigId }: { rigId: string }) {
 
   const selected = camera.view?.selected
 
-  const isSelected = (device: RigDeviceDetailView) => device.id === selected?.id && device.name === selected.name
+  const isSelected = (device: RigDeviceDetailView) => device.kind === 'camera' && device.id === camera.view?.selectedDeviceId && device.name === selected?.name
   const selectedDevice = view.devices.find(isSelected)
   const cameraConnected = selectedDevice?.connection === 'connected' && !camera.offline && camera.view?.state === 'ready'
   const presentation = observation.view ? readinessPresentation(observation.view, busy, observation.interrupted) : null

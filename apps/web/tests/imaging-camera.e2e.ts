@@ -16,6 +16,7 @@ const cameras = [
 const empty: ImagingCameraView = {
   rigId: 'rig-1',
   selected: null,
+  selectedDeviceId: null,
   cameras,
   state: 'unselected',
   editable: true,
@@ -24,6 +25,7 @@ const empty: ImagingCameraView = {
 const saved: ImagingCameraView = {
   ...empty,
   selected: { id: 'main', name: cameras[0]!.name },
+  selectedDeviceId: 'rig-1-main',
   state: 'ready',
 }
 

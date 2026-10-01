@@ -43,6 +43,12 @@ contracts. Recognizing a `DeviceKind` does not mean Vela implements operations
 for that kind. Rig-detail views distinguish connected devices whose detail is
 `unsupported` from devices whose current status is `unavailable`.
 
+`ImagingCameraView.selected` retains the saved camera identity used by configuration
+writes. `selectedDeviceId` links that selection to `RigDetailView.devices` only
+when its current reported identity matches; otherwise it is null. Consumers must
+not equate the saved selection ID with the rig-scoped detail ID or reconstruct
+that ID's encoding in the browser.
+
 ## Verification
 
 Run the focused checks with:
