@@ -669,7 +669,7 @@ function FieldroomLatestImage({ image, busy, interrupted, rigId, savedDetail = f
         <div className="capture-image__facts">
           <span>{frame.exposureSeconds} s · {frame.color === 'color' ? 'Color' : 'Mono'} exposure</span>
           <span className="capture-image__star-size" title="Median half-flux radius in native image pixels">
-            Star size <span>{hfr == null ? '—' : Number(hfr.toFixed(2))} px HFR</span>
+            Star size{'   '}{hfr == null ? '—' : Number(hfr.toFixed(2))} px HFR
           </span>
           <span>{frame.statistics ? `${frame.statistics.detectedStars} stars` : 'Star measurements unavailable'}</span>
         </div>

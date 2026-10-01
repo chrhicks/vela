@@ -219,10 +219,10 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 6px 24px;
+  color: var(--vela-text-muted);
 }
 .capture-image__star-size {
-  display: inline-flex;
-  gap: 12px;
+  white-space: pre-wrap;
 }
 .capture-image__saved {
   grid-column: 2;

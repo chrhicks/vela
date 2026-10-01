@@ -70,6 +70,35 @@ for (const width of [1440, 390]) {
 
       expect(createHash('sha256').update(reference).digest('hex')).toBe(referenceImage.sha256)
       await page.screenshot({ path: `/tmp/vela-${sceneName}-${width}.png`, fullPage: true })
+
+      // The open control is part of the whole-route reference, and changing it
+      // must keep the decoded exposure and page geometry intact.
+      const pixels = page.locator('.capture-image__window img')
+      await pixels.evaluate(element => element.setAttribute('data-kept-exposure', 'yes'))
+      const imageUrl = await pixels.getAttribute('src')
+      await page.getByRole('button', { name: 'Appearance', exact: true }).click()
+      await page.emulateMedia({ colorScheme: 'light' })
+      const preference = sceneName === 'tonight-light' ? 'System' : 'Dark'
+      const appearance = page.getByRole('dialog', { name: 'Appearance', exact: true })
+      await expect(appearance).toBeVisible()
+      await appearance.evaluate(element => Promise.all(element.getAnimations().map(animation => animation.finished)))
+      await page.getByRole('radio', { name: new RegExp(`^${preference}`) }).check()
+      const panel = await appearance.boundingBox()
+      expect(panel?.width).toBe(width === 390 ? 350 : 360)
+      expect(panel!.x).toBeGreaterThanOrEqual(20)
+      expect(panel!.x + panel!.width).toBeLessThanOrEqual(width - 20)
+      await expect(pixels).toHaveAttribute('data-kept-exposure', 'yes')
+      await expect(pixels).toHaveAttribute('src', imageUrl!)
+      expect(await page.locator('.capture-image').boundingBox()).toEqual({
+        x: geometry.image.x, y: geometry.image.y,
+        width: geometry.image.width, height: geometry.image.height,
+      })
+      await page.screenshot({ path: `/tmp/vela-${sceneName}-appearance-${width}.png`, fullPage: true })
+      await page.getByRole('radio', { name: sceneName === 'tonight-light' ? 'Dark' : 'Light', exact: true }).check()
+      await expect(pixels).toHaveAttribute('data-kept-exposure', 'yes')
+      await expect(pixels).toHaveAttribute('src', imageUrl!)
+      await page.keyboard.press('Escape')
+      await expect(page.getByRole('button', { name: 'Appearance', exact: true })).toBeFocused()
     })
   }
 }
