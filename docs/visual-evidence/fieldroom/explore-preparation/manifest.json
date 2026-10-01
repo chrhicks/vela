@@ -1,0 +1,85 @@
+{
+  "reviewedHead": "8906518",
+  "capturedAt": "2026-10-01T04:50:29.089557+00:00",
+  "source": "project Chromium real-route fixtures, post-independent-OK acceptance pass",
+  "images": [
+    {
+      "file": "explore-light-1440.png",
+      "width": 1440,
+      "height": 980,
+      "sha256": "dda59a9f88fc5a98d30e67d5c8ec519216e498332284c28051d5d031a73c6b2b"
+    },
+    {
+      "file": "explore-light-390.png",
+      "width": 390,
+      "height": 2788,
+      "sha256": "ef0aadcb8c8dc5a5f84f9da3df7e7a5699ee2e8c37fc26f852032b7ed90da840"
+    },
+    {
+      "file": "explore-dark-1440.png",
+      "width": 1440,
+      "height": 980,
+      "sha256": "9b9a25530557fc7cb3b508183e5b4ef04a21319e7ad20a66cb09c5f81dac87dd"
+    },
+    {
+      "file": "explore-dark-390.png",
+      "width": 390,
+      "height": 2788,
+      "sha256": "d43a5a3f933b2c337a2338fef281a7842bdaca9e7227c3939610ca6b4531a5f1"
+    },
+    {
+      "file": "framing-light-1440.png",
+      "width": 1440,
+      "height": 1021,
+      "sha256": "ca550b4c8e74833a7ec04469e236dc57fd3e56df5e7de4eed653f194a896fb72"
+    },
+    {
+      "file": "framing-light-390.png",
+      "width": 390,
+      "height": 1913,
+      "sha256": "da9b804f8dcb224bcd8001158efe1d64ef33df1328653c67eb2f4c2237c842c3"
+    },
+    {
+      "file": "framing-dark-1440.png",
+      "width": 1440,
+      "height": 1021,
+      "sha256": "d95681af33aebeb25c31df56ff092017bd77779dd86c3717b9917802e8cb9f92"
+    },
+    {
+      "file": "framing-dark-390.png",
+      "width": 390,
+      "height": 1913,
+      "sha256": "651d7f01b49263df2630d0eb2e964f630258745323cf61386dc651e6af0e0a38"
+    },
+    {
+      "file": "preparation-light-1440.png",
+      "width": 1440,
+      "height": 990,
+      "sha256": "6baac634e9bd23fb4955ba0c67a71364711a792e55eb17797325eb3583a7c4df"
+    },
+    {
+      "file": "preparation-light-390.png",
+      "width": 390,
+      "height": 1681,
+      "sha256": "5686540e690040ca570586e441f3a76bb85c2ca10cbdfb9fe597ca6085f650b8"
+    },
+    {
+      "file": "preparation-dark-1440.png",
+      "width": 1440,
+      "height": 990,
+      "sha256": "cf729b8802c75c5a13a9e9a6da4667c11c6911fadfe811f92841da72792b5d1e"
+    },
+    {
+      "file": "preparation-dark-390.png",
+      "width": 390,
+      "height": 1681,
+      "sha256": "222b3682794ce7e8ca0d58a6f63ed50686e3f312df90e1e41b9c4fd77efcb15d"
+    },
+    {
+      "file": "explore-below-horizon.png",
+      "width": 1440,
+      "height": 980,
+      "sha256": "ac76db7254f7886558478e1b4b3559ba926182e570e4ad7ee79e80100ee7a971"
+    }
+  ]
+}

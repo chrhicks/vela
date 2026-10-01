@@ -1,6 +1,6 @@
 # Explore, framing, and preparation
 
-Status: implemented; independent review and final visual acceptance pending.
+Status: accepted at `8906518` after independent OK and final browser comparison.
 Tonight/Appearance passed its gate at `032c8b1` before this slice began.
 The parent accepts the concrete decisions below within the already approved
 required feature work; no new execution permission is needed.
@@ -481,3 +481,14 @@ Review at `5710cf9` confirmed both sky-copy corrections, with 876 project tests
 and 131 web browser checks passing. Its remaining P2 was a nested main landmark
 on the new rigless Explore route. Both target-route wrappers now leave the main
 landmark to Shell; rigged and rigless real-route checks assert a single landmark.
+
+Final review of `8906518` returned **OK**, no findings. The parent then reran
+all 22 Explore/framing/preparation route checks and inspected all thirteen
+captured images against 03.1–03.3 and the paired Fieldroom palette. Eight DOM
+geometry files and the unmodified PNGs are retained with hashes in
+[acceptance evidence](visual-evidence/fieldroom/explore-preparation/README.md).
+Native preview confirmed reachable routes, loaded fonts and preparation/framing
+pixels at desktop and phone dimensions; its snapshot-export limitation remains
+explicit. No further discrepancy required code changes. The planned slice is
+accepted, with the factual source substitutions recorded beside its evidence.
+Photographs may begin; whole-application acceptance remains Chris's final gate.
