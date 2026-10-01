@@ -6,6 +6,7 @@ const target: TargetView = {
   id: 'm31',
   name: 'Andromeda Galaxy',
   catalog: 'M31',
+  constellation: null,
   kind: 'Galaxy',
   raDegrees: 10.6847,
   decDegrees: 41.269,

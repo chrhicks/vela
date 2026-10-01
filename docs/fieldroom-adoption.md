@@ -108,7 +108,7 @@ Draft delivery PR: https://github.com/chrhicks/vela/pull/86. Fresh independent
 review of `5257da9` returned **OK** after correcting the archive recipe's typing
 and spacing. `pnpm lint` passed. The final reference pass confirmed frozen
 dimensions, hashes, legacy desktop/phone output, and the corrected supplement.
-This accepts reference preparation only; no production appearance is attested.
+This accepts reference preparation only; application adoption is recorded below.
 
 ## 2. Shared Fieldroom foundations
 
@@ -144,8 +144,8 @@ comparison to DS.01–DS.16 before app composition work starts.
 
 ### Actual / deviations / evidence
 
-Implemented in the shared resolver and stable primitives; awaiting fresh
-independent review and the final browser comparison before acceptance.
+Implemented in the shared resolver and stable primitives. The settled review
+and final comparison below accepted this foundation.
 
 Fieldroom adds explicit semantic overrides within the existing profile resolver,
 including pending, hover, pressed, warning, and error colors. The workshop uses
@@ -249,7 +249,12 @@ Use the slice gate; parent self-accepts this checkpoint before later screens.
 
 ### Actual / deviations / evidence
 
-Pending.
+Implemented against the [expanded Tonight plan](fieldroom-tonight-plan.md).
+Application configuration and Appearance, shared rig observation, subject/run
+facts, image inspection, sampled sky and footer are in place. The plan's actual
+outcome records files, operational boundaries, narrow additional controls, and
+preliminary geometry. Review scenes use the real route on the development-only
+HTTP fixture server. Independent review and final visual acceptance are pending.
 
 ## 4. Required capability additions
 
@@ -282,7 +287,11 @@ which visual slice consumes each addition.
 
 ### Actual / deviations / evidence
 
-Pending.
+Subject snapshots, per-run saved/integration totals, held/native image inspection,
+exact-image Keep/retry/expiry, and catalog constellations were implemented with
+Tonight. Focused checks cover the new contracts and deferred acquisition/save
+races. Framing exposure preview remains scheduled with its consuming slice.
+Nothing in this checkpoint adds durable capture sequences or run recovery.
 
 ## 5. Remaining application slices
 

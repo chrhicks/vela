@@ -8,6 +8,7 @@ export interface TargetView extends TargetPosition {
   id: string
   name: string
   catalog: string
+  constellation: string | null
   kind: string
   sizeArcminutes: number | null
   thumbnailUrl: string

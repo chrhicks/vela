@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { FramingView } from '@vela/model/web'
-import { isFramingView } from './validation'
+import { isFramingView, isTarget } from './validation'
 
 const view: FramingView = {
   captureReadState: 'current',
@@ -86,4 +86,20 @@ describe('framing transport validation', () => {
     ])
       expect(isFramingView({ ...view, ...invalid }, 'rig')).toBe(false)
   })
+})
+
+
+it('accepts known or unavailable constellation context and rejects malformed catalog facts', () => {
+  const target = {
+    id: 'ngc0224', name: 'Andromeda Galaxy', catalog: 'NGC 224', kind: 'Galaxy',
+    constellation: 'Andromeda', raDegrees: 10.6847, decDegrees: 41.2687,
+    sizeArcminutes: 177.8, thumbnailUrl: '/api/survey/thumbnail', sky: null,
+  }
+
+  expect(isTarget(target)).toBe(true)
+  expect(isTarget({ ...target, constellation: null })).toBe(true)
+
+  for (const constellation of [undefined, '', '   ', 42]) {
+    expect(isTarget({ ...target, constellation })).toBe(false)
+  }
 })

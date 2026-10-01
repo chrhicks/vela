@@ -274,7 +274,7 @@ function TargetComposition({ rigId, targetId }: { rigId: string; targetId: strin
                   {!offline && !pending && !commandUnconfirmed && (
                     <Link
                       className="vela-button vela-button--accent"
-                      to={`/rigs/${encodeURIComponent(rigId)}/observe/capture`}
+                      to={`/rigs/${encodeURIComponent(rigId)}/observe/capture?target=${encodeURIComponent(targetId)}`}
                     >
                       Continue to capture →
                     </Link>
@@ -416,7 +416,7 @@ function TargetComposition({ rigId, targetId }: { rigId: string; targetId: strin
           </Panel>
         </aside>
         {centering && <CenteringProgress centering={centering} current={currentMeasurement} />}
-        <div className="vela-target-sky-context">
+        <div id="sky" className="vela-target-sky-context">
           <SkyInspection sky={target.sky} targetName={target.name} stale={skyStale} />
         </div>
       </div>

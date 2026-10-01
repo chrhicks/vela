@@ -44,6 +44,7 @@ export type {
 
 export type {
   CaptureCoolingView,
+  CaptureSubject,
   CaptureImage,
   CaptureImageStatistics,
   CapturePhase,

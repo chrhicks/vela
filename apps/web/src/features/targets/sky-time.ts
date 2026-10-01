@@ -1,7 +1,7 @@
 import type { TargetSkyPath } from '@vela/model/web'
 
 export const skyTime = (at: string) =>
-  new Date(at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+  new Date(at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })
 
 export function skyWindow(sky: TargetSkyPath) {
   return sky.aboveHorizonDuringDarkness.length

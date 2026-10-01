@@ -32,6 +32,9 @@ const capture: CaptureView = {
   completedCount: 7,
   saveFrames: false,
   savedImageCount: 0,
+  subject: null,
+  savedCount: 0,
+  integrationSeconds: 0,
   error: null,
   cooling: null,
   latestImage: {
@@ -182,7 +185,7 @@ for (const width of [1280, 390]) {
       return route.abort('connectionreset')
     })
     await page.goto('/rigs/rig-1/observe/capture')
-    const progress = page.locator('.capture-page__progress')
+    const progress = page.getByRole('region', { name: 'Capture images' })
     const image = page.getByRole('region', { name: 'Latest image', exact: true })
     await expect(progress.getByRole('progressbar')).toBeVisible()
     await expect(image.getByRole('img')).toHaveAttribute('src', imageUrl)
@@ -193,19 +196,22 @@ for (const width of [1280, 390]) {
     await expect(page.locator('.capture-page__warning')).toContainText(
       'Retrying reads for exposure 8',
     )
-    await expect(page.locator('.capture-page__heading')).toContainText('Awaiting camera')
+    await expect(page.locator('.tonight-capture__heading')).toContainText('Camera observation interrupted')
     await expect(progress.getByRole('progressbar')).toHaveCount(0)
     await expect(progress).not.toContainText('8.0 / 30')
-    await expect(page.locator('.capture-page__count')).toHaveText('7images completed')
-    await expect(image).toContainText('1 min ago · Previous exposure')
+    await expect(progress).toContainText('Exposure 8')
+    await expect(image.locator('.capture-image__heading > span')).toHaveText(/^\d{2}:\d{2}:\d{2} · 1 min ago$/)
+    await expect(image.locator('.capture-image__heading > span')).toHaveAttribute('title', /^Received /)
+    await expect(image.getByRole('img')).toHaveAttribute('alt', '2 second exposure from Simulator Camera')
     await expect(image).toContainText('2.35')
-    await expect(page.getByRole('button', { name: 'Stop run', exact: true })).toBeEnabled()
-    await expect(page.getByRole('button', { name: 'Start run', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Stop capture', exact: true })).toBeEnabled()
+    await expect(page.getByRole('button', { name: 'Start capture', exact: true })).toHaveCount(0)
     const navigation = page.locator('.vela-navigation')
-    await expect(navigation).toContainText('Awaiting camera')
+    await expect(navigation.locator('.vela-navigation__activity')).toHaveCount(0)
     await expect(navigation.locator('progress')).toHaveCount(0)
     await screenshot(page, 'capture', width)
-    await page.getByRole('link', { name: '← Observe', exact: true }).click()
+    await page.goto('/rigs/rig-1/observe')
+    await expect(navigation).toContainText('Awaiting camera')
     const hub = page.locator('.vela-capture-entry').first()
     await expect(hub).toContainText('Retrying reads for the same exposure')
     await expect(hub).toContainText('7 completed')
@@ -213,23 +219,23 @@ for (const width of [1280, 390]) {
     await expect(hub.getByRole('img')).toHaveAttribute('src', imageUrl)
     await screenshot(page, 'observe', width)
     await page.getByRole('link', { name: 'View capture' }).click()
-    await expect(page.locator('.capture-page__heading')).toContainText('Awaiting camera')
+    await expect(page.locator('.tonight-capture__heading')).toContainText('Camera observation interrupted')
     offline = true
     await expect(page.locator('.capture-page__warning')).toContainText('Connection interrupted')
-    await expect(page.getByRole('button', { name: 'Stop run', exact: true })).toBeDisabled()
-    await expect(navigation).toContainText('Updates lost')
+    await expect(page.getByRole('button', { name: 'Stop capture', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('heading', { name: 'Capture state unknown' })).toBeVisible()
     offline = false
     state = { ...state, captureReadState: 'current', phase: 'reading' }
     await expect(progress).toContainText('Receiving image')
     await expect(page.locator('.capture-page__warning')).toHaveCount(0)
-    await expect(page.locator('.capture-page__count')).toHaveText('7images completed')
+    await expect(progress).toContainText('Exposure 8')
     await expect(image.getByRole('img')).toHaveAttribute('src', imageUrl)
     await expect(progress).not.toContainText('Image received')
     state = { ...state, captureReadState: 'retrying' }
-    await expect(page.locator('.capture-page__heading')).toContainText('Awaiting camera')
-    await page.getByRole('button', { name: 'Stop run', exact: true }).click()
+    await expect(page.locator('.tonight-capture__heading')).toContainText('Camera observation interrupted')
+    await page.getByRole('button', { name: 'Stop capture', exact: true }).click()
     await expect(page.locator('.capture-page__warning')).toContainText('Command outcome unknown')
-    await expect(page.locator('.capture-page__heading')).toContainText('Confirmation needed')
+    await expect(page.locator('.tonight-capture__heading')).toContainText('Command outcome unknown')
     await expect(progress.getByRole('progressbar')).toHaveCount(0)
     state = {
       ...state,
@@ -238,7 +244,7 @@ for (const width of [1280, 390]) {
       phase: 'failed',
       error: 'Camera stop could not be confirmed. Check the camera before starting another run.',
     }
-    await expect(page.getByRole('button', { name: 'Start run', exact: true })).toBeDisabled()
+    await expect(page.getByRole('button', { name: 'Start capture', exact: true })).toBeDisabled()
     await expect(image.getByRole('img')).toHaveAttribute('src', imageUrl)
     await page.getByRole('button', { name: 'Check capture state', exact: true }).click()
     await expect(page.locator('.capture-page__warning')).toContainText(
@@ -257,6 +263,7 @@ for (const width of [1280, 390]) {
       id: 'm31',
       name: 'Andromeda Galaxy',
       catalog: 'M31',
+      constellation: 'Andromeda',
       kind: 'Galaxy',
       raDegrees: 10.6847,
       decDegrees: 41.269,

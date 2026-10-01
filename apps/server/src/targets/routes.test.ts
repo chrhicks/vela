@@ -561,6 +561,7 @@ describe('target and framing HTTP boundary', () => {
     expect(target.json()).toMatchObject({
       id: 'ngc6205',
       catalog: 'NGC 6205',
+      constellation: 'Hercules',
       sky: null,
       raDegrees: start.raDegrees,
     })

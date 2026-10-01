@@ -174,3 +174,28 @@ it('preserves estimated starts on disk and rejects unknown provenance without re
   expect((await reopened.get('rig', image.id))?.capturedAtSource).toBeUndefined()
   expect(await fs.readFile(metadataPath, 'utf8')).toBe(legacyText)
 })
+
+
+it('retains subject intent across reopen, rejects malformed snapshots, and reads legacy absence unchanged', async () => {
+  const root = await temporary()
+  const store = await openFileSavedImageStore(root)
+  const subject = { targetId: 'ngc0224', name: 'Andromeda Galaxy', catalog: 'NGC 224' }
+  const saved = await store.save('rig', { ...image, subject }, files)
+  const reopened = await openFileSavedImageStore(root)
+  expect((await reopened.get('rig', image.id))?.subject).toEqual(subject)
+
+  const metadataPath = join(
+    root,
+    createHash('sha256').update('rig').digest('hex'),
+    createHash('sha256').update(image.id).digest('hex'),
+    'metadata.json',
+  )
+
+  await writeFile(metadataPath, JSON.stringify({ ...saved, subject: { ...subject, targetId: '' } }))
+  await expect(reopened.get('rig', image.id)).rejects.toThrow('Invalid saved image metadata')
+  const { subject: _subject, ...legacy } = saved
+  const legacyText = JSON.stringify(legacy)
+  await writeFile(metadataPath, legacyText)
+  expect((await reopened.get('rig', image.id))?.subject).toBeUndefined()
+  expect(await fs.readFile(metadataPath, 'utf8')).toBe(legacyText)
+})

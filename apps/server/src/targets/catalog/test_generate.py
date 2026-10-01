@@ -1,8 +1,16 @@
 import unittest
-from generate import coordinate, extent, normalize
+from generate import coordinate, extent, normalize, constellation
 
 
 class CatalogImportTest(unittest.TestCase):
+  def test_expands_source_constellations_without_inventing_missing_values(self):
+    self.assertEqual(constellation('And'), 'Andromeda')
+    self.assertEqual(constellation('Se1'), 'Serpens Caput')
+    self.assertEqual(constellation('Se2'), 'Serpens Cauda')
+    self.assertIsNone(constellation(''))
+    with self.assertRaises(KeyError):
+      constellation('Unknown')
+
   def test_rejects_malformed_or_out_of_range_coordinates(self):
     for value, ra in [
       ('24:00:00', True),

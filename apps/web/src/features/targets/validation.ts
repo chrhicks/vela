@@ -54,6 +54,7 @@ const target = position.extend({
   name: z.string(),
   catalog: z.string(),
   kind: z.string(),
+  constellation: z.string().trim().min(1).nullable(),
   sizeArcminutes: z.number().nullable(),
   thumbnailUrl: z.string().startsWith('/api/'),
   sky: sky.nullable(),

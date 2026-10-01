@@ -15,6 +15,9 @@ const idle: CaptureView = {
   error: null,
   saveFrames: false,
   savedImageCount: 0,
+  subject: null,
+  savedCount: 0,
+  integrationSeconds: 0,
   latestImage: null,
   repeat: false,
   completedCount: 0,
@@ -27,6 +30,7 @@ const idle: CaptureView = {
 }
 
 test.beforeEach(async ({ page }) => {
+  await page.route('**/api/**', route => route.fulfill({ status: 503, json: { error: 'No fixture for this request' } }))
   await page.route('**/api/web/navigation', route =>
     route.fulfill({ json: { rigs: [], captures: [] } }),
   )
@@ -66,6 +70,7 @@ test('keeps uncertain temperature visible through incomplete reads and capture c
     return route.fulfill({ json: current })
   })
   await page.goto('/rigs/rig-1/observe/capture')
+  await page.getByText('Camera cooling', { exact: true }).first().click()
   const cooling = page.getByRole('region', { name: 'Camera cooling' })
   const check = cooling.getByRole('button', { name: 'Check camera cooling' })
   const warning = cooling.getByText('Cooler command outcome unknown.', { exact: false })
@@ -81,10 +86,10 @@ test('keeps uncertain temperature visible through incomplete reads and capture c
   await expect(cooling.getByRole('button', { name: 'Set temperature' })).toBeDisabled()
 
   await page.getByRole('button', { name: 'Take exposure' }).click()
-  await expect(page.getByRole('button', { name: 'Stop exposure' })).toBeEnabled()
+  await expect(page.getByRole('button', { name: 'Stop capture' })).toBeEnabled()
   await expect(warning).toBeVisible()
   await expect(check).toBeDisabled()
-  await page.getByRole('button', { name: 'Stop exposure' }).click()
+  await page.getByRole('button', { name: 'Stop capture' }).click()
   await expect(check).toBeEnabled()
   await expect(warning).toBeVisible()
 
@@ -114,6 +119,7 @@ test('resolves an uncertain cooler switch from its fresh state without requiring
     return route.abort()
   })
   await page.goto('/rigs/rig-1/observe/capture')
+  await page.getByText('Camera cooling', { exact: true }).first().click()
   const cooling = page.getByRole('region', { name: 'Camera cooling' })
   await cooling.getByText('Cooler on', { exact: true }).click()
   await expect(cooling.getByText('Cooler command outcome unknown.', { exact: false })).toBeVisible()

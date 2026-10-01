@@ -207,6 +207,7 @@ export function registerTargets(
       id: target.id,
       name: target.commonName ?? target.catalogName,
       catalog: target.catalogName,
+      constellation: target.constellation,
       kind: target.type,
       raDegrees: target.raDegrees,
       decDegrees: target.decDegrees,
