@@ -461,3 +461,11 @@ Authenticated source bytes could not be retrieved, so exact remote/local byte
 identity is not claimed. No higher-resolution source, CSS filter or opacity
 change was found, and image pixels are not altered to compensate for raster or
 profile differences.
+
+Renewed review at `c4b67e1` returned **OK WITH NOTES**: all 158 browser checks
+passed, but a manual edge-state reproduction found negative current altitude
+being described as “above the horizon.” The summary now gives the absolute
+angular distance with above/below wording; refreshing from +68° to −12° is
+covered by a real-route regression without physical commands. All eleven
+Explore/framing checks pass with the correction. The note remains pending fresh
+independent disposition before visual acceptance.

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { isTargetDiscovery } from '../src/features/targets/validation'
 import { writeFileSync } from 'node:fs'
 import { openExploreScene } from './fixtures/fieldroom/browser'
 import { reviewTimezone } from './fixtures/fieldroom/tonight'
@@ -175,5 +176,29 @@ test('a newer unsolved exposure retains its own preview beside the older solved 
   await expect(page.locator('.framing-exposure')).toContainText('No solved position')
   await expect(page.getByRole('link', { name: 'Continue to capture' })).toHaveCount(0)
   expect(requests.some((request) => request.includes('/review-test-2/fit.png'))).toBe(true)
+  expect(scene.commands).toEqual([])
+})
+
+
+test('a refreshed subject below the horizon is not described as above it', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  const { scene } = await openExploreScene(page, 'explore-light')
+  const altitude = page.locator('.vela-discovery__altitude')
+  await expect(altitude).toContainText('above the horizon')
+  await page.route('**/api/web/rigs/fra400/target-discovery?*', route => {
+    const url = new URL(route.request().url())
+    const result = scene.respond('GET', `${url.pathname}${url.search}`)
+    const view = structuredClone(result.json)
+
+    if (!isTargetDiscovery(view, 'fra400')) throw new Error('Invalid discovery fixture')
+    view.targets[0]!.sky!.currentAltitudeDegrees = -12
+    view.targets[0]!.opportunity!.currentAltitudeDegrees = -12
+
+    return route.fulfill({ json: view })
+  })
+  await page.getByRole('button', { name: 'Update sky' }).click()
+  await expect(altitude.locator('strong')).toHaveText('12°')
+  await expect(altitude).toContainText('below the horizon at 21:43')
+  await page.screenshot({ path: '/tmp/vela-explore-below-horizon.png', fullPage: true })
   expect(scene.commands).toEqual([])
 })
