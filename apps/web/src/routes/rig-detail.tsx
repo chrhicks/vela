@@ -81,7 +81,7 @@ function Equipment({ rigId }: { rigId: string }) {
     setForgetting(true)
 
     try {
-      const current = await loadHome()
+      const current = await loadHome(AbortSignal.timeout(5000))
 
       if (!current.rigs.some(rig => rig.id === rigId)) finishForget()
       else {

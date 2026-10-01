@@ -380,6 +380,13 @@ captures retain separate focused-error evidence and the unfocused state matching
 the reference's dismissed keyboard. Repository lint and the web build pass.
 No live-device commands were needed or issued for this slice.
 
+Independent review of `7aa5bf2` returned **BLOCK**: the new Add/Forget saved-state
+checks disabled dismissal while awaiting reads with no deadlines. Both now use
+five-second read deadlines. Focused stalled-request regressions prove controls
+recover, uncertainty and drafts remain, a later explicit check can succeed, and
+the Add/DELETE write count stays one. No automatic retry was introduced. A fresh
+independent verdict is required for the corrected head before visual acceptance.
+
 ## Settled implementation refinements
 
 - Keep the existing shell-owned rig observation. Equipment adds its explicit

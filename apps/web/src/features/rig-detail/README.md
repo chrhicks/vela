@@ -20,3 +20,6 @@ and dismissal while pending, and retains an unknown outcome across dismissal.
 Its explicit Check saved rigs uses the validated Home projection: absence confirms
 removal; presence permits a later explicit DELETE. A confirmed removal navigates
 to Home, whose route-local provider mounts with a fresh catalog read.
+The inspection read has a five-second deadline so a stalled request cannot lock
+the dialog. Timeout restores dismissal and keeps the unknown outcome for the
+next explicit check; it never enables an uninspected DELETE retry.
