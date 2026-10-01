@@ -193,12 +193,15 @@ test('a refreshed subject below the horizon is not described as above it', async
     if (!isTargetDiscovery(view, 'fra400')) throw new Error('Invalid discovery fixture')
     view.targets[0]!.sky!.currentAltitudeDegrees = -12
     view.targets[0]!.opportunity!.currentAltitudeDegrees = -12
+    view.targets[0]!.opportunity!.startsAt = '2026-09-30T03:00:00.000Z'
+    view.targets[0]!.opportunity!.endsAt = '2026-09-30T06:00:00.000Z'
 
     return route.fulfill({ json: view })
   })
   await page.getByRole('button', { name: 'Update sky' }).click()
   await expect(altitude.locator('strong')).toHaveText('12°')
   await expect(altitude).toContainText('below the horizon at 21:43')
+  await expect(page.locator('.vela-discovery__window').first()).toHaveText('Above 30° from 23:00 to 02:00')
   await page.screenshot({ path: '/tmp/vela-explore-below-horizon.png', fullPage: true })
   expect(scene.commands).toEqual([])
 })
