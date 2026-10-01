@@ -394,6 +394,8 @@ it('saves every repeated frame before exposing again, including a completed fram
   expect(await stopping).toMatchObject({
     active: false,
     completedCount: 2,
+    savedCount: 2,
+    integrationSeconds: 20,
     latestImage: { saved: true },
   })
   expect(await store.count('fra 400')).toBe(2)
@@ -410,6 +412,8 @@ it('stops on an automatic save failure and retains that frame for an explicit re
   expect(controller.snapshot()).toMatchObject({
     phase: 'failed',
     completedCount: 1,
+    savedCount: 0,
+    integrationSeconds: 10,
     latestImage: { saved: false },
   })
   expect(controller.snapshot().error).toContain('Disk full')
@@ -417,6 +421,7 @@ it('stops on an automatic save failure and retains that frame for an explicit re
   expect(await controller.keep(id)).toMatchObject({ id, saved: true })
   expect(controller.snapshot().latestImage?.saved).toBe(true)
   expect(await store.count('fra 400')).toBe(1)
+  expect(controller.snapshot().savedCount).toBe(1)
 })
 
 it('bounds unsaved frame availability but keeps saved frames idempotent after eviction', async () => {
@@ -450,4 +455,80 @@ it('preserves an estimated start in the published image, retained metadata and o
   expect(fits).toContain("DATE-OBS= '2026-09-05T16:00:00.000Z'")
   expect(fits).toContain("TIMESRC = 'SERVER-ESTIMATE'")
   expect(fits).toContain('COMMENT DATE-OBS estimated from server UTC before StartExposure.')
+})
+
+
+it('snapshots subject intent and counts only published integration, retaining image intent across a targetless run', async () => {
+  const { controller, requests, frame } = setup()
+  const subject = { targetId: 'ngc0224', name: 'Andromeda Galaxy', catalog: 'NGC 224' }
+  await controller.start(7, { repeat: true, subject })
+  subject.name = 'Changed selection'
+  expect(controller.snapshot()).toMatchObject({
+    subject: { name: 'Andromeda Galaxy' }, completedCount: 0, integrationSeconds: 0,
+  })
+  requests[0]!.resolve(frame)
+  await vi.waitFor(() => expect(requests).toHaveLength(2))
+  expect(controller.snapshot()).toMatchObject({ completedCount: 1, integrationSeconds: 7 })
+  const stopping = controller.stop()
+  requests[1]!.reject(new CaptureStoppedError())
+  await stopping
+  expect(controller.snapshot()).toMatchObject({ completedCount: 1, integrationSeconds: 7 })
+  await controller.start(3)
+  expect(controller.snapshot()).toMatchObject({
+    subject: null, savedCount: 0, integrationSeconds: 0, completedCount: 0,
+    latestImage: { subject: { name: 'Andromeda Galaxy' } },
+  })
+  requests[2]!.resolve(frame)
+  await vi.waitFor(() => expect(controller.active()).toBe(false))
+  expect(controller.snapshot()).toMatchObject({ integrationSeconds: 3, latestImage: { subject: null } })
+})
+
+it('counts overlapping automatic and manual Keep once, and excludes an older run save completing during a new run', async () => {
+  const store = createMemorySavedImageStore()
+  const gate = deferred<void>()
+  const original = store.save.bind(store)
+
+  const save = vi.spyOn(store, 'save').mockImplementation(async (...args) => {
+    await gate.promise
+
+    return original(...args)
+  })
+
+  const { controller, requests, frame } = setup(store)
+  await controller.start(5, { saveFrames: true })
+  requests[0]!.resolve(frame)
+  await vi.waitFor(() => expect(save).toHaveBeenCalledOnce())
+  const image = controller.snapshot().latestImage!
+  const keeping = controller.keep(image.id)
+  await vi.waitFor(() => expect(save).toHaveBeenCalledTimes(2))
+  const stopping = controller.stop()
+  expect(controller.snapshot()).toMatchObject({ phase: 'stopping', savedCount: 0, integrationSeconds: 5 })
+  gate.resolve()
+  await Promise.all([keeping, stopping])
+  await controller.keep(image.id)
+  expect(controller.snapshot()).toMatchObject({ savedCount: 1, savedImageCount: 1, integrationSeconds: 5 })
+
+  save.mockRestore()
+  await controller.start(8)
+  requests[1]!.resolve(frame)
+  await vi.waitFor(() => expect(controller.active()).toBe(false))
+  const olderImage = controller.snapshot().latestImage!
+  const olderGate = deferred<void>()
+
+  const olderSave = vi.spyOn(store, 'save').mockImplementationOnce(async (...args) => {
+    await olderGate.promise
+
+    return original(...args)
+  })
+
+  const olderKeep = controller.keep(olderImage.id)
+  await vi.waitFor(() => expect(olderSave).toHaveBeenCalledOnce())
+  await controller.start(11)
+  olderGate.resolve()
+  await olderKeep
+  expect(controller.snapshot()).toMatchObject({ savedCount: 0, savedImageCount: 2, integrationSeconds: 0 })
+  requests[2]!.resolve(frame)
+  await vi.waitFor(() => expect(controller.active()).toBe(false))
+  await controller.keep(controller.snapshot().latestImage!.id)
+  expect(controller.snapshot()).toMatchObject({ savedCount: 1, savedImageCount: 3, integrationSeconds: 11 })
 })

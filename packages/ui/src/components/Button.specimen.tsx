@@ -7,26 +7,26 @@ export const specimen: ComponentSpecimen = {
   componentName: 'Button',
   id: 'button-primary',
   name: 'Primary action',
-  description: 'A semantic action with tone, size, and disabled states.',
+  description: 'A semantic action with tone, pending, and unavailable states.',
   controls: {
     label: { type: 'text', label: 'Label' },
     tone: { type: 'select', label: 'Tone', options: ['neutral', 'accent', 'quiet'] },
-    size: { type: 'select', label: 'Size', options: ['small', 'medium', 'large'] },
+    pending: { type: 'boolean', label: 'Pending' },
     disabled: { type: 'boolean', label: 'Disabled' },
   },
   defaultProps: {
     label: 'Start capture',
     tone: 'accent',
-    size: 'medium',
     disabled: false,
+    pending: false,
   },
   render: props => (
     <Button
       disabled={Boolean(props.disabled)}
-      size={z.enum(['small', 'medium', 'large']).parse(props.size)}
+      pending={Boolean(props.pending)}
       tone={z.enum(['neutral', 'accent', 'quiet']).parse(props.tone)}
     >
-      {String(props.label)}
+      {props.pending ? 'Starting…' : String(props.label)}
     </Button>
   ),
 }

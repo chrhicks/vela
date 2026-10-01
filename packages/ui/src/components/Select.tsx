@@ -33,6 +33,8 @@ export function Select({
         <select
           {...props}
           className={`vela-select ${className}`.trim()}
+          aria-invalid={invalid || undefined}
+          aria-describedby={[props['aria-describedby'], message ? `${selectId}-message` : undefined].filter(Boolean).join(' ') || undefined}
           data-invalid={invalid}
           id={selectId}
         >
@@ -44,7 +46,7 @@ export function Select({
         </select>
       </span>
       {message ? (
-        <span className="vela-field__message" data-invalid={invalid}>
+        <span id={`${selectId}-message`} className="vela-field__message" data-invalid={invalid}>
           {message}
         </span>
       ) : null}

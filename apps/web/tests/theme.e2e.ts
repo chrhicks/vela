@@ -1,15 +1,19 @@
 import { expect, test } from '@playwright/test'
-import { VELA_CURRENT_PROFILE, resolveTheme, themeStyle } from '@vela/ui/themes'
+import { FIELDROOM_PROFILE, resolveTheme, themeStyle } from '@vela/ui/themes'
 import { observation } from './fixtures/observation'
 import type { CaptureView } from '@vela/model/web'
 
-const theme = resolveTheme(VELA_CURRENT_PROFILE)
+const theme = resolveTheme(FIELDROOM_PROFILE)
 
 const tokens = themeStyle(theme, 'dark')
 
 for (const width of [1040, 390]) {
-  test(`preserves the adopted workshop theme in the app at ${width}px`, async ({ page }) => {
+  test(`preserves shared theme tokens and geometry in the app at ${width}px`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'dark' })
     await page.setViewportSize({ width, height: 900 })
+    await page.route('**/api/web/navigation', route =>
+      route.fulfill({ json: { rigs: [{ id: 'rig-1', name: observation().rig.name }], captures: [] } }),
+    )
     await page.route('**/api/web/rigs/rig-1', route =>
       route.fulfill({
         contentType: 'application/json',
@@ -17,7 +21,7 @@ for (const width of [1040, 390]) {
       }),
     )
     await page.goto('/rigs/rig-1')
-    const panel = page.locator('.vela-rig-device').first()
+    const panel = page.locator('.equipment__setup')
     await expect(panel).toBeVisible()
 
     // A shared component can still drift when its app shell selects a different
@@ -33,12 +37,13 @@ for (const width of [1040, 390]) {
       'border-radius',
       `${theme.radius}px`,
     )
-    await expect(panel).toHaveCSS('border-radius', `${theme.radius * 1.25}px`)
-    await expect(panel).toHaveCSS('border-top-width', `${theme.borderWidth}px`)
-    await expect(panel).toHaveCSS('border-top-style', 'solid')
-    await expect(panel.locator('.vela-panel__title')).toHaveCSS(
+    await expect(panel).toHaveCSS('border-radius', '6px')
+    const device = page.locator('.equipment__device').first()
+    await expect(device).toHaveCSS('border-top-width', `${theme.borderWidth}px`)
+    await expect(device).toHaveCSS('border-top-style', 'solid')
+    await expect(panel.getByRole('heading', { name: 'Imaging setup' })).toHaveCSS(
       'font-size',
-      `${theme.fontSize * 0.96}px`,
+      '24px',
     )
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
@@ -62,6 +67,7 @@ for (const width of [1040, 390]) {
       repeat: false,
       completedCount: 0,
       cooling: null,
+      subject: null, savedCount: 0, integrationSeconds: 0,
     }
 
     await page.route('**/api/web/rigs/rig-1/capture', route =>
@@ -75,12 +81,9 @@ for (const width of [1040, 390]) {
     // specificity rule and shrink the specimen's command to the base size.
     await expect(page.getByRole('button', { name: 'Take exposure' })).toHaveCSS(
       'min-height',
-      '44px',
+      '46px',
     )
-    await expect(page.locator('.capture-page__controls .vela-panel__header')).toHaveCSS(
-      'border-bottom-width',
-      '0px',
-    )
+    await expect(page.locator('.tonight-capture')).toHaveCSS('border-radius', '6px')
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true)

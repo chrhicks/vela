@@ -33,10 +33,10 @@ export const specimen: ComponentSpecimen = {
         elevation={z.enum(['flat', 'raised']).parse(props.elevation)}
         footer={
           <>
-            <Button size="small" tone="quiet">
+            <Button tone="quiet">
               Details
             </Button>
-            <Button size="small" tone="accent">
+            <Button tone="accent">
               Cool camera
             </Button>
           </>

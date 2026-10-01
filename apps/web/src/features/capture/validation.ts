@@ -9,6 +9,8 @@ import type {
 
 const text = z.string().refine(value => value.trim().length > 0)
 
+const subject = z.object({ targetId: text, name: text, catalog: text })
+
 const timestamp = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}T.+Z$/)
@@ -27,6 +29,7 @@ const statistics = z
 const captureImage = z
   .object({
     id: text,
+    subject: subject.nullable().optional(),
     cameraName: text,
     saved: z.boolean(),
     imageUrl: z.string(),
@@ -62,6 +65,9 @@ const captureView = z.object({
   captureReadState: z.enum(['current', 'retrying']),
   exposureSeconds: z.number().min(0).max(600),
   repeat: z.boolean(),
+  subject: subject.nullable(),
+  savedCount: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+  integrationSeconds: z.number().finite().nonnegative(),
   completedCount: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
   saveFrames: z.boolean(),
   savedImageCount: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).nullable(),
@@ -140,13 +146,25 @@ export function isSavedImage(value: unknown, rigId: string): value is SavedImage
   )
 }
 
+const timeZone = text.refine(value => {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: value })
+
+    return true
+  } catch {
+    return false
+  }
+})
+
 const savedImagesView = z.object({
+  timeZone,
   rigId: z.string(),
   rigName: text,
   images: z.array(savedImage),
 })
 
 const savedImageView = z.object({
+  timeZone,
   rigId: z.string(),
   rigName: text,
   image: savedImage,

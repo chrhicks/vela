@@ -1,0 +1,67 @@
+.vela-library-demo { container: library / inline-size; width: 100%; min-width: 0; background: var(--vela-canvas); color: var(--vela-text); font: 400 16px/24px var(--vela-font); }
+.vela-library-demo * { box-sizing: border-box; }
+.vela-library-demo :where(h1, h2, p, dl, dd) { margin: 0; }
+.vela-library-demo h1 { font: 400 28px/34px var(--vela-font-heading); }
+.vela-library-demo h2 { font: 400 24px/30px var(--vela-font-heading); }
+.vela-library-demo .vela-navigation__bar { padding-inline: 36px; }
+.vela-library-demo__heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px 24px; padding: 26px 36px 24px; }
+.vela-library-demo__heading > span, .vela-library-demo__heading > p { color: var(--vela-text-muted); font-size: 14px; }
+.vela-library-demo__heading > p { margin-left: auto; }
+.vela-library-demo main { padding: 0 36px; }
+.vela-library-demo__search { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin: 24px 0; }
+.vela-library-demo__search .vela-field { width: min(100%, 440px); }
+.vela-library-demo__search > span, .vela-library-demo__hint, .vela-library-demo__footer { font-size: 14px; line-height: 20px; color: var(--vela-text-muted); }
+.vela-library-demo__search > span { padding-bottom: 12px; }
+.vela-library-demo__groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.vela-library-demo button { font-family: inherit; }
+.vela-library-demo__group { display: grid; grid-template-columns: 144px minmax(0, 1fr) 16px; padding: 16px; align-items: center; gap: 20px; background: transparent; color: var(--vela-text); border: 1px solid var(--vela-line); border-radius: 6px; text-align: left; cursor: pointer; }
+.vela-library-demo__group:hover, .vela-library-demo__photos button:hover { background: var(--vela-accent-surface); border-color: var(--vela-line-strong); }
+.vela-library-demo__cover { height: 144px; background: var(--vela-surface); border-radius: 3px; overflow: hidden; display: grid; place-items: center; text-align: center; color: var(--vela-text-muted); }
+.vela-library-demo__cover img { width: 100%; height: 100%; object-fit: cover; }
+.vela-library-demo__group h2 { font-size: 22px; line-height: 28px; margin-bottom: 10px; }
+.vela-library-demo__group p { font-size: 14px; line-height: 20px; color: var(--vela-text-muted); margin-top: 8px; }
+.vela-library-demo__hint { margin-top: 24px; }
+.vela-library-demo__empty { padding: 32px 0; }
+.vela-library-demo__back { margin-bottom: 24px; }
+.vela-library-demo__group-heading { display: flex; justify-content: space-between; align-items: end; gap: 24px; margin-bottom: 24px; }
+.vela-library-demo__group-heading p { margin-top: 8px; color: var(--vela-text-muted); }
+.vela-library-demo__group-heading .vela-field { min-width: 240px; }
+.vela-library-demo__photos { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; }
+.vela-library-demo__photos button { display: flex; flex-direction: column; gap: 8px; min-width: 0; padding: 10px; text-align: left; background: transparent; color: var(--vela-text); border: 1px solid var(--vela-line); border-radius: 6px; cursor: pointer; }
+.vela-library-demo__photos button > div { width: 100%; aspect-ratio: 4 / 3; display: grid; place-items: center; background: var(--vela-surface); overflow: hidden; border-radius: 2px; }
+.vela-library-demo__photos img { width: 100%; height: 100%; object-fit: contain; }
+.vela-library-demo__photos strong { font-size: 16px; line-height: 24px; font-weight: 500; }
+.vela-library-demo__photos span, .vela-library-demo__photos small { font-size: 14px; line-height: 20px; color: var(--vela-text-muted); }
+.vela-library-demo__inspection { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 32px; }
+.vela-library-demo__viewer { min-width: 0; border: 1px solid var(--vela-line); background: var(--vela-surface); border-radius: 6px; overflow: hidden; }
+.vela-library-demo__viewer > header, .vela-library-demo__viewer > footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 12px 16px; font-size: 14px; }
+.vela-library-demo__viewer > div { height: 480px; display: grid; place-items: center; }
+.vela-library-demo__viewer img { width: 100%; height: 100%; object-fit: contain; min-height: 0; }
+.vela-library-demo__inspection aside > p { color: var(--vela-text-muted); }
+.vela-library-demo dl { display: grid; gap: 20px; margin-top: 24px; }
+.vela-library-demo dt { font-size: 14px; color: var(--vela-text-muted); margin-bottom: 6px; }
+.vela-library-demo__footer { padding: 24px 36px; }
+.vela-library-demo :focus-visible { outline: 2px solid var(--vela-focus); outline-offset: 3px; }
+@container library (width < 1050px) {
+  .vela-library-demo__groups { grid-template-columns: 1fr; }
+  .vela-library-demo__photos { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .vela-library-demo__heading > p { width: 100%; margin: 0; }
+}
+@container library (width < 700px) {
+  .vela-library-demo .vela-navigation__bar { padding-inline: 20px; }
+  .vela-library-demo__heading { padding: 24px 20px; gap: 8px; }
+  .vela-library-demo__heading > span { width: 100%; }
+  .vela-library-demo main { padding: 0 20px; }
+  .vela-library-demo__search, .vela-library-demo__group-heading { flex-direction: column; align-items: stretch; gap: 12px; }
+  .vela-library-demo__search > span { padding: 0; }
+  .vela-library-demo__group { grid-template-columns: 84px minmax(0, 1fr); gap: 14px; padding: 12px; }
+  .vela-library-demo__group > span { display: none; }
+  .vela-library-demo__cover { height: 100px; }
+  .vela-library-demo__group h2 { font-size: 20px; line-height: 26px; }
+  .vela-library-demo__photos { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .vela-library-demo__inspection { grid-template-columns: 1fr; gap: 24px; }
+  .vela-library-demo__viewer > div { height: auto; aspect-ratio: 1; }
+  .vela-library-demo__viewer > footer { padding: 10px; gap: 8px; }
+  .vela-library-demo__viewer .vela-button { padding-inline: 10px; }
+  .vela-library-demo__footer { padding: 24px 20px; }
+}

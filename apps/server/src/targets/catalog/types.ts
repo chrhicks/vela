@@ -5,6 +5,7 @@ export interface CatalogTarget {
   readonly aliases: readonly string[]
   readonly raDegrees: number
   readonly decDegrees: number
+  readonly constellation: string | null
   readonly type: string
   readonly majorAxisArcminutes: number | null
   readonly minorAxisArcminutes: number | null
@@ -20,4 +21,5 @@ export type CatalogRow = readonly [
   type: string,
   majorAxisArcminutes: number | null,
   minorAxisArcminutes: number | null,
+  constellation: string | null,
 ]

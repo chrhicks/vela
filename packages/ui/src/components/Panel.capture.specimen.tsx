@@ -201,7 +201,6 @@ function CapturePreview({
           <Button
             className="vela-capture-back"
             tone="quiet"
-            size="small"
             onClick={() => update({ screen: 'observe' })}
           >
             ← Observe
@@ -258,7 +257,7 @@ function CapturePreview({
                       </span>
                     )}
                   </div>
-                  <Button size="large" tone="accent" onClick={() => update({ screen: 'capture' })}>
+                  <Button tone="accent" onClick={() => update({ screen: 'capture' })}>
                     {busy ? 'View capture' : 'Open capture'} →
                   </Button>
                 </div>
@@ -317,7 +316,6 @@ function CapturePreview({
                   {hasImage && (
                     <div className="vela-capture-zoom" aria-label="Image scale">
                       <Button
-                        size="small"
                         tone={zoomed ? 'quiet' : 'neutral'}
                         aria-pressed={!zoomed}
                         onClick={() => setZoomed(false)}
@@ -325,7 +323,6 @@ function CapturePreview({
                         Fit
                       </Button>
                       <Button
-                        size="small"
                         tone={zoomed ? 'neutral' : 'quiet'}
                         aria-pressed={zoomed}
                         onClick={() => setZoomed(true)}
@@ -467,7 +464,6 @@ function CapturePreview({
                 <div className="vela-capture-command">
                   {phase === 'exposing' ? (
                     <Button
-                      size="large"
                       onClick={() => {
                         setPlaying(false)
                         update({ phase: 'stopped' })
@@ -477,7 +473,6 @@ function CapturePreview({
                     </Button>
                   ) : (
                     <Button
-                      size="large"
                       tone="accent"
                       disabled={phase === 'reading' || disconnected || !validExposure}
                       onClick={takeExposure}

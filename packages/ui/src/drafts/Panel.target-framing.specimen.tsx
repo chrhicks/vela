@@ -369,7 +369,6 @@ function TargetFramingPreview({
                   <div>
                     <strong>Camera orientation stays fixed</strong>
                     <Button
-                      size="small"
                       tone="quiet"
                       disabled={busy || checking}
                       onClick={() => update({ frameX: 50, frameY: 50 })}
@@ -410,7 +409,6 @@ function TargetFramingPreview({
                   <OverheadSkyPath {...displaySky} compact />
                   <Button
                     className="vela-target-expand-sky"
-                    size="small"
                     tone="quiet"
                     data-expand-sky
                     onClick={expandSky}

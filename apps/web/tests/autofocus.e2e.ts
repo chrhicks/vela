@@ -32,9 +32,9 @@ test('setup starts from the current EAF position and never offers a home to 0', 
   await page.route('**/api/web/rigs/rig-1/autofocus', route => route.fulfill({ json: setup }))
   await page.goto('/rigs/rig-1/observe/autofocus')
   await expect(page.getByRole('heading', { name: 'Autofocus' })).toBeVisible()
-  await expect(page.locator('.vela-af-facts')).toContainText('32842')
-  await expect(page.locator('.vela-af-facts')).toContainText('60000')
-  await expect(page.locator('.vela-af-facts')).toContainText('32642 → 33042')
+  await expect(page.locator('.vela-af-window--desktop')).toContainText('32,842')
+  await expect(page.locator('.vela-af-facts')).toContainText('60,000')
+  await expect(page.locator('.vela-af-window-facts')).toContainText('32,642 – 33,042')
   await expect(page.getByRole('button', { name: 'Start autofocus' })).toBeEnabled()
   await expect(page.locator('.vela-af-facts')).not.toContainText('0 in / 0 out')
   await expect(page.locator('.vela-autofocus')).not.toContainText('Move(0)')
@@ -94,11 +94,11 @@ test('the V-curve grows as each short lands', async ({ page }) => {
   await page.goto('/rigs/rig-1/observe/autofocus')
   await page.getByRole('button', { name: 'Start autofocus' }).click()
   await expect(page.locator('.vela-af-point')).toHaveCount(1)
-  await expect(page.locator('.vela-af-readout')).toContainText('32842')
-  await expect(page.locator('.vela-af-readout')).toContainText('33042 · 5.42 px')
+  await expect(page.locator('.vela-af-readout')).toContainText('32,842')
+  await expect(page.locator('.vela-af-readout')).toContainText('33,042 · 5.42 px')
   await expect(page.locator('.vela-af-readout')).toContainText('Fitted focus')
   await expect(page.locator('.vela-af-point')).toHaveCount(2, { timeout: 4000 })
-  await expect(page.locator('.vela-af-readout')).toContainText('32992 · 4.10 px')
+  await expect(page.locator('.vela-af-readout')).toContainText('32,992 · 4.10 px')
 })
 
 test('a window that would approach 0 does not start', async ({ page }) => {
@@ -109,8 +109,8 @@ test('a window that would approach 0 does not start', async ({ page }) => {
   )
   await page.goto('/rigs/rig-1/observe/autofocus')
   await expect(page.getByRole('button', { name: 'Window does not fit' })).toBeDisabled()
-  await expect(page.getByText('Walk would approach a travel limit')).toBeVisible()
-  await expect(page.locator('.vela-af-facts')).toContainText('Does not fit around start')
+  await expect(page.getByRole('heading', { name: 'Window does not fit' })).toBeVisible()
+  await expect(page.locator('.vela-af-window-facts')).toContainText('Does not fit around start')
 })
 
 test('a travel-limit start result returns to setup instead of a disconnect', async ({ page }) => {
@@ -131,7 +131,7 @@ test('a travel-limit start result returns to setup instead of a disconnect', asy
   })
   await page.goto('/rigs/rig-1/observe/autofocus')
   await page.getByRole('button', { name: 'Start autofocus' }).click()
-  await expect(page.getByText('Walk would approach a travel limit')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Window does not fit' })).toBeVisible()
   await expect(page.locator('.vela-af-notice')).toContainText('will not command 0 or MaxStep')
   await expect(page.locator('.vela-autofocus')).not.toContainText('Disconnected')
   await expect(page.locator('.vela-autofocus')).not.toContainText('Start position was not restored')
@@ -167,8 +167,8 @@ test('an unrestored failure is not labeled as a travel limit', async ({ page }) 
 
   await page.route('**/api/web/rigs/rig-1/autofocus', route => route.fulfill({ json: failed }))
   await page.goto('/rigs/rig-1/observe/autofocus')
-  await expect(page.getByText('Start position was not restored')).toBeVisible()
-  await expect(page.getByText('Walk failed · start was not restored')).toBeVisible()
+  await expect(page.getByText('Start position not confirmed')).toBeVisible()
+  await expect(page.getByText('Restoration failed', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Back to setup' })).toBeVisible()
   await expect(page.locator('.vela-autofocus')).not.toContainText(
     'Walk would approach a travel limit',
@@ -180,7 +180,7 @@ test('an unrestored failure is not labeled as a travel limit', async ({ page }) 
   await page.getByRole('button', { name: 'Back to setup' }).click()
   await expect(page.getByLabel('Step size')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Start autofocus' })).toBeVisible()
-  await expect(page.getByText('Start position was not restored')).toBeVisible()
+  await expect(page.getByText('Start position not confirmed')).toBeVisible()
 })
 
 test('a restored stop keeps the walk view and notice, then returns to setup', async ({ page }) => {
@@ -205,8 +205,8 @@ test('a restored stop keeps the walk view and notice, then returns to setup', as
   await page.route('**/api/web/rigs/rig-1/autofocus', route => route.fulfill({ json: stopped }))
   await page.goto('/rigs/rig-1/observe/autofocus')
   await expect(page.getByText('Start position restored')).toBeVisible()
-  await expect(page.locator('.vela-af-notice')).toContainText('back at 32842')
-  await expect(page.locator('.vela-af-readout')).toContainText('1 of 9 shorts on the curve')
+  await expect(page.locator('.vela-af-notice')).toContainText('back at 32,842')
+  await expect(page.locator('.vela-af-point')).toHaveCount(1)
   await expect(page.getByRole('button', { name: 'Back to setup' })).toBeVisible()
   await page.getByRole('button', { name: 'Back to setup' }).click()
   await expect(page.getByLabel('Step size')).toBeVisible()
@@ -246,9 +246,155 @@ test('focus again returns to setup instead of starting another walk', async ({ p
   )
   await page.goto('/rigs/rig-1/observe/autofocus')
   await expect(page.getByText('Fitted focus is ready')).toBeVisible()
-  await expect(page.locator('.vela-af-readout')).toContainText('32838')
+  await expect(page.locator('.vela-af-readout')).toContainText('32,838')
   await page.getByRole('button', { name: 'Focus again' }).click()
   await expect(page.getByLabel('Step size')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Start autofocus' })).toBeVisible()
   await expect(page.locator('.vela-autofocus')).not.toContainText('should not start')
+})
+
+test('an unknown Stop stays blocked through active reads until a terminal result is confirmed', async ({ page }) => {
+  let stops = 0
+  let readsAfterStop = 0
+
+  let current: AutofocusView = {
+    ...setup,
+    phase: 'walking',
+    activity: 'exposing',
+    active: true,
+    startPosition: 32842,
+    currentPosition: 32992,
+    samples: [{ position: 33042, detectedStars: 18, hfrPixels: 5.1, capturedAt: '2026-09-17T00:00:00.000Z' }],
+  }
+
+  await page.route('**/api/**', route => route.fulfill({ status: 503, json: { error: 'Unrelated fixture request' } }))
+  await page.route('**/api/web/rigs/rig-1/autofocus', route => {
+    if (stops) readsAfterStop++
+
+    return route.fulfill({ json: current })
+  })
+  await page.route('**/api/rigs/rig-1/autofocus/stop', route => {
+    stops++
+
+    return route.abort('failed')
+  })
+  await page.goto('/rigs/rig-1/observe/autofocus')
+  const stop = page.getByRole('button', { name: 'Stop and restore start', exact: true })
+  await stop.click()
+  await expect(page.getByText('Command outcome unknown', { exact: true }).first()).toBeVisible()
+  await expect.poll(() => readsAfterStop).toBeGreaterThanOrEqual(2)
+  expect(stops).toBe(1)
+  await expect(page.locator('.vela-af-point')).toHaveCount(1)
+  await expect(stop).toBeDisabled()
+
+  current = { ...current, phase: 'stopped', activity: 'idle', active: false, currentPosition: 32842, restoredStart: true }
+  await expect(page.getByText('Start position restored', { exact: true })).toBeVisible()
+  await expect(page.getByText('Command outcome unknown', { exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Back to setup', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Start autofocus', exact: true })).toBeEnabled()
+  expect(stops).toBe(1)
+})
+
+test('the autofocus hook itself blocks repeated Stop calls until terminal reconciliation', async ({ page }) => {
+  let stops = 0
+  let starts = 0
+
+  let current: AutofocusView = {
+    ...setup,
+    phase: 'walking',
+    activity: 'exposing',
+    active: true,
+    startPosition: 32842,
+    currentPosition: 32992,
+  }
+
+  await page.route('**/api/**', route => route.fulfill({ status: 503, json: { error: 'Unrelated fixture request' } }))
+  await page.route('**/api/web/rigs/rig-1/autofocus', route => route.fulfill({ json: current }))
+  await page.route('**/api/rigs/rig-1/autofocus/stop', route => {
+    stops++
+
+    return route.abort('failed')
+  })
+  await page.route('**/api/rigs/rig-1/autofocus/start', route => {
+    starts++
+
+    return route.fulfill({ json: { ...current, phase: 'walking', active: true, activity: 'moving' } })
+  })
+  await page.goto('/')
+  await page.evaluate(async () => {
+    const path = '/tests/autofocus-hook-harness.tsx'
+    const harness = await import(path)
+    harness.mountAutofocusHook()
+  })
+  await expect.poll(() => page.evaluate(async () => {
+    const path = '/tests/autofocus-hook-harness.tsx'
+    const harness = await import(path)
+
+    return harness.getAutofocusHook().view?.active
+  })).toBe(true)
+
+  // Call the same captured callback twice: no button can suppress the second call.
+  await page.evaluate(async () => {
+    const path = '/tests/autofocus-hook-harness.tsx'
+    const harness = await import(path)
+    const controller = harness.getAutofocusHook()
+    await controller.stop()
+    await controller.stop()
+    await controller.start(50, 2)
+  })
+  expect(stops).toBe(1)
+  expect(starts).toBe(0)
+  await expect.poll(() => page.evaluate(async () => {
+    const path = '/tests/autofocus-hook-harness.tsx'
+    const harness = await import(path)
+    const controller = harness.getAutofocusHook()
+
+    return { pending: controller.pending, unconfirmed: controller.stopUnconfirmed }
+  })).toEqual({ pending: false, unconfirmed: true })
+
+  current = { ...current, phase: 'stopped', active: false, activity: 'idle', currentPosition: 32842, restoredStart: true }
+  await expect.poll(() => page.evaluate(async () => {
+    const path = '/tests/autofocus-hook-harness.tsx'
+    const harness = await import(path)
+    const controller = harness.getAutofocusHook()
+
+    return { phase: controller.view?.phase, unconfirmed: controller.stopUnconfirmed, error: controller.error }
+  })).toEqual({ phase: 'stopped', unconfirmed: false, error: null })
+  await page.evaluate(async () => {
+    const path = '/tests/autofocus-hook-harness.tsx'
+    const harness = await import(path)
+    await harness.getAutofocusHook().start(50, 2)
+    harness.unmountAutofocusHook()
+  })
+  expect(stops).toBe(1)
+  expect(starts).toBe(1)
+})
+
+test('a lost Start response can still be stopped after the active walk is observed', async ({ page }) => {
+  let starts = 0
+  let stops = 0
+  let current = setup
+  await page.route('**/api/**', route => route.fulfill({ status: 503, json: { error: 'Unrelated fixture request' } }))
+  await page.route('**/api/web/rigs/rig-1/autofocus', route => route.fulfill({ json: current }))
+  await page.route('**/api/rigs/rig-1/autofocus/start', route => {
+    starts++
+    current = { ...setup, phase: 'walking', activity: 'moving', active: true, startPosition: 32842 }
+
+    return route.abort('failed')
+  })
+  await page.route('**/api/rigs/rig-1/autofocus/stop', route => {
+    stops++
+    current = { ...current, phase: 'stopped', activity: 'idle', active: false, restoredStart: true }
+
+    return route.fulfill({ json: current })
+  })
+  await page.goto('/rigs/rig-1/observe/autofocus')
+  await page.getByRole('button', { name: 'Start autofocus', exact: true }).click()
+  await expect(page.getByText('Command outcome unknown', { exact: true }).first()).toBeVisible()
+  const stop = page.getByRole('button', { name: 'Stop and restore start', exact: true })
+  await expect(stop).toBeEnabled()
+  await stop.click()
+  await expect(page.getByText('Start position restored', { exact: true })).toBeVisible()
+  expect(starts).toBe(1)
+  expect(stops).toBe(1)
 })

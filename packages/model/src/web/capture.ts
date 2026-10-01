@@ -1,3 +1,10 @@
+/** Chosen observing intent, not evidence of pointing or a plate solution. */
+export interface CaptureSubject {
+  readonly targetId: string
+  readonly name: string
+  readonly catalog: string
+}
+
 /** Conservative star measurements from this image's linear samples. */
 export interface CaptureImageStatistics {
   detectedStars: number
@@ -8,6 +15,8 @@ export interface CaptureImageStatistics {
 /** Metadata belongs to this image, independent of any subsequent exposure. */
 export interface CaptureImage {
   id: string
+  /** Absent on legacy artifacts; null explicitly means no selected subject. */
+  subject?: CaptureSubject | null
   imageUrl: string
   /** Smaller display preview; imageUrl always retains native resolution. */
   fitImageUrl?: string
@@ -40,12 +49,16 @@ export interface SavedImage extends CaptureImage {
 }
 
 export interface SavedImagesView {
+  /** Vela server time zone used consistently for library nights and capture times. */
+  timeZone: string
   rigId: string
   rigName: string
   images: SavedImage[]
 }
 
 export interface SavedImageView {
+  /** Vela server time zone, matching the collection projection. */
+  timeZone: string
   rigId: string
   rigName: string
   image: SavedImage
@@ -86,6 +99,12 @@ export interface CaptureView {
   savedImageCount: number | null
   /** Completed images published during the current or most recent run. */
   completedCount: number
+  /** Snapshot of the selected subject for this run. */
+  subject: CaptureSubject | null
+  /** Images from this run durably retained, including explicit Keep. */
+  savedCount: number
+  /** Sum of exposure durations actually published during this run. */
+  integrationSeconds: number
   exposureSeconds: number
   elapsedSeconds: number
   error: string | null

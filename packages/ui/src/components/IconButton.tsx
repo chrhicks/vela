@@ -3,14 +3,16 @@ import type { ButtonHTMLAttributes, ReactNode } from 'react'
 export interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   label: string
   tone?: 'neutral' | 'accent' | 'quiet'
-  size?: 'small' | 'medium' | 'large'
+  pending?: boolean
   icon: ReactNode
 }
 
 export function IconButton({
   label,
   tone = 'neutral',
-  size = 'medium',
+  pending = false,
+  disabled,
+  onClick,
   icon,
   className = '',
   ...props
@@ -19,10 +21,21 @@ export function IconButton({
     <button
       aria-label={label}
       className={`vela-icon-button ${className}`.trim()}
-      data-size={size}
       data-tone={tone}
       title={label}
       {...props}
+      disabled={disabled}
+      aria-busy={pending || props['aria-busy']}
+      aria-disabled={pending || disabled || props['aria-disabled']}
+      onClick={event => {
+        if (pending) {
+          event.preventDefault()
+
+          return
+        }
+
+        onClick?.(event)
+      }}
     >
       {icon}
     </button>

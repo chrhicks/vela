@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button, Dialog } from '@vela/ui'
 import { alignmentViewport, angularScaleLabel } from './image-viewport'
 import type { AlignmentImageView, AlignmentMeasurement } from './image-viewport'
@@ -47,6 +47,24 @@ function ImageCanvas({
   readonly frame: AlignmentImageFrame
   readonly view: AlignmentImageView
 }) {
+  const canvas = useRef<SVGSVGElement>(null)
+  const solved = frame.solution !== null
+  const [size, setSize] = useState({ width: 640, height: 400 })
+  useEffect(() => {
+    const element = canvas.current
+
+    if (!element) return
+
+    const observer = new ResizeObserver(() => {
+      const bounds = element.getBoundingClientRect()
+      setSize({ width: bounds.width, height: bounds.height })
+    })
+
+    observer.observe(element)
+
+    return () => observer.disconnect()
+  }, [view, solved])
+
   const [imageError, setImageError] = useState(false)
   const [attempt, setAttempt] = useState(0)
   useEffect(() => {
@@ -54,7 +72,7 @@ function ImageCanvas({
 
     const timer = setTimeout(() => {
       setImageError(false)
-      setAttempt(value => value + 1)
+      setAttempt((value) => value + 1)
     }, 1500)
 
     return () => clearTimeout(timer)
@@ -105,11 +123,12 @@ function ImageCanvas({
 
   const m = frame.solution
   const box = alignmentViewport(m, view)
-  const scale = box.width / 640
+  const scale = Math.max(box.width / Math.max(size.width, 1), box.height / Math.max(size.height, 1))
 
   return (
     <div className="vela-polar-image-canvas">
       <svg
+        ref={canvas}
         viewBox={`${box.left} ${box.top} ${box.width} ${box.height}`}
         role="img"
         aria-label={frame.alt}
@@ -124,28 +143,35 @@ function ImageCanvas({
         <path
           d={`M${box.referenceX} ${box.referenceY}L${m.targetX} ${m.targetY}`}
           fill="none"
-          stroke="var(--vela-polar-reference)"
-          strokeWidth={1.5 * scale}
+          stroke="var(--vela-polar-target)"
+          strokeWidth={2 * scale}
         />
         <circle
           data-marker="reference"
           cx={box.referenceX}
           cy={box.referenceY}
-          r={9 * scale}
+          r={8 * scale}
           fill="none"
           stroke="var(--vela-polar-reference)"
-          strokeWidth={1.5 * scale}
+          strokeWidth={scale}
         />
-        <g
-          data-marker="target"
+        <path
+          data-marker="reference-crosshair"
+          d={`M${box.referenceX - 18 * scale} ${box.referenceY}h${12 * scale}m${12 * scale} 0h${12 * scale}M${box.referenceX} ${box.referenceY - 18 * scale}v${12 * scale}m0 ${12 * scale}v${12 * scale}`}
           fill="none"
-          stroke="var(--vela-polar-target)"
-          strokeWidth={1.4 * scale}
-        >
-          <circle cx={m.targetX} cy={m.targetY} r={16 * scale} />
-          <path
-            d={`M${m.targetX - 30 * scale} ${m.targetY}h${20 * scale}m${20 * scale} 0h${20 * scale}M${m.targetX} ${m.targetY - 30 * scale}v${20 * scale}m0 ${20 * scale}v${20 * scale}`}
+          stroke="var(--vela-polar-reference)"
+          strokeWidth={2 * scale}
+        />
+        <g data-marker="target">
+          <circle
+            cx={m.targetX}
+            cy={m.targetY}
+            r={13 * scale}
+            fill="none"
+            stroke="var(--vela-polar-target)"
+            strokeWidth={2 * scale}
           />
+          <circle cx={m.targetX} cy={m.targetY} r={3 * scale} fill="var(--vela-polar-target)" />
         </g>
       </svg>
       <div
@@ -166,12 +192,18 @@ function InspectionView({
   now,
   retained,
   noSolution,
+  expanded = false,
+  openerId,
+  onEnlarge,
 }: {
   readonly frame: AlignmentImageFrame
   readonly readState: ReadState
   readonly now: number
   readonly retained: boolean
   readonly noSolution: boolean
+  readonly expanded?: boolean
+  readonly openerId?: string
+  readonly onEnlarge?: () => void
 }) {
   const [view, setView] = useState<AlignmentImageView>(frame.solution ? 'fit' : 'full')
 
@@ -180,13 +212,13 @@ function InspectionView({
     : null
 
   const age = frame.capturedAt
-    ? `${Math.max(0, Math.floor((now - Date.parse(frame.capturedAt)) / 1000))} s ago`
+    ? `${Math.max(0, Math.floor((now - Date.parse(frame.capturedAt)) / 1000))} seconds old`
     : 'Age unavailable'
 
   const status = frame.solution
     ? retained || readState !== 'current'
-      ? 'Last known solve'
-      : 'Latest solve'
+      ? `Last solved frame · ${age}`
+      : 'Last solved frame'
     : noSolution
       ? 'No solution · Exposure retained for inspection. No alignment result yet.'
       : 'No alignment result yet'
@@ -199,29 +231,31 @@ function InspectionView({
   }
 
   return (
-    <div className="vela-polar-inspection">
-      <div className="vela-polar-inspection-tools" aria-label="Image view">
-        {frame.solution && (
-          <>
-            <Button size="small" aria-pressed={view === 'fit'} onClick={() => setView('fit')}>
-              Fit both
-            </Button>
-            <Button size="small" aria-pressed={view === 'fine'} onClick={() => setView('fine')}>
-              Fine · 1′
-            </Button>
-          </>
+    <div className="vela-polar-inspection" data-expanded={expanded || undefined}>
+      <div className="vela-polar-image-opening">
+        <ImageCanvas key={frame.imageUrl} frame={frame} view={view} />
+        {!expanded && (
+          <button
+            id={openerId}
+            type="button"
+            className="vela-polar-enlarge"
+            aria-label="Enlarge image"
+            onClick={onEnlarge}
+          >
+            ⤢
+          </button>
         )}
-        <Button size="small" aria-pressed={view === 'full'} onClick={() => setView('full')}>
-          Full frame
-        </Button>
-        <Button size="small" aria-pressed={view === 'native'} onClick={() => setView('native')}>
-          100%
-        </Button>
       </div>
       <p className="vela-polar-inspection-status">
-        {status} · {age}
-        {readMessages[readState]}
+        {status}
+        {expanded && readMessages[readState]}
       </p>
+      {frame.solution && view !== 'native' && (
+        <div className="vela-polar-inspection-legend">
+          <span>Crosshair: optical center</span>
+          <span>Ring: correction target</span>
+        </div>
+      )}
       {box?.outsideImage && (
         <p className="vela-polar-inspection-note">
           Target outside captured image · Blank area has no image data.
@@ -232,20 +266,40 @@ function InspectionView({
           Markers outside this fine view. Use Fit both to see the correction.
         </p>
       )}
-      <ImageCanvas key={frame.imageUrl} frame={frame} view={view} />
-      <p className="vela-polar-inspection-meta">
-        {descriptions[view]}
-        {box && view !== 'native' && ' · Approximate scale from camera field'}
-      </p>
-      {frame.solution && view !== 'native' && (
-        <div className="vela-polar-inspection-legend">
-          <span>
-            <i /> Frame reference
-          </span>
-          <span>
-            <i /> Correction target
-          </span>
-        </div>
+      <div className="vela-polar-inspection-tools" aria-label="Image view">
+        {frame.solution && (
+          <>
+            <Button aria-pressed={view === 'fit'} onClick={() => setView('fit')}>
+              Fit both
+            </Button>
+            <Button
+              aria-label="Fine · 1′"
+              aria-pressed={view === 'fine'}
+              onClick={() => setView('fine')}
+            >
+              Fine
+            </Button>
+          </>
+        )}
+        <Button aria-pressed={view === 'full'} onClick={() => setView('full')}>
+          Full frame
+        </Button>
+        {expanded && (
+          <Button aria-pressed={view === 'native'} onClick={() => setView('native')}>
+            100%
+          </Button>
+        )}
+      </div>
+      {expanded && (
+        <>
+          <p className="vela-polar-inspection-meta">
+            {descriptions[view]}
+            {box && view !== 'native' && ' · Approximate scale from camera field'}
+          </p>
+          <p className="vela-polar-inspection-time">
+            <ExposureTime frame={frame} /> · Retained for inspection
+          </p>
+        </>
       )}
     </div>
   )
@@ -270,22 +324,15 @@ export function AlignmentImage({
 }) {
   return (
     <figure className="vela-polar-image">
-      <div className="vela-polar-image-heading">
-        <span>{frame.title}</span>
-        <Button id={openerId} size="small" onClick={() => onEnlarge({ frame, noSolution })}>
-          Enlarge image
-        </Button>
-      </div>
       <InspectionView
         frame={frame}
         readState={readState}
         now={now}
         retained={retained}
         noSolution={noSolution}
+        openerId={openerId}
+        onEnlarge={() => onEnlarge({ frame, noSolution })}
       />
-      <figcaption>
-        <ExposureTime frame={frame} />
-      </figcaption>
     </figure>
   )
 }
@@ -313,18 +360,14 @@ export function AlignmentImageDialog({
       className="vela-polar-inspection-dialog"
     >
       {image && (
-        <>
-          <p className="vela-polar-inspection-time">
-            <ExposureTime frame={image.frame} /> · Retained for inspection
-          </p>
-          <InspectionView
-            frame={image.frame}
-            readState={readState}
-            now={now}
-            retained
-            noSolution={image.noSolution}
-          />
-        </>
+        <InspectionView
+          frame={image.frame}
+          readState={readState}
+          now={now}
+          retained
+          noSolution={image.noSolution}
+          expanded
+        />
       )}
     </Dialog>
   )

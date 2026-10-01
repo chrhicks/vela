@@ -5,6 +5,10 @@ import { isImagingCameraView } from './validation'
 
 type Choice = NonNullable<ImagingCameraView['selected']>
 
+export type ImagingCameraSaveResult =
+  | { status: 'confirmed'; view: ImagingCameraView }
+  | { status: 'rejected' | 'unconfirmed' | 'unavailable' }
+
 export function useImagingCamera(rigId: string) {
   const [view, setView] = useState<ImagingCameraView | null>(null)
   const [offline, setOffline] = useState(false)
@@ -57,7 +61,11 @@ export function useImagingCamera(rigId: string) {
 
         if (!isImagingCameraView(next, rigId)) throw new Error('Invalid camera response')
 
-        if (alive.current && generation.current === current) accept(next, checked)
+        if (alive.current && generation.current === current) {
+          accept(next, checked)
+
+          return next
+        }
       } catch {
         if (alive.current && generation.current === current) setOffline(true)
       } finally {
@@ -97,11 +105,12 @@ export function useImagingCamera(rigId: string) {
     }
   }, [read])
 
-  async function save(choice: Choice) {
+  async function save(choice: Choice): Promise<ImagingCameraSaveResult> {
     if (!alive.current || writing.current || uncertainChoice.current || offline || !view?.editable)
-      return
+      return { status: 'unavailable' }
 
-    if (!view.cameras.some(camera => camera.id === choice.id && camera.name === choice.name)) return
+    if (!view.cameras.some(camera => camera.id === choice.id && camera.name === choice.name))
+      return { status: 'unavailable' }
     request.current?.abort()
     const controller = new AbortController()
     request.current = controller
@@ -125,20 +134,26 @@ export function useImagingCamera(rigId: string) {
       )
         throw new Error('Unconfirmed selection')
 
-      if (!alive.current || generation.current !== current) return
+      if (!alive.current || generation.current !== current) return { status: 'unavailable' }
       accept(next)
       setConfirmedSaves(count => count + 1)
+
+      return { status: 'confirmed', view: next }
     } catch (cause) {
-      if (!alive.current || generation.current !== current) return
+      if (!alive.current || generation.current !== current) return { status: 'unavailable' }
 
       if (cause instanceof ApiError && [400, 404, 409].includes(cause.status)) {
         setError('The camera choice was not saved. Check current camera state and select it again.')
+
+        return { status: 'rejected' }
       } else {
         uncertainChoice.current = choice
         setUnconfirmed(true)
         setError(
           'The save response could not be confirmed. Checking the saved camera; Vela has not repeated the request.',
         )
+
+        return { status: 'unconfirmed' }
       }
     } finally {
       if (request.current === controller) {

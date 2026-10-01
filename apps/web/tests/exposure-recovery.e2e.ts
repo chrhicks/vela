@@ -32,6 +32,9 @@ const capture: CaptureView = {
   completedCount: 7,
   saveFrames: false,
   savedImageCount: 0,
+  subject: null,
+  savedCount: 0,
+  integrationSeconds: 0,
   error: null,
   cooling: null,
   latestImage: {
@@ -118,19 +121,23 @@ test('an uncertain autofocus Stop retains priority until polling confirms restor
     return route.abort('connectionreset')
   })
   await page.goto('/rigs/rig-1/observe/autofocus')
-  await expect(page.locator('.vela-af-heading')).toContainText('Awaiting camera')
+  await expect(page.locator('.vela-af-outcome')).toContainText('Waiting for the same exposure')
   await page.getByRole('button', { name: 'Stop and restore start' }).click()
   await expect.poll(() => commands).toBe(1)
   await expect(page.getByRole('button', { name: 'Stop and restore start' })).toBeDisabled()
-  await expect(page.locator('.vela-af-activity')).toContainText('Sending command')
-  await expect(page.locator('.vela-af-activity__spinner')).toHaveCount(0)
+  await expect(page.locator('.vela-af-outcome')).toContainText('Sending command…')
+  await expect(page.locator('.vela-af-point')).toHaveCount(1)
+  await expect(page.locator('.vela-af-readout time')).toHaveAttribute('datetime', capturedAt)
+  await expect(page.getByText('Start position restored', { exact: true })).toHaveCount(0)
+  await expect(page.locator('.vela-af-status-dot')).toHaveCount(0)
+  await screenshot(page, 'autofocus-stop-pending', 1280)
   finishStop()
   await expect(page.locator('.vela-af-notice')).toContainText('Command outcome unknown')
-  await expect(page.locator('.vela-af-heading')).toContainText('Confirmation needed')
+  await expect(page.locator('.vela-af-outcome')).toContainText('Confirmation needed')
   const readsAfterCommand = reads
   await expect.poll(() => reads).toBeGreaterThan(readsAfterCommand)
-  await expect(page.locator('.vela-af-activity')).toContainText('Command outcome unknown')
-  await expect(page.locator('.vela-af-activity__spinner')).toHaveCount(0)
+  await expect(page.locator('.vela-af-outcome')).toContainText('Command outcome unknown')
+  await expect(page.locator('.vela-af-status-dot')).toHaveCount(0)
   await expect(page.getByText('now', { exact: true })).toHaveCount(0)
   await expect(page.locator('.vela-af-readout time')).toHaveAttribute('datetime', capturedAt)
   state = {
@@ -143,11 +150,11 @@ test('an uncertain autofocus Stop retains priority until polling confirms restor
     restoredStart: true,
   }
   await expect(page.locator('.vela-af-notice')).toContainText('Start position restored')
-  await expect(page.locator('.vela-af-heading')).toContainText('Restored')
-  await expect(page.locator('.vela-af-heading')).not.toContainText('Confirmation needed')
-  await expect(page.locator('.vela-af-activity')).toContainText('Walk stopped · start restored')
+  await expect(page.locator('.vela-af-outcome')).toContainText('Confirmed stop')
+  await expect(page.locator('.vela-af-outcome')).not.toContainText('Confirmation needed')
+  await expect(page.locator('.vela-af-outcome')).toContainText('Current position 32,842')
   await expect(page.getByText('Command outcome unknown', { exact: true })).toHaveCount(0)
-  await expect(page.getByText('now', { exact: true })).toBeVisible()
+  await expect(page.getByText('now', { exact: true })).toHaveCount(0)
   expect(commands).toBe(1)
 })
 
@@ -182,7 +189,7 @@ for (const width of [1280, 390]) {
       return route.abort('connectionreset')
     })
     await page.goto('/rigs/rig-1/observe/capture')
-    const progress = page.locator('.capture-page__progress')
+    const progress = page.getByRole('region', { name: 'Capture images' })
     const image = page.getByRole('region', { name: 'Latest image', exact: true })
     await expect(progress.getByRole('progressbar')).toBeVisible()
     await expect(image.getByRole('img')).toHaveAttribute('src', imageUrl)
@@ -193,43 +200,52 @@ for (const width of [1280, 390]) {
     await expect(page.locator('.capture-page__warning')).toContainText(
       'Retrying reads for exposure 8',
     )
-    await expect(page.locator('.capture-page__heading')).toContainText('Awaiting camera')
+    await expect(page.locator('.tonight-capture__heading')).toContainText('Camera observation interrupted')
     await expect(progress.getByRole('progressbar')).toHaveCount(0)
     await expect(progress).not.toContainText('8.0 / 30')
-    await expect(page.locator('.capture-page__count')).toHaveText('7images completed')
-    await expect(image).toContainText('1 min ago · Previous exposure')
+    await expect(progress).toContainText('Exposure 8')
+    await expect(image.locator('.capture-image__heading > span')).toHaveText(/^\d{2}:\d{2}:\d{2} · 1 min ago$/)
+    await expect(image.locator('.capture-image__heading > span')).toHaveAttribute('title', /^Received /)
+    await expect(image.getByRole('img')).toHaveAttribute('alt', '2 second exposure from Simulator Camera')
     await expect(image).toContainText('2.35')
-    await expect(page.getByRole('button', { name: 'Stop run', exact: true })).toBeEnabled()
-    await expect(page.getByRole('button', { name: 'Start run', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Stop capture', exact: true })).toBeEnabled()
+    await expect(page.getByRole('button', { name: 'Start capture', exact: true })).toHaveCount(0)
     const navigation = page.locator('.vela-navigation')
-    await expect(navigation).toContainText('Awaiting camera')
+    await expect(navigation.locator('.vela-navigation__activity')).toHaveCount(0)
     await expect(navigation.locator('progress')).toHaveCount(0)
     await screenshot(page, 'capture', width)
-    await page.getByRole('link', { name: '← Observe', exact: true }).click()
-    const hub = page.locator('.vela-capture-entry').first()
-    await expect(hub).toContainText('Retrying reads for the same exposure')
-    await expect(hub).toContainText('7 completed')
-    await expect(hub).toContainText('2 s · 60 s ago')
-    await expect(hub.getByRole('img')).toHaveAttribute('src', imageUrl)
+    await page.goto('/rigs/rig-1/observe')
+    await expect(navigation).toContainText('Awaiting camera')
+    const preparation = page.getByRole('region', { name: 'Prepare a capture' })
+    await expect(preparation.getByRole('form', { name: 'Capture settings' })).toContainText('Camera observation interrupted')
+    await expect(navigation).toContainText('7 captured')
+    await expect(preparation.getByRole('region', { name: 'Last test exposure' })).toContainText('No test exposure yet')
+    await expect(preparation.getByRole('img')).toHaveCount(0)
+    expect(commands).toEqual([])
     await screenshot(page, 'observe', width)
-    await page.getByRole('link', { name: 'View capture' }).click()
-    await expect(page.locator('.capture-page__heading')).toContainText('Awaiting camera')
+    await page.getByRole('link', { name: 'Open active capture →', exact: true }).click()
+    await expect(page.locator('.tonight-capture__heading')).toContainText('Camera observation interrupted')
+    await expect(progress).toContainText('Exposure 8')
+    await expect(image.getByRole('img')).toHaveAttribute('src', imageUrl)
+    await expect(image.getByRole('img')).toHaveAttribute('alt', '2 second exposure from Simulator Camera')
+    await expect(image.locator('.capture-image__heading > span')).toHaveText(/^\d{2}:\d{2}:\d{2} · 1 min ago$/)
+    expect(commands).toEqual([])
     offline = true
     await expect(page.locator('.capture-page__warning')).toContainText('Connection interrupted')
-    await expect(page.getByRole('button', { name: 'Stop run', exact: true })).toBeDisabled()
-    await expect(navigation).toContainText('Updates lost')
+    await expect(page.getByRole('button', { name: 'Stop capture', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('heading', { name: 'Capture state unknown' })).toBeVisible()
     offline = false
     state = { ...state, captureReadState: 'current', phase: 'reading' }
     await expect(progress).toContainText('Receiving image')
     await expect(page.locator('.capture-page__warning')).toHaveCount(0)
-    await expect(page.locator('.capture-page__count')).toHaveText('7images completed')
+    await expect(progress).toContainText('Exposure 8')
     await expect(image.getByRole('img')).toHaveAttribute('src', imageUrl)
     await expect(progress).not.toContainText('Image received')
     state = { ...state, captureReadState: 'retrying' }
-    await expect(page.locator('.capture-page__heading')).toContainText('Awaiting camera')
-    await page.getByRole('button', { name: 'Stop run', exact: true }).click()
+    await expect(page.locator('.tonight-capture__heading')).toContainText('Camera observation interrupted')
+    await page.getByRole('button', { name: 'Stop capture', exact: true }).click()
     await expect(page.locator('.capture-page__warning')).toContainText('Command outcome unknown')
-    await expect(page.locator('.capture-page__heading')).toContainText('Confirmation needed')
+    await expect(page.locator('.tonight-capture__heading')).toContainText('Command outcome unknown')
     await expect(progress.getByRole('progressbar')).toHaveCount(0)
     state = {
       ...state,
@@ -238,7 +254,7 @@ for (const width of [1280, 390]) {
       phase: 'failed',
       error: 'Camera stop could not be confirmed. Check the camera before starting another run.',
     }
-    await expect(page.getByRole('button', { name: 'Start run', exact: true })).toBeDisabled()
+    await expect(page.getByRole('button', { name: 'Start capture', exact: true })).toBeDisabled()
     await expect(image.getByRole('img')).toHaveAttribute('src', imageUrl)
     await page.getByRole('button', { name: 'Check capture state', exact: true }).click()
     await expect(page.locator('.capture-page__warning')).toContainText(
@@ -257,15 +273,18 @@ for (const width of [1280, 390]) {
       id: 'm31',
       name: 'Andromeda Galaxy',
       catalog: 'M31',
+      constellation: 'Andromeda',
       kind: 'Galaxy',
       raDegrees: 10.6847,
       decDegrees: 41.269,
       sizeArcminutes: 178,
+      minorSizeArcminutes: 63,
       thumbnailUrl: '/api/targets/m31/thumbnail',
       sky: null,
     }
 
     let state: FramingView = {
+      preview: null,
       rigId: 'rig-1',
       rigName: 'Recovery simulator',
       enabled: true,
@@ -371,7 +390,8 @@ for (const width of [1280, 390]) {
       )
       .toBe(true)
     const corners = await footprint.getAttribute('points')
-    const measurementTime = page.getByText(/^Test exposure /)
+    await page.getByText('Framing details & state', { exact: true }).click()
+    const measurementTime = page.locator('p').filter({ hasText: /^Test exposure / })
     const timeText = await measurementTime.textContent()
     const history = page.getByRole('region', { name: 'Centering measurements' })
     const historyText = await history.textContent()
@@ -424,34 +444,35 @@ for (const width of [1280, 390]) {
       return route.fulfill({ json: state })
     })
     await page.goto('/rigs/rig-1/observe/autofocus')
-    await expect(page.locator('.vela-af-activity')).toContainText('Exposing at 33042')
+    await expect(page.locator('.vela-af-status')).toContainText('Exposing at')
+    await expect(page.locator('.vela-af-status')).toContainText('33,042')
     const sample = page.locator('.vela-af-point')
     const position = await sample.getAttribute('cx')
     state = { ...state, captureReadState: 'retrying' }
     await expect(page.locator('.vela-af-notice')).toContainText(
-      'Retrying reads for the same exposure',
+      'Waiting for the same exposure',
     )
-    await expect(page.locator('.vela-af-heading')).toContainText('Awaiting camera')
-    await expect(page.locator('.vela-af-activity__spinner')).toHaveCount(0)
+    await expect(page.locator('.vela-af-outcome')).toContainText('Waiting for the same exposure')
+    await expect(page.locator('.vela-af-status-dot')).toHaveCount(0)
     await expect(sample).toHaveCount(1)
     await expect(sample).toHaveAttribute('cx', position!)
-    await expect(page.locator('.vela-af-readout')).toContainText('33042 · 5.10 px')
+    await expect(page.locator('.vela-af-readout')).toContainText('33,042 · 5.10 px')
     await expect(page.locator('.vela-af-readout time')).toHaveAttribute('datetime', capturedAt)
     await expect(page.getByRole('button', { name: 'Stop and restore start' })).toBeEnabled()
     await expect(page.getByRole('button', { name: 'Start autofocus' })).toHaveCount(0)
     await screenshot(page, 'autofocus', width)
     offline = true
-    await expect(page.locator('.vela-af-heading')).toContainText('Disconnected')
+    await expect(page.locator('.vela-af-outcome')).toContainText('Autofocus state is unknown')
     await expect(page.getByRole('button', { name: 'Stop and restore start' })).toBeDisabled()
     offline = false
     state = { ...state, captureReadState: 'current', activity: 'measuring' }
-    await expect(page.locator('.vela-af-activity')).toContainText('Measuring star HFR')
+    await expect(page.locator('.vela-af-status')).toContainText('Measuring star HFR')
     await expect(page.locator('.vela-af-notice')).toHaveCount(0)
     await expect(sample).toHaveCount(1)
     state = { ...state, captureReadState: 'retrying', activity: 'exposing' }
-    await expect(page.locator('.vela-af-heading')).toContainText('Awaiting camera')
+    await expect(page.locator('.vela-af-outcome')).toContainText('Waiting for the same exposure')
     await page.getByRole('button', { name: 'Stop and restore start' }).click()
-    await expect(page.locator('.vela-af-activity')).toContainText('Restoring start 32842')
+    await expect(page.locator('.vela-af-status')).toContainText('Restoring start 32842')
     state = {
       ...state,
       phase: 'failed',
@@ -460,7 +481,7 @@ for (const width of [1280, 390]) {
       error:
         'The focuser did not confirm return to the start position. Vela did not repeat the move.',
     }
-    await expect(page.locator('.vela-af-notice')).toContainText('Start position was not restored')
+    await expect(page.locator('.vela-af-notice')).toContainText('Start position not confirmed')
     await expect(sample).toHaveCount(1)
     await expect(page.locator('.vela-af-readout time')).toHaveAttribute('datetime', capturedAt)
     expect(commands).toEqual(['stop'])
@@ -514,7 +535,8 @@ for (const width of [1280, 390]) {
       return route.fulfill({ json: state })
     })
     await page.goto('/rigs/rig-1/observe/alignment')
-    await expect(page.getByRole('progressbar')).toBeVisible()
+    await expect(page.locator('.vela-polar-activity')).toContainText('8.0 / 20 seconds')
+    await expect(page.locator('.vela-polar-activity__spinner')).toBeVisible()
 
     const baseline = page.getByRole('img', {
       name: 'Latest camera exposure at baseline position 1',
@@ -527,14 +549,16 @@ for (const width of [1280, 390]) {
       exposureStartedAt: null,
       warning: 'Device connection interrupted. Retrying automatically.',
     }
-    await expect(page.getByRole('alert')).toContainText(
-      'Any pending exposure is kept; it is not restarted while reads retry',
+    await expect(page.locator('.vela-polar-activity')).toContainText(
+      'Device connection interrupted · Retrying…',
     )
-    await expect(page.getByRole('progressbar')).toBeHidden()
+    expect(commands).toEqual([])
+    await expect(page.locator('.vela-polar-activity')).not.toContainText(' / 20 seconds')
     await expect(page.locator('.vela-polar-activity__spinner')).toBeHidden()
-    await expect(page.locator('.vela-polar-activity__time')).toHaveCount(0)
     await expect(baseline).toHaveAttribute('src', imageUrl)
-    await expect(page.locator('time')).toHaveAttribute('datetime', capturedAt)
+    await page.getByRole('button', { name: 'Enlarge image', exact: true }).click()
+    await expect(page.getByRole('dialog').locator('time')).toHaveAttribute('datetime', capturedAt)
+    await page.keyboard.press('Escape')
     await expect(page.getByRole('list', { name: 'Three measurement positions' })).toContainText(
       'Position 1Solved',
     )
@@ -542,7 +566,9 @@ for (const width of [1280, 390]) {
     await screenshot(page, 'alignment-baseline', width)
     state = { ...state, activity: 'solving', warning: null }
     await expect(page.locator('.vela-polar-activity')).toContainText('Plate-solving')
-    await expect(page.locator('time')).toHaveAttribute('datetime', capturedAt)
+    await page.getByRole('button', { name: 'Enlarge image', exact: true }).click()
+    await expect(page.getByRole('dialog').locator('time')).toHaveAttribute('datetime', capturedAt)
+    await page.keyboard.press('Escape')
     state = {
       ...state,
       phase: 'adjusting',
@@ -564,13 +590,14 @@ for (const width of [1280, 390]) {
     }
     await expect(page.locator('.vela-polar-total')).toContainText('14″')
     await expect(
-      page.getByText(/Pause adjustments until a fresh measurement arrives/),
+      page.getByText('Baseline retained. Wait for a fresh measurement before adjusting.'),
     ).toBeVisible()
     await expect(page.getByRole('img', { name: /alignment target/ })).toBeVisible()
-    await expect(page.locator('.vela-polar-activity__spinner')).toBeHidden()
+    await expect(page.locator('.vela-polar-status-dot')).toHaveCount(0)
+    await expect(page.locator('.vela-polar-total time')).toHaveAttribute('datetime', capturedAt)
     await expect(page.getByRole('button', { name: 'Start measurement' })).toHaveCount(0)
     await screenshot(page, 'alignment-adjustment', width)
-    await page.getByRole('button', { name: 'Stop to reposition' }).click()
+    await page.getByRole('button', { name: 'Stop session' }).click()
     await expect(page.locator('.vela-polar-notice')).toContainText(
       'Camera stop could not be confirmed',
     )

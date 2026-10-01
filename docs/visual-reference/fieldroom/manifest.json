@@ -1,0 +1,432 @@
+{
+  "fileId": "01M3SATFK7ZW5ZCBPFSWD6XS91",
+  "exportedAt": "2026-10-01T01:38:30.822840+00:00",
+  "scale": "1x",
+  "records": [
+    {
+      "nodeId": "8A-0",
+      "name": "03.0 / Tonight \u2014 capturing",
+      "pageId": "p-1-0",
+      "path": "app/03-0.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "93dcb715885740dd14b19175a5a820b6489241599390ace19f03121ea8f8f1f6",
+      "appCrop": null
+    },
+    {
+      "nodeId": "139-0",
+      "name": "03.10 / Tonight \u2014 connection interrupted",
+      "pageId": "p-1-0",
+      "path": "app/03-10.png",
+      "width": 1440,
+      "height": 965,
+      "sha256": "ba083504bf2254ad5c96cea488b09205645463db4bfc1278035f8375e8fdd6ef",
+      "appCrop": null
+    },
+    {
+      "nodeId": "K0-0",
+      "name": "03.3 / Prepare a capture",
+      "pageId": "p-1-0",
+      "path": "app/03-3.png",
+      "width": 1440,
+      "height": 989,
+      "sha256": "cef545632c5763d56e510334d0816e1fd0e1cf95a535c3d7eb8c2878c3d5d643",
+      "appCrop": null
+    },
+    {
+      "nodeId": "B2-0",
+      "name": "04 / Fieldroom \u2014 beside the rig",
+      "pageId": "p-1-0",
+      "path": "app/04.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "7a1b42bd23f49e6714115a855cf9a4e13a0f93e4f4f6a4b5c2467b890b18e5af",
+      "appCrop": null
+    },
+    {
+      "nodeId": "3HH-0",
+      "name": "03.19 / Appearance \u2014 system resolves light",
+      "pageId": "p-1-0",
+      "path": "app/03-19.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "f72585babb84dbd064dba38a9471f2a382725eef6ed7f4f2457487971e4a9c87",
+      "appCrop": null
+    },
+    {
+      "nodeId": "3K7-0",
+      "name": "03.20 / Appearance \u2014 system resolves dark",
+      "pageId": "p-1-0",
+      "path": "app/03-20.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "090a1072cecb5bb4d3a754f53e69c02d1da2a1b1f067898b031d34bc0059c07e",
+      "appCrop": null
+    },
+    {
+      "nodeId": "E0-0",
+      "name": "03.1 / Explore the sky",
+      "pageId": "p-1-0",
+      "path": "app/03-1.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "da39ffaf6a88bb4be4afc8c3066524e095611741dc37131112e4a53e43dadd84",
+      "appCrop": null
+    },
+    {
+      "nodeId": "HF-0",
+      "name": "03.2 / Frame a subject",
+      "pageId": "p-1-0",
+      "path": "app/03-2.png",
+      "width": 1440,
+      "height": 989,
+      "sha256": "df905fb9ef1f3e21fea0765a7bd771db9568a026bd7492b3d28708443ad90008",
+      "appCrop": null
+    },
+    {
+      "nodeId": "O3-0",
+      "name": "03.4 / Photographs \u2014 inspect a saved frame",
+      "pageId": "p-1-0",
+      "path": "app/03-4.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "a109a5249e3b21a4943dd6e38a78f73e5fbbdf372d21d98653401528d7b6e248",
+      "appCrop": null
+    },
+    {
+      "nodeId": "RK-0",
+      "name": "03.5 / Equipment and rig settings",
+      "pageId": "p-1-0",
+      "path": "app/03-5.png",
+      "width": 1440,
+      "height": 921,
+      "sha256": "423ba0deb691966519b9be0956575fba0f7520cfc1da2b1d2fce353d96e234c4",
+      "appCrop": null
+    },
+    {
+      "nodeId": "UZ-0",
+      "name": "03.6 / Phone \u2014 polar adjustment",
+      "pageId": "p-1-0",
+      "path": "app/03-6.png",
+      "width": 390,
+      "height": 844,
+      "sha256": "2054cd5b79c2055472ae02a1f9169bc5a36293d481a493400b7411a02759f1f8",
+      "appCrop": {
+        "x": 0,
+        "y": 62,
+        "width": 390,
+        "height": 782
+      }
+    },
+    {
+      "nodeId": "3N6-0",
+      "name": "03.21 / Appearance \u2014 phone light",
+      "pageId": "p-1-0",
+      "path": "app/03-21.png",
+      "width": 390,
+      "height": 844,
+      "sha256": "0e950e36ff7542331523e567af0d97f404c4584599f53f54568517a1cfbf4b10",
+      "appCrop": {
+        "x": 0,
+        "y": 62,
+        "width": 390,
+        "height": 782
+      }
+    },
+    {
+      "nodeId": "3OS-0",
+      "name": "03.22 / Appearance \u2014 phone dark",
+      "pageId": "p-1-0",
+      "path": "app/03-22.png",
+      "width": 390,
+      "height": 844,
+      "sha256": "689f63488e1451c1bde8e4c0a916ff9484328bae75dfb820508721dd0cd9cc8f",
+      "appCrop": {
+        "x": 0,
+        "y": 62,
+        "width": 390,
+        "height": 782
+      }
+    },
+    {
+      "nodeId": "WX-0",
+      "name": "03.7 / Phone \u2014 measurements interrupted",
+      "pageId": "p-1-0",
+      "path": "app/03-7.png",
+      "width": 390,
+      "height": 844,
+      "sha256": "d63c857c6a841aa1b47ff500ecb939088c711ea01563d2dfedc0e53120a1f0f2",
+      "appCrop": {
+        "x": 0,
+        "y": 62,
+        "width": 390,
+        "height": 782
+      }
+    },
+    {
+      "nodeId": "YZ-0",
+      "name": "03.8 / First night \u2014 no rig",
+      "pageId": "p-1-0",
+      "path": "app/03-8.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "23d0aafc0649251e0f8ee05a7ad495860f3b0d384cd1cdd901f5a2b00f788ae8",
+      "appCrop": null
+    },
+    {
+      "nodeId": "18U-0",
+      "name": "03.12 / Add rig \u2014 review discovery",
+      "pageId": "p-1-0",
+      "path": "app/03-12.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "4d8d1f446e70efe23ad2cfa33d252d09129f805389c4b067677327b8f514bbb7",
+      "appCrop": null
+    },
+    {
+      "nodeId": "10N-0",
+      "name": "03.9 / Empty and loading states",
+      "pageId": "p-1-0",
+      "path": "app/03-9.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "186be09d67f0c4a5680b0f056b3c355464ba546ff1ab33cd17a125788ed6cfd1",
+      "appCrop": null
+    },
+    {
+      "nodeId": "162-0",
+      "name": "03.11 / Operational errors and recovery",
+      "pageId": "p-1-0",
+      "path": "app/03-11.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "1ae6606933992603995dff3cc7368f77672aeb5e71103c612342798e3570bc7e",
+      "appCrop": null
+    },
+    {
+      "nodeId": "1BF-0",
+      "name": "03.13 / Dialogs \u2014 validation and forgetting",
+      "pageId": "p-1-0",
+      "path": "app/03-13.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "471e8ad9f40d56c36070964645024b1d372c178c077437c1593c2b4c34666813",
+      "appCrop": null
+    },
+    {
+      "nodeId": "1DN-0",
+      "name": "03.14 / Image and equipment edge states",
+      "pageId": "p-1-0",
+      "path": "app/03-14.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "61e79c5e596715646cc44b43762aadb9569fdde701f5af61502efaf1df32e61c",
+      "appCrop": null
+    },
+    {
+      "nodeId": "1FN-0",
+      "name": "03.15 / Phone \u2014 address validation",
+      "pageId": "p-1-0",
+      "path": "app/03-15.png",
+      "width": 390,
+      "height": 844,
+      "sha256": "bd3f863738f2917cab1ed29706ce77d2d19183fb2ef090a4efc29d9a5893ff7e",
+      "appCrop": {
+        "x": 0,
+        "y": 62,
+        "width": 390,
+        "height": 782
+      }
+    },
+    {
+      "nodeId": "1GV-0",
+      "name": "03.16 / Interaction \u2014 capture and stop",
+      "pageId": "p-1-0",
+      "path": "app/03-16.png",
+      "width": 1440,
+      "height": 1000,
+      "sha256": "da26ee27e29efbd0b758703dde948c4c2036e4825b71c196a9dd3d07574e32ae",
+      "appCrop": null
+    },
+    {
+      "nodeId": "1J6-0",
+      "name": "03.17 / Interaction \u2014 inspecting an exposure",
+      "pageId": "p-1-0",
+      "path": "app/03-17.png",
+      "width": 1440,
+      "height": 1000,
+      "sha256": "6073cbc5f34704f30e2def7aaab4acaf26982beff5bd6aa37772d128a7aee3a6",
+      "appCrop": null
+    },
+    {
+      "nodeId": "1LA-0",
+      "name": "03.18 / Interaction \u2014 focus, dialogs and motion",
+      "pageId": "p-1-0",
+      "path": "app/03-18.png",
+      "width": 1440,
+      "height": 1000,
+      "sha256": "1223bf10d76bd233d89785f2f56cc7ab6b31887c3287f7b26756135d3642bba6",
+      "appCrop": null
+    },
+    {
+      "nodeId": "1NG-0",
+      "name": "DS.01 / Color \u2014 paper, forest, photograph",
+      "pageId": "p-3-0",
+      "path": "system/ds-01.png",
+      "width": 1440,
+      "height": 1400,
+      "sha256": "b9725fd9e272f70349f2c1c8a96772a11a66bcc4ba76ab3e4679410dbf477c3a",
+      "appCrop": null
+    },
+    {
+      "nodeId": "1SD-0",
+      "name": "DS.02 / Type \u2014 character and working rhythm",
+      "pageId": "p-3-0",
+      "path": "system/ds-02.png",
+      "width": 1440,
+      "height": 1400,
+      "sha256": "0667b1e0be4fcd006041bf506e246a94930ed6635803f2f9fda4b983726c3c91",
+      "appCrop": null
+    },
+    {
+      "nodeId": "1V6-0",
+      "name": "DS.03 / Tokens \u2014 from values to intent",
+      "pageId": "p-3-0",
+      "path": "system/ds-03.png",
+      "width": 1440,
+      "height": 1400,
+      "sha256": "4256bdb5439cfc76fc6679e9e5815b11f5c811030f943d936f9f515b200f7ebd",
+      "appCrop": null
+    },
+    {
+      "nodeId": "20Y-0",
+      "name": "DS.04 / Layout \u2014 image first, context alongside",
+      "pageId": "p-3-0",
+      "path": "system/ds-04.png",
+      "width": 1440,
+      "height": 1400,
+      "sha256": "571cbea23858667554eccdbab119a117544158931c928da53bead2ffa34a7314",
+      "appCrop": null
+    },
+    {
+      "nodeId": "23M-0",
+      "name": "DS.05 / Controls \u2014 clear intent, steady targets",
+      "pageId": "p-3-0",
+      "path": "system/ds-05.png",
+      "width": 1440,
+      "height": 1400,
+      "sha256": "57388026aa89cb9b705deb015ec70a4ba1c9e913df51f298e23b0cdb2c4e1e4a",
+      "appCrop": null
+    },
+    {
+      "nodeId": "282-0",
+      "name": "DS.06 / Cards & surfaces \u2014 grouping without clutter",
+      "pageId": "p-3-0",
+      "path": "system/ds-06.png",
+      "width": 1440,
+      "height": 1400,
+      "sha256": "ae102717e44aa7969208d99387b06bd86dc87a95aa4e7e76a205423c194a1159",
+      "appCrop": null
+    },
+    {
+      "nodeId": "2BC-0",
+      "name": "DS.07 / Dialogs \u2014 one decision, clear return",
+      "pageId": "p-3-0",
+      "path": "system/ds-07.png",
+      "width": 1440,
+      "height": 1400,
+      "sha256": "2877006e8718aacf874c366824190c0e5c75d98c731f0be3b19b0823da2f3857",
+      "appCrop": null
+    },
+    {
+      "nodeId": "2E4-0",
+      "name": "DS.08 / Feedback \u2014 nothing, waiting, uncertain, done",
+      "pageId": "p-3-0",
+      "path": "system/ds-08.png",
+      "width": 1440,
+      "height": 1400,
+      "sha256": "367e22210d0da5c4912bf1bc4302dfd0a1d7e960249faf6a8b2462de861cf929",
+      "appCrop": null
+    },
+    {
+      "nodeId": "2NT-0",
+      "name": "DS.10 / Image inspection \u2014 frame, tools, evidence",
+      "pageId": "p-3-0",
+      "path": "system/ds-10.png",
+      "width": 1440,
+      "height": 1400,
+      "sha256": "1193d977becbe376e6a145bd23c5ca3678cb62407f4314781e2de1d7e6d60c8d",
+      "appCrop": null
+    },
+    {
+      "nodeId": "2O1-0",
+      "name": "DS.12 / Supporting overlays \u2014 placement and return",
+      "pageId": "p-3-0",
+      "path": "system/ds-12.png",
+      "width": 1440,
+      "height": 1200,
+      "sha256": "eee426be5f5a40e3547e2cf42f17f25974ee264ef2c4037fabd7b0271988f54a",
+      "appCrop": null
+    },
+    {
+      "nodeId": "2O9-0",
+      "name": "DS.13 / Feedback behavior \u2014 persistence and time",
+      "pageId": "p-3-0",
+      "path": "system/ds-13.png",
+      "width": 1440,
+      "height": 1400,
+      "sha256": "14a91b2b306a8e430723402fecb0343891c580456e77c5dbaa53627b7ee4f905",
+      "appCrop": null
+    },
+    {
+      "nodeId": "2OH-0",
+      "name": "DS.09 / Geometry \u2014 edges, focus, elevation",
+      "pageId": "p-3-0",
+      "path": "system/ds-09.png",
+      "width": 1440,
+      "height": 1400,
+      "sha256": "eb988776d570dba70ef6bdd1cecbbd8ad5baf295bf392934d238402c85519537",
+      "appCrop": null
+    },
+    {
+      "nodeId": "2Q2-0",
+      "name": "DS.11 / Responsive \u2014 change priority before shrinking",
+      "pageId": "p-3-0",
+      "path": "system/ds-11.png",
+      "width": 1440,
+      "height": 1400,
+      "sha256": "bef40e2866fd574b2b888db1c8a8f613f820a9276db7ed45cc1b982ae4dcf15c",
+      "appCrop": null
+    },
+    {
+      "nodeId": "3HG-0",
+      "name": "DS.15 / Dark components and states",
+      "pageId": "p-3-0",
+      "path": "system/ds-15.png",
+      "width": 1440,
+      "height": 1400,
+      "sha256": "74d29628b4d3bda320252af6e21321d108778beaa66a169c5fde436ce6125d7c",
+      "appCrop": null
+    },
+    {
+      "nodeId": "3MY-0",
+      "name": "DS.14 / Appearance \u2014 one Fieldroom, two themes",
+      "pageId": "p-3-0",
+      "path": "system/ds-14.png",
+      "width": 1440,
+      "height": 1400,
+      "sha256": "b9bd67938458645b3415f4966c115469759fd28ab2571ee1c35baa9edf317bb1",
+      "appCrop": null
+    },
+    {
+      "nodeId": "407-0",
+      "name": "DS.16 / Appearance \u2014 preference and resolved theme",
+      "pageId": "p-3-0",
+      "path": "system/ds-16.png",
+      "width": 1440,
+      "height": 1100,
+      "sha256": "df713b2d4f779b923e97097d8f5bc95f09efb1d4a22662429c092fd594c6e959",
+      "appCrop": null
+    }
+  ]
+}

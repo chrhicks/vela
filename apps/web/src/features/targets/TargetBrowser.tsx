@@ -1,12 +1,23 @@
-import type { TargetCategory, TargetDiscoveryItem, TargetFilterChoice } from '@vela/model/web'
-import { Button, Input, Panel } from '@vela/ui'
+import type {
+  TargetCatalogItem,
+  TargetCatalogView,
+  TargetCategory,
+  TargetDiscoveryItem,
+  TargetDiscoveryView,
+  TargetFilterChoice,
+} from '@vela/model/web'
+import { Button, Input, Panel, Select } from '@vela/ui'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
+import { AltitudeTrace } from './AltitudeTrace'
+import { skyTime } from './sky-time'
+import { SkyInspection } from './SkyInspection'
+import { useCatalog } from './use-catalog'
 import { savedDiscovery, selectionOf, useDiscovery, type DiscoverySelection } from './use-discovery'
 import './target-discovery.css'
 
 const categories: Array<[TargetCategory | 'all', string]> = [
-  ['all', 'All objects'],
+  ['all', 'All object types'],
   ['emission', 'Emission nebulae'],
   ['reflection-dark', 'Reflection & dark'],
   ['galaxy', 'Galaxies'],
@@ -16,13 +27,10 @@ const categories: Array<[TargetCategory | 'all', string]> = [
 ]
 
 const filters: Array<[TargetFilterChoice | 'all', string]> = [
-  ['all', 'All light'],
+  ['all', 'Imaging preference · Any filter'],
   ['dual-band', 'L-Ultimate subjects'],
   ['broadband', 'Broadband subjects'],
 ]
-
-const clock = (at: string) =>
-  new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
 
 const dateTime = (at: string) =>
   new Date(at).toLocaleString([], {
@@ -30,22 +38,27 @@ const dateTime = (at: string) =>
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
+    hour12: false,
   })
 
-function duration(minutes: number) {
-  const rounded = Math.max(1, Math.round(minutes))
+const direction = (degrees: number) =>
+  ['North', 'Northeast', 'East', 'Southeast', 'South', 'Southwest', 'West', 'Northwest'][
+    Math.round(degrees / 45) % 8
+  ]
 
-  return rounded >= 60
-    ? `${Math.floor(rounded / 60)}h${rounded % 60 ? ` ${rounded % 60}m` : ''}`
-    : `${rounded}m`
+function extent(target: TargetCatalogItem) {
+  if (target.sizeArcminutes === null) return 'Size unavailable'
+
+  return target.minorSizeArcminutes === null
+    ? `${target.sizeArcminutes}′ across`
+    : `${target.sizeArcminutes}′ × ${target.minorSizeArcminutes}′`
 }
 
-function ReferenceImage({ target }: { target: TargetDiscoveryItem }) {
+function ReferenceImage({ target }: { target: TargetCatalogItem }) {
   const [failed, setFailed] = useState(false)
 
   return failed ? (
     <div className="vela-target-no-image">
-      <span aria-hidden="true">◇</span>
       <strong>Reference image unavailable</strong>
       <span>{target.name}</span>
     </div>
@@ -60,8 +73,8 @@ function ReferenceImage({ target }: { target: TargetDiscoveryItem }) {
   )
 }
 
-function parseSelection(params: URLSearchParams, rigId: string): DiscoverySelection {
-  if (!params.size) {
+function parseSelection(params: URLSearchParams, rigId?: string): DiscoverySelection {
+  if (!params.size && rigId) {
     const saved = savedDiscovery(rigId)
 
     if (saved) return selectionOf(saved)
@@ -76,12 +89,86 @@ function parseSelection(params: URLSearchParams, rigId: string): DiscoverySelect
 }
 
 export function TargetBrowser({ rigId }: { rigId: string }) {
-  const [params, setParams] = useSearchParams()
+  const [params] = useSearchParams()
   const selection = parseSelection(params, rigId)
+
+  return <ExploreSubjects rigId={rigId} selection={selection} {...useDiscovery(rigId, selection)} />
+}
+
+export function CatalogBrowser() {
+  const [params] = useSearchParams()
+  const selection = parseSelection(params)
+
+  return <ExploreSubjects selection={selection} {...useCatalog(selection)} />
+}
+
+function ExploreSubjects({
+  rigId,
+  selection,
+  view,
+  loading,
+  error,
+  saved,
+  refresh,
+}: {
+  rigId?: string
+  selection: DiscoverySelection
+  view: TargetDiscoveryView | TargetCatalogView | null
+  loading: boolean
+  error: string | null
+  saved: boolean
+  refresh(): void
+}) {
+  const [params, setParams] = useSearchParams()
   const [input, setInput] = useState(selection.query)
-  const { view, loading, error, saved, refresh } = useDiscovery(rigId, selection)
   const resultsHeading = useRef<HTMLDivElement>(null)
+  const subjectPanel = useRef<HTMLElement>(null)
+  const focusSelectedSubject = useRef(false)
   const pageNavigation = useRef<DiscoverySelection | null>(null)
+  const discovery = view && 'snapshotId' in view ? view : null
+  const displayed = view ? selectionOf(view) : selection
+
+  const selected =
+    view?.targets.find((target) => target.id === params.get('subject')) ?? view?.targets[0]
+
+  const sky = discovery?.targets.find((target) => target.id === selected?.id)?.sky ?? null
+
+  const changed =
+    !!view &&
+    (view.query !== selection.query.trim() ||
+      view.category !== selection.category ||
+      view.filter !== selection.filter ||
+      view.offset !== selection.offset)
+
+  const browseParams = (next: DiscoverySelection) => {
+    const values = new URLSearchParams({ category: next.category, filter: next.filter })
+
+    if (next.query) values.set('q', next.query)
+
+    if (next.offset) values.set('offset', String(next.offset))
+
+    return values
+  }
+
+  const update = (patch: Partial<DiscoverySelection>) => {
+    pageNavigation.current = null
+    const next = browseParams({ ...selection, offset: 0, ...patch })
+    const subject = params.get('subject')
+
+    if (subject) next.set('subject', subject)
+    setParams(next)
+  }
+
+  useEffect(() => {
+    setInput(selection.query)
+  }, [selection.query])
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (input !== selection.query) update({ query: input })
+    }, 300)
+
+    return () => clearTimeout(timer)
+  }, [input, selection.query, selection.category, selection.filter])
   useEffect(() => {
     const requested = pageNavigation.current
 
@@ -99,15 +186,7 @@ export function TargetBrowser({ rigId }: { rigId: string }) {
       return
     }
 
-    if (
-      loading ||
-      !view ||
-      view.query !== requested.query.trim() ||
-      view.category !== requested.category ||
-      view.filter !== requested.filter ||
-      view.offset !== requested.offset
-    )
-      return
+    if (loading || !view || changed) return
     pageNavigation.current = null
     resultsHeading.current?.scrollIntoView({ block: 'start' })
     resultsHeading.current?.focus({ preventScroll: true })
@@ -115,47 +194,50 @@ export function TargetBrowser({ rigId }: { rigId: string }) {
     view,
     loading,
     error,
+    changed,
     selection.query,
     selection.category,
     selection.filter,
     selection.offset,
   ])
+  // A subject is presentation state on this result page, never a hardware command.
+  useEffect(() => {
+    if (
+      !view ||
+      loading ||
+      changed ||
+      !params.has('subject') ||
+      view.targets.some((target) => target.id === params.get('subject'))
+    )
+      return
+    const next = new URLSearchParams(params)
+    next.delete('subject')
+    setParams(next, { replace: true })
+  }, [view, loading, changed, params, setParams])
 
-  const update = (patch: Partial<DiscoverySelection>) => {
-    pageNavigation.current = null
-    const next = { ...selection, offset: 0, ...patch }
-    const values = new URLSearchParams({ category: next.category, filter: next.filter })
-
-    if (next.query) values.set('q', next.query)
-
-    if (next.offset) values.set('offset', String(next.offset))
-    setParams(values)
+  const showSubjectOnPhone = () => {
+    if (!window.matchMedia('(max-width: 720px)').matches) return
+    subjectPanel.current?.scrollIntoView({ block: 'start' })
+    subjectPanel.current?.focus({ preventScroll: true })
   }
 
   useEffect(() => {
-    setInput(selection.query)
-  }, [selection.query])
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (input !== selection.query) update({ query: input })
-    }, 300)
+    if (!focusSelectedSubject.current) return
+    focusSelectedSubject.current = false
+    showSubjectOnPhone()
+  }, [selected?.id])
 
-    return () => clearTimeout(timer)
-  }, [input, selection.query, selection.category, selection.filter])
-  const displayed = view ? selectionOf(view) : selection
+  const select = (id: string) => {
+    if (id === selected?.id) {
+      showSubjectOnPhone()
 
-  const changed =
-    !!view &&
-    (view.query !== selection.query.trim() ||
-      view.category !== selection.category ||
-      view.filter !== selection.filter ||
-      view.offset !== selection.offset)
+      return
+    }
 
-  const pending = loading
-
-  const refreshFromNow = () => {
-    if (selection.offset) update({ offset: 0 })
-    refresh()
+    focusSelectedSubject.current = true
+    const values = browseParams(displayed)
+    values.set('subject', id)
+    setParams(values)
   }
 
   const turnPage = (offset: number) => {
@@ -164,294 +246,366 @@ export function TargetBrowser({ rigId }: { rigId: string }) {
     pageNavigation.current = next
   }
 
-  const noSite = view?.status === 'site-unavailable'
-  const search = view?.query
+  const refreshFromNow = () => {
+    if (selection.offset) update({ offset: 0 })
+    refresh()
+  }
+
+  const frameSearch = browseParams(displayed)
+
+  if (selected) frameSearch.set('subject', selected.id)
+
+  const frameLink =
+    rigId && selected
+      ? `/rigs/${encodeURIComponent(rigId)}/observe/targets/${encodeURIComponent(selected.id)}?${frameSearch}`
+      : null
+
+  const noSite = discovery?.status === 'site-unavailable'
 
   return (
     <section className="vela-discovery" aria-label="Target discovery">
       <header className="vela-discovery__header">
-        <div>
-          <p className="vela-discovery__eyebrow">{view?.rigName ?? 'Observe'} / Targets</p>
-          <h1>Find your next subject</h1>
-          <p>
-            {search
-              ? 'Search the deep-sky catalog, with tonight’s context.'
-              : noSite
-                ? 'Explore the catalog while the observing site is unavailable.'
-                : 'Explore the night from your observing site.'}
-          </p>
+        <h1>Explore the sky</h1>
+        <div className="vela-discovery__snapshot" role="status">
+          <span>
+            {discovery
+              ? `${discovery.rigName} · ${saved ? 'Saved suggestions' : 'Calculated'} ${dateTime(discovery.calculatedAt)}`
+              : rigId
+                ? error
+                  ? 'Sky calculation unavailable'
+                  : 'Reading observing site…'
+                : 'Deep-sky catalog'}
+          </span>
+          <Button tone="quiet" disabled={loading} onClick={refreshFromNow}>
+            {rigId ? 'Update sky' : 'Refresh catalog'}
+          </Button>
         </div>
-        <Button tone="quiet" disabled={loading} onClick={refreshFromNow}>
-          {loading ? 'Loading…' : 'Refresh'}
-        </Button>
       </header>
-      <div className="vela-discovery__snapshot" role="status">
-        <span>
-          {view
-            ? `${saved ? 'Saved suggestions' : 'Calculated'} · ${dateTime(view.calculatedAt)}`
-            : error
-              ? 'Suggestions unavailable'
-              : 'Finding tonight’s subjects…'}
-        </span>
-        <span>
-          {view?.site
-            ? `${Math.abs(view.site.latitudeDegrees).toFixed(2)}° ${view.site.latitudeDegrees < 0 ? 'S' : 'N'} · ${Math.abs(view.site.longitudeDegrees).toFixed(2)}° ${view.site.longitudeDegrees < 0 ? 'W' : 'E'}`
-            : view
-              ? 'Site unavailable'
-              : 'Reading observing site'}
-        </span>
+      <div className="vela-discovery__controls">
+        <div className="vela-discovery__search">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <circle cx="10" cy="10" r="7" />
+            <path d="m15 15 6 6" />
+          </svg>
+          <Input
+            aria-label="Find a target"
+            type="search"
+            placeholder="Search a name or catalog number"
+            value={input}
+            onFocus={() => {
+              pageNavigation.current = null
+            }}
+            onChange={(event) => {
+              pageNavigation.current = null
+              setInput(event.target.value)
+            }}
+          />
+        </div>
+        <Select
+          aria-label="Object type"
+          value={selection.category}
+          options={categories.map(([value, label]) => ({ value, label }))}
+          onChange={(event) =>
+            update({
+              category: categories.find(([value]) => value === event.target.value)?.[0] ?? 'all',
+            })
+          }
+        />
+        <Select
+          aria-label="Imaging filter"
+          value={selection.filter}
+          options={filters.map(([value, label]) => ({ value, label }))}
+          onChange={(event) =>
+            update({
+              filter: filters.find(([value]) => value === event.target.value)?.[0] ?? 'all',
+            })
+          }
+        />
       </div>
-      <Input
-        label="Find a target"
-        type="search"
-        placeholder="Name, catalog number, or object type"
-        value={input}
-        onFocus={() => {
-          pageNavigation.current = null
-        }}
-        onChange={event => {
-          pageNavigation.current = null
-          setInput(event.target.value)
-        }}
-      />
-      <nav className="vela-discovery__filters" aria-label="Object type">
-        {categories.map(([key, label]) => (
-          <button
-            key={key}
-            type="button"
-            aria-pressed={selection.category === key}
-            onClick={() => update({ category: key })}
-          >
-            {label}
-          </button>
-        ))}
-      </nav>
-      <nav className="vela-discovery__filters vela-discovery__light" aria-label="Imaging filter">
-        {filters.map(([key, label]) => (
-          <button
-            key={key}
-            type="button"
-            aria-pressed={selection.filter === key}
-            onClick={() => update({ filter: key })}
-          >
-            {label}
-          </button>
-        ))}
-      </nav>
-      <p className="vela-discovery__filter-note">
-        Your filter: <strong>Optolong L-Ultimate · dual 3nm Hα / O III</strong>
-        <span>Filter advice is for imaging. Installation is not detected.</span>
-      </p>
       {error && (
         <Panel>
           <p role="alert">{error}</p>
           {changed && <p>The cards below still show your previous selection.</p>}
         </Panel>
       )}
-      {view?.siteUnavailableReason && (
+      {discovery?.siteUnavailableReason && (
         <Panel>
-          <p role="status">The mount’s site could not be read: {view.siteUnavailableReason}</p>
+          <p role="status">The mount’s site could not be read: {discovery.siteUnavailableReason}</p>
           <p>
-            These are catalog suggestions, without a location-based ranking. Refresh after the site
-            becomes available.
+            These are catalog suggestions, without a location-based ranking. Update sky after the
+            site becomes available.
           </p>
         </Panel>
       )}
-      <div className="vela-discovery__results" role="status" ref={resultsHeading} tabIndex={-1}>
-        <strong>
-          {search
-            ? `Results for “${search}”`
-            : noSite
-              ? 'Explore the catalog'
-              : view?.night?.kind === 'upcoming-night'
-                ? 'The coming night'
-                : 'Explore tonight'}
-        </strong>
-        <span>
-          {pending
-            ? 'Loading selection…'
-            : view
-              ? `${view.total.toLocaleString()} ${search ? 'matches' : 'subjects'}`
-              : ''}
-        </span>
-      </div>
-      <div className="vela-discovery__grid" aria-busy={loading}>
-        {view?.targets.map((target, index) => {
-          const opportunity = target.opportunity
+      <div className="vela-discovery__layout">
+        <div>
+          <div className="vela-discovery__results" role="status" ref={resultsHeading} tabIndex={-1}>
+            <span>
+              {view?.query
+                ? `Results for “${view.query}”`
+                : !rigId || noSite
+                  ? 'Explore the catalog'
+                  : discovery?.night?.kind === 'upcoming-night'
+                    ? 'The coming night'
+                    : discovery?.night?.kind === 'polar-night'
+                      ? 'Polar night · next 24 hours'
+                      : 'Visible tonight'}
+            </span>
+            <span>
+              {loading
+                ? 'Loading selection…'
+                : view
+                  ? `Showing ${view.targets.length} of ${view.total.toLocaleString()} subjects`
+                  : ''}
+            </span>
+          </div>
+          <div className="vela-discovery__grid" aria-busy={loading}>
+            {view?.targets.map((target) => {
+              const item: TargetDiscoveryItem | null =
+                discovery?.targets.find((candidate) => candidate.id === target.id) ?? null
 
-          const linkParams = new URLSearchParams({
-            category: displayed.category,
-            filter: displayed.filter,
-            offset: String(displayed.offset),
-          })
-
-          if (displayed.query) linkParams.set('q', displayed.query)
-
-          return (
-            <article className="vela-discovery__card" key={target.id}>
-              <Link
-                className="vela-discovery__image"
-                tabIndex={-1}
-                aria-hidden="true"
-                to={{
-                  pathname: `/rigs/${encodeURIComponent(rigId)}/observe/targets/${encodeURIComponent(target.id)}`,
-                  search: linkParams.toString(),
-                }}
-              >
-                <ReferenceImage target={target} />
-                <span>{target.kind}</span>
-              </Link>
-              <div className="vela-discovery__body">
-                <p className="vela-discovery__catalog">
-                  <span>
-                    {target.catalog}
-                    {target.sizeArcminutes !== null ? ` · ${target.sizeArcminutes}′ across` : ''}
-                  </span>
-                  {!noSite && !search && <span>#{view.offset + index + 1}</span>}
+              return (
+                <article
+                  className="vela-discovery__card"
+                  data-selected={selected?.id === target.id}
+                  key={target.id}
+                >
+                  <div className="vela-discovery__image">
+                    <ReferenceImage target={target} />
+                  </div>
+                  <div className="vela-discovery__body">
+                    <h2>{target.name}</h2>
+                    <p className="vela-discovery__catalog">
+                      {target.catalog} · {target.kind}
+                    </p>
+                    <div className="vela-discovery__card-facts">
+                      <span>
+                        {item?.sky
+                          ? `${Math.round(item.sky.currentAltitudeDegrees)}° · ${direction(item.sky.currentAzimuthDegrees)}`
+                          : (target.constellation ?? 'Catalog subject')}
+                      </span>
+                      <span>{extent(target)}</span>
+                    </div>
+                    <p className="vela-discovery__window">
+                      {item?.opportunity
+                        ? discovery && Date.parse(item.opportunity.startsAt) > Date.parse(discovery.calculatedAt)
+                          ? `Above 30° from ${skyTime(item.opportunity.startsAt)} to ${skyTime(item.opportunity.endsAt)}`
+                          : `Above 30° until ${skyTime(item.opportunity.endsAt)}`
+                        : item?.sky
+                          ? 'No useful window this night'
+                          : rigId
+                            ? 'Observing window unavailable'
+                            : 'Choose a rig for sky timing'}
+                    </p>
+                    <Button
+                      tone="quiet"
+                      aria-pressed={selected?.id === target.id}
+                      onClick={() => select(target.id)}
+                    >
+                      {selected?.id === target.id ? (
+                        <>
+                          Selected · Details{' '}
+                          <span className="vela-discovery__wide-location">at right</span>
+                          <span className="vela-discovery__compact-location">below</span> →
+                        </>
+                      ) : (
+                        'View subject →'
+                      )}
+                    </Button>
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+          {view?.total === 0 && (
+            <Panel>
+              <div className="vela-target-empty">
+                <h2>
+                  {discovery?.status === 'no-darkness' && !view.query
+                    ? 'No astronomical darkness ahead'
+                    : 'No targets match these filters'}
+                </h2>
+                <p>
+                  {discovery?.status === 'no-darkness' && !view.query
+                    ? 'The Sun does not reach 18° below the horizon in the calculation window. You can still search the catalog.'
+                    : 'Your search is kept. Broaden the target types or turn off the imaging filter.'}
                 </p>
-                <h2>{target.name}</h2>
-                <div className="vela-discovery__window">
-                  <strong>
-                    {opportunity
-                      ? `${duration(opportunity.usefulMinutes)} of useful dark sky`
-                      : noSite
-                        ? 'Observing window unavailable'
-                        : 'No useful window this night'}
-                  </strong>
-                  <span>
-                    {opportunity
-                      ? `${clock(opportunity.startsAt)} – ${clock(opportunity.endsAt)} · above 30°`
-                      : 'Explore the target to inspect its sky path.'}
-                  </span>
-                </div>
-                <p className="vela-discovery__reason">
-                  {opportunity
-                    ? `Best remaining altitude ${Math.round(opportunity.bestAltitudeDegrees)}° at ${clock(opportunity.bestAt)}. ${Math.round(opportunity.currentAltitudeDegrees)}° at calculation time.`
-                    : target.sky
-                      ? 'Below the useful altitude during remaining darkness.'
-                      : 'Refresh with an available observing site for tonight’s context.'}
-                </p>
-                <div className="vela-discovery__advice">
-                  <strong>
-                    {
-                      {
-                        'dual-band': 'L-Ultimate suits this subject',
-                        broadband: 'Broadband is the better fit',
-                        uncertain: 'Start with broadband',
-                      }[target.filterChoice]
-                    }
-                  </strong>
-                  <p>{target.filterReason}</p>
-                </div>
-                <Link
-                  className="vela-button vela-button--quiet"
-                  to={{
-                    pathname: `/rigs/${encodeURIComponent(rigId)}/observe/targets/${encodeURIComponent(target.id)}`,
-                    search: linkParams.toString(),
+                <Button
+                  onClick={() => {
+                    update({ category: 'all', filter: 'all' })
                   }}
                 >
-                  Explore target <span aria-hidden="true">→</span>
-                </Link>
-                <small>Reference survey · DSS2 / CDS</small>
+                  Clear filters
+                </Button>
               </div>
-            </article>
-          )
-        })}
+            </Panel>
+          )}
+        </div>
+        {selected && (
+          <aside
+            ref={subjectPanel}
+            tabIndex={-1}
+            className="vela-discovery__subject"
+            aria-label={`${selected.name} details`}
+          >
+            <div className="vela-discovery__subject-heading">
+              <p>{selected.name} · {sky ? 'Through the night' : 'Subject details'}</p>
+              {sky && (
+                <SkyInspection
+                  key={selected.id}
+                  sky={sky}
+                  targetName={selected.name}
+                  stale={saved || !!error}
+                />
+              )}
+            </div>
+            {sky ? (
+              <>
+                <div className="vela-discovery__altitude">
+                  <strong>{Math.round(Math.abs(sky.currentAltitudeDegrees))}°</strong>
+                  <span>
+                    {sky.currentAltitudeDegrees < 0 ? 'below' : 'above'} the horizon at{' '}
+                    {skyTime(sky.observedAt)}
+                  </span>
+                </div>
+                <AltitudeTrace sky={sky} stale={saved || !!error} variant="explore" />
+                <dl>
+                  <div>
+                    <dt>Direction</dt>
+                    <dd>
+                      {direction(sky.currentAzimuthDegrees)} ·{' '}
+                      {Math.round(sky.currentAzimuthDegrees)}°
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Moon separation</dt>
+                    <dd>{Math.round(sky.currentMoonSeparationDegrees)}°</dd>
+                  </div>
+                </dl>
+                <p>Sky estimates don’t include local obstructions or weather.</p>
+              </>
+            ) : (
+              <>
+                <h2>{selected.name}</h2>
+                <dl>
+                  <div>
+                    <dt>Catalog</dt>
+                    <dd>{selected.catalog}</dd>
+                  </div>
+                  <div>
+                    <dt>Object type</dt>
+                    <dd>{selected.kind}</dd>
+                  </div>
+                  <div>
+                    <dt>Constellation</dt>
+                    <dd>{selected.constellation ?? 'Unavailable'}</dd>
+                  </div>
+                  <div>
+                    <dt>Apparent size</dt>
+                    <dd>{extent(selected)}</dd>
+                  </div>
+                  <div>
+                    <dt>Distance</dt>
+                    <dd>Unavailable</dd>
+                  </div>
+                </dl>
+                <p>
+                  {rigId
+                    ? 'Sky timing is unavailable until the observing site can be read.'
+                    : 'Sky timing requires a rig and its observing site.'}
+                </p>
+              </>
+            )}
+            {frameLink ? (
+              <Link className="vela-button" data-tone="accent" to={frameLink}>
+                Frame this subject →
+              </Link>
+            ) : (
+              <Link className="vela-button" data-tone="accent" to="/">
+                Add or choose a rig →
+              </Link>
+            )}
+          </aside>
+        )}
       </div>
-      {view?.total === 0 && (
-        <Panel>
-          <div className="vela-target-empty">
-            <h2>
-              {view.status === 'no-darkness' && !view.query
-                ? 'No astronomical darkness ahead'
-                : 'No matching subjects'}
-            </h2>
-            <p>
-              {view.status === 'no-darkness' && !view.query
-                ? 'The Sun does not reach 18° below the horizon in the calculation window. You can still search the catalog.'
-                : 'Try another object type, imaging filter, or catalog search.'}
-            </p>
+      <footer className="vela-discovery__footer">
+        <span>Reference survey · DSS2 / CDS</span>
+        {view && view.total > 0 && (
+          <nav aria-label="Target pages">
+            <span>
+              Page {Math.floor(view.offset / view.pageSize) + 1} of{' '}
+              {Math.ceil(view.total / view.pageSize)}
+            </span>
+            {view.offset > 0 && (
+              <Button
+                tone="quiet"
+                disabled={loading || view.offset === 0}
+                onClick={() => turnPage(Math.max(0, view.offset - view.pageSize))}
+              >
+                Previous
+              </Button>
+            )}
             <Button
-              onClick={() => {
-                setInput('')
-                update({ query: '', category: 'all', filter: 'all' })
-              }}
-            >
-              Clear filters
-            </Button>
-          </div>
-        </Panel>
-      )}
-      {view && view.total > 0 && (
-        <nav className="vela-discovery__footer" aria-label="Target pages">
-          <span>
-            {view.offset + 1}–{Math.min(view.offset + view.pageSize, view.total)} of{' '}
-            {view.total.toLocaleString()}
-          </span>
-          <div>
-            <Button
-              tone="quiet"
-              disabled={loading || view.offset === 0}
-              onClick={() => turnPage(Math.max(0, view.offset - view.pageSize))}
-            >
-              Previous
-            </Button>
-            <Button
-              tone="quiet"
               disabled={loading || view.offset + view.pageSize >= view.total}
               onClick={() => turnPage(view.offset + view.pageSize)}
             >
-              Next
+              Next subjects →
             </Button>
-          </div>
-        </nav>
+          </nav>
+        )}
+      </footer>
+      {selected && (
+        <details className="vela-discovery__subject-details">
+          <summary>Subject facts & imaging advice</summary>
+          <p>
+            {selected.catalog} · {selected.kind} ·{' '}
+            {selected.constellation ?? 'Constellation unavailable'} · {extent(selected)}
+          </p>
+          <p>Distance unavailable.</p>
+          <p>{selected.filterReason}</p>
+          <p>Filter advice is for imaging. Installation is not detected.</p>
+        </details>
       )}
       <details className="vela-discovery__method">
-        <summary>How these suggestions work</summary>
+        <summary>How these suggestions work & credits</summary>
         <p>
-          Ranked for photographic interest using object type, apparent size and familiar showpieces,
-          balanced against remaining time above 30° during astronomical darkness (Sun below −18°).
-          These approximate windows start at the calculation time or later. Refresh recalculates
-          from now; the list stays steady while you browse.
+          {rigId
+            ? 'Ranked for photographic interest, balanced against remaining time above 30° during astronomical darkness (Sun below −18°). Search includes catalog objects without a useful window. Update sky recalculates from now; the list stays steady while you browse.'
+            : 'Catalog subjects are ranked for photographic interest using object type, apparent size and familiar showpieces. No observing site or sky timing is inferred.'}
         </p>
         <p>
-          Search includes catalog objects even without a useful window. Rankings do not predict
-          weather, Moon interference, local obstructions, or how a subject fits your camera. Check
-          the sky path and framing before choosing.
+          Rankings do not predict weather, Moon interference, local obstructions, or how a subject
+          fits your camera. Filter advice does not detect installed filters.
         </p>
-        {view?.night && (
+        {discovery?.night && (
           <p>
-            Calculation window: {dateTime(view.night.startsAt)} to {dateTime(view.night.endsAt)}
-            {view.night.kind === 'polar-night' ? ' · polar night, limited to 24 hours' : ''}. Times
-            use this browser’s timezone.
+            Calculation window: {dateTime(discovery.night.startsAt)} to{' '}
+            {dateTime(discovery.night.endsAt)}. Times use this browser’s timezone.
           </p>
         )}
+        <p>
+          Reference imagery: DSS2 color / CDS.{' '}
+          <a
+            href="https://archive.stsci.edu/dss/acknowledging.html"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Survey credits ↗
+          </a>
+        </p>
+        <p>
+          Catalog adapted from{' '}
+          <a
+            href="https://github.com/mattiaverga/OpenNGC/tree/da90466031b0372c896588b85be6016c617e205b"
+            target="_blank"
+            rel="noreferrer"
+          >
+            OpenNGC
+          </a>{' '}
+          by Mattia Verga and <a href="/third-party/openngc-authors.txt">contributors</a> ·{' '}
+          <a href="/third-party/openngc-license.txt">CC BY-SA 4.0</a>.
+        </p>
       </details>
-      <p className="vela-target-footnote">
-        Reference imagery: DSS2 color / CDS.{' '}
-        <a href="https://archive.stsci.edu/dss/acknowledging.html" target="_blank" rel="noreferrer">
-          Survey credits ↗
-        </a>
-      </p>
-      <p className="vela-target-footnote">
-        Catalog adapted from{' '}
-        <a
-          href="https://github.com/mattiaverga/OpenNGC/tree/da90466031b0372c896588b85be6016c617e205b"
-          target="_blank"
-          rel="noreferrer"
-        >
-          OpenNGC
-        </a>{' '}
-        by Mattia Verga and{' '}
-        <a href="/third-party/openngc-authors.txt" target="_blank" rel="noreferrer">
-          contributors
-        </a>{' '}
-        ·{' '}
-        <a href="/third-party/openngc-license.txt" target="_blank" rel="noreferrer">
-          CC BY-SA 4.0
-        </a>
-        .
-      </p>
     </section>
   )
 }

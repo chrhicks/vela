@@ -12,6 +12,7 @@ const target = (id: string, overrides: Partial<CatalogTarget> = {}): CatalogTarg
   id,
   catalogName: id,
   commonName: null,
+  constellation: null,
   aliases: [id],
   raDegrees: 10.68470833,
   decDegrees: 41.26875,

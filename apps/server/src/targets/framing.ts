@@ -4,9 +4,12 @@ import { trace, SpanStatusCode, type Attributes } from '@opentelemetry/api'
 import type {
   FramingCentering,
   FramingPointingSide,
+  FramingPreview,
   FramingView,
   TargetPosition,
 } from '@vela/model/web'
+import { capturePreviews } from '../imaging/preview.js'
+import { measureStars } from '../imaging/statistics.js'
 import type { MonoFrame, PlateSolver } from '../plate-solving/solver.js'
 import { angularDistance, fromMount, plateCorners, toMount, type Site } from './sky.js'
 
@@ -61,6 +64,14 @@ function fixedPointing(mount: FramingMount) {
   )
 }
 
+interface FramingExposureContext {
+  desired: TargetPosition
+  targetId: string
+  exposureSeconds: number
+  rigId: string
+  cameraName: string
+}
+
 interface FramingCheck {
   actual: FramingView['actual']
   pointing: TargetPosition | undefined
@@ -107,6 +118,7 @@ export function createFramingController(
   now = () => new Date(),
   waitForMountObservation: (signal: AbortSignal) => Promise<void> = signal =>
     delay(1000, undefined, { signal }),
+  images = { render: capturePreviews, analyze: measureStars },
 ) {
   let state: Pick<
     FramingView,
@@ -116,6 +128,7 @@ export function createFramingController(
     | 'desired'
     | 'targetId'
     | 'actual'
+    | 'preview'
     | 'error'
     | 'exposureSeconds'
     | 'pointingSide'
@@ -126,12 +139,15 @@ export function createFramingController(
     desired: null,
     targetId: null,
     actual: null,
+    preview: null,
     error: null,
     exposureSeconds: 2,
     pointingSide: 'unknown',
     centering: null,
     captureReadState: 'current',
   }
+
+  const previews = new Map<string, { native: Buffer; fit: Buffer | undefined }>()
 
   let abort: AbortController | undefined
   let pending: Promise<void> | undefined
@@ -202,8 +218,59 @@ export function createFramingController(
     )
   }
 
+  async function inspectExposure(
+    frame: FramingFrame,
+    input: FramingExposureContext,
+    solver: PlateSolver,
+    signal: AbortSignal,
+  ) {
+    const acquisitionId = randomUUID()
+
+    const preview: FramingPreview = {
+      id: acquisitionId,
+      rigId: input.rigId,
+      targetId: input.targetId,
+      width: frame.width,
+      height: frame.height,
+      exposureSeconds: input.exposureSeconds,
+      cameraName: input.cameraName,
+      capturedAt: frame.capturedAt,
+      capturedAtSource: frame.capturedAtSource ?? 'camera',
+      checkId: null,
+      previewUrl: null,
+      nativePreviewUrl: null,
+      statistics: null,
+    }
+
+    // All consumers see this acquisition's linear samples. Neither optional
+    // image work nor its failure changes the solver result or repeats capture.
+    const [solveResult, rendered, analyzed] = await Promise.allSettled([
+      solver.solve(frame, input.desired, signal),
+      images.render(frame.width, frame.height, frame.pixels, frame.color),
+      images.analyze(frame.width, frame.height, frame.pixels, frame.color),
+    ])
+
+    signal.throwIfAborted()
+
+    if (rendered.status === 'fulfilled') {
+      previews.set(acquisitionId, rendered.value)
+
+      while (previews.size > 3) previews.delete(previews.keys().next().value!)
+      const base = `/api/web/rigs/${encodeURIComponent(preview.rigId)}/framing/previews/${acquisitionId}`
+      preview.previewUrl = `${base}/fit.png`
+      preview.nativePreviewUrl = `${base}/native.png`
+    }
+
+    if (analyzed.status === 'fulfilled') preview.statistics = analyzed.value
+    state = { ...state, preview }
+
+    if (solveResult.status === 'rejected') throw solveResult.reason
+
+    return { solved: solveResult.value, preview }
+  }
+
   async function measure(
-    input: { desired: TargetPosition; exposureSeconds: number; configuration: string },
+    input: FramingExposureContext & { configuration: string },
     hardware: FramingHardware,
     solver: PlateSolver,
     signal: AbortSignal,
@@ -232,8 +299,7 @@ export function createFramingController(
 
       signal.throwIfAborted()
       state = { ...state, phase: 'solving' }
-      const solved = await solver.solve(frame, input.desired, signal)
-      signal.throwIfAborted()
+      const { solved, preview } = await inspectExposure(frame, input, solver, signal)
 
       if (solved.status !== 'solved')
         throw new FramingCheckNeeded(
@@ -250,7 +316,7 @@ export function createFramingController(
         offsetArcminutes: angularDistance(input.desired, solved) * 60,
       }
 
-      state = { ...state, actual }
+      state = { ...state, actual, preview: { ...preview, checkId: actual.checkId } }
       recordFraming('framing.solved', {
         'framing.check.id': actual.checkId,
         'framing.solved.ra_degrees': actual.raDegrees,
@@ -376,7 +442,8 @@ export function createFramingController(
       exposureSeconds: number
       configuration: string
       action: 'start' | 'center' | 'check'
-      rigId?: string
+      rigId: string
+      cameraName: string
       requestId?: string
     },
     hardware: FramingHardware,
@@ -391,6 +458,7 @@ export function createFramingController(
       ...state,
       captureReadState: 'current',
       actual: input.targetId === state.targetId ? state.actual : null,
+      preview: input.targetId === state.targetId ? state.preview : null,
       desired: input.desired,
       targetId: input.targetId,
       exposureSeconds: input.exposureSeconds,
@@ -558,6 +626,11 @@ export function createFramingController(
 
   return {
     snapshot: () => structuredClone(state),
+    preview(id: string, size: 'fit' | 'native') {
+      const pair = previews.get(id)
+
+      return size === 'fit' ? pair?.fit ?? pair?.native : pair?.native
+    },
     canCenter,
     checkCurrent,
     start,

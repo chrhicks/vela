@@ -1,32 +1,59 @@
+import { z } from 'zod'
+import { useState } from 'react'
+import { Appearance } from './Appearance'
+import type { AppearancePreference } from './Appearance'
 import { NavigationBar, type NavigationActivity, type NavigationBarProps } from './NavigationBar'
 import type { ComponentSpecimen } from '../themes'
+import './NavigationBar.specimen.css'
+
+const connectionSchema = z.enum(['connected', 'interrupted', 'offline'])
+
+function NavigationAppearance() {
+  const [open, setOpen] = useState(false)
+  const [value, setValue] = useState<AppearancePreference>('system')
+
+  return <Appearance open={open} onOpenChange={setOpen} value={value} onValueChange={setValue} systemMode="light" persistence="visit" />
+}
+
+function NavigationUtility({ connection }: { connection: z.infer<typeof connectionSchema> }) {
+  const connectionLabels = { connected: 'Connected', interrupted: 'Updates lost', offline: 'Offline' }
+
+  return (
+    <span className="vela-navigation-specimen__connection" data-state={connection}>
+      <i aria-hidden="true" />
+      {connectionLabels[connection]}
+    </span>
+  )
+}
 
 export const specimen: ComponentSpecimen = {
   componentId: 'navigation-bar',
   componentName: 'Navigation bar',
   id: 'navigation-bar-anatomy',
-  name: 'Primitive anatomy',
+  name: 'Fieldroom navigation · Primitive anatomy',
   description:
     'Rig context, page links and optional capture activity. Callers own destinations, current state and progress.',
   controls: {
+    compact: { type: 'boolean', label: 'Focused phone task' },
     rig: { type: 'select', label: 'Viewing rig', options: ['askar', 'seestar', 'all'] },
-    page: { type: 'select', label: 'Current page', options: ['observe', 'targets', 'capture'] },
+    page: { type: 'select', label: 'Current page', options: ['tonight', 'explore', 'photographs'] },
+    connection: { type: 'select', label: 'Connection', options: ['connected', 'interrupted', 'offline'] },
     activity: {
       type: 'select',
       label: 'Activity',
       options: ['exposing', 'reading', 'interrupted', 'none'],
     },
   },
-  defaultProps: { rig: 'askar', page: 'targets', activity: 'exposing' },
+  defaultProps: { compact: false, rig: 'askar', page: 'tonight', connection: 'connected', activity: 'none' },
   render: (props, onPropsChange) => {
     const navigation: Pick<NavigationBarProps, 'activity'> = {}
 
     if (props.activity !== 'none') {
       const activity: NavigationActivity = {
-        href: '#capture',
+        href: '#tonight',
         onClick: event => {
           event.preventDefault()
-          onPropsChange?.({ rig: 'askar', page: 'capture' })
+          onPropsChange?.({ rig: 'askar', page: 'tonight' })
         },
         label:
           'Askar FRA 400 capture. 17 captured. Current exposure 18 of 60 seconds. Open capture.',
@@ -72,20 +99,26 @@ export const specimen: ComponentSpecimen = {
           { id: 'seestar', name: 'Seestar S30' },
         ]}
         currentRigId={String(props.rig)}
+        {...(props.compact ? { compact: {
+          back: { href: '#tonight', label: '← Tonight', onClick: event => event.preventDefault() },
+          label: props.rig === 'seestar' ? 'Seestar S30' : 'Askar FRA 400',
+        } } : {})}
         onRigChange={rig => onPropsChange?.({ rig })}
         links={
           props.rig === 'all'
             ? []
-            : ['observe', 'targets', 'capture'].map(page => ({
-                href: `#${page}`,
-                label: page[0]!.toUpperCase() + page.slice(1),
-                current: props.page === page,
+            : [{ id: 'tonight', label: 'Tonight' }, { id: 'explore', label: 'Explore the sky' }, { id: 'photographs', label: 'Photographs' }].map(page => ({
+                href: `#${page.id}`,
+                label: page.label,
+                current: props.page === page.id,
                 onClick: event => {
                   event.preventDefault()
-                  onPropsChange?.({ page })
+                  onPropsChange?.({ page: page.id })
                 },
               }))
         }
+        actions={<NavigationAppearance />}
+        utility={<NavigationUtility connection={connectionSchema.parse(props.connection)} />}
         {...navigation}
       />
     )

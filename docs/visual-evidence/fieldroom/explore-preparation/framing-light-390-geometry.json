@@ -1,0 +1,82 @@
+{
+  "heading": {
+    "x": 20,
+    "y": 200,
+    "width": 350,
+    "height": 114,
+    "top": 200,
+    "right": 370,
+    "bottom": 314,
+    "left": 20
+  },
+  "layout": {
+    "x": 20,
+    "y": 336,
+    "width": 350,
+    "height": 1373,
+    "top": 336,
+    "right": 370,
+    "bottom": 1709,
+    "left": 20
+  },
+  "surveyCard": {
+    "x": 20,
+    "y": 336,
+    "width": 350,
+    "height": 608,
+    "top": 336,
+    "right": 370,
+    "bottom": 944,
+    "left": 20
+  },
+  "toolbar": {
+    "x": 21,
+    "y": 337,
+    "width": 348,
+    "height": 90,
+    "top": 337,
+    "right": 369,
+    "bottom": 427,
+    "left": 21
+  },
+  "survey": {
+    "x": 21,
+    "y": 427,
+    "width": 348,
+    "height": 360,
+    "top": 427,
+    "right": 369,
+    "bottom": 787,
+    "left": 21
+  },
+  "result": {
+    "x": 20,
+    "y": 964,
+    "width": 350,
+    "height": 278,
+    "top": 964,
+    "right": 370,
+    "bottom": 1242,
+    "left": 20
+  },
+  "preview": {
+    "x": 20,
+    "y": 1316,
+    "width": 350,
+    "height": 124,
+    "top": 1316,
+    "right": 370,
+    "bottom": 1440,
+    "left": 20
+  },
+  "footer": {
+    "x": 20,
+    "y": 1709,
+    "width": 350,
+    "height": 64,
+    "top": 1709,
+    "right": 370,
+    "bottom": 1773,
+    "left": 20
+  }
+}

@@ -23,6 +23,7 @@ const targets: readonly CatalogTarget[] = Object.freeze(
       type,
       majorAxisArcminutes,
       minorAxisArcminutes,
+      constellation,
     ] = row
 
     return Object.freeze({
@@ -35,6 +36,7 @@ const targets: readonly CatalogTarget[] = Object.freeze(
       type,
       majorAxisArcminutes,
       minorAxisArcminutes,
+      constellation,
     })
   }),
 )

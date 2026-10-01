@@ -23,6 +23,7 @@ export function captureActivity(view: CaptureView, offline: boolean) {
 export function useCapture(rigId: string) {
   const [view, setView] = useState<CaptureView | null>(null)
   const [offline, setOffline] = useState(false)
+  const [interruptedAt, setInterruptedAt] = useState<number | null>(null)
   const [pending, setPending] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -64,6 +65,7 @@ export function useCapture(rigId: string) {
         lastView.current = next
         setView(next)
         setOffline(false)
+        setInterruptedAt(null)
 
         if (interruptedExposure) {
           setCommandUnconfirmed(true)
@@ -89,6 +91,7 @@ export function useCapture(rigId: string) {
       } catch (cause) {
         if (!alive.current || current !== generation.current) return
         setOffline(true)
+        setInterruptedAt(current => current ?? Date.now())
 
         if (cause instanceof ApiError && cause.status === 404)
           setError('This Rig is no longer available.')
@@ -149,7 +152,7 @@ export function useCapture(rigId: string) {
   async function post(
     path: 'start' | 'stop' | 'cooling',
     body:
-      | { exposureSeconds: number; repeat: boolean; saveFrames: boolean }
+      | { exposureSeconds: number; repeat: boolean; saveFrames: boolean; targetId?: string }
       | { coolerOn: boolean }
       | { setpointC: number }
       | Record<string, never>,
@@ -195,6 +198,7 @@ export function useCapture(rigId: string) {
       lastView.current = next
       setView(next)
       setOffline(false)
+      setInterruptedAt(null)
       setCommandUnconfirmed(false)
       setError(null)
 
@@ -203,6 +207,8 @@ export function useCapture(rigId: string) {
         setCoolingUnconfirmed(false)
         setCoolingError(null)
       }
+
+      return next
     } catch (cause) {
       if (!alive.current || current !== generation.current) return
 
@@ -244,6 +250,7 @@ export function useCapture(rigId: string) {
   return {
     view,
     offline,
+    interruptedAt,
     pending,
     coolingPending,
     refreshing,
@@ -254,10 +261,12 @@ export function useCapture(rigId: string) {
     canStart,
     canStop,
     canCool,
-    start: (seconds: number, repeat: boolean, saveFrames: boolean) => {
+    start: (seconds: number, repeat: boolean, saveFrames: boolean, targetId?: string) => {
       if (!Number.isFinite(seconds) || seconds < 0.1 || seconds > 600) return Promise.resolve()
 
-      return post('start', { exposureSeconds: seconds, repeat, saveFrames })
+      const body = { exposureSeconds: seconds, repeat, saveFrames }
+
+      return post('start', targetId === undefined ? body : { ...body, targetId })
     },
     stop: () => post('stop', {}),
     setCooler: (coolerOn: boolean) => post('cooling', { coolerOn }),

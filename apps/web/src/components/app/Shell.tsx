@@ -1,17 +1,17 @@
-import { VELA_CURRENT_PROFILE, resolveTheme, themeStyle } from '@vela/ui'
-import { Outlet } from 'react-router'
+import { Outlet, matchPath, useLocation } from 'react-router'
 import { AppNavigation } from '../../features/navigation/AppNavigation'
-
-const theme = resolveTheme(VELA_CURRENT_PROFILE)
+import { RigObservationProvider } from '../../features/rig-detail/RigContext'
+import { useAppearance } from '../../appearance/AppearanceProvider'
 
 export default function Shell() {
+  const { pathname } = useLocation()
+  const rigId = matchPath('/rigs/:rigId/*', pathname)?.params.rigId
+  const { mode } = useAppearance()
+  const content = <><AppNavigation /><main><Outlet /></main></>
+
   return (
-    <div className="vela-theme min-h-screen" data-mode="dark" style={themeStyle(theme, 'dark')}>
-      <AppNavigation />
-      <main>
-        <Outlet />
-      </main>
-      <footer />
+    <div className="vela-theme vela-app min-h-screen" data-mode={mode}>
+      {rigId ? <RigObservationProvider key={rigId} rigId={rigId}>{content}</RigObservationProvider> : content}
     </div>
   )
 }

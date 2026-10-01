@@ -1,297 +1,584 @@
-/* Web-owned layout follows the approved autofocus workshop reference. */
 .vela-autofocus {
-  --vela-af-curve: #a6cbd5;
-  --vela-af-sample: #e6b86a;
-  --vela-af-fit: var(--vela-accent);
+  width: 100%;
+  color: var(--vela-text);
+  background: var(--vela-canvas);
   container-type: inline-size;
+  font: 400 16px/24px var(--vela-font);
+  text-rendering: geometricPrecision;
+}
+.vela-autofocus * {
+  box-sizing: border-box;
 }
 .vela-af-heading {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 18px;
-}
-.vela-af-heading p {
-  color: var(--vela-text-muted);
-  font-size: 12px;
-  margin: 0 0 4px;
+  gap: 28px;
+  min-height: 44px;
+  margin-bottom: 24px;
 }
 .vela-af-heading h1 {
-  font-size: 23px;
-  line-height: 1.25;
-  font-weight: 600;
+  font: 400 28px/36px var(--vela-font-heading);
   margin: 0;
 }
+.vela-af-heading > span {
+  margin-left: auto;
+  color: var(--vela-text-muted);
+  font-size: 14px;
+  line-height: 20px;
+}
+.vela-af-heading a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--vela-text);
+  font-size: 15px;
+  font-weight: 500;
+  text-decoration: none;
+}
+.vela-autofocus :focus-visible {
+  outline: 2px solid var(--vela-focus);
+  outline-offset: 3px;
+}
+.vela-af-main {
+  padding: 28px 36px;
+}
+.vela-af-setup,
 .vela-af-layout {
   display: grid;
-  gap: 16px;
+  grid-template-columns: minmax(0, 888fr) minmax(0, 452fr);
+  gap: 20px 28px;
+  align-items: start;
 }
-.vela-af-chart-panel .vela-panel__body {
-  padding: 14px 14px 10px;
+.vela-af-layout {
+  grid-template-rows: auto auto 1fr;
+}
+.vela-af-chart-panel {
+  grid-column: 1;
+  grid-row: 1 / 4;
+  min-width: 0;
+  min-height: 540px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  border: 1px solid var(--vela-line);
+  border-radius: 6px;
+  background: var(--vela-surface);
+}
+.vela-af-chart-panel h2 {
+  font: 400 24px/30px var(--vela-font-heading);
+  margin: 0;
+}
+.vela-autofocus p {
+  margin: 0;
+}
+.vela-af-intro {
+  font-size: 16px;
+  line-height: 24px;
+  color: var(--vela-text-muted);
+}
+.vela-af-support,
+.vela-af-panel-note,
+.vela-af-actions,
+.vela-af-footer {
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--vela-text-muted);
 }
 .vela-af-chart {
+  display: block;
   width: 100%;
   height: auto;
-  display: block;
 }
-.vela-af-chart-heading {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  font-size: 11px;
-  color: var(--vela-text-muted);
-  margin-bottom: 8px;
-}
-.vela-af-chart text {
-  font-size: 11px;
+.vela-af-chart text,
+.vela-af-window text {
+  font-family: var(--vela-font);
+  font-size: 14px;
   fill: var(--vela-text-muted);
 }
 .vela-af-chart .vela-af-axis {
-  stroke: var(--vela-line);
-  stroke-width: 1;
+  stroke: var(--vela-line-strong);
   fill: none;
 }
 .vela-af-chart .vela-af-grid {
   stroke: var(--vela-line);
-  stroke-width: 1;
-  opacity: 0.55;
 }
-.vela-af-chart .vela-af-start {
+.vela-af-start {
   stroke: var(--vela-text-muted);
+  stroke-width: 1.5px;
   stroke-dasharray: 4 4;
-  stroke-width: 1.2;
 }
-.vela-af-chart .vela-af-fit-line {
-  stroke: var(--vela-af-fit);
-  stroke-width: 1.4;
+.vela-af-point {
+  fill: var(--vela-accent);
 }
-.vela-af-chart .vela-af-hyperbola {
+.vela-af-min-sample {
   fill: none;
-  stroke: var(--vela-af-curve);
-  stroke-width: 1.6;
+  stroke: var(--vela-line-strong);
+  stroke-width: 1.5px;
 }
-.vela-af-chart .vela-af-point {
-  fill: var(--vela-af-sample);
+.vela-af-fit-line {
+  stroke: var(--vela-accent);
 }
-.vela-af-chart .vela-af-point[data-latest] {
-  fill: var(--vela-text);
-}
-.vela-af-chart .vela-af-point[data-empty] {
+.vela-af-hyperbola {
   fill: none;
-  stroke: var(--vela-text-muted);
-  stroke-width: 1.2;
-}
-.vela-af-chart .vela-af-min-sample {
-  fill: none;
-  stroke: var(--vela-text-muted);
-  stroke-width: 1.3;
+  stroke: var(--vela-accent);
+  stroke-width: 2px;
 }
 .vela-af-legend {
   display: flex;
+  gap: 28px;
   flex-wrap: wrap;
-  gap: 14px;
-  padding: 8px 2px 2px;
-  font-size: 11px;
+  font-size: 14px;
+  line-height: 20px;
   color: var(--vela-text-muted);
+}
+.vela-af-panel-note {
+  border-top: 1px solid var(--vela-line);
+  padding-top: 16px;
+}
+.vela-af-window {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.vela-af-window-axis {
+  fill: none;
+  stroke: var(--vela-line-strong);
+  stroke-width: 1.5px;
+}
+.vela-af-window-direction {
+  fill: none;
+  stroke: var(--vela-accent);
+  stroke-width: 1.5px;
+}
+.vela-af-window text.vela-af-window-value {
+  font-size: 16px;
+  fill: var(--vela-text);
+}
+.vela-af-window rect {
+  fill: var(--vela-accent-surface);
+}
+.vela-af-window circle {
+  fill: var(--vela-accent);
+}
+.vela-af-window-facts {
+  display: grid;
+  grid-template-columns: 254px 184px minmax(0, 1fr);
+  gap: 24px;
+  margin: 0;
+}
+.vela-af-window-facts > div {
+  display: grid;
+  gap: 6px;
+}
+.vela-af-window-facts dt {
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--vela-text-muted);
+}
+.vela-af-window-facts dd {
+  font-size: 16px;
+  line-height: 24px;
+  margin: 0;
+}
+.vela-af-side {
+  display: grid;
+  gap: 20px;
+}
+.vela-af-side .vela-af-status {
+  grid-column: auto;
+}
+.vela-af-status {
+  grid-column: 2;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--vela-accent-surface);
+  border-radius: 6px;
+}
+.vela-af-status-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.vela-af-status-line span {
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--vela-text-muted);
+}
+.vela-af-status strong {
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+}
+.vela-af-status p {
+  font-size: 16px;
+  line-height: 24px;
+}
+.vela-af-status .vela-af-support {
+  font-size: 14px;
+  line-height: 20px;
+}
+.vela-af-status .vela-af-current {
+  font: 400 46px/56px var(--vela-font-heading);
+  letter-spacing: -2px;
+}
+.vela-af-status .vela-button,
+.vela-af-side > .vela-button,
+.vela-af-actions .vela-button {
+  width: 100%;
+}
+.vela-af-status[data-warning] {
+  background: var(--vela-warning-surface);
+  color: var(--vela-warning);
+}
+.vela-af-facts,
+.vela-af-readout {
+  margin: 0;
+}
+.vela-af-facts > div,
+.vela-af-readout > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--vela-line);
+  align-items: center;
+}
+.vela-af-facts dt,
+.vela-af-readout dt {
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--vela-text-muted);
+}
+.vela-af-facts dd,
+.vela-af-readout dd {
+  font-size: 16px;
+  line-height: 24px;
+  margin: 0;
+  text-align: right;
+}
+.vela-af-readout,
+.vela-af-actions {
+  grid-column: 2;
+}
+.vela-af-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  margin-top: 24px;
+}
+.vela-af-chart--compact,
+.vela-af-mobile-label,
+.vela-af-mobile-activity,
+.vela-af-mobile-action,
+.vela-af-mobile-help,
+.vela-af-readout .vela-af-mobile-fact {
+  display: none;
+}
+.vela-af-status strong:not(.vela-af-current) {
+  display: flex;
+  align-items: center;
+}
+.vela-af-status-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: currentColor;
+  margin-right: 4px;
+  flex: 0 0 10px;
 }
 .vela-af-legend span {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 .vela-af-legend i {
-  width: 10px;
-  height: 2px;
-  background: var(--vela-text-muted);
-}
-.vela-af-legend i[data-kind='start'] {
-  background: transparent;
-  border-top: 1.5px dashed var(--vela-text-muted);
-  height: 0;
-  width: 14px;
-}
-.vela-af-legend i[data-kind='sample'] {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--vela-af-sample);
-}
-.vela-af-legend i[data-kind='curve'] {
-  background: var(--vela-af-curve);
-}
-.vela-af-legend i[data-kind='fit'] {
-  background: var(--vela-af-fit);
-}
-.vela-af-readout .vela-panel__body {
-  padding: 16px;
-}
-.vela-af-readout dl {
-  margin: 0;
-  display: grid;
-  gap: 0;
-}
-.vela-af-readout dl > div {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 6px 12px;
-  padding: 8px 0;
-  border-top: 1px solid var(--vela-line);
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
-}
-.vela-af-readout dl > div:first-child {
-  border-top: 0;
-  padding-top: 0;
-}
-.vela-af-readout dt {
-  color: var(--vela-text-muted);
-  font-size: 12px;
-}
-.vela-af-readout dd {
-  margin: 0;
-  font-weight: 550;
-}
-.vela-af-activity {
-  font-size: 11px;
-  line-height: 1.5;
-  color: var(--vela-text-muted);
-  border-top: 1px solid var(--vela-line);
-  padding-top: 12px;
-  margin-top: 12px;
-}
-.vela-af-activity__line {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  color: var(--vela-text);
-  min-height: 18px;
-}
-.vela-af-activity__line strong {
-  font-size: 12px;
-  font-weight: 550;
-}
-.vela-af-activity__spinner {
+  display: inline-block;
   width: 10px;
   height: 10px;
   flex: 0 0 10px;
-  border: 1px solid var(--vela-line-strong);
-  border-top-color: var(--vela-accent);
+}
+.vela-af-legend-sample {
+  background: var(--vela-text-muted);
   border-radius: 50%;
-  animation: vela-af-working 1.2s linear infinite;
 }
-@keyframes vela-af-working {
-  to {
-    transform: rotate(360deg);
-  }
+.vela-af-legend-lowest {
+  border: 1px solid var(--vela-text-muted);
+  border-radius: 50%;
 }
-@media (prefers-reduced-motion: reduce) {
-  .vela-af-activity__spinner {
-    animation: none;
-  }
+.vela-af-legend .vela-af-legend-start {
+  border-left: 1px dashed var(--vela-text-muted);
+  width: 0;
+  flex-basis: 0;
+  height: 20px;
 }
-.vela-af-notice {
-  padding: 14px 16px;
-  margin-bottom: 18px;
-  border: 1px solid color-mix(in oklch, var(--vela-warning) 38%, var(--vela-line));
-  border-radius: var(--vela-radius);
-  background: color-mix(in oklch, var(--vela-warning) 8%, var(--vela-surface));
-  color: var(--vela-warning);
-  font-size: 14px;
-  line-height: 1.5;
-}
-.vela-af-notice strong {
-  font-size: 16px;
-  font-weight: 600;
-}
-.vela-af-notice p {
-  margin: 4px 0 0;
-}
-.vela-af-setup {
-  display: grid;
-  gap: 20px;
-}
-.vela-af-setup h2 {
-  font-size: 18px;
-  font-weight: 550;
-  margin: 0 0 10px;
-}
-.vela-af-setup h3 {
-  font-size: 14px;
-  font-weight: 550;
-  margin: 0 0 10px;
-}
-.vela-af-setup p {
-  font-size: 12px;
-  line-height: 1.6;
-  color: var(--vela-text-muted);
-  margin: 0 0 12px;
-}
-.vela-af-facts {
-  margin: 0;
-  border-top: 1px solid var(--vela-line);
-  padding-top: 12px;
-}
-.vela-af-facts > div {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 5px;
-  font-size: 12px;
-  padding: 6px 0;
-}
-.vela-af-facts dt {
-  color: var(--vela-text-muted);
-}
-.vela-af-facts dd {
-  margin: 0;
-  font-variant-numeric: tabular-nums;
-}
-.vela-af-setup .vela-field {
-  margin: 12px 0;
-}
-.vela-af-next .vela-button {
-  width: 100%;
-  min-height: 44px;
-  margin-top: 6px;
-}
-.vela-af-actions > p {
-  color: var(--vela-text-muted);
-  font-size: 12px;
-  line-height: 1.5;
-  margin: 0 0 14px;
-}
-.vela-af-actions .vela-button {
-  min-height: 44px;
-  width: 100%;
-}
-@container (min-width: 680px) {
-  .vela-af-heading {
-    margin-bottom: 24px;
+@container (max-width: 900px) {
+  .vela-af-setup {
+    grid-template-columns: 1fr;
   }
   .vela-af-layout {
-    grid-template-columns: minmax(0, 1.7fr) minmax(240px, 0.9fr);
-    gap: 20px;
-    align-items: start;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  }
+  .vela-af-chart-panel {
+    min-height: auto;
+  }
+  .vela-af-legend {
+    gap: 12px;
+  }
+  .vela-af-window-facts {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+@container (max-width: 600px) {
+  .vela-af-main {
+    padding: 12px 20px;
+  }
+  .vela-af-setup,
+  .vela-af-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .vela-af-layout > * {
+    width: 100%;
+  }
+  .vela-af-layout .vela-af-status {
+    order: -1;
+  }
+  .vela-af-status {
+    padding: 14px;
+    gap: 6px;
+  }
+  .vela-af-chart-panel {
+    padding: 14px;
+    gap: 8px;
+    min-height: auto;
+  }
+  .vela-af-chart--compact {
+    display: block;
+  }
+  .vela-af-chart--desktop,
+  .vela-af-layout .vela-af-chart-panel h2,
+  .vela-af-chart-intro,
+  .vela-af-legend,
+  .vela-af-layout .vela-af-panel-note,
+  .vela-af-desktop-activity,
+  .vela-af-current,
+  .vela-af-exposure > span,
+  .vela-af-desktop-action,
+  .vela-af-readout .vela-af-desktop-fact,
+  .vela-af-desktop-help {
+    display: none;
+  }
+  .vela-af-mobile-label,
+  .vela-af-mobile-activity,
+  .vela-af-mobile-action,
+  .vela-af-mobile-help {
+    display: block;
+  }
+  .vela-af-mobile-label {
+    font-size: 14px;
+    line-height: 20px;
+    color: var(--vela-text-muted);
+  }
+  .vela-af-mobile-activity {
+    font-weight: 500;
+  }
+  .vela-af-readout {
+    display: grid;
+    gap: 8px;
+  }
+  .vela-af-readout > div {
+    padding: 0;
+    border: 0;
+  }
+  .vela-af-readout .vela-af-mobile-fact {
+    display: flex;
+  }
+  .vela-af-mobile-fact dd {
+    font-size: 14px;
+    line-height: 20px;
   }
   .vela-af-actions {
-    grid-column: 2;
+    border-top: 1px solid var(--vela-line);
+    padding-top: 12px;
+    display: grid;
+    gap: 12px;
   }
-  .vela-af-setup {
-    grid-template-columns: 1.5fr 1fr;
-    gap: 28px;
-    align-items: start;
-  }
-  .vela-af-next {
-    padding: 18px 0;
+  .vela-af-footer {
+    flex-direction: column;
+    gap: 8px;
   }
 }
-.vela-autofocus .vela-button:hover,
-.vela-autofocus .vela-button:disabled {
-  transform: none;
+
+.vela-af-window-facts {
+  border-top: 1px solid var(--vela-line);
+  padding-top: 20px;
+  gap: 24px;
 }
-.vela-autofocus[data-pending] .vela-button:disabled {
-  opacity: 1;
-  cursor: wait;
+.vela-af-window-facts dd {
+  font-weight: 500;
+}
+.vela-af-setup .vela-af-panel-note {
+  border: 0;
+  padding-top: 0;
+}
+.vela-af-ready {
+  gap: 8px;
+}
+.vela-af-ready p {
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--vela-text-muted);
+}
+.vela-af-step {
+  position: relative;
+}
+.vela-af-step .vela-input {
+  padding-right: 65px;
+}
+.vela-af-step-suffix {
+  position: absolute;
+  right: 15px;
+  top: 28px;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  font-size: 16px;
+  line-height: 24px;
+  color: var(--vela-text-muted);
+  pointer-events: none;
+}
+.vela-af-outcome {
+  grid-column: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+  border: 1px solid var(--vela-line);
+  border-radius: 6px;
+  min-height: 364px;
+  background: var(--vela-accent-surface);
+}
+.vela-af-side .vela-af-outcome {
+  grid-column: auto;
+}
+.vela-af-outcome[data-tone='warning'] {
+  background: var(--vela-warning-surface);
+}
+.vela-af-outcome[data-tone='danger'] {
+  background: var(--vela-danger-surface);
+}
+.vela-af-outcome h2 {
+  margin: 0;
+  font: 400 24px/30px var(--vela-font-heading);
+}
+.vela-af-outcome .vela-af-outcome-eyebrow {
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--vela-text-muted);
+}
+.vela-af-outcome-body {
+  font-size: 16px;
+  line-height: 24px;
+}
+.vela-af-outcome-fact,
+.vela-af-outcome-footer {
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--vela-text-muted);
+}
+.vela-af-outcome[data-tone='danger'] .vela-af-outcome-eyebrow,
+.vela-af-outcome[data-tone='danger'] .vela-af-outcome-fact {
+  color: var(--vela-danger);
+}
+.vela-af-outcome[data-tone='warning'] .vela-af-outcome-eyebrow,
+.vela-af-outcome[data-tone='warning'] .vela-af-outcome-fact {
+  color: var(--vela-warning);
+}
+.vela-af-outcome .vela-button {
+  width: 100%;
+  margin-top: auto;
+}
+@container (max-width: 900px) {
+  .vela-af-window-facts {
+    grid-template-columns: 1fr;
+  }
+}
+@container (max-width: 600px) {
+  .vela-af-layout .vela-af-outcome {
+    order: -1;
+  }
+  .vela-af-outcome {
+    padding: 20px;
+    min-height: 0;
+    gap: 12px;
+  }
+  .vela-af-outcome .vela-button {
+    margin-top: 8px;
+  }
+}
+
+.vela-af-point[data-empty] {
+  fill: var(--vela-surface);
+  stroke: var(--vela-text-muted);
+  stroke-width: 1.5px;
+}
+.vela-af-window-unavailable {
+  min-height: 210px;
+  display: grid;
+  align-content: center;
+  color: var(--vela-text-muted);
+}
+.vela-af-footer details {
+  max-width: 452px;
+}
+.vela-af-footer summary {
+  cursor: pointer;
+  min-height: 44px;
+}
+.vela-af-footer details p {
+  padding-top: 8px;
+}
+.vela-af-facts dd,
+.vela-af-readout dd {
+  overflow-wrap: anywhere;
+}
+@container (max-width: 600px) {
+  .vela-af-heading {
+    min-height: 36px;
+    margin: 0 0 12px;
+  }
+  .vela-af-heading > a,
+  .vela-af-heading > span {
+    display: none;
+  }
+  .vela-af-footer {
+    display: none;
+  }
+  .vela-af-setup + .vela-af-footer {
+    display: flex;
+  }
+}
+
+.vela-af-window--compact {
+  display: none;
+}
+@container (max-width: 600px) {
+  .vela-af-window--desktop {
+    display: none;
+  }
+  .vela-af-window--compact {
+    display: block;
+  }
+  .vela-af-window--compact text.vela-af-window-value {
+    font-size: 14px;
+  }
 }

@@ -8,8 +8,10 @@ export interface TargetView extends TargetPosition {
   id: string
   name: string
   catalog: string
+  constellation: string | null
   kind: string
   sizeArcminutes: number | null
+  minorSizeArcminutes: number | null
   thumbnailUrl: string
   sky: TargetSkyPath | null
 }
@@ -32,6 +34,9 @@ export interface TargetSkyPath {
       waxing: boolean
     }
   }>
+  /** Position calculated at observedAt, independent of the sampled night span. */
+  currentMoonSeparationDegrees: number
+  currentAzimuthDegrees: number
   currentAltitudeDegrees: number
   highestAltitudeDegrees: number
   aboveHorizonDuringDarkness: Array<{ startsAt: string; endsAt: string }>
@@ -96,6 +101,36 @@ export interface TargetDiscoveryView {
   targets: TargetDiscoveryItem[]
 }
 
+/** Catalog browsing has no inferred observing location or sky calculation. */
+export type TargetCatalogItem = Omit<TargetDiscoveryItem, 'sky' | 'opportunity'>
+
+export interface TargetCatalogView {
+  query: string
+  category: TargetCategory | 'all'
+  filter: TargetFilterChoice | 'all'
+  offset: number
+  pageSize: number
+  total: number
+  targets: TargetCatalogItem[]
+}
+
+/** Temporary pixels from one framing exposure, independently of its solve outcome. */
+export interface FramingPreview {
+  id: string
+  rigId: string
+  targetId: string
+  width: number
+  height: number
+  exposureSeconds: number
+  cameraName: string
+  capturedAt: string
+  capturedAtSource: 'camera' | 'server-estimate'
+  checkId: string | null
+  previewUrl: string | null
+  nativePreviewUrl: string | null
+  statistics: { detectedStars: number; medianHfrPixels: number | null } | null
+}
+
 export type FramingPointingSide = 'east' | 'west' | 'unknown'
 
 /** Bounded measurements from one centering request, all against its fixed desired center. */
@@ -151,6 +186,7 @@ export interface FramingView {
   centering: FramingCentering | null
   desired: TargetPosition | null
   targetId: string | null
+  preview: FramingPreview | null
   actual:
     | (TargetPosition & {
         checkId: string

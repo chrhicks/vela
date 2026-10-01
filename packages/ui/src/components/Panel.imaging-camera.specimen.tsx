@@ -85,7 +85,6 @@ function ImagingCameraPreview({
             {!editing && (
               <Button
                 tone="quiet"
-                size="small"
                 disabled={locked}
                 onClick={() => {
                   setChoice(saved)

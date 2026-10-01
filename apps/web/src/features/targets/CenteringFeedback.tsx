@@ -30,7 +30,7 @@ export function FramingStatus({
       exposing: `Taking a ${view.exposureSeconds}-second test exposure`,
       downloading: 'Receiving the image',
       solving: 'Measuring the new framing',
-      checked: checked ? 'Framing checked' : 'Composition not checked',
+      checked: checked ? 'Test frame solved' : 'Composition not checked',
       stopping: 'Stopping framing',
       stopped: 'Framing stopped',
       failed: 'Framing not confirmed',
@@ -90,7 +90,10 @@ export function FramingStatus({
           !pending
         }
       />
-      <strong>{title}</strong>
+      <strong>
+        {title === 'Test frame solved' && <span aria-hidden="true">✓ </span>}
+        <span>{title}</span>
+      </strong>
       {detail && <p>{detail}</p>}
     </div>
   )
@@ -109,7 +112,7 @@ export function CenteringProgress({
   centering: FramingCentering
   current: boolean
 }) {
-  const measured = centering.measurements.filter(sample => sample.correction > 0).length
+  const measured = centering.measurements.filter((sample) => sample.correction > 0).length
 
   return (
     <section className="vela-target-progress" aria-label="Centering measurements">

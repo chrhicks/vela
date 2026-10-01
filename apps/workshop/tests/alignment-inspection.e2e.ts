@@ -3,11 +3,11 @@ import { expect, test } from '@playwright/test'
 // The workbench adds 32px canvas padding per side and a 1px preview border.
 // Request the outer width that gives the specimen the actual phone/desktop width.
 const url = (width: number, example = 'large-error', phase = 'adjusting') =>
-  `/?component=panel&specimen=panel-polar-alignment&profile=vela-current&mode=dark&context=isolated&viewport=${width + 66}&prop.example=${example}&prop.phase=${phase}`
+  `/?component=panel&specimen=panel-polar-alignment&profile=fieldroom&mode=dark&context=isolated&viewport=${width + 66}&prop.example=${example}&prop.phase=${phase}`
 
 test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 1700, height: 1400 })
-  await page.route('**/__workshop/**', route =>
+  await page.route('**/__workshop/**', (route) =>
     route.fulfill({
       contentType: 'application/json',
       body: JSON.stringify({ session: null, profiles: [] }),
@@ -23,21 +23,30 @@ for (const width of [390, 1040]) {
       await page.goto(url(width, example))
       const demo = page.locator('.vela-polar-demo')
       const image = demo.getByRole('img')
-      await expect(demo.getByRole('button', { name: 'Fit both', exact: true })).toHaveAttribute(
-        'aria-pressed',
-        'true',
-      )
-      expect(await demo.evaluate(element => element.getBoundingClientRect().width)).toBe(width)
+      await expect(
+        demo.getByRole('button', { name: 'Fit both', exact: true }),
+      ).toHaveAttribute('aria-pressed', 'true')
+      expect(
+        await demo.evaluate((element) => element.getBoundingClientRect().width),
+      ).toBe(width)
 
-      const framing = await image.evaluate(element => {
-        if (!(element instanceof SVGSVGElement)) throw new Error('Expected the inspection SVG')
+      const framing = await image.evaluate((element) => {
+        if (!(element instanceof SVGSVGElement))
+          throw new Error('Expected the inspection SVG')
 
         const box = element.viewBox.baseVal
-        const markers = [...element.querySelectorAll('circle')]
+
+        const markers = [
+          ...element.querySelectorAll(
+            '[data-marker="reference"], [data-marker="target"]',
+          ),
+        ]
 
         return (
           markers.length === 2 &&
-          markers.every(marker => {
+          markers.every((marker) => {
+            if (!(marker instanceof SVGCircleElement))
+              throw new Error('Expected marker circle')
             const x = marker.cx.baseVal.value
             const y = marker.cy.baseVal.value
 
@@ -52,15 +61,22 @@ for (const width of [390, 1040]) {
       })
 
       expect(framing).toBe(true)
-      expect(await demo.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
+      expect(
+        await demo.evaluate(
+          (element) => element.scrollWidth <= element.clientWidth,
+        ),
+      ).toBe(true)
 
       if (example === 'outside-image')
         await expect(demo).toContainText('Blank area has no image data')
-      await demo.screenshot({ path: `test-results/alignment-${width}-${example}.png` })
+      await demo.screenshot({
+        path: `test-results/alignment-${width}-${example}.png`,
+      })
       await demo.getByRole('button', { name: 'Fine · 1′', exact: true }).click()
 
-      const fineHeight = await image.evaluate(element => {
-        if (!(element instanceof SVGSVGElement)) throw new Error('Expected the inspection SVG')
+      const fineHeight = await image.evaluate((element) => {
+        if (!(element instanceof SVGSVGElement))
+          throw new Error('Expected the inspection SVG')
 
         return element.viewBox.baseVal.height
       })
@@ -70,7 +86,9 @@ for (const width of [390, 1040]) {
       if (example === 'near-aligned')
         await expect(demo).not.toContainText('Markers outside this fine view')
       else await expect(demo).toContainText('Markers outside this fine view')
-      await demo.screenshot({ path: `test-results/alignment-${width}-${example}-fine.png` })
+      await demo.screenshot({
+        path: `test-results/alignment-${width}-${example}-fine.png`,
+      })
     }
   })
 
@@ -82,28 +100,42 @@ for (const width of [390, 1040]) {
     await expect(demo).toContainText('No solution · Exposure retained')
     const imageSource = await demo.locator('svg image').getAttribute('href')
 
-    if (!imageSource) throw new Error('Baseline exposure must have an image source')
+    if (!imageSource)
+      throw new Error('Baseline exposure must have an image source')
 
     await demo.getByRole('button', { name: 'Enlarge image' }).click()
     const dialog = demo.getByRole('dialog')
-    await expect(dialog).toContainText('Same exposure · Started 8:25:49 PM')
+    await expect(dialog).toContainText('Same exposure · Started 21:02:14')
     expect(
-      await dialog.evaluate(element => element.getBoundingClientRect().width),
-    ).toBeLessThanOrEqual(await demo.evaluate(element => element.clientWidth))
-    await expect(dialog.locator('svg image')).toHaveAttribute('href', imageSource)
+      await dialog.evaluate((element) => element.getBoundingClientRect().width),
+    ).toBeLessThanOrEqual(await demo.evaluate((element) => element.clientWidth))
+    await expect(dialog.locator('svg image')).toHaveAttribute(
+      'href',
+      imageSource,
+    )
     await expect(dialog.locator('[data-marker]')).toHaveCount(0)
-    await dialog.screenshot({ path: `test-results/alignment-${width}-baseline-expanded.png` })
+    await dialog.screenshot({
+      path: `test-results/alignment-${width}-baseline-expanded.png`,
+    })
     await dialog.getByRole('button', { name: '100%', exact: true }).click()
     const native = dialog.locator('.vela-polar-native img')
     await expect(native).toHaveAttribute('src', imageSource)
-    expect(await native.evaluate(element => element.getBoundingClientRect().width)).toBe(1600)
-    await dialog.getByRole('region').evaluate(element => {
+    expect(
+      await native.evaluate((element) => element.getBoundingClientRect().width),
+    ).toBe(1600)
+    await dialog.getByRole('region').evaluate((element) => {
       element.scrollLeft = 500
     })
-    expect(await dialog.getByRole('region').evaluate(element => element.scrollLeft)).toBe(500)
+    expect(
+      await dialog
+        .getByRole('region')
+        .evaluate((element) => element.scrollLeft),
+    ).toBe(500)
     await page.keyboard.press('Escape')
     await expect(dialog).toHaveCount(0)
-    await expect(demo.getByRole('button', { name: 'Enlarge image' })).toBeFocused()
+    await expect(
+      demo.getByRole('button', { name: 'Enlarge image' }),
+    ).toBeFocused()
   })
 }
 
@@ -113,11 +145,11 @@ test('retrying keeps last-known status beside the image, including enlargement',
   await page.goto(url(390, 'near-aligned', 'reconnecting'))
   const demo = page.locator('.vela-polar-demo')
   await expect(demo.locator('.vela-polar-inspection-status')).toHaveText(
-    'Last known solve · 1 min 7 s ago · Retrying; pause adjustments',
+    'Last solved frame · 45 seconds old',
   )
   await demo.screenshot({ path: 'test-results/alignment-390-retrying.png' })
   await demo.getByRole('button', { name: 'Enlarge image' }).click()
   await expect(demo.getByRole('dialog')).toContainText(
-    'Last known solve · 1 min 7 s ago · Retrying; pause adjustments',
+    'Last solved frame · 45 seconds old',
   )
 })

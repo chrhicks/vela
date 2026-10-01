@@ -1,0 +1,98 @@
+.equipment { container: equipment / inline-size; width: 100%; color: var(--vela-text); background: var(--vela-canvas); font: 400 16px/24px var(--vela-font); text-rendering: geometricPrecision; }
+.equipment * { box-sizing: border-box; }
+.equipment :where(h1, h2, h3, p, dl, dd) { margin: 0; }
+.equipment__heading { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 26px 36px 24px; }
+.equipment__heading > div { display: flex; align-items: baseline; flex-wrap: wrap; gap: 24px; }
+.equipment__heading h1 { font: 400 28px/34px var(--vela-font-heading); }
+.equipment__heading span { color: var(--vela-text-muted); }
+.equipment__heading > a, .equipment__setup a, .equipment__text-action { display: inline-flex; align-items: center; min-height: 44px; padding: 0; border: 0; color: var(--vela-text); background: transparent; font: 500 15px/20px var(--vela-font); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.equipment :focus-visible { outline: 2px solid var(--vela-focus); outline-offset: 2px; }
+.equipment__layout { display: grid; grid-template-columns: minmax(0, 1fr) 452px; grid-template-areas: 'readiness setup' 'devices setup' 'preparation setup'; column-gap: 28px; padding: 0 36px; }
+.equipment__readiness { grid-area: readiness; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 24px; border-radius: 6px; background: var(--vela-accent-surface); }
+.equipment__readiness > div { display: grid; gap: 8px; }
+.equipment__readiness h2, .equipment__setup h2 { font: 400 24px/30px var(--vela-font-heading); }
+.equipment__readiness p { font-size: 14px; line-height: 20px; }
+.equipment__readiness .vela-button { flex-shrink: 0; }
+.equipment__devices { grid-area: devices; min-width: 0; }
+.equipment__devices > header { display: flex; justify-content: space-between; padding: 24px 0 14px; }
+.equipment__devices > header h2 { color: var(--vela-text-muted); font: 400 14px/20px var(--vela-font); }
+.equipment__devices > header .equipment__text-action { align-items: start; color: var(--vela-text-muted); }
+.equipment__device { border-top: 1px solid var(--vela-line); }
+.equipment__row { display: grid; grid-template-columns: 64px 300px minmax(0, 1fr) 210px 60px; align-items: center; min-height: 99px; }
+.equipment__row > svg { color: var(--vela-text-muted); }
+.equipment__row > .vela-icon-button { justify-self: end; }
+.equipment__name { display: grid; gap: 7px; min-width: 0; }
+.equipment__name h3 { font: 500 16px/24px var(--vela-font); }
+.equipment__name p, .equipment__summary, .equipment__connection { font-size: 14px; line-height: 20px; }
+.equipment__name p, .equipment__summary { color: var(--vela-text-muted); }
+.equipment__connection { justify-self: end; }
+.equipment__device-details { padding: 0 60px 24px 64px; }
+.equipment__device-details dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+.equipment__device-details dl > div { display: grid; gap: 7px; }
+.equipment__device-details dt { color: var(--vela-text-muted); font-size: 14px; line-height: 20px; }
+.equipment__setup { grid-area: setup; display: flex; flex-direction: column; gap: 20px; padding: 24px; border-radius: 6px; background: var(--vela-surface); }
+.equipment__setup-group { display: grid; gap: 10px; }
+.equipment__setup-group > p { color: var(--vela-text-muted); font-size: 14px; line-height: 20px; }
+.equipment__setup .vela-field { gap: 10px; }
+.equipment__divider { border-top: 1px solid var(--vela-line); padding-top: 18px; }
+.equipment__focal { position: relative; }
+.equipment__focal > span { position: absolute; top: 41px; right: 14px; }
+.equipment__focal .vela-input { padding-right: 50px; }
+.equipment__preparation { grid-area: preparation; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 22px 0; border-top: 1px solid var(--vela-line); }
+.equipment__preparation > div { display: flex; flex-wrap: wrap; gap: 14px; }
+.equipment__freshness { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; min-height: 60px; padding: 8px 36px; color: var(--vela-text-muted); font-size: 14px; line-height: 20px; }
+.equipment__notice { padding: 12px 36px 0; color: var(--vela-text-muted); font-size: 14px; }
+@container equipment (width < 1360px) {
+  .equipment__layout { display: flex; flex-direction: column; padding: 0 20px; }
+  .equipment__setup { margin-top: 24px; }
+  .equipment__row { grid-template-columns: 64px minmax(0, 1.2fr) minmax(0, 1fr) 150px 60px; }
+  .equipment__preparation { margin-top: 24px; }
+  .equipment__heading { padding-inline: 20px; }
+  
+  .equipment__freshness { padding-inline: 20px; }
+}
+@container equipment (width < 600px) {
+  .equipment__heading { flex-wrap: wrap; gap: 8px; }
+  .equipment__heading > div { gap: 8px 24px; }
+  .equipment__readiness { flex-direction: column; align-items: stretch; padding: 20px; }
+  .equipment__row { grid-template-columns: 44px minmax(0, 1fr) 44px; gap: 8px; padding: 16px 0; }
+  .equipment__row > svg { grid-column: 1; grid-row: 1 / 3; align-self: start; }
+  .equipment__name { grid-column: 2; grid-row: 1; }
+  .equipment__summary { grid-column: 2; grid-row: 2; }
+  .equipment__connection { grid-column: 2; grid-row: 3; justify-self: start; }
+  .equipment__row > .vela-icon-button { grid-column: 3; grid-row: 1; }
+  .equipment__device-details { padding: 0 0 20px 52px; }
+  .equipment__device-details dl { grid-template-columns: 1fr; gap: 14px; }
+  .equipment__setup { padding: 20px; }
+  .equipment__preparation { align-items: start; flex-direction: column; }
+}
+
+.equipment { font-size: 16px; }
+.equipment a.vela-button { text-decoration: none; }
+.equipment__row h3, .equipment__row p { overflow-wrap: anywhere; }
+.equipment__row > svg { flex-shrink: 0; }
+.equipment__device-details > p { color: var(--vela-text-muted); font-size: 14px; margin-bottom: 12px; }
+.equipment__device-details dl { margin-top: 12px; }
+.equipment__connection-actions { display: grid; flex-shrink: 0; gap: 12px; }
+.equipment__connection[data-tone="warning"], .equipment__setup-notice { color: var(--vela-text-muted); }
+.equipment__setup-notice { display: grid; gap: 10px; font-size: 14px; line-height: 20px; }
+.equipment__readiness .vela-observe-result { margin-top: 12px; }
+.equipment__readiness dl { display: grid; gap: 8px; font-size: 14px; }
+.equipment__rig-details { color: var(--vela-text-muted); }
+.equipment__rig-details[open] { flex-basis: 100%; padding-bottom: 16px; }
+.equipment__rig-details > summary { display: list-item; padding-block: 12px; cursor: pointer; }
+.equipment__rig-details dl { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 24px; font-size: 14px; }
+.equipment__rig-details dt { margin-bottom: 6px; }
+.equipment__rig-details dd { color: var(--vela-text); }
+.equipment__management { display: flex; justify-content: space-between; gap: 20px; align-items: center; padding-top: 20px; font-size: 14px; }
+.equipment__forget-dialog { width: min(624px, calc(100vw - 40px)); padding: 28px; gap: 12px; font: 400 16px/24px var(--vela-font); }
+.equipment__forget-dialog .vela-dialog__footer { margin-top: 6px; }
+.equipment__forget-dialog [role="alert"] { margin-top: 16px; color: var(--vela-text); }
+.equipment__route-state { padding: 36px; }
+.equipment__route-state > * { margin-block: 16px; }
+@container equipment (width < 1360px) {
+  .equipment__rig-details { margin-inline: 0; }
+}
+@container equipment (width < 600px) {
+  .equipment__management { flex-direction: column; align-items: start; }
+}

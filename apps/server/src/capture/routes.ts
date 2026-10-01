@@ -7,7 +7,7 @@ import {
   type AlpacaCameraCooling,
   type AlpacaDeviceTelemetry,
 } from '@vela/alpaca'
-import type { CaptureCoolingView, CaptureView, NavigationCapture } from '@vela/model/web'
+import type { CaptureCoolingView, CaptureSubject, CaptureView, NavigationCapture } from '@vela/model/web'
 import type { RigCatalogRecord } from '../rig/contracts.js'
 import type { RigCatalog } from '../rig/catalog.js'
 import type { RigOperations } from '../rig/operations.js'
@@ -22,6 +22,7 @@ export interface CaptureSettings {
 }
 
 interface CaptureRouteOptions {
+  lookupSubject?: (targetId: string) => CaptureSubject | undefined
   savedImages?: SavedImageStore
   createCamera?: (settings: CaptureSettings) => CaptureCamera
   createInspector?: RigDetailOptions['createInspector']
@@ -83,6 +84,7 @@ export function registerCapture(
   catalog: RigCatalog,
   operations: RigOperations,
   {
+    lookupSubject,
     createCamera = configuredCamera,
     createInspector,
     createCooling = configuredCooling,
@@ -123,6 +125,9 @@ export function registerCapture(
         repeat: true,
         saveFrames: false,
         completedCount: 0,
+        subject: null,
+        savedCount: 0,
+        integrationSeconds: 0,
         exposureSeconds: 2,
         elapsedSeconds: 0,
         error: null,
@@ -215,17 +220,23 @@ export function registerCapture(
           exposureSeconds: z.number().min(0.1).max(600),
           repeat: z.boolean().optional(),
           saveFrames: z.boolean().optional(),
+          targetId: z.string().trim().min(1).max(100).optional(),
         })
         .safeParse(request.body)
 
       if (!request.headers['content-type']?.startsWith('application/json') || !parsed.success) {
         return reply.code(400).send({
           error:
-            'Expected exposureSeconds between 0.1 and 600 and optional boolean repeat and saveFrames.',
+            'Expected exposureSeconds between 0.1 and 600 and optional boolean repeat and saveFrames, and optional targetId.',
         })
       }
 
       const body = parsed.data
+      const subject = body.targetId === undefined ? null : lookupSubject?.(body.targetId)
+
+      if (subject === undefined)
+        return reply.code(400).send({ error: 'The selected capture subject was not found.' })
+
       const release = operations.acquire(request.params.rigId, 'capture')
 
       if (!release) return reply.code(409).send({ error: 'Another Rig operation is in progress.' })
@@ -260,6 +271,7 @@ export function registerCapture(
           createCamera(settings),
           view.camera.name,
           {
+            subject,
             onSettled: release,
             repeat: body.repeat === true,
             saveFrames: body.saveFrames === true,

@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { createMemoryRigCatalog, openFileRigCatalog } from './catalog.js'
 import { createRigOperations } from './operations.js'
 import { registerImagingCamera } from './imaging-camera.js'
+import { loadRigDetailView, type RigDetailOptions } from './detail.js'
 
 const rig = {
   id: 'rig',
@@ -49,7 +50,8 @@ it('requires explicit current identity and excludes selection changes during rig
   const operations = createRigOperations()
   let name = 'Main camera'
   let present = true
-  registerImagingCamera(app, catalog, operations, {
+
+  const options: RigDetailOptions = {
     createInspector: () => ({
       async inspectDevices() {
         return present
@@ -69,7 +71,9 @@ it('requires explicit current identity and excludes selection changes during rig
           : []
       },
     }),
-  })
+  }
+
+  registerImagingCamera(app, catalog, operations, options)
   const get = () => app.inject('/api/web/rigs/rig/imaging-camera')
 
   const put = (cameraName = name) =>
@@ -82,23 +86,33 @@ it('requires explicit current identity and excludes selection changes during rig
   try {
     expect((await get()).json()).toMatchObject({
       selected: null,
+      selectedDeviceId: null,
       state: 'unselected',
       editable: true,
     })
-    expect((await put()).statusCode).toBe(200)
-    expect((await get()).json()).toMatchObject({ selected: { id: 'slot', name }, state: 'ready' })
+    const saved = await put()
+    expect(saved.statusCode).toBe(200)
+    const detail = await loadRigDetailView(catalog, 'rig', options)
+    expect(detail.state).toBe('found')
+
+    if (detail.state !== 'found') throw new Error('Expected rig detail')
+    const selectedDeviceId = detail.view.devices[0]!.id
+    expect(selectedDeviceId).not.toBe('slot')
+    expect(saved.json().selectedDeviceId).toBe(selectedDeviceId)
+    expect((await get()).json()).toMatchObject({ selected: { id: 'slot', name }, selectedDeviceId, state: 'ready' })
     const release = operations.acquire('rig', 'capture')!
     expect((await put()).statusCode).toBe(409)
     expect((await get()).json().editable).toBe(false)
     release()
     name = 'Guide camera'
-    expect((await get()).json().state).toBe('changed')
+    expect((await get()).json()).toMatchObject({ state: 'changed', selectedDeviceId: null })
     expect((await put('Main camera')).statusCode).toBe(409)
     expect((await put()).statusCode).toBe(200)
     present = false
     expect((await get()).json()).toMatchObject({
       selected: { name: 'Guide camera' },
       state: 'missing',
+      selectedDeviceId: null,
     })
     expect((await put()).statusCode).toBe(409)
   } finally {

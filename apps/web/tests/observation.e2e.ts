@@ -25,6 +25,9 @@ test.beforeEach(async ({ page }) => {
       repeat: false,
       saveFrames: false,
       savedImageCount: 0,
+      subject: null,
+      savedCount: 0,
+      integrationSeconds: 0,
       captureReadState: 'current',
       completedCount: 0,
       error: null,
@@ -38,6 +41,7 @@ test.beforeEach(async ({ page }) => {
       editable: true,
       state: 'unselected',
       selected: null,
+      selectedDeviceId: null,
       cameras: [],
     }),
   )
@@ -53,11 +57,12 @@ test('enters and leaves observation without a hardware command', async ({ page }
   await page.route('**/api/web/rigs/rig-1/observe', route => respond(route, observation()))
   await page.goto('/rigs/rig-1')
   await page.screenshot({ path: test.info().outputPath('rig-entry.png') })
-  await page.getByRole('button', { name: 'Start observing' }).click()
+  await page.locator('.equipment__rig-details summary').click()
+  await page.getByRole('link', { name: 'Capture preparation →' }).click()
   await expect(page).toHaveURL(/\/rigs\/rig-1\/observe$/)
   await expect(page.getByRole('heading', { name: 'Connect this Rig’s devices' })).toBeVisible()
-  await page.getByRole('link', { name: 'Rig details' }).click()
-  await expect(page.getByRole('heading', { name: 'Seestar S30', exact: true })).toBeVisible()
+  await page.getByRole('link', { name: 'Equipment & settings' }).click()
+  await expect(page.getByRole('heading', { name: 'Your rig', exact: true })).toBeVisible()
   expect(commands).toBe(0)
 })
 
@@ -198,11 +203,7 @@ test('handles already prepared, offline, missing and malformed observations', as
   let status = 200
   await page.route('**/api/web/rigs/rig-1/observe', route => respond(route, response ?? {}, status))
   await page.goto('/rigs/rig-1/observe')
-  await expect(page.locator('.vela-capture-rig > summary')).toContainText(
-    'Connection preparation complete',
-  )
-  await page.locator('.vela-capture-rig > summary').click()
-  await expect(page.getByRole('heading', { name: 'Connection preparation complete' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Prepare a capture', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Connect devices' })).toHaveCount(0)
   response = offlineObservation()
   await page.reload()
@@ -363,18 +364,19 @@ test('leaving a pending command cannot overwrite another Rig', async ({ page }) 
   })
   await page.getByRole('button', { name: 'Connect devices' }).click()
   await started
-  await page.getByRole('link', { name: 'Rig details' }).click()
-  await page.getByRole('link', { name: 'All rigs' }).click()
+  await page.getByRole('link', { name: 'Equipment & settings' }).click()
+  await page.getByRole('link', { name: 'Manage saved rigs' }).click()
   await page.getByRole('link', { name: 'View Askar FRA 400' }).click()
-  await page.getByRole('button', { name: 'Start observing' }).click()
-  await expect(page.getByRole('heading', { name: 'Observe', exact: true })).toBeVisible()
-  await expect(page.locator('.capture-page__heading')).toContainText('Askar FRA 400')
+  await page.locator('.equipment__rig-details summary').click()
+  await page.getByRole('link', { name: 'Capture preparation →' }).click()
+  await expect(page.getByRole('heading', { name: 'Prepare a capture', exact: true })).toBeVisible()
+  await expect(page.locator('.tonight-equipment')).toContainText('Askar FRA 400')
   finish()
   await settled
   await expect(page.locator('html')).toHaveAttribute('data-navigation-test', 'same-document')
   await expect(page).toHaveURL(/\/rigs\/rig-2\/observe$/)
-  await expect(page.getByRole('heading', { name: 'Observe', exact: true })).toBeVisible()
-  await expect(page.locator('.capture-page__heading')).toContainText('Askar FRA 400')
+  await expect(page.getByRole('heading', { name: 'Prepare a capture', exact: true })).toBeVisible()
+  await expect(page.locator('.tonight-equipment')).toContainText('Askar FRA 400')
   await expect(page.getByRole('button', { name: 'Connect devices' })).toBeVisible()
   await expect(page.getByText('Last connection attempt:', { exact: false })).toHaveCount(0)
 })
@@ -389,7 +391,7 @@ for (const width of [390, 768, 1280]) {
     await page.goto('/rigs/rig-1/observe')
     await expect(page.getByRole('button', { name: 'Connecting devices…' })).toBeVisible()
     await expect(page.locator('.vela-observe-spinner')).toHaveCSS('animation-name', 'none')
-    await expect(page.locator('.vela-observe time')).toBeVisible()
+    await expect(page.locator('.capture-preparation__readiness time')).toBeVisible()
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true)
