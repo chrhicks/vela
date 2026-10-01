@@ -54,7 +54,7 @@ for (const mode of ['light', 'dark'] as const) {
         expect(geometry.controls.y).toBe(180)
         expect(geometry.controls.height).toBe(46)
         expect(geometry.cards.y).toBe(288)
-        expect(geometry.photograph.height).toBe(227)
+        expect(geometry.photograph.height).toBe(226)
         expect(geometry.summary.x).toBeCloseTo(978, 0)
         expect(geometry.summary.y).toBe(250)
         expect(geometry.summary.width).toBeCloseTo(426, 0)

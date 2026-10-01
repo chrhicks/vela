@@ -445,3 +445,19 @@ across the full run and affected rerun, plus the new axis-preservation regressio
 it is not a claim that the original full run was failure-free.
 Independent verdict and retained final browser comparison follow before this
 slice can be accepted.
+
+Independent review of `ec14cb4` returned **OK**, with 876 project tests, 52
+focused web checks, nine workshop checks and four catalog Python checks passing.
+The parent’s post-review comparison found and corrected the selected Explore
+card’s source 2px border/226px image crop, framing’s in-field seconds suffix,
+remaining 24-hour timestamps, and preparation’s Barlow 20/20 enlarge glyph
+(Paper `LY-0`). The correction run passes 46 affected route checks; renewed
+independent review and final paired comparison are required on the corrected head.
+
+Paper’s Crescent asset metadata reports 1280×1224 and the same asset ID for
+Explore and Preparation, matching local dimensions and centered cover/contain
+recipes. Frozen Paper exports carry Display P3 ICC; browser PNGs do not.
+Authenticated source bytes could not be retrieved, so exact remote/local byte
+identity is not claimed. No higher-resolution source, CSS filter or opacity
+change was found, and image pixels are not altered to compensate for raster or
+profile differences.

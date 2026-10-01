@@ -408,14 +408,14 @@
   font-size: 14px;
   line-height: 20px;
 }
-.targets-page .vela-target-command > .vela-field {
+.targets-page .vela-target-exposure {
   display: grid;
   grid-template-columns: 156px minmax(0, 1fr);
   align-items: center;
   gap: 14px;
   margin-bottom: 8px;
 }
-.targets-page .vela-target-command .vela-field__label {
+.targets-page .vela-target-exposure > label {
   font-size: 14px;
   line-height: 20px;
 }
@@ -500,7 +500,7 @@
   .targets-page .vela-target-survey-toolbar {
     padding: 8px 12px;
   }
-  .targets-page .vela-target-command > .vela-field {
+  .targets-page .vela-target-exposure {
     grid-template-columns: 140px minmax(0, 1fr);
     gap: 10px;
   }
@@ -556,4 +556,20 @@
 .targets-page .vela-target-status {
   font-size: 15px;
   line-height: 20px;
+}
+
+.vela-target-exposure__input {
+  position: relative;
+  min-width: 0;
+}
+.vela-target-exposure__input input {
+  padding-right: 82px;
+}
+.vela-target-exposure__input > span {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--vela-text-muted);
+  pointer-events: none;
 }
