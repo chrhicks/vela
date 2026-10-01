@@ -57,7 +57,26 @@ making all technical details permanently visible.
 
 ## Workshop proposal
 
-Open [Sky context & framing](http://127.0.0.1:5174/?component=panel&specimen=panel-sky-context&profile=fieldroom&mode=light&context=isolated&viewport=1280).
+The first combined proposal below is superseded for design review. Chris found
+its reduced Explore example unrecognizable compared with the real grid and
+sidebar. Review one change in its faithful page context at a time.
+
+The current proposal is **Explore sky access**: preserve Explore's navigation,
+filters, nine-card grid and selected-subject sidebar, adding only the sky-path
+icon at the sidebar heading to open the dialog. Its static catalog fixture uses
+the same nine subjects and survey cutouts as the real page. Framing and the
+remaining audit findings are deferred until this proposal has been reviewed.
+
+Open [Explore sky access](http://127.0.0.1:5174/?component=panel&specimen=panel-explore-sky&profile=fieldroom&mode=dark&context=isolated&viewport=1280).
+UI typecheck, workshop build and lint pass. Native-browser inspection confirmed
+the nine-card desktop layout, selected-subject icon/dialog and dismissal, and
+phone selection scroll/focus without horizontal overflow. These are workshop
+checks; this proposal has not changed the application.
+
+### Earlier exploratory composition
+
+[Sky context & framing](http://127.0.0.1:5174/?component=panel&specimen=panel-sky-context&profile=fieldroom&mode=light&context=isolated&viewport=1280)
+remains a historical sketch.
 The Page control switches between Framing and a deliberately reduced Explore
 example focused on the selected subject's sky entry point. The Explore example
 does not propose replacing the existing catalog grid.
