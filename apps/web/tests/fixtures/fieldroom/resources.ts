@@ -1,8 +1,17 @@
 import surveyManifest from './survey-manifest.json' with { type: 'json' }
 import { referenceImage } from './tonight'
 
+/** Simulator pixels, not a new exposure or measured WCS. See the fixture README. */
+export const alignmentResource = {
+  resource: 'alignment-star-field',
+  path: 'packages/ui/src/components/fixtures/capture-star-field.png',
+  sha256: '32fc1935092d3d98768c18e21c94829f6134262524cd302133bbf1f269099f4c',
+  contentType: 'image/png',
+}
+
 /** Exact local resources only. No network fallback or pathname-to-filesystem mapping. */
 export const reviewResources = [
+  alignmentResource,
   { resource: 'crescent', ...referenceImage, contentType: 'image/jpeg' },
   {
     resource: 'andromeda',

@@ -86,10 +86,10 @@ for (const width of [1100, 390]) {
         fieldHeightDegrees: 1,
       },
     })
-    await expect(page.locator('.vela-polar-activity__age')).toContainText(
-      'Estimated exposure start',
-    )
-    await expect(page.getByText(/Adjust the mount’s altitude and azimuth knobs/)).toBeVisible()
+    await page.getByRole('button', { name: 'Enlarge image' }).click()
+    await expect(page.getByRole('dialog')).toContainText('Estimated exposure start')
+    await page.keyboard.press('Escape')
+    await expect(page.getByText(/Adjust the mount manually/)).toBeVisible()
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
     await page.screenshot({ path: `/tmp/alignment-app-adjusting-${width}.png`, fullPage: true })
 
@@ -97,18 +97,16 @@ for (const width of [1100, 390]) {
       activity: 'retrying',
       warning: 'Device connection interrupted. Retrying automatically.',
     })
-    await expect(page.getByText('Reconnecting', { exact: true })).toBeVisible()
-    await expect(page.getByRole('alert')).toContainText('Device connection interrupted')
-    await expect(page.getByRole('alert')).not.toContainText('Plate-solving failed')
-    await expect(
-      page.getByText(/Pause adjustments until a fresh measurement arrives/),
-    ).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Stop to reposition' })).toBeEnabled()
+    await expect(page.getByText('Measurements interrupted', { exact: true })).toBeVisible()
+    await expect(page.locator('.vela-polar-status')).toContainText('Retrying camera reads')
+    await expect(page.getByRole('alert')).toHaveCount(0)
+    await expect(page.getByText(/Wait for a fresh measurement before adjusting/)).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Stop session' })).toBeEnabled()
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
     await page.screenshot({ path: `/tmp/alignment-app-reconnecting-${width}.png`, fullPage: true })
     Object.assign(view, { activity: 'waiting', warning: null })
     await expect(page.getByRole('alert')).toHaveCount(0)
-    await expect(page.getByText(/Adjust the mount’s altitude and azimuth knobs/)).toBeVisible()
+    await expect(page.getByText(/Adjust the mount manually/)).toBeVisible()
 
     Object.assign(view, { mode: 'offline', phase: 'setup', active: false, measurement: null })
     await expect(page.getByText(/simulator’s large-error preset/)).toBeVisible()
@@ -168,8 +166,13 @@ for (const width of [1100, 390]) {
     const bounds = await image.boundingBox()
     expect(bounds!.width / bounds!.height).toBeCloseTo(640 / 400, 2)
     await expect(page.getByRole('button', { name: 'Full frame', exact: true })).toBeVisible()
-    await expect(page.locator('time')).toHaveAttribute('datetime', view.preview!.capturedAt)
-    await expect(page.locator('figcaption')).toContainText('Estimated exposure start')
+    await page.getByRole('button', { name: 'Enlarge image' }).click()
+    await expect(page.getByRole('dialog').locator('time')).toHaveAttribute(
+      'datetime',
+      view.preview!.capturedAt,
+    )
+    await expect(page.getByRole('dialog')).toContainText('Estimated exposure start')
+    await page.keyboard.press('Escape')
     await expect(page.getByRole('img', { name: /alignment target/ })).toHaveCount(0)
     Object.assign(view, {
       phase: 'stopped',
@@ -248,6 +251,64 @@ test('stopped baseline preview recovers from a failed image request without anot
     .toBe(640)
   await expect(page.getByText('The exposure preview could not be loaded. Retrying…')).toHaveCount(0)
   await expect(image).toHaveAttribute('src', '/api/retry-fixture.png')
-  await expect(page.locator('time')).toHaveAttribute('datetime', '2026-09-15T00:25:49Z')
+  await page.getByRole('button', { name: 'Enlarge image' }).click()
+  await expect(page.getByRole('dialog').locator('time')).toHaveAttribute(
+    'datetime',
+    '2026-09-15T00:25:49Z',
+  )
   expect(requests).toBe(2)
+})
+
+test('unknown alignment Stop waits for a terminal observation before another command', async ({
+  page,
+}) => {
+  let reads = 0
+  let writes = 0
+  let stopped = false
+
+  const view: AlignmentView = {
+    rigId: 'rig-1',
+    rigName: 'Askar FRA 400',
+    mode: 'physical',
+    cameraName: 'Review camera',
+    enabled: true,
+    unavailableReason: null,
+    phase: 'baseline',
+    activity: 'exposing',
+    active: true,
+    position: 1,
+    solvedPositions: 0,
+    exposureSeconds: 2,
+    exposureStartedAt: null,
+    measuredAt: null,
+    measurement: null,
+    preview: null,
+    warning: null,
+    error: null,
+  }
+
+  await page.route('**/api/web/rigs/rig-1/alignment', route => {
+    reads++
+
+    return route.fulfill({
+      json: stopped ? { ...view, active: false, phase: 'stopped', activity: 'idle' } : view,
+    })
+  })
+  await page.route('**/api/rigs/rig-1/alignment/stop', route => {
+    writes++
+
+    return route.fulfill({ status: 503, json: { error: 'response-lost' } })
+  })
+  await page.goto('/rigs/rig-1/observe/alignment')
+  const stop = page.getByRole('button', { name: 'Stop measurement', exact: true })
+  await stop.click()
+  await expect(page.getByText(/The command was not repeated/)).toBeVisible()
+  const readsAfterLoss = reads
+  await expect.poll(() => reads).toBeGreaterThan(readsAfterLoss + 1)
+  await expect(stop).toBeDisabled()
+  expect(writes).toBe(1)
+  stopped = true
+  await expect(page.getByRole('button', { name: 'Start again', exact: true })).toBeEnabled()
+  await expect(page.getByText(/The command was not repeated/)).toHaveCount(0)
+  expect(writes).toBe(1)
 })

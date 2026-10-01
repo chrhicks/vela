@@ -114,7 +114,7 @@ Autofocus fixture values derive from `autofocus-reference-fixtures.json` but mus
 
 ## Planned versus actual
 
-Pending implementation. Record final files, checks/counts, commit/verdict, live review runtime, native screenshots/DOM measurements and each deviation above. No hardware operations or browser automation were performed to prepare this draft.
+Production adoption is in progress after the workshop comparison described below. Record final checks, committed verifier target and post-verification visual evidence before accepting this slice. No hardware operations are required by this presentation adoption.
 
 
 ### Execution refresh before adoption
@@ -136,3 +136,93 @@ camera-read retries and browser disconnect, preserving the exact loaded solve.
 The optional estimated-exposure provenance remains in inspection details, rather
 than lengthening the compact primary error summary. No new device writes are
 authorized by these presentation changes.
+
+### Demonstrated autofocus command correction
+
+Before visual adoption, a focused browser regression reproduced an existing
+uncertainty gap: a lost Stop response followed by at least two valid still-active
+reads leaves the unknown-outcome notice visible but enables Stop again. The
+no-replay rule requires more than preventing automatic repetition. Reuse the
+hook’s existing `stopUnconfirmed` flag to block both command entry and route
+controls until its existing validated terminal-read branch resolves the outcome.
+Keep lost Start separate so an observed active run can still be stopped. Add a
+hook-level direct-call regression as well as the real-route proof. This is a
+narrow preservation fix, not a new recovery API or orchestration subsystem.
+
+The same regression was demonstrated on Alignment baseline Stop: after a lost
+response and multiple still-active reads, Stop measurement remained enabled.
+Alignment now retains a narrow end-command uncertainty guard for Stop/Finish,
+blocks command entry and controls, and clears it only on a validated inactive
+stopped/finished/failed projection. The baseline regression changed from failing
+to passing with exactly one POST and a later enabled Start again. No read or
+physical-command replay was added.
+
+
+### Workshop preparation implemented
+
+The alignment and autofocus specimens now use Fieldroom compositions. Compact
+alignment has a measured 48px header, a 350×196px image starting at y=260 in a
+390px specimen, and the adjustment Stop action within y=782. Baseline Stop sits
+above the image so preparation remains operable on a phone. Desktop alignment is
+a deliberate extension of the compact arrangement with secondary inspection in
+a keyboard-dismissable enlarged sheet. Inspection retains fit, fine, full and
+native views; its illustrative fit retains the existing 4′ minimum field.
+Reference and target markers preserve CSS-pixel size when the drawing scales.
+The enlarge affordance retains a 44px interaction target. These are documented
+interpretations of the source, rather than new alignment mathematics.
+
+Autofocus desktop keeps the source chart panel at x=36/y=184 and 888×540px within
+a 1440px specimen. The compact chart is 320×146px with Stop within y=782. Setup
+shows the step unit inside the input and travel facts beneath the divider.
+Complete, restored and restore-unconfirmed sheets distinguish selected position,
+measured best sample and physical restoration outcome; the unknown restoration
+sheet has a danger treatment and does not imply a repeated move. The interactive
+workshop walk retains only completed samples when stopped. Travel-limit examples
+use position 150 and a default −50..350 window, making the blocked state agree
+with the illustrated mechanical limits.
+
+Focused workshop checks cover light/dark phone image geometry, desktop autofocus
+geometry, Appearance and inspection dismissal, native image access, baseline
+preparation at 390/768/1440px, missing-solve marker suppression, setup limits,
+terminal wording and stopping an interactive walk. These are deterministic
+workshop observations; they do not establish production integration or hardware
+outcomes. Settled captures are copied outside Playwright's replaceable results
+folder for parent visual comparison before route adoption. Production runtime,
+independent verdict and final browser acceptance remain separate delivery steps.
+
+### Production adoption checkpoint
+
+The root applied the approved Alignment composition and single compact preparation
+navigation. The image component preserves projected geometry and pins enlargement
+across baseline completion. Device/browser interruption uses past-tense corrections;
+confirmed stopping and unconfirmed Stop/Finish disable end commands until a terminal
+observation. Failed next-image GET keeps prior pixels, reticle, error and timestamp
+paired. Regression fixtures cover these transitions with exact POST counts.
+
+The parent compared real route captures to frozen phone sources 03.6/03.7 and the
+approved desktop specimen. At 390×782 the status starts at y108, image at y260 with
+350×196 bounds, and Stop ends at y764. The actual simulator pixels and projected
+coordinates deliberately differ from Paper's decorative star field, as agreed.
+The source's sample caption becomes “Last solved frame”; physical/offline provenance
+remains below the primary workflow. Compact Appearance settles at x20/y48/width350.
+Tests wait for placement and disable reveal animation for geometry measurements.
+
+A phone Autofocus setup check exposed unreadably scaled desktop labels. The parent
+approved a revised workshop320×120 planned-window diagram with14px labels after
+viewing valid and blocked windows in both palettes. Desktop geometry is unchanged.
+Outcome actions use the reference's neutral outlined treatment; walking/start
+controls retain the accent treatment. Autofocus sample times use24-hour display to
+match the preparation references. Its fitted-curve y-axis expands to contain real
+samples and curve endpoints rather than clipping them to the source's nominal6px.
+
+Independent verification and final post-OK comparison remain pending. Preliminary
+captures live in /tmp; retained evidence is produced only after that gate. No
+physical device commands have been issued for this slice.
+
+Settled pre-review checks: 39 Alignment/navigation browser cases (10 existing
+workflow/inspection and29 Fieldroom/navigation),66 Autofocus browser cases,13
+alignment/fixture unit checks plus8 autofocus unit checks,22 focused workshop
+checks, repository lint, and UI/web/workshop builds passed. One combined browser
+run lost its shared Vite process and reported connection-refused failures; the
+29 affected route/navigation cases passed after starting a parent-owned persistent
+server. This was test-environment evidence, not a successful application run.

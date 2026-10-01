@@ -1,5 +1,10 @@
 import type { NavigationCapture } from '@vela/model/web'
-import { Appearance, NavigationBar, type NavigationActivity, type NavigationBarProps } from '@vela/ui'
+import {
+  Appearance,
+  NavigationBar,
+  type NavigationActivity,
+  type NavigationBarProps,
+} from '@vela/ui'
 import type { MouseEvent } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { matchPath, useLocation, useNavigate } from 'react-router'
@@ -21,6 +26,9 @@ export function AppNavigation() {
   const targets = useRef(new Map<string, string>())
   const inTargets = pathname.startsWith(`${base}/observe/targets`)
   const inPhotographs = pathname.startsWith(`${base}/observe/saved-images`)
+
+  const inPreparation =
+    pathname === `${base}/observe/alignment` || pathname === `${base}/observe/autofocus`
 
   useEffect(() => {
     if (rigId && inTargets) targets.current.set(rigId, search)
@@ -66,9 +74,21 @@ export function AppNavigation() {
       home={routeLink('/')}
       rigs={rigs}
       currentRigId={rigId}
-      onRigChange={id => navigate(id
-        ? `/rigs/${encodeURIComponent(id)}/observe/${inPhotographs ? 'saved-images' : 'capture'}`
-        : '/')}
+      {...(inPreparation
+        ? {
+            compact: {
+              back: { label: '← Tonight', ...routeLink(`${base}/observe/capture`) },
+              label: rig?.view?.name ?? rigs.find(item => item.id === rigId)?.name ?? 'Current rig',
+            },
+          }
+        : {})}
+      onRigChange={id =>
+        navigate(
+          id
+            ? `/rigs/${encodeURIComponent(id)}/observe/${inPhotographs ? 'saved-images' : 'capture'}`
+            : '/',
+        )
+      }
       utility={
         <>
           <Appearance
@@ -79,15 +99,49 @@ export function AppNavigation() {
             systemMode={appearance.systemMode}
             persistence={appearance.persistence}
           />
-          {connection && <span className="vela-app__connection" data-connected={connection === 'Connected'}><span className="vela-app__connection-dot" aria-hidden="true">●</span> {connection}</span>}
-          {!rigId && view?.rigs.length === 0 && !offline && !missing && <span className="vela-app__connection">No rig added</span>}
+          {connection && (
+            <span className="vela-app__connection" data-connected={connection === 'Connected'}>
+              <span className="vela-app__connection-dot" aria-hidden="true">
+                ●
+              </span>{' '}
+              {connection}
+            </span>
+          )}
+          {!rigId && view?.rigs.length === 0 && !offline && !missing && (
+            <span className="vela-app__connection">No rig added</span>
+          )}
         </>
       }
-      links={rigId ? [
-        { label: 'Tonight', ...routeLink(`${base}/observe/capture`), current: pathname === `${base}/observe/capture` || pathname === `${base}/observe` },
-        { label: 'Explore the sky', ...routeLink(`${base}/observe/targets${targetSearch}`), current: inTargets },
-        { label: 'Photographs', ...routeLink(`${base}/observe/saved-images`), current: inPhotographs },
-      ] : [{ label: 'Explore the sky', ...routeLink('/explore'), current: pathname === '/explore' }]}
+      links={
+        rigId
+          ? [
+              {
+                label: 'Tonight',
+                ...routeLink(`${base}/observe/capture`),
+                current:
+                  pathname === `${base}/observe/capture` ||
+                  pathname === `${base}/observe` ||
+                  inPreparation,
+              },
+              {
+                label: 'Explore the sky',
+                ...routeLink(`${base}/observe/targets${targetSearch}`),
+                current: inTargets,
+              },
+              {
+                label: 'Photographs',
+                ...routeLink(`${base}/observe/saved-images`),
+                current: inPhotographs,
+              },
+            ]
+          : [
+              {
+                label: 'Explore the sky',
+                ...routeLink('/explore'),
+                current: pathname === '/explore',
+              },
+            ]
+      }
       {...activityProps}
     />
   )
