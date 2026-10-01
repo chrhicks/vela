@@ -1,0 +1,59 @@
+{
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "main": {
+    "x": 0,
+    "y": 182,
+    "width": 390,
+    "height": 1053,
+    "top": 182,
+    "right": 390,
+    "bottom": 1235,
+    "left": 0
+  },
+  "heading": {
+    "x": 20,
+    "y": 234,
+    "width": 290.53125,
+    "height": 36,
+    "top": 234,
+    "right": 310.53125,
+    "bottom": 270,
+    "left": 20
+  },
+  "content": [
+    {
+      "className": "vela-home",
+      "bounds": {
+        "x": 0,
+        "y": 182,
+        "width": 390,
+        "height": 1053,
+        "top": 182,
+        "right": 390,
+        "bottom": 1235,
+        "left": 0
+      }
+    },
+    {
+      "className": "vela-home__empty",
+      "bounds": {
+        "x": 20,
+        "y": 354,
+        "width": 350,
+        "height": 452,
+        "top": 354,
+        "right": 370,
+        "bottom": 806,
+        "left": 20
+      }
+    }
+  ],
+  "fonts": {
+    "heading": "\"Space Grotesk\", ui-sans-serif, sans-serif",
+    "body": "-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", \"Noto Sans\", Arial, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\""
+  },
+  "overflow": false
+}
