@@ -1,7 +1,10 @@
 import { expect, test } from '@playwright/test'
 import { writeFileSync } from 'node:fs'
+import { reviewTimezone } from './fixtures/fieldroom/tonight'
 import { openAutofocusScene } from './fixtures/fieldroom/browser'
 import { autofocusScenes } from './fixtures/fieldroom/autofocus'
+
+test.use({ timezoneId: reviewTimezone })
 
 for (const width of [1440, 768, 390]) {
   for (const mode of ['light', 'dark'] as const) {

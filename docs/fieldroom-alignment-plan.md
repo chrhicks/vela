@@ -251,3 +251,8 @@ first, then adopted that single scoped rule in the route. Nine workshop cases
 and 85 Alignment/Autofocus/theme cases passed. The main route matrices now also
 emit measured geometry next to their captures. This correction is receiving a
 fresh independent review before the final acceptance comparison.
+
+The final capture recipes now explicitly pin America/New_York, matching their
+fixture declarations, instead of inheriting the workstation's timezone. This
+changes no current pixels but makes the retained 24-hour sample times reproducible
+on another machine.
