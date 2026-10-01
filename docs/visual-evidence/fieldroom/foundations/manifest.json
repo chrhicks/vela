@@ -1,0 +1,44 @@
+{
+  "reviewedCommit": "c7c5712",
+  "browser": "T3 collaborative Chromium preview",
+  "devicePixelRatio": 1.5,
+  "note": "Screenshots are native preview presentation captures, not 1x Paper exports. DOM measurements establish CSS geometry; editor chrome and its padding are not application layout.",
+  "records": [
+    {
+      "path": "controls-light.png",
+      "sha256": "52b41b4f07e27f9993b35ab7ad8c40fb445902745f98724dda934fb6f6ccc3c7"
+    },
+    {
+      "path": "controls-dark.png",
+      "sha256": "cf4b6c59aedbaf1248c8ea3ce6b769aa8bcf29ad7bfa4146962391afaae22108"
+    },
+    {
+      "path": "states-dark.png",
+      "sha256": "a42d0ebc7681b21f22ea69efc43b1d43b40f1792ce3cb138aa2248add06db0a5"
+    },
+    {
+      "path": "dialog-dark.png",
+      "sha256": "4eb3bea50d49ce16253d5654cc9ede34fee49885e47758583bce7555b1ee1cb2"
+    },
+    {
+      "path": "appearance-light.png",
+      "sha256": "7e7b2be74a22dd54713750d7d6bb18b91f1e89cd87d1a9cbe58d33870c58ad07"
+    },
+    {
+      "path": "appearance-dark.png",
+      "sha256": "e320f43bac324b39afc3253e64c2a739a36327013e8836ec4486dd66c3d7dac0"
+    },
+    {
+      "path": "appearance-phone-light.png",
+      "sha256": "72e48f449da324741153d42e7365f2fc926e8c88b14fd408bd3aab2f811edaca"
+    },
+    {
+      "path": "dialog-phone.png",
+      "sha256": "dbc74f41f8277a41ee307a6c0f20663c3f85443b95e76d61349fdd1adefe6853"
+    },
+    {
+      "path": "navigation-phone.png",
+      "sha256": "2a9261716d34b09b65371549cf63109ee3b8306e9efd2fe25253cd87ef7339ca"
+    }
+  ]
+}

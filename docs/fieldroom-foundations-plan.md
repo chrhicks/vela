@@ -1,6 +1,6 @@
 # Fieldroom foundations implementation plan
 
-Status: implemented; independent review and final browser acceptance pending.
+Status: accepted at `c7c5712`; independent OK and final browser comparison complete.
 The Step 1 reference gate in [fieldroom-adoption.md](fieldroom-adoption.md) passed
 before implementation. This document preserves the second slice’s before-work
 plan; measured results and deviations are recorded in the adoption document.
