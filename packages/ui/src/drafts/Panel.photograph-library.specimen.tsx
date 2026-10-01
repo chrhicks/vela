@@ -35,11 +35,17 @@ function PhotographLibrary({ props, onPropsChange }: { props: Props; onPropsChan
   const values = onPropsChange ? props : local
   const update = (patch: Props) => onPropsChange ? onPropsChange(patch) : setLocal(current => ({ ...current, ...patch }))
   const byNight = values.browse !== 'targets'
-  const group = String(values.group ?? '')
+  const requestedGroup = String(values.group ?? '')
+
+  const validGroup = byNight
+    ? nights.some((_, index) => String(index) === requestedGroup)
+    : targets.some(target => target.id === requestedGroup)
+
+  const group = validGroup ? requestedGroup : ''
   const filter = String(values.filter ?? '')
-  const selected = photographs.find(photo => photo.id === values.selected)
   const inGroup = photographs.filter(photo => byNight ? String(photo.night) === group : photo.target.id === group)
   const visible = inGroup.filter(photo => !filter || (byNight ? photo.target.id === filter : String(photo.night) === filter))
+  const selected = visible.find(photo => photo.id === values.selected)
   const selectedIndex = visible.findIndex(photo => photo.id === selected?.id)
   const title = byNight ? `Night of ${nights[Number(group)]}` : targets.find(target => target.id === group)?.name
 
