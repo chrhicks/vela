@@ -340,3 +340,24 @@ The post-verdict collection/shared-state run passed 31 cases and the whole-route
 reference run passed 46. [Final retained evidence](visual-evidence/fieldroom/final/README.md)
 includes the nine captures and their hashes. Chris's whole-application acceptance
 remains the merge gate.
+
+## October 1 library workshop proposal
+
+Chris's live review reopened archive navigation: six-row disclosure makes finding
+another observing night awkward. Nights and targets are equally useful starting
+points for him. The separate `photograph-library` Panel specimen explores equal
+Nights / Targets tabs, searchable group cards, a group's photograph grid, a
+cross-filter (target within night or night within target), and selected-photo
+inspection with newer/older navigation. The current application's Photographs
+behavior remains unchanged pending workshop agreement.
+
+The specimen uses 64 invented records over four nights and repeated bundled
+reference images. Its noon-to-noon local observing-night boundary is a proposed
+presentation rule, not a saved session or capture run. Production metadata has
+capture timestamps and optional intended subject, but no observing timezone,
+night key or session ID; timezone semantics need agreement before adoption.
+Unknown subjects stay visible as No recorded target rather than being inferred
+from the pixels. Real archive paging and retained-image rendering remain separate
+boundary concerns; this prototype does not change either server behavior.
+
+Open `http://127.0.0.1:5174/?component=panel&specimen=photograph-library&profile=fieldroom&mode=light&context=isolated&viewport=1280`.

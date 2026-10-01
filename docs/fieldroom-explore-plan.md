@@ -77,9 +77,10 @@ results for the failed selection.
 
 The source shows 3 results per page. Add a small bounded `pageSize` query to the
 existing discovery endpoint (keep the existing default for direct callers), and
-have Fieldroom request 3. The snapshot remains site/time-scoped, independent of
+have Fieldroom request 9 following Chris’s October 1 browser feedback (the
+original frozen composition used 3). The snapshot remains site/time-scoped, independent of
 page size. Validate page size and include it in cache reuse compatibility; old
-12-card cached pages must not paint as a claimed 3-card page. Ignoring incompatible
+3-card and 12-card cached pages must not paint as a claimed 9-card page. Ignoring incompatible
 cached presentation is sufficient; no cache migration framework.
 
 Keep Update sky as explicit refresh; no timer silently reranks the screen.
@@ -163,7 +164,9 @@ caption and remaining surface occupy the lower region. Reproduce the grid's
 stretch/alignment without forcing every state to a fixed height. The right
 solved-state region is approximately y=180..435, with 24px inset and a 46/56
 Space Grotesk offset metric. A test-exposure heading near y=456 leads to a
-124px-high fitted thumbnail at y=508. Test-duration, Check current frame,
+124px-high fitted thumbnail at y=508. Empty/loading/unavailable preview copy
+uses content height with a 124px minimum so instructions remain visible on
+narrower sidebars and phones. Test-duration, Check current frame,
 Adjust composition and Continue controls occupy the remaining right column.
 Footer observation context sits below the columns.
 

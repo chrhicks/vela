@@ -18,7 +18,7 @@ export function useCatalog({ query, category, filter, offset }: DiscoverySelecti
       category,
       filter,
       offset: String(offset),
-      pageSize: '3',
+      pageSize: '9',
     })
 
     setLoading(true)
@@ -27,7 +27,7 @@ export function useCatalog({ query, category, filter, offset }: DiscoverySelecti
       signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]),
     })
       .then((next) => {
-        if (!isTargetCatalog(next) || next.pageSize !== 3)
+        if (!isTargetCatalog(next) || next.pageSize !== 9)
           throw new Error('Invalid catalog response')
 
         if (!controller.signal.aborted) setView(next)

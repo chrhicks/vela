@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test'
 import { isTargetDiscovery } from '../src/features/targets/validation'
 import { writeFileSync } from 'node:fs'
 import { openExploreScene } from './fixtures/fieldroom/browser'
+import { reviewFraming } from './fixtures/fieldroom/explore'
 import { reviewTimezone } from './fixtures/fieldroom/tonight'
 
 test.use({ timezoneId: reviewTimezone })
@@ -207,3 +208,35 @@ test('a refreshed subject below the horizon is not described as above it', async
   await page.screenshot({ path: '/tmp/vela-explore-below-horizon.png', fullPage: true })
   expect(scene.commands).toEqual([])
 })
+
+for (const width of [1280, 390]) {
+  test(`empty framing instructions fit their preview at ${width}`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 800 })
+    await openExploreScene(page, 'framing-light')
+    await page.route('**/api/web/rigs/fra400/framing', route => route.fulfill({ json: {
+      ...reviewFraming,
+      preview: null,
+      actual: null,
+      phase: 'idle',
+      checkCurrent: false,
+      canCenter: false,
+    } }))
+    await page.reload()
+    const empty = page.locator('.framing-exposure .capture-image__empty')
+    await expect(empty).toContainText('No test exposure yet')
+
+    const bounds = await empty.evaluate(element => {
+      const viewport = element.parentElement!.getBoundingClientRect()
+      const content = element.getBoundingClientRect()
+      const paragraph = element.querySelector('p')!.getBoundingClientRect()
+      const input = document.querySelector('#framing-exposure-seconds')!.getBoundingClientRect()
+
+      return { viewport: viewport.toJSON(), content: content.toJSON(), paragraph: paragraph.toJSON(), input: input.toJSON() }
+    })
+
+    expect(bounds.content.bottom).toBeLessThanOrEqual(bounds.viewport.bottom)
+    expect(bounds.paragraph.bottom).toBeLessThan(bounds.viewport.bottom)
+    expect(bounds.input.top).toBeGreaterThan(bounds.viewport.bottom)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false)
+  })
+}

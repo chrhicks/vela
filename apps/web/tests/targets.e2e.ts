@@ -143,7 +143,7 @@ test('catalog is paged and search updates use actual server results; missing sit
       category: params.get('category') ?? 'all',
       filter: params.get('filter') ?? 'all',
       offset: Number(params.get('offset')),
-      pageSize: 3,
+      pageSize: 9,
       targets: [
         {
           ...target,
@@ -166,7 +166,7 @@ test('catalog is paged and search updates use actual server results; missing sit
     page.getByText('The mount’s site could not be read: Mount site is unavailable.'),
   ).toBeVisible()
   await page.getByRole('button', { name: 'Next subjects →', exact: true }).click()
-  await expect.poll(() => queries.some((q) => q.includes('offset=3'))).toBe(true)
+  await expect.poll(() => queries.some((q) => q.includes('offset=9'))).toBe(true)
   await page.getByLabel('Find a target').fill('M31')
   await expect
     .poll(() =>
@@ -576,7 +576,7 @@ test('Targets breadcrumb preserves search and results page through a detail relo
       category: 'all',
       filter: 'all',
       offset: 24,
-      pageSize: 3,
+      pageSize: 9,
       targets: [
         {
           ...target,
@@ -604,7 +604,7 @@ test('Targets breadcrumb preserves search and results page through a detail relo
   expect(new URL(page.url()).searchParams.get('q')).toBe('galaxy')
   expect(new URL(page.url()).searchParams.get('offset')).toBe('24')
   await expect(page.getByLabel('Find a target')).toHaveValue('galaxy')
-  await expect(page.getByText('Page 9 of 17')).toBeVisible()
+  await expect(page.getByText('Page 3 of 6')).toBeVisible()
   expect(new URL(queries.at(-1)!).searchParams.get('q')).toBe('galaxy')
   expect(new URL(queries.at(-1)!).searchParams.get('offset')).toBe('24')
 })
