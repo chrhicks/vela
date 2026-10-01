@@ -469,3 +469,10 @@ angular distance with above/below wording; refreshing from +68° to −12° is
 covered by a real-route regression without physical commands. All eleven
 Explore/framing checks pass with the correction. The note remains pending fresh
 independent disposition before visual acceptance.
+
+The next review at `f8b3d81` confirmed the horizon correction and found a related
+future-window issue: “Above 30° until” omitted the start of an upcoming window.
+Future windows now say “Above 30° from … to …”, based on the frozen calculation
+time; a window already in progress retains the source wording. The same
+below-horizon refresh regression verifies both future boundaries. Renewed
+independent disposition remains required before the final visual pass.

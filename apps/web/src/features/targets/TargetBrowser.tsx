@@ -388,7 +388,9 @@ function ExploreSubjects({
                     </div>
                     <p className="vela-discovery__window">
                       {item?.opportunity
-                        ? `Above 30° until ${skyTime(item.opportunity.endsAt)}`
+                        ? discovery && Date.parse(item.opportunity.startsAt) > Date.parse(discovery.calculatedAt)
+                          ? `Above 30° from ${skyTime(item.opportunity.startsAt)} to ${skyTime(item.opportunity.endsAt)}`
+                          : `Above 30° until ${skyTime(item.opportunity.endsAt)}`
                         : item?.sky
                           ? 'No useful window this night'
                           : rigId
