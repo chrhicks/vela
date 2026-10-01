@@ -16,13 +16,13 @@ export function Targets() {
   const { rigId = '', targetId } = useParams()
 
   return (
-    <main className="vela-rig-page targets-page">
+    <div className="vela-rig-page targets-page">
       {targetId ? (
         <TargetComposition key={`${rigId}/${targetId}`} rigId={rigId} targetId={targetId} />
       ) : (
         <TargetBrowser key={rigId} rigId={rigId} />
       )}
-    </main>
+    </div>
   )
 }
 
