@@ -1,8 +1,8 @@
 import type { TargetSkyPath } from '@vela/model/web'
-import { Button, Dialog, IconButton, Panel, SkyPath, type SkyPathProps, type SkyLightPhase } from '@vela/ui'
+import { Dialog, IconButton, SkyPath, type SkyPathProps, type SkyLightPhase } from '@vela/ui'
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { skyTime, skyWindow } from './sky-time'
+import { skyTime } from './sky-time'
 
 // Geometric solar-altitude bands; the server supplies the Sun's position.
 function lightPhase(sunAltitude: number): SkyLightPhase {
@@ -19,27 +19,23 @@ export function SkyInspection({
   sky,
   targetName,
   stale,
-  presentation = 'panel',
+  open,
+  onOpenChange,
 }: {
-  sky: TargetSkyPath | null
+  sky: TargetSkyPath
   targetName: string
   stale: boolean
-  presentation?: 'panel' | 'icon'
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }) {
-  if (!sky)
-    return (
-      <Panel title="Through the night" description="Site unavailable">
-        <p>Site unavailable · sky path unknown</p>
-      </Panel>
-    )
-
   return (
     <AvailableSky
       key={`${targetName}:${sky.startsAt}`}
       sky={sky}
       targetName={targetName}
       stale={stale}
-      presentation={presentation}
+      open={open}
+      onOpenChange={onOpenChange}
     />
   )
 }
@@ -48,15 +44,19 @@ function AvailableSky({
   sky,
   targetName,
   stale,
-  presentation,
+  open,
+  onOpenChange,
 }: {
   sky: TargetSkyPath
   targetName: string
   stale: boolean
-  presentation: 'panel' | 'icon'
+  open: boolean | undefined
+  onOpenChange: ((open: boolean) => void) | undefined
 }) {
   const [selectedAt, setSelectedAt] = useState<string | null>(null)
-  const [expanded, setExpanded] = useState(false)
+  const [localOpen, setLocalOpen] = useState(false)
+  const expanded = open ?? localOpen
+  const setExpanded = onOpenChange ?? setLocalOpen
   const root = useRef<HTMLDivElement>(null)
   const [overlayHost, setOverlayHost] = useState<Element | null>(null)
   useEffect(() => {
@@ -117,54 +117,28 @@ function AvailableSky({
     day: 'numeric',
   })
 
-  const details = (
-    <>
-      <p className={presentation === 'icon' ? 'vela-discovery__sky-note' : 'vela-target-sky-time'}>
-        {selectedDate} · Light boundaries approximate · 15-minute samples
-      </p>
-      {stale && <p role="status">Sky updates interrupted · last calculation shown.</p>}
-    </>
-  )
-
   return (
     <div ref={root}>
-      {presentation === 'icon' ? (
-        <IconButton
-          label="View sky path"
-          onClick={() => setExpanded(true)}
-          icon={
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M3 19h18M4 15a8 8 0 0 1 10-9" />
-              <path d="m17 3 1.1 2.9L21 7l-2.9 1.1L17 11l-1.1-2.9L13 7l2.9-1.1Z" />
-              <path d="M20 13v2" />
-              <circle cx="4" cy="15" r="1.5" fill="currentColor" stroke="none" />
-            </svg>
-          }
-        />
-      ) : (
-        <Panel
-          title="Through the night"
-          description={`Local time · ${stale ? 'last update' : 'calculated'} ${skyTime(sky.observedAt)}`}
-        >
-          <SkyPath {...skyProps} compact />
-          {details}
-          <Button className="vela-target-expand-sky" tone="quiet" onClick={() => setExpanded(true)}>
-            Expand sky view
-          </Button>
-          <div className="vela-target-sky-facts">
-            <strong>{skyWindow(sky)}</strong>
-            <span>{sky.highestAltitudeDegrees.toFixed(0)}° highest altitude</span>
-          </div>
-        </Panel>
-      )}
+      <IconButton
+        label="View sky path"
+        onClick={() => setExpanded(true)}
+        icon={
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M3 19h18M4 15a8 8 0 0 1 10-9" />
+            <path d="m17 3 1.1 2.9L21 7l-2.9 1.1L17 11l-1.1-2.9L13 7l2.9-1.1Z" />
+            <path d="M20 13v2" />
+            <circle cx="4" cy="15" r="1.5" fill="currentColor" stroke="none" />
+          </svg>
+        }
+      />
       {overlayHost &&
         createPortal(
           <div data-sky-overlay>
@@ -173,11 +147,14 @@ function AvailableSky({
               title={`${targetName} · Through the night`}
               description="Local time · target and Moon positions"
               dismissLabel="Close sky view"
-              className={presentation === 'icon' ? 'vela-discovery__sky-dialog' : 'vela-target-sky-dialog'}
+              className="vela-target-sky-dialog"
               onDismiss={() => setExpanded(false)}
             >
               <SkyPath {...skyProps} />
-              {details}
+              <p className="vela-target-sky-note">
+                {selectedDate} · Light boundaries approximate · 15-minute samples
+              </p>
+              {stale && <p role="status">Sky updates interrupted · last calculation shown.</p>}
             </Dialog>
           </div>,
           overlayHost,

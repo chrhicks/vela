@@ -181,7 +181,7 @@ for (const mode of ['light', 'dark'] as const) {
 
       if (width === 1440) {
         expect(geometry.layout.x).toBe(36)
-        expect(geometry.layout.y).toBe(180)
+        expect(geometry.layout.y).toBe(196)
         expect(geometry.surveyCard.width).toBeCloseTo(888, 0)
         expect(geometry.result.x).toBeCloseTo(952, 0)
         expect(geometry.result.width).toBeCloseTo(452, 0)
@@ -189,6 +189,33 @@ for (const mode of ['light', 'dark'] as const) {
         expect(geometry.survey.height).toBe(520)
         expect(geometry.preview.height).toBe(124)
       }
+
+      await page.getByText('Framing details & state', { exact: true }).click()
+      const check = page.getByRole('button', { name: 'Check rig state', exact: true })
+
+      const actionSpacing = await check.evaluate(button => {
+        const card = button.closest('.vela-target-result')!
+        const previous = button.previousElementSibling!
+        const action = button.getBoundingClientRect()
+        const parent = card.getBoundingClientRect()
+        const style = getComputedStyle(button)
+        const cardStyle = getComputedStyle(card)
+
+        return {
+          above: action.top - previous.getBoundingClientRect().bottom,
+          left: action.left - parent.left - parseFloat(cardStyle.borderLeftWidth),
+          bottom: parent.bottom - action.bottom - parseFloat(cardStyle.borderBottomWidth),
+          border: style.borderTopColor,
+          text: style.color,
+        }
+      })
+
+      expect(actionSpacing.above).toBeCloseTo(16, 0)
+      expect(actionSpacing.left).toBeCloseTo(24, 0)
+      expect(actionSpacing.bottom).toBeCloseTo(24, 0)
+      expect(actionSpacing.border).not.toBe('rgba(0, 0, 0, 0)')
+      expect(actionSpacing.text).not.toBe('rgba(0, 0, 0, 0)')
+      await page.getByText('Framing details & state', { exact: true }).click()
 
       await page.screenshot({ path: `/tmp/vela-framing-${mode}-${width}.png`, fullPage: true })
       writeFileSync(

@@ -1,6 +1,6 @@
 import type { FramingView, TargetPosition } from '@vela/model/web'
 import { Button } from '@vela/ui'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { frameCorners, offsetPosition } from './geometry'
 import { isPosition } from './validation'
 
@@ -14,6 +14,7 @@ export function SurveyField({
   locked,
   focalLengthMm,
   onChange,
+  controls,
 }: {
   target: TargetPosition
   desired: TargetPosition
@@ -21,6 +22,7 @@ export function SurveyField({
   actual: FramingView['actual']
   locked: boolean
   focalLengthMm: number | null
+  controls?: ReactNode
   onChange: (position: TargetPosition) => void
 }) {
   const host = useRef<HTMLDivElement>(null)
@@ -385,7 +387,7 @@ export function SurveyField({
           Image credit ↗
         </a>
       </footer>
-      <details className="vela-target-adjustments">
+      <details className="vela-target-adjustments" open={!focalLengthMm}>
         <summary>Frame position & controls</summary>
         <div>
           <strong>Camera orientation stays fixed</strong>
@@ -419,6 +421,7 @@ export function SurveyField({
           ))}
         </div>
         <p>Drag sky to pan · scroll to zoom. View controls do not move the mount.</p>
+        {controls}
       </details>
     </>
   )

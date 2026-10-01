@@ -105,7 +105,16 @@ UI typecheck, workshop build and lint pass. Native-browser review covers desktop
 dark and phone light, dialog opening/time scrubbing/dismissal, both relocated
 disclosures, and explicitly simulated check feedback. The phone composition
 stacks without horizontal overflow, and the exposure input retains its value
-and units without overlap. Design approval and application adoption are pending.
+and units without overlap. Chris approved this design for shipping on 2026-10-01,
+including a neutral, visibly bordered Check rig state button, 16px above that
+action, 12px between supporting paragraphs, and 24px card insets.
+
+The application now adopts this composition with its actual survey, exposure,
+framing state and command guards. Missing focal length exposes the nested optics
+controls; missing site reports unavailable sky context. Tonight's `#sky` link
+opens the dialog after target data arrives, keeps focus contained while framing
+data finishes loading, and clears the hash on dismissal. Background sky refreshes
+do not reopen a dismissed dialog. Explore retains the same shared icon/dialog.
 
 ### Earlier exploratory composition
 
