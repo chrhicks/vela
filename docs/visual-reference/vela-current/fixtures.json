@@ -1,0 +1,254 @@
+{
+  "/api/web/navigation": {
+    "rigs": [
+      {
+        "id": "rig-1",
+        "name": "Askar FRA 400"
+      }
+    ],
+    "captures": [
+      {
+        "rigId": "rig-1",
+        "rigName": "Askar FRA 400",
+        "phase": "exposing",
+        "active": true,
+        "captureReadState": "current",
+        "completedCount": 12,
+        "elapsedSeconds": 96,
+        "exposureSeconds": 180,
+        "error": null
+      }
+    ]
+  },
+  "/api/web/rigs/rig-1": {
+    "id": "rig-1",
+    "name": "Askar FRA 400",
+    "state": "reachable",
+    "endpoint": {
+      "host": "alpaca.local",
+      "port": 11111
+    },
+    "addedAt": "2026-09-21T01:00:00.000Z",
+    "lastInventoryAt": "2026-09-21T01:00:00.000Z",
+    "refreshedAt": "2026-09-21T01:00:08.000Z",
+    "connections": {
+      "total": 3,
+      "connected": 3,
+      "disconnected": 0,
+      "unavailable": 0
+    },
+    "capabilities": [
+      "forget"
+    ],
+    "devices": [
+      {
+        "id": "camera-0",
+        "kind": "camera",
+        "name": "ZWO ASI2600MC Pro",
+        "configuredName": "Main camera",
+        "connection": "connected",
+        "observedAt": "2026-09-21T01:00:08.000Z",
+        "status": {
+          "availability": "complete",
+          "activity": "idle",
+          "sensorTemperatureC": -10,
+          "cooling": {
+            "state": "on",
+            "powerPercent": 42
+          }
+        }
+      },
+      {
+        "id": "focuser-0",
+        "kind": "focuser",
+        "name": "ZWO Focuser",
+        "configuredName": "Focuser",
+        "connection": "connected",
+        "observedAt": "2026-09-21T01:00:08.000Z",
+        "status": {
+          "availability": "complete",
+          "activity": "idle",
+          "position": 32842,
+          "temperatureC": 17
+        }
+      },
+      {
+        "id": "mount-0",
+        "kind": "telescope",
+        "name": "ASI Mount",
+        "configuredName": "Mount",
+        "connection": "connected",
+        "observedAt": "2026-09-21T01:00:08.000Z",
+        "status": {
+          "availability": "complete",
+          "activity": "tracking",
+          "tracking": "on",
+          "parking": "unparked",
+          "home": "away"
+        }
+      }
+    ]
+  },
+  "/api/web/rigs/rig-1/observe": {
+    "rig": {
+      "id": "rig-1",
+      "name": "Askar FRA 400",
+      "state": "reachable",
+      "endpoint": {
+        "host": "alpaca.local",
+        "port": 11111
+      },
+      "addedAt": "2026-09-21T01:00:00.000Z",
+      "lastInventoryAt": "2026-09-21T01:00:00.000Z",
+      "refreshedAt": "2026-09-21T01:00:08.000Z",
+      "connections": {
+        "total": 3,
+        "connected": 3,
+        "disconnected": 0,
+        "unavailable": 0
+      },
+      "capabilities": [
+        "forget"
+      ],
+      "devices": [
+        {
+          "id": "camera-0",
+          "kind": "camera",
+          "name": "ZWO ASI2600MC Pro",
+          "configuredName": "Main camera",
+          "connection": "connected",
+          "observedAt": "2026-09-21T01:00:08.000Z",
+          "status": {
+            "availability": "complete",
+            "activity": "idle",
+            "sensorTemperatureC": -10,
+            "cooling": {
+              "state": "on",
+              "powerPercent": 42
+            }
+          }
+        },
+        {
+          "id": "focuser-0",
+          "kind": "focuser",
+          "name": "ZWO Focuser",
+          "configuredName": "Focuser",
+          "connection": "connected",
+          "observedAt": "2026-09-21T01:00:08.000Z",
+          "status": {
+            "availability": "complete",
+            "activity": "idle",
+            "position": 32842,
+            "temperatureC": 17
+          }
+        },
+        {
+          "id": "mount-0",
+          "kind": "telescope",
+          "name": "ASI Mount",
+          "configuredName": "Mount",
+          "connection": "connected",
+          "observedAt": "2026-09-21T01:00:08.000Z",
+          "status": {
+            "availability": "complete",
+            "activity": "tracking",
+            "tracking": "on",
+            "parking": "unparked",
+            "home": "away"
+          }
+        }
+      ]
+    },
+    "connectionPreparation": {
+      "state": "complete",
+      "capabilities": []
+    }
+  },
+  "/api/web/rigs/rig-1/capture": {
+    "rigId": "rig-1",
+    "rigName": "Askar FRA 400",
+    "camera": {
+      "name": "ZWO ASI2600MC Pro"
+    },
+    "enabled": true,
+    "unavailableReason": null,
+    "phase": "exposing",
+    "active": true,
+    "captureReadState": "current",
+    "exposureSeconds": 180,
+    "elapsedSeconds": 96,
+    "repeat": true,
+    "completedCount": 12,
+    "saveFrames": true,
+    "savedImageCount": 12,
+    "error": null,
+    "cooling": {
+      "state": "on",
+      "canSetTemperature": true,
+      "setpointC": -10,
+      "sensorTemperatureC": -10,
+      "powerPercent": 42
+    },
+    "latestImage": {
+      "id": "retained",
+      "saved": true,
+      "imageUrl": "/api/rigs/rig-1/capture/images/retained",
+      "width": 1600,
+      "height": 1200,
+      "exposureSeconds": 180,
+      "capturedAt": "2026-09-21T01:00:00.000Z",
+      "receivedAt": "2026-09-21T01:00:03.000Z",
+      "cameraName": "ZWO ASI2600MC Pro",
+      "color": "mono",
+      "statistics": {
+        "detectedStars": 842,
+        "medianHfrPixels": 2.1
+      }
+    }
+  },
+  "/api/web/rigs/rig-1/imaging-camera": {
+    "rigId": "rig-1",
+    "editable": true,
+    "state": "ready",
+    "selected": {
+      "id": "camera-0",
+      "name": "ZWO ASI2600MC Pro"
+    },
+    "cameras": [
+      {
+        "id": "camera-0",
+        "configuredName": "Main camera",
+        "name": "ZWO ASI2600MC Pro"
+      }
+    ]
+  },
+  "/api/web/rigs/rig-1/alignment": {
+    "rigId": "rig-1",
+    "rigName": "Askar FRA 400",
+    "mode": "physical",
+    "enabled": true,
+    "unavailableReason": null,
+    "phase": "adjusting",
+    "activity": "waiting",
+    "active": true,
+    "position": 3,
+    "solvedPositions": 3,
+    "exposureSeconds": 2,
+    "exposureStartedAt": null,
+    "measuredAt": "2026-09-21T01:00:00.000Z",
+    "warning": null,
+    "error": null,
+    "measurement": {
+      "imageUrl": "/api/rigs/rig-1/capture/images/retained",
+      "imageWidth": 1600,
+      "imageHeight": 1200,
+      "fieldHeightDegrees": 2,
+      "capturedAtSource": "server-estimate",
+      "totalArcsec": 503,
+      "azimuthArcsec": -440,
+      "altitudeArcsec": -244,
+      "targetX": 726.1667,
+      "targetY": 558.8333
+    }
+  }
+}

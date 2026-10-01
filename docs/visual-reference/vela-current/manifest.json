@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "sourceSha": "15c2bbe19770ef55ed2d6aa830fb833a19216ae4",
+  "capturedAt": "2026-10-01T01:35:46.636Z",
+  "fixedBrowserTime": "2026-09-21T01:00:08.000Z",
+  "browser": "151.0.7922.34",
+  "platform": "linux",
+  "locale": "en-US",
+  "timezone": "America/New_York",
+  "deviceScaleFactor": 1,
+  "themeMode": "dark",
+  "sourceHashes": {
+    "packages/ui/src/styles.css": "9ab718972c803a3289f0f860e4c8a5451e3307a8f599a38673fb1c8dbcbc2be3",
+    "packages/ui/src/themes/defaults.ts": "907599643f46c64c35d5d0c9fe4d3a7dcd5691a9048d98928ce0fb9d0f54f89c",
+    "packages/ui/src/themes/runtime.ts": "105cf1f3974feff6eeedd297892a535c5b48f9b3e59b6cd586d75f511577f874",
+    "packages/ui/src/fonts/InterVariable.woff2": "693b77d4f32ee9b8bfc995589b5fad5e99adf2832738661f5402f9978429a8e3",
+    "packages/ui/src/fonts/InterVariable-Italic.woff2": "e564f652916db6c139570fefb9524a77c4d48f30c92928de9db19b6b5c7a262a",
+    "apps/web/src/styles.css": "dbf53ef5744ed7472b4dba26a6e06d4def0fc5634070e64e782d88cbdc5f26b2",
+    "apps/web/src/main.tsx": "13047b8464dc1013f6cc078f373b729b4d46db2840d1d364a8a68e4d391ee678"
+  },
+  "image": {
+    "source": "packages/ui/src/components/fixtures/capture-star-field.png",
+    "archive": "assets/capture-star-field.png",
+    "sha256": "32fc1935092d3d98768c18e21c94829f6134262524cd302133bbf1f269099f4c"
+  },
+  "fixtureSources": [
+    "apps/web/tests/fixtures/observation.ts",
+    "apps/web/tests/rig-detail.e2e.ts",
+    "apps/web/tests/alignment-inspection.e2e.ts",
+    "apps/web/tests/exposure-recovery.e2e.ts"
+  ],
+  "fixtureSha256": "bb068a39e02ce1b24f89105d69d7d02f66af83d53baeeaada165221cc99c7876",
+  "scenes": [
+    {
+      "id": "capture-desktop",
+      "route": "/rigs/rig-1/observe/capture",
+      "width": 1440,
+      "height": 900,
+      "ready": ".capture-page__controls",
+      "png": "capture-desktop.png",
+      "sha256": "38326381041f65a5a05d6acaa404fc76515ae44d99726e75c1bed905e902358c",
+      "pageSize": {
+        "width": 1440,
+        "height": 1270
+      }
+    },
+    {
+      "id": "equipment-desktop",
+      "route": "/rigs/rig-1",
+      "width": 1440,
+      "height": 900,
+      "ready": ".vela-rig-device",
+      "png": "equipment-desktop.png",
+      "sha256": "834794ac26197a9719dc274514c2e53295eea1b1c76b95046c72e2876e4cc931",
+      "pageSize": {
+        "width": 1440,
+        "height": 1094
+      }
+    },
+    {
+      "id": "observe-desktop",
+      "route": "/rigs/rig-1/observe",
+      "width": 1440,
+      "height": 900,
+      "ready": ".vela-capture-hub",
+      "png": "observe-desktop.png",
+      "sha256": "5bbb397e8b267b28387a3e0d0a470a575f1ffa5b9beb1dfbbbda7c523077e0cd",
+      "pageSize": {
+        "width": 1440,
+        "height": 1314
+      }
+    },
+    {
+      "id": "alignment-phone",
+      "route": "/rigs/rig-1/observe/alignment",
+      "width": 390,
+      "height": 844,
+      "ready": ".vela-polar-image",
+      "png": "alignment-phone.png",
+      "sha256": "1030d12cba12918785dd379e0bd9da7a413d608b52c5b334917252faeeb25f1d",
+      "pageSize": {
+        "width": 390,
+        "height": 1233
+      }
+    }
+  ],
+  "apiWrites": [],
+  "unmappedRequests": [],
+  "browserErrors": [],
+  "limitation": "Static synthetic fixture scenes; not physical-device observations. Current production theme is dark only. Light token mapping is retained in theme.json but no light application rendering was synthesized."
+}

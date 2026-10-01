@@ -1,0 +1,22 @@
+[
+  {
+    "path": "packages/ui/src/drafts/target-framing/crescent.jpg",
+    "sha256": "84e71f8578a39f3104f929c6013c1c76bb7fa953f64c6ca4ef9055247f203664",
+    "bytes": 709208
+  },
+  {
+    "path": "packages/ui/src/drafts/target-framing/andromeda.jpg",
+    "sha256": "af67cc41ad424694b925adca949fb10091198a89343fb1629d830a6007169ffc",
+    "bytes": 259049
+  },
+  {
+    "path": "packages/ui/src/drafts/target-framing/m13.jpg",
+    "sha256": "eddd9e504c7ff15f4fc5fa44f4183af61d0be19c8b5aa1d872be51a3335e474b",
+    "bytes": 270215
+  },
+  {
+    "path": "packages/ui/src/components/fixtures/capture-star-field.png",
+    "sha256": "32fc1935092d3d98768c18e21c94829f6134262524cd302133bbf1f269099f4c",
+    "bytes": 616273
+  }
+]
