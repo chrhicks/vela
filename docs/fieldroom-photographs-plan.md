@@ -330,3 +330,13 @@ checks that releasing collection loading causes no extra detail read. The parent
 also corrected inherited text-rendering only on the new card to match the
 workshop's exact Barlow wraps; populated-gallery typography is untouched.
 Independent verification and final post-verdict comparison are next.
+
+
+The collection-state addendum is accepted at `cd404b8` after independent **OK**
+and the final post-verdict route comparison. All nine new collection captures
+were inspected against source 03.9 and the approved workshop; both palettes,
+desktop/phone wrapping and selected-detail independence match the agreed design.
+The post-verdict collection/shared-state run passed 31 cases and the whole-route
+reference run passed 46. [Final retained evidence](visual-evidence/fieldroom/final/README.md)
+includes the nine captures and their hashes. Chris's whole-application acceptance
+remains the merge gate.
