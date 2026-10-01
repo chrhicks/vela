@@ -115,3 +115,13 @@ Continue to capture keeps its exact current-check/target/composition guards and
 opens `/observe?target=…` for preparation. Starting remains a separate explicit
 command. Detailed sky inspection, centering history and frame nudges are retained
 in progressive disclosures; reference-view reset/zoom never edits composition.
+
+Equipment edits effective focal length through `focal-length-api` and
+`useFocalLengthSettings`, without mounting the framing exposure controller. The
+existing framing GET exposes saved focal length even when framing is unavailable.
+The configuration boundary validates the full projection, rig identity and
+observation age, then exposes only focal length, active state and timestamp.
+Saving requires a finite 10–20000 mm value and confirms that exact returned
+value; a malformed, stale, different or lost response remains uncertain. A
+subsequent matching GET confirms persistence, while an explicit differing GET
+allows the user to review and retry. No write is automatically repeated.

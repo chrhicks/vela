@@ -63,7 +63,7 @@ const server = createHttpServer(async (request, response) => {
       return
     }
 
-    if (url.pathname === '/__review' || url.pathname === '/') {
+    if (url.pathname === '/__review') {
       response
         .writeHead(200, { 'Content-Type': 'text/html' })
         .end(

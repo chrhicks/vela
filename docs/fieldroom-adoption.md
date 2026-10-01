@@ -308,7 +308,7 @@ Nothing in this checkpoint adds durable capture sequences or run recovery.
 
 ## 5. Remaining application slices
 
-Status: Explore/framing/preparation accepted at `8906518`; Photographs accepted at `99195ae`; Equipment/Home is next.
+Status: Explore/framing/preparation accepted at `8906518`; Photographs accepted at `99195ae`; Equipment/Home implementation and focused checks are underway.
 
 | Slice | Production owners | Paper coverage |
 | --- | --- | --- |
@@ -338,7 +338,8 @@ post-review route checks passed. Photographs then passed independent **OK** at
 `99195ae` and the final parent comparison at three widths in both palettes,
 including original-preview fallback. Its [retained evidence](visual-evidence/fieldroom/photographs/README.md)
 records source geometry, fixture substitutions and browser limitations.
-Equipment/Home/onboarding is next.
+Equipment/Home/onboarding has accepted workshop compositions and production
+adoption underway. Its independent and final visual gates are still pending.
 
 ## 6. Whole-application verification and handoff
 

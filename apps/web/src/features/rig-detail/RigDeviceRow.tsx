@@ -1,5 +1,6 @@
 import type { RigDeviceDetailView, RigSwitchChannelView } from '@vela/model/web'
-import { Badge, Panel } from '@vela/ui'
+import { IconButton } from '@vela/ui'
+import { useId, useState } from 'react'
 import { DeviceIcon } from './DeviceIcon'
 
 interface Metric {
@@ -29,75 +30,79 @@ const kindLabels = {
   unknown: 'Device',
 } as const
 
-export function RigDeviceCard({
-  device,
-  stale,
-}: {
+export function RigDeviceRow({ device, stale, imagingCamera = false }: {
   readonly device: RigDeviceDetailView
   readonly stale: boolean
+  readonly imagingCamera?: boolean
 }) {
+  const [open, setOpen] = useState(false)
+  const id = useId()
   const connection = connectionPresentation(device, stale)
   const presentation = devicePresentation(device)
+  let role: string = kindLabels[device.kind]
 
-  const noDetails =
-    presentation.metrics.length === 0 &&
-    (presentation.channels === undefined || presentation.channels.length === 0)
+  if (device.kind === 'camera') role = imagingCamera ? 'Camera · Main camera' : 'Other camera · Not used for imaging'
+  else if (device.kind === 'telescope') role = 'Mount'
+
+  let summary = device.connection === 'connected'
+    ? presentation.metrics.slice(0, 2).map(metric => `${metric.label === 'Sensor' ? '' : `${metric.label} `}${metric.value}`).join(' · ') || presentation.activity
+    : 'No current readings'
+
+  if (device.connection === 'connected') {
+    role += ` · ${presentation.activity}`
+
+    if (device.kind === 'telescope' && device.status.availability !== 'unsupported') {
+      if (device.status.parking !== 'unknown') role += device.status.parking === 'parked' ? ' · Parked' : ' · Not parked'
+      summary = presentation.activity
+    } else if (device.kind === 'focuser' && device.status.availability !== 'unsupported' && device.status.position !== undefined) {
+      role = `Focuser · Position ${formatInteger(device.status.position)}`
+      summary = presentation.activity
+    }
+  }
+
+  const detailsAvailable = presentation.metrics.length > 0 || !!presentation.channels?.length
 
   return (
-    <Panel
-      action={
-        <Badge marker={<i />} size="small" tone={connection.tone}>
-          {connection.label}
-        </Badge>
-      }
-      className="vela-rig-device"
-      data-connection={stale ? 'last-known' : device.connection}
-      description={
-        device.configuredName !== device.name
-          ? `${kindLabels[device.kind]} · ${device.configuredName}`
-          : kindLabels[device.kind]
-      }
-      elevation="raised"
-      title={device.name}
-    >
-      <div className="vela-rig-device__state">
-        <span className="vela-rig-device__icon">
-          <DeviceIcon kind={device.kind} />
-        </span>
-        <p>
-          <small>STATUS</small>
-          <strong>{presentation.activity}</strong>
-          <span>{presentation.note}</span>
-        </p>
-      </div>
-
-      {presentation.metrics.length > 0 ? (
-        <dl className="vela-rig-device__metrics">
-          {presentation.metrics.map(metric => (
-            <div data-tone={metric.tone ?? 'normal'} key={metric.label}>
-              <dt>{metric.label}</dt>
-              <dd>{metric.value}</dd>
-            </div>
-          ))}
-        </dl>
-      ) : null}
-
-      {presentation.channels && presentation.channels.length > 0 ? (
-        <div className="vela-rig-device__channels">
-          {presentation.channels.map(channel => (
-            <span key={channel.id}>
-              <small>{channel.name}</small>
-              {channel.value === undefined ? null : <strong>{formatNumber(channel.value)}</strong>}
-              {channel.on === undefined ? null : <em>{channel.on ? 'On' : 'Off'}</em>}
-            </span>
-          ))}
+    <section className="equipment__device" aria-label={device.name} data-connection={stale ? 'last-known' : device.connection}>
+      <div className="equipment__row">
+        <DeviceIcon kind={device.kind} />
+        <div className="equipment__name">
+          <h3>{device.name}</h3>
+          <p>{role}</p>
         </div>
-      ) : null}
-
-      {noDetails ? (
-        <p className="vela-rig-device__empty">Detailed status is not available from this device.</p>
-      ) : null}
-    </Panel>
+        <p className="equipment__summary">{summary}</p>
+        <p className="equipment__connection" data-tone={connection.tone}>
+          <span aria-hidden="true">{device.connection === 'connected' && !stale ? '●' : '○'} </span>{connection.label}
+        </p>
+        <IconButton
+          tone="quiet"
+          label={`${open ? 'Hide' : 'Show'} ${device.name} details`}
+          aria-expanded={open}
+          aria-controls={id}
+          icon={<span aria-hidden="true">{open ? '⌃' : '⌄'}</span>}
+          onClick={() => setOpen(value => !value)}
+        />
+      </div>
+      <div id={id} hidden={!open} className="equipment__device-details">
+        {stale && <p>Last known measurements; live updates are interrupted.</p>}
+        <p>{presentation.note}</p>
+        {device.configuredName !== device.name && <p>Configured as {device.configuredName}</p>}
+        {presentation.metrics.length > 0 && (
+          <dl>{presentation.metrics.map(metric => (
+            <div data-tone={metric.tone ?? 'normal'} key={metric.label}><dt>{metric.label}</dt><dd>{metric.value}</dd></div>
+          ))}</dl>
+        )}
+        {!!presentation.channels?.length && (
+          <dl>{presentation.channels.map(channel => (
+            <div key={channel.id}>
+              <dt>{channel.name}</dt>
+              <dd>{channel.value === undefined ? 'Value unavailable' : formatNumber(channel.value)}{channel.on === undefined ? '' : ` · ${channel.on ? 'On' : 'Off'}`}</dd>
+            </div>
+          ))}</dl>
+        )}
+        {!detailsAvailable && <p>Detailed status is not available from this device.</p>}
+      </div>
+    </section>
   )
 }
 
@@ -114,7 +119,7 @@ function connectionPresentation(device: RigDeviceDetailView, stale: boolean) {
 }
 
 function devicePresentation(device: RigDeviceDetailView): DevicePresentation {
-  if (device.status.availability === 'unavailable') {
+  if (device.connection !== 'connected') {
     return {
       activity: device.connection === 'disconnected' ? 'Disconnected' : 'Status unavailable',
       note:

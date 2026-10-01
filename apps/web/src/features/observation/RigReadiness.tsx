@@ -155,7 +155,7 @@ export function RigReadiness({ observation }: { observation: ReturnType<typeof u
   )
 }
 
-function ConnectionResult({ result }: { result: ConnectRigDevicesResult }) {
+export function ConnectionResult({ result }: { result: ConnectRigDevicesResult }) {
   if (result.outcome === 'unavailable')
     return (
       <p className="vela-observe-warning">

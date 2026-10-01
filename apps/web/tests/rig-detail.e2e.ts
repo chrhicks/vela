@@ -187,43 +187,37 @@ test('navigates through the complete Rig card and renders ordered responsive det
   await expect(
     page.locator('.vela-navigation').getByRole('link', { name: 'Tonight', exact: true }),
   ).toHaveAttribute('href', '/rigs/rig-1/observe/capture')
-  await expect(page.getByRole('heading', { level: 1, name: 'Backyard rig' })).toBeVisible()
-  await expect(page.locator('.vela-rig-device .vela-panel__title')).toHaveText([
+  await expect(page.getByRole('heading', { level: 1, name: 'Your rig' })).toBeVisible()
+  await expect(page.locator('.equipment__name h3')).toHaveText([
     'Mount',
+    'Focuser',
     'Main camera',
     'Guide camera',
-    'Focuser',
     'Filter wheel',
     'Weather sensor',
     'Power box',
   ])
+
+  for (const name of ['Main camera', 'Weather sensor', 'Power box'])
+    await page.getByRole('button', { name: `Show ${name} details` }).click()
+
   await expect(page.getByText('Some values could not be read')).toBeVisible()
   await expect(page.getByText('Input Voltage')).toBeVisible()
-  await expect(page.getByText('12.9', { exact: true })).toBeVisible()
+  await expect(page.getByText('12.9 · On', { exact: true })).toBeVisible()
   await expect(page.getByText('12.9 V', { exact: true })).toHaveCount(0)
 
-  const details = page.getByRole('button', { name: /Rig details/ })
-  await expect(details).toHaveAttribute('aria-expanded', 'false')
-  await details.click()
-  await expect(details).toHaveAttribute('aria-expanded', 'true')
+  const details = page.locator('.equipment__rig-details')
+  await expect(details).not.toHaveAttribute('open')
+  await details.locator('summary').click()
+  await expect(details).toHaveAttribute('open', '')
   await expect(page.getByText('192.168.4.104:11111', { exact: true })).toBeVisible()
 
   await page.setViewportSize({ width: 390, height: 844 })
-  await expect
-    .poll(() =>
-      page
-        .locator('.vela-rig-device-grid')
-        .evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length),
-    )
-    .toBe(1)
-  await expect
-    .poll(() =>
-      page
-        .locator('.vela-rig-device__metrics')
-        .first()
-        .evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length),
-    )
-    .toBe(2)
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await expect(page.getByRole('button', { name: 'Hide Main camera details' })).toBeVisible()
+  await expect.poll(() => page.locator('.equipment__device-details dl').first()
+    .evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length)).toBe(1)
+
 })
 
 test('shows active refresh, retains stale values, and resumes non-overlapping polling', async ({
@@ -244,22 +238,23 @@ test('shows active refresh, retains stale values, and resumes non-overlapping po
   })
 
   await page.goto('/rigs/rig-1')
-  await expect(page.getByText('-5.0 °C')).toBeVisible()
+  await page.getByRole('button', { name: 'Show Main camera details' }).click()
+  await expect(page.getByText('-5.0 °C', { exact: true })).toBeVisible()
 
-  await page.getByRole('button', { name: 'Refresh Rig' }).click()
-  const refreshing = page.getByRole('button', { name: 'Refreshing Rig' })
+  await page.getByRole('button', { name: 'Refresh state' }).click()
+  const refreshing = page.getByRole('button', { name: 'Refreshing state…' })
   await expect(refreshing).toBeDisabled()
-  await expect(refreshing.locator('svg')).toHaveCSS('animation-name', 'vela-rig-refresh-spin')
+  await expect(refreshing).toHaveAttribute('aria-busy', 'true')
   await page.waitForTimeout(5_100)
   expect(requests).toBe(2)
   await expect(refreshing).toBeDisabled()
-  await expect(page.getByRole('status')).toContainText('Live updates are interrupted')
-  await expect(page.getByText('-5.0 °C')).toBeVisible()
+  await expect(page.getByRole('status').first()).toContainText('Live updates are interrupted')
+  await expect(page.getByText('-5.0 °C', { exact: true })).toBeVisible()
   await expect(page.getByText('Last known').first()).toBeVisible()
   expect(requests).toBe(2)
 
-  await page.getByRole('button', { name: 'Refresh Rig' }).click()
-  await expect(page.getByText('-4.0 °C')).toBeVisible()
+  await page.getByRole('button', { name: 'Refresh state' }).click()
+  await expect(page.getByText('-4.0 °C', { exact: true })).toBeVisible()
   await expect(page.getByText('Live updates are interrupted')).toHaveCount(0)
   expect(requests).toBe(3)
 
@@ -274,7 +269,7 @@ test('pauses polling while hidden and refreshes immediately when visible', async
   })
 
   await page.goto('/rigs/rig-1')
-  await expect(page.getByRole('heading', { level: 1, name: 'Backyard rig' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Your rig' })).toBeVisible()
   expect(requests).toBe(1)
 
   await page.evaluate(() => {
@@ -305,9 +300,10 @@ test('distinguishes offline, unknown, and malformed fresh loads', async ({ page 
   })
 
   await page.goto('/rigs/offline')
-  await expect(page.getByRole('status')).toContainText('This Rig is offline')
-  await expect(page.getByText('Status unavailable')).toBeVisible()
-  await expect(page.getByText('Unavailable', { exact: true })).toBeVisible()
+  await expect(page.getByRole('status').first()).toContainText('This Rig is offline')
+  await page.getByRole('button', { name: 'Show Camera slot details' }).click()
+  await expect(page.getByText('No live information from this device')).toBeVisible()
+  await expect(page.locator('.equipment__connection').filter({ hasText: 'Unavailable' })).toBeVisible()
 
   await page.goto('/rigs/missing')
   await expect(page.getByRole('heading', { name: 'Rig not found' })).toBeVisible()
@@ -329,15 +325,87 @@ test('forgets from the secondary management area and returns Home', async ({ pag
   })
 
   await page.goto('/rigs/rig-1')
+  await page.locator('.equipment__rig-details summary').click()
   await page.getByRole('button', { name: 'Forget rig' }).click()
   const confirmation = page.getByRole('dialog', { name: 'Forget Backyard rig?' })
-  await expect(confirmation).toContainText('does not change the Alpaca server or any hardware')
+  await expect(confirmation).toContainText('does not change its ALPACA server or hardware')
   await confirmation.getByRole('button', { name: 'Cancel' }).click()
   expect(deleteRequests).toBe(0)
 
   await page.getByRole('button', { name: 'Forget rig' }).click()
   await confirmation.getByRole('button', { name: 'Forget rig' }).click()
   await expect(page).toHaveURL(/\/$/)
-  await expect(page.getByRole('heading', { name: 'No Rigs configured' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Connect your first rig' })).toBeVisible()
   expect(deleteRequests).toBe(1)
+})
+
+test('Forget focuses Cancel, blocks dismissal while pending, and submits one DELETE', async ({ page }) => {
+  let deletes = 0
+  let release: () => void = () => {}
+
+  const pending = new Promise<void>(resolve => { release = resolve })
+  await useHome(page, () => ({ rigs: [], refreshedAt: now }))
+  await page.route('**/api/web/rigs/rig-1', route => fulfillJson(route, liveDetail()))
+  await page.route('**/api/rigs/rig-1', async route => {
+    deletes++
+    await pending
+    await route.fulfill({ status: 204, body: '' })
+  })
+  await page.goto('/rigs/rig-1')
+  await page.locator('.equipment__rig-details summary').click()
+  const opener = page.getByRole('button', { name: 'Forget rig', exact: true })
+  await opener.click()
+  const dialog = page.getByRole('dialog', { name: 'Forget Backyard rig?' })
+  await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused()
+  await expect(dialog.getByRole('button', { name: 'Close dialog' })).toHaveCount(0)
+  await page.keyboard.press('Escape')
+  await expect(dialog).toHaveCount(0)
+  await expect(opener).toBeFocused()
+  await opener.click()
+  await dialog.getByRole('button', { name: 'Forget rig', exact: true }).click()
+  await expect.poll(() => deletes).toBe(1)
+  await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeDisabled()
+  await page.keyboard.press('Escape')
+  await expect(dialog).toBeVisible()
+  expect(deletes).toBe(1)
+  release()
+  await expect(page).toHaveURL(/\/$/)
+  expect(deletes).toBe(1)
+})
+
+test('unknown Forget requires catalog inspection across dismissal and never repeats DELETE', async ({ page }) => {
+  let deletes = 0
+  let reads = 0
+  let checkAvailable = false
+  await page.route('**/api/web/home', route => {
+    reads++
+
+    return checkAvailable
+      ? fulfillJson(route, { rigs: [], refreshedAt: now })
+      : fulfillJson(route, { invalid: true })
+  })
+  await page.route('**/api/web/rigs/rig-1', route => fulfillJson(route, liveDetail()))
+  await page.route('**/api/rigs/rig-1', async route => {
+    deletes++
+    await route.abort('failed')
+  })
+  await page.goto('/rigs/rig-1')
+  await page.locator('.equipment__rig-details summary').click()
+  await page.getByRole('button', { name: 'Forget rig', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Forget Backyard rig?' })
+  await dialog.getByRole('button', { name: 'Forget rig', exact: true }).click()
+  await expect(dialog.getByRole('button', { name: 'Check saved rigs' })).toBeVisible()
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await page.getByRole('button', { name: 'Forget rig', exact: true }).click()
+  await expect(dialog.getByRole('button', { name: 'Forget rig', exact: true })).toHaveCount(0)
+  await dialog.getByRole('button', { name: 'Check saved rigs' }).click()
+  await expect(dialog.getByRole('alert')).toContainText('could not be checked')
+  expect(deletes).toBe(1)
+  expect(reads).toBe(1)
+  checkAvailable = true
+  await dialog.getByRole('button', { name: 'Check saved rigs' }).click()
+  await expect(page).toHaveURL(/\/$/)
+  await expect(page.getByRole('heading', { name: 'Connect your first rig' })).toBeVisible()
+  expect(deletes).toBe(1)
+  expect(reads).toBe(3)
 })
