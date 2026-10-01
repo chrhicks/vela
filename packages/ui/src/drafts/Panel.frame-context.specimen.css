@@ -53,6 +53,8 @@
 .vela-frame-context__result[data-current='true'] { background: var(--vela-accent-surface); }
 .vela-frame-context__result details { border-top: 1px solid var(--vela-line); padding-top: 4px; }
 .vela-frame-context__result details p { color: var(--vela-text-muted); }
+.vela-frame-context__result details p + p { margin-top: 12px; }
+.vela-frame-context__result details > .vela-button { margin-top: 16px; }
 .vela-frame-context__result dl { display: grid; gap: 12px; margin: 8px 0 20px; }
 .vela-frame-context__result dl > div { display: flex; justify-content: space-between; gap: 12px; }
 .vela-frame-context__result dt { color: var(--vela-text-muted); }
