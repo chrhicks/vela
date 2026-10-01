@@ -387,6 +387,9 @@
   border: 0;
   padding-top: 0;
 }
+.vela-af-ready {
+  gap: 8px;
+}
 .vela-af-ready p {
   font-size: 14px;
   line-height: 20px;

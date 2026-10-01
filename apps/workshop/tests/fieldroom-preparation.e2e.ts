@@ -141,6 +141,9 @@ test('autofocus setup and outcomes keep measurement and restore semantics', asyn
     await expect(demo).toBeVisible()
     await page.evaluate(() => document.fonts.ready)
 
+    if (phase === 'setup')
+      await expect(demo.locator('.vela-af-ready')).toHaveCSS('height', '96px')
+
     if (phase === 'interrupted') {
       await expect(demo).toContainText('same exposure')
       await expect(

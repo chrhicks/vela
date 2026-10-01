@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { writeFileSync } from 'node:fs'
 import { openAlignmentScene } from './fixtures/fieldroom/browser'
 import type { AlignmentScene } from './fixtures/fieldroom/alignment'
 
@@ -22,6 +23,45 @@ for (const width of [1440, 768, 390]) {
         await page.evaluate(() => document.fonts.ready)
         await page.locator('h1').click()
         await page.mouse.move(0, 0)
+
+        const geometry = await page.evaluate(
+          selectors => ({
+            viewport: { width: innerWidth, height: innerHeight, dpr: devicePixelRatio },
+            mode: document.documentElement.dataset.mode,
+            elements: selectors.flatMap(selector =>
+              Array.from(document.querySelectorAll(selector)).map(element => {
+                const rect = element.getBoundingClientRect()
+                const style = getComputedStyle(element)
+
+                return {
+                  selector,
+                  x: rect.x,
+                  y: rect.y,
+                  width: rect.width,
+                  height: rect.height,
+                  font: style.font,
+                  gap: style.gap,
+                  color: style.color,
+                  background: style.backgroundColor,
+                }
+              }),
+            ),
+          }),
+          [
+            'h1',
+            '.vela-polar-layout',
+            '.vela-polar-status',
+            '.vela-polar-total',
+            '.vela-polar-image',
+            '.vela-polar-actions',
+            '.vela-polar-image svg',
+          ],
+        )
+
+        writeFileSync(
+          `/tmp/vela-${name}-${width}-${mode}-geometry.json`,
+          JSON.stringify(geometry, null, 2),
+        )
         await page.screenshot({ path: `/tmp/vela-${name}-${width}-${mode}.png`, fullPage: true })
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
           true,
