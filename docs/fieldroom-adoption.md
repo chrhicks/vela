@@ -112,7 +112,7 @@ This accepts reference preparation only; no production appearance is attested.
 
 ## 2. Shared Fieldroom foundations
 
-Status: in progress after the accepted reference checkpoint.
+Status: accepted at `c7c5712` after independent OK and final browser comparison.
 
 ### Plan
 
@@ -212,6 +212,13 @@ Affected reruns passed: 24 focused unit tests, six Dialog/foundation browser
 tests, two navigation browser tests, lint, and UI/web builds. These corrections
 are why intermediate slice acceptance includes actual browser comparison after
 an independent code/behavior verdict.
+
+The corrected target `c7c5712` received renewed independent **OK**. The parent’s
+final native-browser pass then accepted the paired recipes, typography, control
+and overlay bounds, navigation structure, pending/focus behavior, and non-modal
+Appearance interaction. [Retained evidence and exact measurements](visual-evidence/fieldroom/foundations/README.md)
+record scope, screenshot hashes, device-scale rounding, and the remaining
+application-owned checks. Phase 2 is accepted; Phase 3 may begin.
 
 ## 3. Tonight and Appearance vertical slice
 
