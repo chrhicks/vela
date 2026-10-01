@@ -7,7 +7,8 @@ export type AddRigFailure =
   | 'conflict'
   | 'inspection-failed'
   | 'no-stable-device-id'
-  | 'unknown'
+  | 'rejected'
+  | 'unconfirmed'
 
 export class AddRigError extends Error {
   constructor(readonly reason: AddRigFailure) {
@@ -33,7 +34,9 @@ export async function addRig(
 
     return z.object({ rigId: z.string().min(1) }).parse(response).rigId
   } catch (error) {
-    if (!(error instanceof ApiError)) throw error
+    if (!(error instanceof ApiError) || ![400, 404, 409].includes(error.status)) {
+      throw new AddRigError('unconfirmed')
+    }
 
     switch (error.code) {
       case 'rig-already-added':
@@ -45,7 +48,7 @@ export async function addRig(
       case 'rig-inspection-failed':
         throw new AddRigError('inspection-failed')
       default:
-        throw new AddRigError('unknown')
+        throw new AddRigError('rejected')
     }
   }
 }

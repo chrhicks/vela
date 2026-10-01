@@ -1,10 +1,8 @@
 # Equipment, Home, and rig onboarding
 
-Status: plan only. No application implementation is authorized by this document
-before the Tonight/Appearance slice completes its gate in
-[Fieldroom adoption](fieldroom-adoption.md). This plan was prepared against the
-accepted `c7c5712` foundations and the in-progress Phase 3 shell. It does not
-claim implementation, browser equivalence, or independent verification.
+Status: implementation and focused checks complete; independent verification
+and the final parent visual gate are pending. Work began after Photographs
+passed independent OK at `99195ae` and visual acceptance in `58fb7e4`.
 
 ## Scope and visual authority
 
@@ -298,17 +296,10 @@ hardware campaign for a presentation slice.
 
 ## Open decision and exit gate
 
-**First-night Explore is a real functional gap, not a settled copy omission.**
-All current target/discovery pages and endpoints require a saved rig; 03.8 offers
-Explore before one exists. The smallest concrete option is a rig-less catalog
-browse route using the pinned catalog with search and category filters, no site
-or sky-opportunity claims, and no framing/capture controls until a rig is chosen.
-Its server read can return catalog facts/thumbnail identities without requesting
-rig hardware; it must not invent a site, a camera, or a rig. Reconcile this with
-the Explore slice's route/contract plan before Equipment/Home implementation.
-Do not silently hide the approved Explore action or add a broad location/setup
-subsystem. Parent alignment must record which existing/new route provides the
-working entry and the corresponding fixture/tests.
+**First-night Explore is resolved.** The preceding Explore slice implements
+`/explore` with the pinned catalog, search and categories before a rig exists.
+Home already links there. Keep that route and no-rig shell; do not invent a
+location or camera, or remove the first-night Explore action.
 
 Other explicit comparison substitutions are scoped and factual: Connect devices
 for the existing multi-device operation; truthful partial navigation status;
@@ -327,5 +318,113 @@ first-night Explore decision before starting the next application slice.
 
 ## Actual results
 
-Planning only. The referenced screens and current browser/server capability
-owners were inspected; no application code or device state changed for this task.
+Pre-implementation refresh inspected current route owners and the live Paper
+03.5 inline styles (RK-0, token hash 811c9dc5), in addition to frozen 03.5/03.8.
+The source has exact device-row columns 64/300/254/210/60 within 888px; its
+imaging setup uses 24px padding, 20px group gaps and 18px divider insets.
+Current initial Home reads already retain the previous catalog on failure.
+No device commands were issued during this preparation.
+
+Workshop adoption review accepted the non-exported Equipment, Home, and rig
+onboarding examples after comparing desktop source bounds and the rendered
+1440/900/390px layouts in both palettes. Equipment reproduces the 888×106
+readiness region, 100px desktop rows, and 452px setup column; compact layouts
+stack those regions and retain useful expanded details. Review reproduces the
+624×616 four-device example while remaining content-sized. The phone address
+form uses the existing Dialog focus boundary at 390×782, with no mock OS strip.
+The 39 focused workshop cases, scoped lint, and UI build passed.
+
+Comparison corrected an overly broad link rule that shrank the navigation
+wordmark, the first-night illustration paths/160×120 viewbox, and step spacing.
+First-night copy now says the latest exposure appears **in Tonight**: Home is
+the rig catalog once a rig is added. Populated Home uses connection counts and
+last-seen observations, since its projection provides neither endpoints nor
+selected-camera identity. These are factual substitutions to the source, not
+new fields. The empty-catalog shell shows “No rig added” only after a successful
+current navigation read. Workshop screenshots and geometry are retained under
+`/tmp/vela-equipment-workshop/`; production verification remains outstanding.
+
+Production comparison found two concrete adoption differences and corrected
+them before independent review. Home's copied specimen minimum height added
+88px beneath the real shell; the app now owns viewport height. Workshop's
+inherited `text-rendering: geometricPrecision` also changes Barlow glyph widths:
+the first step measured 544px unwrapped, versus 557px with the app's default
+rendering, despite the same 16/24 font and 400px column. Home and Equipment now
+scope the approved rendering mode locally, preserving earlier accepted slices.
+Rig details and Forget remain available through a footer disclosure, evaluated
+open and closed in the workshop at desktop and phone widths. Its collapsed
+44px target fits the 60px footer and preserves the default 1440×921 composition.
+
+The implemented Equipment consumes the existing shell observation and connection
+capability, with all supported telemetry retained in `RigDeviceRow`. Camera and
+focal-length saves run sequentially only for changed fields, keep drafts and
+partial success, and stop after uncertain outcomes. Setup submission also blocks
+overlapping Connect and Forget controls. Forget focuses Cancel, prevents duplicate
+submission/dismissal while pending, and preserves an unknown result if the dialog
+is later closed and reopened. Its explicit catalog check never replays DELETE.
+
+Home now opens discovery explicitly, distinguishes unknown/loading/failed reads
+from confirmed first use, and retains a known catalog when Add succeeds but its
+refresh fails. Discovery keeps endpoint-specific name drafts and address drafts
+through Back. The review status is a small ready/adding/unconfirmed/checking union;
+unknown Add outcomes require inspection of the exact endpoint. The previous
+Orbit/Scanner decoration and displaced Home/device-card CSS were removed.
+
+Validation before independent review: 25 real-route Equipment/Home cases, 27
+onboarding cases, the existing Equipment/imaging-camera/observation regressions,
+four appearance regressions, and 35 focused boundary tests pass. The 36-scene
+fixture module has five contract checks; the workshop has 39 focused cases,
+with four Equipment geometry/disclosure cases rerun after its footer addition.
+Production review/address captures use 1440/900/390 in both palettes. Address
+captures retain separate focused-error evidence and the unfocused state matching
+the reference's dismissed keyboard. Repository lint and the web build pass.
+No live-device commands were needed or issued for this slice.
+
+## Settled implementation refinements
+
+- Keep the existing shell-owned rig observation. Equipment adds its explicit
+  connection composition through the existing observation hook; it does not
+  create another detail poller or derive connection eligibility from cards.
+- Save camera first and focal length second, only for changed fields. Expose a
+  typed save result from the camera hook while preserving `confirmedSaves` for
+  Preparation’s current consumer. The focal-length boundary reads the existing
+  `/web/rigs/:id/framing` projection; avoid mounting the full framing exposure
+  controller just to edit a setting. Confirm the returned requested value.
+- Camera identity is ID plus reported name. Preserve drafts across reads and
+  partial success; inspect an uncertain configuration result before enabling
+  another write. No generic transaction or recovery framework.
+- Match source ordering by showing the selected imaging camera first, followed
+  by mount/focuser and other cameras, then other supported/unknown kinds. The
+  full telemetry remains in expandable rows. The source’s camera role and pier
+  side remain explicit factual substitutions, not fabricated device facts.
+- Home retains its existing provider and confirmed-Add/failed-refresh separation.
+  Remove automatic discovery opening. Preserve the editable review name across
+  Back. Known unreachable address inspection returns to retained editable
+  address fields; protocol and malformed responses keep their true meaning.
+- After an ambiguous Add or Forget response, show an explicit check of the saved
+  catalog/rig before another write. This is narrow state inspection, never
+  automatic replay. After confirmed Forget, navigate Home, whose route-scoped
+  provider mounts and reads the catalog afresh. The initial plan incorrectly
+  assumed that provider persisted outside Home; do not broaden its scope to
+  force a redundant refresh from Equipment. Failed refresh after Add preserves
+  the existing Home catalog because that operation stays on the same route.
+- Existing Dialog already supplies initial/return focus and close-button
+  control. Forget uses Cancel first and no extra close icon. Full-screen compact
+  discovery will use the existing modal/focus mechanism with scoped styling.
+
+## Work order and ownership
+
+1. Evaluate a non-exported Equipment/Home workshop example at 1440, 900 and
+   390px in both palettes, with expanded row, saved-rig catalog and first-night
+   states. Evaluate compact discovery address/review in the same workshop
+   using existing Dialog behavior. Parent comparison settles unspecified
+   responsive composition before production adoption.
+2. Prepare new development-only fixture scenes and source-shaped contracts,
+   independently of production edits. Parent integrates the scene registry.
+3. Adopt Equipment plus combined settings and its focused tests as one bounded
+   owner. Adopt Home/discovery/Forget state reconciliation and its tests as a
+   separate owner, coordinating Forget with the Equipment route owner. Shared
+   contracts and CSS are changed only where the owning boundary requires it.
+4. Compare changed-route screenshots with sources and specimen; run focused
+   checks, obtain fresh independent OK, then complete the parent’s final visual
+   review before the alignment/autofocus slice. Record actual results here.

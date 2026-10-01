@@ -158,3 +158,54 @@ unchanged when an image's preview renderer changes; JPEG preview bytes stay the
 same pinned reference photograph in both renderer versions. These scenes prove
 resource identity and download behavior, not physical acquisition or image
 processing correctness.
+
+## Equipment, Home and onboarding
+
+`equipment.ts` supplies 36 deterministic real-route Equipment/Home scenes using
+production rig, observation, imaging-camera, framing and discovery contracts.
+`equipment-connected` and `equipment-dark` reproduce the source's four-device
+inventory: selected ZWO ASI2600MC Pro, ASI Mount, ZWO Focuser and disconnected
+ZWO ASI220MM Mini. Three of four are connected; the second camera has no invented
+guide role and the mount has no fabricated pier-side reading. The illustrative
+camera temperature/power and focuser position are fixture data, not live telemetry.
+
+The `equipment-` names separate camera disconnection, all-kind detail inventory,
+interrupted reads, initial failure, missing rig, offline inventory, empty inventory,
+connection complete/partial/rejected/unconfirmed outcomes and setup save outcomes.
+All-kind details include unknown focuser activity, partial conditions, generic
+switch channels with unitless values and every unsupported device kind. The read
+interruption starts after two detail reads, allowing development StrictMode's
+cancelled first read; `setDetailFailure(null)` explicitly restores successful reads.
+
+`home-no-rigs` / `home-no-rigs-dark` start at the intentional first-night rest
+state; `home-rigs` / `home-rigs-dark` include reachable, offline and unknown rigs.
+The `rig-` scenes start at Home (Forget scenes at Equipment). Open Add a rig and
+choose the real scan/address flow before review; these fixtures do not synthesize
+modal state or automatically click controls. `rig-address-validation-phone` is
+captured at 390×782 after entering `http://192.168.4.104`; client validation should
+block inspection. `rig-address-unreachable` retains the normal host and port.
+`rig-dialog-submission` holds Add for 2.5 seconds, and
+`equipment-connect-outcomes` holds Connect for two seconds.
+
+Scenes expose `snapshot()`, `unknownRequests`, `writes`, `detailReads`, `homeReads`
+and narrow controls: `setDetailFailure(statusOrNull)`, `setHomeFailure(statusOrNull)`,
+`setRig(view)`, `setCamera(view)`, `setDiscovery(result)`,
+`setConnectionOutcome('complete' | 'partial' | 'rejected' | 'unconfirmed')`,
+`setWriteOutcome('camera' | 'focal' | 'add' | 'forget', outcome)` and
+`setDelay(operation, milliseconds)`. Write outcomes are `confirmed`, `rejected`
+and `unconfirmed`. Delays are bounded to 60 seconds. The `writes` ledger includes
+POST discovery inspections as requests; discovery has no device side effect.
+
+Unconfirmed write scenes apply the state change but lose its response. An explicit
+GET can observe camera/focal/connection/Forget state without replay. After Add,
+manual discovery reports the candidate as `already-added` with the saved rig ID;
+a rejected Add leaves it `new`. `rig-add-refresh-failed` confirms Add before failing
+Home reads, preserving the distinction between a successful write and failed
+catalog refresh. Each session owns its mutable state. Unknown requests fail with
+501 and never fall through to an observatory endpoint.
+
+`equipment-fixtures.e2e.ts` validates every initial snapshot through production
+projection guards and checks connection result contracts, separate settings
+outcomes, ambiguous Add/Forget inspection, and blocked unknown routes. These are
+fixture-boundary checks; rendered behavior and visual comparisons remain the
+responsibility of the real-route browser scenarios.

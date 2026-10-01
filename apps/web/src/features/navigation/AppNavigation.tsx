@@ -80,6 +80,7 @@ export function AppNavigation() {
             persistence={appearance.persistence}
           />
           {connection && <span className="vela-app__connection" data-connected={connection === 'Connected'}><span className="vela-app__connection-dot" aria-hidden="true">●</span> {connection}</span>}
+          {!rigId && view?.rigs.length === 0 && !offline && !missing && <span className="vela-app__connection">No rig added</span>}
         </>
       }
       links={rigId ? [
