@@ -14,6 +14,7 @@ for (const mode of ['light', 'dark'] as const) {
       await page.setViewportSize({ width, height: width === 1440 ? 900 : 782 })
       const { scene } = await openExploreScene(page, `explore-${mode}`)
       await expect(page.getByRole('heading', { name: 'Explore the sky' })).toBeVisible()
+      await expect(page.getByRole('main')).toHaveCount(1)
       await expect(page.locator('.vela-discovery__card')).toHaveCount(3)
       await expect(page.locator('.vela-discovery__card img')).toHaveCount(3)
       await page.evaluate(async () => {
@@ -81,6 +82,7 @@ test('rigless Explore can search and inspect with no rig API requests or sky cla
   page,
 }) => {
   const { scene, requests } = await openExploreScene(page, 'explore-no-rig')
+  await expect(page.getByRole('main')).toHaveCount(1)
   await expect(page.locator('.vela-discovery__card')).toHaveCount(3)
   await expect(page.getByText(/sky timing requires/i)).toBeVisible()
   await page.getByRole('searchbox').fill('M31')

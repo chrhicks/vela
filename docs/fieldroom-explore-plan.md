@@ -476,3 +476,8 @@ Future windows now say “Above 30° from … to …”, based on the frozen cal
 time; a window already in progress retains the source wording. The same
 below-horizon refresh regression verifies both future boundaries. Renewed
 independent disposition remains required before the final visual pass.
+
+Review at `5710cf9` confirmed both sky-copy corrections, with 876 project tests
+and 131 web browser checks passing. Its remaining P2 was a nested main landmark
+on the new rigless Explore route. Both target-route wrappers now leave the main
+landmark to Shell; rigged and rigless real-route checks assert a single landmark.
