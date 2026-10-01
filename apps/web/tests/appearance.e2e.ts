@@ -34,6 +34,11 @@ for (const width of [1440, 390]) {
     )
     await expect(page.locator('.vela-app__connection')).toHaveText('● Connected')
     const trigger = page.getByRole('button', { name: 'Appearance', exact: true })
+    await expect(trigger).toHaveCount(1)
+    const rigBounds = await page.getByRole('combobox', { name: 'Viewing rig' }).boundingBox()
+    const appearanceBounds = await trigger.boundingBox()
+    expect(appearanceBounds!.x).toBeGreaterThanOrEqual(rigBounds!.x + rigBounds!.width)
+    expect(Math.abs(appearanceBounds!.y - rigBounds!.y)).toBeLessThan(3)
     await trigger.click()
     await page
       .getByRole('dialog', { name: 'Appearance' })

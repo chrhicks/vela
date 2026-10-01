@@ -94,7 +94,7 @@ export function createExploreScene(name: ExploreScene) {
   let framing = structuredClone(reviewFraming)
 
   let camera: ImagingCameraView = {
-    rigId: 'fra400', selected: { id: 'camera', name: 'ASI2600MC Pro' },
+    rigId: 'fra400', selected: { id: 'camera', name: 'ASI2600MC Pro' }, selectedDeviceId: 'camera',
     cameras: [ { id: 'camera', name: 'ASI2600MC Pro', configuredName: 'ASI2600MC Pro' },
       { id: 'guide-camera', name: 'ASI220MM Mini', configuredName: 'ASI220MM Mini' } ],
     state: 'ready', editable: true,
@@ -248,7 +248,7 @@ export function createExploreScene(name: ExploreScene) {
         const selected = camera.cameras.find(item => item.id === body?.id && item.name === body?.name)
 
         if (!selected?.name) return failure(400, 'Unknown imaging camera')
-        camera = { ...camera, selected: { id: selected.id, name: selected.name } }
+        camera = { ...camera, selected: { id: selected.id, name: selected.name }, selectedDeviceId: selected.id }
         capture = { ...capture, camera: { name: selected.name } }
 
         return json(camera)

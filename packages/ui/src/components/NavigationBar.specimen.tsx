@@ -8,19 +8,21 @@ import './NavigationBar.specimen.css'
 
 const connectionSchema = z.enum(['connected', 'interrupted', 'offline'])
 
-function NavigationUtility({ connection }: { connection: z.infer<typeof connectionSchema> }) {
+function NavigationAppearance() {
   const [open, setOpen] = useState(false)
   const [value, setValue] = useState<AppearancePreference>('system')
+
+  return <Appearance open={open} onOpenChange={setOpen} value={value} onValueChange={setValue} systemMode="light" persistence="visit" />
+}
+
+function NavigationUtility({ connection }: { connection: z.infer<typeof connectionSchema> }) {
   const connectionLabels = { connected: 'Connected', interrupted: 'Updates lost', offline: 'Offline' }
 
   return (
-    <>
-      <Appearance open={open} onOpenChange={setOpen} value={value} onValueChange={setValue} systemMode="light" persistence="visit" />
-      <span className="vela-navigation-specimen__connection" data-state={connection}>
-        <i aria-hidden="true" />
-        {connectionLabels[connection]}
-      </span>
-    </>
+    <span className="vela-navigation-specimen__connection" data-state={connection}>
+      <i aria-hidden="true" />
+      {connectionLabels[connection]}
+    </span>
   )
 }
 
@@ -115,6 +117,7 @@ export const specimen: ComponentSpecimen = {
                 },
               }))
         }
+        actions={<NavigationAppearance />}
         utility={<NavigationUtility connection={connectionSchema.parse(props.connection)} />}
         {...navigation}
       />

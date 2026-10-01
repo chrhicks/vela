@@ -456,3 +456,26 @@ browser limitations. The shared browser is open to Tonight on the isolated
 review runtime, with fonts, decoded image, expected state and no horizontal
 overflow confirmed. Implementation is complete; Chris's browser acceptance is
 the remaining merge gate. No physical-device outcome is claimed by these checks.
+
+## Browser acceptance follow-up: camera identity and header order
+
+Chris requested two adjustments on 2026-10-01 during live FRA 400 review:
+correct Equipment's mistaken “Other camera” label and move Appearance to the
+right of the rig selector so it no longer crowds connection status. This explicit
+header preference supersedes the frozen source's original control order.
+
+The live device check exposed different identity scopes: imaging selection keeps
+the provider camera ID while rig-detail rows use a rig-scoped ID. The server now
+projects `selectedDeviceId` only for a matching current camera identity, and
+Equipment uses that association plus the reported name. It no longer compares
+unrelated ID formats. Equipment fixtures now reflect the distinct scopes; a
+server regression compares the association to the actual detail projection, and
+a route regression checks primary-camera labeling/sorting and changed identity.
+Saved configuration and capture selection are unchanged.
+
+The shared navigation specimen was inspected at desktop and phone sizes before
+adoption. A trailing actions slot places Appearance after the rig selector;
+phone layout keeps selector and Appearance together below brand/status. Focused
+phone preparation keeps return link, rig context and a single Appearance control.
+Focused geometry and popover checks passed. Final independent verification and
+live-page confirmation are recorded with the follow-up delivery.
