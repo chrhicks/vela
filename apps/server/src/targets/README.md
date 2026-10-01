@@ -13,6 +13,9 @@ environmental safety policy exists. Darkness means Sun below −18°. The paths
 and displayed windows are sampled at 15-minute intervals and are approximate.
 Morning after astronomical dawn selects the coming night; before dawn retains
 the active night. Polar day/night and unavailable site data remain explicit.
+The current altitude and azimuth are calculated at `observedAt`, separately from
+the sampled night span, which can begin hours in the future. Current direction
+must not be inferred from the nearest night sample.
 Every sample includes target azimuth and the Moon's topocentric azimuth and
 altitude at the same time and site, without atmospheric refraction. Azimuth is
 0° north, increasing eastward. Lunar illumination is the geocentric illuminated

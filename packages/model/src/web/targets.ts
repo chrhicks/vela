@@ -33,6 +33,8 @@ export interface TargetSkyPath {
       waxing: boolean
     }
   }>
+  /** Position calculated at observedAt, independent of the sampled night span. */
+  currentAzimuthDegrees: number
   currentAltitudeDegrees: number
   highestAltitudeDegrees: number
   aboveHorizonDuringDarkness: Array<{ startsAt: string; endsAt: string }>

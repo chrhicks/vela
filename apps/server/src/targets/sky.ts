@@ -97,12 +97,15 @@ export function skyPath(target: TargetPosition, site: Site, now: Date): TargetSk
     }
   }
 
+  const current = horizontal(now)
+
   return {
     observedAt: now.toISOString(),
     startsAt: samples[0]!.at,
     endsAt: samples.at(-1)!.at,
     samples,
-    currentAltitudeDegrees: horizontal(now).altitude,
+    currentAltitudeDegrees: current.altitude,
+    currentAzimuthDegrees: current.azimuth,
     highestAltitudeDegrees: Math.max(...samples.map(sample => sample.altitudeDegrees)),
     aboveHorizonDuringDarkness: windows,
   }

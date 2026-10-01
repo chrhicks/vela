@@ -222,7 +222,7 @@ application-owned checks. Phase 2 is accepted; Phase 3 may begin.
 
 ## 3. Tonight and Appearance vertical slice
 
-Status: planned; waits for foundations.
+Status: implemented; independent review corrections in progress.
 
 ### Plan
 
@@ -254,7 +254,15 @@ Application configuration and Appearance, shared rig observation, subject/run
 facts, image inspection, sampled sky and footer are in place. The plan's actual
 outcome records files, operational boundaries, narrow additional controls, and
 preliminary geometry. Review scenes use the real route on the development-only
-HTTP fixture server. Independent review and final visual acceptance are pending.
+HTTP fixture server. The first independent review at `a4905c0` returned BLOCK:
+the equipment footer could select a guide camera from inventory order, and the
+current sky direction could use a future night sample. The footer now consumes
+the capture projection's selected-camera cooling, including its own stale state.
+The sky boundary projects azimuth at `observedAt` alongside current altitude;
+night samples remain for the trace. Regression coverage includes a warmer guide
+camera first in inventory, unavailable selected-camera cooling, and a future
+sample pointing in a different direction. Renewed independent review and final
+visual acceptance are pending.
 
 ## 4. Required capability additions
 

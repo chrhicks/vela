@@ -1,3 +1,4 @@
+import type { CaptureCoolingView } from '@vela/model/web'
 import { Button, Checkbox, Input } from '@vela/ui'
 import { useState, type ReactNode } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
@@ -114,14 +115,7 @@ function CapturePage({ rigId }: { rigId: string }) {
 
   const sky = target?.sky
 
-  const nearest = sky?.samples.reduce((best, sample) =>
-    Math.abs(Date.parse(sample.at) - Date.parse(sky.observedAt)) <
-    Math.abs(Date.parse(best.at) - Date.parse(sky.observedAt))
-      ? sample
-      : best,
-  )
-
-  const direction = nearest
+  const direction = sky
     ? [
         'Northern',
         'Northeastern',
@@ -131,7 +125,7 @@ function CapturePage({ rigId }: { rigId: string }) {
         'Southwestern',
         'Western',
         'Northwestern',
-      ][Math.round(nearest.azimuthDegrees / 45) % 8]
+      ][Math.round(sky.currentAzimuthDegrees / 45) % 8]
     : null
 
   const hasPendingChoice =
@@ -399,6 +393,8 @@ function CapturePage({ rigId }: { rigId: string }) {
       <TonightEquipment
         rigName={view.rigName}
         rigId={rigId}
+        cooling={view.cooling}
+        coolingStale={offline || capture.coolingUnconfirmed}
         coolingAction={
           (view.cooling || capture.coolingError) && (
             <button
@@ -441,20 +437,17 @@ function TonightEquipment({
   rigName,
   rigId,
   coolingAction,
+  cooling,
+  coolingStale,
 }: {
   rigName: string
   rigId: string
   coolingAction: ReactNode
+  cooling: CaptureCoolingView | null
+  coolingStale: boolean
 }) {
   const observation = useRigObservation()
-  const camera = observation?.view?.devices.find(device => device.kind === 'camera')
   const focuser = observation?.view?.devices.find(device => device.kind === 'focuser')
-
-  const cameraStatus =
-    camera?.connection === 'connected' &&
-    (camera.status.availability === 'complete' || camera.status.availability === 'partial')
-      ? camera.status
-      : null
 
   const focusStatus =
     focuser?.connection === 'connected' &&
@@ -468,9 +461,9 @@ function TonightEquipment({
         <strong>{rigName}</strong>
         <span>
           Camera{'  '}
-          {cameraStatus
-            ? `${cameraStatus.sensorTemperatureC?.toFixed(1) ?? '—'}°C · ${observation?.interrupted ? 'last known' : cameraStatus.cooling ? `Cooler ${cameraStatus.cooling.state}` : 'Cooling unknown'}`
-            : (camera?.connection ?? 'Unavailable')}
+          {cooling
+            ? `${cooling.sensorTemperatureC?.toFixed(1) ?? '—'}°C · ${coolingStale ? 'last known' : `Cooler ${cooling.state}`}`
+            : 'Temperature / cooling unavailable'}
         </span>
         <span>
           Focuser{'  '}
