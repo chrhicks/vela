@@ -146,13 +146,25 @@ export function isSavedImage(value: unknown, rigId: string): value is SavedImage
   )
 }
 
+const timeZone = text.refine(value => {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: value })
+
+    return true
+  } catch {
+    return false
+  }
+})
+
 const savedImagesView = z.object({
+  timeZone,
   rigId: z.string(),
   rigName: text,
   images: z.array(savedImage),
 })
 
 const savedImageView = z.object({
+  timeZone,
   rigId: z.string(),
   rigName: text,
   image: savedImage,

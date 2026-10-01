@@ -49,12 +49,16 @@ export interface SavedImage extends CaptureImage {
 }
 
 export interface SavedImagesView {
+  /** Vela server time zone used consistently for library nights and capture times. */
+  timeZone: string
   rigId: string
   rigName: string
   images: SavedImage[]
 }
 
 export interface SavedImageView {
+  /** Vela server time zone, matching the collection projection. */
+  timeZone: string
   rigId: string
   rigName: string
   image: SavedImage

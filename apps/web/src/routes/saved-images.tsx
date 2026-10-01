@@ -1,12 +1,20 @@
 import type { SavedImage } from '@vela/model/web'
-import { Button } from '@vela/ui'
-import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { Button, Select } from '@vela/ui'
+import { useEffect, useMemo, useRef, type MouseEvent } from 'react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
+import { PhotographGrid, PhotographGroups } from '../features/photographs/PhotographLibrary'
 import { SelectedPhotograph } from '../features/photographs/SelectedPhotograph'
 import { useSavedImage, useSavedImages } from '../features/photographs/use-saved-images'
-import { photographDay, photographTime } from '../features/photographs/format'
+import { groupPhotographs, photographNight, photographNightTitle, photographTarget } from '../features/photographs/library'
+import type { PhotographBrowse } from '../features/photographs/library'
 import { pixelIdentity } from '../features/image-inspection/image-pixels'
 import './saved-images.css'
+
+const noImages: SavedImage[] = []
+
+type BrowseSelection = { browse: PhotographBrowse; group: string; filter: string; query: string }
+
+type FocusDestination = 'library' | 'group' | 'image'
 
 export function SavedImages() {
   const { rigId = '', imageId } = useParams()
@@ -17,173 +25,180 @@ export function SavedImages() {
 function PhotographsPage({ rigId, imageId }: { rigId: string; imageId?: string }) {
   const collection = useSavedImages(rigId)
   const selected = useSavedImage(rigId, imageId)
+  const [params] = useSearchParams()
   const navigate = useNavigate()
-  const [revealed, setRevealed] = useState(6)
-  const listHeading = useRef<HTMLHeadingElement>(null)
-  const rows = useRef<HTMLDivElement>(null)
+  const library = useRef<HTMLDivElement>(null)
+  const groupHeading = useRef<HTMLHeadingElement>(null)
   const viewer = useRef<HTMLElement>(null)
-  const requestedFocus = useRef<string | null>(null)
+  const requestedFocus = useRef<FocusDestination | null>(null)
   const base = `/rigs/${encodeURIComponent(rigId)}/observe/saved-images`
   const image = selected.view?.image
-  const images = collection.view?.images ?? []
-  const selectedIndex = images.findIndex(item => item.id === imageId)
-  const visibleCount = Math.max(revealed, Math.ceil((selectedIndex + 1) / 6) * 6)
+  const listedImages = collection.view?.images ?? noImages
+
+  const images = useMemo(() => image
+    ? listedImages.map(listed => listed.id === image.id ? image : listed)
+    : listedImages, [listedImages, image])
+
+  const timeZone = collection.view?.timeZone ?? selected.view?.timeZone ?? 'UTC'
+  const browse: PhotographBrowse = params.get('browse') === 'targets' ? 'targets' : 'nights'
+  const groups = useMemo(() => groupPhotographs(images, browse, timeZone), [images, browse, timeZone])
+  const selectedMetadata = image ?? images.find(item => item.id === imageId)
+
+  const inferredGroup = selectedMetadata
+    ? browse === 'nights' ? photographNight(selectedMetadata.capturedAt, timeZone) : photographTarget(selectedMetadata).id
+    : ''
+
+  const groupId = params.get('group') ?? (imageId ? inferredGroup : '')
+  const group = groups.find(item => item.id === groupId)
+  const opposite = browse === 'nights' ? 'targets' : 'nights'
+  const filters = useMemo(() => groupPhotographs(group?.images ?? noImages, opposite, timeZone), [group, opposite, timeZone])
+  const filter = filters.some(item => item.id === params.get('filter')) ? params.get('filter')! : ''
+  const visible = filter ? filters.find(item => item.id === filter)!.images : group?.images ?? noImages
+  const selectedIndex = visible.findIndex(item => item.id === imageId)
+  const selection: BrowseSelection = { browse, group: groupId, filter, query: params.get('q') ?? '' }
   const rigName = selected.view?.rigName ?? collection.view?.rigName
-  const position = selectedIndex < 0 ? null : `Image ${images.length - selectedIndex} of ${images.length}`
+  const groupTitle = group ? (browse === 'nights' ? `Night of ${group.title}` : group.title) : null
+  const position = selectedIndex < 0 ? null : `Image ${selectedIndex + 1} of ${visible.length}`
 
-  useEffect(() => {
-    if (!imageId && images[0])
-      void navigate(`${base}/${encodeURIComponent(images[0].id)}`, { replace: true })
-  }, [imageId, images, base, navigate])
+  function href(patch: Partial<BrowseSelection> = {}, nextImageId?: string) {
+    const next = { ...selection, ...patch }
+    const search = new URLSearchParams({ browse: next.browse })
 
-  useEffect(() => {
-    if (visibleCount > revealed) setRevealed(visibleCount)
+    if (next.group) search.set('group', next.group)
 
-    if (selectedIndex < 6 || requestedFocus.current === imageId) return
+    if (next.filter) search.set('filter', next.filter)
 
-    rows.current?.querySelector('[aria-current]')?.scrollIntoView({ block: 'nearest' })
-  }, [imageId, selectedIndex, visibleCount, revealed])
+    if (next.query) search.set('q', next.query)
 
-  useEffect(() => {
-    if (!imageId || requestedFocus.current !== imageId) return
-    viewer.current?.focus({ preventScroll: true })
-    viewer.current?.scrollIntoView({ block: 'nearest' })
-
-    if (selected.view || selected.error) requestedFocus.current = null
-  }, [imageId, selected.view, selected.error])
-
-  const groups = new Map<string, SavedImage[]>()
-
-  for (const listed of images.slice(0, visibleCount)) {
-    const frame = image?.id === listed.id ? image : listed
-    const day = photographDay(frame.capturedAt)
-    const group = groups.get(day) ?? []
-    group.push(frame)
-    groups.set(day, group)
+    return `${base}${nextImageId ? `/${encodeURIComponent(nextImageId)}` : ''}?${search}`
   }
 
-  const nextReveal = Math.min(6, images.length - visibleCount)
+  function requestFocus(event: MouseEvent<HTMLAnchorElement>, destination: FocusDestination) {
+    if (event.button === 0 && !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey)
+      requestedFocus.current = destination
+  }
+
+  useEffect(() => {
+    const destination = requestedFocus.current
+
+    if (!destination) return
+
+    const element = { image: viewer.current, group: groupHeading.current, library: library.current }[destination]
+
+    if (!element) return
+
+    element.focus({ preventScroll: true })
+    element.scrollIntoView({ block: 'nearest' })
+
+    if (destination !== 'image' || selected.view || selected.error) requestedFocus.current = null
+  }, [imageId, groupId, browse, selected.view, selected.error])
+
+  const navigation = selectedIndex < 0 ? null : (
+    <nav className="photographs__image-navigation" aria-label="Photographs in this group">
+      {selectedIndex > 0 ? (
+        <Link className="vela-button" to={href({}, visible[selectedIndex - 1]!.id)} onClick={event => requestFocus(event, 'image')}>← Newer</Link>
+      ) : <Button disabled>← Newer</Button>}
+      <span>{position}</span>
+      {selectedIndex < visible.length - 1 ? (
+        <Link className="vela-button" to={href({}, visible[selectedIndex + 1]!.id)} onClick={event => requestFocus(event, 'image')}>Older →</Link>
+      ) : <Button disabled>Older →</Button>}
+    </nav>
+  )
 
   return (
     <article className="photographs">
       <header className="photographs__heading">
         <h1>Photographs</h1>
-        {rigName && (
-          <span>
-            {rigName}{collection.view && ` · ${images.length} saved ${images.length === 1 ? 'image' : 'images'}`}
-          </span>
-        )}
+        {rigName && <span>{rigName}{collection.view && ` · ${images.length} photographs`}</span>}
         <p>Available even when the rig is disconnected</p>
       </header>
-      {imageId && (
-        <div className="photographs__jump">
-          <span>{image ? `Selected · ${photographTime(image.capturedAt)}` : 'Selected photograph'}</span>
-          <Button onClick={() => {
-            listHeading.current?.focus({ preventScroll: true })
-            listHeading.current?.scrollIntoView({ block: 'start' })
-          }}>Jump to photographs ↓</Button>
-        </div>
-      )}
-      <div
-        className="photographs__layout"
-        data-unselected={(!imageId && images.length === 0) || undefined}
-      >
-        <section className="photographs__list" aria-label="Photographs list">
-          {images.length === 0 && <h2 className="photographs__list-title" tabIndex={-1} ref={listHeading}>Photographs list</h2>}
-          {collection.loading && (
-            images.length === 0 ? (
-              <CollectionState state="loading" rigId={rigId} rigName={rigName} />
+      <div className="photographs__content" role="region" aria-label="Photograph library" ref={library} tabIndex={-1}>
+        {collection.error && (
+          <div className="photographs__read-status photographs__collection-feedback" role="status">
+            <p>{collection.error}</p>
+            <Button onClick={collection.refresh}>Retry photographs</Button>
+          </div>
+        )}
+        {collection.loading && images.length === 0 && (imageId
+          ? <p className="photographs__collection-feedback" role="status">Loading photographs…</p>
+          : <CollectionState state="loading" rigId={rigId} rigName={rigName} />)}
+        {!collection.loading && collection.view && images.length === 0 && (imageId
+          ? <p className="photographs__collection-feedback">No photographs in the current collection listing.</p>
+          : <CollectionState state="empty" rigId={rigId} rigName={rigName} />)}
+        {(groupId || imageId) && (
+          <div className="photographs__back">
+            <Link
+              className="vela-button"
+              to={href(imageId && group ? {} : { group: '', filter: '' })}
+              onClick={event => requestFocus(event, imageId && group ? 'group' : 'library')}
+            >← {imageId && groupTitle ? groupTitle : `All ${browse}`}</Link>
+          </div>
+        )}
+        {group && (
+          <div className="photographs__group-heading">
+            <div>
+              <h2 ref={groupHeading} tabIndex={-1}>{groupTitle}</h2>
+              <p>{visible.length} photographs{filter ? ' matching filter' : ''} · Newest first</p>
+            </div>
+            {!imageId && <Select
+              label={browse === 'nights' ? 'Target' : 'Observing night'}
+              value={filter}
+              options={[
+                { value: '', label: `All ${opposite}` },
+                ...filters.map(item => ({ value: item.id, label: item.title })),
+              ]}
+              onChange={event => { void navigate(href({ filter: event.target.value })) }}
+            />}
+          </div>
+        )}
+        {imageId ? (
+          <div className="photographs__inspection">
+            {image ? (
+              <SelectedPhotograph
+                key={pixelIdentity(image)}
+                image={image}
+                rigId={rigId}
+                timeZone={timeZone}
+                night={photographNightTitle(photographNight(image.capturedAt, timeZone))}
+                position={position}
+                navigation={navigation}
+                viewerRef={viewer}
+              />
             ) : (
-              <p role="status">Loading photographs…</p>
-            )
-          )}
-          {collection.error && (
-            <div className="photographs__read-status" role="status">
-              <p>{collection.error}</p>
-              <Button onClick={collection.refresh}>Retry photographs</Button>
-            </div>
-          )}
-          {images.length > 0 && (
-            <>
-              <div className="photographs__rows" ref={rows}>
-                {[...groups].map(([day, frames], groupIndex) => (
-                  <section className="photographs__day" key={day}>
-                    <header>
-                      <h2 ref={groupIndex === 0 ? listHeading : undefined} tabIndex={-1}>{day}</h2>
-                      {groupIndex === 0 && <span>Newest first</span>}
-                    </header>
-                    {frames.map(frame => (
-                      <Link
-                        key={frame.id}
-                        to={`${base}/${encodeURIComponent(frame.id)}`}
-                        aria-current={frame.id === imageId ? 'true' : undefined}
-                        data-original={frame.previewRendering?.status !== 'current' || undefined}
-                        onClick={event => {
-                          if (event.button !== 0 || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return
-                          requestedFocus.current = frame.id
-
-                          if (frame.id === imageId) {
-                            viewer.current?.focus({ preventScroll: true })
-                            viewer.current?.scrollIntoView({ block: 'nearest' })
-
-                            if (selected.view || selected.error) requestedFocus.current = null
-                          }
-                        }}
-                      >
-                        <img src={frame.fitImageUrl ?? frame.imageUrl} alt="" loading="lazy" />
-                        <span>
-                          <strong>{photographTime(frame.capturedAt)}</strong>
-                          <small>{frame.exposureSeconds} s · {frame.color === 'color' ? 'Color' : 'Mono'}</small>
-                          {frame.previewRendering?.status !== 'current' && <small>Original preview</small>}
-                        </span>
-                        <span aria-hidden="true">{frame.id === imageId ? '→' : ''}</span>
-                      </Link>
-                    ))}
-                  </section>
-                ))}
-              </div>
-              {nextReveal > 0 && (
-                <Button onClick={() => {
-                  setRevealed(visibleCount + nextReveal)
-
-                  if (nextReveal === images.length - visibleCount) listHeading.current?.focus()
-                }}>Show {nextReveal} earlier images</Button>
-              )}
-            </>
-          )}
-          {!collection.loading && collection.view && images.length === 0 && (
-            <CollectionState state="empty" rigId={rigId} rigName={rigName} />
-          )}
-        </section>
-        {image ? (
-          <SelectedPhotograph
-            key={pixelIdentity(image)}
-            image={image}
-            rigId={rigId}
-            position={position}
-            viewerRef={viewer}
+              <section className="photographs__viewer photographs__pending" aria-label="Saved preview" tabIndex={-1} ref={viewer}>
+                <div className="photographs__read-status" role="status">
+                  {selected.loading ? <>
+                    <h2>Preparing selected photograph</h2>
+                    <p>Preparing the display preview from the retained original may take a moment.</p>
+                  </> : <>
+                    <h2>Selected photograph unavailable</h2>
+                    <p>{selected.error}</p>
+                    <Button onClick={selected.refresh}>Retry selected photograph</Button>
+                  </>}
+                </div>
+              </section>
+            )}
+          </div>
+        ) : group ? (
+          <PhotographGrid images={visible} browse={browse} timeZone={timeZone} imageHref={id => href({}, id)} onOpen={event => requestFocus(event, 'image')} />
+        ) : groupId && collection.view ? (
+          <p role="status">This group is no longer in the photograph collection.</p>
+        ) : images.length > 0 ? (
+          <PhotographGroups
+            groups={groups}
+            browse={browse}
+            query={selection.query}
+            timeZone={timeZone}
+            onBrowse={next => { void navigate(href({ browse: next, group: '', filter: '', query: '' })) }}
+            onSearch={query => { void navigate(href({ query }), { replace: true }) }}
+            groupHref={id => href({ group: id, filter: '' })}
+            onOpen={event => requestFocus(event, 'group')}
           />
-        ) : imageId ? (
-          <section className="photographs__viewer photographs__pending" aria-label="Saved preview" tabIndex={-1} ref={viewer}>
-            <div className="photographs__read-status" role="status">
-              {selected.loading ? (
-                <>
-                  <h2>Preparing selected photograph</h2>
-                  <p>Preparing the display preview from the retained original may take a moment.</p>
-                </>
-              ) : (
-                <>
-                  <h2>Selected photograph unavailable</h2>
-                  <p>{selected.error}</p>
-                  <Button onClick={selected.refresh}>Retry selected photograph</Button>
-                </>
-              )}
-            </div>
-          </section>
         ) : null}
       </div>
       <footer className="photographs__footer">
-        Saved images belong to this rig. Select another rig to browse its photographs.
+        <span>Saved images belong to this rig. Select another rig to browse its photographs.</span>
+        {(collection.view || selected.view) && <span>Vela server time · {timeZone}</span>}
       </footer>
     </article>
   )

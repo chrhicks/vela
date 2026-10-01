@@ -35,7 +35,13 @@ the optional fitted preview is used for collection thumbnails. New images retain
 an optional `subject` snapshot of the selected target ID, name and catalog identity.
 It records observing intent, not a measured pointing or solved frame. Explicit null
 means no chosen subject; absent legacy metadata remains valid and is not rewritten.
-No grouping or run history is inferred from the image collection.
+Collection and detail projections include the Vela server's system `timeZone`.
+The browser uses this explicit zone for capture dates, times and noon-to-noon
+observing-night groups, consistently across clients. It is labeled server time,
+not an inferred observatory location. Night/target groups are presentation derived
+from these timestamps and optional subject identities, not persisted sessions or
+run history. Changing the server time zone changes those presentation groups,
+without modifying artifact metadata.
 
 Estimated exposure starts retain `capturedAtSource: server-estimate` in metadata.
 Their FITS `DATE-OBS` uses that same start, with `TIMESRC = SERVER-ESTIMATE` and a

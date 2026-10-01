@@ -150,8 +150,8 @@ for (const mode of ['light', 'dark'] as const) {
     await page.setViewportSize({ width: 1440, height: 900 })
     const { scene } = await openPhotographsScene(page, `photographs-${mode}`)
     await expect(
-      page.getByRole('region', { name: 'Photographs list' }).getByRole('link'),
-    ).toHaveCount(6)
+      page.getByRole('region', { name: 'Photograph library' }).getByRole('link'),
+    ).toHaveCount(1)
     const gate = deferred()
     let requested = false
     await page.route(`**${collectionPath}`, async route => {
@@ -167,7 +167,7 @@ for (const mode of ['light', 'dark'] as const) {
     ).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Loading saved photographs', exact: true })).toBeVisible()
     await expect(
-      page.getByRole('region', { name: 'Photographs list' }).getByRole('link'),
+      page.getByRole('region', { name: 'Photograph library' }).getByRole('link'),
     ).toHaveCount(0)
     await expect(
       page.getByText('No saved photographs yet', { exact: true }),
@@ -178,8 +178,8 @@ for (const mode of ['light', 'dark'] as const) {
       page.getByText('Loading photographs…', { exact: true }),
     ).toHaveCount(0)
     await expect(
-      page.getByRole('region', { name: 'Photographs list' }).getByRole('link'),
-    ).toHaveCount(6)
+      page.getByRole('region', { name: 'Photograph library' }).getByRole('link'),
+    ).toHaveCount(1)
     expect(scene.unknownRequests).toEqual([])
   })
 

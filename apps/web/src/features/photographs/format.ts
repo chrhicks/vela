@@ -1,18 +1,21 @@
-export function photographTime(timestamp: string) {
+export function photographTime(timestamp: string, timeZone?: string) {
   return new Date(timestamp).toLocaleTimeString(undefined, {
-    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+    timeZone, hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
   })
 }
 
-export function photographDate(timestamp: string, year = true) {
-  const date = new Date(timestamp)
-  const month = date.toLocaleDateString('en-US', { month: 'short' })
+export function photographDate(timestamp: string, year = true, timeZone?: string) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone, day: 'numeric', month: 'short', year: 'numeric',
+  }).formatToParts(new Date(timestamp))
 
-  return `${date.getDate()} ${month}${year ? ` ${date.getFullYear()}` : ''}`
+  const value = (type: Intl.DateTimeFormatPartTypes) => parts.find(part => part.type === type)!.value
+
+  return `${value('day')} ${value('month')}${year ? ` ${value('year')}` : ''}`
 }
 
-export function photographDay(timestamp: string) {
+export function photographDay(timestamp: string, timeZone?: string) {
   return new Date(timestamp).toLocaleDateString('en-GB', {
-    day: 'numeric', month: 'long', year: 'numeric',
+    timeZone, day: 'numeric', month: 'long', year: 'numeric',
   })
 }

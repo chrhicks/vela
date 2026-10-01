@@ -401,10 +401,11 @@ it('retains a displayed frame and serves original and preview downloads while di
     latestImage: { saved: true },
   })
   const listing = (await subject.app.inject('/api/web/rigs/sim/saved-images')).json()
-  expect(listing).toMatchObject({ rigId: 'sim', rigName: 'Simulator', images: [saved] })
+  expect(listing).toMatchObject({ rigId: 'sim', rigName: 'Simulator', timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, images: [saved] })
   expect((await subject.app.inject(`/api/web/rigs/sim/saved-images/${saved.id}`)).json()).toEqual({
     rigId: 'sim',
     rigName: 'Simulator',
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     image: saved,
   })
   const fits = await subject.app.inject(saved.fitsUrl)

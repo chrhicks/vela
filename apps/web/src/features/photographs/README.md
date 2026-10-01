@@ -1,43 +1,62 @@
 # Photographs
 
-The per-rig `/observe/saved-images/:imageId?` route owns one dated collection
-and selected photograph. A collection entry replaces its URL with the newest
-returned image's existing deep link. Explicit links remain authoritative:
-missing detail never silently selects a different image. Server order is
-preserved, including its saved-time tie-breaker.
+The per-rig `/observe/saved-images/:imageId?` route owns the photograph library
+and selected image. The collection entry opens equally prominent Nights and
+Targets tabs. It does not select an image automatically. Group cards summarize
+retained images, and a group opens a thumbnail grid with a complementary target
+or night filter. Search matches group dates and recorded target names/catalogs.
+
+`browse`, `group`, `filter` and `q` query parameters retain that browsing context
+across selection, reload and Back/Forward. Image IDs remain in the existing detail
+path. An explicit detail remains authoritative even when its collection fails,
+is empty or omits that image; never silently substitute another photograph.
+A direct image link without group context derives its observing-night breadcrumb
+when available. An invalid group has an explicit unavailable state and a return
+link. Switching rigs opens the other rig's library without carrying image or
+group identity across rigs.
+
+`library.ts` groups the server-ordered metadata without changing order within a
+group. An observing night begins at noon in the response's `timeZone` and ends
+at the following noon. Calendar-date arithmetic preserves this boundary across
+DST. All capture times, grouping and labels use that server-provided zone; the
+footer identifies it as Vela server time. A phone's timezone does not alter the
+library. These are derived groups, not saved observing sessions or capture runs.
+Targets use recorded subject IDs, not display names or solved pointing. Null or
+absent legacy subject metadata remains under No recorded target.
+
+The endpoint still returns the complete collection. Grouping, search and filters
+are browser presentation, not server pagination. Thumbnails load lazily, with
+no per-thumbnail detail reads or archive preview conversion. There is no
+six-at-a-time disclosure, automatic collection polling or new archive database.
 
 `useSavedImages` reads collection metadata independently from `useSavedImage`.
 Their timeouts remain 10 seconds and 120 seconds respectively; opening detail
 may prepare a retained display derivative. Both cancel obsolete requests and
-validate rig/image identity at the HTTP boundary. A failed list or disconnected
-camera does not block a valid direct detail. Retries are explicit reads, with no
-capture/device request or background archive conversion.
+validate rig/image identity and the viewing timezone at the HTTP boundary.
+A failed list or disconnected camera does not block a valid direct detail.
+Retries are explicit reads, with no capture/device request. A collection retry
+preserves selected pixels and inspection state.
 
-The collection owner is keyed only by rig. URL selection, Back/Forward, palette
-changes and earlier-row disclosure preserve it. Six rows are shown initially,
-with six more per explicit reveal; an older direct link reveals its own row.
-This bounds disclosure, not server metadata size: the endpoint still returns
-the complete collection. Dates/times use the browser's local timezone. The
-ordinal describes position in that collection, not an exposure-run counter.
-Switching rigs from Photographs opens the other rig's collection without
-carrying its predecessor's selected ID.
-
-`SelectedPhotograph` uses the shared image-inspection controller, viewport and
+`SelectedPhotograph` uses the existing image-inspection controller, viewport and
 enlargement. Its key includes acquisition ID and fitted/native URLs, so a new
 selection or renderer version clears the old viewer before publication. Facts,
 rendering copy and downloads come from the displayed typed snapshot. Valid
 metadata and original FITS remain accessible when preview pixels fail. Native
 404/410 is a missing saved preview, never evidence of camera-cache expiry or
-loss of the retained original.
+loss of the retained original. Downloads use validated exact resource links.
 
-Fieldroom's desktop composition is the dated list, fitted photograph and
-exposure details. Compact presentation puts preview first, details next and
-the list below. Explicit list/row actions move focus between those regions;
-initial rendering and appearance changes do not. Enlargement keeps the inline
-extent and shared native pan/focus behavior. No Keep or live-follow controls
-belong here. Downloads use native links to validated exact resources.
+Newer/Older navigate within the selected group/filter, keeping the URL context.
+The ordinal is newest-first within that displayed group, not a capture-run
+counter. Suppress navigation/ordinal if collection membership is unknown.
+Desktop inspection pairs the image with exposure facts; phone inspection stacks
+them. Explicit navigation moves focus to the opened group or image; initial
+rendering and appearance changes do not. Returning to a group preserves filters.
+Enlargement preserves inline extent and shared native pan/focus behavior.
 
-The accepted composition specimen is
-`packages/ui/src/drafts/Panel.photographs.specimen.tsx`; it is not imported by
-the application. The adoption plan and retained-image server README own the
-visual evidence and artifact/version contracts respectively.
+The accepted library composition is
+`packages/ui/src/drafts/Panel.photograph-library.specimen.tsx`; the application
+composes stable primitives and does not import that product specimen. The older
+`Panel.photographs.specimen.tsx` remains historical design evidence for the
+previous dated-list composition. Existing loading/empty and retained-preview
+fallback treatments continue to apply. The adoption plan and retained-image
+server README own visual evidence and artifact/version contracts respectively.
