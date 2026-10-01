@@ -303,13 +303,12 @@ which visual slice consumes each addition.
 Subject snapshots, per-run saved/integration totals, held/native image inspection,
 exact-image Keep/retry/expiry, and catalog constellations were implemented with
 Tonight. Focused checks cover the new contracts and deferred acquisition/save
-races. Framing exposure preview is now implemented with its consuming slice and awaits
-that slice’s independent and visual gate.
+races. Framing exposure preview is implemented and passed its consuming slice’s independent and visual gate.
 Nothing in this checkpoint adds durable capture sequences or run recovery.
 
 ## 5. Remaining application slices
 
-Status: Explore/framing/preparation accepted at `8906518`; later slices planned.
+Status: Explore/framing/preparation accepted at `8906518`; Photographs accepted at `99195ae`; Equipment/Home is next.
 
 | Slice | Production owners | Paper coverage |
 | --- | --- | --- |
@@ -335,7 +334,11 @@ parent completed the final paired comparison of all three routes at desktop
 and compact widths. The owning plan and
 [retained acceptance evidence](visual-evidence/fieldroom/explore-preparation/README.md)
 record actual geometry, source substitutions and browser limitations. All 22
-post-review route checks passed. Photographs is next.
+post-review route checks passed. Photographs then passed independent **OK** at
+`99195ae` and the final parent comparison at three widths in both palettes,
+including original-preview fallback. Its [retained evidence](visual-evidence/fieldroom/photographs/README.md)
+records source geometry, fixture substitutions and browser limitations.
+Equipment/Home/onboarding is next.
 
 ## 6. Whole-application verification and handoff
 

@@ -1,6 +1,6 @@
 # Fieldroom Photographs
 
-Status: production composition and focused checks complete; independent review and final visual comparison pending. Explore/framing/preparation passed independent OK and its final visual comparison at `8906518`; acceptance is recorded in `0f23355`. Photographs has not yet passed its implementation gate.
+Status: accepted at `99195ae` after independent OK and the parent’s final visual comparison. Explore/framing/preparation passed independent OK and its final visual comparison at `8906518`; acceptance is recorded in `0f23355`. Photographs has now passed its implementation gate.
 
 ## Outcome and boundary
 
@@ -270,3 +270,20 @@ matching download anchors; a separate actual HTTP GET through the review runtime
 returned the synthetic FITS with the expected content type, 3,136,320 bytes and
 pinned SHA-256. This does not claim an operating-system disk-write test.
 Independent review and the final post-review visual comparison remain pending.
+
+## Final verification and parent acceptance
+
+Independent **OK** at `99195ae` found no issues: 876 project tests and all builds,
+178 web checks, 22 workshop checks and four Python checks passed. After that
+verdict the parent reran the 19 gallery checks and captured/inspected twelve
+settled current/fallback renders in both palettes at 1440, 900 and 390px.
+Desktop source geometry, image framing, list extents, compact order, fallback
+wrapping, controls and typography match the source and evaluated specimen.
+No application correction was required by that comparison.
+
+[Retained evidence](visual-evidence/fieldroom/photographs/README.md) includes
+the screenshots, geometry, reproduction recipe and factual substitutions.
+Native snapshot/host limitations are distinguished from project browser evidence.
+The parent accepts this intermediate slice under Chris’s authorization;
+Equipment/Home/onboarding may proceed. Chris’s final whole-application browser
+acceptance remains required before merge.
