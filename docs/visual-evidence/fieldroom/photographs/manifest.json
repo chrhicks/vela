@@ -1,0 +1,77 @@
+{
+  "sourceHead": "99195ae4074740b26e5e746aec0fe18a086bd6e9",
+  "records": [
+    {
+      "path": "dark-1440-current.png",
+      "sha256": "1c20b86fb88e4b0c2a888276318f6279811a8625049c03daf372743020eb99d9"
+    },
+    {
+      "path": "dark-1440-fallback.png",
+      "sha256": "81f34c5f6f8d108c84d8952d240a8ed67f48eca965f0142e21f54da948f5cf45"
+    },
+    {
+      "path": "dark-1440-geometry.json",
+      "sha256": "0914de9edc041e1890be5673bc90a55bb70acebd8d639c7318e53d71e02855d9"
+    },
+    {
+      "path": "dark-390-current.png",
+      "sha256": "c368a940103863ba04eb1e9127c3a276c7f2dca66f5bf6e0580c5b30a8cdc081"
+    },
+    {
+      "path": "dark-390-fallback.png",
+      "sha256": "fd70bedf0527ce522e1fc295e35b8615b6b6f484e551cdc65526277a2ed03950"
+    },
+    {
+      "path": "dark-390-geometry.json",
+      "sha256": "e0e7af8b7056af92cb7e001a31a36cfdef15738de3d188c963109059dea28d28"
+    },
+    {
+      "path": "dark-900-current.png",
+      "sha256": "bf32858acaadc5980360df9f8bf476d0c27fee10da873e92b35d4fa13cb83d51"
+    },
+    {
+      "path": "dark-900-fallback.png",
+      "sha256": "75d57ee5bd3c98338a032398bb47ca3d32e4693bbee79ad1f0b6df26dcf8f2e8"
+    },
+    {
+      "path": "dark-900-geometry.json",
+      "sha256": "3cb2c9b1060bef55056cf92f6accd8a5ccdcf1b6c8f6d24182795c77e391157a"
+    },
+    {
+      "path": "light-1440-current.png",
+      "sha256": "4c80f1991a53d67a8ed3618e36a98a6e6fa873203ba731efa08fc1e05a820e8a"
+    },
+    {
+      "path": "light-1440-fallback.png",
+      "sha256": "4c1678503d4a85eebd9ecc72842f2f19e73134692d47337983a4555dcf4ed064"
+    },
+    {
+      "path": "light-1440-geometry.json",
+      "sha256": "0914de9edc041e1890be5673bc90a55bb70acebd8d639c7318e53d71e02855d9"
+    },
+    {
+      "path": "light-390-current.png",
+      "sha256": "7ecf3a397ff5db500363df46cab923e7b642156f8b95bbcdb9f878fd5566a657"
+    },
+    {
+      "path": "light-390-fallback.png",
+      "sha256": "65e0e7b774a309caff2a959e79e0316df9e4f6fbc78339df82ef1bc69d756f63"
+    },
+    {
+      "path": "light-390-geometry.json",
+      "sha256": "e0e7af8b7056af92cb7e001a31a36cfdef15738de3d188c963109059dea28d28"
+    },
+    {
+      "path": "light-900-current.png",
+      "sha256": "3ca77134a0b4dba040eeea8ba59d144f1073838ed635da1fc5738d07b6e6a7c2"
+    },
+    {
+      "path": "light-900-fallback.png",
+      "sha256": "133c6ce524445be1c7216185df68b272d097f12c145722a6263e7e9b4bb56f31"
+    },
+    {
+      "path": "light-900-geometry.json",
+      "sha256": "3cb2c9b1060bef55056cf92f6accd8a5ccdcf1b6c8f6d24182795c77e391157a"
+    }
+  ]
+}
