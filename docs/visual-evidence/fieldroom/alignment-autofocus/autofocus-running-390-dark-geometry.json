@@ -1,0 +1,65 @@
+{
+  "viewport": {
+    "width": 390,
+    "height": 782,
+    "dpr": 1
+  },
+  "mode": "dark",
+  "elements": [
+    {
+      "selector": "h1",
+      "x": 20,
+      "y": 60,
+      "width": 141.546875,
+      "height": 36,
+      "font": "28px / 36px \"Space Grotesk\", ui-sans-serif, sans-serif",
+      "gap": "normal",
+      "color": "rgb(221, 225, 215)",
+      "background": "rgba(0, 0, 0, 0)"
+    },
+    {
+      "selector": ".vela-af-chart-panel",
+      "x": 20,
+      "y": 224,
+      "width": 350,
+      "height": 232,
+      "font": "16px / 24px Barlow, ui-sans-serif, sans-serif",
+      "gap": "8px",
+      "color": "rgb(221, 225, 215)",
+      "background": "rgb(28, 36, 30)"
+    },
+    {
+      "selector": ".vela-af-status",
+      "x": 20,
+      "y": 108,
+      "width": 350,
+      "height": 104,
+      "font": "16px / 24px Barlow, ui-sans-serif, sans-serif",
+      "gap": "6px",
+      "color": "rgb(221, 225, 215)",
+      "background": "rgb(38, 49, 39)"
+    },
+    {
+      "selector": ".vela-af-chart",
+      "x": 35,
+      "y": 267,
+      "width": 320,
+      "height": 146,
+      "font": "16px / 24px Barlow, ui-sans-serif, sans-serif",
+      "gap": "normal",
+      "color": "rgb(221, 225, 215)",
+      "background": "rgba(0, 0, 0, 0)"
+    },
+    {
+      "selector": ".vela-af-actions",
+      "x": 20,
+      "y": 564,
+      "width": 350,
+      "height": 111,
+      "font": "14px / 20px Barlow, ui-sans-serif, sans-serif",
+      "gap": "12px",
+      "color": "rgb(168, 180, 167)",
+      "background": "rgba(0, 0, 0, 0)"
+    }
+  ]
+}

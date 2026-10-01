@@ -271,7 +271,7 @@ limitation. Tonight/Appearance is accepted; Explore/framing/preparation may begi
 
 ## 4. Required capability additions
 
-Status: planned; implemented alongside the slices that need them.
+Status: implemented and accepted with the consuming Tonight and framing slices.
 
 ### Plan
 
@@ -308,7 +308,7 @@ Nothing in this checkpoint adds durable capture sequences or run recovery.
 
 ## 5. Remaining application slices
 
-Status: Explore/framing/preparation accepted at `8906518`; Photographs accepted at `99195ae`; Equipment/Home accepted at `a50c6bb`; alignment/autofocus is next.
+Status: Explore/framing/preparation accepted at `8906518`; Photographs accepted at `99195ae`; Equipment/Home accepted at `a50c6bb`; alignment/autofocus accepted at `00b1564`.
 
 | Slice | Production owners | Paper coverage |
 | --- | --- | --- |
@@ -343,11 +343,14 @@ Equipment/Home/onboarding passed independent **OK** at `a50c6bb`, followed by
 parent comparison at 1440/900/390px in both palettes. Its
 [retained evidence](visual-evidence/fieldroom/equipment-home/README.md) records
 source substitutions, corrected read deadlines and the browser limitation.
-Alignment/autofocus is the remaining route-adoption slice.
+Alignment/autofocus passed independent **OK** at `00b1564`, followed by 83
+post-verdict browser cases and final parent comparison. Its
+[retained evidence](visual-evidence/fieldroom/alignment-autofocus/README.md) includes
+74 captures and 60 measured geometry records. All main route slices are accepted.
 
 ## 6. Whole-application verification and handoff
 
-Status: final review preparation; final preparation-slice verification remains a prerequisite.
+Status: final whole-application review; a collection-state presentation correction is in progress before the final handoff.
 
 ### Plan
 
@@ -378,14 +381,14 @@ navigation, application theme and Appearance checks to cover shared composition.
 The preparation slice contributes its reviewed alignment/autofocus matrix.
 
 Inspect the resulting whole-route captures against frozen sources and the accepted
-slice evidence, including both palettes and compact widths. Check all44 frozen
+slice evidence, including both palettes and compact widths. Check all 44 frozen
 source hashes/dimensions. Record final screenshots, checks, fixture substitutions
 and any native-browser limitations in the owning evidence directories, with a
 whole-application index linking them. Update the original planned-scene coverage
 with the actual fixture/test mapping; names may differ, observable coverage may not.
 
-Use the parent-owned persistent web runtime on5175 for checks and the deterministic
-review server on5176 for the handoff. Open the actual Tonight scene in the shared
+Use the parent-owned persistent web runtime on 5175 for checks and the deterministic
+review server on 5176 for the handoff. Open the actual Tonight scene in the shared
 browser and confirm rendered state. Supply direct scene links for other workflows
 because each review session intentionally serves only its selected contract fixture.
 Keep this review server isolated from physical devices. The independent verdict,
@@ -414,3 +417,11 @@ fixtures and owning tests. No production behavior defect was found by these case
 The preparation comparison found and corrected a 4px Autofocus setup card-height
 mismatch through the workshop. The final settled head is receiving renewed
 independent review before the last visual acceptance and Chris's handoff.
+
+
+Independent review returned **OK** at `00b1564`; preparation then passed its
+post-verdict comparison and was accepted. The expanded final state captures
+exposed a visual omission in Photographs loading/empty states relative to 03.9.
+Its owning plan now records a bounded workshop-first correction; normal gallery
+and fallback layout remain unchanged. Final acceptance waits for that correction
+to receive independent review and the final comparison.

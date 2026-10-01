@@ -287,3 +287,31 @@ Native snapshot/host limitations are distinguished from project browser evidence
 The parent accepts this intermediate slice under Chris’s authorization;
 Equipment/Home/onboarding may proceed. Chris’s final whole-application browser
 acceptance remains required before merge.
+
+### Final whole-application state-sheet correction
+
+The final coverage audit added a held archive-collection request. Its rendered
+capture exposed a visual omission from source 03.9: initial collection loading
+and the empty archive still used plain list text rather than the approved state
+card. This is a presentation correction; list/detail ownership, navigation and
+request timing remain unchanged. The completed-gallery and fallback composition
+remain the accepted layouts above.
+
+Plan before correction: extend the existing Photographs workshop specimen with
+loading/empty collection examples, inspect both palettes at 1440 and 390px, then
+adopt the approved card in the real route. Source `10N-0` specifies a 440×294
+card, inset surface, 1px divider, 6px radius, 24px padding and 16px between its
+three groups. Context is 12/16 with 1.2px tracking; title is 24/30; title/body gap
+is 10px; body is 16/24 with a 72px minimum; action/loading footer is 46px high.
+Use content growth on narrow screens rather than clipping. Initial unselected
+collection state may span the absent viewer columns, max 440px; phone uses the
+available 350px. Loading has no saved count or invented rig facts. Empty state
+uses the confirmed rig name and the current Tonight link.
+
+A direct selected photograph must stay usable while collection loading or failure
+is displayed in the narrow list region. Do not replace its viewer, fetch other
+images, or infer an empty archive from a pending request. Retain the existing
+explicit loading text and empty heading semantics where compatible with the
+source. Verify held loading→resolved collection, empty→Tonight navigation, and
+direct-detail independence. Retain paired route captures after fresh independent
+OK and the final source comparison.
