@@ -175,7 +175,7 @@ Keep selectors feature-local. Avoid viewport-sized widths such as `100vw` for pr
 2. Use the browser tools available in the session. Prefer T3 preview tools when exposed: check preview status, open it if necessary, then navigate and inspect. Follow the session's browser-tool rules for any fallback; no new capture tool or generator is needed.
 3. Wait for the feature's images and fonts to finish loading before capture. Confirm images have loaded successfully, rather than capturing empty placeholders or assuming a fixed delay is sufficient.
 4. Capture the preview surface using an element screenshot or a crop of the visible preview, excluding workshop controls. If cropping from DOM bounds, compare the saved image's pixel dimensions with the browser's CSS viewport dimensions and scale the crop coordinates accordingly; they may differ. A full-page screenshot does not necessarily include content hidden inside an inner scrolling element. Inspect the intended crop, scroll deliberately if needed, and capture the visible composition rather than stitching hidden content into an invented layout.
-5. Save the image beside the feature and reference it with `new URL('./thumbnail.png', import.meta.url).href`, or save under `apps/workshop/public/` and use its root-relative URL. Write descriptive alt text, then inspect the actual shelf card at its thumbnail crop.
+5. Save the image beside the feature and reference it with `new URL('./thumbnail.png', import.meta.url).href`, or save under `apps/workshop/public/` and use its root-relative URL. Write descriptive alt text, then inspect the actual shelf card at its thumbnail crop. Reload the shelf if a previously missing image remains broken after creating the file.
 
 ### Feature links and reset
 
