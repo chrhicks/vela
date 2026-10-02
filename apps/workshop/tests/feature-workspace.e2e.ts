@@ -26,6 +26,15 @@ test('Reset and scenario changes restore the starting scene after local interact
   await expect(page.getByText('Framing checked · demo', { exact: true })).toBeVisible()
 
   await exposure.fill('12')
+  await frame.focus()
+  await frame.press('ArrowRight')
+  await page.getByRole('button', { name: 'Start from: Frame checked', exact: true }).click()
+  await page.getByRole('menuitemradio', { name: /^Frame checked/ }).click()
+  await expect(exposure).toHaveValue('2')
+  await expect(frame).toHaveAttribute('aria-valuenow', '50')
+  await expect(page.getByText('Framing checked · demo', { exact: true })).toBeVisible()
+
+  await exposure.fill('12')
   await page.getByRole('button', { name: 'Start from: Frame checked', exact: true }).click()
   await page.getByRole('menuitemradio', { name: /^Ready to frame/ }).click()
   await expect(page.getByText('Ready to frame', { exact: true })).toBeVisible()

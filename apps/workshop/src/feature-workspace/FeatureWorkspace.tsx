@@ -157,7 +157,10 @@ function FeaturePreview({ feature, preview, navigate }: {
             onSelect={mode => change({ mode: mode === 'dark' ? 'dark' : 'light' })} />
           <ChoiceMenu label="Start from" title="Choose a starting scenario" value={scenario.id} choices={design.scenarios}
             footer="Scenarios set the starting point. Interact with the preview from there."
-            onSelect={scenarioId => change({ scenarioId })} />
+            onSelect={scenarioId => {
+              setReset(value => value + 1)
+              change({ scenarioId })
+            }} />
           <Button tone="quiet" onClick={() => setReset(value => value + 1)}>Reset</Button>
           <Button tone="quiet" leadingIcon={<LinkIcon />} onClick={() => void copyLink()}>{copyState === 'copied' ? 'Copied' : 'Copy link'}</Button>
           <span ref={focusTrigger}><IconButton tone="quiet" label="Focus preview" icon={<ExpandIcon />} onClick={() => setFocused(true)} /></span>

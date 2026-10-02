@@ -149,7 +149,7 @@ A complete preview URL looks like:
 
 `mode` is `light` or `dark`; `viewport` is `fit` or a pixel width from 320 through 1920. Copy link resolves Fit to the actual preview width so another browser opens the intended layout. Links reproduce starting conditions, not an interaction session halfway through a simulation.
 
-The toolbar labels the selected starting preset **Start from**. It remains selected while the preview is explored; it does not describe the current interaction state.
+The toolbar labels the selected starting preset **Start from**. Choosing a preset jumps the mock to that configuration, including choosing the same preset again after interacting. It remains selected while the preview is explored; it does not describe the current interaction state.
 
 A bare feature URL can recover the last local selection. A full explicit URL takes priority over recovered choices. Reset returns the current scenario to its starting fixture. Theme and viewport choices are workshop presentation settings, separate from scenario data.
 
