@@ -228,6 +228,22 @@ test('focus mode keeps interaction state and Escape returns focus to its control
   await expect(page.getByText('Ready to frame', { exact: true })).toBeVisible()
 })
 
+test('focus mode reserves space below the preview for its return control', async ({ page }) => {
+  for (const browserWidth of [390, 1440]) {
+    await page.setViewportSize({ width: browserWidth, height: 667 })
+
+    for (const viewport of ['fit', '390']) {
+      await page.goto(checkedPreview.replace('viewport=fit', `viewport=${viewport}`))
+      await page.getByRole('button', { name: 'Focus preview', exact: true }).click()
+      const surface = await page.locator('.feature-preview-surface').boundingBox()
+      const control = await page.getByRole('button', { name: 'Return to workshop', exact: true }).boundingBox()
+      expect(surface!.height).toBeGreaterThan(0)
+      expect(control!.y).toBeGreaterThanOrEqual(surface!.y + surface!.height)
+      expect(control!.y + control!.height).toBeLessThanOrEqual(667)
+    }
+  }
+})
+
 
 test('a short phone can scroll the shelf to open its feature', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 667 })
