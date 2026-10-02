@@ -5,7 +5,13 @@ Chris requested a cross-page review after finding the framing footer detached,
 the sky panel excessively tall, and Through the night difficult to discover.
 
 This is a focused usability review, not a new implementation acceptance verdict.
-The proposed sky treatment belongs in the workshop before application adoption.
+The findings below preserve the reviewed state. Explore and Frame subsequently
+adopted their approved workshop designs and shipped in PR #86 after independent
+verification, including Tonight's sky entry point. Chris accepted Explore in the
+application and explicitly authorized shipping Frame at workshop approval;
+Frame did not receive a separate implementation browser acceptance. Capture
+preparation navigation/readiness, Equipment navigation, and Tonight cooling
+remain follow-up work.
 
 ## Evidence and scope
 
@@ -61,11 +67,11 @@ The first combined proposal below is superseded for design review. Chris found
 its reduced Explore example unrecognizable compared with the real grid and
 sidebar. Review one change in its faithful page context at a time.
 
-The current proposal is **Explore sky access**: preserve Explore's navigation,
+The next proposal was **Explore sky access**: preserve Explore's navigation,
 filters, nine-card grid and selected-subject sidebar, adding only the sky-path
 icon at the sidebar heading to open the dialog. Its static catalog fixture uses
 the same nine subjects and survey cutouts as the real page. Framing and the
-remaining audit findings are deferred until this proposal has been reviewed.
+remaining audit findings were deferred while this proposal was reviewed.
 
 Open [Explore sky access](http://127.0.0.1:5174/?component=panel&specimen=panel-explore-sky&profile=fieldroom&mode=dark&context=isolated&viewport=1280).
 UI typecheck, workshop build and lint pass. Native-browser inspection confirmed
@@ -79,13 +85,13 @@ Explore now places the approved SVG IconButton beside the selected subject's
 Through the night heading and opens the existing production sky inspection in
 the approved 560px dialog. The redundant sky panel is removed from the bottom
 facts disclosure. Real server samples, Moon positions, light phases and stale
-feedback remain in use. Framing and the other audit proposals remain deferred.
+feedback remain in use. Framing followed as the separate proposal below.
 
 Focused browser checks cover direct access, subject changes, scrub-time retention,
 dismissal/focus restoration, interrupted data and bounds at 1280px and 390px,
 alongside existing discovery and framing-sky regression coverage. Web build and
-lint pass. Independent verification and Chris's application acceptance follow
-the workshop approval separately.
+lint passed. Independent verification and Chris's application acceptance were
+completed separately from workshop approval before PR #86 merged.
 
 ### Frame-only proposal
 
@@ -116,6 +122,17 @@ opens the dialog after target data arrives, keeps focus contained while framing
 data finishes loading, and clears the hash on dismissal. Background sky refreshes
 do not reopen a dismissed dialog. Explore retains the same shared icon/dialog.
 
+### Capture preparation exploration
+
+The next workshop feature is **Capture preparation**, under
+`/features/capture-preparation`. Its **Preparation within reach** design keeps
+the existing image, subject, settings and cooling context, groups optional Polar
+alignment and Autofocus beside the subject, and places connection readiness and
+its remedy immediately above Start capture. The Ready, Devices disconnected and
+Connection unconfirmed starting scenarios use local simulation only. Checking an
+uncertain connection shows fresh device state without claiming the original
+command succeeded. This is a proposal for design review, not application adoption.
+
 ### Earlier exploratory composition
 
 [Sky context & framing](http://127.0.0.1:5174/?component=panel&specimen=panel-sky-context&profile=fieldroom&mode=light&context=isolated&viewport=1280)
@@ -133,4 +150,5 @@ The sample path, Moon, twilight colors and camera geometry are illustrative.
 Workshop build and lint passed. Parent browser inspection covered the desktop
 light and phone dark compositions, the full light-phase legend, keyboard time
 scrubbing (readout and stable URL update), and opening/dismissing the sky dialog
-from both page variants. Production adoption remains pending design feedback.
+from both page variants. This combined sketch was not adopted; the approved
+Explore and Frame compositions above supersede it.
