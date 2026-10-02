@@ -1,13 +1,17 @@
-import { useState, type MouseEvent } from 'react'
+import type { MouseEvent } from 'react'
 import { Input, Tabs } from '@vela/ui'
 import { featureCatalog, catalogErrors } from './catalog'
 import { ArrowIcon, SearchIcon } from './Icons'
 import type { WorkshopFeature } from './definitions'
 import './shelf.css'
 
-export function FeatureShelf({ navigate }: { navigate: (href: string) => void }) {
-  const [search, setSearch] = useState('')
-
+export function FeatureShelf({ navigate, search, onSearchChange, collection, onCollectionChange }: {
+  navigate: (href: string) => void
+  search: string
+  onSearchChange: (search: string) => void
+  collection: WorkshopFeature['collection']
+  onCollectionChange: (collection: WorkshopFeature['collection']) => void
+}) {
   function open(event: MouseEvent<HTMLAnchorElement>) {
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
     event.preventDefault()
@@ -88,12 +92,14 @@ export function FeatureShelf({ navigate }: { navigate: (href: string) => void })
                 aria-label="Find a feature"
                 placeholder="Find a feature…"
                 value={search}
-                onChange={event => setSearch(event.target.value)}
+                onChange={event => onSearchChange(event.target.value)}
               />
             </div>
             <Tabs
               className="feature-shelf-tabs"
               aria-label="Feature collections"
+              value={collection}
+              onValueChange={value => onCollectionChange(value === 'past' ? 'past' : 'current')}
               items={[
                 { id: 'current', label: 'Current', content: renderCollection('current') },
                 { id: 'past', label: 'Past explorations', content: renderCollection('past') },

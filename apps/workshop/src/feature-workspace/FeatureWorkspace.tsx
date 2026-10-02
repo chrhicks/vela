@@ -22,6 +22,8 @@ function recoveredSelection(featureId: string) {
 }
 
 export function FeatureWorkspace({ url, navigate }: { url: URL; navigate: Navigate }) {
+  const [shelfSearch, setShelfSearch] = useState('')
+  const [shelfCollection, setShelfCollection] = useState<WorkshopFeature['collection']>('current')
   const match = /^\/features\/([^/]+)\/?$/.exec(url.pathname)
   const feature = match ? featureCatalog.find(item => encodeURIComponent(item.id) === match[1]) : undefined
   const location = feature ? resolvePreview(feature, url.searchParams, recoveredSelection(feature.id)) : undefined
@@ -29,7 +31,8 @@ export function FeatureWorkspace({ url, navigate }: { url: URL; navigate: Naviga
 
   return (
     <div className="vela-theme feature-workspace" data-mode="light" style={themeStyle(theme, 'light')}>
-      {shelf ? <FeatureShelf navigate={navigate} /> : feature && location?.ok ? (
+      {shelf ? <FeatureShelf navigate={navigate} search={shelfSearch} onSearchChange={setShelfSearch}
+        collection={shelfCollection} onCollectionChange={setShelfCollection} /> : feature && location?.ok ? (
         <FeaturePreview key={feature.id} feature={feature} preview={location.preview} navigate={navigate} />
       ) : (
         <main className="feature-unavailable">

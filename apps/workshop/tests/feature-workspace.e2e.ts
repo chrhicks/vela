@@ -338,3 +338,45 @@ test('long feature, design, and scenario labels keep toolbar controls within the
     expect(await page.locator('.feature-workspace').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
   }
 })
+
+test('returning from a feature preserves the shelf collection and search', async ({ page }) => {
+  const features = [
+    { id: 'cloud-trend', label: 'Cloud trend', collection: 'current' },
+    { id: 'sky-brightness', label: 'Sky brightness', collection: 'past' },
+  ].map(feature => ({
+    ...feature,
+    description: 'Sky conditions study',
+    thumbnail: { src: '/unused-thumbnail.png', alt: 'Study preview' },
+    defaultDesign: 'trend',
+    designs: [{
+      id: 'trend', label: 'Quiet trend', intent: 'Inspect a trend.', defaultScenario: 'initial',
+      scenarios: [{ id: 'initial', label: 'Initial reading' }],
+    }],
+  }))
+
+  await page.route('**/src/feature-workspace/catalog.ts*', route => route.fulfill({
+    contentType: 'text/javascript',
+    body: `export const catalogErrors = []
+      export const featureCatalog = ${JSON.stringify(features)}
+      for (const feature of featureCatalog)
+        feature.designs[0].scenarios[0].render = () => feature.label`,
+  }))
+  await page.goto('/features')
+  await page.getByRole('tab', { name: 'Past explorations', exact: true }).click()
+  await page.getByRole('searchbox', { name: 'Find a feature' }).fill('brightness')
+  await page.getByRole('link', { name: 'Open Sky brightness', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Sky brightness', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Features', exact: true }).click()
+  await expect(page.getByRole('tab', { name: 'Past explorations', exact: true })).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByRole('searchbox', { name: 'Find a feature' })).toHaveValue('brightness')
+  await expect(page.getByRole('link', { name: 'Open Sky brightness', exact: true })).toBeVisible()
+
+  await page.getByRole('tab', { name: 'Current', exact: true }).click()
+  await page.getByRole('searchbox', { name: 'Find a feature' }).fill('cloud')
+  await page.getByRole('link', { name: 'Open Cloud trend', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Cloud trend', exact: true })).toBeVisible()
+  await page.goBack()
+  await expect(page.getByRole('tab', { name: 'Current', exact: true })).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByRole('searchbox', { name: 'Find a feature' })).toHaveValue('cloud')
+  await expect(page.getByRole('link', { name: 'Open Cloud trend', exact: true })).toBeVisible()
+})
