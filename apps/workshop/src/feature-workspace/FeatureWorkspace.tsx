@@ -22,6 +22,8 @@ function recoveredSelection(featureId: string) {
 }
 
 export function FeatureWorkspace({ url, navigate }: { url: URL; navigate: Navigate }) {
+  const [shelfSearch, setShelfSearch] = useState('')
+  const [shelfCollection, setShelfCollection] = useState<WorkshopFeature['collection']>('current')
   const match = /^\/features\/([^/]+)\/?$/.exec(url.pathname)
   const feature = match ? featureCatalog.find(item => encodeURIComponent(item.id) === match[1]) : undefined
   const location = feature ? resolvePreview(feature, url.searchParams, recoveredSelection(feature.id)) : undefined
@@ -29,7 +31,8 @@ export function FeatureWorkspace({ url, navigate }: { url: URL; navigate: Naviga
 
   return (
     <div className="vela-theme feature-workspace" data-mode="light" style={themeStyle(theme, 'light')}>
-      {shelf ? <FeatureShelf navigate={navigate} /> : feature && location?.ok ? (
+      {shelf ? <FeatureShelf navigate={navigate} search={shelfSearch} onSearchChange={setShelfSearch}
+        collection={shelfCollection} onCollectionChange={setShelfCollection} /> : feature && location?.ok ? (
         <FeaturePreview key={feature.id} feature={feature} preview={location.preview} navigate={navigate} />
       ) : (
         <main className="feature-unavailable">
@@ -148,10 +151,16 @@ function FeaturePreview({ feature, preview, navigate }: {
           />}
         </div>
         <div className="feature-toolbar-controls">
-          <div className="feature-viewport-toggle" aria-label="Preview width">
-            <Button tone="quiet" aria-pressed={selection.viewport === 'fit' || selection.viewport > 600} onClick={() => change({ viewport: 'fit' })}>Desktop</Button>
-            <Button tone="quiet" aria-pressed={selection.viewport !== 'fit' && selection.viewport <= 600} onClick={() => change({ viewport: 390 })}>Phone</Button>
-          </div>
+          <ChoiceMenu label="Width" title="Preview width" value={String(selection.viewport)}
+            choices={[
+              { id: 'fit', label: 'Fit', description: 'Use the available space.' },
+              { id: '390', label: 'Phone · 390 px' },
+              { id: '1280', label: 'Desktop · 1280 px' },
+              ...(selection.viewport !== 'fit' && selection.viewport !== 390 && selection.viewport !== 1280
+                ? [{ id: String(selection.viewport), label: `${selection.viewport} px`, description: 'Width from this preview link.' }]
+                : []),
+            ]}
+            onSelect={viewport => change({ viewport: viewport === 'fit' ? 'fit' : Number(viewport) })} />
           <ChoiceMenu label="Appearance" title="Preview appearance" value={selection.mode}
             choices={[{ id: 'light', label: 'Light' }, { id: 'dark', label: 'Dark' }]}
             onSelect={mode => change({ mode: mode === 'dark' ? 'dark' : 'light' })} />
@@ -171,7 +180,7 @@ function FeaturePreview({ feature, preview, navigate }: {
           <summary>About this design</summary>
           <div><p>{design.intent}</p>{scenario.tryThis && <p><strong>Try this</strong> {scenario.tryThis}</p>}</div>
         </details>
-        <span>{selection.viewport === 'fit' ? 'Desktop' : `${selection.viewport} px`} · Interactive preview</span>
+        <span>{selection.viewport === 'fit' ? 'Fit' : `${selection.viewport} px`} · Interactive preview</span>
       </div>}
       {copyState === 'fallback' && !focused && <div className="feature-share-fallback">
         <label htmlFor="feature-share-link">Copy this link to reopen the same starting scenario:</label>

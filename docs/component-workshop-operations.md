@@ -90,7 +90,18 @@ Open:
 
 Legacy `/?component=...&specimen=...` and `/gallery` links remain supported.
 
-Source and specimen edits refresh through Vite HMR. The local persistence server binds to `127.0.0.1` and exposes only the fixed session and profile routes.
+Source and specimen edits refresh through Vite HMR. The development server binds to `127.0.0.1` by default; its local persistence API exposes only the fixed session and profile routes.
+
+For another checkout or a busy default port, choose an available port and launch explicitly:
+
+```sh
+pnpm --filter @vela/workshop exec vite --host 127.0.0.1 --port 5184 --strictPort
+WORKSHOP_PORT=5184 pnpm --filter @vela/workshop test:browser
+```
+
+The first command runs the preview until stopped. The second can reuse that runtime, or start its own server on the same configured port. `WORKSHOP_PORT` defaults to 5174 and accepts integers from 1 through 65535; it sets both Playwright's base URL and its server command. Strict port selection makes a collision fail instead of silently moving the server. Verify any reused runtime belongs to the checkout under review. For a focused test, append its test filename to `test:browser`.
+
+If the browser runs on another machine, use `--host 0.0.0.0` for the preview and navigate to the development machine's reachable address, or use the browser tool's environment-port target. Loopback-only reachability does not prove that a remote preview can connect. Keep a review runtime running while its link is in use; stopping an isolated trial server leaves its browser tab disconnected.
 
 Choose focused tests and builds for the affected boundary using [CODING_STANDARDS.md](../CODING_STANDARDS.md#focused-verification), then check the diff. For example, a UI component change may use:
 
@@ -123,7 +134,7 @@ Use the smallest change that represents the requested work:
 
 Start from [starter.feature.tsx](../apps/workshop/src/feature-workspace/starter.feature.tsx), copying it to `apps/workshop/src/features/<feature-id>.feature.tsx`. This destination keeps its import path valid. Supporting components, assets, and fixtures can be colocated in a feature directory; adjust relative imports when nesting the declaration. The starter is compiled but sits outside automatic discovery. It shows an ordinary React component initializing local state from `initialState`, then updating that state through a button.
 
-Replace the starter's IDs, labels, intent, content, and thumbnail. Capture a useful preview and reference that local image; replace the deliberately missing thumbnail placeholder before presenting the feature. [The Framing declaration](../apps/workshop/src/features/framing/framing.feature.tsx) is the first real example.
+Replace the starter's IDs, labels, intent, content, and thumbnail. Its temporary placeholder is allowed while authoring; capture an actual preview and replace it before presenting the feature. Follow [the capture recipe](#capture-a-feature-thumbnail). [The Framing declaration](../apps/workshop/src/features/framing/framing.feature.tsx) is the first real example.
 
 `defineDesign<State>` ties scenario fixtures to the component's `initialState` prop. `defineFeature` groups the resulting designs. Keep these declarations small; layout, interactions, and feature-specific simulation logic stay in ordinary React components. The workshop does not interpret the meaning of fixture fields.
 
@@ -139,6 +150,38 @@ Authoring rules:
 
 TypeScript catches incompatible fixture inputs. Catalog validation reports source filename, declaration path, and the problem for duplicate IDs, empty required text or lists, missing defaults, and missing named exports. The catalog publishes no partial list when those authoring errors exist. Fix the indicated declaration and let HMR reload it.
 
+### Responsive preview sizing
+
+The Width menu offers Fit, Phone (390px), and Desktop (1280px). Custom widths from 320 through 1920 remain available through `viewport` in the URL. The preview is an element inside the workshop, not an iframe or resized browser viewport: `@media (max-width: ...)` measures the outer browser and will not respond to selecting Phone on a wide desktop.
+
+The workshop provides an inline-size query container around the preview. Use container queries on the composition inside it:
+
+```css
+.my-feature-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+}
+
+@container (max-width: 640px) {
+  .my-feature-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+```
+
+Keep selectors feature-local. Avoid viewport-sized widths such as `100vw` for preview content; use the available container width. Fit follows available space within the supported width range. At narrow browser sizes the stage removes horizontal padding; a deliberately selected width larger than the available space remains that width and scrolls horizontally. Choosing Desktop on a phone therefore inspects a desktop layout; choosing Fit inspects the layout that fits the phone.
+
+### Capture a feature thumbnail
+
+1. Open the new feature directly with explicit design, scenario, light/dark mode, and `viewport=1024`. Use a browser wide enough to show the entire preview. Choose a representative starting state, close menus and details, and reset any exploratory interaction.
+2. Use the browser tools available in the session. Prefer T3 preview tools when exposed: check preview status, open it if necessary, then navigate and inspect. Follow the session's browser-tool rules for any fallback; no new capture tool or generator is needed.
+3. Wait for the feature's images and fonts to finish loading before capture. Confirm images have loaded successfully, rather than capturing empty placeholders or assuming a fixed delay is sufficient.
+4. Capture the preview surface using an element screenshot or a crop of the visible preview, excluding workshop controls. If cropping from DOM bounds, compare the saved image's pixel dimensions with the browser's CSS viewport dimensions and scale the crop coordinates accordingly; they may differ. A full-page screenshot does not necessarily include content hidden inside an inner scrolling element. Inspect the intended crop, scroll deliberately if needed, and capture the visible composition rather than stitching hidden content into an invented layout.
+5. Save the image beside the feature and reference it with `new URL('./thumbnail.png', import.meta.url).href`, or save under `apps/workshop/public/` and use its root-relative URL. Write descriptive alt text.
+6. Inspect the actual shelf card. Thumbnails use a centered cover crop in a 190px-high area whose width changes with the shelf layout; very wide, short captures can lose content at the sides. Choose a representative crop with room around the important content. Reload the shelf if a previously missing image remains broken after creating the file.
+
+For a saved screenshot, an installed image tool is enough; no capture dependency belongs in the feature. For example, ImageMagick crops with `magick capture.png -crop WIDTHxHEIGHT+X+Y +repage thumbnail.png`, using the measured image-pixel dimensions and offsets in place of the uppercase placeholders.
+
 ### Feature links and reset
 
 A complete preview URL looks like:
@@ -147,7 +190,7 @@ A complete preview URL looks like:
 /features/framing?design=sky-context&scenario=frame-checked&mode=light&viewport=1024
 ```
 
-`mode` is `light` or `dark`; `viewport` is `fit` or a pixel width from 320 through 1920. Copy link resolves Fit to the actual preview width so another browser opens the intended layout. Links reproduce starting conditions, not an interaction session halfway through a simulation.
+`mode` is `light` or `dark`; `viewport` is `fit` or a pixel width from 320 through 1920. The Width menu provides Fit, Phone (390px), and Desktop (1280px), while explicit URLs can select any supported custom width. Copy link resolves Fit to the actual preview width so another browser opens the intended layout. Links reproduce starting conditions, not an interaction session halfway through a simulation.
 
 The toolbar labels the selected starting preset **Start from**. Choosing a preset jumps the mock to that configuration, including choosing the same preset again after interacting. It remains selected while the preview is explored; it does not describe the current interaction state.
 
