@@ -1138,7 +1138,10 @@ input[type='text']:focus {
 
 .loading-screen {
   display: grid;
-  height: 100vh;
+  min-height: 100vh;
+  padding: 24px;
+  text-align: center;
+  overflow-wrap: anywhere;
   place-content: center;
   justify-items: center;
   gap: 12px;
