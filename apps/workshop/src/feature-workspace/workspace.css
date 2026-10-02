@@ -13,6 +13,7 @@
   flex-shrink: 0;
   padding: 8px 20px;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
@@ -24,12 +25,14 @@
   align-items: center;
   gap: 4px;
 }
-.feature-toolbar-heading { flex-shrink: 0; }
-.feature-toolbar h1 { font: 500 19px 'Space Grotesk', sans-serif; margin: 0 12px; }
+.feature-toolbar-heading { flex-wrap: wrap; min-width: 0; max-width: 100%; }
+.feature-toolbar h1 { min-width: 0; overflow-wrap: anywhere; font: 500 19px 'Space Grotesk', sans-serif; margin: 0 12px; }
 .feature-toolbar-divider { width: 1px; height: 22px; background: #c4cbbe; margin-left: 10px; }
-.feature-toolbar-controls { flex-wrap: wrap; justify-content: flex-end; }
-.feature-choice-trigger { white-space: nowrap; }
-.feature-choice-trigger > span { display: inline-flex; align-items: center; gap: 6px; }
+.feature-toolbar-controls { min-width: 0; max-width: 100%; flex-wrap: wrap; justify-content: flex-end; }
+.feature-menu-anchor { min-width: 0; max-width: 100%; }
+.feature-choice-trigger { max-width: 100%; white-space: normal; text-align: left; }
+.feature-choice-trigger > span { display: inline-flex; min-width: 0; align-items: center; gap: 6px; }
+.feature-choice-trigger > span > span { min-width: 0; overflow-wrap: anywhere; }
 .feature-preview-context {
   padding: 6px 28px;
   min-height: 34px;
@@ -87,7 +90,6 @@
 .feature-choice-menu p { margin: 10px 10px 4px; border-top: 1px solid #dce0d6; padding-top: 12px; color: #637063; font-size: 12px; line-height: 1.5; }
 .feature-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 @media (max-width: 1150px) {
-  .feature-toolbar { flex-wrap: wrap; }
   .feature-toolbar-controls { justify-content: flex-start; }
 }
 @media (max-width: 600px) {
