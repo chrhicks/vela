@@ -155,7 +155,7 @@ function FeaturePreview({ feature, preview, navigate }: {
           <ChoiceMenu label="Appearance" title="Preview appearance" value={selection.mode}
             choices={[{ id: 'light', label: 'Light' }, { id: 'dark', label: 'Dark' }]}
             onSelect={mode => change({ mode: mode === 'dark' ? 'dark' : 'light' })} />
-          <ChoiceMenu label="Scenario" title="Choose a starting scenario" value={scenario.id} choices={design.scenarios}
+          <ChoiceMenu label="Start from" title="Choose a starting scenario" value={scenario.id} choices={design.scenarios}
             footer="Scenarios set the starting point. Interact with the preview from there."
             onSelect={scenarioId => change({ scenarioId })} />
           <Button tone="quiet" onClick={() => setReset(value => value + 1)}>Reset</Button>

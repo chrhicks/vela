@@ -26,7 +26,7 @@ test('Reset and scenario changes restore the starting scene after local interact
   await expect(page.getByText('Framing checked · demo', { exact: true })).toBeVisible()
 
   await exposure.fill('12')
-  await page.getByRole('button', { name: 'Scenario: Frame checked', exact: true }).click()
+  await page.getByRole('button', { name: 'Start from: Frame checked', exact: true }).click()
   await page.getByRole('menuitemradio', { name: /^Ready to frame/ }).click()
   await expect(page.getByText('Ready to frame', { exact: true })).toBeVisible()
   await expect(exposure).toHaveValue('2')
@@ -34,7 +34,7 @@ test('Reset and scenario changes restore the starting scene after local interact
   await expect(page.getByText('Framing checked · demo', { exact: true })).toBeVisible()
   await expect(page).toHaveURL(/scenario=ready/)
 
-  await page.getByRole('button', { name: 'Scenario: Ready to frame', exact: true }).click()
+  await page.getByRole('button', { name: 'Start from: Ready to frame', exact: true }).click()
   await page.getByRole('menuitemradio', { name: /^Through the night/ }).click()
   const dialog = page.getByRole('dialog', { name: 'North America Nebula · Through the night' })
   await expect(dialog).toBeVisible()
@@ -115,7 +115,7 @@ test('legacy specimen and gallery links still open the design system', async ({ 
   await page.goto('/?component=panel&specimen=panel-frame-context&profile=fieldroom&prop.state=Checked')
   await expect(page.getByRole('heading', { name: 'Frame context · Draft product example', exact: true })).toBeVisible()
   await expect(page.getByText('Framing checked · demo', { exact: true })).toBeVisible()
-  await expect(page.getByRole('button', { name: /^Scenario:/ })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /^Start from:/ })).toHaveCount(0)
   await page.goto('/gallery')
   await expect(page.getByRole('heading', { name: 'Initial primitive library', exact: true })).toBeVisible()
   await expect(page.locator('.feature-preview')).toHaveCount(0)
@@ -148,7 +148,7 @@ test('shelf and fit preview work on an actual 390px mobile viewport', async ({ p
   await expect(page.getByText('Framing checked · demo', { exact: true })).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
 
-  for (const name of ['Desktop', 'Phone', 'Appearance: Light', 'Scenario: Frame checked', 'Reset', 'Copy link', 'Focus preview']) {
+  for (const name of ['Desktop', 'Phone', 'Appearance: Light', 'Start from: Frame checked', 'Reset', 'Copy link', 'Focus preview']) {
     const button = page.getByRole('button', { name, exact: true })
     await expect(button).toBeVisible()
     const bounds = await button.boundingBox()
@@ -157,7 +157,7 @@ test('shelf and fit preview work on an actual 390px mobile viewport', async ({ p
   }
 
   await page.screenshot({ path: '/tmp/vela-workshop-mobile-preview.png', fullPage: true })
-  await page.getByRole('button', { name: 'Scenario: Frame checked', exact: true }).click()
+  await page.getByRole('button', { name: 'Start from: Frame checked', exact: true }).click()
   const menu = page.getByRole('menu', { name: 'Choose a starting scenario' })
   await expect(menu).toBeVisible()
   const bounds = await menu.boundingBox()
@@ -168,7 +168,7 @@ test('shelf and fit preview work on an actual 390px mobile viewport', async ({ p
 
 test('keyboard scenario navigation dismisses with Escape and restores trigger focus', async ({ page }) => {
   await page.goto(checkedPreview)
-  const trigger = page.getByRole('button', { name: 'Scenario: Frame checked', exact: true })
+  const trigger = page.getByRole('button', { name: 'Start from: Frame checked', exact: true })
   await trigger.focus()
   await page.keyboard.press('ArrowDown')
   const selected = page.getByRole('menuitemradio', { name: /^Frame checked/ })
@@ -208,7 +208,7 @@ test('focus mode keeps interaction state and Escape returns focus to its control
   await frame.press('ArrowRight')
   await trigger.click()
   await expect(page.getByRole('button', { name: 'Return to workshop', exact: true })).toBeFocused()
-  await expect(page.getByRole('button', { name: 'Scenario: Frame checked', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Start from: Frame checked', exact: true })).toHaveCount(0)
   await expect(frame).toHaveAttribute('aria-valuenow', '51')
   await page.keyboard.press('Escape')
   await expect(trigger).toBeFocused()
