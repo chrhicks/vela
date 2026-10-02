@@ -89,7 +89,18 @@ export function App() {
     return (
       <main className="loading-screen">
         <div className="brand-mark">V</div>
-        <p>{workshop.status}</p>
+        {workshop.loadError ? (
+          <>
+            <h1>Couldn’t open Design system</h1>
+            <p>The saved workspace could not be loaded. Your saved session and profiles have not been changed.</p>
+            <details>
+              <summary>Error details</summary>
+              <p>{workshop.loadError}</p>
+            </details>
+            <button className="button" onClick={workshop.retryLoad}>Try again</button>
+            <a className="workshop-features-link" href="/">← Features</a>
+          </>
+        ) : <p>{workshop.status}</p>}
       </main>
     )
   }

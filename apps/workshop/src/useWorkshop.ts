@@ -63,14 +63,22 @@ export function useWorkshop() {
   const [session, setSession] = useState<WorkingSession>(DEFAULT_SESSION)
   const [profiles, setProfiles] = useState<DesignProfile[]>([FIELDROOM_PROFILE, DEFAULT_PROFILE, VELA_CURRENT_PROFILE])
   const [hydrated, setHydrated] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [loadAttempt, setLoadAttempt] = useState(0)
   const [status, setStatus] = useState('Loading local workspace…')
   const [undoStack, setUndoStack] = useState<Partial<ThemeParameters>[]>([])
   const [redoStack, setRedoStack] = useState<Partial<ThemeParameters>[]>([])
   const saveTimer = useRef<number | undefined>(undefined)
 
   useEffect(() => {
+    let cancelled = false
+    setLoadError(null)
+    setStatus('Loading local workspace…')
+
     Promise.all([loadSession(), loadProfiles()])
       .then(([storedSession, storedProfiles]) => {
+        if (cancelled) return
+
         const nextSession = sessionFromUrl(storedSession ?? DEFAULT_SESSION)
         const discovered = [FIELDROOM_PROFILE, DEFAULT_PROFILE, VELA_CURRENT_PROFILE, ...storedProfiles]
 
@@ -85,10 +93,16 @@ export function useWorkshop() {
         setHydrated(true)
         setStatus(storedSession ? 'Session recovered from disk' : 'New local session')
       })
-      .catch((cause: unknown) =>
-        setStatus(cause instanceof Error ? cause.message : 'Unable to load workshop state'),
-      )
-  }, [])
+      .catch((cause: unknown) => {
+        if (cancelled) return
+
+        setLoadError(cause instanceof Error ? cause.message : 'Unable to load workshop state')
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [loadAttempt])
 
   useEffect(() => {
     if (!hydrated) return
@@ -227,6 +241,8 @@ export function useWorkshop() {
     activeProfile,
     editTheme,
     hydrated,
+    loadError,
+    retryLoad: () => setLoadAttempt(attempt => attempt + 1),
     patchProps,
     patchSession,
     profiles,
