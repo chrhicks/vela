@@ -10,9 +10,10 @@ Follow [AGENTS.md](../AGENTS.md#working-with-chris) for collaboration, authoriza
 
 The approved workshop specimen and profile define the design; `@vela/ui` owns
 its shared implementation, and `apps/web` adopts it. **Fieldroom** is the shared
-and workshop authority; fresh workshop sessions use Fieldroom/light. Production
-application adoption is in progress under the [Fieldroom adoption plan](fieldroom-adoption.md);
-the application shell retains its previous profile until that application slice.
+and workshop authority; fresh workshop sessions use Fieldroom/light. The
+application adopted Fieldroom in PR #86 and defaults to it through `VITE_THEME`;
+browser-local Appearance selects System, Light, or Dark independently. The
+[Fieldroom adoption record](fieldroom-adoption.md) preserves the delivery evidence.
 `DEFAULT_PROFILE` (**Vela UI Default**) and `VELA_CURRENT_PROFILE` (**Vela Current**)
 remain named token references. The archived screenshots preserve their previous
 appearance; shared components do not maintain a second legacy stylesheet.
@@ -62,7 +63,7 @@ packages/ui/src/
 
 The Design system discovers `*.specimen.tsx` files from both `components/` and `drafts/`. Their directory determines the Stable or Draft label shown in the library and gallery. The feature workspace separately discovers `src/features/**/*.feature.tsx`; every discovered file exports a named `feature` declaration.
 
-Only Framing is initially available in the feature workspace. Its declaration uses a narrow source adapter to the existing framing specimen rather than recreating the approved composition. That adapter is not exported from the UI package API. Other examples remain in Design system without an automatic promotion, archival, or adoption change. New feature compositions and fixtures belong in `apps/workshop/src/features`.
+Framing was the first feature in the workspace. Its declaration uses a narrow source adapter to the existing framing specimen rather than recreating the approved composition. That adapter is not exported from the UI package API. Capture preparation is a workshop-owned exploration of preparation actions and actionable capture readiness, without application adoption. Other examples remain in Design system without an automatic promotion, archival, or adoption change. New feature compositions and fixtures belong in `apps/workshop/src/features`.
 
 ## Artifact terminology
 
@@ -309,7 +310,7 @@ Promotion makes a component available; adoption uses it in the agreed feature. K
 
 1. Run and visually inspect the approved product example at the relevant states, pace, and widths before implementation. Use the [application visual authority](#application-visual-authority) settings to compare like with like.
 2. Import stable primitives from `@vela/ui`. Compose the feature from web-owned state, copy, domain markup, and assets, following the [primitive and product-example boundaries](#pair-primitive-anatomy-with-product-examples). Promote a new primitive when concrete reuse establishes a useful contract.
-3. Use the application's explicitly adopted profile and existing `@vela/ui/styles.css` entry point; follow the Fieldroom plan while that adoption is in progress. Keep shared style loading ahead of feature composition styles; resolve missing tokens at their owning boundary rather than adding a parallel theme adapter.
+3. Use the application's configured profile (Fieldroom by default) and existing `@vela/ui/styles.css` entry point. Keep shared style loading ahead of feature composition styles; resolve missing tokens at their owning boundary rather than adding a parallel theme adapter.
 4. Compare the implemented feature with the running specimen. Preserve its hierarchy, typography, borders, artwork, and interaction feel while keeping wording honest for real operational states. Verify the changed behavior in the actual application context.
 5. Prepare the running product and concrete acceptance scenarios through the [delivery workflow](../AGENTS.md#verification-browser-review-and-merge).
 

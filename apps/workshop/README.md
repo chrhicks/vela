@@ -29,7 +29,7 @@ The structure is **Feature → Design → Scenario**:
 
 Copy [the starter](src/feature-workspace/starter.feature.tsx) to `src/features/<feature-id>.feature.tsx` for a new feature. Refine an existing design in place, add a design for a competing approach, or add a scenario for a different situation. The starter stays outside discovery but participates in TypeScript checks. [Framing](src/features/framing/framing.feature.tsx) is the working example; the [authoring guide](../../docs/component-workshop-operations.md#author-a-feature-exploration) covers these choices, reset behavior, stable URLs, and verification.
 
-Only Framing has moved into the feature workspace initially. It reuses a narrow, non-public source adapter to its existing specimen so the approved composition remains recognizable. Other product examples remain accessible in Design system with their existing status. New feature compositions belong to the workshop; this pilot adapter does not create a public feature API in `@vela/ui`.
+Framing was the first feature in the workspace. It reuses a narrow, non-public source adapter to its existing specimen so the approved composition remains recognizable. Capture preparation adds a workshop-owned exploration of preparation actions and actionable capture readiness; it is not application adoption. Other product examples remain accessible in Design system with their existing status. New feature compositions belong to the workshop; Framing's pilot adapter does not create a public feature API in `@vela/ui`.
 
 The feature workspace uses Fieldroom light/dark and a Width menu: Fit, Phone (390px), and Desktop (1280px), with custom widths supported by URL. Preview width changes an element's size; use container queries for responsive compositions. A copied link records the feature, design, scenario, appearance, and actual preview width. Reset and scenario changes remount the preview from its fixture. Interaction progress is temporary; returning to a feature can recover its last selection, while an explicit shared URL wins over local selections. The authoring guide includes [responsive sizing](../../docs/component-workshop-operations.md#responsive-preview-sizing) and a [thumbnail capture recipe](../../docs/component-workshop-operations.md#capture-a-feature-thumbnail).
 
@@ -104,8 +104,9 @@ See the [operations guide](../../docs/component-workshop-operations.md) for addi
 
 ## Fieldroom and Appearance
 
-Fieldroom is the shared/workshop design authority. Production application
-adoption is tracked separately in [the adoption plan](../../docs/fieldroom-adoption.md).
+Fieldroom is the shared/workshop design authority and the application's default
+theme, adopted in PR #86. [The adoption record](../../docs/fieldroom-adoption.md)
+preserves the implementation and review evidence.
 Use Fieldroom in the matching light or dark mode at density 1 for reference
 comparisons. The two older profiles remain named token references; shared
 component changes are not a promise to freeze their historical rendering.
