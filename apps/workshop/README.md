@@ -10,6 +10,15 @@ pnpm dev:workshop
 
 Open `http://127.0.0.1:5174` for the feature shelf, `/features/framing` for the first feature exploration, or `/design-system` for the existing component and theme workbench. `/design-system/gallery` opens paired component previews. Legacy `/?component=...&specimen=...` links and `/gallery` still work. Source edits refresh through Vite HMR.
 
+For an isolated runtime on another port, launch it explicitly:
+
+```sh
+pnpm --filter @vela/workshop exec vite --host 127.0.0.1 --port 5184 --strictPort
+WORKSHOP_PORT=5184 pnpm --filter @vela/workshop test:browser
+```
+
+`WORKSHOP_PORT` configures the browser suite's base URL and server launch together (default 5174, valid range 1–65535). Strict port selection prevents testing a silently reassigned server. Use an available port and verify the preview belongs to your checkout.
+
 ## Feature authoring
 
 The structure is **Feature → Design → Scenario**:
@@ -22,7 +31,7 @@ Copy [the starter](src/feature-workspace/starter.feature.tsx) to `src/features/<
 
 Only Framing has moved into the feature workspace initially. It reuses a narrow, non-public source adapter to its existing specimen so the approved composition remains recognizable. Other product examples remain accessible in Design system with their existing status. New feature compositions belong to the workshop; this pilot adapter does not create a public feature API in `@vela/ui`.
 
-The feature workspace uses Fieldroom light/dark and a viewport control. A copied link records the feature, design, scenario, appearance, and actual preview width. Reset and scenario changes remount the preview from its fixture. Interaction progress is temporary; returning to a feature can recover its last selection, while an explicit shared URL wins over local selections.
+The feature workspace uses Fieldroom light/dark and a Width menu: Fit, Phone (390px), and Desktop (1280px), with custom widths supported by URL. Preview width changes an element's size; use container queries for responsive compositions. A copied link records the feature, design, scenario, appearance, and actual preview width. Reset and scenario changes remount the preview from its fixture. Interaction progress is temporary; returning to a feature can recover its last selection, while an explicit shared URL wins over local selections. The authoring guide includes [responsive sizing](../../docs/component-workshop-operations.md#responsive-preview-sizing) and a [thumbnail capture recipe](../../docs/component-workshop-operations.md#capture-a-feature-thumbnail).
 
 ## Existing design-system library
 
