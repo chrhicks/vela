@@ -180,6 +180,8 @@ Keep selectors feature-local. Avoid viewport-sized widths such as `100vw` for pr
 5. Save the image beside the feature and reference it with `new URL('./thumbnail.png', import.meta.url).href`, or save under `apps/workshop/public/` and use its root-relative URL. Write descriptive alt text.
 6. Inspect the actual shelf card. Thumbnails use a centered cover crop in a 190px-high area whose width changes with the shelf layout; very wide, short captures can lose content at the sides. Choose a representative crop with room around the important content. Reload the shelf if a previously missing image remains broken after creating the file.
 
+For a saved screenshot, an installed image tool is enough; no capture dependency belongs in the feature. For example, ImageMagick crops with `magick capture.png -crop WIDTHxHEIGHT+X+Y +repage thumbnail.png`, using the measured image-pixel dimensions and offsets in place of the uppercase placeholders.
+
 ### Feature links and reset
 
 A complete preview URL looks like:
