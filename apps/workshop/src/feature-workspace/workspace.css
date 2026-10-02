@@ -50,6 +50,7 @@
 .feature-preview-context > span { white-space: nowrap; }
 .feature-preview-stage { flex: 1; min-height: 0; overflow: auto; padding: 28px; }
 .feature-preview-stage--fit { padding: 0; }
+.feature-preview--focused .feature-preview-stage { padding-bottom: calc(max(46px, var(--vela-control-height)) + 40px); }
 .feature-preview-surface { max-width: 1920px; min-width: 320px; margin: 0 auto; flex-shrink: 0; background: var(--vela-canvas); color: var(--vela-text); height: 100%; overflow: hidden; transform: translateZ(0); }
 .feature-preview-content { height: 100%; overflow: auto; container-type: inline-size; }
 .feature-focus-return {
