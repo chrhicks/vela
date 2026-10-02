@@ -63,7 +63,7 @@ packages/ui/src/
 
 The Design system discovers `*.specimen.tsx` files from both `components/` and `drafts/`. Their directory determines the Stable or Draft label shown in the library and gallery. The feature workspace separately discovers `src/features/**/*.feature.tsx`; every discovered file exports a named `feature` declaration.
 
-Framing was the first feature in the workspace. Its declaration uses a narrow source adapter to the existing framing specimen rather than recreating the approved composition. That adapter is not exported from the UI package API. Capture preparation is a workshop-owned exploration of preparation actions and actionable capture readiness, without application adoption. Other examples remain in Design system without an automatic promotion, archival, or adoption change. New feature compositions and fixtures belong in `apps/workshop/src/features`.
+Framing was the first feature in the workspace. Its declaration uses a narrow source adapter to the existing framing specimen rather than recreating the approved composition. That adapter is not exported from the UI package API. Capture preparation is a workshop-owned design reference for preparation actions and actionable capture readiness; its local simulations are not application dependencies. Other examples remain in Design system without an automatic promotion, archival, or adoption change. New feature compositions and fixtures belong in `apps/workshop/src/features`.
 
 ## Artifact terminology
 
