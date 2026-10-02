@@ -29,10 +29,16 @@ a second run. Framing Continue carries explicit target intent but takes no image
 Only a confirmed successful Start response navigates to Tonight; uncertain or
 failed responses remain here with explicit state inspection and no replay.
 
-`RigReadiness` preserves device connection and result semantics when preparation
-is incomplete, interrupted or has a connection outcome to explain. Successful
-connection is still not permission for every observing activity. Autofocus,
-Polar alignment and Equipment remain explicit links.
+The Preparation group beside the subject holds optional Polar alignment and
+Autofocus links. `RigReadiness` sits immediately above Start capture, with the
+connection problem and its explicit remedy visible without opening details.
+Device counts, observation age and the last connection attempt remain in its
+local disclosure. Interrupted, offline and uncertain states keep their existing
+read/command semantics; Check state reads rather than replays a command. A check
+that resolves readiness returns focus to Start capture, or to Capture settings
+if another precondition still disables Start. Successful connection does not
+create a new all-devices-ready capture policy; existing capture gates still apply.
+Equipment & settings remains in the equipment footer.
 
 Camera selection is a browser draft until the existing ID-and-name save boundary
 confirms it. Start remains unavailable for a changed unsaved camera. A confirmed
