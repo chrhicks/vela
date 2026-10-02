@@ -18,7 +18,7 @@
   box-sizing: border-box;
 }
 body {
-  min-width: 1180px;
+  min-width: 320px;
   margin: 0;
   overflow: hidden;
 }
@@ -32,10 +32,18 @@ button {
 }
 
 .workshop-shell {
+  min-width: 1180px;
   display: grid;
   grid-template: 64px minmax(0, 1fr) / 230px minmax(620px, 1fr) 330px;
   height: 100vh;
   background: #0a0c10;
+}
+.workshop-features-link {
+  align-self: center;
+  padding: 10px;
+  color: #a5acb7;
+  font-size: 12px;
+  text-decoration: none;
 }
 .workshop-shell--gallery {
   grid-template: 64px minmax(0, 1fr) / 1fr;

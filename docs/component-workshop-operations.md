@@ -1,6 +1,6 @@
-# Component Workshop Operations Guide
+# Workshop Operations Guide
 
-This guide covers designing, validating, promoting, and adopting components from `@vela/ui`. The original product and architecture decisions remain in [Component Workshop Decision Record](component-workshop.md).
+This guide covers feature explorations in the workshop and the secondary Design system workflow for designing, validating, promoting, and adopting components from `@vela/ui`. The original component-workshop decisions remain in [Component Workshop Decision Record](component-workshop.md).
 
 The workshop is a local developer tool. None of the procedures below publish a package, change Vela's default theme, apply a named design profile to Vela, or adopt a component into the Vela application automatically.
 
@@ -42,6 +42,8 @@ explicitly adopted; the application does not read workshop session files.
 ```text
 apps/workshop/
   src/                         visual evaluation and workflow UI
+  src/features/                feature declarations, compositions, and local fixtures
+  src/feature-workspace/       feature shell, typed authoring contract, and starter
   designs/*.json               explicitly saved, tracked design profiles
   .local/session.json          ignored automatic recovery state
 
@@ -58,10 +60,15 @@ packages/ui/src/
 - `@vela/ui` is the stable API. It currently exports themes and promoted components.
 - `@vela/ui/drafts` is the explicit experimental API used by the workshop. Drafts must not leak through the stable root.
 
-The workshop discovers `*.specimen.tsx` files from both `components/` and `drafts/`. Their directory determines the Stable or Draft label shown in the library and gallery.
+The Design system discovers `*.specimen.tsx` files from both `components/` and `drafts/`. Their directory determines the Stable or Draft label shown in the library and gallery. The feature workspace separately discovers `src/features/**/*.feature.tsx`; every discovered file exports a named `feature` declaration.
+
+Only Framing is initially available in the feature workspace. Its declaration uses a narrow source adapter to the existing framing specimen rather than recreating the approved composition. That adapter is not exported from the UI package API. Other examples remain in Design system without an automatic promotion, archival, or adoption change. New feature compositions and fixtures belong in `apps/workshop/src/features`.
 
 ## Artifact terminology
 
+- **Feature:** a capability or change being explored, containing one or more designs. Its `current` or `past` collection controls shelf placement, not approval or production status.
+- **Design:** a React composition, intent, and scenarios for one approach to the feature. A single design needs no comparison selector.
+- **Scenario:** named initial conditions for trying a design. Subsequent clicks and progress are local interaction state, not additional scenarios by default.
 - **Working session:** ignored recovery data for the active component, specimen, profile, mode, context, viewport, density, props, comparison state, and unsaved theme overrides.
 - **Design profile:** explicitly saved, tracked JSON containing token overrides plus baseline identity and fingerprint.
 - **Draft component:** real React source under `packages/ui/src/drafts`, exported only from `@vela/ui/drafts`.
@@ -76,8 +83,12 @@ pnpm dev:workshop
 
 Open:
 
-- `http://127.0.0.1:5174/` for the focused workbench.
-- `http://127.0.0.1:5174/gallery` for paired light/dark library evaluation.
+- `http://127.0.0.1:5174/` or `/features` for the feature shelf.
+- `http://127.0.0.1:5174/features/framing` for the framing exploration.
+- `http://127.0.0.1:5174/design-system` for the component and theme workbench.
+- `http://127.0.0.1:5174/design-system/gallery` for paired light/dark library evaluation.
+
+Legacy `/?component=...&specimen=...` and `/gallery` links remain supported.
 
 Source and specimen edits refresh through Vite HMR. The local persistence server binds to `127.0.0.1` and exposes only the fixed session and profile routes.
 
@@ -98,6 +109,53 @@ pnpm --filter @vela/workshop test:browser
 ```
 
 The suite starts the workshop itself and checks passive gallery previews, modal focus containment and restoration, dismissal, simulated responsive and comparison canvases, and asynchronous specimen state updates. Appearance checks cover radio selection, non-modal focus, outside actions, phone bounds, reduced motion, and saved/visit-only copy.
+
+## Author a feature exploration
+
+Use the smallest change that represents the requested work:
+
+| Work | Authoring action |
+| --- | --- |
+| Explore a new capability or change | Copy the canonical starter and assign a new feature identity |
+| Refine the approach already under discussion | Edit that design in place |
+| Compare a competing layout or interaction | Add a design under the existing feature; reuse or copy its composition as appropriate |
+| Try another starting condition or simulated outcome | Add a scenario to the existing design |
+
+Start from [starter.feature.tsx](../apps/workshop/src/feature-workspace/starter.feature.tsx), copying it to `apps/workshop/src/features/<feature-id>.feature.tsx`. This destination keeps its import path valid. Supporting components, assets, and fixtures can be colocated in a feature directory; adjust relative imports when nesting the declaration. The starter is compiled but sits outside automatic discovery. It shows an ordinary React component initializing local state from `initialState`, then updating that state through a button.
+
+Replace the starter's IDs, labels, intent, content, and thumbnail. Capture a useful preview and reference that local image; replace the deliberately missing thumbnail placeholder before presenting the feature. [The Framing declaration](../apps/workshop/src/features/framing/framing.feature.tsx) is the first real example.
+
+`defineDesign<State>` ties scenario fixtures to the component's `initialState` prop. `defineFeature` groups the resulting designs. Keep these declarations small; layout, interactions, and feature-specific simulation logic stay in ordinary React components. The workshop does not interpret the meaning of fixture fields.
+
+Authoring rules:
+
+- Export `const feature = defineFeature(...)` from each discovered `*.feature.tsx` file. Supporting files should not use that suffix.
+- Use stable kebab-case IDs. Feature IDs are unique across the catalog; design IDs are unique within their feature; scenario IDs are unique within their design. Change labels freely without breaking links.
+- Declare `defaultDesign` and `defaultScenario` explicitly, each matching a real entry. Every feature needs a design, and every design needs a scenario.
+- Write a short `intent` explaining what the design explores. A scenario's optional `description` explains its starting situation; `tryThis` suggests an interaction worth evaluating. These notes belong in the preview's details, not permanent surrounding chrome.
+- Treat `initialState` as an immutable fixture. Initialize local state from it and replace changed objects rather than mutating fixture data. Reset and design/scenario switches remount the preview; do not retain simulation state in module globals or browser storage.
+- Clean up timers, subscriptions, and other effects on unmount so changing scenarios or resetting cannot leave old work running. Simulate locally; feature previews do not command observatory hardware.
+- Preserve believable page context when exploring changes to an existing feature. Reuse stable UI primitives, keep composition styles local, and avoid recreating the entire app's service graph.
+
+TypeScript catches incompatible fixture inputs. Catalog validation reports source filename, declaration path, and the problem for duplicate IDs, empty required text or lists, missing defaults, and missing named exports. The catalog publishes no partial list when those authoring errors exist. Fix the indicated declaration and let HMR reload it.
+
+### Feature links and reset
+
+A complete preview URL looks like:
+
+```text
+/features/framing?design=sky-context&scenario=frame-checked&mode=light&viewport=1024
+```
+
+`mode` is `light` or `dark`; `viewport` is `fit` or a pixel width from 320 through 1920. Copy link resolves Fit to the actual preview width so another browser opens the intended layout. Links reproduce starting conditions, not an interaction session halfway through a simulation.
+
+A bare feature URL can recover the last local selection. A full explicit URL takes priority over recovered choices. Reset returns the current scenario to its starting fixture. Theme and viewport choices are workshop presentation settings, separate from scenario data.
+
+### Prove the authoring path
+
+Open the actual preview, try its suggested interactions, switch scenarios, and reset after making changes. Check relevant desktop and phone widths and light/dark appearance. Open a copied link and confirm it restores the intended starting view. Ensure effects stop when leaving a preview. Run workshop TypeScript checks and focused tests appropriate to the changed behavior.
+
+Prove this workflow with the first feature before expanding migration. Adding the next feature should require a small declaration and ordinary React composition, without introducing a generator, custom agent tool, or a new framework layer. Follow the independent verification and browser acceptance workflow in [AGENTS.md](../AGENTS.md#verification-browser-review-and-merge) before adopting user-facing changes.
 
 ## Add a draft component
 
@@ -146,7 +204,7 @@ The contrast is intentional: the primitive specimen explains **what the componen
 
 ## Work with profiles and session recovery
 
-Ordinary workbench changes save automatically to `apps/workshop/.local/session.json`. This is recovery state and remains ignored by Git.
+Ordinary Design system workbench changes save automatically to `apps/workshop/.local/session.json`. This is recovery state and remains ignored by Git. Feature preview selections use separate browser-local recovery and do not persist simulation progress.
 
 Theme adjustments remain in `unsavedOverrides` until Save or Save As is chosen:
 
@@ -159,7 +217,7 @@ The local server validates schema version, IDs, primitive props, modes, contexts
 
 ## Use stable URLs and Copy Context
 
-The workbench URL records component, specimen, profile, mode, context, viewport, and controlled specimen props. Paste that URL to reopen the same visual scenario.
+The Design system workbench URL records component, specimen, profile, mode, context, viewport, and controlled specimen props. Paste that URL to reopen the same visual scenario. Feature previews use the separate [feature link contract](#feature-links-and-reset).
 
 Copy Context adds density, baseline identity and fingerprint, plus unsaved overrides. Use it when asking for a source change so the exact state can be inspected and reproduced.
 
