@@ -1,0 +1,268 @@
+.feature-shelf {
+  min-height: 100vh;
+  background: #f6f5f1;
+  color: #293c36;
+  font-family: Barlow, sans-serif;
+}
+
+.feature-shelf-header {
+  height: 80px;
+  padding: 0 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  background: #faf9f5;
+  border-bottom: 1px solid #c4cbbe;
+}
+
+.feature-shelf a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.feature-shelf a:focus-visible {
+  outline: 2px solid #293c36;
+  outline-offset: 5px;
+}
+
+.feature-shelf-brand {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 14px;
+  white-space: nowrap;
+}
+
+.feature-shelf-brand strong {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 26px;
+  font-weight: 500;
+  letter-spacing: -1px;
+}
+
+.feature-shelf-brand span {
+  color: #637063;
+  font-size: 16px;
+}
+
+.feature-shelf-design-system {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  font-size: 15px;
+}
+
+.feature-shelf svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.feature-shelf-main {
+  max-width: 1568px;
+  margin: 0 auto;
+  padding: 56px 64px 80px;
+}
+
+.feature-shelf-intro {
+  margin-bottom: 40px;
+}
+
+.feature-shelf h1,
+.feature-shelf h2 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 400;
+}
+
+.feature-shelf h1 {
+  margin: 0 0 12px;
+  font-size: 40px;
+  line-height: 1.2;
+  letter-spacing: -1.2px;
+}
+
+.feature-shelf-intro p {
+  margin: 0;
+  color: #637063;
+  font-size: 18px;
+  line-height: 1.5;
+}
+
+.feature-shelf-browser {
+  position: relative;
+}
+
+.feature-shelf-search {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 260px;
+}
+
+.feature-shelf-search > svg {
+  position: absolute;
+  top: 14px;
+  left: 13px;
+  z-index: 1;
+  color: #637063;
+  pointer-events: none;
+}
+
+.feature-shelf-search .vela-input {
+  padding-left: 40px;
+  background: #faf9f5;
+  border-color: #c4cbbe;
+  font-size: 15px;
+}
+
+.feature-shelf-tabs {
+  gap: 0;
+}
+
+.feature-shelf-tabs > .vela-tabs__list {
+  width: calc(100% - 300px);
+  min-height: 46px;
+  border-bottom: 0;
+  gap: 24px;
+  background: transparent;
+}
+
+.feature-shelf-tabs > .vela-tabs__list > button {
+  padding: 12px 0;
+  background: transparent;
+  color: #637063;
+  font-size: 16px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+}
+
+.feature-shelf-tabs > .vela-tabs__list > button[data-active='true'] {
+  color: #293c36;
+  border-bottom-color: #293c36;
+  background: transparent;
+}
+
+.feature-shelf-tabs > .vela-tabs__panel {
+  margin-top: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.feature-shelf-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.feature-shelf-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #c4cbbe;
+  border-radius: 8px;
+  background: #faf9f5;
+}
+
+.feature-shelf-card > img {
+  width: 100%;
+  height: 190px;
+  display: block;
+  object-fit: cover;
+  border-bottom: 1px solid #c4cbbe;
+  background: #e8eae2;
+}
+
+.feature-shelf-card-body {
+  padding: 24px;
+}
+
+.feature-shelf-card h2 {
+  margin: 0 0 10px;
+  font-size: 24px;
+  letter-spacing: -.5px;
+}
+
+.feature-shelf-card p {
+  min-height: 48px;
+  margin: 0;
+  color: #637063;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.feature-shelf-card a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  margin-top: 20px;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.feature-shelf-card a:hover span,
+.feature-shelf-design-system:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.feature-shelf-empty {
+  padding: 64px 24px;
+  text-align: center;
+  border: 1px dashed #c4cbbe;
+  border-radius: 8px;
+}
+
+.feature-shelf-empty h2,
+.feature-shelf-errors h2 {
+  margin: 0 0 12px;
+  font-size: 24px;
+}
+
+.feature-shelf-empty p,
+.feature-shelf-errors p {
+  margin: 0;
+  color: #637063;
+  line-height: 1.5;
+}
+
+.feature-shelf-errors {
+  padding: 24px;
+  border: 1px solid #c4cbbe;
+  background: #faf9f5;
+}
+
+.feature-shelf-errors li {
+  margin-top: 20px;
+  overflow-wrap: anywhere;
+}
+
+.feature-shelf-errors li > code,
+.feature-shelf-errors li > span {
+  display: block;
+  margin-top: 6px;
+}
+
+@media (max-width: 1050px) {
+  .feature-shelf-main { padding: 40px 32px 64px; }
+  .feature-shelf-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 680px) {
+  .feature-shelf-header { height: 72px; padding: 0 20px; gap: 12px; }
+  .feature-shelf-brand { gap: 8px; }
+  .feature-shelf-brand strong { font-size: 23px; }
+  .feature-shelf-brand span { font-size: 14px; }
+  .feature-shelf-design-system { font-size: 14px; gap: 6px; }
+  .feature-shelf-design-system svg { display: none; }
+  .feature-shelf-main { padding: 36px 20px 56px; }
+  .feature-shelf h1 { font-size: 34px; }
+  .feature-shelf-intro { margin-bottom: 28px; }
+  .feature-shelf-intro p { font-size: 17px; }
+  .feature-shelf-search { position: relative; width: 100%; margin-bottom: 16px; }
+  .feature-shelf-tabs > .vela-tabs__list { width: 100%; }
+  .feature-shelf-tabs > .vela-tabs__panel { margin-top: 20px; }
+  .feature-shelf-grid { grid-template-columns: minmax(0, 1fr); }
+}
