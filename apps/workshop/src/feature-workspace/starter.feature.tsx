@@ -9,6 +9,8 @@ interface InitialState {
 function FeaturePreview({ initialState }: { initialState: InitialState }) {
   const [offsetArcmin, setOffsetArcmin] = useState(initialState.offsetArcmin)
 
+  // Preview width is a container, not the browser viewport; use @container for responsive composition.
+  // See docs/component-workshop-operations.md for sizing and thumbnail capture.
   return (
     <section aria-label="Illustrative framing preview">
       <h1>Framing</h1>

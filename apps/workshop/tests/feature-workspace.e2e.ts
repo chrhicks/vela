@@ -60,7 +60,8 @@ test('appearance and viewport changes preserve local interaction state', async (
   await frame.focus()
   await frame.press('ArrowRight')
   await exposure.fill('8')
-  await page.getByRole('button', { name: 'Phone', exact: true }).click()
+  await page.getByRole('button', { name: 'Width: Fit', exact: true }).click()
+  await page.getByRole('menuitemradio', { name: 'Phone · 390 px', exact: true }).click()
   await expect(page).toHaveURL(/viewport=390/)
   await page.getByRole('button', { name: 'Appearance: Light', exact: true }).click()
   await page.getByRole('menuitemradio', { name: 'Dark', exact: true }).click()
@@ -69,7 +70,8 @@ test('appearance and viewport changes preserve local interaction state', async (
   await expect(frame).toHaveAttribute('aria-valuenow', '51')
   await expect(exposure).toHaveValue('8')
   await expect(page.getByText('Ready to frame', { exact: true })).toBeVisible()
-  await page.getByRole('button', { name: 'Desktop', exact: true }).click()
+  await page.getByRole('button', { name: 'Width: Phone · 390 px', exact: true }).click()
+  await page.getByRole('menuitemradio', { name: /^Fit/ }).click()
   await expect(frame).toHaveAttribute('aria-valuenow', '51')
   await expect(exposure).toHaveValue('8')
 })
@@ -157,7 +159,7 @@ test('shelf and fit preview work on an actual 390px mobile viewport', async ({ p
   await expect(page.getByText('Framing checked · demo', { exact: true })).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
 
-  for (const name of ['Desktop', 'Phone', 'Appearance: Light', 'Start from: Frame checked', 'Reset', 'Copy link', 'Focus preview']) {
+  for (const name of ['Width: Fit', 'Appearance: Light', 'Start from: Frame checked', 'Reset', 'Copy link', 'Focus preview']) {
     const button = page.getByRole('button', { name, exact: true })
     await expect(button).toBeVisible()
     const bounds = await button.boundingBox()
@@ -238,4 +240,20 @@ test('a short phone can scroll the shelf to open its feature', async ({ page }) 
   await openFeature.click()
   await expect(page.getByRole('slider', { name: 'Camera frame position' })).toHaveCount(1)
   await expect(page).toHaveURL(/\/features\/framing\?/)
+})
+
+
+test('fixed Phone width fits an equally wide browser while larger widths stay explicit', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto(checkedPreview.replace('viewport=fit', 'viewport=390'))
+  const stage = page.locator('.feature-preview-stage')
+  const surface = page.locator('.feature-preview-surface')
+  await expect(page.getByRole('button', { name: 'Width: Phone · 390 px' })).toBeVisible()
+  expect(await surface.evaluate(element => element.getBoundingClientRect().width)).toBe(390)
+  expect(await stage.evaluate(element => element.scrollWidth - element.clientWidth)).toBe(0)
+
+  await page.getByRole('button', { name: 'Width: Phone · 390 px' }).click()
+  await page.getByRole('menuitemradio', { name: 'Desktop · 1280 px' }).click()
+  expect(await surface.evaluate(element => element.getBoundingClientRect().width)).toBe(1280)
+  expect(await stage.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true)
 })

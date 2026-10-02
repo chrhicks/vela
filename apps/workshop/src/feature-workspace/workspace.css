@@ -19,7 +19,7 @@
   border-bottom: 1px solid #c4cbbe;
   background: #faf9f5;
 }
-.feature-toolbar-heading, .feature-toolbar-controls, .feature-viewport-toggle {
+.feature-toolbar-heading, .feature-toolbar-controls {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -28,8 +28,6 @@
 .feature-toolbar h1 { font: 500 19px 'Space Grotesk', sans-serif; margin: 0 12px; }
 .feature-toolbar-divider { width: 1px; height: 22px; background: #c4cbbe; margin-left: 10px; }
 .feature-toolbar-controls { flex-wrap: wrap; justify-content: flex-end; }
-.feature-viewport-toggle { border: 1px solid #c4cbbe; border-radius: 8px; padding: 2px; }
-.feature-viewport-toggle [aria-pressed='true'] { background: #e3e8db; color: #293c36; }
 .feature-choice-trigger { white-space: nowrap; }
 .feature-choice-trigger > span { display: inline-flex; align-items: center; gap: 6px; }
 .feature-preview-context {
@@ -98,7 +96,7 @@
   .feature-toolbar h1 { margin: 0 8px; }
   .feature-preview-context { padding: 6px 12px; }
   .feature-preview-context > span { display: none; }
-  .feature-preview-stage { padding: 12px; }
+  .feature-preview-stage { padding: 12px 0; }
   .feature-preview-stage--fit { padding: 0; }
   .feature-unavailable { padding: 28px; }
 }
