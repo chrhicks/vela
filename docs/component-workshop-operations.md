@@ -90,7 +90,7 @@ Open:
 
 Legacy `/?component=...&specimen=...` and `/gallery` links remain supported.
 
-Source and specimen edits refresh through Vite HMR. The local persistence server binds to `127.0.0.1` and exposes only the fixed session and profile routes.
+Source and specimen edits refresh through Vite HMR. The development server binds to `127.0.0.1` by default; its local persistence API exposes only the fixed session and profile routes.
 
 For another checkout or a busy default port, choose an available port and launch explicitly:
 
@@ -100,6 +100,8 @@ WORKSHOP_PORT=5184 pnpm --filter @vela/workshop test:browser
 ```
 
 The first command runs the preview until stopped. The second can reuse that runtime, or start its own server on the same configured port. `WORKSHOP_PORT` defaults to 5174 and accepts integers from 1 through 65535; it sets both Playwright's base URL and its server command. Strict port selection makes a collision fail instead of silently moving the server. Verify any reused runtime belongs to the checkout under review. For a focused test, append its test filename to `test:browser`.
+
+If the browser runs on another machine, use `--host 0.0.0.0` for the preview and navigate to the development machine's reachable address, or use the browser tool's environment-port target. Loopback-only reachability does not prove that a remote preview can connect. Keep a review runtime running while its link is in use; stopping an isolated trial server leaves its browser tab disconnected.
 
 Choose focused tests and builds for the affected boundary using [CODING_STANDARDS.md](../CODING_STANDARDS.md#focused-verification), then check the diff. For example, a UI component change may use:
 
