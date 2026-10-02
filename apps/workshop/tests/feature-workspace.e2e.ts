@@ -257,3 +257,68 @@ test('fixed Phone width fits an equally wide browser while larger widths stay ex
   expect(await surface.evaluate(element => element.getBoundingClientRect().width)).toBe(1280)
   expect(await stage.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true)
 })
+
+test('long feature, design, and scenario labels keep toolbar controls within the browser', async ({ page }) => {
+  const featureLabel = 'Guide-camera signal check before starting an observing session'
+
+  const designLabels = [
+    'Guide-star image beside the latest signal reading',
+    'Signal reading above a compact guide-star image',
+  ]
+
+  const scenarioLabels = [
+    'A clear guide star after removing the lens cap',
+    'A faint guide star with thin cloud crossing the field',
+  ]
+
+  const feature = {
+    id: 'long-labels', label: featureLabel, description: 'Toolbar layout fixture', collection: 'current',
+    thumbnail: { src: '/unused-thumbnail.png', alt: 'Unused preview thumbnail' },
+    defaultDesign: 'design-0',
+    designs: designLabels.map((label, index) => ({
+      id: `design-${index}`, label, intent: 'Keep the complete choice readable.', defaultScenario: 'scenario-0',
+      scenarios: scenarioLabels.map((label, index) => ({ id: `scenario-${index}`, label })),
+    })),
+  }
+
+  await page.route('**/src/feature-workspace/catalog.ts*', route => route.fulfill({
+    contentType: 'text/javascript',
+    body: `export const catalogErrors = []
+      export const featureCatalog = ${JSON.stringify([feature])}
+      for (const design of featureCatalog[0].designs)
+        for (const scenario of design.scenarios) scenario.render = () => 'Local preview fixture'`,
+  }))
+
+  for (const width of [320, 390, 1440]) {
+    await page.setViewportSize({ width, height: 900 })
+    await page.goto('/features/long-labels?design=design-0&scenario=scenario-0&mode=light&viewport=fit')
+    await expect(page.getByText('Local preview fixture')).toBeVisible()
+    const toolbar = page.locator('.feature-toolbar')
+    const controls = toolbar.locator('h1, button')
+
+    for (const control of await controls.all()) {
+      const bounds = await control.boundingBox()
+      expect(bounds).not.toBeNull()
+      expect(bounds!.x).toBeGreaterThanOrEqual(0)
+      expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width)
+      expect(await control.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
+    }
+
+    expect(await page.locator('.feature-preview-surface').evaluate(element => element.clientWidth)).toBe(width)
+    await page.getByRole('button', { name: `Design: ${designLabels[0]}`, exact: true }).click()
+    const menu = page.getByRole('menu', { name: 'Choose a design' })
+    const menuBounds = await menu.boundingBox()
+    expect(menuBounds!.x).toBeGreaterThanOrEqual(0)
+    expect(menuBounds!.x + menuBounds!.width).toBeLessThanOrEqual(width)
+    await page.getByRole('menuitemradio', { name: designLabels[1], exact: true }).click()
+    await expect(page.getByRole('button', { name: `Design: ${designLabels[1]}`, exact: true })).toBeVisible()
+    await page.getByRole('button', { name: `Start from: ${scenarioLabels[0]}`, exact: true }).click()
+    await page.getByRole('menuitemradio', { name: scenarioLabels[1], exact: true }).click()
+    await expect(page.getByRole('button', { name: `Start from: ${scenarioLabels[1]}`, exact: true })).toBeVisible()
+
+    await page.getByRole('button', { name: 'Width: Fit', exact: true }).click()
+    await page.getByRole('menuitemradio', { name: 'Desktop · 1280 px', exact: true }).click()
+    expect(await page.locator('.feature-preview-surface').evaluate(element => element.clientWidth)).toBe(1280)
+    expect(await page.locator('.feature-workspace').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
+  }
+})
