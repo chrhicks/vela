@@ -221,6 +221,22 @@ function FrameContext({ props, onPropsChange }: {
   )
 }
 
+export type FrameContextInitialState = {
+  state: 'Ready' | 'Checked'
+  skyOpen?: boolean
+}
+
+export function FrameContextPreview({ initialState }: { initialState: FrameContextInitialState }) {
+  return (
+    <FrameContext props={{
+      state: initialState.state,
+      skyOpen: initialState.skyOpen ?? false,
+      skyIndex: snapshotIndex,
+      notice: '',
+    }} />
+  )
+}
+
 export const specimen: ComponentSpecimen = {
   componentId: 'panel', componentName: 'Panel / Card', id: 'panel-frame-context',
   name: 'Frame context · Draft product example',

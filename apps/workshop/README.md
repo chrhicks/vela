@@ -1,6 +1,6 @@
-# Vela Component Workshop
+# Vela Workshop
 
-The workshop is a local, source-backed environment for designing real components in `@vela/ui`. It does not replace Vela's current theme or automatically export, promote, or adopt components.
+The workshop is a local, source-backed place to compose and try Vela features. Its secondary Design system area retains the component workbench, gallery, and theme tools. Nothing is automatically promoted or adopted into the application.
 
 ## Run it
 
@@ -8,9 +8,23 @@ The workshop is a local, source-backed environment for designing real components
 pnpm dev:workshop
 ```
 
-Open `http://127.0.0.1:5174` for the focused workbench or `http://127.0.0.1:5174/gallery` for library-wide evaluation. Component and specimen source edits refresh through Vite HMR.
+Open `http://127.0.0.1:5174` for the feature shelf, `/features/framing` for the first feature exploration, or `/design-system` for the existing component and theme workbench. `/design-system/gallery` opens paired component previews. Legacy `/?component=...&specimen=...` links and `/gallery` still work. Source edits refresh through Vite HMR.
 
-## Current workshop
+## Feature authoring
+
+The structure is **Feature → Design → Scenario**:
+
+- A feature groups a capability or change, such as Framing.
+- A design supplies a React composition and a sentence explaining its intent.
+- A scenario supplies typed starting state and optional “try this” guidance for that composition.
+
+Copy [the starter](src/feature-workspace/starter.feature.tsx) to `src/features/<feature-id>.feature.tsx` for a new feature. Refine an existing design in place, add a design for a competing approach, or add a scenario for a different situation. The starter stays outside discovery but participates in TypeScript checks. [Framing](src/features/framing/framing.feature.tsx) is the working example; the [authoring guide](../../docs/component-workshop-operations.md#author-a-feature-exploration) covers these choices, reset behavior, stable URLs, and verification.
+
+Only Framing has moved into the feature workspace initially. It reuses a narrow, non-public source adapter to its existing specimen so the approved composition remains recognizable. Other product examples remain accessible in Design system with their existing status. New feature compositions belong to the workshop; this pilot adapter does not create a public feature API in `@vela/ui`.
+
+The feature workspace uses Fieldroom light/dark and a viewport control. A copied link records the feature, design, scenario, appearance, and actual preview width. Reset and scenario changes remount the preview from its fixture. Interaction progress is temporary; returning to a feature can recover its last selection, while an explicit shared URL wins over local selections.
+
+## Existing design-system library
 
 - A [local retained-image preview-color comparison](preview-color/README.md): current rendering versus bounded display-only background subtraction, with fit/native/thumbnail scales and explicit source hashes. Workshop only; generated private fixtures stay ignored, with no production rendering or archive changes.
 - Stable Button, IconButton, Input, Select, Checkbox, Badge, Tabs, NavigationBar, and Panel/Card components
@@ -41,7 +55,7 @@ Open `http://127.0.0.1:5174` for the focused workbench or `http://127.0.0.1:5174
 - Automatic ignored session recovery
 - Explicit tracked design-profile Save and Save As
 
-Gallery cards intentionally contain live component previews and a separate Open action. The gallery is for judging cohesion; the workbench remains the place to adjust props, contexts, responsive width, and theme values for one component.
+Design-system gallery cards intentionally contain live component previews and a separate Open action. The gallery is for judging cohesion; the component workbench remains the place to adjust props, contexts, responsive width, and theme values for one component.
 
 ## Primitive and product-example specimens
 
@@ -53,7 +67,7 @@ This pattern is visible under Dialog as **Primitive anatomy** and **Rig discover
 
 ## Persistence
 
-The Vite development server exposes a local-only persistence boundary:
+The feature workspace remembers preview selections locally in the browser; it does not persist interactive simulation state. The Design system's Vite development server exposes a local-only persistence boundary:
 
 - `.local/session.json` is ignored recovery state and updates automatically.
 - `designs/*.json` contains tracked named design profiles and changes only through Save or Save As.
@@ -69,6 +83,8 @@ packages/ui/src/themes/       token contract and defaults
 packages/ui/src/components/   stable React components and specimens
 packages/ui/src/drafts/       draft components, specimens, and specimen-local styles
 apps/workshop/src/            workshop experience
+apps/workshop/src/features/   feature declarations, compositions, and local fixtures
+apps/workshop/src/feature-workspace/ feature shell, authoring contract, and starter
 apps/workshop/designs/        named tracked profiles
 apps/workshop/.local/         ignored recovery state
 ```

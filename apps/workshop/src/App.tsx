@@ -18,7 +18,7 @@ export function App() {
   const [pathname, setPathname] = useState(window.location.pathname)
   const unsavedCount = Object.keys(workshop.session.unsavedOverrides).length
   const baselineDrift = workshop.activeProfile.baselineFingerprint !== BASELINE_FINGERPRINT
-  const isGallery = pathname === '/gallery'
+  const isGallery = pathname === '/gallery' || pathname === '/design-system/gallery'
 
   useEffect(() => {
     const updatePath = () => setPathname(window.location.pathname)
@@ -27,14 +27,14 @@ export function App() {
     return () => window.removeEventListener('popstate', updatePath)
   }, [])
 
-  function navigate(path: '/' | '/gallery') {
+  function navigate(path: '/design-system' | '/design-system/gallery') {
     window.history.pushState(null, '', `${path}${window.location.search}`)
     setPathname(path)
   }
 
   function openSpecimen(componentId: string, specimenId: string) {
     workshop.selectSpecimen(componentId, specimenId)
-    navigate('/')
+    navigate('/design-system')
   }
 
   function openComposition(
@@ -44,7 +44,7 @@ export function App() {
   ) {
     workshop.selectSpecimen(componentId, specimenId)
     workshop.patchSession({ context })
-    navigate('/')
+    navigate('/design-system')
   }
 
   async function copyContext() {
@@ -101,15 +101,16 @@ export function App() {
           <div className="brand-lockup">
             <div className="brand-mark">V</div>
             <div>
-              <strong>Component Workshop</strong>
+              <strong>Design system</strong>
               <span>Vela UI · local source</span>
             </div>
           </div>
           <nav className="view-switch" aria-label="Workshop view">
-            <button className={!isGallery ? 'active' : ''} onClick={() => navigate('/')}>
+            <a className="workshop-features-link" href="/">← Features</a>
+            <button className={!isGallery ? 'active' : ''} onClick={() => navigate('/design-system')}>
               Workbench
             </button>
-            <button className={isGallery ? 'active' : ''} onClick={() => navigate('/gallery')}>
+            <button className={isGallery ? 'active' : ''} onClick={() => navigate('/design-system/gallery')}>
               Gallery
             </button>
           </nav>
