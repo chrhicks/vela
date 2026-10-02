@@ -1,5 +1,5 @@
 import { Button, Checkbox, Input, Select } from '@vela/ui'
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { captureActivity, useCapture } from '../features/capture/use-capture'
 import { PreparationCooling } from '../features/capture/PreparationCooling'
@@ -33,6 +33,7 @@ function Preparation({ rigId }: { rigId: string }) {
   const [exposure, setExposure] = useState<string | null>(null)
   const [repeat, setRepeat] = useState<boolean | null>(null)
   const [saveFrames, setSaveFrames] = useState<boolean | null>(null)
+  const startActionId = useId()
   const { view } = capture
   const base = `/rigs/${encodeURIComponent(rigId)}`
   const selected = camera.view?.selected
@@ -74,16 +75,9 @@ function Preparation({ rigId }: { rigId: string }) {
 
   const activity = !view
     ? 'Checking camera…'
-    : !capture.offline && view.enabled && view.phase === 'idle'
-      ? 'Camera idle'
+    : !capture.offline && view.phase === 'idle'
+      ? view.enabled ? 'Camera idle' : 'Camera unavailable'
       : captureActivity(view, capture.offline)
-
-  const needsPreparation =
-    !observation.view ||
-    observation.view.connectionPreparation.state !== 'complete' ||
-    observation.interrupted ||
-    observation.commandUnconfirmed ||
-    !!observation.result
 
   useEffect(() => {
     if (camera.confirmedSaves > 0) {
@@ -127,9 +121,26 @@ function Preparation({ rigId }: { rigId: string }) {
             )}
           </header>
 
+          <section className="capture-preparation__tools" aria-label="Preparation tools">
+            <header>
+              <h2>Preparation</h2>
+              <span>{observation.view?.rig.name ?? view?.rigName ?? 'Current rig'}</span>
+            </header>
+            <div>
+              <Link className="vela-button" data-tone="neutral" to={`${base}/observe/alignment`}>
+                Polar alignment →
+              </Link>
+              <Link className="vela-button" data-tone="neutral" to={`${base}/observe/autofocus`}>
+                Autofocus →
+              </Link>
+            </div>
+            <p>Use these when needed before capturing.</p>
+          </section>
+
           <form
             className="capture-preparation__form"
             aria-label="Capture settings"
+            tabIndex={-1}
             onSubmit={event => {
               event.preventDefault()
               void start()
@@ -230,12 +241,14 @@ function Preparation({ rigId }: { rigId: string }) {
                 onChange={event => setSaveFrames(event.target.checked)}
               />
             </div>
+            <RigReadiness observation={observation} startActionId={startActionId} />
             {view?.active ? (
-              <Link className="vela-button" data-tone="accent" to={`${base}/observe/capture`}>
+              <Link id={startActionId} className="vela-button" data-tone="accent" to={`${base}/observe/capture`}>
                 Open active capture →
               </Link>
             ) : (
               <Button
+                id={startActionId}
                 type="submit"
                 tone="accent"
                 pending={capture.pending}
@@ -271,7 +284,6 @@ function Preparation({ rigId }: { rigId: string }) {
             onCooler={value => void capture.setCooler(value)}
             onSetpoint={value => void capture.setCoolingTemperature(value)}
             onCheck={() => void capture.refresh()}
-            autofocusHref={`${base}/observe/autofocus`}
           />
         </div>
       </div>
@@ -281,32 +293,8 @@ function Preparation({ rigId }: { rigId: string }) {
         rigName={observation.view?.rig.name ?? view?.rigName ?? 'Current rig'}
         cooling={view?.cooling ?? null}
         coolingStale={capture.offline || capture.coolingUnconfirmed}
-        coolingAction={(
-          <Link className="tonight-link" to={`${base}/observe/alignment`}>Polar alignment</Link>
-        )}
+        coolingAction={null}
       />
-      {needsPreparation && (
-        <div className="capture-preparation__readiness">
-          {observation.view ? (
-            <RigReadiness observation={observation} />
-          ) : (
-            <div role="status">
-              <h2>
-                {observation.error === 'not-found'
-                  ? 'Rig not found'
-                  : observation.error
-                    ? 'Could not load this Rig'
-                    : 'Checking Rig readiness…'}
-              </h2>
-              {observation.error && (
-                <Button disabled={observation.refreshing} onClick={() => void observation.refresh()}>
-                  Check Rig again
-                </Button>
-              )}
-            </div>
-          )}
-        </div>
-      )}
     </section>
   )
 }

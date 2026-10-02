@@ -9,9 +9,9 @@ The findings below preserve the reviewed state. Explore and Frame subsequently
 adopted their approved workshop designs and shipped in PR #86 after independent
 verification, including Tonight's sky entry point. Chris accepted Explore in the
 application and explicitly authorized shipping Frame at workshop approval;
-Frame did not receive a separate implementation browser acceptance. Capture
-preparation navigation/readiness, Equipment navigation, and Tonight cooling
-remain follow-up work.
+Frame did not receive a separate implementation browser acceptance. Chris
+approved Capture preparation on 2026-10-02; its adoption is described below.
+Equipment navigation and Tonight cooling remain separate follow-up work.
 
 ## Evidence and scope
 
@@ -131,7 +131,13 @@ alignment and Autofocus beside the subject, and places connection readiness and
 its remedy immediately above Start capture. The Ready, Devices disconnected and
 Connection unconfirmed starting scenarios use local simulation only. Checking an
 uncertain connection shows fresh device state without claiming the original
-command succeeded. This is a proposal for design review, not application adoption.
+command succeeded. Chris approved this design on 2026-10-02 as more accessible.
+The application adopts its preparation-tools group and inline readiness using
+real links, connection eligibility and command results. Supporting device facts
+and per-device attempt details remain available beside the actionable status;
+the layout does not make all-device connection a new capture prerequisite.
+Independent verification and application browser acceptance remain separate from
+the workshop design approval.
 
 ### Earlier exploratory composition
 
