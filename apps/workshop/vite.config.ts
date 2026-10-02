@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { DesignProfile, WorkingSession } from '@vela/ui/themes'
-import { mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, readdir } from 'node:fs/promises'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -9,6 +9,7 @@ import tailwindcss from '@tailwindcss/vite'
 import { defineConfig, type Plugin } from 'vite'
 import { designProfileSchema, workingSessionSchema } from '../../packages/ui/src/themes/index'
 import { isSafeProfileId, parseProfile, parseSession } from './shared/persistence.ts'
+import { writeJsonAtomic } from './server/file-persistence.ts'
 import { previewColorFixtures } from './preview-color/fixture-server.ts'
 
 const workshopRoot = dirname(fileURLToPath(import.meta.url))
@@ -32,13 +33,6 @@ async function readJson<T>(path: string, schema: z.ZodType<T>): Promise<T | null
     if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return null
     throw error
   }
-}
-
-async function writeJsonAtomic(path: string, value: WorkingSession | DesignProfile): Promise<void> {
-  await mkdir(dirname(path), { recursive: true })
-  const temporaryPath = `${path}.tmp`
-  await writeFile(temporaryPath, `${JSON.stringify(value, null, 2)}\n`, 'utf8')
-  await rename(temporaryPath, path)
 }
 
 async function readBody(request: IncomingMessage): Promise<string> {

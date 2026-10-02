@@ -83,7 +83,7 @@ The feature workspace remembers preview selections locally in the browser; it do
 - Built-in `Fieldroom`, `Vela UI Default`, and `Vela Current` profiles are read-only references. Fresh sessions start in Fieldroom/light; recovered sessions keep their selected profile and mode.
 - A named profile whose baseline fingerprint differs from the current package default is identified as baseline drift; it is never rebased automatically.
 
-The boundary accepts only the fixed session and profile routes, validates payload shape, restricts profile IDs, limits request size, and writes atomically. It is not a general filesystem API.
+The boundary accepts only the fixed session and profile routes, validates payload shape, restricts profile IDs, limits request size, and writes atomically with a unique temporary file for each save, including overlapping saves from multiple tabs. If session or profile loading fails, the Design system offers Try again and a return to Features without overwriting saved data. It is not a general filesystem API.
 
 ## Source ownership
 
