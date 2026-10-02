@@ -1,5 +1,6 @@
 .feature-workspace {
-  min-height: 100vh;
+  height: 100dvh;
+  overflow: auto;
   color: #293c36;
   background: #f6f5f1;
   font-family: 'Barlow', sans-serif;

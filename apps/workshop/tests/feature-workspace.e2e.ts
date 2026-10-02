@@ -216,3 +216,17 @@ test('focus mode keeps interaction state and Escape returns focus to its control
   await expect(frame).toHaveAttribute('aria-valuenow', '51')
   await expect(page.getByText('Ready to frame', { exact: true })).toBeVisible()
 })
+
+
+test('a short phone can scroll the shelf to open its feature', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 667 })
+  await page.goto('/')
+  const openFeature = page.getByRole('link', { name: 'Open Framing', exact: true })
+  await expect(openFeature).not.toBeInViewport()
+  await page.mouse.move(190, 500)
+  await page.mouse.wheel(0, 500)
+  await expect(openFeature).toBeInViewport()
+  await openFeature.click()
+  await expect(page.getByRole('slider', { name: 'Camera frame position' })).toHaveCount(1)
+  await expect(page).toHaveURL(/\/features\/framing\?/)
+})
