@@ -114,6 +114,41 @@ export class CriaHttp {
       schema.parse(await this.jsonBody(response, path)))
   }
 
+  /** The stream owner supplies connection, inactivity and lifetime cancellation. */
+  async events(signal: AbortSignal, consume: (body: ReadableStream<Uint8Array>) => Promise<void>): Promise<void> {
+    const path = '/v2/events'
+    let response: Response | undefined
+
+    try {
+      response = await this.fetch(new URL(path, this.baseUrl), {
+        headers: { authorization: `Bearer ${this.token}`, accept: 'text/event-stream' },
+        redirect: 'error',
+        signal,
+      })
+
+      if (!response.ok) {
+        const error = CriaErrorSchema.parse(await this.jsonBody(response, path))
+
+        throw new CriaApiError(response.status, error.error.code,
+          error.error.message.replaceAll(this.token, '[redacted]'), path)
+      }
+
+      if (response.headers.get('content-type')?.split(';')[0]?.trim() !== 'text/event-stream' || !response.body)
+        throw this.invalid('Cria returned an invalid state stream', path)
+
+      await consume(response.body)
+    } catch (error) {
+      if (error instanceof EquipmentError) throw error
+      const invalid = error instanceof z.ZodError || error instanceof SyntaxError
+
+      throw new EquipmentError(invalid ? 'Cria returned an invalid state event' : 'Cria state stream was interrupted', {
+        reason: invalid ? 'invalid-response' : 'transport', endpoint: path, cause: error,
+      })
+    } finally {
+      if (response?.body && !response.body.locked) await response.body.cancel().catch(() => {})
+    }
+  }
+
   original(path: string, expectedBytes: number, sha256: string, timeoutMs: number): Promise<ArrayBuffer> {
     return this.response(path, 'GET', undefined, timeoutMs, async response => {
       if (response.headers.get('content-type')?.split(';')[0]?.trim() !== 'application/imagebytes' ||

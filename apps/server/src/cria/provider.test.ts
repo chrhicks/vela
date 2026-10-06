@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import {
   CriaClient,
   type CriaDevice,
@@ -64,6 +64,9 @@ function providerFor(devices: CriaDevice[]) {
   }
 
   const transport = { failure: false }
+  let stream: ReadableStreamDefaultController<Uint8Array> | undefined
+
+  const event = () => new TextEncoder().encode(`event: state\ndata: ${JSON.stringify(state)}\n\n`)
 
   const bindings: CriaEquipmentBinding[] = devices.map(value => ({
     providerDeviceId: `remote-${value.kind}`,
@@ -77,16 +80,44 @@ function providerFor(devices: CriaDevice[]) {
     token: 'provider-test-token-that-is-long-enough',
     storeId,
     devices: bindings.map(({ id, kind, expectedName }) => ({ id, kind, expectedName })),
+    eventReconnectMs: 5,
+    eventMaxReconnectMs: 20,
     fetch: async input => {
-      if (new URL(String(input)).pathname !== '/v2/state') throw new Error('Unexpected request')
+      if (new URL(String(input)).pathname !== '/v2/events') throw new Error('Unexpected request')
 
       if (transport.failure) throw new Error('Network interrupted')
 
-      return Response.json(state)
+      return new Response(new ReadableStream<Uint8Array>({
+        start(controller) {
+          stream = controller
+          controller.enqueue(event())
+        },
+        cancel() { stream = undefined },
+      }), { headers: { 'content-type': 'text/event-stream' } })
     },
   })
 
-  return { provider: createCriaProvider(client, bindings), state, transport }
+  onTestFinished(() => client.close())
+
+  async function publish() {
+    state.sequence++
+    stream?.enqueue(event())
+    await vi.waitFor(async () => expect((await client.state()).state.sequence).toBe(state.sequence))
+  }
+
+  async function interrupt() {
+    transport.failure = true
+    stream?.error(new TypeError('Network interrupted'))
+    stream = undefined
+    await vi.waitFor(async () => expect(client.state()).rejects.toMatchObject({ reason: 'transport' }))
+  }
+
+  async function recover() {
+    transport.failure = false
+    await publish()
+  }
+
+  return { provider: createCriaProvider(client, bindings), state, publish, interrupt, recover }
 }
 
 describe('Cria equipment inspection', () => {
@@ -101,7 +132,7 @@ describe('Cria equipment inspection', () => {
       canGetCoolerPower: reading(false, 40_000),
     })
 
-    const { provider } = providerFor([camera])
+    const { provider, publish } = providerFor([camera])
 
     const [complete] = await provider.inspectDevices()
 
@@ -113,8 +144,9 @@ describe('Cria equipment inspection', () => {
       state: 'current', observedAt: new Date(generatedAt - 2000).toISOString(),
     })
 
-    // A fresh HTTP response and status=current do not renew the field's age.
+    // A new state event and status=current do not renew the field's age.
     camera.fields.temperatureC = reading(-10, 20_000)
+    await publish()
     const [partial] = await provider.inspectDevices()
 
     expect(partial?.telemetry).toMatchObject({
@@ -133,7 +165,7 @@ describe('Cria equipment inspection', () => {
       coolerOn: unsupported(),
     })
 
-    const { provider } = providerFor([camera])
+    const { provider, publish } = providerFor([camera])
 
     const [malformed] = await provider.inspectDevices()
 
@@ -141,11 +173,13 @@ describe('Cria equipment inspection', () => {
 
     camera.fields.state = unsupported()
     camera.fields.temperatureC = unsupported()
+    await publish()
     const [unsupportedValues] = await provider.inspectDevices()
 
     expect(unsupportedValues?.telemetry).toEqual({ availability: 'complete', values: { kind: 'camera' } })
 
     delete camera.fields.temperatureC
+    await publish()
     const [missing] = await provider.inspectDevices()
 
     expect(missing?.observation?.state).toBe('partial')
@@ -188,9 +222,9 @@ describe('Cria equipment inspection', () => {
       state: reading(0), temperatureC: reading(-8, 700), coolerOn: unsupported(),
     })
 
-    const { provider, state, transport } = providerFor([camera])
+    const { provider, state, publish, interrupt, recover } = providerFor([camera])
     const [known] = await provider.inspectDevices()
-    transport.failure = true
+    await interrupt()
     const [offline] = await provider.inspectDevices()
 
     expect(offline?.telemetry).toEqual(known?.telemetry)
@@ -199,8 +233,8 @@ describe('Cria equipment inspection', () => {
     })
     expect((await provider.listDevices())[0]?.connection).toBe('unavailable')
 
-    transport.failure = false
     camera.blocked = true
+    await recover()
     const [blocked] = await provider.inspectDevices()
 
     expect(blocked?.telemetry).toEqual(known?.telemetry)
@@ -208,6 +242,7 @@ describe('Cria equipment inspection', () => {
 
     camera.blocked = false
     state.instanceId = 'fe0d09f6-ff27-42fd-aa8b-58a9dac6c3ac'
+    await publish()
     const [identityLost] = await provider.inspectDevices()
 
     expect(identityLost?.telemetry).toEqual(known?.telemetry)

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { CriaClient, CriaUncertainError } from '@vela/cria'
 import { CaptureRetryableError } from '@vela/equipment'
 import { ServiceFixture, serviceOrigin, token, serverNow, reading } from '../../../packages/cria/test/fixture.js'
@@ -9,7 +9,7 @@ import { createTestCadence } from '../src/alignment/test-cadence.js'
 function equipment(service: ServiceFixture, fetch = service.fetch) {
   const bindings = service.state.devices.map(({ id, kind, expectedName }) => ({ id, kind, expectedName }))
 
-  return createCriaEquipment(new CriaClient({
+  const client = new CriaClient({
     baseUrl: serviceOrigin,
     token,
     storeId: service.state.storeId,
@@ -18,49 +18,77 @@ function equipment(service: ServiceFixture, fetch = service.fetch) {
     pollIntervalMs: 1,
     admissionTimeoutMs: 10,
     observationTimeoutMs: 10,
-  }), bindings.map(binding => ({ ...binding, providerDeviceId: binding.id })))
+    eventReconnectMs: 5,
+    eventMaxReconnectMs: 20,
+  })
+
+  onTestFinished(() => client.close())
+
+  return {
+    ...createCriaEquipment(client, bindings.map(binding => ({ ...binding, providerDeviceId: binding.id }))),
+    client,
+  }
 }
 
 describe('Cria alignment read recovery', () => {
   it.each(['transport', 'pointing-error', 'pointing-stale', 'camera-name-error'])(
     'retains the measured baseline through %s and resumes without another sweep', async interruption => {
     const service = new ServiceFixture()
-    let interrupted = true
-    let reads = 0
+    let interrupted = false
     let exposures = 0
     let ra = 10
 
-    const adapter = equipment(service, async (input, init) => {
-      if (new URL(String(input)).pathname === '/v2/state') {
-        reads++
-
-        if (interrupted && interruption === 'transport') throw new TypeError('Transient read interruption')
-        service.mount.fields = {
-          ...service.mount.fields,
-          rightAscensionHours: reading(ra / 15),
-          declinationDegrees: reading(60),
-          siderealTimeHours: reading(((exposures + 1) * 24) / 86164.0905),
-          latitudeDegrees: reading(40),
-          tracking: reading(true),
-          coordinateSystem: reading(2),
-        }
-        service.camera.fields.name = reading(service.camera.expectedName)
-
-        if (interrupted && interruption === 'pointing-error')
-          service.mount.fields.rightAscensionHours.status = 'error'
-
-        if (interrupted && interruption === 'pointing-stale')
-          service.mount.fields.rightAscensionHours.status = 'stale'
-
-        if (interrupted && interruption === 'camera-name-error')
-          service.camera.fields.name.status = 'error'
+    function updateReadings() {
+      service.mount.fields = {
+        ...service.mount.fields,
+        rightAscensionHours: reading(ra / 15),
+        declinationDegrees: reading(60),
+        siderealTimeHours: reading(((exposures + 1) * 24) / 86164.0905),
+        latitudeDegrees: reading(40),
+        tracking: reading(true),
+        coordinateSystem: reading(2),
       }
+      service.camera.fields.name = reading(service.camera.expectedName)
+
+      if (interrupted && interruption === 'pointing-error')
+        service.mount.fields.rightAscensionHours.status = 'error'
+
+      if (interrupted && interruption === 'pointing-stale')
+        service.mount.fields.rightAscensionHours.status = 'stale'
+
+      if (interrupted && interruption === 'camera-name-error')
+        service.camera.fields.name.status = 'error'
+    }
+
+    updateReadings()
+
+    const adapter = equipment(service, async (input, init) => {
+      if (new URL(String(input)).pathname === '/v2/events' && interrupted && interruption === 'transport')
+        throw new TypeError('Transient stream interruption')
 
       return service.fetch(input, init)
     })
 
+    async function setInterrupted(value: boolean) {
+      interrupted = value
+      updateReadings()
+
+      if (value && interruption === 'transport') {
+        service.interrupt()
+        await vi.waitFor(async () => expect(adapter.client.state()).rejects.toMatchObject({ reason: 'transport' }))
+      } else {
+        await service.publish()
+        await vi.waitFor(async () => expect((await adapter.client.state()).state.sequence).toBe(service.state.sequence))
+      }
+    }
+
     const cadence = createTestCadence()
-    const move = vi.fn(async (_id: string, rate: number, duration: number) => { ra += rate * duration })
+
+    const move = vi.fn(async (_id: string, rate: number, duration: number) => {
+      ra += rate * duration
+      updateReadings()
+      await service.publish()
+    })
 
     const pointing = vi.fn(async () => exposures >= 3 && interruption.startsWith('pointing-')
       ? adapter.acquisition.pointing('mount')
@@ -83,6 +111,8 @@ describe('Cria alignment read recovery', () => {
         async capture(options) {
           if (exposures < 3) {
             exposures++
+            updateReadings()
+            await service.publish()
 
             return {
               width: 2, height: 3, pixels: new Float64Array(6), color: { kind: 'mono' },
@@ -92,6 +122,8 @@ describe('Cria alignment read recovery', () => {
 
           const frame = await adapter.acquisition.capture(options)
           exposures++
+          updateReadings()
+          await service.publish()
 
           return frame
         },
@@ -115,10 +147,11 @@ describe('Cria alignment read recovery', () => {
       const measuredAt = controller.snapshot().measuredAt
       const initialMoves = move.mock.calls.length
       expect(baseline).not.toBeNull()
+      await adapter.client.state()
+      await setInterrupted(true)
 
       for (let attempt = 1; attempt <= 2; attempt++) {
         cadence.waits.shift()!()
-        await vi.waitFor(() => expect(reads).toBeGreaterThanOrEqual(attempt))
         await vi.waitFor(() => expect(controller.snapshot().activity).toBe('retrying'))
         await vi.waitFor(() => expect(cadence.waits).toHaveLength(1))
         expect(controller.snapshot()).toMatchObject({ phase: 'adjusting', active: true, error: null, measuredAt })
@@ -128,7 +161,7 @@ describe('Cria alignment read recovery', () => {
       }
 
       const pointingChecks = pointing.mock.calls.length
-      interrupted = false
+      await setInterrupted(false)
       cadence.waits.shift()!()
       await vi.waitFor(() => expect(controller.snapshot().measuredAt).not.toBe(measuredAt))
       expect(controller.snapshot()).toMatchObject({ phase: 'adjusting', active: true, warning: null, error: null })
@@ -136,7 +169,7 @@ describe('Cria alignment read recovery', () => {
       expect(pointing.mock.calls.length).toBeGreaterThan(pointingChecks)
       expect(move).toHaveBeenCalledTimes(initialMoves)
 
-      interrupted = true
+      await setInterrupted(true)
       cadence.waits.shift()!()
       await vi.waitFor(() => expect(controller.snapshot().activity).toBe('retrying'))
       await vi.waitFor(() => expect(cadence.waits).toHaveLength(1))
@@ -150,13 +183,19 @@ describe('Cria alignment read recovery', () => {
 
   it('never grants a capture retry after uncertain admission or unresolved driver ownership', async () => {
     const service = new ServiceFixture()
+    let unavailable = false
 
     const adapter = equipment(service, async (input, init) => {
       const path = new URL(String(input)).pathname
 
-      if (path === '/v2/state') return service.fetch(input, init)
+      if (path === '/v2/events' && !unavailable) return service.fetch(input, init)
 
-      if (path === '/v2/operations') await service.fetch(input, init)
+      if (path === '/v2/operations') {
+        unavailable = true
+        service.interrupt()
+        await service.fetch(input, init)
+      }
+
       throw new TypeError('Acknowledgement and reconciliation unavailable')
     })
 

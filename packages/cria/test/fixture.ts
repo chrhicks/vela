@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
+import { setImmediate } from 'node:timers/promises'
 import { z } from 'zod'
 import {
   CriaClient,
@@ -18,6 +19,18 @@ export const serviceOrigin = 'http://cria.fixture:4319'
 export const token = 'fixture-private-token-with-32-characters'
 
 export const serverNow = 1_700_000_000_000
+
+const clients: CriaClient[] = []
+
+export async function closeFixtures(): Promise<void> {
+  await Promise.all(clients.splice(0).map(client => client.close()))
+}
+
+export function eventResponse(value: CriaValue): Response {
+  return new Response(`event: state\ndata: ${JSON.stringify(value)}\n\n`, {
+    headers: { 'content-type': 'text/event-stream' },
+  })
+}
 
 export function json(value: CriaValue, status = 200): Response {
   return Response.json(value, { status })
@@ -78,6 +91,7 @@ export function pixels(): ArrayBuffer {
 }
 
 export class ServiceFixture {
+  private readonly subscribers = new Set<ReadableStreamDefaultController<Uint8Array>>()
   readonly camera = device('camera', 'camera')
   readonly mount = device('mount', 'mount')
   readonly state: CriaState = {
@@ -99,10 +113,11 @@ export class ServiceFixture {
   original = pixels()
   completeImmediately = true
   cancelImmediately = false
+  publishOperations = true
   last: CriaOperation | null = null
 
   client(options: Partial<CriaClientOptions> = {}): CriaClient {
-    return new CriaClient({
+    const client = new CriaClient({
       baseUrl: serviceOrigin,
       token,
       storeId: this.state.storeId,
@@ -113,9 +128,33 @@ export class ServiceFixture {
       observationTimeoutMs: 100,
       operationTimeoutMs: 1_000,
       imageRetryMs: 30,
+      eventReconnectMs: 5,
+      eventMaxReconnectMs: 20,
       ...options,
     })
+
+    clients.push(client)
+
+    return client
   }
+
+  /** Publish changed fixture state and let the stream consumer accept it. */
+  async publish(): Promise<void> {
+    this.state.sequence++
+    this.state.operations = [...this.operations.values()]
+    const bytes = new TextEncoder().encode(`event: state\ndata: ${JSON.stringify(this.state)}\n\n`)
+
+    for (const subscriber of this.subscribers) subscriber.enqueue(bytes)
+    await setImmediate()
+  }
+
+  /** Drop live subscriptions; subsequent GET /v2/events reconnects unless fetch rejects it. */
+  interrupt(): void {
+    for (const subscriber of this.subscribers) subscriber.error(new TypeError('Fixture stream interrupted'))
+    this.subscribers.clear()
+  }
+
+  get streamCount(): number { return this.subscribers.size }
 
   finish(status: CriaOperation['status'] = 'succeeded'): CriaOperation {
     const operation = this.last
@@ -129,6 +168,18 @@ export class ServiceFixture {
 
     if (operation.kind === 'capture' && status === 'succeeded')
       operation.image = this.image(operation)
+
+    // Represent the fresh post-write observation. Production additionally publishes
+    // its invalidated generation while the domain's write lane is still held.
+    for (const device of this.state.devices) {
+      if (device.failureDomain !== operation.failureDomain) continue
+      device.observationGeneration++
+
+      for (const field of Object.values(device.fields))
+        if (field.status === 'current') field.generation = device.observationGeneration
+    }
+
+    if (this.publishOperations) void this.publish()
 
     return operation
   }
@@ -178,6 +229,21 @@ export class ServiceFixture {
 
     if (path === '/v2/state') return json(this.state)
 
+    if (path === '/v2/events') {
+      let subscriber: ReadableStreamDefaultController<Uint8Array> | undefined
+
+      return new Response(new ReadableStream<Uint8Array>({
+        start: controller => {
+          subscriber = controller
+          this.subscribers.add(controller)
+          void this.publish()
+        },
+        cancel: () => {
+          if (subscriber) this.subscribers.delete(subscriber)
+        },
+      }), { headers: { 'content-type': 'text/event-stream' } })
+    }
+
     if (path === '/v2/operations' && method === 'POST') {
       const text = z.string().parse(init?.body)
       const request = CriaOperationRequestSchema.parse(JSON.parse(text))
@@ -216,6 +282,7 @@ export class ServiceFixture {
       this.last = operation
 
       if (this.completeImmediately) this.finish()
+      else if (this.publishOperations) void this.publish()
 
       return json(operation, 202)
     }
@@ -237,6 +304,7 @@ export class ServiceFixture {
         operation.cancelRequested = true
 
         if (this.cancelImmediately) this.finish('cancelled')
+        else if (this.publishOperations) void this.publish()
       }
 
       return json(operation, method === 'POST' ? 202 : 200)

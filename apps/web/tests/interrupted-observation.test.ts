@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { RigDetailView, RigObservationView } from '@vela/model/web'
 import { ServiceFixture, reading, serverNow } from '../../../packages/cria/test/fixture'
 import { buildApp } from '../../server/src/app'
@@ -72,6 +72,8 @@ describe('interrupted equipment responses', () => {
       expect(current.observation.connectionPreparation.state).toBe('available')
 
       interrupted = true
+      service.interrupt()
+      await vi.waitFor(async () => expect(client.state()).rejects.toMatchObject({ reason: 'transport' }))
       now += 30_000
       const retained = await views()
       expect(retained.detail).toMatchObject({
@@ -92,11 +94,13 @@ describe('interrupted equipment responses', () => {
       expect(retained.detail.devices[0]?.observation?.message).toEqual(expect.any(String))
 
       interrupted = false
+      await vi.waitFor(async () => expect((await client.state()).state.instanceId).toBe(service.state.instanceId))
       const recovered = await views()
       expect(recovered.detail.connections).toEqual(current.detail.connections)
       expect(recovered.observation.connectionPreparation.state).toBe('available')
     } finally {
       await app.close()
+      await client.close()
     }
   })
 })

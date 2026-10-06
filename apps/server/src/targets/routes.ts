@@ -178,7 +178,7 @@ export function registerTargets(
     } else if (ready.mount.slewing && !state.active) {
       reason = 'The mount is already moving.'
     } else if (!options.solver && !options.createSolver) {
-      reason = 'Plate solving is not configured on the Vela server.'
+      reason = 'Plate solving is not configured. Configure the Vela server’s ASTAP executable and star catalog to check framing.'
     }
 
     return {

@@ -12,6 +12,7 @@ import {
   CriaUncertainError,
 } from './error.js'
 import { CriaHttp } from './http.js'
+import { CriaEvents, type ObservedState } from './events.js'
 import {
   CriaClientConfigSchema,
   CriaCommandSchema,
@@ -31,27 +32,27 @@ import {
   type CriaValue,
 } from './schema.js'
 
-export interface ObservedState {
-  state: CriaState
-  receivedAt: number
-  roundTripMs: number
-  receivedMonotonic: number
-}
+export type { ObservedState } from './events.js'
 
 export interface CriaClientOptions extends Omit<CriaClientConfig, 'devices'> {
   devices: readonly CriaDeviceBinding[]
   fetch?: typeof globalThis.fetch
   requestTimeoutMs?: number
+  /** Admission and original-transfer retry cadence; healthy state is never polled. */
   pollIntervalMs?: number
   admissionTimeoutMs?: number
   observationTimeoutMs?: number
   /** Added to requested exposure time; includes driver cleanup and original retention. */
   operationTimeoutMs?: number
+  operationReconcileMs?: number
   imageTimeoutMs?: number
   imageRetryMs?: number
   dynamicMaxAgeMs?: number
   metadataMaxAgeMs?: number
   maxStateRoundTripMs?: number
+  eventIdleTimeoutMs?: number
+  eventReconnectMs?: number
+  eventMaxReconnectMs?: number
   maxPixels?: number
 }
 
@@ -78,6 +79,7 @@ interface ActiveOperation {
   cancelRequested: boolean
   unresolved: boolean
   failure: CriaUncertainError | null
+  cancellation: AbortController
 }
 
 const timingSchema = z.strictObject({
@@ -86,30 +88,17 @@ const timingSchema = z.strictObject({
   admissionTimeoutMs: z.number().int().min(1).max(300_000).default(15_000),
   observationTimeoutMs: z.number().int().min(1).max(300_000).default(15_000),
   operationTimeoutMs: z.number().int().min(1).max(3_600_000).default(660_000),
+  operationReconcileMs: z.number().int().min(1).max(60_000).default(1_000),
   imageTimeoutMs: z.number().int().min(1).max(3_600_000).default(600_000),
   imageRetryMs: z.number().int().min(1).max(300_000).default(15_000),
   dynamicMaxAgeMs: z.number().int().min(1).max(120_000).default(6_000),
   metadataMaxAgeMs: z.number().int().min(1).max(7_200_000).default(65_000),
   maxStateRoundTripMs: z.number().int().min(1).max(60_000).default(3_000),
+  eventIdleTimeoutMs: z.number().int().min(1).max(60_000).default(10_000),
+  eventReconnectMs: z.number().int().min(1).max(60_000).default(250),
+  eventMaxReconnectMs: z.number().int().min(1).max(60_000).default(5_000),
   maxPixels: z.number().int().min(1).max(100_000_000).default(40_000_000),
 })
-
-async function waitFor<T>(work: Promise<T>, signal?: AbortSignal): Promise<T> {
-  if (!signal) return work
-  signal.throwIfAborted()
-  let onAbort = () => {}
-
-  const interrupted = new Promise<never>((_, reject) => {
-    onAbort = () => reject(signal.reason)
-    signal.addEventListener('abort', onAbort, { once: true })
-  })
-
-  try {
-    return await Promise.race([work, interrupted])
-  } finally {
-    signal.removeEventListener('abort', onAbort)
-  }
-}
 
 function terminal(operation: CriaOperation): boolean {
   return operation.status !== 'accepted' && operation.status !== 'running'
@@ -127,14 +116,16 @@ export class CriaClient {
   private readonly config: CriaClientConfig
   private readonly timing: z.infer<typeof timingSchema>
   private readonly http: CriaHttp
-  private stateRead: Promise<ObservedState> | null = null
   private instanceId: string | null = null
   private readonly bindings = new Map<string, string>()
   private readonly failureDomains = new Map<string, string>()
+  private readonly readBarriers = new Map<string, number>()
   private readonly active = new Map<string, ActiveOperation>()
   private readonly completions = new Map<string, Promise<CriaOperation>>()
   private readonly images = new Map<string, CriaImage>()
   private writeFailure: EquipmentError | null = null
+  private events: CriaEvents | null = null
+  private closed = false
 
   constructor(options: CriaClientOptions) {
     const {
@@ -145,6 +136,18 @@ export class CriaClient {
     this.config = CriaClientConfigSchema.parse({ baseUrl, token, storeId, devices })
     this.timing = timingSchema.parse(timing)
     this.http = new CriaHttp(baseUrl, token, fetch, this.timing.requestTimeoutMs)
+  }
+
+  /** Start once at service composition; every device shares this authenticated stream. */
+  start(): void {
+    if (this.closed) throw new EquipmentError('Cria client is closed', { reason: 'transport', endpoint: '/v2/events' })
+    this.events ??= new CriaEvents(this.http, this.timing, state => this.pin(state))
+  }
+
+  /** Stop transport observation. This does not claim or request physical equipment cancellation. */
+  async close(): Promise<void> {
+    this.closed = true
+    await this.events?.close()
   }
 
   get commandBlockReason(): string | null {
@@ -217,35 +220,14 @@ export class CriaClient {
     }
   }
 
-  /** Concurrent callers share one request; caller cancellation does not cancel other readers. */
-  state(signal?: AbortSignal): Promise<ObservedState> {
+  /** Concurrent callers share the latest complete snapshot from one service stream. */
+  async state(signal?: AbortSignal): Promise<ObservedState> {
     signal?.throwIfAborted()
+    this.start()
 
-    if (!this.stateRead) {
-      const started = performance.now()
+    if (!this.events) throw this.invalid('Cria state stream was not started')
 
-      const request = this.http.json('/v2/state', CriaStateSchema).then(state => {
-        const receivedMonotonic = performance.now()
-
-        const snapshot = {
-          state,
-          receivedAt: Date.now(),
-          roundTripMs: receivedMonotonic - started,
-          receivedMonotonic,
-        }
-
-        this.pin(state)
-
-        return snapshot
-      })
-
-      this.stateRead = request
-      void request.finally(() => {
-        if (this.stateRead === request) this.stateRead = null
-      }).catch(() => {})
-    }
-
-    return waitFor(this.stateRead, signal)
+    return this.events.state(signal)
   }
 
   device(snapshot: ObservedState, id: string): CriaDevice {
@@ -266,8 +248,11 @@ export class CriaClient {
     options: CriaReadingOptions = {},
   ): CriaValue | undefined {
     const reading = device.fields[key]
+    const barrier = this.readBarriers.get(device.id)
 
-    if (device.blocked || device.refreshPending || !reading || reading.status !== 'current' ||
+    if (this.closed || this.events && !this.events.owns(snapshot) ||
+      barrier !== undefined && device.observationGeneration <= barrier ||
+      device.blocked || device.refreshPending || !reading || reading.status !== 'current' ||
       reading.generation !== device.observationGeneration || reading.observedAt === null ||
       reading.readStartedAt === null || reading.checkedAt === null ||
       reading.readStartedAt > reading.observedAt || reading.observedAt > reading.checkedAt ||
@@ -349,7 +334,10 @@ export class CriaClient {
         throw this.invalid('Fresh Cria identity observation timed out')
       }
 
-      await delay(this.timing.pollIntervalMs, undefined, { signal: options.signal })
+      if (!this.events) throw this.invalid('Cria state stream was not started')
+
+      if (this.events.current !== snapshot) continue
+      await this.events.wait(this.events.version, deadline - performance.now(), options.signal)
     }
   }
 
@@ -359,8 +347,18 @@ export class CriaClient {
     const result = await this.http.json(`/v2/devices/${encodeURIComponent(id)}/refresh`, CriaRefreshSchema, 'POST')
 
     if (result.deviceId !== id) throw this.invalid('Cria refreshed another device')
+    this.readBarriers.set(id, result.generation - 1)
 
     return result
+  }
+
+  private requirePostWriteObservation(snapshot: ObservedState, operation: CriaOperation): void {
+    // Cria invalidates the whole domain at admission and completion, and accepts no
+    // poll result while its write lane is held. HTTP can finish before those events
+    // arrive: the pre-write snapshot must not become a post-write confirmation.
+    for (const device of snapshot.state.devices)
+      if (device.failureDomain === operation.failureDomain)
+        this.readBarriers.set(device.id, device.observationGeneration)
   }
 
   private verifyOperation(operation: CriaOperation, request?: CriaOperationRequest): void {
@@ -478,13 +476,22 @@ export class CriaClient {
     }
   }
 
-  private async follow(active: ActiveOperation, options: CriaRunOptions): Promise<CriaOperation> {
+  private async follow(
+    active: ActiveOperation,
+    options: CriaRunOptions,
+    events: CriaEvents,
+  ): Promise<CriaOperation> {
     const request = active.request
-    let operation = active.operation
+    const admitted = active.operation
 
-    if (!request || !operation) throw this.invalid('Cria operation was not admitted', '/v2/operations')
+    if (!request || !admitted) throw this.invalid('Cria operation was not admitted', '/v2/operations')
+    let operation: CriaOperation = admitted
     const exposureMs = request.kind === 'capture' ? request.parameters.exposureSeconds * 1000 : 0
     const deadline = performance.now() + exposureMs + this.timing.operationTimeoutMs
+    let version = -1
+    let missing = false
+    let lastReconciledAt = -Infinity
+    let nextReconcileAt = Infinity
     let interrupted = false
 
     for (;;) {
@@ -493,41 +500,101 @@ export class CriaClient {
 
       if (terminal(operation)) return operation
 
-      if (performance.now() >= deadline)
-        throw this.uncertain('Cria operation observation timed out; equipment completion is unconfirmed', active)
+      if (this.closed || performance.now() >= deadline)
+        throw this.uncertain('Cria operation observation ended; equipment completion is unconfirmed', active)
 
       if (active.cancelRequested && !operation.cancelRequested) {
         try {
           operation = await this.cancel(operation)
           this.verifyOperation(operation, request)
           active.operation = operation
-          interrupted = false
 
           if (terminal(operation)) continue
         } catch (error) {
           if (error instanceof CriaIdentityError)
             throw this.uncertain('Cria cancellation identity could not be confirmed', active, { cause: error })
-          // Repeating this idempotent request only sets cancelRequested on the same operation.
           interrupted = true
           options.onReadState?.('retrying')
         }
       }
 
-      await delay(this.timing.pollIntervalMs)
+      const latest = events.current
+
+      const snapshotDeadline = latest === null ? Infinity :
+        latest.receivedMonotonic + this.timing.eventIdleTimeoutMs
+
+      const observationExpired = performance.now() >= snapshotDeadline
+
+      if (version !== events.version || observationExpired && !missing) {
+        const initial = version === -1
+
+        version = events.version
+        const snapshot = observationExpired ? null : latest
+        const operationId = operation.id
+        const candidate = snapshot?.state.operations.find(value => value.id === operationId)
+
+        try {
+          if (candidate) {
+            this.verifyOperation(candidate, request)
+
+            // A just-returned HTTP admission/cancellation response can be ahead of the
+            // latest event. Do not regress its acknowledged progress or cleanup request.
+            if (terminal(candidate) ||
+              (!operation.cancelRequested || candidate.cancelRequested) &&
+              !(operation.status === 'running' && candidate.status === 'accepted') &&
+              (candidate.elapsedSeconds ?? 0) >= (operation.elapsedSeconds ?? 0))
+              operation = candidate
+            active.operation = operation
+            interrupted = false
+            missing = false
+            nextReconcileAt = Infinity
+            lastReconciledAt = -Infinity
+            continue
+          }
+
+          interrupted = snapshot === null
+          missing = true
+          nextReconcileAt = Math.max(lastReconciledAt + this.timing.operationReconcileMs,
+            performance.now() + (initial && !interrupted ? this.timing.operationReconcileMs : 0))
+        } catch (error) {
+          if (error instanceof CriaIdentityError ||
+            error instanceof EquipmentError && error.reason === 'invalid-response' ||
+            error instanceof CriaApiError && [404, 410].includes(error.status))
+            throw this.uncertain('Cria operation outcome is no longer available', active, { cause: error })
+          interrupted = true
+        }
+      }
+
+      // A lost connection or eviction from Cria's recent terminal list is an explicit
+      // observation gap. Reconcile only that gap, paced independently of stream cadence.
+      if (missing && performance.now() >= nextReconcileAt) {
+        lastReconciledAt = performance.now()
+        nextReconcileAt = lastReconciledAt + this.timing.operationReconcileMs
+
+        try {
+          operation = await this.operation(operation.id)
+          this.verifyOperation(operation, request)
+          active.operation = operation
+
+          if (terminal(operation)) interrupted = false
+          continue
+        } catch (error) {
+          if (error instanceof CriaIdentityError ||
+            error instanceof EquipmentError && error.reason === 'invalid-response' ||
+            error instanceof CriaApiError && [404, 410].includes(error.status))
+            throw this.uncertain('Cria operation outcome is no longer available', active, { cause: error })
+          interrupted = true
+        }
+      }
+
+      options.onReadState?.(interrupted ? 'retrying' : operation.observation)
 
       try {
-        operation = await this.operation(operation.id)
-        this.verifyOperation(operation, request)
-        active.operation = operation
-        interrupted = false
+        await events.wait(version,
+          Math.min(deadline, nextReconcileAt, missing ? Infinity : snapshotDeadline) - performance.now(),
+          active.cancelRequested ? undefined : active.cancellation.signal)
       } catch (error) {
-        if (error instanceof CriaIdentityError ||
-          error instanceof EquipmentError && error.reason === 'invalid-response' ||
-          error instanceof CriaApiError &&
-          [404, 410].includes(error.status))
-          throw this.uncertain('Cria operation outcome is no longer available', active, { cause: error })
-        interrupted = true
-        options.onReadState?.('retrying')
+        if (!active.cancelRequested) throw error
       }
     }
   }
@@ -568,10 +635,12 @@ export class CriaClient {
 
     active.request = request
     active.operation = await this.admit(request, active)
+    this.requirePostWriteObservation(snapshot, active.operation)
     let operation: CriaOperation
 
     try {
-      operation = await this.follow(active, options)
+      if (!this.events) throw this.invalid('Cria state stream was not started')
+      operation = await this.follow(active, options, this.events)
     } catch (error) {
       if (error instanceof CriaUncertainError) throw error
       throw this.uncertain('Cria operation observation ended before equipment completion was confirmed', active, { cause: error })
@@ -607,9 +676,13 @@ export class CriaClient {
       cancelRequested: false,
       unresolved: false,
       failure: null,
+      cancellation: new AbortController(),
     }
 
-    const onAbort = () => { active.cancelRequested = true }
+    const onAbort = () => {
+      active.cancelRequested = true
+      active.cancellation.abort()
+    }
 
     this.active.set(id, active)
     options.signal?.addEventListener('abort', onAbort, { once: true })
@@ -645,6 +718,7 @@ export class CriaClient {
 
     if (!active || !completion) return
     active.cancelRequested = true
+    active.cancellation.abort()
 
     try {
       await completion
@@ -676,14 +750,18 @@ export class CriaClient {
       image.original.bytes > 44 + 4 * this.timing.maxPixels)
       throw this.invalid('Cria original does not belong to the completed capture', '/v2/images')
 
-    // Completed originals survive API incarnations, but never belong to a replacement store.
-    const snapshot = await this.state()
-    const retainedFor = image.expiresAt - snapshot.state.generatedAt - snapshot.roundTripMs
+    // Completed originals survive API incarnations and stream loss, but never belong to
+    // a replacement store. Reconcile that ownership over HTTP if the stream is unavailable.
+    const transferDeadline = performance.now() + this.timing.imageRetryMs
+    const snapshot = await this.originalState(transferDeadline, options)
+
+    const retainedFor = image.expiresAt - snapshot.state.generatedAt - snapshot.roundTripMs -
+      Math.max(0, performance.now() - snapshot.receivedMonotonic)
 
     if (retainedFor <= 0)
       throw new CriaApiError(410, 'image-gone', 'Cria original retention has expired', image.original.url)
 
-    const retryDeadline = performance.now() + Math.min(this.timing.imageRetryMs, retainedFor)
+    const retryDeadline = Math.min(transferDeadline, performance.now() + retainedFor)
     let bytes: ArrayBuffer
 
     for (;;) {
@@ -725,6 +803,43 @@ export class CriaClient {
         capturedAtSource: image.capturedAtSource,
         color: image.color === 'mono' ? { kind: 'mono' } : { kind: 'bayer', pattern: image.color },
       },
+    }
+  }
+
+  private async originalState(
+    deadline: number,
+    options: Pick<CriaRunOptions, 'onReadState'>,
+  ): Promise<ObservedState> {
+    try {
+      return await this.state()
+    } catch (error) {
+      if (this.closed || !(error instanceof EquipmentError) || error.reason !== 'transport') throw error
+    }
+
+    options.onReadState?.('retrying')
+
+    for (;;) {
+      const started = performance.now()
+
+      try {
+        const state = await this.http.json('/v2/state', CriaStateSchema)
+        const receivedMonotonic = performance.now()
+
+        this.pin(state)
+
+        return {
+          state,
+          receivedAt: Date.now(),
+          receivedMonotonic,
+          roundTripMs: receivedMonotonic - started,
+        }
+      } catch (error) {
+        const transient = error instanceof EquipmentError && error.reason === 'transport' ||
+          error instanceof CriaApiError && [429, 500, 502, 503, 504].includes(error.status)
+
+        if (!transient || this.closed || performance.now() + this.timing.pollIntervalMs >= deadline) throw error
+        await delay(this.timing.pollIntervalMs)
+      }
     }
   }
 

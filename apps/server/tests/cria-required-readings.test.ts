@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, onTestFinished } from 'vitest'
 import { CriaClient, CriaUncertainError, type CriaReading } from '@vela/cria'
 import { EquipmentError } from '@vela/equipment'
 import { ServiceFixture, reading, serverNow, serviceOrigin, token } from '../../../packages/cria/test/fixture.js'
@@ -46,10 +46,15 @@ function fixture() {
     observationTimeoutMs: 10,
   })
 
+  onTestFinished(() => client.close())
+
   const adapter = createCriaEquipment(client, bindings.map(binding => ({ ...binding, providerDeviceId: binding.id })))
 
   return {
     service,
+    async publish() {
+      await service.publish()
+    },
     geometry: () => adapter.framing.cameraGeometry({ cameraId: 'camera', expectedCameraName: service.camera.expectedName }),
     mount: () => adapter.framing.telescopeStatus('mount', undefined, { includeAlignmentObservations: true }),
   }
@@ -63,6 +68,7 @@ describe('Cria facts required by physical alignment', () => {
 
     await expect(subject.geometry()).rejects.toMatchObject({ reason: 'transport' })
     subject.service.camera.fields.pixelWidthMicrons = original
+    await subject.publish()
     await expect(subject.geometry()).resolves.toMatchObject({ pixelWidthMicrons: 3.76, width: 2, height: 3 })
     expect(subject.service.posts).toHaveLength(0)
   })
@@ -80,6 +86,7 @@ describe('Cria facts required by physical alignment', () => {
     await expect(subject.mount()).rejects.toBeInstanceOf(EquipmentError)
     await expect(subject.mount()).rejects.toMatchObject({ reason: 'transport' })
     subject.service.mount.fields[key] = original
+    await subject.publish()
     await expect(subject.mount()).resolves.toMatchObject({
       coordinateSystem: 'topocentric', trackingRate: 'sidereal', latitudeDegrees: 40,
       longitudeDegrees: -75, elevationMeters: 100, pierSide: 'east',
@@ -94,6 +101,7 @@ describe('Cria facts required by physical alignment', () => {
 
     await expect(subject.mount()).rejects.toMatchObject({ reason: 'transport' })
     subject.service.mount.fields.coordinateSystem = reading(1)
+    await subject.publish()
     await expect(subject.mount()).resolves.toMatchObject({ coordinateSystem: 'topocentric' })
   })
 

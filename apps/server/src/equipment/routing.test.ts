@@ -174,6 +174,8 @@ function setup() {
   }
 
   const equipment: EquipmentComposition = {
+    start() {},
+    async close() {},
     createInventory(source) {
       select('inventory', source)
 
