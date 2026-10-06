@@ -39,7 +39,10 @@ export function useRigDetail(rigId: string): RigDetailResult {
     setState(current => ({ ...current, refreshing: true }))
 
     try {
-      const view = await loadRigDetail(rigId, nextController.signal)
+      const view = await loadRigDetail(
+        rigId,
+        AbortSignal.any([nextController.signal, AbortSignal.timeout(5000)]),
+      )
 
       if (requestGeneration.current !== generation) return
       setState({ view, refreshing: true, interrupted: false })

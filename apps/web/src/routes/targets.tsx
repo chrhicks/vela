@@ -277,7 +277,6 @@ function TargetComposition({ rigId, targetId }: { rigId: string; targetId: strin
             )}
             {view?.error && <p role="alert">{view.error}</p>}
             {error && <p role="alert">{error}</p>}
-            {view?.unavailableReason && <p>{view.unavailableReason}</p>}
             {view?.active && !matching && (
               <p>A framing check for another target is active on this rig.</p>
             )}
@@ -368,6 +367,9 @@ function TargetComposition({ rigId, targetId }: { rigId: string; targetId: strin
             compact
           />
           <div className="vela-target-command">
+            {view?.unavailableReason && (
+              <p id="framing-unavailable" role="status">{view.unavailableReason}</p>
+            )}
             <div className="vela-target-exposure">
               <label htmlFor="framing-exposure-seconds">Test exposure</label>
               <div className="vela-target-exposure__input">
@@ -388,11 +390,20 @@ function TargetComposition({ rigId, targetId }: { rigId: string; targetId: strin
             {!view?.active && (
               <>
                 {!checked && (
-                  <Button tone="accent" disabled={!canExpose} onClick={() => void startFraming()}>
+                  <Button
+                    tone="accent"
+                    disabled={!canExpose}
+                    aria-describedby={view?.unavailableReason ? 'framing-unavailable' : undefined}
+                    onClick={() => void startFraming()}
+                  >
                     Slew & check
                   </Button>
                 )}
-                <Button disabled={!canExpose} onClick={() => void startFraming('check')}>
+                <Button
+                  disabled={!canExpose}
+                  aria-describedby={view?.unavailableReason ? 'framing-unavailable' : undefined}
+                  onClick={() => void startFraming('check')}
+                >
                   Check current frame
                 </Button>
                 <p>Takes a new test exposure without moving the mount.</p>

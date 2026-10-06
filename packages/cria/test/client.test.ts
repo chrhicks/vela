@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { EquipmentError } from '@vela/equipment'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   CriaApiError,
   CriaCancelledError,
@@ -9,7 +9,9 @@ import {
   type CriaCommand,
   type CriaOperation,
 } from '../src/index.js'
-import { failure, json, reading, serverNow, ServiceFixture } from './fixture.js'
+import { closeFixtures, eventResponse, failure, json, reading, serverNow, ServiceFixture } from './fixture.js'
+
+afterEach(closeFixtures)
 
 const capture: CriaCommand = { kind: 'capture', parameters: { exposureSeconds: 0.001, light: true } }
 
@@ -115,6 +117,8 @@ describe('state and identity', () => {
 
     if (changed === 'store') service.state.storeId = randomUUID()
 
+    await service.publish()
+
     if (changed === 'store') await expect(client.state()).rejects.toBeInstanceOf(CriaIdentityError)
     else await client.state()
     await expect(client.run('camera', capture)).rejects.toBeInstanceOf(CriaIdentityError)
@@ -125,7 +129,7 @@ describe('state and identity', () => {
     const service = new ServiceFixture()
 
     const client = service.client({
-      fetch: async () => json({ ...service.state, devices: [{ ...service.camera, blocked: 'false' }] }),
+      fetch: async () => eventResponse({ ...service.state, devices: [{ ...service.camera, blocked: 'false' }] }),
     })
 
     await expect(client.run('camera', capture)).rejects.toMatchObject({ reason: 'invalid-response' })
@@ -292,27 +296,31 @@ describe('operation completion and cancellation', () => {
     await expect(client.run('camera', capture)).resolves.toMatchObject({ status: 'succeeded' })
   })
 
-  it('keeps a read interruption visible until the same operation can be observed again', async () => {
+  it('keeps a stream interruption visible until the same operation can be observed again', async () => {
     const service = new ServiceFixture()
     const states: string[] = []
-    let reads = 0
+    let interrupted = false
 
     service.completeImmediately = false
 
     const client = service.client({
       fetch: async (input, init) => {
-        if (path(input).startsWith('/v2/operations/')) {
-          reads++
-
-          if (reads <= 2) throw new TypeError('Temporary read failure')
-          service.finish()
-        }
+        if (interrupted && (path(input) === '/v2/events' || path(input).startsWith('/v2/operations/')))
+          throw new TypeError('Temporary read failure')
 
         return service.fetch(input, init)
       },
     })
 
-    await client.run('camera', capture, { onReadState: state => states.push(state) })
+    const running = client.run('camera', capture, { onReadState: state => states.push(state) })
+
+    await vi.waitFor(() => expect(service.posts).toHaveLength(1))
+    interrupted = true
+    service.interrupt()
+    await vi.waitFor(() => expect(states).toContain('retrying'))
+    service.finish()
+    interrupted = false
+    await running
     const changes = states.filter((state, index) => index === 0 || state !== states[index - 1])
 
     expect(changes).toEqual(['current', 'retrying', 'current'])
@@ -531,7 +539,7 @@ describe('original ownership', () => {
     await expect(client.release(acquired.image.id)).rejects.toBeInstanceOf(CriaApiError)
     expect(Array.from(acquired.frame.pixels)).toEqual([1, 2, 3, 4, 5, 6])
     await expect(client.release(acquired.image.id)).rejects.toThrow('has not been acquired')
-    service.state.generatedAt = acquired.image.expiresAt + 1
+    operation.image = { ...acquired.image, retainedAt: serverNow - 120_000, expiresAt: serverNow - 60_000 }
     await expect(client.download(operation)).rejects.toMatchObject({ status: 410, code: 'image-gone' })
   })
 })

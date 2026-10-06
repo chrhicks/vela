@@ -134,6 +134,8 @@ await assert.rejects(equipment.acquisition.capture({
 
 console.log('PASS exposure cancellation waits for confirmed equipment cleanup')
 
+await client.close()
+
 const configurations = parseCriaConfiguration(JSON.stringify({ rigs: [{
   id: 'fixture-check', name: 'Cria fixture check', url: connection.baseUrl,
   tokenEnv: 'FIXTURE_TOKEN', storeId: state.storeId, devices: connection.devices,

@@ -69,6 +69,8 @@ export function buildApp({
   savedImages = createMemorySavedImageStore(),
 }: BuildAppOptions = {}) {
   const app = Fastify({ logger: true })
+  app.addHook('onReady', async () => { equipment.start() })
+  app.addHook('onClose', async () => { await equipment.close() })
   const operations = createRigOperations()
   registerAlignment(app, rigCatalog, alignment, operations, undefined, {
     createInspector,

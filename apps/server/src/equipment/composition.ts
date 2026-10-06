@@ -16,6 +16,8 @@ import { criaDeviceId, type CriaRigConfiguration } from './config.js'
 import { alpacaEndpoint } from './source.js'
 
 export interface EquipmentComposition {
+  start(): void
+  close(): Promise<void>
   createInventory(rig: RigEquipmentSource): RigDeviceInventory
   createInspector(rig: RigEquipmentSource): RigDeviceInspector
   createConnector(rig: RigEquipmentSource): RigDeviceConnector
@@ -80,6 +82,12 @@ export function createEquipmentComposition(
   }
 
   return {
+    start() {
+      for (const client of clients.values()) client.start()
+    },
+    async close() {
+      await Promise.all([...clients.values()].map(client => client.close()))
+    },
     createInventory: rig => rig.source
       ? createRigDeviceInventory(rig, { provider: cria(rig).provider })
       : createRigDeviceInventory(rig),

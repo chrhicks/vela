@@ -1,5 +1,5 @@
 import Fastify from 'fastify'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { CriaClient } from '@vela/cria'
 import { FramingStoppedError } from '@vela/equipment'
 import { ServiceFixture, serviceOrigin, token } from '../../../packages/cria/test/fixture.js'
@@ -17,7 +17,7 @@ function equipment(service: ServiceFixture, fetch = service.fetch) {
     providerDeviceId: device.id,
   }))
 
-  return createCriaEquipment(new CriaClient({
+  const client = new CriaClient({
     baseUrl: serviceOrigin,
     token,
     storeId: service.state.storeId,
@@ -25,7 +25,11 @@ function equipment(service: ServiceFixture, fetch = service.fetch) {
     fetch,
     pollIntervalMs: 1,
     operationTimeoutMs: 1000,
-  }), bindings)
+  })
+
+  onTestFinished(() => client.close())
+
+  return createCriaEquipment(client, bindings)
 }
 
 describe('Cria cancellation through Vela workflows', () => {
@@ -81,7 +85,7 @@ describe('Cria cancellation through Vela workflows', () => {
       expect(stop.json()).toMatchObject({ phase: 'stopped', active: false, error: null })
       expect(service.posts).toHaveLength(0)
       release()
-      await vi.waitFor(() => expect(service.paths).toContain('GET /v2/state'))
+      await vi.waitFor(() => expect(service.paths).toContain('GET /v2/events'))
       expect(service.posts).toHaveLength(0)
     } finally {
       release()
@@ -112,9 +116,11 @@ describe('Cria cancellation through Vela workflows', () => {
       await vi.waitFor(() => expect(service.posts).toHaveLength(1))
       let settled = false
 
-      const stopping = controller.stop().then(view => { settled = true;
+      const stopping = controller.stop().then(view => {
+        settled = true
 
- return view })
+        return view
+      })
 
       await vi.waitFor(() => expect(service.cancellations).toHaveLength(1))
       expect(settled).toBe(false)

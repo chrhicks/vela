@@ -54,7 +54,8 @@ configuration that remains present will recreate a forgotten rig at startup.
 Provider IDs include the configuration ID, Cria store ID and device ID, so two
 services' local `camera` IDs cannot collide. A device at one service origin may
 belong to only one configured rig. Multiple disjoint bindings on the same service
-share one authenticated client and snapshot cache. A replacement Cria store
+share one authenticated client and state stream. Application startup starts those
+streams; shutdown closes them and cancels reconnects. A replacement Cria store
 requires explicit configuration; it is not accepted as the previous service.
 
 `imagingCameraId`, `focalLengthMm` and `alignment` are optional. Alignment additionally
@@ -65,6 +66,12 @@ endpoint. `offline` mode remains explicitly available for simulator fixtures.
 Existing `VELA_ALIGNMENT_ENDPOINT`, device-ID and mode settings continue to select
 legacy Alpaca alignment.
 
+Explore framing needs an imaging camera, the effective focal length, and the
+server's `VELA_ASTAP` executable and `VELA_STAR_CATALOG` directory. It does not
+require an alignment configuration. Use absolute solver paths when launching from
+a different checkout; missing solver configuration leaves browsing available and
+explains why framing actions are unavailable.
+
 ## Observations and operations
 
 The normalized contracts live in `@vela/equipment`. Cria transport and wire
@@ -74,6 +81,12 @@ fresh device readings. Inspection carries observation state and command readines
 page projections preserve last-known values and their age while commands require
 the facts relevant to their operation. Workflows already running retain their
 context while their acknowledged operation is observed or cancelled.
+
+Browser polling still reads Vela-owned projections: capture progress, saved
+selection, framing results and equipment presentation. These reads share the
+Cria stream rather than issuing new service state requests. Navigation reads
+only the catalog and controller snapshots. Streaming Cria observations does not
+replace delivery of those separate Vela projections to the browser.
 
 The server owns capture repetition, focus decisions, plate solving, alignment
 geometry, image analysis, previews, FITS and saved images. Cria owns the physical
