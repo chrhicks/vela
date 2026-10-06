@@ -56,6 +56,13 @@ export class DeviceReadings {
     return this.optional(key, z.number().finite().min(minimum).max(maximum), metadata)
   }
 
+  /** Omit unsupported facts, but never hide a failed read of a supported fact. */
+  supportedNumber(key: string, minimum: number, maximum: number, metadata = false) {
+    if (this.device.fields[key]?.status === 'unsupported') return undefined
+
+    return this.number(key, minimum, maximum, metadata)
+  }
+
   optionalInteger(key: string, minimum: number, maximum: number, metadata = false) {
     return this.optional(key, z.number().int().min(minimum).max(maximum), metadata)
   }
@@ -96,20 +103,23 @@ export class DeviceReadings {
     this.measurements.push(...channel.measurements)
   }
 
-  coordinateSystem() {
-    const value = this.optionalInteger('coordinateSystem', 0, 4, true)
+  coordinateSystem(required = false) {
+    const value = required
+      ? this.integer('coordinateSystem', 0, 4, true)
+      : this.optionalInteger('coordinateSystem', 0, 4, true)
 
     return value === undefined ? 'unknown' : frames[value] ?? 'unknown'
   }
 
   trackingRate() {
-    const value = this.optionalInteger('trackingRate', 0, 3)
+    const value = this.integer('trackingRate', 0, 3)
 
-    return value === undefined ? undefined : trackingRates[value]
+    return trackingRates[value]!
   }
 
   pierSide(): 'east' | 'west' | 'unknown' {
-    const value = this.optionalInteger('pierSide', -1, 1)
+    if (this.device.fields.pierSide?.status === 'unsupported') return 'unknown'
+    const value = this.integer('pierSide', -1, 1)
 
     if (value === 0) return 'east'
 

@@ -295,7 +295,22 @@ export class CriaClient {
   ): CriaValue {
     const value = this.optionalReading(snapshot, device, key, options)
 
-    if (value === undefined) throw this.invalid(`Cria ${key} observation is unavailable or stale`)
+    if (value === undefined) {
+      if (device.blocked)
+        throw new CriaUncertainError(device.reason ?? 'Cria driver ownership is unresolved', '/v2/state', null, null)
+      const field = device.fields[key]
+      const message = `Cria ${key} observation is unavailable or stale`
+
+      if (!field || field.status === 'unsupported') throw this.invalid(message)
+
+      if (field.status === 'current' && (
+        field.readStartedAt === null || field.observedAt === null || field.checkedAt === null ||
+        field.readStartedAt > field.observedAt || field.observedAt > field.checkedAt ||
+        field.checkedAt > snapshot.state.generatedAt
+      )) throw this.invalid(`Cria ${key} observation has invalid measurement timestamps`)
+
+      throw new EquipmentError(message, { reason: 'transport', endpoint: '/v2/state' })
+    }
 
     return value
   }
@@ -328,7 +343,12 @@ export class CriaClient {
       if (!device.refreshPending && connected === true && observedName === device.expectedName)
         return { snapshot, device }
 
-      if (performance.now() >= deadline) throw this.invalid('Fresh Cria identity observation timed out')
+      if (performance.now() >= deadline) {
+        this.reading(snapshot, device, 'connected')
+        this.reading(snapshot, device, 'name')
+        throw this.invalid('Fresh Cria identity observation timed out')
+      }
+
       await delay(this.timing.pollIntervalMs, undefined, { signal: options.signal })
     }
   }
