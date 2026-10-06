@@ -23,8 +23,10 @@ export function createCriaMountControl(
     if (!selected) return undefined
     const { snapshot, device } = await client.observe(selected.id, signal ? { signal } : {})
 
+    // External recovery clears the interlock without rewriting the historical outcome.
     if (!snapshot.state.commandsEnabled || !device.commandReady || snapshot.state.operations.some(operation =>
-      operation.failureDomain === device.failureDomain && (!operation.settled || operation.blocksDevice)))
+      operation.failureDomain === device.failureDomain && (operation.blocksDevice ||
+        !operation.settled && !operation.reconciliation?.externalRecoveryConfirmed)))
       return undefined
     const readings = new DeviceReadings(client, snapshot, device)
     let observation: MountControlObservation = {}
