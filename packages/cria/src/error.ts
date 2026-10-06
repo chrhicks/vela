@@ -41,8 +41,9 @@ export class CriaOperationFailedError extends EquipmentError {
 }
 
 export class CriaCancelledError extends EquipmentError {
-  constructor(readonly operation: CriaOperation, endpoint: string) {
-    super(operation.message ?? 'Equipment cancellation confirmed', { reason: 'protocol-error', endpoint })
+  /** null establishes that cancellation happened before any admission request. */
+  constructor(readonly operation: CriaOperation | null, endpoint: string) {
+    super(operation?.message ?? 'Equipment cancellation confirmed', { reason: 'protocol-error', endpoint })
     this.name = 'CriaCancelledError'
   }
 }
