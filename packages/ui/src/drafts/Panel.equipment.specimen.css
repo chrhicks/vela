@@ -32,6 +32,9 @@
 .vela-equipment-demo__device-details dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
 .vela-equipment-demo__device-details dl > div { display: grid; gap: 7px; }
 .vela-equipment-demo__device-details dt { color: var(--vela-text-muted); font-size: 14px; line-height: 20px; }
+.vela-equipment-demo__mount-controls { display: grid; gap: 12px; margin-top: 20px; }
+.vela-equipment-demo__mount-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.vela-equipment-demo__mount-controls > p { color: var(--vela-text-muted); font-size: 14px; line-height: 20px; }
 .vela-equipment-demo__setup { grid-area: setup; display: flex; flex-direction: column; gap: 20px; padding: 24px; border-radius: 6px; background: var(--vela-surface); }
 .vela-equipment-demo__setup-group { display: grid; gap: 10px; }
 .vela-equipment-demo__setup-group > p { color: var(--vela-text-muted); font-size: 14px; line-height: 20px; }

@@ -1,7 +1,8 @@
-import type { RigDeviceDetailView, RigSwitchChannelView } from '@vela/model/web'
+import type { RigDetailView, RigDeviceDetailView, RigSwitchChannelView } from '@vela/model/web'
 import { IconButton } from '@vela/ui'
-import { useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { DeviceIcon } from './DeviceIcon'
+import { MountControls } from './MountControls'
 
 interface Metric {
   readonly label: string
@@ -30,13 +31,30 @@ const kindLabels = {
   unknown: 'Device',
 } as const
 
-export function RigDeviceRow({ device, stale, imagingCamera = false }: {
+export function RigDeviceRow({ device, stale, imagingCamera = false, rigId, refresh, revealMount = false }: {
   readonly device: RigDeviceDetailView
   readonly stale: boolean
   readonly imagingCamera?: boolean
+  readonly rigId?: string
+  readonly refresh?: () => Promise<RigDetailView | undefined>
+  readonly revealMount?: boolean
 }) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(revealMount)
+  const controls = useRef<HTMLDivElement>(null)
   const id = useId()
+
+  useEffect(() => {
+    if (!revealMount) return
+
+    setOpen(true)
+
+    const frame = requestAnimationFrame(() => {
+      controls.current?.scrollIntoView({ block: 'center' })
+      controls.current?.focus({ preventScroll: true })
+    })
+
+    return () => cancelAnimationFrame(frame)
+  }, [revealMount])
   stale = stale || device.observation?.state === 'interrupted'
   const connection = connectionPresentation(device, stale)
   const presentation = devicePresentation(device)
@@ -54,7 +72,7 @@ export function RigDeviceRow({ device, stale, imagingCamera = false }: {
 
     if (device.kind === 'telescope' && device.status.availability !== 'unsupported') {
       if (device.status.parking !== 'unknown') role += device.status.parking === 'parked' ? ' · Parked' : ' · Not parked'
-      summary = presentation.activity
+      summary = device.status.tracking === 'unknown' ? 'Tracking unknown' : `Tracking ${device.status.tracking}`
     } else if (device.kind === 'focuser' && device.status.availability !== 'unsupported' && device.status.position !== undefined) {
       role = `Focuser · Position ${formatInteger(device.status.position)}`
       summary = presentation.activity
@@ -105,6 +123,11 @@ export function RigDeviceRow({ device, stale, imagingCamera = false }: {
           ))}</dl>
         )}
         {!detailsAvailable && <p>Detailed status is not available from this device.</p>}
+        {device.kind === 'telescope' && rigId && refresh && (
+          <div ref={controls} id={revealMount ? 'mount-controls' : undefined} tabIndex={-1} aria-label={`${device.name} mount controls`}>
+            <MountControls rigId={rigId} device={device} stale={stale} refresh={refresh} />
+          </div>
+        )}
       </div>
     </section>
   )

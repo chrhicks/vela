@@ -180,6 +180,24 @@ function command(
 }
 
 describe('target and framing HTTP boundary', () => {
+  it('links only observed parked or tracking-off prerequisites to mount controls', async () => {
+    const subject = setup()
+    subject.mount.tracking = false
+    expect((await subject.app.inject('/api/web/rigs/rig/framing')).json()).toMatchObject({
+      mountControlReason: 'tracking-off', enabled: true,
+    })
+    subject.mount.parked = true
+    expect((await subject.app.inject('/api/web/rigs/rig/framing')).json()).toMatchObject({
+      mountControlReason: 'parked', enabled: false,
+    })
+    vi.mocked(subject.adapter.telescopeStatus).mockRejectedValueOnce(new Error('Mount readings interrupted'))
+    expect((await subject.app.inject('/api/web/rigs/rig/framing')).json().mountControlReason).toBeUndefined()
+    expect(subject.hardware.slew).not.toHaveBeenCalled()
+    expect(subject.hardware.tracking).not.toHaveBeenCalled()
+    expect(subject.hardware.capture).not.toHaveBeenCalled()
+  })
+
+
   it('rejects malformed commands and settings without starting hardware work', async () => {
     const subject = setup()
 

@@ -39,6 +39,7 @@ describe('@vela/alpaca export boundary', () => {
       'createAlpacaDiscovery',
       'createAlpacaFocuser',
       'createAlpacaFraming',
+      'createAlpacaMountControl',
       'createAlpacaProvider',
     ])
   })

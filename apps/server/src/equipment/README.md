@@ -117,3 +117,20 @@ capture and cooling checks use that real service; focus analysis and plate solvi
 must honestly report insufficient image data. Deterministic controller tests prove
 their workflow behavior separately. These checks do not qualify physical ASCOM
 drivers, polar-alignment accuracy, or a sky/focus model.
+
+Your Rig mount controls receive a separate `MountControl` capability at this same
+composition boundary. The server validates the rig-scoped device identity and
+claims the rig operation lane for one explicit Unpark or tracking command.
+Commands survive a browser disconnect, never chain or replay, and retain the lane
+while their result is uncertain. Fresh stationary adapter observations can resolve
+that uncertainty without another write. The existing detail projection carries
+action readiness and the latest command identity/outcome to every browser.
+
+A browser with a lost mount-command response can explicitly check its request ID.
+The check only reads equipment: it retires an unseen ID before inspection, so a
+delayed original request cannot later issue its write. It preserves an admitted
+command and any other browser's current command; ordinary refresh does not retire
+requests or submit commands. These admission markers last only for this server
+process, like the command state itself. Each request also carries the Vela server
+instance identity from its control view: a new instance rejects an old write and
+reports the old admission as unknown, rather than claiming it never happened.

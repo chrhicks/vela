@@ -276,6 +276,16 @@ function TargetComposition({ rigId, targetId }: { rigId: string; targetId: strin
               </p>
             )}
             {view?.error && <p role="alert">{view.error}</p>}
+            {view?.mountControlReason && !view.active && !view.error && (
+              <p>{view.mountControlReason === 'parked'
+                ? 'The mount is parked. Unpark it in Your rig before framing.'
+                : 'Tracking is off. Turn it on in Your rig before checking the current frame.'}</p>
+            )}
+            {view?.mountControlReason && !view.active && (
+              <Link className="vela-button" to={`/rigs/${encodeURIComponent(rigId)}#mount-controls`}>
+                Mount controls in Your rig →
+              </Link>
+            )}
             {error && <p role="alert">{error}</p>}
             {view?.active && !matching && (
               <p>A framing check for another target is active on this rig.</p>

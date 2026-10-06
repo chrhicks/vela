@@ -1,7 +1,7 @@
 import type { RigDetailView, RigDeviceDetailView } from '@vela/model/web'
 import { Button, Dialog } from '@vela/ui'
 import { useEffect, useId, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { Link, useLocation, useNavigate } from 'react-router'
 import { loadHome } from '../features/home/load-home'
 import { ImagingSetup } from '../features/imaging-camera/ImagingSetup'
 import { useImagingCamera } from '../features/imaging-camera/use-imaging-camera'
@@ -21,6 +21,7 @@ export function RigDetail() {
 
 function Equipment({ rigId }: { rigId: string }) {
   const navigate = useNavigate()
+  const location = useLocation()
   const { view, refreshing, interrupted, initialError, refresh } = useRigObservation()!
   const observation = useObservation(rigId)
   const camera = useImagingCamera(rigId)
@@ -114,6 +115,7 @@ function Equipment({ rigId }: { rigId: string }) {
 
   const isSelected = (device: RigDeviceDetailView) => device.kind === 'camera' && device.id === camera.view?.selectedDeviceId && device.name === selected?.name
   const selectedDevice = view.devices.find(isSelected)
+  const mountDevice = view.devices.find(device => device.kind === 'telescope')
   const cameraConnected = selectedDevice?.connection === 'connected' && !camera.offline && camera.view?.state === 'ready'
   const presentation = observation.view ? readinessPresentation(observation.view, busy, observation.interrupted) : null
 
@@ -158,7 +160,15 @@ function Equipment({ rigId }: { rigId: string }) {
         <section className="equipment__devices" aria-label="Equipment">
           <header><h2>Equipment</h2><button className="equipment__text-action" disabled={refreshing} aria-busy={refreshing} onClick={() => void refresh()}>{refreshing ? 'Refreshing state…' : 'Refresh state'}</button></header>
           {view.devices.length === 0 ? <p>No devices are currently configured for this Rig.</p> : orderDevices(view.devices, selectedDevice?.id).map(device => (
-            <RigDeviceRow key={device.id} device={device} stale={interrupted} imagingCamera={isSelected(device)} />
+            <RigDeviceRow
+              key={device.id}
+              device={device}
+              stale={interrupted}
+              imagingCamera={isSelected(device)}
+              rigId={rigId}
+              refresh={() => refresh({ force: true })}
+              revealMount={device.id === mountDevice?.id && location.hash === '#mount-controls'}
+            />
           ))}
         </section>
         <ImagingSetup rigId={rigId} camera={camera} interrupted={interrupted} connecting={busy || uncertain} onSaved={() => { void refresh() }} onPendingChange={setSettingsPending} />

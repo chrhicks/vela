@@ -78,3 +78,5 @@ export type {
 } from './targets.js'
 
 export type { NavigationCapture, NavigationView } from './navigation.js'
+
+export type { MountControlAction, MountControlAvailability, MountControlView } from './mount-control.js'

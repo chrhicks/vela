@@ -23,6 +23,7 @@ import {
 } from '@vela/cria'
 import { DeviceReadings } from './readings.js'
 import { createCriaProvider } from './provider.js'
+import { createCriaMountControl } from './mount-control.js'
 
 export interface CriaEquipmentBinding {
   readonly providerDeviceId: string
@@ -309,7 +310,11 @@ export function createCriaEquipment(client: CriaClient, bindings: ReadonlyArray<
     },
   }
 
-  return { acquisition, framing, focuser, cooling, provider: createCriaProvider(client, bindings) }
+  return {
+    acquisition, framing, focuser, cooling,
+    mountControl: createCriaMountControl(client, bindings),
+    provider: createCriaProvider(client, bindings),
+  }
 }
 
 function coolingObservation(r: DeviceReadings): CameraCoolingObservation | undefined {

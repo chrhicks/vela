@@ -174,7 +174,7 @@ export function registerTargets(
     if (owner && owner !== 'framing') {
       reason = 'Another rig operation is in progress.'
     } else if (ready.mount.parked) {
-      reason = 'Unpark the mount before framing.'
+      reason = 'The mount is parked. Unpark it in Your Rig before framing.'
     } else if (ready.mount.slewing && !state.active) {
       reason = 'The mount is already moving.'
     } else if (!options.solver && !options.createSolver) {
@@ -183,6 +183,9 @@ export function registerTargets(
 
     return {
       ...view,
+      ...(ready.mount.parked
+        ? { mountControlReason: 'parked' as const }
+        : !ready.mount.tracking ? { mountControlReason: 'tracking-off' as const } : {}),
       camera: ready.camera,
       enabled: !reason,
       unavailableReason: reason,
