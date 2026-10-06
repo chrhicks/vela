@@ -51,6 +51,15 @@ export function createCriaEquipment(client: CriaClient, bindings: ReadonlyArray<
     return new DeviceReadings(client, snapshot, device)
   }
 
+  async function runMount(id: string, command: CriaCommand, signal?: AbortSignal) {
+    try {
+      await client.run(binding(id, 'mount').id, command, signal ? { signal } : {})
+    } catch (error) {
+      if (error instanceof CriaCancelledError) throw new FramingStoppedError()
+      throw error
+    }
+  }
+
   const acquisition: Acquisition = {
     async capture(options) {
       const selected = binding(options.cameraId, 'camera', options.expectedCameraName)
@@ -114,14 +123,14 @@ export function createCriaEquipment(client: CriaClient, bindings: ReadonlyArray<
       }
     },
     async move(id, rateDegreesPerSecond, durationSeconds, signal) {
-      await client.run(binding(id, 'mount').id, {
+      await runMount(id, {
         kind: 'mount-axis', parameters: { rateDegreesPerSecond, durationSeconds },
-      }, signal ? { signal } : {})
+      }, signal)
     },
     async rotateRightAscension(id, rateDegreesPerSecond, distanceDegrees, signal) {
-      await client.run(binding(id, 'mount').id, {
+      await runMount(id, {
         kind: 'mount-rotate', parameters: { rateDegreesPerSecond, distanceDegrees },
-      }, signal ? { signal } : {})
+      }, signal)
     },
     async abort(cameraId, telescopeId) {
       await Promise.all([
@@ -190,30 +199,25 @@ export function createCriaEquipment(client: CriaClient, bindings: ReadonlyArray<
       return status
     },
     async setTracking(id, tracking, signal) {
-      await client.run(binding(id, 'mount').id, {
+      await runMount(id, {
         kind: 'mount-tracking', parameters: { tracking },
-      }, signal ? { signal } : {})
+      }, signal)
     },
     async slew(options, signal) {
       if (options.coordinateSystem === 'unknown' || options.coordinateSystem === 'other')
         throw new Error('A known mount coordinate frame is required before slewing')
 
-      try {
-        await client.run(binding(options.telescopeId, 'mount').id, {
-          kind: 'mount-slew',
-          parameters: {
-            rightAscensionDegrees: options.rightAscensionDegrees,
-            declinationDegrees: options.declinationDegrees,
-            coordinateSystem: options.coordinateSystem,
-          },
-        }, signal ? { signal } : {})
-      } catch (error) {
-        if (error instanceof CriaCancelledError) throw new FramingStoppedError()
-        throw error
-      }
+      await runMount(options.telescopeId, {
+        kind: 'mount-slew',
+        parameters: {
+          rightAscensionDegrees: options.rightAscensionDegrees,
+          declinationDegrees: options.declinationDegrees,
+          coordinateSystem: options.coordinateSystem,
+        },
+      }, signal)
     },
     async home(id, signal) {
-      await client.run(binding(id, 'mount').id, { kind: 'mount-home', parameters: {} }, signal ? { signal } : {})
+      await runMount(id, { kind: 'mount-home', parameters: {} }, signal)
     },
     async abortTelescope(id) {
       await client.cancelDevice(binding(id, 'mount').id)

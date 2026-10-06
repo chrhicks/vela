@@ -533,7 +533,7 @@ export class CriaClient {
 
     options.signal?.throwIfAborted()
 
-    if (active.cancelRequested) throw new DOMException('Operation cancelled before admission', 'AbortError')
+    if (active.cancelRequested) throw new CriaCancelledError(null, '/v2/operations')
     active.failureDomain = device.failureDomain
 
     const request: CriaOperationRequest = {
@@ -567,7 +567,7 @@ export class CriaClient {
   }
 
   run(id: string, command: CriaCommand, options: CriaRunOptions = {}): Promise<CriaOperation> {
-    options.signal?.throwIfAborted()
+    if (options.signal?.aborted) return Promise.reject(new CriaCancelledError(null, '/v2/operations'))
     this.binding(id)
 
     if (this.writeFailure) return Promise.reject(this.writeFailure)
@@ -593,7 +593,12 @@ export class CriaClient {
     this.active.set(id, active)
     options.signal?.addEventListener('abort', onAbort, { once: true })
 
-    const completion = this.execute(id, validated, active, options).finally(() => {
+    const completion = this.execute(id, validated, active, options).catch(error => {
+      if (active.request === null && options.signal?.aborted &&
+        (error === options.signal.reason || error instanceof Error && error.name === 'AbortError'))
+        throw new CriaCancelledError(null, '/v2/operations')
+      throw error
+    }).finally(() => {
       options.signal?.removeEventListener('abort', onAbort)
 
       if (!active.unresolved) {
@@ -621,7 +626,6 @@ export class CriaClient {
     } catch (error) {
       if (error instanceof CriaCancelledError || error instanceof CriaOperationFailedError) return
 
-      if (error instanceof DOMException && error.name === 'AbortError' && active.request === null) return
       throw error
     }
   }

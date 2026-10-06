@@ -225,6 +225,33 @@ describe('durable admission', () => {
 })
 
 describe('operation completion and cancellation', () => {
+  it('identifies cancellation before admission even with a custom signal reason', async () => {
+    const service = new ServiceFixture()
+    let release = () => {}
+
+    const gate = new Promise<void>(resolve => { release = resolve })
+
+    const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+      await gate
+
+      return service.fetch(input, init)
+    })
+
+    const client = service.client({ fetch })
+    const abort = new AbortController()
+    const running = client.run('camera', capture, { signal: abort.signal })
+    const stopped = expect(running).rejects.toMatchObject({ name: 'CriaCancelledError', operation: null })
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce())
+    abort.abort(new Error('User stopped'))
+    await stopped
+    expect(service.posts).toHaveLength(0)
+    release()
+    await client.state()
+    expect(service.posts).toHaveLength(0)
+    await expect(client.run('camera', capture, { signal: abort.signal })).rejects.toBeInstanceOf(CriaCancelledError)
+    await expect(client.run('camera', capture)).resolves.toMatchObject({ status: 'succeeded' })
+  })
+
   it('keeps a read interruption visible until the same operation can be observed again', async () => {
     const service = new ServiceFixture()
     const states: string[] = []
