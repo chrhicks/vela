@@ -1,11 +1,9 @@
-export type AlpacaProviderErrorReason = 'transport' | 'invalid-response' | 'protocol-error'
+import { EquipmentError, type EquipmentErrorOptions } from '@vela/equipment'
 
-export interface AlpacaProviderErrorOptions {
-  reason: AlpacaProviderErrorReason
-  endpoint: string
-  cause?: unknown
-  errorNumber?: number
-}
+export type {
+  EquipmentErrorReason as AlpacaProviderErrorReason,
+  EquipmentErrorOptions as AlpacaProviderErrorOptions,
+} from '@vela/equipment'
 
 export class AlpacaDiscoveryError extends Error {
   readonly reason = 'transport' as const
@@ -16,19 +14,9 @@ export class AlpacaDiscoveryError extends Error {
   }
 }
 
-export class AlpacaProviderError extends Error {
-  readonly reason: AlpacaProviderErrorReason
-  readonly endpoint: string
-  readonly errorNumber?: number
-
-  constructor(message: string, options: AlpacaProviderErrorOptions) {
-    super(message, options.cause === undefined ? undefined : { cause: options.cause })
+export class AlpacaProviderError extends EquipmentError {
+  constructor(message: string, options: EquipmentErrorOptions) {
+    super(message, options)
     this.name = 'AlpacaProviderError'
-    this.reason = options.reason
-    this.endpoint = options.endpoint
-
-    if (options.errorNumber !== undefined) {
-      this.errorNumber = options.errorNumber
-    }
   }
 }

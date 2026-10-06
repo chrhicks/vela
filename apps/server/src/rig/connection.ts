@@ -1,4 +1,4 @@
-import { AlpacaProviderError, type AlpacaDeviceConnectionResult } from '@vela/alpaca'
+import { EquipmentError, type DeviceConnectionResult } from '@vela/equipment'
 import type {
   ConnectRigDevicesResult,
   RigConnectionDeviceView,
@@ -39,7 +39,7 @@ export interface RigConnectionRequestOptions {
   readonly onConflict?: RigDetailOptions['onConflict']
   readonly onProviderResult?: (
     providerDeviceId: string,
-    result: AlpacaDeviceConnectionResult | AlpacaProviderError,
+    result: DeviceConnectionResult | EquipmentError,
   ) => void
   readonly onUnavailable?: RigDetailOptions['onUnavailable']
 }
@@ -158,17 +158,17 @@ export function createRigConnectionCoordinator({
         }
       }
 
-      const connector = createConnector({
-        id: detail.view.id,
-        endpoint: detail.view.endpoint,
-      })
+      const rig = await catalog.get(rigId)
+
+      if (!rig) return { state: 'not-found' }
+      const connector = createConnector(rig)
 
       const confirmedConnected: RigConnectionDeviceView[] = []
 
       for (let index = 0; index < candidates.length; index += 1) {
         options.signal?.throwIfAborted()
         const candidate = candidates[index]!
-        let result: AlpacaDeviceConnectionResult
+        let result: DeviceConnectionResult
 
         try {
           result = await connector.connectDevice(
@@ -178,7 +178,7 @@ export function createRigConnectionCoordinator({
         } catch (error) {
           if (options.signal?.aborted) throw error
 
-          if (!(error instanceof AlpacaProviderError)) throw error
+          if (!(error instanceof EquipmentError)) throw error
 
           options.onProviderResult?.(candidate.providerDeviceId, error)
           const view = await refreshObservation(rigId, options)

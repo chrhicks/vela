@@ -20,6 +20,28 @@ function inspection(
 }
 
 describe('Rig device detail mapping', () => {
+  it('keeps the measurement time and interrupted status when HTTP delivers retained readings', () => {
+    const measurement = '2026-09-03T19:55:00.000Z'
+
+    const view = currentDeviceView('rig-1', inspection({
+      kind: 'focuser',
+      observation: {
+        state: 'interrupted', observedAt: measurement, commandReady: false,
+        message: 'Device reads are interrupted',
+      },
+      telemetry: {
+        availability: 'partial',
+        values: { kind: 'focuser', position: 12000, moving: false },
+      },
+    }), observedAt)
+
+    expect(view).toMatchObject({
+      observedAt: measurement,
+      observation: { state: 'interrupted', commandReady: false },
+      status: { position: 12000 },
+    })
+  })
+
   it('maps every supported kind into its Vela status vocabulary', () => {
     const devices: ReadonlyArray<AlpacaDeviceInspection> = [
       inspection({

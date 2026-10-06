@@ -37,6 +37,7 @@ export function RigDeviceRow({ device, stale, imagingCamera = false }: {
 }) {
   const [open, setOpen] = useState(false)
   const id = useId()
+  stale = stale || device.observation?.state === 'interrupted'
   const connection = connectionPresentation(device, stale)
   const presentation = devicePresentation(device)
   let role: string = kindLabels[device.kind]
@@ -84,7 +85,10 @@ export function RigDeviceRow({ device, stale, imagingCamera = false }: {
         />
       </div>
       <div id={id} hidden={!open} className="equipment__device-details">
-        {stale && <p>Last known measurements; live updates are interrupted.</p>}
+        {stale && <p>Last known measurements; live updates are interrupted.
+          {device.observation?.observedAt && <> Observed {new Date(device.observation.observedAt).toLocaleTimeString()}.</>}
+        </p>}
+        {device.observation?.message && <p>{device.observation.message}</p>}
         <p>{presentation.note}</p>
         {device.configuredName !== device.name && <p>Configured as {device.configuredName}</p>}
         {presentation.metrics.length > 0 && (
@@ -108,6 +112,9 @@ export function RigDeviceRow({ device, stale, imagingCamera = false }: {
 
 function connectionPresentation(device: RigDeviceDetailView, stale: boolean) {
   if (stale) return { label: 'Last known', tone: 'warning' as const }
+
+  if (device.observation?.state === 'partial')
+    return { label: 'Partial readings', tone: 'warning' as const }
 
   if (device.connection === 'connected') return { label: 'Connected', tone: 'positive' as const }
 

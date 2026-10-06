@@ -5,6 +5,14 @@ web applications. It gives both sides one normalized vocabulary without
 assigning protocol, transport, persistence, or application behavior to this
 package.
 
+Device detail may carry `observation` separately from HTTP refresh time. Its
+`interrupted` state identifies retained measurements, with their original time,
+and prevents a retained connection from counting as currently connected.
+`partial` means only validated available fields are displayed. `commandReady`
+is an adapter observation used by server preconditions; it does not replace
+validation at command admission. These are semantic page facts, not raw protocol
+readings or credentials.
+
 ## Boundaries
 
 - `@vela/model/device` describes normalized device kinds and live device

@@ -11,6 +11,8 @@ apps/
   server/    # Fastify API and device adapters
 packages/
   alpaca/    # Server-side Alpaca protocol adapter and normalized provider boundary
+  cria/      # Authenticated Cria v2 client and operation/original transfer boundary
+  equipment/ # Transport-neutral equipment capabilities and ImageBytes decoding
   model/     # Shared types for web and server
   ui/        # @vela/ui tokens, stable components, and draft workspace
 ```
@@ -31,6 +33,11 @@ pnpm dev
 `pnpm dev` starts the web app and Fastify together. Vite proxies `/api/*` to Fastify at `http://127.0.0.1:3001`; visit `http://localhost:5173/api` in the SPA to exercise `GET /api/health`.
 
 The server stores added Rigs in the Git-ignored `data/rigs.yaml`. Set `VELA_RIG_CATALOG_PATH` to use a different location; [`data/rigs.example.yaml`](data/rigs.example.yaml) shows the file shape.
+
+Cria rigs use explicit server configuration through `VELA_CRIA_CONFIG_PATH`.
+See [equipment composition](apps/server/src/equipment/README.md) for bindings,
+credentials, driver ownership, and fixture verification. Existing rigs continue
+using Alpaca; a configured Cria rig never falls back to another adapter.
 
 Useful focused commands:
 

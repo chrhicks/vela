@@ -1,3 +1,10 @@
+import { FramingStoppedError as AlpacaFramingStoppedError } from '@vela/equipment'
+import type {
+  CoordinateSystem as AlpacaCoordinateSystem,
+  TelescopeStatus as AlpacaTelescopeStatus,
+  Framing as AlpacaFraming
+} from '@vela/equipment'
+
 import { Schema } from 'effect'
 import { setTimeout as delay } from 'node:timers/promises'
 import { AlpacaProviderError } from './error.js'
@@ -5,55 +12,19 @@ import { createAlpacaClient } from './internal/client.js'
 import { rejectDuplicateDeviceIds, stableDeviceId } from './internal/configured-device.js'
 import type { ConfiguredDevice } from './internal/types/management.js'
 
+export { FramingStoppedError as AlpacaFramingStoppedError } from '@vela/equipment'
+
+export type {
+  CoordinateSystem as AlpacaCoordinateSystem,
+  CameraGeometry as AlpacaCameraGeometry,
+  TelescopeStatus as AlpacaTelescopeStatus,
+  SlewOptions as AlpacaSlewOptions,
+  Framing as AlpacaFraming
+} from '@vela/equipment'
+
 const trackingRates = ['sidereal', 'lunar', 'solar', 'king'] as const
 
 const coordinateSystems = ['other', 'topocentric', 'j2000', 'j2050', 'b1950'] as const
-
-export type AlpacaCoordinateSystem = (typeof coordinateSystems)[number] | 'unknown'
-
-export interface AlpacaCameraGeometry {
-  cameraName: string
-  sensorWidthPixels: number
-  sensorHeightPixels: number
-  pixelWidthMicrons: number
-  pixelHeightMicrons: number
-  binX: number
-  binY: number
-  /** Image dimensions and origin are in binned pixels. */
-  width: number
-  height: number
-  startX: number
-  startY: number
-}
-
-export interface AlpacaTelescopeStatus {
-  rightAscensionDegrees: number
-  declinationDegrees: number
-  coordinateSystem: AlpacaCoordinateSystem
-  latitudeDegrees?: number
-  /** East-positive longitude. */
-  longitudeDegrees?: number
-  elevationMeters?: number
-  tracking: boolean
-  trackingRate?: (typeof trackingRates)[number]
-  /** Offset from sidereal, in seconds of RA per sidereal second. */
-  rightAscensionRateSecondsPerSiderealSecond?: number
-  /** Offset from zero declination motion, in arcseconds per SI second. */
-  declinationRateArcsecondsPerSecond?: number
-  /** ASCOM pointing state: east is normal, west is through the pole. */
-  pierSide?: 'east' | 'west' | 'unknown'
-  slewing: boolean
-  parked: boolean
-  observedAt: string
-}
-
-export interface AlpacaSlewOptions {
-  telescopeId: string
-  rightAscensionDegrees: number
-  declinationDegrees: number
-  /** Coordinates must already be expressed in the driver's reported frame. */
-  coordinateSystem: AlpacaCoordinateSystem
-}
 
 export interface AlpacaFramingOptions {
   baseUrl: string
@@ -61,29 +32,6 @@ export interface AlpacaFramingOptions {
   requestTimeoutMs?: number
   slewTimeoutMs?: number
   pollIntervalMs?: number
-}
-
-export interface AlpacaFraming {
-  cameraGeometry(
-    options: { cameraId: string; expectedCameraName?: string },
-    signal?: AbortSignal,
-  ): Promise<AlpacaCameraGeometry>
-  telescopeStatus(
-    telescopeId: string,
-    signal?: AbortSignal,
-    options?: { includeAlignmentObservations?: boolean; includePointingSide?: boolean },
-  ): Promise<AlpacaTelescopeStatus>
-  setTracking(telescopeId: string, tracking: boolean, signal?: AbortSignal): Promise<void>
-  slew(options: AlpacaSlewOptions, signal?: AbortSignal): Promise<void>
-  home(telescopeId: string, signal?: AbortSignal): Promise<void>
-  abortTelescope(telescopeId: string): Promise<void>
-}
-
-export class AlpacaFramingStoppedError extends Error {
-  constructor() {
-    super('Telescope slew cancellation confirmed')
-    this.name = 'AbortError'
-  }
 }
 
 function invalid(message: string, endpoint: string): never {

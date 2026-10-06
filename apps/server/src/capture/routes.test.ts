@@ -8,7 +8,7 @@ import type {
 import { createMemoryRigCatalog } from '../rig/catalog.js'
 import { createRigOperations } from '../rig/operations.js'
 import { CaptureStoppedError, type CaptureCamera, type CaptureFrame } from './controller.js'
-import { registerCapture } from './routes.js'
+import { registerCapture, type CaptureSettings } from './routes.js'
 import { registerNavigation } from '../navigation.js'
 import { createMemorySavedImageStore } from '../saved-images/store.js'
 import { registerSavedImages } from '../saved-images/routes.js'
@@ -61,11 +61,7 @@ function setup(
       setpointC?: number
     }
     sensorTemperatureC?: number
-    createCooling?: (settings: {
-      endpoint: string
-      cameraId: string
-      expectedCameraName: string
-    }) => AlpacaCameraCooling
+    createCooling?: (settings: CaptureSettings) => AlpacaCameraCooling
   } = {},
 ) {
   const app = Fastify()
@@ -79,7 +75,7 @@ function setup(
   const savedImages = createMemorySavedImageStore()
   let cameraId = 'camera'
   let cameraName = 'Main camera'
-  const bindings: Array<{ endpoint: string; cameraId: string; expectedCameraName: string }> = []
+  const bindings: CaptureSettings[] = []
   let connected = true
   let activity: 'idle' | 'exposing' = 'idle'
   let inspectionGate: Promise<void> | undefined
@@ -325,7 +321,7 @@ it('binds each exposure to the current selection and endpoint while retaining ea
   await subject.catalog.observe({ host: 'moved.local', port: 22222 }, record.lastObservedInventory)
   expect((await subject.start()).statusCode).toBe(200)
   expect(subject.bindings.at(-1)).toMatchObject({
-    endpoint: 'http://moved.local:22222',
+    rig: { endpoint: { host: 'moved.local', port: 22222 } },
     cameraId: 'other',
     expectedCameraName: 'Other camera',
   })

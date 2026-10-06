@@ -1,0 +1,470 @@
+import { createHash, randomUUID } from 'node:crypto'
+import { EquipmentError } from '@vela/equipment'
+import { describe, expect, it, vi } from 'vitest'
+import {
+  CriaApiError,
+  CriaCancelledError,
+  CriaIdentityError,
+  CriaUncertainError,
+  type CriaCommand,
+  type CriaOperation,
+} from '../src/index.js'
+import { failure, json, reading, serverNow, ServiceFixture } from './fixture.js'
+
+const capture: CriaCommand = { kind: 'capture', parameters: { exposureSeconds: 0.001, light: true } }
+
+function path(input: RequestInfo | URL): string {
+  return new URL(input instanceof Request ? input.url : String(input)).pathname
+}
+
+describe('state and identity', () => {
+  it('shares state reads without allowing one caller cancellation to abort another', async () => {
+    const service = new ServiceFixture()
+    let release = () => {}
+
+    const gate = new Promise<void>(resolve => { release = resolve })
+
+    const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+      await gate
+
+      return service.fetch(input, init)
+    })
+
+    const client = service.client({ fetch })
+    const signal = new AbortController()
+    const first = client.state(signal.signal)
+    const rejected = expect(first).rejects.toMatchObject({ name: 'AbortError' })
+    const second = client.state()
+
+    signal.abort()
+    await rejected
+    expect(fetch).toHaveBeenCalledTimes(1)
+    release()
+    expect((await second).state.storeId).toBe(service.state.storeId)
+    expect(fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('uses server-relative read age, metadata age, generation and RTT instead of clock synchronization', async () => {
+    const service = new ServiceFixture()
+    const client = service.client()
+
+    service.camera.fields.state = reading(0, serverNow - 8_000)
+    service.camera.fields.width = reading(2, serverNow - 8_000)
+    const snapshot = await client.state()
+    const camera = client.device(snapshot, 'camera')
+
+    expect(client.reading(snapshot, camera, 'connected')).toBe(true)
+    expect(client.optionalReading(snapshot, camera, 'state')).toBeUndefined()
+    expect(client.reading(snapshot, camera, 'width', { metadata: true })).toBe(2)
+    expect(client.optionalReading({ ...snapshot, roundTripMs: 4_000 }, camera, 'connected')).toBeUndefined()
+    camera.fields.width = { ...reading(2), generation: 3 }
+    expect(client.optionalReading(snapshot, camera, 'width', { metadata: true })).toBeUndefined()
+    camera.fields.state = { ...reading(0), readStartedAt: serverNow - 9_000 }
+    expect(client.optionalReading(snapshot, camera, 'state')).toBeUndefined()
+  })
+
+  it.each(['instance', 'binding', 'store'] as const)('blocks new writes after %s identity changes', async changed => {
+    const service = new ServiceFixture()
+    const client = service.client()
+
+    await client.state()
+
+    if (changed === 'instance') service.state.instanceId = randomUUID()
+
+    if (changed === 'binding') service.camera.bindingId = randomUUID()
+
+    if (changed === 'store') service.state.storeId = randomUUID()
+
+    if (changed === 'store') await expect(client.state()).rejects.toBeInstanceOf(CriaIdentityError)
+    else await client.state()
+    await expect(client.run('camera', capture)).rejects.toBeInstanceOf(CriaIdentityError)
+    expect(service.posts).toHaveLength(0)
+  })
+
+  it('rejects malformed response fields before using a readiness flag', async () => {
+    const service = new ServiceFixture()
+
+    const client = service.client({
+      fetch: async () => json({ ...service.state, devices: [{ ...service.camera, blocked: 'false' }] }),
+    })
+
+    await expect(client.run('camera', capture)).rejects.toMatchObject({ reason: 'invalid-response' })
+    expect(service.posts).toHaveLength(0)
+  })
+})
+
+describe('durable admission', () => {
+  it('recovers an accepted operation after its HTTP acknowledgement disappears', async () => {
+    const service = new ServiceFixture()
+    let dropped = false
+
+    const client = service.client({
+      fetch: async (input, init) => {
+        const response = await service.fetch(input, init)
+
+        if (path(input) === '/v2/operations' && !dropped) {
+          dropped = true
+          throw new TypeError('Connection ended after durable admission')
+        }
+
+        return response
+      },
+    })
+
+    const result = await client.run('camera', capture)
+
+    expect(result.status).toBe('succeeded')
+    expect(result.id).toBe(service.last?.id)
+    expect(service.posts).toHaveLength(1)
+    expect(service.operations.size).toBe(1)
+    expect(service.paths.some(request => request.startsWith('GET /v2/requests/'))).toBe(true)
+  })
+
+  it('retries an unacknowledged admission using the byte-identical request and dispatches once', async () => {
+    const service = new ServiceFixture()
+    const attempts: string[] = []
+
+    const client = service.client({
+      fetch: async (input, init) => {
+        if (path(input) === '/v2/operations') {
+          attempts.push(String(init?.body))
+
+          if (attempts.length === 1) throw new TypeError('Request never reached service')
+        }
+
+        return service.fetch(input, init)
+      },
+    })
+
+    await client.run('camera', capture)
+    expect(attempts).toHaveLength(2)
+    expect(attempts[1]).toBe(attempts[0])
+    expect(service.operations.size).toBe(1)
+  })
+
+  it('preserves an unresolved admission and blocks fresh commands, including another domain', async () => {
+    const service = new ServiceFixture()
+    let posts = 0
+
+    const client = service.client({
+      fetch: async (input, init) => {
+        if (path(input) === '/v2/operations') {
+          posts++
+          throw new TypeError('Admission response lost')
+        }
+
+        if (path(input).startsWith('/v2/requests/')) return failure(503)
+
+        return service.fetch(input, init)
+      },
+    })
+
+    await expect(client.run('camera', capture)).rejects.toMatchObject({
+      name: 'CriaUncertainError',
+      request: { instanceId: service.state.instanceId, deviceId: 'camera', kind: 'capture' },
+      operation: null,
+    })
+    await expect(client.run('mount', { kind: 'mount-stop', parameters: {} })).rejects.toBeInstanceOf(CriaUncertainError)
+    expect(posts).toBe(1)
+    expect(client.commandBlockReason).toContain('unresolved')
+  })
+
+  it('does not submit a replacement exposure when Stop arrives during unresolved admission', async () => {
+    const service = new ServiceFixture()
+    let release = () => {}
+
+    const gate = new Promise<void>(resolve => { release = resolve })
+    let attempts = 0
+
+    const client = service.client({
+      fetch: async (input, init) => {
+        if (path(input) === '/v2/operations') {
+          attempts++
+          await gate
+          throw new TypeError('Lost request')
+        }
+
+        return service.fetch(input, init)
+      },
+    })
+
+    const running = client.run('camera', capture)
+    const rejected = expect(running).rejects.toBeInstanceOf(CriaUncertainError)
+
+    await vi.waitFor(() => expect(attempts).toBe(1))
+    const stopping = client.cancelDevice('camera')
+    const stopRejected = expect(stopping).rejects.toBeInstanceOf(CriaUncertainError)
+
+    release()
+    await rejected
+    await stopRejected
+    expect(attempts).toBe(1)
+    expect(service.operations.size).toBe(0)
+  })
+  it('does not treat an expired durable request result as permission to dispatch again', async () => {
+    const service = new ServiceFixture()
+    let posts = 0
+
+    const client = service.client({
+      fetch: async (input, init) => {
+        if (path(input) === '/v2/operations') {
+          posts++
+          throw new TypeError('Admission acknowledgement lost')
+        }
+
+        if (path(input).startsWith('/v2/requests/')) return failure(410, 'result-expired')
+
+        return service.fetch(input, init)
+      },
+    })
+
+    await expect(client.run('camera', capture)).rejects.toBeInstanceOf(CriaUncertainError)
+    expect(posts).toBe(1)
+    expect(client.commandBlockReason).not.toBeNull()
+  })
+})
+
+describe('operation completion and cancellation', () => {
+  it('keeps a read interruption visible until the same operation can be observed again', async () => {
+    const service = new ServiceFixture()
+    const states: string[] = []
+    let reads = 0
+
+    service.completeImmediately = false
+
+    const client = service.client({
+      fetch: async (input, init) => {
+        if (path(input).startsWith('/v2/operations/')) {
+          reads++
+
+          if (reads <= 2) throw new TypeError('Temporary read failure')
+          service.finish()
+        }
+
+        return service.fetch(input, init)
+      },
+    })
+
+    await client.run('camera', capture, { onReadState: state => states.push(state) })
+    const changes = states.filter((state, index) => index === 0 || state !== states[index - 1])
+
+    expect(changes).toEqual(['current', 'retrying', 'current'])
+    expect(service.posts).toHaveLength(1)
+  })
+
+  it('waits for physical settlement after cancellation is accepted', async () => {
+    const service = new ServiceFixture()
+
+    service.completeImmediately = false
+    const client = service.client()
+    const running = client.run('camera', capture)
+    const cancelled = expect(running).rejects.toBeInstanceOf(CriaCancelledError)
+
+    await vi.waitFor(() => expect(service.last).not.toBeNull())
+    let stopped = false
+    const stopping = client.cancelDevice('camera').then(() => { stopped = true })
+
+    await vi.waitFor(() => expect(service.cancellations).toHaveLength(1))
+    expect(stopped).toBe(false)
+    expect(service.last?.settled).toBe(false)
+    service.finish('cancelled')
+    await cancelled
+    await stopping
+    expect(stopped).toBe(true)
+  })
+
+  it('keeps a naturally completed capture after a lost cancellation response', async () => {
+    const service = new ServiceFixture()
+    const signal = new AbortController()
+
+    service.completeImmediately = false
+
+    const client = service.client({
+      fetch: async (input, init) => {
+        const response = await service.fetch(input, init)
+
+        if (path(input).endsWith('/cancel')) {
+          service.finish()
+          throw new TypeError('Cancellation acknowledgement lost')
+        }
+
+        return response
+      },
+    })
+
+    const result = await client.run('camera', capture, {
+      signal: signal.signal,
+      onProgress: operation => {
+        if (operation.status === 'running') signal.abort()
+      },
+    })
+
+    expect(result.status).toBe('succeeded')
+    expect(result.image).not.toBeNull()
+    expect(service.cancellations).toHaveLength(1)
+    expect(service.posts).toHaveLength(1)
+  })
+
+  it('does not claim a local observation timeout cancelled equipment, or block unrelated domains', async () => {
+    const service = new ServiceFixture()
+
+    service.completeImmediately = false
+    const client = service.client({ operationTimeoutMs: 10 })
+
+    await expect(client.run('camera', capture)).rejects.toBeInstanceOf(CriaUncertainError)
+    expect(service.last?.status).toBe('running')
+    expect(service.cancellations).toHaveLength(0)
+    expect(client.commandBlockReasonFor('camera')).toContain('unconfirmed')
+    expect(client.commandBlockReasonFor('mount')).toBeNull()
+    await expect(client.run('camera', capture)).rejects.toBeInstanceOf(CriaUncertainError)
+    service.completeImmediately = true
+    expect((await client.run('mount', { kind: 'mount-stop', parameters: {} })).status).toBe('succeeded')
+  })
+  it('requires settlement even for a terminal status and retains the whole failure domain', async () => {
+    const service = new ServiceFixture()
+
+    service.mount.failureDomain = service.camera.failureDomain
+
+    const client = service.client({
+      fetch: async (input, init) => {
+        const response = await service.fetch(input, init)
+
+        if (path(input) === '/v2/operations' && service.last)
+          return json({ ...service.last, status: 'cancelled', settled: false, blocksDevice: true }, 202)
+
+        return response
+      },
+    })
+
+    await expect(client.run('camera', capture)).rejects.toBeInstanceOf(CriaUncertainError)
+    expect(client.commandBlockReasonFor('mount')).not.toBeNull()
+    await expect(client.run('mount', { kind: 'mount-stop', parameters: {} })).rejects.toBeInstanceOf(CriaUncertainError)
+    expect(service.posts).toHaveLength(1)
+  })
+})
+
+describe('original ownership', () => {
+  it('validates and decodes the original before separately releasing its temporary storage', async () => {
+    const service = new ServiceFixture()
+    const client = service.client()
+    const operation = await client.run('camera', capture)
+    const { image, frame } = await client.download(operation)
+
+    expect(frame.width).toBe(2)
+    expect(frame.height).toBe(3)
+    expect(Array.from(frame.pixels)).toEqual([1, 2, 3, 4, 5, 6])
+    expect(service.deletes).toHaveLength(0)
+    await client.release(image.id)
+    expect(service.deletes).toEqual([image.id])
+  })
+
+  it('retries a transient transfer of the same original without another exposure', async () => {
+    const service = new ServiceFixture()
+    let downloads = 0
+
+    const client = service.client({
+      fetch: async (input, init) => {
+        if (path(input).endsWith('/original') && ++downloads === 1)
+          throw new TypeError('Transfer interrupted')
+
+        return service.fetch(input, init)
+      },
+    })
+
+    const operation = await client.run('camera', capture)
+    const states: string[] = []
+    const result = await client.download(operation, { onReadState: state => states.push(state) })
+
+    expect(result.image.id).toBe(operation.image?.id)
+    expect(downloads).toBe(2)
+    expect(states).toEqual(['retrying', 'current'])
+    expect(service.posts).toHaveLength(1)
+  })
+
+  it('does not retry or release an original with corrupt pixels', async () => {
+    const service = new ServiceFixture()
+    const client = service.client()
+    const operation = await client.run('camera', capture)
+
+    new DataView(service.original).setInt32(44, 99, true)
+    await expect(client.download(operation)).rejects.toMatchObject({ reason: 'invalid-response' })
+    expect(service.paths.filter(request => request.endsWith('/original'))).toHaveLength(1)
+    expect(service.deletes).toHaveLength(0)
+    expect(service.posts).toHaveLength(1)
+  })
+
+  it('checks pixel geometry independently of a valid checksum', async () => {
+    const service = new ServiceFixture()
+    const client = service.client()
+    const operation = await client.run('camera', capture)
+    const image = operation.image
+    const stored = service.last?.image
+
+    if (!image || !stored) throw new Error('Fixture capture did not retain an image')
+    new DataView(service.original).setInt32(32, 3, true)
+    image.sha256 = createHash('sha256').update(new Uint8Array(service.original)).digest('hex')
+    stored.sha256 = image.sha256
+    await expect(client.download(operation)).rejects.toMatchObject({ reason: 'invalid-response' })
+    expect(service.deletes).toHaveLength(0)
+  })
+
+  it('bounds transfer retries by remaining server retention without relying on synchronized clocks', async () => {
+    const service = new ServiceFixture()
+    let attempts = 0
+
+    const client = service.client({
+      imageRetryMs: 1_000,
+      pollIntervalMs: 5,
+      fetch: async (input, init) => {
+        if (path(input).endsWith('/original')) {
+          attempts++
+          throw new TypeError('Transfer interrupted')
+        }
+
+        return service.fetch(input, init)
+      },
+    })
+
+    const operation = await client.run('camera', capture)
+
+    if (!operation.image) throw new Error('Fixture did not retain an original')
+    operation.image.expiresAt = serverNow + 12
+    await expect(client.download(operation)).rejects.toMatchObject({ reason: 'transport' })
+    expect(attempts).toBeGreaterThan(0)
+    expect(attempts).toBeLessThan(4)
+    expect(service.posts).toHaveLength(1)
+  })
+
+  it('rejects cross-operation metadata and external original URLs before downloading', async () => {
+    const service = new ServiceFixture()
+    const client = service.client()
+    const operation = await client.run('camera', capture)
+    const image = operation.image
+
+    if (!image) throw new Error('Fixture capture did not retain an image')
+    const foreign: CriaOperation = { ...operation, image: { ...image, operationId: randomUUID() } }
+
+    await expect(client.download(foreign)).rejects.toBeInstanceOf(EquipmentError)
+    const external = { ...operation, image: { ...image, original: { ...image.original, url: 'http://other.fixture/original' } } }
+
+    await expect(client.download(external)).rejects.toThrow()
+    expect(service.paths.some(request => request.endsWith('/original'))).toBe(false)
+  })
+
+  it('reports expiry distinctly and forgets best-effort release failures after pixels transfer', async () => {
+    const service = new ServiceFixture()
+
+    const client = service.client({
+      fetch: async (input, init) => init?.method === 'DELETE' ? failure(503) : service.fetch(input, init),
+    })
+
+    const operation = await client.run('camera', capture)
+    const acquired = await client.download(operation)
+
+    await expect(client.release(acquired.image.id)).rejects.toBeInstanceOf(CriaApiError)
+    expect(Array.from(acquired.frame.pixels)).toEqual([1, 2, 3, 4, 5, 6])
+    await expect(client.release(acquired.image.id)).rejects.toThrow('has not been acquired')
+    service.state.generatedAt = acquired.image.expiresAt + 1
+    await expect(client.download(operation)).rejects.toMatchObject({ status: 410, code: 'image-gone' })
+  })
+})

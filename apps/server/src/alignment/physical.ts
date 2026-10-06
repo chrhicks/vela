@@ -1,11 +1,11 @@
 import { setTimeout as delay } from 'node:timers/promises'
 import type {
-  AlpacaAcquisition,
-  AlpacaCameraGeometry,
-  AlpacaFrame,
-  AlpacaFraming,
-  AlpacaTelescopeStatus,
-} from '@vela/alpaca'
+  Acquisition,
+  CameraGeometry,
+  Frame,
+  Framing,
+  TelescopeStatus,
+} from '@vela/equipment'
 import { fromMount, type Site } from '../astronomy/coordinates.js'
 import {
   localSiderealDegrees,
@@ -26,12 +26,12 @@ const difference = (a: number, b: number) => ((a - b + 540) % 360) - 180
  * a pointing model may move DEC even when the requested declination is fixed. */
 export function createPhysicalAlignment(
   settings: PhysicalAlignmentSettings,
-  acquisition: AlpacaAcquisition,
-  device: AlpacaFraming,
+  acquisition: Acquisition,
+  device: Framing,
   settle: (signal: AbortSignal) => Promise<void> = signal => delay(3_000, undefined, { signal }),
 ) {
-  let reference: AlpacaTelescopeStatus | undefined
-  let geometry: AlpacaCameraGeometry | undefined
+  let reference: TelescopeStatus | undefined
+  let geometry: CameraGeometry | undefined
   let site: Site | undefined
   let westRate: number | undefined
 
@@ -259,7 +259,7 @@ export function createPhysicalAlignment(
     prepare,
     pointing,
     move,
-    validate: async (signal: AbortSignal, frame?: Pick<AlpacaFrame, 'width' | 'height'>) => {
+    validate: async (signal: AbortSignal, frame?: Pick<Frame, 'width' | 'height'>) => {
       const current = await status(signal)
 
       if (frame && (frame.width !== geometry?.width || frame.height !== geometry.height))
@@ -283,8 +283,8 @@ export function createPhysicalAlignment(
 export type PhysicalAlignment = ReturnType<typeof createPhysicalAlignment>
 
 function sameCameraGeometry(
-  observed: AlpacaCameraGeometry,
-  reference: AlpacaCameraGeometry | undefined,
+  observed: CameraGeometry,
+  reference: CameraGeometry | undefined,
 ): boolean {
   return (
     !!reference &&

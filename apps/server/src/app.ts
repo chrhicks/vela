@@ -1,22 +1,12 @@
 import { z } from 'zod'
+import { EquipmentError } from '@vela/equipment'
+import { createEquipmentComposition, type EquipmentComposition } from './equipment/composition.js'
 import Fastify from 'fastify'
 import { AlpacaProviderError, createAlpacaDiscovery, type AlpacaDiscovery } from '@vela/alpaca'
 import type { DiscoveryResultView } from '@vela/model/rig'
-import {
-  createRigDeviceInventory,
-  type RigDeviceInventory,
-  type RigInventorySource,
-} from './device/inventory.js'
-import {
-  createRigDeviceConnector,
-  type RigConnectionSource,
-  type RigDeviceConnector,
-} from './device/connection.js'
-import {
-  createRigDeviceInspector,
-  type RigDeviceInspector,
-  type RigInspectionSource,
-} from './device/inspection.js'
+import type { RigDeviceInventory, RigInventorySource } from './device/inventory.js'
+import type { RigConnectionSource, RigDeviceConnector } from './device/connection.js'
+import type { RigDeviceInspector, RigInspectionSource } from './device/inspection.js'
 import { createMemoryRigCatalog, type RigCatalog } from './rig/catalog.js'
 import {
   discoverRigs,
@@ -44,6 +34,7 @@ import { registerTargets, type TargetOptions } from './targets/routes.js'
 import { createSurveyCache, registerSurvey, type SurveyCache } from './targets/survey.js'
 
 interface BuildAppOptions {
+  readonly equipment?: EquipmentComposition
   readonly targets?: TargetOptions
   readonly surveyCache?: SurveyCache
   readonly savedImages?: SavedImageStore
@@ -69,19 +60,27 @@ export function buildApp({
   surveyCache,
   alignment,
   alpacaDiscovery = createAlpacaDiscovery(),
-  createConnector = createRigDeviceConnector,
-  createInventory = createRigDeviceInventory,
-  createInspector = createRigDeviceInspector,
+  equipment = createEquipmentComposition(),
+  createConnector = equipment.createConnector,
+  createInventory = equipment.createInventory,
+  createInspector = equipment.createInspector,
   now = () => new Date(),
   rigCatalog = createMemoryRigCatalog(),
   savedImages = createMemorySavedImageStore(),
 }: BuildAppOptions = {}) {
   const app = Fastify({ logger: true })
   const operations = createRigOperations()
-  registerAlignment(app, rigCatalog, alignment, operations)
+  registerAlignment(app, rigCatalog, alignment, operations, undefined, {
+    createInspector,
+    settingsForRig: equipment.alignmentSettings,
+    createAcquisition: equipment.createAcquisition,
+    createFraming: equipment.createFraming,
+  })
 
   const capture = registerCapture(app, rigCatalog, operations, {
     createInspector,
+    createAcquisition: equipment.createAcquisition,
+    createCooling: settings => equipment.createCooling(settings.rig),
     savedImages,
     lookupSubject(targetId) {
       const target = getTarget(targetId)
@@ -94,11 +93,21 @@ export function buildApp({
     },
   })
 
-  registerAutofocus(app, rigCatalog, operations, { createInspector })
+  registerAutofocus(app, rigCatalog, operations, {
+    createInspector,
+    createAcquisition: equipment.createAcquisition,
+    createFocuserAdapter: equipment.createFocuser,
+  })
   registerNavigation(app, rigCatalog, capture)
   registerSavedImages(app, rigCatalog, savedImages)
   registerImagingCamera(app, rigCatalog, operations, { createInspector })
-  registerTargets(app, rigCatalog, operations, { ...targets, createInspector, now })
+  registerTargets(app, rigCatalog, operations, {
+    ...targets,
+    createInspector,
+    createAdapter: targets?.createAdapter ?? equipment.createFraming,
+    createAcquisition: targets?.createAcquisition ?? equipment.createAcquisition,
+    now,
+  })
   registerSurvey(app, surveyCache ?? createSurveyCache())
 
   const rigConnections = createRigConnectionCoordinator({
@@ -338,7 +347,7 @@ function rigConnectionLogging(
       request.log.warn({ rigId: rig.id }, 'Known Rig identity conflicts before device connection')
     },
     onProviderResult(providerDeviceId, result) {
-      if (!(result instanceof AlpacaProviderError) && result.outcome === 'connected') return
+      if (!(result instanceof EquipmentError) && result.outcome === 'connected') return
       request.log.warn(
         { providerDeviceId, result },
         'Rig device connection did not confirm success',
