@@ -40,6 +40,14 @@ export class CriaOperationFailedError extends EquipmentError {
   }
 }
 
+/** The initial observation failed before any command admission was attempted. */
+export class CriaNotAdmittedError extends EquipmentError {
+  constructor(cause: EquipmentError) {
+    super(cause.message, { reason: cause.reason, endpoint: cause.endpoint, cause })
+    this.name = 'CriaNotAdmittedError'
+  }
+}
+
 export class CriaCancelledError extends EquipmentError {
   /** null establishes that cancellation happened before any admission request. */
   constructor(readonly operation: CriaOperation | null, endpoint: string) {

@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import {
   CaptureStoppedError,
+  CaptureRetryableError,
   EquipmentError,
   FocuserStoppedError,
   FramingStoppedError,
@@ -14,6 +15,7 @@ import {
 import {
   CriaCancelledError,
   CriaOperationFailedError,
+  CriaNotAdmittedError,
   CriaUncertainError,
   type CriaClient,
   type CriaCommand,
@@ -101,6 +103,8 @@ export function createCriaEquipment(client: CriaClient, bindings: ReadonlyArray<
         return frame
       } catch (error) {
         if (error instanceof CriaCancelledError) throw new CaptureStoppedError()
+
+        if (error instanceof CriaNotAdmittedError) throw new CaptureRetryableError(error)
         throw error
       }
     },
