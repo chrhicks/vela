@@ -206,6 +206,12 @@ function setup() {
 
       return focuser
     },
+    createMountControl() {
+      return {
+        observe: async () => undefined,
+        execute: async () => ({ outcome: 'failed', reason: 'unsupported' }),
+      }
+    },
     createCooling(source) {
       select('cooling', source)
 

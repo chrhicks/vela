@@ -48,3 +48,10 @@ export type {
   InspectDevicesOptions,
   ConnectDeviceOptions,
 } from './provider.js'
+
+export type {
+  MountControl,
+  MountControlCommand,
+  MountControlCommandResult,
+  MountControlObservation,
+} from './mount-control.js'

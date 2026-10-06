@@ -26,3 +26,9 @@ Adapters translate its error into their own boundary context.
 The Alpaca package retains its existing public and internal decoder entrypoints
 as compatibility exports and wrappers, so existing consumers need not migrate
 with the extraction.
+
+`MountControl` exposes fresh parked/tracking/motion facts and the explicit Unpark
+or tracking on/off commands. Missing booleans remain unknown. Adapters check
+identity, connection, stationary state and the relevant capability before one
+write, and distinguish confirmed readback, known failure and unresolved outcome.
+It does not compose unpark, tracking and motion into a workflow.

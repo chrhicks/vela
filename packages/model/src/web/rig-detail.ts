@@ -1,3 +1,4 @@
+import type { MountControlView } from './mount-control.js'
 import type { ConnectionStatus, DeviceKind } from '../device/index.js'
 import type {
   IsoDateTime,
@@ -84,7 +85,9 @@ export interface RigTelescopeStatus {
   readonly home: 'at-home' | 'away' | 'unknown'
 }
 
-export type RigTelescopeDeviceView = RigDeviceView<'telescope', RigTelescopeStatus>
+export type RigTelescopeDeviceView = RigDeviceView<'telescope', RigTelescopeStatus> & {
+  readonly mountControl?: MountControlView
+}
 
 export interface RigFocuserStatus {
   readonly availability: 'complete' | 'partial'

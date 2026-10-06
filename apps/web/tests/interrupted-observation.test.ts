@@ -61,7 +61,19 @@ describe('interrupted equipment responses', () => {
       const observation = observationResponse.json<RigObservationView>()
       expect(isRigDetailView(detail)).toBe(true)
       expect(isRigObservationView(observation)).toBe(true)
-      expect(observation.rig).toEqual(detail)
+
+      // Your Rig adds command controls; preparation shares the same device observations.
+      const observedDetail = {
+        ...detail,
+        devices: detail.devices.map(device => {
+          if (device.kind !== 'telescope') return device
+          const { mountControl: _mountControl, ...observed } = device
+
+          return observed
+        }),
+      }
+
+      expect(observation.rig).toEqual(observedDetail)
 
       return { detail, observation }
     }

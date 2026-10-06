@@ -3,9 +3,10 @@ import {
   createAlpacaCameraCooling,
   createAlpacaFocuser,
   createAlpacaFraming,
+  createAlpacaMountControl,
 } from '@vela/alpaca'
 import { CriaClient } from '@vela/cria'
-import { EquipmentError, type Acquisition, type CameraCooling, type Focuser, type Framing } from '@vela/equipment'
+import { EquipmentError, type Acquisition, type CameraCooling, type Focuser, type Framing, type MountControl } from '@vela/equipment'
 import { createCriaEquipment } from '../cria/equipment.js'
 import { createRigDeviceInventory, type RigDeviceInventory } from '../device/inventory.js'
 import { createRigDeviceInspector, type RigDeviceInspector } from '../device/inspection.js'
@@ -24,6 +25,7 @@ export interface EquipmentComposition {
   createAcquisition(rig: RigCatalogRecord): Acquisition
   createFraming(rig: RigCatalogRecord): Framing
   createFocuser(rig: RigCatalogRecord): Focuser
+  createMountControl(rig: RigCatalogRecord): MountControl
   createCooling(rig: RigCatalogRecord): CameraCooling
   alignmentSettings(rig: RigCatalogRecord): AlignmentSettings | undefined
 }
@@ -106,6 +108,9 @@ export function createEquipmentComposition(
     createFocuser: rig => rig.source
       ? cria(rig).focuser
       : createAlpacaFocuser({ baseUrl: alpacaEndpoint(rig) }),
+    createMountControl: rig => rig.source
+      ? cria(rig).mountControl
+      : createAlpacaMountControl({ baseUrl: alpacaEndpoint(rig) }),
     createCooling: rig => rig.source
       ? cria(rig).cooling
       : createAlpacaCameraCooling({ baseUrl: alpacaEndpoint(rig) }),

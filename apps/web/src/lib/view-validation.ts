@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import type { RigDeviceConnectionSummary } from '@vela/model/rig'
 import type { HomeView, RigDetailView } from '@vela/model/web'
+import { mountControlSchema } from '../features/rig-detail/mount-control-api'
 
 const text = z.string().refine(value => value.trim().length > 0)
 
@@ -107,6 +108,7 @@ const identity = z.object({
   id: canonicalText,
   name: text,
   configuredName: text,
+  mountControl: mountControlSchema.optional(),
   observation: z.object({
     state: z.enum(['current', 'partial', 'interrupted']),
     observedAt: isoDate.optional(),

@@ -309,3 +309,18 @@ a no-op. Request spans include transport stage timings, device/command identity
 and protocol outcomes, including ALPACA errors returned with HTTP 200. Image
 payloads are excluded. See [local tracing](../../docs/local-tracing.md) for the
 server configuration and incremental inspection workflow.
+
+## Mount preparation controls
+
+`createAlpacaMountControl({ baseUrl })` resolves a stable telescope identity and
+exposes Unpark and tracking on/off. It reads `AtPark`, `Tracking`, `Slewing`,
+`CanUnpark` and `CanSetTracking`; unsupported facts stay unknown. Each explicit
+command requires fresh connected identity and stationary state. Tracking-on
+requires confirmed unparked state. A matching state is a confirmed no-op.
+
+Writes use `PUT unpark` or `PUT tracking` with the boolean `Tracking` field,
+following the [ASCOM telescope contract](https://ascom-standards.org/newdocs/telescope.html).
+Readback must confirm the requested state and `Slewing=false`. Unpark may finish
+asynchronously, so confirmation is bounded. A lost write response is reconciled
+with read-only state and never replayed. This capability never sends tracking as
+a side effect of Unpark, or sends park, home, slew or abort commands.

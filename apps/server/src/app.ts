@@ -21,6 +21,7 @@ import {
 import { loadRigDetailView } from './rig/detail.js'
 import { loadHomeView } from './rig/home.js'
 import { createRigOperations } from './rig/operations.js'
+import { registerMountControls } from './rig/mount-control.js'
 import { getTarget } from './targets/catalog/index.js'
 import { registerCapture } from './capture/routes.js'
 import { registerAutofocus } from './autofocus/routes.js'
@@ -72,6 +73,12 @@ export function buildApp({
   app.addHook('onReady', async () => { equipment.start() })
   app.addHook('onClose', async () => { await equipment.close() })
   const operations = createRigOperations()
+
+  const mountControls = registerMountControls(app, rigCatalog, operations, {
+    createInspector,
+    createMountControl: equipment.createMountControl,
+  })
+
   registerAlignment(app, rigCatalog, alignment, operations, undefined, {
     createInspector,
     settingsForRig: equipment.alignmentSettings,
@@ -331,7 +338,7 @@ export function buildApp({
         return reply.code(404).send({ error: 'rig-not-found' })
       }
 
-      return result.view
+      return mountControls.decorate(result.view)
     } finally {
       request.raw.removeListener('aborted', cancel)
       reply.raw.removeListener('close', cancel)
