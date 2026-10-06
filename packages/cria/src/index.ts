@@ -13,6 +13,7 @@ export {
   CriaIdentityError,
   CriaUncertainError,
   CriaOperationFailedError,
+  CriaNotAdmittedError,
   CriaCancelledError,
 } from './error.js'
 

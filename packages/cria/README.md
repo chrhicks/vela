@@ -26,6 +26,8 @@ After admission, an aborted caller signal requests equipment cancellation and co
 
 `run()` resolves only for confirmed successful completion. It throws `CriaCancelledError` for confirmed cancellation, `CriaOperationFailedError` for settled failure, and `CriaUncertainError` when completion is unresolved. A cancelled error with `operation: null` establishes that no admission request was sent; otherwise it retains the settled operation. These extend `EquipmentError`; capability adapters translate known cancellation to their specific workflow errors. A local timeout never means equipment stopped. The operation observation allowance includes the requested exposure duration plus configurable driver cleanup and retention time.
 
+A transient observation failure before admission throws `CriaNotAdmittedError`. It establishes that no command was dispatched. The acquisition adapter translates this into `CaptureRetryableError`, allowing alignment to retain its baseline and retry at its existing cancellable cadence. Ownership uncertainty, failures after dispatch, and original-transfer failures never grant permission to repeat an exposure.
+
 `onProgress` receives a validated `CriaOperation`. `onReadState` reports interrupted observation until a fresh operation response arrives. `elapsedSeconds` is worker progress, including time spent waiting for cleanup; it is not measured shutter-open duration.
 
 ## Original ownership

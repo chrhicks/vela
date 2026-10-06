@@ -8,6 +8,7 @@ import {
   CriaCancelledError,
   CriaIdentityError,
   CriaOperationFailedError,
+  CriaNotAdmittedError,
   CriaUncertainError,
 } from './error.js'
 import { CriaHttp } from './http.js'
@@ -597,6 +598,10 @@ export class CriaClient {
       if (active.request === null && options.signal?.aborted &&
         (error === options.signal.reason || error instanceof Error && error.name === 'AbortError'))
         throw new CriaCancelledError(null, '/v2/operations')
+
+      if (active.request === null && error instanceof EquipmentError &&
+        error.reason === 'transport' && !(error instanceof CriaUncertainError))
+        throw new CriaNotAdmittedError(error)
       throw error
     }).finally(() => {
       options.signal?.removeEventListener('abort', onAbort)
