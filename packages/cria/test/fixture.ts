@@ -1,0 +1,268 @@
+import { createHash, randomUUID } from 'node:crypto'
+import { z } from 'zod'
+import {
+  CriaClient,
+  CriaCommandSchema,
+  CriaOperationRequestSchema,
+  type CriaClientOptions,
+  type CriaDevice,
+  type CriaImage,
+  type CriaOperation,
+  type CriaReading,
+  type CriaState,
+  type CriaValue,
+} from '../src/index.js'
+
+export const serviceOrigin = 'http://cria.fixture:4319'
+
+export const token = 'fixture-private-token-with-32-characters'
+
+export const serverNow = 1_700_000_000_000
+
+export function json(value: CriaValue, status = 200): Response {
+  return Response.json(value, { status })
+}
+
+export function failure(status: number, code = 'unavailable'): Response {
+  return json({ error: { code, message: 'Fixture service error' } }, status)
+}
+
+export function reading(value: CriaValue, at = serverNow): CriaReading {
+  return {
+    value,
+    observedAt: at,
+    checkedAt: at,
+    readStartedAt: at,
+    generation: 4,
+    status: 'current',
+    message: null,
+  }
+}
+
+function device(id: string, kind: CriaDevice['kind']): CriaDevice {
+  return {
+    id,
+    kind,
+    bindingId: randomUUID(),
+    expectedName: `Fixture ${id}`,
+    failureDomain: id,
+    health: 'ready',
+    blocked: false,
+    reason: null,
+    observationGeneration: 4,
+    refreshPending: false,
+    commandReady: true,
+    fields: {
+      connected: reading(true),
+      name: reading(`Fixture ${id}`),
+      state: reading(0),
+      width: reading(2),
+      height: reading(3),
+    },
+    channels: [],
+  }
+}
+
+export function pixels(): ArrayBuffer {
+  const bytes = new ArrayBuffer(44 + 6 * 4)
+  const view = new DataView(bytes)
+  const header = [1, 0, 1, 1, 44, 2, 2, 2, 2, 3, 0]
+
+  header.forEach((value, index) => view.setInt32(index * 4, value, true))
+  // Independent ASCOM rank-two wire order: first dimension outermost.
+  const samples = [1, 3, 5, 2, 4, 6]
+
+  samples.forEach((value, index) => view.setInt32(44 + index * 4, value, true))
+
+  return bytes
+}
+
+export class ServiceFixture {
+  readonly camera = device('camera', 'camera')
+  readonly mount = device('mount', 'mount')
+  readonly state: CriaState = {
+    protocolVersion: 2,
+    storeId: randomUUID(),
+    instanceId: randomUUID(),
+    sequence: 1,
+    generatedAt: serverNow,
+    commandsEnabled: true,
+    devices: [this.camera, this.mount],
+    operations: [],
+  }
+  readonly operations = new Map<string, CriaOperation>()
+  readonly requests = new Map<string, CriaOperation>()
+  readonly posts: string[] = []
+  readonly paths: string[] = []
+  readonly deletes: string[] = []
+  readonly cancellations: string[] = []
+  original = pixels()
+  completeImmediately = true
+  cancelImmediately = false
+  last: CriaOperation | null = null
+
+  client(options: Partial<CriaClientOptions> = {}): CriaClient {
+    return new CriaClient({
+      baseUrl: serviceOrigin,
+      token,
+      storeId: this.state.storeId,
+      devices: this.state.devices.map(({ id, kind, expectedName }) => ({ id, kind, expectedName })),
+      fetch: this.fetch,
+      pollIntervalMs: 1,
+      admissionTimeoutMs: 30,
+      observationTimeoutMs: 100,
+      operationTimeoutMs: 1_000,
+      imageRetryMs: 30,
+      ...options,
+    })
+  }
+
+  finish(status: CriaOperation['status'] = 'succeeded'): CriaOperation {
+    const operation = this.last
+
+    if (!operation) throw new Error('Fixture has no admitted operation')
+    operation.status = status
+    operation.phase = 'finished'
+    operation.completedAt = serverNow
+    operation.settled = status !== 'uncertain'
+    operation.blocksDevice = !operation.settled
+
+    if (operation.kind === 'capture' && status === 'succeeded')
+      operation.image = this.image(operation)
+
+    return operation
+  }
+
+  private image(operation: CriaOperation): CriaImage {
+    if (!operation.reservedImageId) throw new Error('Fixture capture lacks a reservation')
+
+    return {
+      id: operation.reservedImageId,
+      operationId: operation.id,
+      instanceId: operation.instanceId,
+      deviceId: operation.deviceId,
+      cameraName: operation.expectedName,
+      bindingId: operation.bindingId,
+      width: 2,
+      height: 3,
+      binX: 1,
+      binY: 1,
+      startX: 0,
+      startY: 0,
+      exposureSeconds: z.number().parse(operation.parameters.exposureSeconds),
+      capturedAt: serverNow,
+      capturedAtSource: 'camera',
+      retainedAt: serverNow,
+      expiresAt: serverNow + 60_000,
+      color: 'mono',
+      sha256: createHash('sha256').update(new Uint8Array(this.original)).digest('hex'),
+      original: {
+        mediaType: 'application/imagebytes',
+        bytes: this.original.byteLength,
+        url: `/v2/images/${operation.reservedImageId}/original`,
+      },
+      preview: null,
+    }
+  }
+
+  readonly fetch: typeof globalThis.fetch = async (input, init) => {
+    const path = new URL(input instanceof Request ? input.url : String(input)).pathname
+    const method = init?.method ?? 'GET'
+
+    this.paths.push(`${method} ${path}`)
+
+    if (new Headers(init?.headers).get('authorization') !== `Bearer ${token}`)
+      return failure(401, 'unauthorized')
+
+    if (init?.redirect !== 'error') throw new Error('Fixture requires redirect refusal')
+
+    if (path === '/v2/state') return json(this.state)
+
+    if (path === '/v2/operations' && method === 'POST') {
+      const text = z.string().parse(init?.body)
+      const request = CriaOperationRequestSchema.parse(JSON.parse(text))
+      const command = CriaCommandSchema.parse({ kind: request.kind, parameters: request.parameters })
+
+      this.posts.push(text)
+      const existing = this.requests.get(request.requestId)
+
+      if (existing) return json(existing, 202)
+
+      const operation: CriaOperation = {
+        ...request,
+        kind: command.kind,
+        id: randomUUID(),
+        failureDomain: request.deviceId,
+        acceptedAt: serverNow,
+        startedAt: serverNow,
+        elapsedSeconds: 0,
+        completedAt: null,
+        status: 'running',
+        phase: 'exposing',
+        acknowledged: true,
+        cancelRequested: false,
+        blocksDevice: true,
+        settled: false,
+        observation: 'current',
+        message: null,
+        result: {},
+        reservedImageId: command.kind === 'capture' ? randomUUID() : null,
+        image: null,
+        reconciliation: null,
+      }
+
+      this.operations.set(operation.id, operation)
+      this.requests.set(operation.requestId, operation)
+      this.last = operation
+
+      if (this.completeImmediately) this.finish()
+
+      return json(operation, 202)
+    }
+
+    if (path.startsWith('/v2/requests/')) {
+      const operation = this.requests.get(path.split('/').at(-1) ?? '')
+
+      return operation ? json(operation) : failure(404, 'not-found')
+    }
+
+    if (path.startsWith('/v2/operations/')) {
+      const id = path.split('/')[3] ?? ''
+      const operation = this.operations.get(id)
+
+      if (!operation) return failure(404, 'not-found')
+
+      if (path.endsWith('/cancel')) {
+        this.cancellations.push(id)
+        operation.cancelRequested = true
+
+        if (this.cancelImmediately) this.finish('cancelled')
+      }
+
+      return json(operation, method === 'POST' ? 202 : 200)
+    }
+
+    if (path.startsWith('/v2/images/')) {
+      const image = this.last?.image
+
+      if (!image || path.split('/')[3] !== image.id) return failure(404, 'not-found')
+
+      if (method === 'DELETE') {
+        this.deletes.push(image.id)
+
+        return json({ id: image.id, released: true })
+      }
+
+      if (path.endsWith('/original'))
+        return new Response(this.original, {
+          headers: {
+            'content-type': 'application/imagebytes',
+            'content-length': String(this.original.byteLength),
+            etag: `"${image.sha256}"`,
+          },
+        })
+    }
+
+    throw new Error(`Unexpected fixture request: ${method} ${path}`)
+  }
+}

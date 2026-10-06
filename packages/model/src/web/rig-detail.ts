@@ -22,6 +22,12 @@ interface RigDeviceIdentity {
   readonly id: string
   readonly name: string
   readonly configuredName: string
+  readonly observation?: {
+    readonly state: 'current' | 'partial' | 'interrupted'
+    readonly observedAt?: IsoDateTime
+    readonly commandReady: boolean
+    readonly message?: string
+  }
 }
 
 interface ConnectedRigDeviceDetail extends RigDeviceIdentity {

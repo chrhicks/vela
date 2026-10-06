@@ -1,12 +1,12 @@
 import { z } from 'zod'
 import type { FastifyInstance } from 'fastify'
 import {
-  AlpacaCaptureStoppedError,
-  AlpacaFocuserStoppedError,
   createAlpacaAcquisition,
   createAlpacaFocuser,
-  type AlpacaFocuserMove,
 } from '@vela/alpaca'
+import { CaptureStoppedError, FocuserStoppedError, type Acquisition, type Focuser, type FocuserMove } from '@vela/equipment'
+import type { RigCatalogRecord } from '../rig/contracts.js'
+import { alpacaEndpoint } from '../equipment/source.js'
 import type { AutofocusView } from '@vela/model/web'
 import type { RigCatalog } from '../rig/catalog.js'
 import { inspectRigDetail, type RigDetailOptions } from '../rig/detail.js'
@@ -23,22 +23,22 @@ import { DEFAULT_OFFSET_STEPS, DEFAULT_STEP_SIZE } from './walk.js'
 
 interface AutofocusRouteOptions {
   createInspector?: RigDetailOptions['createInspector']
+  createAcquisition?: (rig: RigCatalogRecord) => Acquisition
+  createFocuserAdapter?: (rig: RigCatalogRecord) => Focuser
   createCamera?: (settings: {
-    endpoint: string
+    rig: RigCatalogRecord
     cameraId: string
     expectedCameraName: string
   }) => AutofocusCamera
-  createFocuser?: (settings: { endpoint: string; focuserId: string }) => AutofocusFocuser
+  createFocuser?: (settings: { rig: RigCatalogRecord; focuserId: string }) => AutofocusFocuser
   measure?: typeof measureAutofocusStars
 }
 
 function configuredCamera(settings: {
-  endpoint: string
+  rig: RigCatalogRecord
   cameraId: string
   expectedCameraName: string
-}): AutofocusCamera {
-  const acquisition = createAlpacaAcquisition({ baseUrl: settings.endpoint })
-
+}, acquisition: Acquisition): AutofocusCamera {
   return {
     async capture({ exposureSeconds, signal, onProgress, onReadState }) {
       try {
@@ -51,27 +51,25 @@ function configuredCamera(settings: {
           onReadState,
         })
       } catch (error) {
-        if (error instanceof AlpacaCaptureStoppedError) throw new AutofocusStoppedError()
+        if (error instanceof CaptureStoppedError) throw new AutofocusStoppedError()
         throw error
       }
     },
   }
 }
 
-function configuredFocuser(settings: { endpoint: string; focuserId: string }): AutofocusFocuser {
-  const focuser = createAlpacaFocuser({ baseUrl: settings.endpoint })
-
+function configuredFocuser(settings: { focuserId: string }, focuser: Focuser): AutofocusFocuser {
   return {
     status: signal => focuser.status(settings.focuserId, signal),
     async move(position, window, signal) {
-      const command: AlpacaFocuserMove = { focuserId: settings.focuserId, position, window }
+      const command: FocuserMove = { focuserId: settings.focuserId, position, window }
 
       if (signal) command.signal = signal
 
       try {
         return await focuser.move(command)
       } catch (error) {
-        if (error instanceof AlpacaFocuserStoppedError) throw new AutofocusStoppedError()
+        if (error instanceof FocuserStoppedError) throw new AutofocusStoppedError()
         throw error
       }
     },
@@ -85,16 +83,20 @@ export function registerAutofocus(
   operations: RigOperations,
   {
     createInspector,
-    createCamera = configuredCamera,
-    createFocuser = configuredFocuser,
+    createCamera,
+    createFocuser,
+    createAcquisition = rig => createAlpacaAcquisition({ baseUrl: alpacaEndpoint(rig) }),
+    createFocuserAdapter = rig => createAlpacaFocuser({ baseUrl: alpacaEndpoint(rig) }),
     measure,
   }: AutofocusRouteOptions = {},
 ) {
   const controllers = new Map<string, ReturnType<typeof createAutofocusController>>()
+  const cameraFactory = createCamera ?? (settings => configuredCamera(settings, createAcquisition(settings.rig)))
+  const focuserFactory = createFocuser ?? (settings => configuredFocuser(settings, createFocuserAdapter(settings.rig)))
 
   async function readiness(rigId: string): Promise<{
     view?: AutofocusView
-    devices?: { endpoint: string; cameraId: string; focuserId: string }
+    devices?: { rig: RigCatalogRecord; cameraId: string; focuserId: string }
   }> {
     const rig = await catalog.get(rigId)
 
@@ -198,13 +200,17 @@ export function registerAutofocus(
         : snapshot.maxStep
 
     if (!snapshot.active) {
+      const blocked = [camera, focuser].find(device => device.observation?.commandReady === false)
+
+      if (blocked)
+        return unavailable(blocked.observation?.message ?? 'Fresh equipment state is required before autofocus.', names)
       const cameraTelemetry = camera.telemetry.values
 
       if (cameraTelemetry?.kind !== 'camera' || cameraTelemetry.activity !== 'idle') {
         return unavailable('The camera has not confirmed it is idle.', names)
       }
 
-      if (focuserTelemetry?.kind !== 'focuser' || focuserTelemetry.moving) {
+      if (focuserTelemetry?.kind !== 'focuser' || focuserTelemetry.moving !== false) {
         return unavailable('The focuser has not confirmed it is idle.', names)
       }
 
@@ -224,7 +230,7 @@ export function registerAutofocus(
         unavailableReason: null,
       },
       devices: {
-        endpoint: `http://${rig.endpoint.host}:${rig.endpoint.port}`,
+        rig,
         cameraId: rig.imagingCamera.uniqueId,
         focuserId: focuser.providerDeviceId,
       },
@@ -298,12 +304,12 @@ export function registerAutofocus(
           options.exposureSeconds = parsed.data.exposureSeconds
 
         const result = await controller.start(
-          createCamera({
-            endpoint: devices.endpoint,
+          cameraFactory({
+            rig: devices.rig,
             cameraId: devices.cameraId,
             expectedCameraName: view.cameraName,
           }),
-          createFocuser({ endpoint: devices.endpoint, focuserId: devices.focuserId }),
+          focuserFactory({ rig: devices.rig, focuserId: devices.focuserId }),
           options,
         )
 

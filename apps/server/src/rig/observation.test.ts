@@ -124,3 +124,14 @@ describe('Rig observation projection', () => {
     expect(view).not.toHaveProperty('canObserve')
   })
 })
+
+it('does not treat a retained connected state as current connection preparation', () => {
+  const retained: RigDeviceDetailView = {
+    ...device('camera', 'camera', 'connected'),
+    observation: { state: 'interrupted', commandReady: false },
+  }
+
+  expect(rigObservationView(rig([retained])).connectionPreparation).toEqual({
+    state: 'unavailable', capabilities: [],
+  })
+})

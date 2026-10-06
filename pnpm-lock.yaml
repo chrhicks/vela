@@ -75,6 +75,12 @@ importers:
       '@vela/alpaca':
         specifier: workspace:*
         version: link:../../packages/alpaca
+      '@vela/cria':
+        specifier: workspace:*
+        version: link:../../packages/cria
+      '@vela/equipment':
+        specifier: workspace:*
+        version: link:../../packages/equipment
       '@vela/model':
         specifier: workspace:*
         version: link:../../packages/model
@@ -201,6 +207,9 @@ importers:
       '@opentelemetry/api':
         specifier: 1.9.1
         version: 1.9.1
+      '@vela/equipment':
+        specifier: workspace:*
+        version: link:../equipment
       effect:
         specifier: 4.0.0-beta.107
         version: 4.0.0-beta.107
@@ -211,6 +220,28 @@ importers:
       '@types/node':
         specifier: ^26.2.0
         version: 26.2.0
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
+  packages/cria:
+    dependencies:
+      '@vela/equipment':
+        specifier: workspace:*
+        version: link:../equipment
+      zod:
+        specifier: 4.5.4
+        version: 4.5.4
+    devDependencies:
+      '@types/node':
+        specifier: ^26.2.0
+        version: 26.2.0
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
+  packages/equipment:
+    devDependencies:
       typescript:
         specifier: ^7.0.2
         version: 7.0.2

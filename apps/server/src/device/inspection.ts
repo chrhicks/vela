@@ -1,24 +1,18 @@
-import {
-  createAlpacaProvider,
-  type AlpacaDeviceInspection,
-  type AlpacaInspectDevicesOptions,
-  type AlpacaProvider,
-} from '@vela/alpaca'
-import type { RigEndpoint, RigId } from '@vela/model/rig'
+import { createAlpacaProvider } from '@vela/alpaca'
+import type { EquipmentInspection, InspectDevicesOptions, EquipmentProvider } from '@vela/equipment'
+import type { RigEquipmentSource } from '../rig/contracts.js'
+import { alpacaEndpoint } from '../equipment/source.js'
 
-export interface RigInspectionSource {
-  readonly id: RigId
-  readonly endpoint: RigEndpoint
-}
+export type RigInspectionSource = RigEquipmentSource
 
 export interface RigDeviceInspector {
   inspectDevices(
-    options?: AlpacaInspectDevicesOptions,
-  ): Promise<ReadonlyArray<AlpacaDeviceInspection>>
+    options?: InspectDevicesOptions,
+  ): Promise<ReadonlyArray<EquipmentInspection>>
 }
 
 export interface RigDeviceInspectorOptions {
-  readonly provider?: Pick<AlpacaProvider, 'inspectDevices'>
+  readonly provider?: Pick<EquipmentProvider, 'inspectDevices'>
 }
 
 export function createRigDeviceInspector(
@@ -28,7 +22,7 @@ export function createRigDeviceInspector(
   const provider =
     options.provider ??
     createAlpacaProvider({
-      baseUrl: `http://${rig.endpoint.host}:${rig.endpoint.port}`,
+      baseUrl: alpacaEndpoint(rig),
     })
 
   return {

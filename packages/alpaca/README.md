@@ -4,6 +4,13 @@ Server-side Alpaca protocol boundary for Vela. Raw wire fields, response envelop
 
 The package does not depend on `@vela/model` and performs no network activity during import or factory creation.
 
+Transport-neutral capability contracts and shared error bases live in
+`@vela/equipment`. Existing `Alpaca*` contract exports remain compatible aliases;
+Alpaca's provider and retryable-capture errors retain their diagnostic names while
+extending the shared errors. ASCOM ImageBytes decoding uses the separate
+`@vela/equipment/image-bytes` primitive, with errors translated back into the
+Alpaca boundary's existing context.
+
 ## Discovery and inspection
 
 ```ts

@@ -1,3 +1,11 @@
+import { CaptureRetryableError } from '@vela/equipment'
+import { CaptureStoppedError as AlpacaCaptureStoppedError } from '@vela/equipment'
+import type {
+  FrameColor as AlpacaFrameColor,
+  Frame as AlpacaFrame,
+  Acquisition as AlpacaAcquisition
+} from '@vela/equipment'
+
 import { Schema } from 'effect'
 import { setTimeout as delay } from 'node:timers/promises'
 import { SpanStatusCode, trace } from '@opentelemetry/api'
@@ -7,50 +15,23 @@ import { createAlpacaClient, type CameraImage } from './internal/client.js'
 import type { ConfiguredDevice } from './internal/types/management.js'
 import { rejectDuplicateDeviceIds, stableDeviceId } from './internal/configured-device.js'
 
-export class AlpacaCaptureStoppedError extends Error {
-  constructor() {
-    super('Exposure cancellation confirmed')
-    this.name = 'AbortError'
-  }
-}
+export { CaptureStoppedError as AlpacaCaptureStoppedError } from '@vela/equipment'
+
+export type {
+  FrameColor as AlpacaFrameColor,
+  Frame as AlpacaFrame,
+  CaptureOptions as AlpacaCaptureOptions,
+  Pointing as AlpacaPointing,
+  Acquisition as AlpacaAcquisition
+} from '@vela/equipment'
 
 /** A fresh capture may be attempted: no exposure started, or an acknowledged
  * exposure was stopped and the camera confirmed idle. Never an uncertain write. */
-export class AlpacaCaptureRetryableError extends Error {
+export class AlpacaCaptureRetryableError extends CaptureRetryableError {
   constructor(cause: AlpacaProviderError) {
-    super(cause.message, { cause })
+    super(cause)
     this.name = 'AlpacaCaptureRetryableError'
   }
-}
-
-export type AlpacaFrameColor =
-  | { kind: 'mono' }
-  | { kind: 'bayer'; pattern: 'rggb' | 'grbg' | 'gbrg' | 'bggr' }
-
-export interface AlpacaFrame {
-  width: number
-  height: number
-  /** Row-major, pixels[y * width + x]. */
-  pixels: Float64Array
-  capturedAt: string
-  /** Missing means a camera-supplied timestamp (including older callers). */
-  capturedAtSource?: 'camera' | 'server-estimate'
-  /** Color layout at the returned image origin, after accounting for subframe position. */
-  color: AlpacaFrameColor
-}
-
-export interface AlpacaCaptureOptions {
-  cameraId: string
-  /** Confirm the operational camera name when a driver slot can host different hardware. */
-  expectedCameraName?: string
-  exposureSeconds: number
-  /** Reject color before starting when the consumer requires monochrome samples. */
-  monochromeOnly?: boolean
-  signal?: AbortSignal
-  onProgress?: (elapsedSeconds: number) => void
-  onReadout?: () => void
-  /** Observation of this acknowledged exposure is interrupted; no new exposure is started. */
-  onReadState?: (state: 'retrying' | 'current') => void
 }
 
 export interface AlpacaAcquisitionOptions {
@@ -62,34 +43,6 @@ export interface AlpacaAcquisitionOptions {
 }
 
 const coordinateSystems = ['other', 'topocentric', 'j2000', 'j2050', 'b1950'] as const
-
-export interface AlpacaPointing {
-  rightAscensionDegrees: number
-  declinationDegrees: number
-  siderealTimeDegrees: number
-  latitudeDegrees: number
-  tracking: boolean
-  coordinateSystem: (typeof coordinateSystems)[number]
-}
-
-export interface AlpacaAcquisition {
-  capture(options: AlpacaCaptureOptions): Promise<AlpacaFrame>
-  pointing(telescopeId: string, signal?: AbortSignal): Promise<AlpacaPointing>
-  move(
-    telescopeId: string,
-    rateDegreesPerSecond: number,
-    durationSeconds: number,
-    signal?: AbortSignal,
-  ): Promise<void>
-  /** Rotate the primary axis until observed RA reaches the signed angular travel. */
-  rotateRightAscension(
-    telescopeId: string,
-    rateDegreesPerSecond: number,
-    distanceDegrees: number,
-    signal?: AbortSignal,
-  ): Promise<void>
-  abort(cameraId: string, telescopeId: string): Promise<void>
-}
 
 function invalid(message: string, endpoint: string): never {
   throw new AlpacaProviderError(message, { reason: 'invalid-response', endpoint })

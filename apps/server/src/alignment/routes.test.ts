@@ -189,6 +189,32 @@ describe('alignment environment settings', () => {
 })
 
 describe('alignment routes', () => {
+  it('composes physical Cria alignment by explicit rig identity without a legacy endpoint', async () => {
+    const criaRig: RigCatalogRecord = { ...rig, source: { kind: 'cria', configurationId: 'fixture' } }
+    const app = Fastify()
+    apps.push(app)
+    const acquisition = createAlpacaAcquisition({ baseUrl: 'http://unused.invalid' })
+    const framing = createAlpacaFraming({ baseUrl: 'http://unused.invalid' })
+    const selectAcquisition = vi.fn(() => acquisition)
+    const selectFraming = vi.fn(() => framing)
+    const settings = alignmentSettings({ ...env, VELA_ALIGNMENT_MODE: 'physical' })!
+
+    registerAlignment(app, createMemoryRigCatalog([criaRig]), undefined, createRigOperations(), mocks, {
+      settingsForRig: () => ({ ...settings, rigId: criaRig.id, endpoint: 'http://different-cria:4319' }),
+      createAcquisition: selectAcquisition,
+      createFraming: selectFraming,
+    })
+
+    expect((await app.inject('/api/web/rigs/rig/alignment')).json()).toMatchObject({ enabled: true, mode: 'physical' })
+    expect((await app.inject({ method: 'POST', url: '/api/rigs/rig/alignment/start', payload: {} })).statusCode).toBe(200)
+    expect(selectAcquisition).toHaveBeenCalledWith(criaRig)
+    expect(selectFraming).toHaveBeenCalledWith(criaRig)
+    expect(mocks.acquisition).not.toHaveBeenCalled()
+    expect(mocks.framing).not.toHaveBeenCalled()
+    expect(mocks.physical.mock.calls[0]?.[1]).toBe(acquisition)
+    expect(mocks.physical.mock.calls[0]?.[2]).toBe(framing)
+  })
+
   it('shows physical mode only for the configured selected camera with a focal length', async () => {
     const { app } = setup()
     const response = await app.inject('/api/web/rigs/rig/alignment')
