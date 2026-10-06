@@ -110,7 +110,7 @@ export function createCriaEquipment(client: CriaClient, bindings: ReadonlyArray<
     },
     async pointing(id, signal) {
       const readings = await observed(id, 'mount', signal)
-      const coordinateSystem = readings.coordinateSystem()
+      const coordinateSystem = readings.coordinateSystem(true)
 
       if (coordinateSystem === 'unknown')
         throw new EquipmentError('Mount coordinate frame is unavailable', {
@@ -168,16 +168,24 @@ export function createCriaEquipment(client: CriaClient, bindings: ReadonlyArray<
       const status: TelescopeStatus = {
         rightAscensionDegrees: r.number('rightAscensionHours', 0, 24) * 15,
         declinationDegrees: r.number('declinationDegrees', -90, 90),
-        coordinateSystem: r.coordinateSystem(),
+        coordinateSystem: r.coordinateSystem(options?.includeAlignmentObservations),
         tracking: r.boolean('tracking'),
         slewing: r.boolean('slewing'),
         parked: r.boolean('parked'),
         observedAt: r.observedAt(['rightAscensionHours', 'declinationDegrees', 'tracking', 'slewing', 'parked']),
       }
 
-      const latitude = r.optionalNumber('latitudeDegrees', -90, 90, true)
-      const longitude = r.optionalNumber('longitudeDegrees', -180, 180, true)
-      const elevation = r.optionalNumber('elevationMeters', -300, 10000, true)
+      const latitude = options?.includeAlignmentObservations
+        ? r.number('latitudeDegrees', -90, 90, true)
+        : r.optionalNumber('latitudeDegrees', -90, 90, true)
+
+      const longitude = options?.includeAlignmentObservations
+        ? r.number('longitudeDegrees', -180, 180, true)
+        : r.optionalNumber('longitudeDegrees', -180, 180, true)
+
+      const elevation = options?.includeAlignmentObservations
+        ? r.supportedNumber('elevationMeters', -300, 10000, true)
+        : r.optionalNumber('elevationMeters', -300, 10000, true)
 
       if (latitude !== undefined) status.latitudeDegrees = latitude
 
@@ -189,15 +197,9 @@ export function createCriaEquipment(client: CriaClient, bindings: ReadonlyArray<
         status.pierSide = r.pierSide()
 
       if (options?.includeAlignmentObservations) {
-        const rate = r.trackingRate()
-        const raRate = r.optionalNumber('rightAscensionRateSecondsPerSiderealSecond', -1e6, 1e6)
-        const decRate = r.optionalNumber('declinationRateArcsecondsPerSecond', -1e6, 1e6)
-
-        if (rate !== undefined) status.trackingRate = rate
-
-        if (raRate !== undefined) status.rightAscensionRateSecondsPerSiderealSecond = raRate
-
-        if (decRate !== undefined) status.declinationRateArcsecondsPerSecond = decRate
+        status.trackingRate = r.trackingRate()
+        status.rightAscensionRateSecondsPerSiderealSecond = r.number('rightAscensionRateSecondsPerSiderealSecond', -1e6, 1e6)
+        status.declinationRateArcsecondsPerSecond = r.number('declinationRateArcsecondsPerSecond', -1e6, 1e6)
       }
 
       return status

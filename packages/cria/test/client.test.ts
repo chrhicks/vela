@@ -63,6 +63,46 @@ describe('state and identity', () => {
     expect(client.optionalReading(snapshot, camera, 'state')).toBeUndefined()
   })
 
+  it('distinguishes temporary required measurements from unsupported or malformed facts', async () => {
+    const service = new ServiceFixture()
+    const client = service.client()
+    const snapshot = await client.state()
+    const camera = client.device(snapshot, 'camera')
+
+    const transient = [
+      { ...reading(0), status: 'error' as const },
+      { ...reading(0), status: 'pending' as const },
+      { ...reading(0), status: 'stale' as const },
+      { ...reading(0), generation: 3 },
+      reading(0, serverNow - 8_000),
+    ]
+
+    for (const field of transient) {
+      camera.fields.state = field
+      expect(() => client.reading(snapshot, camera, 'state')).toThrowError(expect.objectContaining({ reason: 'transport' }))
+    }
+
+    camera.fields.state = reading(0)
+    camera.refreshPending = true
+    expect(() => client.reading(snapshot, camera, 'state')).toThrowError(expect.objectContaining({ reason: 'transport' }))
+    camera.refreshPending = false
+    expect(() => client.reading({ ...snapshot, roundTripMs: 4_000 }, camera, 'state')).toThrowError(expect.objectContaining({ reason: 'transport' }))
+
+    for (const field of [
+      { ...reading(null), status: 'unsupported' as const },
+      { ...reading(0), checkedAt: serverNow + 1 },
+      { ...reading(0), observedAt: null },
+    ]) {
+      camera.fields.state = field
+      expect(() => client.reading(snapshot, camera, 'state')).toThrowError(expect.objectContaining({ reason: 'invalid-response' }))
+    }
+
+    delete camera.fields.state
+    expect(() => client.reading(snapshot, camera, 'state')).toThrowError(expect.objectContaining({ reason: 'invalid-response' }))
+    camera.blocked = true
+    expect(() => client.reading(snapshot, camera, 'state')).toThrowError(expect.objectContaining({ name: 'CriaUncertainError', reason: 'protocol-error' }))
+  })
+
   it.each(['instance', 'binding', 'store'] as const)('blocks new writes after %s identity changes', async changed => {
     const service = new ServiceFixture()
     const client = service.client()

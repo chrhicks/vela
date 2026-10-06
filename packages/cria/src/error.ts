@@ -28,7 +28,7 @@ export class CriaUncertainError extends EquipmentError {
     readonly operation: CriaOperation | null,
     options?: ErrorOptions,
   ) {
-    super(message, { reason: 'transport', endpoint, cause: options?.cause })
+    super(message, { reason: 'protocol-error', endpoint, cause: options?.cause })
     this.name = 'CriaUncertainError'
   }
 }

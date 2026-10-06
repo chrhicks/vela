@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { CriaClient, CriaUncertainError } from '@vela/cria'
 import { CaptureRetryableError } from '@vela/equipment'
-import { ServiceFixture, serviceOrigin, token, serverNow } from '../../../packages/cria/test/fixture.js'
+import { ServiceFixture, serviceOrigin, token, serverNow, reading } from '../../../packages/cria/test/fixture.js'
 import { createCriaEquipment } from '../src/cria/equipment.js'
 import { createAlignmentController } from '../src/alignment/controller.js'
 import { createTestCadence } from '../src/alignment/test-cadence.js'
@@ -17,31 +17,54 @@ function equipment(service: ServiceFixture, fetch = service.fetch) {
     fetch,
     pollIntervalMs: 1,
     admissionTimeoutMs: 10,
+    observationTimeoutMs: 10,
   }), bindings.map(binding => ({ ...binding, providerDeviceId: binding.id })))
 }
 
 describe('Cria alignment read recovery', () => {
-  it('retains the measured baseline through pre-admission failures and resumes without another sweep', async () => {
+  it.each(['transport', 'pointing-error', 'pointing-stale', 'camera-name-error'])(
+    'retains the measured baseline through %s and resumes without another sweep', async interruption => {
     const service = new ServiceFixture()
     let interrupted = true
     let reads = 0
+    let exposures = 0
+    let ra = 10
 
     const adapter = equipment(service, async (input, init) => {
       if (new URL(String(input)).pathname === '/v2/state') {
         reads++
 
-        if (interrupted) throw new TypeError('Transient read interruption')
+        if (interrupted && interruption === 'transport') throw new TypeError('Transient read interruption')
+        service.mount.fields = {
+          ...service.mount.fields,
+          rightAscensionHours: reading(ra / 15),
+          declinationDegrees: reading(60),
+          siderealTimeHours: reading(((exposures + 1) * 24) / 86164.0905),
+          latitudeDegrees: reading(40),
+          tracking: reading(true),
+          coordinateSystem: reading(2),
+        }
+        service.camera.fields.name = reading(service.camera.expectedName)
+
+        if (interrupted && interruption === 'pointing-error')
+          service.mount.fields.rightAscensionHours.status = 'error'
+
+        if (interrupted && interruption === 'pointing-stale')
+          service.mount.fields.rightAscensionHours.status = 'stale'
+
+        if (interrupted && interruption === 'camera-name-error')
+          service.camera.fields.name.status = 'error'
       }
 
       return service.fetch(input, init)
     })
 
     const cadence = createTestCadence()
-    let exposures = 0
-    let ra = 10
     const move = vi.fn(async (_id: string, rate: number, duration: number) => { ra += rate * duration })
 
-    const pointing = vi.fn(async () => ({
+    const pointing = vi.fn(async () => exposures >= 3 && interruption.startsWith('pointing-')
+      ? adapter.acquisition.pointing('mount')
+      : ({
       rightAscensionDegrees: ra,
       declinationDegrees: 60,
       siderealTimeDegrees: ((exposures + 1) * 360) / 86164.0905,
@@ -95,8 +118,9 @@ describe('Cria alignment read recovery', () => {
 
       for (let attempt = 1; attempt <= 2; attempt++) {
         cadence.waits.shift()!()
-        await vi.waitFor(() => expect(reads).toBe(attempt))
+        await vi.waitFor(() => expect(reads).toBeGreaterThanOrEqual(attempt))
         await vi.waitFor(() => expect(controller.snapshot().activity).toBe('retrying'))
+        await vi.waitFor(() => expect(cadence.waits).toHaveLength(1))
         expect(controller.snapshot()).toMatchObject({ phase: 'adjusting', active: true, error: null, measuredAt })
         expect(controller.snapshot().measurement).toBe(baseline)
         expect(service.posts).toHaveLength(0)
@@ -115,6 +139,7 @@ describe('Cria alignment read recovery', () => {
       interrupted = true
       cadence.waits.shift()!()
       await vi.waitFor(() => expect(controller.snapshot().activity).toBe('retrying'))
+      await vi.waitFor(() => expect(cadence.waits).toHaveLength(1))
       expect(await controller.stop()).toMatchObject({ phase: 'stopped', active: false, error: null })
       expect(cadence.waits).toHaveLength(0)
       expect(service.posts).toHaveLength(1)
