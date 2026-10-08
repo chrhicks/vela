@@ -144,7 +144,7 @@ export function createCriaEquipment(
 
           return acquired.frame
         } finally {
-          if (requestId !== null) custody.release(requestId)
+          if (requestId !== null) custody.disown(requestId)
         }
       } catch (error) {
         if (error instanceof CriaCancelledError) throw new CaptureStoppedError()
