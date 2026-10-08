@@ -134,7 +134,8 @@ export function createCriaCustody(client: CriaClient, archive: AcquisitionArchiv
     for (const imageId of unreceipted) {
       const record = await client.custody(imageId).catch(() => undefined)
 
-      if (record && owned.has(record.requestId)) continue
+      // Still retained (for example on a page this cycle never read) or owned: pending, not a problem.
+      if (record && (owned.has(record.requestId) || record.state === 'retained')) continue
 
       const finished = record?.receipt &&
         await expectedFor(record).then(expected => archive.receipt(expected)).catch(() => undefined)

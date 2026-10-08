@@ -299,6 +299,38 @@ describe('acquisition custody through the Cria adapter', () => {
     error.mockRestore()
   })
 
+  it('does not misreport copies on unread pages when a full archive disk ends the cycle', async () => {
+    const service = new ServiceFixture()
+    const directory = await mkdtemp(join(tmpdir(), 'vela-custody-'))
+    let failing: 'original' | 'receipt' = 'original'
+
+    const full = await openAcquisitionArchive(directory, {
+      ...nodeArchiveFileSystem,
+      open: async (path, flags) => {
+        if (String(path).includes(failing === 'original' ? 'original.imagebytes' : 'receipt.json'))
+          throw new Error('No space left on device')
+
+        return open(path, flags)
+      },
+    })
+
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const capturing = setup(service, full)
+
+    for (let index = 0; index < 50; index++) await capturing.equipment.acquisition.capture(request)
+    // The 51st, on the second page, was published but its receipt write failed.
+    failing = 'receipt'
+    await capturing.equipment.acquisition.capture(request)
+    failing = 'original'
+
+    const report = await setup(service, full).custody.recover()
+
+    expect(report.preserved).toBe(0)
+    expect(report.problems).toEqual([expect.stringContaining(': No space left on device'), expect.stringContaining('Archive unavailable')])
+    expect([...service.custody.values()].every(record => record.state === 'retained')).toBe(true)
+    error.mockRestore()
+  })
+
   it('reports no problem when an acquisition finishes its receipt while recovery runs', async () => {
     const service = new ServiceFixture()
     const directory = await mkdtemp(join(tmpdir(), 'vela-custody-'))
