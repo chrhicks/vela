@@ -24,7 +24,7 @@ function fixture() {
 
   const control = createCriaEquipment(client, [{
     providerDeviceId: 'mount-id', id: 'mount', kind: 'mount', expectedName: 'Fixture mount',
-  }], createCriaCustody(client, createMemoryAcquisitionArchive(), service.state.storeId)).mountControl
+  }], createCriaCustody(client, createMemoryAcquisitionArchive(), service.state.storeId), 'rig-1').mountControl
 
   return { service, control }
 }

@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { setTimeout as delay } from 'node:timers/promises'
 import { EquipmentError, type Frame } from '@vela/equipment'
 import { imageBytesPixels } from '@vela/equipment/image-bytes'
@@ -65,6 +65,11 @@ export interface CriaRunOptions {
   signal?: AbortSignal
   onProgress?: (operation: CriaOperation) => void
   onReadState?: (state: 'current' | 'retrying') => void
+  /**
+   * Awaited after the exact request is built and before it is sent. A failure here means the
+   * request was never sent, so the caller can record what it intends before Cria can act on it.
+   */
+  beforeAdmission?: (request: CriaOperationRequest) => Promise<void>
 }
 
 export interface CriaObserveOptions {
@@ -616,7 +621,10 @@ export class CriaClient {
     if (this.writeFailure) throw this.writeFailure
     const { device, snapshot } = observed
 
-    if (!snapshot.state.commandsEnabled) throw new CriaApiError(403, 'commands-disabled', 'Cria equipment writes are disabled', '/v2/operations')
+    if (!snapshot.state.commandsEnabled) {
+      throw new CriaApiError(403, 'commands-disabled',
+        snapshot.state.admissionStoppedReason ?? 'Cria equipment writes are disabled', '/v2/operations')
+    }
 
     for (const other of this.active.values())
       if (other !== active && other.failureDomain === device.failureDomain)
@@ -636,6 +644,7 @@ export class CriaClient {
       ...command,
     }
 
+    await options.beforeAdmission?.(request)
     active.request = request
     active.operation = await this.admit(request, active)
     this.requirePostWriteObservation(snapshot, active.operation)
@@ -740,6 +749,30 @@ export class CriaClient {
     operation: CriaOperation,
     options: Pick<CriaRunOptions, 'onReadState'> = {},
   ): Promise<{ image: CriaImage; frame: Frame; original: Uint8Array }> {
+    const image = this.confirmedImage(operation)
+    const bytes = await this.transferOriginal(image, options)
+    const frame = this.frameOf(image, bytes)
+
+    options.onReadState?.('current')
+
+    return { image, original: new Uint8Array(bytes), frame }
+  }
+
+  /**
+   * Decode an original of a confirmed capture that was already verified elsewhere, such as the
+   * same bytes in Vela's archive after Cria released its copy. The digest must still match.
+   */
+  decodeOriginal(operation: CriaOperation, original: Uint8Array): Frame {
+    const image = this.confirmedImage(operation)
+
+    if (original.byteLength !== image.original.bytes ||
+      createHash('sha256').update(original).digest('hex') !== image.sha256)
+      throw this.invalid('Archived original does not match the confirmed capture', image.original.url)
+
+    return this.frameOf(image, Uint8Array.from(original).buffer)
+  }
+
+  private confirmedImage(operation: CriaOperation): CriaImage {
     const validated = CriaOperationSchema.parse(operation)
 
     this.verifyOperation(validated)
@@ -755,8 +788,10 @@ export class CriaClient {
       image.exposureSeconds !== validated.parameters.exposureSeconds)
       throw this.invalid('Cria original does not belong to the completed capture', '/v2/images')
 
-    const bytes = await this.transferOriginal(image, options)
-    const original = new Uint8Array(bytes)
+    return image
+  }
+
+  private frameOf(image: CriaImage, bytes: ArrayBuffer): Frame {
     let pixels: Float64Array
 
     try {
@@ -767,19 +802,13 @@ export class CriaClient {
       })
     }
 
-    options.onReadState?.('current')
-
     return {
-      image,
-      original,
-      frame: {
-        width: image.width,
-        height: image.height,
-        pixels,
-        capturedAt: new Date(image.capturedAt).toISOString(),
-        capturedAtSource: image.capturedAtSource,
-        color: image.color === 'mono' ? { kind: 'mono' } : { kind: 'bayer', pattern: image.color },
-      },
+      width: image.width,
+      height: image.height,
+      pixels,
+      capturedAt: new Date(image.capturedAt).toISOString(),
+      capturedAtSource: image.capturedAtSource,
+      color: image.color === 'mono' ? { kind: 'mono' } : { kind: 'bayer', pattern: image.color },
     }
   }
 

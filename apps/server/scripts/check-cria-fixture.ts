@@ -52,7 +52,7 @@ const bindings = connection.devices.map(device => ({ ...device, providerDeviceId
 
 const acquisitions = await openAcquisitionArchive(await mkdtemp(join(tmpdir(), 'vela-cria-fixture-acquisitions-')))
 
-const equipment = createCriaEquipment(client, bindings, createCriaCustody(client, acquisitions, state.storeId))
+const equipment = createCriaEquipment(client, bindings, createCriaCustody(client, acquisitions, state.storeId), 'fixture-check')
 
 assert.equal((await equipment.provider.inspectDevices()).length, 5)
 

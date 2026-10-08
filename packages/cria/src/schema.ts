@@ -330,6 +330,8 @@ export const CriaStateSchema = z.strictObject({
   sequence: z.number().int().nonnegative(),
   generatedAt: timestamp,
   commandsEnabled: z.boolean(),
+  /** Set once an essential Cria storage write failed; admission stays stopped until restart. */
+  admissionStoppedReason: z.string().nullable(),
   devices: z.array(CriaDeviceSchema).max(16),
   operations: z.array(CriaOperationSchema),
 }).refine(state => new Set(state.devices.map(device => device.id)).size === state.devices.length,
