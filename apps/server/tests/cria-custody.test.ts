@@ -140,7 +140,7 @@ describe('acquisition custody through the Cria adapter', () => {
     const working = createMemoryAcquisitionArchive()
     const { equipment } = setup(service, { ...working, recordIntent: async () => { throw new Error('Archive disk unavailable') } })
 
-    await expect(equipment.acquisition.capture(request)).rejects.toThrow('Archive disk unavailable')
+    await expect(equipment.acquisition.capture(request)).rejects.toThrow('Acquisition archive unavailable; capture not started: Archive disk unavailable')
     expect(service.posts).toHaveLength(0)
   })
 

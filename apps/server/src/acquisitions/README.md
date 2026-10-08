@@ -67,7 +67,7 @@ An archived copy or manifest that no longer matches is reported as a problem and
 
 ## Known limits
 
-- No destination-space forecast or user-visible archive status yet. A persistently failing archive shows up as logged errors and, eventually, Cria refusing new captures once its custody budget is full.
+- No destination-space forecast or user-visible archive status yet. An archive that cannot record intent (unmounted, read-only or completely full) refuses every Cria capture before it is sent, with "Acquisition archive unavailable; capture not started". An archive that records intent but cannot store originals lets captures continue: frames are returned, the failure appears only in logs, and Cria eventually refuses new captures once its custody budget is full.
 - **Run one Vela archive per Cria store.** Ownership of in-flight requests is per process, and nothing binds a Cria store to one archive. Two Vela servers pointed at the same Cria are not coordinated (for example two Rift workspaces with copied Cria configuration): either may archive the other's originals, and Cria accepts whichever receipt arrives first and may release its copy. An active capture can recover its frame from the other server's copy only if both share the same archive directory. Otherwise its capture can fail, and the only archived copy may sit in the other workspace's ignored `data/` folder. Recovery reports a receipt conflict as "another archive holds it".
 - Intent files are kept after acknowledgement (a few hundred bytes each); compaction is later work.
 - Directory synchronisation follows the Linux `fsync` contract. Process-crash and injected-failure ordering are tested. Power-loss behaviour of the actual filesystem is not qualified.
