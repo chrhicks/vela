@@ -1,5 +1,6 @@
 import type { CriaClient, CriaCustody } from '@vela/cria'
 import {
+  ArchiveConflictError,
   ExpectedAcquisitionSchema,
   type AcquisitionArchive,
   type AcquisitionIntent,
@@ -86,19 +87,31 @@ export function createCriaCustody(client: CriaClient, archive: AcquisitionArchiv
       }
     }
 
-    for (let after = 0; ;) {
+    // An archive that cannot write fails every original the same way. One failed write ends the
+    // cycle, so a failing disk does not re-download every retained original every cycle.
+    let archiveUnavailable: string | null = null
+
+    for (let after = 0; archiveUnavailable === null;) {
       const page = await client.retainedOriginals(after)
 
       for (const record of page.images) {
         unreceipted.delete(record.id)
 
-        if (owned.has(record.requestId)) continue
+        if (owned.has(record.requestId) || archiveUnavailable !== null) continue
 
         try {
           const expected = await expectedFor(record)
+          let receipt = await archive.receipt(expected)
 
-          const receipt = await archive.receipt(expected) ??
-            await archive.preserve({ expected, original: await client.originalOf(record), preservedBy: 'recovery' })
+          if (!receipt) {
+            const original = await client.originalOf(record)
+
+            receipt = await archive.preserve({ expected, original, preservedBy: 'recovery' }).catch(error => {
+              if (!(error instanceof ArchiveConflictError))
+                archiveUnavailable = error instanceof Error ? error.message : 'archive write failed'
+              throw error
+            })
+          }
 
           await acknowledge(receipt)
           report.preserved++
@@ -113,9 +126,22 @@ export function createCriaCustody(client: CriaClient, archive: AcquisitionArchiv
       after = page.next
     }
 
-    // A published copy without a receipt whose original Cria no longer retains cannot be vouched for.
-    for (const imageId of unreceipted)
+    if (archiveUnavailable !== null)
+      report.problems.push(`Archive unavailable (${archiveUnavailable}); remaining originals deferred to the next cycle`)
+
+    // A published copy without a receipt whose original Cria no longer retains cannot be vouched for,
+    // unless an active acquisition finished it meanwhile: then Cria holds Vela's receipt.
+    for (const imageId of unreceipted) {
+      const record = await client.custody(imageId).catch(() => undefined)
+
+      if (record && owned.has(record.requestId)) continue
+
+      const finished = record?.receipt &&
+        await expectedFor(record).then(expected => archive.receipt(expected)).catch(() => undefined)
+
+      if (finished && finished.receiptId === record?.receipt?.receiptId) continue
       report.problems.push(`${imageId}: archived without a receipt, but Cria does not retain this original`)
+    }
 
     return report
   }
