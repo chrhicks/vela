@@ -59,6 +59,7 @@ function providerFor(devices: CriaDevice[]) {
     sequence: 1,
     generatedAt,
     commandsEnabled: true,
+    admissionStoppedReason: null,
     devices,
     operations: [],
   }

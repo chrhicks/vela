@@ -1,8 +1,8 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { mkdir, mkdtemp, open, readFile, readdir, rename, rm } from 'node:fs/promises'
-import { join } from 'node:path'
+import { mkdir, mkdtemp, open, readFile, readdir, rename, rm, stat } from 'node:fs/promises'
+import { dirname, join, resolve } from 'node:path'
 import { z } from 'zod'
-import type { CriaCustody, CriaImage } from '@vela/cria'
+import { CriaImageSchema, CriaReadingSchema } from '@vela/cria'
 import { syncDirectory, writeDurable } from '../saved-images/durable-files.js'
 
 /**
@@ -10,14 +10,18 @@ import { syncDirectory, writeDurable } from '../saved-images/durable-files.js'
  * context manifest. Preservation is additive: it does not choose the permanent archive format
  * and it does not replace FITS export or Keep.
  *
- * <root>/<storeId>/<imageId>/
- *   original.imagebytes   exact source bytes
- *   context.json          immutable manifest; its SHA-256 is bound into the receipt
- *   receipt.json          written once, after both files are re-read and verified
- *   acknowledgement.json  Cria accepted the receipt
+ * <root>/<storeId>/
+ *   .intents/<requestId>.json  Vela's acquisition intent, written before the request is sent
+ *   <imageId>/
+ *     original.imagebytes      exact source bytes
+ *     context.json             complete manifest, checked against expected context before a receipt
+ *     receipt.json             written once; binds the original and manifest digests
+ *     acknowledgement.json     Cria accepted that receipt
  */
 
 const digest = z.string().regex(/^[a-f0-9]{64}$/)
+
+const jsonObject = z.record(z.string(), z.json())
 
 export const AcquisitionSourceSchema = z.strictObject({
   system: z.literal('cria'),
@@ -32,7 +36,91 @@ export const AcquisitionSourceSchema = z.strictObject({
 
 export type AcquisitionSource = z.infer<typeof AcquisitionSourceSchema>
 
-const manifestSchema = z.looseObject({ version: z.literal(1), source: AcquisitionSourceSchema })
+export const AcquisitionPurposeSchema = z.enum(['capture', 'autofocus', 'framing', 'alignment'])
+
+/** What Vela knew about an exposure before asking Cria for it. Cria cannot reconstruct this. */
+export const AcquisitionIntentSchema = z.strictObject({
+  version: z.literal(1),
+  storeId: z.uuid(),
+  requestId: z.string().min(1),
+  rigId: z.string().min(1),
+  deviceId: z.string().min(1),
+  expectedCameraName: z.string().nullable(),
+  purpose: AcquisitionPurposeSchema.nullable(),
+  exposureSeconds: z.number().positive(),
+  recordedAt: z.iso.datetime(),
+})
+
+export type AcquisitionIntent = z.infer<typeof AcquisitionIntentSchema>
+
+/**
+ * Cria's acquisition context, version 1. Ordinary records carry the requested parameters and
+ * labelled camera observations; records Cria migrated name their source instead, so the
+ * missing observations are explicit rather than silently absent.
+ */
+const CriaContextSchema = z.union([
+  z.strictObject({
+    version: z.literal(1),
+    requested: jsonObject,
+    cameraObservations: z.record(z.string(), CriaReadingSchema),
+    observationsNote: z.string(),
+  }),
+  z.strictObject({
+    version: z.literal(1),
+    migratedFrom: z.string().min(1),
+    requested: jsonObject.optional(),
+  }),
+])
+
+const acquisitionFields = {
+  source: AcquisitionSourceSchema,
+  cria: z.strictObject({
+    identities: z.strictObject({
+      instanceId: z.string(),
+      deviceId: z.string(),
+      bindingId: z.string(),
+      cameraName: z.string(),
+      reservedAt: z.number().int().nonnegative(),
+    }),
+    image: CriaImageSchema,
+    context: CriaContextSchema,
+  }),
+  /** Null when no Vela intent was recorded for this request; its purpose is then unknown. */
+  intent: AcquisitionIntentSchema.nullable(),
+}
+
+type ExpectedFields = z.infer<z.ZodObject<typeof acquisitionFields>>
+
+function checkIdentities(value: ExpectedFields, context: z.RefinementCtx) {
+  const { source, cria, intent } = value
+  const image = cria.image
+
+  if (image.id !== source.imageId || image.operationId !== source.operationId ||
+    image.sha256 !== source.sha256 || image.original.bytes !== source.bytes ||
+    image.bindingId !== cria.identities.bindingId || image.deviceId !== cria.identities.deviceId ||
+    image.instanceId !== cria.identities.instanceId || image.cameraName !== cria.identities.cameraName)
+    context.addIssue({ code: 'custom', message: 'Acquisition identities disagree with the source' })
+
+  if (intent && (intent.storeId !== source.storeId || intent.requestId !== source.requestId ||
+    intent.deviceId !== cria.identities.deviceId))
+    context.addIssue({ code: 'custom', message: 'Acquisition intent names another request or device' })
+}
+
+/** Everything about the acquisition that must match before Vela vouches for it. */
+export const ExpectedAcquisitionSchema = z.strictObject(acquisitionFields).superRefine(checkIdentities)
+
+export type ExpectedAcquisition = z.infer<typeof ExpectedAcquisitionSchema>
+
+const ManifestSchema = z.strictObject({
+  version: z.literal(1),
+  ...acquisitionFields,
+  preservation: z.strictObject({
+    by: z.enum(['acquisition', 'recovery']),
+    at: z.iso.datetime(),
+  }),
+}).superRefine(checkIdentities)
+
+export type AcquisitionManifest = z.infer<typeof ManifestSchema>
 
 export const ArchiveReceiptSchema = z.strictObject({
   receiptId: z.uuid(),
@@ -61,35 +149,47 @@ export class ArchiveConflictError extends Error {
   }
 }
 
-/** Why and how an original was preserved, plus the source's own context, recorded once. */
-export interface AcquisitionContext {
-  acquisition: {
-    purpose: string
-    preservedBy: 'acquisition' | 'recovery'
-    preservedAt: string
-  }
-  cria?: {
-    identities: {
-      instanceId: string
-      deviceId: string
-      bindingId: string
-      cameraName: string
-      reservedAt: number
-    }
-    image: CriaImage | null
-    context: CriaCustody['context']
-  }
-}
-
 export interface AcquisitionArchive {
-  /** Publish, re-read and verify, then return the one receipt for this acquisition. Idempotent. */
-  preserve(input: { source: AcquisitionSource; original: Uint8Array; context: AcquisitionContext }): Promise<ArchiveReceipt>
+  /** Durably record intent before the request is sent, so it survives a lost response or restart. */
+  recordIntent(intent: AcquisitionIntent): Promise<void>
+  intent(storeId: string, requestId: string): Promise<AcquisitionIntent | undefined>
+  /**
+   * Publish if absent, re-read, check the stored manifest equals the expected acquisition, then
+   * return the one receipt for it. Idempotent; a stored copy that differs is a conflict.
+   */
+  preserve(input: {
+    expected: ExpectedAcquisition
+    original: Uint8Array
+    preservedBy: 'acquisition' | 'recovery'
+  }): Promise<ArchiveReceipt>
+  /** The receipt of an already published acquisition, checked against the expected acquisition. */
+  receipt(expected: ExpectedAcquisition): Promise<ArchiveReceipt | undefined>
   /** Record that the source accepted the receipt. */
   acknowledged(receipt: ArchiveReceipt, sourceState: string): Promise<void>
-  /** Receipts not yet acknowledged, each re-verified against the stored files. */
-  unacknowledged(): Promise<{ receipts: ArchiveReceipt[]; problems: string[] }>
-  /** The verified receipt of an already published acquisition, if any. */
-  receipt(storeId: string, imageId: string): Promise<ArchiveReceipt | undefined>
+  /**
+   * Work left for one store: re-verified receipts not yet acknowledged, and published
+   * acquisitions with no receipt, which need expected context before one can be issued.
+   */
+  unacknowledged(storeId: string): Promise<{ receipts: ArchiveReceipt[]; unreceipted: string[]; problems: string[] }>
+  /** Verified original bytes of an acquisition that already has a receipt. */
+  original(storeId: string, imageId: string): Promise<Uint8Array | undefined>
+}
+
+/** Filesystem operations whose order makes publication durable. Injectable to test that order. */
+export interface ArchiveFileSystem {
+  open: typeof open
+  mkdir(path: string): Promise<void>
+  rename(from: string, to: string): Promise<void>
+  syncDirectory(path: string): Promise<void>
+}
+
+export const nodeArchiveFileSystem: ArchiveFileSystem = {
+  open,
+  mkdir: async path => {
+    await mkdir(path)
+  },
+  rename,
+  syncDirectory,
 }
 
 const sha256 = (data: Uint8Array) => createHash('sha256').update(data).digest('hex')
@@ -107,14 +207,67 @@ async function readOptional(path: string) {
   }
 }
 
-export async function openAcquisitionArchive(root: string, openFile: typeof open = open): Promise<AcquisitionArchive> {
-  await mkdir(root, { recursive: true })
+async function exists(path: string) {
+  try {
+    await stat(path)
+
+    return true
+  } catch (error) {
+    if (isFileError(error) && error.code === 'ENOENT') return false
+    throw error
+  }
+}
+
+/**
+ * Both sides pass through the same schemas, which emit fields in schema order, so equal
+ * acquisitions serialize identically. Reordered or extra content compares unequal: a conflict.
+ */
+function manifestMatches(manifest: AcquisitionManifest, expected: ExpectedAcquisition) {
+  const { source, cria, intent } = manifest
+
+  return JSON.stringify(ExpectedAcquisitionSchema.parse({ source, cria, intent })) ===
+    JSON.stringify(ExpectedAcquisitionSchema.parse(expected))
+}
+
+export async function openAcquisitionArchive(
+  root: string,
+  fs: ArchiveFileSystem = nodeArchiveFileSystem,
+): Promise<AcquisitionArchive> {
+  /**
+   * Create each missing directory and sync its parent, so its own name is durable too. The final
+   * directory's parent is synced even when it already existed: an earlier attempt may have been
+   * interrupted between creating it and syncing its parent.
+   */
+  async function ensureDirectory(path: string) {
+    const missing: string[] = []
+    const final = resolve(path)
+
+    for (let current = final; !(await exists(current)); current = dirname(current))
+      missing.unshift(current)
+
+    for (const created of missing) {
+      try {
+        await fs.mkdir(created)
+      } catch (error) {
+        if (!isFileError(error) || error.code !== 'EEXIST') throw error
+      }
+
+      await fs.syncDirectory(dirname(created))
+    }
+
+    if (missing.length === 0) await fs.syncDirectory(dirname(final))
+  }
+
+  await ensureDirectory(root)
 
   // An interrupted publication is Vela's own unverified copy; Cria still holds the original.
   for (const entry of await readdir(root))
     if (entry.startsWith('.staging-')) await rm(join(root, entry), { recursive: true, force: true })
 
   const directory = (storeId: string, imageId: string) => join(root, storeId, imageId)
+
+  const intentPath = (storeId: string, requestId: string) =>
+    join(root, storeId, '.intents', `${encodeURIComponent(requestId)}.json`)
 
   // One writer per acquisition in this process; Vela runs a single server per archive.
   const writers = new Map<string, Promise<unknown>>()
@@ -128,34 +281,55 @@ export async function openAcquisitionArchive(root: string, openFile: typeof open
     return next
   }
 
-  /** A small record appears under its final name only once complete and synced. */
+  /**
+   * A small record appears under its final name only once complete and synced. An existing one
+   * may have been renamed just before an interruption, so its directory is synced again too.
+   */
   async function publishOnce(path: string, data: string) {
-    if (await readOptional(path)) return
+    if (await readOptional(path)) {
+      await fs.syncDirectory(dirname(path))
+
+      return
+    }
 
     const temporary = `${path}.${randomUUID()}.new`
 
     try {
-      await writeDurable(temporary, data, openFile)
-      await rename(temporary, path)
+      await writeDurable(temporary, data, fs.open)
+      await fs.rename(temporary, path)
+      await fs.syncDirectory(dirname(path))
     } finally {
       await rm(temporary, { force: true })
     }
   }
 
-  async function publish(source: AcquisitionSource, original: Uint8Array, context: AcquisitionContext) {
+  async function publish(expected: ExpectedAcquisition, original: Uint8Array, preservedBy: 'acquisition' | 'recovery') {
+    const { source } = expected
     const target = directory(source.storeId, source.imageId)
 
-    if (await readOptional(join(target, 'context.json'))) return target
+    if (await readOptional(join(target, 'context.json'))) {
+      // Published earlier, possibly just before an interruption: make its path durable again.
+      await ensureDirectory(join(root, source.storeId))
+      await fs.syncDirectory(join(root, source.storeId))
+
+      return target
+    }
+
+    const manifest: AcquisitionManifest = {
+      version: 1,
+      ...expected,
+      preservation: { by: preservedBy, at: new Date().toISOString() },
+    }
 
     const staging = await mkdtemp(join(root, '.staging-'))
 
     try {
-      await writeDurable(join(staging, 'original.imagebytes'), Buffer.from(original), openFile)
-      await writeDurable(join(staging, 'context.json'), JSON.stringify({ version: 1, ...context, source }, null, 2), openFile)
-      await syncDirectory(staging)
-      await mkdir(join(root, source.storeId), { recursive: true })
-      await rename(staging, target)
-      await syncDirectory(join(root, source.storeId))
+      await writeDurable(join(staging, 'original.imagebytes'), Buffer.from(original), fs.open)
+      await writeDurable(join(staging, 'context.json'), JSON.stringify(manifest, null, 2), fs.open)
+      await fs.syncDirectory(staging)
+      await ensureDirectory(join(root, source.storeId))
+      await fs.rename(staging, target)
+      await fs.syncDirectory(join(root, source.storeId))
     } catch (error) {
       await rm(staging, { recursive: true, force: true })
 
@@ -166,39 +340,63 @@ export async function openAcquisitionArchive(root: string, openFile: typeof open
     return target
   }
 
-  /** Re-read both files; any difference from the source identity is a conflict, never a repair. */
-  async function verify(source: AcquisitionSource, target: string) {
+  /**
+   * Re-read the stored files. The original must match its source digest and the manifest must be
+   * complete and internally consistent. Differences are conflicts, never repaired.
+   */
+  async function stored(target: string) {
     const original = await readOptional(join(target, 'original.imagebytes'))
     const contextBytes = await readOptional(join(target, 'context.json'))
 
     if (!original || !contextBytes) throw new ArchiveConflictError('Archived acquisition is incomplete')
 
-    const manifest = manifestSchema.parse(JSON.parse(contextBytes.toString('utf8')))
-    const stored = manifest.source
+    let parsed: ReturnType<typeof ManifestSchema.safeParse>
 
-    if (stored.storeId !== source.storeId || stored.imageId !== source.imageId ||
-      stored.operationId !== source.operationId || stored.sha256 !== source.sha256 || stored.bytes !== source.bytes)
-      throw new ArchiveConflictError('Archived context names a different acquisition')
+    try {
+      parsed = ManifestSchema.safeParse(JSON.parse(contextBytes.toString('utf8')))
+    } catch {
+      throw new ArchiveConflictError('Archived context is unreadable')
+    }
 
-    if (original.byteLength !== source.bytes || sha256(original) !== source.sha256)
+    if (!parsed.success) throw new ArchiveConflictError('Archived context is incomplete or inconsistent')
+    const manifest = parsed.data
+
+    if (original.byteLength !== manifest.source.bytes || sha256(original) !== manifest.source.sha256)
       throw new ArchiveConflictError('Archived original differs from the Cria source')
 
-    return { contextSha256: sha256(contextBytes) }
+    return { manifest, original, contextSha256: sha256(contextBytes) }
   }
 
-  async function receiptFor(source: AcquisitionSource, target: string): Promise<ArchiveReceipt> {
-    const { contextSha256 } = await verify(source, target)
-    const path = join(target, 'receipt.json')
-    const existing = await readOptional(path)
+  async function existingReceipt(target: string, files: Awaited<ReturnType<typeof stored>>) {
+    const bytes = await readOptional(join(target, 'receipt.json'))
 
-    if (existing) {
-      const receipt = ArchiveReceiptSchema.parse(JSON.parse(existing.toString('utf8')))
+    if (!bytes) return undefined
+    const receipt = ArchiveReceiptSchema.parse(JSON.parse(bytes.toString('utf8')))
+    const { source } = files.manifest
 
-      if (receipt.imageId !== source.imageId || receipt.sha256 !== source.sha256 || receipt.archive.contextSha256 !== contextSha256)
-        throw new ArchiveConflictError('Stored archive receipt does not match its verified files')
+    // A receipt binds the bytes and manifest it was issued for; they can never change afterwards.
+    if (receipt.imageId !== source.imageId || receipt.storeId !== source.storeId ||
+      receipt.operationId !== source.operationId || receipt.sha256 !== source.sha256 ||
+      receipt.archive.contextSha256 !== files.contextSha256)
+      throw new ArchiveConflictError('Stored archive receipt does not match its files')
 
-      return receipt
-    }
+    // It may have been renamed into place just before an interruption; sync before handing it out.
+    await fs.syncDirectory(target)
+
+    return receipt
+  }
+
+  async function receiptFor(expected: ExpectedAcquisition, target: string): Promise<ArchiveReceipt> {
+    const files = await stored(target)
+
+    if (!manifestMatches(files.manifest, expected))
+      throw new ArchiveConflictError('Archived context differs from the expected acquisition context')
+
+    const existing = await existingReceipt(target, files)
+
+    if (existing) return existing
+
+    const { source } = expected
 
     const receipt: ArchiveReceipt = {
       receiptId: randomUUID(),
@@ -213,109 +411,134 @@ export async function openAcquisitionArchive(root: string, openFile: typeof open
         representation: 'imagebytes',
         sha256: source.sha256,
         bytes: source.bytes,
-        contextSha256,
+        contextSha256: files.contextSha256,
         verification: { method: 'sha256-reread', verifiedAt: Date.now() },
       },
     }
 
-    await publishOnce(path, JSON.stringify(receipt, null, 2))
-    await syncDirectory(target)
+    await publishOnce(join(target, 'receipt.json'), JSON.stringify(receipt, null, 2))
 
     return receipt
   }
 
-  // The first receipt written for an acquisition stays authoritative.
-  const verifiedReceipt = (source: AcquisitionSource, target: string) => exclusive(target, () => receiptFor(source, target))
-
   return {
-    async preserve({ source, original, context }) {
-      const validated = AcquisitionSourceSchema.parse(source)
+    async recordIntent(intent) {
+      const validated = AcquisitionIntentSchema.parse(intent)
+      const path = intentPath(validated.storeId, validated.requestId)
 
-      if (original.byteLength !== validated.bytes || sha256(original) !== validated.sha256)
+      await ensureDirectory(dirname(path))
+      await publishOnce(path, JSON.stringify(validated, null, 2))
+    },
+    async intent(storeId, requestId) {
+      const bytes = await readOptional(intentPath(storeId, requestId))
+
+      return bytes && AcquisitionIntentSchema.parse(JSON.parse(bytes.toString('utf8')))
+    },
+    async preserve({ expected, original, preservedBy }) {
+      const validated = ExpectedAcquisitionSchema.parse(expected)
+
+      if (original.byteLength !== validated.source.bytes || sha256(original) !== validated.source.sha256)
         throw new ArchiveConflictError('Original bytes do not match their Cria source digest')
 
-      return verifiedReceipt(validated, await publish(validated, original, context))
+      const target = await publish(validated, original, preservedBy)
+
+      return exclusive(target, () => receiptFor(validated, target))
+    },
+    async receipt(expected) {
+      const validated = ExpectedAcquisitionSchema.parse(expected)
+      const target = directory(validated.source.storeId, validated.source.imageId)
+
+      if (!await readOptional(join(target, 'context.json'))) return undefined
+
+      return exclusive(target, async () => {
+        await ensureDirectory(join(root, validated.source.storeId))
+        await fs.syncDirectory(join(root, validated.source.storeId))
+
+        return receiptFor(validated, target)
+      })
     },
     async acknowledged(receipt, sourceState) {
       const target = directory(receipt.storeId, receipt.imageId)
 
-      await exclusive(target, async () => {
-        await publishOnce(join(target, 'acknowledgement.json'), JSON.stringify({
-          receiptId: receipt.receiptId,
-          sourceState,
-          acknowledgedAt: new Date().toISOString(),
-        }, null, 2))
-        await syncDirectory(target)
-      })
+      await exclusive(target, () => publishOnce(join(target, 'acknowledgement.json'), JSON.stringify({
+        receiptId: receipt.receiptId,
+        sourceState,
+        acknowledgedAt: new Date().toISOString(),
+      }, null, 2)))
     },
-    async unacknowledged() {
+    async unacknowledged(storeId) {
       const receipts: ArchiveReceipt[] = []
+      const unreceipted: string[] = []
       const problems: string[] = []
 
-      for (const storeId of await readdir(root)) {
-        if (storeId.startsWith('.')) continue
+      if (!await exists(join(root, storeId))) return { receipts, unreceipted, problems }
 
-        for (const imageId of await readdir(join(root, storeId))) {
-          const target = directory(storeId, imageId)
+      // Receipts listed here may be sent; re-link the store path in case of an earlier interruption.
+      await ensureDirectory(join(root, storeId))
+      await fs.syncDirectory(join(root, storeId))
 
-          if (await readOptional(join(target, 'acknowledgement.json'))) continue
+      for (const imageId of await readdir(join(root, storeId))) {
+        if (imageId.startsWith('.')) continue
+        const target = directory(storeId, imageId)
 
-          try {
-            const contextBytes = await readOptional(join(target, 'context.json'))
+        if (await readOptional(join(target, 'acknowledgement.json'))) continue
 
-            if (!contextBytes) throw new ArchiveConflictError('Archived acquisition has no context')
-            const { source } = manifestSchema.parse(JSON.parse(contextBytes.toString('utf8')))
+        try {
+          const files = await stored(target)
+          const receipt = await existingReceipt(target, files)
 
-            receipts.push(await verifiedReceipt(source, target))
-          } catch (error) {
-            problems.push(`${storeId}/${imageId}: ${error instanceof Error ? error.message : 'unreadable'}`)
-          }
+          if (receipt) receipts.push(receipt)
+          else unreceipted.push(imageId)
+        } catch (error) {
+          problems.push(`${storeId}/${imageId}: ${error instanceof Error ? error.message : 'unreadable'}`)
         }
       }
 
-      return { receipts, problems }
+      return { receipts, unreceipted, problems }
     },
-    async receipt(storeId, imageId) {
+    async original(storeId, imageId) {
       const target = directory(storeId, imageId)
-      const contextBytes = await readOptional(join(target, 'context.json'))
 
-      if (!contextBytes) return undefined
+      if (!await readOptional(join(target, 'receipt.json'))) return undefined
+      const files = await stored(target)
 
-      return verifiedReceipt(manifestSchema.parse(JSON.parse(contextBytes.toString('utf8'))).source, target)
+      return (await existingReceipt(target, files)) && new Uint8Array(files.original)
     },
   }
 }
 
 /** Same contract without durability, for tests and composition without a configured archive. */
 export function createMemoryAcquisitionArchive(): AcquisitionArchive {
+  const intents = new Map<string, AcquisitionIntent>()
+
   const entries = new Map<string, {
-    source: AcquisitionSource
+    manifest: AcquisitionManifest
     original: Buffer
-    context: Buffer
     receipt?: ArchiveReceipt
     acknowledged?: string
   }>()
 
-  function receiptFor(key: string): ArchiveReceipt {
+  function receiptFor(expected: ExpectedAcquisition): ArchiveReceipt {
+    const key = `${expected.source.storeId}/${expected.source.imageId}`
     const entry = entries.get(key)!
 
-    if (entry.original.byteLength !== entry.source.bytes || sha256(entry.original) !== entry.source.sha256)
-      throw new ArchiveConflictError('Archived original differs from the Cria source')
+    if (!manifestMatches(entry.manifest, expected))
+      throw new ArchiveConflictError('Archived context differs from the expected acquisition context')
 
     entry.receipt ??= {
       receiptId: randomUUID(),
-      storeId: entry.source.storeId,
-      imageId: entry.source.imageId,
-      operationId: entry.source.operationId,
-      sha256: entry.source.sha256,
-      bytes: entry.source.bytes,
+      storeId: expected.source.storeId,
+      imageId: expected.source.imageId,
+      operationId: expected.source.operationId,
+      sha256: expected.source.sha256,
+      bytes: expected.source.bytes,
       archive: {
         system: 'vela',
         artifactId: key,
         representation: 'imagebytes',
-        sha256: entry.source.sha256,
-        bytes: entry.source.bytes,
-        contextSha256: sha256(entry.context),
+        sha256: expected.source.sha256,
+        bytes: expected.source.bytes,
+        contextSha256: sha256(Buffer.from(JSON.stringify(entry.manifest))),
         verification: { method: 'sha256-reread', verifiedAt: Date.now() },
       },
     }
@@ -324,37 +547,57 @@ export function createMemoryAcquisitionArchive(): AcquisitionArchive {
   }
 
   return {
-    async preserve({ source, original, context }) {
-      const validated = AcquisitionSourceSchema.parse(source)
-      const key = `${validated.storeId}/${validated.imageId}`
+    async recordIntent(intent) {
+      const validated = AcquisitionIntentSchema.parse(intent)
 
-      if (original.byteLength !== validated.bytes || sha256(original) !== validated.sha256)
+      intents.set(`${validated.storeId}/${validated.requestId}`, validated)
+    },
+    async intent(storeId, requestId) {
+      return intents.get(`${storeId}/${requestId}`)
+    },
+    async preserve({ expected, original, preservedBy }) {
+      const validated = ExpectedAcquisitionSchema.parse(expected)
+      const key = `${validated.source.storeId}/${validated.source.imageId}`
+
+      if (original.byteLength !== validated.source.bytes || sha256(original) !== validated.source.sha256)
         throw new ArchiveConflictError('Original bytes do not match their Cria source digest')
 
       if (!entries.has(key)) {
         entries.set(key, {
-          source: validated,
+          manifest: { version: 1, ...validated, preservation: { by: preservedBy, at: new Date().toISOString() } },
           original: Buffer.from(original),
-          context: Buffer.from(JSON.stringify({ version: 1, ...context, source: validated })),
         })
       }
 
-      return receiptFor(key)
+      return receiptFor(validated)
+    },
+    async receipt(expected) {
+      const validated = ExpectedAcquisitionSchema.parse(expected)
+
+      return entries.has(`${validated.source.storeId}/${validated.source.imageId}`) ? receiptFor(validated) : undefined
     },
     async acknowledged(receipt, sourceState) {
       const entry = entries.get(`${receipt.storeId}/${receipt.imageId}`)
 
       if (entry) entry.acknowledged = sourceState
     },
-    async unacknowledged() {
+    async unacknowledged(storeId) {
       const receipts: ArchiveReceipt[] = []
+      const unreceipted: string[] = []
 
-      for (const [key, entry] of entries) if (!entry.acknowledged) receipts.push(receiptFor(key))
+      for (const entry of entries.values()) {
+        if (entry.manifest.source.storeId !== storeId || entry.acknowledged) continue
 
-      return { receipts, problems: [] }
+        if (entry.receipt) receipts.push(entry.receipt)
+        else unreceipted.push(entry.manifest.source.imageId)
+      }
+
+      return { receipts, unreceipted, problems: [] }
     },
-    async receipt(storeId, imageId) {
-      return entries.has(`${storeId}/${imageId}`) ? receiptFor(`${storeId}/${imageId}`) : undefined
+    async original(storeId, imageId) {
+      const entry = entries.get(`${storeId}/${imageId}`)
+
+      return entry?.receipt && new Uint8Array(entry.original)
     },
   }
 }

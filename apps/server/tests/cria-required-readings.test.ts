@@ -54,6 +54,7 @@ function fixture() {
     client,
     bindings.map(binding => ({ ...binding, providerDeviceId: binding.id })),
     createCriaCustody(client, createMemoryAcquisitionArchive(), service.state.storeId),
+    'rig-1',
   )
 
   return {

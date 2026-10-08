@@ -31,7 +31,7 @@ function equipment(service: ServiceFixture, fetch = service.fetch) {
 
   onTestFinished(() => client.close())
 
-  return createCriaEquipment(client, bindings, createCriaCustody(client, createMemoryAcquisitionArchive(), service.state.storeId))
+  return createCriaEquipment(client, bindings, createCriaCustody(client, createMemoryAcquisitionArchive(), service.state.storeId), 'rig-1')
 }
 
 describe('Cria cancellation through Vela workflows', () => {

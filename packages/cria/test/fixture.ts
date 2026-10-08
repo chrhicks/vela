@@ -103,6 +103,7 @@ export class ServiceFixture {
     sequence: 1,
     generatedAt: serverNow,
     commandsEnabled: true,
+    admissionStoppedReason: null,
     devices: [this.camera, this.mount],
     operations: [],
   }
@@ -116,6 +117,8 @@ export class ServiceFixture {
   readonly cancellations: string[] = []
   original = pixels()
   completeImmediately = true
+  /** Model Cria's release of its local copy once a receipt is accepted. */
+  releaseOnReceipt = false
   cancelImmediately = false
   publishOperations = true
   last: CriaOperation | null = null
@@ -205,7 +208,12 @@ export class ServiceFixture {
       reservedAt: serverNow,
       updatedAt: serverNow,
       reason: null,
-      context: { version: 1, requested: operation.parameters },
+      context: {
+        version: 1,
+        requested: operation.parameters,
+        cameraObservations: { gain: reading(10) },
+        observationsNote: 'Latest Cria readings when the capture was admitted',
+      },
       image,
       discovery: 'operation-result',
       candidate: null,
@@ -373,10 +381,13 @@ export class ServiceFixture {
 
         if (receipt.sha256 !== record.image.sha256 || receipt.storeId !== record.storeId)
           return failure(409, 'receipt-conflict')
-        Object.assign(record, { state: 'archived', receipt, receiptAcceptedAt: serverNow })
+        Object.assign(record, { state: this.releaseOnReceipt ? 'released' : 'archived', receipt, receiptAcceptedAt: serverNow })
 
         return json(record)
       }
+
+      if (path.endsWith('/original') && !['retained', 'archived'].includes(record.state))
+        return failure(410, 'image-gone')
 
       if (path.endsWith('/original'))
         return new Response(this.original, {

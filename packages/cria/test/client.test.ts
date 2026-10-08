@@ -573,6 +573,46 @@ describe('original custody', () => {
     expect(service.receipts).toHaveLength(3)
   })
 
+  it('runs the before-admission hook with the exact request before sending it', async () => {
+    const service = new ServiceFixture()
+    const client = service.client()
+    const seen: string[] = []
+
+    const operation = await client.run('camera', capture, {
+      async beforeAdmission(request) {
+        seen.push(request.requestId)
+        expect(service.posts).toHaveLength(0)
+      },
+    })
+
+    expect(seen).toEqual([operation.requestId])
+    await expect(client.run('camera', capture, { beforeAdmission: async () => { throw new Error('Intent not recorded') } }))
+      .rejects.toThrow('Intent not recorded')
+    expect(service.posts).toHaveLength(1)
+  })
+
+  it('decodes an archived original only when it matches the confirmed capture', async () => {
+    const service = new ServiceFixture()
+    const client = service.client()
+    const operation = await client.run('camera', capture)
+
+    expect(Array.from(client.decodeOriginal(operation, new Uint8Array(service.original)).pixels)).toEqual([1, 2, 3, 4, 5, 6])
+    const altered = new Uint8Array(service.original)
+
+    altered[44] = 9
+    expect(() => client.decodeOriginal(operation, altered)).toThrow('does not match the confirmed capture')
+  })
+
+  it('reports why Cria stopped admission', async () => {
+    const service = new ServiceFixture()
+
+    Object.assign(service.state, { commandsEnabled: false, admissionStoppedReason: 'Custody record could not be saved: disk full' })
+    const client = service.client()
+
+    await expect(client.run('camera', capture)).rejects.toThrow('Custody record could not be saved: disk full')
+    expect(service.posts).toHaveLength(0)
+  })
+
   it('refuses a protocol 2 Cria before admitting any work', async () => {
     const service = new ServiceFixture()
 

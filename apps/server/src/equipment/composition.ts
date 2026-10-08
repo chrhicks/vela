@@ -79,7 +79,7 @@ export function createEquipmentComposition(
     equipment.set(configuration.id, createCriaEquipment(client, configuration.devices.map(device => ({
       ...device,
       providerDeviceId: criaDeviceId(configuration, device.id),
-    })), custodies.get(configuration.url)!))
+    })), custodies.get(configuration.url)!, configuration.id))
   }
 
   function cria(rig: RigEquipmentSource) {

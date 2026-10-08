@@ -51,7 +51,11 @@ Existing results are reached through custody, independently of an operation's ou
 - `originalOf(record)` transfers the same verified bytes for a retained or archived record. It works while the operation that produced it remains uncertain and never clears the command interlock.
 - `acknowledgeArchive(receipt)` sends an exact-byte receipt after Vela has verified its archive. Repeating the same receipt is safe; Cria rejects a different receipt or mismatched identity with `receipt-conflict`.
 
-There is no release call. Cria deletes its redundant copy only after accepting a receipt, and only when its own release setting allows it.
+- `decodeOriginal(operation, original)` decodes the same original from another verified source, such as Vela's archive after Cria released its copy. The bytes must still match the confirmed capture's digest and length.
+
+`run()` accepts `beforeAdmission(request)`, awaited after the exact request (including its request ID) is built and before it is sent. A failure there means nothing was sent. Callers use it to record intent and ownership before Cria can act on the request.
+
+There is no release call. Cria deletes its redundant copy only after accepting a receipt, and only when its own release setting allows it. When Cria has stopped admission after an essential storage failure, `state.admissionStoppedReason` explains why and write attempts fail with that reason.
 
 ## Focused verification
 
