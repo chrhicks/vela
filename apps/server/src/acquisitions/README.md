@@ -60,7 +60,8 @@ If preservation fails, the consumer still receives its frame, preservation stays
 
 - Receipts that were written but never acknowledged are re-verified and sent again, with the same receipt ID.
 - Originals Cria still lists as `retained` are preserved, including results of operations that remain uncertain. The expected context comes from Cria's custody record plus the recorded intent. An already published copy is finished against that expected context; otherwise the same original is fetched again by image ID. Requests an active acquisition owns are skipped, so recovery cannot take a result from a capture whose admission response is still delayed. The device interlock and the operation's uncertainty are left alone.
-- A copy published without a receipt whose original Cria no longer retains is reported, not vouched for.
+- A copy published without a receipt whose original Cria no longer retains is reported, not vouched for, unless an active acquisition finished it meanwhile and Cria holds that same receipt.
+- If the archive cannot write (for example, a full or read-only disk), the first failure ends the cycle with one "Archive unavailable" problem. The remaining originals wait for the next cycle instead of each being downloaded again.
 
 An archived copy or manifest that no longer matches is reported as a problem and never "repaired" by rewriting it. Interrupted staging directories are Vela's own unverified copies and are discarded on open; Cria still holds the original.
 

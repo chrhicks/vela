@@ -1,13 +1,14 @@
-import { mkdtemp, readFile } from 'node:fs/promises'
+import { mkdtemp, open, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { CriaClient, CriaUncertainError } from '@vela/cria'
 import { ServiceFixture, serviceOrigin, token } from '../../../packages/cria/test/fixture.js'
 import { createCriaEquipment } from '../src/cria/equipment.js'
-import { createCriaCustody } from '../src/cria/custody.js'
+import { createCriaCustody, expectedAcquisition } from '../src/cria/custody.js'
 import {
   createMemoryAcquisitionArchive,
+  nodeArchiveFileSystem,
   openAcquisitionArchive,
   type AcquisitionArchive,
 } from '../src/acquisitions/archive.js'
@@ -276,6 +277,63 @@ describe('acquisition custody through the Cria adapter', () => {
 
     expect(report).toMatchObject({ preserved: 59, problems: [] })
     expect([...service.custody.values()].filter(record => record.state === 'retained')).toHaveLength(1)
+    error.mockRestore()
+  })
+
+  it('ends a cycle at the first archive write failure instead of re-downloading every original', async () => {
+    const service = new ServiceFixture()
+    const working = createMemoryAcquisitionArchive()
+    const broken: AcquisitionArchive = { ...working, preserve: async () => { throw new Error('No space left on device') } }
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const failing = setup(service, broken)
+
+    for (let index = 0; index < 5; index++) await failing.equipment.acquisition.capture(request)
+    const before = service.paths.filter(path => path.endsWith('/original')).length
+    const report = await setup(service, broken).custody.recover()
+
+    expect(service.paths.filter(path => path.endsWith('/original')).length - before).toBe(1)
+    expect(report.preserved).toBe(0)
+    expect(report.problems.at(-1)).toContain('Archive unavailable (No space left on device)')
+    expect([...service.custody.values()].every(record => record.state === 'retained')).toBe(true)
+    error.mockRestore()
+  })
+
+  it('reports no problem when an acquisition finishes its receipt while recovery runs', async () => {
+    const service = new ServiceFixture()
+    const directory = await mkdtemp(join(tmpdir(), 'vela-custody-'))
+    const archive = await openAcquisitionArchive(directory)
+    let interrupt = true
+
+    // The first preservation publishes the copy but is interrupted before its receipt.
+    const interrupted = await openAcquisitionArchive(directory, {
+      ...nodeArchiveFileSystem,
+      open: async (path, flags) => {
+        if (interrupt && String(path).includes('receipt.json')) throw new Error('Interrupted before the receipt')
+
+        return open(path, flags)
+      },
+    })
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    await setup(service, interrupted).equipment.acquisition.capture(request)
+    interrupt = false
+    const record = [...service.custody.values()][0]!
+    let finished = false
+
+    // While recovery lists its work, the copy gets its receipt and Cria accepts it.
+    const { custody, client } = setup(service, archive, async (input, init) => {
+      if (!finished && new URL(String(input)).pathname === '/v2/images') {
+        finished = true
+        const expected = expectedAcquisition(record, (await archive.intent(record.storeId, record.requestId)) ?? null)
+
+        await client.acknowledgeArchive((await archive.receipt(expected))!)
+      }
+
+      return service.fetch(input, init)
+    })
+
+    expect(await custody.recover()).toEqual({ acknowledged: 0, preserved: 0, problems: [] })
+    expect(record.state).toBe('archived')
     error.mockRestore()
   })
 
