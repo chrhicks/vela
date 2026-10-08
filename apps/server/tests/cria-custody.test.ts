@@ -288,6 +288,7 @@ describe('acquisition custody through the Cria adapter', () => {
     const failing = setup(service, broken)
 
     for (let index = 0; index < 5; index++) await failing.equipment.acquisition.capture(request)
+
     const before = service.paths.filter(path => path.endsWith('/original')).length
     const report = await setup(service, broken).custody.recover()
 
@@ -313,6 +314,7 @@ describe('acquisition custody through the Cria adapter', () => {
         return open(path, flags)
       },
     })
+
     const error = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     await setup(service, interrupted).equipment.acquisition.capture(request)
