@@ -28,6 +28,8 @@ The root `AGENTS.md` and older capture documentation describe ephemeral runs as 
 
 ## Provenance
 
+Review: [Vela PR91](https://github.com/chrhicks/vela/pull/91) targets `feature/cria-v2-adoption`; [Cria PR1](https://github.com/chrhicks/cria/pull/1) holds the shared baseline and catalogue. This documentation PR depends on the adoption branch and contains no adoption implementation changes.
+
 The primary Vela checkout inspected was clean at `91ed4310f1364d90c995f14ef62e213b50877fd4` on `workshop/capture-preparation`. This documentation branch is based on the actual Cria adoption worktree at `d5de035`, not that earlier checkout. It is isolated on `docs/architecture-baseline-20261008`; the adoption branch is unchanged.
 
 Shared [evidence and primary-source register](https://github.com/chrhicks/cria/blob/docs/architecture-baseline-20261008/docs/architecture/evidence.md) records exact revisions, approved records, runtime reporting, historical trial limits and Microsoft/ASCOM sources accessed 2026-10-08. The initial drafting decision authorizes this living body, not the proposed format, session-ending policy or numerical thresholds. See [validation](qualification.md#documentation-validation) for the checks performed on these pages.
