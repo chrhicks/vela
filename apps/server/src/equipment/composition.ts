@@ -8,6 +8,8 @@ import {
 import { CriaClient } from '@vela/cria'
 import { EquipmentError, type Acquisition, type CameraCooling, type Focuser, type Framing, type MountControl } from '@vela/equipment'
 import { createCriaEquipment } from '../cria/equipment.js'
+import { createCriaCustody, type CriaCustodyCoordinator } from '../cria/custody.js'
+import type { AcquisitionArchive } from '../acquisitions/archive.js'
 import { createRigDeviceInventory, type RigDeviceInventory } from '../device/inventory.js'
 import { createRigDeviceInspector, type RigDeviceInspector } from '../device/inspection.js'
 import { createRigDeviceConnector, type RigDeviceConnector } from '../device/connection.js'
@@ -33,6 +35,10 @@ export interface EquipmentComposition {
 interface CompositionOptions {
   solver?: { executable: string; catalogPath: string }
   diagnosticsPath?: string
+  /** Required with Cria rigs: every acquired original is preserved here before release. */
+  acquisitions?: AcquisitionArchive
+  /** How often to finish interrupted archive work; an engineering cadence, not a retention policy. */
+  custodyRecoveryMs?: number
 }
 
 /** Select equipment ownership at composition; workflows receive only the capabilities they use. */
@@ -41,7 +47,12 @@ export function createEquipmentComposition(
   options: CompositionOptions = {},
 ): EquipmentComposition {
   const clients = new Map<string, CriaClient>()
+  const custodies = new Map<string, CriaCustodyCoordinator>()
   const equipment = new Map<string, ReturnType<typeof createCriaEquipment>>()
+  let recoveryTimer: NodeJS.Timeout | undefined
+
+  if (configurations.length > 0 && !options.acquisitions)
+    throw new Error('Cria rigs require an acquisition archive before any capture')
 
   for (const configuration of configurations) {
     let client = clients.get(configuration.url)
@@ -62,12 +73,13 @@ export function createEquipmentComposition(
         devices: [...devices.values()],
       })
       clients.set(configuration.url, client)
+      custodies.set(configuration.url, createCriaCustody(client, options.acquisitions!, configuration.storeId))
     }
 
     equipment.set(configuration.id, createCriaEquipment(client, configuration.devices.map(device => ({
       ...device,
       providerDeviceId: criaDeviceId(configuration, device.id),
-    }))))
+    })), custodies.get(configuration.url)!))
   }
 
   function cria(rig: RigEquipmentSource) {
@@ -86,8 +98,23 @@ export function createEquipmentComposition(
   return {
     start() {
       for (const client of clients.values()) client.start()
+
+      if (custodies.size === 0) return
+
+      const recover = () => {
+        for (const custody of custodies.values()) {
+          void custody.recover().then(report => {
+            if (report.problems.length > 0) console.warn('Acquisition custody recovery incomplete', report)
+          }, error => console.warn('Acquisition custody recovery deferred', error))
+        }
+      }
+
+      recover()
+      recoveryTimer = setInterval(recover, options.custodyRecoveryMs ?? 30_000)
+      recoveryTimer.unref()
     },
     async close() {
+      clearInterval(recoveryTimer)
       await Promise.all([...clients.values()].map(client => client.close()))
     },
     createInventory: rig => rig.source

@@ -43,8 +43,10 @@ Stop clears the interruption indicator immediately and still waits for cleanup;
 late callbacks cannot update a cancelled or settled acquisition.
 Any terminal acquisition or preview failure ends the run without replay. Preview stretching preserves native dimensions for 100% inspection;
 only the latest three image pairs and their temporary original FITS buffers remain
-in memory. Saving releases the temporary original buffer after the archive confirms
-the write. This bounded cache lets Keep this image target the displayed frame when
+in memory. Saving releases the temporary FITS buffer after the saved-image store confirms
+the write. Keep is a gallery selection, not preservation: with Cria, every exposure's
+exact original and context are already archived by the acquisition adapter before this
+controller sees its pixels (see `../acquisitions`). This bounded cache lets Keep this image target the displayed frame when
 browser image loading trails the latest acquisition. An expired unsaved frame
 returns an explicit unavailable result; it never saves a different frame instead.
 

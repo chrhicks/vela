@@ -8,6 +8,7 @@ import { createSurveyCache } from './targets/survey.js'
 import { startTelemetry } from './telemetry.js'
 import { loadCriaConfiguration, registerConfiguredCriaRigs } from './equipment/config.js'
 import { createEquipmentComposition } from './equipment/composition.js'
+import { openAcquisitionArchive } from './acquisitions/archive.js'
 
 const telemetry = startTelemetry(process.env.VELA_TRACE_PATH)
 
@@ -77,6 +78,14 @@ try {
   const equipmentOptions: NonNullable<Parameters<typeof createEquipmentComposition>[1]> = {}
 
   if (targets.solver) equipmentOptions.solver = targets.solver
+
+  if (cria.length > 0) {
+    equipmentOptions.acquisitions = await openAcquisitionArchive(
+      process.env.VELA_ACQUISITIONS_PATH
+        ? resolve(process.env.VELA_ACQUISITIONS_PATH)
+        : resolve(dirname(rigCatalogPath), 'acquisitions'),
+    )
+  }
 
   if (process.env.VELA_ALIGNMENT_DIAGNOSTICS_PATH) {
     if (!isAbsolute(process.env.VELA_ALIGNMENT_DIAGNOSTICS_PATH))

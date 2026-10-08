@@ -54,9 +54,9 @@ An interrupted image read should preserve useful workflow context and clearly sh
 
 ## Current image and session limitations
 
-The [Cria adapter](../../apps/server/src/cria/equipment.ts#L97) releases the local original immediately after verified download/decoding. The capture controller subsequently creates preview/FITS data, keeps three recent images in memory and saves durably only when requested. The archive store has useful staging/synchronization, but there is no durable Cria archive receipt. This is a preservation gap, not an approved exception for unselected frames.
+**Updated by the custody slice (in review):** the [Cria adapter](../../apps/server/src/cria/equipment.ts) no longer releases after decoding. It preserves the exact original and an immutable context manifest in the [acquisition archive](../../apps/server/src/acquisitions/README.md), verifies them, and sends Cria a receipt before returning the frame; recovery finishes interrupted receipts and archives originals Cria still retains. The capture controller still creates preview/FITS data, keeps three recent images in memory and saves to the gallery only when requested. Keep remains a gallery choice, not the preservation trigger.
 
-The normalized `Frame` loses source store/operation/image identities, and a new Vela image ID is created later. Request maps and capture runs are memory-resident. Durable Cria admission alone cannot reconstruct Vela's goals or archive obligations after Vela restarts. The [session/archive design](session-and-archive.md) introduces the minimum required durable facts without persisting every live reading or solver step.
+The normalized `Frame` still omits source identities; they are recorded in the archive manifest rather than carried through scientific controllers, and the gallery creates its own Vela image ID. Request maps and capture runs are memory-resident. Durable Cria admission alone cannot reconstruct Vela's goals or archive obligations after Vela restarts. The [session/archive design](session-and-archive.md) introduces the minimum required durable facts without persisting every live reading or solver step.
 
 ## Concurrency and failure scope
 

@@ -53,7 +53,7 @@ function device(kind: CriaDevice['kind'], fields: CriaDevice['fields']): CriaDev
 
 function providerFor(devices: CriaDevice[]) {
   const state: CriaState = {
-    protocolVersion: 2,
+    protocolVersion: 3,
     instanceId: 'bbd6befc-83b4-4c39-9b04-144ae328d7ea',
     storeId,
     sequence: 1,

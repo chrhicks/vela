@@ -3,6 +3,8 @@ import { randomUUID } from 'node:crypto'
 import { CriaClient } from '@vela/cria'
 import { reading, ServiceFixture, serviceOrigin, token } from '../../../packages/cria/test/fixture.js'
 import { createCriaEquipment } from '../src/cria/equipment.js'
+import { createCriaCustody } from '../src/cria/custody.js'
+import { createMemoryAcquisitionArchive } from '../src/acquisitions/archive.js'
 
 
 function fixture() {
@@ -22,7 +24,7 @@ function fixture() {
 
   const control = createCriaEquipment(client, [{
     providerDeviceId: 'mount-id', id: 'mount', kind: 'mount', expectedName: 'Fixture mount',
-  }]).mountControl
+  }], createCriaCustody(client, createMemoryAcquisitionArchive(), service.state.storeId)).mountControl
 
   return { service, control }
 }

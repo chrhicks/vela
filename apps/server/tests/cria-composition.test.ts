@@ -6,6 +6,7 @@ import { ServiceFixture, token } from '../../../packages/cria/test/fixture.js'
 import { buildApp } from '../src/app.js'
 import { createMemoryRigCatalog } from '../src/rig/catalog.js'
 import { createEquipmentComposition } from '../src/equipment/composition.js'
+import { createMemoryAcquisitionArchive } from '../src/acquisitions/archive.js'
 import { registerConfiguredCriaRigs, type CriaRigConfiguration } from '../src/equipment/config.js'
 
 it('shares one authenticated stream across configured rigs and closes it with the app', async () => {
@@ -52,7 +53,7 @@ it('shares one authenticated stream across configured rigs and closes it with th
   await registerConfiguredCriaRigs(catalog, configurations)
 
   const app = buildApp({
-    equipment: createEquipmentComposition(configurations),
+    equipment: createEquipmentComposition(configurations, { acquisitions: createMemoryAcquisitionArchive() }),
     rigCatalog: catalog,
   })
 

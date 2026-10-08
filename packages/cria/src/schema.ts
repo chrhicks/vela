@@ -10,6 +10,8 @@ const name = z.string().min(1).max(256)
 
 const jsonObject = z.record(z.string(), z.json())
 
+const digest = z.string().regex(/^[a-f0-9]{64}$/)
+
 function noControlCharacters(value: string): boolean {
   return Array.from(value).every(character => {
     const code = character.charCodeAt(0)
@@ -191,8 +193,7 @@ export const CriaImageSchema = z.strictObject({
   capturedAt: timestamp,
   capturedAtSource: z.enum(['camera', 'server-estimate']),
   retainedAt: timestamp,
-  expiresAt: timestamp,
-  sha256: z.string().regex(/^[a-f0-9]{64}$/),
+  sha256: digest,
   original: z.strictObject({
     mediaType: z.literal('application/imagebytes'),
     bytes: z.number().int().min(44).max(400_000_044),
@@ -200,10 +201,71 @@ export const CriaImageSchema = z.strictObject({
   }),
   preview: z.null(),
 }).refine(image => image.width * image.height <= 100_000_000 &&
-  image.expiresAt > image.retainedAt &&
   image.original.url === `/v2/images/${image.id}/original`, 'Invalid retained image bounds or URL')
 
 export type CriaImage = z.infer<typeof CriaImageSchema>
+
+/** Exact-byte archive attestation; Cria checks its own identities and digest before accepting it. */
+export const CriaArchiveReceiptSchema = z.strictObject({
+  receiptId: uuid,
+  storeId: uuid,
+  imageId: uuid,
+  operationId: uuid,
+  sha256: digest,
+  bytes: z.number().int().min(44),
+  archive: z.strictObject({
+    system: z.string().min(1).max(64),
+    artifactId: z.string().min(1).max(256),
+    representation: z.literal('imagebytes'),
+    sha256: digest,
+    bytes: z.number().int().min(44),
+    contextSha256: digest,
+    verification: z.strictObject({ method: z.string().min(1).max(64), verifiedAt: timestamp }),
+  }),
+})
+
+export type CriaArchiveReceipt = z.infer<typeof CriaArchiveReceiptSchema>
+
+export const CriaCustodyStateSchema = z.enum([
+  'reserved', 'retained', 'quarantined', 'absent', 'archived', 'released', 'missing', 'legacy-removed',
+])
+
+export type CriaCustodyState = z.infer<typeof CriaCustodyStateSchema>
+
+/** Cria's durable record for one reserved image, readable whatever its operation outcome. */
+export const CriaCustodySchema = z.strictObject({
+  id: uuid,
+  storeId: uuid,
+  operationId: z.string(),
+  requestId: z.string(),
+  instanceId: z.string(),
+  deviceId: z.string(),
+  bindingId: z.string(),
+  cameraName: z.string(),
+  state: CriaCustodyStateSchema,
+  reservedAt: timestamp,
+  updatedAt: timestamp,
+  reason: z.string().nullable(),
+  context: jsonObject,
+  image: CriaImageSchema.nullable(),
+  discovery: z.enum(['operation-result', 'worker-completion', 'migration']).nullable(),
+  candidate: z.strictObject({ path: z.string(), bytes: z.number().int().nonnegative() }).nullable(),
+  receipt: CriaArchiveReceiptSchema.nullable(),
+  receiptFingerprint: digest.nullable(),
+  receiptAcceptedAt: timestamp.nullable(),
+  releasedAt: timestamp.nullable(),
+  history: z.array(z.strictObject({ at: timestamp, state: CriaCustodyStateSchema, note: z.string() })),
+}).refine(record => !['retained', 'archived'].includes(record.state) ||
+  record.image?.id === record.id && record.image.operationId === record.operationId,
+'Retained custody must describe its own original')
+
+export type CriaCustody = z.infer<typeof CriaCustodySchema>
+
+export const CriaCustodyPageSchema = z.strictObject({
+  storeId: uuid,
+  images: z.array(CriaCustodySchema).max(500),
+  next: z.number().int().nonnegative(),
+})
 
 export const CriaOperationSchema = z.strictObject({
   id: uuid,
@@ -261,7 +323,8 @@ export const CriaDeviceSchema = z.strictObject({
 export type CriaDevice = z.infer<typeof CriaDeviceSchema>
 
 export const CriaStateSchema = z.strictObject({
-  protocolVersion: z.literal(2),
+  /** 3: originals stay in Cria custody until an accepted archive receipt. */
+  protocolVersion: z.literal(3),
   instanceId: uuid,
   storeId: uuid,
   sequence: z.number().int().nonnegative(),
@@ -284,5 +347,3 @@ export const CriaRefreshSchema = z.strictObject({
   generation: z.number().int().nonnegative(),
   pending: z.literal(true),
 })
-
-export const CriaReleaseSchema = z.strictObject({ id: uuid, released: z.literal(true) })

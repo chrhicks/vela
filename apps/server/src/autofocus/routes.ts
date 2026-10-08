@@ -44,6 +44,7 @@ function configuredCamera(settings: {
       try {
         return await acquisition.capture({
           cameraId: settings.cameraId,
+          purpose: 'autofocus',
           expectedCameraName: settings.expectedCameraName,
           exposureSeconds,
           signal,

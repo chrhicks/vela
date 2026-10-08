@@ -3,6 +3,8 @@ import { CriaClient, CriaUncertainError, type CriaReading } from '@vela/cria'
 import { EquipmentError } from '@vela/equipment'
 import { ServiceFixture, reading, serverNow, serviceOrigin, token } from '../../../packages/cria/test/fixture.js'
 import { createCriaEquipment } from '../src/cria/equipment.js'
+import { createCriaCustody } from '../src/cria/custody.js'
+import { createMemoryAcquisitionArchive } from '../src/acquisitions/archive.js'
 
 function fixture() {
   const service = new ServiceFixture()
@@ -48,7 +50,11 @@ function fixture() {
 
   onTestFinished(() => client.close())
 
-  const adapter = createCriaEquipment(client, bindings.map(binding => ({ ...binding, providerDeviceId: binding.id })))
+  const adapter = createCriaEquipment(
+    client,
+    bindings.map(binding => ({ ...binding, providerDeviceId: binding.id })),
+    createCriaCustody(client, createMemoryAcquisitionArchive(), service.state.storeId),
+  )
 
   return {
     service,
