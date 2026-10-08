@@ -1,4 +1,4 @@
-import type { CriaClient, CriaCustody } from '@vela/cria'
+import { CriaApiError, type CriaClient, type CriaCustody } from '@vela/cria'
 import {
   ArchiveConflictError,
   ExpectedAcquisitionSchema,
@@ -13,6 +13,13 @@ export interface CriaCustodyReport {
   preserved: number
   problems: string[]
 }
+
+/** A receipt conflict means another archive's receipt was accepted first. */
+function isReceiptConflict(error: unknown): error is CriaApiError {
+  return error instanceof CriaApiError && error.code === 'receipt-conflict'
+}
+
+const receiptConflict = 'Cria accepted a different archive receipt for this original; another archive holds it'
 
 /**
  * The acquisition Vela can vouch for: Cria's authoritative custody record plus Vela's own
@@ -83,7 +90,7 @@ export function createCriaCustody(client: CriaClient, archive: AcquisitionArchiv
         await acknowledge(receipt)
         report.acknowledged++
       } catch (error) {
-        report.problems.push(`${receipt.imageId}: ${error instanceof Error ? error.message : 'acknowledgement failed'}`)
+        report.problems.push(`${receipt.imageId}: ${(isReceiptConflict(error) ? receiptConflict : error instanceof Error ? error.message : 'acknowledgement failed')}`)
       }
     }
 
@@ -116,7 +123,7 @@ export function createCriaCustody(client: CriaClient, archive: AcquisitionArchiv
           await acknowledge(receipt)
           report.preserved++
         } catch (error) {
-          report.problems.push(`${record.id}: ${error instanceof Error ? error.message : 'preservation failed'}`)
+          report.problems.push(`${record.id}: ${(isReceiptConflict(error) ? receiptConflict : error instanceof Error ? error.message : 'preservation failed')}`)
         }
       }
 
@@ -132,7 +139,17 @@ export function createCriaCustody(client: CriaClient, archive: AcquisitionArchiv
     // A published copy without a receipt whose original Cria no longer retains cannot be vouched for,
     // unless an active acquisition finished it meanwhile: then Cria holds Vela's receipt.
     for (const imageId of unreceipted) {
-      const record = await client.custody(imageId).catch(() => undefined)
+      let record: CriaCustody | undefined
+
+      try {
+        record = await client.custody(imageId)
+      } catch (error) {
+        // Only a confirmed unknown image means Cria does not retain it; anything else is unread.
+        if (!(error instanceof CriaApiError && error.status === 404)) {
+          report.problems.push(`${imageId}: Cria custody could not be read (${(isReceiptConflict(error) ? receiptConflict : error instanceof Error ? error.message : 'unreadable')}); still pending`)
+          continue
+        }
+      }
 
       // Still retained (for example on a page this cycle never read) or owned: pending, not a problem.
       if (record && (owned.has(record.requestId) || record.state === 'retained')) continue
@@ -141,7 +158,9 @@ export function createCriaCustody(client: CriaClient, archive: AcquisitionArchiv
         await expectedFor(record).then(expected => archive.receipt(expected)).catch(() => undefined)
 
       if (finished && finished.receiptId === record?.receipt?.receiptId) continue
-      report.problems.push(`${imageId}: archived without a receipt, but Cria does not retain this original`)
+      report.problems.push(record?.receipt
+        ? `${imageId}: Cria accepted another archive's receipt for this original; this archive's unreceipted copy is not vouched for`
+        : `${imageId}: archived without a receipt, but Cria does not retain this original`)
     }
 
     return report
