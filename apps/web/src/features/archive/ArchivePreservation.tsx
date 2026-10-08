@@ -91,6 +91,9 @@ function Preservation({
 
         <h3>Where originals stand</h3>
         <dl>
+          {(obligations.arriving?.count ?? 0) > 0 && (
+            <Fact term="Arriving from this capture" value={tallyText(obligations.arriving)} />
+          )}
           <Fact term="Waiting at Cria" value={tallyText(obligations.waitingAtCria)} />
           <Fact term="Being verified" value={tallyText(obligations.unverified)} />
           <Fact term="Waiting for Cria to confirm" value={tallyText(obligations.acknowledgementPending)} />
@@ -191,7 +194,11 @@ function Preservation({
           {forecast.criaCapturesBeforeRefusal !== null && (
             <Fact
               term="If archiving stopped"
-              value={`Cria could admit about ${forecast.criaCapturesBeforeRefusal} more ${forecast.criaCapturesBeforeRefusal === 1 ? 'capture' : 'captures'}`}
+              value={
+                forecast.criaCapturesBeforeRefusal === 0
+                  ? 'Cria is already refusing new captures'
+                  : `Cria could admit about ${forecast.criaCapturesBeforeRefusal} more ${forecast.criaCapturesBeforeRefusal === 1 ? 'capture' : 'captures'}`
+              }
             />
           )}
         </dl>

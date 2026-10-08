@@ -110,6 +110,8 @@ export interface ArchiveSourceView {
  * been read, or Vela's archive folder cannot be listed.
  */
 export interface ArchiveObligationsView {
+  /** Originals the active capture is preserving right now; a failure there is reported at once. */
+  arriving: ArchiveTally | null
   /** Originals only Cria holds, waiting for transfer to Vela. */
   waitingAtCria: ArchiveTally | null
   /** Copied to Vela but not yet verified. */

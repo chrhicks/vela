@@ -64,6 +64,10 @@ command. Missing telemetry and successful exposure commands do not dismiss that
 warning. A fresh setting resolves uncertainty even if it differs from the requested
 value; the interface shows the observed state rather than claiming the write won.
 
+The Preservation section below the capture card reports whether each original is
+preserved in the Vela archive; see [archive health](../archive/README.md). It is
+independent of Keep and Save frames, and capture state never implies preservation.
+
 Saved images are available at the per-rig `/observe/saved-images` route independently
 of camera readiness. [Photographs](../photographs/README.md) owns the dated
 collection and selected-image composition, validating retained metadata and exact

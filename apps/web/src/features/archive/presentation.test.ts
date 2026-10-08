@@ -13,6 +13,7 @@ function view(overrides: Partial<CriaArchiveHealthView> = {}): CriaArchiveHealth
     observedAt: at,
     status: 'current',
     obligations: {
+      arriving: { count: 0, bytes: 0 },
       waitingAtCria: { count: 0, bytes: 0 },
       unverified: { count: 0, bytes: 0 },
       acknowledgementPending: { count: 0, bytes: 0 },
@@ -103,6 +104,12 @@ describe('preservation wording', () => {
       title: 'Preservation status unknown',
       explanation: "Capturing · Cria's custody could not be read: Cria is unreachable. Last known totals are shown with their age.",
     })
+  })
+
+  it('says when a problem summary rests on last-known Cria facts', () => {
+    const stale = view({ status: 'degraded', source: { ...view().source, current: false, error: 'Cria request did not complete' } })
+
+    expect(preservationSummary(stale, false).explanation).toMatch(/Cria could not be read just now; its totals are last known\.$/)
   })
 
   it('formats measured bytes plainly', () => {

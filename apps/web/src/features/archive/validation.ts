@@ -100,6 +100,7 @@ const criaHealth = z.object({
   observedAt: timestamp,
   status: z.enum(['degraded', 'attention', 'unknown', 'catching-up', 'current']),
   obligations: z.object({
+    arriving: tally.nullable(),
     waitingAtCria: tally.nullable(),
     unverified: tally.nullable(),
     acknowledgementPending: tally.nullable(),
