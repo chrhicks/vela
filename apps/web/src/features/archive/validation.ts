@@ -107,7 +107,8 @@ const criaHealth = z.object({
     preserved: tally.nullable(),
     archiveCountedAt: timestamp.nullable(),
     complete: z.boolean(),
-  }),
+    partial: z.array(z.enum(['cria-unread', 'cria-last-known', 'archive-not-counted', 'archive-count-old', 'pending-copies-unchecked'])),
+  }).refine(obligations => obligations.complete === (obligations.partial.length === 0)),
   destination,
   source,
   issues: z

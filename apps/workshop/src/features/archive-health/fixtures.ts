@@ -23,6 +23,7 @@ export function health(overrides: Partial<CriaArchiveHealthView> = {}): CriaArch
       preserved: { count: 42, bytes: 42 * frame },
       archiveCountedAt: at,
       complete: true,
+      partial: [],
     },
     destination: {
       location: '/srv/vela/acquisitions',
@@ -155,7 +156,7 @@ export const scenarios = {
   stale: health({
     status: 'unknown',
     source: { ...base.source, current: false, error: 'Cria request did not complete', observedAt: ago(8) },
-    obligations: { ...base.obligations, complete: false },
+    obligations: { ...base.obligations, complete: false, partial: ['cria-last-known'] },
   }),
 } satisfies Record<string, CriaArchiveHealthView>
 
