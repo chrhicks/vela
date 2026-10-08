@@ -367,6 +367,59 @@ describe('acquisition custody through the Cria adapter', () => {
     error.mockRestore()
   })
 
+  it('never issues a receipt while reporting a copy another archive already vouched for', async () => {
+    const service = new ServiceFixture()
+    const directory = await mkdtemp(join(tmpdir(), 'vela-custody-'))
+
+    const interrupted = await openAcquisitionArchive(directory, {
+      ...nodeArchiveFileSystem,
+      open: async (path, flags) => {
+        if (String(path).includes('receipt.json')) throw new Error('Interrupted before the receipt')
+
+        return open(path, flags)
+      },
+    })
+
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    await setup(service, interrupted).equipment.acquisition.capture(request)
+    const record = [...service.custody.values()][0]!
+
+    // Another archive's receipt was accepted first.
+    const image = record.image!
+
+    Object.assign(record, {
+      state: 'archived',
+      receipt: {
+        receiptId: crypto.randomUUID(),
+        storeId: record.storeId,
+        imageId: record.id,
+        operationId: record.operationId,
+        sha256: image.sha256,
+        bytes: image.original.bytes,
+        archive: {
+          system: 'vela',
+          artifactId: 'another-archive',
+          representation: 'imagebytes',
+          sha256: image.sha256,
+          bytes: image.original.bytes,
+          contextSha256: '0'.repeat(64),
+          verification: { method: 'sha256-reread', verifiedAt: 1 },
+        },
+      },
+    })
+    const archive = await openAcquisitionArchive(directory)
+
+    for (let pass = 0; pass < 2; pass++) {
+      const report = await setup(service, archive).custody.recover()
+
+      expect(report.problems).toEqual([expect.stringContaining("Cria accepted another archive's receipt")])
+    }
+
+    expect(await archive.issuedReceipt(record.storeId, record.id)).toBeUndefined()
+    error.mockRestore()
+  })
+
   it('reports no problem when an acquisition finishes its receipt while recovery runs', async () => {
     const service = new ServiceFixture()
     const directory = await mkdtemp(join(tmpdir(), 'vela-custody-'))

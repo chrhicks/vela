@@ -178,6 +178,8 @@ export interface AcquisitionArchive {
   unacknowledged(storeId: string): Promise<{ receipts: ArchiveReceipt[]; unreceipted: string[]; problems: string[] }>
   /** Verified original bytes of an acquisition that already has a receipt. */
   original(storeId: string, imageId: string): Promise<Uint8Array | undefined>
+  /** The receipt already written for an acquisition, if any. Read-only: never issues one. */
+  issuedReceipt(storeId: string, imageId: string): Promise<ArchiveReceipt | undefined>
 }
 
 /** Filesystem operations whose order makes publication durable. Injectable to test that order. */
@@ -509,6 +511,13 @@ export async function openAcquisitionArchive(
 
       return (await existingReceipt(target, files)) && new Uint8Array(files.original)
     },
+    async issuedReceipt(storeId, imageId) {
+      const target = directory(storeId, imageId)
+
+      if (!await readOptional(join(target, 'receipt.json'))) return undefined
+
+      return existingReceipt(target, await stored(target))
+    },
   }
 }
 
@@ -603,6 +612,9 @@ export function createMemoryAcquisitionArchive(): AcquisitionArchive {
       const entry = entries.get(`${storeId}/${imageId}`)
 
       return entry?.receipt && new Uint8Array(entry.original)
+    },
+    async issuedReceipt(storeId, imageId) {
+      return entries.get(`${storeId}/${imageId}`)?.receipt
     },
   }
 }
