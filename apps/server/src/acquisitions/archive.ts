@@ -214,10 +214,12 @@ export const nodeArchiveFileSystem: ArchiveFileSystem = {
 }
 
 /**
- * One owner per archive on this host. A Linux abstract-namespace socket named after the archive's
- * real path is held by exactly one live socket; the kernel releases it when its process exits or
- * crashes, so there is no stale lock to clear and nothing to take over from a slow but live owner.
- * A second open, in this process or another, fails before it can clean up or write anything.
+ * One owner per archive path on this host and network namespace. A Linux abstract-namespace socket
+ * named after the archive's canonical real path is held by exactly one live socket; the kernel
+ * releases it when its process exits or crashes, so there is no stale lock to clear and nothing to
+ * take over from a slow but live owner. A second open, in this process or another, fails before it
+ * can clean up or write anything. Separate network namespaces, other hosts and other mount paths
+ * are outside this guarantee.
  */
 async function acquireOwnership(root: string): Promise<() => Promise<void>> {
   if (process.platform !== 'linux')
