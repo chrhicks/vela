@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { CriaClient, CriaUncertainError } from '@vela/cria'
-import { ServiceFixture, serviceOrigin, token } from '../../../packages/cria/test/fixture.js'
+import { ServiceFixture, failure, serviceOrigin, token } from '../../../packages/cria/test/fixture.js'
 import { createCriaEquipment } from '../src/cria/equipment.js'
 import { createCriaCustody, expectedAcquisition } from '../src/cria/custody.js'
 import {
@@ -328,6 +328,42 @@ describe('acquisition custody through the Cria adapter', () => {
     expect(report.preserved).toBe(0)
     expect(report.problems).toEqual([expect.stringContaining(': No space left on device'), expect.stringContaining('Archive unavailable')])
     expect([...service.custody.values()].every(record => record.state === 'retained')).toBe(true)
+    error.mockRestore()
+  })
+
+  it('reports an unreadable Cria record as pending, not as a missing original', async () => {
+    const service = new ServiceFixture()
+    const directory = await mkdtemp(join(tmpdir(), 'vela-custody-'))
+
+    const interrupted = await openAcquisitionArchive(directory, {
+      ...nodeArchiveFileSystem,
+      open: async (path, flags) => {
+        if (String(path).includes('receipt.json')) throw new Error('Interrupted before the receipt')
+
+        return open(path, flags)
+      },
+    })
+
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    await setup(service, interrupted).equipment.acquisition.capture(request)
+    const record = [...service.custody.values()][0]!
+
+    // Cria lists nothing as retained, and reading this record fails with a server error.
+    const { custody } = setup(service, await openAcquisitionArchive(directory), async (input, init) => {
+      const path = new URL(String(input)).pathname
+
+      if (path === '/v2/images') return Response.json({ storeId: service.state.storeId, images: [], next: 0 })
+
+      if (path === `/v2/images/${record.id}`) return failure(503)
+
+      return service.fetch(input, init)
+    })
+
+    const report = await custody.recover()
+
+    expect(report.problems).toEqual([expect.stringContaining('Cria custody could not be read')])
+    expect(report.problems[0]).toContain('still pending')
     error.mockRestore()
   })
 
