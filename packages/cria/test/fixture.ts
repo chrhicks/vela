@@ -355,9 +355,16 @@ export class ServiceFixture {
     }
 
     if (path === '/v2/images') {
-      const images = [...this.custody.values()].filter(record => record.state === 'retained')
+      // Cria pages by admission sequence: records after the cursor, in order, at most `limit`.
+      const query = new URL(input instanceof Request ? input.url : String(input)).searchParams
+      const after = Number(query.get('after') ?? 0)
+      const limit = Number(query.get('limit') ?? 100)
 
-      return json({ storeId: this.state.storeId, images, next: images.length })
+      const page = [...this.custody.values()]
+        .flatMap((record, index) => index + 1 > after && record.state === 'retained' ? [{ record, sequence: index + 1 }] : [])
+        .slice(0, limit)
+
+      return json({ storeId: this.state.storeId, images: page.map(({ record }) => record), next: page.at(-1)?.sequence ?? after })
     }
 
     if (path.startsWith('/v2/images/')) {

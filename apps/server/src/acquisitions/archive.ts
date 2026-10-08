@@ -21,7 +21,12 @@ import { syncDirectory, writeDurable } from '../saved-images/durable-files.js'
 
 const digest = z.string().regex(/^[a-f0-9]{64}$/)
 
-const jsonObject = z.record(z.string(), z.json())
+/** Records are compared by content, not by the order Cria happened to emit their keys. */
+function sortedEntries<T>(record: Record<string, T>): Record<string, T> {
+  return Object.fromEntries(Object.entries(record).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
+}
+
+const jsonObject = z.record(z.string(), z.json()).transform(sortedEntries)
 
 export const AcquisitionSourceSchema = z.strictObject({
   system: z.literal('cria'),
@@ -62,7 +67,7 @@ const CriaContextSchema = z.union([
   z.strictObject({
     version: z.literal(1),
     requested: jsonObject,
-    cameraObservations: z.record(z.string(), CriaReadingSchema),
+    cameraObservations: z.record(z.string(), CriaReadingSchema).transform(sortedEntries),
     observationsNote: z.string(),
   }),
   z.strictObject({

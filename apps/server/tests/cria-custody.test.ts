@@ -235,6 +235,22 @@ describe('acquisition custody through the Cria adapter', () => {
     delayed.release()
   })
 
+  it('recovers every retained original across several pages', async () => {
+    const service = new ServiceFixture()
+    const working = createMemoryAcquisitionArchive()
+    const broken: AcquisitionArchive = { ...working, preserve: async () => { throw new Error('Archive disk unavailable') } }
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const failing = setup(service, broken)
+
+    for (let index = 0; index < 120; index++) await failing.equipment.acquisition.capture(request)
+    expect([...service.custody.values()].filter(record => record.state === 'retained')).toHaveLength(120)
+
+    expect(await setup(service, working).custody.recover()).toMatchObject({ preserved: 120, problems: [] })
+    expect([...service.custody.values()].every(record => record.state === 'archived')).toBe(true)
+    expect(service.posts).toHaveLength(120)
+    error.mockRestore()
+  })
+
   it("uses Vela's verified archived copy when another process already archived and released it", async () => {
     const service = new ServiceFixture()
 
