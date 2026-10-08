@@ -591,6 +591,31 @@ describe('original custody', () => {
     expect(service.posts).toHaveLength(1)
   })
 
+  it('sends nothing when Stop arrives while the before-admission hook runs', async () => {
+    // Found by the Vela verifier: Stop during the intent write still sent the exposure.
+    const service = new ServiceFixture()
+    const client = service.client()
+    const stop = new AbortController()
+
+    await expect(client.run('camera', capture, {
+      signal: stop.signal,
+      async beforeAdmission() {
+        stop.abort()
+      },
+    })).rejects.toBeInstanceOf(CriaCancelledError)
+
+    const cancelling = client.run('camera', capture, {
+      async beforeAdmission() {
+        // Stop from another caller marks the active work cancelled at once.
+        void client.cancelDevice('camera').catch(() => {})
+      },
+    })
+
+    await expect(cancelling).rejects.toBeInstanceOf(CriaCancelledError)
+    expect(service.posts).toHaveLength(0)
+    expect(service.cancellations).toHaveLength(0)
+  })
+
   it('decodes an archived original only when it matches the confirmed capture', async () => {
     const service = new ServiceFixture()
     const client = service.client()

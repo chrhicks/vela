@@ -645,6 +645,13 @@ export class CriaClient {
     }
 
     await options.beforeAdmission?.(request)
+
+    // The hook can take time (Vela writes intent durably); Stop or a write block may arrive meanwhile.
+    options.signal?.throwIfAborted()
+
+    if (active.cancelRequested) throw new CriaCancelledError(null, '/v2/operations')
+
+    if (this.writeFailure) throw this.writeFailure
     active.request = request
     active.operation = await this.admit(request, active)
     this.requirePostWriteObservation(snapshot, active.operation)
