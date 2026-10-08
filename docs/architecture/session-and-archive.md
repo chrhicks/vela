@@ -20,7 +20,7 @@ Vela needs enough durable information to know what Observer asked for and reconc
 
 Record pending intent before sending equipment work. A single active writer owns the session; a second local Vela process must not continue it concurrently. This is an application ownership requirement, not a need for a distributed scheduler. Persist evidence sufficient to reconstruct counters from unique outcomes rather than requiring every UI update to be durable.
 
-**Current gap:** request IDs are generated inside the [client](../../packages/cria/src/client.ts#L627) and retained in memory; capture state is also memory-only. The exact storage model, interface and schema migration remain design work.
+**Current state:** each capture's acquisition intent (rig, device, purpose, exposure and the exact Cria request ID) is recorded durably before the request is sent; see the [acquisition archive](../../apps/server/src/acquisitions/README.md). That covers archive obligations only. Session intent, stop state, limits and capture runs are still memory-only; their storage model remains design work.
 
 ## Restart reconciliation
 
@@ -54,13 +54,13 @@ Accept these boundaries before claiming restart continuity:
 - Revalidate operational state and dependent workflow assumptions. Recovering an alignment frame does not prove the interrupted alignment computation remains valid.
 - Give each requested final hardware action a stable identity too. Acquisition ended, archive complete and equipment end state confirmed are separate facts.
 
-Cria API/worker failure is a separate case from Vela-only restart. A verified result may become recoverable while equipment remains blocked. The current [download gate](../../packages/cria/src/client.ts#L740) requires a succeeded, settled operation, so the future adapter must support the shared result-recovery contract without weakening the command interlock.
+Cria API/worker failure is a separate case from Vela-only restart. A verified result may become recoverable while equipment remains blocked. The client's `download()` still requires a succeeded, settled operation for the active consumer. Results of other operations are recovered through Cria custody (`custody()`, `originalOf()`) by the acquisition archive's recovery, which leaves the command interlock in place; see the [Cria client](../../packages/cria/README.md).
 
 ## Archive boundary for every consumer
 
 The preservation path must sit where all real acquisitions pass through it: Capture, autofocus, target framing and alignment. Caller context identifies why an image was acquired; quality/preview success is not a prerequisite for storage.
 
-The current [saved-image store](../../apps/server/src/saved-images/store.ts#L156) is a useful foundation: write/sync staging files, publish the directory and sync its parent. Its deduplication by Vela frame ID and metadata/file-existence checks do not yet prove matching Cria source identity or archive verification. The current `Frame` lacks those identities, and [download](../../packages/cria/src/client.ts#L732) does not return original bytes to the caller.
+The current [saved-image store](../../apps/server/src/saved-images/store.ts#L156) is a useful foundation: write/sync staging files, publish the directory and sync its parent. Its deduplication by Vela frame ID and metadata/file-existence checks do not yet prove matching Cria source identity or archive verification. The `Frame` still lacks source identities; the acquisition archive records them, and `download()` now also returns the exact original bytes for preservation.
 
 Proposed responsibilities:
 

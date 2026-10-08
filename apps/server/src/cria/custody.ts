@@ -154,7 +154,8 @@ export function createCriaCustody(client: CriaClient, archive: AcquisitionArchiv
       await archive.recordIntent(intent)
       owned.add(intent.requestId)
     },
-    release(requestId: string) {
+    /** The acquisition is done with this request; recovery may now finish its archive work. */
+    disown(requestId: string) {
       owned.delete(requestId)
     },
     /** Preserve a just-acquired original before any consumer processes its pixels. */
