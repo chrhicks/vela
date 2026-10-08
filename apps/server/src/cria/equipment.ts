@@ -24,6 +24,7 @@ import {
 import { DeviceReadings } from './readings.js'
 import { createCriaProvider } from './provider.js'
 import { createCriaMountControl } from './mount-control.js'
+import type { CriaCustodyCoordinator } from './custody.js'
 
 export interface CriaEquipmentBinding {
   readonly providerDeviceId: string
@@ -32,7 +33,11 @@ export interface CriaEquipmentBinding {
   readonly expectedName: string
 }
 
-export function createCriaEquipment(client: CriaClient, bindings: ReadonlyArray<CriaEquipmentBinding>) {
+export function createCriaEquipment(
+  client: CriaClient,
+  bindings: ReadonlyArray<CriaEquipmentBinding>,
+  custody: CriaCustodyCoordinator,
+) {
   function binding(id: string, kind: CriaDeviceKind, expectedName?: string) {
     const selected = bindings.find(device => device.providerDeviceId === id)
 
@@ -75,8 +80,15 @@ export function createCriaEquipment(client: CriaClient, bindings: ReadonlyArray<
 
         if (options.monochromeOnly !== undefined) parameters.monochromeOnly = options.monochromeOnly
 
+        let reserved: string | null = null
+
         let runOptions: NonNullable<Parameters<CriaClient['run']>[2]> = {
           onProgress(progress) {
+            if (reserved === null && progress.reservedImageId) {
+              reserved = progress.reservedImageId
+              custody.claim(reserved)
+            }
+
             if (progress.phase === 'readout' || progress.phase === 'retaining') {
               options.onReadout?.()
 
@@ -94,14 +106,27 @@ export function createCriaEquipment(client: CriaClient, bindings: ReadonlyArray<
 
         if (options.onReadState) runOptions = { ...runOptions, onReadState: options.onReadState }
 
-        const operation = await client.run(selected.id, { kind: 'capture', parameters }, runOptions)
-        const downloadOptions = options.onReadState ? { onReadState: options.onReadState } : {}
-        const { image, frame } = await client.download(operation, downloadOptions)
+        try {
+          const operation = await client.run(selected.id, { kind: 'capture', parameters }, runOptions)
 
-        // Vela owns verified pixels now. A lost release only delays remote spool cleanup.
-        await client.release(image.id).catch(() => {})
+          if (reserved === null && operation.reservedImageId) {
+            reserved = operation.reservedImageId
+            custody.claim(reserved)
+          }
 
-        return frame
+          const downloadOptions = options.onReadState ? { onReadState: options.onReadState } : {}
+          const { image, frame, original } = await client.download(operation, downloadOptions)
+
+          // Preserve every acquisition before any consumer judges or processes it. If this fails,
+          // Cria keeps the same original and custody recovery archives it later; never re-expose.
+          await custody.preserveAcquisition(image.id, original, options.purpose).catch(error => {
+            console.error('Acquisition preservation deferred; Cria retains the original', image.id, error)
+          })
+
+          return frame
+        } finally {
+          if (reserved !== null) custody.unclaim(reserved)
+        }
       } catch (error) {
         if (error instanceof CriaCancelledError) throw new CaptureStoppedError()
 
