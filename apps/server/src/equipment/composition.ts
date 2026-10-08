@@ -114,8 +114,12 @@ export function createEquipmentComposition(
       recoveryTimer.unref()
     },
     async close() {
+      // Stop starting recovery, let a running pass finish, then close transports and only then give
+      // up archive ownership, so no writer outlives this process's claim on the archive.
       clearInterval(recoveryTimer)
+      await Promise.all([...custodies.values()].map(custody => custody.idle()))
       await Promise.all([...clients.values()].map(client => client.close()))
+      await options.acquisitions?.close()
     },
     createInventory: rig => rig.source
       ? createRigDeviceInventory(rig, { provider: cria(rig).provider })

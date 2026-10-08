@@ -224,6 +224,7 @@ describe('acquisition custody through the Cria adapter', () => {
     await delayed.reached
     // The process ends here: its in-memory ownership is gone, the durable intent is not.
     await before.client.close()
+    await before.archive.close()
 
     const after = setup(service, await openAcquisitionArchive(directory))
 
@@ -347,6 +348,7 @@ describe('acquisition custody through the Cria adapter', () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     await setup(service, interrupted).equipment.acquisition.capture(request)
+    await interrupted.close()
     const record = [...service.custody.values()][0]!
 
     // Cria lists nothing as retained, and reading this record fails with a server error.
@@ -383,6 +385,7 @@ describe('acquisition custody through the Cria adapter', () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     await setup(service, interrupted).equipment.acquisition.capture(request)
+    await interrupted.close()
     const record = [...service.custody.values()][0]!
 
     // Another archive's receipt was accepted first.
@@ -423,14 +426,12 @@ describe('acquisition custody through the Cria adapter', () => {
   it('reports no problem when an acquisition finishes its receipt while recovery runs', async () => {
     const service = new ServiceFixture()
     const directory = await mkdtemp(join(tmpdir(), 'vela-custody-'))
-    const archive = await openAcquisitionArchive(directory)
-    let interrupt = true
 
     // The first preservation publishes the copy but is interrupted before its receipt.
     const interrupted = await openAcquisitionArchive(directory, {
       ...nodeArchiveFileSystem,
       open: async (path, flags) => {
-        if (interrupt && String(path).includes('receipt.json')) throw new Error('Interrupted before the receipt')
+        if (String(path).includes('receipt.json')) throw new Error('Interrupted before the receipt')
 
         return open(path, flags)
       },
@@ -439,7 +440,8 @@ describe('acquisition custody through the Cria adapter', () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     await setup(service, interrupted).equipment.acquisition.capture(request)
-    interrupt = false
+    await interrupted.close()
+    const archive = await openAcquisitionArchive(directory)
     const record = [...service.custody.values()][0]!
     let finished = false
 
@@ -460,18 +462,20 @@ describe('acquisition custody through the Cria adapter', () => {
     error.mockRestore()
   })
 
-  it("uses Vela's verified archived copy when another process already archived and released it", async () => {
+  it("uses Vela's verified archived copy when another coordinator already archived and released it", async () => {
     const service = new ServiceFixture()
 
     service.releaseOnReceipt = true
     const directory = await mkdtemp(join(tmpdir(), 'vela-custody-'))
     const delayed = delayedAdmission(service)
-    const foreground = setup(service, await openAcquisitionArchive(directory), delayed.fetch)
+    const archive = await openAcquisitionArchive(directory)
+    const foreground = setup(service, archive, delayed.fetch)
     const capturing = foreground.equipment.acquisition.capture(request)
 
     await delayed.reached
-    // A separate process (for example one that survived a restart race) does not share ownership.
-    expect((await setup(service, await openAcquisitionArchive(directory)).custody.recover()).preserved).toBe(1)
+    // A coordinator that does not know this request is active. Another process cannot do this: it
+    // would be refused the archive, and a separate archive would hold no copy to fall back on.
+    expect((await setup(service, archive).custody.recover()).preserved).toBe(1)
     expect([...service.custody.values()][0]!.state).toBe('released')
     delayed.release()
 
