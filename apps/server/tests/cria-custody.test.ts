@@ -251,6 +251,34 @@ describe('acquisition custody through the Cria adapter', () => {
     error.mockRestore()
   })
 
+  it('continues past a short page that Cria returns while records change state', async () => {
+    const service = new ServiceFixture()
+    const working = createMemoryAcquisitionArchive()
+    const broken: AcquisitionArchive = { ...working, preserve: async () => { throw new Error('Archive disk unavailable') } }
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const failing = setup(service, broken)
+
+    for (let index = 0; index < 60; index++) await failing.equipment.acquisition.capture(request)
+    let shortened = false
+
+    // The first page comes back one record short, as when a record is archived mid-scan.
+    const { custody } = setup(service, working, async (input, init) => {
+      const response = await service.fetch(input, init)
+
+      if (shortened || new URL(String(input)).pathname !== '/v2/images') return response
+      shortened = true
+      const page = await response.json()
+
+      return Response.json({ ...page, images: page.images.slice(1) })
+    })
+
+    const report = await custody.recover()
+
+    expect(report).toMatchObject({ preserved: 59, problems: [] })
+    expect([...service.custody.values()].filter(record => record.state === 'retained')).toHaveLength(1)
+    error.mockRestore()
+  })
+
   it("uses Vela's verified archived copy when another process already archived and released it", async () => {
     const service = new ServiceFixture()
 
