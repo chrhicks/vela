@@ -512,7 +512,7 @@ export async function openAcquisitionArchive(
   }
 }
 
-/** Same contract without durability, for tests and composition without a configured archive. */
+/** Same contract without durability. Test-only: Cria rigs are never composed without a durable archive. */
 export function createMemoryAcquisitionArchive(): AcquisitionArchive {
   const intents = new Map<string, AcquisitionIntent>()
 

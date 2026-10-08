@@ -107,7 +107,9 @@ export function createCriaCustody(client: CriaClient, archive: AcquisitionArchiv
         }
       }
 
-      if (page.images.length < 50) break
+      // Cria drops records that change state while it reads a page, so a short page is not the
+      // end. Stop only when the cursor no longer advances.
+      if (page.next <= after) break
       after = page.next
     }
 
