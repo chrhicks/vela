@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, open, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -68,6 +68,31 @@ describe('acquisition archive', () => {
     expect(pending.receipts).toEqual([])
     expect(pending.problems[0]).toContain('differs from the Cria source')
     await expect(archive.preserve({ source: acquired, original, context: context() })).rejects.toBeInstanceOf(ArchiveConflictError)
+  })
+
+  it('never leaves a partially written receipt under its final name', async () => {
+    const directory = await root()
+    const acquired = source()
+    let failReceipt = true
+
+    // Simulate a crash while the receipt's bytes are being written.
+    const failing = await openAcquisitionArchive(directory, async (path, flags) => {
+      const file = await open(path, flags)
+
+      if (String(path).includes('receipt.json') && failReceipt) {
+        failReceipt = false
+        await file.close()
+        throw new Error('Simulated crash while writing receipt')
+      }
+
+      return file
+    })
+
+    await expect(failing.preserve({ source: acquired, original, context: context() })).rejects.toThrow('Simulated crash')
+    const target = join(directory, acquired.storeId, acquired.imageId)
+
+    expect((await readdir(target)).sort()).toEqual(['context.json', 'original.imagebytes'])
+    expect((await (await openAcquisitionArchive(directory)).unacknowledged()).receipts).toHaveLength(1)
   })
 
   it('publishes concurrently preserved copies once', async () => {
