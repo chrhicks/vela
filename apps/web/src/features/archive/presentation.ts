@@ -63,6 +63,15 @@ function pendingSentence(view: CriaArchiveHealthView) {
   return parts.join(' · ')
 }
 
+const partialSentences: Record<CriaArchiveHealthView['obligations']['partial'][number], string> = {
+  'cria-unread': "Cria has not been read yet, so Vela cannot say every original is preserved.",
+  'cria-last-known': "Cria's totals are last known, so Vela cannot say every original is preserved.",
+  'archive-not-counted': 'Vela is still counting its archive, so it cannot yet say every original is preserved.',
+  'archive-count-old': 'The archive count is not recent, so Vela cannot say every original is preserved. A new count is running.',
+  'pending-copies-unchecked':
+    'More copies are waiting for Cria to confirm than Vela checks at once, so some may be counted twice. Vela resends their receipts automatically.',
+}
+
 export function preservationSummary(view: CriaArchiveHealthView, capturing: boolean): PreservationSummary {
   const summary = summarize(view, capturing)
 
@@ -114,9 +123,7 @@ function summarize(view: CriaArchiveHealthView, capturing: boolean): Preservatio
         title: 'Preservation status unknown',
         explanation: !view.source.current
           ? `${lead}Cria's custody could not be read${view.source.error ? `: ${sentence(view.source.error)}` : '.'} ${view.source.observedAt ? 'Last known totals are shown with their age.' : 'No totals are known yet.'}`
-          : view.obligations.archiveCountedAt === null
-            ? `${lead}Vela is still counting its archive, so it cannot yet say every original is preserved.`
-            : `${lead}The archive count is not recent, so Vela cannot say every original is preserved. A new count is running.`,
+          : `${lead}${partialSentences[view.obligations.partial[0] ?? 'archive-count-old']}`,
         nextStep: !view.source.current ? 'Check that Cria is reachable. Vela retries automatically.' : null,
       }
     case 'catching-up':

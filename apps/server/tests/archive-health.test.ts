@@ -337,7 +337,7 @@ describe('archive health', () => {
 
     expect(stale.source).toMatchObject({ current: false, observedAt: before.source.observedAt })
     expect(stale.source.error).toBeTruthy()
-    expect(stale.obligations).toMatchObject({ waitingAtCria: { count: 1 }, complete: false })
+    expect(stale.obligations).toMatchObject({ waitingAtCria: { count: 1 }, complete: false, partial: ['cria-last-known'] })
     error.mockRestore()
   })
 
@@ -389,6 +389,25 @@ describe('archive health', () => {
     expect((await health.view()).forecast).toMatchObject({ rate: null, rateUnknown: 'not-acquiring', destinationHours: null })
   })
 
+  it('measures the rate over the latest unbroken run, not across a pause', async () => {
+    const service = new ServiceFixture()
+    const { equipment, health, time } = await setup(service)
+
+    for (let frame = 0; frame < 8; frame++) {
+      await equipment.acquisition.capture(capture())
+      time.advance(60_000)
+    }
+
+    time.advance(2 * 3_600_000)
+
+    for (let frame = 0; frame < 2; frame++) {
+      await equipment.acquisition.capture(capture())
+      time.advance(60_000)
+    }
+
+    expect((await health.view()).forecast.rate).toMatchObject({ framesPerHour: 60, frames: 2 })
+  })
+
   it('reports Cria read failures without inventing an archive problem', async () => {
     const service = new ServiceFixture()
 
@@ -427,7 +446,7 @@ describe('archive health', () => {
     expect(first).toBe(second)
     expect(censuses).toBe(1)
     expect(first.status).toBe('unknown')
-    expect(first.obligations).toMatchObject({ preserved: null, archiveCountedAt: null, complete: false })
+    expect(first.obligations).toMatchObject({ preserved: null, archiveCountedAt: null, complete: false, partial: ['archive-not-counted'] })
 
     release()
     await new Promise(resolve => setTimeout(resolve, 10))
@@ -459,7 +478,7 @@ describe('archive health', () => {
     time.advance(120_000)
     const old = await health.view()
 
-    expect(old.obligations).toMatchObject({ preserved: { count: 1 }, complete: false })
+    expect(old.obligations).toMatchObject({ preserved: { count: 1 }, complete: false, partial: ['archive-count-old'] })
     expect(Date.parse(old.observedAt) - Date.parse(old.obligations.archiveCountedAt!)).toBe(120_000)
     expect(old.status).toBe('unknown')
     release()

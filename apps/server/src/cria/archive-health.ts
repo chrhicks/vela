@@ -482,6 +482,15 @@ function obligationsOf(input: ProjectionInput, source: ArchiveSourceView): Archi
   const reading = input.source?.reading
   const retained = reading?.storage.images.states.retained
 
+  const partial: ArchiveObligationsView['partial'] = []
+
+  if (!source.current) partial.push(source.observedAt ? 'cria-last-known' : 'cria-unread')
+
+  if (!input.census) partial.push('archive-not-counted')
+  else if (!input.census.current) partial.push('archive-count-old')
+
+  if (input.census && reading && !reading.overlap.complete) partial.push('pending-copies-unchecked')
+
   // An original Vela already copied, or one the active capture is preserving, is not waiting.
   const arriving = reading ? (reading.arriving ?? tally(0, 0)) : null
 
@@ -499,7 +508,8 @@ function obligationsOf(input: ProjectionInput, source: ArchiveSourceView): Archi
     acknowledgementPending: census ? tally(census.acknowledgementPending.count, census.acknowledgementPending.bytes) : null,
     preserved: census ? tally(census.preserved.count, census.preserved.bytes) : null,
     archiveCountedAt: input.census?.at ?? null,
-    complete: Boolean(input.census?.current && source.current && reading?.overlap.complete),
+    complete: partial.length === 0,
+    partial,
   }
 }
 
@@ -563,13 +573,12 @@ function forecastOf(input: ProjectionInput, obligations: ArchiveObligationsView,
   let rate: ArchiveForecastView['rate'] = null
   let rateUnknown: ArchiveForecastView['rateUnknown'] = 'too-few-acquisitions'
 
-  if (samples.length >= 2 && latest) {
-    const first = samples[0]!
-    const meanIntervalMs = (latest.at - first.at) / (samples.length - 1)
+  const run = recentRun(samples.map(sample => sample.at))
 
+  if (run && latest) {
     // Still acquiring if the next frame is not overdue; an engineering heuristic, not a policy.
-    if (meanIntervalMs > 0 && input.nowMs - latest.at <= 3 * meanIntervalMs) {
-      rate = { framesPerHour: 3_600_000 / meanIntervalMs, frames: samples.length, since: new Date(first.at).toISOString() }
+    if (run.meanIntervalMs > 0 && input.nowMs - latest.at <= 3 * run.meanIntervalMs) {
+      rate = { framesPerHour: 3_600_000 / run.meanIntervalMs, frames: run.frames, since: new Date(run.since).toISOString() }
       rateUnknown = null
     } else rateUnknown = 'not-acquiring'
   }
@@ -600,6 +609,29 @@ function forecastOf(input: ProjectionInput, obligations: ArchiveObligationsView,
   }
 
   return { frameBytes, rate, rateUnknown, backlogBytes, destinationHours, criaCapturesBeforeRefusal, totalRequirement: 'unknown' }
+}
+
+/**
+ * The latest unbroken run of acquisitions: walking back from the newest, stop at a gap more than
+ * three times the run's typical interval, so a pause is not averaged into the rate.
+ */
+function recentRun(times: number[]) {
+  if (times.length < 2) return null
+
+  const intervals: number[] = []
+
+  for (let index = times.length - 1; index > 0; index--) {
+    const interval = times[index]! - times[index - 1]!
+    const sorted = [...intervals].sort((a, b) => a - b)
+    const typical = sorted[Math.floor(sorted.length / 2)]
+
+    if (typical !== undefined && interval > 3 * typical) break
+    intervals.push(interval)
+  }
+
+  const total = intervals.reduce((sum, interval) => sum + interval, 0)
+
+  return { meanIntervalMs: total / intervals.length, frames: intervals.length + 1, since: times.at(-1)! - total }
 }
 
 const attentionReasons = new Set<ArchiveIssueReason>([

@@ -125,8 +125,21 @@ export interface ArchiveObligationsView {
    * be older than the view; null until the first count finishes.
    */
   archiveCountedAt: string | null
-  /** False when a tally is unknown, the archive count is no longer recent, or Cria's totals are last known. */
+  /** True when no reason below applies. */
   complete: boolean
+  /** Why the totals are not complete, most fundamental first. */
+  partial: Array<
+    /** Cria has not been read since Vela started. */
+    | 'cria-unread'
+    /** Cria's latest read failed; its totals are last known. */
+    | 'cria-last-known'
+    /** Vela's archive has not finished its first count. */
+    | 'archive-not-counted'
+    /** The latest archive count is no longer recent; a new one is running. */
+    | 'archive-count-old'
+    /** More copies await Cria's confirmation than one read checks, so some may be counted twice. */
+    | 'pending-copies-unchecked'
+  >
 }
 
 /** Estimates from measured evidence only; null wherever the evidence is insufficient. */

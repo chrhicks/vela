@@ -20,6 +20,7 @@ function view(overrides: Partial<CriaArchiveHealthView> = {}): CriaArchiveHealth
       preserved: { count: 12, bytes: 12 * 104_368_428 },
       archiveCountedAt: at,
       complete: true,
+      partial: [],
     },
     destination: {
       location: '/srv/vela/acquisitions',
@@ -116,13 +117,21 @@ describe('preservation wording', () => {
   it('says the archive is still being counted rather than guessing its totals', () => {
     const counting = view({
       status: 'unknown',
-      obligations: { ...view().obligations, unverified: null, acknowledgementPending: null, preserved: null, archiveCountedAt: null, complete: false },
+      obligations: { ...view().obligations, unverified: null, acknowledgementPending: null, preserved: null, archiveCountedAt: null, complete: false, partial: ['archive-not-counted'] },
     })
 
     expect(preservationSummary(counting, false)).toMatchObject({
       tone: 'unknown',
       explanation: 'Vela is still counting its archive, so it cannot yet say every original is preserved.',
     })
+  })
+
+  it('names the real reason when only the pending-copy check is incomplete', () => {
+    const many = view({ status: 'unknown', obligations: { ...view().obligations, complete: false, partial: ['pending-copies-unchecked'] } })
+
+    expect(preservationSummary(many, false).explanation).toBe(
+      'More copies are waiting for Cria to confirm than Vela checks at once, so some may be counted twice. Vela resends their receipts automatically.',
+    )
   })
 
   it('formats measured bytes plainly', () => {

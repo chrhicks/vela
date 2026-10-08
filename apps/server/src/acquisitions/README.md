@@ -97,7 +97,7 @@ The two archive failures stay distinct. If intent cannot be recorded, the captur
 
 The destination is compared with the folder Vela opened, by device and inode. A missing path, or one that now leads to another folder (an empty mount point after unmounting), is unavailable. Its free space is then measured wherever the path leads and labelled `other-location`. Operating-system messages are reduced to their error codes, so temporary file names and paths do not reach the page.
 
-Forecasts use only measured evidence: the latest acquired original's length, the rate over the last ten acquisitions (unknown with fewer than two, or once the next frame is overdue by three intervals), the bytes waiting at Cria, and Cria's own admission rules. The total a capture run needs is always unknown, because runs continue until stopped. They are estimates, not guarantees: saved FITS files, previews and other programs writing to either disk are not included.
+Forecasts use only measured evidence: the latest acquired original's length, the rate over the latest unbroken run among the last ten acquisitions (a gap more than three times the run's typical interval ends it, so a pause is not averaged in; unknown with fewer than two, or once the next frame is overdue by three intervals), the bytes waiting at Cria, and Cria's own admission rules. The total a capture run needs is always unknown, because runs continue until stopped. They are estimates, not guarantees: saved FITS files, previews and other programs writing to either disk are not included.
 
 Reads are cached for 5 seconds and coalesced across browsers. Cria reads are bounded: 50 pending copies are checked against Cria, 5 pages of missing records are counted, and the arriving check runs only when 20 or fewer originals are retained. Beyond those limits totals are marked partial.
 
@@ -108,7 +108,7 @@ The archive census grows with the archive, so it never runs on a health read's c
 - **A read waits, for at most 1 second,** only when no census has finished yet or the last one is no longer current: older than 60 seconds or three reuse periods. If the census is still running after that second, the view says Vela is still counting, or marks totals partial with the time they were counted. Status is then unknown, never current.
 - **Check archive now** waits up to 10 seconds for a census that starts after its recovery pass. It never returns a read that started before the check finished.
 
-Measured on Polaris with sparse full-size originals (`evidence-archive-health/measure-*.log`):
+Measured on Polaris with sparse full-size originals. The measurement scripts and logs accompany the review evidence, outside this repository:
 
 | Entries | Census | Health reads |
 | --- | --- | --- |
