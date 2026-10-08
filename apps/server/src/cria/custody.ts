@@ -15,11 +15,15 @@ export interface CriaCustodyReport {
 }
 
 /** A receipt conflict means another archive's receipt was accepted first. */
-function isReceiptConflict(error: unknown): error is CriaApiError {
+function isReceiptConflict(error: Error | null): error is CriaApiError {
   return error instanceof CriaApiError && error.code === 'receipt-conflict'
 }
 
-const receiptConflict = 'Cria accepted a different archive receipt for this original; another archive holds it'
+function problem(error: Error | null, fallback: string) {
+  if (isReceiptConflict(error)) return 'Cria accepted a different archive receipt for this original; another archive holds it'
+
+  return error?.message ?? fallback
+}
 
 /**
  * The acquisition Vela can vouch for: Cria's authoritative custody record plus Vela's own
@@ -90,7 +94,7 @@ export function createCriaCustody(client: CriaClient, archive: AcquisitionArchiv
         await acknowledge(receipt)
         report.acknowledged++
       } catch (error) {
-        report.problems.push(`${receipt.imageId}: ${(isReceiptConflict(error) ? receiptConflict : error instanceof Error ? error.message : 'acknowledgement failed')}`)
+        report.problems.push(`${receipt.imageId}: ${problem(error instanceof Error ? error : null, 'acknowledgement failed')}`)
       }
     }
 
@@ -123,7 +127,7 @@ export function createCriaCustody(client: CriaClient, archive: AcquisitionArchiv
           await acknowledge(receipt)
           report.preserved++
         } catch (error) {
-          report.problems.push(`${record.id}: ${(isReceiptConflict(error) ? receiptConflict : error instanceof Error ? error.message : 'preservation failed')}`)
+          report.problems.push(`${record.id}: ${problem(error instanceof Error ? error : null, 'preservation failed')}`)
         }
       }
 
@@ -146,7 +150,7 @@ export function createCriaCustody(client: CriaClient, archive: AcquisitionArchiv
       } catch (error) {
         // Only a confirmed unknown image means Cria does not retain it; anything else is unread.
         if (!(error instanceof CriaApiError && error.status === 404)) {
-          report.problems.push(`${imageId}: Cria custody could not be read (${(isReceiptConflict(error) ? receiptConflict : error instanceof Error ? error.message : 'unreadable')}); still pending`)
+          report.problems.push(`${imageId}: Cria custody could not be read (${(error instanceof Error ? error.message : 'unreadable')}); still pending`)
           continue
         }
       }
@@ -170,7 +174,12 @@ export function createCriaCustody(client: CriaClient, archive: AcquisitionArchiv
     storeId,
     /** Record intent durably and take ownership of the request before it is sent. */
     async intend(intent: AcquisitionIntent) {
-      await archive.recordIntent(intent)
+      try {
+        await archive.recordIntent(intent)
+      } catch (error) {
+        throw new Error(`Acquisition archive unavailable; capture not started: ${error instanceof Error ? error.message : 'intent not recorded'}`, { cause: error })
+      }
+
       owned.add(intent.requestId)
     },
     /** The acquisition is done with this request; recovery may now finish its archive work. */
