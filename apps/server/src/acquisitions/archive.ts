@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { mkdir, mkdtemp, open, readFile, readdir, rename, rm, stat } from 'node:fs/promises'
-import { dirname, join, resolve } from 'node:path'
+import { link, mkdir, mkdtemp, open, readFile, readdir, realpath, rename, rm, stat } from 'node:fs/promises'
+import { createConnection, createServer } from 'node:net'
+import { dirname, join, parse, resolve } from 'node:path'
 import { z } from 'zod'
 import { CriaImageSchema, CriaReadingSchema } from '@vela/cria'
 import { syncDirectory, writeDurable } from '../saved-images/durable-files.js'
@@ -154,6 +155,14 @@ export class ArchiveConflictError extends Error {
   }
 }
 
+/** Another live process, or another open instance in this process, already owns the archive. */
+export class ArchiveOwnedError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'ArchiveOwnedError'
+  }
+}
+
 export interface AcquisitionArchive {
   /** Durably record intent before the request is sent, so it survives a lost response or restart. */
   recordIntent(intent: AcquisitionIntent): Promise<void>
@@ -178,6 +187,8 @@ export interface AcquisitionArchive {
   unacknowledged(storeId: string): Promise<{ receipts: ArchiveReceipt[]; unreceipted: string[]; problems: string[] }>
   /** Verified original bytes of an acquisition that already has a receipt. */
   original(storeId: string, imageId: string): Promise<Uint8Array | undefined>
+  /** Finish in-flight writes and give up ownership. Later calls fail; reopening is allowed. */
+  close(): Promise<void>
   /** The receipt already written for an acquisition, if any. Read-only: never issues one. */
   issuedReceipt(storeId: string, imageId: string): Promise<ArchiveReceipt | undefined>
 }
@@ -187,6 +198,8 @@ export interface ArchiveFileSystem {
   open: typeof open
   mkdir(path: string): Promise<void>
   rename(from: string, to: string): Promise<void>
+  /** Hard link that fails with EEXIST rather than replacing an existing name. */
+  link(existing: string, created: string): Promise<void>
   syncDirectory(path: string): Promise<void>
 }
 
@@ -196,7 +209,48 @@ export const nodeArchiveFileSystem: ArchiveFileSystem = {
     await mkdir(path)
   },
   rename,
+  link,
   syncDirectory,
+}
+
+/**
+ * One owner per archive on this host. A Linux abstract-namespace socket named after the archive's
+ * real path is held by exactly one live socket; the kernel releases it when its process exits or
+ * crashes, so there is no stale lock to clear and nothing to take over from a slow but live owner.
+ * A second open, in this process or another, fails before it can clean up or write anything.
+ */
+async function acquireOwnership(root: string): Promise<() => Promise<void>> {
+  if (process.platform !== 'linux')
+    throw new ArchiveOwnedError('The acquisition archive ownership guard requires Linux; refusing to open the archive without it')
+
+  const name = `\0vela-acquisition-archive/${createHash('sha256').update(await realpath(root)).digest('hex')}`
+  const owner = JSON.stringify({ pid: process.pid, openedAt: new Date().toISOString() })
+  const server = createServer(socket => socket.end(owner))
+
+  try {
+    await new Promise<void>((resolveListen, rejectListen) => {
+      server.once('error', rejectListen)
+      server.listen({ path: name, exclusive: true }, () => resolveListen())
+    })
+  } catch (error) {
+    if (!isFileError(error) || error.code !== 'EADDRINUSE') throw error
+
+    const holder = await new Promise<string>(resolveHolder => {
+      const socket = createConnection({ path: name })
+      let reply = ''
+
+      socket.setTimeout(500, () => socket.destroy())
+      socket.on('data', chunk => { reply += String(chunk) })
+      socket.on('close', () => resolveHolder(reply))
+      socket.on('error', () => resolveHolder(reply))
+    })
+
+    throw new ArchiveOwnedError(`Acquisition archive ${root} is already owned by ${holder || 'another live Vela process'}; refusing to open it twice`)
+  }
+
+  server.unref()
+
+  return () => new Promise<void>(resolveClose => server.close(() => resolveClose()))
 }
 
 const sha256 = (data: Uint8Array) => createHash('sha256').update(data).digest('hex')
@@ -241,13 +295,14 @@ export async function openAcquisitionArchive(
   fs: ArchiveFileSystem = nodeArchiveFileSystem,
 ): Promise<AcquisitionArchive> {
   /**
-   * Create each missing directory and sync its parent, so its own name is durable too. The final
-   * directory's parent is synced even when it already existed: an earlier attempt may have been
-   * interrupted between creating it and syncing its parent.
+   * Make `path` exist with every directory link from `anchor` down to it durable. Existence is not
+   * proof: an earlier attempt may have created a component and been interrupted before syncing its
+   * parent. So the parent of every component up to the anchor is synced on every call.
    */
-  async function ensureDirectory(path: string) {
-    const missing: string[] = []
+  async function ensureDirectory(path: string, anchor: string) {
     const final = resolve(path)
+    const top = resolve(anchor)
+    const missing: string[] = []
 
     for (let current = final; !(await exists(current)); current = dirname(current))
       missing.unshift(current)
@@ -258,18 +313,44 @@ export async function openAcquisitionArchive(
       } catch (error) {
         if (!isFileError(error) || error.code !== 'EEXIST') throw error
       }
-
-      await fs.syncDirectory(dirname(created))
     }
 
-    if (missing.length === 0) await fs.syncDirectory(dirname(final))
+    for (let current = final; current !== dirname(current); current = dirname(current)) {
+      await fs.syncDirectory(dirname(current))
+
+      if (current === top) break
+    }
   }
 
-  await ensureDirectory(root)
+  // The root's whole ancestry, up to the filesystem root, may include directories this or an
+  // interrupted earlier start created.
+  await ensureDirectory(root, parse(resolve(root)).root)
+  const releaseOwnership = await acquireOwnership(root)
+  let closed = false
 
-  // An interrupted publication is Vela's own unverified copy; Cria still holds the original.
-  for (const entry of await readdir(root))
-    if (entry.startsWith('.staging-')) await rm(join(root, entry), { recursive: true, force: true })
+  // Only the owner gets here. An interrupted publication is then Vela's own unverified copy from a
+  // process that has exited; Cria still holds the original.
+  try {
+    for (const entry of await readdir(root))
+      if (entry.startsWith('.staging-')) await rm(join(root, entry), { recursive: true, force: true })
+  } catch (error) {
+    await releaseOwnership()
+    throw error
+  }
+
+  function assertOpen() {
+    if (closed) throw new ArchiveOwnedError('Acquisition archive is closed; this process no longer owns it')
+  }
+
+  // Work started before close() finishes before ownership is given up.
+  const inflight = new Set<Promise<unknown>>()
+
+  function tracked<T>(work: Promise<T>): Promise<T> {
+    inflight.add(work)
+    void work.finally(() => inflight.delete(work)).catch(() => {})
+
+    return work
+  }
 
   const directory = (storeId: string, imageId: string) => join(root, storeId, imageId)
 
@@ -303,7 +384,21 @@ export async function openAcquisitionArchive(
 
     try {
       await writeDurable(temporary, data, fs.open)
-      await fs.rename(temporary, path)
+
+      try {
+        // Never replace a record another writer already published; the first one stays.
+        await fs.link(temporary, path)
+      } catch (error) {
+        if (!isFileError(error) || error.code === 'EEXIST') throw error
+
+        // Filesystems without hard links (for example exFAT): rename, relying on ownership.
+        if (!['EPERM', 'ENOTSUP', 'EOPNOTSUPP', 'ENOSYS', 'EXDEV'].includes(error.code ?? '')) throw error
+        await fs.rename(temporary, path)
+      }
+
+      await fs.syncDirectory(dirname(path))
+    } catch (error) {
+      if (!isFileError(error) || error.code !== 'EEXIST') throw error
       await fs.syncDirectory(dirname(path))
     } finally {
       await rm(temporary, { force: true })
@@ -316,7 +411,7 @@ export async function openAcquisitionArchive(
 
     if (await readOptional(join(target, 'context.json'))) {
       // Published earlier, possibly just before an interruption: make its path durable again.
-      await ensureDirectory(join(root, source.storeId))
+      await ensureDirectory(join(root, source.storeId), root)
       await fs.syncDirectory(join(root, source.storeId))
 
       return target
@@ -334,7 +429,7 @@ export async function openAcquisitionArchive(
       await writeDurable(join(staging, 'original.imagebytes'), Buffer.from(original), fs.open)
       await writeDurable(join(staging, 'context.json'), JSON.stringify(manifest, null, 2), fs.open)
       await fs.syncDirectory(staging)
-      await ensureDirectory(join(root, source.storeId))
+      await ensureDirectory(join(root, source.storeId), root)
       await fs.rename(staging, target)
       await fs.syncDirectory(join(root, source.storeId))
     } catch (error) {
@@ -425,46 +520,58 @@ export async function openAcquisitionArchive(
 
     await publishOnce(join(target, 'receipt.json'), JSON.stringify(receipt, null, 2))
 
-    return receipt
+    // Return what is stored, so every caller gets the one receipt recovery can resend.
+    const published = await existingReceipt(target, files)
+
+    if (!published) throw new ArchiveConflictError('Archive receipt was not published')
+
+    return published
   }
 
   return {
     async recordIntent(intent) {
+      assertOpen()
+
       const validated = AcquisitionIntentSchema.parse(intent)
       const path = intentPath(validated.storeId, validated.requestId)
 
-      await ensureDirectory(dirname(path))
-      await publishOnce(path, JSON.stringify(validated, null, 2))
+      await tracked(ensureDirectory(dirname(path), root).then(() => publishOnce(path, JSON.stringify(validated, null, 2))))
     },
     async intent(storeId, requestId) {
+      assertOpen()
+
       const bytes = await readOptional(intentPath(storeId, requestId))
 
       return bytes && AcquisitionIntentSchema.parse(JSON.parse(bytes.toString('utf8')))
     },
     async preserve({ expected, original, preservedBy }) {
+      assertOpen()
+
       const validated = ExpectedAcquisitionSchema.parse(expected)
 
       if (original.byteLength !== validated.source.bytes || sha256(original) !== validated.source.sha256)
         throw new ArchiveConflictError('Original bytes do not match their Cria source digest')
 
-      const target = await publish(validated, original, preservedBy)
-
-      return exclusive(target, () => receiptFor(validated, target))
+      return tracked(publish(validated, original, preservedBy).then(target => exclusive(target, () => receiptFor(validated, target))))
     },
     async receipt(expected) {
+      assertOpen()
+
       const validated = ExpectedAcquisitionSchema.parse(expected)
       const target = directory(validated.source.storeId, validated.source.imageId)
 
       if (!await readOptional(join(target, 'context.json'))) return undefined
 
       return exclusive(target, async () => {
-        await ensureDirectory(join(root, validated.source.storeId))
+        await ensureDirectory(join(root, validated.source.storeId), root)
         await fs.syncDirectory(join(root, validated.source.storeId))
 
         return receiptFor(validated, target)
       })
     },
     async acknowledged(receipt, sourceState) {
+      assertOpen()
+
       const target = directory(receipt.storeId, receipt.imageId)
 
       await exclusive(target, () => publishOnce(join(target, 'acknowledgement.json'), JSON.stringify({
@@ -474,6 +581,8 @@ export async function openAcquisitionArchive(
       }, null, 2)))
     },
     async unacknowledged(storeId) {
+      assertOpen()
+
       const receipts: ArchiveReceipt[] = []
       const unreceipted: string[] = []
       const problems: string[] = []
@@ -481,7 +590,7 @@ export async function openAcquisitionArchive(
       if (!await exists(join(root, storeId))) return { receipts, unreceipted, problems }
 
       // Receipts listed here may be sent; re-link the store path in case of an earlier interruption.
-      await ensureDirectory(join(root, storeId))
+      await ensureDirectory(join(root, storeId), root)
       await fs.syncDirectory(join(root, storeId))
 
       for (const imageId of await readdir(join(root, storeId))) {
@@ -504,6 +613,8 @@ export async function openAcquisitionArchive(
       return { receipts, unreceipted, problems }
     },
     async original(storeId, imageId) {
+      assertOpen()
+
       const target = directory(storeId, imageId)
 
       if (!await readOptional(join(target, 'receipt.json'))) return undefined
@@ -512,11 +623,19 @@ export async function openAcquisitionArchive(
       return (await existingReceipt(target, files)) && new Uint8Array(files.original)
     },
     async issuedReceipt(storeId, imageId) {
+      assertOpen()
+
       const target = directory(storeId, imageId)
 
       if (!await readOptional(join(target, 'receipt.json'))) return undefined
 
       return existingReceipt(target, await stored(target))
+    },
+    async close() {
+      if (closed) return
+      closed = true
+      await Promise.allSettled([...inflight, ...writers.values()])
+      await releaseOwnership()
     },
   }
 }
@@ -616,5 +735,6 @@ export function createMemoryAcquisitionArchive(): AcquisitionArchive {
     async issuedReceipt(storeId, imageId) {
       return entries.get(`${storeId}/${imageId}`)?.receipt
     },
+    async close() {},
   }
 }

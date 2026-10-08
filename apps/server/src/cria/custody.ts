@@ -206,6 +206,10 @@ export function createCriaCustody(client: CriaClient, archive: AcquisitionArchiv
 
       return recovering
     },
+    /** Resolves once no recovery pass is running, so shutdown can release the archive safely. */
+    async idle() {
+      await recovering?.catch(() => {})
+    },
   }
 }
 

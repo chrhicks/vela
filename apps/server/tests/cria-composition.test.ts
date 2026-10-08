@@ -52,8 +52,13 @@ it('shares one authenticated stream across configured rigs and closes it with th
   const catalog = createMemoryRigCatalog()
   await registerConfiguredCriaRigs(catalog, configurations)
 
+  const acquisitions = createMemoryAcquisitionArchive()
+  let archiveClosed = 0
+
   const app = buildApp({
-    equipment: createEquipmentComposition(configurations, { acquisitions: createMemoryAcquisitionArchive() }),
+    equipment: createEquipmentComposition(configurations, {
+      acquisitions: { ...acquisitions, close: async () => { archiveClosed++ } },
+    }),
     rigCatalog: catalog,
   })
 
@@ -72,9 +77,12 @@ it('shares one authenticated stream across configured rigs and closes it with th
     await app.inject('/api/web/rigs/camera')
     expect(requests).toEqual(['GET /v2/events'])
     expect(openStreams).toBe(1)
+    expect(archiveClosed).toBe(0)
     await app.close()
     await closed
     expect(openStreams).toBe(0)
+    // App shutdown gives up archive ownership after recovery and transports have stopped.
+    expect(archiveClosed).toBe(1)
   } finally {
     await app.close()
     remote.closeAllConnections()
