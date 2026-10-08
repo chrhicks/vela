@@ -31,6 +31,7 @@ import { registerAlignment } from './alignment/routes.js'
 import type { AlignmentSettings } from './alignment/controller.js'
 import { createMemorySavedImageStore, type SavedImageStore } from './saved-images/store.js'
 import { registerSavedImages } from './saved-images/routes.js'
+import { registerArchiveHealth } from './acquisitions/health-routes.js'
 import { registerTargets, type TargetOptions } from './targets/routes.js'
 import { createSurveyCache, registerSurvey, type SurveyCache } from './targets/survey.js'
 
@@ -109,6 +110,7 @@ export function buildApp({
   })
   registerNavigation(app, rigCatalog, capture)
   registerSavedImages(app, rigCatalog, savedImages)
+  registerArchiveHealth(app, rigCatalog, rig => equipment.archiveHealth(rig))
   registerImagingCamera(app, rigCatalog, operations, { createInspector })
   registerTargets(app, rigCatalog, operations, {
     ...targets,

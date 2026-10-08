@@ -119,6 +119,11 @@ export class ServiceFixture {
   completeImmediately = true
   /** Model Cria's release of its local copy once a receipt is accepted. */
   releaseOnReceipt = false
+  /** Local capacity reported by `/v2/storage`. */
+  budgetBytes = 2 * 1024 ** 3
+  reservationBytes = 44 + 4 * 2 * 2
+  freeBytes = 500 * 1024 ** 3
+  storageFailure = false
   cancelImmediately = false
   publishOperations = true
   last: CriaOperation | null = null
@@ -354,14 +359,54 @@ export class ServiceFixture {
       return json(operation, method === 'POST' ? 202 : 200)
     }
 
+    if (path === '/v2/storage') {
+      if (this.storageFailure) return failure(503, 'storage-unavailable')
+
+      const tally = (state: string) => {
+        const records = [...this.custody.values()].filter(record => record.state === state)
+
+        return {
+          records: records.length,
+          bytes: records.reduce((sum, record) => sum + (state === 'reserved' ? this.reservationBytes : record.image?.original.bytes ?? 0), 0),
+        }
+      }
+
+      const states = { reserved: tally('reserved'), retained: tally('retained'), quarantined: tally('quarantined'), archived: tally('archived') }
+      const committedBytes = Object.values(states).reduce((sum, state) => sum + state.bytes, 0)
+      const outstandingRecords = Object.values(states).reduce((sum, state) => sum + state.records, 0)
+      const refusal = committedBytes + this.reservationBytes > this.budgetBytes ? 'Image budget full' : null
+
+      return json({
+        operations: { storeId: this.state.storeId, requests: this.requests.size, requestLimit: 1000000, retainedOperationLimit: 2048, durable: true },
+        images: {
+          retention: 'until-archive-receipt',
+          releaseArchivedOriginals: this.releaseOnReceipt,
+          imageRetentionSecondsIgnored: true,
+          committedBytes,
+          budgetBytes: this.budgetBytes,
+          reservationBytes: this.reservationBytes,
+          freeBytes: this.freeBytes,
+          freeSpaceReserveBytes: 1048576,
+          outstandingRecords,
+          recordLimit: 10000,
+          states,
+          downloads: 0,
+          captureAdmissible: refusal === null,
+          refusal,
+          migration: null,
+        },
+      })
+    }
+
     if (path === '/v2/images') {
       // Cria pages by admission sequence: records after the cursor, in order, at most `limit`.
       const query = new URL(input instanceof Request ? input.url : String(input)).searchParams
       const after = Number(query.get('after') ?? 0)
       const limit = Number(query.get('limit') ?? 100)
+      const states = (query.get('state') ?? 'reserved,retained,quarantined,archived').split(',')
 
       const page = [...this.custody.values()]
-        .flatMap((record, index) => index + 1 > after && record.state === 'retained' ? [{ record, sequence: index + 1 }] : [])
+        .flatMap((record, index) => index + 1 > after && states.includes(record.state) ? [{ record, sequence: index + 1 }] : [])
         .slice(0, limit)
 
       return json({ storeId: this.state.storeId, images: page.map(({ record }) => record), next: page.at(-1)?.sequence ?? after })

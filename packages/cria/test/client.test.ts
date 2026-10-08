@@ -542,6 +542,25 @@ describe('original custody', () => {
     expect(client.commandBlockReasonFor('camera')).not.toBeNull()
   })
 
+  it('reads custody capacity and state pages without contacting a driver, refusing another store', async () => {
+    const service = new ServiceFixture()
+    const client = service.client()
+
+    await client.run('camera', capture)
+    const posts = service.posts.length
+    const storage = await client.storage()
+
+    expect(storage.images.states.retained.records).toBe(1)
+    expect((await client.custodyPage(['missing'])).images).toEqual([])
+    expect(service.posts).toHaveLength(posts)
+
+    const other = new ServiceFixture()
+    const stranger = other.client({ storeId: service.state.storeId })
+
+    await expect(stranger.storage()).rejects.toThrow('Cria storage belongs to another store')
+    await expect(stranger.custodyPage(['retained'])).rejects.toThrow('another store or state')
+  })
+
   it('sends the same archive receipt idempotently and refuses one for another store', async () => {
     const service = new ServiceFixture()
     const client = service.client()

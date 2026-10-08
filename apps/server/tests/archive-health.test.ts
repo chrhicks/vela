@@ -1,0 +1,354 @@
+import { mkdir, mkdtemp, open, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { describe, expect, it, onTestFinished, vi } from 'vitest'
+import { CriaClient, type CriaCustody } from '@vela/cria'
+import { ServiceFixture, failure, serviceOrigin, token } from '../../../packages/cria/test/fixture.js'
+import { createCriaEquipment } from '../src/cria/equipment.js'
+import { createCriaCustody } from '../src/cria/custody.js'
+import { createArchiveHealth, createArchiveHealthTracker } from '../src/cria/archive-health.js'
+import { nodeArchiveFileSystem, openAcquisitionArchive, type ArchiveFileSystem } from '../src/acquisitions/archive.js'
+// What the browser accepts and tells Chris must describe the same event the server publishes.
+import { isArchiveHealthView } from '../../web/src/features/archive/validation.js'
+import { preservationSummary } from '../../web/src/features/archive/presentation.js'
+
+/** A clock the test advances, so cached reads and acquisition rates are deterministic. */
+function clock(start = Date.parse('2026-10-08T22:00:00.000Z')) {
+  let current = start
+
+  return { now: () => new Date(current), advance(ms: number) { current += ms } }
+}
+
+/** Fails chosen archive writes, as a full or unmounted disk would, until restored. */
+function faultyDisk() {
+  let failing: RegExp | null = null
+
+  const fs: ArchiveFileSystem = {
+    ...nodeArchiveFileSystem,
+    open: async (path, flags) => {
+      if (failing?.test(String(path))) throw Object.assign(new Error('No space left on device'), { code: 'ENOSPC' })
+
+      return open(path, flags)
+    },
+  }
+
+  return { fs, fail(pattern: RegExp) { failing = pattern }, restore() { failing = null } }
+}
+
+async function setup(service: ServiceFixture, options: { fs?: ArchiveFileSystem; fetch?: typeof fetch } = {}) {
+  const time = clock()
+  const directory = await mkdtemp(join(tmpdir(), 'vela-health-'))
+  const archive = await openAcquisitionArchive(directory, options.fs)
+  const bindings = service.state.devices.map(({ id, kind, expectedName }) => ({ id, kind, expectedName, providerDeviceId: id }))
+
+  const client = new CriaClient({
+    baseUrl: serviceOrigin,
+    token,
+    storeId: service.state.storeId,
+    devices: bindings.map(({ id, kind, expectedName }) => ({ id, kind, expectedName })),
+    fetch: options.fetch ?? service.fetch,
+    pollIntervalMs: 1,
+    operationTimeoutMs: 1000,
+    imageRetryMs: 30,
+  })
+
+  onTestFinished(async () => {
+    await client.close()
+    await archive.close()
+  })
+
+  const tracker = createArchiveHealthTracker(time.now)
+  const custody = createCriaCustody(client, archive, service.state.storeId, tracker)
+  const health = createArchiveHealth({ client, archive, tracker, storeId: service.state.storeId, reconcile: async () => { await custody.recover() }, now: time.now })
+  const equipment = createCriaEquipment(client, bindings, custody, 'rig-1')
+
+  return { time, directory, archive, client, custody, health, equipment }
+}
+
+const capture = (purpose: 'capture' | 'autofocus' | 'framing' | 'alignment' = 'capture') =>
+  ({ cameraId: 'camera', exposureSeconds: 0.001, purpose }) as const
+
+const exposures = (service: ServiceFixture) => service.posts.filter(post => post.includes('"capture"')).length
+
+describe('archive health', () => {
+  it('counts one preserved original per acquisition whatever its purpose, without Keep', async () => {
+    const service = new ServiceFixture()
+    const { equipment, health, time } = await setup(service)
+
+    for (const purpose of ['capture', 'autofocus', 'framing', 'alignment'] as const) {
+      await equipment.acquisition.capture(capture(purpose))
+      time.advance(60_000)
+    }
+
+    const view = await health.view()
+
+    expect(view.status).toBe('current')
+    expect(view.obligations).toMatchObject({ preserved: { count: 4, bytes: 4 * service.original.byteLength }, waitingAtCria: { count: 0 }, complete: true })
+    expect(view.issues.total).toBe(0)
+    expect(view.destination).toMatchObject({ state: 'available', intentRefusal: null })
+    expect(view.destination.space?.basis).toBe('opened-archive')
+  })
+
+  it('says no exposure was requested when intent cannot be recorded', async () => {
+    const service = new ServiceFixture()
+    const disk = faultyDisk()
+    const { equipment, health } = await setup(service, { fs: disk.fs })
+
+    disk.fail(/\.intents/)
+    await expect(equipment.acquisition.capture(capture())).rejects.toThrow(/capture not started/)
+
+    const view = await health.view()
+
+    expect(exposures(service)).toBe(0)
+    expect(view.destination.intentRefusal?.detail).toContain('No space left on device')
+    // Nothing was acquired, so nothing is waiting and preservation is not degraded.
+    expect(view.obligations.waitingAtCria).toEqual({ count: 0, bytes: 0 })
+    expect(view.destination.state).toBe('available')
+
+    // Once intent can be recorded again the refusal is resolved, not left as a standing warning.
+    disk.restore()
+    await equipment.acquisition.capture(capture())
+    expect((await health.reconcile()).destination.intentRefusal).toBeNull()
+  })
+
+  it('shows a growing backlog while originals cannot be written, then completes it once without another exposure', async () => {
+    const service = new ServiceFixture()
+    const disk = faultyDisk()
+    const { equipment, health, time } = await setup(service, { fs: disk.fs })
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    disk.fail(/original\.imagebytes/)
+
+    // The consumer still receives pixels while preservation fails.
+    for (let index = 0; index < 3; index++) {
+      expect((await equipment.acquisition.capture(capture())).pixels.length).toBe(6)
+      time.advance(30_000)
+    }
+
+    const degraded = await health.view()
+
+    expect(degraded.status).toBe('degraded')
+    expect(degraded.destination).toMatchObject({ state: 'unavailable', problem: { kind: 'write-failed', detail: 'No space left on device' } })
+    expect(degraded.obligations.waitingAtCria).toEqual({ count: 3, bytes: 3 * service.original.byteLength })
+    expect(degraded.forecast.criaCapturesBeforeRefusal).toBeGreaterThan(0)
+    expect(degraded.issues.total).toBe(0)
+    expect([...service.custody.values()].every(record => record.state === 'retained')).toBe(true)
+
+    const published = { rigId: 'rig-1', rigName: 'FRA 400', preservation: 'cria' as const, ...degraded }
+
+    expect(isArchiveHealthView(published, 'rig-1')).toBe(true)
+    expect(preservationSummary(published, true).explanation).toBe(
+      'Capturing · 3 originals waiting for archive. The Vela archive cannot accept originals: No space left on device. ' +
+      'Cria is retaining them; new captures will be refused when its capacity is exhausted.',
+    )
+
+    disk.restore()
+    const restored = await health.reconcile()
+
+    expect(restored.status).toBe('current')
+    expect(restored.obligations).toMatchObject({ waitingAtCria: { count: 0 }, preserved: { count: 3 } })
+    expect(exposures(service)).toBe(3)
+    expect(new Set(service.receipts).size).toBe(3)
+
+    // Reconciling again changes nothing: the totals are durable facts, not counters.
+    await Promise.all([health.reconcile(), health.reconcile()])
+    expect((await health.reconcile()).obligations.preserved).toEqual({ count: 3, bytes: 3 * service.original.byteLength })
+    expect(new Set(service.receipts).size).toBe(3)
+    error.mockRestore()
+  })
+
+  it('treats a lost receipt response as a pending acknowledgement, not a lost image', async () => {
+    const service = new ServiceFixture()
+    let dropping = true
+
+    const { equipment, health } = await setup(service, {
+      fetch: async (input, init) => {
+        const response = await service.fetch(input, init)
+
+        if (dropping && String(input).endsWith('/archive-receipt')) throw new TypeError('Simulated lost receipt response')
+
+        return response
+      },
+    })
+
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    await equipment.acquisition.capture(capture())
+    const pending = await health.view()
+
+    expect(pending.status).toBe('catching-up')
+    expect(pending.obligations).toMatchObject({ acknowledgementPending: { count: 1 }, waitingAtCria: { count: 0 } })
+    expect(pending.issues.shown).toEqual([expect.objectContaining({ reason: 'acknowledgement-pending' })])
+
+    dropping = false
+    const settled = await health.reconcile()
+
+    expect(settled.status).toBe('current')
+    expect(settled.obligations).toMatchObject({ acknowledgementPending: { count: 0 }, preserved: { count: 1 } })
+    expect(settled.issues.total).toBe(0)
+    error.mockRestore()
+  })
+
+  it("keeps one original's conflict while another original completes", async () => {
+    const service = new ServiceFixture()
+    const disk = faultyDisk()
+    const { equipment, health, directory } = await setup(service, { fs: disk.fs })
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    // The first original's copy is published but its receipt cannot be written; then it is altered.
+    disk.fail(/receipt\.json/)
+    await equipment.acquisition.capture(capture())
+    const [damaged] = [...service.custody.values()]
+
+    await writeFile(join(directory, damaged!.storeId, damaged!.id, 'original.imagebytes'), Buffer.alloc(damaged!.image!.original.bytes))
+    disk.restore()
+    await equipment.acquisition.capture(capture())
+
+    const view = await health.reconcile()
+
+    expect(view.status).toBe('attention')
+    expect(view.issues.shown).toEqual([expect.objectContaining({ imageId: damaged!.id, reason: 'original-mismatch' })])
+    expect(view.obligations).toMatchObject({ preserved: { count: 1 }, unverified: { count: 1 }, waitingAtCria: { count: 0 } })
+    expect(damaged!.state).toBe('retained')
+    error.mockRestore()
+  })
+
+  it('lists originals Cria reports missing or quarantined, which its outstanding totals omit', async () => {
+    const service = new ServiceFixture()
+    const { equipment, health } = await setup(service)
+
+    await equipment.acquisition.capture(capture())
+    const template = [...service.custody.values()][0]!
+
+    const record = (state: 'missing' | 'quarantined', reason: string): CriaCustody => ({
+      ...template,
+      id: crypto.randomUUID(),
+      state,
+      reason,
+      image: null,
+      receipt: null,
+      receiptFingerprint: null,
+      receiptAcceptedAt: null,
+      candidate: state === 'quarantined' ? { path: 'images/candidate.imagebytes', bytes: 99 } : null,
+    })
+
+    const missing = record('missing', 'File vanished after verification')
+    const quarantined = record('quarantined', 'Digest verification failed')
+
+    service.custody.set(missing.id, missing)
+    service.custody.set(quarantined.id, quarantined)
+    const view = await health.view()
+
+    expect(view.status).toBe('attention')
+    expect(view.source.missing).toEqual({ count: 1, complete: true })
+    expect(view.issues.shown.map(issue => [issue.imageId, issue.reason, issue.detail])).toEqual(expect.arrayContaining([
+      [missing.id, 'missing-at-cria', 'File vanished after verification'],
+      [quarantined.id, 'quarantined-at-cria', 'Digest verification failed'],
+    ]))
+  })
+
+  it('does not present an unmounted or replaced archive folder as a healthy archive', async () => {
+    const service = new ServiceFixture()
+    const { health, directory, time } = await setup(service)
+
+    await rm(directory, { recursive: true })
+    const missing = await health.view()
+
+    expect(missing.status).toBe('degraded')
+    expect(missing.destination.problem?.kind).toBe('missing')
+    expect(missing.destination.space).toMatchObject({ basis: 'other-location' })
+    expect(missing.obligations.preserved).toBeNull()
+
+    // An empty folder in its place, as an unmounted mount point would leave.
+    await mkdir(directory)
+    time.advance(10_000)
+    const replaced = await health.view()
+
+    expect(replaced.destination.problem?.kind).toBe('replaced')
+    expect(replaced.destination.space?.basis).toBe('other-location')
+    expect(replaced.forecast.destinationHours).toBeNull()
+  })
+
+  it('keeps last-known Cria totals with their age when Cria cannot be read', async () => {
+    const service = new ServiceFixture()
+    const disk = faultyDisk()
+    const { equipment, health, time } = await setup(service, { fs: disk.fs })
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    disk.fail(/original\.imagebytes/)
+    await equipment.acquisition.capture(capture())
+    const before = await health.view()
+
+    service.storageFailure = true
+    time.advance(60_000)
+    const stale = await health.view()
+
+    expect(stale.source).toMatchObject({ current: false, observedAt: before.source.observedAt })
+    expect(stale.source.error).toBeTruthy()
+    expect(stale.obligations).toMatchObject({ waitingAtCria: { count: 1 }, complete: false })
+    error.mockRestore()
+  })
+
+  it('shares one bounded set of reads between polls and never sends an equipment command', async () => {
+    const service = new ServiceFixture()
+    const { equipment, health, time } = await setup(service)
+
+    await equipment.acquisition.capture(capture())
+    const before = service.paths.length
+    const commands = exposures(service)
+
+    await Promise.all([health.view(), health.view(), health.view()])
+    await health.view()
+    const reads = service.paths.slice(before)
+
+    expect(reads.filter(path => path === 'GET /v2/storage')).toHaveLength(1)
+    expect(reads.every(path => path.startsWith('GET '))).toBe(true)
+
+    time.advance(10_000)
+    await health.view()
+    expect(service.paths.slice(before).filter(path => path === 'GET /v2/storage')).toHaveLength(2)
+    expect(exposures(service)).toBe(commands)
+  })
+
+  it('forecasts only from measured frames and an observed rate', async () => {
+    const service = new ServiceFixture()
+    const { equipment, health, time } = await setup(service)
+
+    const first = await health.view()
+
+    expect(first.forecast).toMatchObject({ frameBytes: null, rate: null, rateUnknown: 'too-few-acquisitions', destinationHours: null, criaCapturesBeforeRefusal: null, totalRequirement: 'unknown' })
+
+    await equipment.acquisition.capture(capture())
+    time.advance(120_000)
+    await equipment.acquisition.capture(capture())
+    time.advance(10_000)
+    const acquiring = await health.view()
+
+    expect(acquiring.forecast.frameBytes?.bytes).toBe(service.original.byteLength)
+    expect(acquiring.forecast.rate?.framesPerHour).toBe(30)
+    expect(acquiring.forecast.destinationHours).toBeGreaterThan(0)
+
+    // Cria's rule: refuse once committed bytes plus one reservation exceed its budget.
+    service.budgetBytes = 2 * service.original.byteLength + service.reservationBytes + 3 * service.original.byteLength
+    time.advance(10_000)
+    expect((await health.view()).forecast.criaCapturesBeforeRefusal).toBe(4)
+
+    time.advance(3_600_000)
+    expect((await health.view()).forecast).toMatchObject({ rate: null, rateUnknown: 'not-acquiring', destinationHours: null })
+  })
+
+  it('reports Cria read failures without inventing an archive problem', async () => {
+    const service = new ServiceFixture()
+
+    const { health } = await setup(service, {
+      fetch: async (input, init) => new URL(String(input)).pathname === '/v2/storage' ? failure(503) : service.fetch(input, init),
+    })
+
+    const view = await health.view()
+
+    expect(view.status).toBe('unknown')
+    expect(view.source).toMatchObject({ current: false, observedAt: null, capacity: null })
+    expect(view.destination.state).toBe('available')
+    expect(view.obligations.waitingAtCria).toBeNull()
+  })
+})

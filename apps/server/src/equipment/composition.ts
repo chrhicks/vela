@@ -9,6 +9,7 @@ import { CriaClient } from '@vela/cria'
 import { EquipmentError, type Acquisition, type CameraCooling, type Focuser, type Framing, type MountControl } from '@vela/equipment'
 import { createCriaEquipment } from '../cria/equipment.js'
 import { createCriaCustody, type CriaCustodyCoordinator } from '../cria/custody.js'
+import { createArchiveHealth, createArchiveHealthTracker, type ArchiveHealth } from '../cria/archive-health.js'
 import type { AcquisitionArchive } from '../acquisitions/archive.js'
 import { createRigDeviceInventory, type RigDeviceInventory } from '../device/inventory.js'
 import { createRigDeviceInspector, type RigDeviceInspector } from '../device/inspection.js'
@@ -30,6 +31,8 @@ export interface EquipmentComposition {
   createMountControl(rig: RigCatalogRecord): MountControl
   createCooling(rig: RigCatalogRecord): CameraCooling
   alignmentSettings(rig: RigCatalogRecord): AlignmentSettings | undefined
+  /** Preservation health of the rig's Cria store; undefined for rigs without Cria custody. */
+  archiveHealth(rig: RigEquipmentSource): ArchiveHealth | undefined
 }
 
 interface CompositionOptions {
@@ -48,8 +51,10 @@ export function createEquipmentComposition(
 ): EquipmentComposition {
   const clients = new Map<string, CriaClient>()
   const custodies = new Map<string, CriaCustodyCoordinator>()
+  const health = new Map<string, ArchiveHealth>()
   const equipment = new Map<string, ReturnType<typeof createCriaEquipment>>()
   let recoveryTimer: NodeJS.Timeout | undefined
+  let closing = false
 
   if (configurations.length > 0 && !options.acquisitions)
     throw new Error('Cria rigs require an acquisition archive before any capture')
@@ -73,7 +78,18 @@ export function createEquipmentComposition(
         devices: [...devices.values()],
       })
       clients.set(configuration.url, client)
-      custodies.set(configuration.url, createCriaCustody(client, options.acquisitions!, configuration.storeId))
+
+      const tracker = createArchiveHealthTracker()
+      const custody = createCriaCustody(client, options.acquisitions!, configuration.storeId, tracker)
+
+      custodies.set(configuration.url, custody)
+      health.set(configuration.url, createArchiveHealth({
+        client,
+        archive: options.acquisitions!,
+        tracker,
+        storeId: configuration.storeId,
+        reconcile: async () => { await custody.recover() },
+      }))
     }
 
     equipment.set(configuration.id, createCriaEquipment(client, configuration.devices.map(device => ({
@@ -116,6 +132,7 @@ export function createEquipmentComposition(
     async close() {
       // Stop starting recovery, let a running pass finish, then close transports and only then give
       // up archive ownership, so no writer outlives this process's claim on the archive.
+      closing = true
       clearInterval(recoveryTimer)
       await Promise.all([...custodies.values()].map(custody => custody.idle()))
       await Promise.all([...clients.values()].map(client => client.close()))
@@ -145,6 +162,17 @@ export function createEquipmentComposition(
     createCooling: rig => rig.source
       ? cria(rig).cooling
       : createAlpacaCameraCooling({ baseUrl: alpacaEndpoint(rig) }),
+    archiveHealth(rig) {
+      const configuration = configurations.find(item => item.id === rig.source?.configurationId)
+
+      if (!configuration) return undefined
+
+      // Health reads and reconciliation stay inside the archive owner's lifetime.
+      if (closing)
+        throw new EquipmentError('Vela is shutting down; archive health is unavailable.', { reason: 'transport', endpoint: 'acquisition-archive' })
+
+      return health.get(configuration.url)
+    },
     alignmentSettings(rig) {
       const configuration = configurations.find(item => item.id === rig.source?.configurationId)
 

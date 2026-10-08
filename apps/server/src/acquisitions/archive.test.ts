@@ -200,7 +200,7 @@ describe('acquisition archive', () => {
 
     expect((await reopened.unacknowledged(expected.source.storeId)).receipts).toEqual([first])
     await reopened.acknowledged(first, 'archived')
-    expect(await reopened.unacknowledged(expected.source.storeId)).toEqual({ receipts: [], unreceipted: [], problems: [] })
+    expect(await reopened.unacknowledged(expected.source.storeId)).toEqual({ receipts: [], unreceipted: [], problems: [], damaged: [] })
     expect(await reopened.receipt(expected)).toEqual(first)
     expect(Buffer.from((await reopened.original(expected.source.storeId, expected.source.imageId))!).equals(Buffer.from(original))).toBe(true)
   })
@@ -304,7 +304,7 @@ describe('acquisition archive', () => {
     await publishedWithoutReceipt(directory, expected)
     const archive = await openAcquisitionArchive(directory)
 
-    expect(await archive.unacknowledged(expected.source.storeId)).toEqual({ receipts: [], unreceipted: [expected.source.imageId], problems: [] })
+    expect(await archive.unacknowledged(expected.source.storeId)).toEqual({ receipts: [], unreceipted: [expected.source.imageId], problems: [], damaged: [] })
     const receipt = await archive.receipt(expected)
 
     expect(receipt?.archive.contextSha256).toBe(sha256(await readFile(join(target(directory, expected), 'context.json'))))
