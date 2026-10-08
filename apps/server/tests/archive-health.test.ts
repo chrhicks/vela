@@ -59,7 +59,7 @@ async function setup(service: ServiceFixture, options: { fs?: ArchiveFileSystem;
 
   const tracker = createArchiveHealthTracker(time.now)
   const custody = createCriaCustody(client, archive, service.state.storeId, tracker)
-  const health = createArchiveHealth({ client, archive, tracker, storeId: service.state.storeId, reconcile: async () => { await custody.recover() }, now: time.now })
+  const health = createArchiveHealth({ client, archive, tracker, storeId: service.state.storeId, reconcile: async () => { await custody.recover() }, owns: requestId => custody.owns(requestId), now: time.now })
   const equipment = createCriaEquipment(client, bindings, custody, 'rig-1')
 
   return { time, directory, archive, client, custody, health, equipment }
@@ -100,7 +100,7 @@ describe('archive health', () => {
     const view = await health.view()
 
     expect(exposures(service)).toBe(0)
-    expect(view.destination.intentRefusal?.detail).toContain('No space left on device')
+    expect(view.destination.intentRefusal?.detail).toBe('No space left on the archive disk')
     // Nothing was acquired, so nothing is waiting and preservation is not degraded.
     expect(view.obligations.waitingAtCria).toEqual({ count: 0, bytes: 0 })
     expect(view.destination.state).toBe('available')
@@ -128,7 +128,7 @@ describe('archive health', () => {
     const degraded = await health.view()
 
     expect(degraded.status).toBe('degraded')
-    expect(degraded.destination).toMatchObject({ state: 'unavailable', problem: { kind: 'write-failed', detail: 'No space left on device' } })
+    expect(degraded.destination).toMatchObject({ state: 'unavailable', problem: { kind: 'write-failed', detail: 'No space left on the archive disk' } })
     expect(degraded.obligations.waitingAtCria).toEqual({ count: 3, bytes: 3 * service.original.byteLength })
     expect(degraded.forecast.criaCapturesBeforeRefusal).toBeGreaterThan(0)
     expect(degraded.issues.total).toBe(0)
@@ -138,7 +138,7 @@ describe('archive health', () => {
 
     expect(isArchiveHealthView(published, 'rig-1')).toBe(true)
     expect(preservationSummary(published, true).explanation).toBe(
-      'Capturing · 3 originals waiting for archive. The Vela archive cannot accept originals: No space left on device. ' +
+      'Capturing · 3 originals waiting for archive. The Vela archive cannot accept originals: No space left on the archive disk. ' +
       'Cria is retaining them; new captures will be refused when its capacity is exhausted.',
     )
 
@@ -155,6 +155,39 @@ describe('archive health', () => {
     expect((await health.reconcile()).obligations.preserved).toEqual({ count: 3, bytes: 3 * service.original.byteLength })
     expect(new Set(service.receipts).size).toBe(3)
     error.mockRestore()
+  })
+
+  it('counts an original the active capture is still preserving as arriving, not as backlog', async () => {
+    const service = new ServiceFixture()
+    let release = () => {}
+
+    let reached = () => {}
+
+    const downloading = new Promise<void>(resolve => { reached = resolve })
+    const held = new Promise<void>(resolve => { release = resolve })
+
+    const { equipment, health } = await setup(service, {
+      fetch: async (input, init) => {
+        if (String(input).endsWith('/original')) {
+          reached()
+          await held
+        }
+
+        return service.fetch(input, init)
+      },
+    })
+
+    const capturing = equipment.acquisition.capture(capture())
+
+    await downloading
+    const during = await health.view()
+
+    expect(during.obligations).toMatchObject({ arriving: { count: 1 }, waitingAtCria: { count: 0 } })
+    expect(during.status).toBe('current')
+
+    release()
+    await capturing
+    expect((await health.reconcile()).obligations).toMatchObject({ arriving: { count: 0 }, preserved: { count: 1 } })
   })
 
   it('treats a lost receipt response as a pending acknowledgement, not a lost image', async () => {

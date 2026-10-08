@@ -89,6 +89,7 @@ export function createEquipmentComposition(
         tracker,
         storeId: configuration.storeId,
         reconcile: async () => { await custody.recover() },
+        owns: requestId => custody.owns(requestId),
       }))
     }
 

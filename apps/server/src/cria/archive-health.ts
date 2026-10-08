@@ -21,6 +21,8 @@ export const ARCHIVE_HEALTH_LIMITS = {
   censusEntries: 20_000,
   /** Pending Vela copies checked individually against Cria to avoid counting them twice. */
   overlapChecks: 50,
+  /** Retained originals inspected for ones the active capture owns; larger backlogs count as waiting. */
+  arrivingScan: 20,
   /** Pages of Cria `missing` records counted per read, 100 each. */
   missingPages: 5,
   /** Issues returned per view, most recent first. */
@@ -38,6 +40,30 @@ export type ArchiveFailure =
 
 const message = (error: Error | null, fallback: string) => error?.message ?? fallback
 
+const fileProblems = new Map([
+  ['EACCES', 'Permission denied'],
+  ['EPERM', 'Permission denied'],
+  ['ENOSPC', 'No space left on the archive disk'],
+  ['EDQUOT', 'Disk quota exceeded'],
+  ['EROFS', 'The archive disk is read-only'],
+  ['ENOENT', 'An archive folder is missing'],
+  ['EIO', 'The archive disk reported an input/output error'],
+])
+
+function isFileError(error: Error | null): error is NodeJS.ErrnoException {
+  return error !== null && 'code' in error
+}
+
+/**
+ * A safe explanation of an archive write failure. Operating-system messages name temporary
+ * files and full paths; the error code says what Chris can act on.
+ */
+export function describeArchiveError(error: Error | null, fallback: string) {
+  const known = isFileError(error) && error.code ? fileProblems.get(error.code) : undefined
+
+  return known ?? message(error, fallback)
+}
+
 /**
  * Translate a failure while preserving or acknowledging one original. A failed archive write is
  * destination-wide; anything Cria reports concerns this original; a conflict names what differs.
@@ -54,7 +80,7 @@ export function classifyArchiveFailure(error: Error | null, stage: 'preserve' | 
       ? { scope: 'image', reason: 'acknowledgement-pending', detail: `Cria has not confirmed the receipt: ${error.message}` }
       : { scope: 'image', reason: 'source-unavailable', detail: error.message }
 
-  return { scope: 'destination', detail: message(error, 'archive write failed') }
+  return { scope: 'destination', detail: describeArchiveError(error, 'archive write failed') }
 }
 
 /**
@@ -132,6 +158,8 @@ interface SourceReading {
   quarantined: CriaCustody[]
   /** Pending Vela copies that Cria still lists as retained, to subtract from its waiting total. */
   overlap: { tally: ArchiveTally; complete: boolean }
+  /** Retained originals an active capture owns and is preserving now; null when not inspected. */
+  arriving: ArchiveTally | null
 }
 
 /**
@@ -145,6 +173,7 @@ export function createArchiveHealth({
   tracker,
   storeId,
   reconcile,
+  owns,
   now = () => new Date(),
 }: {
   client: CriaClient
@@ -153,6 +182,8 @@ export function createArchiveHealth({
   storeId: string
   /** Run the same recovery pass the server already runs on its interval. */
   reconcile: () => Promise<void>
+  /** Whether an active acquisition owns this request and preserves its original itself. */
+  owns: (requestId: string) => boolean
   now?: () => Date
 }) {
   let lastSource: { reading: SourceReading; at: string } | null = null
@@ -198,11 +229,28 @@ export function createArchiveHealth({
       }
     }
 
+    // Only a small backlog is inspected; beyond that every retained original counts as waiting.
+    const retained = storage.images.states.retained.records
+    let arriving: ArchiveTally | null = null
+
+    if (retained > 0 && retained <= ARCHIVE_HEALTH_LIMITS.arrivingScan) {
+      const atVela = new Set(pending)
+
+      arriving = { count: 0, bytes: 0 }
+
+      for (const record of (await client.custodyPage(['retained'], 0, ARCHIVE_HEALTH_LIMITS.arrivingScan)).images) {
+        if (!owns(record.requestId) || atVela.has(record.id) || !record.image) continue
+        arriving.count++
+        arriving.bytes += record.image.original.bytes
+      }
+    }
+
     return {
       storage,
       missing: { count: missingRecords.length, complete: missingComplete, records: missingRecords },
       quarantined,
       overlap,
+      arriving,
     }
   }
 
@@ -343,12 +391,18 @@ function obligationsOf(input: ProjectionInput, source: ArchiveSourceView): Archi
   const reading = input.source?.reading
   const retained = reading?.storage.images.states.retained
 
-  // An original Vela already copied is counted at Vela, not again as waiting at Cria.
-  const waitingAtCria = retained && reading
-    ? tally(Math.max(0, retained.records - reading.overlap.tally.count), Math.max(0, retained.bytes - reading.overlap.tally.bytes))
+  // An original Vela already copied, or one the active capture is preserving, is not waiting.
+  const arriving = reading ? (reading.arriving ?? tally(0, 0)) : null
+
+  const waitingAtCria = retained && reading && arriving
+    ? tally(
+        Math.max(0, retained.records - reading.overlap.tally.count - arriving.count),
+        Math.max(0, retained.bytes - reading.overlap.tally.bytes - arriving.bytes),
+      )
     : null
 
   return {
+    arriving,
     waitingAtCria,
     unverified: census ? tally(census.unverified.count, census.unverified.bytes) : null,
     acknowledgementPending: census ? tally(census.acknowledgementPending.count, census.acknowledgementPending.bytes) : null,

@@ -73,9 +73,40 @@ Without this, a second server could delete the first one's staging directory mid
 
 An archived copy or manifest that no longer matches is reported as a problem and never "repaired" by rewriting it. Interrupted staging directories are Vela's own unverified copies and are discarded on open; Cria still holds the original.
 
+## Health and forecast
+
+Tonight shows whether originals are preserved, not only whether capture is running (`../cria/archive-health.ts`, `GET /api/web/rigs/:rigId/archive`). One projection per Cria store joins, by image identity:
+
+- **Cria's durable facts:** `GET /v2/storage` totals (validated strictly at the client) and pages of `missing` and `quarantined` records, which Cria's outstanding totals omit.
+- **The archive's durable facts:** a census from directory listings and file sizes only. Nothing is re-read or hashed for a health read; integrity is still verified whenever a receipt is issued or handed out.
+- **What only this server saw:** intent refusals, write failures, recent acquisitions and per-image attempts.
+
+Each original is counted once:
+
+| Shown as | Meaning |
+| --- | --- |
+| Arriving | Retained at Cria and owned by the active capture, which is preserving it now |
+| Waiting at Cria | Retained at Cria and not yet copied; pending Vela copies are subtracted |
+| Being verified | Copied to Vela without a receipt |
+| Waiting for Cria to confirm | Receipted; Cria has not acknowledged it. A lost receipt response lands here, not as a lost image |
+| Preserved | Receipted and acknowledged |
+
+Totals are durable facts, so repeated or concurrent recovery cannot inflate them. A per-image issue has a stable reason (`source-unavailable`, `original-mismatch`, `context-mismatch`, `receipt-mismatch`, `acknowledgement-pending`, `receipt-conflict`, `unvouched-copy`, `missing-at-cria`, `quarantined-at-cria`) and is cleared only by that original's own success. A failed archive write is destination-wide, not one issue per image.
+
+The two archive failures stay distinct. If intent cannot be recorded, the capture is refused before any request and the view says no exposure was requested; the next successful intent resolves the notice. If intent is recorded but originals cannot be written, capture continues and the view shows the archive as unavailable with the growing number waiting at Cria. Cria's own capacity refusal remains the only automatic stop.
+
+The destination is compared with the folder Vela opened, by device and inode. A missing path, or one that now leads to another folder (an empty mount point after unmounting), is unavailable. Its free space is then measured wherever the path leads and labelled `other-location`. Operating-system messages are reduced to their error codes, so temporary file names and paths do not reach the page.
+
+Forecasts use only measured evidence: the latest acquired original's length, the rate over the last ten acquisitions (unknown with fewer than two, or once the next frame is overdue by three intervals), the bytes waiting at Cria, and Cria's own admission rules. The total a capture run needs is always unknown, because runs continue until stopped. They are estimates, not guarantees: saved FITS files, previews and other programs writing to either disk are not included.
+
+Reads are cached for 5 seconds and coalesced across browsers. Each read is bounded: the census lists at most 20,000 entries, 50 pending copies are checked against Cria, 5 pages of missing records are counted, and the arriving check runs only when 20 or fewer originals are retained. Beyond those limits totals are marked partial. A measured census of 2,000 sparse full-size originals took about 30 ms and read about 34 KB of directory metadata. At 20,000 entries it took about 290 ms. These are engineering bounds, not retention or storage policy.
+
+**Check archive now** reruns the existing recovery pass: it resends the same receipts and copies the same retained originals. It never takes an exposure, replaces a receipt or context, clears an uncertain operation or rearms equipment. Health reads and this action are refused once shutdown begins.
+
 ## Known limits
 
-- No destination-space forecast or user-visible archive status yet. An archive that cannot record intent (unmounted, read-only or completely full) refuses every Cria capture before it is sent, with "Acquisition archive unavailable; capture not started". An archive that records intent but cannot store originals lets captures continue: frames are returned, the failure appears only in logs, and Cria eventually refuses new captures once its custody budget is full.
+- An archive that cannot record intent (unmounted, read-only or completely full) refuses every Cria capture before it is sent, with "Acquisition archive unavailable; capture not started". An archive that records intent but cannot store originals lets captures continue: frames are returned, Tonight shows the archive as unavailable, and Cria eventually refuses new captures once its custody budget is full. No earlier stop, pause or threshold is applied.
+- Health counts what the archive's files say, not a fresh integrity check, and only for this server's own archive. The in-memory attempts, rate and refusal notices restart with the server; obligations are rebuilt from durable facts.
 - The ownership guard excludes a second server only when all three match: **Linux, the same host and network namespace, and the same canonical archive path**. That covers the supported deployment, one personal Linux Vela server. It is not a distributed lock:
   - On other platforms the archive refuses to open rather than run unguarded.
   - Abstract socket names are private to a Linux network namespace. Containers or sandboxes with separate network namespaces that share the archive directory do not see each other's ownership.

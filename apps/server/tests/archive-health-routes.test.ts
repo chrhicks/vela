@@ -42,6 +42,7 @@ describe('archive health routes', () => {
       tracker,
       storeId: service.state.storeId,
       reconcile: async () => { reconciled++ },
+      owns: () => false,
     })
 
     const { server, rig } = await app(() => health)

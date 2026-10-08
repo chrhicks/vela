@@ -64,6 +64,16 @@ function pendingSentence(view: CriaArchiveHealthView) {
 }
 
 export function preservationSummary(view: CriaArchiveHealthView, capturing: boolean): PreservationSummary {
+  const summary = summarize(view, capturing)
+
+  // Any summary built partly from Cria's last-known facts says so.
+  if (!view.source.current && view.status !== 'unknown')
+    return { ...summary, explanation: `${summary.explanation} Cria could not be read just now; its totals are last known.` }
+
+  return summary
+}
+
+function summarize(view: CriaArchiveHealthView, capturing: boolean): PreservationSummary {
   const lead = capturing ? 'Capturing · ' : ''
   const waiting = view.obligations.waitingAtCria?.count ?? 0
   const pending = pendingSentence(view)
@@ -78,9 +88,11 @@ export function preservationSummary(view: CriaArchiveHealthView, capturing: bool
         title: 'Archive unavailable',
         explanation:
           `${lead}${backlog}The Vela archive cannot accept originals${problem ? `: ${sentence(problem.detail)}` : '.'} ` +
-          (capturing
-            ? 'Cria is retaining them; new captures will be refused when its capacity is exhausted.'
-            : 'Cria is retaining them until they can be archived.'),
+          (view.source.capacity?.captureAdmissible === false
+            ? 'Cria is retaining them and its capacity is full, so it refuses new captures until originals are archived.'
+            : capturing
+              ? 'Cria is retaining them; new captures will be refused when its capacity is exhausted.'
+              : 'Cria is retaining them until they can be archived.'),
         nextStep: problem ? destinationSteps[problem.kind] : 'Check the archive disk.',
       }
     }
@@ -113,6 +125,16 @@ export function preservationSummary(view: CriaArchiveHealthView, capturing: bool
         nextStep: null,
       }
     case 'current':
+      if (view.obligations.preserved?.count === 0)
+        return {
+          tone: 'current',
+          title: 'No originals yet',
+          explanation: capturing
+            ? 'Capturing · originals are preserved as they arrive.'
+            : 'Originals from this rig are preserved in the Vela archive as they arrive.',
+          nextStep: null,
+        }
+
       return {
         tone: 'current',
         title: 'Originals preserved',

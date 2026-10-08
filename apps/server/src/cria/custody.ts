@@ -8,7 +8,7 @@ import {
   type ExpectedAcquisition,
 } from '../acquisitions/archive.js'
 import { z } from 'zod'
-import { classifyArchiveFailure, createArchiveHealthTracker, provenanceOf, type ArchiveHealthTracker } from './archive-health.js'
+import { classifyArchiveFailure, createArchiveHealthTracker, describeArchiveError, provenanceOf, type ArchiveHealthTracker } from './archive-health.js'
 
 export interface CriaCustodyReport {
   acknowledged: number
@@ -164,10 +164,8 @@ export function createCriaCustody(
       after = page.next
     }
 
-    if (archiveUnavailable !== null) {
+    if (archiveUnavailable !== null)
       report.problems.push(`Archive unavailable (${archiveUnavailable}); remaining originals deferred to the next cycle`)
-      tracker.failed('', { scope: 'destination', detail: archiveUnavailable }, provenanceOf(undefined))
-    }
 
     // A published copy without a receipt whose original Cria no longer retains cannot be vouched for,
     // unless an active acquisition finished it meanwhile: then Cria holds Vela's receipt.
@@ -217,12 +215,18 @@ export function createCriaCustody(
       try {
         await archive.recordIntent(intent)
       } catch (error) {
-        tracker.intentRefused(error instanceof Error ? error.message : 'intent not recorded')
-        throw new Error(`Acquisition archive unavailable; capture not started: ${error instanceof Error ? error.message : 'intent not recorded'}`, { cause: error })
+        const detail = describeArchiveError(error instanceof Error ? error : null, 'intent not recorded')
+
+        tracker.intentRefused(detail)
+        throw new Error(`Acquisition archive unavailable; capture not started: ${detail}`, { cause: error })
       }
 
       tracker.intentRecorded()
       owned.add(intent.requestId)
+    },
+    /** Whether an active acquisition owns this request; recovery leaves those to it. */
+    owns(requestId: string) {
+      return owned.has(requestId)
     },
     /** The acquisition is done with this request; recovery may now finish its archive work. */
     disown(requestId: string) {
