@@ -51,6 +51,17 @@ try {
   const rigCatalog = await openFileRigCatalog(rigCatalogPath)
   const alignment = alignmentSettings(process.env)
   const cria = await loadCriaConfiguration(process.env.VELA_CRIA_CONFIG_PATH, process.env)
+
+  // Own the archive before this server writes anything, so an accidental second start against the
+  // same archive exits here without touching the catalog, the archive or the listener.
+  const acquisitions = cria.length > 0
+    ? await openAcquisitionArchive(
+      process.env.VELA_ACQUISITIONS_PATH
+        ? resolve(process.env.VELA_ACQUISITIONS_PATH)
+        : resolve(dirname(rigCatalogPath), 'acquisitions'),
+    )
+    : undefined
+
   await registerConfiguredCriaRigs(rigCatalog, cria)
 
   const savedImages = await openFileSavedImageStore(
@@ -79,13 +90,7 @@ try {
 
   if (targets.solver) equipmentOptions.solver = targets.solver
 
-  if (cria.length > 0) {
-    equipmentOptions.acquisitions = await openAcquisitionArchive(
-      process.env.VELA_ACQUISITIONS_PATH
-        ? resolve(process.env.VELA_ACQUISITIONS_PATH)
-        : resolve(dirname(rigCatalogPath), 'acquisitions'),
-    )
-  }
+  if (acquisitions) equipmentOptions.acquisitions = acquisitions
 
   if (process.env.VELA_ALIGNMENT_DIAGNOSTICS_PATH) {
     if (!isAbsolute(process.env.VELA_ALIGNMENT_DIAGNOSTICS_PATH))
