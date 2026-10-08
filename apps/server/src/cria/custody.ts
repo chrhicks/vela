@@ -154,8 +154,8 @@ export function createCriaCustody(client: CriaClient, archive: AcquisitionArchiv
       // Still retained (for example on a page this cycle never read) or owned: pending, not a problem.
       if (record && (owned.has(record.requestId) || record.state === 'retained')) continue
 
-      const finished = record?.receipt &&
-        await expectedFor(record).then(expected => archive.receipt(expected)).catch(() => undefined)
+      // Read-only: this check must never issue a receipt for a copy it cannot vouch for.
+      const finished = record?.receipt && await archive.issuedReceipt(storeId, imageId).catch(() => undefined)
 
       if (finished && finished.receiptId === record?.receipt?.receiptId) continue
       report.problems.push(record?.receipt
