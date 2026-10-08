@@ -105,6 +105,7 @@ const criaHealth = z.object({
     unverified: tally.nullable(),
     acknowledgementPending: tally.nullable(),
     preserved: tally.nullable(),
+    archiveCountedAt: timestamp.nullable(),
     complete: z.boolean(),
   }),
   destination,

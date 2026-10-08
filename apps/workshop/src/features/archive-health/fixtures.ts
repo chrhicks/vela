@@ -21,6 +21,7 @@ export function health(overrides: Partial<CriaArchiveHealthView> = {}): CriaArch
       unverified: { count: 0, bytes: 0 },
       acknowledgementPending: { count: 0, bytes: 0 },
       preserved: { count: 42, bytes: 42 * frame },
+      archiveCountedAt: at,
       complete: true,
     },
     destination: {

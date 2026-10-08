@@ -11,14 +11,29 @@ import type {
   ArchiveTally,
   CriaArchiveHealthView,
 } from '@vela/model/web'
-import { ArchiveConflictError, type AcquisitionArchive, type AcquisitionIntent, type ArchiveStatus } from '../acquisitions/archive.js'
+import {
+  ArchiveConflictError,
+  type AcquisitionArchive,
+  type AcquisitionIntent,
+  type ArchiveCensus,
+  type ArchiveStatus,
+} from '../acquisitions/archive.js'
 
 /** Engineering bounds on one health read; they limit work, not what Vela keeps. */
 export const ARCHIVE_HEALTH_LIMITS = {
   /** A health read is reused for this long, however many browsers poll. */
   maxAgeMs: 5_000,
-  /** Archive entries listed per read before the census is reported as partial. */
-  censusEntries: 20_000,
+  /**
+   * A health read waits at most this long for an archive census. A slower census finishes in the
+   * background and the read uses the last completed one, labelled with when it was counted.
+   */
+  censusWaitMs: 1_000,
+  /** Check archive now waits longer, so its result usually reflects the work it just did. */
+  reconcileCensusWaitMs: 10_000,
+  /** A census is reused for this multiple of its own measured duration, and at least maxAgeMs. */
+  censusReuseFactor: 10,
+  /** Older than this, or than three reuse periods, a census no longer counts as current. */
+  censusCurrentMs: 60_000,
   /** Pending Vela copies checked individually against Cria to avoid counting them twice. */
   overlapChecks: 50,
   /** Retained originals inspected for ones the active capture owns; larger backlogs count as waiting. */
@@ -191,8 +206,61 @@ export function createArchiveHealth({
   let cached: { view: StoreHealth; at: number } | null = null
   let refreshing: Promise<StoreHealth> | undefined
   let reconciling: Promise<void> | undefined
+  let census: { value: ArchiveCensus; atMs: number; durationMs: number } | null = null
+  let censusError: string | null = null
+  let counting: Promise<void> | undefined
 
-  async function readSource(census: ArchiveStatus['census']): Promise<SourceReading> {
+  const reuseMs = () => census ? Math.max(ARCHIVE_HEALTH_LIMITS.maxAgeMs, ARCHIVE_HEALTH_LIMITS.censusReuseFactor * census.durationMs) : 0
+
+  /** One census at a time, shared by every reader; it never runs on the read path's clock. */
+  function count() {
+    counting ??= (async () => {
+      const startedAt = now().getTime()
+      const started = performance.now()
+      const value = await archive.census(storeId)
+
+      census = { value, atMs: startedAt, durationMs: performance.now() - started }
+      censusError = null
+    })()
+      .catch(error => { censusError = message(error instanceof Error ? error : null, 'archive could not be listed') })
+      .finally(() => { counting = undefined })
+
+    return counting
+  }
+
+  /** Wait for `work`, but never longer than `ms`; the work continues either way. */
+  async function within(work: Promise<void> | undefined, ms: number) {
+    let timer: NodeJS.Timeout | undefined
+
+    await Promise.race([work, new Promise<void>(resolve => { timer = setTimeout(resolve, ms) })])
+    clearTimeout(timer)
+  }
+
+  const currentMs = () => Math.max(ARCHIVE_HEALTH_LIMITS.censusCurrentMs, 3 * reuseMs())
+
+  /**
+   * Reuse a recent census. Past its reuse period, recount in the background and answer with the
+   * existing one; wait (briefly) only when there is none yet or it is no longer current.
+   */
+  async function recentCensus() {
+    const age = census ? now().getTime() - census.atMs : Infinity
+
+    if (age < reuseMs()) return
+
+    if (age <= currentMs()) void count()
+    else await within(count(), ARCHIVE_HEALTH_LIMITS.censusWaitMs)
+  }
+
+  /** A census that started after the caller's work, waited for within one deadline. */
+  async function freshCensus(ms: number) {
+    const deadline = performance.now() + ms
+
+    if (counting) await within(counting, ms)
+
+    if (!counting) await within(count(), Math.max(0, deadline - performance.now()))
+  }
+
+  async function readSource(census: ArchiveCensus | null): Promise<SourceReading> {
     const storage = await client.storage()
     const missingRecords: CriaCustody[] = []
     let missingComplete = false
@@ -255,18 +323,30 @@ export function createArchiveHealth({
   }
 
   async function refresh(): Promise<StoreHealth> {
-    const observedAt = now()
     let status: ArchiveStatus | null = null
     let archiveError: string | null = null
 
     try {
-      status = await archive.status(storeId, { limit: ARCHIVE_HEALTH_LIMITS.censusEntries })
+      status = await archive.status()
     } catch (error) {
-      archiveError = message(error instanceof Error ? error : null, 'archive could not be listed')
+      archiveError = message(error instanceof Error ? error : null, 'archive could not be read')
     }
 
+    if (status?.location === 'opened') await recentCensus()
+
+    const observedAt = now()
+
+    // Only a census of the folder Vela opened describes the archive.
+    const counted = status?.location === 'opened' && census
+      ? {
+          value: census.value,
+          at: new Date(census.atMs).toISOString(),
+          current: observedAt.getTime() - census.atMs <= currentMs(),
+        }
+      : null
+
     try {
-      lastSource = { reading: await readSource(status?.census ?? null), at: observedAt.toISOString() }
+      lastSource = { reading: await readSource(counted?.value ?? null), at: observedAt.toISOString() }
       sourceError = null
     } catch (error) {
       sourceError = message(error instanceof Error ? error : null, 'Cria custody could not be read')
@@ -277,6 +357,8 @@ export function createArchiveHealth({
       nowMs: observedAt.getTime(),
       status,
       archiveError,
+      census: counted,
+      censusError: status?.location === 'opened' ? censusError : null,
       source: lastSource,
       sourceError,
       tracked: tracker.snapshot(),
@@ -310,6 +392,10 @@ export function createArchiveHealth({
       reconciling ??= reconcile().catch(() => {}).finally(() => { reconciling = undefined })
       await reconciling
 
+      // Count again after the work, and never return a read that started before it finished.
+      await freshCensus(ARCHIVE_HEALTH_LIMITS.reconcileCensusWaitMs)
+      await refreshing?.catch(() => {})
+
       return current(true)
     },
   }
@@ -325,6 +411,9 @@ interface ProjectionInput {
   nowMs: number
   status: ArchiveStatus | null
   archiveError: string | null
+  /** The latest completed census of the opened folder, or null before the first one finishes. */
+  census: { value: ArchiveCensus; at: string; current: boolean } | null
+  censusError: string | null
   source: { reading: SourceReading; at: string } | null
   sourceError: string | null
   tracked: ReturnType<ArchiveHealthTracker['snapshot']>
@@ -344,6 +433,8 @@ function destinationOf(input: ProjectionInput): ArchiveDestinationView {
     problem = { kind: 'replaced', detail: 'The archive path now leads to a different folder than the one Vela opened. Its disk may be unmounted.', observedAt }
   else if (!status.writable)
     problem = { kind: 'not-writable', detail: 'Vela may not write to the archive folder.', observedAt }
+  else if (input.censusError)
+    problem = { kind: 'unreadable', detail: `The archive could not be listed: ${input.censusError}`, observedAt }
   else if (tracked.writeFailure)
     problem = { kind: 'write-failed', detail: tracked.writeFailure.detail, observedAt: tracked.writeFailure.at }
 
@@ -387,7 +478,7 @@ function sourceOf(input: ProjectionInput, storeId: string): ArchiveSourceView {
 }
 
 function obligationsOf(input: ProjectionInput, source: ArchiveSourceView): ArchiveObligationsView {
-  const census = input.status?.census ?? null
+  const census = input.census?.value ?? null
   const reading = input.source?.reading
   const retained = reading?.storage.images.states.retained
 
@@ -407,12 +498,14 @@ function obligationsOf(input: ProjectionInput, source: ArchiveSourceView): Archi
     unverified: census ? tally(census.unverified.count, census.unverified.bytes) : null,
     acknowledgementPending: census ? tally(census.acknowledgementPending.count, census.acknowledgementPending.bytes) : null,
     preserved: census ? tally(census.preserved.count, census.preserved.bytes) : null,
-    complete: Boolean(census?.complete && source.current && reading?.overlap.complete),
+    archiveCountedAt: input.census?.at ?? null,
+    complete: Boolean(input.census?.current && source.current && reading?.overlap.complete),
   }
 }
 
 function issuesOf(input: ProjectionInput) {
-  const census = input.status?.census
+  const census = input.census?.value
+  const preserved = new Set(census?.preserved.imageIds ?? [])
   const pendingAcknowledgement = new Set(census?.acknowledgementPending.imageIds ?? [])
   const reading = input.source?.reading
   const byImage = new Map<string, ArchiveIssue>()
@@ -431,8 +524,23 @@ function issuesOf(input: ProjectionInput) {
     ...provenanceOf(record),
   })
 
-  for (const record of reading?.missing.records ?? [])
-    byImage.set(record.id, fromCria(record, 'missing-at-cria', 'Cria reports this original as missing'))
+  // Cria's extra copy may vanish after Vela preserved and Cria acknowledged it; nothing is lost then.
+  for (const record of reading?.missing.records ?? []) {
+    if (!preserved.has(record.id))
+      byImage.set(record.id, fromCria(record, 'missing-at-cria', 'Cria reports this original as missing'))
+  }
+
+  for (const imageId of census?.damaged.imageIds ?? []) {
+    byImage.set(imageId, {
+      imageId,
+      reason: 'original-mismatch',
+      detail: 'The archived original file is missing',
+      observedAt: input.census?.at ?? input.observedAt,
+      requestId: null,
+      operationId: null,
+      purpose: null,
+    })
+  }
 
   for (const record of reading?.quarantined ?? [])
     byImage.set(record.id, fromCria(record, 'quarantined-at-cria', 'Cria kept an unverifiable candidate for inspection'))

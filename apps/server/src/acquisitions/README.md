@@ -99,14 +99,31 @@ The destination is compared with the folder Vela opened, by device and inode. A 
 
 Forecasts use only measured evidence: the latest acquired original's length, the rate over the last ten acquisitions (unknown with fewer than two, or once the next frame is overdue by three intervals), the bytes waiting at Cria, and Cria's own admission rules. The total a capture run needs is always unknown, because runs continue until stopped. They are estimates, not guarantees: saved FITS files, previews and other programs writing to either disk are not included.
 
-Reads are cached for 5 seconds and coalesced across browsers. Each read is bounded: the census lists at most 20,000 entries, 50 pending copies are checked against Cria, 5 pages of missing records are counted, and the arriving check runs only when 20 or fewer originals are retained. Beyond those limits totals are marked partial. A measured census of 2,000 sparse full-size originals took about 30 ms and read about 34 KB of directory metadata. At 20,000 entries it took about 290 ms. These are engineering bounds, not retention or storage policy.
+Reads are cached for 5 seconds and coalesced across browsers. Cria reads are bounded: 50 pending copies are checked against Cria, 5 pages of missing records are counted, and the arriving check runs only when 20 or fewer originals are retained. Beyond those limits totals are marked partial.
+
+The archive census grows with the archive, so it never runs on a health read's clock:
+
+- **One census at a time,** shared by every reader. It runs in the background and is reused for ten times its own measured duration, and at least 5 seconds.
+- **After that period,** a read answers at once with the existing census while a new one runs.
+- **A read waits, for at most 1 second,** only when no census has finished yet or the last one is no longer current: older than 60 seconds or three reuse periods. If the census is still running after that second, the view says Vela is still counting, or marks totals partial with the time they were counted. Status is then unknown, never current.
+- **Check archive now** waits up to 10 seconds for a census that starts after its recovery pass. It never returns a read that started before the check finished.
+
+Measured on Polaris with sparse full-size originals (`evidence-archive-health/measure-*.log`):
+
+| Entries | Census | Health reads |
+| --- | --- | --- |
+| 2,000 | ~28 ms, ~34 KB of directory metadata read | — |
+| 20,000 | ~300 ms | — |
+| 100,000 (about 10 TB apparent) | ~1.4 s | Ten concurrent cold reads answered in ~1.0 s, saying Vela was still counting, and shared one census. Later reads took 3–5 ms. Event-loop delay stayed under 25 ms |
+
+These are engineering bounds, not retention or storage policy.
 
 **Check archive now** reruns the existing recovery pass: it resends the same receipts and copies the same retained originals. It never takes an exposure, replaces a receipt or context, clears an uncertain operation or rearms equipment. Health reads and this action are refused once shutdown begins.
 
 ## Known limits
 
 - An archive that cannot record intent (unmounted, read-only or completely full) refuses every Cria capture before it is sent, with "Acquisition archive unavailable; capture not started". An archive that records intent but cannot store originals lets captures continue: frames are returned, Tonight shows the archive as unavailable, and Cria eventually refuses new captures once its custody budget is full. No earlier stop, pause or threshold is applied.
-- Health counts what the archive's files say, not a fresh integrity check, and only for this server's own archive. The in-memory attempts, rate and refusal notices restart with the server; obligations are rebuilt from durable facts.
+- Health counts what the archive's files say, not a fresh integrity check, and only for this server's own archive. An entry whose original file is gone is reported, never counted as preserved; a Cria `missing` record whose image Vela preserved and acknowledged is not an issue. The in-memory attempts, rate and refusal notices restart with the server; obligations are rebuilt from durable facts.
 - The ownership guard excludes a second server only when all three match: **Linux, the same host and network namespace, and the same canonical archive path**. That covers the supported deployment, one personal Linux Vela server. It is not a distributed lock:
   - On other platforms the archive refuses to open rather than run unguarded.
   - Abstract socket names are private to a Linux network namespace. Containers or sandboxes with separate network namespaces that share the archive directory do not see each other's ownership.
