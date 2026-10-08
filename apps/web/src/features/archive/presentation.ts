@@ -114,7 +114,9 @@ function summarize(view: CriaArchiveHealthView, capturing: boolean): Preservatio
         title: 'Preservation status unknown',
         explanation: !view.source.current
           ? `${lead}Cria's custody could not be read${view.source.error ? `: ${sentence(view.source.error)}` : '.'} ${view.source.observedAt ? 'Last known totals are shown with their age.' : 'No totals are known yet.'}`
-          : `${lead}Some totals are partial, so Vela cannot say every original is preserved.`,
+          : view.obligations.archiveCountedAt === null
+            ? `${lead}Vela is still counting its archive, so it cannot yet say every original is preserved.`
+            : `${lead}The archive count is not recent, so Vela cannot say every original is preserved. A new count is running.`,
         nextStep: !view.source.current ? 'Check that Cria is reachable. Vela retries automatically.' : null,
       }
     case 'catching-up':

@@ -7,7 +7,7 @@ import { ServiceFixture, failure, serviceOrigin, token } from '../../../packages
 import { createCriaEquipment } from '../src/cria/equipment.js'
 import { createCriaCustody } from '../src/cria/custody.js'
 import { createArchiveHealth, createArchiveHealthTracker } from '../src/cria/archive-health.js'
-import { nodeArchiveFileSystem, openAcquisitionArchive, type ArchiveFileSystem } from '../src/acquisitions/archive.js'
+import { nodeArchiveFileSystem, openAcquisitionArchive, type ArchiveCensus, type ArchiveFileSystem } from '../src/acquisitions/archive.js'
 // What the browser accepts and tells Chris must describe the same event the server publishes.
 import { isArchiveHealthView } from '../../web/src/features/archive/validation.js'
 import { preservationSummary } from '../../web/src/features/archive/presentation.js'
@@ -35,7 +35,14 @@ function faultyDisk() {
   return { fs, fail(pattern: RegExp) { failing = pattern }, restore() { failing = null } }
 }
 
-async function setup(service: ServiceFixture, options: { fs?: ArchiveFileSystem; fetch?: typeof fetch } = {}) {
+interface SetupOptions {
+  fs?: ArchiveFileSystem
+  fetch?: typeof fetch
+  /** Wraps the archive census the health view sees, to slow or count it. */
+  census?: (count: () => Promise<ArchiveCensus>) => Promise<ArchiveCensus>
+}
+
+async function setup(service: ServiceFixture, options: SetupOptions = {}) {
   const time = clock()
   const directory = await mkdtemp(join(tmpdir(), 'vela-health-'))
   const archive = await openAcquisitionArchive(directory, options.fs)
@@ -59,7 +66,19 @@ async function setup(service: ServiceFixture, options: { fs?: ArchiveFileSystem;
 
   const tracker = createArchiveHealthTracker(time.now)
   const custody = createCriaCustody(client, archive, service.state.storeId, tracker)
-  const health = createArchiveHealth({ client, archive, tracker, storeId: service.state.storeId, reconcile: async () => { await custody.recover() }, owns: requestId => custody.owns(requestId), now: time.now })
+  const wrap = options.census
+  const seen = wrap ? { ...archive, census: (storeId: string) => wrap(() => archive.census(storeId)) } : archive
+
+  const health = createArchiveHealth({
+    client,
+    archive: seen,
+    tracker,
+    storeId: service.state.storeId,
+    reconcile: async () => { await custody.recover() },
+    owns: requestId => custody.owns(requestId),
+    now: time.now,
+  })
+
   const equipment = createCriaEquipment(client, bindings, custody, 'rig-1')
 
   return { time, directory, archive, client, custody, health, equipment }
@@ -383,5 +402,146 @@ describe('archive health', () => {
     expect(view.source).toMatchObject({ current: false, observedAt: null, capacity: null })
     expect(view.destination.state).toBe('available')
     expect(view.obligations.waitingAtCria).toBeNull()
+  })
+  it('answers within its deadline while a slow first census finishes in the background', async () => {
+    const service = new ServiceFixture()
+    let release = () => {}
+
+    let censuses = 0
+    const gate = new Promise<void>(resolve => { release = resolve })
+
+    const { equipment, health, time } = await setup(service, {
+      census: async count => {
+        censuses++
+        await gate
+
+        return count()
+      },
+    })
+
+    await equipment.acquisition.capture(capture())
+    const started = performance.now()
+    const [first, second] = await Promise.all([health.view(), health.view()])
+
+    expect(performance.now() - started).toBeLessThan(3_000)
+    expect(first).toBe(second)
+    expect(censuses).toBe(1)
+    expect(first.status).toBe('unknown')
+    expect(first.obligations).toMatchObject({ preserved: null, archiveCountedAt: null, complete: false })
+
+    release()
+    await new Promise(resolve => setTimeout(resolve, 10))
+    time.advance(10_000)
+    const counted = await health.view()
+
+    expect(counted.status).toBe('current')
+    expect(counted.obligations).toMatchObject({ preserved: { count: 1 }, complete: true })
+    expect(censuses).toBe(1)
+  })
+
+  it('stops calling an old census current while a new one is still running', async () => {
+    const service = new ServiceFixture()
+    let blocking = false
+    let release = () => {}
+
+    const { equipment, health, time } = await setup(service, {
+      census: async count => {
+        if (blocking) await new Promise<void>(resolve => { release = resolve })
+
+        return count()
+      },
+    })
+
+    await equipment.acquisition.capture(capture())
+    expect((await health.view()).obligations.complete).toBe(true)
+
+    blocking = true
+    time.advance(120_000)
+    const old = await health.view()
+
+    expect(old.obligations).toMatchObject({ preserved: { count: 1 }, complete: false })
+    expect(Date.parse(old.observedAt) - Date.parse(old.obligations.archiveCountedAt!)).toBe(120_000)
+    expect(old.status).toBe('unknown')
+    release()
+  })
+
+  it("does not raise attention when Cria's extra copy vanished after Vela preserved it", async () => {
+    const service = new ServiceFixture()
+    const { equipment, health } = await setup(service)
+
+    await equipment.acquisition.capture(capture())
+    const [record] = [...service.custody.values()]
+
+    // Cria kept its copy after the receipt, then found its file gone.
+    Object.assign(record!, { state: 'missing', reason: 'File vanished after verification' })
+    const view = await health.view()
+
+    expect(view.source.missing).toEqual({ count: 1, complete: true })
+    expect(view.issues.total).toBe(0)
+    expect(view.status).toBe('current')
+  })
+
+  it('never counts an archived entry whose original file is gone as preserved', async () => {
+    const service = new ServiceFixture()
+    const { equipment, health, directory } = await setup(service)
+
+    await equipment.acquisition.capture(capture())
+    const [record] = [...service.custody.values()]
+
+    await rm(join(directory, record!.storeId, record!.id, 'original.imagebytes'))
+    const view = await health.view()
+
+    expect(view.obligations.preserved).toEqual({ count: 0, bytes: 0 })
+    expect(view.status).toBe('attention')
+    expect(view.issues.shown).toEqual([expect.objectContaining({ imageId: record!.id, reason: 'original-mismatch', detail: 'The archived original file is missing' })])
+  })
+
+  it('returns a reading taken after Check archive now, not one already in flight', async () => {
+    const service = new ServiceFixture()
+    const disk = faultyDisk()
+    let holdStorage = false
+    let releaseStorage = () => {}
+
+    let storageHeld = () => {}
+
+    const held = new Promise<void>(resolve => { storageHeld = resolve })
+
+    const { equipment, health, time } = await setup(service, {
+      fs: disk.fs,
+      fetch: async (input, init) => {
+        const response = await service.fetch(input, init)
+
+        // Cria has answered; only its reply is delayed, so this reading predates the check.
+        if (holdStorage && new URL(String(input)).pathname === '/v2/storage') {
+          holdStorage = false
+          storageHeld()
+          await new Promise<void>(resolve => { releaseStorage = resolve })
+        }
+
+        return response
+      },
+    })
+
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    disk.fail(/original\.imagebytes/)
+    await equipment.acquisition.capture(capture())
+    expect((await health.view()).status).toBe('degraded')
+
+    // A browser poll is mid-read when the disk is restored and the check runs.
+    time.advance(10_000)
+    holdStorage = true
+    const poll = health.view()
+
+    await held
+    disk.restore()
+    const checking = health.reconcile()
+
+    await vi.waitFor(() => expect(service.receipts).toHaveLength(1))
+    releaseStorage()
+
+    expect((await poll).status).not.toBe('current')
+    expect(await checking).toMatchObject({ status: 'current', obligations: { preserved: { count: 1 }, waitingAtCria: { count: 0 } } })
+    error.mockRestore()
   })
 })

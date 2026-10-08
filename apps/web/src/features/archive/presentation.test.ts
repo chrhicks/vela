@@ -18,6 +18,7 @@ function view(overrides: Partial<CriaArchiveHealthView> = {}): CriaArchiveHealth
       unverified: { count: 0, bytes: 0 },
       acknowledgementPending: { count: 0, bytes: 0 },
       preserved: { count: 12, bytes: 12 * 104_368_428 },
+      archiveCountedAt: at,
       complete: true,
     },
     destination: {
@@ -110,6 +111,18 @@ describe('preservation wording', () => {
     const stale = view({ status: 'degraded', source: { ...view().source, current: false, error: 'Cria request did not complete' } })
 
     expect(preservationSummary(stale, false).explanation).toMatch(/Cria could not be read just now; its totals are last known\.$/)
+  })
+
+  it('says the archive is still being counted rather than guessing its totals', () => {
+    const counting = view({
+      status: 'unknown',
+      obligations: { ...view().obligations, unverified: null, acknowledgementPending: null, preserved: null, archiveCountedAt: null, complete: false },
+    })
+
+    expect(preservationSummary(counting, false)).toMatchObject({
+      tone: 'unknown',
+      explanation: 'Vela is still counting its archive, so it cannot yet say every original is preserved.',
+    })
   })
 
   it('formats measured bytes plainly', () => {

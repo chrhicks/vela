@@ -1,5 +1,6 @@
 import type { ArchiveIssue, CriaArchiveHealthView } from '@vela/model/web'
 import { Button } from '@vela/ui'
+import { useEffect, useState } from 'react'
 import {
   age,
   formatBytes,
@@ -50,7 +51,7 @@ function Preservation({
   health: ReturnType<typeof useArchiveHealth>
   capturing: boolean
 }) {
-  const now = Date.now()
+  const now = useNow()
   const summary = preservationSummary(view, capturing)
   const { destination, source, obligations, forecast, issues } = view
   const interrupted = health.interruptedAt !== null
@@ -99,7 +100,12 @@ function Preservation({
           <Fact term="Waiting for Cria to confirm" value={tallyText(obligations.acknowledgementPending)} />
           <Fact term="Preserved in Vela" value={tallyText(obligations.preserved)} />
         </dl>
-        {!obligations.complete && <p>Some totals are partial or last known.</p>}
+        <p>
+          {obligations.archiveCountedAt
+            ? `Archive counted ${age(obligations.archiveCountedAt, now)}.`
+            : 'Vela is still counting its archive.'}
+          {!obligations.complete && ' Some totals are partial or last known.'}
+        </p>
 
         {issues.shown.length > 0 && (
           <>
@@ -219,6 +225,19 @@ function Preservation({
       </details>
     </section>
   )
+}
+
+/** Re-render periodically so ages keep advancing while reads are interrupted. */
+function useNow() {
+  const [now, setNow] = useState(() => Date.now())
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 15_000)
+
+    return () => clearInterval(timer)
+  }, [])
+
+  return now
 }
 
 function Fact({ term, value }: { term: string; value: string }) {

@@ -120,7 +120,12 @@ export interface ArchiveObligationsView {
   acknowledgementPending: ArchiveTally | null
   /** Verified at Vela and acknowledged by Cria. */
   preserved: ArchiveTally | null
-  /** False when a listing was cut short, a tally is unknown, or Cria's totals are last-known. */
+  /**
+   * When Vela's archive was last counted. Counting runs in the background, so the Vela tallies can
+   * be older than the view; null until the first count finishes.
+   */
+  archiveCountedAt: string | null
+  /** False when a tally is unknown, the archive count is no longer recent, or Cria's totals are last known. */
   complete: boolean
 }
 

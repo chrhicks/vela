@@ -17,7 +17,11 @@ be refused when its capacity is exhausted." An intent refusal is a separate
 notice saying no exposure was requested. Whenever Cria's facts are last known,
 the summary says so. Copy, issue labels and next steps live there, beside their tests.
 
-The workshop feature `archive-health` renders this component with fixture
-projections for each state, as the reference for refining its design.
+**Design status: proposed.** No approved specimen preceded this panel. It uses
+the existing Tonight aside patterns (section heading, muted text, a native
+disclosure as in Rig readiness) and stable `@vela/ui` primitives. The workshop
+feature `archive-health` renders this same component with fixture projections for
+each state, so Chris's workshop review and any refinement apply to what ships
+rather than to a copy. Browser acceptance waits for that review.
 See the [acquisition archive](../../../../server/src/acquisitions/README.md#health-and-forecast)
 for what each count means and how reads are bounded.

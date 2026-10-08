@@ -176,14 +176,14 @@ export interface ArchiveTally {
  * re-read or hashed here: integrity is verified when a receipt is issued or handed out.
  */
 export interface ArchiveCensus {
-  /** False when the listing stopped at its entry limit; totals then cover only what was read. */
-  complete: boolean
   /** Verified, receipted and acknowledged by Cria. */
-  preserved: ArchiveTally
+  preserved: ArchiveTally & { imageIds: string[] }
   /** Verified and receipted; Cria has not confirmed the receipt. */
   acknowledgementPending: ArchiveTally & { imageIds: string[] }
   /** Copied but not yet verified: no receipt has been issued. */
   unverified: ArchiveTally & { imageIds: string[] }
+  /** Entries whose original file is gone; never counted as preserved. */
+  damaged: { count: number; imageIds: string[] }
 }
 
 /**
@@ -198,8 +198,6 @@ export interface ArchiveStatus {
   writable: boolean
   /** Free space of the opened archive's filesystem, or an estimate measured elsewhere. */
   space: { freeBytes: number; totalBytes: number; measuredPath: string; basis: 'opened-archive' | 'other-location' } | null
-  /** Null when the location is not the opened archive. */
-  census: ArchiveCensus | null
 }
 
 export interface AcquisitionArchive {
@@ -236,8 +234,13 @@ export interface AcquisitionArchive {
   close(): Promise<void>
   /** The receipt already written for an acquisition, if any. Read-only: never issues one. */
   issuedReceipt(storeId: string, imageId: string): Promise<ArchiveReceipt | undefined>
-  /** Read-only location, space and census for health views. Never writes or reads originals. */
-  status(storeId: string, options?: { limit?: number }): Promise<ArchiveStatus>
+  /** Read-only location and space for health views: a few system calls, whatever the archive size. */
+  status(): Promise<ArchiveStatus>
+  /**
+   * Read-only listing of every acquisition in one store, from file metadata only. Its cost grows with
+   * the archive, so health views run it in the background and reuse the result.
+   */
+  census(storeId: string): Promise<ArchiveCensus>
 }
 
 /** Filesystem operations whose order makes publication durable. Injectable to test that order. */
@@ -578,7 +581,7 @@ export async function openAcquisitionArchive(
     return published
   }
 
-  async function archiveStatus(storeId: string, limit: number): Promise<ArchiveStatus> {
+  async function archiveStatus(): Promise<ArchiveStatus> {
     const current = await stat(root).catch(error => {
       if (isFileError(error) && error.code === 'ENOENT') return undefined
       throw error
@@ -587,7 +590,7 @@ export async function openAcquisitionArchive(
     const location = !current ? 'missing' : current.dev === opened.dev && current.ino === opened.ino ? 'opened' : 'replaced'
     const writable = location === 'opened' && await access(root, constants.W_OK).then(() => true, () => false)
 
-    return { root, location, writable, space: await space(location), census: location === 'opened' ? await census(storeId, limit) : null }
+    return { root, location, writable, space: await space(location) }
   }
 
   /** Measure the archive's filesystem; if its path is gone, the nearest existing ancestor, labelled. */
@@ -608,12 +611,12 @@ export async function openAcquisitionArchive(
     }
   }
 
-  async function census(storeId: string, limit: number): Promise<ArchiveCensus> {
+  async function census(storeId: string): Promise<ArchiveCensus> {
     const result: ArchiveCensus = {
-      complete: true,
-      preserved: { count: 0, bytes: 0 },
+      preserved: { count: 0, bytes: 0, imageIds: [] },
       acknowledgementPending: { count: 0, bytes: 0, imageIds: [] },
       unverified: { count: 0, bytes: 0, imageIds: [] },
+      damaged: { count: 0, imageIds: [] },
     }
 
     const entries = await readdir(join(root, storeId)).catch(error => {
@@ -621,22 +624,19 @@ export async function openAcquisitionArchive(
       throw error
     })
 
-    let listed = 0
-
     for (const imageId of entries) {
       if (imageId.startsWith('.')) continue
 
-      if (listed++ >= limit) {
-        result.complete = false
-        break
-      }
-
       const target = directory(storeId, imageId)
-      const size = await stat(join(target, 'original.imagebytes')).then(file => file.size, () => 0)
+      const size = await stat(join(target, 'original.imagebytes')).then(file => file.size, () => undefined)
 
-      if (await exists(join(target, 'acknowledgement.json'))) {
+      if (size === undefined) {
+        result.damaged.count++
+        result.damaged.imageIds.push(imageId)
+      } else if (await exists(join(target, 'acknowledgement.json'))) {
         result.preserved.count++
         result.preserved.bytes += size
+        result.preserved.imageIds.push(imageId)
       } else if (await exists(join(target, 'receipt.json'))) {
         result.acknowledgementPending.count++
         result.acknowledgementPending.bytes += size
@@ -757,10 +757,15 @@ export async function openAcquisitionArchive(
 
       return existingReceipt(target, await stored(target))
     },
-    async status(storeId, { limit = 20_000 } = {}) {
+    async status() {
       assertOpen()
 
-      return tracked(archiveStatus(storeId, limit))
+      return tracked(archiveStatus())
+    },
+    async census(storeId) {
+      assertOpen()
+
+      return tracked(census(storeId))
     },
     async close() {
       if (closed) return
@@ -866,12 +871,15 @@ export function createMemoryAcquisitionArchive(): AcquisitionArchive {
     async issuedReceipt(storeId, imageId) {
       return entries.get(`${storeId}/${imageId}`)?.receipt
     },
-    async status(storeId) {
+    async status() {
+      return { root: 'memory', location: 'opened', writable: true, space: null }
+    },
+    async census(storeId) {
       const census: ArchiveCensus = {
-        complete: true,
-        preserved: { count: 0, bytes: 0 },
+        preserved: { count: 0, bytes: 0, imageIds: [] },
         acknowledgementPending: { count: 0, bytes: 0, imageIds: [] },
         unverified: { count: 0, bytes: 0, imageIds: [] },
+        damaged: { count: 0, imageIds: [] },
       }
 
       for (const entry of entries.values()) {
@@ -883,6 +891,7 @@ export function createMemoryAcquisitionArchive(): AcquisitionArchive {
         if (entry.acknowledged) {
           census.preserved.count++
           census.preserved.bytes += bytes
+          census.preserved.imageIds.push(imageId)
           continue
         }
 
@@ -893,7 +902,7 @@ export function createMemoryAcquisitionArchive(): AcquisitionArchive {
         pending.imageIds.push(imageId)
       }
 
-      return { root: 'memory', location: 'opened', writable: true, space: null, census }
+      return census
     },
     async close() {},
   }
