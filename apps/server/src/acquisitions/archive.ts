@@ -116,6 +116,32 @@ export async function openAcquisitionArchive(root: string, openFile: typeof open
 
   const directory = (storeId: string, imageId: string) => join(root, storeId, imageId)
 
+  // One writer per acquisition in this process; Vela runs a single server per archive.
+  const writers = new Map<string, Promise<unknown>>()
+
+  function exclusive<T>(target: string, work: () => Promise<T>): Promise<T> {
+    const next = (writers.get(target) ?? Promise.resolve()).catch(() => {}).then(work)
+
+    writers.set(target, next)
+    void next.finally(() => { if (writers.get(target) === next) writers.delete(target) }).catch(() => {})
+
+    return next
+  }
+
+  /** A small record appears under its final name only once complete and synced. */
+  async function publishOnce(path: string, data: string) {
+    if (await readOptional(path)) return
+
+    const temporary = `${path}.${randomUUID()}.new`
+
+    try {
+      await writeDurable(temporary, data, openFile)
+      await rename(temporary, path)
+    } finally {
+      await rm(temporary, { force: true })
+    }
+  }
+
   async function publish(source: AcquisitionSource, original: Uint8Array, context: AcquisitionContext) {
     const target = directory(source.storeId, source.imageId)
 
@@ -192,18 +218,14 @@ export async function openAcquisitionArchive(root: string, openFile: typeof open
       },
     }
 
-    try {
-      await writeDurable(path, JSON.stringify(receipt, null, 2), openFile)
-      await syncDirectory(target)
-    } catch (error) {
-      // Another preservation recorded the receipt first; that one is authoritative.
-      if (!isFileError(error) || error.code !== 'EEXIST') throw error
-
-      return receiptFor(source, target)
-    }
+    await publishOnce(path, JSON.stringify(receipt, null, 2))
+    await syncDirectory(target)
 
     return receipt
   }
+
+  // The first receipt written for an acquisition stays authoritative.
+  const verifiedReceipt = (source: AcquisitionSource, target: string) => exclusive(target, () => receiptFor(source, target))
 
   return {
     async preserve({ source, original, context }) {
@@ -212,21 +234,19 @@ export async function openAcquisitionArchive(root: string, openFile: typeof open
       if (original.byteLength !== validated.bytes || sha256(original) !== validated.sha256)
         throw new ArchiveConflictError('Original bytes do not match their Cria source digest')
 
-      return receiptFor(validated, await publish(validated, original, context))
+      return verifiedReceipt(validated, await publish(validated, original, context))
     },
     async acknowledged(receipt, sourceState) {
       const target = directory(receipt.storeId, receipt.imageId)
 
-      try {
-        await writeDurable(join(target, 'acknowledgement.json'), JSON.stringify({
+      await exclusive(target, async () => {
+        await publishOnce(join(target, 'acknowledgement.json'), JSON.stringify({
           receiptId: receipt.receiptId,
           sourceState,
           acknowledgedAt: new Date().toISOString(),
-        }, null, 2), openFile)
+        }, null, 2))
         await syncDirectory(target)
-      } catch (error) {
-        if (!isFileError(error) || error.code !== 'EEXIST') throw error
-      }
+      })
     },
     async unacknowledged() {
       const receipts: ArchiveReceipt[] = []
@@ -246,7 +266,7 @@ export async function openAcquisitionArchive(root: string, openFile: typeof open
             if (!contextBytes) throw new ArchiveConflictError('Archived acquisition has no context')
             const { source } = manifestSchema.parse(JSON.parse(contextBytes.toString('utf8')))
 
-            receipts.push(await receiptFor(source, target))
+            receipts.push(await verifiedReceipt(source, target))
           } catch (error) {
             problems.push(`${storeId}/${imageId}: ${error instanceof Error ? error.message : 'unreadable'}`)
           }
@@ -261,7 +281,7 @@ export async function openAcquisitionArchive(root: string, openFile: typeof open
 
       if (!contextBytes) return undefined
 
-      return receiptFor(manifestSchema.parse(JSON.parse(contextBytes.toString('utf8'))).source, target)
+      return verifiedReceipt(manifestSchema.parse(JSON.parse(contextBytes.toString('utf8'))).source, target)
     },
   }
 }
