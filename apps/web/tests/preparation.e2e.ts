@@ -155,3 +155,75 @@ test('preparation without a framing exposure never substitutes a capture or surv
   await expect(page.getByRole('button', { name: 'Start capture', exact: true })).toBeEnabled()
   expect(scene.commands).toEqual([])
 })
+
+for (const width of [1440, 1024, 390]) {
+  test(`preparation tools are beside the subject and connection recovery is beside Start at ${width}`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 })
+    const { scene } = await openExploreScene(page, 'preparation-disconnected')
+    const tools = page.getByRole('region', { name: 'Preparation tools', exact: true })
+    await expect(tools).toBeVisible()
+    expect(await page.locator('.capture-preparation__field > label').evaluateAll(labels =>
+      labels.every(label => label.scrollWidth <= label.clientWidth + 1),
+    )).toBe(true)
+    await expect(tools.getByRole('link', { name: /Polar alignment/ })).toHaveAttribute('href', '/rigs/fra400/observe/alignment')
+    await expect(tools.getByRole('link', { name: /Autofocus/ })).toHaveAttribute('href', '/rigs/fra400/observe/autofocus')
+    const start = page.getByRole('button', { name: 'Start capture', exact: true })
+    const connect = page.getByRole('button', { name: 'Connect devices', exact: true })
+    await expect(start).toBeDisabled()
+    const settings = page.getByRole('form', { name: 'Capture settings', exact: true })
+    await expect(settings.getByText('Ready for an exposure', { exact: true })).toHaveCount(0)
+    await expect(settings.getByText('Camera unavailable', { exact: true })).toBeVisible()
+    await expect(settings.getByText('The imaging camera is disconnected.', { exact: false })).toBeVisible()
+    await expect(connect).toBeVisible()
+    const form = page.locator('form').filter({ has: start })
+    await expect(form.getByRole('button', { name: 'Connect devices', exact: true })).toBeVisible()
+    const connectBox = (await connect.boundingBox())!
+    const startBox = (await start.boundingBox())!
+    expect(startBox.y - (connectBox.y + connectBox.height)).toBeGreaterThanOrEqual(0)
+    expect(startBox.y - (connectBox.y + connectBox.height)).toBeLessThan(100)
+    await expect(connect).toHaveAttribute('type', 'button')
+    const pixels = page.locator('.framing-exposure img')
+    await expect(pixels).toBeVisible()
+    const source = await pixels.getAttribute('src')
+    await pixels.evaluate(element => element.setAttribute('data-retained-frame', 'yes'))
+    await page.getByRole('spinbutton', { name: 'Exposure time' }).fill('120')
+    await connect.click()
+    await expect(start).toBeEnabled()
+    await expect(page.getByRole('spinbutton', { name: 'Exposure time' })).toHaveValue('120')
+    await expect(pixels).toHaveAttribute('src', source!)
+    await expect(pixels).toHaveAttribute('data-retained-frame', 'yes')
+    expect(scene.commands).toEqual([{ method: 'POST', pathname: '/api/rigs/fra400/connections', body: undefined }])
+    expect(scene.unknownRequests).toEqual([])
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false)
+  })
+}
+
+for (const width of [1440, 390]) {
+  test(`unknown connection outcome keeps Start blocked until an explicit check at ${width}`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 })
+    const { scene, requests } = await openExploreScene(page, 'preparation-connection-uncertain')
+    const start = page.getByRole('button', { name: 'Start capture', exact: true })
+    await page.getByRole('spinbutton', { name: 'Exposure time' }).fill('45')
+    await page.getByRole('button', { name: 'Connect devices', exact: true }).click()
+    await expect(page.getByText('The command response could not be confirmed.', { exact: false })).toBeVisible()
+    await expect(start).toBeDisabled()
+    await expect.poll(() => requests.filter(request => request === 'GET /api/web/rigs/fra400/observe').length, { timeout: 10_000 }).toBeGreaterThanOrEqual(3)
+    await expect(start).toBeDisabled()
+    await expect(page.getByRole('button', { name: 'Connect devices', exact: true })).toHaveCount(0)
+    const form = page.locator('form').filter({ has: start })
+    const check = form.getByRole('button', { name: 'Check state', exact: true })
+    await expect(check).toHaveAttribute('type', 'button')
+    const checkBox = (await check.boundingBox())!
+    const startBox = (await start.boundingBox())!
+    expect(startBox.y - (checkBox.y + checkBox.height)).toBeGreaterThanOrEqual(0)
+    expect(startBox.y - (checkBox.y + checkBox.height)).toBeLessThan(100)
+    await check.click()
+    await expect(start).toBeEnabled()
+    await expect(start).toBeFocused()
+    await expect(page.getByRole('spinbutton', { name: 'Exposure time' })).toHaveValue('45')
+    await expect(page.locator('.framing-exposure img')).toBeVisible()
+    expect(scene.commands).toHaveLength(1)
+    expect(scene.commands[0]).toMatchObject({ method: 'POST', pathname: '/api/rigs/fra400/connections' })
+    expect(scene.unknownRequests).toEqual([])
+  })
+}

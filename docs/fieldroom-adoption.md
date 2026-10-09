@@ -1,5 +1,12 @@
 # Fieldroom adoption
 
+Completed: as of 2026-10-02, PR #86 has merged at `ac64685`, following independent
+verification and Chris's application acceptance. Fieldroom is the application's
+default theme. The dated slice and review checkpoints below preserve the delivery
+history; their pending-review statements are not current blockers. Explore and
+Frame delivery follow-ups also shipped in that PR; remaining usability work is
+identified in the [workflow hierarchy review](visual-evidence/fieldroom/ux-hierarchy-review.md).
+
 ## Agreement and completion
 
 Chris approved this work on 2026-09-30 after reviewing the Paper designs and the
@@ -452,10 +459,12 @@ artifact links; all 44 frozen source hashes/dimensions remain unchanged.
 
 [The whole-application evidence index](visual-evidence/fieldroom/README.md) links
 each slice, final comparisons, actual scene coverage, reproduction commands and
-browser limitations. The shared browser is open to Tonight on the isolated
+browser limitations. At this pre-acceptance checkpoint, the shared browser was
+open to Tonight on the isolated
 review runtime, with fonts, decoded image, expected state and no horizontal
-overflow confirmed. Implementation is complete; Chris's browser acceptance is
-the remaining merge gate. No physical-device outcome is claimed by these checks.
+overflow confirmed. Implementation was complete; Chris's browser acceptance was
+the remaining merge gate, subsequently completed before PR #86 merged.
+No physical-device outcome is claimed by these checks.
 
 ## Browser acceptance follow-up: camera identity and header order
 
