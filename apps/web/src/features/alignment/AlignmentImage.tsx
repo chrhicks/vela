@@ -220,6 +220,7 @@ function InspectionView({
   now,
   retained,
   superseded = false,
+  newerImageUnavailable = false,
   noSolution,
   expanded = false,
   openerId,
@@ -231,6 +232,8 @@ function InspectionView({
   readonly retained: boolean
   /** A newer correction is shown above; this image belongs to an earlier one. */
   readonly superseded?: boolean
+  /** The newer correction's image failed to load and is retrying. */
+  readonly newerImageUnavailable?: boolean
   readonly noSolution: boolean
   readonly expanded?: boolean
   readonly openerId?: string
@@ -248,7 +251,11 @@ function InspectionView({
 
   let solvedStatus = 'Last solved frame'
 
-  if (superseded) solvedStatus = `Earlier solved frame · ${age} · Newer image loading`
+  if (superseded) {
+    solvedStatus = `Earlier solved frame · ${age} · ${
+      newerImageUnavailable ? 'Newer image unavailable' : 'Newer image loading'
+    }`
+  }
   else if (retained || readState !== 'current') solvedStatus = `Last solved frame · ${age}`
 
   const status = frame.solution
@@ -345,6 +352,7 @@ export function AlignmentImage({
   now,
   retained,
   superseded = false,
+  newerImageUnavailable = false,
   noSolution = false,
   openerId,
   onEnlarge,
@@ -354,6 +362,7 @@ export function AlignmentImage({
   readonly now: number
   readonly retained: boolean
   readonly superseded?: boolean
+  readonly newerImageUnavailable?: boolean
   readonly noSolution?: boolean
   readonly openerId: string
   readonly onEnlarge: (image: ExpandedAlignmentImage) => void
@@ -366,6 +375,7 @@ export function AlignmentImage({
         now={now}
         retained={retained}
         superseded={superseded}
+        newerImageUnavailable={newerImageUnavailable}
         noSolution={noSolution}
         openerId={openerId}
         onEnlarge={() => onEnlarge({ frame, noSolution })}

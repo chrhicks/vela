@@ -1,5 +1,11 @@
 # Implementation brief: Vela polar alignment feedback ≤10 seconds
 
+> **Superseded in part (October 8, 2026, later the same night).** Chris chose to publish a
+> correction as soon as its solve and geometry complete, without waiting for its image; the
+> preview catches up and is labelled when it belongs to an earlier correction. That replaces
+> this brief's rule to publish a correction only with a matching ready display image and to make
+> the browser wait for it. Reason and evidence: [implementation evidence](2026-10-08-alignment-latency-after.md).
+
 Recipient: **Opus 5.5 High**, handed off by **Atraeus**. Prepared by Astra High, October 8, 2026. This is a complete implementation brief, not authorization to alter tonight's observing session. The requested profiling/planning work is complete; Atraeus owns the subsequent implementation handoff and independent verification.
 
 ## Objective and non-negotiable scope

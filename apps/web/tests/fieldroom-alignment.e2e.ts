@@ -160,6 +160,9 @@ test('a fresh correction shows before its image, which keeps an earlier paired o
   await expect(page.locator('.vela-polar-inspection-status')).toContainText(
     'Earlier solved frame',
   )
+  await expect(page.locator('.vela-polar-inspection-status')).toContainText(
+    'Newer image unavailable',
+  )
   scene.setReadFailure(503)
   await expect(page.getByText('Measurements interrupted', { exact: true })).toBeVisible()
   await expect(page.locator('.vela-polar-directions')).toContainText('Last: right')

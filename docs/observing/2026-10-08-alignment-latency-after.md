@@ -10,6 +10,23 @@ command, exposure, slew or network probe was issued. Evidence below is labelled 
 (executed or passively observed), **replayed** (isolated harness with recorded delays) or
 **modelled** (arithmetic from measured inputs).
 
+## Decision: corrections before images
+
+The [brief](2026-10-08-opus-alignment-latency-brief.md) said to publish a correction only with a
+matching ready image. Partway through implementation, Chris chose the opposite: publish a fresh
+correction as soon as its solve and geometry complete, and let the preview catch up
+asynchronously. Readings now normally arrive about a second before their image. Until the image
+arrives, the image area shows the previous frame with that frame's own overlay and timestamp,
+labelled as earlier. This is a product decision that Chris's browser review should cover. The
+replay below shows why: a correction no longer waits for display preparation, which is what
+removed most of the delay after pixels arrive.
+
+The steady-adjustment settling change is part of the same review. The 3 s window after each
+reading now also counts as the settling allowance before the next exposure. Its post-settle mount
+and camera checks remain. An exposure can therefore start about 3 s after the previous reading is
+published, instead of about 6 s. If Chris is still turning a knob at that moment, the frame may
+smear or fail to solve. Vibration effects on the physical rig are unverified.
+
 ## What changed
 
 A correction now publishes as soon as its solve, geometry and one final mount check finish. It no
