@@ -112,8 +112,8 @@ const criaHealth = z.object({
   destination,
   source,
   issues: z
-    .object({ total: amount, shown: z.array(issue) })
-    .refine(issues => issues.shown.length <= issues.total),
+    .object({ total: amount, needsAttention: amount, shown: z.array(issue) })
+    .refine(issues => issues.shown.length <= issues.total && issues.needsAttention <= issues.total),
   forecast,
   reconciling: z.boolean(),
 })

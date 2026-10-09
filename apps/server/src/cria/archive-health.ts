@@ -612,8 +612,9 @@ function forecastOf(input: ProjectionInput, obligations: ArchiveObligationsView,
 }
 
 /**
- * The latest unbroken run of acquisitions: walking back from the newest, stop at a gap more than
- * three times the run's typical interval, so a pause is not averaged into the rate.
+ * The latest run of acquisitions at one cadence: walking back from the newest, stop at an interval
+ * more than three times longer or shorter than the run's typical one. A pause, or a burst such as
+ * autofocus before a capture run, is then not averaged into the rate.
  */
 function recentRun(times: number[]) {
   if (times.length < 2) return null
@@ -625,7 +626,7 @@ function recentRun(times: number[]) {
     const sorted = [...intervals].sort((a, b) => a - b)
     const typical = sorted[Math.floor(sorted.length / 2)]
 
-    if (typical !== undefined && interval > 3 * typical) break
+    if (typical !== undefined && (interval > 3 * typical || 3 * interval < typical)) break
     intervals.push(interval)
   }
 
@@ -667,7 +668,7 @@ function project(storeId: string, input: ProjectionInput): StoreHealth {
     obligations,
     destination,
     source,
-    issues: { total: issues.total, shown: issues.shown },
+    issues: { total: issues.total, needsAttention: issues.needsAttention, shown: issues.shown },
     forecast: forecastOf(input, obligations, destination),
     reconciling: input.reconciling,
   }

@@ -54,7 +54,7 @@ export function health(overrides: Partial<CriaArchiveHealthView> = {}): CriaArch
       quarantined: { count: 0, bytes: 0 },
       missing: { count: 0, complete: true },
     },
-    issues: { total: 0, shown: [] },
+    issues: { total: 0, needsAttention: 0, shown: [] },
     forecast: {
       frameBytes: { bytes: frame, observedAt: at },
       rate: { framesPerHour: 18, frames: 10, since: ago(30) },
@@ -79,6 +79,7 @@ export const scenarios = {
     obligations: { ...base.obligations, acknowledgementPending: { count: 1, bytes: frame } },
     issues: {
       total: 1,
+      needsAttention: 0,
       shown: [{
         imageId: '0c6b2a1e-6f43-4d0e-9a55-1b8a3c2f7e90',
         reason: 'acknowledgement-pending',
@@ -131,6 +132,7 @@ export const scenarios = {
     source: { ...base.source, quarantined: { count: 1, bytes: 52_184_214 } },
     issues: {
       total: 2,
+      needsAttention: 2,
       shown: [
         {
           imageId: '8d2e4f6a-1c3b-4a5d-9e7f-0b1c2d3e4f50',
