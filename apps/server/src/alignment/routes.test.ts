@@ -98,7 +98,7 @@ beforeEach(() => {
     active: () => mocks.state.active,
     start: mocks.start,
     stop: mocks.stop,
-    image: () => undefined,
+    image: async () => undefined,
   }))
 })
 

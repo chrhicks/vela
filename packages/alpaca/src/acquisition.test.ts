@@ -631,6 +631,22 @@ describe('normalized Alpaca acquisition', () => {
     expect(rig.state.aborts).toBe(0)
   })
 
+  it('reports the exposure request once, immediately before StartExposure is sent', async () => {
+    const rig = observatory()
+    const startsWhenRequested: number[] = []
+
+    const result = rig.acquisition.capture({
+      cameraId: 'camera-id',
+      exposureSeconds: 1,
+      onExposureRequested: () => startsWhenRequested.push(rig.state.starts),
+    })
+
+    await started(rig)
+    rig.complete()
+    await result
+    expect(startsWhenRequested).toEqual([0])
+  })
+
   it('captures a Bayer ImageBytes exposure through the same normalized frame contract', async () => {
     const rig = observatory()
     rig.state.sensorType = 2

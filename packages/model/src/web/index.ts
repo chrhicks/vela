@@ -32,7 +32,11 @@ export type {
   UnsupportedRigDeviceView,
 } from './rig-detail.js'
 
-export type { AlignmentView } from './alignment.js'
+export type {
+  AlignmentDetailImage,
+  AlignmentExposureImage,
+  AlignmentView,
+} from './alignment.js'
 
 export type {
   AutofocusActivity,

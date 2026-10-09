@@ -1,6 +1,9 @@
 # Equipment
 
-The shell's keyed `RigObservationProvider` owns the only rig-detail poller.
+The shell's keyed `RigObservationProvider` owns the only rig-detail poller. Polar
+alignment reads the same devices every few seconds, so on its page the poller keeps
+its first observation and pauses periodic inspection; leaving the page refreshes at
+once. Other open Vela pages for the rig still poll.
 Equipment consumes that observation, preserving last-known telemetry when a
 read fails and exposing each device's complete supported metrics in a disclosure.
 The saved imaging camera sorts first only when the camera projection's

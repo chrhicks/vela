@@ -1,7 +1,11 @@
 # Alignment image inspection
 
 The route owns polling, commands and the pairing of each loaded solved image with
-its measurements and exposure timestamp. `AlignmentImage` only changes its display
+its own correction overlay and exposure timestamp. A fresh correction's readings and
+directions appear as soon as the server publishes them; its image follows. Until the
+newer frame's fit and detail images load, the image keeps the newest loaded frame with
+that frame's overlay and is labelled as an earlier solved frame. A newer correction
+cancels an older image load, so a late response cannot replace it. `AlignmentImage` only changes its display
 viewport. The route keeps enlargement mounted across baseline completion, pinning
 the exposure and inspection viewport while polling may publish a newer image
 behind it. Dismissal focuses the current enlargement button even if the layout
@@ -19,8 +23,10 @@ field-to-pixel ratio. No fixture scale or correction-angle-to-pixel inference en
 production. Baseline previews expose no angular field, so unsolved images have no
 angular scale or correction markers. Outside-image areas remain blank.
 
-The alignment PNG is a native-dimension display derivative, so 100% is one image
-pixel per CSS pixel with its own scroll region; it is not original-FITS processing.
+Normal views draw the fit image in native image coordinates, with native-resolution
+detail around the reference and target for Fit both and Fine. The native-dimension
+display PNG loads only for 100%, which is one image pixel per CSS pixel with its own
+scroll region and a loading status; it is not original-FITS processing.
 The compact view shows the last solved frame and its age when retained. Exposure
 start provenance, approximate angular scale and native inspection live in the
 enlarged dialog. Device-read

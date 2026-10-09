@@ -5,6 +5,8 @@ export function rigConnectionLabel(rig: RigObservation): string {
 
   if (rig.initialError === 'not-found') return 'Rig not found'
 
+  if (rig.paused && rig.view) return 'Updates paused'
+
   if (rig.initialError || rig.view?.state === 'offline') return 'Rig unavailable'
 
   if (!rig.view) return 'Checking rig'

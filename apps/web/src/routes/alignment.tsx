@@ -110,17 +110,34 @@ function useAlignment(rigId: string) {
   return { view, offline, pending, error, endUnconfirmed: endUnconfirmed.current, command }
 }
 
+const exposureImageSchema = {
+  frameId: z.string().min(1),
+  imageUrl: z.string().startsWith('/api/'),
+  imageWidth: z.number().positive(),
+  imageHeight: z.number().positive(),
+  fitImageUrl: z.string().startsWith('/api/'),
+  fitImageScale: z.number().int().positive(),
+}
+
 const measurementSchema = z.object({
+  ...exposureImageSchema,
   altitudeArcsec: z.number(),
   azimuthArcsec: z.number(),
   totalArcsec: z.number(),
+  solvedAt: z.string().refine(time => Number.isFinite(Date.parse(time))),
   targetX: z.number(),
   targetY: z.number(),
-  imageWidth: z.number().positive(),
-  imageHeight: z.number().positive(),
   fieldHeightDegrees: z.number().positive(),
   capturedAtSource: z.enum(['camera', 'server-estimate']).optional(),
-  imageUrl: z.string().startsWith('/api/'),
+  detail: z
+    .object({
+      imageUrl: z.string().startsWith('/api/'),
+      x: z.number().int().nonnegative(),
+      y: z.number().int().nonnegative(),
+      width: z.number().int().positive(),
+      height: z.number().int().positive(),
+    })
+    .optional(),
 })
 
 const alignmentSchema = z.object({
@@ -158,9 +175,7 @@ const alignmentSchema = z.object({
   measurement: measurementSchema.nullable(),
   preview: z
     .object({
-      imageUrl: z.string().startsWith('/api/'),
-      imageWidth: z.number().positive(),
-      imageHeight: z.number().positive(),
+      ...exposureImageSchema,
       capturedAt: z.string().refine(time => Number.isFinite(Date.parse(time))),
       capturedAtSource: z.enum(['camera', 'server-estimate']).optional(),
       position: z.number(),
@@ -176,54 +191,77 @@ function validateView(value: unknown, rigId: string): asserts value is Alignment
   if (!result.success || result.data.rigId !== rigId) throw new Error('Invalid alignment response')
 }
 
-function useSolvedMeasurement(view: AlignmentView | null) {
-  const [solved, setSolved] = useState<{
-    measurement: NonNullable<AlignmentView['measurement']>
-    measuredAt: string | null
-  } | null>(null)
+type SolvedMeasurement = {
+  measurement: NonNullable<AlignmentView['measurement']>
+  measuredAt: string | null
+}
 
+/**
+ * The latest correction is shown as soon as it arrives. Its image may follow:
+ * `displayed` is the newest correction whose own images have loaded, so each
+ * image keeps the overlay and timestamp of the exposure it shows.
+ */
+function useDisplayedMeasurement(view: AlignmentView | null) {
+  const [displayed, setDisplayed] = useState<SolvedMeasurement | null>(null)
   const [imageError, setImageError] = useState(false)
+  const frameId = view?.measurement?.frameId
+
+  useEffect(() => {
+    if (frameId) performance.mark('vela.alignment.correction', { detail: { frameId } })
+  }, [frameId])
+
   useEffect(() => {
     const measurement = view?.measurement
 
     if (!measurement) {
-      setSolved(null)
+      setDisplayed(null)
       setImageError(false)
 
       return
     }
 
     const next = { measurement, measuredAt: view.measuredAt }
+    // The full native image is fetched only for 100% inspection.
+    const urls = [measurement.fitImageUrl, measurement.detail?.imageUrl].filter(url => url !== undefined)
     let current = true
     let retry: ReturnType<typeof setTimeout> | undefined
 
-    function load() {
-      const image = new Image()
-      image.onload = () => {
-        if (current) {
-          setSolved(next)
-          setImageError(false)
-        }
-      }
-
-      image.onerror = () => {
-        if (!current) return
-        setImageError(true)
-        retry = setTimeout(load, 1500)
-      }
-
-      image.src = next.measurement.imageUrl
+    function load(url: string) {
+      return new Promise<void>((resolve, reject) => {
+        const image = new Image()
+        image.onload = () => resolve()
+        image.onerror = () => reject(new Error('Image unavailable'))
+        image.src = url
+      })
     }
 
-    load()
+    function loadAll() {
+      Promise.all(urls.map(load)).then(
+        () => {
+          // A newer correction replaces this request before it can commit.
+          if (!current) return
+          setDisplayed(next)
+          setImageError(false)
+          performance.mark('vela.alignment.image', { detail: { frameId: next.measurement.frameId } })
+        },
+        () => {
+          if (!current) return
+          setImageError(true)
+          retry = setTimeout(loadAll, 1500)
+        },
+      )
+    }
+
+    setImageError(false)
+    loadAll()
 
     return () => {
       current = false
       clearTimeout(retry)
     }
-  }, [view?.measurement?.imageUrl])
+  }, [frameId])
 
-  return { solved, imageError }
+  return { displayed, imageError }
 }
 
 function angle(value: number) {
@@ -266,7 +304,7 @@ export function Alignment() {
 
 function AlignmentPage({ rigId }: { rigId: string }) {
   const { view, offline, pending, error, endUnconfirmed, command } = useAlignment(rigId)
-  const { solved, imageError } = useSolvedMeasurement(view)
+  const { displayed, imageError } = useDisplayedMeasurement(view)
   const [now, setNow] = useState(Date.now())
   const [expandedImage, setExpandedImage] = useState<ExpandedAlignmentImage | null>(null)
   const imageOpenerId = useId()
@@ -296,23 +334,26 @@ function AlignmentPage({ rigId }: { rigId: string }) {
     )
   const physical = view.mode === 'physical'
   const disabled = pending || offline || endUnconfirmed || view.activity === 'stopping'
-  const measurement = solved?.measurement ?? null
+  const measurement = view.measurement
   const baseline = !measurement || view.phase === 'baseline'
+  // The image follows its correction; until it loads, show the newest loaded pair.
+  const imagePair = displayed ?? (measurement ? { measurement, measuredAt: view.measuredAt } : null)
+  const imageSuperseded = !!measurement && imagePair?.measurement.frameId !== measurement.frameId
 
   const elapsed = view.exposureStartedAt
     ? Math.min(view.exposureSeconds, Math.max(0, (now - Date.parse(view.exposureStartedAt)) / 1000))
     : 0
 
   // The controller publishes the solved frame's exposure start as measuredAt, not solve completion.
-  const age = solved?.measuredAt
-    ? `${Math.max(0, Math.floor((now - Date.parse(solved.measuredAt)) / 1000))} seconds ago`
+  const age = view.measuredAt
+    ? `${Math.max(0, Math.floor((now - Date.parse(view.measuredAt)) / 1000))} seconds ago`
     : 'Not measured'
 
   const activity = alignmentActivity(view, offline)
   const retrying = view.activity === 'retrying'
   const interrupted = offline || retrying
   const imageReadState = offline ? 'offline' : retrying ? 'retrying' : 'current'
-  const lastCorrection = !view.active || interrupted || imageError || endUnconfirmed || pending
+  const lastCorrection = !view.active || interrupted || endUnconfirmed || pending
 
   const nextInstruction = view.active
     ? 'After the third solve, the adjustment view will show your alignment error and the target reticle.'
@@ -327,7 +368,7 @@ function AlignmentPage({ rigId }: { rigId: string }) {
 
   let adjustmentInstruction
 
-  if (interrupted || imageError || endUnconfirmed || pending) {
+  if (interrupted || endUnconfirmed || pending) {
     adjustmentInstruction = 'Baseline retained. Wait for a fresh measurement before adjusting.'
   } else if (view.active) {
     adjustmentInstruction = physical
@@ -395,8 +436,8 @@ function AlignmentPage({ rigId }: { rigId: string }) {
       )}
       {imageError && (
         <p className="vela-polar-notice" role="status">
-          The latest solved image could not be loaded. Previous readings and overlay remain
-          together.
+          The latest solved image could not be loaded. The image shows an earlier measurement
+          with its own overlay.
         </p>
       )}
       {(error || view.error || !view.enabled) && (
@@ -526,9 +567,9 @@ function AlignmentPage({ rigId }: { rigId: string }) {
             <div>
               <span>Last measured error</span>
               <span>
-                {solved?.measuredAt ? (
-                  <time dateTime={solved.measuredAt}>
-                    {new Date(solved.measuredAt).toLocaleTimeString('en-GB')}
+                {view.measuredAt ? (
+                  <time dateTime={view.measuredAt}>
+                    {new Date(view.measuredAt).toLocaleTimeString('en-GB')}
                   </time>
                 ) : 'Time unavailable'}
                 {lastCorrection ? ` · ${age}` : ''}
@@ -538,20 +579,17 @@ function AlignmentPage({ rigId }: { rigId: string }) {
           </div>
           <AlignmentImage
             frame={{
-              ...measurement,
-              solution: measurement,
-              capturedAt: solved?.measuredAt ?? null,
+              ...imagePair!.measurement,
+              solution: imagePair!.measurement,
+              capturedAt: imagePair!.measuredAt,
               title: 'Last solved frame',
               alt: 'Solved camera image with frame reference and alignment target',
             }}
             readState={imageReadState}
             now={now}
-            retained={
-              !view.active ||
-              imageError ||
-              view.activity !== 'waiting' ||
-              view.measurement?.imageUrl !== measurement.imageUrl
-            }
+            retained={!view.active || view.activity !== 'waiting' || imageSuperseded}
+            superseded={imageSuperseded}
+            newerImageUnavailable={imageError}
             openerId={imageOpenerId}
             onEnlarge={setExpandedImage}
           />

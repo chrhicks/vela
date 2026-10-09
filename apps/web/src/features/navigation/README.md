@@ -32,4 +32,5 @@ The shared Appearance utility consumes the browser-owned preference controller.
 Connection copy uses the shell-scoped rig observation, independently of the
 navigation endpoint: Connected means every inventoried device is confirmed
 connected; missing, unavailable, partial, and interrupted observations are named
-explicitly. Navigation reads do not imply device connectivity.
+explicitly. While the observation is paused for polar alignment, the label reads
+Updates paused instead of repeating an aging Connected. Navigation reads do not imply device connectivity.

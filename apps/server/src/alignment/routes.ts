@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { isAbsolute } from 'node:path'
-import type { FastifyInstance } from 'fastify'
+import type { FastifyInstance, FastifyReply } from 'fastify'
 import { trace, SpanStatusCode } from '@opentelemetry/api'
 import { createAlpacaAcquisition, createAlpacaFraming } from '@vela/alpaca'
 import type { AlignmentView } from '@vela/model/web'
@@ -246,23 +246,39 @@ export function registerAlignment(
         },
       ),
   )
+
+  async function sendImage(
+    request: { params: { rigId: string; imageId: string } },
+    reply: FastifyReply,
+    kind: 'native' | 'fit' | 'detail',
+  ) {
+    const view = await rigView(request.params.rigId)
+
+    const image =
+      view && alignment?.snapshot().rigId === request.params.rigId
+        ? await alignment.image(request.params.imageId, kind)
+        : undefined
+
+    if (!image) return reply.code(404).send({ error: 'Frame no longer available' })
+
+    return reply
+      .type('image/png')
+      .header('cache-control', 'private, max-age=3600, immutable')
+      .send(image)
+  }
+
+  // The native image is rendered on its first request; fit and detail are ready at publication.
   app.get<{ Params: { rigId: string; imageId: string } }>(
     '/api/rigs/:rigId/alignment/images/:imageId',
-    async (request, reply) => {
-      const view = await rigView(request.params.rigId)
-
-      const image =
-        view && alignment?.snapshot().rigId === request.params.rigId
-          ? alignment.image(request.params.imageId)
-          : undefined
-
-      if (!image) return reply.code(404).send({ error: 'Frame no longer available' })
-
-      return reply
-        .type('image/png')
-        .header('cache-control', 'private, max-age=3600, immutable')
-        .send(image)
-    },
+    (request, reply) => sendImage(request, reply, 'native'),
+  )
+  app.get<{ Params: { rigId: string; imageId: string } }>(
+    '/api/rigs/:rigId/alignment/images/:imageId/fit',
+    (request, reply) => sendImage(request, reply, 'fit'),
+  )
+  app.get<{ Params: { rigId: string; imageId: string } }>(
+    '/api/rigs/:rigId/alignment/images/:imageId/detail',
+    (request, reply) => sendImage(request, reply, 'detail'),
   )
   app.addHook('onClose', async () => {
     await alignment?.stop()

@@ -512,6 +512,9 @@ for (const width of [1280, 390]) {
       warning: null,
       preview: {
         imageUrl,
+        fitImageUrl: imageUrl,
+        frameId: imageUrl,
+        fitImageScale: 1,
         imageWidth: 1600,
         imageHeight: 1200,
         capturedAt,
@@ -580,12 +583,16 @@ for (const width of [1280, 390]) {
         altitudeArcsec: 9,
         azimuthArcsec: 11,
         totalArcsec: 14,
+        solvedAt: '2026-09-21T01:00:30Z',
         targetX: 310,
         targetY: 190,
         imageWidth: 1600,
         imageHeight: 1200,
         fieldHeightDegrees: 1,
         imageUrl,
+        fitImageUrl: imageUrl,
+        frameId: imageUrl,
+        fitImageScale: 1,
       },
     }
     await expect(page.locator('.vela-polar-total')).toContainText('14″')
