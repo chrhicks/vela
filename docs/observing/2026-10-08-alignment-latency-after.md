@@ -1,8 +1,9 @@
 # Polar alignment latency: implementation evidence
 
 October 8, 2026. Baseline `cbe0ba6536f78213fd534a56e39cd3f595d6dc40` (main). Implementation
-`26662684cf7bd4e4d2b3f48331d19ecb47c2d837` on `perf/polar-alignment-latency` (the replayed code;
-later commits change documentation only). Profiling context: [report](2026-10-08-alignment-latency-report.md)
+`26662684cf7bd4e4d2b3f48331d19ecb47c2d837` on `perf/polar-alignment-latency` (the replayed code).
+`c6ad68d` later fixed a baseline preview's position label and kept a published correction's
+image through Stop. It does not change the correction path the replay measures. Profiling context: [report](2026-10-08-alignment-latency-report.md)
 and [brief](2026-10-08-opus-alignment-latency-brief.md).
 
 No observing service, worktree, configuration, shared image or rig state was changed. No device
