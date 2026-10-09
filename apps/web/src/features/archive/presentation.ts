@@ -70,6 +70,8 @@ const partialSentences: Record<CriaArchiveHealthView['obligations']['partial'][n
   'archive-count-old': 'The archive count is not recent, so Vela cannot say every original is preserved. A new count is running.',
   'pending-copies-unchecked':
     'More copies are waiting for Cria to confirm than Vela checks at once, so some may be counted twice. Vela resends their receipts automatically.',
+  'missing-unchecked':
+    'Cria reports more missing originals than Vela checks at once, so some are not yet compared with the archive.',
 }
 
 export function preservationSummary(view: CriaArchiveHealthView, capturing: boolean): PreservationSummary {

@@ -53,7 +53,7 @@ export type ArchiveFailure =
   | { scope: 'destination'; detail: string }
   | { scope: 'image'; reason: ArchiveIssueReason; detail: string }
 
-const message = (error: Error | null, fallback: string) => error?.message ?? fallback
+const message = (error: Error | null, fallback: string) => error?.message.trim() || fallback
 
 const fileProblems = new Map([
   ['EACCES', 'Permission denied'],
@@ -93,7 +93,7 @@ export function classifyArchiveFailure(error: Error | null, stage: 'preserve' | 
   if (error instanceof EquipmentError)
     return stage === 'acknowledge'
       ? { scope: 'image', reason: 'acknowledgement-pending', detail: `Cria has not confirmed the receipt: ${error.message}` }
-      : { scope: 'image', reason: 'source-unavailable', detail: error.message }
+      : { scope: 'image', reason: 'source-unavailable', detail: message(error, 'Cria could not provide this original') }
 
   return { scope: 'destination', detail: describeArchiveError(error, 'archive write failed') }
 }
@@ -491,6 +491,8 @@ function obligationsOf(input: ProjectionInput, source: ArchiveSourceView): Archi
 
   if (input.census && reading && !reading.overlap.complete) partial.push('pending-copies-unchecked')
 
+  if (reading && !reading.missing.complete) partial.push('missing-unchecked')
+
   // An original Vela already copied, or one the active capture is preserving, is not waiting.
   const arriving = reading ? (reading.arriving ?? tally(0, 0)) : null
 
@@ -529,13 +531,14 @@ function issuesOf(input: ProjectionInput) {
   const fromCria = (record: CriaCustody, reason: ArchiveIssueReason, fallback: string): ArchiveIssue => ({
     imageId: record.id,
     reason,
-    detail: record.reason ?? fallback,
+    detail: record.reason?.trim() || fallback,
     observedAt: input.source?.at ?? input.observedAt,
     ...provenanceOf(record),
   })
 
   // Cria's extra copy may vanish after Vela preserved and Cria acknowledged it; nothing is lost then.
-  for (const record of reading?.missing.records ?? []) {
+  // Until the archive has been counted that cannot be told apart, so missing records wait for it.
+  for (const record of census ? reading?.missing.records ?? [] : []) {
     if (!preserved.has(record.id))
       byImage.set(record.id, fromCria(record, 'missing-at-cria', 'Cria reports this original as missing'))
   }
@@ -557,12 +560,12 @@ function issuesOf(input: ProjectionInput) {
 
   const all = [...byImage.values()].sort((a, b) => b.observedAt.localeCompare(a.observedAt))
   const quarantinedBeyondPage = Math.max(0, (reading?.storage.images.states.quarantined.records ?? 0) - (reading?.quarantined.length ?? 0))
-  const missingBeyondPages = reading && !reading.missing.complete ? 1 : 0
 
   return {
     total: all.length + quarantinedBeyondPage,
     shown: all.slice(0, ARCHIVE_HEALTH_LIMITS.shownIssues),
-    needsAttention: all.filter(issue => attentionReasons.has(issue.reason)).length + quarantinedBeyondPage + missingBeyondPages,
+    // Records beyond the pages read are a partial total, not invented issues.
+    needsAttention: all.filter(issue => attentionReasons.has(issue.reason)).length + quarantinedBeyondPage,
   }
 }
 

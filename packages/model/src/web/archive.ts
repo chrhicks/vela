@@ -139,6 +139,8 @@ export interface ArchiveObligationsView {
     | 'archive-count-old'
     /** More copies await Cria's confirmation than one read checks, so some may be counted twice. */
     | 'pending-copies-unchecked'
+    /** Cria reports more missing originals than one read lists; the rest are not checked. */
+    | 'missing-unchecked'
   >
 }
 

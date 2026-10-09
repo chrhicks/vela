@@ -521,6 +521,52 @@ describe('archive health', () => {
     expect(view.status).toBe('current')
   })
 
+  it('reports missing records beyond the pages read as partial, never as invented issues', async () => {
+    const service = new ServiceFixture()
+    const { equipment, health } = await setup(service)
+
+    await equipment.acquisition.capture(capture())
+    const template = [...service.custody.values()][0]!
+
+    for (let index = 0; index < 600; index++) {
+      const id = crypto.randomUUID()
+
+      service.custody.set(id, { ...template, id, state: 'missing', reason: 'File vanished', image: null, receipt: null, receiptFingerprint: null, receiptAcceptedAt: null })
+    }
+
+    const view = await health.view()
+
+    expect(view.source.missing).toEqual({ count: 500, complete: false })
+    expect(view.obligations.partial).toContain('missing-unchecked')
+    expect(view.issues.needsAttention).toBe(500)
+    expect(view.issues.needsAttention).toBeLessThanOrEqual(view.issues.total)
+    expect(view.status).toBe('attention')
+    expect(isArchiveHealthView({ rigId: 'rig-1', rigName: 'FRA 400', preservation: 'cria', ...view }, 'rig-1')).toBe(true)
+  })
+
+  it('waits for the archive count before treating Cria missing records as lost', async () => {
+    const service = new ServiceFixture()
+    let release = () => {}
+
+    const gate = new Promise<void>(resolve => { release = resolve })
+
+    const { equipment, health } = await setup(service, {
+      census: async count => {
+        await gate
+
+        return count()
+      },
+    })
+
+    await equipment.acquisition.capture(capture())
+    Object.assign([...service.custody.values()][0]!, { state: 'missing', reason: 'File vanished after verification' })
+    const early = await health.view()
+
+    expect(early.issues.total).toBe(0)
+    expect(early.status).toBe('unknown')
+    release()
+  })
+
   it('never counts an archived entry whose original file is gone as preserved', async () => {
     const service = new ServiceFixture()
     const { equipment, health, directory } = await setup(service)
