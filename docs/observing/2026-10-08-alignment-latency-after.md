@@ -1,8 +1,8 @@
 # Polar alignment latency: implementation evidence
 
 October 8, 2026. Baseline `cbe0ba6536f78213fd534a56e39cd3f595d6dc40` (main). Implementation
-`07e069e49f51c853d2f5c78107d33e54c71b71e8` on `perf/polar-alignment-latency`; later commits on
-the branch change documentation only. Profiling context: [report](2026-10-08-alignment-latency-report.md)
+`26662684cf7bd4e4d2b3f48331d19ecb47c2d837` on `perf/polar-alignment-latency` (the replayed code;
+later commits change documentation only). Profiling context: [report](2026-10-08-alignment-latency-report.md)
 and [brief](2026-10-08-opus-alignment-latency-brief.md).
 
 No observing service, worktree, configuration, shared image or rig state was changed. No device
@@ -28,7 +28,49 @@ Camera acquisition and decoding are unchanged and still precede every solve.
 
 ## Replayed before/after
 
-_Pending: see "Replay status" below._
+Same schedule, inputs and limits for both refs: 3 baseline frames, then tonight's first 40
+recorded adjustment attempts in order (33 solved, 7 failed). Each frame replays its recorded
+StartExposure → decoded-pixels delay, capture pre-start time and mount-validation and pre-exposure
+read durations. Solving is real ASTAP on four saved real FRA400/ASI2600MC RGGB exposures; failed
+attempts use a star-free version so ASTAP genuinely exhausts its search. Geometry comes from the
+independent physical-coordinate fixture. Real 3 s waits. A client polls state every 750 ms after
+each response, like the browser. Node 26.7.0, `nice 19`, four logical CPUs, one process at a time.
+
+| Solved adjustment rounds (n = 33) | Before `cbe0ba6` p50 / P95 / max | After `2666268` p50 / P95 / max |
+|---|---:|---:|
+| StartExposure → decoded pixels (replayed input) | 9.18 / 12.93 / 16.40 s | 9.18 / 12.93 / 16.40 s |
+| StartExposure → server correction | 14.36 / 18.10 / 21.30 s | **10.29 / 13.84 / 17.36 s** |
+| StartExposure → browser correction | 14.51 / 18.44 / 21.38 s ¹ | **10.43 / 14.24 / 17.46 s** |
+| StartExposure → browser image, loopback | 14.51 / 18.44 / 21.38 s | 11.45 / 15.20 / 18.71 s |
+| StartExposure → browser image, Wi-Fi model ² | 19.02 / 22.87 / 25.89 s | 11.73 / 15.48 / 19.00 s |
+| Rounds with browser correction ≤ 10 s | 0 of 33 | 12 of 33 |
+| Interval between valid corrections (n = 32) | 22.78 / 28.96 / 50.81 s | 14.81 / 21.12 / 36.63 s |
+| Image bytes per correction | 64.2 MB native PNG | 4.0 MB fit + detail |
+| Mount snapshots / camera geometry reads (whole run) | 206 / 43 | 125 / 43 |
+| Solve (FITS + ASTAP), replay CPUs | 0.60 s | 0.60 s |
+
+¹ Before, the browser held each correction until its native image loaded; on a remote browser the
+correction arrived with the Wi-Fi image row. ² Modelled: bytes ÷ tonight's measured alignment image
+response throughput (64.6 MB in 4.495 s); not measured on a phone.
+
+Both runs ended `stopped` without error. Idle Stop took about 1 ms in both; peak RSS 1.32 → 1.23 GiB
+(harness retains four 6248 × 4176 frames); event-loop delay p99 14.3 → 14.4 ms.
+
+An intermediate implementation (`07e069e`) started display preparation as soon as pixels arrived.
+Its stretch shared the event loop with the solver's FITS preparation and tripled solve time
+(0.60 → 1.87 s), leaving a 11.57 s median server correction. `2666268` starts display preparation
+when the solve returns. Both results are retained.
+
+**The ≤ 10 s target is not met.** The median browser correction is 10.43 s and P95 14.24 s. In this
+replay, 11 of 33 frames already exceeded 10 s before Vela had pixels. After pixels arrive, the
+correction path is now about 1.1 s at the median (capture check alongside the solve, then one final
+mount check). A remaining ~0.4 s comes from the 750 ms browser poll. Further progress depends on
+acquisition: readiness, ASTROPC's 1.5 s before the first byte and the 52 MB body. Removing rig-detail
+polling may shorten real transfers, but this replay cannot show it: its acquisition delays were
+recorded with that polling active. The real gain needs a physical measurement.
+
+Not measured here: real browser paint, a phone over Wi-Fi, physical device timing with the new code,
+and outdoor accuracy. Geometry tests check fixture agreement, not the sky.
 
 ## Passive observing measurements (measured)
 
