@@ -299,17 +299,17 @@ it.each(['during solve', 'during preview'] as const)(
   },
 )
 
-it('retains the previous solved image and timestamp when external movement invalidates a new preview', async () => {
+it('retains the previous solved image and timestamp when external movement invalidates a new exposure', async () => {
   const subject = setup()
   await subject.baseline()
   await vi.waitFor(() => expect(control.waits).toHaveLength(1))
   const previous = subject.controller.snapshot()
   const previousImageId = previous.measurement!.imageUrl.split('/').at(-1)!
   const previousImage = await subject.controller.image(previousImageId, 'native')
-  control.afterPreview = subject.changeMount
   control.waits.shift()!()
-  // Solving runs alongside display preparation; the final mount check still rejects it.
+  // Movement while solving: the final mount check rejects the new correction.
   const rejected = await subject.nextSolve()
+  subject.changeMount()
   rejected.complete()
   await vi.waitFor(() => expect(subject.controller.active()).toBe(false))
   expect(subject.controller.snapshot()).toMatchObject({
@@ -753,7 +753,7 @@ it('uses the adjustment window as the settling allowance and gates each correcti
   expect(vi.mocked(subject.physical.validate).mock.calls.length - validations).toBe(2)
 })
 
-it('cancels the concurrent solve and display when the capture check fails, publishing nothing from that exposure', async () => {
+it('cancels the concurrent solve when the capture check fails, publishing nothing from that exposure', async () => {
   const subject = setup()
   await subject.baseline()
   await vi.waitFor(() => expect(control.waits).toHaveLength(1))
@@ -777,7 +777,8 @@ it('cancels the concurrent solve and display when the capture check fails, publi
   control.waits.shift()!()
   await vi.waitFor(() => expect(subject.controller.active()).toBe(false))
   expect(solving?.signal.aborted).toBe(true)
-  expect(displaySignal?.aborted).toBe(true)
+  // Display preparation waits for the solve, so it never started.
+  expect(displaySignal).toBeUndefined()
   expect(subject.controller.snapshot()).toMatchObject({
     phase: 'failed',
     error: 'The mount pointing side changed. Measure a new baseline.',
@@ -787,7 +788,7 @@ it('cancels the concurrent solve and display when the capture check fails, publi
   })
 })
 
-it('stops promptly during display preparation and solving without publishing the exposure', async () => {
+it('stops promptly during display preparation, keeping the published correction and no late preview', async () => {
   const subject = setup()
   await subject.baseline()
   await vi.waitFor(() => expect(control.waits).toHaveLength(1))
@@ -803,13 +804,17 @@ it('stops promptly during display preparation and solving without publishing the
 
   control.waits.shift()!()
   const request = await subject.nextSolve()
+  request.complete()
+  await vi.waitFor(() => expect(subject.controller.snapshot().measurement).not.toBe(previous.measurement))
+  const published = subject.controller.snapshot().measurement!
+  await vi.waitFor(() => expect(displaySignal).toBeDefined())
   await subject.controller.stop()
   expect(displaySignal?.aborted).toBe(true)
-  expect(request.signal.aborted).toBe(true)
+  expect(await subject.controller.image(published.frameId, 'fit')).toBeUndefined()
   expect(subject.controller.snapshot()).toMatchObject({
     active: false,
     phase: 'stopped',
-    measurement: previous.measurement,
+    measurement: published,
     preview: previous.preview,
   })
   expect(subject.captures).toHaveLength(4)

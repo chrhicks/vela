@@ -197,10 +197,14 @@ it('rejects another start while acquisition remains active', async () => {
   expect(subject.exposures()).toBe(1)
 })
 
-it('publishes a baseline image before solving and preserves it through no-solution and stop', async () => {
+it('publishes a baseline image after its solve attempt, including no-solution, and preserves it through stop', async () => {
   const subject = setup()
   await subject.controller.start('sim', 'Simulator')
   const request = await subject.nextSolve()
+  // Display preparation waits for the solve so it cannot delay a correction.
+  await Promise.resolve()
+  expect(subject.controller.snapshot().preview).toBeNull()
+  request.result.resolve({ status: 'no-solution' })
   await vi.waitFor(() => expect(subject.controller.snapshot().preview).toBeTruthy())
   const preview = subject.controller.snapshot().preview!
   expect(preview).toMatchObject({
@@ -215,10 +219,7 @@ it('publishes a baseline image before solving and preserves it through no-soluti
   expect((await subject.controller.image(id, 'native'))?.subarray(0, 8)).toEqual(
     Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
   )
-  request.result.resolve({ status: 'no-solution' })
-  await vi.waitFor(() =>
-    expect(subject.controller.snapshot().warning).toContain('Plate-solving failed'),
-  )
+  expect(subject.controller.snapshot().warning).toContain('Plate-solving failed')
   expect(subject.controller.snapshot().preview).toBe(preview)
   await subject.controller.stop()
   expect(subject.controller.snapshot()).toMatchObject({
