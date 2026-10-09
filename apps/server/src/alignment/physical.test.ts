@@ -191,6 +191,31 @@ describe('physical alignment sweep', () => {
     expect(fake.device.cameraGeometry).toHaveBeenCalledTimes(1)
   })
 
+  it('uses a caller-owned settling interval without skipping the post-settle checks', async () => {
+    const fake = observatory()
+    await fake.alignment.prepare(signal)
+    const settled = fake.settle.mock.calls.length
+    const statuses = vi.mocked(fake.device.telescopeStatus).mock.calls.length
+    const geometries = vi.mocked(fake.device.cameraGeometry).mock.calls.length
+
+    await expect(fake.alignment.pointing(signal, { afterSettling: true })).resolves.toMatchObject({
+      latitude: 39,
+    })
+    expect(fake.settle).toHaveBeenCalledTimes(settled)
+    expect(fake.device.telescopeStatus).toHaveBeenCalledTimes(statuses + 1)
+    expect(fake.device.cameraGeometry).toHaveBeenCalledTimes(geometries + 1)
+
+    fake.mount.tracking = false
+    await expect(fake.alignment.pointing(signal, { afterSettling: true })).rejects.toThrow(
+      'tracking enabled',
+    )
+    fake.mount.tracking = true
+    fake.camera.binY += 1
+    await expect(fake.alignment.pointing(signal, { afterSettling: true })).rejects.toThrow(
+      'geometry changed',
+    )
+  })
+
   it('rechecks mount state after settling', async () => {
     const fake = observatory()
     await fake.alignment.prepare(signal)

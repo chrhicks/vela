@@ -1,15 +1,17 @@
 import { randomUUID } from 'node:crypto'
 import { trace, SpanStatusCode, type Attributes } from '@opentelemetry/api'
 import { setTimeout as delay } from 'node:timers/promises'
-import type { AlignmentView } from '@vela/model/web'
+import type { AlignmentExposureImage, AlignmentView } from '@vela/model/web'
 import {
   AlpacaProviderError,
   AlpacaCaptureRetryableError,
   type AlpacaAcquisition,
+  type AlpacaFrame,
 } from '@vela/alpaca'
 import { createAlignmentBaseline, measureAlignment, type AlignmentSample } from './geometry.js'
-import { createAstapSolver, projectSky } from './solver.js'
-import { previewPng } from '../imaging/preview.js'
+import { createAstapSolver, projectSky, type SkyPosition } from './solver.js'
+import { detailRegion, prepareAlignmentDisplay, type AlignmentDisplay } from './display.js'
+import { fitFactor } from '../imaging/preview.js'
 import type { PhysicalAlignment } from './physical.js'
 import type {
   AlignmentDiagnosticRun,
@@ -40,7 +42,7 @@ export type AlignmentControllerOptions = {
   hardware: AlpacaAcquisition
   now?: () => number
   waitForNextExposure?: (signal: AbortSignal) => Promise<void>
-  renderPreview?: typeof previewPng
+  prepareDisplay?: typeof prepareAlignmentDisplay
   openDiagnostics?: AlignmentDiagnosticsFactory | undefined
 } & (
   | { mode: 'offline'; solver: Solver }
@@ -57,7 +59,7 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
     hardware,
     now = Date.now,
     waitForNextExposure = (signal: AbortSignal) => delay(3000, undefined, { signal }),
-    renderPreview = previewPng,
+    prepareDisplay = prepareAlignmentDisplay,
   } = options
 
   const physical = options.mode === 'physical' ? options.physical : undefined
@@ -128,7 +130,11 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
   let previousSample: AlignmentSample | undefined
   let diagnostics: AlignmentDiagnosticRun | undefined
   let finishRequested = false
-  const images = new Map<string, Buffer>()
+  /** Display images of recent exposures, prepared beside the correction path. */
+  const images = new Map<string, RetainedImage>()
+  const preparing = new Set<Promise<unknown>>()
+  let frameSequence = 0
+  let previewSequence = 0
 
   function patch(next: Partial<AlignmentView>) {
     view = { ...view, ...next }
@@ -230,6 +236,8 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
         }
       })
       .finally(async () => {
+        // Display preparation stops with the run; wait so none outlives it.
+        await Promise.allSettled(preparing)
         await diagnostics?.finish({
           phase:
             view.phase === 'failed'
@@ -263,12 +271,15 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
     return view
   }
 
-  async function acquireFrame(signal: AbortSignal) {
-    return retryObservation(
+  /** `afterSettling`: the adjustment window just ended, so that wait is also the settling allowance. */
+  async function acquireFrame(signal: AbortSignal, afterSettling: boolean) {
+    let exposureRequestedAt: number | undefined
+
+    const acquired = await retryObservation(
       async () => {
         // A safe pre-start retry still needs a fresh mount observation and solve hint.
         const actual = physical
-          ? await retryObservation(() => physical.pointing(signal), signal)
+          ? await retryObservation(() => physical.pointing(signal, { afterSettling }), signal)
           : undefined
 
         const pointing = actual
@@ -298,6 +309,9 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
               ...(physical
                 ? { expectedCameraName: physical.cameraName }
                 : { monochromeOnly: true }),
+              onExposureRequested() {
+                exposureRequestedAt = performance.now()
+              },
               onReadState(state) {
                 if (!capturePending || signal.aborted) return
                 patch(
@@ -321,147 +335,284 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
       signal,
       error => error instanceof AlpacaCaptureRetryableError,
     )
+
+    return { ...acquired, timing: frameTiming(exposureRequestedAt) }
   }
 
-  async function acquire(solver: Solver, signal: AbortSignal) {
-    const { frame, actual, pointing, pointingObservedAt } = await acquireFrame(signal)
-    signal.throwIfAborted()
+  /** Monotonic milestones of one exposure, persisted as compact trace records. */
+  function frameTiming(exposureRequestedAt = performance.now()) {
+    const pixelsMs = performance.now() - exposureRequestedAt
+    let solvedMs: number | undefined
 
-    const afterCapture = physical
-      ? await retryObservation(() => physical.validate(signal, frame), signal)
-      : undefined
+    const record = (name: string, attributes: Attributes) =>
+      tracer
+        .startSpan(name, {
+          attributes: {
+            'alignment.run.id': runId,
+            'rig.id': view.rigId,
+            'alignment.timing.pixels_ms': pixelsMs,
+            ...attributes,
+          },
+        })
+        .end()
 
-    patch({ activity: 'solving', exposureStartedAt: null })
-    const imageId = randomUUID()
+    return {
+      solved() {
+        solvedMs = performance.now() - exposureRequestedAt
+      },
+      published(outcome: 'baseline' | 'measurement' | 'no-solution', attributes: Attributes) {
+        record('alignment.frame', {
+          'alignment.frame.outcome': outcome,
+          'alignment.timing.solved_ms': solvedMs,
+          'alignment.timing.published_ms': performance.now() - exposureRequestedAt,
+          ...attributes,
+        })
+      },
+      displayed(attributes: Attributes) {
+        record('alignment.frame.display', {
+          'alignment.timing.display_ms': performance.now() - exposureRequestedAt,
+          ...attributes,
+        })
+      },
+    }
+  }
 
-    const previewBytes = await step('alignment.preview', () =>
-      renderPreview(frame.width, frame.height, frame.pixels, frame.color),
+  /**
+   * Prepare this exposure's display images without delaying its correction. The
+   * work belongs to the frame: it stops with the run or a failed frame, and Stop
+   * waits for it. Image requests wait for it; nothing else depends on it.
+   */
+  function prepareFrameDisplay(
+    frameId: string,
+    frame: AlpacaFrame,
+    signal: AbortSignal,
+    timing: ReturnType<typeof frameTiming>,
+  ) {
+    const display = step('alignment.preview', () => prepareDisplay(frame, signal)).then(
+      prepared => {
+        timing.displayed({ 'alignment.frame.id': frameId, 'alignment.image.fit_bytes': prepared.fit.length })
+
+        return prepared
+      },
     )
 
-    signal.throwIfAborted()
+    const settled = display.then(
+      () => undefined,
+      () => undefined,
+    )
 
-    if (physical) await retryObservation(() => physical.validate(signal), signal)
-    images.set(imageId, previewBytes)
+    preparing.add(settled)
+    void settled.then(() => preparing.delete(settled))
+    images.set(frameId, { display })
 
     // Keep the last solved image available even through many unsuccessful frames.
-    const measuredImageId = view.measurement?.imageUrl.split('/').at(-1)
+    const measuredFrameId = view.measurement?.frameId
 
     for (const id of images.keys()) {
       if (images.size <= 4) break
 
-      if (id !== measuredImageId) images.delete(id)
+      if (id !== measuredFrameId) images.delete(id)
     }
 
-    const preview: NonNullable<AlignmentView['preview']> = {
-      imageUrl: `/api/rigs/${encodeURIComponent(view.rigId)}/alignment/images/${imageId}`,
-      imageWidth: frame.width,
-      imageHeight: frame.height,
-      capturedAt: frame.capturedAt,
-      position: view.position,
-    }
+    return display
+  }
 
-    if (frame.capturedAtSource) preview.capturedAtSource = frame.capturedAtSource
-    patch({ preview })
+  /** Publish a validated exposure's preview once its display is ready, unless a newer one is shown. */
+  function showPreviewWhenReady(
+    frameId: string,
+    sequence: number,
+    frame: AlpacaFrame,
+    display: Promise<AlignmentDisplay>,
+    signal: AbortSignal,
+  ) {
+    void display.then(
+      () => {
+        if (signal.aborted || sequence <= previewSequence || !images.has(frameId)) return
+        previewSequence = sequence
 
-    const solved = await step(
-      'alignment.solve',
-      async () => {
-        const result = await solver.solve(
-          frame,
-          actual?.hint ?? {
-            raDegrees: pointing!.rightAscensionDegrees,
-            decDegrees: pointing!.declinationDegrees,
-          },
-          signal,
-        )
-
-        trace.getActiveSpan()?.setAttribute('alignment.solve.outcome', result.status)
-
-        return result
-      },
-      { 'alignment.position': view.position },
-    )
-
-    signal.throwIfAborted()
-
-    if (solved.status === 'no-solution') {
-      patch({ warning: 'Plate-solving failed. Trying a new image.' })
-
-      return undefined
-    }
-
-    patch({ warning: null })
-
-    const sample: AlignmentSample = physical
-      ? physical.sample(solved, {
+        const preview: NonNullable<AlignmentView['preview']> = {
+          ...exposureImage(frameId, frame),
           capturedAt: frame.capturedAt,
-          exposureSeconds: settings.exposureSeconds,
-        })
-      : {
-          raDegrees: solved.raDegrees,
-          decDegrees: solved.decDegrees,
-          capturedAt: frame.capturedAt,
-          siderealTimeDegrees:
-            (pointing!.siderealTimeDegrees +
-              (((Date.parse(frame.capturedAt) - pointingObservedAt) / 1000) * 360) / 86164.0905 +
-              360) %
-            360,
+          position: view.position,
         }
 
-    const evidence: AlignmentFrameEvidence = {
-      phase: view.phase === 'baseline' ? 'baseline' : 'adjusting',
-      position: view.position,
-      solution: solved,
-      sample,
-      hint: actual?.hint ?? {
-        raDegrees: pointing!.rightAscensionDegrees,
-        decDegrees: pointing!.declinationDegrees,
+        if (frame.capturedAtSource) preview.capturedAtSource = frame.capturedAtSource
+        patch({ preview })
       },
-      fieldHeightDegrees,
-    }
+      () => undefined,
+    )
+  }
 
-    if (actual && afterCapture) {
-      evidence.physical = {
-        site: actual.observation.site,
-        camera: actual.observation.camera,
-        before: actual.observation.mount,
-        after: afterCapture,
-      }
-    }
-
-    if (pointing) evidence.offlinePointing = pointing
-    await diagnostics?.recordFrame(frame, evidence)
-    signal.throwIfAborted()
-
-    if (previousSample) {
-      const elapsed = (Date.parse(sample.capturedAt) - Date.parse(previousSample.capturedAt)) / 1000
-      const expected = (elapsed * 360) / 86164.0905
-
-      const observed =
-        ((sample.siderealTimeDegrees - previousSample.siderealTimeDegrees + 540) % 360) - 180
-
-      if (elapsed <= 0 || Math.abs(observed - expected) > 0.01)
-        throw new Error('The rig clock or simulator baseline changed. Stop and measure again.')
-    }
-
-    previousSample = sample
+  function exposureImage(
+    frameId: string,
+    frame: { width: number; height: number },
+  ): AlignmentExposureImage {
+    const imageUrl = `/api/rigs/${encodeURIComponent(view.rigId)}/alignment/images/${frameId}`
 
     return {
-      frame,
-      preview,
-      solved,
-      sample,
-      latitude: actual?.latitude ?? pointing!.latitudeDegrees,
+      frameId,
+      imageUrl,
+      imageWidth: frame.width,
+      imageHeight: frame.height,
+      fitImageUrl: `${imageUrl}/fit`,
+      fitImageScale: fitFactor(frame.width, frame.height),
     }
   }
 
-  async function solvedFrame(solver: Solver, signal: AbortSignal) {
+  async function acquire(solver: Solver, signal: AbortSignal, afterSettling: boolean) {
+    const { frame, actual, pointing, pointingObservedAt, timing } = await acquireFrame(
+      signal,
+      afterSettling,
+    )
+
+    signal.throwIfAborted()
+    patch({ activity: 'solving', exposureStartedAt: null })
+    const frameId = randomUUID()
+    const sequence = ++frameSequence
+    const frameWork = followAbort(signal)
+    const display = prepareFrameDisplay(frameId, frame, frameWork.signal, timing)
+    void display.then(frameWork.release, frameWork.release)
+
+    try {
+      const hint: SkyPosition = actual?.hint ?? {
+        raDegrees: pointing!.rightAscensionDegrees,
+        decDegrees: pointing!.declinationDegrees,
+      }
+
+      // The correction path: capture validation beside the solve, then one final check.
+      // Display preparation runs separately and never delays a correction.
+      const [afterCapture, solved] = await together(signal, workSignal => [
+        (physical
+          ? retryObservation(() => physical.validate(workSignal, frame), workSignal)
+          : Promise.resolve(undefined)
+        ).then(validated => {
+          // A validated capture's preview may appear before its solve completes.
+          showPreviewWhenReady(frameId, sequence, frame, display, frameWork.signal)
+
+          return validated
+        }),
+        step(
+          'alignment.solve',
+          async () => {
+            const result = await solver.solve(frame, hint, workSignal)
+
+            trace.getActiveSpan()?.setAttribute('alignment.solve.outcome', result.status)
+            timing.solved()
+
+            return result
+          },
+          { 'alignment.position': view.position },
+        ),
+      ])
+
+      signal.throwIfAborted()
+
+      const frameRecord = {
+        'alignment.position': view.position,
+        'alignment.frame.id': frameId,
+        'alignment.capture.timestamp_source': frame.capturedAtSource ?? 'camera',
+      }
+
+      if (solved.status === 'no-solution') {
+        patch({ warning: 'Plate-solving failed. Trying a new image.' })
+        timing.published('no-solution', frameRecord)
+
+        return undefined
+      }
+
+      const solvedAt = new Date(now()).toISOString()
+
+      const sample: AlignmentSample = physical
+        ? physical.sample(solved, {
+            capturedAt: frame.capturedAt,
+            exposureSeconds: settings.exposureSeconds,
+          })
+        : {
+            raDegrees: solved.raDegrees,
+            decDegrees: solved.decDegrees,
+            capturedAt: frame.capturedAt,
+            siderealTimeDegrees:
+              (pointing!.siderealTimeDegrees +
+                (((Date.parse(frame.capturedAt) - pointingObservedAt) / 1000) * 360) /
+                  86164.0905 +
+                360) %
+              360,
+          }
+
+      const evidence: AlignmentFrameEvidence = {
+        phase: view.phase === 'baseline' ? 'baseline' : 'adjusting',
+        position: view.position,
+        solution: solved,
+        sample,
+        hint,
+        fieldHeightDegrees,
+      }
+
+      if (actual && afterCapture) {
+        evidence.physical = {
+          site: actual.observation.site,
+          camera: actual.observation.camera,
+          before: actual.observation.mount,
+          after: afterCapture,
+        }
+      }
+
+      if (pointing) evidence.offlinePointing = pointing
+      await diagnostics?.recordFrame(frame, evidence)
+      signal.throwIfAborted()
+
+      // One observation after all processing gates any correction from this exposure.
+      const mount = physical
+        ? await retryObservation(() => physical.validate(signal), signal)
+        : undefined
+
+      patch({ warning: null })
+
+      if (view.phase === 'baseline') timing.published('baseline', frameRecord)
+
+      if (previousSample) {
+        const elapsed =
+          (Date.parse(sample.capturedAt) - Date.parse(previousSample.capturedAt)) / 1000
+
+        const expected = (elapsed * 360) / 86164.0905
+
+        const observed =
+          ((sample.siderealTimeDegrees - previousSample.siderealTimeDegrees + 540) % 360) - 180
+
+        if (elapsed <= 0 || Math.abs(observed - expected) > 0.01)
+          throw new Error('The rig clock or simulator baseline changed. Stop and measure again.')
+      }
+
+      previousSample = sample
+
+      return {
+        frame,
+        frameId,
+        display,
+        solved,
+        solvedAt,
+        sample,
+        mount,
+        timing,
+        frameRecord,
+        latitude: actual?.latitude ?? pointing!.latitudeDegrees,
+      }
+    } catch (error) {
+      // A failed exposure takes its display work with it.
+      frameWork.abort()
+
+      throw error
+    }
+  }
+
+  async function solvedFrame(solver: Solver, signal: AbortSignal, afterSettling: boolean) {
     while (true) {
-      const result = await acquire(solver, signal)
+      const result = await acquire(solver, signal, afterSettling)
 
       if (result) return result
       patch({ activity: 'waiting' })
       await waitForNextExposure(signal)
+      afterSettling = true
     }
   }
 
@@ -504,7 +655,7 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
       }
     }
 
-    const first = await solvedFrame(solver, signal)
+    const first = await solvedFrame(solver, signal, false)
     const samples: AlignmentSample[] = [first.sample]
     let current = first
 
@@ -516,7 +667,7 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
           'alignment.position': position,
         })
       else await hardware.move(settings.telescopeId, 1.5, 12, signal)
-      current = await solvedFrame(solver, signal)
+      current = await solvedFrame(solver, signal, false)
       samples.push(current.sample)
     }
 
@@ -531,11 +682,8 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
       const measured = measureAlignment(baseline, current.sample, true)
       signal.throwIfAborted()
 
-      const measuredMount = physical
-        ? await retryObservation(() => physical.validate(signal), signal)
-        : undefined
-
-      await diagnostics?.recordMeasurement(current.sample, measured, measuredMount)
+      // The frame's final observation already gated this correction; no new read is needed.
+      await diagnostics?.recordMeasurement(current.sample, measured, current.mount)
       signal.throwIfAborted()
 
       const target = physical
@@ -544,24 +692,41 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
 
       if (!target) throw new Error('Alignment target is outside the solvable camera projection')
 
+      const { frame, frameId, display } = current
+
+      const region = detailRegion(frame, {
+        reference: { x: (frame.width - 1) / 2, y: (frame.height - 1) / 2 },
+        target,
+        arcsecPerPixel: (fieldHeightDegrees * 3600) / frame.height,
+      })
+
       const measurement: NonNullable<AlignmentView['measurement']> = {
         altitudeArcsec: measured.altitudeArcsec,
         azimuthArcsec: measured.azimuthArcsec,
         totalArcsec: measured.totalArcsec,
-        imageUrl: current.preview.imageUrl,
-        imageWidth: current.frame.width,
-        imageHeight: current.frame.height,
+        ...exposureImage(frameId, frame),
+        solvedAt: current.solvedAt,
         targetX: target.x,
         targetY: target.y,
         fieldHeightDegrees,
       }
 
-      if (current.frame.capturedAtSource)
-        measurement.capturedAtSource = current.frame.capturedAtSource
-      patch({ measuredAt: current.frame.capturedAt, activity: 'waiting', measurement })
-      // A calm adjustment window between exposures; never infer solver progress from elapsed time.
+      const retained = images.get(frameId)
+
+      if (region && retained) {
+        retained.detail = display.then(prepared => prepared.detail(region))
+        void retained.detail.catch(() => undefined)
+        measurement.detail = { imageUrl: `${measurement.imageUrl}/detail`, ...region }
+      }
+
+      if (frame.capturedAtSource) measurement.capturedAtSource = frame.capturedAtSource
+      patch({ measuredAt: frame.capturedAt, activity: 'waiting', measurement })
+      current.timing.published('measurement', current.frameRecord)
+
+      // A calm adjustment window between exposures; never infer solver progress from
+      // elapsed time. It is also the settling allowance before the next exposure.
       await waitForNextExposure(signal)
-      current = await solvedFrame(solver, signal)
+      current = await solvedFrame(solver, signal, true)
     }
   }
 
@@ -569,7 +734,79 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
     start,
     stop,
     snapshot: () => view,
-    image: (id: string) => images.get(id),
+    /** Waits for an exposure's display preparation; undefined if it is gone or failed. */
+    image: async (id: string, kind: 'native' | 'fit' | 'detail') => {
+      const retained = images.get(id)
+
+      try {
+        if (!retained) return undefined
+
+        if (kind === 'detail') return await retained.detail
+
+        const display = await retained.display
+
+        return kind === 'fit' ? display.fit : await display.native()
+      } catch {
+        return undefined
+      }
+    },
     active: () => !!running,
+  }
+}
+
+/**
+ * Start independent work on one exposure. The first failure cancels the rest, and
+ * nothing started here is still running when this settles.
+ */
+async function together<A, B>(
+  signal: AbortSignal,
+  start: (signal: AbortSignal) => [Promise<A>, Promise<B>],
+): Promise<[A, B]> {
+  const frame = new AbortController()
+  const cancel = () => frame.abort(new DOMException('Exposure work cancelled', 'AbortError'))
+  const failures: Error[] = []
+
+  signal.addEventListener('abort', cancel, { once: true })
+
+  try {
+    if (signal.aborted) cancel()
+    const work = start(frame.signal)
+
+    for (const task of work) {
+      task.catch(error => {
+        failures.push(error)
+        cancel()
+      })
+    }
+
+    await Promise.allSettled(work)
+
+    if (signal.aborted) throw signal.reason
+
+    if (failures.length > 0) throw failures[0]
+
+    return await Promise.all(work)
+  } finally {
+    signal.removeEventListener('abort', cancel)
+  }
+}
+
+interface RetainedImage {
+  display: Promise<AlignmentDisplay>
+  detail?: Promise<Buffer>
+}
+
+/** A child cancellation for one exposure's work; release detaches it from the run. */
+function followAbort(signal: AbortSignal) {
+  const child = new AbortController()
+  const abort = () => child.abort(new DOMException('Exposure work cancelled', 'AbortError'))
+
+  if (signal.aborted) abort()
+  else signal.addEventListener('abort', abort, { once: true })
+
+  return {
+    signal: child.signal,
+    abort,
+    release: () => signal.removeEventListener('abort', abort),
   }
 }
