@@ -16,8 +16,12 @@ export interface Frame {
   color: FrameColor
 }
 
+/** Why an exposure was taken; recorded with its preserved original. */
+export type AcquisitionPurpose = 'capture' | 'autofocus' | 'framing' | 'alignment'
+
 export interface CaptureOptions {
   cameraId: string
+  purpose?: AcquisitionPurpose
   /** Confirm the operational camera name when a driver slot can host different hardware. */
   expectedCameraName?: string
   exposureSeconds: number

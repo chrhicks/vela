@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { setTimeout as delay } from 'node:timers/promises'
 import { EquipmentError, type Frame } from '@vela/equipment'
 import { imageBytesPixels } from '@vela/equipment/image-bytes'
@@ -14,14 +14,18 @@ import {
 import { CriaHttp } from './http.js'
 import { CriaEvents, type ObservedState } from './events.js'
 import {
+  CriaArchiveReceiptSchema,
   CriaClientConfigSchema,
   CriaCommandSchema,
+  CriaCustodyPageSchema,
+  CriaCustodySchema,
   CriaImageSchema,
   CriaOperationSchema,
   CriaRefreshSchema,
-  CriaReleaseSchema,
   CriaStateSchema,
+  type CriaArchiveReceipt,
   type CriaClientConfig,
+  type CriaCustody,
   type CriaCommand,
   type CriaDevice,
   type CriaDeviceBinding,
@@ -61,6 +65,11 @@ export interface CriaRunOptions {
   signal?: AbortSignal
   onProgress?: (operation: CriaOperation) => void
   onReadState?: (state: 'current' | 'retrying') => void
+  /**
+   * Awaited after the exact request is built and before it is sent. A failure here means the
+   * request was never sent, so the caller can record what it intends before Cria can act on it.
+   */
+  beforeAdmission?: (request: CriaOperationRequest) => Promise<void>
 }
 
 export interface CriaObserveOptions {
@@ -122,7 +131,6 @@ export class CriaClient {
   private readonly readBarriers = new Map<string, number>()
   private readonly active = new Map<string, ActiveOperation>()
   private readonly completions = new Map<string, Promise<CriaOperation>>()
-  private readonly images = new Map<string, CriaImage>()
   private writeFailure: EquipmentError | null = null
   private events: CriaEvents | null = null
   private closed = false
@@ -613,7 +621,10 @@ export class CriaClient {
     if (this.writeFailure) throw this.writeFailure
     const { device, snapshot } = observed
 
-    if (!snapshot.state.commandsEnabled) throw new CriaApiError(403, 'commands-disabled', 'Cria equipment writes are disabled', '/v2/operations')
+    if (!snapshot.state.commandsEnabled) {
+      throw new CriaApiError(403, 'commands-disabled',
+        snapshot.state.admissionStoppedReason ?? 'Cria equipment writes are disabled', '/v2/operations')
+    }
 
     for (const other of this.active.values())
       if (other !== active && other.failureDomain === device.failureDomain)
@@ -633,6 +644,14 @@ export class CriaClient {
       ...command,
     }
 
+    await options.beforeAdmission?.(request)
+
+    // The hook can take time (Vela writes intent durably); Stop or a write block may arrive meanwhile.
+    options.signal?.throwIfAborted()
+
+    if (active.cancelRequested) throw new CriaCancelledError(null, '/v2/operations')
+
+    if (this.writeFailure) throw this.writeFailure
     active.request = request
     active.operation = await this.admit(request, active)
     this.requirePostWriteObservation(snapshot, active.operation)
@@ -729,10 +748,38 @@ export class CriaClient {
     }
   }
 
+  /**
+   * The verified original of a completed capture, with its exact bytes for preservation.
+   * Cria keeps its copy until an archive receipt is accepted; nothing is released here.
+   */
   async download(
     operation: CriaOperation,
     options: Pick<CriaRunOptions, 'onReadState'> = {},
-  ): Promise<{ image: CriaImage; frame: Frame }> {
+  ): Promise<{ image: CriaImage; frame: Frame; original: Uint8Array }> {
+    const image = this.confirmedImage(operation)
+    const bytes = await this.transferOriginal(image, options)
+    const frame = this.frameOf(image, bytes)
+
+    options.onReadState?.('current')
+
+    return { image, original: new Uint8Array(bytes), frame }
+  }
+
+  /**
+   * Decode an original of a confirmed capture that was already verified elsewhere, such as the
+   * same bytes in Vela's archive after Cria released its copy. The digest must still match.
+   */
+  decodeOriginal(operation: CriaOperation, original: Uint8Array): Frame {
+    const image = this.confirmedImage(operation)
+
+    if (original.byteLength !== image.original.bytes ||
+      createHash('sha256').update(original).digest('hex') !== image.sha256)
+      throw this.invalid('Archived original does not match the confirmed capture', image.original.url)
+
+    return this.frameOf(image, Uint8Array.from(original).buffer)
+  }
+
+  private confirmedImage(operation: CriaOperation): CriaImage {
     const validated = CriaOperationSchema.parse(operation)
 
     this.verifyOperation(validated)
@@ -745,41 +792,13 @@ export class CriaClient {
     if (image.operationId !== validated.id || image.instanceId !== validated.instanceId ||
       image.bindingId !== validated.bindingId || image.deviceId !== validated.deviceId ||
       image.cameraName !== validated.expectedName || image.id !== validated.reservedImageId ||
-      image.exposureSeconds !== validated.parameters.exposureSeconds ||
-      image.width * image.height > this.timing.maxPixels ||
-      image.original.bytes > 44 + 4 * this.timing.maxPixels)
+      image.exposureSeconds !== validated.parameters.exposureSeconds)
       throw this.invalid('Cria original does not belong to the completed capture', '/v2/images')
 
-    // Completed originals survive API incarnations and stream loss, but never belong to
-    // a replacement store. Reconcile that ownership over HTTP if the stream is unavailable.
-    const transferDeadline = performance.now() + this.timing.imageRetryMs
-    const snapshot = await this.originalState(transferDeadline, options)
+    return image
+  }
 
-    const retainedFor = image.expiresAt - snapshot.state.generatedAt - snapshot.roundTripMs -
-      Math.max(0, performance.now() - snapshot.receivedMonotonic)
-
-    if (retainedFor <= 0)
-      throw new CriaApiError(410, 'image-gone', 'Cria original retention has expired', image.original.url)
-
-    const retryDeadline = Math.min(transferDeadline, performance.now() + retainedFor)
-    let bytes: ArrayBuffer
-
-    for (;;) {
-      try {
-        bytes = await this.http.original(
-          image.original.url, image.original.bytes, image.sha256, this.timing.imageTimeoutMs,
-        )
-        break
-      } catch (error) {
-        const transient = error instanceof EquipmentError && error.reason === 'transport' ||
-          error instanceof CriaApiError && [429, 500, 502, 503, 504].includes(error.status)
-
-        if (!transient || performance.now() + this.timing.pollIntervalMs >= retryDeadline) throw error
-        options.onReadState?.('retrying')
-        await delay(this.timing.pollIntervalMs)
-      }
-    }
-
+  private frameOf(image: CriaImage, bytes: ArrayBuffer): Frame {
     let pixels: Float64Array
 
     try {
@@ -790,19 +809,102 @@ export class CriaClient {
       })
     }
 
-    this.images.set(image.id, image)
-    options.onReadState?.('current')
-
     return {
-      image,
-      frame: {
-        width: image.width,
-        height: image.height,
-        pixels,
-        capturedAt: new Date(image.capturedAt).toISOString(),
-        capturedAtSource: image.capturedAtSource,
-        color: image.color === 'mono' ? { kind: 'mono' } : { kind: 'bayer', pattern: image.color },
-      },
+      width: image.width,
+      height: image.height,
+      pixels,
+      capturedAt: new Date(image.capturedAt).toISOString(),
+      capturedAtSource: image.capturedAtSource,
+      color: image.color === 'mono' ? { kind: 'mono' } : { kind: 'bayer', pattern: image.color },
+    }
+  }
+
+  /** Cria's custody record for an image, readable whatever its operation outcome. */
+  async custody(imageId: string): Promise<CriaCustody> {
+    const record = await this.http.json(`/v2/images/${imageId}`, CriaCustodySchema)
+
+    if (record.id !== imageId || record.storeId !== this.config.storeId)
+      throw this.invalid('Cria custody belongs to another image or store', '/v2/images')
+
+    return record
+  }
+
+  /** One page of verified originals still awaiting archive, in admission order. */
+  async retainedOriginals(after = 0): Promise<{ images: CriaCustody[]; next: number }> {
+    const page = await this.http.json(`/v2/images?state=retained&after=${after}&limit=50`, CriaCustodyPageSchema)
+
+    if (page.storeId !== this.config.storeId ||
+      page.images.some(record => record.state !== 'retained' || record.storeId !== page.storeId))
+      throw this.invalid('Cria returned originals from another store or state', '/v2/images')
+
+    return { images: page.images, next: page.next }
+  }
+
+  /**
+   * The same verified bytes for an existing result. This never starts, retries or rearms
+   * equipment, and works while the operation that produced it remains uncertain.
+   */
+  async originalOf(
+    record: CriaCustody,
+    options: Pick<CriaRunOptions, 'onReadState'> = {},
+  ): Promise<Uint8Array> {
+    const image = record.image
+
+    if (!['retained', 'archived'].includes(record.state) || !image)
+      throw this.invalid('Cria has no verified local original for this image', '/v2/images')
+
+    if (record.storeId !== this.config.storeId || image.id !== record.id ||
+      image.operationId !== record.operationId || image.bindingId !== record.bindingId ||
+      image.deviceId !== record.deviceId)
+      throw this.invalid('Cria custody identities do not match its original', '/v2/images')
+
+    return new Uint8Array(await this.transferOriginal(image, options))
+  }
+
+  /** Send a receipt Vela recorded after verifying its archive; retrying the same receipt is safe. */
+  async acknowledgeArchive(receipt: CriaArchiveReceipt): Promise<CriaCustody> {
+    const validated = CriaArchiveReceiptSchema.parse(receipt)
+
+    if (validated.storeId !== this.config.storeId)
+      throw this.invalid('Archive receipt names another Cria store', '/v2/images')
+
+    const path = `/v2/images/${validated.imageId}/archive-receipt`
+    const record = await this.http.json(path, CriaCustodySchema, 'POST', JSON.stringify(validated))
+
+    if (record.id !== validated.imageId || record.receipt?.receiptId !== validated.receiptId ||
+      !['archived', 'released'].includes(record.state))
+      throw this.invalid('Cria did not record this archive receipt', path)
+
+    return record
+  }
+
+  private async transferOriginal(
+    image: CriaImage,
+    options: Pick<CriaRunOptions, 'onReadState'>,
+  ): Promise<ArrayBuffer> {
+    if (image.width * image.height > this.timing.maxPixels ||
+      image.original.bytes > 44 + 4 * this.timing.maxPixels)
+      throw this.invalid('Cria original exceeds this client\'s pixel bound', '/v2/images')
+
+    // Originals survive API incarnations and stream loss, but never belong to a
+    // replacement store. Reconcile that ownership over HTTP if the stream is unavailable.
+    const retryDeadline = performance.now() + this.timing.imageRetryMs
+
+    await this.originalState(retryDeadline, options)
+
+    for (;;) {
+      try {
+        return await this.http.original(
+          image.original.url, image.original.bytes, image.sha256, this.timing.imageTimeoutMs,
+        )
+      } catch (error) {
+        const transient = error instanceof EquipmentError && error.reason === 'transport' ||
+          error instanceof CriaApiError && [429, 500, 502, 503, 504].includes(error.status)
+
+        if (!transient || performance.now() + this.timing.pollIntervalMs >= retryDeadline) throw error
+        options.onReadState?.('retrying')
+        await delay(this.timing.pollIntervalMs)
+      }
     }
   }
 
@@ -841,25 +943,5 @@ export class CriaClient {
         await delay(this.timing.pollIntervalMs)
       }
     }
-  }
-
-  /** Release only an original whose verified pixels were handed to this client. */
-  async release(imageId: string): Promise<void> {
-    if (!this.images.has(imageId)) throw this.invalid('Cria original has not been acquired by this client', '/v2/images')
-
-    // Pixels already belong to Vela. Cria retention handles a failed best-effort release;
-    // keep no growing collection of cleanup failures across a long capture run.
-    this.images.delete(imageId)
-    await this.state()
-
-    try {
-      const result = await this.http.json(`/v2/images/${imageId}`, CriaReleaseSchema, 'DELETE')
-
-      if (result.id !== imageId) throw this.invalid('Cria released another image', '/v2/images')
-    } catch (error) {
-      // Expired or forgotten temporary originals already own no releasable storage.
-      if (!(error instanceof CriaApiError && [404, 410].includes(error.status))) throw error
-    }
-
   }
 }

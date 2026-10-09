@@ -1,11 +1,15 @@
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { mkdtemp, readFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { z } from 'zod'
 import { CriaClient, CriaStateSchema } from '@vela/cria'
 import { CaptureStoppedError } from '@vela/equipment'
 import type { CaptureView, RigDetailView } from '@vela/model/web'
 import { createCriaEquipment } from '../src/cria/equipment.js'
+import { createCriaCustody } from '../src/cria/custody.js'
+import { openAcquisitionArchive } from '../src/acquisitions/archive.js'
 import { createEquipmentComposition } from '../src/equipment/composition.js'
 import { parseCriaConfiguration, registerConfiguredCriaRigs } from '../src/equipment/config.js'
 import { createMemoryRigCatalog } from '../src/rig/catalog.js'
@@ -46,7 +50,9 @@ const client = new CriaClient({
 
 const bindings = connection.devices.map(device => ({ ...device, providerDeviceId: `fixture:${device.id}` }))
 
-const equipment = createCriaEquipment(client, bindings)
+const acquisitions = await openAcquisitionArchive(await mkdtemp(join(tmpdir(), 'vela-cria-fixture-acquisitions-')))
+
+const equipment = createCriaEquipment(client, bindings, createCriaCustody(client, acquisitions, state.storeId), 'fixture-check')
 
 assert.equal((await equipment.provider.inspectDevices()).length, 5)
 
@@ -62,7 +68,11 @@ assert.equal(frame.pixels[1]! - frame.pixels[0]!, 1)
 
 assert.equal(frame.pixels[frame.width]! - frame.pixels[0]!, frame.width)
 
-console.log('PASS verified original pixels, geometry and ownership transfer')
+const preserved = (await client.retainedOriginals()).images
+
+assert.equal(preserved.length, 0, 'Every captured original reached a verified archive receipt')
+
+console.log('PASS verified original pixels, geometry and archive custody')
 
 const initialCooling = await equipment.cooling.observe('fixture:camera')
 
@@ -150,7 +160,7 @@ const savedImages = createMemorySavedImageStore()
 
 const app = buildApp({
   rigCatalog: catalog, savedImages,
-  equipment: createEquipmentComposition(configurations),
+  equipment: createEquipmentComposition(configurations, { acquisitions }),
 })
 
 try {

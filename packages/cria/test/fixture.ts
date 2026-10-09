@@ -2,10 +2,12 @@ import { createHash, randomUUID } from 'node:crypto'
 import { setImmediate } from 'node:timers/promises'
 import { z } from 'zod'
 import {
+  CriaArchiveReceiptSchema,
   CriaClient,
   CriaCommandSchema,
   CriaOperationRequestSchema,
   type CriaClientOptions,
+  type CriaCustody,
   type CriaDevice,
   type CriaImage,
   type CriaOperation,
@@ -95,12 +97,13 @@ export class ServiceFixture {
   readonly camera = device('camera', 'camera')
   readonly mount = device('mount', 'mount')
   readonly state: CriaState = {
-    protocolVersion: 2,
+    protocolVersion: 3,
     storeId: randomUUID(),
     instanceId: randomUUID(),
     sequence: 1,
     generatedAt: serverNow,
     commandsEnabled: true,
+    admissionStoppedReason: null,
     devices: [this.camera, this.mount],
     operations: [],
   }
@@ -109,9 +112,13 @@ export class ServiceFixture {
   readonly posts: string[] = []
   readonly paths: string[] = []
   readonly deletes: string[] = []
+  readonly receipts: string[] = []
+  readonly custody = new Map<string, CriaCustody>()
   readonly cancellations: string[] = []
   original = pixels()
   completeImmediately = true
+  /** Model Cria's release of its local copy once a receipt is accepted. */
+  releaseOnReceipt = false
   cancelImmediately = false
   publishOperations = true
   last: CriaOperation | null = null
@@ -166,8 +173,10 @@ export class ServiceFixture {
     operation.settled = status !== 'uncertain'
     operation.blocksDevice = !operation.settled
 
-    if (operation.kind === 'capture' && status === 'succeeded')
+    if (operation.kind === 'capture' && status === 'succeeded') {
       operation.image = this.image(operation)
+      this.retain(operation, operation.image)
+    }
 
     // Represent the fresh post-write observation. Production additionally publishes
     // its invalidated generation while the domain's write lane is still held.
@@ -184,7 +193,43 @@ export class ServiceFixture {
     return operation
   }
 
-  private image(operation: CriaOperation): CriaImage {
+  /** Cria custody for a verified original, as after adoption by result or later discovery. */
+  retain(operation: CriaOperation, image = this.image(operation)): CriaCustody {
+    const record: CriaCustody = {
+      id: image.id,
+      storeId: this.state.storeId,
+      operationId: operation.id,
+      requestId: operation.requestId,
+      instanceId: operation.instanceId,
+      deviceId: operation.deviceId,
+      bindingId: operation.bindingId,
+      cameraName: operation.expectedName,
+      state: 'retained',
+      reservedAt: serverNow,
+      updatedAt: serverNow,
+      reason: null,
+      context: {
+        version: 1,
+        requested: operation.parameters,
+        cameraObservations: { gain: reading(10) },
+        observationsNote: 'Latest Cria readings when the capture was admitted',
+      },
+      image,
+      discovery: 'operation-result',
+      candidate: null,
+      receipt: null,
+      receiptFingerprint: null,
+      receiptAcceptedAt: null,
+      releasedAt: null,
+      history: [],
+    }
+
+    this.custody.set(record.id, record)
+
+    return record
+  }
+
+  image(operation: CriaOperation): CriaImage {
     if (!operation.reservedImageId) throw new Error('Fixture capture lacks a reservation')
 
     return {
@@ -204,7 +249,6 @@ export class ServiceFixture {
       capturedAt: serverNow,
       capturedAtSource: 'camera',
       retainedAt: serverNow,
-      expiresAt: serverNow + 60_000,
       color: 'mono',
       sha256: createHash('sha256').update(new Uint8Array(this.original)).digest('hex'),
       original: {
@@ -310,25 +354,58 @@ export class ServiceFixture {
       return json(operation, method === 'POST' ? 202 : 200)
     }
 
-    if (path.startsWith('/v2/images/')) {
-      const image = this.last?.image
+    if (path === '/v2/images') {
+      // Cria pages by admission sequence: records after the cursor, in order, at most `limit`.
+      const query = new URL(input instanceof Request ? input.url : String(input)).searchParams
+      const after = Number(query.get('after') ?? 0)
+      const limit = Number(query.get('limit') ?? 100)
 
-      if (!image || path.split('/')[3] !== image.id) return failure(404, 'not-found')
+      const page = [...this.custody.values()]
+        .flatMap((record, index) => index + 1 > after && record.state === 'retained' ? [{ record, sequence: index + 1 }] : [])
+        .slice(0, limit)
+
+      return json({ storeId: this.state.storeId, images: page.map(({ record }) => record), next: page.at(-1)?.sequence ?? after })
+    }
+
+    if (path.startsWith('/v2/images/')) {
+      const record = this.custody.get(path.split('/')[3] ?? '')
+
+      if (!record?.image) return failure(404, 'not-found')
 
       if (method === 'DELETE') {
-        this.deletes.push(image.id)
+        this.deletes.push(record.id)
 
-        return json({ id: image.id, released: true })
+        return failure(409, 'archive-receipt-required')
       }
+
+      if (path.endsWith('/archive-receipt')) {
+        const receipt = CriaArchiveReceiptSchema.parse(JSON.parse(z.string().parse(init?.body)))
+
+        this.receipts.push(receipt.receiptId)
+
+        if (record.receipt)
+          return record.receipt.receiptId === receipt.receiptId ? json(record) : failure(409, 'receipt-conflict')
+
+        if (receipt.sha256 !== record.image.sha256 || receipt.storeId !== record.storeId)
+          return failure(409, 'receipt-conflict')
+        Object.assign(record, { state: this.releaseOnReceipt ? 'released' : 'archived', receipt, receiptAcceptedAt: serverNow })
+
+        return json(record)
+      }
+
+      if (path.endsWith('/original') && !['retained', 'archived'].includes(record.state))
+        return failure(410, 'image-gone')
 
       if (path.endsWith('/original'))
         return new Response(this.original, {
           headers: {
             'content-type': 'application/imagebytes',
             'content-length': String(this.original.byteLength),
-            etag: `"${image.sha256}"`,
+            etag: `"${record.image.sha256}"`,
           },
         })
+
+      return json(record)
     }
 
     throw new Error(`Unexpected fixture request: ${method} ${path}`)

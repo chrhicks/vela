@@ -4,6 +4,8 @@ import { CriaClient } from '@vela/cria'
 import { FramingStoppedError } from '@vela/equipment'
 import { ServiceFixture, serviceOrigin, token } from '../../../packages/cria/test/fixture.js'
 import { createCriaEquipment } from '../src/cria/equipment.js'
+import { createCriaCustody } from '../src/cria/custody.js'
+import { createMemoryAcquisitionArchive } from '../src/acquisitions/archive.js'
 import { registerCapture } from '../src/capture/routes.js'
 import { createMemoryRigCatalog } from '../src/rig/catalog.js'
 import { createRigOperations } from '../src/rig/operations.js'
@@ -29,7 +31,7 @@ function equipment(service: ServiceFixture, fetch = service.fetch) {
 
   onTestFinished(() => client.close())
 
-  return createCriaEquipment(client, bindings)
+  return createCriaEquipment(client, bindings, createCriaCustody(client, createMemoryAcquisitionArchive(), service.state.storeId), 'rig-1')
 }
 
 describe('Cria cancellation through Vela workflows', () => {
