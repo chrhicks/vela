@@ -51,7 +51,7 @@ function view(overrides: Partial<CriaArchiveHealthView> = {}): CriaArchiveHealth
       quarantined: { count: 0, bytes: 0 },
       missing: { count: 0, complete: true },
     },
-    issues: { total: 0, shown: [] },
+    issues: { total: 0, needsAttention: 0, shown: [] },
     forecast: {
       frameBytes: null,
       rate: null,
@@ -134,6 +134,18 @@ describe('preservation wording', () => {
     )
   })
 
+  it('counts only originals that need attention in the title, not ones Vela retries', () => {
+    const issue = (imageId: string, reason: 'quarantined-at-cria' | 'source-unavailable') =>
+      ({ imageId, reason, detail: 'detail', observedAt: at, requestId: null, operationId: null, purpose: null })
+
+    const mixed = view({
+      status: 'attention',
+      issues: { total: 4, needsAttention: 1, shown: [issue('q', 'quarantined-at-cria'), issue('a', 'source-unavailable'), issue('b', 'source-unavailable'), issue('c', 'source-unavailable')] },
+    })
+
+    expect(preservationSummary(mixed, false).title).toBe('1 original needs attention')
+  })
+
   it('formats measured bytes plainly', () => {
     expect(formatBytes(512)).toBe('512 bytes')
     expect(formatBytes(104_368_428)).toBe('104 MB')
@@ -152,7 +164,7 @@ describe('archive health validation', () => {
     const rate = { framesPerHour: 20, frames: 4, since: at }
 
     expect(isArchiveHealthView(view({ forecast: { ...view().forecast, rate } }), 'fra400')).toBe(false)
-    expect(isArchiveHealthView(view({ issues: { total: 0, shown: [{ imageId: 'a', reason: 'missing-at-cria', detail: 'gone', observedAt: at, requestId: null, operationId: null, purpose: null }] } }), 'fra400')).toBe(false)
+    expect(isArchiveHealthView(view({ issues: { total: 0, needsAttention: 0, shown: [{ imageId: 'a', reason: 'missing-at-cria', detail: 'gone', observedAt: at, requestId: null, operationId: null, purpose: null }] } }), 'fra400')).toBe(false)
     expect(isArchiveHealthView({ ...view(), obligations: { ...view().obligations, preserved: { count: -1, bytes: 0 } } }, 'fra400')).toBe(false)
   })
 })

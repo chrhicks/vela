@@ -107,7 +107,7 @@ function summarize(view: CriaArchiveHealthView, capturing: boolean): Preservatio
     }
 
     case 'attention': {
-      const count = view.issues.total
+      const count = view.issues.needsAttention
 
       return {
         tone: 'problem',

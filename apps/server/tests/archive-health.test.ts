@@ -408,6 +408,27 @@ describe('archive health', () => {
     expect((await health.view()).forecast.rate).toMatchObject({ framesPerHour: 60, frames: 2 })
   })
 
+  it('does not merge an autofocus burst into the following capture rate', async () => {
+    const service = new ServiceFixture()
+    const { equipment, health, time } = await setup(service)
+
+    for (let frame = 0; frame < 9; frame++) {
+      await equipment.acquisition.capture(capture('autofocus'))
+      time.advance(3_000)
+    }
+
+    time.advance(60_000)
+    await equipment.acquisition.capture(capture())
+
+    for (let frame = 0; frame < 2; frame++) {
+      time.advance(300_000)
+      await equipment.acquisition.capture(capture())
+    }
+
+    time.advance(100_000)
+    expect((await health.view()).forecast.rate).toMatchObject({ framesPerHour: 12, frames: 3 })
+  })
+
   it('reports Cria read failures without inventing an archive problem', async () => {
     const service = new ServiceFixture()
 

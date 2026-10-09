@@ -168,8 +168,11 @@ export interface CriaArchiveHealthView {
   obligations: ArchiveObligationsView
   destination: ArchiveDestinationView
   source: ArchiveSourceView
-  /** Most recent first; `total` counts every open issue. */
-  issues: { total: number; shown: ArchiveIssue[] }
+  /**
+   * Most recent first. `total` counts every open issue; `needsAttention` only those Vela cannot
+   * resolve by retrying (mismatches, conflicts, unvouched copies, missing or quarantined at Cria).
+   */
+  issues: { total: number; needsAttention: number; shown: ArchiveIssue[] }
   forecast: ArchiveForecastView
   /** A requested reconciliation is running. */
   reconciling: boolean
