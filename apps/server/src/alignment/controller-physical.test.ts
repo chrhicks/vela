@@ -1,9 +1,16 @@
 import { afterEach, expect, it, vi } from 'vitest'
+import { trace, context } from '@opentelemetry/api'
+import {
+  InMemorySpanExporter,
+  NodeTracerProvider,
+  SimpleSpanProcessor,
+} from '@opentelemetry/sdk-trace-node'
 import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createTestCadence } from './test-cadence.js'
 import { fixture } from './physical-fixture.js'
+import { prepareAlignmentDisplay } from './display.js'
 import { previewPng } from '../imaging/preview.js'
 import {
   AlpacaProviderError,
@@ -26,9 +33,13 @@ const control: {
   waits: Array<() => void>
   wait: (signal: AbortSignal) => Promise<void>
   afterPreview?: (() => void) | undefined
+  beforeDisplay?: ((signal: AbortSignal) => Promise<void>) | undefined
 } = createTestCadence()
 
 const frames = [...fixture.cases[0]!.samples, fixture.cases[0]!.adjusted]
+
+const frameBytes = () =>
+  new Float64Array([900, 200, 900, 200, 200, 50, 200, 50, 900, 200, 900, 200, 200, 50, 200, 50])
 
 const settings = {
   mode: 'physical' as const,
@@ -47,6 +58,7 @@ const stops: Array<ReturnType<typeof createAlignmentController>['stop']> = []
 
 afterEach(async () => {
   control.afterPreview = undefined
+  control.beforeDisplay = undefined
   await Promise.all(stops.splice(0).map(stop => stop()))
   expect(control.waits).toHaveLength(0)
 })
@@ -55,7 +67,7 @@ function setup(openDiagnostics?: AlignmentDiagnosticsFactory) {
   let exposures = 0
   let externalChange = false
   const captures: AlpacaCaptureOptions[] = []
-  const requests: Array<{ index: number; complete: () => void }> = []
+  const requests: Array<{ index: number; signal: AbortSignal; complete: () => void }> = []
 
   const hardware: AlpacaAcquisition = {
     rotateRightAscension: async () => {
@@ -68,9 +80,7 @@ function setup(openDiagnostics?: AlignmentDiagnosticsFactory) {
       return {
         width: 4,
         height: 4,
-        pixels: new Float64Array([
-          900, 200, 900, 200, 200, 50, 200, 50, 900, 200, 900, 200, 200, 50, 200, 50,
-        ]),
+        pixels: frameBytes(),
         capturedAt: frame.capturedAt,
         capturedAtSource: 'server-estimate' as const,
         color: { kind: 'bayer' as const, pattern: 'rggb' as const },
@@ -145,6 +155,7 @@ function setup(openDiagnostics?: AlignmentDiagnosticsFactory) {
         signal.addEventListener('abort', abort, { once: true })
         requests.push({
           index,
+          signal,
           complete: () => {
             signal.removeEventListener('abort', abort)
             const frame = frames[index]!
@@ -176,11 +187,12 @@ function setup(openDiagnostics?: AlignmentDiagnosticsFactory) {
     createSolver: solverFactory,
     waitForNextExposure: control.wait,
     openDiagnostics,
-    renderPreview: async (...args) => {
-      const png = await previewPng(...args)
+    prepareDisplay: async (...args) => {
+      await control.beforeDisplay?.(args[1]!)
+      const display = await prepareAlignmentDisplay(...args)
       control.afterPreview?.()
 
-      return png
+      return display
     },
   })
 
@@ -248,7 +260,7 @@ it('uses physical optics, selected Bayer camera, and midpoint geometry while pre
     Date.parse(subject.sample.mock.results[2]!.value.capturedAt) - Date.parse(view.measuredAt!),
   ).toBe(1000)
   const imageId = view.measurement!.imageUrl.split('/').at(-1)!
-  const png = subject.controller.image(imageId)!
+  const png = (await subject.controller.image(imageId, 'native'))!
   expect([...png.subarray(0, 8)]).toEqual([137, 80, 78, 71, 13, 10, 26, 10])
   expect(png[25]).toBe(2) // PNG IHDR color type: RGB, not grayscale Bayer samples.
 })
@@ -260,10 +272,11 @@ it.each(['during solve', 'during preview'] as const)(
     await subject.controller.start('physical', 'Physical rig')
 
     const first = await subject.nextSolve()
+
+    // The next exposure's display preparation starts only after this solve completes.
+    if (timing === 'during preview') control.afterPreview = subject.changeMount
     first.complete()
     const second = await subject.nextSolve()
-
-    if (timing === 'during preview') control.afterPreview = subject.changeMount
     second.complete()
 
     if (timing === 'during solve') {
@@ -286,22 +299,25 @@ it.each(['during solve', 'during preview'] as const)(
   },
 )
 
-it('retains the previous solved image and timestamp when external movement invalidates a new preview', async () => {
+it('retains the previous solved image and timestamp when external movement invalidates a new exposure', async () => {
   const subject = setup()
   await subject.baseline()
   await vi.waitFor(() => expect(control.waits).toHaveLength(1))
   const previous = subject.controller.snapshot()
   const previousImageId = previous.measurement!.imageUrl.split('/').at(-1)!
-  const previousImage = subject.controller.image(previousImageId)
-  control.afterPreview = subject.changeMount
+  const previousImage = await subject.controller.image(previousImageId, 'native')
   control.waits.shift()!()
+  // Movement while solving: the final mount check rejects the new correction.
+  const rejected = await subject.nextSolve()
+  subject.changeMount()
+  rejected.complete()
   await vi.waitFor(() => expect(subject.controller.active()).toBe(false))
   expect(subject.controller.snapshot()).toMatchObject({
     phase: 'failed',
     measuredAt: previous.measuredAt,
     measurement: previous.measurement,
   })
-  expect(subject.controller.image(previousImageId)).toBe(previousImage)
+  expect(await subject.controller.image(previousImageId, 'native')).toBe(previousImage)
 })
 
 it('shows homing and permits Stop before any exposure begins', async () => {
@@ -682,5 +698,184 @@ it('replays a physical controller trial from its actual recorded bundle', async 
   } finally {
     await subject.controller.stop()
     await rm(directory, { recursive: true, force: true })
+  }
+})
+
+it('publishes the fit image and native detail around the correction, rendering the full native image only on request', async () => {
+  const subject = setup()
+  await subject.baseline()
+  await vi.waitFor(() => expect(subject.controller.snapshot().measurement).not.toBeNull())
+  const measurement = subject.controller.snapshot().measurement!
+  const imageId = measurement.imageUrl.split('/').at(-1)!
+  expect(measurement).toMatchObject({
+    imageWidth: 4,
+    imageHeight: 4,
+    fitImageUrl: `${measurement.imageUrl}/fit`,
+    fitImageScale: 1,
+    detail: { imageUrl: `${measurement.imageUrl}/detail`, x: 0, y: 0, width: 4, height: 4 },
+  })
+  expect(subject.controller.snapshot().preview).toMatchObject({
+    imageUrl: measurement.imageUrl,
+    fitImageUrl: measurement.fitImageUrl,
+  })
+
+  const signature = [137, 80, 78, 71, 13, 10, 26, 10]
+  const fit = (await subject.controller.image(imageId, 'fit'))!
+  const detail = (await subject.controller.image(imageId, 'detail'))!
+  expect([...fit.subarray(0, 8)]).toEqual(signature)
+  expect([...detail.subarray(0, 8)]).toEqual(signature)
+
+  const native = (await subject.controller.image(imageId, 'native'))!
+  expect(native).toEqual(await previewPng(4, 4, frameBytes(), { kind: 'bayer', pattern: 'rggb' }))
+  expect(await subject.controller.image(imageId, 'native')).toBe(native)
+  expect(await subject.controller.image('missing', 'fit')).toBeUndefined()
+})
+
+it('uses the adjustment window as the settling allowance and gates each correction with one final mount check', async () => {
+  const subject = setup()
+  await subject.baseline()
+  await vi.waitFor(() => expect(control.waits).toHaveLength(1))
+  const baselineCalls = vi.mocked(subject.physical.pointing).mock.calls
+  expect(baselineCalls.map(call => call[1])).toEqual([
+    { afterSettling: false },
+    { afterSettling: false },
+    { afterSettling: false },
+  ])
+  const validations = vi.mocked(subject.physical.validate).mock.calls.length
+  const previous = subject.controller.snapshot().measurement
+
+  control.waits.shift()!()
+  const adjusted = await subject.nextSolve()
+  adjusted.complete()
+  await vi.waitFor(() => expect(subject.controller.snapshot().measurement).not.toBe(previous))
+  expect(vi.mocked(subject.physical.pointing).mock.calls[3]![1]).toEqual({ afterSettling: true })
+  // One capture check alongside processing, then one final check before publication.
+  expect(vi.mocked(subject.physical.validate).mock.calls.length - validations).toBe(2)
+})
+
+it('cancels the concurrent solve when the capture check fails, publishing nothing from that exposure', async () => {
+  const subject = setup()
+  await subject.baseline()
+  await vi.waitFor(() => expect(control.waits).toHaveLength(1))
+  const previous = subject.controller.snapshot()
+  let displaySignal: AbortSignal | undefined
+  control.beforeDisplay = signal => {
+    displaySignal = signal
+
+    return new Promise((_resolve, reject) => {
+      signal.addEventListener('abort', () => reject(signal.reason), { once: true })
+    })
+  }
+
+  let solving: { signal: AbortSignal } | undefined
+  vi.mocked(subject.physical.validate).mockImplementationOnce(async () => {
+    solving = await subject.nextSolve()
+
+    throw new Error('The mount pointing side changed. Measure a new baseline.')
+  })
+
+  control.waits.shift()!()
+  await vi.waitFor(() => expect(subject.controller.active()).toBe(false))
+  expect(solving?.signal.aborted).toBe(true)
+  // Display preparation waits for the solve, so it never started.
+  expect(displaySignal).toBeUndefined()
+  expect(subject.controller.snapshot()).toMatchObject({
+    phase: 'failed',
+    error: 'The mount pointing side changed. Measure a new baseline.',
+    measuredAt: previous.measuredAt,
+    measurement: previous.measurement,
+    preview: previous.preview,
+  })
+})
+
+it('keeps a published correction’s image through Stop, waiting for its display preparation', async () => {
+  const subject = setup()
+  await subject.baseline()
+  await vi.waitFor(() => expect(control.waits).toHaveLength(1))
+  const previous = subject.controller.snapshot()
+  let displaySignal: AbortSignal | undefined
+  let release!: () => void
+  control.beforeDisplay = signal => {
+    displaySignal = signal
+
+    return new Promise(resolve => {
+      release = resolve
+    })
+  }
+
+  control.waits.shift()!()
+  const request = await subject.nextSolve()
+  request.complete()
+  await vi.waitFor(() => expect(subject.controller.snapshot().measurement).not.toBe(previous.measurement))
+  const published = subject.controller.snapshot().measurement!
+  await vi.waitFor(() => expect(displaySignal).toBeDefined())
+  let stopped = false
+
+  const stopping = subject.controller.stop(true).then(() => {
+    stopped = true
+  })
+
+  await new Promise(resolve => setTimeout(resolve, 20))
+  expect(stopped).toBe(false)
+  expect(displaySignal?.aborted).toBe(false)
+  release()
+  await stopping
+  expect(await subject.controller.image(published.frameId, 'fit')).toBeDefined()
+  expect(subject.controller.snapshot()).toMatchObject({
+    active: false,
+    phase: 'finished',
+    measurement: published,
+  })
+  expect(subject.controller.snapshot().preview!.frameId).toBe(published.frameId)
+  expect(subject.controller.snapshot().preview).not.toEqual(previous.preview)
+  expect(subject.captures).toHaveLength(4)
+})
+
+it('records one compact timing summary for each published exposure', async () => {
+  const exporter = new InMemorySpanExporter()
+  const provider = new NodeTracerProvider({ spanProcessors: [new SimpleSpanProcessor(exporter)] })
+  provider.register()
+
+  try {
+    const subject = setup()
+    await subject.baseline()
+    await vi.waitFor(() => expect(subject.controller.snapshot().measurement).not.toBeNull())
+    const spans = exporter.getFinishedSpans()
+    const frames = spans.filter(span => span.name === 'alignment.frame')
+    expect(frames.map(span => span.attributes['alignment.frame.outcome'])).toEqual([
+      'baseline',
+      'baseline',
+      'baseline',
+      'measurement',
+    ])
+    const measured = frames.at(-1)!.attributes
+    const frameId = subject.controller.snapshot().measurement!.frameId
+    expect(measured['alignment.frame.id']).toBe(frameId)
+
+    for (const name of ['pixels', 'solved', 'published'])
+      expect(measured[`alignment.timing.${name}_ms`]).toBeGreaterThanOrEqual(0)
+    expect(measured['alignment.timing.published_ms']).toBeGreaterThanOrEqual(
+      Number(measured['alignment.timing.solved_ms']),
+    )
+    expect(measured['alignment.capture.timestamp_source']).toBe('server-estimate')
+
+    const displayed = () =>
+      exporter
+        .getFinishedSpans()
+        .find(
+          span =>
+            span.name === 'alignment.frame.display' &&
+            span.attributes['alignment.frame.id'] === frameId,
+        )
+
+    await vi.waitFor(() => expect(displayed()).toBeDefined())
+    const display = displayed()!.attributes
+
+    expect(display['alignment.timing.display_ms']).toBeGreaterThanOrEqual(0)
+    expect(display['alignment.image.fit_bytes']).toBeGreaterThan(0)
+  } finally {
+    await provider.shutdown()
+    trace.disable()
+    context.disable()
   }
 })
