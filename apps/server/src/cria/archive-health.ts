@@ -486,7 +486,8 @@ function obligationsOf(input: ProjectionInput, source: ArchiveSourceView): Archi
 
   if (!source.current) partial.push(source.observedAt ? 'cria-last-known' : 'cria-unread')
 
-  if (!input.census) partial.push('archive-not-counted')
+  if (input.status && input.status.location !== 'opened') partial.push('archive-unavailable')
+  else if (!input.census) partial.push('archive-not-counted')
   else if (!input.census.current) partial.push('archive-count-old')
 
   if (input.census && reading && !reading.overlap.complete) partial.push('pending-copies-unchecked')

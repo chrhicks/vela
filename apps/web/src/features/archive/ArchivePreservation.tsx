@@ -101,9 +101,11 @@ function Preservation({
           <Fact term="Preserved in Vela" value={tallyText(obligations.preserved)} />
         </dl>
         <p>
-          {obligations.archiveCountedAt
-            ? `Archive counted ${age(obligations.archiveCountedAt, now)}.`
-            : 'Vela is still counting its archive.'}
+          {obligations.partial.includes('archive-unavailable')
+            ? 'The archive cannot be counted while its folder is unavailable.'
+            : obligations.archiveCountedAt
+              ? `Archive counted ${age(obligations.archiveCountedAt, now)}.`
+              : 'Vela is still counting its archive.'}
           {obligations.partial.includes('pending-copies-unchecked') && ' Some waiting originals may be counted twice.'}
           {obligations.partial.includes('missing-unchecked') && ' Not every missing record at Cria has been checked.'}
           {(obligations.partial.includes('cria-last-known') || obligations.partial.includes('archive-count-old')) && ' Some totals are last known.'}
@@ -111,7 +113,11 @@ function Preservation({
 
         {issues.shown.length > 0 && (
           <>
-            <h3>{issues.total === 1 ? '1 original to check' : `${issues.total} originals to check`}</h3>
+            <h3>
+              {obligations.partial.includes('missing-unchecked')
+                ? `${issues.total} or more originals to check`
+                : issues.total === 1 ? '1 original to check' : `${issues.total} originals to check`}
+            </h3>
             <ul className="tonight-preservation__issues">
               {issues.shown.map(issue => <Issue key={issue.imageId} issue={issue} now={now} />)}
             </ul>

@@ -66,6 +66,7 @@ function pendingSentence(view: CriaArchiveHealthView) {
 const partialSentences: Record<CriaArchiveHealthView['obligations']['partial'][number], string> = {
   'cria-unread': "Cria has not been read yet, so Vela cannot say every original is preserved.",
   'cria-last-known': "Cria's totals are last known, so Vela cannot say every original is preserved.",
+  'archive-unavailable': 'The archive folder is unavailable, so Vela cannot count what it holds.',
   'archive-not-counted': 'Vela is still counting its archive, so it cannot yet say every original is preserved.',
   'archive-count-old': 'The archive count is not recent, so Vela cannot say every original is preserved. A new count is running.',
   'pending-copies-unchecked':
@@ -110,10 +111,13 @@ function summarize(view: CriaArchiveHealthView, capturing: boolean): Preservatio
 
     case 'attention': {
       const count = view.issues.needsAttention
+      const atLeast = view.obligations.partial.includes('missing-unchecked')
 
       return {
         tone: 'problem',
-        title: count === 1 ? '1 original needs attention' : `${count} originals need attention`,
+        title: atLeast
+          ? `${count} or more originals need attention`
+          : count === 1 ? '1 original needs attention' : `${count} originals need attention`,
         explanation: `${lead}${pending ? `${pending}. ` : ''}Some originals cannot be vouched for as they are. Vela keeps every copy and replaces nothing.`,
         nextStep: 'Open the archive details to see each original and what to check.',
       }

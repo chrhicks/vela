@@ -105,7 +105,17 @@ export const scenarios = {
   }),
   capacityFull: health({
     status: 'degraded',
-    obligations: { ...base.obligations, waitingAtCria: { count: 19, bytes: 19 * frame } },
+    // What the server sends while the archive folder is missing: Vela's own tallies are unknown.
+    obligations: {
+      ...base.obligations,
+      waitingAtCria: { count: 19, bytes: 19 * frame },
+      unverified: null,
+      acknowledgementPending: null,
+      preserved: null,
+      archiveCountedAt: null,
+      complete: false,
+      partial: ['archive-unavailable'],
+    },
     destination: {
       ...base.destination,
       state: 'unavailable',

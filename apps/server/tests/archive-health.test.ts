@@ -310,6 +310,7 @@ describe('archive health', () => {
     expect(missing.destination.problem?.kind).toBe('missing')
     expect(missing.destination.space).toMatchObject({ basis: 'other-location' })
     expect(missing.obligations.preserved).toBeNull()
+    expect(missing.obligations.partial).toEqual(['archive-unavailable'])
 
     // An empty folder in its place, as an unmounted mount point would leave.
     await mkdir(directory)
@@ -541,7 +542,11 @@ describe('archive health', () => {
     expect(view.issues.needsAttention).toBe(500)
     expect(view.issues.needsAttention).toBeLessThanOrEqual(view.issues.total)
     expect(view.status).toBe('attention')
-    expect(isArchiveHealthView({ rigId: 'rig-1', rigName: 'FRA 400', preservation: 'cria', ...view }, 'rig-1')).toBe(true)
+
+    const published = { rigId: 'rig-1', rigName: 'FRA 400', preservation: 'cria' as const, ...view }
+
+    expect(isArchiveHealthView(published, 'rig-1')).toBe(true)
+    expect(preservationSummary(published, false).title).toBe('500 or more originals need attention')
   })
 
   it('waits for the archive count before treating Cria missing records as lost', async () => {
