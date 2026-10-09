@@ -421,6 +421,7 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
   function showPreviewWhenReady(
     frameId: string,
     sequence: number,
+    position: number,
     frame: AlpacaFrame,
     display: Promise<AlignmentDisplay>,
     signal: AbortSignal,
@@ -433,7 +434,7 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
         const preview: NonNullable<AlignmentView['preview']> = {
           ...exposureImage(frameId, frame),
           capturedAt: frame.capturedAt,
-          position: view.position,
+          position,
         }
 
         if (frame.capturedAtSource) preview.capturedAtSource = frame.capturedAtSource
@@ -469,6 +470,8 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
     patch({ activity: 'solving', exposureStartedAt: null })
     const frameId = randomUUID()
     const sequence = ++frameSequence
+    // The run may move on to the next position before this display is ready.
+    const position = view.position
     const frameWork = followAbort(signal)
     let display: Promise<AlignmentDisplay> | undefined
 
@@ -508,7 +511,7 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
       ])
 
       // The validated capture's preview follows its display, including unsolved frames.
-      showPreviewWhenReady(frameId, sequence, frame, prepare(), frameWork.signal)
+      showPreviewWhenReady(frameId, sequence, position, frame, prepare(), frameWork.signal)
       signal.throwIfAborted()
 
       const frameRecord = {
@@ -593,6 +596,8 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
         frame,
         frameId,
         display: prepare(),
+        /** Once its correction is published, let this frame's display finish even through Stop. */
+        keepDisplay: frameWork.release,
         solved,
         solvedAt,
         sample,
@@ -725,6 +730,8 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
 
       if (frame.capturedAtSource) measurement.capturedAtSource = frame.capturedAtSource
       patch({ measuredAt: frame.capturedAt, activity: 'waiting', measurement })
+      // A published correction keeps its image: Stop waits for this bounded display work.
+      current.keepDisplay()
       current.timing.published('measurement', current.frameRecord)
 
       // A calm adjustment window between exposures; never infer solver progress from

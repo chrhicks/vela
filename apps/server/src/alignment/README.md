@@ -41,12 +41,14 @@ and publication: a fit-size image (the shared
 stretch averaged over `fitImageScale` native pixels) and, for a correction, a
 native-resolution detail region around the reference and target. The full native
 PNG is rendered only when someone requests 100% inspection. Image requests wait for
-that frame's preparation. Display work stops with a failed frame or with Stop, and
-the run waits for it; a display failure leaves the correction valid and its image
-unavailable.
+that frame's preparation. Display work stops with a failed frame, or with Stop before
+its correction is published. Once a correction is published, its bounded display work
+finishes so Finish and Stop keep that reading's image; the run waits for it either
+way. A display failure leaves the correction valid and its image unavailable.
 
 The latest validated full-frame preview is published once its display is ready after
-the solve attempt, including frames that cannot solve. A late
+the solve attempt, including frames that cannot solve. It keeps the position at which
+it was captured, even when the run has already moved on. A late
 older display never replaces a newer preview. Its exposure timestamp and baseline
 position are separate from the last solved measurement. Image retention is bounded
 and preserves the last solved image through repeated unsuccessful exposures.

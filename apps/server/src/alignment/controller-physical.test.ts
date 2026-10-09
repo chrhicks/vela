@@ -788,17 +788,18 @@ it('cancels the concurrent solve when the capture check fails, publishing nothin
   })
 })
 
-it('stops promptly during display preparation, keeping the published correction and no late preview', async () => {
+it('keeps a published correction’s image through Stop, waiting for its display preparation', async () => {
   const subject = setup()
   await subject.baseline()
   await vi.waitFor(() => expect(control.waits).toHaveLength(1))
   const previous = subject.controller.snapshot()
   let displaySignal: AbortSignal | undefined
+  let release!: () => void
   control.beforeDisplay = signal => {
     displaySignal = signal
 
-    return new Promise((_resolve, reject) => {
-      signal.addEventListener('abort', () => reject(signal.reason), { once: true })
+    return new Promise(resolve => {
+      release = resolve
     })
   }
 
@@ -808,15 +809,25 @@ it('stops promptly during display preparation, keeping the published correction 
   await vi.waitFor(() => expect(subject.controller.snapshot().measurement).not.toBe(previous.measurement))
   const published = subject.controller.snapshot().measurement!
   await vi.waitFor(() => expect(displaySignal).toBeDefined())
-  await subject.controller.stop()
-  expect(displaySignal?.aborted).toBe(true)
-  expect(await subject.controller.image(published.frameId, 'fit')).toBeUndefined()
+  let stopped = false
+
+  const stopping = subject.controller.stop(true).then(() => {
+    stopped = true
+  })
+
+  await new Promise(resolve => setTimeout(resolve, 20))
+  expect(stopped).toBe(false)
+  expect(displaySignal?.aborted).toBe(false)
+  release()
+  await stopping
+  expect(await subject.controller.image(published.frameId, 'fit')).toBeDefined()
   expect(subject.controller.snapshot()).toMatchObject({
     active: false,
-    phase: 'stopped',
+    phase: 'finished',
     measurement: published,
-    preview: previous.preview,
   })
+  expect(subject.controller.snapshot().preview!.frameId).toBe(published.frameId)
+  expect(subject.controller.snapshot().preview).not.toEqual(previous.preview)
   expect(subject.captures).toHaveLength(4)
 })
 

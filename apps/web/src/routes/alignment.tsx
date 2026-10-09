@@ -589,6 +589,7 @@ function AlignmentPage({ rigId }: { rigId: string }) {
             now={now}
             retained={!view.active || view.activity !== 'waiting' || imageSuperseded}
             superseded={imageSuperseded}
+            newerImageUnavailable={imageError}
             openerId={imageOpenerId}
             onEnlarge={setExpandedImage}
           />

@@ -432,17 +432,31 @@ it('never lets an older exposure’s late display replace a newer preview', asyn
   expect(subject.controller.snapshot().preview!.frameId).toBe(newer)
 })
 
-it('stops display preparation with the run, leaving no late preview', async () => {
+it('stops an unpublished exposure’s display preparation with the run, leaving no late preview', async () => {
   const subject = setup()
   await subject.baseline()
   const previous = subject.controller.snapshot()
   subject.holdDisplay(4)
 
   cadence.waits.shift()!()
+  // A sidereal reset fails this frame after its solve, so its correction is never published.
+  subject.resetSidereal()
   subject.solve(await subject.nextSolve(), 59.99)
-  await vi.waitFor(() => expect(cadence.waits).toHaveLength(1))
-  const frameId = subject.controller.snapshot().measurement!.frameId
-  await subject.controller.stop()
-  expect(await subject.controller.image(frameId, 'fit')).toBeUndefined()
-  expect(subject.controller.snapshot().preview).toEqual(previous.preview)
+  await vi.waitFor(() => expect(subject.controller.active()).toBe(false))
+  expect(subject.controller.snapshot()).toMatchObject({
+    phase: 'failed',
+    measurement: previous.measurement,
+    preview: previous.preview,
+  })
+})
+
+it('labels each baseline preview with the position it was captured at, even after the run moves on', async () => {
+  const subject = setup()
+  const release = subject.holdDisplay(1)
+  await subject.controller.start('sim', 'Simulator')
+  subject.solve(await subject.nextSolve())
+  await vi.waitFor(() => expect(subject.controller.snapshot().position).toBe(2))
+  release()
+  await vi.waitFor(() => expect(subject.controller.snapshot().preview).toBeTruthy())
+  expect(subject.controller.snapshot().preview!.position).toBe(1)
 })
