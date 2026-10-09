@@ -470,8 +470,16 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
     const frameId = randomUUID()
     const sequence = ++frameSequence
     const frameWork = followAbort(signal)
-    const display = prepareFrameDisplay(frameId, frame, frameWork.signal, timing)
-    void display.then(frameWork.release, frameWork.release)
+    let display: Promise<AlignmentDisplay> | undefined
+
+    // Display preparation starts once the solve returns. Started earlier, its stretch
+    // shares the event loop with the solver's FITS preparation and delays the correction.
+    const prepare = () => {
+      display ??= prepareFrameDisplay(frameId, frame, frameWork.signal, timing)
+      void display.then(frameWork.release, frameWork.release)
+
+      return display
+    }
 
     try {
       const hint: SkyPosition = actual?.hint ?? {
@@ -480,17 +488,10 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
       }
 
       // The correction path: capture validation beside the solve, then one final check.
-      // Display preparation runs separately and never delays a correction.
       const [afterCapture, solved] = await together(signal, workSignal => [
-        (physical
+        physical
           ? retryObservation(() => physical.validate(workSignal, frame), workSignal)
-          : Promise.resolve(undefined)
-        ).then(validated => {
-          // A validated capture's preview may appear before its solve completes.
-          showPreviewWhenReady(frameId, sequence, frame, display, frameWork.signal)
-
-          return validated
-        }),
+          : Promise.resolve(undefined),
         step(
           'alignment.solve',
           async () => {
@@ -498,6 +499,7 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
 
             trace.getActiveSpan()?.setAttribute('alignment.solve.outcome', result.status)
             timing.solved()
+            prepare()
 
             return result
           },
@@ -505,6 +507,8 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
         ),
       ])
 
+      // The validated capture's preview follows its display, including unsolved frames.
+      showPreviewWhenReady(frameId, sequence, frame, prepare(), frameWork.signal)
       signal.throwIfAborted()
 
       const frameRecord = {
@@ -588,7 +592,7 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
       return {
         frame,
         frameId,
-        display,
+        display: prepare(),
         solved,
         solvedAt,
         sample,

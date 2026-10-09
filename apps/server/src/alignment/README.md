@@ -35,7 +35,9 @@ unsupported capabilities and subprocess errors still stop the operation.
 A correction never waits for its image. After an exposure's pixels arrive, the
 capture check runs beside the plate solve; one final mount check follows, and the
 correction is published with its frame ID, exposure start and solve time. Display
-preparation runs separately for the same frame: a fit-size image (the shared
+preparation for the same frame starts when its solve returns, so its image stretch
+cannot compete with the solver's FITS preparation, and then runs beside the final check
+and publication: a fit-size image (the shared
 stretch averaged over `fitImageScale` native pixels) and, for a correction, a
 native-resolution detail region around the reference and target. The full native
 PNG is rendered only when someone requests 100% inspection. Image requests wait for
@@ -43,8 +45,8 @@ that frame's preparation. Display work stops with a failed frame or with Stop, a
 the run waits for it; a display failure leaves the correction valid and its image
 unavailable.
 
-The latest validated full-frame preview is published once its display is ready,
-usually before its solve completes and including frames that cannot solve. A late
+The latest validated full-frame preview is published once its display is ready after
+the solve attempt, including frames that cannot solve. A late
 older display never replaces a newer preview. Its exposure timestamp and baseline
 position are separate from the last solved measurement. Image retention is bounded
 and preserves the last solved image through repeated unsuccessful exposures.
