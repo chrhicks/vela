@@ -1,12 +1,11 @@
 import { z } from 'zod'
 import type { FastifyInstance } from 'fastify'
 import {
-  AlpacaCaptureStoppedError,
   createAlpacaAcquisition,
   createAlpacaCameraCooling,
-  type AlpacaCameraCooling,
-  type AlpacaDeviceTelemetry,
 } from '@vela/alpaca'
+import { CaptureStoppedError as EquipmentCaptureStoppedError, type Acquisition, type CameraCooling, type DeviceTelemetry } from '@vela/equipment'
+import { alpacaEndpoint } from '../equipment/source.js'
 import type { CaptureCoolingView, CaptureSubject, CaptureView, NavigationCapture } from '@vela/model/web'
 import type { RigCatalogRecord } from '../rig/contracts.js'
 import type { RigCatalog } from '../rig/catalog.js'
@@ -16,7 +15,7 @@ import { CaptureStoppedError, createCaptureController, type CaptureCamera } from
 import { createMemorySavedImageStore, type SavedImageStore } from '../saved-images/store.js'
 
 export interface CaptureSettings {
-  endpoint: string
+  rig: RigCatalogRecord
   cameraId: string
   expectedCameraName: string
 }
@@ -25,13 +24,12 @@ interface CaptureRouteOptions {
   lookupSubject?: (targetId: string) => CaptureSubject | undefined
   savedImages?: SavedImageStore
   createCamera?: (settings: CaptureSettings) => CaptureCamera
+  createAcquisition?: (rig: RigCatalogRecord) => Acquisition
   createInspector?: RigDetailOptions['createInspector']
-  createCooling?: (settings: CaptureSettings) => AlpacaCameraCooling
+  createCooling?: (settings: CaptureSettings) => CameraCooling
 }
 
-function configuredCamera(settings: CaptureSettings): CaptureCamera {
-  const acquisition = createAlpacaAcquisition({ baseUrl: settings.endpoint })
-
+function configuredCamera(settings: CaptureSettings, acquisition: Acquisition): CaptureCamera {
   return {
     async capture({ exposureSeconds, signal, onProgress, onReadState }) {
       try {
@@ -45,18 +43,18 @@ function configuredCamera(settings: CaptureSettings): CaptureCamera {
           onReadState,
         })
       } catch (error) {
-        if (error instanceof AlpacaCaptureStoppedError) throw new CaptureStoppedError()
+        if (error instanceof EquipmentCaptureStoppedError) throw new CaptureStoppedError()
         throw error
       }
     },
   }
 }
 
-function configuredCooling(settings: CaptureSettings): AlpacaCameraCooling {
-  return createAlpacaCameraCooling({ baseUrl: settings.endpoint })
+function configuredCooling(settings: CaptureSettings): CameraCooling {
+  return createAlpacaCameraCooling({ baseUrl: alpacaEndpoint(settings.rig) })
 }
 
-function captureCooling(telemetry: AlpacaDeviceTelemetry | undefined): CaptureCoolingView | null {
+function captureCooling(telemetry: DeviceTelemetry | undefined): CaptureCoolingView | null {
   if (telemetry?.kind !== 'camera' || telemetry.cooling === undefined) return null
 
   let cooling: CaptureCoolingView = {
@@ -85,20 +83,20 @@ export function registerCapture(
   operations: RigOperations,
   {
     lookupSubject,
-    createCamera = configuredCamera,
+    createCamera,
+    createAcquisition = rig => createAlpacaAcquisition({ baseUrl: alpacaEndpoint(rig) }),
     createInspector,
     createCooling = configuredCooling,
     savedImages = createMemorySavedImageStore(),
   }: CaptureRouteOptions = {},
 ) {
   const controllers = new Map<string, ReturnType<typeof createCaptureController>>()
+  const cameraFactory = createCamera ?? (settings => configuredCamera(settings, createAcquisition(settings.rig)))
 
   function cameraSettings(rig: RigCatalogRecord): CaptureSettings | undefined {
-    const endpoint = `http://${rig.endpoint.host}:${rig.endpoint.port}`
-
     if (rig.imagingCamera) {
       return {
-        endpoint,
+        rig,
         cameraId: rig.imagingCamera.uniqueId,
         expectedCameraName: rig.imagingCamera.name,
       }
@@ -174,7 +172,10 @@ export function registerCapture(
       name: rig.imagingCamera?.name ?? camera.name?.trim() ?? camera.configuredName,
     }
 
-    const cooling = captureCooling(camera.telemetry.values)
+    const cooling = camera.observation?.state === 'interrupted'
+      ? null
+      : captureCooling(camera.telemetry.values)
+
     const project = (view: CaptureView): CaptureView => ({ ...view, camera: cameraView, cooling })
 
     if (
@@ -196,6 +197,8 @@ export function registerCapture(
       return project({ ...unavailable('Another Rig operation is in progress.') })
 
     if (!controllers.get(rigId)?.active()) {
+      if (camera.observation?.commandReady === false)
+        return project(unavailable(camera.observation.message ?? 'Fresh camera state is required before capture.'))
       const telemetry = camera.telemetry.values
 
       if (telemetry?.kind !== 'camera' || telemetry.activity !== 'idle') {
@@ -268,7 +271,7 @@ export function registerCapture(
 
         const result = await controller.start(
           body.exposureSeconds,
-          createCamera(settings),
+          cameraFactory(settings),
           view.camera.name,
           {
             subject,

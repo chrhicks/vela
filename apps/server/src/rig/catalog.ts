@@ -4,12 +4,14 @@ import { randomUUID } from 'node:crypto'
 import { parse, stringify } from 'yaml'
 import { z } from 'zod'
 import type { RigEndpoint, RigId } from '@vela/model/rig'
-import type { ObservedRigInventory, RigCandidateMatch, RigCatalogRecord } from './contracts.js'
+import type { ObservedRigInventory, RigCandidateMatch, RigCatalogRecord, RigSource } from './contracts.js'
 
 export interface AddRigInput {
+  readonly id?: RigId
   readonly name: string
   readonly endpoint: RigEndpoint
   readonly inventory: ObservedRigInventory
+  readonly source?: RigSource
 }
 
 export type AddRigResult =
@@ -20,7 +22,7 @@ export type AddRigResult =
 export interface RigCatalog {
   list(): Promise<ReadonlyArray<RigCatalogRecord>>
   get(rigId: RigId): Promise<RigCatalogRecord | undefined>
-  observe(endpoint: RigEndpoint, inventory: ObservedRigInventory): Promise<RigCandidateMatch>
+  observe(endpoint: RigEndpoint, inventory: ObservedRigInventory, source?: RigSource): Promise<RigCandidateMatch>
   add(input: AddRigInput): Promise<AddRigResult>
   setImagingCamera(
     rigId: RigId,
@@ -80,17 +82,20 @@ const rigSchema = z
     id: canonicalString,
     name: nonEmptyString,
     endpoint: z.strictObject({ host: canonicalString, port: z.number().int().min(1).max(65535) }),
+    source: z.strictObject({ kind: z.literal('cria'), configurationId: canonicalString }).optional(),
     addedAt: isoDateTime,
     imagingCamera: z.strictObject({ uniqueId: canonicalString, name: nonEmptyString }).optional(),
     focalLengthMm: z.number().min(10).max(20000).optional(),
     lastObservedInventory: inventorySchema,
   })
-  .transform(({ imagingCamera, focalLengthMm, ...required }): RigCatalogRecord => {
+  .transform(({ imagingCamera, focalLengthMm, source, ...required }): RigCatalogRecord => {
     let rig: RigCatalogRecord = required
 
     if (imagingCamera !== undefined) rig = { ...rig, imagingCamera }
 
     if (focalLengthMm !== undefined) rig = { ...rig, focalLengthMm }
+
+    if (source !== undefined) rig = { ...rig, source }
 
     return rig
   })
@@ -175,10 +180,10 @@ function createRigCatalog(
       return record === undefined ? undefined : copyRecord(record)
     },
 
-    observe(endpoint, inventory) {
+    observe(endpoint, inventory, source) {
       return change(async () => {
         const checkedInventory = validateObservedInventory(inventory)
-        const match = matchRigCandidate(records, endpoint, checkedInventory)
+        const match = matchRigCandidate(records, endpoint, checkedInventory, source)
 
         if (match.state !== 'known') return match
 
@@ -200,8 +205,20 @@ function createRigCatalog(
 
     add(input) {
       return change(async () => {
+        if (input.id !== undefined && !canonicalString.safeParse(input.id).success)
+          throw new Error('Invalid Rig ID')
         const checkedInventory = validateObservedInventory(input.inventory)
-        const match = matchRigCandidate(records, input.endpoint, checkedInventory)
+        const match = matchRigCandidate(records, input.endpoint, checkedInventory, input.source)
+
+        if (input.id !== undefined) {
+          const existing = records.find(record => record.id === input.id)
+
+          if (existing && (match.state !== 'known' || match.rigId !== existing.id))
+            return { state: 'conflict', rigIds: [existing.id] }
+
+          if (match.state === 'known' && match.rigId !== input.id)
+            return { state: 'conflict', rigIds: [match.rigId] }
+        }
 
         if (match.state === 'known') {
           const nextRecords = records.map(record =>
@@ -221,13 +238,15 @@ function createRigCatalog(
 
         if (match.state === 'conflict') return match
 
-        const rig: RigCatalogRecord = {
-          id: createId(),
+        let rig: RigCatalogRecord = {
+          id: input.id ?? createId(),
           name: input.name.trim(),
           endpoint: { ...input.endpoint },
           addedAt: now().toISOString(),
           lastObservedInventory: checkedInventory,
         }
+
+        if (input.source) rig = { ...rig, source: { ...input.source } }
 
         await replace([...records, rig])
 
@@ -286,14 +305,18 @@ export function matchRigCandidate(
   records: ReadonlyArray<RigCatalogRecord>,
   endpoint: RigEndpoint,
   inventory: ObservedRigInventory,
+  source?: RigSource,
 ): RigCandidateMatch {
   const candidateDeviceIds = new Set(inventory.devices.map(device => device.uniqueId))
 
-  const matchingRigs = records.filter(
-    record =>
-      endpointsEqual(record.endpoint, endpoint) ||
-      record.lastObservedInventory.devices.some(device => candidateDeviceIds.has(device.uniqueId)),
-  )
+  const matchingRigs = records.filter(record => {
+    if (source) return record.source?.configurationId === source.configurationId
+
+    if (record.source) return false
+
+    return endpointsEqual(record.endpoint, endpoint) ||
+      record.lastObservedInventory.devices.some(device => candidateDeviceIds.has(device.uniqueId))
+  })
 
   if (matchingRigs.length === 0) return { state: 'new' }
 
@@ -379,11 +402,13 @@ function copyRecords(records: ReadonlyArray<RigCatalogRecord>): ReadonlyArray<Ri
 }
 
 function copyRecord(record: RigCatalogRecord): RigCatalogRecord {
-  const copy: RigCatalogRecord = {
+  let copy: RigCatalogRecord = {
     ...record,
     endpoint: { ...record.endpoint },
     lastObservedInventory: copyInventory(record.lastObservedInventory),
   }
+
+  if (record.source) copy = { ...copy, source: { ...record.source } }
 
   if (record.imagingCamera) return { ...copy, imagingCamera: { ...record.imagingCamera } }
 

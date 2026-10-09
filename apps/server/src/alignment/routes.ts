@@ -3,6 +3,10 @@ import { isAbsolute } from 'node:path'
 import type { FastifyInstance } from 'fastify'
 import { trace, SpanStatusCode } from '@opentelemetry/api'
 import { createAlpacaAcquisition, createAlpacaFraming } from '@vela/alpaca'
+import type { Acquisition, Framing } from '@vela/equipment'
+import type { RigCatalogRecord } from '../rig/contracts.js'
+import { alpacaEndpoint } from '../equipment/source.js'
+import { inspectRigDetail, type RigDetailOptions } from '../rig/detail.js'
 import type { AlignmentView } from '@vela/model/web'
 import { createRigOperations, type RigOperations } from '../rig/operations.js'
 import type { RigCatalog } from '../rig/catalog.js'
@@ -12,8 +16,8 @@ import { createPhysicalAlignment } from './physical.js'
 import { createAlignmentDiagnostics } from './diagnostics.js'
 
 export interface AlignmentFactories {
-  acquisition: typeof createAlpacaAcquisition
-  framing: typeof createAlpacaFraming
+  acquisition: (options: { baseUrl: string }) => Acquisition
+  framing: (options: { baseUrl: string }) => Framing
   physical: typeof createPhysicalAlignment
   solver: typeof createAstapSolver
   controller: typeof createAlignmentController
@@ -27,15 +31,29 @@ const defaultFactories: AlignmentFactories = {
   controller: createAlignmentController,
 }
 
+export interface AlignmentEquipmentOptions {
+  settingsForRig?: (rig: RigCatalogRecord) => AlignmentSettings | undefined
+  createAcquisition?: (rig: RigCatalogRecord) => Acquisition
+  createFraming?: (rig: RigCatalogRecord) => Framing
+  createInspector?: RigDetailOptions['createInspector']
+}
+
 const emptyCommand = z.object({}).strict()
 
 export function registerAlignment(
   app: FastifyInstance,
   catalog: RigCatalog,
-  settings?: AlignmentSettings,
+  legacySettings?: AlignmentSettings,
   operations: RigOperations = createRigOperations(),
   factories: AlignmentFactories = defaultFactories,
+  equipment: AlignmentEquipmentOptions = {},
 ) {
+  function configuredSettings(rig: RigCatalogRecord) {
+    return rig.source ? equipment.settingsForRig?.(rig) : legacySettings
+  }
+
+  const settings = legacySettings
+
   const openDiagnostics = settings?.diagnosticsPath
     ? createAlignmentDiagnostics(settings.diagnosticsPath, error =>
         app.log.error(
@@ -60,19 +78,95 @@ export function registerAlignment(
         })
       : undefined
 
+  function createRun(rig: RigCatalogRecord, settings: AlignmentSettings) {
+    const acquisition = equipment.createAcquisition?.(rig) ??
+      factories.acquisition({ baseUrl: alpacaEndpoint(rig) })
+
+    const openDiagnostics = settings.diagnosticsPath
+      ? createAlignmentDiagnostics(settings.diagnosticsPath, error =>
+          app.log.error({ err: error }, 'Alignment diagnostic recording stopped'),
+        )
+      : undefined
+
+    if (settings.mode !== 'physical') {
+      return factories.controller({
+        mode: 'offline',
+        settings,
+        hardware: acquisition,
+        openDiagnostics,
+        solver: factories.solver({
+          executable: settings.executable,
+          catalogPath: settings.catalogPath,
+          fieldHeightDegrees: settings.fieldHeightDegrees,
+        }),
+      })
+    }
+
+    const physical = factories.physical(
+      {
+        cameraId: settings.cameraId,
+        telescopeId: settings.telescopeId,
+        cameraName: rig.imagingCamera!.name,
+        focalLengthMm: rig.focalLengthMm!,
+      },
+      acquisition,
+      equipment.createFraming?.(rig) ?? factories.framing({ baseUrl: alpacaEndpoint(rig) }),
+    )
+
+    return factories.controller({
+      mode: 'physical',
+      settings,
+      hardware: acquisition,
+      physical,
+      openDiagnostics,
+      createSolver: fieldHeightDegrees => factories.solver({
+        executable: settings.executable,
+        catalogPath: settings.catalogPath,
+        fieldHeightDegrees,
+      }),
+    })
+  }
+
   async function rigView(rigId: string): Promise<AlignmentView | undefined> {
     const rig = await catalog.get(rigId)
 
     if (!rig) return undefined
+    const settings = configuredSettings(rig)
     const endpoint = `http://${rig.endpoint.host}:${rig.endpoint.port}`
+    let inventory = rig.lastObservedInventory.devices
+    let equipmentReason: string | null = null
+
+    if (rig.source && settings && equipment.createInspector) {
+      const detail = await inspectRigDetail(catalog, rig.id, { createInspector: equipment.createInspector })
+
+      if (detail.state !== 'current') {
+        equipmentReason = 'Rig identity or equipment state needs attention before alignment.'
+      } else {
+        inventory = detail.inspections.map(device => ({
+          uniqueId: device.providerDeviceId,
+          kind: device.kind,
+          name: device.configuredName,
+        }))
+
+        if (!alignment?.active() || alignment.snapshot().rigId !== rig.id) {
+          const blocked = detail.inspections.find(device =>
+            (device.providerDeviceId === settings.cameraId || device.providerDeviceId === settings.telescopeId) &&
+            (device.connection !== 'connected' || device.observation?.commandReady === false),
+          )
+
+          if (blocked)
+            equipmentReason = blocked.observation?.message ?? 'Fresh connected equipment state is required before alignment.'
+        }
+      }
+    }
 
     const configured =
       !!settings &&
-      endpoint === settings.endpoint &&
-      rig.lastObservedInventory.devices.some(
+      (rig.source ? settings.rigId === rig.id : endpoint === settings.endpoint) &&
+      inventory.some(
         device => device.uniqueId === settings.cameraId && device.kind === 'camera',
       ) &&
-      rig.lastObservedInventory.devices.some(
+      inventory.some(
         device => device.uniqueId === settings.telescopeId && device.kind === 'telescope',
       )
 
@@ -82,6 +176,8 @@ export function registerAlignment(
 
     if (!configured) {
       reason = 'Polar alignment is not configured for this Rig.'
+    } else if (equipmentReason) {
+      reason = equipmentReason
     } else if (owner && owner !== 'alignment') {
       reason = 'Another Rig operation is in progress.'
     } else if (settings?.mode === 'physical' && rig.imagingCamera?.uniqueId !== settings.cameraId) {
@@ -110,7 +206,8 @@ export function registerAlignment(
 
     const state = alignment?.snapshot()
 
-    const view = state && (!state.rigId || state.rigId === rigId) ? { ...empty, ...state } : empty
+    const sameRun = state && (state.rigId === rigId || (!state.rigId && !rig.source))
+    const view = sameRun ? { ...empty, ...state } : empty
     view.rigId = rigId
     view.rigName = rig.name
     view.enabled = !reason
@@ -176,40 +273,17 @@ export function registerAlignment(
                 return await alignment.stop(request.params.command === 'finish')
               }
 
-              if (!view.enabled || !settings)
+              const rig = await catalog.get(view.rigId)
+              const settings = rig && configuredSettings(rig)
+
+              if (!view.enabled || !settings || !rig)
                 return reply.code(409).send({ error: view.unavailableReason })
 
               if (request.params.command === 'start') {
-                if (settings.mode === 'physical') {
-                  if (alignment?.active()) throw new Error('A measurement is already running')
-                  const rig = (await catalog.get(view.rigId))!
-                  const acquisition = factories.acquisition({ baseUrl: settings.endpoint })
+                if (alignment?.active()) throw new Error('A measurement is already running')
 
-                  const physical = factories.physical(
-                    {
-                      cameraId: settings.cameraId,
-                      telescopeId: settings.telescopeId,
-                      cameraName: rig.imagingCamera!.name,
-                      focalLengthMm: rig.focalLengthMm!,
-                    },
-                    acquisition,
-                    factories.framing({ baseUrl: settings.endpoint }),
-                  )
-
-                  alignment = factories.controller({
-                    mode: 'physical',
-                    settings,
-                    hardware: acquisition,
-                    physical,
-                    openDiagnostics,
-                    createSolver: fieldHeightDegrees =>
-                      factories.solver({
-                        executable: settings.executable,
-                        catalogPath: settings.catalogPath,
-                        fieldHeightDegrees,
-                      }),
-                  })
-                }
+                if (settings.mode === 'physical' || rig.source)
+                  alignment = createRun(rig, settings)
 
                 if (!alignment) throw new Error('Polar alignment is not configured')
                 const result = await alignment.start(view.rigId, view.rigName, release)

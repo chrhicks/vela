@@ -19,7 +19,14 @@ Route
 composition acquires the same Rig operation lease used by alignment and
 connection commands before checking the selected identity and connection. The lease
 lasts across every exposure and through final acquisition cleanup. Device protocol preconditions and abort
-confirmation belong to the ALPACA adapter.
+confirmation belong to the selected equipment adapter.
+
+For Cria rigs, the server composition provides the same acquisition and cooling
+capabilities. Cria performs one exposure and temporarily retains its original;
+Vela verifies the image identity, checksum, byte length and geometry before
+accepting pixels. Vela then owns preview creation, FITS, retention and repetition.
+Releasing Cria's temporary original is best effort after that transfer. A failed
+transfer or archive write ends the run without requesting another exposure.
 
 The controller depends on `CaptureCamera`, not a concrete transport. A successful
 frame publishes its own exposure settings, acquisition start timestamp and

@@ -1,16 +1,10 @@
-import {
-  createAlpacaProvider,
-  type AlpacaDevice,
-  type AlpacaDeviceKind,
-  type AlpacaProvider,
-} from '@vela/alpaca'
-import type { RigEndpoint, RigId } from '@vela/model/rig'
+import { createAlpacaProvider } from '@vela/alpaca'
+import type { EquipmentDevice, DeviceKind, EquipmentProvider } from '@vela/equipment'
+import type { RigEquipmentSource } from '../rig/contracts.js'
+import { alpacaEndpoint } from '../equipment/source.js'
 import type { ObservedRigDevice, RigDeviceKind } from './model.js'
 
-export interface RigInventorySource {
-  readonly id: RigId
-  readonly endpoint: RigEndpoint
-}
+export type RigInventorySource = RigEquipmentSource
 
 export interface RigDeviceInventory {
   listDevices(): Promise<ReadonlyArray<ObservedRigDevice>>
@@ -18,10 +12,10 @@ export interface RigDeviceInventory {
 
 export interface RigDeviceInventoryOptions {
   now?: () => Date
-  provider?: Pick<AlpacaProvider, 'listDevices'>
+  provider?: Pick<EquipmentProvider, 'listDevices'>
 }
 
-function toRigDeviceKind(kind: AlpacaDeviceKind): RigDeviceKind {
+function toRigDeviceKind(kind: DeviceKind): RigDeviceKind {
   switch (kind) {
     case 'camera':
     case 'cover-calibrator':
@@ -40,10 +34,10 @@ function toRigDeviceKind(kind: AlpacaDeviceKind): RigDeviceKind {
 
 function toObservedRigDevice(
   rig: RigInventorySource,
-  device: AlpacaDevice,
+  device: EquipmentDevice,
   observedAt: Date,
 ): ObservedRigDevice {
-  return {
+  const observed: ObservedRigDevice = {
     id: `${rig.id}-${device.providerDeviceId}`,
     rigId: rig.id,
     uniqueId: device.providerDeviceId,
@@ -52,8 +46,12 @@ function toObservedRigDevice(
     driver: { ...device.driver },
     connection: device.connection,
     status: { state: 'unknown' },
-    observedAt,
+    observedAt: device.observation?.observedAt ? new Date(device.observation.observedAt) : observedAt,
   }
+
+  if (device.observation) observed.observation = device.observation
+
+  return observed
 }
 
 export function createRigDeviceInventory(
@@ -65,7 +63,7 @@ export function createRigDeviceInventory(
   const provider =
     options.provider ??
     createAlpacaProvider({
-      baseUrl: `http://${rig.endpoint.host}:${rig.endpoint.port}`,
+      baseUrl: alpacaEndpoint(rig),
     })
 
   return {

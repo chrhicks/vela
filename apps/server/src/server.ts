@@ -2,10 +2,12 @@ import { buildApp } from './app.js'
 import { openFileRigCatalog } from './rig/catalog.js'
 import { resolveRigCatalogPath } from './rig/catalog-path.js'
 import { alignmentSettings } from './alignment/routes.js'
-import { dirname, resolve } from 'node:path'
+import { dirname, isAbsolute, resolve } from 'node:path'
 import { openFileSavedImageStore } from './saved-images/store.js'
 import { createSurveyCache } from './targets/survey.js'
 import { startTelemetry } from './telemetry.js'
+import { loadCriaConfiguration, registerConfiguredCriaRigs } from './equipment/config.js'
+import { createEquipmentComposition } from './equipment/composition.js'
 
 const telemetry = startTelemetry(process.env.VELA_TRACE_PATH)
 
@@ -47,6 +49,8 @@ const rigCatalogPath = resolveRigCatalogPath(process.env.VELA_RIG_CATALOG_PATH)
 try {
   const rigCatalog = await openFileRigCatalog(rigCatalogPath)
   const alignment = alignmentSettings(process.env)
+  const cria = await loadCriaConfiguration(process.env.VELA_CRIA_CONFIG_PATH, process.env)
+  await registerConfiguredCriaRigs(rigCatalog, cria)
 
   const savedImages = await openFileSavedImageStore(
     process.env.VELA_SAVED_IMAGES_PATH
@@ -70,8 +74,20 @@ try {
       : {},
   )
 
+  const equipmentOptions: NonNullable<Parameters<typeof createEquipmentComposition>[1]> = {}
+
+  if (targets.solver) equipmentOptions.solver = targets.solver
+
+  if (process.env.VELA_ALIGNMENT_DIAGNOSTICS_PATH) {
+    if (!isAbsolute(process.env.VELA_ALIGNMENT_DIAGNOSTICS_PATH))
+      throw new Error('VELA_ALIGNMENT_DIAGNOSTICS_PATH must be an absolute directory path')
+    equipmentOptions.diagnosticsPath = process.env.VELA_ALIGNMENT_DIAGNOSTICS_PATH
+  }
+
+  const equipment = createEquipmentComposition(cria, equipmentOptions)
+
   if (!shutdownTask) {
-    const options = { rigCatalog, savedImages, targets, surveyCache }
+    const options = { rigCatalog, savedImages, targets, surveyCache, equipment }
     app = buildApp(alignment ? { ...options, alignment } : options)
     await app.listen({ port, host })
   }

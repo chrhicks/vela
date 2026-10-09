@@ -3,10 +3,10 @@ import { trace, SpanStatusCode, type Attributes } from '@opentelemetry/api'
 import { setTimeout as delay } from 'node:timers/promises'
 import type { AlignmentView } from '@vela/model/web'
 import {
-  AlpacaProviderError,
-  AlpacaCaptureRetryableError,
-  type AlpacaAcquisition,
-} from '@vela/alpaca'
+  EquipmentError,
+  CaptureRetryableError,
+  type Acquisition,
+} from '@vela/equipment'
 import { createAlignmentBaseline, measureAlignment, type AlignmentSample } from './geometry.js'
 import { createAstapSolver, projectSky } from './solver.js'
 import { previewPng } from '../imaging/preview.js'
@@ -20,6 +20,7 @@ import type {
 /** Explicit server configuration keeps the synthetic clock separate from physical rigs. */
 export interface AlignmentSettings {
   mode?: 'offline' | 'physical'
+  rigId?: string
   endpoint: string
   cameraId: string
   telescopeId: string
@@ -37,7 +38,7 @@ export type AlignmentControllerOptions = {
     AlignmentSettings,
     'cameraId' | 'telescopeId' | 'exposureSeconds' | 'fieldHeightDegrees'
   >
-  hardware: AlpacaAcquisition
+  hardware: Acquisition
   now?: () => number
   waitForNextExposure?: (signal: AbortSignal) => Promise<void>
   renderPreview?: typeof previewPng
@@ -138,7 +139,7 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
     read: () => Promise<T>,
     signal: AbortSignal,
     retryable = (error: Error) =>
-      error instanceof AlpacaProviderError && error.reason === 'transport',
+      error instanceof EquipmentError && error.reason === 'transport',
   ): Promise<T> {
     const activity = view.activity
     let interrupted = false
@@ -319,7 +320,7 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
         return { frame, actual, pointing, pointingObservedAt }
       },
       signal,
-      error => error instanceof AlpacaCaptureRetryableError,
+      error => error instanceof CaptureRetryableError,
     )
   }
 

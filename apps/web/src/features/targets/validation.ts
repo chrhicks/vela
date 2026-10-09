@@ -169,6 +169,7 @@ const framing = z
     rigId: z.string(),
     rigName: z.string(),
     enabled: z.boolean(),
+    mountControlReason: z.enum(['parked', 'tracking-off']).optional(),
     active: z.boolean(),
     canCenter: z.boolean(),
     checkCurrent: z.boolean(),

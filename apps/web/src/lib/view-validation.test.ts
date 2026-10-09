@@ -75,6 +75,35 @@ describe('web View validation', () => {
     expect(isRigDetailView(invalidPercentage)).toBe(false)
   })
 
+  it('validates freshness evidence before accepting retained device readings', () => {
+    const view = detail()
+    const observation = { state: 'interrupted', observedAt, commandReady: false }
+
+    const retained = {
+      ...view,
+      state: 'needs-attention',
+      connections: { total: 2, connected: 0, disconnected: 1, unavailable: 1 },
+      devices: [{ ...view.devices[0], observation }, view.devices[1]],
+    }
+
+    expect(isRigDetailView(retained)).toBe(true)
+    expect(isRigDetailView({ ...retained, connections: view.connections })).toBe(false)
+
+    for (const invalid of [
+      null,
+      { ...observation, state: 'fresh' },
+      { ...observation, observedAt: 'yesterday' },
+      { ...observation, commandReady: undefined },
+      { ...observation, commandReady: 'false' },
+      { ...observation, message: 42 },
+    ]) {
+      expect(isRigDetailView({
+        ...retained,
+        devices: [{ ...view.devices[0], observation: invalid }, view.devices[1]],
+      })).toBe(false)
+    }
+  })
+
   it('rejects contradictory reachability and connection summaries', () => {
     const inconsistent = detail()
     inconsistent.connections = { total: 2, connected: 0, disconnected: 2, unavailable: 0 }

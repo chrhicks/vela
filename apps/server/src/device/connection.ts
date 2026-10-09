@@ -1,25 +1,19 @@
-import {
-  createAlpacaProvider,
-  type AlpacaConnectDeviceOptions,
-  type AlpacaDeviceConnectionResult,
-  type AlpacaProvider,
-} from '@vela/alpaca'
-import type { RigEndpoint, RigId } from '@vela/model/rig'
+import { createAlpacaProvider } from '@vela/alpaca'
+import type { ConnectDeviceOptions, DeviceConnectionResult, EquipmentProvider } from '@vela/equipment'
+import type { RigEquipmentSource } from '../rig/contracts.js'
+import { alpacaEndpoint } from '../equipment/source.js'
 
-export interface RigConnectionSource {
-  readonly id: RigId
-  readonly endpoint: RigEndpoint
-}
+export type RigConnectionSource = RigEquipmentSource
 
 export interface RigDeviceConnector {
   connectDevice(
     providerDeviceId: string,
-    options?: AlpacaConnectDeviceOptions,
-  ): Promise<AlpacaDeviceConnectionResult>
+    options?: ConnectDeviceOptions,
+  ): Promise<DeviceConnectionResult>
 }
 
 export interface RigDeviceConnectorOptions {
-  readonly provider?: Pick<AlpacaProvider, 'connectDevice'>
+  readonly provider?: Pick<EquipmentProvider, 'connectDevice'>
 }
 
 export function createRigDeviceConnector(
@@ -29,7 +23,7 @@ export function createRigDeviceConnector(
   const provider =
     options.provider ??
     createAlpacaProvider({
-      baseUrl: `http://${rig.endpoint.host}:${rig.endpoint.port}`,
+      baseUrl: alpacaEndpoint(rig),
     })
 
   return {

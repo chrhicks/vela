@@ -1,6 +1,8 @@
 import { z } from 'zod'
 import type { FastifyInstance } from 'fastify'
-import { createAlpacaAcquisition, createAlpacaFraming, type AlpacaFraming } from '@vela/alpaca'
+import { createAlpacaAcquisition, createAlpacaFraming } from '@vela/alpaca'
+import type { Acquisition, Framing } from '@vela/equipment'
+import { alpacaEndpoint } from '../equipment/source.js'
 import type { FramingView, TargetView, TargetsView } from '@vela/model/web'
 import type { RigCatalog } from '../rig/catalog.js'
 import type { RigCatalogRecord } from '../rig/contracts.js'
@@ -19,7 +21,8 @@ import { registerTargetDiscovery } from './discovery-routes.js'
 
 export interface TargetOptions {
   solver?: { executable: string; catalogPath: string }
-  createAdapter?: (endpoint: string) => AlpacaFraming
+  createAdapter?: (rig: RigCatalogRecord) => Framing
+  createAcquisition?: (rig: RigCatalogRecord) => Acquisition
   createHardware?: (rig: RigCatalogRecord, telescopeId: string) => FramingHardware
   createSolver?: (fieldHeightDegrees: number) => PlateSolver
   createInspector?: RigDetailOptions['createInspector']
@@ -35,15 +38,15 @@ export function registerTargets(
 ) {
   const now = options.now ?? (() => new Date())
   const controllers = new Map<string, ReturnType<typeof createFramingController>>()
-  const adapters = new Map<string, AlpacaFraming>()
+  const adapters = new Map<string, Framing>()
 
   function adapter(rig: RigCatalogRecord) {
-    const endpoint = `http://${rig.endpoint.host}:${rig.endpoint.port}`
-    let value = adapters.get(endpoint)
+    const key = JSON.stringify([rig.id, rig.source, rig.endpoint])
+    let value = adapters.get(key)
 
     if (!value) {
-      value = options.createAdapter?.(endpoint) ?? createAlpacaFraming({ baseUrl: endpoint })
-      adapters.set(endpoint, value)
+      value = options.createAdapter?.(rig) ?? createAlpacaFraming({ baseUrl: alpacaEndpoint(rig) })
+      adapters.set(key, value)
     }
 
     return value
@@ -80,6 +83,9 @@ export function registerTargets(
       camera.name?.trim() !== rig.imagingCamera.name
     )
       throw new Error('The selected imaging camera is disconnected or its identity changed.')
+
+    if (!controllers.get(rig.id)?.snapshot().active && camera.observation?.commandReady === false)
+      throw new Error(camera.observation.message ?? 'Fresh camera state is required before framing.')
 
     if (
       !controllers.get(rig.id)?.snapshot().active &&
@@ -168,15 +174,18 @@ export function registerTargets(
     if (owner && owner !== 'framing') {
       reason = 'Another rig operation is in progress.'
     } else if (ready.mount.parked) {
-      reason = 'Unpark the mount before framing.'
+      reason = 'The mount is parked. Unpark it in Your Rig before framing.'
     } else if (ready.mount.slewing && !state.active) {
       reason = 'The mount is already moving.'
     } else if (!options.solver && !options.createSolver) {
-      reason = 'Plate solving is not configured on the Vela server.'
+      reason = 'Plate solving is not configured. Configure the Vela server’s ASTAP executable and star catalog to check framing.'
     }
 
     return {
       ...view,
+      ...(ready.mount.parked
+        ? { mountControlReason: 'parked' as const }
+        : !ready.mount.tracking ? { mountControlReason: 'tracking-off' as const } : {}),
       camera: ready.camera,
       enabled: !reason,
       unavailableReason: reason,
@@ -420,7 +429,12 @@ export function registerTargets(
 
         const hardware =
           options.createHardware?.(rig, ready.telescopeId) ??
-          configuredHardware(rig, ready.telescopeId, adapter(rig))
+          configuredHardware(
+            rig,
+            ready.telescopeId,
+            adapter(rig),
+            options.createAcquisition?.(rig) ?? createAlpacaAcquisition({ baseUrl: alpacaEndpoint(rig) }),
+          )
 
         controller.start(
           {
@@ -456,12 +470,9 @@ export function registerTargets(
 function configuredHardware(
   rig: RigCatalogRecord,
   telescopeId: string,
-  adapter: AlpacaFraming,
+  adapter: Framing,
+  acquisition: Acquisition,
 ): FramingHardware {
-  const acquisition = createAlpacaAcquisition({
-    baseUrl: `http://${rig.endpoint.host}:${rig.endpoint.port}`,
-  })
-
   return {
     status: signal => adapter.telescopeStatus(telescopeId, signal, { includePointingSide: true }),
     tracking: (enabled, signal) => adapter.setTracking(telescopeId, enabled, signal),

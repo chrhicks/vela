@@ -172,9 +172,14 @@ export function createFramingController(
       signal.throwIfAborted()
       const current = await observe(hardware, signal)
 
-      if (current.parked || !current.tracking)
+      if (current.parked)
         throw new FramingCheckNeeded(
-          'The mount is parked or tracking is off. Restore tracking, then choose Check current frame.',
+          'The mount is parked. Unpark it in Your Rig, then choose Check current frame.',
+        )
+
+      if (!current.tracking)
+        throw new FramingCheckNeeded(
+          'Mount tracking is off. Turn tracking on in Your Rig, then choose Check current frame.',
         )
 
       const stable =
@@ -493,7 +498,7 @@ export function createFramingController(
           if (mount.parked || mount.slewing) {
             throw new FramingCheckNeeded(
               mount.parked
-                ? 'Unpark the mount, then choose Check current frame.'
+                ? 'The mount is parked. Unpark it in Your Rig, then choose Check current frame.'
                 : 'The mount is still moving. Wait for it to settle, then choose Check current frame.',
             )
           }

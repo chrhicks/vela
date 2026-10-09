@@ -5,6 +5,14 @@ web applications. It gives both sides one normalized vocabulary without
 assigning protocol, transport, persistence, or application behavior to this
 package.
 
+Device detail may carry `observation` separately from HTTP refresh time. Its
+`interrupted` state identifies retained measurements, with their original time,
+and prevents a retained connection from counting as currently connected.
+`partial` means only validated available fields are displayed. `commandReady`
+is an adapter observation used by server preconditions; it does not replace
+validation at command admission. These are semantic page facts, not raw protocol
+readings or credentials.
+
 ## Boundaries
 
 - `@vela/model/device` describes normalized device kinds and live device
@@ -127,3 +135,11 @@ pins native, fitted and PNG-download resources to one version; original FITS
 identity and measurement metadata do not change. The field is optional for older
 API fixtures, which retain the original-preview URL contract. The server owns
 refresh policy and file publication; the model owns no rendering or migration.
+
+`RigTelescopeDeviceView.mountControl` carries independent Unpark and tracking
+action readiness, plus the latest ephemeral command outcome and request identity.
+Its server instance identity prevents a restart from falsely resolving an old
+request as never admitted.
+Parking and tracking remain separate observed facts in the device status. A
+confirmed Unpark command does not imply either tracking state; an uncertain
+command remains explicit until fresh stationary readings resolve it.

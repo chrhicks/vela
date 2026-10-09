@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import type { RigDeviceConnectionSummary } from '@vela/model/rig'
 import type { HomeView, RigDetailView } from '@vela/model/web'
+import { mountControlSchema } from '../features/rig-detail/mount-control-api'
 
 const text = z.string().refine(value => value.trim().length > 0)
 
@@ -103,7 +104,18 @@ const switchStatus = z.object({
     .optional(),
 })
 
-const identity = z.object({ id: canonicalText, name: text, configuredName: text })
+const identity = z.object({
+  id: canonicalText,
+  name: text,
+  configuredName: text,
+  mountControl: mountControlSchema.optional(),
+  observation: z.object({
+    state: z.enum(['current', 'partial', 'interrupted']),
+    observedAt: isoDate.optional(),
+    commandReady: z.boolean(),
+    message: text.optional(),
+  }).optional(),
+})
 
 const connected = identity.extend({ connection: z.literal('connected'), observedAt: isoDate })
 
@@ -156,14 +168,16 @@ export const rigDetailSchema = z
   .refine(value => {
     const summary = value.connections
 
+    const observedConnections = value.devices.map(item =>
+      item.observation?.state === 'interrupted' ? 'unavailable' : item.connection,
+    )
+
     return (
       new Set(value.devices.map(item => item.id)).size === value.devices.length &&
       summary.total === value.devices.length &&
-      summary.connected === value.devices.filter(item => item.connection === 'connected').length &&
-      summary.disconnected ===
-        value.devices.filter(item => item.connection === 'disconnected').length &&
-      summary.unavailable ===
-        value.devices.filter(item => item.connection === 'unavailable').length &&
+      summary.connected === observedConnections.filter(connection => connection === 'connected').length &&
+      summary.disconnected === observedConnections.filter(connection => connection === 'disconnected').length &&
+      summary.unavailable === observedConnections.filter(connection => connection === 'unavailable').length &&
       (value.state !== 'offline' || allConnectionsUnavailable(summary))
     )
   })

@@ -52,6 +52,10 @@ function connectionPreparation(
 
   const connectableDevices = rig.devices.filter(device => isConnectableDeviceKind(device.kind))
 
+  if (connectableDevices.some(device => device.observation?.state === 'interrupted')) {
+    return { state: 'unavailable', capabilities: [] }
+  }
+
   if (connectableDevices.some(device => device.connection === 'unavailable')) {
     return { state: 'unavailable', capabilities: [] }
   }

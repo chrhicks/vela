@@ -36,7 +36,10 @@ export function useObservation(rigId: string) {
       setState(current => ({ ...current, refreshing: true }))
 
       try {
-        const view = await loadObservation(rigId, controller.signal)
+        const view = await loadObservation(
+          rigId,
+          AbortSignal.any([controller.signal, AbortSignal.timeout(5000)]),
+        )
 
         if (controller.signal.aborted) return
 

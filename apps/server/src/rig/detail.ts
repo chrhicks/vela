@@ -1,4 +1,4 @@
-import { AlpacaProviderError, type AlpacaDeviceInspection } from '@vela/alpaca'
+import { EquipmentError, type EquipmentInspection } from '@vela/equipment'
 import type { RigState } from '@vela/model/rig'
 import type { RigDetailView, RigDeviceDetailView } from '@vela/model/web'
 import {
@@ -19,7 +19,7 @@ export type InspectRigDetailResult =
   | {
       readonly state: 'current'
       readonly view: RigDetailView
-      readonly inspections: ReadonlyArray<AlpacaDeviceInspection>
+      readonly inspections: ReadonlyArray<EquipmentInspection>
     }
   | {
       readonly state: 'unavailable'
@@ -35,7 +35,7 @@ export interface RigDetailOptions {
   readonly onUnavailable?: (
     rig: RigCatalogRecord,
     state: Exclude<RigState, 'reachable'>,
-    cause: AlpacaProviderError,
+    cause: EquipmentError,
   ) => void
   readonly onConflict?: (rig: RigCatalogRecord) => void
   readonly signal?: AbortSignal
@@ -56,7 +56,7 @@ export async function inspectRigDetail(
 
   if (record === undefined) return { state: 'not-found' }
 
-  let inspections: ReadonlyArray<AlpacaDeviceInspection>
+  let inspections: ReadonlyArray<EquipmentInspection>
 
   try {
     inspections = await createInspector(record).inspectDevices(
@@ -65,7 +65,7 @@ export async function inspectRigDetail(
   } catch (error) {
     if (signal?.aborted) throw error
 
-    if (!(error instanceof AlpacaProviderError)) throw error
+    if (!(error instanceof EquipmentError)) throw error
 
     const state = error.reason === 'transport' ? 'offline' : 'needs-attention'
     onUnavailable(record, state, error)
@@ -79,7 +79,10 @@ export async function inspectRigDetail(
 
   const refreshedAt = now().toISOString()
   const inventory = observedInventory(inspections, refreshedAt)
-  const match = await catalog.observe(record.endpoint, inventory)
+  const interrupted = inspections.some(device => device.observation?.state === 'interrupted')
+
+  const match = interrupted ? { state: 'known', rigId: record.id }
+    : await catalog.observe(record.endpoint, inventory, record.source)
 
   if (match.state !== 'known' || match.rigId !== record.id) {
     onConflict(record)
@@ -103,7 +106,7 @@ export async function inspectRigDetail(
       state: resolvedRigState(devices),
       endpoint: { ...record.endpoint },
       addedAt: record.addedAt,
-      lastInventoryAt: refreshedAt,
+      lastInventoryAt: interrupted ? record.lastObservedInventory.observedAt : refreshedAt,
       refreshedAt,
       connections: summarizeDeviceConnections(devices),
       devices,
@@ -125,6 +128,7 @@ export async function loadRigDetailView(
 function resolvedRigState(devices: ReadonlyArray<RigDeviceDetailView>): RigState {
   const hasDeviceError = devices.some(
     device =>
+      device.observation?.state === 'interrupted' ||
       device.kind === 'camera' &&
       (device.status.availability === 'complete' || device.status.availability === 'partial') &&
       device.status.activity === 'error',
@@ -134,7 +138,7 @@ function resolvedRigState(devices: ReadonlyArray<RigDeviceDetailView>): RigState
 }
 
 function observedInventory(
-  inspections: ReadonlyArray<AlpacaDeviceInspection>,
+  inspections: ReadonlyArray<EquipmentInspection>,
   observedAt: string,
 ): ObservedRigInventory {
   return {
