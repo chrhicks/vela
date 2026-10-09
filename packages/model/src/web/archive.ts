@@ -133,6 +133,8 @@ export interface ArchiveObligationsView {
     | 'cria-unread'
     /** Cria's latest read failed; its totals are last known. */
     | 'cria-last-known'
+    /** The archive folder Vela opened is missing or replaced, so it cannot be counted. */
+    | 'archive-unavailable'
     /** Vela's archive has not finished its first count. */
     | 'archive-not-counted'
     /** The latest archive count is no longer recent; a new one is running. */
