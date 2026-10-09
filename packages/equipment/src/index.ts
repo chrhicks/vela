@@ -8,7 +8,7 @@ export {
 
 export type { EquipmentErrorReason, EquipmentErrorOptions } from './error.js'
 
-export type { Acquisition, CaptureOptions, Frame, FrameColor, Pointing } from './acquisition.js'
+export type { Acquisition, AcquisitionPurpose, CaptureOptions, Frame, FrameColor, Pointing } from './acquisition.js'
 
 export type {
   Framing,

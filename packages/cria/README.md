@@ -38,13 +38,24 @@ A transient observation failure before admission throws `CriaNotAdmittedError`. 
 
 `onProgress` receives a validated `CriaOperation`. `onReadState` reports interrupted observation until a fresh operation response arrives. `elapsedSeconds` is worker progress, including time spent waiting for cleanup; it is not measured shutter-open duration.
 
-## Original ownership
+## Original custody
 
-`download(operation)` accepts only a confirmed capture and validates the original's operation, instance, device, binding, geometry and requested exposure. It checks the configured store again, downloads a bounded ImageBytes body, verifies length and SHA-256, and decodes geometry before returning `{ image, frame }`. If the stream is interrupted after an operation's terminal result was confirmed, a bounded HTTP state read reconciles store identity and remaining retention; loss of the stream alone does not discard a reachable original. This exception never authorizes a new exposure.
+Cria protocol 3 keeps every original until it accepts an archive receipt. The client requires `protocolVersion: 3` on its first state read, so an older Cria is refused before any command is admitted.
 
-A transient transfer failure can retry the same original within `imageRetryMs` and remaining server retention. This never starts another exposure. Invalid metadata, checksum or encoding stops immediately. Completed originals can outlive an API incarnation; operation metadata does not extend their retention. Expired originals remain distinguishable from an uncertain physical operation.
+`download(operation)` accepts only a confirmed capture and validates the original's operation, instance, device, binding, geometry and requested exposure. It checks the configured store again, downloads a bounded ImageBytes body, verifies length and SHA-256, and decodes geometry before returning `{ image, frame, original }`. `original` holds the exact verified bytes so the caller can preserve them before processing. If the stream is interrupted after an operation's terminal result was confirmed, a bounded HTTP state read reconciles store identity; loss of the stream alone does not discard a reachable original. A transient transfer failure retries the same original within `imageRetryMs`. Invalid metadata, checksum or encoding stops immediately. None of these paths starts another exposure.
 
-After accepting the pixels, call `release(image.id)` separately. A failed best-effort release must not discard the acquired frame. The client drops its cleanup bookkeeping after the attempt; Cria's retention bounds temporary storage if release fails. No release is permitted before successful pixel acquisition.
+Existing results are reached through custody, independently of an operation's outcome:
+
+- `custody(imageId)` reads Cria's record in any state (reserved, retained, quarantined, absent, archived, released, missing, legacy-removed).
+- `retainedOriginals(after)` pages verified originals still awaiting archive.
+- `originalOf(record)` transfers the same verified bytes for a retained or archived record. It works while the operation that produced it remains uncertain and never clears the command interlock.
+- `acknowledgeArchive(receipt)` sends an exact-byte receipt after Vela has verified its archive. Repeating the same receipt is safe; Cria rejects a different receipt or mismatched identity with `receipt-conflict`.
+
+- `decodeOriginal(operation, original)` decodes the same original from another verified source, such as Vela's archive after Cria released its copy. The bytes must still match the confirmed capture's digest and length.
+
+`run()` accepts `beforeAdmission(request)`, awaited after the exact request (including its request ID) is built and before it is sent. A failure there means nothing was sent. Callers use it to record intent and ownership before Cria can act on the request.
+
+There is no release call. Cria deletes its redundant copy only after accepting a receipt, and only when its own release setting allows it. When Cria has stopped admission after an essential storage failure, `state.admissionStoppedReason` explains why and write attempts fail with that reason.
 
 ## Focused verification
 
@@ -54,4 +65,4 @@ pnpm --filter @vela/cria build
 pnpm exec oxlint packages/cria
 ```
 
-The transport fixtures exercise lost admission, identical retry, expiry, cancellation and settlement, domain isolation, identity changes, interrupted reads, clock-independent freshness, and original integrity/ownership. They never contact observatory hardware. Application integration against Cria's separate-process fixtures is verified at the server boundary.
+The transport fixtures exercise lost admission, identical retry, custody reads, archive receipts, protocol refusal, cancellation and settlement, domain isolation, identity changes, interrupted reads, clock-independent freshness, and original integrity/ownership. They never contact observatory hardware. Application integration against Cria's separate-process fixtures is verified at the server boundary.

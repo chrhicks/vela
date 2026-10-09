@@ -2,7 +2,6 @@ import { createHash, randomUUID } from 'node:crypto'
 import { EquipmentError } from '@vela/equipment'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
-  CriaApiError,
   CriaCancelledError,
   CriaIdentityError,
   CriaUncertainError,
@@ -418,19 +417,19 @@ describe('operation completion and cancellation', () => {
   })
 })
 
-describe('original ownership', () => {
-  it('validates and decodes the original before separately releasing its temporary storage', async () => {
+describe('original custody', () => {
+  it('returns the exact verified bytes with decoded pixels and never releases Cria\'s copy', async () => {
     const service = new ServiceFixture()
     const client = service.client()
     const operation = await client.run('camera', capture)
-    const { image, frame } = await client.download(operation)
+    const { frame, original } = await client.download(operation)
 
     expect(frame.width).toBe(2)
     expect(frame.height).toBe(3)
     expect(Array.from(frame.pixels)).toEqual([1, 2, 3, 4, 5, 6])
-    expect(service.deletes).toHaveLength(0)
-    await client.release(image.id)
-    expect(service.deletes).toEqual([image.id])
+    expect(Buffer.from(original).equals(Buffer.from(service.original))).toBe(true)
+    expect(service.paths.some(request => request.startsWith('DELETE'))).toBe(false)
+    expect('release' in client).toBe(false)
   })
 
   it('retries a transient transfer of the same original without another exposure', async () => {
@@ -456,7 +455,7 @@ describe('original ownership', () => {
     expect(service.posts).toHaveLength(1)
   })
 
-  it('does not retry or release an original with corrupt pixels', async () => {
+  it('does not retry an original with corrupt pixels', async () => {
     const service = new ServiceFixture()
     const client = service.client()
     const operation = await client.run('camera', capture)
@@ -464,7 +463,6 @@ describe('original ownership', () => {
     new DataView(service.original).setInt32(44, 99, true)
     await expect(client.download(operation)).rejects.toMatchObject({ reason: 'invalid-response' })
     expect(service.paths.filter(request => request.endsWith('/original'))).toHaveLength(1)
-    expect(service.deletes).toHaveLength(0)
     expect(service.posts).toHaveLength(1)
   })
 
@@ -480,15 +478,14 @@ describe('original ownership', () => {
     image.sha256 = createHash('sha256').update(new Uint8Array(service.original)).digest('hex')
     stored.sha256 = image.sha256
     await expect(client.download(operation)).rejects.toMatchObject({ reason: 'invalid-response' })
-    expect(service.deletes).toHaveLength(0)
   })
 
-  it('bounds transfer retries by remaining server retention without relying on synchronized clocks', async () => {
+  it('bounds transfer retries by its own retry window', async () => {
     const service = new ServiceFixture()
     let attempts = 0
 
     const client = service.client({
-      imageRetryMs: 1_000,
+      imageRetryMs: 25,
       pollIntervalMs: 5,
       fetch: async (input, init) => {
         if (path(input).endsWith('/original')) {
@@ -502,11 +499,9 @@ describe('original ownership', () => {
 
     const operation = await client.run('camera', capture)
 
-    if (!operation.image) throw new Error('Fixture did not retain an original')
-    operation.image.expiresAt = serverNow + 12
     await expect(client.download(operation)).rejects.toMatchObject({ reason: 'transport' })
     expect(attempts).toBeGreaterThan(0)
-    expect(attempts).toBeLessThan(4)
+    expect(attempts).toBeLessThan(10)
     expect(service.posts).toHaveLength(1)
   })
 
@@ -526,20 +521,130 @@ describe('original ownership', () => {
     expect(service.paths.some(request => request.endsWith('/original'))).toBe(false)
   })
 
-  it('reports expiry distinctly and forgets best-effort release failures after pixels transfer', async () => {
+  it('reads an existing result while its operation stays uncertain, without another command', async () => {
     const service = new ServiceFixture()
 
-    const client = service.client({
-      fetch: async (input, init) => init?.method === 'DELETE' ? failure(503) : service.fetch(input, init),
+    service.completeImmediately = false
+    const client = service.client()
+    const running = client.run('camera', capture)
+
+    await vi.waitFor(() => expect(service.last).not.toBeNull())
+    const operation = service.finish('uncertain')
+
+    await expect(running).rejects.toBeInstanceOf(CriaUncertainError)
+    const record = service.retain(operation)
+    const found = await client.custody(record.id)
+
+    expect(found.state).toBe('retained')
+    expect(Buffer.from(await client.originalOf(found)).equals(Buffer.from(service.original))).toBe(true)
+    expect((await client.retainedOriginals()).images.map(image => image.id)).toEqual([record.id])
+    expect(service.posts).toHaveLength(1)
+    expect(client.commandBlockReasonFor('camera')).not.toBeNull()
+  })
+
+  it('sends the same archive receipt idempotently and refuses one for another store', async () => {
+    const service = new ServiceFixture()
+    const client = service.client()
+    const operation = await client.run('camera', capture)
+    const image = operation.image!
+
+    const receipt = {
+      receiptId: randomUUID(),
+      storeId: service.state.storeId,
+      imageId: image.id,
+      operationId: operation.id,
+      sha256: image.sha256,
+      bytes: image.original.bytes,
+      archive: {
+        system: 'vela',
+        artifactId: image.id,
+        representation: 'imagebytes' as const,
+        sha256: image.sha256,
+        bytes: image.original.bytes,
+        contextSha256: '0'.repeat(64),
+        verification: { method: 'sha256-reread', verifiedAt: serverNow },
+      },
+    }
+
+    expect((await client.acknowledgeArchive(receipt)).state).toBe('archived')
+    expect((await client.acknowledgeArchive(receipt)).state).toBe('archived')
+    await expect(client.acknowledgeArchive({ ...receipt, receiptId: randomUUID() })).rejects.toMatchObject({ code: 'receipt-conflict' })
+    await expect(client.acknowledgeArchive({ ...receipt, storeId: randomUUID() })).rejects.toThrow('another Cria store')
+    expect(service.receipts).toHaveLength(3)
+  })
+
+  it('runs the before-admission hook with the exact request before sending it', async () => {
+    const service = new ServiceFixture()
+    const client = service.client()
+    const seen: string[] = []
+
+    const operation = await client.run('camera', capture, {
+      async beforeAdmission(request) {
+        seen.push(request.requestId)
+        expect(service.posts).toHaveLength(0)
+      },
     })
 
-    const operation = await client.run('camera', capture)
-    const acquired = await client.download(operation)
+    expect(seen).toEqual([operation.requestId])
+    await expect(client.run('camera', capture, { beforeAdmission: async () => { throw new Error('Intent not recorded') } }))
+      .rejects.toThrow('Intent not recorded')
+    expect(service.posts).toHaveLength(1)
+  })
 
-    await expect(client.release(acquired.image.id)).rejects.toBeInstanceOf(CriaApiError)
-    expect(Array.from(acquired.frame.pixels)).toEqual([1, 2, 3, 4, 5, 6])
-    await expect(client.release(acquired.image.id)).rejects.toThrow('has not been acquired')
-    operation.image = { ...acquired.image, retainedAt: serverNow - 120_000, expiresAt: serverNow - 60_000 }
-    await expect(client.download(operation)).rejects.toMatchObject({ status: 410, code: 'image-gone' })
+  it('sends nothing when Stop arrives while the before-admission hook runs', async () => {
+    // Found by the Vela verifier: Stop during the intent write still sent the exposure.
+    const service = new ServiceFixture()
+    const client = service.client()
+    const stop = new AbortController()
+
+    await expect(client.run('camera', capture, {
+      signal: stop.signal,
+      async beforeAdmission() {
+        stop.abort()
+      },
+    })).rejects.toBeInstanceOf(CriaCancelledError)
+
+    const cancelling = client.run('camera', capture, {
+      async beforeAdmission() {
+        // Stop from another caller marks the active work cancelled at once.
+        void client.cancelDevice('camera').catch(() => {})
+      },
+    })
+
+    await expect(cancelling).rejects.toBeInstanceOf(CriaCancelledError)
+    expect(service.posts).toHaveLength(0)
+    expect(service.cancellations).toHaveLength(0)
+  })
+
+  it('decodes an archived original only when it matches the confirmed capture', async () => {
+    const service = new ServiceFixture()
+    const client = service.client()
+    const operation = await client.run('camera', capture)
+
+    expect(Array.from(client.decodeOriginal(operation, new Uint8Array(service.original)).pixels)).toEqual([1, 2, 3, 4, 5, 6])
+    const altered = new Uint8Array(service.original)
+
+    altered[44] = 9
+    expect(() => client.decodeOriginal(operation, altered)).toThrow('does not match the confirmed capture')
+  })
+
+  it('reports why Cria stopped admission', async () => {
+    const service = new ServiceFixture()
+
+    Object.assign(service.state, { commandsEnabled: false, admissionStoppedReason: 'Custody record could not be saved: disk full' })
+    const client = service.client()
+
+    await expect(client.run('camera', capture)).rejects.toThrow('Custody record could not be saved: disk full')
+    expect(service.posts).toHaveLength(0)
+  })
+
+  it('refuses a protocol 2 Cria before admitting any work', async () => {
+    const service = new ServiceFixture()
+
+    Object.assign(service.state, { protocolVersion: 2 })
+    const client = service.client()
+
+    await expect(client.run('camera', capture)).rejects.toBeInstanceOf(EquipmentError)
+    expect(service.posts).toHaveLength(0)
   })
 })

@@ -493,6 +493,7 @@ function configuredHardware(
     capture: ({ exposureSeconds, signal, onReadout, onReadState }) =>
       acquisition.capture({
         cameraId: rig.imagingCamera!.uniqueId,
+        purpose: 'framing',
         expectedCameraName: rig.imagingCamera!.name,
         exposureSeconds,
         signal,
