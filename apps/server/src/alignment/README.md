@@ -10,8 +10,9 @@ server's measurement path.
 server-owned controller. `controller.ts` takes three solved positions, constructs
 a baseline, and then solves fresh exposures to measure physical adjustments.
 `geometry.ts` operates on solved sightlines and observed sidereal angles;
-`solver.ts` owns FITS, the bounded external process and WCS. `../imaging/preview.ts` stretches
-only the display copy. Solver input retains original integer pixels.
+`solver.ts` owns FITS, the bounded external process and WCS. `display.ts` prepares each
+exposure's display images from one `../imaging/preview.ts` stretch of a display copy.
+Solver input retains original integer pixels.
 
 The operation remains active across browser disconnects. Stop cancels the current
 acquisition, movement or solver and waits for cleanup. Failed physical commands
@@ -29,11 +30,29 @@ is allowed only when the adapter explicitly reports a safe pre-start failure.
 That retry refreshes and validates the mount observation and solve hint before
 requesting exposure. Preparation and motion are not repeated. Lost command responses, failed cleanup, invalid data,
 unsupported capabilities and subprocess errors still stop the operation.
-The latest acquired full-frame preview is published during baseline
-measurement before solving, including frames that cannot solve. Its exposure
-timestamp and baseline position are separate from the last solved preview,
-measurement and timestamp, which remain together. Image retention is bounded
+### Corrections before images
+
+A correction never waits for its image. After an exposure's pixels arrive, the
+capture check runs beside the plate solve; one final mount check follows, and the
+correction is published with its frame ID, exposure start and solve time. Display
+preparation runs separately for the same frame: a fit-size image (the shared
+stretch averaged over `fitImageScale` native pixels) and, for a correction, a
+native-resolution detail region around the reference and target. The full native
+PNG is rendered only when someone requests 100% inspection. Image requests wait for
+that frame's preparation. Display work stops with a failed frame or with Stop, and
+the run waits for it; a display failure leaves the correction valid and its image
+unavailable.
+
+The latest validated full-frame preview is published once its display is ready,
+usually before its solve completes and including frames that cannot solve. A late
+older display never replaces a newer preview. Its exposure timestamp and baseline
+position are separate from the last solved measurement. Image retention is bounded
 and preserves the last solved image through repeated unsuccessful exposures.
+
+Each exposure leaves compact `alignment.frame` and `alignment.frame.display` trace
+records: monotonic milliseconds from the StartExposure request to pixels, solve,
+publication and display readiness, with the frame ID and fit size. ALPACA image
+reads record the negotiated Content-Type and transferred bytes.
 Restart takes a completely new baseline. Server restart interrupts the operation;
 there is no durable execution or recovery.
 
@@ -74,8 +93,11 @@ baseline. A rejected, ambiguous or unexpected move ends the measurement without
 replay. Stop waits for the acquisition adapter's stop confirmation. The acquisition
 adapter allows up to five seconds after an accepted stop command for the driver
 to report motion stopped. Before each 2-second physical exposure, alignment waits
-three seconds for settling and rechecks mount state; this settling allowance does
-not claim to measure vibration. Cancellation interrupts that pause. The mount
+three seconds for settling and rechecks mount state and camera geometry; this
+settling allowance does not claim to measure vibration. During steady adjustment the
+three-second adjustment window after each reading is that allowance; the separate
+pre-exposure pause applies after preparation, movement and baseline positions.
+Cancellation interrupts either pause. The mount
 remains at the last observed position, with tracking enabled after successful
 preparation. An interrupted or failed homing may leave tracking off; Vela does not
 claim it was restored.
@@ -233,7 +255,7 @@ fine and same-exposure enlargement behavior is owned by the
 ## Validation limits
 
 Route tests inject the acquisition, framing, physical alignment, solver and controller
-factories at composition. Controller tests inject the next-exposure pause and preview
+factories at composition. Controller tests inject the next-exposure pause and display
 renderer, retaining real cancellation and image rendering without replacing modules.
 Independent coordinate fixtures are parsed as exactly three baseline samples before use.
 
