@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, open, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, open, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
@@ -320,6 +320,24 @@ describe('archive health', () => {
     expect(replaced.destination.problem?.kind).toBe('replaced')
     expect(replaced.destination.space?.basis).toBe('other-location')
     expect(replaced.forecast.destinationHours).toBeNull()
+  })
+
+  it('reports an archive it cannot list as unavailable, in plain words', async () => {
+    const service = new ServiceFixture()
+    const { equipment, health, directory } = await setup(service)
+
+    await equipment.acquisition.capture(capture())
+    const store = join(directory, [...service.custody.values()][0]!.storeId)
+
+    await chmod(store, 0o000)
+    onTestFinished(() => chmod(store, 0o755))
+
+    const view = await health.view()
+
+    expect(view.status).toBe('degraded')
+    expect(view.destination.problem).toMatchObject({ kind: 'unreadable', detail: 'The archive could not be listed: Permission denied' })
+    expect(view.obligations.partial).toEqual(['archive-unavailable'])
+    expect(JSON.stringify(view)).not.toContain(store)
   })
 
   it('keeps last-known Cria totals with their age when Cria cannot be read', async () => {

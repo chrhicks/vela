@@ -222,7 +222,7 @@ export function createArchiveHealth({
       census = { value, atMs: startedAt, durationMs: performance.now() - started }
       censusError = null
     })()
-      .catch(error => { censusError = message(error instanceof Error ? error : null, 'archive could not be listed') })
+      .catch(error => { censusError = describeArchiveError(error instanceof Error ? error : null, 'archive could not be listed') })
       .finally(() => { counting = undefined })
 
     return counting
@@ -329,7 +329,7 @@ export function createArchiveHealth({
     try {
       status = await archive.status()
     } catch (error) {
-      archiveError = message(error instanceof Error ? error : null, 'archive could not be read')
+      archiveError = describeArchiveError(error instanceof Error ? error : null, 'archive could not be read')
     }
 
     if (status?.location === 'opened') await recentCensus()
@@ -486,7 +486,9 @@ function obligationsOf(input: ProjectionInput, source: ArchiveSourceView): Archi
 
   if (!source.current) partial.push(source.observedAt ? 'cria-last-known' : 'cria-unread')
 
-  if (input.status && input.status.location !== 'opened') partial.push('archive-unavailable')
+  // A folder that is gone, replaced or unreadable cannot be counted; that is not "still counting".
+  if (!input.status || input.status.location !== 'opened' || (input.censusError && !input.census))
+    partial.push('archive-unavailable')
   else if (!input.census) partial.push('archive-not-counted')
   else if (!input.census.current) partial.push('archive-count-old')
 
