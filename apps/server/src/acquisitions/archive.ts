@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { link, mkdir, mkdtemp, open, readFile, readdir, realpath, rename, rm, stat } from 'node:fs/promises'
+import { access, constants, link, mkdir, mkdtemp, open, readFile, readdir, realpath, rename, rm, stat, statfs } from 'node:fs/promises'
 import { createConnection, createServer } from 'node:net'
 import { dirname, join, parse, resolve } from 'node:path'
 import { z } from 'zod'
@@ -148,8 +148,11 @@ export const ArchiveReceiptSchema = z.strictObject({
 
 export type ArchiveReceipt = z.infer<typeof ArchiveReceiptSchema>
 
+/** Which stored or delivered fact disagrees with the acquisition Vela can vouch for. */
+export type ArchiveConflictSubject = 'original' | 'context' | 'receipt'
+
 export class ArchiveConflictError extends Error {
-  constructor(message: string) {
+  constructor(message: string, readonly subject: ArchiveConflictSubject) {
     super(message)
     this.name = 'ArchiveConflictError'
   }
@@ -161,6 +164,40 @@ export class ArchiveOwnedError extends Error {
     super(message)
     this.name = 'ArchiveOwnedError'
   }
+}
+
+export interface ArchiveTally {
+  count: number
+  bytes: number
+}
+
+/**
+ * What the archive holds for one store, from directory listings and file sizes only. Nothing is
+ * re-read or hashed here: integrity is verified when a receipt is issued or handed out.
+ */
+export interface ArchiveCensus {
+  /** Verified, receipted and acknowledged by Cria. */
+  preserved: ArchiveTally & { imageIds: string[] }
+  /** Verified and receipted; Cria has not confirmed the receipt. */
+  acknowledgementPending: ArchiveTally & { imageIds: string[] }
+  /** Copied but not yet verified: no receipt has been issued. */
+  unverified: ArchiveTally & { imageIds: string[] }
+  /** Entries whose original file is gone; never counted as preserved. */
+  damaged: { count: number; imageIds: string[] }
+}
+
+/**
+ * Read-only health of the archive location. `location` compares the configured path with the
+ * directory Vela opened: an unmounted disk can leave the path missing, or leave an empty mount
+ * point on another filesystem in its place, which must not read as a healthy archive.
+ */
+export interface ArchiveStatus {
+  root: string
+  location: 'opened' | 'missing' | 'replaced'
+  /** Whether this process may write there now; a full disk is only found by writing. */
+  writable: boolean
+  /** Free space of the opened archive's filesystem, or an estimate measured elsewhere. */
+  space: { freeBytes: number; totalBytes: number; measuredPath: string; basis: 'opened-archive' | 'other-location' } | null
 }
 
 export interface AcquisitionArchive {
@@ -184,13 +221,26 @@ export interface AcquisitionArchive {
    * Work left for one store: re-verified receipts not yet acknowledged, and published
    * acquisitions with no receipt, which need expected context before one can be issued.
    */
-  unacknowledged(storeId: string): Promise<{ receipts: ArchiveReceipt[]; unreceipted: string[]; problems: string[] }>
+  unacknowledged(storeId: string): Promise<{
+    receipts: ArchiveReceipt[]
+    unreceipted: string[]
+    problems: string[]
+    /** The same problems, for stored copies that conflict with what they record. */
+    damaged: Array<{ imageId: string; subject: ArchiveConflictSubject; message: string }>
+  }>
   /** Verified original bytes of an acquisition that already has a receipt. */
   original(storeId: string, imageId: string): Promise<Uint8Array | undefined>
   /** Finish in-flight writes and give up ownership. Later calls fail; reopening is allowed. */
   close(): Promise<void>
   /** The receipt already written for an acquisition, if any. Read-only: never issues one. */
   issuedReceipt(storeId: string, imageId: string): Promise<ArchiveReceipt | undefined>
+  /** Read-only location and space for health views: a few system calls, whatever the archive size. */
+  status(): Promise<ArchiveStatus>
+  /**
+   * Read-only listing of every acquisition in one store, from file metadata only. Its cost grows with
+   * the archive, so health views run it in the background and reuse the result.
+   */
+  census(storeId: string): Promise<ArchiveCensus>
 }
 
 /** Filesystem operations whose order makes publication durable. Injectable to test that order. */
@@ -328,6 +378,7 @@ export async function openAcquisitionArchive(
   // interrupted earlier start created.
   await ensureDirectory(root, parse(resolve(root)).root)
   const releaseOwnership = await acquireOwnership(root)
+  const opened = await stat(root)
   let closed = false
 
   // Only the owner gets here. An interrupted publication is then Vela's own unverified copy from a
@@ -452,21 +503,21 @@ export async function openAcquisitionArchive(
     const original = await readOptional(join(target, 'original.imagebytes'))
     const contextBytes = await readOptional(join(target, 'context.json'))
 
-    if (!original || !contextBytes) throw new ArchiveConflictError('Archived acquisition is incomplete')
+    if (!original || !contextBytes) throw new ArchiveConflictError('Archived acquisition is incomplete', 'original')
 
     let parsed: ReturnType<typeof ManifestSchema.safeParse>
 
     try {
       parsed = ManifestSchema.safeParse(JSON.parse(contextBytes.toString('utf8')))
     } catch {
-      throw new ArchiveConflictError('Archived context is unreadable')
+      throw new ArchiveConflictError('Archived context is unreadable', 'context')
     }
 
-    if (!parsed.success) throw new ArchiveConflictError('Archived context is incomplete or inconsistent')
+    if (!parsed.success) throw new ArchiveConflictError('Archived context is incomplete or inconsistent', 'context')
     const manifest = parsed.data
 
     if (original.byteLength !== manifest.source.bytes || sha256(original) !== manifest.source.sha256)
-      throw new ArchiveConflictError('Archived original differs from the Cria source')
+      throw new ArchiveConflictError('Archived original differs from the Cria source', 'original')
 
     return { manifest, original, contextSha256: sha256(contextBytes) }
   }
@@ -482,7 +533,7 @@ export async function openAcquisitionArchive(
     if (receipt.imageId !== source.imageId || receipt.storeId !== source.storeId ||
       receipt.operationId !== source.operationId || receipt.sha256 !== source.sha256 ||
       receipt.archive.contextSha256 !== files.contextSha256)
-      throw new ArchiveConflictError('Stored archive receipt does not match its files')
+      throw new ArchiveConflictError('Stored archive receipt does not match its files', 'receipt')
 
     // It may have been renamed into place just before an interruption; sync before handing it out.
     await fs.syncDirectory(target)
@@ -494,7 +545,7 @@ export async function openAcquisitionArchive(
     const files = await stored(target)
 
     if (!manifestMatches(files.manifest, expected))
-      throw new ArchiveConflictError('Archived context differs from the expected acquisition context')
+      throw new ArchiveConflictError('Archived context differs from the expected acquisition context', 'context')
 
     const existing = await existingReceipt(target, files)
 
@@ -525,9 +576,79 @@ export async function openAcquisitionArchive(
     // Return what is stored, so every caller gets the one receipt recovery can resend.
     const published = await existingReceipt(target, files)
 
-    if (!published) throw new ArchiveConflictError('Archive receipt was not published')
+    if (!published) throw new ArchiveConflictError('Archive receipt was not published', 'receipt')
 
     return published
+  }
+
+  async function archiveStatus(): Promise<ArchiveStatus> {
+    const current = await stat(root).catch(error => {
+      if (isFileError(error) && error.code === 'ENOENT') return undefined
+      throw error
+    })
+
+    const location = !current ? 'missing' : current.dev === opened.dev && current.ino === opened.ino ? 'opened' : 'replaced'
+    const writable = location === 'opened' && await access(root, constants.W_OK).then(() => true, () => false)
+
+    return { root, location, writable, space: await space(location) }
+  }
+
+  /** Measure the archive's filesystem; if its path is gone, the nearest existing ancestor, labelled. */
+  async function space(location: ArchiveStatus['location']): Promise<ArchiveStatus['space']> {
+    for (let path = root; ; path = dirname(path)) {
+      const measured = await statfs(path).catch(() => undefined)
+
+      if (measured) {
+        return {
+          freeBytes: measured.bavail * measured.bsize,
+          totalBytes: measured.blocks * measured.bsize,
+          measuredPath: path,
+          basis: location === 'opened' && path === root ? 'opened-archive' : 'other-location',
+        }
+      }
+
+      if (path === dirname(path)) return null
+    }
+  }
+
+  async function census(storeId: string): Promise<ArchiveCensus> {
+    const result: ArchiveCensus = {
+      preserved: { count: 0, bytes: 0, imageIds: [] },
+      acknowledgementPending: { count: 0, bytes: 0, imageIds: [] },
+      unverified: { count: 0, bytes: 0, imageIds: [] },
+      damaged: { count: 0, imageIds: [] },
+    }
+
+    const entries = await readdir(join(root, storeId)).catch(error => {
+      if (isFileError(error) && error.code === 'ENOENT') return []
+      throw error
+    })
+
+    for (const imageId of entries) {
+      if (imageId.startsWith('.')) continue
+
+      const target = directory(storeId, imageId)
+      const size = await stat(join(target, 'original.imagebytes')).then(file => file.size, () => undefined)
+
+      if (size === undefined) {
+        result.damaged.count++
+        result.damaged.imageIds.push(imageId)
+      } else if (await exists(join(target, 'acknowledgement.json'))) {
+        result.preserved.count++
+        result.preserved.bytes += size
+        result.preserved.imageIds.push(imageId)
+      } else if (await exists(join(target, 'receipt.json'))) {
+        result.acknowledgementPending.count++
+        result.acknowledgementPending.bytes += size
+        result.acknowledgementPending.imageIds.push(imageId)
+      } else {
+        result.unverified.count++
+        result.unverified.bytes += size
+        result.unverified.imageIds.push(imageId)
+      }
+    }
+
+    return result
   }
 
   return {
@@ -552,7 +673,7 @@ export async function openAcquisitionArchive(
       const validated = ExpectedAcquisitionSchema.parse(expected)
 
       if (original.byteLength !== validated.source.bytes || sha256(original) !== validated.source.sha256)
-        throw new ArchiveConflictError('Original bytes do not match their Cria source digest')
+        throw new ArchiveConflictError('Original bytes do not match their Cria source digest', 'original')
 
       return tracked(publish(validated, original, preservedBy).then(target => exclusive(target, () => receiptFor(validated, target))))
     },
@@ -588,8 +709,9 @@ export async function openAcquisitionArchive(
       const receipts: ArchiveReceipt[] = []
       const unreceipted: string[] = []
       const problems: string[] = []
+      const damaged: Array<{ imageId: string; subject: ArchiveConflictSubject; message: string }> = []
 
-      if (!await exists(join(root, storeId))) return { receipts, unreceipted, problems }
+      if (!await exists(join(root, storeId))) return { receipts, unreceipted, problems, damaged }
 
       // Receipts listed here may be sent; re-link the store path in case of an earlier interruption.
       await ensureDirectory(join(root, storeId), root)
@@ -609,10 +731,12 @@ export async function openAcquisitionArchive(
           else unreceipted.push(imageId)
         } catch (error) {
           problems.push(`${storeId}/${imageId}: ${error instanceof Error ? error.message : 'unreadable'}`)
+
+          if (error instanceof ArchiveConflictError) damaged.push({ imageId, subject: error.subject, message: error.message })
         }
       }
 
-      return { receipts, unreceipted, problems }
+      return { receipts, unreceipted, problems, damaged }
     },
     async original(storeId, imageId) {
       assertOpen()
@@ -632,6 +756,16 @@ export async function openAcquisitionArchive(
       if (!await readOptional(join(target, 'receipt.json'))) return undefined
 
       return existingReceipt(target, await stored(target))
+    },
+    async status() {
+      assertOpen()
+
+      return tracked(archiveStatus())
+    },
+    async census(storeId) {
+      assertOpen()
+
+      return tracked(census(storeId))
     },
     async close() {
       if (closed) return
@@ -658,7 +792,7 @@ export function createMemoryAcquisitionArchive(): AcquisitionArchive {
     const entry = entries.get(key)!
 
     if (!manifestMatches(entry.manifest, expected))
-      throw new ArchiveConflictError('Archived context differs from the expected acquisition context')
+      throw new ArchiveConflictError('Archived context differs from the expected acquisition context', 'context')
 
     entry.receipt ??= {
       receiptId: randomUUID(),
@@ -695,7 +829,7 @@ export function createMemoryAcquisitionArchive(): AcquisitionArchive {
       const key = `${validated.source.storeId}/${validated.source.imageId}`
 
       if (original.byteLength !== validated.source.bytes || sha256(original) !== validated.source.sha256)
-        throw new ArchiveConflictError('Original bytes do not match their Cria source digest')
+        throw new ArchiveConflictError('Original bytes do not match their Cria source digest', 'original')
 
       if (!entries.has(key)) {
         entries.set(key, {
@@ -727,7 +861,7 @@ export function createMemoryAcquisitionArchive(): AcquisitionArchive {
         else unreceipted.push(entry.manifest.source.imageId)
       }
 
-      return { receipts, unreceipted, problems: [] }
+      return { receipts, unreceipted, problems: [], damaged: [] }
     },
     async original(storeId, imageId) {
       const entry = entries.get(`${storeId}/${imageId}`)
@@ -736,6 +870,39 @@ export function createMemoryAcquisitionArchive(): AcquisitionArchive {
     },
     async issuedReceipt(storeId, imageId) {
       return entries.get(`${storeId}/${imageId}`)?.receipt
+    },
+    async status() {
+      return { root: 'memory', location: 'opened', writable: true, space: null }
+    },
+    async census(storeId) {
+      const census: ArchiveCensus = {
+        preserved: { count: 0, bytes: 0, imageIds: [] },
+        acknowledgementPending: { count: 0, bytes: 0, imageIds: [] },
+        unverified: { count: 0, bytes: 0, imageIds: [] },
+        damaged: { count: 0, imageIds: [] },
+      }
+
+      for (const entry of entries.values()) {
+        const { imageId, storeId: entryStore } = entry.manifest.source
+
+        if (entryStore !== storeId) continue
+        const bytes = entry.original.byteLength
+
+        if (entry.acknowledged) {
+          census.preserved.count++
+          census.preserved.bytes += bytes
+          census.preserved.imageIds.push(imageId)
+          continue
+        }
+
+        const pending = entry.receipt ? census.acknowledgementPending : census.unverified
+
+        pending.count++
+        pending.bytes += bytes
+        pending.imageIds.push(imageId)
+      }
+
+      return census
     },
     async close() {},
   }

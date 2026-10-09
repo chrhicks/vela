@@ -70,7 +70,7 @@ Proposed responsibilities:
 4. Reconcile duplicate/lost acknowledgement against the same source and receipt. A saved artifact without a receipt is rediscovered and verified; another exposure is never the repair.
 5. Keep archive failure separate from preview/analysis failure. A poor image remains preserved, with its assessment attached.
 
-The full receipt contents, order and failure matrix are authoritative in [shared custody](https://github.com/chrhicks/cria/blob/docs/architecture-baseline-20261008/docs/architecture/contracts.md#originals-and-archive-custody). Storage forecasting belongs to Vela for its destination and Cria for its local disk. If destination storage is unavailable, retain the same original at Cria and pause acquisition when bounded capacity demands it. No unselected-frame or temporary-archive expiry is authorized.
+The full receipt contents, order and failure matrix are authoritative in [shared custody](https://github.com/chrhicks/cria/blob/docs/architecture-baseline-20261008/docs/architecture/contracts.md#originals-and-archive-custody). Storage forecasting belongs to Vela for its destination and Cria for its local disk. If destination storage is unavailable, retain the same original at Cria and pause acquisition when bounded capacity demands it. Today that pause is Cria's own capacity refusal; Vela's [archive health](../../apps/server/src/acquisitions/README.md#health-and-forecast) reports it and adds no earlier threshold. No unselected-frame or temporary-archive expiry is authorized.
 
 ## Canonical representation
 

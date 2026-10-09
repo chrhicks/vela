@@ -80,3 +80,18 @@ export type {
 export type { NavigationCapture, NavigationView } from './navigation.js'
 
 export type { MountControlAction, MountControlAvailability, MountControlView } from './mount-control.js'
+
+export type {
+  ArchiveDestinationProblemKind,
+  ArchiveDestinationView,
+  ArchiveForecastView,
+  ArchiveHealthStatus,
+  ArchiveHealthView,
+  ArchiveIssue,
+  ArchiveIssueReason,
+  ArchiveObligationsView,
+  ArchiveSourceView,
+  ArchiveTally,
+  CriaArchiveHealthView,
+  UnarchivedRigHealthView,
+} from './archive.js'

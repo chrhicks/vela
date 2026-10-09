@@ -23,9 +23,11 @@ import {
   CriaOperationSchema,
   CriaRefreshSchema,
   CriaStateSchema,
+  CriaStorageSchema,
   type CriaArchiveReceipt,
   type CriaClientConfig,
   type CriaCustody,
+  type CriaCustodyState,
   type CriaCommand,
   type CriaDevice,
   type CriaDeviceBinding,
@@ -33,6 +35,7 @@ import {
   type CriaOperation,
   type CriaOperationRequest,
   type CriaState,
+  type CriaStorage,
   type CriaValue,
 } from './schema.js'
 
@@ -838,6 +841,32 @@ export class CriaClient {
       throw this.invalid('Cria returned originals from another store or state', '/v2/images')
 
     return { images: page.images, next: page.next }
+  }
+
+  /** One page of custody records in the named states, in admission order. Never contacts a driver. */
+  async custodyPage(
+    states: ReadonlyArray<CriaCustodyState>,
+    after = 0,
+    limit = 100,
+  ): Promise<{ images: CriaCustody[]; next: number }> {
+    const query = `state=${states.join(',')}&after=${after}&limit=${limit}`
+    const page = await this.http.json(`/v2/images?${query}`, CriaCustodyPageSchema)
+
+    if (page.storeId !== this.config.storeId ||
+      page.images.some(record => !states.includes(record.state) || record.storeId !== page.storeId))
+      throw this.invalid('Cria returned custody from another store or state', '/v2/images')
+
+    return { images: page.images, next: page.next }
+  }
+
+  /** Cria's custody capacity and per-state totals. Read-only bookkeeping, no driver contact. */
+  async storage(): Promise<CriaStorage> {
+    const storage = await this.http.json('/v2/storage', CriaStorageSchema)
+
+    if (storage.operations.storeId !== this.config.storeId)
+      throw this.invalid('Cria storage belongs to another store', '/v2/storage')
+
+    return storage
   }
 
   /**

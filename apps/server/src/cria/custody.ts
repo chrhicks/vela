@@ -7,6 +7,8 @@ import {
   type ArchiveReceipt,
   type ExpectedAcquisition,
 } from '../acquisitions/archive.js'
+import { z } from 'zod'
+import { classifyArchiveFailure, createArchiveHealthTracker, describeArchiveError, provenanceOf, type ArchiveHealthTracker } from './archive-health.js'
 
 export interface CriaCustodyReport {
   acknowledged: number
@@ -32,9 +34,9 @@ function problem(error: Error | null, fallback: string) {
 export function expectedAcquisition(record: CriaCustody, intent: AcquisitionIntent | null): ExpectedAcquisition {
   const image = record.image
 
-  if (!image) throw new Error('Cria custody has no verified original')
+  if (!image) throw new ArchiveConflictError('Cria custody has no verified original', 'context')
 
-  return ExpectedAcquisitionSchema.parse({
+  const expected = ExpectedAcquisitionSchema.safeParse({
     source: {
       system: 'cria',
       storeId: record.storeId,
@@ -58,6 +60,11 @@ export function expectedAcquisition(record: CriaCustody, intent: AcquisitionInte
     },
     intent,
   })
+
+  if (!expected.success)
+    throw new ArchiveConflictError(`Cria's acquisition record cannot be vouched for: ${z.prettifyError(expected.error)}`, 'context')
+
+  return expected.data
 }
 
 /**
@@ -65,10 +72,20 @@ export function expectedAcquisition(record: CriaCustody, intent: AcquisitionInte
  * Cria, which may then release its redundant copy. A failed transfer or archive is repaired by
  * fetching the same original again; this never requests another exposure.
  */
-export function createCriaCustody(client: CriaClient, archive: AcquisitionArchive, storeId: string) {
+export function createCriaCustody(
+  client: CriaClient,
+  archive: AcquisitionArchive,
+  storeId: string,
+  /** Observed attempts for the archive health view; recovery itself never depends on it. */
+  tracker: ArchiveHealthTracker = createArchiveHealthTracker(),
+) {
   // Requests an active acquisition owns, from before they are sent until its frame is returned.
   const owned = new Set<string>()
   let recovering: Promise<CriaCustodyReport> | undefined
+
+  async function intentOf(record: CriaCustody) {
+    return record.requestId ? await archive.intent(storeId, record.requestId).catch(() => undefined) ?? null : null
+  }
 
   async function expectedFor(record: CriaCustody) {
     const intent = record.requestId ? await archive.intent(storeId, record.requestId) : undefined
@@ -89,12 +106,17 @@ export function createCriaCustody(client: CriaClient, archive: AcquisitionArchiv
 
     report.problems.push(...local.problems)
 
+    for (const damaged of local.damaged)
+      tracker.failed(damaged.imageId, { scope: 'image', reason: `${damaged.subject}-mismatch`, detail: damaged.message }, provenanceOf(undefined))
+
     for (const receipt of local.receipts) {
       try {
         await acknowledge(receipt)
         report.acknowledged++
+        tracker.preserved(receipt.imageId)
       } catch (error) {
         report.problems.push(`${receipt.imageId}: ${problem(error instanceof Error ? error : null, 'acknowledgement failed')}`)
+        tracker.failed(receipt.imageId, classifyArchiveFailure(error instanceof Error ? error : null, 'acknowledge'), { requestId: null, operationId: receipt.operationId, purpose: null })
       }
     }
 
@@ -110,6 +132,8 @@ export function createCriaCustody(client: CriaClient, archive: AcquisitionArchiv
 
         if (owned.has(record.requestId) || archiveUnavailable !== null) continue
 
+        let stage: 'preserve' | 'acknowledge' = 'preserve'
+
         try {
           const expected = await expectedFor(record)
           let receipt = await archive.receipt(expected)
@@ -124,10 +148,13 @@ export function createCriaCustody(client: CriaClient, archive: AcquisitionArchiv
             })
           }
 
+          stage = 'acknowledge'
           await acknowledge(receipt)
           report.preserved++
+          tracker.preserved(record.id)
         } catch (error) {
           report.problems.push(`${record.id}: ${problem(error instanceof Error ? error : null, 'preservation failed')}`)
+          tracker.failed(record.id, classifyArchiveFailure(error instanceof Error ? error : null, stage), provenanceOf(record, await intentOf(record)))
         }
       }
 
@@ -150,7 +177,10 @@ export function createCriaCustody(client: CriaClient, archive: AcquisitionArchiv
       } catch (error) {
         // Only a confirmed unknown image means Cria does not retain it; anything else is unread.
         if (!(error instanceof CriaApiError && error.status === 404)) {
-          report.problems.push(`${imageId}: Cria custody could not be read (${(error instanceof Error ? error.message : 'unreadable')}); still pending`)
+          const detail = `Cria custody could not be read (${(error instanceof Error ? error.message : 'unreadable')}); still pending`
+
+          report.problems.push(`${imageId}: ${detail}`)
+          tracker.failed(imageId, { scope: 'image', reason: 'source-unavailable', detail }, provenanceOf(undefined))
           continue
         }
       }
@@ -161,10 +191,17 @@ export function createCriaCustody(client: CriaClient, archive: AcquisitionArchiv
       // Read-only: this check must never issue a receipt for a copy it cannot vouch for.
       const finished = record?.receipt && await archive.issuedReceipt(storeId, imageId).catch(() => undefined)
 
-      if (finished && finished.receiptId === record?.receipt?.receiptId) continue
-      report.problems.push(record?.receipt
-        ? `${imageId}: Cria accepted another archive's receipt for this original; this archive's unreceipted copy is not vouched for`
-        : `${imageId}: archived without a receipt, but Cria does not retain this original`)
+      if (finished && finished.receiptId === record?.receipt?.receiptId) {
+        tracker.settled(imageId)
+        continue
+      }
+
+      const detail = record?.receipt
+        ? "Cria accepted another archive's receipt for this original; this archive's unreceipted copy is not vouched for"
+        : 'archived without a receipt, but Cria does not retain this original'
+
+      report.problems.push(`${imageId}: ${detail}`)
+      tracker.failed(imageId, { scope: 'image', reason: record?.receipt ? 'receipt-conflict' : 'unvouched-copy', detail }, provenanceOf(record))
     }
 
     return report
@@ -172,15 +209,24 @@ export function createCriaCustody(client: CriaClient, archive: AcquisitionArchiv
 
   return {
     storeId,
+    tracker,
     /** Record intent durably and take ownership of the request before it is sent. */
     async intend(intent: AcquisitionIntent) {
       try {
         await archive.recordIntent(intent)
       } catch (error) {
-        throw new Error(`Acquisition archive unavailable; capture not started: ${error instanceof Error ? error.message : 'intent not recorded'}`, { cause: error })
+        const detail = describeArchiveError(error instanceof Error ? error : null, 'intent not recorded')
+
+        tracker.intentRefused(detail)
+        throw new Error(`Acquisition archive unavailable; capture not started: ${detail}`, { cause: error })
       }
 
+      tracker.intentRecorded()
       owned.add(intent.requestId)
+    },
+    /** Whether an active acquisition owns this request; recovery leaves those to it. */
+    owns(requestId: string) {
+      return owned.has(requestId)
     },
     /** The acquisition is done with this request; recovery may now finish its archive work. */
     disown(requestId: string) {
@@ -188,10 +234,21 @@ export function createCriaCustody(client: CriaClient, archive: AcquisitionArchiv
     },
     /** Preserve a just-acquired original before any consumer processes its pixels. */
     async preserveAcquisition(imageId: string, original: Uint8Array) {
-      const record = await client.custody(imageId)
-      const receipt = await archive.preserve({ expected: await expectedFor(record), original, preservedBy: 'acquisition' })
+      tracker.acquired(original.byteLength)
+      let record: CriaCustody | undefined
+      let stage: 'preserve' | 'acknowledge' = 'preserve'
 
-      await acknowledge(receipt)
+      try {
+        record = await client.custody(imageId)
+        const receipt = await archive.preserve({ expected: await expectedFor(record), original, preservedBy: 'acquisition' })
+
+        stage = 'acknowledge'
+        await acknowledge(receipt)
+        tracker.preserved(imageId)
+      } catch (error) {
+        tracker.failed(imageId, classifyArchiveFailure(error instanceof Error ? error : null, stage), provenanceOf(record, record && await intentOf(record)))
+        throw error
+      }
     },
     /** The same verified original from Vela's archive, if it already holds a receipted copy. */
     archivedOriginal(imageId: string) {

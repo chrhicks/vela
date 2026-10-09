@@ -1,0 +1,114 @@
+.tonight-preservation {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 18px;
+  border-top: 1px solid var(--vela-line);
+  font-size: 14px;
+  line-height: 20px;
+}
+.tonight-preservation > p {
+  color: var(--vela-text-muted);
+}
+.tonight-preservation__state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+.tonight-preservation__dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  border-radius: 50%;
+  background: var(--vela-text-muted);
+}
+.tonight-preservation[data-tone='current'] .tonight-preservation__dot {
+  background: var(--vela-positive);
+}
+.tonight-preservation[data-tone='problem'] .tonight-preservation__dot {
+  background: var(--vela-warning);
+}
+.tonight-preservation[data-tone='problem'] .tonight-preservation__state {
+  color: var(--vela-warning);
+}
+.tonight-preservation[data-tone='unknown'] .tonight-preservation__dot {
+  background: transparent;
+  border: 1px solid var(--vela-text-muted);
+}
+.tonight-preservation > .tonight-preservation__next {
+  color: var(--vela-text);
+}
+.tonight-preservation__notice {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: var(--vela-radius);
+  background: var(--vela-warning-surface);
+}
+.tonight-preservation__notice strong {
+  font-weight: 500;
+}
+.tonight-preservation__details > summary {
+  cursor: pointer;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  color: var(--vela-text-muted);
+}
+.tonight-preservation__details h3 {
+  margin: 16px 0 8px;
+  font: 500 14px/20px var(--vela-font);
+}
+.tonight-preservation__details dl {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+.tonight-preservation__details dl > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 2px 12px;
+}
+.tonight-preservation__details dt {
+  color: var(--vela-text-muted);
+}
+.tonight-preservation__details dd {
+  margin: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.tonight-preservation__details p {
+  margin-top: 8px;
+  color: var(--vela-text-muted);
+}
+.tonight-preservation__issues {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tonight-preservation__issues li {
+  display: grid;
+  gap: 2px;
+}
+.tonight-preservation__issues li p {
+  margin: 0;
+}
+.tonight-preservation__issues strong {
+  font-weight: 500;
+}
+.tonight-preservation__meta {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.tonight-preservation__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  color: var(--vela-text-muted);
+}

@@ -267,6 +267,51 @@ export const CriaCustodyPageSchema = z.strictObject({
   next: z.number().int().nonnegative(),
 })
 
+const byteCount = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER)
+
+const recordTally = z.strictObject({ records: byteCount, bytes: byteCount })
+
+/**
+ * Cria's local custody capacity from `GET /v2/storage`. Read-only bookkeeping: reading it never
+ * contacts a driver. `states` counts outstanding records; `missing` and terminal states are not
+ * included and must be listed separately.
+ */
+export const CriaStorageSchema = z.strictObject({
+  operations: z.strictObject({
+    storeId: uuid,
+    requests: byteCount,
+    requestLimit: byteCount,
+    retainedOperationLimit: byteCount,
+    durable: z.boolean(),
+  }),
+  images: z.strictObject({
+    retention: z.literal('until-archive-receipt'),
+    releaseArchivedOriginals: z.boolean(),
+    imageRetentionSecondsIgnored: z.boolean(),
+    committedBytes: byteCount,
+    budgetBytes: byteCount,
+    /** Bytes held for each admitted capture until its original is measured. */
+    reservationBytes: byteCount,
+    /** Free space of the volume holding Cria's image store. */
+    freeBytes: byteCount,
+    freeSpaceReserveBytes: byteCount,
+    outstandingRecords: byteCount,
+    recordLimit: byteCount,
+    states: z.strictObject({
+      reserved: recordTally,
+      retained: recordTally,
+      quarantined: recordTally,
+      archived: recordTally,
+    }),
+    downloads: byteCount,
+    captureAdmissible: z.boolean(),
+    refusal: z.string().nullable(),
+    migration: jsonObject.nullable(),
+  }),
+})
+
+export type CriaStorage = z.infer<typeof CriaStorageSchema>
+
 export const CriaOperationSchema = z.strictObject({
   id: uuid,
   ...operationIdentity,
