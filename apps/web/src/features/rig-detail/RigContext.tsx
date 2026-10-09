@@ -7,8 +7,16 @@ export type RigObservation = RigDetailResult & { rigId: string }
 
 const RigContext = createContext<RigObservation | undefined>(undefined)
 
-export function RigObservationProvider({ rigId, children }: { rigId: string; children: ReactNode }) {
-  const observation = useRigDetail(rigId)
+export function RigObservationProvider({
+  rigId,
+  paused,
+  children,
+}: {
+  rigId: string
+  paused: boolean
+  children: ReactNode
+}) {
+  const observation = useRigDetail(rigId, { paused })
 
   return <RigContext value={{ ...observation, rigId }}>{children}</RigContext>
 }

@@ -1,12 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
+import type { AlignmentDetailImage } from '@vela/model/web'
 import { Button, Dialog } from '@vela/ui'
 import { alignmentViewport, angularScaleLabel } from './image-viewport'
 import type { AlignmentImageView, AlignmentMeasurement } from './image-viewport'
 
 export interface AlignmentImageFrame {
+  /** Native display pixels, loaded only for 100% inspection. */
   imageUrl: string
   imageWidth: number
   imageHeight: number
+  fitImageUrl: string
+  fitImageScale: number
+  detail?: AlignmentDetailImage
   capturedAt: string | null
   capturedAtSource?: 'camera' | 'server-estimate'
   title: string
@@ -77,6 +82,8 @@ function ImageCanvas({
 
     return () => clearTimeout(timer)
   }, [imageError, attempt])
+  const [nativeLoaded, setNativeLoaded] = useState(false)
+
   const imageEvents = { onError: () => setImageError(true), onLoad: () => setImageError(false) }
 
   const warning = imageError && (
@@ -99,9 +106,14 @@ function ImageCanvas({
             height={frame.imageHeight}
             style={{ width: frame.imageWidth, height: frame.imageHeight }}
             alt={frame.alt}
-            {...imageEvents}
+            onError={imageEvents.onError}
+            onLoad={() => {
+              setImageError(false)
+              setNativeLoaded(true)
+            }}
           />
         </div>
+        {!nativeLoaded && !imageError && <p role="status">Loading full-resolution image…</p>}
         {warning}
       </>
     )
@@ -111,7 +123,7 @@ function ImageCanvas({
       <>
         <img
           key={attempt}
-          src={frame.imageUrl}
+          src={frame.fitImageUrl}
           width={frame.imageWidth}
           height={frame.imageHeight}
           alt={frame.alt}
@@ -124,6 +136,9 @@ function ImageCanvas({
   const m = frame.solution
   const box = alignmentViewport(m, view)
   const scale = Math.max(box.width / Math.max(size.width, 1), box.height / Math.max(size.height, 1))
+  // Each fit pixel covers fitImageScale native pixels from the origin, so the last may overhang.
+  const fitWidth = Math.ceil(frame.imageWidth / frame.fitImageScale) * frame.fitImageScale
+  const fitHeight = Math.ceil(frame.imageHeight / frame.fitImageScale) * frame.fitImageScale
 
   return (
     <div className="vela-polar-image-canvas">
@@ -134,12 +149,25 @@ function ImageCanvas({
         aria-label={frame.alt}
       >
         <image
-          key={attempt}
-          href={frame.imageUrl}
-          width={frame.imageWidth}
-          height={frame.imageHeight}
+          key={`fit-${attempt}`}
+          href={frame.fitImageUrl}
+          width={fitWidth}
+          height={fitHeight}
+          preserveAspectRatio="none"
           {...imageEvents}
         />
+        {frame.detail && view !== 'full' && (
+          <image
+            key={`detail-${attempt}`}
+            href={frame.detail.imageUrl}
+            x={frame.detail.x}
+            y={frame.detail.y}
+            width={frame.detail.width}
+            height={frame.detail.height}
+            preserveAspectRatio="none"
+            {...imageEvents}
+          />
+        )}
         <path
           d={`M${box.referenceX} ${box.referenceY}L${m.targetX} ${m.targetY}`}
           fill="none"
@@ -191,6 +219,7 @@ function InspectionView({
   readState,
   now,
   retained,
+  superseded = false,
   noSolution,
   expanded = false,
   openerId,
@@ -200,6 +229,8 @@ function InspectionView({
   readonly readState: ReadState
   readonly now: number
   readonly retained: boolean
+  /** A newer correction is shown above; this image belongs to an earlier one. */
+  readonly superseded?: boolean
   readonly noSolution: boolean
   readonly expanded?: boolean
   readonly openerId?: string
@@ -215,10 +246,13 @@ function InspectionView({
     ? `${Math.max(0, Math.floor((now - Date.parse(frame.capturedAt)) / 1000))} seconds old`
     : 'Age unavailable'
 
+  let solvedStatus = 'Last solved frame'
+
+  if (superseded) solvedStatus = `Earlier solved frame · ${age} · Newer image loading`
+  else if (retained || readState !== 'current') solvedStatus = `Last solved frame · ${age}`
+
   const status = frame.solution
-    ? retained || readState !== 'current'
-      ? `Last solved frame · ${age}`
-      : 'Last solved frame'
+    ? solvedStatus
     : noSolution
       ? 'No solution · Exposure retained for inspection. No alignment result yet.'
       : 'No alignment result yet'
@@ -310,6 +344,7 @@ export function AlignmentImage({
   readState,
   now,
   retained,
+  superseded = false,
   noSolution = false,
   openerId,
   onEnlarge,
@@ -318,6 +353,7 @@ export function AlignmentImage({
   readonly readState: ReadState
   readonly now: number
   readonly retained: boolean
+  readonly superseded?: boolean
   readonly noSolution?: boolean
   readonly openerId: string
   readonly onEnlarge: (image: ExpandedAlignmentImage) => void
@@ -329,6 +365,7 @@ export function AlignmentImage({
         readState={readState}
         now={now}
         retained={retained}
+        superseded={superseded}
         noSolution={noSolution}
         openerId={openerId}
         onEnlarge={() => onEnlarge({ frame, noSolution })}

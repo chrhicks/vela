@@ -49,6 +49,8 @@ export interface AlpacaCaptureOptions {
   signal?: AbortSignal
   onProgress?: (elapsedSeconds: number) => void
   onReadout?: () => void
+  /** Called immediately before the StartExposure command is sent; for latency observation only. */
+  onExposureRequested?: () => void
   /** Observation of this acknowledged exposure is interrupted; no new exposure is started. */
   onReadState?: (state: 'retrying' | 'current') => void
 }
@@ -318,6 +320,7 @@ export function createAlpacaAcquisition({
       onProgress,
       onReadout,
       onReadState,
+      onExposureRequested,
     }) {
       bounded(exposureSeconds, 0.001, 3600, 'exposure duration')
 
@@ -367,6 +370,7 @@ export function createAlpacaAcquisition({
         const startedAt = performance.now()
         const requestedAt = new Date().toISOString()
         attempted = true
+        onExposureRequested?.()
         // A lost response can still mean the exposure started. Never replay it.
         await client.command(
           camera,

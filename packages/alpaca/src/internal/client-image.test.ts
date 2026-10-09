@@ -1,4 +1,10 @@
 import { afterEach, expect, it, vi } from 'vitest'
+import { context, trace } from '@opentelemetry/api'
+import {
+  InMemorySpanExporter,
+  NodeTracerProvider,
+  SimpleSpanProcessor,
+} from '@opentelemetry/sdk-trace-node'
 import { createAlpacaClient } from './client.js'
 
 afterEach(() => vi.useRealTimers())
@@ -131,4 +137,55 @@ it('rejects an unrecognized Content-Type and preserves a JSON protocol error', a
     reason: 'protocol-error',
     errorNumber: 1025,
   })
+})
+
+it('records the negotiated image format and transferred size without the payload', async () => {
+  const exporter = new InMemorySpanExporter()
+  const provider = new NodeTracerProvider({ spanProcessors: [new SimpleSpanProcessor(exporter)] })
+  provider.register()
+
+  const camera = { DeviceName: 'Camera', DeviceType: 'Camera', DeviceNumber: 0, UniqueID: 'camera' }
+  const bytes = new ArrayBuffer(46)
+  const metadata = new DataView(bytes)
+  const fields = [1, 0, 0, 1, 44, 2, 8, 2, 1, 1, 0]
+  fields.forEach((value, index) => metadata.setInt32(index * 4, value, true))
+
+  const json = {
+    ErrorNumber: 0,
+    ErrorMessage: '',
+    ClientTransactionID: 0,
+    ServerTransactionID: 1,
+    Type: 2,
+    Rank: 2,
+    Value: [[7]],
+  }
+
+  try {
+    for (const binary of [true, false]) {
+      const fetch: typeof globalThis.fetch = async () =>
+        binary
+          ? new Response(bytes, {
+              headers: { 'content-type': 'application/imagebytes', 'content-length': '46' },
+            })
+          : Response.json(json)
+
+      await createAlpacaClient({ baseUrl: 'http://fake', fetch }).image(camera)
+    }
+
+    const [binary, fallback] = exporter.getFinishedSpans()
+    expect(binary!.attributes).toMatchObject({
+      'alpaca.response.content_type': 'application/imagebytes',
+      'alpaca.response.content_length': 46,
+      'alpaca.response.body_bytes': 46,
+    })
+    expect(fallback!.attributes).toMatchObject({
+      'alpaca.response.content_type': 'application/json',
+      'alpaca.response.body_characters': JSON.stringify(json).length,
+    })
+    expect(Object.values(binary!.attributes)).not.toContain(bytes)
+  } finally {
+    await provider.shutdown()
+    trace.disable()
+    context.disable()
+  }
 })

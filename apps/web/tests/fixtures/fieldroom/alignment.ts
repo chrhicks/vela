@@ -50,7 +50,11 @@ export const alignmentMeasurement: NonNullable<AlignmentView['measurement']> = {
   altitudeArcsec: -30,
   azimuthArcsec: -23,
   totalArcsec: Math.hypot(30, 23),
+  solvedAt: '2026-09-21T01:00:30Z',
   imageUrl,
+  fitImageUrl: imageUrl,
+  frameId: imageUrl,
+  fitImageScale: 1,
   imageWidth: 1600,
   imageHeight: 1200,
   // Illustrative projected coordinates in a north-up 1-degree-high field.
@@ -138,6 +142,9 @@ export function createAlignmentScene(name: AlignmentScene) {
       measuredAt: null,
       preview: {
         imageUrl,
+        fitImageUrl: imageUrl,
+        frameId: imageUrl,
+        fitImageScale: 1,
         imageWidth: 1600,
         imageHeight: 1200,
         capturedAt: alignmentMeasuredAt,
