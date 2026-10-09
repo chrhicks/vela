@@ -105,6 +105,7 @@ function Preservation({
             ? `Archive counted ${age(obligations.archiveCountedAt, now)}.`
             : 'Vela is still counting its archive.'}
           {obligations.partial.includes('pending-copies-unchecked') && ' Some waiting originals may be counted twice.'}
+          {obligations.partial.includes('missing-unchecked') && ' Not every missing record at Cria has been checked.'}
           {(obligations.partial.includes('cria-last-known') || obligations.partial.includes('archive-count-old')) && ' Some totals are last known.'}
         </p>
 
