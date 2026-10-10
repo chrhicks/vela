@@ -1,0 +1,40 @@
+.archive-health-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  max-width: 400px;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+.archive-health-preview__capture {
+  display: grid;
+  gap: 12px;
+  padding: 20px 22px;
+  border-radius: var(--vela-card-radius);
+  background: var(--vela-surface);
+  font-size: 14px;
+  line-height: 20px;
+}
+.archive-health-preview__capture strong {
+  font-size: 15px;
+  font-weight: 500;
+}
+.archive-health-preview__capture p {
+  margin: 0;
+  color: var(--vela-text-muted);
+}
+.archive-health-preview .tonight-context__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+}
+.archive-health-preview .tonight-context__heading strong {
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+}
+.archive-health-preview p {
+  margin: 0;
+}

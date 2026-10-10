@@ -11,10 +11,12 @@ export type {
 export {
   CriaApiError,
   CriaIdentityError,
+  CriaOriginalVerificationError,
   CriaUncertainError,
   CriaOperationFailedError,
   CriaNotAdmittedError,
   CriaCancelledError,
+  isTransientCriaFailure,
 } from './error.js'
 
 export {
@@ -31,6 +33,7 @@ export {
   CriaOperationSchema,
   CriaDeviceSchema,
   CriaStateSchema,
+  CriaStorageSchema,
 } from './schema.js'
 
 export type {
@@ -47,5 +50,6 @@ export type {
   CriaOperation,
   CriaDevice,
   CriaState,
+  CriaStorage,
   CriaValue,
 } from './schema.js'
