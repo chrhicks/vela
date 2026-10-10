@@ -91,6 +91,12 @@ is active so Stop stays available. Every cooling command acquires its own exclus
 Rig lease through readback; an existing capture owner never permits another
 cooling command to join that operation.
 
+Whenever any operation owns the Rig, the cooling projection carries `blockedBy`:
+`alignment`, `autofocus`, `framing`, `capture` for an active run, or `rig` for any
+other short command. It uses the same condition under which the cooling command is
+refused, so the browser can disable the control and name the reason instead of
+discovering a 409. A confirmed cooling response is read after its own lease ends.
+
 ## Local review
 
 Choose the simulator imaging camera through the same Rig setup API used for a

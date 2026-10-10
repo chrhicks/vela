@@ -47,6 +47,7 @@ export type {
 } from './autofocus.js'
 
 export type {
+  CaptureCoolingBlocker,
   CaptureCoolingView,
   CaptureSubject,
   CaptureImage,

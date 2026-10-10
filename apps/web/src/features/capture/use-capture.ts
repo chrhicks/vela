@@ -140,8 +140,10 @@ export function useCapture(rigId: string) {
 
   const canStop = !!view?.active && view.phase !== 'stopping' && !offline && !pending
 
+  // The server marks cooling blocked whenever its command would be refused.
   const canCool =
     !!view?.cooling &&
+    !view.cooling.blockedBy &&
     !view.active &&
     !offline &&
     !pending &&
