@@ -421,6 +421,7 @@ function CapturePage({ rigId }: { rigId: string }) {
             error={capture.coolingError}
             unconfirmed={capture.coolingUnconfirmed}
             runActive={view.active}
+            stale={offline || capture.coolingUnconfirmed}
             blocker={coolingBlocker(view.cooling?.blockedBy, base)}
             onCooler={coolerOn => void capture.setCooler(coolerOn)}
             onSetpoint={setpointC => void capture.setCoolingTemperature(setpointC)}
