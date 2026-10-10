@@ -3,7 +3,32 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#F1EEE5" />
+    <style>
+      /* Fieldroom canvas before the app applies its theme variables. */
+      html { color-scheme: light; background: var(--vela-canvas, #F1EEE5); }
+      html[data-mode='dark'] { color-scheme: dark; background: var(--vela-canvas, #141715); }
+      @media (prefers-color-scheme: dark) {
+        html:not([data-mode]) { color-scheme: dark; background: #141715; }
+      }
+    </style>
+    <script>
+      // Resolve a saved Light/Dark choice before first paint; the app takes over after.
+      ;(() => {
+        let saved = null
+
+        try {
+          saved = localStorage.getItem('vela.appearance')
+        } catch {
+          // Storage may be blocked; System still applies.
+        }
+
+        const dark = saved === 'dark' || (saved !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches)
+        document.documentElement.dataset.mode = dark ? 'dark' : 'light'
+        document.querySelector('meta[name="theme-color"]').content = dark ? '#141715' : '#F1EEE5'
+      })()
+    </script>
     <meta name="description" content="Vela astronomy companion" />
     <title>Vela</title>
   </head>

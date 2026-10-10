@@ -153,8 +153,15 @@ it('validates confirmed retention and exact same-origin download resources', () 
     { savedImageCount: undefined },
     { savedImageCount: 0.5 },
     { cooling: { state: 'off' } },
+    { cooling: { state: 'off', canSetTemperature: true, blockedBy: 'guiding' } },
   ]) {
     expect(isCaptureView({ ...view, ...patch }, 'rig-1')).toBe(false)
+  }
+
+  for (const blockedBy of ['capture', 'alignment', 'autofocus', 'framing', 'rig']) {
+    expect(
+      isCaptureView({ ...view, cooling: { state: 'off', canSetTemperature: true, blockedBy } }, 'rig-1'),
+    ).toBe(true)
   }
 })
 

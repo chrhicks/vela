@@ -234,6 +234,12 @@ export function createAlpacaClient({
           .toLowerCase()
 
         binary = contentType === 'application/imagebytes'
+        // Record the negotiated image format and declared size, never the payload.
+        span?.setAttributes({
+          'alpaca.response.content_type': contentType ?? '',
+          'alpaca.response.content_encoding': response.headers.get('content-encoding') ?? '',
+          'alpaca.response.content_length': Number(response.headers.get('content-length') ?? -1),
+        })
 
         if (!binary && contentType !== 'application/json') {
           throw new AlpacaProviderError('Unsupported camera image Content-Type', {
@@ -247,11 +253,16 @@ export function createAlpacaClient({
       let json: unknown
 
       if (binary) {
+        let bytes: ArrayBuffer
+
         try {
-          json = await response.arrayBuffer()
+          bytes = await response.arrayBuffer()
         } catch (cause) {
           throwTransportError(cause)
         }
+
+        span?.setAttribute('alpaca.response.body_bytes', bytes.byteLength)
+        json = bytes
       } else {
         let text: string
 
@@ -260,6 +271,8 @@ export function createAlpacaClient({
         } catch (cause) {
           throwTransportError(cause)
         }
+
+        if (bodyFormat === 'image') span?.setAttribute('alpaca.response.body_characters', text.length)
 
         try {
           json = JSON.parse(text)

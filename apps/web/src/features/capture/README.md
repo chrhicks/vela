@@ -58,6 +58,15 @@ temperature is not treated as cooling enabled. Cooler on/off and target temperat
 are explicit commands; setting a target does not turn the cooler on. Cooling is
 disabled while a capture run is active so Stop stays available. Cooler command
 failures stay in the cooling region and do not label capture unavailable.
+When the server marks cooling `blockedBy` another operation, the switch is disabled
+and the cooling region names what holds the rig, with a link to alignment or
+autofocus where Chris can resolve it. Command feedback (blocker, refusal or unknown
+outcome) has one slot directly below the switch. The description above it explains
+observed state without claiming freshness and never changes with a command; the
+switch's own note and "Confirming cooler state…" share one cell, and a previous
+refusal keeps its space invisibly while the next command confirms, so a tap never
+moves the control. While capture is offline or a cooling outcome is unknown, the
+card heading reads "Cooling · last known", matching the Tonight footer.
 An uncertain command retains the affected setting until an explicit check observes
 it again: CoolerOn for a switch command, requested setpoint for a temperature
 command. Missing telemetry and successful exposure commands do not dismiss that

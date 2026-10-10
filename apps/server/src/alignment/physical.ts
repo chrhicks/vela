@@ -179,10 +179,14 @@ export function createPhysicalAlignment(
     }
   }
 
-  async function pointing(signal: AbortSignal) {
-    await status(signal)
-    // Stopped telemetry does not establish that vibration has settled.
-    await settle(signal)
+  /** `afterSettling`: the caller has just waited one cancellable settling interval itself. */
+  async function pointing(signal: AbortSignal, { afterSettling = false } = {}) {
+    if (!afterSettling) {
+      await status(signal)
+      // Stopped telemetry does not establish that vibration has settled.
+      await settle(signal)
+    }
+
     const current = await status(signal)
 
     const observed = await device.cameraGeometry(

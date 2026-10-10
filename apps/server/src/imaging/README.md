@@ -82,7 +82,8 @@ asinh strength 10 remain unchanged. There are no channel gains or separate chann
 stretches. Field-filling emission can bias the estimate; a cap is not a color
 calibration. Mono and insufficient/invalid background estimates remain unchanged.
 
-`previewPng` and `capturePreviews` use the same transform. Native pixels and the
+`previewPng`, `capturePreviews` and alignment display images use the same `stretchImage`
+transform; fit, region and native encoders share one stretch. Native pixels and the
 fitted displayed-pixel averages therefore agree; thumbnails use the fitted
 derivative. This affects display only: acquisition samples, statistics and solver
 inputs remain independent. Rendering and compression retain cooperative yields.

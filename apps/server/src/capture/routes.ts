@@ -6,7 +6,13 @@ import {
 } from '@vela/alpaca'
 import { CaptureStoppedError as EquipmentCaptureStoppedError, type Acquisition, type CameraCooling, type DeviceTelemetry } from '@vela/equipment'
 import { alpacaEndpoint } from '../equipment/source.js'
-import type { CaptureCoolingView, CaptureSubject, CaptureView, NavigationCapture } from '@vela/model/web'
+import type {
+  CaptureCoolingBlocker,
+  CaptureCoolingView,
+  CaptureSubject,
+  CaptureView,
+  NavigationCapture,
+} from '@vela/model/web'
 import type { RigCatalogRecord } from '../rig/contracts.js'
 import type { RigCatalog } from '../rig/catalog.js'
 import type { RigOperations } from '../rig/operations.js'
@@ -94,6 +100,26 @@ export function registerCapture(
   const controllers = new Map<string, ReturnType<typeof createCaptureController>>()
   const cameraFactory = createCamera ?? (settings => configuredCamera(settings, createAcquisition(settings.rig)))
 
+  /**
+   * Marks observed cooling with whatever owns the Rig's commands right now. It
+   * mirrors the cooling command, which any current owner refuses.
+   */
+  function withCoolingBlocker(
+    rigId: string,
+    observed: CaptureCoolingView | null,
+  ): CaptureCoolingView | null {
+    if (!observed) return null
+    const { blockedBy: _previous, ...cooling } = observed
+    const owner = operations.owner(rigId)
+    let blockedBy: CaptureCoolingBlocker | undefined
+
+    if (owner === 'alignment' || owner === 'autofocus' || owner === 'framing') blockedBy = owner
+    else if (owner === 'capture' && controllers.get(rigId)?.active()) blockedBy = 'capture'
+    else if (owner) blockedBy = 'rig'
+
+    return blockedBy ? { ...cooling, blockedBy } : cooling
+  }
+
   function cameraSettings(rig: RigCatalogRecord): CaptureSettings | undefined {
     if (rig.imagingCamera) {
       return {
@@ -175,7 +201,7 @@ export function registerCapture(
 
     const cooling = camera.observation?.state === 'interrupted'
       ? null
-      : captureCooling(camera.telemetry.values)
+      : withCoolingBlocker(rigId, captureCooling(camera.telemetry.values))
 
     const project = (view: CaptureView): CaptureView => ({ ...view, camera: cameraView, cooling })
 
@@ -284,7 +310,12 @@ export function registerCapture(
 
         started = true
 
-        return { ...result, savedImageCount: view.savedImageCount, cooling: view.cooling }
+        return {
+          ...result,
+          savedImageCount: view.savedImageCount,
+          // The run now owns the Rig, so cooling is re-marked after it started.
+          cooling: withCoolingBlocker(view.rigId, view.cooling),
+        }
       } catch (error) {
         return reply
           .code(409)
@@ -362,6 +393,10 @@ export function registerCapture(
             .code(status)
             .send({ error: result.message ?? 'The camera did not accept the cooling command.' })
         }
+
+        // The confirmed state is read after this command's own lease ends, so it
+        // does not report cooling as blocked by itself.
+        release()
 
         return (
           (await rigView(request.params.rigId)) ?? reply.code(404).send({ error: 'Rig not found' })

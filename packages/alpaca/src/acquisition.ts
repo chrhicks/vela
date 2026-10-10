@@ -271,6 +271,7 @@ export function createAlpacaAcquisition({
       onProgress,
       onReadout,
       onReadState,
+      onExposureRequested,
     }) {
       bounded(exposureSeconds, 0.001, 3600, 'exposure duration')
 
@@ -320,6 +321,7 @@ export function createAlpacaAcquisition({
         const startedAt = performance.now()
         const requestedAt = new Date().toISOString()
         attempted = true
+        onExposureRequested?.()
         // A lost response can still mean the exposure started. Never replay it.
         await client.command(
           camera,

@@ -15,6 +15,8 @@ interface RigDetailState {
 }
 
 export interface RigDetailResult extends RigDetailState {
+  /** Periodic device inspection is paused; the view is the last completed observation. */
+  readonly paused: boolean
   refresh(options?: { force?: boolean }): Promise<RigDetailView | undefined>
 }
 
@@ -23,11 +25,12 @@ const initialState: RigDetailState = {
   interrupted: false,
 }
 
-export function useRigDetail(rigId: string): RigDetailResult {
+export function useRigDetail(rigId: string, { paused = false } = {}): RigDetailResult {
   const [state, setState] = useState<RigDetailState>(initialState)
   const inFlight = useRef(false)
   const controller = useRef<AbortController | undefined>(undefined)
   const requestGeneration = useRef(0)
+  const wasPaused = useRef(false)
 
   const refresh = useCallback(async (options?: { force?: boolean }) => {
     if (inFlight.current && !options?.force) return
@@ -98,6 +101,20 @@ export function useRigDetail(rigId: string): RigDetailResult {
       timer = undefined
     }
 
+    if (paused) {
+      wasPaused.current = true
+
+      return
+    }
+
+    // The last observation aged while paused; replace it instead of waiting another interval.
+    if (wasPaused.current) {
+      wasPaused.current = false
+      void refresh()
+
+      return
+    }
+
     const schedule = () => {
       clearTimer()
 
@@ -118,7 +135,7 @@ export function useRigDetail(rigId: string): RigDetailResult {
       clearTimer()
       document.removeEventListener('visibilitychange', visibilityChanged)
     }
-  }, [refresh, state.refreshing])
+  }, [refresh, state.refreshing, paused])
 
-  return { ...state, refresh }
+  return { ...state, paused, refresh }
 }

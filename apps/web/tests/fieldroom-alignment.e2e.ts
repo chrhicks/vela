@@ -127,7 +127,7 @@ test('appearance preserves alignment viewport, solve and command state', async (
   expect(scene.writes).toEqual([])
 })
 
-test('failed next image preserves paired solve and interrupted browser gives past-tense guidance', async ({
+test('a fresh correction shows before its image, which keeps an earlier paired overlay until it loads', async ({
   page,
 }) => {
   const { scene } = await openAlignmentScene(page, 'alignment-phone-adjusting')
@@ -138,17 +138,30 @@ test('failed next image preserves paired solve and interrupted browser gives pas
   scene.setView({
     ...prior,
     measuredAt: '2026-10-01T01:02:15Z',
-    measurement: { ...prior.measurement!, imageUrl: nextUrl, totalArcsec: 7 },
+    measurement: {
+      ...prior.measurement!,
+      frameId: nextUrl,
+      imageUrl: nextUrl,
+      fitImageUrl: nextUrl,
+      totalArcsec: 7,
+    },
   })
-  await expect(page.getByText(/Previous readings and overlay remain together/)).toBeVisible()
-  await expect(page.locator('.vela-polar-total strong')).toHaveText('38″')
-  await expect(page.locator('.vela-polar-image svg image')).toHaveAttribute(
-    'href',
-    prior.measurement!.imageUrl,
-  )
+  // The correction is not held back by its image.
+  await expect(page.locator('.vela-polar-total strong')).toHaveText('7″')
   await expect(page.locator('.vela-polar-total time')).toHaveAttribute(
     'datetime',
-    prior.measuredAt!,
+    '2026-10-01T01:02:15Z',
+  )
+  await expect(page.getByText(/The image shows an earlier measurement/)).toBeVisible()
+  await expect(page.locator('.vela-polar-image svg image').first()).toHaveAttribute(
+    'href',
+    prior.measurement!.fitImageUrl,
+  )
+  await expect(page.locator('.vela-polar-inspection-status')).toContainText(
+    'Earlier solved frame',
+  )
+  await expect(page.locator('.vela-polar-inspection-status')).toContainText(
+    'Newer image unavailable',
   )
   scene.setReadFailure(503)
   await expect(page.getByText('Measurements interrupted', { exact: true })).toBeVisible()
@@ -157,7 +170,8 @@ test('failed next image preserves paired solve and interrupted browser gives pas
   scene.setReadFailure(null)
   scene.setImageFailure(nextUrl, null)
   await expect(page.locator('.vela-polar-total strong')).toHaveText('7″')
-  await expect(page.locator('.vela-polar-image svg image')).toHaveAttribute('href', nextUrl)
+  await expect(page.locator('.vela-polar-image svg image').first()).toHaveAttribute('href', nextUrl)
+  await expect(page.locator('.vela-polar-inspection-status')).not.toContainText('Earlier')
   expect(scene.writes).toEqual([])
 })
 

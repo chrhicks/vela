@@ -3,6 +3,7 @@ import { useEffect, useId, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { captureActivity, useCapture } from '../features/capture/use-capture'
 import { PreparationCooling } from '../features/capture/PreparationCooling'
+import { coolingBlocker } from '../features/capture/CaptureCooling'
 import { useImagingCamera } from '../features/imaging-camera/use-imaging-camera'
 import { EquipmentSummary } from '../features/observation/EquipmentSummary'
 import { RigReadiness } from '../features/observation/RigReadiness'
@@ -281,6 +282,7 @@ function Preparation({ rigId }: { rigId: string }) {
             error={capture.coolingError}
             unconfirmed={capture.coolingUnconfirmed}
             runActive={view?.active}
+            blocker={coolingBlocker(view?.cooling?.blockedBy, base)}
             onCooler={value => void capture.setCooler(value)}
             onSetpoint={value => void capture.setCoolingTemperature(value)}
             onCheck={() => void capture.refresh()}
