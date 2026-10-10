@@ -4,8 +4,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   CriaCancelledError,
   CriaIdentityError,
+  CriaApiError,
+  CriaCustodySchema,
+  CriaOriginalVerificationError,
   CriaUncertainError,
+  isTransientCriaFailure,
   type CriaCommand,
+  type CriaCustody,
   type CriaOperation,
 } from '../src/index.js'
 import { closeFixtures, eventResponse, failure, json, reading, serverNow, ServiceFixture } from './fixture.js'
@@ -505,6 +510,81 @@ describe('original custody', () => {
     expect(service.posts).toHaveLength(1)
   })
 
+  it('types an original that fails verification apart from an interrupted transfer', async () => {
+    const service = new ServiceFixture()
+    let interrupting = false
+
+    const client = service.client({
+      imageRetryMs: 25,
+      pollIntervalMs: 5,
+      fetch: async (input, init) => {
+        if (interrupting && path(input).endsWith('/original')) throw new TypeError('Transfer interrupted')
+
+        return service.fetch(input, init)
+      },
+    })
+
+    await client.run('camera', capture)
+    const record = [...service.custody.values()][0]!
+
+    interrupting = true
+    await expect(client.originalOf(record)).rejects.toMatchObject({ reason: 'transport' })
+    await expect(client.originalOf(record)).rejects.not.toBeInstanceOf(CriaOriginalVerificationError)
+
+    interrupting = false
+    new Uint8Array(service.original)[service.original.byteLength - 1]! ^= 1
+    await expect(client.originalOf(record)).rejects.toBeInstanceOf(CriaOriginalVerificationError)
+
+    const foreign = { ...record, operationId: randomUUID() }
+
+    await expect(client.originalOf(foreign)).rejects.toBeInstanceOf(CriaOriginalVerificationError)
+    expect(service.posts).toHaveLength(1)
+  })
+
+  it('types a custody record for another image or store as a verification failure', async () => {
+    const service = new ServiceFixture()
+    let rewrite: ((record: CriaCustody) => void) | null = null
+
+    const client = service.client({
+      fetch: async (input, init) => {
+        const response = await service.fetch(input, init)
+
+        if (!rewrite || !/^\/v2\/images\/[^/]+$/.test(path(input))) return response
+        const record = CriaCustodySchema.parse(await response.json())
+
+        rewrite(record)
+
+        return Response.json(record)
+      },
+    })
+
+    await client.run('camera', capture)
+    const imageId = [...service.custody.keys()][0]!
+
+    rewrite = record => {
+      const id = randomUUID()
+
+      Object.assign(record, { id, image: record.image && { ...record.image, id, original: { ...record.image.original, url: `/v2/images/${id}/original` } } })
+    }
+
+    await expect(client.custody(imageId)).rejects.toBeInstanceOf(CriaOriginalVerificationError)
+    rewrite = record => { record.storeId = randomUUID() }
+
+    await expect(client.custody(imageId)).rejects.toBeInstanceOf(CriaOriginalVerificationError)
+    rewrite = null
+
+    await expect(client.custody(imageId)).resolves.toMatchObject({ id: imageId })
+  })
+
+  it('names transient failures once, for retries and for whoever reports them', () => {
+    expect(isTransientCriaFailure(new EquipmentError('interrupted', { reason: 'transport', endpoint: '/v2/state' }))).toBe(true)
+    expect(isTransientCriaFailure(new CriaApiError(503, 'unavailable', 'Unavailable', '/v2/images'))).toBe(true)
+    expect(isTransientCriaFailure(new CriaApiError(429, 'download-busy', 'Busy', '/v2/images'))).toBe(true)
+    expect(isTransientCriaFailure(new CriaApiError(401, 'unauthorized', 'Unauthorized', '/v2/images'))).toBe(false)
+    expect(isTransientCriaFailure(new EquipmentError('invalid', { reason: 'invalid-response', endpoint: '/v2/images' }))).toBe(false)
+    expect(isTransientCriaFailure(new CriaOriginalVerificationError('integrity', '/v2/images'))).toBe(false)
+  })
+
   it('rejects cross-operation metadata and external original URLs before downloading', async () => {
     const service = new ServiceFixture()
     const client = service.client()
@@ -540,6 +620,25 @@ describe('original custody', () => {
     expect((await client.retainedOriginals()).images.map(image => image.id)).toEqual([record.id])
     expect(service.posts).toHaveLength(1)
     expect(client.commandBlockReasonFor('camera')).not.toBeNull()
+  })
+
+  it('reads custody capacity and state pages without contacting a driver, refusing another store', async () => {
+    const service = new ServiceFixture()
+    const client = service.client()
+
+    await client.run('camera', capture)
+    const posts = service.posts.length
+    const storage = await client.storage()
+
+    expect(storage.images.states.retained.records).toBe(1)
+    expect((await client.custodyPage(['missing'])).images).toEqual([])
+    expect(service.posts).toHaveLength(posts)
+
+    const other = new ServiceFixture()
+    const stranger = other.client({ storeId: service.state.storeId })
+
+    await expect(stranger.storage()).rejects.toThrow('Cria storage belongs to another store')
+    await expect(stranger.custodyPage(['retained'])).rejects.toThrow('another store or state')
   })
 
   it('sends the same archive receipt idempotently and refuses one for another store', async () => {

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { EquipmentError } from '@vela/equipment'
 import { z } from 'zod'
-import { CriaApiError } from './error.js'
+import { CriaApiError, CriaOriginalVerificationError } from './error.js'
 import { CriaErrorSchema, type CriaValue } from './schema.js'
 
 const jsonLimit = 4 * 1024 * 1024
@@ -153,11 +153,11 @@ export class CriaHttp {
     return this.response(path, 'GET', undefined, timeoutMs, async response => {
       if (response.headers.get('content-type')?.split(';')[0]?.trim() !== 'application/imagebytes' ||
         response.headers.get('content-length') !== String(expectedBytes) || !response.body)
-        throw this.invalid('Cria original headers do not match retained metadata', path)
+        throw new CriaOriginalVerificationError('Cria original headers do not match retained metadata', path)
       const etag = response.headers.get('etag')
 
       if (etag !== null && etag !== `"${sha256}"`)
-        throw this.invalid('Cria original checksum header changed', path)
+        throw new CriaOriginalVerificationError('Cria original checksum header changed', path)
 
       const bytes = new ArrayBuffer(expectedBytes)
       const output = new Uint8Array(bytes)
@@ -173,7 +173,7 @@ export class CriaHttp {
           if (done) break
 
           if (offset + value.byteLength > expectedBytes)
-            throw this.invalid('Cria original exceeds its declared length', path)
+            throw new CriaOriginalVerificationError('Cria original exceeds its declared length', path)
           output.set(value, offset)
           hash.update(value)
           offset += value.byteLength
@@ -182,7 +182,7 @@ export class CriaHttp {
         complete = true
 
         if (offset !== expectedBytes || hash.digest('hex') !== sha256)
-          throw this.invalid('Cria original integrity check failed', path)
+          throw new CriaOriginalVerificationError('Cria original integrity check failed', path)
 
         return bytes
       } finally {

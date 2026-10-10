@@ -9,7 +9,9 @@ import {
   CriaIdentityError,
   CriaOperationFailedError,
   CriaNotAdmittedError,
+  CriaOriginalVerificationError,
   CriaUncertainError,
+  isTransientCriaFailure,
 } from './error.js'
 import { CriaHttp } from './http.js'
 import { CriaEvents, type ObservedState } from './events.js'
@@ -23,9 +25,11 @@ import {
   CriaOperationSchema,
   CriaRefreshSchema,
   CriaStateSchema,
+  CriaStorageSchema,
   type CriaArchiveReceipt,
   type CriaClientConfig,
   type CriaCustody,
+  type CriaCustodyState,
   type CriaCommand,
   type CriaDevice,
   type CriaDeviceBinding,
@@ -33,6 +37,7 @@ import {
   type CriaOperation,
   type CriaOperationRequest,
   type CriaState,
+  type CriaStorage,
   type CriaValue,
 } from './schema.js'
 
@@ -824,7 +829,7 @@ export class CriaClient {
     const record = await this.http.json(`/v2/images/${imageId}`, CriaCustodySchema)
 
     if (record.id !== imageId || record.storeId !== this.config.storeId)
-      throw this.invalid('Cria custody belongs to another image or store', '/v2/images')
+      throw new CriaOriginalVerificationError('Cria custody belongs to another image or store', '/v2/images')
 
     return record
   }
@@ -838,6 +843,32 @@ export class CriaClient {
       throw this.invalid('Cria returned originals from another store or state', '/v2/images')
 
     return { images: page.images, next: page.next }
+  }
+
+  /** One page of custody records in the named states, in admission order. Never contacts a driver. */
+  async custodyPage(
+    states: ReadonlyArray<CriaCustodyState>,
+    after = 0,
+    limit = 100,
+  ): Promise<{ images: CriaCustody[]; next: number }> {
+    const query = `state=${states.join(',')}&after=${after}&limit=${limit}`
+    const page = await this.http.json(`/v2/images?${query}`, CriaCustodyPageSchema)
+
+    if (page.storeId !== this.config.storeId ||
+      page.images.some(record => !states.includes(record.state) || record.storeId !== page.storeId))
+      throw this.invalid('Cria returned custody from another store or state', '/v2/images')
+
+    return { images: page.images, next: page.next }
+  }
+
+  /** Cria's custody capacity and per-state totals. Read-only bookkeeping, no driver contact. */
+  async storage(): Promise<CriaStorage> {
+    const storage = await this.http.json('/v2/storage', CriaStorageSchema)
+
+    if (storage.operations.storeId !== this.config.storeId)
+      throw this.invalid('Cria storage belongs to another store', '/v2/storage')
+
+    return storage
   }
 
   /**
@@ -856,7 +887,7 @@ export class CriaClient {
     if (record.storeId !== this.config.storeId || image.id !== record.id ||
       image.operationId !== record.operationId || image.bindingId !== record.bindingId ||
       image.deviceId !== record.deviceId)
-      throw this.invalid('Cria custody identities do not match its original', '/v2/images')
+      throw new CriaOriginalVerificationError('Cria custody identities do not match its original', '/v2/images')
 
     return new Uint8Array(await this.transferOriginal(image, options))
   }
@@ -898,8 +929,7 @@ export class CriaClient {
           image.original.url, image.original.bytes, image.sha256, this.timing.imageTimeoutMs,
         )
       } catch (error) {
-        const transient = error instanceof EquipmentError && error.reason === 'transport' ||
-          error instanceof CriaApiError && [429, 500, 502, 503, 504].includes(error.status)
+        const transient = error instanceof EquipmentError && isTransientCriaFailure(error)
 
         if (!transient || performance.now() + this.timing.pollIntervalMs >= retryDeadline) throw error
         options.onReadState?.('retrying')
@@ -936,8 +966,7 @@ export class CriaClient {
           roundTripMs: receivedMonotonic - started,
         }
       } catch (error) {
-        const transient = error instanceof EquipmentError && error.reason === 'transport' ||
-          error instanceof CriaApiError && [429, 500, 502, 503, 504].includes(error.status)
+        const transient = error instanceof EquipmentError && isTransientCriaFailure(error)
 
         if (!transient || this.closed || performance.now() + this.timing.pollIntervalMs >= deadline) throw error
         await delay(this.timing.pollIntervalMs)
