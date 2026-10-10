@@ -11,6 +11,7 @@ import {
   CriaNotAdmittedError,
   CriaOriginalVerificationError,
   CriaUncertainError,
+  isTransientCriaFailure,
 } from './error.js'
 import { CriaHttp } from './http.js'
 import { CriaEvents, type ObservedState } from './events.js'
@@ -828,7 +829,7 @@ export class CriaClient {
     const record = await this.http.json(`/v2/images/${imageId}`, CriaCustodySchema)
 
     if (record.id !== imageId || record.storeId !== this.config.storeId)
-      throw this.invalid('Cria custody belongs to another image or store', '/v2/images')
+      throw new CriaOriginalVerificationError('Cria custody belongs to another image or store', '/v2/images')
 
     return record
   }
@@ -928,8 +929,7 @@ export class CriaClient {
           image.original.url, image.original.bytes, image.sha256, this.timing.imageTimeoutMs,
         )
       } catch (error) {
-        const transient = error instanceof EquipmentError && error.reason === 'transport' ||
-          error instanceof CriaApiError && [429, 500, 502, 503, 504].includes(error.status)
+        const transient = error instanceof EquipmentError && isTransientCriaFailure(error)
 
         if (!transient || performance.now() + this.timing.pollIntervalMs >= retryDeadline) throw error
         options.onReadState?.('retrying')
@@ -966,8 +966,7 @@ export class CriaClient {
           roundTripMs: receivedMonotonic - started,
         }
       } catch (error) {
-        const transient = error instanceof EquipmentError && error.reason === 'transport' ||
-          error instanceof CriaApiError && [429, 500, 502, 503, 504].includes(error.status)
+        const transient = error instanceof EquipmentError && isTransientCriaFailure(error)
 
         if (!transient || this.closed || performance.now() + this.timing.pollIntervalMs >= deadline) throw error
         await delay(this.timing.pollIntervalMs)

@@ -178,9 +178,11 @@ export function createCriaCustody(
         // Only a confirmed unknown image means Cria does not retain it; anything else is unread.
         if (!(error instanceof CriaApiError && error.status === 404)) {
           const detail = `Cria custody could not be read (${(error instanceof Error ? error.message : 'unreadable')}); still pending`
+          // Classified like any other Cria failure: a rejected or identity-changed record needs attention.
+          const failure = classifyArchiveFailure(error instanceof Error ? error : null, 'preserve')
 
           report.problems.push(`${imageId}: ${detail}`)
-          tracker.failed(imageId, { scope: 'image', reason: 'source-unavailable', detail }, provenanceOf(undefined))
+          tracker.failed(imageId, failure.scope === 'image' ? failure : { scope: 'image', reason: 'source-unavailable', detail }, provenanceOf(undefined))
           continue
         }
       }

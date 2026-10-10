@@ -2,12 +2,13 @@ import { chmod, mkdir, mkdtemp, open, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
-import { CriaClient, type CriaCustody } from '@vela/cria'
+import { EquipmentError } from '@vela/equipment'
+import { CriaApiError, CriaClient, CriaCustodySchema, CriaIdentityError, CriaOriginalVerificationError, type CriaCustody } from '@vela/cria'
 import { ServiceFixture, failure, serviceOrigin, token } from '../../../packages/cria/test/fixture.js'
 import { createCriaEquipment } from '../src/cria/equipment.js'
 import { createCriaCustody } from '../src/cria/custody.js'
-import { createArchiveHealth, createArchiveHealthTracker } from '../src/cria/archive-health.js'
-import { nodeArchiveFileSystem, openAcquisitionArchive, type ArchiveCensus, type ArchiveFileSystem } from '../src/acquisitions/archive.js'
+import { classifyArchiveFailure, createArchiveHealth, createArchiveHealthTracker } from '../src/cria/archive-health.js'
+import { ArchiveConflictError, nodeArchiveFileSystem, openAcquisitionArchive, type ArchiveCensus, type ArchiveFileSystem } from '../src/acquisitions/archive.js'
 // What the browser accepts and tells Chris must describe the same event the server publishes.
 import { isArchiveHealthView } from '../../web/src/features/archive/validation.js'
 import { issueSteps, preservationSummary } from '../../web/src/features/archive/presentation.js'
@@ -720,5 +721,194 @@ describe('archive health', () => {
 
     expect(resumed).toMatchObject({ status: 'current', issues: { total: 0 }, obligations: { preserved: { count: 1 } } })
     expect(exposures(service)).toBe(1)
+  })
+
+  it.each([
+    ['image', (record: CriaCustody) => {
+      // A consistent, schema-valid record for a different image, served at this image's URL.
+      const id = crypto.randomUUID()
+
+      Object.assign(record, { id, image: record.image && { ...record.image, id, original: { ...record.image.original, url: `/v2/images/${id}/original` } } })
+    }],
+    ['store', (record: CriaCustody) => { record.storeId = crypto.randomUUID() }],
+  ])('needs attention when the custody record for a capture belongs to another %s, and preserves it later', async (_, change) => {
+    const service = new ServiceFixture()
+    let rewriting = true
+
+    const { equipment, health } = await setup(service, {
+      fetch: async (input, init) => {
+        const response = await service.fetch(input, init)
+
+        if (!rewriting || !/^\/v2\/images\/[^/]+$/.test(new URL(String(input)).pathname)) return response
+        const record = CriaCustodySchema.parse(await response.json())
+
+        change(record)
+
+        return Response.json(record)
+      },
+    })
+
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const frame = await equipment.acquisition.capture(capture())
+
+    expect(frame.width).toBe(2)
+    const view = await health.view()
+
+    expect(view.status).toBe('attention')
+    expect(view.issues).toMatchObject({ total: 1, needsAttention: 1 })
+    // The rejected record cannot vouch for provenance, so none is claimed.
+    expect(view.issues.shown).toEqual([expect.objectContaining({ reason: 'source-mismatch', detail: 'Cria custody belongs to another image or store', purpose: null })])
+    expect(service.receipts).toHaveLength(0)
+    expect(exposures(service)).toBe(1)
+
+    const published = { rigId: 'rig-1', rigName: 'FRA 400', preservation: 'cria' as const, ...view }
+
+    expect(isArchiveHealthView(published, 'rig-1')).toBe(true)
+    expect(preservationSummary(published, false)).toMatchObject({ tone: 'problem', title: '1 original needs attention' })
+    expect(preservationSummary(published, false).explanation).not.toContain('automatically')
+
+    // Recovery reads the retained page and verifies the same original's bytes; no new exposure.
+    rewriting = false
+    const recovered = await health.reconcile()
+
+    expect(recovered).toMatchObject({ status: 'current', issues: { total: 0 }, obligations: { preserved: { count: 1 } } })
+    expect(service.receipts).toHaveLength(1)
+    expect(exposures(service)).toBe(1)
+    error.mockRestore()
+  })
+
+  it('needs attention on every recovery while a configured device identity has changed, then preserves the same original', async () => {
+    const service = new ServiceFixture()
+    const { client, health } = await setup(service)
+    const expectedName = service.camera.expectedName
+
+    await client.run('camera', { kind: 'capture', parameters: { exposureSeconds: 0.001, light: true } })
+    service.camera.expectedName = 'A different camera'
+    await service.publish()
+
+    for (let pass = 0; pass < 3; pass++) {
+      const view = await health.reconcile()
+      const published = { rigId: 'rig-1', rigName: 'FRA 400', preservation: 'cria' as const, ...view }
+
+      expect(view.status).toBe('attention')
+      expect(view.issues).toMatchObject({ total: 1, needsAttention: 1 })
+      expect(view.issues.shown).toEqual([expect.objectContaining({ reason: 'source-identity', detail: 'Configured Cria device identity changed' })])
+      expect(isArchiveHealthView(published, 'rig-1')).toBe(true)
+      expect(preservationSummary(published, false).explanation).not.toContain('automatically')
+      expect(issueSteps['source-identity']).toContain('has not released it')
+      expect(service.receipts).toHaveLength(0)
+      expect(exposures(service)).toBe(1)
+    }
+
+    // The client's state stream reconnects with its own bounded backoff after the rejection;
+    // until then each pass still reports the identity rejection, never automatic progress.
+    service.camera.expectedName = expectedName
+    await service.publish()
+    await vi.waitFor(async () => {
+      expect(await health.reconcile()).toMatchObject({ status: 'current', issues: { total: 0 }, obligations: { preserved: { count: 1 } } })
+    }, { timeout: 10_000, interval: 100 })
+    expect(service.receipts).toHaveLength(1)
+    expect(exposures(service)).toBe(1)
+  })
+
+  it('needs attention, without claiming corruption, when Cria sends an unusable custody reply', async () => {
+    const service = new ServiceFixture()
+
+    const { equipment, health } = await setup(service, {
+      fetch: async (input, init) => /^\/v2\/images\/[^/]+$/.test(new URL(String(input)).pathname)
+        ? new Response('{broken-json', { headers: { 'content-type': 'application/json' } })
+        : service.fetch(input, init),
+    })
+
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    await equipment.acquisition.capture(capture())
+    const view = await health.view()
+
+    expect(view.status).toBe('attention')
+    expect(view.issues.shown).toEqual([expect.objectContaining({ reason: 'source-rejected' })])
+    expect(issueSteps['source-rejected']).not.toMatch(/verif|corrupt/)
+    expect(service.receipts).toHaveLength(0)
+    expect(exposures(service)).toBe(1)
+    error.mockRestore()
+  })
+
+  it.each([
+    [401, 'source-rejected', 'attention', 1],
+    [503, 'source-unavailable', 'catching-up', 0],
+  ] as const)('classifies a %i on the original by whether retrying can succeed', async (status, reason, expected, needsAttention) => {
+    const service = new ServiceFixture()
+    let refusing = true
+
+    const { client, health } = await setup(service, {
+      fetch: async (input, init) => refusing && new URL(String(input)).pathname.endsWith('/original')
+        ? failure(status)
+        : service.fetch(input, init),
+    })
+
+    await client.run('camera', { kind: 'capture', parameters: { exposureSeconds: 0.001, light: true } })
+    const view = await health.reconcile()
+
+    expect(view.status).toBe(expected)
+    expect(view.issues).toMatchObject({ total: 1, needsAttention })
+    expect(view.issues.shown).toEqual([expect.objectContaining({ reason })])
+    expect(service.receipts).toHaveLength(0)
+
+    refusing = false
+    expect(await health.reconcile()).toMatchObject({ status: 'current', obligations: { preserved: { count: 1 } } })
+    expect(exposures(service)).toBe(1)
+  })
+
+  it('needs attention when Cria refuses a receipt for a reason retrying will not clear', async () => {
+    const service = new ServiceFixture()
+    let refusing = true
+
+    const { equipment, health } = await setup(service, {
+      fetch: async (input, init) => refusing && String(input).endsWith('/archive-receipt')
+        ? failure(401, 'unauthorized')
+        : service.fetch(input, init),
+    })
+
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    await equipment.acquisition.capture(capture())
+    const view = await health.view()
+
+    expect(view.status).toBe('attention')
+    expect(view.obligations.acknowledgementPending).toMatchObject({ count: 1 })
+    expect(view.issues.shown).toEqual([expect.objectContaining({ reason: 'source-rejected' })])
+    expect(view.issues.shown[0]!.detail).toMatch(/^Cria did not accept the receipt/)
+
+    refusing = false
+    expect(await health.reconcile()).toMatchObject({ status: 'current', issues: { total: 0 }, obligations: { preserved: { count: 1 } } })
+    expect(service.receipts).toHaveLength(1)
+    expect(exposures(service)).toBe(1)
+    error.mockRestore()
+  })
+})
+
+describe('archive failure classification', () => {
+  const transport = new EquipmentError('Cria request did not complete', { reason: 'transport', endpoint: '/v2/images' })
+  const invalid = new EquipmentError('Cria returned an invalid response', { reason: 'invalid-response', endpoint: '/v2/images' })
+
+  it.each([
+    ['original verification', new CriaOriginalVerificationError('Cria original integrity check failed', '/v2/images/x/original'), 'source-mismatch', 'source-mismatch'],
+    ['identity change', new CriaIdentityError('Cria durable store identity changed', '/v2/state'), 'source-identity', 'source-identity'],
+    ['transport', transport, 'source-unavailable', 'acknowledgement-pending'],
+    ['retryable 503', new CriaApiError(503, 'unavailable', 'Fixture service error', '/v2/images'), 'source-unavailable', 'acknowledgement-pending'],
+    ['retryable 429', new CriaApiError(429, 'download-busy', 'Busy', '/v2/images'), 'source-unavailable', 'acknowledgement-pending'],
+    ['unauthorized 401', new CriaApiError(401, 'unauthorized', 'Unauthorized', '/v2/images'), 'source-rejected', 'source-rejected'],
+    ['gone 410', new CriaApiError(410, 'image-gone', 'Gone', '/v2/images'), 'source-rejected', 'source-rejected'],
+    ['malformed reply', invalid, 'source-rejected', 'source-rejected'],
+    ['receipt conflict', new CriaApiError(409, 'receipt-conflict', 'Conflict', '/v2/images'), 'receipt-conflict', 'receipt-conflict'],
+    ['archived copy differs', new ArchiveConflictError('Archived original differs from the Cria source', 'original'), 'original-mismatch', 'original-mismatch'],
+  ])('%s', (_, error, preserving, acknowledging) => {
+    expect(classifyArchiveFailure(error, 'preserve')).toMatchObject({ scope: 'image', reason: preserving })
+    expect(classifyArchiveFailure(error, 'acknowledge')).toMatchObject({ scope: 'image', reason: acknowledging })
+  })
+
+  it('treats a non-Cria failure as the destination archive', () => {
+    expect(classifyArchiveFailure(Object.assign(new Error('No space left on device'), { code: 'ENOSPC' }), 'preserve'))
+      .toEqual({ scope: 'destination', detail: 'No space left on the archive disk' })
   })
 })

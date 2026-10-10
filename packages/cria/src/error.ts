@@ -13,6 +13,16 @@ export class CriaApiError extends EquipmentError {
   }
 }
 
+const retryableStatuses = new Set([429, 500, 502, 503, 504])
+
+/**
+ * Whether retrying the same request may succeed: an interrupted transport or a retryable Cria
+ * status. Anything else is an established rejection that retrying will not clear by itself.
+ */
+export function isTransientCriaFailure(error: EquipmentError): boolean {
+  return error.reason === 'transport' || error instanceof CriaApiError && retryableStatuses.has(error.status)
+}
+
 export class CriaIdentityError extends EquipmentError {
   constructor(message: string, endpoint: string) {
     super(message, { reason: 'invalid-response', endpoint })
@@ -21,8 +31,8 @@ export class CriaIdentityError extends EquipmentError {
 }
 
 /**
- * A served original disagrees with Cria's own record of it: its headers, length, digest or
- * identities. Retrying the transfer is safe, but this is not a transport interruption.
+ * A served original, or Cria's record of it, disagrees with what was requested or recorded: its
+ * headers, length, digest or identities. Retrying is safe, but this is not a transport interruption.
  */
 export class CriaOriginalVerificationError extends EquipmentError {
   constructor(message: string, endpoint: string) {

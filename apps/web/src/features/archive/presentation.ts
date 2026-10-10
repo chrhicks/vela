@@ -163,7 +163,9 @@ function summarize(view: CriaArchiveHealthView, capturing: boolean): Preservatio
 
 export const issueLabels: Record<ArchiveIssueReason, string> = {
   'source-unavailable': 'Cria could not provide it',
-  'source-mismatch': "Cria's copy failed verification",
+  'source-mismatch': "Cria's original could not be verified",
+  'source-identity': "Cria's identity changed",
+  'source-rejected': 'Cria refused the request',
   'original-mismatch': 'Original differs',
   'context-mismatch': 'Record differs',
   'receipt-mismatch': 'Receipt differs',
@@ -177,7 +179,11 @@ export const issueLabels: Record<ArchiveIssueReason, string> = {
 export const issueSteps: Record<ArchiveIssueReason, string> = {
   'source-unavailable': 'Vela retries automatically. Check that Cria is reachable.',
   'source-mismatch':
-    'Vela archived nothing and sent no receipt, so Cria has not released it. Check the original on the rig computer; Vela retries but never accepts bytes that fail verification.',
+    'Vela archived nothing and sent no receipt, so Cria has not released it. Check the original on the rig computer; Vela retries but never accepts an original that fails verification.',
+  'source-identity':
+    "Cria's store or a configured device no longer matches Vela's configuration, so Vela will not complete this original and Cria has not released it. Check the rig's Cria and device configuration.",
+  'source-rejected':
+    "Cria refused the request or sent a reply Vela cannot use, so Cria has not released this original. Vela retries, but this is unlikely to clear by itself; check Cria's configuration, access token and version.",
   'original-mismatch': 'Cria keeps its original. Inspect the archived copy; Vela will not replace it.',
   'context-mismatch': 'Cria keeps its original. Vela will not certify a copy whose record differs; inspect it.',
   'receipt-mismatch': 'Cria keeps its original. Inspect the archived files; Vela will not reissue the receipt.',
