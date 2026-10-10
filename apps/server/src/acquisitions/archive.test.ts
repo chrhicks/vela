@@ -441,6 +441,37 @@ describe('acquisition archive', () => {
     await (await openAcquisitionArchive(directory)).close()
   })
 
+  it('releases its directory only after every operation started before close has finished', async () => {
+    const directory = await root()
+    const expected = acquisition()
+    let release = () => {}
+
+    const gate = new Promise<void>(resolve => { release = resolve })
+
+    let blocked = false
+
+    const archive = await openAcquisitionArchive(directory, {
+      ...nodeArchiveFileSystem,
+      syncDirectory: async path => {
+        if (blocked) await gate
+        await nodeArchiveFileSystem.syncDirectory(path)
+      },
+    })
+
+    await archive.preserve({ expected, original, preservedBy: 'acquisition' })
+    blocked = true
+    const listing = archive.unacknowledged(expected.source.storeId)
+    let closed = false
+    const closing = archive.close().then(() => { closed = true })
+
+    await new Promise(resolve => setTimeout(resolve, 50))
+    expect(closed).toBe(false)
+    release()
+    expect((await listing).receipts.map(receipt => receipt.imageId)).toEqual([expected.source.imageId])
+    await closing
+    await expect(archive.original(expected.source.storeId, expected.source.imageId)).rejects.toBeInstanceOf(ArchiveOwnedError)
+  })
+
   it('refuses an archive another live process owns, leaves its staging alone, and opens after it dies', async () => {
     const directory = await root()
     const { ready, kill } = await owner(directory, 'idle')
