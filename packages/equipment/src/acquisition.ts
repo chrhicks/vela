@@ -30,6 +30,8 @@ export interface CaptureOptions {
   signal?: AbortSignal
   onProgress?: (elapsedSeconds: number) => void
   onReadout?: () => void
+  /** Called immediately before the StartExposure command is sent; for latency observation only. */
+  onExposureRequested?: () => void
   /** Observation of this acknowledged exposure is interrupted; no new exposure is started. */
   onReadState?: (state: 'retrying' | 'current') => void
 }

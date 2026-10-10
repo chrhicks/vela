@@ -1,17 +1,20 @@
 import { useId, useState } from 'react'
+import { Link } from 'react-router'
 import { Button, Input, Switch } from '@vela/ui'
 import type { CaptureCoolingView } from '@vela/model/web'
+import type { CoolingBlocker } from './CaptureCooling'
 
 function temperature(value: number) {
   return `${value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 1 }).replace('-', '−')}°C`
 }
 
 export function PreparationCooling({
-  cooling, disabled, pending, checking, error, unconfirmed, runActive,
+  cooling, disabled, pending, checking, error, unconfirmed, runActive, blocker = null,
   onCooler, onSetpoint, onCheck,
 }: {
   cooling: CaptureCoolingView | null
   disabled: boolean
+  blocker?: CoolingBlocker
   pending: boolean
   checking?: boolean
   error: string | null
@@ -41,6 +44,12 @@ export function PreparationCooling({
             pending={pending} disabled={blocked} onChange={onCooler} />}
         </div>
       </header>
+      {blocker && !unconfirmed && (
+        <p role="status">
+          {blocker.message}{' '}
+          {blocker.action && <Link className="tonight-link" to={blocker.action.to}>{blocker.action.label}</Link>}
+        </p>
+      )}
       <div className="preparation-cooling__reading">
         <strong className="vela-type-metric" aria-label="Sensor temperature">
           {cooling?.sensorTemperatureC === undefined ? '—' : temperature(cooling.sensorTemperatureC)}
@@ -72,7 +81,7 @@ export function PreparationCooling({
       {!cooling && <p role="status">Cooling state is unavailable. Waiting for a fresh camera reading.</p>}
       {pending && <p role="status">Confirming cooler state…</p>}
       {unconfirmed && <p role="status">Cooler command outcome unknown. Check the camera before assuming it changed.</p>}
-      {error && <p role="status">{error}</p>}
+      {error && (unconfirmed || !blocker) && <p role="status">{error}</p>}
       {unconfirmed && onCheck && (
         <Button type="button" disabled={pending || checking || runActive} onClick={onCheck}>Check camera cooling</Button>
       )}

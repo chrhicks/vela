@@ -2,6 +2,7 @@ import { createTestCadence } from './test-cadence.js'
 import { afterEach, expect, it, vi } from 'vitest'
 import type { AlpacaAcquisition, AlpacaFrame } from '@vela/alpaca'
 import { createAlignmentController } from './controller.js'
+import { prepareAlignmentDisplay } from './display.js'
 import type { MonoFrame, PlateSolver, SkyPosition, SolveResult } from './solver.js'
 
 const cadence = createTestCadence()
@@ -46,6 +47,8 @@ function setup() {
   let moves = 0
   let siderealOffset = 0
   let captureOverride: ((signal: AbortSignal) => Promise<AlpacaFrame>) | undefined
+  let displays = 0
+  const heldDisplays = new Map<number, ReturnType<typeof deferred<void>>>()
 
   const requests: Array<{
     frame: MonoFrame
@@ -105,6 +108,19 @@ function setup() {
     solver,
     waitForNextExposure: cadence.wait,
     now: () => 1_700_000_000_000 + (exposures + 1) * 1000,
+    async prepareDisplay(frame, signal) {
+      const held = heldDisplays.get(++displays)
+
+      if (held)
+        await Promise.race([
+          held.promise,
+          new Promise((_resolve, reject) =>
+            signal?.addEventListener('abort', () => reject(signal.reason), { once: true }),
+          ),
+        ])
+
+      return prepareAlignmentDisplay(frame, signal)
+    },
   })
 
   stops.push(() => controller.stop())
@@ -158,6 +174,13 @@ function setup() {
     setCapture: (capture: typeof captureOverride) => {
       captureOverride = capture
     },
+    /** Hold the display preparation of the nth exposure until released. */
+    holdDisplay: (exposure: number) => {
+      const held = deferred<void>()
+      heldDisplays.set(exposure, held)
+
+      return held.resolve
+    },
   }
 }
 
@@ -174,10 +197,15 @@ it('rejects another start while acquisition remains active', async () => {
   expect(subject.exposures()).toBe(1)
 })
 
-it('publishes a baseline image before solving and preserves it through no-solution and stop', async () => {
+it('publishes a baseline image after its solve attempt, including no-solution, and preserves it through stop', async () => {
   const subject = setup()
   await subject.controller.start('sim', 'Simulator')
   const request = await subject.nextSolve()
+  // Display preparation waits for the solve so it cannot delay a correction.
+  await Promise.resolve()
+  expect(subject.controller.snapshot().preview).toBeNull()
+  request.result.resolve({ status: 'no-solution' })
+  await vi.waitFor(() => expect(subject.controller.snapshot().preview).toBeTruthy())
   const preview = subject.controller.snapshot().preview!
   expect(preview).toMatchObject({
     capturedAt: request.frame.capturedAt,
@@ -188,13 +216,10 @@ it('publishes a baseline image before solving and preserves it through no-soluti
   expect(subject.controller.snapshot().measurement).toBeNull()
   expect(subject.controller.snapshot().measuredAt).toBeNull()
   const id = preview.imageUrl.split('/').at(-1)!
-  expect(subject.controller.image(id)?.subarray(0, 8)).toEqual(
+  expect((await subject.controller.image(id, 'native'))?.subarray(0, 8)).toEqual(
     Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
   )
-  request.result.resolve({ status: 'no-solution' })
-  await vi.waitFor(() =>
-    expect(subject.controller.snapshot().warning).toContain('Plate-solving failed'),
-  )
+  expect(subject.controller.snapshot().warning).toContain('Plate-solving failed')
   expect(subject.controller.snapshot().preview).toBe(preview)
   await subject.controller.stop()
   expect(subject.controller.snapshot()).toMatchObject({
@@ -209,7 +234,7 @@ it('keeps the solved image retrievable after repeated failed adjustment images',
   await subject.baseline()
   const measurement = subject.controller.snapshot().measurement!
   const id = measurement.imageUrl.split('/').at(-1)!
-  const image = subject.controller.image(id)
+  const image = await subject.controller.image(id, 'native')
 
   for (let attempt = 0; attempt < 6; attempt++) {
     cadence.waits.shift()!()
@@ -219,7 +244,7 @@ it('keeps the solved image retrievable after repeated failed adjustment images',
   }
 
   expect(subject.controller.snapshot().measurement).toBe(measurement)
-  expect(subject.controller.image(id)).toBe(image)
+  expect(await subject.controller.image(id, 'native')).toBe(image)
 })
 
 it.each([false, true])(
@@ -269,7 +294,7 @@ it('publishes image and readings together only after a solve, retaining the last
   expect(previous.phase).toBe('adjusting')
   expect(previous.measurement!.totalArcsec).toBeLessThan(0.001)
   const previousImageId = previous.measurement!.imageUrl.split('/').at(-1)!
-  expect(subject.controller.image(previousImageId)?.subarray(0, 8)).toEqual(
+  expect((await subject.controller.image(previousImageId, 'native'))?.subarray(0, 8)).toEqual(
     Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
   )
 
@@ -295,7 +320,9 @@ it('publishes image and readings together only after a solve, retaining the last
   expect(updated.warning).toBeNull()
   expect(updated.measurement!.totalArcsec).toBeGreaterThan(1)
   expect(updated.measurement!.imageUrl).not.toBe(previous.measurement!.imageUrl)
-  expect(subject.controller.image(updated.measurement!.imageUrl.split('/').at(-1)!)).toBeDefined()
+  expect(
+    await subject.controller.image(updated.measurement!.imageUrl.split('/').at(-1)!, 'fit'),
+  ).toBeDefined()
 
   cadence.waits.shift()!()
   const secondBlank = await subject.nextSolve()
@@ -349,3 +376,87 @@ it.each([
     expect(subject.moves()).toBe(0)
   },
 )
+
+it('publishes a correction before its display is ready, and image requests wait for that exposure', async () => {
+  const subject = setup()
+  await subject.baseline()
+  const previous = subject.controller.snapshot()
+  const release = subject.holdDisplay(4)
+
+  cadence.waits.shift()!()
+  const fresh = await subject.nextSolve()
+  subject.solve(fresh, 59.99)
+  await vi.waitFor(() =>
+    expect(subject.controller.snapshot().measuredAt).toBe(fresh.frame.capturedAt),
+  )
+  const published = subject.controller.snapshot()
+  const frameId = published.measurement!.frameId
+  expect(frameId).not.toBe(previous.measurement!.frameId)
+  expect(published.measurement!.solvedAt).toEqual(expect.any(String))
+  // The preview still belongs to the earlier exposure; its images keep their own identity.
+  expect(published.preview!.frameId).toBe(previous.preview!.frameId)
+
+  let fit: Buffer | undefined
+
+  const request = subject.controller.image(frameId, 'fit').then(image => {
+    fit = image
+  })
+
+  await Promise.resolve()
+  expect(fit).toBeUndefined()
+  release()
+  await request
+  expect([...fit!.subarray(0, 8)]).toEqual([137, 80, 78, 71, 13, 10, 26, 10])
+  await vi.waitFor(() => expect(subject.controller.snapshot().preview!.frameId).toBe(frameId))
+})
+
+it('never lets an older exposure’s late display replace a newer preview', async () => {
+  const subject = setup()
+  await subject.baseline()
+  const release = subject.holdDisplay(4)
+
+  cadence.waits.shift()!()
+  subject.solve(await subject.nextSolve(), 59.99)
+  await vi.waitFor(() => expect(cadence.waits).toHaveLength(1))
+  const older = subject.controller.snapshot().measurement!.frameId
+
+  cadence.waits.shift()!()
+  subject.solve(await subject.nextSolve(), 59.98)
+  await vi.waitFor(() => expect(subject.controller.snapshot().measurement!.frameId).not.toBe(older))
+  const newer = subject.controller.snapshot().measurement!.frameId
+  await vi.waitFor(() => expect(subject.controller.snapshot().preview!.frameId).toBe(newer))
+
+  release()
+  expect(await subject.controller.image(older, 'fit')).toBeDefined()
+  await new Promise(resolve => setTimeout(resolve, 20))
+  expect(subject.controller.snapshot().preview!.frameId).toBe(newer)
+})
+
+it('stops an unpublished exposure’s display preparation with the run, leaving no late preview', async () => {
+  const subject = setup()
+  await subject.baseline()
+  const previous = subject.controller.snapshot()
+  subject.holdDisplay(4)
+
+  cadence.waits.shift()!()
+  // A sidereal reset fails this frame after its solve, so its correction is never published.
+  subject.resetSidereal()
+  subject.solve(await subject.nextSolve(), 59.99)
+  await vi.waitFor(() => expect(subject.controller.active()).toBe(false))
+  expect(subject.controller.snapshot()).toMatchObject({
+    phase: 'failed',
+    measurement: previous.measurement,
+    preview: previous.preview,
+  })
+})
+
+it('labels each baseline preview with the position it was captured at, even after the run moves on', async () => {
+  const subject = setup()
+  const release = subject.holdDisplay(1)
+  await subject.controller.start('sim', 'Simulator')
+  subject.solve(await subject.nextSolve())
+  await vi.waitFor(() => expect(subject.controller.snapshot().position).toBe(2))
+  release()
+  await vi.waitFor(() => expect(subject.controller.snapshot().preview).toBeTruthy())
+  expect(subject.controller.snapshot().preview!.position).toBe(1)
+})
