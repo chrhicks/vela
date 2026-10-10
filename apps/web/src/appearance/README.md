@@ -12,7 +12,11 @@ as saved only after a valid stored value was read or a write succeeded. Failed
 writes keep the choice for the current visit and the shared Appearance control
 reports “For this visit only.”
 
-Before React renders, the controller applies the configured profile's resolved
+Before any script loads, `index.html` paints the Fieldroom canvas for the saved
+Light/Dark choice or the system preference, and sets `data-mode` and `theme-color`
+to match, so a cold load or reload shows the canvas rather than white while
+scripts load. Before
+React renders, the controller applies the configured profile's resolved
 variables to the document root, together with `color-scheme` and `theme-color`.
 System tracks the browser media preference. Explicit Light/Dark leaves that
 choice intact while still tracking the system value for an immediate return to

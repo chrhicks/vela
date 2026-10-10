@@ -37,36 +37,80 @@ try {
   await available(5173, '0.0.0.0')
   console.log(`Starting Vela for http://${env.VELA_LAN_HOST}:5173 — Ctrl+C stops this run.`)
 
-  // A separate process group lets this command stop pnpm and all its watchers.
-  const child = spawn('pnpm', ['dev'], {
-    cwd: root,
-    env,
-    stdio: 'inherit',
-    detached: true,
-  })
+  // Observing serves the built browser app. The development client reloads the
+  // whole page whenever its live-update socket closes, which a phone does when
+  // another app comes forward; the built app keeps the page and its state.
+  for (const workspace of ['@vela/model', '@vela/alpaca', '@vela/web']) {
+    await build(workspace, env)
+  }
+
+  // Each runtime gets its own process group so stopping one stops its watchers.
+  const children = [
+    spawn(
+      'pnpm',
+      [
+        '--parallel',
+        '--filter',
+        '@vela/model',
+        '--filter',
+        '@vela/alpaca',
+        '--filter',
+        '@vela/server',
+        'dev',
+      ],
+      { cwd: root, env, stdio: 'inherit', detached: true },
+    ),
+    spawn('pnpm', ['--filter', '@vela/web', 'preview'], {
+      cwd: root,
+      env,
+      stdio: 'inherit',
+      detached: true,
+    }),
+  ]
 
   const stop = signal => {
-    try {
-      process.kill(-child.pid, signal)
-    } catch (error) {
-      if (error.code !== 'ESRCH') throw error
+    for (const child of children) {
+      try {
+        process.kill(-child.pid, signal)
+      } catch (error) {
+        if (error.code !== 'ESRCH') throw error
+      }
     }
   }
 
   process.on('SIGINT', () => stop('SIGINT'))
   process.on('SIGTERM', () => stop('SIGTERM'))
-  child.on('error', error => {
-    console.error(error.message)
-    process.exitCode = 1
-  })
-  child.on('exit', (code, signal) => {
-    stop('SIGTERM')
-    process.exitCode = code ?? (signal === 'SIGINT' || signal === 'SIGTERM' ? 0 : 1)
-  })
+
+  for (const child of children) {
+    child.on('error', error => {
+      console.error(error.message)
+      process.exitCode = 1
+    })
+    // Either runtime ending ends the run; a half-running observing app would mislead.
+    child.on('exit', (code, signal) => {
+      stop('SIGTERM')
+      process.exitCode ??= code ?? (signal === 'SIGINT' || signal === 'SIGTERM' ? 0 : 1)
+    })
+  }
 } catch (error) {
   console.error(`Could not start observing: ${error.message}`)
   console.error('Local configuration: .env.observing.local (see .env.observing.example).')
   process.exitCode = 1
+}
+
+function build(workspace, env) {
+  return new Promise((resolveBuilt, reject) => {
+    const child = spawn('pnpm', ['--filter', workspace, 'build'], {
+      cwd: root,
+      env,
+      stdio: 'inherit',
+    })
+
+    child.once('error', reject)
+    child.once('exit', code =>
+      code === 0 ? resolveBuilt() : reject(new Error(`${workspace} build failed`)),
+    )
+  })
 }
 
 function available(port, host) {
