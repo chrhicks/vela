@@ -81,7 +81,14 @@ export interface CaptureCoolingView {
   readonly sensorTemperatureC?: number
   readonly setpointC?: number
   readonly powerPercent?: number
+  /**
+   * Rig work that currently owns device commands, so a cooling command would be
+   * refused. `capture` is an active capture run; `rig` is any other short command.
+   */
+  readonly blockedBy?: CaptureCoolingBlocker
 }
+
+export type CaptureCoolingBlocker = 'capture' | 'alignment' | 'autofocus' | 'framing' | 'rig'
 
 /** Server-owned ephemeral capture run and the most recent retained image. */
 export interface CaptureView {

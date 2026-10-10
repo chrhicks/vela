@@ -4,7 +4,7 @@ import { Link, useParams, useSearchParams } from 'react-router'
 import { CaptureInterruption } from '../features/capture/CaptureInterruption'
 import { LatestImage } from '../features/capture/LatestImage'
 import { captureActivity, useCapture } from '../features/capture/use-capture'
-import { CaptureCooling } from '../features/capture/CaptureCooling'
+import { CaptureCooling, coolingBlocker } from '../features/capture/CaptureCooling'
 import { useRigObservation } from '../features/rig-detail/RigContext'
 import { useTonightTarget } from '../features/targets/use-tonight-target'
 import { AltitudeTrace } from '../features/targets/AltitudeTrace'
@@ -421,6 +421,7 @@ function CapturePage({ rigId }: { rigId: string }) {
             error={capture.coolingError}
             unconfirmed={capture.coolingUnconfirmed}
             runActive={view.active}
+            blocker={coolingBlocker(view.cooling?.blockedBy, base)}
             onCooler={coolerOn => void capture.setCooler(coolerOn)}
             onSetpoint={setpointC => void capture.setCoolingTemperature(setpointC)}
             onCheck={() => void capture.refresh()}
