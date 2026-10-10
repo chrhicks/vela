@@ -11,6 +11,7 @@ export type {
 export {
   CriaApiError,
   CriaIdentityError,
+  CriaOriginalVerificationError,
   CriaUncertainError,
   CriaOperationFailedError,
   CriaNotAdmittedError,

@@ -18,6 +18,7 @@ const issue = z.object({
   imageId: text,
   reason: z.enum([
     'source-unavailable',
+    'source-mismatch',
     'original-mismatch',
     'context-mismatch',
     'receipt-mismatch',

@@ -91,7 +91,7 @@ Each original is counted once:
 | Waiting for Cria to confirm | Receipted; Cria has not acknowledged it. A lost receipt response lands here, not as a lost image |
 | Preserved | Receipted and acknowledged |
 
-Totals are durable facts, so repeated or concurrent recovery cannot inflate them. A per-image issue has a stable reason (`source-unavailable`, `original-mismatch`, `context-mismatch`, `receipt-mismatch`, `acknowledgement-pending`, `receipt-conflict`, `unvouched-copy`, `missing-at-cria`, `quarantined-at-cria`) and is cleared only by that original's own success. A failed archive write is destination-wide, not one issue per image.
+Totals are durable facts, so repeated or concurrent recovery cannot inflate them. A per-image issue has a stable reason (`source-unavailable`, `source-mismatch`, `original-mismatch`, `context-mismatch`, `receipt-mismatch`, `acknowledgement-pending`, `receipt-conflict`, `unvouched-copy`, `missing-at-cria`, `quarantined-at-cria`) and is cleared only by that original's own success. A transfer interruption is `source-unavailable` and retried quietly; an original that fails Cria's own verification (`CriaOriginalVerificationError`: length, digest or identities) is `source-mismatch`, needs attention, and is never archived or receipted. A failed archive write is destination-wide, not one issue per image.
 
 The two archive failures stay distinct. If intent cannot be recorded, the capture is refused before any request and the view says no exposure was requested; the next successful intent resolves the notice. If intent is recorded but originals cannot be written, capture continues and the view shows the archive as unavailable with the growing number waiting at Cria. Cria's own capacity refusal remains the only automatic stop.
 

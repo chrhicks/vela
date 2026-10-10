@@ -10,7 +10,7 @@ import { createArchiveHealth, createArchiveHealthTracker } from '../src/cria/arc
 import { nodeArchiveFileSystem, openAcquisitionArchive, type ArchiveCensus, type ArchiveFileSystem } from '../src/acquisitions/archive.js'
 // What the browser accepts and tells Chris must describe the same event the server publishes.
 import { isArchiveHealthView } from '../../web/src/features/archive/validation.js'
-import { preservationSummary } from '../../web/src/features/archive/presentation.js'
+import { issueSteps, preservationSummary } from '../../web/src/features/archive/presentation.js'
 
 /** A clock the test advances, so cached reads and acquisition rates are deterministic. */
 function clock(start = Date.parse('2026-10-08T22:00:00.000Z')) {
@@ -652,5 +652,73 @@ describe('archive health', () => {
     expect((await poll).status).not.toBe('current')
     expect(await checking).toMatchObject({ status: 'current', obligations: { preserved: { count: 1 }, waitingAtCria: { count: 0 } } })
     error.mockRestore()
+  })
+
+  it('needs attention when the original Cria serves fails verification, and never receipts it', async () => {
+    const service = new ServiceFixture()
+    const { client, health } = await setup(service)
+
+    // A retained original whose later transfer no longer matches Cria's recorded digest.
+    await client.run('camera', { kind: 'capture', parameters: { exposureSeconds: 0.001, light: true } })
+    const flipped = service.original.byteLength - 1
+    const bytes = new Uint8Array(service.original)
+
+    bytes[flipped]! ^= 1
+    const view = await health.reconcile()
+
+    expect(view.status).toBe('attention')
+    expect(view.issues).toMatchObject({ total: 1, needsAttention: 1 })
+    expect(view.issues.shown).toEqual([expect.objectContaining({ reason: 'source-mismatch', detail: 'Cria original integrity check failed' })])
+    expect(view.obligations.waitingAtCria).toMatchObject({ count: 1 })
+    expect(view.obligations.preserved).toMatchObject({ count: 0 })
+    expect(service.receipts).toHaveLength(0)
+    expect(exposures(service)).toBe(1)
+
+    const published = { rigId: 'rig-1', rigName: 'FRA 400', preservation: 'cria' as const, ...view }
+
+    expect(isArchiveHealthView(published, 'rig-1')).toBe(true)
+    expect(preservationSummary(published, false)).toMatchObject({ tone: 'problem', title: '1 original needs attention' })
+    expect(preservationSummary(published, false).explanation).not.toContain('automatically')
+    expect(issueSteps['source-mismatch']).toContain('sent no receipt')
+
+    // Once the same original verifies, it is preserved and the issue clears; still one exposure.
+    bytes[flipped]! ^= 1
+    const repaired = await health.reconcile()
+
+    expect(repaired).toMatchObject({ status: 'current', issues: { total: 0 }, obligations: { preserved: { count: 1 } } })
+    expect(service.receipts).toHaveLength(1)
+    expect(exposures(service)).toBe(1)
+  })
+
+  it('treats an interrupted transfer as progress that Vela retries, not as a mismatch', async () => {
+    const service = new ServiceFixture()
+    let interrupting = true
+
+    const { client, health } = await setup(service, {
+      fetch: async (input, init) => {
+        if (interrupting && new URL(String(input)).pathname.endsWith('/original')) throw new TypeError('Transfer interrupted')
+
+        return service.fetch(input, init)
+      },
+    })
+
+    await client.run('camera', { kind: 'capture', parameters: { exposureSeconds: 0.001, light: true } })
+    const view = await health.reconcile()
+
+    expect(view.status).toBe('catching-up')
+    expect(view.issues).toMatchObject({ total: 1, needsAttention: 0 })
+    expect(view.issues.shown).toEqual([expect.objectContaining({ reason: 'source-unavailable' })])
+    expect(service.receipts).toHaveLength(0)
+
+    const published = { rigId: 'rig-1', rigName: 'FRA 400', preservation: 'cria' as const, ...view }
+
+    expect(isArchiveHealthView(published, 'rig-1')).toBe(true)
+    expect(preservationSummary(published, false)).toMatchObject({ tone: 'pending', title: 'Preservation in progress' })
+
+    interrupting = false
+    const resumed = await health.reconcile()
+
+    expect(resumed).toMatchObject({ status: 'current', issues: { total: 0 }, obligations: { preserved: { count: 1 } } })
+    expect(exposures(service)).toBe(1)
   })
 })

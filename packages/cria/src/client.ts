@@ -9,6 +9,7 @@ import {
   CriaIdentityError,
   CriaOperationFailedError,
   CriaNotAdmittedError,
+  CriaOriginalVerificationError,
   CriaUncertainError,
 } from './error.js'
 import { CriaHttp } from './http.js'
@@ -885,7 +886,7 @@ export class CriaClient {
     if (record.storeId !== this.config.storeId || image.id !== record.id ||
       image.operationId !== record.operationId || image.bindingId !== record.bindingId ||
       image.deviceId !== record.deviceId)
-      throw this.invalid('Cria custody identities do not match its original', '/v2/images')
+      throw new CriaOriginalVerificationError('Cria custody identities do not match its original', '/v2/images')
 
     return new Uint8Array(await this.transferOriginal(image, options))
   }

@@ -17,6 +17,11 @@ export type ArchiveHealthStatus = 'degraded' | 'attention' | 'unknown' | 'catchi
 export type ArchiveIssueReason =
   /** Cria could not provide this original or its record just now; retried later. */
   | 'source-unavailable'
+  /**
+   * The original Cria served failed verification against Cria's own record (length, digest or
+   * identities). Nothing was archived and no receipt was sent; retried, but never accepted as is.
+   */
+  | 'source-mismatch'
   /** Bytes differ from Cria's recorded digest. */
   | 'original-mismatch'
   /** The stored or Cria-provided acquisition context is incomplete or differs. */
@@ -174,7 +179,8 @@ export interface CriaArchiveHealthView {
   source: ArchiveSourceView
   /**
    * Most recent first. `total` counts every open issue; `needsAttention` only those Vela cannot
-   * resolve by retrying (mismatches, conflicts, unvouched copies, missing or quarantined at Cria).
+   * resolve by retrying (a source or archive mismatch, conflicts, unvouched copies, missing or
+   * quarantined at Cria).
    */
   issues: { total: number; needsAttention: number; shown: ArchiveIssue[] }
   forecast: ArchiveForecastView
