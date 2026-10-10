@@ -418,18 +418,19 @@ export async function openAcquisitionArchive(
     throw error
   }
 
-  function assertOpen() {
-    if (closed) throw new ArchiveOwnedError('Acquisition archive is closed; this process no longer owns it')
-  }
-
-  // Work started before close() finishes before ownership is given up.
+  // Every path goes through the descriptor, so close() waits for each operation started before it,
+  // then gives up ownership and only then releases the descriptor.
   const inflight = new Set<Promise<unknown>>()
 
-  function tracked<T>(work: Promise<T>): Promise<T> {
-    inflight.add(work)
-    void work.finally(() => inflight.delete(work)).catch(() => {})
+  function operation<T>(work: () => Promise<T>): Promise<T> {
+    if (closed) return Promise.reject(new ArchiveOwnedError('Acquisition archive is closed; this process no longer owns it'))
 
-    return work
+    const running = work()
+
+    inflight.add(running)
+    void running.finally(() => inflight.delete(running)).catch(() => {})
+
+    return running
   }
 
   /** Where the configured path leads now, compared with the directory opened above. */
@@ -698,48 +699,36 @@ export async function openAcquisitionArchive(
   }
 
   return {
-    async recordIntent(intent) {
-      assertOpen()
-
+    recordIntent: intent => operation(async () => {
       const validated = AcquisitionIntentSchema.parse(intent)
       const path = intentPath(validated.storeId, validated.requestId)
 
-      await tracked((async () => {
-        await assertInPlace()
-        await ensureDirectory(dirname(path), base)
-        await publishOnce(path, JSON.stringify(validated, null, 2))
-      })())
-    },
-    async intent(storeId, requestId) {
-      assertOpen()
-
+      await assertInPlace()
+      await ensureDirectory(dirname(path), base)
+      await publishOnce(path, JSON.stringify(validated, null, 2))
+    }),
+    intent: (storeId, requestId) => operation(async () => {
       const bytes = await readOptional(intentPath(storeId, requestId))
 
       return bytes && AcquisitionIntentSchema.parse(JSON.parse(bytes.toString('utf8')))
-    },
-    async preserve({ expected, original, preservedBy }) {
-      assertOpen()
-
+    }),
+    preserve: ({ expected, original, preservedBy }) => operation(async () => {
       const validated = ExpectedAcquisitionSchema.parse(expected)
 
       if (original.byteLength !== validated.source.bytes || sha256(original) !== validated.source.sha256)
         throw new ArchiveConflictError('Original bytes do not match their Cria source digest', 'original')
 
-      return tracked((async () => {
-        await assertInPlace()
-        const target = await publish(validated, original, preservedBy)
-        const receipt = await exclusive(target, () => receiptFor(validated, target))
+      await assertInPlace()
+      const target = await publish(validated, original, preservedBy)
+      const receipt = await exclusive(target, () => receiptFor(validated, target))
 
-        // The copy went to the opened directory whatever happened meanwhile; hand its receipt to
-        // Cria only if that directory is still the archive at its path.
-        await assertInPlace()
+      // The copy went to the opened directory whatever happened meanwhile; hand its receipt to
+      // Cria only if that directory is still the archive at its path.
+      await assertInPlace()
 
-        return receipt
-      })())
-    },
-    async receipt(expected) {
-      assertOpen()
-
+      return receipt
+    }),
+    receipt: expected => operation(async () => {
       const validated = ExpectedAcquisitionSchema.parse(expected)
       const target = directory(validated.source.storeId, validated.source.imageId)
 
@@ -755,10 +744,8 @@ export async function openAcquisitionArchive(
 
         return receipt
       })
-    },
-    async acknowledged(receipt, sourceState) {
-      assertOpen()
-
+    }),
+    acknowledged: (receipt, sourceState) => operation(async () => {
       const target = directory(receipt.storeId, receipt.imageId)
 
       await exclusive(target, async () => {
@@ -769,10 +756,8 @@ export async function openAcquisitionArchive(
           acknowledgedAt: new Date().toISOString(),
         }, null, 2))
       })
-    },
-    async unacknowledged(storeId) {
-      assertOpen()
-
+    }),
+    unacknowledged: storeId => operation(async () => {
       const receipts: ArchiveReceipt[] = []
       const unreceipted: string[] = []
       const problems: string[] = []
@@ -809,40 +794,28 @@ export async function openAcquisitionArchive(
       await assertInPlace()
 
       return { receipts, unreceipted, problems, damaged }
-    },
-    async original(storeId, imageId) {
-      assertOpen()
-
+    }),
+    original: (storeId, imageId) => operation(async () => {
       const target = directory(storeId, imageId)
 
       if (!await readOptional(join(target, 'receipt.json'))) return undefined
       const files = await stored(target)
 
       return (await existingReceipt(target, files)) && new Uint8Array(files.original)
-    },
-    async issuedReceipt(storeId, imageId) {
-      assertOpen()
-
+    }),
+    issuedReceipt: (storeId, imageId) => operation(async () => {
       const target = directory(storeId, imageId)
 
       if (!await readOptional(join(target, 'receipt.json'))) return undefined
 
       return existingReceipt(target, await stored(target))
-    },
-    async status() {
-      assertOpen()
-
-      return tracked(archiveStatus())
-    },
-    async census(storeId) {
-      assertOpen()
-
-      return tracked(census(storeId))
-    },
+    }),
+    status: () => operation(archiveStatus),
+    census: storeId => operation(() => census(storeId)),
     async close() {
       if (closed) return
       closed = true
-      await Promise.allSettled([...inflight, ...writers.values()])
+      await Promise.allSettled(inflight)
       await releaseOwnership()
       closeSync(descriptor)
     },
