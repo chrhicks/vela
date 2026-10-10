@@ -641,6 +641,79 @@ it('holds an exclusive cooling lease through confirmation and rejects other cool
   expect(commands).toHaveLength(1)
 })
 
+it('marks cooling with the operation that would refuse a cooling command', async () => {
+  const observed = { state: 'off', canSetTemperature: true, sensorTemperatureC: 18, setpointC: 5 }
+
+  const subject = setup(record.imagingCamera, {
+    sensorTemperatureC: 18,
+    cooling: { state: 'off', setpointControl: true, setpointC: 5 },
+    createCooling: () => {
+      throw new Error('A refused cooling command must not reach the camera')
+    },
+  })
+
+  expect((await subject.get()).json().cooling).toEqual(observed)
+
+  for (const [owner, blockedBy] of [
+    ['alignment', 'alignment'],
+    ['autofocus', 'autofocus'],
+    ['framing', 'framing'],
+    ['connection', 'rig'],
+    ['capture', 'rig'],
+  ] as const) {
+    const release = subject.operations.acquire('sim', owner)!
+
+    expect((await subject.get()).json().cooling).toEqual({ ...observed, blockedBy })
+    expect(
+      (
+        await subject.app.inject({
+          method: 'POST',
+          url: '/api/rigs/sim/capture/cooling',
+          payload: { coolerOn: true },
+        })
+      ).statusCode,
+    ).toBe(409)
+    release()
+  }
+
+  expect((await subject.get()).json().cooling).toEqual(observed)
+})
+
+it('marks cooling as held by an active capture run, including in the start response', async () => {
+  const subject = setup(record.imagingCamera, { cooling: { state: 'on' } })
+
+  const started = await subject.start()
+  expect(started.json().cooling).toEqual({ state: 'on', canSetTemperature: false, blockedBy: 'capture' })
+  expect((await subject.get()).json().cooling).toMatchObject({ blockedBy: 'capture' })
+
+  subject.captures[0]!.resolve(frame)
+  await vi.waitFor(() => expect(subject.operations.owner('sim')).toBeUndefined())
+  expect((await subject.get()).json().cooling).toEqual({ state: 'on', canSetTemperature: false })
+})
+
+it('does not report a confirmed cooling command as blocked by its own lease', async () => {
+  const subject = setup(record.imagingCamera, {
+    cooling: { state: 'off' },
+    createCooling: () => ({
+      observe: async () => undefined,
+      setCooling: async () => ({
+        outcome: 'confirmed',
+        observation: { state: 'on', canSetTemperature: false, canGetPower: false },
+      }),
+    }),
+  })
+
+  const response = await subject.app.inject({
+    method: 'POST',
+    url: '/api/rigs/sim/capture/cooling',
+    payload: { coolerOn: true },
+  })
+
+  expect(response.statusCode).toBe(200)
+  expect(response.json().cooling).not.toHaveProperty('blockedBy')
+  expect(subject.operations.owner('sim')).toBeUndefined()
+})
+
 
 it('rejects malformed and unknown subjects before device inspection or acquiring the rig lease', async () => {
   const subject = { targetId: 'ngc0224', name: 'Andromeda Galaxy', catalog: 'NGC 224' }

@@ -89,6 +89,8 @@ is null when storage cannot be inspected. The saving phase remains active while
 the server writes an image. CaptureImage.saved confirms retention of that image's
 original data and preview. `cooling` is confirmed CoolerOn plus optional sensor
 temperature, requested setpoint and power; a near-setpoint sensor is not cooler-on.
+Optional `blockedBy` names the operation that currently owns the Rig's commands and
+would refuse a cooling command.
 Null cooling means the imaging camera does not report cooler state. SavedImage and SavedImagesView describe durable artifacts
 and their download resources separately from the ephemeral capture run. Neither
 contract represents a durable sequence or resumable execution. Collection and

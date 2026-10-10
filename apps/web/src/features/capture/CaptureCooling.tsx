@@ -1,6 +1,7 @@
 import { Button, Checkbox, Input } from '@vela/ui'
-import type { CaptureCoolingView } from '@vela/model/web'
+import type { CaptureCoolingBlocker, CaptureCoolingView } from '@vela/model/web'
 import { useState } from 'react'
+import { Link } from 'react-router'
 
 function formatTemperature(value: number) {
   return `${value.toLocaleString(undefined, { maximumFractionDigits: 1, minimumFractionDigits: 1 })} °C`
@@ -26,6 +27,32 @@ export function coolingSummary(cooling: CaptureCoolingView | null | undefined) {
   return sensor ? `Cooler on · sensor ${sensor}${power ?? ''}` : `Cooler on${power ?? ''}`
 }
 
+/** What currently holds the rig, and where Chris can resolve it. */
+export function coolingBlocker(blockedBy: CaptureCoolingBlocker | undefined, rigPath: string) {
+  switch (blockedBy) {
+    case undefined:
+      return null
+    case 'alignment':
+      return {
+        message: 'Polar alignment is using the rig. Stop or finish alignment to change cooling.',
+        action: { label: 'Open polar alignment', to: `${rigPath}/observe/alignment` },
+      }
+    case 'autofocus':
+      return {
+        message: 'Autofocus is using the rig. Cooling can change when it finishes.',
+        action: { label: 'Open autofocus', to: `${rigPath}/observe/autofocus` },
+      }
+    case 'framing':
+      return { message: 'Framing is using the rig. Cooling can change when it finishes.' }
+    case 'capture':
+      return { message: 'Cooling is locked while capture runs so Stop stays available.' }
+    case 'rig':
+      return { message: 'Another rig command is finishing. Cooling will be available when it does.' }
+  }
+}
+
+export type CoolingBlocker = ReturnType<typeof coolingBlocker>
+
 export function CaptureCooling({
   cooling,
   disabled,
@@ -34,12 +61,14 @@ export function CaptureCooling({
   error,
   unconfirmed,
   runActive,
+  blocker = null,
   onCooler,
   onSetpoint,
   onCheck,
 }: {
   cooling: CaptureCoolingView | null
   disabled: boolean
+  blocker?: CoolingBlocker
   pending: boolean
   checking?: boolean
   error: string | null
@@ -56,12 +85,21 @@ export function CaptureCooling({
   const validTarget =
     requested.trim() !== '' && Number.isFinite(setpoint) && setpoint >= -80 && setpoint <= 50
 
+  const feedback = (
+    <CoolingFeedback
+      blocker={blocker}
+      error={error}
+      unconfirmed={unconfirmed}
+      checking={pending || checking || runActive}
+      onCheck={onCheck}
+    />
+  )
+
   let description
 
-  if (unconfirmed)
-    description = 'Cooler command outcome unknown. Check the camera before assuming it changed.'
-  else if (pending) description = 'Confirming cooler state…'
-  else if (!cooling) description = 'Check the camera before changing cooling.'
+  // The description follows observed state only; command feedback has its own
+  // slot below the switch, so a tap never resizes what sits above the control.
+  if (!cooling) description = 'Check the camera before changing cooling.'
   else if (cooling.state === 'off') {
     description =
       'Cooler is off. A sensor near the requested temperature is not confirmation that cooling is running.'
@@ -108,11 +146,12 @@ export function CaptureCooling({
         <>
           <Checkbox
             label="Cooler on"
-            description="Vela does not turn this on by itself."
+            description={pending ? 'Confirming cooler state…' : 'Vela does not turn this on by itself.'}
             checked={cooling.state === 'on'}
             disabled={disabled}
             onChange={event => onCooler(event.target.checked)}
           />
+          {feedback}
           {cooling.canSetTemperature && (
             <form
               onSubmit={event => {
@@ -144,12 +183,55 @@ export function CaptureCooling({
           )}
         </>
       )}
-      {error && <p role="status">{error}</p>}
-      {unconfirmed && onCheck && (
-        <Button type="button" disabled={pending || checking || runActive} onClick={onCheck}>
-          Check camera cooling
-        </Button>
-      )}
+      {!cooling && feedback}
     </section>
+  )
+}
+
+function CoolingFeedback({
+  blocker,
+  error,
+  unconfirmed,
+  checking,
+  onCheck,
+}: {
+  blocker: CoolingBlocker
+  error: string | null
+  unconfirmed: boolean
+  checking: boolean | undefined
+  onCheck: (() => void) | undefined
+}) {
+  // An unknown outcome comes first: Chris must check before anything else. A
+  // current blocker then explains the state better than an earlier refusal.
+  if (unconfirmed || (error && !blocker)) {
+    return (
+      <div className="capture-page__warning capture-page__cooling-feedback" role="status">
+        <strong>{unconfirmed ? 'Command outcome unknown' : 'Cooling command failed'}</strong>
+        <p>
+          {unconfirmed
+            ? 'Cooler command outcome unknown. Check the camera before assuming it changed.'
+            : error}
+        </p>
+        {unconfirmed && onCheck && (
+          <Button type="button" disabled={checking} onClick={onCheck}>
+            Check camera cooling
+          </Button>
+        )}
+      </div>
+    )
+  }
+
+  if (!blocker) return null
+
+  return (
+    <div className="capture-page__warning capture-page__cooling-feedback" role="status">
+      <strong>Cooling unavailable</strong>
+      <p>{blocker.message}</p>
+      {blocker.action && (
+        <Link className="tonight-link" to={blocker.action.to}>
+          {blocker.action.label}
+        </Link>
+      )}
+    </div>
   )
 }
