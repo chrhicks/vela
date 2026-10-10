@@ -1,4 +1,4 @@
-import { mkdtemp, open, readFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, open, readFile, readdir, rename, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
@@ -164,6 +164,44 @@ describe('acquisition custody through the Cria adapter', () => {
     expect(stored.preservation.by).toBe('recovery')
     expect(service.posts).toHaveLength(1)
     error.mockRestore()
+  })
+
+  it('keeps originals at Cria while the archive path leads to another folder, then hands them over once it is back', async () => {
+    // Promoted from independent review (CUSTODY-01): a replaced root received the copy and a receipt.
+    const service = new ServiceFixture()
+
+    service.releaseOnReceipt = true
+    const directory = await mkdtemp(join(tmpdir(), 'vela-custody-'))
+    const archive = await openAcquisitionArchive(directory)
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    // Preservation fails once, so Cria retains this original for recovery.
+    const failing = setup(service, { ...archive, preserve: async () => { throw new Error('Archive disk unavailable') } })
+
+    await failing.equipment.acquisition.capture(request)
+    const record = [...service.custody.values()][0]!
+
+    // The disk disappears, leaving an empty writable folder at its path.
+    await rename(directory, `${directory}-opened`)
+    await mkdir(directory)
+
+    const { equipment, custody } = setup(service, archive)
+
+    await expect(equipment.acquisition.capture(request)).rejects.toThrow('Acquisition archive unavailable; capture not started')
+    await expect(custody.recover()).rejects.toThrow('different folder')
+    expect(service.receipts).toEqual([])
+    expect(service.posts).toHaveLength(1)
+    expect(record.state).toBe('retained')
+    expect(await readdir(directory)).toEqual([])
+
+    await rm(directory, { recursive: true })
+    await rename(`${directory}-opened`, directory)
+
+    expect(await custody.recover()).toMatchObject({ preserved: 1, problems: [] })
+    expect(record.state).toBe('released')
+    expect((await manifest(directory, service)).source.imageId).toBe(record.id)
+    expect((await archive.census(service.state.storeId)).preserved.imageIds).toEqual([record.id])
+    error.mockRestore()
+    await archive.close()
   })
 
   it('resends the same verified receipt after a lost acknowledgement response', async () => {

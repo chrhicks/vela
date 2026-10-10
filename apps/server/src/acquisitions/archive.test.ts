@@ -1,13 +1,15 @@
 import { spawn } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { once } from 'node:events'
-import { mkdir, mkdtemp, open, readFile, readdir, stat, writeFile } from 'node:fs/promises'
+import { realpathSync } from 'node:fs'
+import { mkdir, mkdtemp, open, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import {
   ArchiveConflictError,
+  ArchiveDisplacedError,
   ArchiveOwnedError,
   nodeArchiveFileSystem,
   openAcquisitionArchive,
@@ -65,36 +67,46 @@ async function root() {
 const target = (directory: string, expected: ExpectedAcquisition) =>
   join(directory, expected.source.storeId, expected.source.imageId)
 
-/** Records publication steps and can fail at one of them, like a crash or I/O error there. */
-function recording(failAt = -1) {
+/**
+ * The archive reaches its files through the directory handle it opened (`/proc/self/fd/<fd>/...`).
+ * Show that as the real path, so steps read like the archive layout.
+ */
+const real = (path: string) => path.replace(/^\/proc\/self\/fd\/\d+/, link => realpathSync(link))
+
+/**
+ * Records publication steps and can fail at one of them, like a crash or I/O error there. `during`
+ * runs at each step first, to change the world at that point.
+ */
+function recording(failAt = -1, during: (step: number) => Promise<void> = async () => {}) {
   const steps: string[] = []
 
-  function step(name: string) {
+  async function step(name: string) {
     steps.push(name)
+    await during(steps.length - 1)
 
     if (steps.length - 1 === failAt) throw new Error(`Injected failure at ${name}`)
   }
 
   const fs: ArchiveFileSystem = {
     open: async (path, flags) => {
-      step(`open ${String(path)}`)
+      await step(`open ${real(String(path))}`)
 
       return open(path, flags)
     },
     mkdir: async path => {
-      step(`mkdir ${path}`)
+      await step(`mkdir ${real(path)}`)
       await nodeArchiveFileSystem.mkdir(path)
     },
     rename: async (from, to) => {
-      step(`rename ${from} -> ${to}`)
+      await step(`rename ${real(from)} -> ${real(to)}`)
       await nodeArchiveFileSystem.rename(from, to)
     },
     link: async (existing, created) => {
-      step(`link ${existing} -> ${created}`)
+      await step(`link ${real(existing)} -> ${real(created)}`)
       await nodeArchiveFileSystem.link(existing, created)
     },
     syncDirectory: async path => {
-      step(`sync ${path}`)
+      await step(`sync ${real(path)}`)
       await nodeArchiveFileSystem.syncDirectory(path)
     },
   }
@@ -398,7 +410,7 @@ describe('acquisition archive', () => {
     const failing = await openAcquisitionArchive(directory, {
       ...nodeArchiveFileSystem,
       syncDirectory: async path => {
-        if (!failed && path === store) {
+        if (!failed && real(path) === store) {
           failed = true
           throw new Error('Interrupted before syncing the new intents directory')
         }
@@ -466,7 +478,7 @@ describe('acquisition archive', () => {
     const archive = await openAcquisitionArchive(directory, {
       ...nodeArchiveFileSystem,
       link: async (existing, created) => {
-        if (created === path && !planted) {
+        if (real(created) === path && !planted) {
           // Another writer publishes first, between the existence check and this link.
           planted = { ...JSON.parse(await readFile(existing, 'utf8')), receiptId: randomUUID() }
           await writeFile(path, JSON.stringify(planted))
@@ -481,5 +493,105 @@ describe('acquisition archive', () => {
     expect(receipt?.receiptId).toBe(planted!.receiptId)
     expect(JSON.parse(await readFile(path, 'utf8')).receiptId).toBe(planted!.receiptId)
     await archive.close()
+  })
+
+  describe('when the archive path stops leading to the directory Vela opened', () => {
+    /** Move the opened directory aside and put an empty writable folder at its path, like an unmounted disk. */
+    async function displace(directory: string) {
+      const moved = `${directory}-opened`
+
+      await rename(directory, moved)
+      await mkdir(directory)
+
+      return moved
+    }
+
+    it('refuses intent and preservation, writes nothing at the replacement, and resumes with the same receipt once back', async () => {
+      const directory = await root()
+      const expected = acquisition()
+      const archive = await openAcquisitionArchive(directory)
+      const moved = await displace(directory)
+
+      expect((await archive.status()).location).toBe('replaced')
+      await expect(archive.recordIntent(expected.intent!)).rejects.toBeInstanceOf(ArchiveDisplacedError)
+      await expect(archive.preserve({ expected, original, preservedBy: 'acquisition' })).rejects.toBeInstanceOf(ArchiveDisplacedError)
+      await expect(archive.unacknowledged(expected.source.storeId)).rejects.toBeInstanceOf(ArchiveDisplacedError)
+      expect(await readdir(directory)).toEqual([])
+      expect(await readdir(moved)).toEqual([])
+
+      await rm(directory, { recursive: true })
+      await rename(moved, directory)
+      const receipt = await archive.preserve({ expected, original, preservedBy: 'acquisition' })
+
+      expect(JSON.parse(await readFile(join(target(directory, expected), 'receipt.json'), 'utf8'))).toEqual(receipt)
+      await archive.close()
+    })
+
+    it('never recreates a deleted root', async () => {
+      const directory = await root()
+      const archive = await openAcquisitionArchive(directory)
+
+      await rm(directory, { recursive: true })
+      expect((await archive.status()).location).toBe('missing')
+      await expect(archive.recordIntent(acquisition().intent!)).rejects.toThrow('no longer at its path')
+      expect(await stat(directory).then(() => 'exists', () => 'absent')).toBe('absent')
+      await archive.close()
+    })
+
+    it('keeps every write in the opened directory and hands out no receipt, whichever publication step it changes at', async () => {
+      const expected = acquisition()
+      const { fs: probe, steps } = recording()
+      const probed = await openAcquisitionArchive(await root(), probe)
+      const opening = steps.length
+
+      await probed.preserve({ expected, original, preservedBy: 'acquisition' })
+      await probed.close()
+      const publication = steps.slice(opening)
+
+      expect(publication.length).toBeGreaterThan(5)
+
+      for (let at = 0; at < publication.length; at++) {
+        const directory = await root()
+        let moved: string | undefined
+
+        const { fs } = recording(-1, async step => {
+          if (step === opening + at) moved = await displace(directory)
+        })
+
+        const archive = await openAcquisitionArchive(directory, fs)
+        const outcome = await archive.preserve({ expected, original, preservedBy: 'acquisition' }).then(() => 'receipt', error => error)
+
+        expect(outcome, publication[at]).toBeInstanceOf(ArchiveDisplacedError)
+        // Nothing reached the folder now at the path: Cria still holds the only verified copy.
+        expect(await readdir(directory), publication[at]).toEqual([])
+
+        // Whatever was written is in the opened archive and is finished there once it is back.
+        await rm(directory, { recursive: true })
+        await rename(moved!, directory)
+
+        const receipt = (await archive.unacknowledged(expected.source.storeId)).receipts[0] ??
+          await archive.preserve({ expected, original, preservedBy: 'recovery' })
+
+        expect(receipt.sha256, publication[at]).toBe(expected.source.sha256)
+        expect(JSON.parse(await readFile(join(target(directory, expected), 'receipt.json'), 'utf8')), publication[at]).toEqual(receipt)
+        await archive.close()
+      }
+    })
+
+    it('does not record an acknowledgement while displaced, and still serves verified reads from the opened directory', async () => {
+      const directory = await root()
+      const expected = acquisition()
+      const archive = await openAcquisitionArchive(directory)
+      const receipt = await archive.preserve({ expected, original, preservedBy: 'acquisition' })
+      const moved = await displace(directory)
+
+      await expect(archive.acknowledged(receipt, 'archived')).rejects.toBeInstanceOf(ArchiveDisplacedError)
+      await expect(archive.receipt(expected)).rejects.toBeInstanceOf(ArchiveDisplacedError)
+      expect(await archive.original(expected.source.storeId, expected.source.imageId)).toEqual(original)
+      expect(await archive.issuedReceipt(expected.source.storeId, expected.source.imageId)).toEqual(receipt)
+      expect(await readdir(directory)).toEqual([])
+      expect(await readdir(target(moved, expected))).not.toContain('acknowledgement.json')
+      await archive.close()
+    })
   })
 })
