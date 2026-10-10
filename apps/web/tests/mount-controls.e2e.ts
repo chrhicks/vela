@@ -14,6 +14,11 @@ const off = { enabled: false, reason: 'The mount state does not permit this acti
 
 const serverInstanceId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 
+const lan = 'http://polaris.test'
+
+// Backstop for the LAN-origin test: the reserved name resolves only to loopback, so nothing leaves this machine.
+test.use({ launchOptions: { args: ['--host-resolver-rules=MAP polaris.test 127.0.0.1'] } })
+
 const available: MountControlView = { serverInstanceId, unpark: off, trackingOn: on, trackingOff: off, command: null }
 
 type Command = NonNullable<MountControlView['command']>
@@ -253,6 +258,51 @@ test('a restarted server keeps an old uncertain request blocked until explicit r
   await expect(mount(page).getByText('Tracking off', { exact: true })).toBeVisible()
   expect(fixture.writes).toHaveLength(1)
   expect(fixture.scene.unknownRequests).toEqual([])
+})
+
+test.describe('from a plain-HTTP LAN origin', () => {
+  // A phone opens Vela as http://polaris.local:5173, which is not a secure context. Serve the app
+  // under the reserved non-loopback name `lan`; every request is answered here.
+  test('commands get a request ID, and a refused command frees the control for a new request', async ({ page, baseURL }) => {
+    await page.routeWebSocket(/polaris\.test/, socket => socket.close())
+    await page.route(`${lan}/**`, async route => {
+      const url = new URL(route.request().url())
+
+      await route.fulfill({ response: await route.fetch({ url: `${baseURL}${url.pathname}${url.search}`, headers: {} }) })
+    })
+    const fixture = await mountScene(page)
+    fixture.handleWrite(async (route, body) => {
+      if (fixture.writes.length === 1) {
+        await route.fulfill({ status: 409, json: { error: 'Another Rig operation is in progress.' } })
+
+        return
+      }
+
+      const command: Command = { ...body, state: 'confirmed', message: 'Tracking is on.' }
+      fixture.setMount('on', 'unparked', { ...available, trackingOn: off, trackingOff: on, command })
+      await route.fulfill({ json: { ...available, trackingOn: off, trackingOff: on, command } })
+    })
+    await page.goto(`${lan}/rigs/fra400#mount-controls`)
+    expect(await page.evaluate(() => ({ origin: location.origin, secure: isSecureContext, randomUUID: 'randomUUID' in crypto })))
+      .toEqual({ origin: lan, secure: false, randomUUID: false })
+
+    await mount(page).getByRole('button', { name: 'Turn tracking on', exact: true }).click()
+    await expect(mount(page).getByRole('status')).toContainText('The command was not accepted.')
+    expect(fixture.writes).toHaveLength(1)
+
+    // Only a new click sends again, with a new request ID: nothing is replayed.
+    await mount(page).getByRole('button', { name: 'Turn tracking on', exact: true }).click()
+    await expect(mount(page).getByRole('button', { name: 'Turn tracking off', exact: true })).toBeEnabled()
+    await expect(mount(page).getByRole('status')).toContainText('Tracking confirmed on.')
+
+    const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+    expect(fixture.writes).toEqual([
+      { serverInstanceId, deviceId, action: 'tracking-on', requestId: expect.stringMatching(uuid) },
+      { serverInstanceId, deviceId, action: 'tracking-on', requestId: expect.stringMatching(uuid) },
+    ])
+    expect(fixture.writes[0]!.requestId).not.toBe(fixture.writes[1]!.requestId)
+    expect(fixture.scene.unknownRequests).toEqual([])
+  })
 })
 
 test('framing prerequisite recovery opens and focuses the mount controls', async ({ page }) => {

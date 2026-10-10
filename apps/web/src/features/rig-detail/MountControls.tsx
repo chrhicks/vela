@@ -2,7 +2,7 @@ import type { MountControlAction, MountControlView, RigDetailView, RigTelescopeD
 import { Button } from '@vela/ui'
 import { useEffect, useId, useRef, useState } from 'react'
 import { ApiError } from '../../lib/api'
-import { checkMountCommand, sendMountCommand } from './mount-control-api'
+import { checkMountCommand, createRequestId, sendMountCommand } from './mount-control-api'
 
 type Command = NonNullable<MountControlView['command']> & { serverInstanceId: string }
 
@@ -41,15 +41,16 @@ export function MountControls({ rigId, device, stale, refresh }: {
 
   async function execute(action: MountControlAction) {
     if (requestInFlight.current || !view) return
-    requestInFlight.current = true
-    const requestId = crypto.randomUUID()
+    const requestId = createRequestId()
     const serverInstanceId = view.serverInstanceId
 
-    setSending(true)
-    setCheckMessage('')
-    setLocal({ requestId, serverInstanceId, action, state: 'pending', message: null })
+    // The lock is taken only where the finally below releases it.
+    requestInFlight.current = true
 
     try {
+      setSending(true)
+      setCheckMessage('')
+      setLocal({ requestId, serverInstanceId, action, state: 'pending', message: null })
       const result = await sendMountCommand(rigId, device.id, action, requestId, serverInstanceId)
 
       if (!mounted.current) return
