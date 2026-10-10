@@ -1,5 +1,5 @@
 import { EquipmentError } from '@vela/equipment'
-import { CriaApiError, type CriaClient, type CriaCustody, type CriaStorage } from '@vela/cria'
+import { CriaApiError, CriaOriginalVerificationError, type CriaClient, type CriaCustody, type CriaStorage } from '@vela/cria'
 import type {
   ArchiveDestinationView,
   ArchiveForecastView,
@@ -82,6 +82,7 @@ export function describeArchiveError(error: Error | null, fallback: string) {
 /**
  * Translate a failure while preserving or acknowledging one original. A failed archive write is
  * destination-wide; anything Cria reports concerns this original; a conflict names what differs.
+ * An original that fails Cria's own verification is a mismatch, never a passing unavailability.
  */
 export function classifyArchiveFailure(error: Error | null, stage: 'preserve' | 'acknowledge'): ArchiveFailure {
   if (error instanceof ArchiveConflictError)
@@ -89,6 +90,9 @@ export function classifyArchiveFailure(error: Error | null, stage: 'preserve' | 
 
   if (error instanceof CriaApiError && error.code === 'receipt-conflict')
     return { scope: 'image', reason: 'receipt-conflict', detail: 'Cria accepted a different archive receipt for this original' }
+
+  if (error instanceof CriaOriginalVerificationError)
+    return { scope: 'image', reason: 'source-mismatch', detail: error.message }
 
   if (error instanceof EquipmentError)
     return stage === 'acknowledge'
@@ -642,7 +646,8 @@ function recentRun(times: number[]) {
 }
 
 const attentionReasons = new Set<ArchiveIssueReason>([
-  'original-mismatch', 'context-mismatch', 'receipt-mismatch', 'receipt-conflict', 'unvouched-copy', 'missing-at-cria', 'quarantined-at-cria',
+  'source-mismatch', 'original-mismatch', 'context-mismatch', 'receipt-mismatch', 'receipt-conflict', 'unvouched-copy', 'missing-at-cria',
+  'quarantined-at-cria',
 ])
 
 function statusOf(

@@ -163,6 +163,7 @@ function summarize(view: CriaArchiveHealthView, capturing: boolean): Preservatio
 
 export const issueLabels: Record<ArchiveIssueReason, string> = {
   'source-unavailable': 'Cria could not provide it',
+  'source-mismatch': "Cria's copy failed verification",
   'original-mismatch': 'Original differs',
   'context-mismatch': 'Record differs',
   'receipt-mismatch': 'Receipt differs',
@@ -175,6 +176,8 @@ export const issueLabels: Record<ArchiveIssueReason, string> = {
 
 export const issueSteps: Record<ArchiveIssueReason, string> = {
   'source-unavailable': 'Vela retries automatically. Check that Cria is reachable.',
+  'source-mismatch':
+    'Vela archived nothing and sent no receipt, so Cria has not released it. Check the original on the rig computer; Vela retries but never accepts bytes that fail verification.',
   'original-mismatch': 'Cria keeps its original. Inspect the archived copy; Vela will not replace it.',
   'context-mismatch': 'Cria keeps its original. Vela will not certify a copy whose record differs; inspect it.',
   'receipt-mismatch': 'Cria keeps its original. Inspect the archived files; Vela will not reissue the receipt.',

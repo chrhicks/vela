@@ -20,6 +20,17 @@ export class CriaIdentityError extends EquipmentError {
   }
 }
 
+/**
+ * A served original disagrees with Cria's own record of it: its headers, length, digest or
+ * identities. Retrying the transfer is safe, but this is not a transport interruption.
+ */
+export class CriaOriginalVerificationError extends EquipmentError {
+  constructor(message: string, endpoint: string) {
+    super(message, { reason: 'invalid-response', endpoint })
+    this.name = 'CriaOriginalVerificationError'
+  }
+}
+
 export class CriaUncertainError extends EquipmentError {
   constructor(
     message: string,

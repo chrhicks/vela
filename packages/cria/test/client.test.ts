@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   CriaCancelledError,
   CriaIdentityError,
+  CriaOriginalVerificationError,
   CriaUncertainError,
   type CriaCommand,
   type CriaOperation,
@@ -502,6 +503,37 @@ describe('original custody', () => {
     await expect(client.download(operation)).rejects.toMatchObject({ reason: 'transport' })
     expect(attempts).toBeGreaterThan(0)
     expect(attempts).toBeLessThan(10)
+    expect(service.posts).toHaveLength(1)
+  })
+
+  it('types an original that fails verification apart from an interrupted transfer', async () => {
+    const service = new ServiceFixture()
+    let interrupting = false
+
+    const client = service.client({
+      imageRetryMs: 25,
+      pollIntervalMs: 5,
+      fetch: async (input, init) => {
+        if (interrupting && path(input).endsWith('/original')) throw new TypeError('Transfer interrupted')
+
+        return service.fetch(input, init)
+      },
+    })
+
+    await client.run('camera', capture)
+    const record = [...service.custody.values()][0]!
+
+    interrupting = true
+    await expect(client.originalOf(record)).rejects.toMatchObject({ reason: 'transport' })
+    await expect(client.originalOf(record)).rejects.not.toBeInstanceOf(CriaOriginalVerificationError)
+
+    interrupting = false
+    new Uint8Array(service.original)[service.original.byteLength - 1]! ^= 1
+    await expect(client.originalOf(record)).rejects.toBeInstanceOf(CriaOriginalVerificationError)
+
+    const foreign = { ...record, operationId: randomUUID() }
+
+    await expect(client.originalOf(foreign)).rejects.toBeInstanceOf(CriaOriginalVerificationError)
     expect(service.posts).toHaveLength(1)
   })
 
