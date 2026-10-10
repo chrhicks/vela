@@ -1,6 +1,6 @@
 import { Button, Checkbox, Input } from '@vela/ui'
 import type { CaptureCoolingBlocker, CaptureCoolingView } from '@vela/model/web'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 
 function formatTemperature(value: number) {
@@ -61,6 +61,7 @@ export function CaptureCooling({
   error,
   unconfirmed,
   runActive,
+  stale = false,
   blocker = null,
   onCooler,
   onSetpoint,
@@ -68,6 +69,8 @@ export function CaptureCooling({
 }: {
   cooling: CaptureCoolingView | null
   disabled: boolean
+  /** The readings are last known: the connection is interrupted or an outcome is unknown. */
+  stale?: boolean
   blocker?: CoolingBlocker
   pending: boolean
   checking?: boolean
@@ -85,10 +88,19 @@ export function CaptureCooling({
   const validTarget =
     requested.trim() !== '' && Number.isFinite(setpoint) && setpoint >= -80 && setpoint <= 50
 
+  // While a command confirms, the previous refusal keeps its space (invisibly) so
+  // a repeated answer does not move the switch or the page.
+  const [lastRefusal, setLastRefusal] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!pending) setLastRefusal(error)
+  }, [pending, error])
+
   const feedback = (
     <CoolingFeedback
       blocker={blocker}
       error={error}
+      held={pending ? lastRefusal : null}
       unconfirmed={unconfirmed}
       checking={pending || checking || runActive}
       onCheck={onCheck}
@@ -97,8 +109,9 @@ export function CaptureCooling({
 
   let description
 
-  // The description follows observed state only; command feedback has its own
-  // slot below the switch, so a tap never resizes what sits above the control.
+  // The description explains observed state without claiming it is current, and
+  // never changes with a command; command feedback has its own slot below the
+  // switch, so a tap never resizes what sits above the control.
   if (!cooling) description = 'Check the camera before changing cooling.'
   else if (cooling.state === 'off') {
     description =
@@ -107,12 +120,12 @@ export function CaptureCooling({
     description = 'Cooler is on. Power shows cooling effort, not a finished temperature.'
   } else {
     description =
-      'Cooler is on. Sensor temperature is live; it is not a substitute for the cooler switch.'
+      'Cooler is on. Sensor temperature is not a substitute for the cooler switch.'
   }
 
   return (
     <section className="capture-page__cooling" aria-label="Camera cooling">
-      <h3>Cooling</h3>
+      <h3>{stale ? 'Cooling · last known' : 'Cooling'}</h3>
       {cooling ? (
         <dl>
           <div>
@@ -146,7 +159,13 @@ export function CaptureCooling({
         <>
           <Checkbox
             label="Cooler on"
-            description={pending ? 'Confirming cooler state…' : 'Vela does not turn this on by itself.'}
+            description={
+              // Both notes occupy one cell so confirming never changes the switch's height.
+              <span className="capture-page__cooling-note">
+                <span aria-hidden={pending || undefined}>Vela does not turn this on by itself.</span>
+                <span aria-hidden={!pending || undefined}>Confirming cooler state…</span>
+              </span>
+            }
             checked={cooling.state === 'on'}
             disabled={disabled}
             onChange={event => onCooler(event.target.checked)}
@@ -191,12 +210,14 @@ export function CaptureCooling({
 function CoolingFeedback({
   blocker,
   error,
+  held,
   unconfirmed,
   checking,
   onCheck,
 }: {
   blocker: CoolingBlocker
   error: string | null
+  held: string | null
   unconfirmed: boolean
   checking: boolean | undefined
   onCheck: (() => void) | undefined
@@ -217,6 +238,19 @@ function CoolingFeedback({
             Check camera cooling
           </Button>
         )}
+      </div>
+    )
+  }
+
+  if (held && !blocker) {
+    return (
+      <div
+        className="capture-page__warning capture-page__cooling-feedback"
+        data-held=""
+        aria-hidden="true"
+      >
+        <strong>Cooling command failed</strong>
+        <p>{held}</p>
       </div>
     )
   }
