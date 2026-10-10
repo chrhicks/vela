@@ -1,5 +1,13 @@
 import { EquipmentError } from '@vela/equipment'
-import { CriaApiError, CriaOriginalVerificationError, type CriaClient, type CriaCustody, type CriaStorage } from '@vela/cria'
+import {
+  CriaApiError,
+  CriaIdentityError,
+  CriaOriginalVerificationError,
+  isTransientCriaFailure,
+  type CriaClient,
+  type CriaCustody,
+  type CriaStorage,
+} from '@vela/cria'
 import type {
   ArchiveDestinationView,
   ArchiveForecastView,
@@ -82,7 +90,8 @@ export function describeArchiveError(error: Error | null, fallback: string) {
 /**
  * Translate a failure while preserving or acknowledging one original. A failed archive write is
  * destination-wide; anything Cria reports concerns this original; a conflict names what differs.
- * An original that fails Cria's own verification is a mismatch, never a passing unavailability.
+ * Only a transient Cria failure is quiet progress. A rejected original or record, a changed Cria
+ * identity, or any other established rejection needs attention, because retrying will not clear it.
  */
 export function classifyArchiveFailure(error: Error | null, stage: 'preserve' | 'acknowledge'): ArchiveFailure {
   if (error instanceof ArchiveConflictError)
@@ -94,10 +103,20 @@ export function classifyArchiveFailure(error: Error | null, stage: 'preserve' | 
   if (error instanceof CriaOriginalVerificationError)
     return { scope: 'image', reason: 'source-mismatch', detail: error.message }
 
-  if (error instanceof EquipmentError)
+  if (error instanceof CriaIdentityError)
+    return { scope: 'image', reason: 'source-identity', detail: error.message }
+
+  if (error instanceof EquipmentError && isTransientCriaFailure(error))
     return stage === 'acknowledge'
       ? { scope: 'image', reason: 'acknowledgement-pending', detail: `Cria has not confirmed the receipt: ${error.message}` }
       : { scope: 'image', reason: 'source-unavailable', detail: message(error, 'Cria could not provide this original') }
+
+  // Malformed replies, protocol errors and non-retryable statuses: established, but no evidence of
+  // a corrupt original or a changed identity.
+  if (error instanceof EquipmentError)
+    return stage === 'acknowledge'
+      ? { scope: 'image', reason: 'source-rejected', detail: `Cria did not accept the receipt: ${error.message}` }
+      : { scope: 'image', reason: 'source-rejected', detail: message(error, 'Cria refused the request') }
 
   return { scope: 'destination', detail: describeArchiveError(error, 'archive write failed') }
 }
@@ -646,8 +665,8 @@ function recentRun(times: number[]) {
 }
 
 const attentionReasons = new Set<ArchiveIssueReason>([
-  'source-mismatch', 'original-mismatch', 'context-mismatch', 'receipt-mismatch', 'receipt-conflict', 'unvouched-copy', 'missing-at-cria',
-  'quarantined-at-cria',
+  'source-mismatch', 'source-identity', 'source-rejected', 'original-mismatch', 'context-mismatch', 'receipt-mismatch', 'receipt-conflict',
+  'unvouched-copy', 'missing-at-cria', 'quarantined-at-cria',
 ])
 
 function statusOf(

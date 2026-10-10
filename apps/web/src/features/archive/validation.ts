@@ -19,6 +19,8 @@ const issue = z.object({
   reason: z.enum([
     'source-unavailable',
     'source-mismatch',
+    'source-identity',
+    'source-rejected',
     'original-mismatch',
     'context-mismatch',
     'receipt-mismatch',

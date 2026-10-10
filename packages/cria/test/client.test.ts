@@ -4,9 +4,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   CriaCancelledError,
   CriaIdentityError,
+  CriaApiError,
+  CriaCustodySchema,
   CriaOriginalVerificationError,
   CriaUncertainError,
+  isTransientCriaFailure,
   type CriaCommand,
+  type CriaCustody,
   type CriaOperation,
 } from '../src/index.js'
 import { closeFixtures, eventResponse, failure, json, reading, serverNow, ServiceFixture } from './fixture.js'
@@ -535,6 +539,50 @@ describe('original custody', () => {
 
     await expect(client.originalOf(foreign)).rejects.toBeInstanceOf(CriaOriginalVerificationError)
     expect(service.posts).toHaveLength(1)
+  })
+
+  it('types a custody record for another image or store as a verification failure', async () => {
+    const service = new ServiceFixture()
+    let rewrite: ((record: CriaCustody) => void) | null = null
+
+    const client = service.client({
+      fetch: async (input, init) => {
+        const response = await service.fetch(input, init)
+
+        if (!rewrite || !/^\/v2\/images\/[^/]+$/.test(path(input))) return response
+        const record = CriaCustodySchema.parse(await response.json())
+
+        rewrite(record)
+
+        return Response.json(record)
+      },
+    })
+
+    await client.run('camera', capture)
+    const imageId = [...service.custody.keys()][0]!
+
+    rewrite = record => {
+      const id = randomUUID()
+
+      Object.assign(record, { id, image: record.image && { ...record.image, id, original: { ...record.image.original, url: `/v2/images/${id}/original` } } })
+    }
+
+    await expect(client.custody(imageId)).rejects.toBeInstanceOf(CriaOriginalVerificationError)
+    rewrite = record => { record.storeId = randomUUID() }
+
+    await expect(client.custody(imageId)).rejects.toBeInstanceOf(CriaOriginalVerificationError)
+    rewrite = null
+
+    await expect(client.custody(imageId)).resolves.toMatchObject({ id: imageId })
+  })
+
+  it('names transient failures once, for retries and for whoever reports them', () => {
+    expect(isTransientCriaFailure(new EquipmentError('interrupted', { reason: 'transport', endpoint: '/v2/state' }))).toBe(true)
+    expect(isTransientCriaFailure(new CriaApiError(503, 'unavailable', 'Unavailable', '/v2/images'))).toBe(true)
+    expect(isTransientCriaFailure(new CriaApiError(429, 'download-busy', 'Busy', '/v2/images'))).toBe(true)
+    expect(isTransientCriaFailure(new CriaApiError(401, 'unauthorized', 'Unauthorized', '/v2/images'))).toBe(false)
+    expect(isTransientCriaFailure(new EquipmentError('invalid', { reason: 'invalid-response', endpoint: '/v2/images' }))).toBe(false)
+    expect(isTransientCriaFailure(new CriaOriginalVerificationError('integrity', '/v2/images'))).toBe(false)
   })
 
   it('rejects cross-operation metadata and external original URLs before downloading', async () => {

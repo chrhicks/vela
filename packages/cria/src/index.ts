@@ -16,6 +16,7 @@ export {
   CriaOperationFailedError,
   CriaNotAdmittedError,
   CriaCancelledError,
+  isTransientCriaFailure,
 } from './error.js'
 
 export {
