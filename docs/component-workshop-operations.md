@@ -8,7 +8,7 @@ Follow [AGENTS.md](../AGENTS.md#working-with-chris) for collaboration, authoriza
 
 ## Application visual authority
 
-The approved workshop specimen and profile define the design; `@vela/ui` owns
+New screens and interactions are designed with Chris in Paper (see [AGENTS.md](../AGENTS.md#design-together)); where a feature has an approved workshop specimen, that specimen and its profile define the design. `@vela/ui` owns
 its shared implementation, and `apps/web` adopts it. **Fieldroom** is the shared
 and workshop authority; fresh workshop sessions use Fieldroom/light. The
 application adopted Fieldroom in PR #86 and defaults to it through `VITE_THEME`;
@@ -308,10 +308,10 @@ Then:
 
 Promotion makes a component available; adoption uses it in the agreed feature. Keep adoption incremental and limited to real use sites that scope needs.
 
-1. Run and visually inspect the approved product example at the relevant states, pace, and widths before implementation. Use the [application visual authority](#application-visual-authority) settings to compare like with like.
+1. Run and visually inspect the approved design (the Paper design, or the workshop product example where one exists) at the relevant states, pace, and widths before implementation. Use the [application visual authority](#application-visual-authority) settings to compare like with like.
 2. Import stable primitives from `@vela/ui`. Compose the feature from web-owned state, copy, domain markup, and assets, following the [primitive and product-example boundaries](#pair-primitive-anatomy-with-product-examples). Promote a new primitive when concrete reuse establishes a useful contract.
 3. Use the application's configured profile (Fieldroom by default) and existing `@vela/ui/styles.css` entry point. Keep shared style loading ahead of feature composition styles; resolve missing tokens at their owning boundary rather than adding a parallel theme adapter.
-4. Compare the implemented feature with the running specimen. Preserve its hierarchy, typography, borders, artwork, and interaction feel while keeping wording honest for real operational states. Verify the changed behavior in the actual application context.
+4. Compare the implemented feature with the approved design. Preserve its hierarchy, typography, borders, artwork, and interaction feel while keeping wording honest for real operational states. Verify the changed behavior in the actual application context.
 5. Prepare the running product and concrete acceptance scenarios through the [delivery workflow](../AGENTS.md#verification-browser-review-and-merge).
 
 Material design departures or global-theme changes outside the agreed scope return to alignment.
