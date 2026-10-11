@@ -1,3 +1,5 @@
+import type { EquipmentObservation } from '@vela/equipment'
+
 export type RigDeviceKind =
   | 'camera'
   | 'cover-calibrator'
@@ -26,4 +28,5 @@ export interface ObservedRigDevice {
   connection: RigDeviceConnection
   status: { state: 'unknown' }
   observedAt: Date
+  observation?: EquipmentObservation
 }

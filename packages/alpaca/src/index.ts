@@ -81,3 +81,7 @@ export type {
   CameraCoolingCommandResult,
   CameraCoolingObservation,
 } from './cooling.js'
+
+export { createAlpacaMountControl } from './mount-control.js'
+
+export type { AlpacaMountControlOptions } from './mount-control.js'

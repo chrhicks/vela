@@ -11,6 +11,7 @@ export const exploreScenes = [
   'framing-light', 'framing-dark', 'framing-unsolved', 'framing-interrupted',
   'framing-preview-failed', 'framing-read-retrying', 'framing-obsolete', 'framing-centering',
   'preparation-light', 'preparation-dark', 'preparation-camera-save-failed',
+  'preparation-disconnected', 'preparation-connection-uncertain',
   'preparation-start-uncertain', 'preparation-cooling-uncertain', 'preparation-unframed',
 ] as const
 
@@ -107,14 +108,26 @@ export function createExploreScene(name: ExploreScene) {
   const commands: Array<{ method: string; pathname: string; body: unknown }> = []
   const unknownRequests: string[] = []
 
-  const rig: RigDetailView = {
+  let rig: RigDetailView = {
     ...structuredClone(reviewRig),
     devices: reviewRig.devices.map(device => device.kind === 'camera' && device.connection === 'connected'
       ? { ...device, status: { availability: 'complete', activity: 'idle', sensorTemperatureC: -8.6, cooling: { state: 'on', powerPercent: 62 } } }
       : structuredClone(device)),
   }
 
-  const observation: RigObservationView = { rig, connectionPreparation: { state: 'complete', capabilities: [] } }
+  let observation: RigObservationView = { rig, connectionPreparation: { state: 'complete', capabilities: [] } }
+
+  const connectedRig = structuredClone(rig)
+  const connectedCapture = structuredClone(capture)
+  let connectionUnconfirmed = false
+  let connectionReads = 0
+
+  if (name === 'preparation-disconnected' || name === 'preparation-connection-uncertain') {
+    rig = { ...rig, connections: { total: rig.devices.length, connected: 0, disconnected: rig.devices.length, unavailable: 0 },
+      devices: rig.devices.map(device => ({ ...device, connection: 'disconnected', status: { availability: 'unavailable' } })) }
+    observation = { rig, connectionPreparation: { state: 'available', capabilities: ['connect-devices'] } }
+    capture = { ...capture, enabled: false, unavailableReason: 'The imaging camera is disconnected.' }
+  }
 
   if (name === 'framing-unsolved') framing = { ...framing, phase: 'needs-check', checkCurrent: false, canCenter: false,
     error: 'This exposure could not be solved. Your composition is kept.',
@@ -144,6 +157,8 @@ export function createExploreScene(name: ExploreScene) {
         statistics: { detectedStars: 842, medianHfrPixels: 2.1 } } }
     capture = { ...capture, cooling: { ...capture.cooling!, sensorTemperatureC: -8.6, setpointC: -10, powerPercent: 62 } }
   }
+
+  if (name === 'preparation-disconnected' || name === 'preparation-connection-uncertain') capture.cooling = null
 
   if (name === 'preparation-unframed') framing = { ...framing, phase: 'idle', actual: null, preview: null, checkCurrent: false, canCenter: false }
 
@@ -233,7 +248,27 @@ export function createExploreScene(name: ExploreScene) {
 
       if (method === 'GET' && pathname === '/api/web/rigs/fra400') return json(rig)
 
-      if (method === 'GET' && pathname === '/api/web/rigs/fra400/observe') return json(observation)
+      if (method === 'GET' && pathname === '/api/web/rigs/fra400/observe') {
+        if (connectionUnconfirmed && ++connectionReads === 1) return failure(503, 'Connection state could not be read')
+
+        return json(observation)
+      }
+
+      if (method === 'POST' && pathname === '/api/rigs/fra400/connections') {
+        rig = structuredClone(connectedRig)
+        observation = { rig, connectionPreparation: { state: 'complete', capabilities: [] } }
+        capture = { ...capture, enabled: connectedCapture.enabled, unavailableReason: connectedCapture.unavailableReason,
+          cooling: structuredClone(connectedCapture.cooling) }
+
+        if (name === 'preparation-connection-uncertain') {
+          connectionUnconfirmed = true
+
+          return failure(503, 'Connection response interrupted')
+        }
+
+        return json({ outcome: 'complete', command: 'completed',
+          confirmedConnected: rig.devices.map(({ id, kind, name }) => ({ id, kind, name })), view: observation })
+      }
 
       if (method === 'GET' && pathname.startsWith('/api/web/rigs/fra400/targets/')) {
         const target = exploreTargets.find(item => item.id === pathname.split('/').at(-1))

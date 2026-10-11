@@ -93,6 +93,12 @@ do not replay writes. The normal preparation scene's 10-second exposure,
 21:06:18 timestamp, 842 stars / 2.1px HFR and −8.6°C / −10°C / 62% cooling are
 explicit illustrative source fixtures. The old check is marked non-current,
 while the preview keeps its exact acquisition association and Temporary status.
+`preparation-disconnected` starts with disconnected devices and recovers after
+one explicit connection command. `preparation-connection-uncertain` simulates a
+lost response after a successful connection: the first reconciliation read
+fails, subsequent reads recover, and the application still requires an explicit
+state check before Start is available. These scenes preserve the entered exposure
+and last test image throughout recovery. No device commands reach hardware.
 No saved framing artifact is claimed. `preparation-unframed` exercises absent
 preview state rather than copying the latest capture into that region.
 

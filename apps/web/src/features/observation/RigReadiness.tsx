@@ -1,157 +1,153 @@
 import type { ConnectRigDevicesResult } from '@vela/model/web'
-import { Button, Panel } from '@vela/ui'
+import { Button } from '@vela/ui'
 import { useEffect, useRef } from 'react'
 import { readinessPresentation } from './presentation'
 import type { useObservation } from './use-observation'
-import { ConnectionMark } from './ObservationMark'
 
-export function RigReadiness({ observation }: { observation: ReturnType<typeof useObservation> }) {
+export function RigReadiness({
+  observation,
+  startActionId,
+}: {
+  observation: ReturnType<typeof useObservation>
+  startActionId: string
+}) {
   const heading = useRef<HTMLHeadingElement>(null)
-  const readiness = useRef<HTMLDetailsElement>(null)
-  const readinessSummary = useRef<HTMLElement>(null)
+  const checkingFromHere = useRef(false)
   const { view, result, connecting, refreshing, interrupted, commandUnconfirmed, completedCommands } = observation
+
+  const visible = !view || connecting || view.connectionPreparation.state !== 'complete' ||
+    interrupted || commandUnconfirmed || !!result
+
   useEffect(() => {
-    if (completedCommands > 0) {
-      const resultTarget = readiness.current?.open ? heading.current : readinessSummary.current
-      resultTarget?.focus()
-    }
+    if (completedCommands > 0) heading.current?.focus()
   }, [completedCommands])
 
-  if (!view) return null
+  useEffect(() => {
+    if (!checkingFromHere.current || refreshing) return
+    checkingFromHere.current = false
+
+    // An explicit successful check can remove readiness. Keep focus in the capture workflow.
+    if (visible) heading.current?.focus()
+    else {
+      const startAction = document.getElementById(startActionId)
+
+      if (startAction instanceof HTMLButtonElement && startAction.disabled)
+        startAction.closest('form')?.focus()
+      else startAction?.focus()
+    }
+  }, [refreshing, visible, startActionId])
+
+  function checkState() {
+    checkingFromHere.current = true
+    void observation.refresh()
+  }
+
+  if (!visible) return null
+
+  if (!view) return (
+    <section className="preparation-readiness" aria-label="Rig readiness">
+      <div role="status">
+        <h3 ref={heading} tabIndex={-1}>
+          {observation.error === 'not-found'
+            ? 'Rig not found'
+            : observation.error ? 'Could not load this Rig' : 'Checking Rig readiness…'}
+        </h3>
+      </div>
+      {observation.error && (
+        <Button type="button" disabled={refreshing} onClick={checkState}>
+          {refreshing ? 'Checking state…' : 'Check state'}
+        </Button>
+      )}
+    </section>
+  )
+
   const busy = connecting || (!interrupted && view.connectionPreparation.state === 'in-progress')
   const presentation = readinessPresentation(view, connecting, interrupted)
   const uncertain = commandUnconfirmed || result?.outcome === 'uncertain'
-  const title = uncertain && !busy ? 'The connection result is uncertain' : presentation.title
+  const title = uncertain && !busy ? 'Connection outcome unknown' : presentation.title
   const { rig } = view
 
   return (
-    <details
-      ref={readiness}
-      className="capture-page__rig vela-capture-rig"
-      open={
-        busy || uncertain || interrupted || view.connectionPreparation.state !== 'complete'
-          ? true
-          : undefined
-      }
-    >
-      <summary ref={readinessSummary}>
-        <span>
-          <i data-offline={interrupted || undefined} />
-          {title}
-        </span>
-        <span>Device details</span>
-      </summary>
-      <div className="vela-observe-section-heading">
-        <div>
-          <small>Preparation</small>
-          <h2>Rig readiness</h2>
-        </div>
-        <span>
+    <section className="preparation-readiness" aria-label="Rig readiness">
+      <div role="status" aria-live="polite" aria-atomic="true">
+        <h3 ref={heading} tabIndex={-1}>{title}</h3>
+        <p>
+          {uncertain && !busy
+            ? 'Check current Rig state before trying another connection. Vela has not repeated the command.'
+            : presentation.description}
+        </p>
+      </div>
+      {result?.outcome === 'unavailable' && <ConnectionResult result={result} />}
+      {(result?.outcome === 'partial' || result?.outcome === 'failed') && (
+        <p role="status">
+          {'failed' in result
+            ? `${result.failed.name}: ${connectionFailure[result.failed.reason]}.`
+            : `Connection stopped after ${result.stoppedAfter.name}; its connection was confirmed by a later check.`}
+          {' '}{result.notAttempted.length > 0
+            ? `${result.notAttempted.length} devices were not attempted.`
+            : 'No other devices remain unattempted.'}
+        </p>
+      )}
+      {commandUnconfirmed && (
+        <p>
+          The command response could not be confirmed. A fresh state check does not prove how
+          that command ended.
+        </p>
+      )}
+      {interrupted && uncertain && (
+        <p>Current state is also unavailable. The values shown are last known.</p>
+      )}
+      <div className="preparation-readiness__actions">
+        {busy ? (
+          <Button type="button" disabled aria-busy="true">Connecting devices…</Button>
+        ) : observation.canConnect ? (
+          <Button type="button" onClick={() => void observation.connect()}>
+            {result?.outcome === 'partial' || result?.outcome === 'failed'
+              ? 'Try remaining devices'
+              : 'Connect devices'}
+          </Button>
+        ) : null}
+        <Button type="button" disabled={connecting || refreshing} onClick={checkState}>
+          {refreshing ? 'Checking state…' : 'Check state'}
+        </Button>
+      </div>
+      <details className="preparation-readiness__details">
+        <summary>Device details{result ? ' & connection result' : ''}</summary>
+        {result && <ConnectionResult result={result} />}
+        <dl>
+          <div>
+            <dt>Rig</dt>
+            <dd>{interrupted || busy ? 'Last known state' : rig.state === 'offline' ? 'Offline' : 'Reachable'}</dd>
+          </div>
+          <div>
+            <dt>Device connections</dt>
+            <dd>{busy ? 'Status updating' : `${rig.connections.connected} confirmed connected`}</dd>
+          </div>
+          <div>
+            <dt>Other device states</dt>
+            <dd>
+              {busy
+                ? 'Status updating'
+                : `${rig.connections.disconnected} disconnected · ${rig.connections.unavailable} unavailable`}
+            </dd>
+          </div>
+        </dl>
+        <p>
           {interrupted || busy ? 'Last received' : 'Checked'}{' '}
           <time dateTime={rig.refreshedAt}>
             {new Date(rig.refreshedAt).toLocaleString(undefined, {
-              month: 'short',
-              day: 'numeric',
-              hour: 'numeric',
-              minute: '2-digit',
+              month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
             })}
           </time>
-        </span>
-      </div>
-      <div className="vela-observe-grid">
-        <Panel
-          className="vela-observe-readiness"
-          elevation="raised"
-          data-tone={uncertain ? 'warning' : presentation.tone}
-        >
-          <div className="vela-observe-summary">
-            <span aria-hidden="true" className="vela-observe-mark">
-              {uncertain || interrupted ? (
-                <span>!</span>
-              ) : (
-                <ConnectionMark busy={busy} tone={presentation.tone} />
-              )}
-            </span>
-            <div role="status" aria-live="polite" aria-atomic="true">
-              <h3 ref={heading} tabIndex={-1}>
-                {title}
-              </h3>
-              <p>
-                {uncertain && !busy
-                  ? 'Check current Rig state before trying another connection. Vela has not repeated the command.'
-                  : presentation.description}
-              </p>
-            </div>
-          </div>
-          {commandUnconfirmed && (
-            <p className="vela-observe-warning">
-              The command response could not be confirmed. A fresh state check does not prove how
-              that command ended.
-            </p>
-          )}
-          {interrupted && uncertain && (
-            <p>Current state is also unavailable. The values shown are last known.</p>
-          )}
-          {result && <ConnectionResult result={result} />}
-          <div className="vela-observe-actions">
-            {busy ? (
-              <Button disabled aria-busy="true" tone="accent">
-                Connecting devices…
-              </Button>
-            ) : observation.canConnect ? (
-              <Button onClick={() => void observation.connect()} tone="accent">
-                {result?.outcome === 'partial' || result?.outcome === 'failed'
-                  ? 'Try remaining devices'
-                  : 'Connect devices'}
-              </Button>
-            ) : null}
-            <Button
-              disabled={connecting || refreshing}
-              onClick={() => void observation.refresh()}
-            >
-              {refreshing ? 'Checking Rig…' : 'Check Rig again'}
-            </Button>
-          </div>
-          <p className="vela-observe-note">
-            {busy
-              ? 'Vela connects devices one at a time and stops if a result cannot be established.'
-              : 'Connection is an explicit preparation action. Checking the Rig only reads current state.'}
-          </p>
-        </Panel>
-        <Panel className="vela-observe-facts" title="What Vela can confirm" elevation="flat">
-          <dl>
-            <div>
-              <dt>Rig</dt>
-              <dd>
-                {interrupted || busy
-                  ? 'Last known state'
-                  : rig.state === 'offline'
-                    ? 'Offline'
-                    : 'Reachable'}
-              </dd>
-            </div>
-            <div>
-              <dt>Device connections</dt>
-              <dd>
-                {busy ? 'Status updating' : `${rig.connections.connected} confirmed connected`}
-              </dd>
-            </div>
-            <div>
-              <dt>Other device states</dt>
-              <dd>
-                {busy
-                  ? 'Status updating'
-                  : `${rig.connections.disconnected} disconnected · ${rig.connections.unavailable} unavailable`}
-              </dd>
-            </div>
-          </dl>
-          <p>
-            {rig.endpoint.host}:{rig.endpoint.port}
-          </p>
-          <p>Opening this workspace does not start an exposure or save an observation.</p>
-        </Panel>
-      </div>
-    </details>
+        </p>
+        <p>{rig.endpoint.host}:{rig.endpoint.port}</p>
+        <p>
+          {busy
+            ? 'Vela connects devices one at a time and stops if a result cannot be established.'
+            : 'Checking the Rig only reads current state. It does not start an exposure.'}
+        </p>
+      </details>
+    </section>
   )
 }
 
@@ -196,14 +192,7 @@ export function ConnectionResult({ result }: { result: ConnectRigDevicesResult }
             <dt>Connection failed</dt>
             <dd>
               {result.failed.name} —{' '}
-              {
-                {
-                  rejected: 'connection rejected',
-                  'remained-disconnected': 'remained disconnected',
-                  'device-not-found': 'device not found',
-                  'connection-check-failed': 'connection check failed',
-                }[result.failed.reason]
-              }
+              {connectionFailure[result.failed.reason]}
             </dd>
           </div>
         )}
@@ -229,4 +218,11 @@ export function ConnectionResult({ result }: { result: ConnectRigDevicesResult }
       </dl>
     </section>
   )
+}
+
+const connectionFailure = {
+  rejected: 'connection rejected',
+  'remained-disconnected': 'remained disconnected',
+  'device-not-found': 'device not found',
+  'connection-check-failed': 'connection check failed',
 }

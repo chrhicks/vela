@@ -459,6 +459,24 @@ describe('framing controller', () => {
     expect(fake.controller.snapshot()).toMatchObject({ phase: 'checked', desired: edited })
   })
 
+  it.each(['parked', 'tracking-off'] as const)(
+    'names the current %s prerequisite without changing mount state or exposing',
+    async condition => {
+      const fake = workshop()
+      fake.mount.parked = condition === 'parked'
+      fake.mount.tracking = false
+      await fake.start({ check: true }).finished
+      expect(fake.controller.snapshot()).toMatchObject({
+        phase: 'needs-check',
+        error: expect.stringContaining(condition === 'parked' ? 'mount is parked' : 'tracking is off'),
+      })
+      expect(fake.hardware.slew).not.toHaveBeenCalled()
+      expect(fake.hardware.tracking).not.toHaveBeenCalled()
+      expect(fake.hardware.capture).not.toHaveBeenCalled()
+      expect(fake.solver.solve).not.toHaveBeenCalled()
+    },
+  )
+
   it('applies the current solved correction to the newly edited destination', async () => {
     const fake = workshop()
     await fake.start().finished

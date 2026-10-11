@@ -2,10 +2,13 @@ import { buildApp } from './app.js'
 import { openFileRigCatalog } from './rig/catalog.js'
 import { resolveRigCatalogPath } from './rig/catalog-path.js'
 import { alignmentSettings } from './alignment/routes.js'
-import { dirname, resolve } from 'node:path'
+import { dirname, isAbsolute, resolve } from 'node:path'
 import { openFileSavedImageStore } from './saved-images/store.js'
 import { createSurveyCache } from './targets/survey.js'
 import { startTelemetry } from './telemetry.js'
+import { loadCriaConfiguration, registerConfiguredCriaRigs } from './equipment/config.js'
+import { createEquipmentComposition } from './equipment/composition.js'
+import { openAcquisitionArchive } from './acquisitions/archive.js'
 
 const telemetry = startTelemetry(process.env.VELA_TRACE_PATH)
 
@@ -47,6 +50,19 @@ const rigCatalogPath = resolveRigCatalogPath(process.env.VELA_RIG_CATALOG_PATH)
 try {
   const rigCatalog = await openFileRigCatalog(rigCatalogPath)
   const alignment = alignmentSettings(process.env)
+  const cria = await loadCriaConfiguration(process.env.VELA_CRIA_CONFIG_PATH, process.env)
+
+  // Own the archive before this server writes anything, so an accidental second start against the
+  // same archive exits here without touching the catalog, the archive or the listener.
+  const acquisitions = cria.length > 0
+    ? await openAcquisitionArchive(
+      process.env.VELA_ACQUISITIONS_PATH
+        ? resolve(process.env.VELA_ACQUISITIONS_PATH)
+        : resolve(dirname(rigCatalogPath), 'acquisitions'),
+    )
+    : undefined
+
+  await registerConfiguredCriaRigs(rigCatalog, cria)
 
   const savedImages = await openFileSavedImageStore(
     process.env.VELA_SAVED_IMAGES_PATH
@@ -70,8 +86,22 @@ try {
       : {},
   )
 
+  const equipmentOptions: NonNullable<Parameters<typeof createEquipmentComposition>[1]> = {}
+
+  if (targets.solver) equipmentOptions.solver = targets.solver
+
+  if (acquisitions) equipmentOptions.acquisitions = acquisitions
+
+  if (process.env.VELA_ALIGNMENT_DIAGNOSTICS_PATH) {
+    if (!isAbsolute(process.env.VELA_ALIGNMENT_DIAGNOSTICS_PATH))
+      throw new Error('VELA_ALIGNMENT_DIAGNOSTICS_PATH must be an absolute directory path')
+    equipmentOptions.diagnosticsPath = process.env.VELA_ALIGNMENT_DIAGNOSTICS_PATH
+  }
+
+  const equipment = createEquipmentComposition(cria, equipmentOptions)
+
   if (!shutdownTask) {
-    const options = { rigCatalog, savedImages, targets, surveyCache }
+    const options = { rigCatalog, savedImages, targets, surveyCache, equipment }
     app = buildApp(alignment ? { ...options, alignment } : options)
     await app.listen({ port, host })
   }

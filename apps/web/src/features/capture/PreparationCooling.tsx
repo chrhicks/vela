@@ -10,7 +10,7 @@ function temperature(value: number) {
 
 export function PreparationCooling({
   cooling, disabled, pending, checking, error, unconfirmed, runActive, blocker = null,
-  onCooler, onSetpoint, onCheck, autofocusHref,
+  onCooler, onSetpoint, onCheck,
 }: {
   cooling: CaptureCoolingView | null
   disabled: boolean
@@ -23,7 +23,6 @@ export function PreparationCooling({
   onCooler: (coolerOn: boolean) => void
   onSetpoint: (setpointC: number) => void
   onCheck?: () => void
-  autofocusHref: string
 }) {
   const inputId = useId()
   const [target, setTarget] = useState<string | null>(null)
@@ -88,7 +87,6 @@ export function PreparationCooling({
       )}
       <div className="preparation-cooling__footnote">
         <span>Capture can start while cooling.</span>
-        <Link className="tonight-link" to={autofocusHref}>Autofocus →</Link>
       </div>
     </section>
   )

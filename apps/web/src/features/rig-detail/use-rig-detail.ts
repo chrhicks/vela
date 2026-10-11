@@ -17,7 +17,7 @@ interface RigDetailState {
 export interface RigDetailResult extends RigDetailState {
   /** Periodic device inspection is paused; the view is the last completed observation. */
   readonly paused: boolean
-  refresh(): Promise<void>
+  refresh(options?: { force?: boolean }): Promise<RigDetailView | undefined>
 }
 
 const initialState: RigDetailState = {
@@ -32,8 +32,10 @@ export function useRigDetail(rigId: string, { paused = false } = {}): RigDetailR
   const requestGeneration = useRef(0)
   const wasPaused = useRef(false)
 
-  const refresh = useCallback(async () => {
-    if (inFlight.current) return
+  const refresh = useCallback(async (options?: { force?: boolean }) => {
+    if (inFlight.current && !options?.force) return
+
+    if (options?.force) controller.current?.abort()
 
     inFlight.current = true
     const generation = ++requestGeneration.current
@@ -42,10 +44,15 @@ export function useRigDetail(rigId: string, { paused = false } = {}): RigDetailR
     setState(current => ({ ...current, refreshing: true }))
 
     try {
-      const view = await loadRigDetail(rigId, nextController.signal)
+      const view = await loadRigDetail(
+        rigId,
+        AbortSignal.any([nextController.signal, AbortSignal.timeout(5000)]),
+      )
 
       if (requestGeneration.current !== generation) return
       setState({ view, refreshing: true, interrupted: false })
+
+      return view
     } catch (error) {
       if (nextController.signal.aborted || requestGeneration.current !== generation) return
 

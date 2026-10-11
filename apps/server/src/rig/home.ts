@@ -40,8 +40,11 @@ export async function loadHomeView(
         return lastKnownRig(record, 'unreachable')
       }
 
+      if (devices.some(device => device.observation?.state === 'interrupted'))
+        return lastKnownRig(record, 'unreachable')
+
       const inventory = observedInventory(devices, now)
-      const match = await catalog.observe(record.endpoint, inventory)
+      const match = await catalog.observe(record.endpoint, inventory, record.source)
 
       if (match.state !== 'known' || match.rigId !== record.id) {
         onConflict(record)
@@ -89,11 +92,10 @@ function reachableRig(
 }
 
 function lastKnownRig(record: RigCatalogRecord, reachability: 'unreachable' | 'unknown'): RigView {
-  return {
+  const view: RigView = {
     id: record.id,
     name: record.name,
     reachability,
-    lastSeenAt: record.lastObservedInventory.observedAt,
     connections: {
       total: record.lastObservedInventory.devices.length,
       connected: 0,
@@ -102,4 +104,7 @@ function lastKnownRig(record: RigCatalogRecord, reachability: 'unreachable' | 'u
     },
     capabilities: ['forget'],
   }
+
+  return record.lastObservedInventory.devices.length === 0 ? view
+    : { ...view, lastSeenAt: record.lastObservedInventory.observedAt }
 }

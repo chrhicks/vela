@@ -19,7 +19,18 @@ Route
 composition acquires the same Rig operation lease used by alignment and
 connection commands before checking the selected identity and connection. The lease
 lasts across every exposure and through final acquisition cleanup. Device protocol preconditions and abort
-confirmation belong to the ALPACA adapter.
+confirmation belong to the selected equipment adapter.
+
+For Cria rigs, the server composition provides the same acquisition and cooling
+capabilities. Cria performs one exposure and keeps its original until Vela's
+acquisition archive returns a verified receipt. Vela verifies the image identity,
+checksum, byte length and geometry before accepting pixels. Before the frame
+reaches this controller, the Cria adapter attempts to preserve the exact original
+and its context. If that attempt fails, the frame is still delivered and
+preservation is **pending**: Cria keeps its copy and custody recovery retries the
+same original later (see [acquisitions](../acquisitions/README.md)). Vela then owns
+preview creation, FITS, the saved-image gallery and repetition. A failed transfer
+ends the run without requesting another exposure; so does a failed Keep write.
 
 The controller depends on `CaptureCamera`, not a concrete transport. A successful
 frame publishes its own exposure settings, acquisition start timestamp and
@@ -36,8 +47,10 @@ Stop clears the interruption indicator immediately and still waits for cleanup;
 late callbacks cannot update a cancelled or settled acquisition.
 Any terminal acquisition or preview failure ends the run without replay. Preview stretching preserves native dimensions for 100% inspection;
 only the latest three image pairs and their temporary original FITS buffers remain
-in memory. Saving releases the temporary original buffer after the archive confirms
-the write. This bounded cache lets Keep this image target the displayed frame when
+in memory. Saving releases the temporary FITS buffer after the saved-image store confirms
+the write. Keep is a gallery selection, not preservation. With Cria, preservation of every
+exposure's exact original and context is attempted before this controller sees its
+pixels; it may still be pending if that attempt failed. This bounded cache lets Keep this image target the displayed frame when
 browser image loading trails the latest acquisition. An expired unsaved frame
 returns an explicit unavailable result; it never saves a different frame instead.
 

@@ -9,11 +9,20 @@ export interface RigCatalogRecord {
   readonly id: RigId
   readonly name: string
   readonly endpoint: RigEndpoint
+  readonly source?: RigSource
   readonly imagingCamera?: { readonly uniqueId: string; readonly name: string }
   readonly focalLengthMm?: number
   readonly addedAt: IsoDateTime
   readonly lastObservedInventory: ObservedRigInventory
 }
+
+/** An absent source preserves legacy Alpaca rig configuration. */
+export interface RigSource {
+  readonly kind: 'cria'
+  readonly configurationId: string
+}
+
+export type RigEquipmentSource = Pick<RigCatalogRecord, 'id' | 'endpoint' | 'source'>
 
 /**
  * Replaceable snapshot from one successful provider inspection. Device order

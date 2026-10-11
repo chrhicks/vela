@@ -18,6 +18,7 @@ export function EquipmentSummary({
 }) {
   const observation = useRigObservation()
   const focuser = observation?.view?.devices.find(device => device.kind === 'focuser')
+  const focusStale = observation?.interrupted || focuser?.observation?.state === 'interrupted'
 
   const focusStatus =
     focuser?.connection === 'connected' &&
@@ -38,7 +39,7 @@ export function EquipmentSummary({
         <span>
           Focuser{'  '}
           {focusStatus
-            ? `${focusStatus.position?.toLocaleString() ?? '—'} · ${observation?.interrupted ? 'last known' : { idle: 'Idle', moving: 'Moving', unknown: 'Activity unknown' }[focusStatus.activity]}`
+            ? `${focusStatus.position?.toLocaleString() ?? '—'} · ${focusStale ? 'last known' : { idle: 'Idle', moving: 'Moving', unknown: 'Activity unknown' }[focusStatus.activity]}`
             : (focuser?.connection ?? 'Unavailable')}
         </span>
       </div>

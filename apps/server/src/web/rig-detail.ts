@@ -1,4 +1,4 @@
-import type { AlpacaDeviceInspection, AlpacaDeviceTelemetry } from '@vela/alpaca'
+import type { EquipmentInspection, DeviceTelemetry } from '@vela/equipment'
 import type { DeviceKind } from '@vela/model/device'
 import type {
   RigCameraStatus,
@@ -15,6 +15,7 @@ interface DeviceIdentity {
   readonly id: string
   readonly name: string
   readonly configuredName: string
+  readonly observation?: NonNullable<EquipmentInspection['observation']>
 }
 
 export function rigDeviceId(rigId: string, providerDeviceId: string): string {
@@ -34,13 +35,18 @@ type UnavailableDeviceViewBase = DeviceIdentity &
 
 export function currentDeviceView(
   rigId: string,
-  inspection: AlpacaDeviceInspection,
+  inspection: EquipmentInspection,
   observedAt: string,
 ): RigDeviceDetailView {
-  const identity = {
+  let identity: DeviceIdentity = {
     id: rigDeviceId(rigId, inspection.providerDeviceId),
     name: inspection.name,
     configuredName: inspection.configuredName,
+  }
+
+  if (inspection.observation) {
+    identity = { ...identity, observation: inspection.observation }
+    observedAt = inspection.observation.observedAt ?? observedAt
   }
 
   if (inspection.connection !== 'connected') {
@@ -107,7 +113,7 @@ export function currentDeviceView(
 
 function cameraStatus(
   availability: 'complete' | 'partial',
-  telemetry: AlpacaDeviceTelemetry | undefined,
+  telemetry: DeviceTelemetry | undefined,
 ): RigCameraStatus | { readonly availability: 'unsupported' } {
   if (telemetry?.kind !== 'camera') {
     return availability === 'complete'
@@ -140,7 +146,7 @@ function cameraStatus(
 
 function telescopeStatus(
   availability: 'complete' | 'partial',
-  telemetry: AlpacaDeviceTelemetry | undefined,
+  telemetry: DeviceTelemetry | undefined,
 ): RigTelescopeStatus | { readonly availability: 'unsupported' } {
   if (telemetry?.kind !== 'telescope') {
     return availability === 'complete'
@@ -164,7 +170,7 @@ function telescopeStatus(
 }
 
 function telescopeActivity(
-  telemetry: Extract<AlpacaDeviceTelemetry, { readonly kind: 'telescope' }>,
+  telemetry: Extract<DeviceTelemetry, { readonly kind: 'telescope' }>,
 ): RigTelescopeStatus['activity'] {
   if (telemetry.parked === true) return 'parked'
 
@@ -180,7 +186,7 @@ function telescopeActivity(
 
 function focuserStatus(
   availability: 'complete' | 'partial',
-  telemetry: AlpacaDeviceTelemetry | undefined,
+  telemetry: DeviceTelemetry | undefined,
 ): RigFocuserStatus | { readonly availability: 'unsupported' } {
   if (telemetry?.kind !== 'focuser') {
     return availability === 'complete'
@@ -203,7 +209,7 @@ function focuserStatus(
 
 function filterWheelStatus(
   availability: 'complete' | 'partial',
-  telemetry: AlpacaDeviceTelemetry | undefined,
+  telemetry: DeviceTelemetry | undefined,
 ): RigFilterWheelStatus | { readonly availability: 'unsupported' } {
   if (telemetry?.kind !== 'filter-wheel') {
     return availability === 'complete'
@@ -225,7 +231,7 @@ function filterWheelStatus(
 
 function conditionsStatus(
   availability: 'complete' | 'partial',
-  telemetry: AlpacaDeviceTelemetry | undefined,
+  telemetry: DeviceTelemetry | undefined,
 ): RigObservingConditionsStatus | { readonly availability: 'unsupported' } {
   if (telemetry?.kind !== 'observing-conditions') {
     return availability === 'complete'
@@ -258,7 +264,7 @@ function conditionsStatus(
 
 function switchStatus(
   availability: 'complete' | 'partial',
-  telemetry: AlpacaDeviceTelemetry | undefined,
+  telemetry: DeviceTelemetry | undefined,
 ): RigSwitchStatus | { readonly availability: 'unsupported' } {
   if (telemetry?.kind !== 'switch') {
     return availability === 'complete'
