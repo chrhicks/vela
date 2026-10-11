@@ -11,6 +11,8 @@ apps/
   server/    # Fastify API and device adapters
 packages/
   alpaca/    # Server-side Alpaca protocol adapter and normalized provider boundary
+  cria/      # Authenticated Cria v2 client and operation/original transfer boundary
+  equipment/ # Transport-neutral equipment capabilities and ImageBytes decoding
   model/     # Shared types for web and server
   ui/        # @vela/ui tokens, stable components, and draft workspace
 ```
@@ -31,6 +33,11 @@ pnpm dev
 `pnpm dev` starts the web app and Fastify together. Vite proxies `/api/*` to Fastify at `http://127.0.0.1:3001`; visit `http://localhost:5173/api` in the SPA to exercise `GET /api/health`.
 
 The server stores added Rigs in the Git-ignored `data/rigs.yaml`. Set `VELA_RIG_CATALOG_PATH` to use a different location; [`data/rigs.example.yaml`](data/rigs.example.yaml) shows the file shape.
+
+Cria rigs use explicit server configuration through `VELA_CRIA_CONFIG_PATH`.
+See [equipment composition](apps/server/src/equipment/README.md) for bindings,
+credentials, driver ownership, and fixture verification. Existing rigs continue
+using Alpaca; a configured Cria rig never falls back to another adapter.
 
 Useful focused commands:
 
@@ -57,7 +64,7 @@ pnpm dev:observing
 
 Open `http://polaris.local:5173` on the desktop or a phone on the same trusted network. The machine must advertise `polaris.local` through mDNS (or resolve through local DNS); the command does not configure hostname resolution. Set `VELA_LAN_HOST` for a different hostname.
 
-This command loads the Git-ignored root `.env.observing.local`, checks the solver paths and ports, builds the browser app, then starts the server watchers and serves the built app with `vite preview`. The built app has no development live-update client; that client reloads the whole page whenever its socket drops, which a phone may do while another app is in front. Restart the command to pick up browser changes. It uses the repository's `data/rigs.yaml` and `data/saved-images` by default, including existing rigs and retained images. Relative paths in this configuration resolve from the repository root. Ctrl+C stops this run and its watchers. Stop other servers on ports 3001 and 5173 before starting it.
+This command loads the Git-ignored root `.env.observing.local`, checks the solver paths and ports, builds every workspace package the server depends on (pnpm reads them from `package.json`) and the browser app, then starts watchers for the server and those packages and serves the built app with `vite preview`. The built app has no development live-update client; that client reloads the whole page whenever its socket drops, which a phone may do while another app is in front. Restart the command to pick up browser changes. It uses the repository's `data/rigs.yaml` and `data/saved-images` by default, including existing rigs and retained images. Relative paths in this configuration resolve from the repository root. Ctrl+C stops this run and its watchers. Stop other servers on ports 3001 and 5173 before starting it.
 
 Fastify stays on loopback; Vite preview listens on the network at port 5173 and proxies `/api` to it. This exposes device controls to the trusted local network without authentication. It is intended for Chris's home/observatory network; do not forward this development server to the internet.
 

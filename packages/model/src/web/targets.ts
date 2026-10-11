@@ -152,6 +152,8 @@ export interface FramingCentering {
 }
 
 export interface FramingView {
+  /** Present when current mount facts identify a prerequisite recoverable in Your Rig. */
+  mountControlReason?: 'parked' | 'tracking-off'
   rigId: string
   rigName: string
   enabled: boolean

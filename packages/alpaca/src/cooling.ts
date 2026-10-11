@@ -1,56 +1,26 @@
+import type {
+  CameraCoolingObservation,
+  CameraCoolingCommandResult,
+  CameraCoolingCommand,
+  CameraCooling as AlpacaCameraCooling
+} from '@vela/equipment'
+
 import { AlpacaProviderError } from './error.js'
 import { createAlpacaClient, type AlpacaClient } from './internal/client.js'
 import { rejectDuplicateDeviceIds, stableDeviceId } from './internal/configured-device.js'
 import type { ConfiguredDevice } from './internal/types/management.js'
 
-/** Confirmed camera cooling facts. Sensor temperature is never a substitute for CoolerOn. */
-export interface CameraCoolingObservation {
-  readonly state: 'on' | 'off'
-  readonly canSetTemperature: boolean
-  readonly canGetPower: boolean
-  readonly sensorTemperatureC?: number
-  readonly setpointC?: number
-  readonly powerPercent?: number
-}
-
-export type CameraCoolingCommandResult =
-  | {
-      readonly outcome: 'confirmed'
-      readonly observation: CameraCoolingObservation
-    }
-  | {
-      readonly outcome: 'failed'
-      readonly reason:
-        | 'device-not-found'
-        | 'disconnected'
-        | 'unsupported'
-        | 'rejected'
-        | 'not-confirmed'
-      readonly message?: string
-      readonly errorNumber?: number
-    }
-  | {
-      readonly outcome: 'uncertain'
-      readonly reason: 'cancelled' | 'write-outcome-unknown' | 'verification-unavailable'
-    }
-
-export interface CameraCoolingCommand {
-  readonly cameraId: string
-  readonly expectedCameraName?: string
-  readonly coolerOn?: boolean
-  readonly setpointC?: number
-  readonly signal?: AbortSignal
-}
+export type {
+  CameraCoolingObservation,
+  CameraCoolingCommandResult,
+  CameraCoolingCommand,
+  CameraCooling as AlpacaCameraCooling
+} from '@vela/equipment'
 
 export interface AlpacaCameraCoolingOptions {
   readonly baseUrl: string
   readonly fetch?: typeof globalThis.fetch
   readonly requestTimeoutMs?: number
-}
-
-export interface AlpacaCameraCooling {
-  observe(cameraId: string, signal?: AbortSignal): Promise<CameraCoolingObservation | undefined>
-  setCooling(command: CameraCoolingCommand): Promise<CameraCoolingCommandResult>
 }
 
 const setpointToleranceC = 0.15

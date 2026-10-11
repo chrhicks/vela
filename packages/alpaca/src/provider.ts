@@ -1,3 +1,9 @@
+import type {
+  EquipmentProvider as AlpacaProvider,
+  InspectDevicesOptions as AlpacaInspectDevicesOptions,
+  ConnectDeviceOptions as AlpacaConnectDeviceOptions
+} from '@vela/equipment'
+
 import { AlpacaProviderError } from './error.js'
 import { createAlpacaClient, type AlpacaClient } from './internal/client.js'
 import {
@@ -19,24 +25,11 @@ import type {
   AlpacaSwitchChannel,
 } from './model.js'
 
-export interface AlpacaProvider {
-  listDevices(): Promise<ReadonlyArray<AlpacaDevice>>
-  inspectDevices(
-    options?: AlpacaInspectDevicesOptions,
-  ): Promise<ReadonlyArray<AlpacaDeviceInspection>>
-  connectDevice(
-    providerDeviceId: string,
-    options?: AlpacaConnectDeviceOptions,
-  ): Promise<AlpacaDeviceConnectionResult>
-}
-
-export interface AlpacaInspectDevicesOptions {
-  readonly signal?: AbortSignal
-}
-
-export interface AlpacaConnectDeviceOptions {
-  readonly signal?: AbortSignal
-}
+export type {
+  EquipmentProvider as AlpacaProvider,
+  InspectDevicesOptions as AlpacaInspectDevicesOptions,
+  ConnectDeviceOptions as AlpacaConnectDeviceOptions
+} from '@vela/equipment'
 
 export interface AlpacaProviderOptions {
   baseUrl: string

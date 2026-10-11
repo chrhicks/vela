@@ -1,27 +1,24 @@
+import { FocuserStoppedError as AlpacaFocuserStoppedError } from '@vela/equipment'
+import type {
+  FocuserTravelWindow,
+  FocuserStatus as AlpacaFocuserStatus,
+  Focuser as AlpacaFocuser
+} from '@vela/equipment'
+
 import { setTimeout as delay } from 'node:timers/promises'
 import { AlpacaProviderError } from './error.js'
 import { createAlpacaClient } from './internal/client.js'
 import { rejectDuplicateDeviceIds, stableDeviceId } from './internal/configured-device.js'
 import type { ConfiguredDevice } from './internal/types/management.js'
 
-export interface FocuserTravelWindow {
-  minPosition: number
-  maxPosition: number
-}
+export { FocuserStoppedError as AlpacaFocuserStoppedError } from '@vela/equipment'
 
-export interface AlpacaFocuserStatus {
-  absolute: boolean
-  position: number
-  maxStep: number
-  moving: boolean
-}
-
-export interface AlpacaFocuserMove {
-  focuserId: string
-  position: number
-  window: FocuserTravelWindow
-  signal?: AbortSignal
-}
+export type {
+  FocuserTravelWindow,
+  FocuserStatus as AlpacaFocuserStatus,
+  FocuserMove as AlpacaFocuserMove,
+  Focuser as AlpacaFocuser
+} from '@vela/equipment'
 
 export interface AlpacaFocuserOptions {
   baseUrl: string
@@ -29,19 +26,6 @@ export interface AlpacaFocuserOptions {
   requestTimeoutMs?: number
   moveTimeoutMs?: number
   pollIntervalMs?: number
-}
-
-export interface AlpacaFocuser {
-  status(focuserId: string, signal?: AbortSignal): Promise<AlpacaFocuserStatus>
-  move(command: AlpacaFocuserMove): Promise<{ position: number }>
-  halt(focuserId: string): Promise<void>
-}
-
-export class AlpacaFocuserStoppedError extends Error {
-  constructor() {
-    super('Focuser move cancellation confirmed')
-    this.name = 'AbortError'
-  }
 }
 
 function invalid(message: string, endpoint: string): never {

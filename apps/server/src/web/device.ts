@@ -2,13 +2,21 @@ import type { ConnectionStatus } from '@vela/model/device'
 import type { RigDeviceConnectionSummary } from '@vela/model/rig'
 
 export function summarizeDeviceConnections(
-  devices: ReadonlyArray<{ readonly connection: ConnectionStatus }>,
+  devices: ReadonlyArray<{
+    readonly connection: ConnectionStatus
+    readonly observation?: { readonly state: 'current' | 'partial' | 'interrupted' }
+  }>,
 ): RigDeviceConnectionSummary {
   let connected = 0
   let disconnected = 0
   let unavailable = 0
 
   for (const device of devices) {
+    if (device.observation?.state === 'interrupted') {
+      unavailable += 1
+      continue
+    }
+
     switch (device.connection) {
       case 'connected':
         connected += 1

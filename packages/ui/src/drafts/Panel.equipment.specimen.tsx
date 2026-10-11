@@ -1,4 +1,4 @@
-import { useId, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { Button, IconButton, Input, NavigationBar, Select } from '../components'
 import type { ComponentSpecimen } from '../themes'
 import { DeviceMark, devices } from './fieldroom-equipment/fixtures'
@@ -23,6 +23,8 @@ function Equipment({ props, onPropsChange }: {
   const [notice, setNotice] = useState('')
   const focalLength = Number(values.focalLength)
   const invalidFocal = !Number.isFinite(focalLength) || focalLength < 10 || focalLength > 20000
+  const mountState = String(values.mountState ?? 'tracking-on')
+  const mount = mountPresentation(mountState)
 
   return (
     <article className="vela-equipment-demo" aria-label="Equipment product example">
@@ -54,8 +56,8 @@ function Equipment({ props, onPropsChange }: {
             <section key={device.id} className="vela-equipment-demo__device" aria-label={device.name}>
               <div className="vela-equipment-demo__row">
                 <DeviceMark kind={device.kind} />
-                <div className="vela-equipment-demo__name"><h3>{device.name}</h3><p>{device.role}</p></div>
-                <p className="vela-equipment-demo__summary">{device.summary}</p>
+                <div className="vela-equipment-demo__name"><h3>{device.name}</h3><p>{device.id === 'mount' ? `Mount · ${mount.role}` : device.role}</p></div>
+                <p className="vela-equipment-demo__summary">{device.id === 'mount' ? `Tracking ${mount.tracking.toLowerCase()}` : device.summary}</p>
                 <p className="vela-equipment-demo__connection">{device.connected ? '● Connected' : '○ Disconnected'}</p>
                 <IconButton
                   tone="quiet"
@@ -69,7 +71,14 @@ function Equipment({ props, onPropsChange }: {
                 />
               </div>
               <div id={`${id}-${device.id}`} hidden={!open.includes(device.id)} className="vela-equipment-demo__device-details">
-                <dl>{device.details.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+                <dl>{device.details.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{device.id === 'mount' && label === 'Tracking' ? mount.tracking : device.id === 'mount' && label === 'Parked' ? mount.parking : value}</dd></div>)}</dl>
+                {device.id === 'mount' && (
+                  <MountControlsPreview
+                    state={mountState}
+                    result={String(values.mountResult ?? 'confirmed')}
+                    onChange={state => update({ mountState: state })}
+                  />
+                )}
               </div>
             </section>
           ))}
@@ -131,6 +140,74 @@ function Equipment({ props, onPropsChange }: {
   )
 }
 
+function mountPresentation(state: string) {
+  if (state === 'unknown') return { tracking: 'Unknown', parking: 'Unknown', role: 'Status unknown' }
+
+  if (state === 'parked') return { tracking: 'Off', parking: 'Yes', role: 'Parked' }
+
+  return { tracking: state === 'tracking-on' ? 'On' : 'Off', parking: 'No', role: 'Not parked' }
+}
+
+const confirmedMount = {
+  unpark: 'Mount confirmed unparked.',
+  'tracking-on': 'Tracking confirmed on.',
+  'tracking-off': 'Tracking confirmed off.',
+}
+
+function MountControlsPreview({ state, result, onChange }: {
+  state: string
+  result: string
+  onChange(state: string): void
+}) {
+  const [action, setAction] = useState<keyof typeof confirmedMount | null>(null)
+  const [message, setMessage] = useState('')
+  const [uncertain, setUncertain] = useState(false)
+  const messageId = useId()
+  const pending = action !== null
+
+  useEffect(() => {
+    if (!action) return
+
+    const timer = setTimeout(() => {
+      setAction(null)
+
+      if (result === 'uncertain') {
+        setUncertain(true)
+        setMessage('The mount command could not be confirmed. Check mount state before another command.')
+      } else if (result === 'failed') {
+        setMessage('The mount rejected the command. Its last confirmed state is shown above.')
+      } else {
+        onChange(action === 'unpark' ? 'tracking-off' : action)
+        setMessage(confirmedMount[action])
+      }
+    }, 1200)
+
+    return () => clearTimeout(timer)
+  }, [action, result, onChange])
+
+  let unavailable = ''
+
+  if (state === 'unknown') unavailable = 'Current parked and tracking state is unavailable. Check mount state before sending a command.'
+  else if (state === 'parked') unavailable = 'Unpark the mount before turning tracking on.'
+
+  return (
+    <div className="vela-equipment-demo__mount-controls" aria-label="Mount controls">
+      <div className="vela-equipment-demo__mount-actions">
+        {(state === 'parked' || state === 'unknown') && (
+          <Button disabled={pending || uncertain || state === 'unknown'} aria-busy={action === 'unpark'} aria-describedby={messageId} onClick={() => setAction('unpark')}>
+            {action === 'unpark' ? 'Unparking…' : 'Unpark mount'}
+          </Button>
+        )}
+        <Button disabled={pending || uncertain || state === 'unknown' || state === 'parked'} aria-busy={pending && action !== 'unpark'} aria-describedby={messageId} onClick={() => setAction(state === 'tracking-on' ? 'tracking-off' : 'tracking-on')}>
+          {action === 'tracking-on' ? 'Turning tracking on…' : action === 'tracking-off' ? 'Turning tracking off…' : state === 'tracking-on' ? 'Turn tracking off' : 'Turn tracking on'}
+        </Button>
+        {(uncertain || state === 'unknown') && <Button disabled={pending} onClick={() => { setUncertain(false); onChange('tracking-off'); setMessage('Mount state checked: unparked, tracking off.') }}>Check mount state</Button>}
+      </div>
+      <p id={messageId} role="status">{pending ? 'Waiting for the mount to confirm the change…' : message || unavailable || 'Tracking follows the sky. It does not slew to your selected subject.'}</p>
+    </div>
+  )
+}
+
 export const specimen: ComponentSpecimen = {
   componentId: 'panel', componentName: 'Panel / Card', id: 'fieldroom-equipment',
   name: 'Equipment · Fieldroom product example',
@@ -140,7 +217,9 @@ export const specimen: ComponentSpecimen = {
     camera: { type: 'select', label: 'Imaging camera', options: ['main-camera', 'other-camera'] },
     focalLength: { type: 'text', label: 'Effective focal length · mm' },
     validate: { type: 'boolean', label: 'Validate focal length' },
+    mountState: { type: 'select', label: 'Mount state', options: ['tracking-off', 'tracking-on', 'parked', 'unknown'] },
+    mountResult: { type: 'select', label: 'Mount command result', options: ['confirmed', 'failed', 'uncertain'] },
   },
-  defaultProps: { expanded: '', camera: 'main-camera', focalLength: '400', validate: false },
+  defaultProps: { expanded: '', camera: 'main-camera', focalLength: '400', validate: false, mountState: 'tracking-on', mountResult: 'confirmed' },
   render: (props, onPropsChange) => <Equipment props={props} {...(onPropsChange ? { onPropsChange } : {})} />,
 }

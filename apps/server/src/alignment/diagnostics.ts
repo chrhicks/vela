@@ -2,11 +2,11 @@ import { createHash, randomUUID } from 'node:crypto'
 import { appendFile, mkdir, mkdtemp, unlink, writeFile } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 import type {
-  AlpacaCameraGeometry,
-  AlpacaFrame,
-  AlpacaPointing,
-  AlpacaTelescopeStatus,
-} from '@vela/alpaca'
+  CameraGeometry,
+  Frame,
+  Pointing,
+  TelescopeStatus,
+} from '@vela/equipment'
 import type { Site } from '../astronomy/coordinates.js'
 import { encodeCaptureFits } from '../imaging/fits.js'
 import type { SkyPosition, SolveResult } from '../plate-solving/solver.js'
@@ -39,15 +39,15 @@ export type AlignmentFrameEvidence = {
   fieldHeightDegrees: number
   physical?: {
     site: Site
-    camera: AlpacaCameraGeometry
-    before: AlpacaTelescopeStatus
-    after: AlpacaTelescopeStatus
+    camera: CameraGeometry
+    before: TelescopeStatus
+    after: TelescopeStatus
   }
-  offlinePointing?: AlpacaPointing
+  offlinePointing?: Pointing
 }
 
 export interface AlignmentDiagnosticRun {
-  recordFrame(frame: AlpacaFrame, evidence: AlignmentFrameEvidence): Promise<void>
+  recordFrame(frame: Frame, evidence: AlignmentFrameEvidence): Promise<void>
   recordBaseline(
     samples: readonly [AlignmentSample, AlignmentSample, AlignmentSample],
     latitudeDegrees: number,
@@ -56,7 +56,7 @@ export interface AlignmentDiagnosticRun {
   recordMeasurement(
     sample: AlignmentSample,
     measurement: AlignmentMeasurement,
-    mount?: AlpacaTelescopeStatus,
+    mount?: TelescopeStatus,
   ): Promise<void>
   finish(outcome: { phase: 'finished' | 'stopped' | 'failed'; error: string | null }): Promise<void>
 }

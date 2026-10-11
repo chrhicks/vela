@@ -77,6 +77,8 @@ export function FramingStatus({
     title = 'Camera observation interrupted'
     detail =
       'The server is connected. Retrying reads for the same exposure; no new exposure or correction will start while waiting. The last solved framing is kept. You can stop while reads retry.'
+  } else if (view && !view.active && !view.enabled) {
+    title = 'Framing unavailable'
   }
 
   return (

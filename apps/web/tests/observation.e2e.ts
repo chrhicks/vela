@@ -95,17 +95,17 @@ test('connects once, shows neutral progress, and focuses the confirmed result', 
   await page.goto('/rigs/rig-1/observe')
   await page.getByRole('button', { name: 'Connect devices' }).dblclick()
   await expect(page.getByRole('button', { name: 'Connecting devices…' })).toBeDisabled()
-  await expect(page.locator('.vela-observe-readiness').getByRole('status')).toContainText(
+  await expect(page.getByRole('region', { name: 'Rig readiness', exact: true }).getByRole('status')).toContainText(
     'Device status is updating',
   )
   await page.waitForTimeout(5_100)
   expect(reads).toBe(1)
   expect(commands).toBe(1)
   finish()
-  const summary = page.locator('.vela-capture-rig > summary')
-  await expect(summary).toContainText('Connection preparation complete')
-  await expect(summary).toBeFocused()
-  await summary.click()
+  const heading = page.getByRole('heading', { name: 'Connection preparation complete' })
+  await expect(heading).toBeVisible()
+  await expect(heading).toBeFocused()
+  await page.locator('.preparation-readiness__details > summary').click()
   await expect(page.getByText('3 confirmed connected', { exact: true })).toBeVisible()
 })
 
@@ -125,6 +125,8 @@ test('renders partial rejection and only retries with a new explicit command', a
   })
   await page.goto('/rigs/rig-1/observe')
   await page.getByRole('button', { name: 'Connect devices' }).click()
+  await expect(page.getByRole('status').filter({ hasText: 'Focuser: connection rejected.' })).toBeVisible()
+  await page.locator('.preparation-readiness__details > summary').click()
   const result = page.getByRole('region', { name: 'Last connection attempt' })
   await expect(result).toContainText('Focuser — connection rejected')
   await expect(result).toContainText('Mount')
@@ -150,10 +152,10 @@ test('uncertainty requires a state check before offering another command', async
   await page.goto('/rigs/rig-1/observe')
   await page.getByRole('button', { name: 'Connect devices' }).click()
   await expect(
-    page.getByRole('heading', { name: 'The connection result is uncertain' }),
+    page.getByRole('heading', { name: 'Connection outcome unknown' }),
   ).toBeFocused()
   await expect(page.getByRole('button', { name: 'Connect devices', exact: true })).toHaveCount(0)
-  await page.getByRole('button', { name: 'Check Rig again' }).click()
+  await page.getByRole('button', { name: 'Check state' }).click()
   await expect(page.getByRole('button', { name: 'Connect devices', exact: true })).toBeVisible()
   expect(commands).toBe(1)
 })
@@ -188,6 +190,7 @@ for (const failure of ['transport', 'malformed', 'conflicting-fields']) {
     })
     await page.goto('/rigs/rig-1/observe')
     await page.getByRole('button', { name: 'Connect devices' }).click()
+    await page.locator('.preparation-readiness__details > summary').click()
     await expect(page.getByText('3 confirmed connected', { exact: true })).toBeVisible()
     await expect(
       page.getByText('The command response could not be confirmed.', { exact: false }),
@@ -251,30 +254,31 @@ test('failed reconciliation keeps commands blocked until an explicit successful 
   await expect(
     page.getByText('Current state is also unavailable. The values shown are last known.'),
   ).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Check Rig again' })).toBeEnabled()
+  await expect(page.getByRole('button', { name: 'Check state' })).toBeEnabled()
   expect(reads).toBe(2)
+  await page.locator('.preparation-readiness__details > summary').click()
   await expect(page.getByText('Last known state', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Connect devices' })).toHaveCount(0)
 
   await page.clock.runFor(5_000)
   await expect.poll(() => reads).toBe(3)
-  await expect(page.getByRole('button', { name: 'Check Rig again' })).toBeEnabled()
+  await expect(page.getByRole('button', { name: 'Check state' })).toBeEnabled()
   expect(commands).toBe(1)
 
   failReads = false
   await page.clock.runFor(5_000)
   await expect.poll(() => reads).toBe(4)
-  await expect(page.getByRole('button', { name: 'Check Rig again' })).toBeEnabled()
+  await expect(page.getByRole('button', { name: 'Check state' })).toBeEnabled()
   await expect(
     page.getByText('Current state is also unavailable. The values shown are last known.'),
   ).toHaveCount(0)
   await expect(
-    page.getByRole('heading', { name: 'The connection result is uncertain' }),
+    page.getByRole('heading', { name: 'Connection outcome unknown' }),
   ).toBeVisible()
   await expect(page.getByRole('button', { name: 'Connect devices' })).toHaveCount(0)
   expect(commands).toBe(1)
 
-  await page.getByRole('button', { name: 'Check Rig again' }).click()
+  await page.getByRole('button', { name: 'Check state' }).click()
   await expect(page.getByRole('button', { name: 'Connect devices' })).toBeVisible()
   await expect(
     page.getByText('The command response could not be confirmed.', { exact: false }),
@@ -292,12 +296,13 @@ test('retains last-known state during failed refresh and restores command eligib
   await page.goto('/rigs/rig-1/observe')
   await expect(page.getByRole('button', { name: 'Connect devices' })).toBeVisible()
   offline = true
-  await page.getByRole('button', { name: 'Check Rig again' }).click()
+  await page.getByRole('button', { name: 'Check state' }).click()
   await expect(page.getByRole('heading', { name: 'Live updates are interrupted' })).toBeVisible()
+  await page.locator('.preparation-readiness__details > summary').click()
   await expect(page.getByText('Last known state', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Connect devices' })).toHaveCount(0)
   offline = false
-  await page.getByRole('button', { name: 'Check Rig again' }).click()
+  await page.getByRole('button', { name: 'Check state' }).click()
   await expect(page.getByRole('button', { name: 'Connect devices' })).toBeVisible()
 })
 
@@ -390,8 +395,9 @@ for (const width of [390, 768, 1280]) {
     )
     await page.goto('/rigs/rig-1/observe')
     await expect(page.getByRole('button', { name: 'Connecting devices…' })).toBeVisible()
-    await expect(page.locator('.vela-observe-spinner')).toHaveCSS('animation-name', 'none')
-    await expect(page.locator('.capture-preparation__readiness time')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Connecting devices…' })).toBeDisabled()
+    await page.locator('.preparation-readiness__details > summary').click()
+    await expect(page.locator('.preparation-readiness time')).toBeVisible()
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true)
@@ -407,11 +413,12 @@ test('failed reads stop presenting last-known progress as active', async ({ page
   await page.goto('/rigs/rig-1/observe')
   await expect(page.getByRole('heading', { name: 'Connecting devices…' })).toBeVisible()
   fail = true
-  await page.getByRole('button', { name: 'Check Rig again' }).click()
+  await page.getByRole('button', { name: 'Check state' }).click()
   await expect(page.getByRole('heading', { name: 'Live updates are interrupted' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Connecting devices…' })).toHaveCount(0)
   await expect(page.locator('.vela-observe-spinner')).toHaveCount(0)
   await expect(page.getByText('Status updating', { exact: true })).toHaveCount(0)
+  await page.locator('.preparation-readiness__details > summary').click()
   await expect(page.getByText('Last known state', { exact: true })).toBeVisible()
 })
 
@@ -430,6 +437,7 @@ for (const state of ['available', 'unavailable'] as const) {
     )
     await page.goto('/rigs/rig-1/observe')
     await page.getByRole('button', { name: 'Connect devices' }).click()
+    await page.locator('.preparation-readiness__details > summary').click()
     await expect(
       page.getByText('Last connection attempt: 3 device connections confirmed.'),
     ).toBeVisible()

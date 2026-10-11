@@ -3,11 +3,11 @@ import { trace, SpanStatusCode, type Attributes } from '@opentelemetry/api'
 import { setTimeout as delay } from 'node:timers/promises'
 import type { AlignmentExposureImage, AlignmentView } from '@vela/model/web'
 import {
-  AlpacaProviderError,
-  AlpacaCaptureRetryableError,
-  type AlpacaAcquisition,
-  type AlpacaFrame,
-} from '@vela/alpaca'
+  EquipmentError,
+  CaptureRetryableError,
+  type Acquisition,
+  type Frame,
+} from '@vela/equipment'
 import { createAlignmentBaseline, measureAlignment, type AlignmentSample } from './geometry.js'
 import { createAstapSolver, projectSky, type SkyPosition } from './solver.js'
 import { detailRegion, prepareAlignmentDisplay, type AlignmentDisplay } from './display.js'
@@ -22,6 +22,7 @@ import type {
 /** Explicit server configuration keeps the synthetic clock separate from physical rigs. */
 export interface AlignmentSettings {
   mode?: 'offline' | 'physical'
+  rigId?: string
   endpoint: string
   cameraId: string
   telescopeId: string
@@ -39,7 +40,7 @@ export type AlignmentControllerOptions = {
     AlignmentSettings,
     'cameraId' | 'telescopeId' | 'exposureSeconds' | 'fieldHeightDegrees'
   >
-  hardware: AlpacaAcquisition
+  hardware: Acquisition
   now?: () => number
   waitForNextExposure?: (signal: AbortSignal) => Promise<void>
   prepareDisplay?: typeof prepareAlignmentDisplay
@@ -144,7 +145,7 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
     read: () => Promise<T>,
     signal: AbortSignal,
     retryable = (error: Error) =>
-      error instanceof AlpacaProviderError && error.reason === 'transport',
+      error instanceof EquipmentError && error.reason === 'transport',
   ): Promise<T> {
     const activity = view.activity
     let interrupted = false
@@ -304,6 +305,7 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
           () =>
             hardware.capture({
               cameraId: settings.cameraId,
+              purpose: 'alignment',
               exposureSeconds: settings.exposureSeconds,
               signal,
               ...(physical
@@ -333,7 +335,7 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
         return { frame, actual, pointing, pointingObservedAt }
       },
       signal,
-      error => error instanceof AlpacaCaptureRetryableError,
+      error => error instanceof CaptureRetryableError,
     )
 
     return { ...acquired, timing: frameTiming(exposureRequestedAt) }
@@ -384,7 +386,7 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
    */
   function prepareFrameDisplay(
     frameId: string,
-    frame: AlpacaFrame,
+    frame: Frame,
     signal: AbortSignal,
     timing: ReturnType<typeof frameTiming>,
   ) {
@@ -422,7 +424,7 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
     frameId: string,
     sequence: number,
     position: number,
-    frame: AlpacaFrame,
+    frame: Frame,
     display: Promise<AlignmentDisplay>,
     signal: AbortSignal,
   ) {
