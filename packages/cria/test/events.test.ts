@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { setTimeout as delay } from 'node:timers/promises'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { CriaClient, CriaIdentityError, type CriaClientOptions, type CriaState } from '../src/index.js'
+import { CriaClient, type CriaClientOptions, type CriaState } from '../src/index.js'
 import { closeFixtures, reading, serverNow, ServiceFixture, token } from './fixture.js'
 
 const clients: CriaClient[] = []
@@ -321,7 +321,7 @@ describe('shared state stream', () => {
     expect(service.paths).toEqual(['GET /v2/events', 'GET /v2/events'])
   })
 
-  it('pins binding and incarnation identity across stream reconnects', async () => {
+  it('adopts a restarted incarnation and rebound driver across stream reconnects', async () => {
     const service = new StreamFixture()
     const client = service.client()
 
@@ -330,9 +330,8 @@ describe('shared state stream', () => {
     service.camera.bindingId = randomUUID()
     service.disconnect()
     await vi.waitFor(() => expect(service.streams).toHaveLength(2))
-    await expect(client.run('camera', {
-      kind: 'capture', parameters: { exposureSeconds: 0.001, light: true },
-    })).rejects.toBeInstanceOf(CriaIdentityError)
+    await vi.waitFor(async () => expect((await client.state()).state.instanceId).toBe(service.state.instanceId))
+    expect(client.commandBlockReasonFor('camera')).toBeNull()
     expect(service.posts).toHaveLength(0)
   })
 

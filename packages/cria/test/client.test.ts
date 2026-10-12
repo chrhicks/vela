@@ -108,19 +108,60 @@ describe('state and identity', () => {
     expect(() => client.reading(snapshot, camera, 'state')).toThrowError(expect.objectContaining({ name: 'CriaUncertainError', reason: 'protocol-error' }))
   })
 
-  it.each(['instance', 'binding'] as const)('blocks new writes after %s identity changes', async changed => {
+  it('starts the next workflow against a restarted Cria instead of blocking', async () => {
+    const service = new ServiceFixture()
+    const client = service.client()
+    const before = (await client.state()).state.instanceId
+
+    service.restart()
+    await service.publish()
+    await client.state()
+    expect(client.commandBlockReasonFor('camera')).toBeNull()
+    await client.run('camera', capture)
+    expect(service.state.instanceId).not.toBe(before)
+    expect(service.last?.instanceId).toBe(service.state.instanceId)
+  })
+
+  it('uses a rebound driver binding for later work', async () => {
     const service = new ServiceFixture()
     const client = service.client()
 
     await client.state()
-
-    if (changed === 'instance') service.state.instanceId = randomUUID()
-
-    if (changed === 'binding') service.camera.bindingId = randomUUID()
-
+    service.camera.bindingId = randomUUID()
     await service.publish()
+    await client.state()
+    await client.run('camera', capture)
+    expect(service.last?.bindingId).toBe(service.camera.bindingId)
+  })
+
+  it('fails running work as unknown when Cria restarts under it, then runs again', async () => {
+    const service = new ServiceFixture()
+
+    service.completeImmediately = false
+    const client = service.client()
+    const running = client.run('camera', capture)
+
+    const outcome = expect(running).rejects.toBeInstanceOf(CriaUncertainError)
+
+    await vi.waitFor(() => expect(service.last).not.toBeNull())
+    service.restart()
+    await service.publish()
+    await outcome
+    expect(client.commandBlockReasonFor('camera')).toBeNull()
+
+    service.completeImmediately = true
+    await client.run('camera', capture)
+    expect(service.posts).toHaveLength(2)
+  })
+
+  it('still blocks when a device no longer matches its configured identity', async () => {
+    const service = new ServiceFixture()
+    const client = service.client()
 
     await client.state()
+    service.camera.expectedName = 'Some other camera'
+    await service.publish()
+    await expect(client.state()).rejects.toBeInstanceOf(CriaIdentityError)
     await expect(client.run('camera', capture)).rejects.toBeInstanceOf(CriaIdentityError)
     expect(service.posts).toHaveLength(0)
   })
