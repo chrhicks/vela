@@ -238,7 +238,6 @@ it('uses physical optics, selected Bayer camera, and midpoint geometry while pre
   for (const capture of subject.captures) {
     expect(capture).toMatchObject({
       cameraId: 'selected-camera',
-      purpose: 'alignment',
       expectedCameraName: 'Selected RGGB camera',
       exposureSeconds: 2,
     })

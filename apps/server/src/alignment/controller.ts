@@ -305,7 +305,6 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
           () =>
             hardware.capture({
               cameraId: settings.cameraId,
-              purpose: 'alignment',
               exposureSeconds: settings.exposureSeconds,
               signal,
               ...(physical
