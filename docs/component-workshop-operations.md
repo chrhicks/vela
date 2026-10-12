@@ -8,7 +8,7 @@ Follow [AGENTS.md](../AGENTS.md#working-with-chris) for collaboration, authoriza
 
 ## Application visual authority
 
-New screens and interactions are designed with Chris in Paper (see [AGENTS.md](../AGENTS.md#design-together)); where a feature has an approved workshop specimen, that specimen and its profile define the design. `@vela/ui` owns
+New screens and interactions are designed with Chris in Paper (see [AGENTS.md](../AGENTS.md#working-with-chris)); where a feature has an approved workshop specimen, that specimen and its profile define the design. `@vela/ui` owns
 its shared implementation, and `apps/web` adopts it. **Fieldroom** is the shared
 and workshop authority; fresh workshop sessions use Fieldroom/light. The
 application adopted Fieldroom in PR #86 and defaults to it through `VITE_THEME`;
@@ -203,7 +203,7 @@ For a review handoff, use Copy link to provide a direct link to the particular d
 
 Open the actual preview, try its suggested interactions, switch scenarios, and reset after making changes. Check relevant desktop and phone widths and light/dark appearance. Open a copied link and confirm it restores the intended starting view. Ensure effects stop when leaving a preview. Run workshop TypeScript checks and focused tests appropriate to the changed behavior.
 
-Prove this workflow with the first feature before expanding migration. Adding the next feature should require a small declaration and ordinary React composition, without introducing a generator, custom agent tool, or a new framework layer. Follow the independent verification and browser acceptance workflow in [AGENTS.md](../AGENTS.md#verification-browser-review-and-merge) before adopting user-facing changes.
+Prove this workflow with the first feature before expanding migration. Adding the next feature should require a small declaration and ordinary React composition, without introducing a generator, custom agent tool, or a new framework layer. Follow the independent verification and browser acceptance workflow in [AGENTS.md](../AGENTS.md#working-with-chris) before adopting user-facing changes.
 
 ## Add a draft component
 
@@ -312,6 +312,6 @@ Promotion makes a component available; adoption uses it in the agreed feature. K
 2. Import stable primitives from `@vela/ui`. Compose the feature from web-owned state, copy, domain markup, and assets, following the [primitive and product-example boundaries](#pair-primitive-anatomy-with-product-examples). Promote a new primitive when concrete reuse establishes a useful contract.
 3. Use the application's configured profile (Fieldroom by default) and existing `@vela/ui/styles.css` entry point. Keep shared style loading ahead of feature composition styles; resolve missing tokens at their owning boundary rather than adding a parallel theme adapter.
 4. Compare the implemented feature with the approved design. Preserve its hierarchy, typography, borders, artwork, and interaction feel while keeping wording honest for real operational states. Verify the changed behavior in the actual application context.
-5. Prepare the running product and concrete acceptance scenarios through the [delivery workflow](../AGENTS.md#verification-browser-review-and-merge).
+5. Prepare the running product and concrete acceptance scenarios through the [delivery workflow](../AGENTS.md#working-with-chris).
 
 Material design departures or global-theme changes outside the agreed scope return to alignment.
