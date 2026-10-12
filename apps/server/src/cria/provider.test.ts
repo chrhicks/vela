@@ -214,7 +214,7 @@ describe('Cria equipment inspection', () => {
     expect(mountView).toMatchObject({ providerDeviceId: 'remote-mount', kind: 'telescope' })
   })
 
-  it('retains the last known view as interrupted after transport, ownership, or identity loss', async () => {
+  it('retains the last known view as interrupted after transport or ownership loss, and follows a restarted Cria', async () => {
     const camera = device('camera', {
       state: reading(0), temperatureC: reading(-8, 700), coolerOn: unsupported(),
     })
@@ -237,12 +237,12 @@ describe('Cria equipment inspection', () => {
     expect(blocked?.telemetry).toEqual(known?.telemetry)
     expect(blocked?.observation?.state).toBe('interrupted')
 
+    // A restarted Cria is a new instance with fresh readings; the view follows it.
     camera.blocked = false
     state.instanceId = 'fe0d09f6-ff27-42fd-aa8b-58a9dac6c3ac'
     await publish()
-    const [identityLost] = await provider.inspectDevices()
+    const [restarted] = await provider.inspectDevices()
 
-    expect(identityLost?.telemetry).toEqual(known?.telemetry)
-    expect(identityLost?.observation).toMatchObject({ state: 'interrupted', commandReady: false })
+    expect(restarted?.observation).toMatchObject({ state: 'current' })
   })
 })

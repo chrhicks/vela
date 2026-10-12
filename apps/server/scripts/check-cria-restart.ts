@@ -19,12 +19,17 @@ const connection = z.object({
 }).parse(JSON.parse(await readFile(path, 'utf8')))
 
 const client = new CriaClient({ baseUrl: connection.baseUrl, token: connection.token, devices: connection.devices })
+
 const bindings = connection.devices.map(device => ({ ...device, providerDeviceId: `fixture:${device.id}` }))
+
 const equipment = createCriaEquipment(client, bindings)
+
 const capture = () => equipment.acquisition.capture({ cameraId: 'fixture:camera', exposureSeconds: 0.1 })
 
 client.start()
+
 assert.ok((await capture()).width > 0)
+
 await writeFile(join(flags, 'first-capture-done'), '')
 
 for (;;) {
@@ -40,6 +45,7 @@ console.log('PASS capture before the restart')
 
 // Cria needs a moment to bring its devices up again; a client that stays blocked never recovers.
 const deadline = Date.now() + 60_000
+
 let last: unknown
 
 for (;;) {
@@ -55,4 +61,5 @@ for (;;) {
 }
 
 console.log('PASS the next capture runs against the restarted Cria')
+
 await client.close()
