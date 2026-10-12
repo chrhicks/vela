@@ -1,15 +1,11 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, readFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { readFile } from 'node:fs/promises'
 import { setTimeout as delay } from 'node:timers/promises'
 import { z } from 'zod'
 import { CriaClient, CriaStateSchema } from '@vela/cria'
 import { CaptureStoppedError } from '@vela/equipment'
 import type { CaptureView, RigDetailView } from '@vela/model/web'
 import { createCriaEquipment } from '../src/cria/equipment.js'
-import { createCriaCustody } from '../src/cria/custody.js'
-import { openAcquisitionArchive } from '../src/acquisitions/archive.js'
 import { createEquipmentComposition } from '../src/equipment/composition.js'
 import { parseCriaConfiguration, registerConfiguredCriaRigs } from '../src/equipment/config.js'
 import { createMemoryRigCatalog } from '../src/rig/catalog.js'
@@ -39,20 +35,17 @@ const response = await fetch(`${connection.baseUrl}/v2/state`, {
 
 assert.equal(response.status, 200)
 
-const state = CriaStateSchema.parse(await response.json())
+CriaStateSchema.parse(await response.json())
 
 const client = new CriaClient({
   baseUrl: connection.baseUrl,
   token: connection.token,
-  storeId: state.storeId,
   devices: connection.devices,
 })
 
 const bindings = connection.devices.map(device => ({ ...device, providerDeviceId: `fixture:${device.id}` }))
 
-const acquisitions = await openAcquisitionArchive(await mkdtemp(join(tmpdir(), 'vela-cria-fixture-acquisitions-')))
-
-const equipment = createCriaEquipment(client, bindings, createCriaCustody(client, acquisitions, state.storeId), 'fixture-check')
+const equipment = createCriaEquipment(client, bindings)
 
 assert.equal((await equipment.provider.inspectDevices()).length, 5)
 
@@ -68,11 +61,7 @@ assert.equal(frame.pixels[1]! - frame.pixels[0]!, 1)
 
 assert.equal(frame.pixels[frame.width]! - frame.pixels[0]!, frame.width)
 
-const preserved = (await client.retainedOriginals()).images
-
-assert.equal(preserved.length, 0, 'Every captured original reached a verified archive receipt')
-
-console.log('PASS verified original pixels, geometry and archive custody')
+console.log('PASS verified original pixels and geometry')
 
 const initialCooling = await equipment.cooling.observe('fixture:camera')
 
@@ -148,7 +137,7 @@ await client.close()
 
 const configurations = parseCriaConfiguration(JSON.stringify({ rigs: [{
   id: 'fixture-check', name: 'Cria fixture check', url: connection.baseUrl,
-  tokenEnv: 'FIXTURE_TOKEN', storeId: state.storeId, devices: connection.devices,
+  tokenEnv: 'FIXTURE_TOKEN', devices: connection.devices,
   imagingCameraId: 'camera', focalLengthMm: 400,
 }] }), { FIXTURE_TOKEN: connection.token })
 
@@ -160,7 +149,7 @@ const savedImages = createMemorySavedImageStore()
 
 const app = buildApp({
   rigCatalog: catalog, savedImages,
-  equipment: createEquipmentComposition(configurations, { acquisitions }),
+  equipment: createEquipmentComposition(configurations),
 })
 
 try {

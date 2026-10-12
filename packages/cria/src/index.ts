@@ -10,6 +10,7 @@ export type {
 
 export {
   CriaApiError,
+  CriaImageGoneError,
   CriaIdentityError,
   CriaOriginalVerificationError,
   CriaUncertainError,
@@ -27,13 +28,9 @@ export {
   CriaOperationRequestSchema,
   CriaReadingSchema,
   CriaImageSchema,
-  CriaArchiveReceiptSchema,
-  CriaCustodySchema,
-  CriaCustodyStateSchema,
   CriaOperationSchema,
   CriaDeviceSchema,
   CriaStateSchema,
-  CriaStorageSchema,
 } from './schema.js'
 
 export type {
@@ -44,12 +41,8 @@ export type {
   CriaOperationRequest,
   CriaReading,
   CriaImage,
-  CriaArchiveReceipt,
-  CriaCustody,
-  CriaCustodyState,
   CriaOperation,
   CriaDevice,
   CriaState,
-  CriaStorage,
   CriaValue,
 } from './schema.js'

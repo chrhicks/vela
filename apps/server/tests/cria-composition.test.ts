@@ -44,7 +44,6 @@ it('shares one authenticated stream across configured rigs and closes it with th
     url: `http://127.0.0.1:${address.port}`,
     tokenEnv: 'UNIT_TEST_TOKEN',
     token,
-    storeId: service.state.storeId,
     devices: [{ id: device.id, kind: device.kind, expectedName: device.expectedName }],
   }))
 

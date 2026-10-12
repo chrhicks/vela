@@ -39,7 +39,6 @@ function fixture() {
   const client = new CriaClient({
     baseUrl: serviceOrigin,
     token,
-    storeId: service.state.storeId,
     devices: bindings,
     fetch: service.fetch,
     pollIntervalMs: 1,

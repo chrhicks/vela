@@ -2,15 +2,14 @@ import { createHash, randomUUID } from 'node:crypto'
 import { EquipmentError } from '@vela/equipment'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  CriaImageGoneError,
   CriaCancelledError,
   CriaIdentityError,
   CriaApiError,
-  CriaCustodySchema,
   CriaOriginalVerificationError,
   CriaUncertainError,
   isTransientCriaFailure,
   type CriaCommand,
-  type CriaCustody,
   type CriaOperation,
 } from '../src/index.js'
 import { closeFixtures, eventResponse, failure, json, reading, serverNow, ServiceFixture } from './fixture.js'
@@ -46,7 +45,7 @@ describe('state and identity', () => {
     await rejected
     expect(fetch).toHaveBeenCalledTimes(1)
     release()
-    expect((await second).state.storeId).toBe(service.state.storeId)
+    expect((await second).state.instanceId).toBe(service.state.instanceId)
     expect(fetch).toHaveBeenCalledTimes(1)
   })
 
@@ -109,7 +108,7 @@ describe('state and identity', () => {
     expect(() => client.reading(snapshot, camera, 'state')).toThrowError(expect.objectContaining({ name: 'CriaUncertainError', reason: 'protocol-error' }))
   })
 
-  it.each(['instance', 'binding', 'store'] as const)('blocks new writes after %s identity changes', async changed => {
+  it.each(['instance', 'binding'] as const)('blocks new writes after %s identity changes', async changed => {
     const service = new ServiceFixture()
     const client = service.client()
 
@@ -119,12 +118,9 @@ describe('state and identity', () => {
 
     if (changed === 'binding') service.camera.bindingId = randomUUID()
 
-    if (changed === 'store') service.state.storeId = randomUUID()
-
     await service.publish()
 
-    if (changed === 'store') await expect(client.state()).rejects.toBeInstanceOf(CriaIdentityError)
-    else await client.state()
+    await client.state()
     await expect(client.run('camera', capture)).rejects.toBeInstanceOf(CriaIdentityError)
     expect(service.posts).toHaveLength(0)
   })
@@ -422,19 +418,17 @@ describe('operation completion and cancellation', () => {
   })
 })
 
-describe('original custody', () => {
-  it('returns the exact verified bytes with decoded pixels and never releases Cria\'s copy', async () => {
+describe('original transfer', () => {
+  it('returns the verified original as decoded pixels and sends no release or delete', async () => {
     const service = new ServiceFixture()
     const client = service.client()
     const operation = await client.run('camera', capture)
-    const { frame, original } = await client.download(operation)
+    const { frame } = await client.download(operation)
 
     expect(frame.width).toBe(2)
     expect(frame.height).toBe(3)
     expect(Array.from(frame.pixels)).toEqual([1, 2, 3, 4, 5, 6])
-    expect(Buffer.from(original).equals(Buffer.from(service.original))).toBe(true)
     expect(service.paths.some(request => request.startsWith('DELETE'))).toBe(false)
-    expect('release' in client).toBe(false)
   })
 
   it('retries a transient transfer of the same original without another exposure', async () => {
@@ -524,56 +518,16 @@ describe('original custody', () => {
       },
     })
 
-    await client.run('camera', capture)
-    const record = [...service.custody.values()][0]!
+    const operation = await client.run('camera', capture)
 
     interrupting = true
-    await expect(client.originalOf(record)).rejects.toMatchObject({ reason: 'transport' })
-    await expect(client.originalOf(record)).rejects.not.toBeInstanceOf(CriaOriginalVerificationError)
+    await expect(client.download(operation)).rejects.toMatchObject({ reason: 'transport' })
+    await expect(client.download(operation)).rejects.not.toBeInstanceOf(CriaOriginalVerificationError)
 
     interrupting = false
     new Uint8Array(service.original)[service.original.byteLength - 1]! ^= 1
-    await expect(client.originalOf(record)).rejects.toBeInstanceOf(CriaOriginalVerificationError)
-
-    const foreign = { ...record, operationId: randomUUID() }
-
-    await expect(client.originalOf(foreign)).rejects.toBeInstanceOf(CriaOriginalVerificationError)
+    await expect(client.download(operation)).rejects.toBeInstanceOf(CriaOriginalVerificationError)
     expect(service.posts).toHaveLength(1)
-  })
-
-  it('types a custody record for another image or store as a verification failure', async () => {
-    const service = new ServiceFixture()
-    let rewrite: ((record: CriaCustody) => void) | null = null
-
-    const client = service.client({
-      fetch: async (input, init) => {
-        const response = await service.fetch(input, init)
-
-        if (!rewrite || !/^\/v2\/images\/[^/]+$/.test(path(input))) return response
-        const record = CriaCustodySchema.parse(await response.json())
-
-        rewrite(record)
-
-        return Response.json(record)
-      },
-    })
-
-    await client.run('camera', capture)
-    const imageId = [...service.custody.keys()][0]!
-
-    rewrite = record => {
-      const id = randomUUID()
-
-      Object.assign(record, { id, image: record.image && { ...record.image, id, original: { ...record.image.original, url: `/v2/images/${id}/original` } } })
-    }
-
-    await expect(client.custody(imageId)).rejects.toBeInstanceOf(CriaOriginalVerificationError)
-    rewrite = record => { record.storeId = randomUUID() }
-
-    await expect(client.custody(imageId)).rejects.toBeInstanceOf(CriaOriginalVerificationError)
-    rewrite = null
-
-    await expect(client.custody(imageId)).resolves.toMatchObject({ id: imageId })
   })
 
   it('names transient failures once, for retries and for whoever reports them', () => {
@@ -601,146 +555,21 @@ describe('original custody', () => {
     expect(service.paths.some(request => request.endsWith('/original'))).toBe(false)
   })
 
-  it('reads an existing result while its operation stays uncertain, without another command', async () => {
-    const service = new ServiceFixture()
-
-    service.completeImmediately = false
-    const client = service.client()
-    const running = client.run('camera', capture)
-
-    await vi.waitFor(() => expect(service.last).not.toBeNull())
-    const operation = service.finish('uncertain')
-
-    await expect(running).rejects.toBeInstanceOf(CriaUncertainError)
-    const record = service.retain(operation)
-    const found = await client.custody(record.id)
-
-    expect(found.state).toBe('retained')
-    expect(Buffer.from(await client.originalOf(found)).equals(Buffer.from(service.original))).toBe(true)
-    expect((await client.retainedOriginals()).images.map(image => image.id)).toEqual([record.id])
-    expect(service.posts).toHaveLength(1)
-    expect(client.commandBlockReasonFor('camera')).not.toBeNull()
-  })
-
-  it('reads custody capacity and state pages without contacting a driver, refusing another store', async () => {
-    const service = new ServiceFixture()
-    const client = service.client()
-
-    await client.run('camera', capture)
-    const posts = service.posts.length
-    const storage = await client.storage()
-
-    expect(storage.images.states.retained.records).toBe(1)
-    expect((await client.custodyPage(['missing'])).images).toEqual([])
-    expect(service.posts).toHaveLength(posts)
-
-    const other = new ServiceFixture()
-    const stranger = other.client({ storeId: service.state.storeId })
-
-    await expect(stranger.storage()).rejects.toThrow('Cria storage belongs to another store')
-    await expect(stranger.custodyPage(['retained'])).rejects.toThrow('another store or state')
-  })
-
-  it('sends the same archive receipt idempotently and refuses one for another store', async () => {
-    const service = new ServiceFixture()
-    const client = service.client()
-    const operation = await client.run('camera', capture)
-    const image = operation.image!
-
-    const receipt = {
-      receiptId: randomUUID(),
-      storeId: service.state.storeId,
-      imageId: image.id,
-      operationId: operation.id,
-      sha256: image.sha256,
-      bytes: image.original.bytes,
-      archive: {
-        system: 'vela',
-        artifactId: image.id,
-        representation: 'imagebytes' as const,
-        sha256: image.sha256,
-        bytes: image.original.bytes,
-        contextSha256: '0'.repeat(64),
-        verification: { method: 'sha256-reread', verifiedAt: serverNow },
-      },
-    }
-
-    expect((await client.acknowledgeArchive(receipt)).state).toBe('archived')
-    expect((await client.acknowledgeArchive(receipt)).state).toBe('archived')
-    await expect(client.acknowledgeArchive({ ...receipt, receiptId: randomUUID() })).rejects.toMatchObject({ code: 'receipt-conflict' })
-    await expect(client.acknowledgeArchive({ ...receipt, storeId: randomUUID() })).rejects.toThrow('another Cria store')
-    expect(service.receipts).toHaveLength(3)
-  })
-
-  it('runs the before-admission hook with the exact request before sending it', async () => {
-    const service = new ServiceFixture()
-    const client = service.client()
-    const seen: string[] = []
-
-    const operation = await client.run('camera', capture, {
-      async beforeAdmission(request) {
-        seen.push(request.requestId)
-        expect(service.posts).toHaveLength(0)
-      },
-    })
-
-    expect(seen).toEqual([operation.requestId])
-    await expect(client.run('camera', capture, { beforeAdmission: async () => { throw new Error('Intent not recorded') } }))
-      .rejects.toThrow('Intent not recorded')
-    expect(service.posts).toHaveLength(1)
-  })
-
-  it('sends nothing when Stop arrives while the before-admission hook runs', async () => {
-    // Found by the Vela verifier: Stop during the intent write still sent the exposure.
-    const service = new ServiceFixture()
-    const client = service.client()
-    const stop = new AbortController()
-
-    await expect(client.run('camera', capture, {
-      signal: stop.signal,
-      async beforeAdmission() {
-        stop.abort()
-      },
-    })).rejects.toBeInstanceOf(CriaCancelledError)
-
-    const cancelling = client.run('camera', capture, {
-      async beforeAdmission() {
-        // Stop from another caller marks the active work cancelled at once.
-        void client.cancelDevice('camera').catch(() => {})
-      },
-    })
-
-    await expect(cancelling).rejects.toBeInstanceOf(CriaCancelledError)
-    expect(service.posts).toHaveLength(0)
-    expect(service.cancellations).toHaveLength(0)
-  })
-
-  it('decodes an archived original only when it matches the confirmed capture', async () => {
+  it('reports a dropped image as lost without retrying or exposing again', async () => {
     const service = new ServiceFixture()
     const client = service.client()
     const operation = await client.run('camera', capture)
 
-    expect(Array.from(client.decodeOriginal(operation, new Uint8Array(service.original)).pixels)).toEqual([1, 2, 3, 4, 5, 6])
-    const altered = new Uint8Array(service.original)
-
-    altered[44] = 9
-    expect(() => client.decodeOriginal(operation, altered)).toThrow('does not match the confirmed capture')
+    service.drop(service.last!.image!.id)
+    await expect(client.download(operation)).rejects.toBeInstanceOf(CriaImageGoneError)
+    expect(service.posts).toHaveLength(1)
+    expect(service.paths.filter(request => request.endsWith('/original'))).toHaveLength(1)
   })
 
-  it('reports why Cria stopped admission', async () => {
+  it('refuses an older protocol Cria before admitting any work', async () => {
     const service = new ServiceFixture()
 
-    Object.assign(service.state, { commandsEnabled: false, admissionStoppedReason: 'Custody record could not be saved: disk full' })
-    const client = service.client()
-
-    await expect(client.run('camera', capture)).rejects.toThrow('Custody record could not be saved: disk full')
-    expect(service.posts).toHaveLength(0)
-  })
-
-  it('refuses a protocol 2 Cria before admitting any work', async () => {
-    const service = new ServiceFixture()
-
-    Object.assign(service.state, { protocolVersion: 2 })
+    Object.assign(service.state, { protocolVersion: 3 })
     const client = service.client()
 
     await expect(client.run('camera', capture)).rejects.toBeInstanceOf(EquipmentError)

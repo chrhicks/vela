@@ -13,7 +13,7 @@ function fixture() {
   })
 
   const client = new CriaClient({
-    baseUrl: serviceOrigin, token, storeId: service.state.storeId,
+    baseUrl: serviceOrigin, token,
     devices: service.state.devices.map(({ id, kind, expectedName }) => ({ id, kind, expectedName })),
     fetch: service.fetch, observationTimeoutMs: 100, pollIntervalMs: 1,
   })

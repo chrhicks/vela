@@ -58,7 +58,6 @@ export function createEquipmentComposition(
       client = new CriaClient({
         baseUrl: configuration.url,
         token: configuration.token,
-        storeId: configuration.storeId,
         devices: [...devices.values()],
       })
       clients.set(configuration.url, client)

@@ -12,7 +12,6 @@ function equipment(service: ServiceFixture, fetch = service.fetch) {
   const client = new CriaClient({
     baseUrl: serviceOrigin,
     token,
-    storeId: service.state.storeId,
     devices: bindings,
     fetch,
     pollIntervalMs: 1,
