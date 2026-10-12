@@ -244,6 +244,7 @@ function CapturePage({ rigId }: { rigId: string }) {
                     <div>
                       {view.savedCount} saved · {integrationTime(view.integrationSeconds)}{' '}
                       collected
+                      {(view.lostFrameCount ?? 0) > 0 && <> · {view.lostFrameCount} lost</>}
                       <br />
                       {view.repeat ? 'Repeats until you stop' : 'One exposure'}
                     </div>
@@ -267,6 +268,7 @@ function CapturePage({ rigId }: { rigId: string }) {
                     <p>
                       {view.savedCount} saved · {integrationTime(view.integrationSeconds)}{' '}
                       collected · {view.completedCount} completed
+                      {(view.lostFrameCount ?? 0) > 0 && <> · {view.lostFrameCount} lost</>}
                     </p>
                   )}
                   <form

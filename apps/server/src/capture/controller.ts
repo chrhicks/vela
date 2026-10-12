@@ -41,6 +41,14 @@ export class CaptureStoppedError extends Error {
   }
 }
 
+/** The exposure finished but its frame was lost before it could be fetched. */
+export class CaptureFrameLostError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'CaptureFrameLostError'
+  }
+}
+
 export interface CaptureRunOptions {
   subject?: CaptureSubject | null
   onSettled?: () => void
@@ -66,6 +74,7 @@ export function createCaptureController(
     saveFrames: false,
     savedImageCount: 0,
     completedCount: 0,
+    lostFrameCount: 0,
     subject: null,
     savedCount: 0,
     integrationSeconds: 0,
@@ -148,22 +157,36 @@ export function createCaptureController(
         patch({ phase: 'exposing', elapsedSeconds: 0, captureReadState: 'current' })
         let capturePending = true
 
-        const frame = await camera
-          .capture({
-            exposureSeconds,
-            signal,
-            onProgress(progress) {
-              if (capturePending && !signal.aborted)
-                patch({ phase: progress.phase, elapsedSeconds: progress.elapsedSeconds })
-            },
-            onReadState(captureReadState) {
-              if (capturePending && !signal.aborted) patch({ captureReadState })
-            },
-          })
-          .finally(() => {
-            capturePending = false
-            patch({ captureReadState: 'current' })
-          })
+        let frame: CaptureFrame
+
+        try {
+          frame = await camera
+            .capture({
+              exposureSeconds,
+              signal,
+              onProgress(progress) {
+                if (capturePending && !signal.aborted)
+                  patch({ phase: progress.phase, elapsedSeconds: progress.elapsedSeconds })
+              },
+              onReadState(captureReadState) {
+                if (capturePending && !signal.aborted) patch({ captureReadState })
+              },
+            })
+            .finally(() => {
+              capturePending = false
+              patch({ captureReadState: 'current' })
+            })
+        } catch (error) {
+          if (!(error instanceof CaptureFrameLostError)) throw error
+
+          // A lost frame is one frame, not the run: count it, never expose again to repair it, and
+          // take the next frame when the run repeats. A single exposure ends, saying so.
+          patch({ lostFrameCount: (view.lostFrameCount ?? 0) + 1 })
+
+          if (!repeat || signal.aborted) throw error
+
+          continue
+        }
 
         // A completed acquisition wins a race with Stop: publish the actual result.
         if (!signal.aborted) patch({ phase: 'reading' })
@@ -259,6 +282,7 @@ export function createCaptureController(
       repeat,
       saveFrames,
       completedCount: 0,
+      lostFrameCount: 0,
       subject: runSubject,
       savedCount: 0,
       integrationSeconds: 0,
