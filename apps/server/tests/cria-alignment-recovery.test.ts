@@ -3,8 +3,6 @@ import { CriaClient, CriaUncertainError } from '@vela/cria'
 import { CaptureRetryableError } from '@vela/equipment'
 import { ServiceFixture, serviceOrigin, token, serverNow, reading } from '../../../packages/cria/test/fixture.js'
 import { createCriaEquipment } from '../src/cria/equipment.js'
-import { createCriaCustody } from '../src/cria/custody.js'
-import { createMemoryAcquisitionArchive } from '../src/acquisitions/archive.js'
 import { createAlignmentController } from '../src/alignment/controller.js'
 import { createTestCadence } from '../src/alignment/test-cadence.js'
 
@@ -30,8 +28,6 @@ function equipment(service: ServiceFixture, fetch = service.fetch) {
     ...createCriaEquipment(
       client,
       bindings.map(binding => ({ ...binding, providerDeviceId: binding.id })),
-      createCriaCustody(client, createMemoryAcquisitionArchive(), service.state.storeId),
-      'rig-1',
     ),
     client,
   }
