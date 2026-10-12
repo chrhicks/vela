@@ -10,8 +10,6 @@ import { useTonightTarget } from '../features/targets/use-tonight-target'
 import { AltitudeTrace } from '../features/targets/AltitudeTrace'
 import { skyTime } from '../features/targets/sky-time'
 import { EquipmentSummary } from '../features/observation/EquipmentSummary'
-import { ArchivePreservation } from '../features/archive/ArchivePreservation'
-import { useArchiveHealth } from '../features/archive/use-archive-health'
 import './capture.css'
 
 export function Capture() {
@@ -22,7 +20,6 @@ export function Capture() {
 
 function CapturePage({ rigId }: { rigId: string }) {
   const capture = useCapture(rigId)
-  const archive = useArchiveHealth(rigId)
   const rig = useRigObservation()
   const [params] = useSearchParams()
   const [exposure, setExposure] = useState<string | null>(null)
@@ -333,7 +330,6 @@ function CapturePage({ rigId }: { rigId: string }) {
               )}
             </section>
           )}
-          <ArchivePreservation health={archive} capturing={view.active && !offline} />
           <section className="tonight-sky" aria-label="In your sky">
             <div className="tonight-context__heading">
               <strong>In your sky</strong>
