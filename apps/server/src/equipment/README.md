@@ -15,8 +15,8 @@ falls back to Alpaca. Alpaca discovery cannot match or migrate a Cria record.
 Set `VELA_CRIA_CONFIG_PATH` to a server-readable JSON file. Keep its token in the
 environment variable named by `tokenEnv`, with at least 32 characters. No token is
 stored in the rig catalog or sent to the browser. URLs must be HTTP(S) origins
-without credentials, paths, queries or fragments. Use the actual service's
-`storeId` and exact configured device IDs, kinds and expected operational names.
+without credentials, paths, queries or fragments. Use the exact configured device
+IDs, kinds and expected operational names.
 
 ```json
 {
@@ -26,7 +26,6 @@ without credentials, paths, queries or fragments. Use the actual service's
       "name": "FRA 400 · Cria",
       "url": "http://rig-host:4319",
       "tokenEnv": "VELA_FRA_CRIA_TOKEN",
-      "storeId": "11111111-1111-4111-8111-111111111111",
       "devices": [
         { "id": "camera", "kind": "camera", "expectedName": "Configured camera name" },
         { "id": "mount", "kind": "mount", "expectedName": "Configured mount name" },
@@ -51,12 +50,13 @@ observed inventory is empty until Cria supplies observations. To remove a manage
 rig permanently, remove its configuration and forget the catalog record; a
 configuration that remains present will recreate a forgotten rig at startup.
 
-Provider IDs include the configuration ID, Cria store ID and device ID, so two
+Provider IDs include the configuration ID and device ID, so two
 services' local `camera` IDs cannot collide. A device at one service origin may
 belong to only one configured rig. Multiple disjoint bindings on the same service
 share one authenticated client and state stream. Application startup starts those
-streams; shutdown closes them and cancels reconnects. A replacement Cria store
-requires explicit configuration; it is not accepted as the previous service.
+streams; shutdown closes them and cancels reconnects. A Cria restart (a new
+instance) currently blocks new commands from this Vela server until the server is
+restarted. Failing only the workflow that was running is the next change.
 
 `imagingCameraId`, `focalLengthMm` and `alignment` are optional. Alignment additionally
 requires `VELA_ASTAP` and `VELA_STAR_CATALOG`; optional

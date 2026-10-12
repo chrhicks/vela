@@ -223,7 +223,6 @@ function setup() {
         }),
       }
     },
-    archiveHealth: () => undefined,
     alignmentSettings: () => ({
       rigId: rig.id,
       endpoint: 'http://cria.local:4319',

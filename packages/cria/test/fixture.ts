@@ -2,12 +2,10 @@ import { createHash, randomUUID } from 'node:crypto'
 import { setImmediate } from 'node:timers/promises'
 import { z } from 'zod'
 import {
-  CriaArchiveReceiptSchema,
   CriaClient,
   CriaCommandSchema,
   CriaOperationRequestSchema,
   type CriaClientOptions,
-  type CriaCustody,
   type CriaDevice,
   type CriaImage,
   type CriaOperation,
@@ -97,13 +95,11 @@ export class ServiceFixture {
   readonly camera = device('camera', 'camera')
   readonly mount = device('mount', 'mount')
   readonly state: CriaState = {
-    protocolVersion: 3,
-    storeId: randomUUID(),
+    protocolVersion: 4,
     instanceId: randomUUID(),
     sequence: 1,
     generatedAt: serverNow,
     commandsEnabled: true,
-    admissionStoppedReason: null,
     devices: [this.camera, this.mount],
     operations: [],
   }
@@ -111,19 +107,11 @@ export class ServiceFixture {
   readonly requests = new Map<string, CriaOperation>()
   readonly posts: string[] = []
   readonly paths: string[] = []
-  readonly deletes: string[] = []
-  readonly receipts: string[] = []
-  readonly custody = new Map<string, CriaCustody>()
+  /** Images this instance still holds; Cria keeps only the newest, so tests drop one to model eviction. */
+  readonly images = new Map<string, CriaImage>()
   readonly cancellations: string[] = []
   original = pixels()
   completeImmediately = true
-  /** Model Cria's release of its local copy once a receipt is accepted. */
-  releaseOnReceipt = false
-  /** Local capacity reported by `/v2/storage`. */
-  budgetBytes = 2 * 1024 ** 3
-  reservationBytes = 44 + 4 * 2 * 2
-  freeBytes = 500 * 1024 ** 3
-  storageFailure = false
   cancelImmediately = false
   publishOperations = true
   last: CriaOperation | null = null
@@ -132,7 +120,6 @@ export class ServiceFixture {
     const client = new CriaClient({
       baseUrl: serviceOrigin,
       token,
-      storeId: this.state.storeId,
       devices: this.state.devices.map(({ id, kind, expectedName }) => ({ id, kind, expectedName })),
       fetch: this.fetch,
       pollIntervalMs: 1,
@@ -180,7 +167,7 @@ export class ServiceFixture {
 
     if (operation.kind === 'capture' && status === 'succeeded') {
       operation.image = this.image(operation)
-      this.retain(operation, operation.image)
+      this.images.set(operation.image.id, operation.image)
     }
 
     // Represent the fresh post-write observation. Production additionally publishes
@@ -198,40 +185,9 @@ export class ServiceFixture {
     return operation
   }
 
-  /** Cria custody for a verified original, as after adoption by result or later discovery. */
-  retain(operation: CriaOperation, image = this.image(operation)): CriaCustody {
-    const record: CriaCustody = {
-      id: image.id,
-      storeId: this.state.storeId,
-      operationId: operation.id,
-      requestId: operation.requestId,
-      instanceId: operation.instanceId,
-      deviceId: operation.deviceId,
-      bindingId: operation.bindingId,
-      cameraName: operation.expectedName,
-      state: 'retained',
-      reservedAt: serverNow,
-      updatedAt: serverNow,
-      reason: null,
-      context: {
-        version: 1,
-        requested: operation.parameters,
-        cameraObservations: { gain: reading(10) },
-        observationsNote: 'Latest Cria readings when the capture was admitted',
-      },
-      image,
-      discovery: 'operation-result',
-      candidate: null,
-      receipt: null,
-      receiptFingerprint: null,
-      receiptAcceptedAt: null,
-      releasedAt: null,
-      history: [],
-    }
-
-    this.custody.set(record.id, record)
-
-    return record
+  /** Model Cria dropping an image from its rolling set. */
+  drop(imageId: string): void {
+    this.images.delete(imageId)
   }
 
   image(operation: CriaOperation): CriaImage {
@@ -359,98 +315,18 @@ export class ServiceFixture {
       return json(operation, method === 'POST' ? 202 : 200)
     }
 
-    if (path === '/v2/storage') {
-      if (this.storageFailure) return failure(503, 'storage-unavailable')
+    if (path.startsWith('/v2/images/') && path.endsWith('/original')) {
+      const image = this.images.get(path.split('/')[3] ?? '')
 
-      const tally = (state: string) => {
-        const records = [...this.custody.values()].filter(record => record.state === state)
+      if (!image) return failure(410, 'image-gone')
 
-        return {
-          records: records.length,
-          bytes: records.reduce((sum, record) => sum + (state === 'reserved' ? this.reservationBytes : record.image?.original.bytes ?? 0), 0),
-        }
-      }
-
-      const states = { reserved: tally('reserved'), retained: tally('retained'), quarantined: tally('quarantined'), archived: tally('archived') }
-      const committedBytes = Object.values(states).reduce((sum, state) => sum + state.bytes, 0)
-      const outstandingRecords = Object.values(states).reduce((sum, state) => sum + state.records, 0)
-      const refusal = committedBytes + this.reservationBytes > this.budgetBytes ? 'Image budget full' : null
-
-      return json({
-        operations: { storeId: this.state.storeId, requests: this.requests.size, requestLimit: 1000000, retainedOperationLimit: 2048, durable: true },
-        images: {
-          retention: 'until-archive-receipt',
-          releaseArchivedOriginals: this.releaseOnReceipt,
-          imageRetentionSecondsIgnored: true,
-          committedBytes,
-          budgetBytes: this.budgetBytes,
-          reservationBytes: this.reservationBytes,
-          freeBytes: this.freeBytes,
-          freeSpaceReserveBytes: 1048576,
-          outstandingRecords,
-          recordLimit: 10000,
-          states,
-          downloads: 0,
-          captureAdmissible: refusal === null,
-          refusal,
-          migration: null,
+      return new Response(this.original, {
+        headers: {
+          'content-type': 'application/imagebytes',
+          'content-length': String(this.original.byteLength),
+          etag: `"${image.sha256}"`,
         },
       })
-    }
-
-    if (path === '/v2/images') {
-      // Cria pages by admission sequence: records after the cursor, in order, at most `limit`.
-      const query = new URL(input instanceof Request ? input.url : String(input)).searchParams
-      const after = Number(query.get('after') ?? 0)
-      const limit = Number(query.get('limit') ?? 100)
-      const states = (query.get('state') ?? 'reserved,retained,quarantined,archived').split(',')
-
-      const page = [...this.custody.values()]
-        .flatMap((record, index) => index + 1 > after && states.includes(record.state) ? [{ record, sequence: index + 1 }] : [])
-        .slice(0, limit)
-
-      return json({ storeId: this.state.storeId, images: page.map(({ record }) => record), next: page.at(-1)?.sequence ?? after })
-    }
-
-    if (path.startsWith('/v2/images/')) {
-      const record = this.custody.get(path.split('/')[3] ?? '')
-
-      if (!record?.image) return failure(404, 'not-found')
-
-      if (method === 'DELETE') {
-        this.deletes.push(record.id)
-
-        return failure(409, 'archive-receipt-required')
-      }
-
-      if (path.endsWith('/archive-receipt')) {
-        const receipt = CriaArchiveReceiptSchema.parse(JSON.parse(z.string().parse(init?.body)))
-
-        this.receipts.push(receipt.receiptId)
-
-        if (record.receipt)
-          return record.receipt.receiptId === receipt.receiptId ? json(record) : failure(409, 'receipt-conflict')
-
-        if (receipt.sha256 !== record.image.sha256 || receipt.storeId !== record.storeId)
-          return failure(409, 'receipt-conflict')
-        Object.assign(record, { state: this.releaseOnReceipt ? 'released' : 'archived', receipt, receiptAcceptedAt: serverNow })
-
-        return json(record)
-      }
-
-      if (path.endsWith('/original') && !['retained', 'archived'].includes(record.state))
-        return failure(410, 'image-gone')
-
-      if (path.endsWith('/original'))
-        return new Response(this.original, {
-          headers: {
-            'content-type': 'application/imagebytes',
-            'content-length': String(this.original.byteLength),
-            etag: `"${record.image.sha256}"`,
-          },
-        })
-
-      return json(record)
     }
 
     throw new Error(`Unexpected fixture request: ${method} ${path}`)

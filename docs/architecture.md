@@ -38,8 +38,6 @@ Each rig uses exactly one mode, chosen at composition in `apps/server/src/equipm
 
 Some routes still build Alpaca capabilities directly. New workflow code takes capabilities from the composition.
 
-Scheduled for removal, do not extend: the acquisition archive and Cria custody/receipt code in `apps/server/src/acquisitions`, `apps/server/src/cria/custody.ts` and `apps/server/src/cria/archive-health.ts`.
-
 ## Runs are ephemeral
 
 - A capture run and every workflow live in Vela server memory. A browser can disconnect and reconnect without ending them.

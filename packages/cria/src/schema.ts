@@ -42,7 +42,6 @@ export const CriaClientConfigSchema = z.strictObject({
       !url.search && !url.hash && url.pathname === '/'
   }, 'Cria endpoint must be an HTTP(S) origin without credentials, query, or fragment'),
   token: z.string().min(32).refine(noControlCharacters),
-  storeId: uuid,
   devices: z.array(CriaDeviceBindingSchema).min(1).max(16)
     .refine(devices => new Set(devices.map(device => device.id)).size === devices.length,
       'Cria device IDs must be unique'),
@@ -205,113 +204,6 @@ export const CriaImageSchema = z.strictObject({
 
 export type CriaImage = z.infer<typeof CriaImageSchema>
 
-/** Exact-byte archive attestation; Cria checks its own identities and digest before accepting it. */
-export const CriaArchiveReceiptSchema = z.strictObject({
-  receiptId: uuid,
-  storeId: uuid,
-  imageId: uuid,
-  operationId: uuid,
-  sha256: digest,
-  bytes: z.number().int().min(44),
-  archive: z.strictObject({
-    system: z.string().min(1).max(64),
-    artifactId: z.string().min(1).max(256),
-    representation: z.literal('imagebytes'),
-    sha256: digest,
-    bytes: z.number().int().min(44),
-    contextSha256: digest,
-    verification: z.strictObject({ method: z.string().min(1).max(64), verifiedAt: timestamp }),
-  }),
-})
-
-export type CriaArchiveReceipt = z.infer<typeof CriaArchiveReceiptSchema>
-
-export const CriaCustodyStateSchema = z.enum([
-  'reserved', 'retained', 'quarantined', 'absent', 'archived', 'released', 'missing', 'legacy-removed',
-])
-
-export type CriaCustodyState = z.infer<typeof CriaCustodyStateSchema>
-
-/** Cria's durable record for one reserved image, readable whatever its operation outcome. */
-export const CriaCustodySchema = z.strictObject({
-  id: uuid,
-  storeId: uuid,
-  operationId: z.string(),
-  requestId: z.string(),
-  instanceId: z.string(),
-  deviceId: z.string(),
-  bindingId: z.string(),
-  cameraName: z.string(),
-  state: CriaCustodyStateSchema,
-  reservedAt: timestamp,
-  updatedAt: timestamp,
-  reason: z.string().nullable(),
-  context: jsonObject,
-  image: CriaImageSchema.nullable(),
-  discovery: z.enum(['operation-result', 'worker-completion', 'migration']).nullable(),
-  candidate: z.strictObject({ path: z.string(), bytes: z.number().int().nonnegative() }).nullable(),
-  receipt: CriaArchiveReceiptSchema.nullable(),
-  receiptFingerprint: digest.nullable(),
-  receiptAcceptedAt: timestamp.nullable(),
-  releasedAt: timestamp.nullable(),
-  history: z.array(z.strictObject({ at: timestamp, state: CriaCustodyStateSchema, note: z.string() })),
-}).refine(record => !['retained', 'archived'].includes(record.state) ||
-  record.image?.id === record.id && record.image.operationId === record.operationId,
-'Retained custody must describe its own original')
-
-export type CriaCustody = z.infer<typeof CriaCustodySchema>
-
-export const CriaCustodyPageSchema = z.strictObject({
-  storeId: uuid,
-  images: z.array(CriaCustodySchema).max(500),
-  next: z.number().int().nonnegative(),
-})
-
-const byteCount = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER)
-
-const recordTally = z.strictObject({ records: byteCount, bytes: byteCount })
-
-/**
- * Cria's local custody capacity from `GET /v2/storage`. Read-only bookkeeping: reading it never
- * contacts a driver. `states` counts outstanding records; `missing` and terminal states are not
- * included and must be listed separately.
- */
-export const CriaStorageSchema = z.strictObject({
-  operations: z.strictObject({
-    storeId: uuid,
-    requests: byteCount,
-    requestLimit: byteCount,
-    retainedOperationLimit: byteCount,
-    durable: z.boolean(),
-  }),
-  images: z.strictObject({
-    retention: z.literal('until-archive-receipt'),
-    releaseArchivedOriginals: z.boolean(),
-    imageRetentionSecondsIgnored: z.boolean(),
-    committedBytes: byteCount,
-    budgetBytes: byteCount,
-    /** Bytes held for each admitted capture until its original is measured. */
-    reservationBytes: byteCount,
-    /** Free space of the volume holding Cria's image store. */
-    freeBytes: byteCount,
-    freeSpaceReserveBytes: byteCount,
-    outstandingRecords: byteCount,
-    recordLimit: byteCount,
-    states: z.strictObject({
-      reserved: recordTally,
-      retained: recordTally,
-      quarantined: recordTally,
-      archived: recordTally,
-    }),
-    downloads: byteCount,
-    captureAdmissible: z.boolean(),
-    refusal: z.string().nullable(),
-    migration: jsonObject.nullable(),
-  }),
-})
-
-export type CriaStorage = z.infer<typeof CriaStorageSchema>
-
 export const CriaOperationSchema = z.strictObject({
   id: uuid,
   ...operationIdentity,
@@ -368,15 +260,12 @@ export const CriaDeviceSchema = z.strictObject({
 export type CriaDevice = z.infer<typeof CriaDeviceSchema>
 
 export const CriaStateSchema = z.strictObject({
-  /** 3: originals stay in Cria custody until an accepted archive receipt. */
-  protocolVersion: z.literal(3),
+  /** 4: no custody. A new instanceId means everything in flight before it is unknown. */
+  protocolVersion: z.literal(4),
   instanceId: uuid,
-  storeId: uuid,
   sequence: z.number().int().nonnegative(),
   generatedAt: timestamp,
   commandsEnabled: z.boolean(),
-  /** Set once an essential Cria storage write failed; admission stays stopped until restart. */
-  admissionStoppedReason: z.string().nullable(),
   devices: z.array(CriaDeviceSchema).max(16),
   operations: z.array(CriaOperationSchema),
 }).refine(state => new Set(state.devices.map(device => device.id)).size === state.devices.length,
