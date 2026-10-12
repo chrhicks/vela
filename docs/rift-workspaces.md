@@ -77,7 +77,7 @@ rift ancestors               # Parents of the current task, nearest first
 git push -u origin task-one
 ```
 
-Use the normal PR and verification workflow in [AGENTS.md](../AGENTS.md#verification-browser-review-and-merge). Commits and refs in a task copy do not automatically appear in the source or sibling copies; push the task branch and fetch in another copy when it needs those commits.
+Use the normal PR and verification workflow in [AGENTS.md](../AGENTS.md#working-with-chris). Commits and refs in a task copy do not automatically appear in the source or sibling copies; push the task branch and fetch in another copy when it needs those commits.
 
 ## Finish a task
 
