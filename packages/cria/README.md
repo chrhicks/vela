@@ -6,7 +6,7 @@ The package depends on `@vela/equipment` for frame contracts and ImageBytes deco
 
 ## Construction and observation
 
-Construct one `CriaClient` per authenticated service and share it across the service's devices. Configuration pins the HTTP(S) origin, bearer token, durable `storeId`, and each endpoint-local device ID, kind and expected operational name. Construction performs no requests. Credentials stay on the server; redirects are refused.
+Construct one `CriaClient` per authenticated service and share it across the service's devices. Configuration pins the HTTP(S) origin, bearer token, and each endpoint-local device ID, kind and expected operational name. Construction performs no requests. Credentials stay on the server; redirects are refused.
 
 Call `start()` at service composition to open one authenticated `/v2/events` stream shared by every configured device and operation. `state()` also starts the stream lazily. Call `close()` when composition shuts down; it releases the stream, timers and waiters without claiming that physical equipment stopped. There is no steady HTTP state polling path.
 
@@ -38,24 +38,13 @@ A transient observation failure before admission throws `CriaNotAdmittedError`. 
 
 `onProgress` receives a validated `CriaOperation`. `onReadState` reports interrupted observation until a fresh operation response arrives. `elapsedSeconds` is worker progress, including time spent waiting for cleanup; it is not measured shutter-open duration.
 
-## Original custody
+## Original transfer
 
-Cria protocol 3 keeps every original until it accepts an archive receipt. The client requires `protocolVersion: 3` on its first state read, so an older Cria is refused before any command is admitted.
+Cria protocol 4 keeps only its newest completed images. The client requires `protocolVersion: 4` on its first state read, so an older Cria is refused before any command is admitted.
 
-`download(operation)` accepts only a confirmed capture and validates the original's operation, instance, device, binding, geometry and requested exposure. It checks the configured store again, downloads a bounded ImageBytes body, verifies length and SHA-256, and decodes geometry before returning `{ image, frame, original }`. `original` holds the exact verified bytes so the caller can preserve them before processing. If the stream is interrupted after an operation's terminal result was confirmed, a bounded HTTP state read reconciles store identity; loss of the stream alone does not discard a reachable original. A transient transfer failure retries the same original within `imageRetryMs`. Invalid metadata, checksum or encoding stops immediately. None of these paths starts another exposure.
+`download(operation)` accepts only a confirmed capture and validates the original's operation, instance, device, binding, geometry and requested exposure. It downloads a bounded ImageBytes body, verifies length and SHA-256, and decodes geometry before returning `{ image, frame }`. If the stream is interrupted after an operation's terminal result was confirmed, a bounded HTTP state read reconciles the instance identity. A transient transfer failure retries the same original within `imageRetryMs`. Invalid metadata, checksum or encoding stops immediately. None of these paths starts another exposure.
 
-Existing results are reached through custody, independently of an operation's outcome:
-
-- `custody(imageId)` reads Cria's record in any state (reserved, retained, quarantined, absent, archived, released, missing, legacy-removed).
-- `retainedOriginals(after)` pages verified originals still awaiting archive.
-- `originalOf(record)` transfers the same verified bytes for a retained or archived record. It works while the operation that produced it remains uncertain and never clears the command interlock.
-- `acknowledgeArchive(receipt)` sends an exact-byte receipt after Vela has verified its archive. Repeating the same receipt is safe; Cria rejects a different receipt or mismatched identity with `receipt-conflict`.
-
-- `decodeOriginal(operation, original)` decodes the same original from another verified source, such as Vela's archive after Cria released its copy. The bytes must still match the confirmed capture's digest and length.
-
-`run()` accepts `beforeAdmission(request)`, awaited after the exact request (including its request ID) is built and before it is sent. A failure there means nothing was sent. Callers use it to record intent and ownership before Cria can act on the request.
-
-There is no release call. Cria deletes its redundant copy only after accepting a receipt, and only when its own release setting allows it. When Cria has stopped admission after an essential storage failure, `state.admissionStoppedReason` explains why and write attempts fail with that reason.
+Fetch right after the capture succeeds. If Cria has dropped the image (410 `image-gone`) `download` throws `CriaImageGoneError`: the frame is lost, nothing retries and nothing exposes again. There is no release call and no archive receipt.
 
 ## Focused verification
 
@@ -65,4 +54,4 @@ pnpm --filter @vela/cria build
 pnpm exec oxlint packages/cria
 ```
 
-The transport fixtures exercise lost admission, identical retry, custody reads, archive receipts, protocol refusal, cancellation and settlement, domain isolation, identity changes, interrupted reads, clock-independent freshness, and original integrity/ownership. They never contact observatory hardware. Application integration against Cria's separate-process fixtures is verified at the server boundary.
+The transport fixtures exercise lost admission, identical retry, a dropped image, protocol refusal, cancellation and settlement, domain isolation, identity changes, interrupted reads, clock-independent freshness, and original integrity/ownership. They never contact observatory hardware. Application integration against Cria's separate-process fixtures is verified at the server boundary.

@@ -11,7 +11,6 @@ import { createCriaProvider } from './provider.js'
 
 const generatedAt = 1_800_000_000_000
 
-const storeId = 'b112d3f8-63e1-45c4-862b-95f74c1c6020'
 
 function reading(value: CriaValue, ageMs = 100): CriaReading {
   return {
@@ -53,13 +52,11 @@ function device(kind: CriaDevice['kind'], fields: CriaDevice['fields']): CriaDev
 
 function providerFor(devices: CriaDevice[]) {
   const state: CriaState = {
-    protocolVersion: 3,
+    protocolVersion: 4,
     instanceId: 'bbd6befc-83b4-4c39-9b04-144ae328d7ea',
-    storeId,
     sequence: 1,
     generatedAt,
     commandsEnabled: true,
-    admissionStoppedReason: null,
     devices,
     operations: [],
   }
@@ -79,7 +76,6 @@ function providerFor(devices: CriaDevice[]) {
   const client = new CriaClient({
     baseUrl: 'http://cria.test',
     token: 'provider-test-token-that-is-long-enough',
-    storeId,
     devices: bindings.map(({ id, kind, expectedName }) => ({ id, kind, expectedName })),
     eventReconnectMs: 5,
     eventMaxReconnectMs: 20,

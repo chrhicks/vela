@@ -41,6 +41,17 @@ export class CriaOriginalVerificationError extends EquipmentError {
   }
 }
 
+/**
+ * Cria no longer holds this image: it keeps only the newest completed captures. The frame is lost;
+ * never expose again to repair it.
+ */
+export class CriaImageGoneError extends EquipmentError {
+  constructor(message: string, endpoint: string) {
+    super(message, { reason: 'protocol-error', endpoint })
+    this.name = 'CriaImageGoneError'
+  }
+}
+
 export class CriaUncertainError extends EquipmentError {
   constructor(
     message: string,

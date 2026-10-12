@@ -51,7 +51,7 @@ Vela talks to each rig in exactly one mode, chosen at composition. There is no f
 
 Both sit behind `@vela/equipment`. Workflows depend on its capabilities, never on a concrete adapter. See [docs/architecture.md](docs/architecture.md).
 
-The Cria custody, receipt, journal and acquisition-archive code (`apps/server/src/acquisitions`, `apps/server/src/cria/custody.ts`, `apps/server/src/cria/archive-health.ts`) is scheduled for removal. Do not extend it or build on it.
+Cria holds only its newest completed images and Vela fetches each one right after its capture succeeds. A frame Cria has dropped is lost; Vela reports it and never exposes again to repair it. There is no archive, receipt or custody protocol between Vela and Cria; do not add one back.
 
 ## Engineering taste
 

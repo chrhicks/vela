@@ -8,7 +8,6 @@ const configuration = {
   name: 'FRA 400',
   url: 'http://cria.local:4319',
   tokenEnv: 'CRIA_TEST_TOKEN',
-  storeId: '11111111-1111-4111-8111-111111111111',
   devices: [
     { id: 'camera', kind: 'camera', expectedName: 'Main camera' },
     { id: 'mount', kind: 'mount', expectedName: 'Mount' },

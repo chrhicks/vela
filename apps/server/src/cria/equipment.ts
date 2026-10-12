@@ -24,7 +24,6 @@ import {
 import { DeviceReadings } from './readings.js'
 import { createCriaProvider } from './provider.js'
 import { createCriaMountControl } from './mount-control.js'
-import type { CriaCustodyCoordinator } from './custody.js'
 
 export interface CriaEquipmentBinding {
   readonly providerDeviceId: string
@@ -36,9 +35,6 @@ export interface CriaEquipmentBinding {
 export function createCriaEquipment(
   client: CriaClient,
   bindings: ReadonlyArray<CriaEquipmentBinding>,
-  custody: CriaCustodyCoordinator,
-  /** The Vela rig these bindings belong to, recorded with each acquisition's intent. */
-  rigId: string,
 ) {
   function binding(id: string, kind: CriaDeviceKind, expectedName?: string) {
     const selected = bindings.find(device => device.providerDeviceId === id)
@@ -82,25 +78,7 @@ export function createCriaEquipment(
 
         if (options.monochromeOnly !== undefined) parameters.monochromeOnly = options.monochromeOnly
 
-        let requestId: string | null = null
-
         let runOptions: NonNullable<Parameters<CriaClient['run']>[2]> = {
-          // Intent is durable and this acquisition owns the request before Cria can act on it,
-          // so recovery cannot take the result even if the admission response is delayed or lost.
-          async beforeAdmission(request) {
-            await custody.intend({
-              version: 1,
-              storeId: custody.storeId,
-              requestId: request.requestId,
-              rigId,
-              deviceId: selected.id,
-              expectedCameraName: options.expectedCameraName ?? null,
-              purpose: options.purpose ?? null,
-              exposureSeconds: options.exposureSeconds,
-              recordedAt: new Date().toISOString(),
-            })
-            requestId = request.requestId
-          },
           onProgress(progress) {
             if (progress.phase === 'readout' || progress.phase === 'retaining') {
               options.onReadout?.()
@@ -119,33 +97,10 @@ export function createCriaEquipment(
 
         if (options.onReadState) runOptions = { ...runOptions, onReadState: options.onReadState }
 
-        try {
-          const operation = await client.run(selected.id, { kind: 'capture', parameters }, runOptions)
-          const downloadOptions = options.onReadState ? { onReadState: options.onReadState } : {}
-          let acquired: Awaited<ReturnType<CriaClient['download']>>
+        const operation = await client.run(selected.id, { kind: 'capture', parameters }, runOptions)
+        const downloadOptions = options.onReadState ? { onReadState: options.onReadState } : {}
 
-          try {
-            acquired = await client.download(operation, downloadOptions)
-          } catch (error) {
-            // Vela may already hold this same original with a receipt; then use that verified copy.
-            const archived = operation.reservedImageId && await custody.archivedOriginal(operation.reservedImageId)
-
-            if (!archived) throw error
-
-            return client.decodeOriginal(operation, archived)
-          }
-
-          // Preservation is attempted before any consumer judges or processes the pixels. If it
-          // fails, the frame is still returned, Cria keeps the same original, and custody
-          // recovery archives it later with this request's recorded intent. Never re-expose.
-          await custody.preserveAcquisition(acquired.image.id, acquired.original).catch(error => {
-            console.error('Acquisition preservation deferred; Cria retains the original', acquired.image.id, error)
-          })
-
-          return acquired.frame
-        } finally {
-          if (requestId !== null) custody.disown(requestId)
-        }
+        return (await client.download(operation, downloadOptions)).frame
       } catch (error) {
         if (error instanceof CriaCancelledError) throw new CaptureStoppedError()
 

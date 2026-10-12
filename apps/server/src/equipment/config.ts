@@ -21,7 +21,6 @@ const rigSchema = z.strictObject({
       url.pathname === '/' && !url.search && !url.hash && !url.username && !url.password
   }, 'Cria URL must be an HTTP(S) origin without credentials'),
   tokenEnv: z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/),
-  storeId: z.uuid(),
   devices: z.array(deviceSchema).min(1),
   imagingCameraId: identifier.max(64).optional(),
   focalLengthMm: z.number().min(10).max(20000).optional(),
@@ -54,18 +53,18 @@ const configurationSchema = z.strictObject({ rigs: z.array(rigSchema) }).superRe
   if (new Set(value.rigs.map(rig => rig.id)).size !== value.rigs.length)
     context.addIssue({ code: 'custom', message: 'Cria rig IDs must be unique' })
 
-  const services = new Map<string, { storeId: string; tokenEnv: string }>()
+  const services = new Map<string, { tokenEnv: string }>()
   const deviceOwners = new Set<string>()
 
   for (const rig of value.rigs) {
     const origin = new URL(rig.url).origin
     const previous = services.get(origin)
 
-    if (previous && (previous.storeId !== rig.storeId || previous.tokenEnv !== rig.tokenEnv)) {
-      context.addIssue({ code: 'custom', message: 'A Cria origin must use one store and token variable' })
+    if (previous && previous.tokenEnv !== rig.tokenEnv) {
+      context.addIssue({ code: 'custom', message: 'A Cria origin must use one token variable' })
     }
 
-    services.set(origin, { storeId: rig.storeId, tokenEnv: rig.tokenEnv })
+    services.set(origin, { tokenEnv: rig.tokenEnv })
 
     for (const device of rig.devices) {
       const identity = `${origin}/${device.id}`
@@ -110,8 +109,8 @@ export async function loadCriaConfiguration(
   return parseCriaConfiguration(await readFile(path, 'utf8'), environment)
 }
 
-export function criaDeviceId(configuration: Pick<CriaRigConfiguration, 'id' | 'storeId'>, deviceId: string): string {
-  return `cria:${encodeURIComponent(configuration.id)}:${configuration.storeId}:${encodeURIComponent(deviceId)}`
+export function criaDeviceId(configuration: Pick<CriaRigConfiguration, 'id'>, deviceId: string): string {
+  return `cria:${encodeURIComponent(configuration.id)}:${encodeURIComponent(deviceId)}`
 }
 
 export function criaEndpoint(configuration: Pick<CriaRigConfiguration, 'url'>): RigEndpoint {

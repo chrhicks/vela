@@ -41,7 +41,6 @@ function configuredCamera(settings: CaptureSettings, acquisition: Acquisition): 
       try {
         return await acquisition.capture({
           cameraId: settings.cameraId,
-          purpose: 'capture',
           expectedCameraName: settings.expectedCameraName,
           exposureSeconds,
           signal,
