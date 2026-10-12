@@ -4,6 +4,7 @@ export {
   CaptureRetryableError,
   FocuserStoppedError,
   FramingStoppedError,
+  FrameLostError,
 } from './error.js'
 
 export type { EquipmentErrorReason, EquipmentErrorOptions } from './error.js'

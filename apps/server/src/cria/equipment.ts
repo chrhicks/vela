@@ -4,6 +4,7 @@ import {
   CaptureRetryableError,
   EquipmentError,
   FocuserStoppedError,
+  FrameLostError,
   FramingStoppedError,
   type Acquisition,
   type CameraCooling,
@@ -14,6 +15,7 @@ import {
 } from '@vela/equipment'
 import {
   CriaCancelledError,
+  CriaImageGoneError,
   CriaOperationFailedError,
   CriaNotAdmittedError,
   CriaUncertainError,
@@ -105,6 +107,8 @@ export function createCriaEquipment(
         if (error instanceof CriaCancelledError) throw new CaptureStoppedError()
 
         if (error instanceof CriaNotAdmittedError) throw new CaptureRetryableError(error)
+
+        if (error instanceof CriaImageGoneError) throw new FrameLostError(error.message, { cause: error })
         throw error
       }
     },
