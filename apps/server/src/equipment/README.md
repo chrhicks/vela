@@ -55,8 +55,8 @@ services' local `camera` IDs cannot collide. A device at one service origin may
 belong to only one configured rig. Multiple disjoint bindings on the same service
 share one authenticated client and state stream. Application startup starts those
 streams; shutdown closes them and cancels reconnects. A Cria restart (a new
-instance) currently blocks new commands from this Vela server until the server is
-restarted. Failing only the workflow that was running is the next change.
+instance) fails the workflow that was running, as unknown, and the next workflow
+starts against the new instance; it never resumes the old one.
 
 `imagingCameraId`, `focalLengthMm` and `alignment` are optional. Alignment additionally
 requires `VELA_ASTAP` and `VELA_STAR_CATALOG`; optional
