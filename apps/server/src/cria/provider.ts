@@ -1,7 +1,9 @@
+import { trace, type Attributes } from '@opentelemetry/api'
 import {
   CriaCancelledError,
   CriaUncertainError,
   type CriaClient,
+  type CriaDevice,
   type CriaDeviceKind,
   type CriaObserveOptions,
   type ObservedState,
@@ -24,6 +26,8 @@ const kinds: Record<CriaDeviceKind, DeviceKind> = {
   weather: 'observing-conditions', switch: 'switch',
 }
 
+const tracer = trace.getTracer('vela.cria')
+
 const cameraStates = ['idle', 'waiting', 'exposing', 'reading', 'downloading', 'error'] as const
 
 export function createCriaProvider(
@@ -31,8 +35,50 @@ export function createCriaProvider(
   bindings: ReadonlyArray<CriaEquipmentBinding>,
 ): EquipmentProvider {
   const previous = new Map<string, EquipmentInspection>()
+  const interruptedSince = new Map<string, number>()
 
-  function interrupted(binding: CriaEquipmentBinding, message: string): EquipmentInspection {
+  /** Record changes only, so a long interruption is one span and the poll rate never matters. */
+  function noteInterrupted(binding: CriaEquipmentBinding, cause: Attributes) {
+    if (interruptedSince.has(binding.id)) return
+    interruptedSince.set(binding.id, Date.now())
+    tracer.startSpan('cria.observation.interrupted', {
+      attributes: { 'cria.device.id': binding.id, ...cause },
+    }).end()
+  }
+
+  function noteRecovered(binding: CriaEquipmentBinding) {
+    const since = interruptedSince.get(binding.id)
+
+    if (since === undefined) return
+    interruptedSince.delete(binding.id)
+    tracer.startSpan('cria.observation.recovered', {
+      attributes: { 'cria.device.id': binding.id, 'cria.interrupted.ms': Date.now() - since },
+    }).end()
+  }
+
+  /** What `client.diagnoseReading` says about one key, as span attributes. */
+  function readingCause(snapshot: ObservedState, device: CriaDevice, key: string): Attributes {
+    const rejection = client.diagnoseReading(snapshot, device, key) ?? { reason: 'invalid-value' as const }
+    const cause: Attributes = { 'cria.reading.key': key, 'cria.reading.reason': rejection.reason }
+
+    if (rejection.reason === 'not-current') cause['cria.reading.status'] = rejection.status
+
+    if (rejection.reason === 'round-trip' || rejection.reason === 'too-old') {
+      cause['cria.reading.roundTripMs'] = Math.round(rejection.roundTripMs)
+      cause['cria.reading.limitMs'] = rejection.limitMs
+    }
+
+    if (rejection.reason === 'too-old') cause['cria.reading.ageMs'] = Math.round(rejection.ageMs)
+
+    return cause
+  }
+
+  function interrupted(
+    binding: CriaEquipmentBinding,
+    message: string,
+    cause: Attributes,
+  ): EquipmentInspection {
+    noteInterrupted(binding, { 'cria.interrupted.message': message, ...cause })
     const known = previous.get(binding.id)
 
     let observation: EquipmentObservation = {
@@ -64,15 +110,22 @@ export function createCriaProvider(
       const connected = r.optionalBoolean('connected')
       const name = r.optionalString('name')
 
-      if (connected === undefined || (connected && name !== binding.expectedName))
-        return interrupted(binding, 'Device identity or connection readings are interrupted')
+      if (connected === undefined || (connected && name !== binding.expectedName)) {
+        const key = connected === undefined ? 'connected' : 'name'
+
+        return interrupted(binding, 'Device identity or connection readings are interrupted',
+          name === undefined || connected === undefined
+            ? readingCause(snapshot, device, key)
+            : { 'cria.reading.key': 'name', 'cria.reading.reason': 'name-mismatch' })
+      }
 
       if (device.blocked)
-        return interrupted(binding, device.reason ?? 'Device outcome needs attention')
+        return interrupted(binding, device.reason ?? 'Device outcome needs attention',
+          { 'cria.reading.reason': 'device-blocked' })
 
       const blocked = client.commandBlockReasonFor(binding.id)
 
-      if (blocked) return interrupted(binding, blocked)
+      if (blocked) return interrupted(binding, blocked, { 'cria.reading.reason': 'command-blocked' })
 
       const values = telemetry(r)
       const partial = r.partial
@@ -97,12 +150,13 @@ export function createCriaProvider(
       }
 
       previous.set(binding.id, result)
+      noteRecovered(binding)
 
       return result
     } catch (error) {
       if (!(error instanceof EquipmentError)) throw error
 
-      return interrupted(binding, error.message)
+      return interrupted(binding, error.message, { 'cria.reading.reason': 'inspection-error' })
     }
   }
 
@@ -117,7 +171,8 @@ export function createCriaProvider(
     } catch (error) {
       if (signal?.aborted || !(error instanceof EquipmentError)) throw error
 
-      return bindings.map(binding => interrupted(binding, error.message))
+      return bindings.map(binding =>
+        interrupted(binding, error.message, { 'cria.reading.reason': 'state-unavailable' }))
     }
   }
 

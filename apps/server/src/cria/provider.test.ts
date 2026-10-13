@@ -1,4 +1,10 @@
-import { describe, expect, it, onTestFinished, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
+import { trace } from '@opentelemetry/api'
+import {
+  InMemorySpanExporter,
+  NodeTracerProvider,
+  SimpleSpanProcessor,
+} from '@opentelemetry/sdk-trace-node'
 import {
   CriaClient,
   type CriaDevice,
@@ -244,5 +250,71 @@ describe('Cria equipment inspection', () => {
     const [restarted] = await provider.inspectDevices()
 
     expect(restarted?.observation).toMatchObject({ state: 'current' })
+  })
+
+  describe('interruption telemetry', () => {
+    const memory = new InMemorySpanExporter()
+
+    beforeEach(() => {
+      memory.reset()
+      trace.setGlobalTracerProvider(new NodeTracerProvider({ spanProcessors: [new SimpleSpanProcessor(memory)] }))
+    })
+
+    afterEach(() => trace.disable())
+
+    const spans = () => memory.getFinishedSpans().map(({ name, attributes }) => ({ name, attributes }))
+
+    it('records one span when a reading ages out, none while it stays out, and one when it returns', async () => {
+      const camera = device('camera', { state: reading(0), temperatureC: reading(-8), coolerOn: unsupported() })
+      const { provider, publish } = providerFor([camera])
+
+      await provider.inspectDevices()
+      expect(spans()).toEqual([])
+
+      camera.fields.connected = reading(true, 7000)
+      await publish()
+      await provider.inspectDevices()
+      await provider.inspectDevices()
+
+      expect(spans()).toEqual([{
+        name: 'cria.observation.interrupted',
+        attributes: expect.objectContaining({
+          'cria.device.id': 'rig-camera',
+          'cria.reading.key': 'connected',
+          'cria.reading.reason': 'too-old',
+          'cria.reading.limitMs': 6000,
+        }),
+      }])
+      expect(spans()[0]?.attributes['cria.reading.ageMs']).toBeGreaterThan(6000)
+
+      camera.fields.connected = reading(true)
+      await publish()
+      await provider.inspectDevices()
+
+      expect(spans().map(({ name }) => name)).toEqual([
+        'cria.observation.interrupted',
+        'cria.observation.recovered',
+      ])
+      expect(spans()[1]?.attributes['cria.interrupted.ms']).toEqual(expect.any(Number))
+    })
+
+    it('names the other ways a device goes interrupted', async () => {
+      const camera = device('camera', { state: reading(0), temperatureC: reading(-8), coolerOn: unsupported() })
+      const { provider, publish, interrupt } = providerFor([camera])
+
+      camera.fields.connected = { ...reading(true), status: 'stale' }
+      await publish()
+      await provider.inspectDevices()
+      expect(spans().at(-1)?.attributes).toMatchObject({
+        'cria.reading.reason': 'not-current', 'cria.reading.status': 'stale',
+      })
+
+      camera.fields.connected = reading(true)
+      await publish()
+      await provider.inspectDevices()
+      await interrupt()
+      await provider.inspectDevices()
+      expect(spans().at(-1)?.attributes).toMatchObject({ 'cria.reading.reason': 'state-unavailable' })
+    })
   })
 })
