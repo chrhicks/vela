@@ -106,6 +106,8 @@ export interface CaptureView {
   savedImageCount: number | null
   /** Completed images published during the current or most recent run. */
   completedCount: number
+  /** Frames that finished exposing but were lost before they could be fetched. */
+  lostFrameCount?: number
   /** Snapshot of the selected subject for this run. */
   subject: CaptureSubject | null
   /** Images from this run durably retained, including explicit Keep. */
