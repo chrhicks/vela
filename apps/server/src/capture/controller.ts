@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { trace, SpanStatusCode, type Span } from '@opentelemetry/api'
 import type { CaptureImage, CaptureSubject, CaptureView } from '@vela/model/web'
 import { capturePreviews, type ImageColor } from '../imaging/preview.js'
 import { measureStars } from '../imaging/statistics.js'
@@ -55,6 +56,8 @@ export interface CaptureRunOptions {
   repeat?: boolean
   saveFrames?: boolean
 }
+
+const tracer = trace.getTracer('vela.capture')
 
 export function createCaptureController(
   settings: { rigId: string; rigName: string },
@@ -152,10 +155,35 @@ export function createCaptureController(
     subject: CaptureSubject | null,
     runGeneration: number,
   ) {
+    let frameSpan: Span | undefined
+
+    // One span per frame, ended exactly once with how the frame turned out.
+    function endFrame(outcome: string, failure?: string) {
+      if (!frameSpan) return
+
+      frameSpan.setAttribute('capture.frame.outcome', outcome)
+
+      if (failure !== undefined) frameSpan.setStatus({ code: SpanStatusCode.ERROR, message: failure })
+
+      frameSpan.end()
+      frameSpan = undefined
+    }
+
     try {
       do {
         patch({ phase: 'exposing', elapsedSeconds: 0, captureReadState: 'current' })
         let capturePending = true
+
+        const span = tracer.startSpan('capture.frame', {
+          attributes: {
+            'capture.rig.id': settings.rigId,
+            'capture.frame.index': view.completedCount + (view.lostFrameCount ?? 0) + 1,
+            'capture.exposure.seconds': exposureSeconds,
+          },
+        })
+
+        frameSpan = span
+        const frameStartedAt = performance.now()
 
         let frame: CaptureFrame
 
@@ -182,15 +210,25 @@ export function createCaptureController(
           // A lost frame is one frame, not the run: count it, never expose again to repair it, and
           // take the next frame when the run repeats. A single exposure ends, saying so.
           patch({ lostFrameCount: (view.lostFrameCount ?? 0) + 1 })
+          endFrame('lost', error.message)
 
           if (!repeat || signal.aborted) throw error
 
           continue
         }
 
+        // Exposure plus readout and transfer; the part beyond the exposure is the camera's overhead.
+        const acquireMs = performance.now() - frameStartedAt
+
+        span.setAttributes({
+          'capture.acquire.ms': Math.round(acquireMs),
+          'capture.overhead.ms': Math.round(acquireMs - exposureSeconds * 1000),
+        })
+
         // A completed acquisition wins a race with Stop: publish the actual result.
         if (!signal.aborted) patch({ phase: 'reading' })
         const id = randomUUID()
+        const processStartedAt = performance.now()
 
         const [previews, statistics, fits] = await Promise.all([
           capturePreviews(frame.width, frame.height, frame.pixels, frame.color),
@@ -201,6 +239,11 @@ export function createCaptureController(
           }),
           encodeCaptureFits(frame, { exposureSeconds, cameraName }),
         ])
+
+        span.setAttributes({
+          'capture.process.ms': Math.round(performance.now() - processStartedAt),
+          'capture.fits.bytes': fits.byteLength,
+        })
 
         let metadata: CaptureImage = {
           id,
@@ -239,19 +282,34 @@ export function createCaptureController(
         })
 
         if (saveFrames) {
+          const saveStartedAt = performance.now()
+
           try {
             await keep(id)
           } catch (error) {
+            span.setAttribute('capture.save.ms', Math.round(performance.now() - saveStartedAt))
+            endFrame('save-failed', error instanceof Error ? error.message : 'Storage unavailable.')
+
             throw new Error(
               `Image could not be saved. Capture stopped; try keeping the latest image again. ${error instanceof Error ? error.message : 'Storage unavailable.'}`,
             )
           }
 
+          span.setAttribute('capture.save.ms', Math.round(performance.now() - saveStartedAt))
           patch({ phase: 'complete' })
         }
+
+        endFrame(saveFrames ? 'saved' : 'unsaved')
       } while (repeat && !signal.aborted)
     } catch (error) {
-      if (signal.aborted && error instanceof CaptureStoppedError) patch({ phase: 'stopped' })
+      const stopped = signal.aborted && error instanceof CaptureStoppedError
+
+      endFrame(
+        stopped ? 'stopped' : 'failed',
+        stopped ? undefined : error instanceof Error ? error.message : 'Exposure failed',
+      )
+
+      if (stopped) patch({ phase: 'stopped' })
       else
         patch({
           phase: 'failed',
@@ -259,6 +317,20 @@ export function createCaptureController(
         })
     } finally {
       patch({ active: false, captureReadState: 'current' })
+
+      // Bounds a run and totals it, so a long run reads as one line.
+      const ended = tracer.startSpan('capture.run.ended', {
+        attributes: {
+          'capture.rig.id': settings.rigId,
+          'capture.run.phase': view.phase,
+          'capture.run.completed': view.completedCount,
+          'capture.run.lost': view.lostFrameCount ?? 0,
+          'capture.run.saved': view.savedCount,
+        },
+      })
+
+      if (view.error) ended.setAttribute('capture.run.error', view.error)
+      ended.end()
     }
   }
 
@@ -291,6 +363,18 @@ export function createCaptureController(
       error: null,
       captureReadState: 'current',
     })
+
+    tracer
+      .startSpan('capture.run.started', {
+        attributes: {
+          'capture.rig.id': settings.rigId,
+          'capture.exposure.seconds': exposureSeconds,
+          'capture.run.repeat': repeat,
+          'capture.run.saveFrames': saveFrames,
+        },
+      })
+      .end()
+
     running = acquire(
       exposureSeconds,
       cancellation.signal,
