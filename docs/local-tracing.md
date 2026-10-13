@@ -116,8 +116,11 @@ marker written when a device's readings stop being usable, and
 `cria.interrupted.ms`. Only changes are recorded, never every poll. The marker
 names the device (`cria.device.id`), why a reading was refused
 (`cria.reading.reason`, for example `too-old` with `cria.reading.ageMs`,
-`limitMs` and `roundTripMs`), and the reading's key. Find them with:
+`limitMs` and `roundTripMs`), and the reading's key. Cria can also stop calling a
+device command-ready while Vela still accepts its readings (its own freshness
+rule is shorter); `cria.command.unready` and `cria.command.ready` mark that, with
+the flags behind it. Find them with:
 
 ```sh
-jq 'select(.name | startswith("cria.observation"))' data/traces/observing.jsonl
+jq 'select(.name | startswith("cria."))' data/traces/observing.jsonl
 ```

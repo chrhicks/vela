@@ -298,6 +298,29 @@ describe('Cria equipment inspection', () => {
       expect(spans()[1]?.attributes['cria.interrupted.ms']).toEqual(expect.any(Number))
     })
 
+    it('records when Cria stops calling a device command-ready although its readings are accepted', async () => {
+      const camera = device('camera', { state: reading(0), temperatureC: reading(-8), coolerOn: unsupported() })
+      const { provider, publish } = providerFor([camera])
+
+      camera.commandReady = false
+      await publish()
+      await provider.inspectDevices()
+      await provider.inspectDevices()
+
+      expect(spans()).toEqual([{
+        name: 'cria.command.unready',
+        attributes: expect.objectContaining({
+          'cria.device.id': 'rig-camera', 'cria.command.deviceReady': false, 'cria.command.health': 'ready',
+        }),
+      }])
+
+      camera.commandReady = true
+      await publish()
+      await provider.inspectDevices()
+
+      expect(spans().map(({ name }) => name)).toEqual(['cria.command.unready', 'cria.command.ready'])
+    })
+
     it('names the other ways a device goes interrupted', async () => {
       const camera = device('camera', { state: reading(0), temperatureC: reading(-8), coolerOn: unsupported() })
       const { provider, publish, interrupt } = providerFor([camera])
