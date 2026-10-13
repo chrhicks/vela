@@ -83,6 +83,10 @@ interface ActiveOperation {
   failureDomain: string | null
   cancelRequested: boolean
   unresolved: boolean
+  /** Its run() has finished, successfully or not. */
+  settled: boolean
+  /** Cria restarted while it was running, so it is unknown and must not block later work. */
+  superseded: boolean
   failure: CriaUncertainError | null
   cancellation: AbortController
 }
@@ -183,11 +187,29 @@ export class CriaClient {
     return binding
   }
 
+  /**
+   * Cria restarted. Everything in flight before it is unknown: running work fails as unknown when
+   * it next looks for its operation, and the next workflow starts fresh against the new instance.
+   */
+  private adopt(instanceId: string): void {
+    this.instanceId = instanceId
+    this.bindings.clear()
+    this.failureDomains.clear()
+    this.readBarriers.clear()
+    this.writeFailure = null
+
+    for (const [id, active] of this.active) {
+      if (active.settled) {
+        this.active.delete(id)
+        this.completions.delete(id)
+      } else {
+        active.superseded = true
+      }
+    }
+  }
+
   private pin(state: CriaState): void {
-    if (this.instanceId !== null && this.instanceId !== state.instanceId)
-      this.writeFailure ??= new CriaIdentityError(
-        'Cria restarted; inspect the new device ownership before issuing more commands', '/v2/state',
-      )
+    if (this.instanceId !== null && this.instanceId !== state.instanceId) this.adopt(state.instanceId)
     this.instanceId ??= state.instanceId
 
     for (const binding of this.config.devices) {
@@ -203,12 +225,9 @@ export class CriaClient {
       const previous = this.bindings.get(device.id)
       const previousDomain = this.failureDomains.get(device.id)
 
-      if (previous !== undefined && previous !== device.bindingId)
-        this.writeFailure ??= new CriaIdentityError(
-          'Cria driver binding changed; inspect the recovered equipment before issuing commands', '/v2/state',
-        )
-
-      if (previous === undefined) this.bindings.set(device.id, device.bindingId)
+      // Recovery rebinds a driver to a new binding. Work started on the old one is checked against
+      // its own request identity; later work simply uses the new binding.
+      if (previous !== device.bindingId) this.bindings.set(device.id, device.bindingId)
 
       if (previousDomain !== undefined && previousDomain !== device.failureDomain)
         this.writeFailure ??= new CriaIdentityError('Cria failure-domain binding changed', '/v2/state')
@@ -413,7 +432,10 @@ export class CriaClient {
     active.unresolved = true
     active.failure = error
 
-    if (active.operation === null || options?.cause instanceof CriaIdentityError)
+    // Only a request to the instance that is still current can leave new work unsafe; if Cria has
+    // restarted since, the request is simply unknown.
+    if ((active.operation === null || options?.cause instanceof CriaIdentityError) &&
+      !active.superseded && active.request?.instanceId === this.instanceId)
       this.writeFailure ??= error
 
     return error
@@ -680,6 +702,8 @@ export class CriaClient {
       failureDomain: null,
       cancelRequested: false,
       unresolved: false,
+      settled: false,
+      superseded: false,
       failure: null,
       cancellation: new AbortController(),
     }
@@ -704,7 +728,9 @@ export class CriaClient {
     }).finally(() => {
       options.signal?.removeEventListener('abort', onAbort)
 
-      if (!active.unresolved) {
+      active.settled = true
+
+      if (!active.unresolved || active.superseded) {
         this.active.delete(id)
         this.completions.delete(id)
       }
