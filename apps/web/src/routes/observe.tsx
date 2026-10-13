@@ -58,7 +58,8 @@ function Preparation({ rigId }: { rigId: string }) {
     secondsText.trim() !== '' && Number.isFinite(seconds) && seconds >= 0.1 && seconds <= 600
 
   const repeatValue = repeat ?? view?.repeat ?? true
-  const saveValue = saveFrames ?? view?.saveFrames ?? false
+  // Saved by default: an unsaved frame past the last three is gone, and a night's frames cannot be retaken.
+  const saveValue = saveFrames ?? (view?.active ? view.saveFrames : true)
 
   const canStart =
     capture.canStart &&
