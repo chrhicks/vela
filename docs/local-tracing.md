@@ -136,7 +136,11 @@ A capture run writes `capture.run.started` (rig, exposure seconds, `capture.run.
 `stopped` or `failed`. `capture.acquire.ms` is the exposure plus readout and transfer, and
 `capture.overhead.ms` is the part beyond the exposure. `capture.process.ms` covers previews, star
 measurement and FITS encoding, `capture.save.ms` the write to the saved-image store (absent when
-frames are not saved), and `capture.fits.bytes` the size of the FITS file. Find the frames of a
+frames are not saved), and `capture.fits.bytes` the size of the FITS file. When the camera's
+reads fall into retrying during a frame, the span gets `capture.read.retrying` and
+`capture.read.recovered` events (with `capture.read.after.ms` from the frame's start and
+`capture.read.retrying.ms`) and `capture.read.retrying.count` and `.ms` totals; the capture page
+shows "Camera observation interrupted" for the same time. Find the frames of a
 run with:
 
 ```sh
