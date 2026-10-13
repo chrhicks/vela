@@ -169,6 +169,43 @@ export function createCaptureController(
       frameSpan = undefined
     }
 
+    // Records when the camera's reads go from current to retrying and back, and how long they retried.
+    function watchReads(span: Span, startedAt: number) {
+      let since: number | undefined
+      let count = 0
+      let retryingMs = 0
+
+      function recover() {
+        if (since === undefined) return
+
+        const ms = Math.round(performance.now() - since)
+        retryingMs += ms
+        span.addEvent('capture.read.recovered', { 'capture.read.retrying.ms': ms })
+        since = undefined
+      }
+
+      return {
+        state(next: CaptureView['captureReadState']) {
+          if (next !== 'retrying') recover()
+          else if (since === undefined) {
+            since = performance.now()
+            count++
+            span.addEvent('capture.read.retrying', {
+              'capture.read.after.ms': Math.round(since - startedAt),
+            })
+          }
+        },
+        finish() {
+          recover()
+
+          span.setAttributes({
+            'capture.read.retrying.count': count,
+            'capture.read.retrying.ms': retryingMs,
+          })
+        },
+      }
+    }
+
     try {
       do {
         patch({ phase: 'exposing', elapsedSeconds: 0, captureReadState: 'current' })
@@ -184,6 +221,7 @@ export function createCaptureController(
 
         frameSpan = span
         const frameStartedAt = performance.now()
+        const reads = watchReads(span, frameStartedAt)
 
         let frame: CaptureFrame
 
@@ -197,6 +235,8 @@ export function createCaptureController(
                   patch({ phase: progress.phase, elapsedSeconds: progress.elapsedSeconds })
               },
               onReadState(captureReadState) {
+                reads.state(captureReadState)
+
                 if (capturePending && !signal.aborted) patch({ captureReadState })
               },
             })
@@ -205,6 +245,8 @@ export function createCaptureController(
               patch({ captureReadState: 'current' })
             })
         } catch (error) {
+          reads.finish()
+
           if (!(error instanceof CaptureFrameLostError)) throw error
 
           // A lost frame is one frame, not the run: count it, never expose again to repair it, and
@@ -216,6 +258,8 @@ export function createCaptureController(
 
           continue
         }
+
+        reads.finish()
 
         // Exposure plus readout and transfer; the part beyond the exposure is the camera's overhead.
         const acquireMs = performance.now() - frameStartedAt
