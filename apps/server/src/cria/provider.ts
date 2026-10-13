@@ -35,26 +35,32 @@ export function createCriaProvider(
   bindings: ReadonlyArray<CriaEquipmentBinding>,
 ): EquipmentProvider {
   const previous = new Map<string, EquipmentInspection>()
-  const interruptedSince = new Map<string, number>()
 
-  /** Record changes only, so a long interruption is one span and the poll rate never matters. */
-  function noteInterrupted(binding: CriaEquipmentBinding, cause: Attributes) {
-    if (interruptedSince.has(binding.id)) return
-    interruptedSince.set(binding.id, Date.now())
-    tracer.startSpan('cria.observation.interrupted', {
-      attributes: { 'cria.device.id': binding.id, ...cause },
-    }).end()
+  /** Record changes only, so a long spell is one span and the poll rate never matters. */
+  function spell(entered: string, left: string, durationKey: string) {
+    const since = new Map<string, number>()
+
+    return {
+      enter(binding: CriaEquipmentBinding, cause: Attributes) {
+        if (since.has(binding.id)) return
+        since.set(binding.id, Date.now())
+        tracer.startSpan(entered, { attributes: { 'cria.device.id': binding.id, ...cause } }).end()
+      },
+      leave(binding: CriaEquipmentBinding) {
+        const started = since.get(binding.id)
+
+        if (started === undefined) return
+        since.delete(binding.id)
+        tracer.startSpan(left, {
+          attributes: { 'cria.device.id': binding.id, [durationKey]: Date.now() - started },
+        }).end()
+      },
+    }
   }
 
-  function noteRecovered(binding: CriaEquipmentBinding) {
-    const since = interruptedSince.get(binding.id)
-
-    if (since === undefined) return
-    interruptedSince.delete(binding.id)
-    tracer.startSpan('cria.observation.recovered', {
-      attributes: { 'cria.device.id': binding.id, 'cria.interrupted.ms': Date.now() - since },
-    }).end()
-  }
+  const interruptions = spell('cria.observation.interrupted', 'cria.observation.recovered', 'cria.interrupted.ms')
+  // Cria can stop calling a device command-ready (its own 3 s freshness rule) while Vela still accepts its readings.
+  const unready = spell('cria.command.unready', 'cria.command.ready', 'cria.unready.ms')
 
   /** What `client.diagnoseReading` says about one key, as span attributes. */
   function readingCause(snapshot: ObservedState, device: CriaDevice, key: string): Attributes {
@@ -78,7 +84,7 @@ export function createCriaProvider(
     message: string,
     cause: Attributes,
   ): EquipmentInspection {
-    noteInterrupted(binding, { 'cria.interrupted.message': message, ...cause })
+    interruptions.enter(binding, { 'cria.interrupted.message': message, ...cause })
     const known = previous.get(binding.id)
 
     let observation: EquipmentObservation = {
@@ -136,6 +142,17 @@ export function createCriaProvider(
         commandReady: snapshot.state.commandsEnabled && device.commandReady && !device.refreshPending,
       }
 
+      if (observation.commandReady) {
+        unready.leave(binding)
+      } else {
+        unready.enter(binding, {
+          'cria.command.commandsEnabled': snapshot.state.commandsEnabled,
+          'cria.command.deviceReady': device.commandReady,
+          'cria.command.refreshPending': device.refreshPending,
+          'cria.command.health': device.health,
+        })
+      }
+
       if (partial) observation = { ...observation, message: 'Some device readings are unavailable' }
 
       const result: EquipmentInspection = {
@@ -150,7 +167,7 @@ export function createCriaProvider(
       }
 
       previous.set(binding.id, result)
-      noteRecovered(binding)
+      interruptions.leave(binding)
 
       return result
     } catch (error) {
