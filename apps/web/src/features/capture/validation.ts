@@ -69,6 +69,7 @@ const captureView = z.object({
   savedCount: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
   integrationSeconds: z.number().finite().nonnegative(),
   completedCount: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+  lostFrameCount: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
   saveFrames: z.boolean(),
   savedImageCount: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).nullable(),
   elapsedSeconds: z.number().nonnegative(),

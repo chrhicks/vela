@@ -4,7 +4,7 @@ import {
   createAlpacaAcquisition,
   createAlpacaCameraCooling,
 } from '@vela/alpaca'
-import { CaptureStoppedError as EquipmentCaptureStoppedError, type Acquisition, type CameraCooling, type DeviceTelemetry } from '@vela/equipment'
+import { CaptureStoppedError as EquipmentCaptureStoppedError, FrameLostError, type Acquisition, type CameraCooling, type DeviceTelemetry } from '@vela/equipment'
 import { alpacaEndpoint } from '../equipment/source.js'
 import type {
   CaptureCoolingBlocker,
@@ -17,7 +17,7 @@ import type { RigCatalogRecord } from '../rig/contracts.js'
 import type { RigCatalog } from '../rig/catalog.js'
 import type { RigOperations } from '../rig/operations.js'
 import { inspectRigDetail, type RigDetailOptions } from '../rig/detail.js'
-import { CaptureStoppedError, createCaptureController, type CaptureCamera } from './controller.js'
+import { CaptureFrameLostError, CaptureStoppedError, createCaptureController, type CaptureCamera } from './controller.js'
 import { createMemorySavedImageStore, type SavedImageStore } from '../saved-images/store.js'
 
 export interface CaptureSettings {
@@ -50,6 +50,8 @@ function configuredCamera(settings: CaptureSettings, acquisition: Acquisition): 
         })
       } catch (error) {
         if (error instanceof EquipmentCaptureStoppedError) throw new CaptureStoppedError()
+
+        if (error instanceof FrameLostError) throw new CaptureFrameLostError(error.message)
         throw error
       }
     },

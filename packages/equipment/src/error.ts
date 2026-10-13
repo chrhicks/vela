@@ -45,6 +45,17 @@ export class FramingStoppedError extends Error {
   }
 }
 
+/**
+ * The exposure finished but its frame was gone before it could be fetched. That frame is lost; a
+ * later exposure is a new frame, never a repair of this one.
+ */
+export class FrameLostError extends Error {
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options)
+    this.name = 'FrameLostError'
+  }
+}
+
 /** A new exposure is safe to attempt because no exposure started, or cleanup
  * confirmed the acknowledged exposure stopped and the camera is idle. */
 export class CaptureRetryableError extends Error {

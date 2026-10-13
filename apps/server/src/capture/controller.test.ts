@@ -2,6 +2,7 @@ import * as statistics from '../imaging/statistics.js'
 import { expect, it, vi } from 'vitest'
 import { inflateSync } from 'node:zlib'
 import {
+  CaptureFrameLostError,
   CaptureStoppedError,
   createCaptureController,
   type CaptureCamera,
@@ -289,6 +290,40 @@ it('repeats completed exposures under one lease and keeps the last frame and cou
   const stopping = controller.stop()
   requests[2]!.reject(new CaptureStoppedError())
   await stopping
+})
+
+it('counts a lost frame and takes the next one while the run repeats', async () => {
+  const { controller, requests, frame } = setup()
+  await controller.start(10, { repeat: true })
+  requests[0]!.reject(new CaptureFrameLostError('Cria no longer holds this image; the frame is lost'))
+  await vi.waitFor(() => expect(requests).toHaveLength(2))
+  expect(controller.snapshot()).toMatchObject({
+    active: true,
+    phase: 'exposing',
+    completedCount: 0,
+    lostFrameCount: 1,
+    error: null,
+  })
+  requests[1]!.resolve(frame)
+  await vi.waitFor(() => expect(requests).toHaveLength(3))
+  expect(controller.snapshot()).toMatchObject({ active: true, completedCount: 1, lostFrameCount: 1 })
+  const stopping = controller.stop()
+  requests[2]!.reject(new CaptureStoppedError())
+  await stopping
+})
+
+it('ends a single exposure whose frame was lost, and says so', async () => {
+  const { controller, requests } = setup()
+  await controller.start(10, { repeat: false })
+  requests[0]!.reject(new CaptureFrameLostError('Cria no longer holds this image; the frame is lost'))
+  await vi.waitFor(() => expect(controller.active()).toBe(false))
+  expect(controller.snapshot()).toMatchObject({
+    phase: 'failed',
+    completedCount: 0,
+    lostFrameCount: 1,
+    error: 'Cria no longer holds this image; the frame is lost',
+  })
+  expect(requests).toHaveLength(1)
 })
 
 it.each(['readout', 'preview'] as const)(
