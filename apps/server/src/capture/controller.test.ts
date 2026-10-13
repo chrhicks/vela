@@ -640,6 +640,39 @@ describe('capture telemetry', () => {
     expect(spans('capture.run.ended')[0]!.attributes).toMatchObject({ 'capture.run.completed': 1, 'capture.run.lost': 1 })
   })
 
+  it('records when the camera reads retry during a frame and how long', async () => {
+    const { controller, requests, frame } = setup()
+    await controller.start(10)
+    requests[0]!.onReadState('retrying')
+    requests[0]!.onReadState('retrying')
+    requests[0]!.onReadState('current')
+    requests[0]!.onReadState('retrying')
+    requests[0]!.resolve(frame)
+    await vi.waitFor(() => expect(controller.active()).toBe(false))
+
+    const [span] = spans('capture.frame')
+    expect(span!.events.map(event => event.name)).toEqual([
+      'capture.read.retrying',
+      'capture.read.recovered',
+      'capture.read.retrying',
+      'capture.read.recovered',
+    ])
+    expect(span!.attributes['capture.read.retrying.count']).toBe(2)
+    expect(span!.attributes['capture.read.retrying.ms']).toEqual(expect.any(Number))
+  })
+
+  it('counts no retrying reads for a frame that never retried', async () => {
+    const { controller, requests, frame } = setup()
+    await controller.start(10)
+    requests[0]!.resolve(frame)
+    await vi.waitFor(() => expect(controller.active()).toBe(false))
+
+    expect(spans('capture.frame')[0]!.attributes).toMatchObject({
+      'capture.read.retrying.count': 0,
+      'capture.read.retrying.ms': 0,
+    })
+  })
+
   it('records a save failure on the frame and the error on the run', async () => {
     const store = createMemorySavedImageStore()
     vi.spyOn(store, 'save').mockRejectedValueOnce(new Error('disk full'))
