@@ -41,7 +41,7 @@ export const CriaClientConfigSchema = z.strictObject({
     return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password &&
       !url.search && !url.hash && url.pathname === '/'
   }, 'Cria endpoint must be an HTTP(S) origin without credentials, query, or fragment'),
-  token: z.string().min(32).refine(noControlCharacters),
+  token: z.string().min(32).refine(noControlCharacters).optional(),
   devices: z.array(CriaDeviceBindingSchema).min(1).max(16)
     .refine(devices => new Set(devices.map(device => device.id)).size === devices.length,
       'Cria device IDs must be unique'),

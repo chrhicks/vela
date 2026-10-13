@@ -52,6 +52,14 @@ describe('explicit Cria rig configuration', () => {
     expect((await catalog.get(configuration.id))?.focalLengthMm).toBe(320)
   })
 
+  it('allows a rig with no token variable, for a Cria that checks none', () => {
+    const { tokenEnv: _omitted, ...withoutToken } = configuration
+    const [configured] = parseCriaConfiguration(JSON.stringify({ rigs: [withoutToken] }), {})
+
+    expect(configured?.token).toBeUndefined()
+    expect(() => parseCriaConfiguration(JSON.stringify({ rigs: [configuration] }), {})).toThrow('at least 32')
+  })
+
   it('keeps endpoint and overlapping local IDs from migrating a Cria rig through Alpaca discovery', async () => {
     const [configured] = parseCriaConfiguration(JSON.stringify({ rigs: [configuration] }), environment)
     const catalog = createMemoryRigCatalog([legacy])
