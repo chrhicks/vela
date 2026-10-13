@@ -1,5 +1,11 @@
 import * as statistics from '../imaging/statistics.js'
-import { expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { trace } from '@opentelemetry/api'
+import {
+  InMemorySpanExporter,
+  NodeTracerProvider,
+  SimpleSpanProcessor,
+} from '@opentelemetry/sdk-trace-node'
 import { inflateSync } from 'node:zlib'
 import {
   CaptureFrameLostError,
@@ -566,4 +572,87 @@ it('counts overlapping automatic and manual Keep once, and excludes an older run
   await vi.waitFor(() => expect(controller.active()).toBe(false))
   await controller.keep(controller.snapshot().latestImage!.id)
   expect(controller.snapshot()).toMatchObject({ savedCount: 1, savedImageCount: 3, integrationSeconds: 11 })
+})
+
+describe('capture telemetry', () => {
+  const memory = new InMemorySpanExporter()
+
+  beforeEach(() => {
+    memory.reset()
+    trace.setGlobalTracerProvider(new NodeTracerProvider({ spanProcessors: [new SimpleSpanProcessor(memory)] }))
+  })
+
+  afterEach(() => trace.disable())
+
+  const spans = (name: string) => memory.getFinishedSpans().filter(span => span.name === name)
+
+  it('records each frame with its timings, size and what became of it, and totals the run', async () => {
+    const { controller, requests, frame } = setup()
+    await controller.start(10, { repeat: true, saveFrames: true })
+    requests[0]!.resolve(frame)
+    await vi.waitFor(() => expect(requests).toHaveLength(2))
+    const stopping = controller.stop()
+    requests[1]!.reject(new CaptureStoppedError())
+    await stopping
+
+    expect(spans('capture.run.started')[0]!.attributes).toMatchObject({
+      'capture.rig.id': 'fra 400',
+      'capture.exposure.seconds': 10,
+      'capture.run.repeat': true,
+      'capture.run.saveFrames': true,
+    })
+
+    const [saved, stopped] = spans('capture.frame')
+    expect(saved!.attributes).toMatchObject({ 'capture.frame.index': 1, 'capture.frame.outcome': 'saved' })
+
+    for (const key of ['capture.acquire.ms', 'capture.overhead.ms', 'capture.process.ms', 'capture.save.ms', 'capture.fits.bytes'])
+      expect(saved!.attributes[key]).toEqual(expect.any(Number))
+
+    expect(saved!.attributes['capture.fits.bytes']).toBeGreaterThan(0)
+    expect(saved!.status.code).toBe(0)
+    expect(stopped!.attributes).toMatchObject({ 'capture.frame.index': 2, 'capture.frame.outcome': 'stopped' })
+    expect(spans('capture.frame')).toHaveLength(2)
+
+    expect(spans('capture.run.ended')[0]!.attributes).toMatchObject({
+      'capture.run.phase': 'stopped',
+      'capture.run.completed': 1,
+      'capture.run.lost': 0,
+      'capture.run.saved': 1,
+    })
+  })
+
+  it('marks a lost frame as an error and a frame that is not saved as unsaved', async () => {
+    const { controller, requests, frame } = setup()
+    await controller.start(10, { repeat: true })
+    requests[0]!.reject(new CaptureFrameLostError('Cria no longer holds this image; the frame is lost'))
+    await vi.waitFor(() => expect(requests).toHaveLength(2))
+    requests[1]!.resolve(frame)
+    await vi.waitFor(() => expect(requests).toHaveLength(3))
+    const stopping = controller.stop()
+    requests[2]!.reject(new CaptureStoppedError())
+    await stopping
+
+    const [lost, unsaved] = spans('capture.frame')
+    expect(lost!.attributes['capture.frame.outcome']).toBe('lost')
+    expect(lost!.status).toMatchObject({ code: 2, message: 'Cria no longer holds this image; the frame is lost' })
+    expect(unsaved!.attributes).toMatchObject({ 'capture.frame.index': 2, 'capture.frame.outcome': 'unsaved' })
+    expect(unsaved!.attributes['capture.save.ms']).toBeUndefined()
+    expect(spans('capture.run.ended')[0]!.attributes).toMatchObject({ 'capture.run.completed': 1, 'capture.run.lost': 1 })
+  })
+
+  it('records a save failure on the frame and the error on the run', async () => {
+    const store = createMemorySavedImageStore()
+    vi.spyOn(store, 'save').mockRejectedValueOnce(new Error('disk full'))
+    const { controller, requests, frame } = setup(store)
+    await controller.start(10, { repeat: true, saveFrames: true })
+    requests[0]!.resolve(frame)
+    await vi.waitFor(() => expect(controller.active()).toBe(false))
+
+    const [failed] = spans('capture.frame')
+    expect(failed!.attributes['capture.frame.outcome']).toBe('save-failed')
+    expect(failed!.attributes['capture.save.ms']).toEqual(expect.any(Number))
+    expect(failed!.status.code).toBe(2)
+    expect(spans('capture.run.ended')[0]!.attributes).toMatchObject({ 'capture.run.phase': 'failed' })
+    expect(spans('capture.run.ended')[0]!.attributes['capture.run.error']).toContain('disk full')
+  })
 })
