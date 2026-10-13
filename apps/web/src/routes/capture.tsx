@@ -48,7 +48,8 @@ function CapturePage({ rigId }: { rigId: string }) {
     : (exposure ?? String(view?.exposureSeconds ?? 2))
 
   const repeating = view?.active ? view.repeat : (repeat ?? view?.repeat ?? true)
-  const savingFrames = view?.active ? view.saveFrames : (saveFrames ?? false)
+  // Saved by default: an unsaved frame past the last three is gone, and a night's frames cannot be retaken.
+  const savingFrames = view?.active ? view.saveFrames : (saveFrames ?? true)
   const seconds = Number(exposureValue)
 
   const validExposure =
