@@ -124,3 +124,21 @@ the flags behind it. Find them with:
 ```sh
 jq 'select(.name | startswith("cria."))' data/traces/observing.jsonl
 ```
+
+## Capture runs and frames
+
+A capture run writes `capture.run.started` (rig, exposure seconds, `capture.run.repeat`,
+`capture.run.saveFrames`) and `capture.run.ended` (final `capture.run.phase`, and the run's
+`completed`, `lost` and `saved` counts, plus `capture.run.error` if it failed). Each frame is one
+`capture.frame` span from the start of its exposure to the end of its save, with
+`capture.frame.index` and `capture.frame.outcome`: `saved`, `unsaved` (kept in memory only),
+`lost` (the camera driver no longer held the image; the span has an error status), `save-failed`,
+`stopped` or `failed`. `capture.acquire.ms` is the exposure plus readout and transfer, and
+`capture.overhead.ms` is the part beyond the exposure. `capture.process.ms` covers previews, star
+measurement and FITS encoding, `capture.save.ms` the write to the saved-image store (absent when
+frames are not saved), and `capture.fits.bytes` the size of the FITS file. Find the frames of a
+run with:
+
+```sh
+jq 'select(.name | startswith("capture."))' data/traces/observing.jsonl
+```
