@@ -201,7 +201,7 @@ shared composition without issuing physical commands.
 
 DS.01–DS.16 map to the source-backed workshop foundation, navigation, control,
 dialog, image-inspection, feedback and Appearance specimens. Their measured
-acceptance is retained in [foundation evidence](../../visual-evidence/fieldroom/foundations/README.md).
+acceptance is retained in foundation evidence.
 Owning slice evidence records exact source substitutions and responsive extensions;
 static UI fixtures do not establish physical device outcomes.
 
@@ -210,4 +210,4 @@ Final collection-state coverage adds `photographs-collection-states.e2e.ts`:
 held loading and empty in both palettes at 1440/390px, plus an independently
 usable direct-selected photograph while the collection request is pending.
 The final whole-application pass and retained-artifact mapping are recorded in
-[the evidence index](../../visual-evidence/fieldroom/README.md).
+the evidence index.
