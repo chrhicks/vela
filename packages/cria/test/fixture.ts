@@ -185,6 +185,17 @@ export class ServiceFixture {
     return operation
   }
 
+  /** Model a Cria restart: a new instance with new bindings, remembering nothing. */
+  restart(): void {
+    this.state.instanceId = randomUUID()
+
+    for (const device of this.state.devices) device.bindingId = randomUUID()
+    this.operations.clear()
+    this.requests.clear()
+    this.images.clear()
+    this.last = null
+  }
+
   /** Model Cria dropping an image from its rolling set. */
   drop(imageId: string): void {
     this.images.delete(imageId)
