@@ -348,8 +348,9 @@ test('repeating capture restores server settings and can stop during image recei
   })
   await page.goto('/rigs/rig-1/observe/capture')
   await expect(page.getByRole('checkbox', { name: 'Repeat until stopped' })).toBeChecked()
+  await expect(page.getByRole('checkbox', { name: 'Save frames' })).toBeChecked()
   await page.getByRole('button', { name: 'Start capture' }).click()
-  expect(startBody).toEqual({ exposureSeconds: 2, repeat: true, saveFrames: false })
+  expect(startBody).toEqual({ exposureSeconds: 2, repeat: true, saveFrames: true })
   await expect(page.getByRole('button', { name: 'Stop capture' })).toBeEnabled()
   current = { ...current, completedCount: 2, latestImage: firstImage, phase: 'reading' }
   await page.reload()
