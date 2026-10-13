@@ -77,6 +77,13 @@ export interface CriaReadingOptions {
   metadata?: boolean
 }
 
+/** Why a reading cannot be used, with the numbers behind the decision where there are any. */
+export type CriaReadingRejection =
+  | { reason: 'closed' | 'not-owned' | 'barrier' | 'blocked' | 'refresh-pending' | 'missing' | 'generation' | 'timestamps' }
+  | { reason: 'not-current'; status: string }
+  | { reason: 'round-trip'; roundTripMs: number; limitMs: number }
+  | { reason: 'too-old'; ageMs: number; limitMs: number; roundTripMs: number }
+
 interface ActiveOperation {
   request: CriaOperationRequest | null
   operation: CriaOperation | null
@@ -263,29 +270,54 @@ export class CriaClient {
     key: string,
     options: CriaReadingOptions = {},
   ): CriaValue | undefined {
+    return this.diagnoseReading(snapshot, device, key, options) ? undefined : device.fields[key]?.value
+  }
+
+  /** The single decision behind `optionalReading`, as data: undefined means the reading is usable. */
+  diagnoseReading(
+    snapshot: ObservedState,
+    device: CriaDevice,
+    key: string,
+    options: CriaReadingOptions = {},
+  ): CriaReadingRejection | undefined {
     const reading = device.fields[key]
     const barrier = this.readBarriers.get(device.id)
 
-    if (this.closed || this.events && !this.events.owns(snapshot) ||
-      barrier !== undefined && device.observationGeneration <= barrier ||
-      device.blocked || device.refreshPending || !reading || reading.status !== 'current' ||
-      reading.generation !== device.observationGeneration || reading.observedAt === null ||
-      reading.readStartedAt === null || reading.checkedAt === null ||
+    if (this.closed) return { reason: 'closed' }
+
+    if (this.events && !this.events.owns(snapshot)) return { reason: 'not-owned' }
+
+    if (barrier !== undefined && device.observationGeneration <= barrier) return { reason: 'barrier' }
+
+    if (device.blocked) return { reason: 'blocked' }
+
+    if (device.refreshPending) return { reason: 'refresh-pending' }
+
+    if (!reading) return { reason: 'missing' }
+
+    if (reading.status !== 'current') return { reason: 'not-current', status: reading.status }
+
+    if (reading.generation !== device.observationGeneration) return { reason: 'generation' }
+
+    if (reading.observedAt === null || reading.readStartedAt === null || reading.checkedAt === null ||
       reading.readStartedAt > reading.observedAt || reading.observedAt > reading.checkedAt ||
-      reading.checkedAt > snapshot.state.generatedAt ||
-      snapshot.roundTripMs > this.timing.maxStateRoundTripMs)
-      return undefined
+      reading.checkedAt > snapshot.state.generatedAt) return { reason: 'timestamps' }
+
+    const roundTripMs = snapshot.roundTripMs
+
+    if (roundTripMs > this.timing.maxStateRoundTripMs)
+      return { reason: 'round-trip', roundTripMs, limitMs: this.timing.maxStateRoundTripMs }
 
     // All server timestamps share a clock. Include the whole RTT and time since receipt,
     // so an unsynchronized client clock cannot turn delayed observations into fresh ones.
-    const age = snapshot.state.generatedAt - reading.readStartedAt + snapshot.roundTripMs +
+    const ageMs = snapshot.state.generatedAt - reading.readStartedAt + roundTripMs +
       Math.max(0, performance.now() - snapshot.receivedMonotonic)
 
-    const limit = options.metadata ? this.timing.metadataMaxAgeMs : this.timing.dynamicMaxAgeMs
+    const limitMs = options.metadata ? this.timing.metadataMaxAgeMs : this.timing.dynamicMaxAgeMs
 
-    if (age < 0 || age > limit) return undefined
+    if (ageMs < 0 || ageMs > limitMs) return { reason: 'too-old', ageMs, limitMs, roundTripMs }
 
-    return reading.value
+    return undefined
   }
 
   reading(
