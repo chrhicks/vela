@@ -20,7 +20,7 @@ const rigSchema = z.strictObject({
     return (url.protocol === 'http:' || url.protocol === 'https:') &&
       url.pathname === '/' && !url.search && !url.hash && !url.username && !url.password
   }, 'Cria URL must be an HTTP(S) origin without credentials'),
-  tokenEnv: z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/),
+  tokenEnv: z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/).optional(),
   devices: z.array(deviceSchema).min(1),
   imagingCameraId: identifier.max(64).optional(),
   focalLengthMm: z.number().min(10).max(20000).optional(),
@@ -53,7 +53,7 @@ const configurationSchema = z.strictObject({ rigs: z.array(rigSchema) }).superRe
   if (new Set(value.rigs.map(rig => rig.id)).size !== value.rigs.length)
     context.addIssue({ code: 'custom', message: 'Cria rig IDs must be unique' })
 
-  const services = new Map<string, { tokenEnv: string }>()
+  const services = new Map<string, { tokenEnv: string | undefined }>()
   const deviceOwners = new Set<string>()
 
   for (const rig of value.rigs) {
@@ -78,7 +78,7 @@ const configurationSchema = z.strictObject({ rigs: z.array(rigSchema) }).superRe
 
 export type CriaConfiguredDevice = z.infer<typeof deviceSchema>
 
-export type CriaRigConfiguration = z.infer<typeof rigSchema> & { readonly token: string }
+export type CriaRigConfiguration = z.infer<typeof rigSchema> & { readonly token?: string }
 
 export function parseCriaConfiguration(contents: string, environment: NodeJS.ProcessEnv): CriaRigConfiguration[] {
   let parsed: z.infer<typeof configurationSchema>
@@ -90,6 +90,9 @@ export function parseCriaConfiguration(contents: string, environment: NodeJS.Pro
   }
 
   return parsed.rigs.map(rig => {
+    // Without tokenEnv the rig sends no bearer token: for a Cria on a private network that checks none.
+    if (!rig.tokenEnv) return { ...rig, url: new URL(rig.url).origin }
+
     const token = environment[rig.tokenEnv]
 
     // oxlint-disable-next-line no-control-regex -- Reject invalid HTTP bearer-token characters.

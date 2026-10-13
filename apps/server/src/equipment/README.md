@@ -13,7 +13,9 @@ falls back to Alpaca. Alpaca discovery cannot match or migrate a Cria record.
 ## Explicit Cria configuration
 
 Set `VELA_CRIA_CONFIG_PATH` to a server-readable JSON file. Keep its token in the
-environment variable named by `tokenEnv`, with at least 32 characters. No token is
+environment variable named by `tokenEnv`, with at least 32 characters. Omit
+`tokenEnv` for a Cria that runs without `CRIA_TOKEN` (private network only); Vela
+then sends no bearer header. No token is
 stored in the rig catalog or sent to the browser. URLs must be HTTP(S) origins
 without credentials, paths, queries or fragments. Use the exact configured device
 IDs, kinds and expected operational names.

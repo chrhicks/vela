@@ -23,6 +23,16 @@ function path(input: RequestInfo | URL): string {
 }
 
 describe('state and identity', () => {
+  it('sends no bearer header when no token is configured', async () => {
+    const service = new ServiceFixture()
+
+    service.requireToken = false
+
+    const client = service.client({ token: undefined })
+
+    expect((await client.state()).state.instanceId).toBe(service.state.instanceId)
+  })
+
   it('shares state reads without allowing one caller cancellation to abort another', async () => {
     const service = new ServiceFixture()
     let release = () => {}

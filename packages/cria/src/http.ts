@@ -9,10 +9,15 @@ const jsonLimit = 4 * 1024 * 1024
 export class CriaHttp {
   constructor(
     private readonly baseUrl: string,
-    private readonly token: string,
+    private readonly token: string | undefined,
     private readonly fetch: typeof globalThis.fetch,
     private readonly timeoutMs: number,
   ) {}
+
+  // Nothing to hide when no token is configured.
+  private redact(message: string): string {
+    return this.token ? message.replaceAll(this.token, '[redacted]') : message
+  }
 
   private invalid(message: string, path: string): EquipmentError {
     return new EquipmentError(message, { reason: 'invalid-response', endpoint: path })
@@ -62,7 +67,9 @@ export class CriaHttp {
       throw this.invalid('Cria request escaped its configured endpoint', path)
 
     try {
-      const headers = new Headers({ authorization: `Bearer ${this.token}` })
+      const headers = new Headers()
+
+      if (this.token) headers.set('authorization', `Bearer ${this.token}`)
 
       if (body !== undefined) headers.set('content-type', 'application/json')
 
@@ -82,7 +89,7 @@ export class CriaHttp {
         throw new CriaApiError(
           response.status,
           error.error.code,
-          error.error.message.replaceAll(this.token, '[redacted]'),
+          this.redact(error.error.message),
           path,
         )
       }
@@ -120,8 +127,12 @@ export class CriaHttp {
     let response: Response | undefined
 
     try {
+      const headers = new Headers({ accept: 'text/event-stream' })
+
+      if (this.token) headers.set('authorization', `Bearer ${this.token}`)
+
       response = await this.fetch(new URL(path, this.baseUrl), {
-        headers: { authorization: `Bearer ${this.token}`, accept: 'text/event-stream' },
+        headers,
         redirect: 'error',
         signal,
       })
@@ -130,7 +141,7 @@ export class CriaHttp {
         const error = CriaErrorSchema.parse(await this.jsonBody(response, path))
 
         throw new CriaApiError(response.status, error.error.code,
-          error.error.message.replaceAll(this.token, '[redacted]'), path)
+          this.redact(error.error.message), path)
       }
 
       if (response.headers.get('content-type')?.split(';')[0]?.trim() !== 'text/event-stream' || !response.body)

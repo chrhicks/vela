@@ -114,6 +114,8 @@ export class ServiceFixture {
   completeImmediately = true
   cancelImmediately = false
   publishOperations = true
+  /** False models a Cria with no CRIA_TOKEN: requests must then carry no bearer header. */
+  requireToken = true
   last: CriaOperation | null = null
 
   client(options: Partial<CriaClientOptions> = {}): CriaClient {
@@ -238,7 +240,9 @@ export class ServiceFixture {
 
     this.paths.push(`${method} ${path}`)
 
-    if (new Headers(init?.headers).get('authorization') !== `Bearer ${token}`)
+    const authorization = new Headers(init?.headers).get('authorization')
+
+    if (this.requireToken ? authorization !== `Bearer ${token}` : authorization !== null)
       return failure(401, 'unauthorized')
 
     if (init?.redirect !== 'error') throw new Error('Fixture requires redirect refusal')
