@@ -5,7 +5,11 @@ verification and Chris's application acceptance. Fieldroom is the application's
 default theme. The dated slice and review checkpoints below preserve the delivery
 history; their pending-review statements are not current blockers. Explore and
 Frame delivery follow-ups also shipped in that PR; remaining usability work is
-identified in the [workflow hierarchy review](visual-evidence/fieldroom/ux-hierarchy-review.md).
+identified in the workflow hierarchy review.
+
+The per-feature plans and screenshot evidence this document mentions were removed
+on 2026-10-13. They remain in git history at `ae200ca` and earlier, under
+`docs/fieldroom-*-plan.md` and `docs/visual-evidence/`.
 
 ## Agreement and completion
 
@@ -138,9 +142,9 @@ Status: accepted at `c7c5712` after independent OK and final browser comparison.
 - Update theme validation, workshop profile selection, diagnostics, and
   documentation together. No migration engine for obsolete scratch artifacts.
 
-The [foundations plan](fieldroom-foundations-plan.md) specifies exact recipes,
+The foundations plan specifies exact recipes,
 file ownership, integration order, tests, and browser acceptance before edits.
-The later [application appearance plan](fieldroom-appearance-plan.md) keeps
+The later application appearance plan keeps
 configuration and browser persistence separate from the shared UI primitive.
 
 ### Verification and exit
@@ -223,7 +227,7 @@ an independent code/behavior verdict.
 The corrected target `c7c5712` received renewed independent **OK**. The parent’s
 final native-browser pass then accepted the paired recipes, typography, control
 and overlay bounds, navigation structure, pending/focus behavior, and non-modal
-Appearance interaction. [Retained evidence and exact measurements](visual-evidence/fieldroom/foundations/README.md)
+Appearance interaction. Retained evidence and exact measurements
 record scope, screenshot hashes, device-scale rounding, and the remaining
 application-owned checks. Phase 2 is accepted; Phase 3 may begin.
 
@@ -256,7 +260,7 @@ Use the slice gate; parent self-accepts this checkpoint before later screens.
 
 ### Actual / deviations / evidence
 
-Implemented against the [expanded Tonight plan](fieldroom-tonight-plan.md).
+Implemented against the expanded Tonight plan.
 Application configuration and Appearance, shared rig observation, subject/run
 facts, image inspection, sampled sky and footer are in place. The plan's actual
 outcome records files, operational boundaries, narrow additional controls, and
@@ -272,7 +276,7 @@ sample pointing in a different direction. Renewed independent reviews at `2d4395
 **OK**. The final reviewed checkpoint passed 865 project tests and builds, 48
 application browser checks, seven workshop checks and four Python tests. The
 parent completed the final paired desktop/phone and interruption comparison,
-including Appearance and unchanged fitted/native imagery. [Retained evidence](visual-evidence/fieldroom/tonight/README.md)
+including Appearance and unchanged fitted/native imagery. Retained evidence
 records source substitutions, exact bounds, and the native screenshot-tool
 limitation. Tonight/Appearance is accepted; Explore/framing/preparation may begin.
 
@@ -295,7 +299,7 @@ Status: implemented and accepted with the consuming Tonight and framing slices.
   catalog; represent unavailable facts explicitly instead of inventing them or
   adding runtime enrichment. Preserve existing retained-image validity.
 
-The [capability plan](fieldroom-capture-capabilities-plan.md) records concrete
+The capability plan records concrete
 owners, identity/lifetime invariants, and focused transition tests before edits.
 
 ### Verification and exit
@@ -324,9 +328,9 @@ Status: Explore/framing/preparation accepted at `8906518`; Photographs accepted 
 | Equipment / rig setup | rig-detail, home, rig-discovery | 03.5, 03.8, 03.12–03.15 |
 | Polar alignment / autofocus | alignment, autofocus | 03.6–03.7, phone Appearance, added Autofocus reference |
 
-Concrete plans: [Explore, framing, preparation](fieldroom-explore-plan.md),
-[Photographs](fieldroom-photographs-plan.md), and
-[Equipment/Home/onboarding](fieldroom-equipment-plan.md). The [alignment/autofocus plan](fieldroom-alignment-plan.md) records the last
+Concrete plans: Explore, framing, preparation,
+Photographs, and
+Equipment/Home/onboarding. The alignment/autofocus plan records the last
 slice before its implementation begins.
 
 Each slice includes loading, empty, pending, unavailable, interrupted, error,
@@ -339,20 +343,20 @@ growing layer of overrides. Preserve all existing operational capabilities.
 Explore/framing/preparation passed independent **OK** at `8906518`, then the
 parent completed the final paired comparison of all three routes at desktop
 and compact widths. The owning plan and
-[retained acceptance evidence](visual-evidence/fieldroom/explore-preparation/README.md)
+retained acceptance evidence
 record actual geometry, source substitutions and browser limitations. All 22
 post-review route checks passed. Photographs then passed independent **OK** at
 `99195ae` and the final parent comparison at three widths in both palettes,
-including original-preview fallback. Its [retained evidence](visual-evidence/fieldroom/photographs/README.md)
+including original-preview fallback. Its retained evidence
 records source geometry, fixture substitutions and browser limitations.
 Equipment/Home/onboarding passed independent **OK** at `a50c6bb`, followed by
 26 reference rendering checks, four supplemental interruption/Forget checks, and
 parent comparison at 1440/900/390px in both palettes. Its
-[retained evidence](visual-evidence/fieldroom/equipment-home/README.md) records
+retained evidence records
 source substitutions, corrected read deadlines and the browser limitation.
 Alignment/autofocus passed independent **OK** at `00b1564`, followed by 83
 post-verdict browser cases and final parent comparison. Its
-[retained evidence](visual-evidence/fieldroom/alignment-autofocus/README.md) includes
+retained evidence includes
 74 captures and 60 measured geometry records. All main route slices are accepted.
 
 ## 6. Whole-application verification and handoff
@@ -457,7 +461,7 @@ artifacts; the other 13 have only sparse edge rasterization differences of at mo
 The final manifest retains 88 capture records with hashes and explicit prior
 artifact links; all 44 frozen source hashes/dimensions remain unchanged.
 
-[The whole-application evidence index](visual-evidence/fieldroom/README.md) links
+The whole-application evidence index links
 each slice, final comparisons, actual scene coverage, reproduction commands and
 browser limitations. At this pre-acceptance checkpoint, the shared browser was
 open to Tonight on the isolated
