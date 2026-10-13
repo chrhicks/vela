@@ -107,3 +107,20 @@ Each attempt's `astap.stdout` and `astap.stderr` retain the last 4096 characters
 with `.truncated` flags. Attempt spans appear after each solver process ends,
 even while the overall solve and alignment run remain active. Raw exposure
 pixels are excluded.
+
+## Cria device interruptions
+
+With Cria equipment, `cria.observation.interrupted` is an immediately completed
+marker written when a device's readings stop being usable, and
+`cria.observation.recovered` is written when they return, with
+`cria.interrupted.ms`. Only changes are recorded, never every poll. The marker
+names the device (`cria.device.id`), why a reading was refused
+(`cria.reading.reason`, for example `too-old` with `cria.reading.ageMs`,
+`limitMs` and `roundTripMs`), and the reading's key. Cria can also stop calling a
+device command-ready while Vela still accepts its readings (its own freshness
+rule is shorter); `cria.command.unready` and `cria.command.ready` mark that, with
+the flags behind it. Find them with:
+
+```sh
+jq 'select(.name | startswith("cria."))' data/traces/observing.jsonl
+```

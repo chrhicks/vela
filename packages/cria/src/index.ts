@@ -5,6 +5,7 @@ export type {
   CriaRunOptions,
   CriaObserveOptions,
   CriaReadingOptions,
+  CriaReadingRejection,
   ObservedState,
 } from './client.js'
 
