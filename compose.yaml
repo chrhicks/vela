@@ -1,0 +1,52 @@
+# Vela on one host. Config and data live in XDG directories on the host and are mounted in:
+#   ${VELA_CONFIG_DIR}  default $XDG_CONFIG_HOME/vela  (cria.json)
+#   ${VELA_DATA_DIR}    default $XDG_DATA_HOME/vela    (rigs.yaml, saved-images, survey-cache, traces,
+#                                                       alignment-diagnostics, astap/)
+# There is no login: whoever can reach VELA_PORT can drive the rig. See docs/docker.md.
+name: vela
+
+x-config-dir: &config-dir ${VELA_CONFIG_DIR:-${XDG_CONFIG_HOME:-${HOME}/.config}/vela}
+x-data-dir: &data-dir ${VELA_DATA_DIR:-${XDG_DATA_HOME:-${HOME}/.local/share}/vela}
+
+services:
+  server:
+    build:
+      context: .
+      target: server
+    image: vela-server:local
+    user: "${VELA_UID:-1000}:${VELA_GID:-1000}"
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-America/New_York}
+      VELA_CRIA_CONFIG_PATH: /config/cria.json
+      VELA_RIG_CATALOG_PATH: /data/rigs.yaml
+      VELA_SAVED_IMAGES_PATH: /data/saved-images
+      VELA_SURVEY_CACHE_PATH: /data/survey-cache
+      VELA_TRACE_PATH: /data/traces/observing.jsonl
+      VELA_ALIGNMENT_DIAGNOSTICS_PATH: /data/alignment-diagnostics/trials
+      VELA_ASTAP: /astap/astap_cli
+      VELA_STAR_CATALOG: /astap/catalog/opt/astap
+    volumes:
+      - type: bind
+        source: *config-dir
+        target: /config
+        read_only: true
+      - type: bind
+        source: *data-dir
+        target: /data
+      - type: bind
+        source: ${VELA_DATA_DIR:-${XDG_DATA_HOME:-${HOME}/.local/share}/vela}/astap
+        target: /astap
+        read_only: true
+
+  web:
+    build:
+      context: .
+      target: web
+    image: vela-web:local
+    restart: unless-stopped
+    depends_on:
+      server:
+        condition: service_healthy
+    ports:
+      - "${VELA_PORT:-5173}:8080"
