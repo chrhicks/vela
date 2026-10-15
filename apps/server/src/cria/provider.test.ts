@@ -321,6 +321,75 @@ describe('Cria equipment inspection', () => {
       expect(spans().map(({ name }) => name)).toEqual(['cria.command.unready', 'cria.command.ready'])
     })
 
+    it('keeps the last accepted view while a refresh is pending after a write, and says so in two spans', async () => {
+      const camera = device('camera', { state: reading(0), temperatureC: reading(-8), coolerOn: unsupported() })
+      const { provider, publish } = providerFor([camera])
+      const [known] = await provider.inspectDevices()
+
+      camera.refreshPending = true
+      await publish()
+      const [waiting] = await provider.inspectDevices()
+      await provider.inspectDevices()
+
+      expect(waiting).toMatchObject({
+        connection: 'connected',
+        telemetry: known?.telemetry,
+        observation: { state: 'partial', commandReady: false, observedAt: known?.observation?.observedAt },
+      })
+      expect((await provider.listDevices())[0]?.connection).toBe('connected')
+      expect(spans()).toEqual([{
+        name: 'cria.observation.refreshing',
+        attributes: expect.objectContaining({
+          'cria.device.id': 'rig-camera', 'cria.reading.reason': 'refresh-pending',
+        }),
+      }])
+
+      camera.refreshPending = false
+      await publish()
+      const [fresh] = await provider.inspectDevices()
+
+      expect(fresh?.observation).toMatchObject({ state: 'current', commandReady: true })
+      expect(spans().map(({ name }) => name)).toEqual(['cria.observation.refreshing', 'cria.observation.refreshed'])
+      expect(spans()[1]?.attributes['cria.refreshing.ms']).toEqual(expect.any(Number))
+    })
+
+    it('is interrupted when nothing was accepted before the refresh, or the wait outlasts the grace', async () => {
+      const camera = device('camera', { state: reading(0), temperatureC: reading(-8), coolerOn: unsupported() })
+      camera.refreshPending = true
+      const { provider, publish } = providerFor([camera])
+      const [first] = await provider.inspectDevices()
+
+      expect(first?.observation?.state).toBe('interrupted')
+      expect(spans().map(({ name }) => name)).toEqual(['cria.observation.interrupted'])
+
+      camera.refreshPending = false
+      await publish()
+      await provider.inspectDevices()
+
+      camera.refreshPending = true
+      await publish()
+      const now = Date.now()
+      const clock = vi.spyOn(Date, 'now')
+
+      clock.mockReturnValue(now)
+      expect((await provider.inspectDevices())[0]?.observation?.state).toBe('partial')
+
+      clock.mockReturnValue(now + 31_000)
+      expect((await provider.inspectDevices())[0]?.observation?.state).toBe('interrupted')
+      expect((await provider.inspectDevices())[0]?.observation?.state).toBe('interrupted')
+      clock.mockRestore()
+    })
+
+    it('does not hold the view for a reading that is too old', async () => {
+      const camera = device('camera', { state: reading(0), temperatureC: reading(-8), coolerOn: unsupported() })
+      const { provider, publish } = providerFor([camera])
+
+      await provider.inspectDevices()
+      camera.fields.connected = reading(true, 7000)
+      await publish()
+      expect((await provider.inspectDevices())[0]?.observation?.state).toBe('interrupted')
+    })
+
     it('names the other ways a device goes interrupted', async () => {
       const camera = device('camera', { state: reading(0), temperatureC: reading(-8), coolerOn: unsupported() })
       const { provider, publish, interrupt } = providerFor([camera])
