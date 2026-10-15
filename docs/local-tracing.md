@@ -119,7 +119,12 @@ names the device (`cria.device.id`), why a reading was refused
 `limitMs` and `roundTripMs`), and the reading's key. Cria can also stop calling a
 device command-ready while Vela still accepts its readings (its own freshness
 rule is shorter); `cria.command.unready` and `cria.command.ready` mark that, with
-the flags behind it. Find them with:
+the flags behind it. After a write Cria invalidates the device's failure domain and
+cannot refresh a camera that is exposing; while that refresh is pending (reason
+`refresh-pending` or `barrier`) Vela keeps showing the last accepted view as
+`partial` and not command-ready, and writes `cria.observation.refreshing` and
+`cria.observation.refreshed` (with `cria.refreshing.ms`). Only a wait longer than
+30 s, or a device with nothing accepted yet, becomes `interrupted`. Find them with:
 
 ```sh
 jq 'select(.name | startswith("cria."))' data/traces/observing.jsonl
