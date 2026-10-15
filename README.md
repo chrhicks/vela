@@ -62,6 +62,8 @@ cp .env.observing.example .env.observing.local # first setup only
 pnpm dev:observing
 ```
 
+To run Vela in Docker instead, see [docs/docker.md](docs/docker.md).
+
 Open `http://polaris.local:5173` on the desktop or a phone on the same trusted network. The machine must advertise `polaris.local` through mDNS (or resolve through local DNS); the command does not configure hostname resolution. Set `VELA_LAN_HOST` for a different hostname.
 
 This command loads the Git-ignored root `.env.observing.local`, checks the solver paths and ports, builds every workspace package the server depends on (pnpm reads them from `package.json`) and the browser app, then starts watchers for the server and those packages and serves the built app with `vite preview`. The built app has no development live-update client; that client reloads the whole page whenever its socket drops, which a phone may do while another app is in front. Restart the command to pick up browser changes. It uses the repository's `data/rigs.yaml` and `data/saved-images` by default, including existing rigs and retained images. Relative paths in this configuration resolve from the repository root. Ctrl+C stops this run and its watchers. Stop other servers on ports 3001 and 5173 before starting it.
