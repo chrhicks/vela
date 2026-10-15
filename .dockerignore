@@ -1,0 +1,15 @@
+.git
+**/node_modules
+**/dist
+**/*.tsbuildinfo
+data
+docs
+.env*
+**/.local
+**/test-results
+**/playwright-report
+.codex
+.cursor
+.opencode
+.agents
+.pi
