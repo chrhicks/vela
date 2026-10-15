@@ -30,6 +30,13 @@ const tracer = trace.getTracer('vela.cria')
 
 const cameraStates = ['idle', 'waiting', 'exposing', 'reading', 'downloading', 'error'] as const
 
+/**
+ * Cria invalidates a device's failure domain on every write and cannot refresh a camera that is
+ * exposing or reading out. How long the last accepted view may stand in for it before the device
+ * is reported interrupted.
+ */
+const refreshGraceMs = 30_000
+
 export function createCriaProvider(
   client: CriaClient,
   bindings: ReadonlyArray<CriaEquipmentBinding>,
@@ -55,10 +62,16 @@ export function createCriaProvider(
           attributes: { 'cria.device.id': binding.id, [durationKey]: Date.now() - started },
         }).end()
       },
+      /** When the current spell began, if there is one. */
+      since(binding: CriaEquipmentBinding): number | undefined {
+        return since.get(binding.id)
+      },
     }
   }
 
   const interruptions = spell('cria.observation.interrupted', 'cria.observation.recovered', 'cria.interrupted.ms')
+  // The device's last accepted view stands in while Cria has a refresh pending after a write.
+  const refreshing = spell('cria.observation.refreshing', 'cria.observation.refreshed', 'cria.refreshing.ms')
   // Cria can stop calling a device command-ready (its own 3 s freshness rule) while Vela still accepts its readings.
   const unready = spell('cria.command.unready', 'cria.command.ready', 'cria.unready.ms')
 
@@ -109,6 +122,33 @@ export function createCriaProvider(
     }
   }
 
+  /**
+   * A write leaves the device waiting for a fresh reading, which says nothing about whether it is
+   * still there. Keep showing what was last accepted, not ready for commands, until the grace runs out.
+   */
+  function awaitingRefresh(binding: CriaEquipmentBinding, cause: Attributes): EquipmentInspection | undefined {
+    const known = previous.get(binding.id)
+
+    if (cause['cria.reading.reason'] !== 'refresh-pending' && cause['cria.reading.reason'] !== 'barrier') return undefined
+
+    if (!known || known.name !== binding.expectedName || interruptions.since(binding) !== undefined) return undefined
+
+    refreshing.enter(binding, cause)
+
+    if (Date.now() - (refreshing.since(binding) ?? Date.now()) > refreshGraceMs) return undefined
+
+    let observation: EquipmentObservation = {
+      state: 'partial',
+      commandReady: false,
+      message: 'Waiting for a fresh reading after a device command',
+    }
+
+    if (known.observation?.observedAt)
+      observation = { ...observation, observedAt: known.observation.observedAt }
+
+    return { ...known, observation }
+  }
+
   function inspection(snapshot: ObservedState, binding: CriaEquipmentBinding): EquipmentInspection {
     try {
       const device = client.device(snapshot, binding.id)
@@ -119,10 +159,12 @@ export function createCriaProvider(
       if (connected === undefined || (connected && name !== binding.expectedName)) {
         const key = connected === undefined ? 'connected' : 'name'
 
-        return interrupted(binding, 'Device identity or connection readings are interrupted',
-          name === undefined || connected === undefined
-            ? readingCause(snapshot, device, key)
-            : { 'cria.reading.key': 'name', 'cria.reading.reason': 'name-mismatch' })
+        const cause = name === undefined || connected === undefined
+          ? readingCause(snapshot, device, key)
+          : { 'cria.reading.key': 'name', 'cria.reading.reason': 'name-mismatch' }
+
+        return awaitingRefresh(binding, cause) ??
+          interrupted(binding, 'Device identity or connection readings are interrupted', cause)
       }
 
       if (device.blocked)
@@ -168,6 +210,7 @@ export function createCriaProvider(
 
       previous.set(binding.id, result)
       interruptions.leave(binding)
+      refreshing.leave(binding)
 
       return result
     } catch (error) {
