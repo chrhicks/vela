@@ -1,17 +1,13 @@
 import type { RigView } from '@vela/model/rig'
 import type { HomeView } from '@vela/model/web'
-import {
-  createRigDeviceInventory,
-  type RigDeviceInventory,
-  type RigInventorySource,
-} from '../device/inventory.js'
+import type { RigDeviceInventory, RigInventorySource } from '../device/inventory.js'
 import type { ObservedRigDevice } from '../device/model.js'
 import { summarizeDeviceConnections } from '../web/device.js'
 import type { RigCatalog } from './catalog.js'
 import type { ObservedRigInventory, RigCatalogRecord } from './contracts.js'
 
 interface HomeViewOptions {
-  readonly createInventory?: (rig: RigInventorySource) => RigDeviceInventory
+  readonly createInventory: (rig: RigInventorySource) => RigDeviceInventory
   readonly now?: () => Date
   readonly onConflict?: (rig: RigCatalogRecord) => void
   readonly onUnavailable?: (rig: RigCatalogRecord, cause: unknown) => void
@@ -20,11 +16,11 @@ interface HomeViewOptions {
 export async function loadHomeView(
   catalog: RigCatalog,
   {
-    createInventory = createRigDeviceInventory,
+    createInventory,
     now = () => new Date(),
     onConflict = () => {},
     onUnavailable = () => {},
-  }: HomeViewOptions = {},
+  }: HomeViewOptions,
 ): Promise<HomeView> {
   const records = await catalog.list()
 

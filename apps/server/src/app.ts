@@ -1,13 +1,12 @@
 import { z } from 'zod'
-import { EquipmentError } from '@vela/equipment'
+import { EquipmentError, type EquipmentConnector, type EquipmentInspector } from '@vela/equipment'
 import { createEquipmentComposition, type EquipmentComposition } from './equipment/composition.js'
 import Fastify from 'fastify'
-import { AlpacaProviderError, createAlpacaDiscovery, type AlpacaDiscovery } from '@vela/alpaca'
+import { AlpacaProviderError, type AlpacaDiscovery } from '@vela/alpaca'
 import type { DiscoveryResultView } from '@vela/model/rig'
 import type { RigDeviceInventory, RigInventorySource } from './device/inventory.js'
-import type { RigConnectionSource, RigDeviceConnector } from './device/connection.js'
-import type { RigDeviceInspector, RigInspectionSource } from './device/inspection.js'
 import { createMemoryRigCatalog, type RigCatalog } from './rig/catalog.js'
+import type { RigEquipmentSource } from './rig/contracts.js'
 import {
   discoverRigs,
   parseDiscoverRigsInput,
@@ -36,14 +35,14 @@ import { createSurveyCache, registerSurvey, type SurveyCache } from './targets/s
 
 interface BuildAppOptions {
   readonly equipment?: EquipmentComposition
-  readonly targets?: TargetOptions
+  readonly targets?: Omit<TargetOptions, 'createAdapter' | 'createAcquisition' | 'createInspector'>
   readonly surveyCache?: SurveyCache
   readonly savedImages?: SavedImageStore
   readonly alignment?: AlignmentSettings
   readonly alpacaDiscovery?: AlpacaDiscovery
-  readonly createConnector?: (rig: RigConnectionSource) => RigDeviceConnector
+  readonly createConnector?: (rig: RigEquipmentSource) => EquipmentConnector
   readonly createInventory?: (rig: RigInventorySource) => RigDeviceInventory
-  readonly createInspector?: (rig: RigInspectionSource) => RigDeviceInspector
+  readonly createInspector?: (rig: RigEquipmentSource) => EquipmentInspector
   readonly now?: () => Date
   readonly rigCatalog?: RigCatalog
 }
@@ -60,8 +59,8 @@ export function buildApp({
   targets,
   surveyCache,
   alignment,
-  alpacaDiscovery = createAlpacaDiscovery(),
   equipment = createEquipmentComposition(),
+  alpacaDiscovery = equipment.alpacaDiscovery,
   createConnector = equipment.createConnector,
   createInventory = equipment.createInventory,
   createInspector = equipment.createInspector,
@@ -84,6 +83,7 @@ export function buildApp({
     settingsForRig: equipment.alignmentSettings,
     createAcquisition: equipment.createAcquisition,
     createFraming: equipment.createFraming,
+    createAlignmentEndpointAcquisition: equipment.createAlignmentEndpointAcquisition,
   })
 
   const capture = registerCapture(app, rigCatalog, operations, {
@@ -113,8 +113,8 @@ export function buildApp({
   registerTargets(app, rigCatalog, operations, {
     ...targets,
     createInspector,
-    createAdapter: targets?.createAdapter ?? equipment.createFraming,
-    createAcquisition: targets?.createAcquisition ?? equipment.createAcquisition,
+    createAdapter: equipment.createFraming,
+    createAcquisition: equipment.createAcquisition,
     now,
   })
   registerSurvey(app, surveyCache ?? createSurveyCache())

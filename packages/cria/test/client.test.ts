@@ -9,9 +9,8 @@ import {
   CriaOriginalVerificationError,
   CriaUncertainError,
   isTransientCriaFailure,
-  type CriaCommand,
-  type CriaOperation,
-} from '../src/index.js'
+} from '../src/error.js'
+import type { CriaCommand, CriaOperation } from '../src/schema.js'
 import { closeFixtures, eventResponse, failure, json, reading, serverNow, ServiceFixture } from './fixture.js'
 
 afterEach(closeFixtures)

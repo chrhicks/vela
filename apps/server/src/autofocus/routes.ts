@@ -1,12 +1,7 @@
 import { z } from 'zod'
 import type { FastifyInstance } from 'fastify'
-import {
-  createAlpacaAcquisition,
-  createAlpacaFocuser,
-} from '@vela/alpaca'
 import { CaptureStoppedError, FocuserStoppedError, type Acquisition, type Focuser, type FocuserMove } from '@vela/equipment'
 import type { RigCatalogRecord } from '../rig/contracts.js'
-import { alpacaEndpoint } from '../equipment/source.js'
 import type { AutofocusView } from '@vela/model/web'
 import type { RigCatalog } from '../rig/catalog.js'
 import { inspectRigDetail, type RigDetailOptions } from '../rig/detail.js'
@@ -22,9 +17,9 @@ import { measureAutofocusStars } from '../imaging/statistics.js'
 import { DEFAULT_OFFSET_STEPS, DEFAULT_STEP_SIZE } from './walk.js'
 
 interface AutofocusRouteOptions {
-  createInspector?: RigDetailOptions['createInspector']
-  createAcquisition?: (rig: RigCatalogRecord) => Acquisition
-  createFocuserAdapter?: (rig: RigCatalogRecord) => Focuser
+  createInspector: RigDetailOptions['createInspector']
+  createAcquisition: (rig: RigCatalogRecord) => Acquisition
+  createFocuserAdapter: (rig: RigCatalogRecord) => Focuser
   createCamera?: (settings: {
     rig: RigCatalogRecord
     cameraId: string
@@ -85,10 +80,10 @@ export function registerAutofocus(
     createInspector,
     createCamera,
     createFocuser,
-    createAcquisition = rig => createAlpacaAcquisition({ baseUrl: alpacaEndpoint(rig) }),
-    createFocuserAdapter = rig => createAlpacaFocuser({ baseUrl: alpacaEndpoint(rig) }),
+    createAcquisition,
+    createFocuserAdapter,
     measure,
-  }: AutofocusRouteOptions = {},
+  }: AutofocusRouteOptions,
 ) {
   const controllers = new Map<string, ReturnType<typeof createAutofocusController>>()
   const cameraFactory = createCamera ?? (settings => configuredCamera(settings, createAcquisition(settings.rig)))
@@ -141,11 +136,7 @@ export function registerAutofocus(
     if (!rig.imagingCamera)
       return unavailable('Choose an imaging camera on Observe before autofocus.')
 
-    const detail = await inspectRigDetail(
-      catalog,
-      rigId,
-      createInspector ? { createInspector } : {},
-    )
+    const detail = await inspectRigDetail(catalog, rigId, { createInspector })
 
     if (detail.state === 'not-found') return {}
 

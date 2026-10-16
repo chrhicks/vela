@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { AlpacaProviderError, type AlpacaDeviceInspection } from '@vela/alpaca'
-import type { RigDeviceInspector } from '../device/inspection.js'
+import type { EquipmentInspector } from '@vela/equipment'
 import { createMemoryRigCatalog } from './catalog.js'
 import type { RigCatalogRecord } from './contracts.js'
 import { loadRigDetailView } from './detail.js'
@@ -22,7 +22,7 @@ function rig(id = 'rig-1', uniqueId = 'camera-0', name = 'Camera slot'): RigCata
   }
 }
 
-function inspector(result: ReadonlyArray<AlpacaDeviceInspection> | Error): RigDeviceInspector {
+function inspector(result: ReadonlyArray<AlpacaDeviceInspection> | Error): EquipmentInspector {
   return {
     async inspectDevices() {
       if (result instanceof Error) throw result

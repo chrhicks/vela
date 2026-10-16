@@ -5,6 +5,18 @@ Capture, autofocus, framing and alignment keep their existing Vela controllers;
 they receive acquisition, focuser, cooling and framing factories with the full
 rig record. Inventory, inspection and connection use the same selection.
 
+Only `composition.ts` chooses a mode. Routes and rig helpers take capabilities as
+arguments and never import `@vela/alpaca` or `@vela/cria`. The
+`no-restricted-imports` rule in `.oxlintrc.json` enforces this outside tests.
+Its other exceptions, and when each goes:
+
+- `rig/discovery.ts` stays. Discovery is Alpaca's own UDP scan; it turns replies
+  into rig candidates and chooses no mode.
+- `app.ts` maps `AlpacaProviderError` when a rig is added. It goes when connect
+  and inspection move onto the rig's devices (migration PR 9).
+- `cria/**` and `scripts/check-cria-*.ts` go when the Cria adapter moves into
+  `packages/cria` and the protocol 4 scripts retire (migration PR 6).
+
 A catalog record without `source` uses Alpaca. A record with
 `source: { kind: cria, configurationId: … }` uses only that Cria configuration.
 Missing configuration, authentication failure or interrupted Cria service never
