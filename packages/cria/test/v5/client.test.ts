@@ -209,7 +209,7 @@ describe('cancel', () => {
 
     cria.durationMs['mount-slew'] = 60_000
     execute(rig.run('fra-mount', slew))
-    await vi.advanceTimersByTimeAsync(100)
+    await vi.advanceTimersByTimeAsync(300)
     const latest = current(rig)
     const [operation] = latest.state === 'live' ? latest.snapshot.operations : []
 
@@ -236,7 +236,7 @@ describe('cancel', () => {
 
     expect(run.outcome).toBeUndefined()
 
-    await vi.advanceTimersByTimeAsync(200)
+    await vi.advanceTimersByTimeAsync(500)
 
     expect(run.outcome).toEqual({ kind: 'stopped' })
     expect(sent('submit', 'cancel', 'lookup')).toEqual(['submit', 'cancel'])
@@ -250,12 +250,12 @@ describe('halts', () => {
     cria.durationMs['mount-slew'] = 60_000
     const slewing = execute(rig.run('fra-mount', slew))
 
-    await vi.advanceTimersByTimeAsync(100)
+    await vi.advanceTimersByTimeAsync(300)
     const latest = current(rig)
     const [operation] = latest.state === 'live' ? latest.snapshot.operations : []
 
     cria.settle(operation?.id ?? never(), { kind: 'uncertain', reason: 'stop-not-confirmed', message: 'The mount did not stand still' })
-    await vi.advanceTimersByTimeAsync(100)
+    await vi.advanceTimersByTimeAsync(300)
 
     expect(slewing.outcome).toEqual({ kind: 'uncertain', reason: 'stop-not-confirmed', message: 'The mount did not stand still' })
     expect(holds(rig)).toEqual([{ deviceId: 'fra-mount', kind: 'quarantine' }])
@@ -295,7 +295,7 @@ describe('captures', () => {
     cria.delay('image', 500)
     const run = execute(rig.capture('fra-camera', { exposureSeconds: 1, light: true }))
 
-    await vi.advanceTimersByTimeAsync(1_100)
+    await vi.advanceTimersByTimeAsync(1_400)
     const imageId = cria.received.find(request => request.route === 'image')?.path.split('/')[3]
 
     cria.dropImage(imageId ?? never())
