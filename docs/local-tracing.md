@@ -113,18 +113,12 @@ pixels are excluded.
 With Cria equipment, `cria.observation.interrupted` is an immediately completed
 marker written when a device's readings stop being usable, and
 `cria.observation.recovered` is written when they return, with
-`cria.interrupted.ms`. Only changes are recorded, never every poll. The marker
-names the device (`cria.device.id`), why a reading was refused
-(`cria.reading.reason`, for example `too-old` with `cria.reading.ageMs`,
-`limitMs` and `roundTripMs`), and the reading's key. Cria can also stop calling a
-device command-ready while Vela still accepts its readings (its own freshness
-rule is shorter); `cria.command.unready` and `cria.command.ready` mark that, with
-the flags behind it. After a write Cria invalidates the device's failure domain and
-cannot refresh a camera that is exposing; while that refresh is pending (reason
-`refresh-pending` or `barrier`) Vela keeps showing the last accepted view as
-`partial` and not command-ready, and writes `cria.observation.refreshing` and
-`cria.observation.refreshed` (with `cria.refreshing.ms`). Only a wait longer than
-30 s, or a device with nothing accepted yet, becomes `interrupted`. Find them with:
+`cria.interrupted.ms`. Only changes are recorded, never every snapshot. The marker
+names the device (`cria.device.id`) and why (`cria.interrupted.message`). Vela
+treats every device as interrupted when Cria's event stream goes 3 s without a
+snapshot. Cria decides each reading's freshness itself. An optional stale
+reading makes the view partial. An interrupted identity or connection reading
+produces an interruption marker. Find them with:
 
 ```sh
 jq 'select(.name | startswith("cria."))' data/traces/observing.jsonl

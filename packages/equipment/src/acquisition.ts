@@ -49,13 +49,13 @@ export interface Acquisition {
     rateDegreesPerSecond: number,
     durationSeconds: number,
     signal?: AbortSignal,
-  ): Promise<void>
+  ): Promise<void | { travelledDegrees: number }>
   /** Rotate the primary axis until observed RA reaches the signed angular travel. */
   rotateRightAscension(
     telescopeId: string,
     rateDegreesPerSecond: number,
     distanceDegrees: number,
     signal?: AbortSignal,
-  ): Promise<void>
+  ): Promise<void | { travelledDegrees: number }>
   abort(cameraId: string, telescopeId: string): Promise<void>
 }

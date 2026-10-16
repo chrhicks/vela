@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   CaptureStoppedError,
   type Acquisition,
+  type CameraCooling,
   type EquipmentInspection,
   type EquipmentProvider,
   type Focuser,
@@ -39,10 +40,11 @@ afterEach(async () => {
   vi.restoreAllMocks()
 })
 
-function setup() {
+function setup({ savedCameraName = 'Camera' }: { savedCameraName?: string } = {}) {
   const unexpectedFetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Unexpected device transport'))
   let connected = true
   let ready = true
+  let holds: Array<{ deviceId: string; reason: string }> = []
   const selected: Array<{ capability: string; rig: RigEquipmentSource }> = []
 
   function select(capability: string, source: RigEquipmentSource) {
@@ -165,11 +167,24 @@ function setup() {
     abortTelescope: async () => {},
   }
 
-  const focuser: Focuser = {
+  const focuser = {
     status: async () => ({ absolute: true, position: 1000, maxStep: 100000, moving: false }),
-    move: async command => ({ position: command.position }),
+    move: vi.fn<Focuser['move']>(async command => ({ position: command.position })),
     halt: async () => {},
   }
+
+  const setCooling = vi.fn<CameraCooling['setCooling']>(async () => ({
+    outcome: 'confirmed',
+    observation: { state: 'on', canSetTemperature: true, canGetPower: false },
+  }))
+
+  const recover = vi.fn<EquipmentComposition['recover']>(async (_rig, deviceId) => {
+    if (!holds.some(hold => hold.deviceId === deviceId))
+      return { outcome: 'failed', message: 'That device is not held.' }
+    holds = holds.filter(hold => hold.deviceId !== deviceId)
+
+    return { outcome: 'confirmed', found: 'The mount is stationary.' }
+  })
 
   const equipment: EquipmentComposition = {
     start() {},
@@ -218,13 +233,7 @@ function setup() {
     createCooling(source) {
       select('cooling', source)
 
-      return {
-        observe: async () => undefined,
-        setCooling: async () => ({
-          outcome: 'confirmed',
-          observation: { state: 'on', canSetTemperature: true, canGetPower: false },
-        }),
-      }
+      return { observe: async () => undefined, setCooling }
     },
     alignmentSettings: () => ({
       rigId: rig.id,
@@ -237,10 +246,14 @@ function setup() {
       exposureSeconds: 1,
       fieldHeightDegrees: 3,
     }),
+    holdsOf: rigId => (rigId === rig.id ? holds : []),
+    recover,
   }
 
   const app = buildApp({
-    rigCatalog: createMemoryRigCatalog([rig]),
+    rigCatalog: createMemoryRigCatalog([
+      { ...rig, imagingCamera: { uniqueId: 'cria:camera', name: savedCameraName } },
+    ]),
     equipment,
     targets: {
       createSolver: () => ({ solve: async () => ({ status: 'no-solution' }) }),
@@ -251,7 +264,8 @@ function setup() {
   apps.push(app)
 
   return {
-    app, capture, selected, unexpectedFetch,
+    app, capture, selected, unexpectedFetch, focuser, setCooling, recover,
+    hold(reason: string) { holds = [{ deviceId: 'cria:mount', reason }] },
     disconnected() { connected = false },
     interrupted() { ready = false },
   }
@@ -316,5 +330,117 @@ describe('equipment selection at server composition', () => {
 
     for (const create of [equipment.createInventory, equipment.createInspector, equipment.createConnector, equipment.createAcquisition, equipment.createFraming, equipment.createFocuser, equipment.createCooling])
       expect(() => create(rig)).toThrow('Cria equipment connection is unavailable')
+  })
+})
+
+describe('device holds through the lease routes', () => {
+  const reason = 'The mount did not confirm it stopped after a slew. Check it before recovering.'
+  const recoverUrl = `/api/rigs/${rig.id}/devices/cria:mount/recover`
+
+  it('refuses work while the mount is held and starts autofocus after recover', async () => {
+    const subject = setup()
+    subject.hold(reason)
+
+    expect((await subject.app.inject(`/api/web/rigs/${rig.id}/autofocus`)).json())
+      .toMatchObject({ enabled: false, unavailableReason: reason })
+    const autofocus = await subject.app.inject({ method: 'POST', url: `/api/rigs/${rig.id}/autofocus/start`, payload: { stepSize: 10 } })
+    expect(autofocus.statusCode).toBe(409)
+    expect(autofocus.json()).toEqual({ error: reason })
+
+    expect((await subject.app.inject(`/api/web/rigs/${rig.id}/capture`)).json()).toMatchObject({
+      enabled: false,
+      unavailableReason: reason,
+      cooling: { state: 'off', canSetTemperature: true, blockedBy: { kind: 'hold', reason } },
+    })
+    const cooling = await subject.app.inject({ method: 'POST', url: `/api/rigs/${rig.id}/capture/cooling`, payload: { coolerOn: true } })
+    expect(cooling.statusCode).toBe(409)
+    expect(cooling.json()).toEqual({ error: reason })
+
+    const forget = await subject.app.inject({ method: 'DELETE', url: `/api/rigs/${rig.id}` })
+    expect(forget.statusCode).toBe(409)
+    expect(forget.json()).toEqual({ error: 'rig-operation-in-progress', message: reason })
+    const connection = await subject.app.inject({ method: 'POST', url: `/api/rigs/${rig.id}/connections`, payload: {} })
+    expect(connection.statusCode).toBe(409)
+    expect(connection.json()).toEqual({ error: 'rig-operation-in-progress', message: reason })
+
+    expect(subject.capture).not.toHaveBeenCalled()
+    expect(subject.focuser.move).not.toHaveBeenCalled()
+    expect(subject.setCooling).not.toHaveBeenCalled()
+
+    const recovered = await subject.app.inject({
+      method: 'POST',
+      url: recoverUrl,
+      payload: { externalRecoveryConfirmed: true, note: '  Checked the mount at the pier.  ' },
+    })
+
+    expect(recovered.statusCode).toBe(200)
+    expect(recovered.json()).toEqual({ outcome: 'confirmed', found: 'The mount is stationary.' })
+    expect(subject.recover.mock.calls.map(([held, deviceId, note]) => [held.id, deviceId, note]))
+      .toEqual([[rig.id, 'cria:mount', 'Checked the mount at the pier.']])
+
+    const started = await subject.app.inject({ method: 'POST', url: `/api/rigs/${rig.id}/autofocus/start`, payload: { stepSize: 10 } })
+    expect(started.statusCode).toBe(200)
+    await vi.waitFor(() => expect(subject.capture).toHaveBeenCalledOnce())
+    expect(subject.focuser.move.mock.calls[0]![0].position).toBe(1040)
+    expect((await subject.app.inject({ method: 'POST', url: `/api/rigs/${rig.id}/autofocus/stop`, payload: {} })).statusCode).toBe(200)
+  })
+
+  it('validates the temporary recover request and reports a recovery that did not confirm', async () => {
+    const subject = setup()
+
+    for (const payload of [
+      {},
+      { externalRecoveryConfirmed: false, note: 'Checked the mount.' },
+      { externalRecoveryConfirmed: true, note: '   ' },
+      { externalRecoveryConfirmed: true, note: 'x'.repeat(1001) },
+      { externalRecoveryConfirmed: true, note: 'Checked the mount.', deviceId: 'cria:camera' },
+    ]) {
+      expect((await subject.app.inject({ method: 'POST', url: recoverUrl, payload })).statusCode).toBe(400)
+    }
+
+    const missing = await subject.app.inject({
+      method: 'POST',
+      url: '/api/rigs/unknown/devices/cria:mount/recover',
+      payload: { externalRecoveryConfirmed: true, note: 'Checked the mount.' },
+    })
+
+    expect(missing.statusCode).toBe(404)
+    expect(subject.recover).not.toHaveBeenCalled()
+
+    const failed = await subject.app.inject({
+      method: 'POST',
+      url: recoverUrl,
+      payload: { externalRecoveryConfirmed: true, note: 'Checked the mount.' },
+    })
+
+    expect(failed.statusCode).toBe(409)
+    expect(failed.json()).toEqual({ outcome: 'failed', message: 'That device is not held.' })
+  })
+})
+
+describe('a Cria rig whose saved camera name predates protocol 5', () => {
+  it('shows the selected camera as ready under the name Cria reports', async () => {
+    const subject = setup({ savedCameraName: 'ZWO ASI2600MC Pro' })
+
+    expect((await subject.app.inject(`/api/web/rigs/${rig.id}/imaging-camera`)).json())
+      .toMatchObject({ state: 'ready', selected: { id: 'cria:camera', name: 'Camera' } })
+    expect((await subject.app.inject(`/api/web/rigs/${rig.id}/capture`)).json())
+      .toMatchObject({ enabled: true, camera: { name: 'Camera' } })
+    expect((await subject.app.inject(`/api/web/rigs/${rig.id}/autofocus`)).json())
+      .toMatchObject({ enabled: true, cameraName: 'Camera' })
+  })
+
+  it.each([
+    { workflow: 'capture', payload: { exposureSeconds: 1 } },
+    { workflow: 'autofocus', payload: { stepSize: 10 } },
+    { workflow: 'framing', payload: { targetId: 'ngc6205', raDegrees: 250, decDegrees: 36, exposureSeconds: 1 } },
+  ])('starts $workflow and expects the camera name Cria reports', async ({ workflow, payload }) => {
+    const subject = setup({ savedCameraName: 'ZWO ASI2600MC Pro' })
+    const start = await subject.app.inject({ method: 'POST', url: `/api/rigs/${rig.id}/${workflow}/start`, payload })
+
+    expect(start.statusCode).toBe(200)
+    await vi.waitFor(() => expect(subject.capture).toHaveBeenCalledOnce())
+    expect(subject.capture.mock.calls[0]![0].expectedCameraName).toBe('Camera')
+    expect((await subject.app.inject({ method: 'POST', url: `/api/rigs/${rig.id}/${workflow}/stop`, payload: {} })).statusCode).toBe(200)
   })
 })

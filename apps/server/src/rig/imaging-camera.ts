@@ -2,9 +2,26 @@ import { z } from 'zod'
 import type { FastifyInstance } from 'fastify'
 import type { ImagingCameraView } from '@vela/model/web'
 import type { RigCatalog } from './catalog.js'
+import type { RigCatalogRecord } from './contracts.js'
 import type { RigOperations } from './operations.js'
 import { inspectRigDetail, type RigDetailOptions } from './detail.js'
 import { rigDeviceId } from '../web/rig-detail.js'
+
+/**
+ * The imaging camera's name to show and expect, or undefined when its identity
+ * changed. Cria already confirms each device against its configured name, so a
+ * Cria Rig's saved name is only the label from when the camera was chosen.
+ */
+export function confirmedCameraName(
+  rig: Pick<RigCatalogRecord, 'source' | 'imagingCamera'>,
+  reportedName: string | null | undefined,
+): string | undefined {
+  const name = reportedName?.trim()
+
+  if (!name) return undefined
+
+  return rig.source?.kind === 'cria' || name === rig.imagingCamera?.name ? name : undefined
+}
 
 export function registerImagingCamera(
   app: FastifyInstance,
@@ -33,6 +50,7 @@ export function registerImagingCamera(
 
     const selected = rig.imagingCamera
     const match = cameras.find(camera => camera.id === selected?.uniqueId)
+    const matchName = confirmedCameraName(rig, match?.name)
 
     function selectionState(): ImagingCameraView['state'] {
       if (detail.state !== 'current') return 'unavailable'
@@ -43,7 +61,7 @@ export function registerImagingCamera(
 
       if (!match.name) return 'unavailable'
 
-      if (match.name !== selected.name) return 'changed'
+      if (!matchName) return 'changed'
 
       return 'ready'
     }
@@ -53,7 +71,7 @@ export function registerImagingCamera(
     return {
       rigId,
       cameras,
-      selected: selected ? { id: selected.uniqueId, name: selected.name } : null,
+      selected: selected ? { id: selected.uniqueId, name: matchName ?? selected.name } : null,
       selectedDeviceId: state === 'ready' && match ? rigDeviceId(rigId, match.id) : null,
       state,
       editable: detail.state === 'current' && !operations.owner(rigId),

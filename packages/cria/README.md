@@ -1,70 +1,64 @@
-# Cria transport
+# Cria adapter
 
-`@vela/cria` is the server-side client for Cria's full .NET v2 service. It owns authenticated HTTP, wire validation, observation freshness, durable operation admission and temporary-original transfer. It follows `dotnet/contract/openapi.json` in Cria, including operation `elapsedSeconds`; the earlier prototype protocol is not supported.
+`@vela/cria` speaks protocol 5 to the TypeScript Cria service. It owns HTTP/SSE,
+wire validation, remote operation outcomes, image transfer, and the mapping to
+Vela's current Promise equipment capabilities. It imports no Alpaca implementation.
 
-The package depends on `@vela/equipment` for frame contracts and ImageBytes decoding. It imports no ALPACA implementation. Vela's capability adapters belong in `apps/server/src/cria`; repetition, autofocus decisions, plate solving, previews, FITS generation and archive ownership remain in Vela.
+Composition creates one `createCriaConnection` per origin and shares it across the
+origin's configured rigs. `start()` opens the scoped session. Reads also open it
+lazily. `close()` releases the stream and background work. Opening starts
+interrupted and reconnects quietly. Configuration keeps its existing `expectedName`
+keys. A stable Cria device ID selects a device, and the configured expected name
+still guards its actual identity. A saved camera's older display name does not
+replace that configured identity.
 
-## Construction and observation
+## Readings and commands
 
-Construct one `CriaClient` per authenticated service and share it across the service's devices. Configuration pins the HTTP(S) origin, bearer token, and each endpoint-local device ID, kind and expected operational name. Construction performs no requests. Credentials stay on the server; redirects are refused.
+`src/v5` contains the protocol client. One SSE stream carries validated snapshots
+and operation progress. Three seconds without a snapshot interrupts observation.
+Each reading is fresh, stale, or unavailable as Cria reports it. Vela retains the
+last accepted device view during an interruption and labels it as last known.
+Availability supplies the command-ready state and its reason. Required reads wait
+while Cria reports `refreshing`, until its readings postdate the settled operation.
+This wait reads the shared snapshot and respects cancellation. The old generation,
+read barrier, and age-budget calculations are gone.
 
-Call `start()` at service composition to open one authenticated `/v2/events` stream shared by every configured device and operation. `state()` also starts the stream lazily. Call `close()` when composition shuts down; it releases the stream, timers and waiters without claiming that physical equipment stopped. There is no steady HTTP state polling path.
+`equipment.ts`, `provider.ts`, `readings.ts`, and `mount-control.ts` translate this
+client into the capabilities used by today's workflows. Each command maps Cria's
+settled Outcome into the existing result or equipment error. There are no thrown
+`Cria*Error` classes. Cooling uses `lastCommandedSetpointC`; unsupported setpoint
+readback does not erase an acknowledged target. Focuser travel is the inclusive
+`minStep..maxStep` window. Axis movement returns Cria's measured `travelledDegrees`.
 
-`state()` returns the latest validated full snapshot with transport-delay and receipt times. Concurrent readers share the subscription; one caller abandoning its wait does not cancel other consumers. The client retains one snapshot, accepts sequence gaps, ignores duplicates, and rejects backwards sequences. Events have a four-MiB bound. Complete heartbeat comments maintain transport liveness but never renew driver facts. Interrupted connections retry with bounded exponential backoff. New writes require facts accepted from the current connection; old snapshots remain unsuitable after reconnection.
+A motion or exposure is POSTed once. A lost admission reply is looked up. Unknown
+admission keeps its execution running with a local hold until lookup or operator
+recovery resolves it. Cancel is resent until a 2xx, 404, or 410, and Vela follows
+the actual ending. The remote operation has no Vela completion deadline while
+snapshots arrive. Cria owns settling, including the mount's bounded stop.
 
-`observe(id)` waits for fresh identity and connection facts; it does not require unrelated device fields. Use `reading()` for a required fact and `optionalReading()` for an optional fact. Both check status, generation, read timing and transport delay. Dynamic fields use a six-second default age budget; pass `{ metadata: true }` for cached geometry and capability facts, whose default budget is 65 seconds. Name and connection are dynamic fields. Switch channels can use a copy of the device with `fields` set to the channel's readings.
+Capture downloads the confirmed original before returning its frame. An image 410
+is one lost frame and never starts another exposure. A Cria restart leaves an
+in-flight operation uncertain with a local hold; nothing is resubmitted.
 
-Required reads preserve transient interruption: pending/error/stale readings, refreshes, previous generations and excessive age or transport delay report a transport error, even when HTTP succeeded. Missing or unsupported required facts, malformed values and inconsistent timestamps remain invalid data. Alignment requires its pointing, geometry, site and tracking facts; optional elevation and pointing side may be omitted only when explicitly unsupported. Display telemetry can still omit unavailable optional fields without hiding the rest of the view. Unresolved ownership is a protocol error, never a retryable read interruption.
+## Holds and recovery
 
-Freshness uses the server's `generatedAt - readStartedAt`, a conservative transport-delay bound, and monotonic time since receipt. Cria generates its initial snapshot after the subscription request: the complete connection round trip bounds that first snapshot's delay. Subsequent events compare elapsed server time with monotonic time since that anchor, so a delayed frame cannot become fresh merely by arriving. This does not compare absolute Windows and Vela clocks. Backwards service time, excessive delay, or a large forward clock discontinuity interrupts the stream and requires a new connection anchor. Heartbeats and snapshot envelopes do not change a field's read timestamps or generation.
+`holds()` projects both Cria quarantine and Vela-local uncertainty. Composition
+passes it to the server's rig lease, which refuses all lease-taking work while any
+hold exists. Device details and capture show its reason. `recover(deviceId, note)`
+pins the current hold and calls the recovery client after a person checks the
+hardware. It takes no rig lease, so it can fence an execution still awaiting
+admission. See the [cutover checklist](../../docs/observing/protocol-5-cutover.md)
+for the temporary server route and the rig session.
 
-The first state pins the service incarnation and driver bindings. A device that no longer matches its configured kind or name blocks new writes until the configuration is fixed. A Cria restart (a new `instanceId`) means everything in flight before it is unknown: running work fails as `CriaUncertainError`, nothing resumes, and the next workflow starts against the new instance and its new bindings. A rebound driver after recovery is adopted the same way.
-
-Confirmed admission invalidates locally cached facts for every device in the operation's failure domain. A fast HTTP completion cannot turn the pre-write snapshot into confirmation: subsequent reads require a newer observation generation with current fields. Cria invalidates the domain at admission and completion and accepts no poll results while its write lane is held, so generation establishes this ordering without comparing wall-clock timestamps. Explicit refresh replies impose the same generation boundary.
-
-## Operations
-
-`run(id, command, options)` validates the operation parameters, observes the selected binding, then submits a client-generated request identity. It preserves the exact serialized request through a lost admission response: lookup first, then retry that same request when appropriate. It never changes an unresolved request to a fresh ID. Once cancellation is requested, a missing admission record is followed without resubmitting an exposure.
-
-Unresolved admission blocks further commands on the client. A known operation with uncertain cleanup blocks its failure domain while unrelated domains remain usable. `commandBlockReason` and `commandBlockReasonFor(id)` expose these conditions. Errors retain the request and last observed operation for diagnosis. The client does not implement operator recovery or clear uncertainty automatically.
-
-After admission, an aborted caller signal requests equipment cancellation and continues observing the outcome. `cancel()` acknowledges only a cleanup request. `cancelDevice(id)` requests cancellation of this client's owned work and waits for settlement. Neither method sends a separate competing motion or capture command. A naturally completed capture can still succeed during Stop.
-
-Operation progress and completion come from the same state stream. HTTP operation reads are reserved for a missing operation, an interrupted connection, or observation that has stopped advancing; these gaps reconcile at a paced interval until events resume or the existing observation allowance expires. This covers Cria's bounded recent-terminal list without polling alongside healthy operation events. Reconnection never dispatches a replacement command. HTTP remains responsible for durable admission lookup, explicit cancellation and original transfer.
-
-`run()` resolves only for confirmed successful completion. It throws `CriaCancelledError` for confirmed cancellation, `CriaOperationFailedError` for settled failure, and `CriaUncertainError` when completion is unresolved. A cancelled error with `operation: null` establishes that no admission request was sent; otherwise it retains the settled operation. These extend `EquipmentError`; capability adapters translate known cancellation to their specific workflow errors. A local timeout never means equipment stopped. The operation observation allowance includes the requested exposure duration plus configurable driver cleanup and retention time.
-
-A transient observation failure before admission throws `CriaNotAdmittedError`. It establishes that no command was dispatched. The acquisition adapter translates this into `CaptureRetryableError`, allowing alignment to retain its baseline and retry at its existing cancellable cadence. Ownership uncertainty, failures after dispatch, and original-transfer failures never grant permission to repeat an exposure.
-
-`onProgress` receives a validated `CriaOperation`. `onReadState` reports interrupted observation until a fresh operation response arrives. `elapsedSeconds` is worker progress, including time spent waiting for cleanup; it is not measured shutter-open duration.
-
-## Original transfer
-
-Cria protocol 4 keeps only its newest completed images. The client requires `protocolVersion: 4` on its first state read, so an older Cria is refused before any command is admitted.
-
-`download(operation)` accepts only a confirmed capture and validates the original's operation, instance, device, binding, geometry and requested exposure. It downloads a bounded ImageBytes body, verifies length and SHA-256, and decodes geometry before returning `{ image, frame }`. If the stream is interrupted after an operation's terminal result was confirmed, a bounded HTTP state read reconciles the instance identity. A transient transfer failure retries the same original within `imageRetryMs`. Invalid metadata, checksum or encoding stops immediately. None of these paths starts another exposure.
-
-Fetch right after the capture succeeds. If Cria has dropped the image (410 `image-gone`) `download` throws `CriaImageGoneError`: the frame is lost, nothing retries and nothing exposes again. There is no release call and no archive receipt.
-
-## Protocol 5, not wired yet
-
-`src/v5` is the protocol 5 client. Composition still builds the protocol 4 `CriaClient`, and nothing chooses between the two at run time; the flip wires `src/v5` and deletes protocol 4. It is Effect code over `@cria/wire` and `@cria/primitives`, and every ending is Cria's settled `Outcome`. Vela never derives a second ending from a Stop.
-
-- `session.ts`: one session per Cria origin, with one event stream. It is `live` while snapshots keep Cria's one-second cadence and `interrupted` three seconds after the last one. It starts interrupted and reconnects every second, so opening it never fails.
-- `operation.ts`: `remoteOperation` sends a command once. A lost reply is looked up. If Cria has not shown the request, the device gets an `unknown` hold and the execution keeps looking it up every second. A Stop cancels a motion or exposure, sent again every 500 ms until Cria acknowledges it, and the execution waits for Cria's ending with no deadline of its own. `halt` sends `mount-stop` or `focuser-halt` and sends a lost one again with the same request ID. `capture` fetches its image before it returns; a 410 is one lost frame.
-- `recovery.ts`: holds (Cria's quarantine and Vela's own) and their recovery. Recovering an unknown admission is the fence: Cria's recover gives the domain a new binding, so a delayed POST is refused, and one more lookup says whether Cria ever ran it.
-- `equipment.ts`: `createCriaEquipment` binds one rig's devices over a session.
-
-`client.test.ts` drives these against `fake-cria.ts`. `golden.test.ts` decodes `wire.golden.json`, a copy of the wire Cria recorded at the pinned commit, with `@cria/wire`, and pins the two entries the protocol 5 design depends on: cancel of an unknown operation answers 404, and recover on a domain that is not held answers 200 with a new binding. Replace the copy only together with the Cria pin. `fake-cria.ts` is an in-memory protocol 5 Cria for the client's tests; its header lists its controls. `pnpm --filter @vela/cria test:types` typechecks these tests.
-
-## Focused verification
+## Verification
 
 ```sh
-pnpm exec vitest run packages/cria/test/client.test.ts packages/cria/test/events.test.ts
-pnpm exec vitest run packages/cria/test/v5
+pnpm exec vitest run packages/cria/test
 pnpm --filter @vela/cria test:types
-pnpm --filter @vela/cria build
-pnpm exec oxlint packages/cria
+pnpm exec vitest run apps/server/tests/cria-protocol5.test.ts
 ```
 
-The transport fixtures exercise lost admission, identical retry, a dropped image, protocol refusal, cancellation and settlement, domain isolation, identity changes, interrupted reads, clock-independent freshness, and original integrity/ownership. They never contact observatory hardware. Application integration against Cria's separate-process fixtures is verified at the server boundary.
+`test/v5/fake-cria.ts` is the typed HTTP/SSE fake used by the client and server
+route scenarios. The golden corpus comes from Cria commit
+`86624908a57573b4953c2f759713b04d606defcd`. Update it only with the dependency pin.
+All tests use fakes or local fixtures and never contact observatory hardware.

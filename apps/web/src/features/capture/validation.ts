@@ -82,7 +82,12 @@ const captureView = z.object({
       sensorTemperatureC: z.number().optional(),
       setpointC: z.number().optional(),
       powerPercent: z.number().min(0).max(100).optional(),
-      blockedBy: z.enum(['capture', 'alignment', 'autofocus', 'framing', 'rig']).optional(),
+      blockedBy: z
+        .union([
+          z.enum(['capture', 'alignment', 'autofocus', 'framing', 'rig']),
+          z.strictObject({ kind: z.literal('hold'), reason: text }),
+        ])
+        .optional(),
     })
     .nullable(),
 })

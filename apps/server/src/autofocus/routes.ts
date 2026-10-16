@@ -6,6 +6,7 @@ import type { AutofocusView } from '@vela/model/web'
 import type { RigCatalog } from '../rig/catalog.js'
 import { inspectRigDetail, type RigDetailOptions } from '../rig/detail.js'
 import type { RigOperations } from '../rig/operations.js'
+import { confirmedCameraName } from '../rig/imaging-camera.js'
 import {
   AutofocusStoppedError,
   createAutofocusController,
@@ -110,6 +111,7 @@ export function registerAutofocus(
         active: false,
         startPosition: null,
         currentPosition: null,
+        minStep: null,
         maxStep: null,
         captureReadState: 'current',
         stepSize: DEFAULT_STEP_SIZE,
@@ -151,16 +153,19 @@ export function registerAutofocus(
     )
 
     const focusers = detail.inspections.filter(device => device.kind === 'focuser')
-    const cameraView = { cameraName: rig.imagingCamera.name }
+    const savedCamera = { cameraName: rig.imagingCamera.name }
 
-    if (!camera) return unavailable('The configured imaging camera was not found.', cameraView)
+    if (!camera) return unavailable('The configured imaging camera was not found.', savedCamera)
+    const cameraName = confirmedCameraName(rig, camera.name)
 
-    if (!camera.name?.trim() || camera.name.trim() !== rig.imagingCamera.name) {
+    if (!cameraName) {
       return unavailable(
         'Camera identity changed or is unavailable. Check the imaging camera configuration.',
-        cameraView,
+        savedCamera,
       )
     }
+
+    const cameraView = { cameraName }
 
     if (focusers.length !== 1)
       return unavailable('Autofocus needs exactly one focuser on this Rig.', cameraView)
@@ -175,7 +180,7 @@ export function registerAutofocus(
     const owner = operations.owner(rigId)
 
     if (owner && owner !== 'autofocus')
-      return unavailable('Another Rig operation is in progress.', names)
+      return unavailable(operations.heldReason(rigId) ?? 'Another Rig operation is in progress.', names)
 
     const snapshot = current()
     const focuserTelemetry = focuser.telemetry.values
@@ -189,6 +194,11 @@ export function registerAutofocus(
       !snapshot.active && focuserTelemetry?.kind === 'focuser'
         ? (focuserTelemetry.maxStep ?? snapshot.maxStep)
         : snapshot.maxStep
+
+    const idleMinStep =
+      !snapshot.active && focuserTelemetry?.kind === 'focuser'
+        ? (focuserTelemetry.minStep ?? snapshot.minStep ?? null)
+        : (snapshot.minStep ?? null)
 
     if (!snapshot.active) {
       const blocked = [camera, focuser].find(device => device.observation?.commandReady === false)
@@ -216,6 +226,7 @@ export function registerAutofocus(
         rigName: rig.name,
         ...names,
         currentPosition: idlePosition,
+        minStep: idleMinStep,
         maxStep: idleMaxStep,
         enabled: true,
         unavailableReason: null,
@@ -257,7 +268,12 @@ export function registerAutofocus(
 
       const release = operations.acquire(request.params.rigId, 'autofocus')
 
-      if (!release) return reply.code(409).send({ error: 'Another Rig operation is in progress.' })
+      if (!release) {
+        return reply.code(409).send({
+          error: operations.heldReason(request.params.rigId) ?? 'Another Rig operation is in progress.',
+        })
+      }
+
       let started = false
 
       try {
