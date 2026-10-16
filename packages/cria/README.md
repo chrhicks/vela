@@ -46,10 +46,16 @@ Cria protocol 4 keeps only its newest completed images. The client requires `pro
 
 Fetch right after the capture succeeds. If Cria has dropped the image (410 `image-gone`) `download` throws `CriaImageGoneError`: the frame is lost, nothing retries and nothing exposes again. There is no release call and no archive receipt.
 
+## Protocol 5 contract tests
+
+`test/v5` holds tests only; nothing in `src` speaks protocol 5 yet. `golden.test.ts` decodes `wire.golden.json`, a copy of the wire Cria recorded at the pinned commit, with `@cria/wire`, and pins the two entries the protocol 5 design depends on: cancel of an unknown operation answers 404, and recover on a domain that is not held answers 200 with a new binding. Replace the copy only together with the Cria pin. `fake-cria.ts` is an in-memory protocol 5 Cria for the client's tests; its header lists its controls. `pnpm --filter @vela/cria test:types` typechecks these tests.
+
 ## Focused verification
 
 ```sh
 pnpm exec vitest run packages/cria/test/client.test.ts packages/cria/test/events.test.ts
+pnpm exec vitest run packages/cria/test/v5
+pnpm --filter @vela/cria test:types
 pnpm --filter @vela/cria build
 pnpm exec oxlint packages/cria
 ```
