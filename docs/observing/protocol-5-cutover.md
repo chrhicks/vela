@@ -15,6 +15,7 @@ Follow these rules at every step:
 - Vela updates the saved `fra-cria` endpoint in `rigs.yaml` itself when it starts with the new URL in `cria.json`.
 - When an operation ends `uncertain`, Cria holds the device's failure domain until a person recovers it. Vela refuses rig operations while a hold exists, and it shows the hold's reason on **Your rig** and on the capture page.
 - Vela has no **Recover** button yet. A temporary route, `POST /api/rigs/:rigId/devices/:deviceId/recover`, clears a hold. [Recover a held device](#recover-a-held-device) shows the call.
+- Physical polar alignment on this AM5 remains unavailable. Preparation requires an advertised sweep rate near the existing 1°/s rate and refuses before homing or moving when none exists. The AM5's 8x rate (0.2507°/s) needs about 228 s per baseline leg, beyond the pinned Cria's 120 s rotation limit. Its 9x rate (3.008°/s) has stop error that can exceed Vela's 54–60° corridor. This session checks capture, autofocus and slew cancellation. Qualifying the physical baseline is deferred.
 
 ## 0. Check the preconditions
 

@@ -435,12 +435,23 @@ describe('reported Cria axis travel', () => {
 
   it('uses the measured probe and sweep, and rates the mount advertises', async () => {
     const fake = observatory()
-    fake.mount.primaryAxisRates = [{ name: '8x', degreesPerSecond: 0.2507 }, { name: '9x', degreesPerSecond: 3.008 }]
+    fake.mount.primaryAxisRates = [{ name: 'probe', degreesPerSecond: 0.2507 }, { name: 'sweep', degreesPerSecond: 0.998 }, { name: 'fast', degreesPerSecond: 3.008 }]
     await fake.alignment.prepare(signal)
     vi.mocked(fake.acquisition.move).mockImplementation(async () => ({ travelledDegrees: 0.25 }))
     vi.mocked(fake.acquisition.rotateRightAscension).mockImplementation(async () => ({ travelledDegrees: -57.05 }))
     await expect(fake.alignment.move(signal)).resolves.toBeUndefined()
     expect(fake.acquisition.move).toHaveBeenCalledExactlyOnceWith('mount', 0.2507, 1, signal)
-    expect(fake.acquisition.rotateRightAscension).toHaveBeenCalledExactlyOnceWith('mount', -3.008, -57.25, signal)
+    expect(fake.acquisition.rotateRightAscension).toHaveBeenCalledExactlyOnceWith('mount', -0.998, -57.25, signal)
+  })
+
+  it('refuses unsupported sweep rates before homing or moving the mount', async () => {
+    const fake = observatory()
+    fake.mount.primaryAxisRates = [{ name: '8x', degreesPerSecond: 0.2507 }, { name: '9x', degreesPerSecond: 3.008 }]
+    await expect(fake.alignment.prepare(signal)).rejects.toThrow('advertised sweep rate near 1°/s')
+    expect(fake.device.home).not.toHaveBeenCalled()
+    expect(fake.device.slew).not.toHaveBeenCalled()
+    expect(fake.acquisition.move).not.toHaveBeenCalled()
+    expect(fake.acquisition.rotateRightAscension).not.toHaveBeenCalled()
+    expect(fake.mount).toMatchObject({ rightAscensionDegrees: 10, declinationDegrees: 60, tracking: true })
   })
 })
