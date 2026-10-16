@@ -99,11 +99,15 @@ export function createCriaEquipment(connection: CriaConnection, bindings: Readon
     async capture(options) {
       const selected = binding(options.cameraId, 'camera')
       const session = connection.session()
+      let exposureRequested = false
 
       const remote = equipment({
         ...session,
         post: request => Effect.andThen(
-          Effect.sync(() => options.onExposureRequested?.()),
+          Effect.sync(() => {
+            exposureRequested = true
+            options.onExposureRequested?.()
+          }),
           session.post(request),
         ),
       })
@@ -145,7 +149,7 @@ export function createCriaEquipment(connection: CriaConnection, bindings: Readon
 
           case 'stopped': throw new CaptureStoppedError()
           case 'failed':
-            if (result.reason === 'unavailable' || result.reason === 'disconnected' || result.reason === 'busy')
+            if (!exposureRequested && (result.reason === 'unavailable' || result.reason === 'disconnected' || result.reason === 'busy'))
               throw new CaptureRetryableError(failure(result.message))
             throw failure(result.message)
           case 'uncertain': throw failure(result.message)
