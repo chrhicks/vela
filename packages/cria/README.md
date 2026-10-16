@@ -46,9 +46,16 @@ Cria protocol 4 keeps only its newest completed images. The client requires `pro
 
 Fetch right after the capture succeeds. If Cria has dropped the image (410 `image-gone`) `download` throws `CriaImageGoneError`: the frame is lost, nothing retries and nothing exposes again. There is no release call and no archive receipt.
 
-## Protocol 5 contract tests
+## Protocol 5, not wired yet
 
-`test/v5` holds tests only; nothing in `src` speaks protocol 5 yet. `golden.test.ts` decodes `wire.golden.json`, a copy of the wire Cria recorded at the pinned commit, with `@cria/wire`, and pins the two entries the protocol 5 design depends on: cancel of an unknown operation answers 404, and recover on a domain that is not held answers 200 with a new binding. Replace the copy only together with the Cria pin. `fake-cria.ts` is an in-memory protocol 5 Cria for the client's tests; its header lists its controls. `pnpm --filter @vela/cria test:types` typechecks these tests.
+`src/v5` is the protocol 5 client. Composition still builds the protocol 4 `CriaClient`, and nothing chooses between the two at run time; the flip wires `src/v5` and deletes protocol 4. It is Effect code over `@cria/wire` and `@cria/primitives`, and every ending is Cria's settled `Outcome`. Vela never derives a second ending from a Stop.
+
+- `session.ts`: one session per Cria origin, with one event stream. It is `live` while snapshots keep Cria's one-second cadence and `interrupted` three seconds after the last one. It starts interrupted and reconnects every second, so opening it never fails.
+- `operation.ts`: `remoteOperation` sends a command once. A lost reply is looked up. If Cria has not shown the request, the device gets an `unknown` hold and the execution keeps looking it up every second. A Stop cancels a motion or exposure, sent again every 500 ms until Cria acknowledges it, and the execution waits for Cria's ending with no deadline of its own. `halt` sends `mount-stop` or `focuser-halt` and sends a lost one again with the same request ID. `capture` fetches its image before it returns; a 410 is one lost frame.
+- `recovery.ts`: holds (Cria's quarantine and Vela's own) and their recovery. Recovering an unknown admission is the fence: Cria's recover gives the domain a new binding, so a delayed POST is refused, and one more lookup says whether Cria ever ran it.
+- `equipment.ts`: `createCriaEquipment` binds one rig's devices over a session.
+
+`client.test.ts` drives these against `fake-cria.ts`. `golden.test.ts` decodes `wire.golden.json`, a copy of the wire Cria recorded at the pinned commit, with `@cria/wire`, and pins the two entries the protocol 5 design depends on: cancel of an unknown operation answers 404, and recover on a domain that is not held answers 200 with a new binding. Replace the copy only together with the Cria pin. `fake-cria.ts` is an in-memory protocol 5 Cria for the client's tests; its header lists its controls. `pnpm --filter @vela/cria test:types` typechecks these tests.
 
 ## Focused verification
 
