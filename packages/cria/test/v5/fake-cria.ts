@@ -118,21 +118,17 @@ const rig: ReadonlyArray<Rigged> = [
 
 const frame = { width: 4, height: 3 }
 
-/** A running operation's ending, due when its timer fires. */
 interface Due {
   readonly at: number
   readonly timer: ReturnType<typeof setTimeout>
 }
 
-/** What one Cria process holds. A restart replaces all of it. */
 interface Instance {
   readonly id: InstanceId
   sequence: number
-  /** When every device was last read. Readings postdate an operation settled before it. */
   readAt: number
   readonly bindings: Map<FailureDomain, BindingId>
-  /** Recoveries, keyed by the binding each one ended. */
-  readonly recoveries: Map<BindingId, { readonly at: number; readonly note: string }>
+  readonly recoveredBindings: Map<BindingId, { readonly at: number; readonly note: string }>
   readonly operations: Map<OperationId, Operation>
   readonly requests: Map<RequestId, { readonly content: string; readonly operationId: OperationId }>
   readonly due: Map<OperationId, Due>
@@ -264,7 +260,7 @@ export class FakeCria {
       case 'submit':
         return this.admit(body ?? '')
       case 'operation':
-        return this.withOperation(first, operation => this.reply(Operation, this.view(operation), 200))
+        return this.withOperation(first, operation => this.reply(Operation, this.withRecovery(operation), 200))
       case 'cancel':
         return this.withOperation(first, operation => this.cancel(operation))
       case 'lookup':
@@ -287,7 +283,7 @@ export class FakeCria {
     if (known) {
       if (known.content !== content) return this.refuse('request-conflict', 'This request ID was used with different content')
 
-      return this.withOperation(known.operationId, operation => this.reply(Operation, this.view(operation), 202))
+      return this.withOperation(known.operationId, operation => this.reply(Operation, this.withRecovery(operation), 202))
     }
 
     if (request.instanceId !== this.instance.id) return this.refuse('instance-changed', 'Cria restarted: this request was for an earlier instance')
@@ -348,7 +344,6 @@ export class FakeCria {
     this.instance.due.set(operation.id, { at: Date.now() + afterMs, timer })
   }
 
-  /** A stop moves the ending earlier, never later: a capture that finishes first still confirms. */
   private stop(operation: Running): void {
     const due = this.instance.due.get(operation.id)
 
@@ -390,11 +385,10 @@ export class FakeCria {
     return { kind: 'confirmed', value: { values: {}, image } }
   }
 
-  /** SPEC "Halts, stops and cancel": the operation as it is now; a running motion or capture is asked to stop. */
   private cancel(operation: Operation): Response {
     if (operation.state === 'running' && !isHalt(operation)) this.stop(operation)
 
-    return this.reply(Operation, this.view(operation), 202)
+    return this.reply(Operation, this.withRecovery(operation), 202)
   }
 
   private lookup(instanceId: string, requestId: string): Response {
@@ -402,10 +396,9 @@ export class FakeCria {
 
     if (!known) return this.refuse('not-found', 'No such request')
 
-    return this.withOperation(known.operationId, operation => this.reply(Operation, this.view(operation), 200))
+    return this.withOperation(known.operationId, operation => this.reply(Operation, this.withRecovery(operation), 200))
   }
 
-  /** SPEC "Recovery": refused while an operation is open; otherwise a new binding for the whole domain. */
   private recover(deviceId: string, body: string): Response {
     const request = decode(RecoveryRequest, body)
 
@@ -422,7 +415,7 @@ export class FakeCria {
     if (this.openIn(device.failureDomain).length > 0)
       return this.refuse('device-busy', 'An operation is still open on this device; recover it once that settles')
 
-    this.instance.recoveries.set(binding, { at: Date.now(), note: request.note })
+    this.instance.recoveredBindings.set(binding, { at: Date.now(), note: request.note })
     this.instance.bindings.set(device.failureDomain, BindingId.make(randomUUID()))
     this.publish()
 
@@ -462,13 +455,11 @@ export class FakeCria {
     )
   }
 
-  /** The one-second cadence: Cria reads every device again, then sends a snapshot. */
   private read(): void {
     this.instance.readAt = Date.now()
     this.publish()
   }
 
-  /** SPEC "Event stream": a snapshot within 250 ms of a change; this one goes at once. */
   private publish(): void {
     if (this.streams.size === 0) return
     const event = this.event()
@@ -497,7 +488,7 @@ export class FakeCria {
       generatedAt: Date.now(),
       commandsEnabled: this.commandsEnabled,
       devices: rig.map(device => this.device(device)),
-      operations: operations.flatMap(operation => (hidden.has(operation) ? [] : [this.view(operation)])),
+      operations: operations.flatMap(operation => (hidden.has(operation) ? [] : [this.withRecovery(operation)])),
     }
   }
 
@@ -542,7 +533,6 @@ export class FakeCria {
     return { ready: true }
   }
 
-  /** SPEC "Quarantine": held from the first uncertain ending under the current binding until a recovery. */
   private quarantineOf(failureDomain: FailureDomain): Device['quarantine'] {
     const first = this.settledIn(failureDomain).find(operation => this.holds(operation))
 
@@ -555,11 +545,10 @@ export class FakeCria {
     return operation.state === 'settled' && operation.outcome.kind === 'uncertain' && operation.bindingId === this.binding(operation.failureDomain)
   }
 
-  /** An uncertain operation carries the recovery of the binding it ended under. */
-  private view(operation: Operation): Operation {
+  private withRecovery(operation: Operation): Operation {
     if (operation.state !== 'settled' || operation.outcome.kind !== 'uncertain') return operation
 
-    return { ...operation, recovery: this.instance.recoveries.get(operation.bindingId) ?? null }
+    return { ...operation, recovery: this.instance.recoveredBindings.get(operation.bindingId) ?? null }
   }
 
   private openIn(failureDomain: FailureDomain): ReadonlyArray<Exclude<Operation, Settled>> {
@@ -602,7 +591,7 @@ export class FakeCria {
       sequence: 0,
       readAt: Date.now(),
       bindings: new Map(rig.map(device => [device.failureDomain, BindingId.make(randomUUID())])),
-      recoveries: new Map(),
+      recoveredBindings: new Map(),
       operations: new Map(),
       requests: new Map(),
       due: new Map(),
@@ -619,7 +608,6 @@ export class FakeCria {
   }
 }
 
-/** Decodes a JSON body at the fake's boundary, refusing unknown keys as Cria does. */
 function decode<S extends Schema.Top & { readonly DecodingServices: never }>(schema: S, body: string): S['Type'] | undefined {
   try {
     return Schema.decodeUnknownSync(schema)(JSON.parse(body), { onExcessProperty: 'error' })

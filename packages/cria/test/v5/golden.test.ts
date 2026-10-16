@@ -25,7 +25,6 @@ const Entry = Schema.Struct({
 
 type Entry = typeof Entry.Type
 
-/** What the recorder keeps of an ImageBytes original: its headers, length and digest. */
 const Original = Schema.Struct({
   contentType: Schema.Literal('application/imagebytes'),
   contentLength: Schema.String,
@@ -46,7 +45,6 @@ const replies = {
   image: Original,
 } satisfies { readonly [R in Route]: Schema.Top }
 
-/** The golden's placeholders, back to values: one UUID per ID placeholder, numbers for times and counters. */
 function resolve(text: string): string {
   const ids = new Map<string, string>()
 

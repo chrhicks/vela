@@ -100,7 +100,6 @@ async function recover(deviceId: keyof typeof names, bindingId: string = cria.bi
   return send('POST', `/v2/devices/${deviceId}/recover`, JSON.stringify(body))
 }
 
-/** Collects every SSE state event the fake sends on one subscription. */
 async function subscribe(): Promise<State[]> {
   const response = await send('GET', '/v2/events')
   const states: State[] = []
