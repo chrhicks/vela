@@ -308,9 +308,12 @@ export class FakeCria {
 
     const now = Date.now()
     const accepted = { ...request, id: OperationId.make(randomUUID()), failureDomain: device.failureDomain, acceptedAt: now }
-    const running: Running = { ...accepted, state: 'running', startedAt: now, progress: { phase: 'preparing', elapsedSeconds: null } }
     const open = this.openIn(device.failureDomain)
+    const quarantine = this.quarantineOf(device.failureDomain)
 
+    if (!isHalt(accepted) && quarantine.held) return this.refuse('device-blocked', `Blocked until recovered: ${quarantine.reason}`)
+
+    if (!isHalt(accepted) && open.length > 0) return this.refuse('device-busy', 'The device is running another operation')
     this.instance.requests.set(request.requestId, { content, operationId: accepted.id })
 
     if (isHalt(accepted) && open.length > 0) {
@@ -324,20 +327,7 @@ export class FakeCria {
       return this.reply(Operation, waiting, 202)
     }
 
-    if (!isHalt(accepted)) {
-      const quarantine = this.quarantineOf(device.failureDomain)
-
-      const refusal =
-        quarantine.held ? this.refuse('device-blocked', `Blocked until recovered: ${quarantine.reason}`)
-        : open.length > 0 ? this.refuse('device-busy', 'The device is running another operation')
-        : undefined
-
-      if (refusal) {
-        this.instance.requests.delete(request.requestId)
-
-        return refusal
-      }
-    }
+    const running: Running = { ...accepted, state: 'running', startedAt: now, progress: { phase: 'preparing', elapsedSeconds: null } }
 
     this.start(running)
     this.publish()
@@ -481,8 +471,10 @@ export class FakeCria {
 
   /** SPEC "Event stream": a snapshot within 250 ms of a change; this one goes at once. */
   private publish(): void {
-    if (!this.reachable || this.streams.size === 0) return
+    if (this.streams.size === 0) return
     const event = this.event()
+
+    if (!this.reachable) return
 
     for (const stream of this.streams) stream.enqueue(event)
   }
