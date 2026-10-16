@@ -15,7 +15,7 @@
  *   the order it was sent; a delayed one lands later. `nameOf` and `bindingOf`
  *   give what a request must carry.
  * - Endings: a capture confirms after its exposure, with an image; any other
- *   kind confirms after `durationMs[kind]` (default 0), with no values.
+ *   kind confirms after `durationMs[kind]` (default 0).
  *   Readings stay as they started. A cancel, or a halt queued behind a motion,
  *   stops it `stopMs` later unless it ends first. `settle(id, outcome)` ends a
  *   running operation now with any outcome.
@@ -161,6 +161,7 @@ export class FakeCria {
   /** False partitions the network: requests fail and open streams go quiet. */
   reachable = true
   commandsEnabled = true
+  deviceView: (device: Device) => Device = device => device
   /** How long a running motion or capture takes to stand still once asked to stop. */
   stopMs = 0
   /** How long each kind runs before it confirms. A capture runs for its exposure. */
@@ -379,7 +380,16 @@ export class FakeCria {
     const afterMs = kind === 'capture' ? parameters.exposureSeconds * 1_000 : (this.durationMs[kind] ?? 0)
 
     this.instance.operations.set(operation.id, operation)
-    this.schedule(operation, afterMs, { kind: 'confirmed', value: { values: {}, image: null } })
+
+    let values: import('@cria/wire').OperationResult['values'] = {}
+
+    if (kind === 'focuser-move') values = { position: parameters.position }
+
+    if (kind === 'mount-rotate') values = { travelledDegrees: parameters.distanceDegrees }
+
+    if (kind === 'mount-axis') values = { travelledDegrees: parameters.rateDegreesPerSecond * parameters.durationSeconds }
+
+    this.schedule(operation, afterMs, { kind: 'confirmed', value: { values, image: null } })
   }
 
   private schedule(operation: Running, afterMs: number, outcome: Ending): void {
@@ -535,7 +545,7 @@ export class FakeCria {
       sequence: this.instance.sequence,
       generatedAt: Date.now(),
       commandsEnabled: this.commandsEnabled,
-      devices: rig.map(device => this.device(device)),
+      devices: rig.map(device => this.deviceView(this.device(device))),
       operations: operations.flatMap(operation => (hidden.has(operation) ? [] : [this.withRecovery(operation)])),
     }
   }

@@ -1,23 +1,7 @@
-export { CriaClient } from './client.js'
+export { createCriaConnection } from './connection.js'
 
-export type { CriaObserveOptions, ObservedState } from './client.js'
+export type { CriaConnection, CriaConnectionOptions } from './connection.js'
 
-export {
-  CriaApiError,
-  CriaImageGoneError,
-  CriaUncertainError,
-  CriaOperationFailedError,
-  CriaNotAdmittedError,
-  CriaCancelledError,
-} from './error.js'
+export { createCriaEquipment } from './equipment.js'
 
-export { CriaStateSchema } from './schema.js'
-
-export type {
-  CriaDeviceKind,
-  CriaCommand,
-  CriaReading,
-  CriaDevice,
-  CriaState,
-  CriaValue,
-} from './schema.js'
+export type { CriaEquipmentBinding } from './equipment.js'

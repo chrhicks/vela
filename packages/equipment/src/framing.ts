@@ -16,6 +16,7 @@ export interface CameraGeometry {
 }
 
 export interface TelescopeStatus {
+  primaryAxisRates?: ReadonlyArray<{ name: string; degreesPerSecond: number }>
   rightAscensionDegrees: number
   declinationDegrees: number
   coordinateSystem: CoordinateSystem

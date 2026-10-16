@@ -71,7 +71,7 @@ export function buildApp({
   const app = Fastify({ logger: true })
   app.addHook('onReady', async () => { equipment.start() })
   app.addHook('onClose', async () => { await equipment.close() })
-  const operations = createRigOperations()
+  const operations = createRigOperations(equipment.holdsOf)
 
   const mountControls = registerMountControls(app, rigCatalog, operations, {
     createInspector,
@@ -220,7 +220,12 @@ export function buildApp({
   app.delete<{ Params: { rigId: string } }>('/api/rigs/:rigId', async (request, reply) => {
     const release = operations.acquire(request.params.rigId, 'rig-management')
 
-    if (!release) return reply.code(409).send({ error: 'rig-operation-in-progress' })
+    if (!release) {
+      return reply.code(409).send({
+        error: 'rig-operation-in-progress',
+        message: operations.heldReason(request.params.rigId),
+      })
+    }
 
     try {
       const operation = await rigConnections.forgetRig(request.params.rigId)
@@ -283,7 +288,13 @@ export function buildApp({
     async (request, reply) => {
       const release = operations.acquire(request.params.rigId, 'connection')
 
-      if (!release) return reply.code(409).send({ error: 'rig-operation-in-progress' })
+      if (!release) {
+        return reply.code(409).send({
+          error: 'rig-operation-in-progress',
+          message: operations.heldReason(request.params.rigId),
+        })
+      }
+
       const controller = new AbortController()
       const cancel = () => controller.abort(new Error('Connection requester disconnected'))
       request.raw.on('aborted', cancel)
@@ -309,6 +320,21 @@ export function buildApp({
         request.raw.removeListener('aborted', cancel)
         reply.raw.removeListener('close', cancel)
       }
+    },
+  )
+
+  app.post<{ Params: { rigId: string; deviceId: string } }>(
+    '/api/rigs/:rigId/devices/:deviceId/recover',
+    async (request, reply) => {
+      const parsed = recoverDeviceSchema.safeParse(request.body)
+
+      if (!parsed.success) return reply.code(400).send({ error: 'invalid-recover-request' })
+      const rig = await rigCatalog.get(request.params.rigId)
+
+      if (!rig) return reply.code(404).send({ error: 'rig-not-found' })
+      const result = await equipment.recover(rig, request.params.deviceId, parsed.data.note)
+
+      return reply.code(result.outcome === 'confirmed' ? 200 : 409).send(result)
     },
   )
 
@@ -370,6 +396,11 @@ function rigConnectionLogging(
     },
   }
 }
+
+const recoverDeviceSchema = z.strictObject({
+  externalRecoveryConfirmed: z.literal(true),
+  note: z.string().trim().min(1).max(1000),
+})
 
 const addRigRequestSchema = z
   .strictObject({

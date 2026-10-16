@@ -7,6 +7,7 @@ import type { RigCatalogRecord } from '../rig/contracts.js'
 import { inspectRigDetail, type RigDetailOptions } from '../rig/detail.js'
 import type { AlignmentView } from '@vela/model/web'
 import { createRigOperations, type RigOperations } from '../rig/operations.js'
+import { confirmedCameraName } from '../rig/imaging-camera.js'
 import type { RigCatalog } from '../rig/catalog.js'
 import { createAlignmentController, type AlignmentSettings } from './controller.js'
 import { createAstapSolver } from './solver.js'
@@ -73,7 +74,11 @@ export function registerAlignment(
         })
       : undefined
 
-  function createRun(rig: RigCatalogRecord, settings: AlignmentSettings) {
+  function createRun(
+    rig: RigCatalogRecord,
+    settings: AlignmentSettings,
+    cameraName: string | undefined,
+  ) {
     const acquisition = equipment.createAcquisition(rig)
 
     const openDiagnostics = settings.diagnosticsPath
@@ -100,7 +105,7 @@ export function registerAlignment(
       {
         cameraId: settings.cameraId,
         telescopeId: settings.telescopeId,
-        cameraName: rig.imagingCamera!.name,
+        cameraName: cameraName ?? rig.imagingCamera!.name,
         focalLengthMm: rig.focalLengthMm!,
       },
       acquisition,
@@ -129,6 +134,7 @@ export function registerAlignment(
     const endpoint = `http://${rig.endpoint.host}:${rig.endpoint.port}`
     let inventory = rig.lastObservedInventory.devices
     let equipmentReason: string | null = null
+    let reportedCameraName: string | undefined
 
     if (rig.source && settings && equipment.createInspector) {
       const detail = await inspectRigDetail(catalog, rig.id, { createInspector: equipment.createInspector })
@@ -141,6 +147,7 @@ export function registerAlignment(
           kind: device.kind,
           name: device.configuredName,
         }))
+        reportedCameraName = detail.inspections.find(device => device.providerDeviceId === settings.cameraId)?.name
 
         if (!alignment?.active() || alignment.snapshot().rigId !== rig.id) {
           const blocked = detail.inspections.find(device =>
@@ -173,7 +180,7 @@ export function registerAlignment(
     } else if (equipmentReason) {
       reason = equipmentReason
     } else if (owner && owner !== 'alignment') {
-      reason = 'Another Rig operation is in progress.'
+      reason = operations.heldReason(rigId) ?? 'Another Rig operation is in progress.'
     } else if (settings?.mode === 'physical' && rig.imagingCamera?.uniqueId !== settings.cameraId) {
       reason = 'Select the configured imaging camera on Observe before alignment.'
     } else if (settings?.mode === 'physical' && !rig.focalLengthMm) {
@@ -210,7 +217,8 @@ export function registerAlignment(
     if (settings?.mode === 'physical') {
       view.mode = 'physical'
 
-      if (rig.imagingCamera) view.cameraName = rig.imagingCamera.name
+      if (rig.imagingCamera)
+        view.cameraName = confirmedCameraName(rig, reportedCameraName) ?? rig.imagingCamera.name
     }
 
     return view
@@ -249,8 +257,12 @@ export function registerAlignment(
                 ? operations.acquire(request.params.rigId, 'alignment')
                 : undefined
 
-            if (request.params.command === 'start' && !release)
-              return reply.code(409).send({ error: 'Another Rig operation is in progress' })
+            if (request.params.command === 'start' && !release) {
+              return reply.code(409).send({
+                error: operations.heldReason(request.params.rigId) ?? 'Another Rig operation is in progress',
+              })
+            }
+
             let started = false
 
             try {
@@ -277,7 +289,7 @@ export function registerAlignment(
                 if (alignment?.active()) throw new Error('A measurement is already running')
 
                 if (settings.mode === 'physical' || rig.source)
-                  alignment = createRun(rig, settings)
+                  alignment = createRun(rig, settings, view.cameraName)
 
                 if (!alignment) throw new Error('Polar alignment is not configured')
                 const result = await alignment.start(view.rigId, view.rigName, release)

@@ -6,6 +6,7 @@ export interface FocuserTravelWindow {
 export interface FocuserStatus {
   absolute: boolean
   position: number
+  minStep?: number
   maxStep: number
   moving: boolean
 }

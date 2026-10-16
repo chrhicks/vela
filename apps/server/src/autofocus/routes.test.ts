@@ -38,23 +38,32 @@ function deferred() {
   return { promise, resolve }
 }
 
-function setup(start = 32842, inventory = record.lastObservedInventory) {
+function setup(
+  start = 32842,
+  inventory = record.lastObservedInventory,
+  { travel = { maxStep: 60000 }, bestFocus = 32838 }: {
+    travel?: { minStep?: number; maxStep: number }
+    bestFocus?: number
+  } = {},
+) {
   const app = Fastify()
   const catalog = createMemoryRigCatalog([{ ...record, lastObservedInventory: inventory }])
   const operations = createRigOperations()
   let position = start
   const moves: number[] = []
+  const windows: Array<{ minPosition: number; maxPosition: number }> = []
   const focuserIds: string[] = []
   const captures: Array<ReturnType<typeof deferred>> = []
 
   const focuser: AutofocusFocuser = {
     async status() {
-      return { absolute: true, position, maxStep: 60000, moving: false }
+      return { absolute: true, position, moving: false, ...travel }
     },
-    async move(target) {
+    async move(target, window) {
       expect(target).not.toBe(0)
       position = target
       moves.push(target)
+      windows.push(window)
 
       return { position }
     },
@@ -97,7 +106,7 @@ function setup(start = 32842, inventory = record.lastObservedInventory) {
             connection: 'connected',
             telemetry: {
               availability: 'complete',
-              values: { kind: 'focuser', position, moving: false, maxStep: 60000 },
+              values: { kind: 'focuser', position, moving: false, ...travel },
             },
           },
         ]
@@ -113,7 +122,7 @@ function setup(start = 32842, inventory = record.lastObservedInventory) {
     },
     measure: async () => ({
       detectedStars: 40,
-      medianHfrPixels: hyperbola(position, 2.18, 95, 32838),
+      medianHfrPixels: hyperbola(position, 2.18, 95, bestFocus),
     }),
   })
 
@@ -151,6 +160,7 @@ function setup(start = 32842, inventory = record.lastObservedInventory) {
     },
     operations,
     moves,
+    windows,
     focuserIds,
   }
 }
@@ -216,6 +226,27 @@ it('returns to setup for a travel-limit start without moving', async () => {
   })
   expect(started.json().error).toMatch(/MaxStep|0/)
   expect(subject.moves).toEqual([])
+})
+
+it('walks a focuser near MinStep without commanding a position or window below MinStep + 1', async () => {
+  const subject = setup(15720, record.lastObservedInventory, {
+    travel: { minStep: 15500, maxStep: 38000 },
+    bestFocus: 15300,
+  })
+
+  expect((await subject.get()).json()).toMatchObject({
+    enabled: true,
+    currentPosition: 15720,
+    minStep: 15500,
+    maxStep: 38000,
+  })
+  expect((await subject.start({ stepSize: 50, exposureSeconds: 2 })).json())
+    .toMatchObject({ active: true, phase: 'walking', minStep: 15500 })
+  await subject.finish()
+
+  expect(subject.moves).toEqual([15920, 15870, 15820, 15770, 15720, 15670, 15620, 15570, 15520, 15720])
+  expect(Math.min(...subject.windows.map(window => window.minPosition))).toBe(15501)
+  expect((await subject.get()).json()).toMatchObject({ phase: 'failed', restoredStart: true })
 })
 
 it('starts the inspected focuser when last-observed inventory does not list it', async () => {

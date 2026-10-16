@@ -14,8 +14,6 @@ Its other exceptions, and when each goes:
   into rig candidates and chooses no mode.
 - `app.ts` maps `AlpacaProviderError` when a rig is added. It goes when connect
   and inspection move onto the rig's devices (migration PR 9).
-- `cria/**` and `scripts/check-cria-*.ts` go when the Cria adapter moves into
-  `packages/cria` and the protocol 4 scripts retire (migration PR 6).
 
 A catalog record without `source` uses Alpaca. A record with
 `source: { kind: cria, configurationId: … }` uses only that Cria configuration.
@@ -55,7 +53,8 @@ IDs, kinds and expected operational names.
 
 The example contains placeholders, not qualified equipment bindings. Configuration
 does not transfer driver ownership or start Cria. Establish its equipment ownership
-separately before connecting Vela. Vela does not configure or attest external recovery.
+separately before connecting Vela. The temporary recovery route records a person's
+explicit confirmation after checking the device.
 
 The rig ID also identifies its server configuration. Startup adds a missing
 configured rig and seeds an explicit imaging camera and focal length only when
@@ -69,8 +68,8 @@ services' local `camera` IDs cannot collide. A device at one service origin may
 belong to only one configured rig. Multiple disjoint bindings on the same service
 share one authenticated client and state stream. Application startup starts those
 streams; shutdown closes them and cancels reconnects. A Cria restart (a new
-instance) fails the workflow that was running, as unknown, and the next workflow
-starts against the new instance; it never resumes the old one.
+instance) leaves in-flight work uncertain with a local hold. A person checks and
+recovers the device before starting another workflow against the new instance.
 
 `imagingCameraId`, `focalLengthMm` and `alignment` are optional. Alignment additionally
 requires `VELA_ASTAP` and `VELA_STAR_CATALOG`; optional
@@ -89,8 +88,7 @@ explains why framing actions are unavailable.
 ## Observations and operations
 
 The normalized contracts live in `@vela/equipment`. Cria transport and wire
-validation live in `@vela/cria`; `../cria` maps its observations and bounded
-operations into those capabilities. A successful HTTP response is not proof of
+validation and the Promise capability adapters live in `@vela/cria`. A successful HTTP response is not proof of
 fresh device readings. Inspection carries observation state and command readiness;
 page projections preserve last-known values and their age while commands require
 the facts relevant to their operation. Workflows already running retain their
@@ -110,33 +108,32 @@ not reported as physical cancellation.
 
 ## Fixture verification
 
-The separate Cria repository provides `dotnet/tests/serve_fixture.py`, which
-starts a persistent loopback service containing only fixture workers. Its private
-`connection.json` is consumed by this opt-in integration check:
+The protocol 5 client and server routes use a typed HTTP/SSE fake. No fixture
+requires a separate .NET process or a rig connection.
 
 ```sh
-pnpm --filter @vela/equipment build
-pnpm --filter @vela/cria build
-pnpm --filter @vela/server exec tsx scripts/check-cria-fixture.ts /path/to/connection.json
+pnpm exec vitest run packages/cria/test
+pnpm exec vitest run apps/server/tests/cria-protocol5.test.ts apps/server/tests/cria-composition.test.ts
 ```
 
-The check rejects non-loopback and non-fixture connections. It verifies original
-pixel layout, cooling, focus, coordinate conversion, axis motion, confirmed
-cancellation and actual Vela capture routes through preview/FITS/archive. Focus,
-cooling and pointing test movements are restored. Use a dedicated fixture while
-it runs; it does not coordinate with another active browser operation.
+These checks cover admission loss, cancellation, restart uncertainty, image loss,
+hold-aware admission, and operator recovery. They do not qualify physical drivers,
+polar-alignment accuracy, or a sky/focus model. The separate
+[cutover checklist](../../../../docs/observing/protocol-5-cutover.md) covers the
+session with Chris present.
 
-The current Cria fixture camera produces a mono ramp, not a star field. Browser
-capture and cooling checks use that real service; focus analysis and plate solving
-must honestly report insufficient image data. Deterministic controller tests prove
-their workflow behavior separately. These checks do not qualify physical ASCOM
-drivers, polar-alignment accuracy, or a sky/focus model.
+Composition supplies `holdsOf` to `createRigOperations`. Any hold refuses new
+lease-taking work and supplies its reason to the page and refusal. The temporary
+`POST /api/rigs/:rigId/devices/:deviceId/recover` takes no lease. It requires
+`{ externalRecoveryConfirmed: true, note }` and calls the Cria recovery client,
+including its fence for an unknown admission. PR 8 replaces this route.
 
 Your Rig mount controls receive a separate `MountControl` capability at this same
 composition boundary. The server validates the rig-scoped device identity and
 claims the rig operation lane for one explicit Unpark or tracking command.
-Commands survive a browser disconnect, never chain or replay, and retain the lane
-while their result is uncertain. Fresh stationary adapter observations can resolve
+Commands survive a browser disconnect and never chain or replay. Alpaca retains
+the lane while its result is uncertain. Cria releases the settled command's lane
+and keeps the rig blocked through its hold until recovery. Fresh stationary adapter observations can resolve
 that uncertainty without another write. The existing detail projection carries
 action readiness and the latest command identity/outcome to every browser.
 

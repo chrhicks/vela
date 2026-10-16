@@ -79,6 +79,7 @@ function AutofocusPage({ rigId }: { rigId: string }) {
     step,
     view.offsetSteps,
     view.maxStep,
+    view.minStep,
   )
 
   const travelBlocked = setup && view.currentPosition !== null && !window.fit
@@ -170,8 +171,8 @@ function AutofocusPage({ rigId }: { rigId: string }) {
                 </div>
               </dl>
               <p className="vela-af-panel-note">
-                Position 0 and MaxStep are mechanical limits. Vela will not
-                command either limit.
+                Vela keeps the autofocus window one step inside the reported
+                MinStep and MaxStep limits.
               </p>
             </section>
             <aside className="vela-af-side">
@@ -211,6 +212,12 @@ function AutofocusPage({ rigId }: { rigId: string }) {
                   <dt>Focuser</dt>
                   <dd>{view.focuserName ?? 'Not found'}</dd>
                 </div>
+                {view.minStep != null && (
+                  <div>
+                    <dt>Minimum position · MinStep</dt>
+                    <dd>{number(view.minStep)}</dd>
+                  </div>
+                )}
                 <div>
                   <dt>Maximum position · MaxStep</dt>
                   <dd>{number(view.maxStep)}</dd>
@@ -515,7 +522,7 @@ function autofocusOutcome(
       body:
         view.error ??
         `At position ${number(view.currentPosition)}, step size ${step} would put this window across a mechanical limit. Adjust the step size before starting.`,
-      fact: 'Position 0 and MaxStep are mechanical limits',
+      fact: 'The autofocus window must stay inside the reported travel',
       footer: 'No movement commanded · Stay in setup',
       tone: 'warning',
     }

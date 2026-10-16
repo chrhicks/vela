@@ -2,13 +2,14 @@ export const DEFAULT_OFFSET_STEPS = 4
 
 export const DEFAULT_STEP_SIZE = 50
 
-/** Commanded positions stay strictly inside (0, maxStep). 0 is a stop, not a home. */
+/** Commanded positions stay strictly inside (minStep, maxStep). 0 is a stop, not a home. */
 export const MECHANICAL_END_MARGIN = 1
 
 export interface AutofocusWalkPlan {
   start: number
   stepSize: number
   offsetSteps: number
+  minStep: number
   maxStep: number
   minPosition: number
   maxPosition: number
@@ -28,21 +29,23 @@ export function planStarHfrWalk(
   stepSize: number,
   offsetSteps: number,
   maxStep: number,
+  minStep = 0,
 ): AutofocusWalkPlanning {
   if (
     !Number.isSafeInteger(start) ||
     !Number.isSafeInteger(stepSize) ||
     !Number.isSafeInteger(offsetSteps) ||
-    !Number.isSafeInteger(maxStep)
+    !Number.isSafeInteger(maxStep) ||
+    !Number.isSafeInteger(minStep)
   ) {
     return {
       ok: false,
       reason: 'invalid',
-      message: 'Autofocus needs integer start, step size, offset and MaxStep.',
+      message: 'Autofocus needs integer start, step size, offset and travel limits.',
     }
   }
 
-  if (stepSize < 1 || offsetSteps < 1 || offsetSteps > 10 || maxStep < 2) {
+  if (stepSize < 1 || offsetSteps < 1 || offsetSteps > 10 || maxStep - minStep < 2) {
     return {
       ok: false,
       reason: 'invalid',
@@ -50,7 +53,7 @@ export function planStarHfrWalk(
     }
   }
 
-  const mechanicalMin = MECHANICAL_END_MARGIN
+  const mechanicalMin = minStep + MECHANICAL_END_MARGIN
   const mechanicalMax = maxStep - MECHANICAL_END_MARGIN
 
   if (start < mechanicalMin || start > mechanicalMax) {
@@ -58,7 +61,7 @@ export function planStarHfrWalk(
       ok: false,
       reason: 'start-at-limit',
       message:
-        'The focuser is already at a mechanical limit. Autofocus starts from the current position and will not command 0 or MaxStep.',
+        'The focuser is outside the reported travel window. Autofocus keeps one step inside MinStep and MaxStep.',
     }
   }
 
@@ -70,7 +73,7 @@ export function planStarHfrWalk(
       ok: false,
       reason: 'window-hits-limit',
       message:
-        'That step-size window would approach 0 or MaxStep. Choose a smaller step or start farther from the ends. Vela will not move.',
+        'That step-size window would approach MinStep or MaxStep. Choose a smaller step or start farther from the ends. Vela will not move.',
     }
   }
 
@@ -81,7 +84,7 @@ export function planStarHfrWalk(
 
   return {
     ok: true,
-    plan: { start, stepSize, offsetSteps, maxStep, minPosition, maxPosition, positions },
+    plan: { start, stepSize, offsetSteps, minStep, maxStep, minPosition, maxPosition, positions },
   }
 }
 
@@ -98,7 +101,7 @@ export function assertCommandedPosition(
 
   if (
     !Number.isSafeInteger(position) ||
-    position < MECHANICAL_END_MARGIN ||
+    position < plan.minStep + MECHANICAL_END_MARGIN ||
     position > plan.maxStep - MECHANICAL_END_MARGIN
   ) {
     throw new Error(
@@ -135,7 +138,11 @@ export function extraInwardPosition(
   const next = inner - plan.stepSize
   const floor = plan.start - (plan.offsetSteps + 2) * plan.stepSize
 
-  if (next < MECHANICAL_END_MARGIN || next < floor || next > plan.maxStep - MECHANICAL_END_MARGIN)
+  if (
+    next < plan.minStep + MECHANICAL_END_MARGIN ||
+    next < floor ||
+    next > plan.maxStep - MECHANICAL_END_MARGIN
+  )
     return undefined
 
   return next

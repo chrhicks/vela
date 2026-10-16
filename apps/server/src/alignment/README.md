@@ -79,24 +79,22 @@ is checked before the reference is set. Stop and failures leave the mount where
 it stopped; only a new attempt homes again.
 
 A nominal 0.25° primary-axis probe establishes the driver's mechanical sign. The two
-baseline legs each target roughly 54° westward in RA, accepting 54–60° of observed
+baseline legs each target roughly 57° westward in RA, accepting 54–60° of observed
 final travel per leg, including the probe's displacement. Allow up to 120° total
 westward travel and 1° on either side for the direction check. The starting field
 leaves a nominal margin of at least 10° before the meridian after that travel at
 preparation time; this margin shrinks as time passes while tracking.
 
-Each leg uses one continuous primary-axis `MoveAxis` rotation at 1° per second,
-with a feedback stop based on observed RA travel and a bounded timeout. The
-slower rate leaves room for delayed position reads and stopping travel within
-the same endpoint corridor; two nominal legs take about two minutes plus imaging
-and settling. A deadline covers in-flight requests, not just the gap between
-polls. It bounds the software operation but does not guarantee instantaneous
-physical stopping. Coordinate
-slews could move DEC to compensate a pointing model and are unsuitable for this
-baseline. A rejected, ambiguous or unexpected move ends the measurement without
+Each leg uses one continuous primary-axis rotation. Cria uses an advertised
+axis rate near 3° per second for the sweep and near 0.25° per second for the probe.
+Its settled `travelledDegrees` determines the endpoint; a later telemetry read
+does not replace that measurement. Cria owns the operation deadline and confirms
+a stationary mount when a stop settles. Alpaca retains its 1° per second sweep
+and confirms travel from readings. Coordinate slews can move DEC to compensate
+a pointing model and are unsuitable for this baseline. A rejected, ambiguous or unexpected move ends the measurement without
 replay. Stop waits for the acquisition adapter's stop confirmation. The acquisition
-adapter allows up to five seconds after an accepted stop command for the driver
-to report motion stopped. Before each 2-second physical exposure, alignment waits
+uses Cria's settled outcome, which waits up to 20 seconds for a stationary
+mount, or Alpaca's existing stop confirmation. Before each 2-second physical exposure, alignment waits
 three seconds for settling and rechecks mount state and camera geometry; this
 settling allowance does not claim to measure vibration. During steady adjustment the
 three-second adjustment window after each reading is that allowance; the separate

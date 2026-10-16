@@ -32,6 +32,24 @@ describe('autofocus walk window', () => {
     })
   })
 
+  it('keeps a Cria travel window one step inside MinStep and MaxStep', () => {
+    expect(planStarHfrWalk(15500, 50, 4, 38000, 15500)).toMatchObject({
+      ok: false,
+      reason: 'start-at-limit',
+    })
+    expect(planStarHfrWalk(15700, 50, 4, 38000, 15500)).toMatchObject({
+      ok: false,
+      reason: 'window-hits-limit',
+    })
+
+    const planned = planStarHfrWalk(15701, 50, 4, 38000, 15500)
+
+    if (!planned.ok) throw new Error(planned.message)
+    expect(planned.plan.positions).toEqual([15901, 15851, 15801, 15751, 15701, 15651, 15601, 15551, 15501])
+    expect(() => assertCommandedPosition(15500, planned.plan, 15451)).toThrow(/mechanical travel limit/)
+    expect(extraInwardPosition(planned.plan, [{ position: 15501, hfrPixels: 2 }])).toBeUndefined()
+  })
+
   it('refuses Move(0) even if a caller asks', () => {
     const planned = planStarHfrWalk(32842, 50, 4, 60000)
     expect(planned.ok).toBe(true)

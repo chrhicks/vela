@@ -6,6 +6,8 @@ The selected recovery, image-inspection, FITS and preview-color follow-ups are
 delivered, along with transport classification. Remaining work below is separate
 from that completed sequence.
 
+For the October 17 FRA 400 session, follow the [protocol 5 cutover checklist](protocol-5-cutover.md).
+
 Start here to see what remains from the September 14–15 FRA/Veil field test.
 This is the maintained status rollup; the linked investigations preserve dated
 findings, rationale and implementation proposals. Their old “current” code anchors,

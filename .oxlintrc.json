@@ -70,9 +70,7 @@
         "apps/server/src/equipment/composition.ts",
         "**/*.test.ts",
         "apps/server/src/rig/discovery.ts",
-        "apps/server/src/app.ts",
-        "apps/server/src/cria/**",
-        "apps/server/scripts/check-cria-*.ts"
+        "apps/server/src/app.ts"
       ],
       "rules": { "no-restricted-imports": ["error", { "patterns": [
         { "group": ["@cria/wire", "@cria/wire/**"], "message": "Wire types stay inside packages/cria." }

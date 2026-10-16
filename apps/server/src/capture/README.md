@@ -9,8 +9,9 @@ explicitly saved images remain available through the saved-images boundary.
 The imaging-camera setup API remembers an explicitly selected camera in the
 Rig catalog by stable provider ID and its reported camera name. An inventory
 camera is never selected automatically. A missing identity or changed reported
-name requires explicit reselection; a different camera in the same configured
-provider slot is not silently accepted.
+name requires explicit reselection for Alpaca. Cria matches the saved camera by
+its stable device ID and checks the actual name against `cria.json` instead.
+A different device in the configured slot is not silently accepted.
 
 The Observe chooser is the setup path. It replaces the temporary
 `VELA_CAPTURE_ENDPOINT` / `VELA_CAPTURE_CAMERA_ID` environment configuration;

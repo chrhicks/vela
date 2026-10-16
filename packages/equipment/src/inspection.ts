@@ -79,6 +79,7 @@ export type DeviceTelemetry =
   | {
       readonly kind: 'focuser'
       readonly position?: number
+      readonly minStep?: number
       readonly maxStep?: number
       readonly moving?: boolean
       readonly temperatureC?: number
