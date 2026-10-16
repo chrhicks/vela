@@ -1,15 +1,10 @@
-import { EquipmentError, type EquipmentInspection } from '@vela/equipment'
+import { EquipmentError, type EquipmentInspection, type EquipmentInspector } from '@vela/equipment'
 import type { RigState } from '@vela/model/rig'
 import type { RigDetailView, RigDeviceDetailView } from '@vela/model/web'
-import {
-  createRigDeviceInspector,
-  type RigDeviceInspector,
-  type RigInspectionSource,
-} from '../device/inspection.js'
 import { summarizeDeviceConnections } from '../web/device.js'
 import { currentDeviceView, unavailableDeviceView } from '../web/rig-detail.js'
 import type { RigCatalog } from './catalog.js'
-import type { ObservedDeviceRecord, ObservedRigInventory, RigCatalogRecord } from './contracts.js'
+import type { ObservedDeviceRecord, ObservedRigInventory, RigCatalogRecord, RigEquipmentSource } from './contracts.js'
 
 export type LoadRigDetailResult =
   | { readonly state: 'found'; readonly view: RigDetailView }
@@ -30,7 +25,7 @@ export type InspectRigDetailResult =
   | { readonly state: 'not-found' }
 
 export interface RigDetailOptions {
-  readonly createInspector?: (rig: RigInspectionSource) => RigDeviceInspector
+  readonly createInspector: (rig: RigEquipmentSource) => EquipmentInspector
   readonly now?: () => Date
   readonly onUnavailable?: (
     rig: RigCatalogRecord,
@@ -45,12 +40,12 @@ export async function inspectRigDetail(
   catalog: RigCatalog,
   rigId: string,
   {
-    createInspector = createRigDeviceInspector,
+    createInspector,
     now = () => new Date(),
     onUnavailable = () => {},
     onConflict = () => {},
     signal,
-  }: RigDetailOptions = {},
+  }: RigDetailOptions,
 ): Promise<InspectRigDetailResult> {
   const record = await catalog.get(rigId)
 
@@ -118,7 +113,7 @@ export async function inspectRigDetail(
 export async function loadRigDetailView(
   catalog: RigCatalog,
   rigId: string,
-  options: RigDetailOptions = {},
+  options: RigDetailOptions,
 ): Promise<LoadRigDetailResult> {
   const result = await inspectRigDetail(catalog, rigId, options)
 

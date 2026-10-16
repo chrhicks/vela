@@ -8,7 +8,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryRigCatalog } from '../rig/catalog.js'
 import type { RigCatalogRecord } from '../rig/contracts.js'
 import { createRigOperations } from '../rig/operations.js'
-import { alignmentSettings, registerAlignment } from './routes.js'
+import { alpacaEndpoint } from '../equipment/source.js'
+import { alignmentSettings, registerAlignment, type AlignmentEquipmentOptions } from './routes.js'
 
 const initialState: AlignmentView = {
   rigId: '',
@@ -37,6 +38,12 @@ const mocks = {
   start: vi.fn<ReturnType<typeof createAlignmentController>['start']>(),
   stop: vi.fn<ReturnType<typeof createAlignmentController>['stop']>(),
   state: initialState,
+}
+
+const equipment: AlignmentEquipmentOptions = {
+  createAcquisition: rig => mocks.acquisition({ baseUrl: alpacaEndpoint(rig) }),
+  createFraming: rig => mocks.framing({ baseUrl: alpacaEndpoint(rig) }),
+  createAlignmentEndpointAcquisition: endpoint => mocks.acquisition({ baseUrl: endpoint }),
 }
 
 const env = {
@@ -128,6 +135,7 @@ function setup(
       : undefined,
     operations,
     mocks,
+    equipment,
   )
 
   const command = (
@@ -200,6 +208,7 @@ describe('alignment routes', () => {
     const settings = alignmentSettings({ ...env, VELA_ALIGNMENT_MODE: 'physical' })!
 
     registerAlignment(app, createMemoryRigCatalog([criaRig]), undefined, createRigOperations(), mocks, {
+      ...equipment,
       settingsForRig: () => ({ ...settings, rigId: criaRig.id, endpoint: 'http://different-cria:4319' }),
       createAcquisition: selectAcquisition,
       createFraming: selectFraming,

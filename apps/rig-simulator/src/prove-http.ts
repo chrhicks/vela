@@ -8,6 +8,7 @@ import { createMemoryRigCatalog } from '../../server/dist/rig/catalog.js'
 import { createRigOperations } from '../../server/dist/rig/operations.js'
 import { registerImagingCamera } from '../../server/dist/rig/imaging-camera.js'
 import { registerCapture } from '../../server/dist/capture/routes.js'
+import { createEquipmentComposition } from '../../server/dist/equipment/composition.js'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { resolve, join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -166,8 +167,13 @@ async function proveCapture() {
 
   const vela = Fastify()
   const operations = createRigOperations()
-  registerImagingCamera(vela, catalog, operations)
-  registerCapture(vela, catalog, operations)
+  const equipment = createEquipmentComposition()
+  registerImagingCamera(vela, catalog, operations, { createInspector: equipment.createInspector })
+  registerCapture(vela, catalog, operations, {
+    createInspector: equipment.createInspector,
+    createAcquisition: equipment.createAcquisition,
+    createCooling: settings => equipment.createCooling(settings.rig),
+  })
 
   const captureView = async () =>
     (await vela.inject('/api/web/rigs/proof/capture')).json<CaptureView>()

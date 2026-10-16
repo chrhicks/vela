@@ -1,7 +1,5 @@
-import { createAlpacaProvider } from '@vela/alpaca'
-import type { EquipmentDevice, DeviceKind, EquipmentProvider } from '@vela/equipment'
+import type { EquipmentDevice, DeviceKind, EquipmentInventory } from '@vela/equipment'
 import type { RigEquipmentSource } from '../rig/contracts.js'
-import { alpacaEndpoint } from '../equipment/source.js'
 import type { ObservedRigDevice, RigDeviceKind } from './model.js'
 
 export type RigInventorySource = RigEquipmentSource
@@ -12,7 +10,7 @@ export interface RigDeviceInventory {
 
 export interface RigDeviceInventoryOptions {
   now?: () => Date
-  provider?: Pick<EquipmentProvider, 'listDevices'>
+  provider: EquipmentInventory
 }
 
 function toRigDeviceKind(kind: DeviceKind): RigDeviceKind {
@@ -56,19 +54,13 @@ function toObservedRigDevice(
 
 export function createRigDeviceInventory(
   rig: RigInventorySource,
-  options: RigDeviceInventoryOptions = {},
+  options: RigDeviceInventoryOptions,
 ): RigDeviceInventory {
   const now = options.now ?? (() => new Date())
 
-  const provider =
-    options.provider ??
-    createAlpacaProvider({
-      baseUrl: alpacaEndpoint(rig),
-    })
-
   return {
     async listDevices() {
-      const devices = await provider.listDevices()
+      const devices = await options.provider.listDevices()
       const observedAt = now()
 
       return devices.map(device => toObservedRigDevice(rig, device, observedAt))

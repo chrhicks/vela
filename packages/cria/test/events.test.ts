@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { setTimeout as delay } from 'node:timers/promises'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { CriaClient, type CriaClientOptions, type CriaState } from '../src/index.js'
+import { CriaClient, type CriaClientOptions } from '../src/client.js'
+import type { CriaState } from '../src/schema.js'
 import { closeFixtures, reading, serverNow, ServiceFixture, token } from './fixture.js'
 
 const clients: CriaClient[] = []

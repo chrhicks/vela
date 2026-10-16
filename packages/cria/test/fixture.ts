@@ -1,18 +1,17 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { setImmediate } from 'node:timers/promises'
 import { z } from 'zod'
+import { CriaClient, type CriaClientOptions } from '../src/client.js'
 import {
-  CriaClient,
   CriaCommandSchema,
   CriaOperationRequestSchema,
-  type CriaClientOptions,
   type CriaDevice,
   type CriaImage,
   type CriaOperation,
   type CriaReading,
   type CriaState,
   type CriaValue,
-} from '../src/index.js'
+} from '../src/schema.js'
 
 export const serviceOrigin = 'http://cria.fixture:4319'
 

@@ -56,6 +56,7 @@
     "anti-slop-effect/no-service-graph": "error",
     "anti-slop-effect/prefer-effect-match": "error",
     "no-restricted-imports": ["error", { "patterns": [
+      { "group": ["@vela/alpaca", "@vela/cria"], "message": "Only apps/server/src/equipment/composition.ts chooses a rig mode. Take the capability as an argument." },
       { "group": ["@cria/wire", "@cria/wire/**"], "message": "Wire types stay inside packages/cria." }
     ] }]
   },
@@ -65,12 +66,28 @@
       "rules": { "anti-slop-effect/no-ending-escape": "error" }
     },
     {
+      "files": [
+        "apps/server/src/equipment/composition.ts",
+        "**/*.test.ts",
+        "apps/server/src/rig/discovery.ts",
+        "apps/server/src/app.ts",
+        "apps/server/src/cria/**",
+        "apps/server/scripts/check-cria-*.ts"
+      ],
+      "rules": { "no-restricted-imports": ["error", { "patterns": [
+        { "group": ["@cria/wire", "@cria/wire/**"], "message": "Wire types stay inside packages/cria." }
+      ] }] }
+    },
+    {
       "files": ["packages/cria/**"],
-      "rules": { "no-restricted-imports": "off" }
+      "rules": { "no-restricted-imports": ["error", { "patterns": [
+        { "group": ["@vela/alpaca", "@vela/cria"], "message": "Only apps/server/src/equipment/composition.ts chooses a rig mode. Take the capability as an argument." }
+      ] }] }
     },
     {
       "files": ["packages/model/**", "apps/web/**"],
       "rules": { "no-restricted-imports": ["error", { "patterns": [
+        { "group": ["@vela/alpaca", "@vela/cria"], "message": "Only apps/server/src/equipment/composition.ts chooses a rig mode. Take the capability as an argument." },
         { "group": ["effect", "effect/**", "@cria/**"], "message": "Shared contracts and the browser must stay free of Effect and Cria imports." }
       ] }] }
     }

@@ -277,9 +277,3 @@ export const CriaErrorSchema = z.strictObject({
   error: z.strictObject({ code: z.string(), message: z.string() }),
   instanceId: uuid.nullable().optional(),
 })
-
-export const CriaRefreshSchema = z.strictObject({
-  deviceId: identifier,
-  generation: z.number().int().nonnegative(),
-  pending: z.literal(true),
-})

@@ -1,4 +1,9 @@
-import { EquipmentError, type DeviceConnectionResult } from '@vela/equipment'
+import {
+  EquipmentError,
+  type DeviceConnectionResult,
+  type EquipmentConnector,
+  type EquipmentInspector,
+} from '@vela/equipment'
 import type {
   ConnectRigDevicesResult,
   RigConnectionDeviceView,
@@ -6,17 +11,8 @@ import type {
   RigConnectionUncertaintyReason,
   RigObservationView,
 } from '@vela/model/web'
-import {
-  createRigDeviceConnector,
-  type RigConnectionSource,
-  type RigDeviceConnector,
-} from '../device/connection.js'
-import {
-  createRigDeviceInspector,
-  type RigDeviceInspector,
-  type RigInspectionSource,
-} from '../device/inspection.js'
 import type { RigCatalog } from './catalog.js'
+import type { RigEquipmentSource } from './contracts.js'
 import { inspectRigDetail, type InspectRigDetailResult, type RigDetailOptions } from './detail.js'
 import { connectionDeviceView, isConnectableDeviceKind, rigObservationView } from './observation.js'
 
@@ -58,8 +54,8 @@ export interface RigConnectionCoordinator {
 
 interface RigConnectionCoordinatorOptions {
   readonly catalog: RigCatalog
-  readonly createConnector?: (rig: RigConnectionSource) => RigDeviceConnector
-  readonly createInspector?: (rig: RigInspectionSource) => RigDeviceInspector
+  readonly createConnector: (rig: RigEquipmentSource) => EquipmentConnector
+  readonly createInspector: (rig: RigEquipmentSource) => EquipmentInspector
   readonly now?: () => Date
 }
 
@@ -70,8 +66,8 @@ interface ConnectionCandidate {
 
 export function createRigConnectionCoordinator({
   catalog,
-  createConnector = createRigDeviceConnector,
-  createInspector = createRigDeviceInspector,
+  createConnector,
+  createInspector,
   now = () => new Date(),
 }: RigConnectionCoordinatorOptions): RigConnectionCoordinator {
   const activeConnections = new Set<string>()

@@ -11,6 +11,7 @@ import { createAlpacaFraming, createAlpacaProvider } from '../../../packages/alp
 import { createMemoryRigCatalog } from '../../server/dist/rig/catalog.js'
 import { createRigOperations } from '../../server/dist/rig/operations.js'
 import { registerTargets } from '../../server/dist/targets/routes.js'
+import { createEquipmentComposition } from '../../server/dist/equipment/composition.js'
 import { getTarget } from '../../server/dist/targets/catalog/index.js'
 import { createStarSource } from './catalog.js'
 import { focalLengthMm } from './optics.js'
@@ -71,7 +72,13 @@ try {
   ])
 
   const operations = createRigOperations()
-  registerTargets(vela, catalog, operations, { solver: { executable, catalogPath } })
+  const equipment = createEquipmentComposition()
+  registerTargets(vela, catalog, operations, {
+    solver: { executable, catalogPath },
+    createAdapter: equipment.createFraming,
+    createAcquisition: equipment.createAcquisition,
+    createInspector: equipment.createInspector,
+  })
   const eagle = getTarget('ic4703')!
   assert.ok(eagle)
 

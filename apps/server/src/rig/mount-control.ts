@@ -17,7 +17,7 @@ import { rigDeviceId } from '../web/rig-detail.js'
 
 interface MountControlOptions {
   createMountControl(rig: RigCatalogRecord): MountControl
-  createInspector: NonNullable<RigDetailOptions['createInspector']>
+  createInspector: RigDetailOptions['createInspector']
 }
 
 interface CommandRecord {

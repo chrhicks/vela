@@ -86,6 +86,9 @@ const capture = registerCapture(app, catalog, createRigOperations(), {
       ]
     },
   }),
+  createAcquisition: () => {
+    throw new Error('The device-free preview review exposes through createCamera')
+  },
   createCamera: () => ({
     async capture({ signal, onProgress }) {
       onProgress({ phase: 'exposing', elapsedSeconds: 0 })
