@@ -1,6 +1,6 @@
 # Cut the FRA 400 over to Cria protocol 5
 
-This checklist moves Vela on chicks-arch onto the TypeScript Cria on errai, which speaks protocol 5. It then proves one short dark, one small focuser move and one cancelled slew. Chris drives the rig, and the observer works on errai. An agent does not drive any step.
+This checklist moves Vela on thuban onto the TypeScript Cria on errai, which speaks protocol 5. It then proves one short dark, one small focuser move and one cancelled slew. Chris drives the rig, and the observer works on errai. An agent does not drive any step.
 
 Follow these rules at every step:
 
@@ -22,7 +22,7 @@ Follow these rules at every step:
 1. Confirm that the change that adds this checklist is merged on Vela `main`.
 2. Confirm with the observer that Cria on errai listens on `100.104.187.54:4319` and has `commandsEnabled: false`.
 3. Confirm that no other Vela is operating errai, such as a dev server in a worktree.
-4. From chicks-arch, read Cria's state:
+4. From thuban, read Cria's state:
 
    ```sh
    curl -s http://100.104.187.54:4319/v2/state | jq '{protocolVersion, commandsEnabled, devices: [.devices[] | {id, name, reason: .availability.reason, held: .quarantine.held}], open: ([.operations[] | select(.state != "settled")] | length)}'
@@ -35,11 +35,11 @@ Follow these rules at every step:
    - Every device has `reason: "commands-disabled"` and `held: false`.
    - `open: 0`.
 
-## 1. Deploy Vela on chicks-arch
+## 1. Deploy Vela on thuban
 
 The running stack is built from `~/dev/personal/vela` with `compose.yaml`. See [Running Vela in Docker](../docker.md) for the layout.
 
-1. Open `http://chicks-arch:5173` and check that no capture, autofocus, framing or alignment is running on any rig.
+1. Open `http://thuban:5173` and check that no capture, autofocus, framing or alignment is running on any rig.
 2. Record the rollback point. Run these commands once. A second run after the edit overwrites the backups with the edited files.
 
    ```sh
@@ -73,7 +73,7 @@ The running stack is built from `~/dev/personal/vela` with `compose.yaml`. See [
    ```
 
    Check the syntax with `jq . ~/.config/vela/cria.json`. Do not edit `rigs.yaml`.
-4. Pull, build and start. The build downloads `@cria/primitives` and `@cria/wire` from GitHub, so chicks-arch needs internet access for this step.
+4. Pull, build and start. The build downloads `@cria/primitives` and `@cria/wire` from GitHub, so thuban needs internet access for this step.
 
    ```sh
    cd ~/dev/personal/vela
@@ -119,10 +119,10 @@ Roll back only if the new Vela fails to start or misbehaves before you enable co
 
 Do not press any command button in this section.
 
-1. Open **Your rig** at `http://chicks-arch:5173/rigs/fra-cria`. The page names the rig **FRA 400 · Cria** and lists six devices under **Equipment**, each marked **Connected**.
+1. Open **Your rig** at `http://thuban:5173/rigs/fra-cria`. The page names the rig **FRA 400 · Cria** and lists six devices under **Equipment**, each marked **Connected**.
 2. Check the imaging camera. The `ZWO CCD ASI2600MC Pro` row reads **Camera · Main camera**, and the `ZWO CCD ASI220MM Mini` row reads **Other camera · Not used for imaging**. The old saved display name does not require **Save imaging setup**. If the selected device is missing or its configured identity differs, stop and check `cria.json`.
 3. Open each device's details with its chevron, for example **Show ZWO AM5 details**. Each device shows a message that commands are disabled. Cria's text for that reason is "Commands are disabled in the Cria configuration". No device shows a hold.
-4. Open the capture page at `http://chicks-arch:5173/rigs/fra-cria/observe/capture`. It shows **Capture unavailable** with the commands-disabled reason.
+4. Open the capture page at `http://thuban:5173/rigs/fra-cria/observe/capture`. It shows **Capture unavailable** with the commands-disabled reason.
 5. Check that the readings are present and update:
 
    - The camera's temperature and cooler state, in its device details or under **Camera cooling** on the capture page.
@@ -171,7 +171,7 @@ Do not press any command button in this section.
 
 Vela has no manual focuser move. This step starts autofocus and stops it after its first move, so the focuser moves out and back.
 
-1. Open **Autofocus** at `http://chicks-arch:5173/rigs/fra-cria/observe/autofocus`. Check that the focuser still reads P0 on **Your rig**.
+1. Open **Autofocus** at `http://thuban:5173/rigs/fra-cria/observe/autofocus`. Check that the focuser still reads P0 on **Your rig**.
 2. Set **Step size** to `50`. **Planned window** then shows P0 − 200 to P0 + 200, which must lie inside 15500 to 38000. If the page shows **Window does not fit**, stop.
 3. **Short exposure** shows 2 seconds per sample. The page does not change it.
 4. Press **Start autofocus**. The focuser moves first to P0 + 200, the outer end of the window.
@@ -186,7 +186,7 @@ The walk can also end before you press stop, because the cap leaves no stars. Th
 1. Write down the mount state from **Your rig**.
 2. If the mount is parked, open **Show ZWO AM5 details** and press **Unpark mount**. Expect "Mount confirmed unparked."
 3. If tracking is off, press **Turn tracking on**. Expect "Tracking confirmed on." Framing refuses to start while the mount is parked or not tracking.
-4. Choose a target about 10 to 20 degrees from the current pointing, above the horizon and clear of the pier. Open it from **Targets** at `http://chicks-arch:5173/rigs/fra-cria/observe/targets`.
+4. Choose a target about 10 to 20 degrees from the current pointing, above the horizon and clear of the pier. Open it from **Targets** at `http://thuban:5173/rigs/fra-cria/observe/targets`.
 5. Press **Slew & check**. The status reads **Moving to your composition**.
 6. While the mount is visibly moving, press **Stop framing**.
 7. Expect **Stopping framing**, then **Framing stopped**. Check the mount by eye. Read its RA and Dec from Cria again to confirm that they hold steady.
@@ -218,7 +218,7 @@ An `uncertain` ending means the device may have moved or changed by an unknown a
 Call the temporary route through the web container. Vela's device ID is `cria:fra-cria:` followed by Cria's device ID, for example `cria:fra-cria:mount`. Describe what you checked in `note`. A recovery clears the device's whole failure domain. `weather` and `switch` share the `pegasus-ppba` domain, so one call recovers both.
 
 ```sh
-curl -s -X POST http://chicks-arch:5173/api/rigs/fra-cria/devices/cria:fra-cria:mount/recover \
+curl -s -X POST http://thuban:5173/api/rigs/fra-cria/devices/cria:fra-cria:mount/recover \
 	-H 'content-type: application/json' \
 	-d '{"externalRecoveryConfirmed": true, "note": "Checked the AM5 by eye: stationary and clear of the pier."}'
 ```
