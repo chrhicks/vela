@@ -171,8 +171,8 @@ function AutofocusPage({ rigId }: { rigId: string }) {
                 </div>
               </dl>
               <p className="vela-af-panel-note">
-                Vela keeps the autofocus window one step inside the reported
-                MinStep and MaxStep limits.
+                Vela keeps the autofocus window inside the reported MinStep and
+                MaxStep limits.
               </p>
             </section>
             <aside className="vela-af-side">

@@ -77,6 +77,14 @@ describe('autofocus response validation', () => {
     expect(isTravelLimitError(travelLimit.error)).toBe(true)
     expect(
       isTravelLimitError(
+        'That step-size window would leave the focuser travel. Choose a smaller step or start farther from the ends. Vela will not move.',
+      ),
+    ).toBe(true)
+    expect(
+      isTravelLimitError('The focuser is outside the reported travel window. Vela will not move.'),
+    ).toBe(true)
+    expect(
+      isTravelLimitError(
         'The focuser did not confirm return to the start position. Vela did not repeat the move.',
       ),
     ).toBe(false)

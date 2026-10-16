@@ -58,6 +58,7 @@ export function isTravelLimitError(error: string | null) {
     (error.includes('already at a mechanical limit') ||
       error.includes('would approach 0 or MaxStep') ||
       error.includes('would approach MinStep or MaxStep') ||
+      error.includes('would leave the focuser travel') ||
       error.includes('outside the reported travel window'))
   )
 }

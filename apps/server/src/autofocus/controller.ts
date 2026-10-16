@@ -8,7 +8,6 @@ import {
   extraInwardPosition,
   planStarHfrWalk,
   assertCommandedPosition,
-  MECHANICAL_END_MARGIN,
   type AutofocusWalkPlan,
 } from './walk.js'
 
@@ -167,7 +166,7 @@ export function createAutofocusController(
     const arrived = await focuser.move(
       position,
       {
-        minPosition: Math.max(plan.minStep + MECHANICAL_END_MARGIN, extraFloor(plan)),
+        minPosition: Math.max(plan.travel.min, extraFloor(plan)),
         maxPosition: plan.maxPosition,
       },
       signal,
@@ -245,7 +244,7 @@ export function createAutofocusController(
         startPosition: plan.start,
         currentPosition: plan.start,
         minStep: status.minStep ?? null,
-        maxStep: plan.maxStep,
+        maxStep: status.maxStep,
         stepSize: plan.stepSize,
         offsetSteps: plan.offsetSteps,
         restoredStart: false,

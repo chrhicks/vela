@@ -224,19 +224,19 @@ it('returns to setup for a travel-limit start without moving', async () => {
     currentPosition: 80,
     restoredStart: false,
   })
-  expect(started.json().error).toMatch(/MaxStep|0/)
+  expect(started.json().error).toMatch(/leave the focuser travel/)
   expect(subject.moves).toEqual([])
 })
 
-it('walks a focuser near MinStep without commanding a position or window below MinStep + 1', async () => {
-  const subject = setup(15720, record.lastObservedInventory, {
+it('walks from the low end of the reported travel and commands MinStep itself', async () => {
+  const subject = setup(15700, record.lastObservedInventory, {
     travel: { minStep: 15500, maxStep: 38000 },
     bestFocus: 15300,
   })
 
   expect((await subject.get()).json()).toMatchObject({
     enabled: true,
-    currentPosition: 15720,
+    currentPosition: 15700,
     minStep: 15500,
     maxStep: 38000,
   })
@@ -244,9 +244,51 @@ it('walks a focuser near MinStep without commanding a position or window below M
     .toMatchObject({ active: true, phase: 'walking', minStep: 15500 })
   await subject.finish()
 
-  expect(subject.moves).toEqual([15920, 15870, 15820, 15770, 15720, 15670, 15620, 15570, 15520, 15720])
-  expect(Math.min(...subject.windows.map(window => window.minPosition))).toBe(15501)
+  expect(subject.moves).toEqual([15900, 15850, 15800, 15750, 15700, 15650, 15600, 15550, 15500, 15700])
+  expect(Math.min(...subject.windows.map(window => window.minPosition))).toBe(15500)
   expect((await subject.get()).json()).toMatchObject({ phase: 'failed', restoredStart: true })
+})
+
+it('walks from the high end of the reported travel and commands MaxStep itself', async () => {
+  const subject = setup(37800, record.lastObservedInventory, {
+    travel: { minStep: 15500, maxStep: 38000 },
+    bestFocus: 15300,
+  })
+
+  expect((await subject.start({ stepSize: 50, exposureSeconds: 2 })).json())
+    .toMatchObject({ active: true, phase: 'walking' })
+  await subject.finish()
+
+  expect(subject.moves.slice(0, 9)).toEqual([38000, 37950, 37900, 37850, 37800, 37750, 37700, 37650, 37600])
+  expect(Math.max(...subject.moves)).toBe(38000)
+  expect(Math.max(...subject.windows.map(window => window.maxPosition))).toBe(38000)
+})
+
+it('refuses a start outside the reported travel without moving', async () => {
+  for (const position of [15499, 38001, 15699, 37801]) {
+    const subject = setup(position, record.lastObservedInventory, {
+      travel: { minStep: 15500, maxStep: 38000 },
+    })
+
+    const started = await subject.start({ stepSize: 50, exposureSeconds: 2 })
+    expect(started.json()).toMatchObject({ phase: 'setup', active: false, startPosition: null })
+    expect(started.json().error).toMatch(/travel/)
+    expect(subject.moves).toEqual([])
+  }
+})
+
+it('keeps the legacy floor of 1 and ceiling below MaxStep when the focuser reports no MinStep', async () => {
+  const subject = setup(201, record.lastObservedInventory, {
+    travel: { maxStep: 60000 },
+    bestFocus: 15300,
+  })
+
+  await subject.start({ stepSize: 50, exposureSeconds: 2 })
+  await subject.finish()
+
+  expect(subject.moves.slice(0, 9)).toEqual([401, 351, 301, 251, 201, 151, 101, 51, 1])
+  expect(Math.min(...subject.windows.map(window => window.minPosition))).toBe(1)
+  expect(subject.moves).not.toContain(0)
 })
 
 it('starts the inspected focuser when last-observed inventory does not list it', async () => {
