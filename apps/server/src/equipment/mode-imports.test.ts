@@ -56,3 +56,17 @@ it('rejects an adapter import outside composition and accepts Alpaca discovery',
 
   expect(report).toEqual({ files: 2, restricted: [routes, routes] })
 })
+
+it('lifts only the mode rule for composition, so Cria wire imports stay restricted there', () => {
+  const composition = 'apps/server/src/equipment/composition.ts'
+
+  const report = lintAt({
+    [composition]: [
+      "import type { Snapshot } from '@cria/wire'",
+      readFileSync(join(root, composition), 'utf8'),
+      'export type Wire = Snapshot',
+    ].join('\n'),
+  })
+
+  expect(report).toEqual({ files: 1, restricted: [composition] })
+})

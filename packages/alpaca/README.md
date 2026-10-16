@@ -1,6 +1,6 @@
 # `@vela/alpaca`
 
-Server-side Alpaca protocol boundary for Vela. Raw wire fields, response envelopes, Effect schemas, device numbers, URL construction, UDP sockets, and protocol errors stay inside this package.
+Server-side Alpaca protocol boundary for Vela. Raw wire fields, response envelopes and their schemas, device numbers, URL construction, UDP sockets, and protocol errors stay inside this package.
 
 The package does not depend on `@vela/model` and performs no network activity during import or factory creation.
 

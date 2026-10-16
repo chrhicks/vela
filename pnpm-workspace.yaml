@@ -2,6 +2,12 @@ packages:
   - apps/*
   - packages/*
 
+# The one Cria pin. Both packages must name the same commit; bump them together and
+# regenerate the lockfile.
+catalog:
+  '@cria/primitives': github:chrhicks/cria#86624908a57573b4953c2f759713b04d606defcd&path:/ts/packages/primitives
+  '@cria/wire': github:chrhicks/cria#86624908a57573b4953c2f759713b04d606defcd&path:/ts/packages/cria-wire
+
 # Vite needs esbuild's postinstall binary. Other dependency build scripts stay blocked.
 allowBuilds:
   esbuild: true
