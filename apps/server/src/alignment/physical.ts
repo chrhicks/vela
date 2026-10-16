@@ -115,6 +115,7 @@ export function createPhysicalAlignment(
     reference = undefined
     westRate = undefined
     const initial = await status(signal, { allowTrackingOff: true })
+    requireSweepRate(initial)
     site = {
       latitudeDegrees: initial.latitudeDegrees!,
       longitudeDegrees: initial.longitudeDegrees!,
@@ -233,7 +234,7 @@ export function createPhysicalAlignment(
           `RA direction check changed reported DEC by ${(current.declinationDegrees - start.declinationDegrees).toFixed(3)}°`,
         )
       probeTravel = -observed
-      const sweepRate = start.primaryAxisRates ? advertisedRate(start, 3) : 1
+      const sweepRate = requireSweepRate(start)
       westRate = -Math.sign(observed) * sweepRate
     }
 
@@ -306,6 +307,15 @@ function sameCameraGeometry(
     observed.startX === reference.startX &&
     observed.startY === reference.startY
   )
+}
+
+function requireSweepRate(mount: TelescopeStatus) {
+  const rate = advertisedRate(mount, 1)
+
+  if (Math.abs(rate - 1) > 0.01)
+    throw new Error('Physical polar alignment needs an advertised sweep rate near 1°/s. The current axis rates do not support this baseline.')
+
+  return rate
 }
 
 function advertisedRate(mount: TelescopeStatus, preferred: number) {
