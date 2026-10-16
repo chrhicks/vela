@@ -224,6 +224,46 @@ describe('alignment routes', () => {
     expect(mocks.physical.mock.calls[0]?.[2]).toBe(framing)
   })
 
+  it('expects the camera name Cria reports when the saved name predates protocol 5', async () => {
+    const criaRig: RigCatalogRecord = {
+      ...rig,
+      source: { kind: 'cria', configurationId: 'fixture' },
+      imagingCamera: { uniqueId: 'camera', name: 'ZWO ASI2600MC Pro' },
+    }
+
+    const app = Fastify()
+    apps.push(app)
+    const settings = alignmentSettings({ ...env, VELA_ALIGNMENT_MODE: 'physical' })!
+
+    const inspection = (providerDeviceId: string, kind: 'camera' | 'telescope', name: string) => ({
+      providerDeviceId,
+      kind,
+      configuredName: name,
+      name,
+      connection: 'connected' as const,
+      observation: { state: 'current' as const, commandReady: true },
+      telemetry: { availability: 'unavailable' as const },
+    })
+
+    registerAlignment(app, createMemoryRigCatalog([criaRig]), undefined, createRigOperations(), mocks, {
+      ...equipment,
+      settingsForRig: () => ({ ...settings, rigId: criaRig.id }),
+      createAcquisition: () => mocks.acquisition({ baseUrl: 'http://unused.invalid' }),
+      createFraming: () => mocks.framing({ baseUrl: 'http://unused.invalid' }),
+      createInspector: () => ({
+        inspectDevices: async () => [
+          inspection('camera', 'camera', 'ZWO CCD ASI2600MC Pro'),
+          inspection('telescope', 'telescope', 'ZWO AM5'),
+        ],
+      }),
+    })
+
+    expect((await app.inject('/api/web/rigs/rig/alignment')).json())
+      .toMatchObject({ enabled: true, mode: 'physical', cameraName: 'ZWO CCD ASI2600MC Pro' })
+    expect((await app.inject({ method: 'POST', url: '/api/rigs/rig/alignment/start', payload: {} })).statusCode).toBe(200)
+    expect(mocks.physical.mock.calls[0]?.[0].cameraName).toBe('ZWO CCD ASI2600MC Pro')
+  })
+
   it('shows physical mode only for the configured selected camera with a focal length', async () => {
     const { app } = setup()
     const response = await app.inject('/api/web/rigs/rig/alignment')

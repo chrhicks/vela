@@ -2,14 +2,17 @@ export const DEFAULT_OFFSET_STEPS = 4
 
 export const DEFAULT_STEP_SIZE = 50
 
-/** Commanded positions stay strictly inside (0, maxStep). 0 is a stop, not a home. */
-export const MECHANICAL_END_MARGIN = 1
+/** The positions Vela may command, inclusive. Distinct from the planned autofocus window inside it. */
+export interface FocuserTravel {
+  min: number
+  max: number
+}
 
 export interface AutofocusWalkPlan {
   start: number
   stepSize: number
   offsetSteps: number
-  maxStep: number
+  travel: FocuserTravel
   minPosition: number
   maxPosition: number
   positions: number[]
@@ -23,26 +26,36 @@ export type AutofocusWalkPlanning =
       message: string
     }
 
+function commandableTravel(maxStep: number, minStep: number | undefined): FocuserTravel {
+  return minStep === undefined
+    ? { min: 1, max: maxStep - 1 }
+    : { min: Math.max(minStep, 1), max: maxStep }
+}
+
 export function planStarHfrWalk(
   start: number,
   stepSize: number,
   offsetSteps: number,
   maxStep: number,
+  minStep?: number,
 ): AutofocusWalkPlanning {
   if (
     !Number.isSafeInteger(start) ||
     !Number.isSafeInteger(stepSize) ||
     !Number.isSafeInteger(offsetSteps) ||
-    !Number.isSafeInteger(maxStep)
+    !Number.isSafeInteger(maxStep) ||
+    (minStep !== undefined && !Number.isSafeInteger(minStep))
   ) {
     return {
       ok: false,
       reason: 'invalid',
-      message: 'Autofocus needs integer start, step size, offset and MaxStep.',
+      message: 'Autofocus needs integer start, step size, offset and travel limits.',
     }
   }
 
-  if (stepSize < 1 || offsetSteps < 1 || offsetSteps > 10 || maxStep < 2) {
+  const travel = commandableTravel(maxStep, minStep)
+
+  if (stepSize < 1 || offsetSteps < 1 || offsetSteps > 10 || travel.max < travel.min) {
     return {
       ok: false,
       reason: 'invalid',
@@ -50,27 +63,24 @@ export function planStarHfrWalk(
     }
   }
 
-  const mechanicalMin = MECHANICAL_END_MARGIN
-  const mechanicalMax = maxStep - MECHANICAL_END_MARGIN
-
-  if (start < mechanicalMin || start > mechanicalMax) {
+  if (start < travel.min || start > travel.max) {
     return {
       ok: false,
       reason: 'start-at-limit',
       message:
-        'The focuser is already at a mechanical limit. Autofocus starts from the current position and will not command 0 or MaxStep.',
+        'The focuser is outside the reported travel window. Vela will not move.',
     }
   }
 
   const maxPosition = start + offsetSteps * stepSize
   const minPosition = start - offsetSteps * stepSize
 
-  if (minPosition < mechanicalMin || maxPosition > mechanicalMax) {
+  if (minPosition < travel.min || maxPosition > travel.max) {
     return {
       ok: false,
       reason: 'window-hits-limit',
       message:
-        'That step-size window would approach 0 or MaxStep. Choose a smaller step or start farther from the ends. Vela will not move.',
+        'That step-size window would leave the focuser travel. Choose a smaller step or start farther from the ends. Vela will not move.',
     }
   }
 
@@ -81,7 +91,7 @@ export function planStarHfrWalk(
 
   return {
     ok: true,
-    plan: { start, stepSize, offsetSteps, maxStep, minPosition, maxPosition, positions },
+    plan: { start, stepSize, offsetSteps, travel, minPosition, maxPosition, positions },
   }
 }
 
@@ -98,12 +108,10 @@ export function assertCommandedPosition(
 
   if (
     !Number.isSafeInteger(position) ||
-    position < MECHANICAL_END_MARGIN ||
-    position > plan.maxStep - MECHANICAL_END_MARGIN
+    position < plan.travel.min ||
+    position > plan.travel.max
   ) {
-    throw new Error(
-      'That focuser move would approach a mechanical travel limit. Vela will not command it.',
-    )
+    throw new Error('That focuser move is outside the focuser travel. Vela will not command it.')
   }
 
   const floor = extraMin ?? plan.minPosition
@@ -135,8 +143,7 @@ export function extraInwardPosition(
   const next = inner - plan.stepSize
   const floor = plan.start - (plan.offsetSteps + 2) * plan.stepSize
 
-  if (next < MECHANICAL_END_MARGIN || next < floor || next > plan.maxStep - MECHANICAL_END_MARGIN)
-    return undefined
+  if (next < plan.travel.min || next < floor || next > plan.travel.max) return undefined
 
   return next
 }

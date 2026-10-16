@@ -23,6 +23,7 @@ export interface AutofocusFocuser {
   status(signal?: AbortSignal): Promise<{
     absolute: boolean
     position: number
+    minStep?: number
     maxStep: number
     moving: boolean
   }>
@@ -165,7 +166,7 @@ export function createAutofocusController(
     const arrived = await focuser.move(
       position,
       {
-        minPosition: Math.max(1, extraFloor(plan)),
+        minPosition: Math.max(plan.travel.min, extraFloor(plan)),
         maxPosition: plan.maxPosition,
       },
       signal,
@@ -176,7 +177,10 @@ export function createAutofocusController(
     return arrived.position
   }
 
-  function abortStart(message: string, status?: { position: number; maxStep: number }) {
+  function abortStart(
+    message: string,
+    status?: { position: number; minStep?: number; maxStep: number },
+  ) {
     patch({
       phase: 'setup',
       activity: 'idle',
@@ -188,6 +192,7 @@ export function createAutofocusController(
       error: message,
       exposureStartedAt: null,
       currentPosition: status?.position ?? view.currentPosition,
+      minStep: status?.minStep ?? view.minStep ?? null,
       maxStep: status?.maxStep ?? view.maxStep,
     })
     plannedReady?.resolve()
@@ -219,7 +224,13 @@ export function createAutofocusController(
         return
       }
 
-      const planned = planStarHfrWalk(status.position, stepSize, offsetSteps, status.maxStep)
+      const planned = planStarHfrWalk(
+        status.position,
+        stepSize,
+        offsetSteps,
+        status.maxStep,
+        status.minStep,
+      )
 
       if (!planned.ok) {
         abortStart(planned.message, status)
@@ -232,7 +243,8 @@ export function createAutofocusController(
         phase: 'walking',
         startPosition: plan.start,
         currentPosition: plan.start,
-        maxStep: plan.maxStep,
+        minStep: status.minStep ?? null,
+        maxStep: status.maxStep,
         stepSize: plan.stepSize,
         offsetSteps: plan.offsetSteps,
         restoredStart: false,
@@ -424,6 +436,7 @@ function emptyView(
     captureReadState: 'current',
     startPosition: null,
     currentPosition: null,
+    minStep: null,
     maxStep: null,
     stepSize,
     offsetSteps,
