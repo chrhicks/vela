@@ -326,7 +326,7 @@ it('aborts a window that would approach 0 without moving', async () => {
     currentPosition: 80,
     restoredStart: false,
   })
-  expect(view.error).toMatch(/MaxStep|0/)
+  expect(view.error).toMatch(/leave the focuser travel/)
   expect(moves).toEqual([])
 })
 
@@ -340,7 +340,7 @@ it('reports a start at position 0 as setup with an error and does not command Mo
     currentPosition: 0,
     restoredStart: false,
   })
-  expect(view.error).toBe('The focuser is outside the reported travel window. Autofocus keeps one step inside MinStep and MaxStep.')
+  expect(view.error).toBe('The focuser is outside the reported travel window. Vela will not move.')
   expect(moves).toEqual([])
 })
 
