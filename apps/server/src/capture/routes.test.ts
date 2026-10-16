@@ -87,6 +87,8 @@ function setup(
 
   const captureOptions: Parameters<typeof registerCapture>[3] = {
     savedImages,
+    createAcquisition: () => { throw new Error('Capture tests expose through createCamera') },
+    createCooling: options.createCooling ?? (() => { throw new Error('This test configures no cooling') }),
     createInspector: () => ({
       async inspectDevices(): Promise<ReadonlyArray<AlpacaDeviceInspection>> {
         inspections++
@@ -132,8 +134,6 @@ function setup(
   }
 
   if (options.lookupSubject) captureOptions.lookupSubject = options.lookupSubject
-
-  if (options.createCooling) captureOptions.createCooling = options.createCooling
 
   const capture = registerCapture(app, catalog, operations, captureOptions)
 

@@ -54,6 +54,30 @@
     "anti-slop-effect/no-manual-tag-comparison": "error",
     "anti-slop-effect/no-manual-tagged-construction": "error",
     "anti-slop-effect/no-service-constructor-imports": "error",
-    "anti-slop-effect/prefer-effect-match": "error"
-  }
+    "anti-slop-effect/prefer-effect-match": "error",
+    "no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          {
+            "group": ["@vela/alpaca", "@vela/cria"],
+            "message": "Only apps/server/src/equipment/composition.ts chooses a rig mode. Take the capability as an argument."
+          }
+        ]
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": [
+        "apps/server/src/equipment/composition.ts",
+        "**/*.test.ts",
+        "apps/server/src/rig/discovery.ts",
+        "apps/server/src/app.ts",
+        "apps/server/src/cria/**",
+        "apps/server/scripts/check-cria-*.ts"
+      ],
+      "rules": { "no-restricted-imports": "off" }
+    }
+  ]
 }

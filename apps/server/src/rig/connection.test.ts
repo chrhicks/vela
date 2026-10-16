@@ -4,9 +4,8 @@ import {
   type AlpacaDeviceConnectionResult,
   type AlpacaDeviceInspection,
 } from '@vela/alpaca'
+import type { EquipmentConnector, EquipmentInspector } from '@vela/equipment'
 import type { DeviceKind } from '@vela/model/device'
-import type { RigDeviceConnector } from '../device/connection.js'
-import type { RigDeviceInspector } from '../device/inspection.js'
 import { createMemoryRigCatalog } from './catalog.js'
 import { createRigConnectionCoordinator } from './connection.js'
 import type { RigCatalogRecord } from './contracts.js'
@@ -66,7 +65,7 @@ function inspectorSequence(
   })
 
   return {
-    createInspector: () => ({ inspectDevices }) satisfies RigDeviceInspector,
+    createInspector: () => ({ inspectDevices }) satisfies EquipmentInspector,
     inspectDevices,
   }
 }
@@ -83,7 +82,7 @@ function connector(
   )
 
   return {
-    createConnector: () => ({ connectDevice }) satisfies RigDeviceConnector,
+    createConnector: () => ({ connectDevice }) satisfies EquipmentConnector,
     connectDevice,
   }
 }

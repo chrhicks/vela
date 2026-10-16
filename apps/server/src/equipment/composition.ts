@@ -1,16 +1,27 @@
 import {
   createAlpacaAcquisition,
   createAlpacaCameraCooling,
+  createAlpacaDiscovery,
   createAlpacaFocuser,
   createAlpacaFraming,
   createAlpacaMountControl,
+  createAlpacaProvider,
+  type AlpacaDiscovery,
 } from '@vela/alpaca'
 import { CriaClient } from '@vela/cria'
-import { EquipmentError, type Acquisition, type CameraCooling, type Focuser, type Framing, type MountControl } from '@vela/equipment'
+import {
+  EquipmentError,
+  type Acquisition,
+  type CameraCooling,
+  type EquipmentConnector,
+  type EquipmentInspector,
+  type EquipmentProvider,
+  type Focuser,
+  type Framing,
+  type MountControl,
+} from '@vela/equipment'
 import { createCriaEquipment } from '../cria/equipment.js'
 import { createRigDeviceInventory, type RigDeviceInventory } from '../device/inventory.js'
-import { createRigDeviceInspector, type RigDeviceInspector } from '../device/inspection.js'
-import { createRigDeviceConnector, type RigDeviceConnector } from '../device/connection.js'
 import type { RigCatalogRecord, RigEquipmentSource } from '../rig/contracts.js'
 import type { AlignmentSettings } from '../alignment/controller.js'
 import { criaDeviceId, type CriaRigConfiguration } from './config.js'
@@ -19,10 +30,12 @@ import { alpacaEndpoint } from './source.js'
 export interface EquipmentComposition {
   start(): void
   close(): Promise<void>
+  readonly alpacaDiscovery: AlpacaDiscovery
   createInventory(rig: RigEquipmentSource): RigDeviceInventory
-  createInspector(rig: RigEquipmentSource): RigDeviceInspector
-  createConnector(rig: RigEquipmentSource): RigDeviceConnector
+  createInspector(rig: RigEquipmentSource): EquipmentInspector
+  createConnector(rig: RigEquipmentSource): EquipmentConnector
   createAcquisition(rig: RigCatalogRecord): Acquisition
+  createAlignmentEndpointAcquisition(endpoint: string): Acquisition
   createFraming(rig: RigCatalogRecord): Framing
   createFocuser(rig: RigCatalogRecord): Focuser
   createMountControl(rig: RigCatalogRecord): MountControl
@@ -83,6 +96,10 @@ export function createEquipmentComposition(
     return configured
   }
 
+  function provider(rig: RigEquipmentSource): EquipmentProvider {
+    return rig.source ? cria(rig).provider : createAlpacaProvider({ baseUrl: alpacaEndpoint(rig) })
+  }
+
   return {
     start() {
       for (const client of clients.values()) client.start()
@@ -90,18 +107,14 @@ export function createEquipmentComposition(
     async close() {
       await Promise.all([...clients.values()].map(client => client.close()))
     },
-    createInventory: rig => rig.source
-      ? createRigDeviceInventory(rig, { provider: cria(rig).provider })
-      : createRigDeviceInventory(rig),
-    createInspector: rig => rig.source
-      ? createRigDeviceInspector(rig, { provider: cria(rig).provider })
-      : createRigDeviceInspector(rig),
-    createConnector: rig => rig.source
-      ? createRigDeviceConnector(rig, { provider: cria(rig).provider })
-      : createRigDeviceConnector(rig),
+    alpacaDiscovery: createAlpacaDiscovery(),
+    createInventory: rig => createRigDeviceInventory(rig, { provider: provider(rig) }),
+    createInspector: provider,
+    createConnector: provider,
     createAcquisition: rig => rig.source
       ? cria(rig).acquisition
       : createAlpacaAcquisition({ baseUrl: alpacaEndpoint(rig) }),
+    createAlignmentEndpointAcquisition: endpoint => createAlpacaAcquisition({ baseUrl: endpoint }),
     createFraming: rig => rig.source
       ? cria(rig).framing
       : createAlpacaFraming({ baseUrl: alpacaEndpoint(rig) }),

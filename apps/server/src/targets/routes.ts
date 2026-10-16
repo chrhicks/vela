@@ -1,8 +1,6 @@
 import { z } from 'zod'
 import type { FastifyInstance } from 'fastify'
-import { createAlpacaAcquisition, createAlpacaFraming } from '@vela/alpaca'
 import type { Acquisition, Framing } from '@vela/equipment'
-import { alpacaEndpoint } from '../equipment/source.js'
 import type { FramingView, TargetView, TargetsView } from '@vela/model/web'
 import type { RigCatalog } from '../rig/catalog.js'
 import type { RigCatalogRecord } from '../rig/contracts.js'
@@ -21,11 +19,11 @@ import { registerTargetDiscovery } from './discovery-routes.js'
 
 export interface TargetOptions {
   solver?: { executable: string; catalogPath: string }
-  createAdapter?: (rig: RigCatalogRecord) => Framing
-  createAcquisition?: (rig: RigCatalogRecord) => Acquisition
+  createAdapter: (rig: RigCatalogRecord) => Framing
+  createAcquisition: (rig: RigCatalogRecord) => Acquisition
   createHardware?: (rig: RigCatalogRecord, telescopeId: string) => FramingHardware
   createSolver?: (fieldHeightDegrees: number) => PlateSolver
-  createInspector?: RigDetailOptions['createInspector']
+  createInspector: RigDetailOptions['createInspector']
   now?: () => Date
   waitForMountObservation?: (signal: AbortSignal) => Promise<void>
 }
@@ -34,7 +32,7 @@ export function registerTargets(
   app: FastifyInstance,
   catalog: RigCatalog,
   operations: RigOperations,
-  options: TargetOptions = {},
+  options: TargetOptions,
 ) {
   const now = options.now ?? (() => new Date())
   const controllers = new Map<string, ReturnType<typeof createFramingController>>()
@@ -45,7 +43,7 @@ export function registerTargets(
     let value = adapters.get(key)
 
     if (!value) {
-      value = options.createAdapter?.(rig) ?? createAlpacaFraming({ baseUrl: alpacaEndpoint(rig) })
+      value = options.createAdapter(rig)
       adapters.set(key, value)
     }
 
@@ -64,11 +62,7 @@ export function registerTargets(
   async function readiness(rig: RigCatalogRecord) {
     if (!rig.imagingCamera) throw new Error('Choose an imaging camera on Observe before framing.')
 
-    const detail = await inspectRigDetail(
-      catalog,
-      rig.id,
-      options.createInspector ? { createInspector: options.createInspector } : {},
-    )
+    const detail = await inspectRigDetail(catalog, rig.id, { createInspector: options.createInspector })
 
     if (detail.state !== 'current')
       throw new Error('Rig identity or connection needs attention before framing.')
@@ -433,7 +427,7 @@ export function registerTargets(
             rig,
             ready.telescopeId,
             adapter(rig),
-            options.createAcquisition?.(rig) ?? createAlpacaAcquisition({ baseUrl: alpacaEndpoint(rig) }),
+            options.createAcquisition(rig),
           )
 
         controller.start(

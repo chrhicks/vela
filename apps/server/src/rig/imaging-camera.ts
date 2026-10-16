@@ -10,7 +10,7 @@ export function registerImagingCamera(
   app: FastifyInstance,
   catalog: RigCatalog,
   operations: RigOperations,
-  options: RigDetailOptions = {},
+  options: RigDetailOptions,
 ) {
   async function inspect(rigId: string): Promise<ImagingCameraView | undefined> {
     const detail = await inspectRigDetail(catalog, rigId, options)

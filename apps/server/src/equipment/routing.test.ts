@@ -12,8 +12,6 @@ import { buildApp } from '../app.js'
 import { createMemoryRigCatalog } from '../rig/catalog.js'
 import type { RigCatalogRecord, RigEquipmentSource } from '../rig/contracts.js'
 import { createRigDeviceInventory } from '../device/inventory.js'
-import { createRigDeviceInspector } from '../device/inspection.js'
-import { createRigDeviceConnector } from '../device/connection.js'
 import { createEquipmentComposition, type EquipmentComposition } from './composition.js'
 
 const rig: RigCatalogRecord = {
@@ -176,6 +174,10 @@ function setup() {
   const equipment: EquipmentComposition = {
     start() {},
     async close() {},
+    alpacaDiscovery: {
+      scan: async () => [],
+      inspect: async () => { throw new Error('Cria rigs are never inspected through Alpaca') },
+    },
     createInventory(source) {
       select('inventory', source)
 
@@ -184,18 +186,19 @@ function setup() {
     createInspector(source) {
       select('inspection', source)
 
-      return createRigDeviceInspector(source, { provider })
+      return provider
     },
     createConnector(source) {
       select('connection', source)
 
-      return createRigDeviceConnector(source, { provider })
+      return provider
     },
     createAcquisition(source) {
       select('acquisition', source)
 
       return acquisition
     },
+    createAlignmentEndpointAcquisition: () => acquisition,
     createFraming(source) {
       select('framing', source)
 
@@ -313,8 +316,5 @@ describe('equipment selection at server composition', () => {
 
     for (const create of [equipment.createInventory, equipment.createInspector, equipment.createConnector, equipment.createAcquisition, equipment.createFraming, equipment.createFocuser, equipment.createCooling])
       expect(() => create(rig)).toThrow('Cria equipment connection is unavailable')
-    expect(() => createRigDeviceInventory(rig)).toThrow('Cria equipment connection is unavailable')
-    expect(() => createRigDeviceInspector(rig)).toThrow('Cria equipment connection is unavailable')
-    expect(() => createRigDeviceConnector(rig)).toThrow('Cria equipment connection is unavailable')
   })
 })

@@ -2,10 +2,8 @@ import { z } from 'zod'
 import { isAbsolute } from 'node:path'
 import type { FastifyInstance, FastifyReply } from 'fastify'
 import { trace, SpanStatusCode } from '@opentelemetry/api'
-import { createAlpacaAcquisition, createAlpacaFraming } from '@vela/alpaca'
 import type { Acquisition, Framing } from '@vela/equipment'
 import type { RigCatalogRecord } from '../rig/contracts.js'
-import { alpacaEndpoint } from '../equipment/source.js'
 import { inspectRigDetail, type RigDetailOptions } from '../rig/detail.js'
 import type { AlignmentView } from '@vela/model/web'
 import { createRigOperations, type RigOperations } from '../rig/operations.js'
@@ -16,16 +14,12 @@ import { createPhysicalAlignment } from './physical.js'
 import { createAlignmentDiagnostics } from './diagnostics.js'
 
 export interface AlignmentFactories {
-  acquisition: (options: { baseUrl: string }) => Acquisition
-  framing: (options: { baseUrl: string }) => Framing
   physical: typeof createPhysicalAlignment
   solver: typeof createAstapSolver
   controller: typeof createAlignmentController
 }
 
 const defaultFactories: AlignmentFactories = {
-  acquisition: createAlpacaAcquisition,
-  framing: createAlpacaFraming,
   physical: createPhysicalAlignment,
   solver: createAstapSolver,
   controller: createAlignmentController,
@@ -33,8 +27,9 @@ const defaultFactories: AlignmentFactories = {
 
 export interface AlignmentEquipmentOptions {
   settingsForRig?: (rig: RigCatalogRecord) => AlignmentSettings | undefined
-  createAcquisition?: (rig: RigCatalogRecord) => Acquisition
-  createFraming?: (rig: RigCatalogRecord) => Framing
+  createAcquisition: (rig: RigCatalogRecord) => Acquisition
+  createFraming: (rig: RigCatalogRecord) => Framing
+  createAlignmentEndpointAcquisition: (endpoint: string) => Acquisition
   createInspector?: RigDetailOptions['createInspector']
 }
 
@@ -43,10 +38,10 @@ const emptyCommand = z.object({}).strict()
 export function registerAlignment(
   app: FastifyInstance,
   catalog: RigCatalog,
-  legacySettings?: AlignmentSettings,
+  legacySettings: AlignmentSettings | undefined,
   operations: RigOperations = createRigOperations(),
   factories: AlignmentFactories = defaultFactories,
-  equipment: AlignmentEquipmentOptions = {},
+  equipment: AlignmentEquipmentOptions,
 ) {
   function configuredSettings(rig: RigCatalogRecord) {
     return rig.source ? equipment.settingsForRig?.(rig) : legacySettings
@@ -69,7 +64,7 @@ export function registerAlignment(
           mode: 'offline',
           settings,
           openDiagnostics,
-          hardware: factories.acquisition({ baseUrl: settings.endpoint }),
+          hardware: equipment.createAlignmentEndpointAcquisition(settings.endpoint),
           solver: factories.solver({
             executable: settings.executable,
             catalogPath: settings.catalogPath,
@@ -79,8 +74,7 @@ export function registerAlignment(
       : undefined
 
   function createRun(rig: RigCatalogRecord, settings: AlignmentSettings) {
-    const acquisition = equipment.createAcquisition?.(rig) ??
-      factories.acquisition({ baseUrl: alpacaEndpoint(rig) })
+    const acquisition = equipment.createAcquisition(rig)
 
     const openDiagnostics = settings.diagnosticsPath
       ? createAlignmentDiagnostics(settings.diagnosticsPath, error =>
@@ -110,7 +104,7 @@ export function registerAlignment(
         focalLengthMm: rig.focalLengthMm!,
       },
       acquisition,
-      equipment.createFraming?.(rig) ?? factories.framing({ baseUrl: alpacaEndpoint(rig) }),
+      equipment.createFraming(rig),
     )
 
     return factories.controller({

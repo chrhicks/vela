@@ -1,11 +1,6 @@
 import { z } from 'zod'
 import type { FastifyInstance } from 'fastify'
-import {
-  createAlpacaAcquisition,
-  createAlpacaCameraCooling,
-} from '@vela/alpaca'
 import { CaptureStoppedError as EquipmentCaptureStoppedError, FrameLostError, type Acquisition, type CameraCooling, type DeviceTelemetry } from '@vela/equipment'
-import { alpacaEndpoint } from '../equipment/source.js'
 import type {
   CaptureCoolingBlocker,
   CaptureCoolingView,
@@ -30,9 +25,9 @@ interface CaptureRouteOptions {
   lookupSubject?: (targetId: string) => CaptureSubject | undefined
   savedImages?: SavedImageStore
   createCamera?: (settings: CaptureSettings) => CaptureCamera
-  createAcquisition?: (rig: RigCatalogRecord) => Acquisition
-  createInspector?: RigDetailOptions['createInspector']
-  createCooling?: (settings: CaptureSettings) => CameraCooling
+  createAcquisition: (rig: RigCatalogRecord) => Acquisition
+  createInspector: RigDetailOptions['createInspector']
+  createCooling: (settings: CaptureSettings) => CameraCooling
 }
 
 function configuredCamera(settings: CaptureSettings, acquisition: Acquisition): CaptureCamera {
@@ -56,10 +51,6 @@ function configuredCamera(settings: CaptureSettings, acquisition: Acquisition): 
       }
     },
   }
-}
-
-function configuredCooling(settings: CaptureSettings): CameraCooling {
-  return createAlpacaCameraCooling({ baseUrl: alpacaEndpoint(settings.rig) })
 }
 
 function captureCooling(telemetry: DeviceTelemetry | undefined): CaptureCoolingView | null {
@@ -92,11 +83,11 @@ export function registerCapture(
   {
     lookupSubject,
     createCamera,
-    createAcquisition = rig => createAlpacaAcquisition({ baseUrl: alpacaEndpoint(rig) }),
+    createAcquisition,
     createInspector,
-    createCooling = configuredCooling,
+    createCooling,
     savedImages = createMemorySavedImageStore(),
-  }: CaptureRouteOptions = {},
+  }: CaptureRouteOptions,
 ) {
   const controllers = new Map<string, ReturnType<typeof createCaptureController>>()
   const cameraFactory = createCamera ?? (settings => configuredCamera(settings, createAcquisition(settings.rig)))
@@ -176,11 +167,7 @@ export function registerCapture(
     if (!target)
       return unavailable('Choose an imaging camera on Observe before taking an exposure.')
 
-    const detail = await inspectRigDetail(
-      catalog,
-      rigId,
-      createInspector ? { createInspector } : {},
-    )
+    const detail = await inspectRigDetail(catalog, rigId, { createInspector })
 
     if (detail.state === 'not-found') return undefined
 

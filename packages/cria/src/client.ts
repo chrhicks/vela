@@ -20,7 +20,6 @@ import {
   CriaCommandSchema,
   CriaImageSchema,
   CriaOperationSchema,
-  CriaRefreshSchema,
   CriaStateSchema,
   type CriaClientConfig,
   type CriaCommand,
@@ -387,17 +386,6 @@ export class CriaClient {
       if (this.events.current !== snapshot) continue
       await this.events.wait(this.events.version, deadline - performance.now(), options.signal)
     }
-  }
-
-  async refresh(id: string): Promise<z.infer<typeof CriaRefreshSchema>> {
-    this.binding(id)
-    await this.state()
-    const result = await this.http.json(`/v2/devices/${encodeURIComponent(id)}/refresh`, CriaRefreshSchema, 'POST')
-
-    if (result.deviceId !== id) throw this.invalid('Cria refreshed another device')
-    this.readBarriers.set(id, result.generation - 1)
-
-    return result
   }
 
   private requirePostWriteObservation(snapshot: ObservedState, operation: CriaOperation): void {

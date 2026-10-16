@@ -103,6 +103,8 @@ function setup(start = 32842, inventory = record.lastObservedInventory) {
         ]
       },
     }),
+    createAcquisition: () => { throw new Error('Autofocus tests expose through createCamera') },
+    createFocuserAdapter: () => { throw new Error('Autofocus tests move through createFocuser') },
     createCamera: () => camera,
     createFocuser: settings => {
       focuserIds.push(settings.focuserId)

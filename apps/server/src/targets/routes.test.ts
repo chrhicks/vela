@@ -134,6 +134,7 @@ function setup(
 
   const options: TargetOptions = {
     createAdapter: () => adapter,
+    createAcquisition: () => { throw new Error('Target tests capture through createHardware') },
     createHardware: () => hardware,
     createInspector: () => ({ inspectDevices: async () => inspections }),
     now: () => new Date(stamp),
@@ -695,7 +696,11 @@ it('browses the pinned catalog without any rig or device access', async () => {
   const catalog = createMemoryRigCatalog([])
   const get = vi.spyOn(catalog, 'get').mockRejectedValue(new Error('No rig reads permitted'))
   const createAdapter = vi.fn(() => { throw new Error('No devices permitted') })
-  registerTargets(app, catalog, createRigOperations(), { createAdapter })
+  registerTargets(app, catalog, createRigOperations(), {
+    createAdapter,
+    createAcquisition: () => { throw new Error('No devices permitted') },
+    createInspector: () => { throw new Error('No devices permitted') },
+  })
   const first = await app.inject('/api/web/target-catalog?pageSize=3')
   expect(first.statusCode).toBe(200)
   expect(first.json().targets).toHaveLength(3)
