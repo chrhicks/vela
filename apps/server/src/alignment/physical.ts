@@ -212,14 +212,16 @@ export function createPhysicalAlignment(
   async function move(signal: AbortSignal) {
     const start = await status(signal)
     let current = start
+    let probeTravel = 0
 
     if (westRate === undefined) {
       // ASCOM leaves MoveAxis sign to the driver. Observe a quarter-degree probe
       // before choosing the sign for the westward sweep.
-      await acquisition.move(settings.telescopeId, 0.25, 1, signal)
+      const probeRate = advertisedRate(start, 0.25)
+      const probe = await acquisition.move(settings.telescopeId, probeRate, 1, signal)
       await settle(signal)
       current = await status(signal, { allowMovement: true })
-      const observed = difference(current.rightAscensionDegrees, start.rightAscensionDegrees)
+      const observed = probe?.travelledDegrees ?? difference(current.rightAscensionDegrees, start.rightAscensionDegrees)
 
       if (Math.abs(observed) < 0.1 || Math.abs(observed) > 1)
         throw new Error(
@@ -230,21 +232,21 @@ export function createPhysicalAlignment(
         throw new Error(
           `RA direction check changed reported DEC by ${(current.declinationDegrees - start.declinationDegrees).toFixed(3)}°`,
         )
-      // Slower travel leaves room for delayed RA feedback and motor stopping
-      // within the existing 54–60° endpoint corridor.
-      westRate = -Math.sign(observed)
+      probeTravel = -observed
+      const sweepRate = start.primaryAxisRates ? advertisedRate(start, 3) : 1
+      westRate = -Math.sign(observed) * sweepRate
     }
 
-    const probeTravel = -difference(current.rightAscensionDegrees, start.rightAscensionDegrees)
-    await acquisition.rotateRightAscension(
+    const rotation = await acquisition.rotateRightAscension(
       settings.telescopeId,
       westRate,
-      -(54 - probeTravel),
+      -(57 - probeTravel),
       signal,
     )
+
     await settle(signal)
     current = await status(signal, { allowMovement: true })
-    const travelled = -difference(current.rightAscensionDegrees, start.rightAscensionDegrees)
+    const travelled = rotation ? probeTravel - rotation.travelledDegrees : -difference(current.rightAscensionDegrees, start.rightAscensionDegrees)
 
     if (
       travelled < 54 - 1e-6 ||
@@ -304,4 +306,15 @@ function sameCameraGeometry(
     observed.startX === reference.startX &&
     observed.startY === reference.startY
   )
+}
+
+function advertisedRate(mount: TelescopeStatus, preferred: number) {
+  const rates = mount.primaryAxisRates
+
+  if (!rates) return preferred
+  const candidates = rates.map(rate => Math.abs(rate.degreesPerSecond)).filter(rate => rate > 0)
+
+  if (!candidates.length) throw new Error('The mount reports no supported primary axis rate')
+
+  return candidates.reduce((closest, rate) => Math.abs(rate - preferred) < Math.abs(closest - preferred) ? rate : closest)
 }

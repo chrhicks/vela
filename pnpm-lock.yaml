@@ -244,15 +244,15 @@ importers:
       '@cria/wire':
         specifier: 'catalog:'
         version: https://codeload.github.com/chrhicks/cria/tar.gz/86624908a57573b4953c2f759713b04d606defcd#path:/ts/packages/cria-wire(@cria/primitives@https://codeload.github.com/chrhicks/cria/tar.gz/86624908a57573b4953c2f759713b04d606defcd#path:/ts/packages/primitives(effect@4.0.3))(effect@4.0.3)
+      '@opentelemetry/api':
+        specifier: 1.9.1
+        version: 1.9.1
       '@vela/equipment':
         specifier: workspace:*
         version: link:../equipment
       effect:
         specifier: 4.0.3
         version: 4.0.3
-      zod:
-        specifier: 4.5.4
-        version: 4.5.4
     devDependencies:
       '@types/node':
         specifier: ^26.2.0

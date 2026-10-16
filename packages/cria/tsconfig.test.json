@@ -7,6 +7,6 @@
     "declarationMap": false,
     "sourceMap": false
   },
-  "include": ["test/v5"],
+  "include": ["test"],
   "exclude": []
 }

@@ -1,9 +1,10 @@
-/** Preview of the walk window around the current EAF position. 0 and MaxStep are stops, not homes. */
+/** Preview of the walk window around the current EAF position. The walk keeps a one-step margin inside the reported travel. */
 export function previewAutofocusWindow(
   position: number | null,
   stepSize: number,
   offsetSteps: number,
   maxStep: number | null,
+  minStep?: number | null,
 ): { fit: true; low: number; high: number } | { fit: false } {
   if (
     position == null ||
@@ -18,7 +19,9 @@ export function previewAutofocusWindow(
   const low = position - offsetSteps * stepSize
   const high = position + offsetSteps * stepSize
 
-  if (position < 1 || low < 1) return { fit: false }
+  const lowest = (minStep ?? 0) + 1
+
+  if (position < lowest || low < lowest) return { fit: false }
 
   if (
     maxStep != null &&

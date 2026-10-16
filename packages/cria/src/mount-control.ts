@@ -1,18 +1,18 @@
-import { setTimeout as delay } from 'node:timers/promises'
-import type {
-  MountControl, MountControlCommand, MountControlCommandResult, MountControlObservation,
-} from '@vela/equipment'
-import {
-  CriaApiError, CriaCancelledError, CriaNotAdmittedError, CriaOperationFailedError,
-  CriaUncertainError, type CriaClient,
-} from '@vela/cria'
+import { Effect } from 'effect'
+import type { MountControl, MountControlCommand, MountControlCommandResult, MountControlObservation } from '@vela/equipment'
+import { outcomeOf, type CriaConnection } from './connection.js'
+import { createCriaEquipment as createRemoteEquipment } from './v5/equipment.js'
 import type { CriaEquipmentBinding } from './equipment.js'
 import { DeviceReadings } from './readings.js'
 
 export function createCriaMountControl(
-  client: CriaClient,
+  connection: CriaConnection,
   bindings: ReadonlyArray<CriaEquipmentBinding>,
 ): MountControl {
+  const remote = () => createRemoteEquipment(connection.session(), bindings.map(binding => ({
+    deviceId: binding.providerDeviceId, criaDeviceId: binding.id, expectedName: binding.expectedName,
+  })))
+
   function binding(id: string) {
     return bindings.find(device => device.providerDeviceId === id && device.kind === 'mount')
   }
@@ -21,21 +21,29 @@ export function createCriaMountControl(
     const selected = binding(id)
 
     if (!selected) return undefined
-    const { snapshot, device } = await client.observe(selected.id, signal ? { signal } : {})
+    signal?.throwIfAborted()
+    const received = Effect.runSync(connection.session().received)
 
-    // External recovery clears the interlock without rewriting the historical outcome.
-    if (!snapshot.state.commandsEnabled || !device.commandReady || snapshot.state.operations.some(operation =>
-      operation.failureDomain === device.failureDomain && (operation.blocksDevice ||
-        !operation.settled && !operation.reconciliation?.externalRecoveryConfirmed)))
+    if (received.state !== 'live') return undefined
+    const snapshot = received.snapshot
+    const device = snapshot.devices.find(device => device.id === selected.id)
+
+    if (!device || device.kind !== 'mount' || device.name !== selected.expectedName) return undefined
+    const held = Effect.runSync(remote().holds).find(hold => hold.deviceId === id)
+
+    if (held) return undefined
+
+    if (!device.availability.ready || device.quarantine.held || snapshot.operations.some(operation =>
+      operation.failureDomain === device.failureDomain && operation.state !== 'settled'))
       return undefined
-    const readings = new DeviceReadings(client, snapshot, device)
+    const readings = new DeviceReadings(device)
     let observation: MountControlObservation = {}
     const keys = ['parked', 'tracking', 'slewing', 'canUnpark', 'canSetTracking'] as const
     const measured: string[] = []
 
     for (const key of keys) {
       const metadata = key === 'canUnpark' || key === 'canSetTracking'
-      const value = readings.optionalBoolean(key, metadata)
+      const value = readings.optionalBoolean(key)
 
       if (value === undefined) continue
       Object.assign(observation, { [key]: value })
@@ -53,8 +61,6 @@ export function createCriaMountControl(
 
     if (!selected) return { outcome: 'failed', reason: 'device-not-found' }
 
-    if (command.expectedTelescopeName !== undefined && command.expectedTelescopeName !== selected.expectedName)
-      return { outcome: 'failed', reason: 'unavailable', message: 'Mount identity changed.' }
     command.signal?.throwIfAborted()
     const before = await observe(command.telescopeId, command.signal)
 
@@ -76,42 +82,26 @@ export function createCriaMountControl(
     if (command.kind === 'unpark' && before.parked === false || matches(command, before))
       return { outcome: 'confirmed', observation: before }
 
-    try {
-      const operation = command.kind === 'unpark'
-        ? { kind: 'mount-unpark' as const, parameters: {} }
-        : { kind: 'mount-tracking' as const, parameters: { tracking: command.tracking } }
+    const operation = command.kind === 'unpark'
+      ? { kind: 'mount-unpark' as const, parameters: {} }
+      : { kind: 'mount-tracking' as const, parameters: { tracking: command.tracking } }
 
-      await client.run(selected.id, operation, command.signal ? { signal: command.signal } : {})
-    } catch (error) {
-      if (error instanceof CriaUncertainError)
-        return { outcome: 'uncertain', reason: 'write-outcome-unknown', message: error.message }
+    const result = await outcomeOf(remote().run(command.telescopeId, operation), command.signal)
 
-      if (error instanceof CriaCancelledError)
-        return { outcome: 'uncertain', reason: 'cancelled' }
+    switch (result.kind) {
+      case 'confirmed': {
+        const { observedAt: _, ...facts } = before
 
-      if (error instanceof CriaOperationFailedError || error instanceof CriaApiError || error instanceof CriaNotAdmittedError)
-        return { outcome: 'failed', reason: 'rejected', message: error.message }
-      throw error
-    }
+        const observation = command.kind === 'unpark'
+          ? { ...facts, parked: false, slewing: false }
+          : { ...facts, tracking: command.tracking, slewing: false }
 
-    // Terminal operation events can precede dynamic field refreshes. These reads
-    // inspect the shared SSE cache; they never poll Cria HTTP or replay a command.
-    const deadline = performance.now() + 10_000
-    const timeout = AbortSignal.timeout(10_000)
-    const signal = command.signal ? AbortSignal.any([command.signal, timeout]) : timeout
-
-    try {
-      for (;;) {
-        const observation = await observe(command.telescopeId, signal)
-
-        if (observation && matches(command, observation)) return { outcome: 'confirmed', observation }
-
-        if (performance.now() >= deadline)
-          return { outcome: 'uncertain', reason: 'verification-unavailable' }
-        await delay(100, undefined, { signal })
+        return { outcome: 'confirmed', observation }
       }
-    } catch {
-      return { outcome: 'uncertain', reason: command.signal?.aborted ? 'cancelled' : 'verification-unavailable' }
+
+      case 'uncertain': return { outcome: 'uncertain', reason: 'write-outcome-unknown', message: result.message }
+      case 'stopped': return { outcome: 'uncertain', reason: 'cancelled' }
+      case 'failed': return { outcome: 'failed', reason: 'rejected', message: result.message }
     }
   }
 

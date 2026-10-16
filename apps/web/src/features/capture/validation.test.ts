@@ -158,7 +158,20 @@ it('validates confirmed retention and exact same-origin download resources', () 
     expect(isCaptureView({ ...view, ...patch }, 'rig-1')).toBe(false)
   }
 
-  for (const blockedBy of ['capture', 'alignment', 'autofocus', 'framing', 'rig']) {
+  for (const blockedBy of [{ kind: 'hold' }, { kind: 'hold', reason: '  ' }, { kind: 'lease', reason: 'Busy.' }]) {
+    expect(
+      isCaptureView({ ...view, cooling: { state: 'off', canSetTemperature: true, blockedBy } }, 'rig-1'),
+    ).toBe(false)
+  }
+
+  for (const blockedBy of [
+    'capture',
+    'alignment',
+    'autofocus',
+    'framing',
+    'rig',
+    { kind: 'hold', reason: 'The mount did not confirm it stopped.' },
+  ]) {
     expect(
       isCaptureView({ ...view, cooling: { state: 'off', canSetTemperature: true, blockedBy } }, 'rig-1'),
     ).toBe(true)

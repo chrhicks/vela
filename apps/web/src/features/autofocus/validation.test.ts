@@ -102,6 +102,13 @@ describe('autofocus response validation', () => {
     ).toBe(true)
   })
 
+  it('accepts a reported MinStep and views from servers that do not report one', () => {
+    expect(isAutofocusView({ ...view, minStep: 15500, maxStep: 38000 }, 'fra')).toBe(true)
+    expect(isAutofocusView({ ...view, minStep: null }, 'fra')).toBe(true)
+    expect(isAutofocusView(view, 'fra')).toBe(true)
+    expect(isAutofocusView({ ...view, minStep: 15500.5 }, 'fra')).toBe(false)
+  })
+
   it('rejects a sample that claims stars without HFR', () => {
     expect(
       isAutofocusView(

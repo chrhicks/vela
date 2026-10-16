@@ -48,6 +48,8 @@ export function coolingBlocker(blockedBy: CaptureCoolingBlocker | undefined, rig
       return { message: 'Cooling is locked while capture runs so Stop stays available.' }
     case 'rig':
       return { message: 'Another rig command is finishing. Cooling will be available when it does.' }
+    default:
+      return { message: blockedBy.reason }
   }
 }
 

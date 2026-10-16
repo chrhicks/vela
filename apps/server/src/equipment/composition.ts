@@ -8,7 +8,7 @@ import {
   createAlpacaProvider,
   type AlpacaDiscovery,
 } from '@vela/alpaca'
-import { CriaClient } from '@vela/cria'
+import { createCriaConnection, createCriaEquipment, type CriaConnection, type CriaConnectionOptions } from '@vela/cria'
 import {
   EquipmentError,
   type Acquisition,
@@ -20,7 +20,6 @@ import {
   type Framing,
   type MountControl,
 } from '@vela/equipment'
-import { createCriaEquipment } from '../cria/equipment.js'
 import { createRigDeviceInventory, type RigDeviceInventory } from '../device/inventory.js'
 import type { RigCatalogRecord, RigEquipmentSource } from '../rig/contracts.js'
 import type { AlignmentSettings } from '../alignment/controller.js'
@@ -28,6 +27,8 @@ import { criaDeviceId, type CriaRigConfiguration } from './config.js'
 import { alpacaEndpoint } from './source.js'
 
 export interface EquipmentComposition {
+  holdsOf(rigId: string): ReadonlyArray<{ readonly deviceId: string; readonly reason: string }>
+  recover(rig: RigCatalogRecord, deviceId: string, note: string): Promise<{ outcome: 'confirmed'; found: string } | { outcome: 'failed'; message: string }>
   start(): void
   close(): Promise<void>
   readonly alpacaDiscovery: AlpacaDiscovery
@@ -46,6 +47,7 @@ export interface EquipmentComposition {
 interface CompositionOptions {
   solver?: { executable: string; catalogPath: string }
   diagnosticsPath?: string
+  fetch?: typeof globalThis.fetch
 }
 
 /** Select equipment ownership at composition; workflows receive only the capabilities they use. */
@@ -53,28 +55,20 @@ export function createEquipmentComposition(
   configurations: ReadonlyArray<CriaRigConfiguration> = [],
   options: CompositionOptions = {},
 ): EquipmentComposition {
-  const clients = new Map<string, CriaClient>()
+  const clients = new Map<string, CriaConnection>()
   const equipment = new Map<string, ReturnType<typeof createCriaEquipment>>()
 
   for (const configuration of configurations) {
     let client = clients.get(configuration.url)
 
     if (!client) {
-      const devices = new Map(configuration.devices.map(device => [device.id, device]))
+      let connection: CriaConnectionOptions = { origin: configuration.url }
 
-      for (const other of configurations) {
-        if (other.url !== configuration.url) continue
+      if (configuration.token) connection = { ...connection, token: configuration.token }
 
-        for (const device of other.devices) devices.set(device.id, device)
-      }
-
-      client = new CriaClient({
-        baseUrl: configuration.url,
-        token: configuration.token,
-        devices: [...devices.values()],
-      })
+      if (options.fetch) connection = { ...connection, fetch: options.fetch }
+      client = createCriaConnection(connection)
       clients.set(configuration.url, client)
-
     }
 
     equipment.set(configuration.id, createCriaEquipment(client, configuration.devices.map(device => ({
@@ -101,6 +95,10 @@ export function createEquipmentComposition(
   }
 
   return {
+    holdsOf: rigId => equipment.get(rigId)?.holds() ?? [],
+    recover: (rig, deviceId, note) => rig.source
+      ? cria(rig).recover(deviceId, note)
+      : Promise.resolve({ outcome: 'failed', message: 'This rig has no Cria recovery.' }),
     start() {
       for (const client of clients.values()) client.start()
     },

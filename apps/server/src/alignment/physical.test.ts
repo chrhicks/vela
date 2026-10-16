@@ -233,11 +233,11 @@ describe('physical alignment sweep', () => {
       const startRa = fake.mount.rightAscensionDegrees
       await fake.alignment.move(signal)
       const firstTravel = (startRa - fake.mount.rightAscensionDegrees + 360) % 360
-      expect(firstTravel).toBeCloseTo(54)
+      expect(firstTravel).toBeCloseTo(57)
       await fake.alignment.validate(signal)
       await fake.alignment.move(signal)
       const totalTravel = (startRa - fake.mount.rightAscensionDegrees + 360) % 360
-      expect(totalTravel).toBeCloseTo(108)
+      expect(totalTravel).toBeCloseTo(114)
       expect(fake.mount.declinationDegrees).toBe(80)
       expect(fake.acquisition.move).toHaveBeenCalledExactlyOnceWith('mount', 0.25, 1, signal)
       expect(fake.acquisition.rotateRightAscension).toHaveBeenCalledTimes(2)
@@ -245,8 +245,8 @@ describe('physical alignment sweep', () => {
       for (const [, rate, distance] of vi.mocked(fake.acquisition.rotateRightAscension).mock
         .calls) {
         expect(rate).toBe(-sign)
-        expect(distance).toBeLessThan(-53)
-        expect(distance).toBeGreaterThan(-55)
+        expect(distance).toBeLessThan(-56)
+        expect(distance).toBeGreaterThan(-58)
       }
 
       await fake.alignment.validate(signal)
@@ -294,7 +294,7 @@ describe('physical alignment sweep', () => {
     const startRa = fake.mount.rightAscensionDegrees
     await fake.alignment.move(signal)
     const travel = (startRa - fake.mount.rightAscensionDegrees + 360) % 360
-    expect(travel).toBeCloseTo(57)
+    expect(travel).toBeCloseTo(60)
     expect(fake.acquisition.rotateRightAscension).toHaveBeenCalledTimes(1)
     await fake.alignment.validate(signal)
   })
@@ -421,5 +421,26 @@ describe('physical alignment sweep', () => {
     await fake.alignment.prepare(signal)
     await expect(fake.alignment.move(signal)).rejects.toThrow('Movement response lost')
     expect(fake.acquisition.move).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('reported Cria axis travel', () => {
+  it.each([53.5, 60.5])('rejects a %s degree total sweep even when later telemetry looks acceptable', async total => {
+    const fake = observatory()
+    await fake.alignment.prepare(signal)
+    vi.mocked(fake.acquisition.move).mockImplementation(async () => ({ travelledDegrees: 0.25 }))
+    vi.mocked(fake.acquisition.rotateRightAscension).mockImplementation(async () => ({ travelledDegrees: -(total + 0.25) }))
+    await expect(fake.alignment.move(signal)).rejects.toThrow('RA sweep expected')
+  })
+
+  it('uses the measured probe and sweep, and rates the mount advertises', async () => {
+    const fake = observatory()
+    fake.mount.primaryAxisRates = [{ name: '8x', degreesPerSecond: 0.2507 }, { name: '9x', degreesPerSecond: 3.008 }]
+    await fake.alignment.prepare(signal)
+    vi.mocked(fake.acquisition.move).mockImplementation(async () => ({ travelledDegrees: 0.25 }))
+    vi.mocked(fake.acquisition.rotateRightAscension).mockImplementation(async () => ({ travelledDegrees: -57.05 }))
+    await expect(fake.alignment.move(signal)).resolves.toBeUndefined()
+    expect(fake.acquisition.move).toHaveBeenCalledExactlyOnceWith('mount', 0.2507, 1, signal)
+    expect(fake.acquisition.rotateRightAscension).toHaveBeenCalledExactlyOnceWith('mount', -3.008, -57.25, signal)
   })
 })

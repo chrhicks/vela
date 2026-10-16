@@ -9,6 +9,15 @@ it('fits a window around the current FRA position', () => {
   })
 })
 
+it('keeps the window one step inside a reported MinStep', () => {
+  expect(previewAutofocusWindow(15701, 50, 4, 38000, 15500)).toEqual({
+    fit: true,
+    low: 15501,
+    high: 15901,
+  })
+  expect(previewAutofocusWindow(15700, 50, 4, 38000, 15500)).toEqual({ fit: false })
+})
+
 it('rejects a window that would approach 0 or MaxStep', () => {
   expect(previewAutofocusWindow(80, 50, 4, 60000)).toEqual({ fit: false })
   expect(previewAutofocusWindow(0, 50, 4, 60000)).toEqual({ fit: false })

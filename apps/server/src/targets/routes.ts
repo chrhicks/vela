@@ -5,6 +5,7 @@ import type { FramingView, TargetView, TargetsView } from '@vela/model/web'
 import type { RigCatalog } from '../rig/catalog.js'
 import type { RigCatalogRecord } from '../rig/contracts.js'
 import type { RigOperations } from '../rig/operations.js'
+import { confirmedCameraName } from '../rig/imaging-camera.js'
 import { inspectRigDetail, type RigDetailOptions } from '../rig/detail.js'
 import { createAstapSolver, type PlateSolver } from '../plate-solving/solver.js'
 import { createFramingController, mountSite, type FramingHardware } from './framing.js'
@@ -71,11 +72,9 @@ export function registerTargets(
       item => item.providerDeviceId === rig.imagingCamera!.uniqueId && item.kind === 'camera',
     )
 
-    if (
-      !camera ||
-      camera.connection !== 'connected' ||
-      camera.name?.trim() !== rig.imagingCamera.name
-    )
+    const cameraName = confirmedCameraName(rig, camera?.name)
+
+    if (!camera || camera.connection !== 'connected' || !cameraName)
       throw new Error('The selected imaging camera is disconnected or its identity changed.')
 
     if (!controllers.get(rig.id)?.snapshot().active && camera.observation?.commandReady === false)
@@ -94,7 +93,7 @@ export function registerTargets(
     const [geometry, mount] = await Promise.all([
       device.cameraGeometry({
         cameraId: rig.imagingCamera.uniqueId,
-        expectedCameraName: rig.imagingCamera.name,
+        expectedCameraName: cameraName,
       }),
       device.telescopeStatus(telescopeId, undefined, { includePointingSide: true }),
     ])
@@ -128,7 +127,7 @@ export function registerTargets(
       telescopeId,
     ])
 
-    return { mount, site, camera: cameraView, configuration, telescopeId }
+    return { mount, site, camera: cameraView, expectedCameraName: cameraName, configuration, telescopeId }
   }
 
   async function framingView(rig: RigCatalogRecord): Promise<FramingView> {
@@ -166,7 +165,7 @@ export function registerTargets(
     let reason: string | null = null
 
     if (owner && owner !== 'framing') {
-      reason = 'Another rig operation is in progress.'
+      reason = operations.heldReason(rig.id) ?? 'Another rig operation is in progress.'
     } else if (ready.mount.parked) {
       reason = 'The mount is parked. Unpark it in Your Rig before framing.'
     } else if (ready.mount.slewing && !state.active) {
@@ -320,7 +319,11 @@ export function registerTargets(
         return reply.code(400).send({ error: 'Expected focalLengthMm between 10 and 20000.' })
       const release = operations.acquire(request.params.rigId, 'framing-settings')
 
-      if (!release) return reply.code(409).send({ error: 'Another rig operation is in progress.' })
+      if (!release) {
+        return reply.code(409).send({
+          error: operations.heldReason(request.params.rigId) ?? 'Another rig operation is in progress.',
+        })
+      }
 
       try {
         if (!(await catalog.setFocalLength(request.params.rigId, settings.data.focalLengthMm)))
@@ -384,7 +387,12 @@ export function registerTargets(
 
       const release = operations.acquire(rigId, 'framing')
 
-      if (!release) return reply.code(409).send({ error: 'Another rig operation is in progress.' })
+      if (!release) {
+        return reply.code(409).send({
+          error: operations.heldReason(rigId) ?? 'Another rig operation is in progress.',
+        })
+      }
+
       let started = false
 
       try {
@@ -426,6 +434,7 @@ export function registerTargets(
           configuredHardware(
             rig,
             ready.telescopeId,
+            ready.expectedCameraName,
             adapter(rig),
             options.createAcquisition(rig),
           )
@@ -464,6 +473,7 @@ export function registerTargets(
 function configuredHardware(
   rig: RigCatalogRecord,
   telescopeId: string,
+  expectedCameraName: string,
   adapter: Framing,
   acquisition: Acquisition,
 ): FramingHardware {
@@ -487,7 +497,7 @@ function configuredHardware(
     capture: ({ exposureSeconds, signal, onReadout, onReadState }) =>
       acquisition.capture({
         cameraId: rig.imagingCamera!.uniqueId,
-        expectedCameraName: rig.imagingCamera!.name,
+        expectedCameraName,
         exposureSeconds,
         signal,
         onReadout: () => onReadout(),

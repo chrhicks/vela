@@ -123,7 +123,8 @@ export function registerMountControls(
 
     if (command?.view.state === 'pending') reason = 'Waiting for the mount command to finish.'
     else if (command?.view.state === 'uncertain') reason = 'The previous command is uncertain. Waiting for fresh mount readings; no command will be repeated.'
-    else if (!ownsLane && operations.owner(rigId)) reason = 'Wait for the active rig operation to finish.'
+    else if (!ownsLane && operations.owner(rigId))
+      reason = operations.heldReason(rigId) ?? 'Wait for the active rig operation to finish.'
     else if (device.connection !== 'connected') reason = 'Connect the mount before changing its state.'
     else if (device.observation?.state === 'interrupted' || device.observation?.commandReady === false || !observation)
       reason = 'Fresh mount readings are unavailable.'
@@ -250,7 +251,13 @@ export function registerMountControls(
     // Acquire before inspecting so another workflow cannot start between preflight and write.
     const release = operations.acquire(rigId, 'mount-control')
 
-    if (!release) return reply.code(409).send({ error: 'rig-operation-in-progress' })
+    if (!release) {
+      return reply.code(409).send({
+        error: 'rig-operation-in-progress',
+        message: operations.heldReason(rigId),
+      })
+    }
+
     let retainOwnership = false
 
     try {
@@ -317,7 +324,7 @@ export function registerMountControls(
         command.view = { requestId, action, state: 'uncertain', message: 'The mount command could not be confirmed. Waiting for fresh readings.' }
       }
 
-      if (command.view.state === 'uncertain') {
+      if (command.view.state === 'uncertain' && !rig.source) {
         command.release = release
         retainOwnership = true
       }

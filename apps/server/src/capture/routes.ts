@@ -11,6 +11,7 @@ import type {
 import type { RigCatalogRecord } from '../rig/contracts.js'
 import type { RigCatalog } from '../rig/catalog.js'
 import type { RigOperations } from '../rig/operations.js'
+import { confirmedCameraName } from '../rig/imaging-camera.js'
 import { inspectRigDetail, type RigDetailOptions } from '../rig/detail.js'
 import { CaptureFrameLostError, CaptureStoppedError, createCaptureController, type CaptureCamera } from './controller.js'
 import { createMemorySavedImageStore, type SavedImageStore } from '../saved-images/store.js'
@@ -103,9 +104,11 @@ export function registerCapture(
     if (!observed) return null
     const { blockedBy: _previous, ...cooling } = observed
     const owner = operations.owner(rigId)
+    const held = operations.heldReason(rigId)
     let blockedBy: CaptureCoolingBlocker | undefined
 
-    if (owner === 'alignment' || owner === 'autofocus' || owner === 'framing') blockedBy = owner
+    if (held) blockedBy = { kind: 'hold', reason: held }
+    else if (owner === 'alignment' || owner === 'autofocus' || owner === 'framing') blockedBy = owner
     else if (owner === 'capture' && controllers.get(rigId)?.active()) blockedBy = 'capture'
     else if (owner) blockedBy = 'rig'
 
@@ -183,9 +186,8 @@ export function registerCapture(
 
     if (!camera) return unavailable('The configured capture camera was not found.')
 
-    const cameraView = {
-      name: rig.imagingCamera?.name ?? camera.name?.trim() ?? camera.configuredName,
-    }
+    const cameraName = confirmedCameraName(rig, camera.name)
+    const cameraView = { name: cameraName ?? target.expectedCameraName }
 
     const cooling = camera.observation?.state === 'interrupted'
       ? null
@@ -193,10 +195,7 @@ export function registerCapture(
 
     const project = (view: CaptureView): CaptureView => ({ ...view, camera: cameraView, cooling })
 
-    if (
-      !camera.name?.trim() ||
-      (rig.imagingCamera && camera.name.trim() !== rig.imagingCamera.name)
-    ) {
+    if (!cameraName) {
       return project({
         ...unavailable(
           'Camera identity changed or is unavailable. Check the imaging camera configuration.',
@@ -209,7 +208,7 @@ export function registerCapture(
     const owner = operations.owner(rigId)
 
     if (owner && owner !== 'capture')
-      return project({ ...unavailable('Another Rig operation is in progress.') })
+      return project({ ...unavailable(operations.heldReason(rigId) ?? 'Another Rig operation is in progress.') })
 
     if (!controllers.get(rigId)?.active()) {
       if (camera.observation?.commandReady === false)
@@ -257,7 +256,12 @@ export function registerCapture(
 
       const release = operations.acquire(request.params.rigId, 'capture')
 
-      if (!release) return reply.code(409).send({ error: 'Another Rig operation is in progress.' })
+      if (!release) {
+        return reply.code(409).send({
+          error: operations.heldReason(request.params.rigId) ?? 'Another Rig operation is in progress.',
+        })
+      }
+
       let started = false
 
       try {
@@ -334,7 +338,11 @@ export function registerCapture(
 
       const release = operations.acquire(request.params.rigId, 'capture')
 
-      if (!release) return reply.code(409).send({ error: 'Another Rig operation is in progress.' })
+      if (!release) {
+        return reply.code(409).send({
+          error: operations.heldReason(request.params.rigId) ?? 'Another Rig operation is in progress.',
+        })
+      }
 
       try {
         const view = await rigView(request.params.rigId)

@@ -50,6 +50,8 @@ export interface AutofocusView {
   /** EAF position when the session began. Restore target. 0 is a reported mechanical stop, not a request to Move(0). */
   startPosition: number | null
   currentPosition: number | null
+  /** Lowest reported focuser position. Absent from older servers and null when the focuser reports none; the floor is then 0. */
+  minStep?: number | null
   maxStep: number | null
   stepSize: number
   offsetSteps: number
