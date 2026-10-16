@@ -121,7 +121,6 @@ const frame = { width: 4, height: 3 }
 /** A running operation's ending, due when its timer fires. */
 interface Due {
   readonly at: number
-  readonly outcome: Ending
   readonly timer: ReturnType<typeof setTimeout>
 }
 
@@ -346,7 +345,7 @@ export class FakeCria {
   private schedule(operation: Running, afterMs: number, outcome: Ending): void {
     const timer = setTimeout(() => this.settle(operation.id, this.confirmCapture(operation, outcome)), afterMs)
 
-    this.instance.due.set(operation.id, { at: Date.now() + afterMs, outcome, timer })
+    this.instance.due.set(operation.id, { at: Date.now() + afterMs, timer })
   }
 
   /** A stop moves the ending earlier, never later: a capture that finishes first still confirms. */

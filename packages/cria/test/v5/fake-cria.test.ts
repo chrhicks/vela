@@ -205,7 +205,7 @@ describe('admission', () => {
 })
 
 describe('lookup', () => {
-  it('finds an admitted request by instance and request ID, and answers 404 for another instance or a refused request', async () => {
+  it('finds an admitted request by instance and request ID; another instance or a refused request is not found and can be sent again', async () => {
     const slew = await admitted(request('mount', 'mount-slew', slewTo, 'slew-7'))
 
     cria.durationMs['focuser-move'] = 10_000
@@ -215,6 +215,12 @@ describe('lookup', () => {
     expect((await read(Operation, await lookup('slew-7'))).id).toBe(slew.id)
     expect(await refusal(await lookup('slew-7', randomUUID()))).toEqual({ status: 404, code: 'not-found' })
     expect(await refusal(await lookup('refused-busy'))).toEqual({ status: 404, code: 'not-found' })
+
+    await advance(10_000)
+    expect(await admitted(request('focuser', 'focuser-move', { position: 20_200, minPosition: 15_500, maxPosition: 38_000 }, 'refused-busy'))).toMatchObject({
+      requestId: 'refused-busy',
+      state: 'running',
+    })
   })
 })
 
