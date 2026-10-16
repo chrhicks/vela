@@ -53,7 +53,26 @@
     "anti-slop-effect/no-manual-effect-error-tag": "error",
     "anti-slop-effect/no-manual-tag-comparison": "error",
     "anti-slop-effect/no-manual-tagged-construction": "error",
-    "anti-slop-effect/no-service-constructor-imports": "error",
-    "anti-slop-effect/prefer-effect-match": "error"
-  }
+    "anti-slop-effect/no-service-graph": "error",
+    "anti-slop-effect/prefer-effect-match": "error",
+    "no-restricted-imports": ["error", { "patterns": [
+      { "group": ["@cria/wire", "@cria/wire/**"], "message": "Wire types stay inside packages/cria." }
+    ] }]
+  },
+  "overrides": [
+    {
+      "files": ["apps/server/src/*/workflow.ts", "apps/server/src/rig/jobs.ts"],
+      "rules": { "anti-slop-effect/no-ending-escape": "error" }
+    },
+    {
+      "files": ["packages/cria/**"],
+      "rules": { "no-restricted-imports": "off" }
+    },
+    {
+      "files": ["packages/model/**", "apps/web/**"],
+      "rules": { "no-restricted-imports": ["error", { "patterns": [
+        { "group": ["effect", "effect/**", "@cria/**"], "message": "Shared contracts and the browser must stay free of Effect and Cria imports." }
+      ] }] }
+    }
+  ]
 }
