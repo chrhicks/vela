@@ -19,8 +19,7 @@ The nested `vendor/eslint-stylistic/LICENSE` and `UPSTREAM.md` are preserved.
 The parent `tools/oxlint/package.json` declares ESM without changing the root
 package's module semantics.
 
-Root `.oxlintrc.json` enables all 18 generic rules, the five Effect rules
-(`packages/alpaca` directly depends on Effect), and native
+Root `.oxlintrc.json` enables all 18 generic rules, the five Effect rules, and native
 `oxc/no-accumulating-spread` at error severity. Agent tooling, generated output,
 local data, and the vendored implementation are excluded from application lint.
 `oxlint` and `@oxlint/plugins` are pinned together at `1.82.0`. The root
