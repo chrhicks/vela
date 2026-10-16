@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { EquipmentError, FocuserStoppedError } from '@vela/equipment'
+import { CaptureRetryableError, EquipmentError, FocuserStoppedError } from '@vela/equipment'
 import { createCriaConnection } from '../src/connection.js'
 import { createCriaEquipment } from '../src/equipment.js'
 import { FakeCria } from './v5/fake-cria.js'
@@ -118,6 +118,53 @@ describe('protocol 5 Promise capabilities', () => {
   it('does not dispatch an unsupported coordinate frame', async () => {
     await expect(equipment.framing.slew({ telescopeId: 'mount', coordinateSystem: 'b1950', rightAscensionDegrees: 10, declinationDegrees: 20 })).rejects.toThrow('known mount coordinate frame')
     expect(cria.received.filter(request => request.route === 'submit')).toHaveLength(0)
+  })
+
+  it('stops on an exhausted image transfer after one exposure instead of allowing a replacement', async () => {
+    await connection.close()
+    let downloads = 0
+
+    connection = createCriaConnection({
+      origin: cria.origin,
+      fetch: async (input, init) => {
+        if (new Request(input, init).url.includes('/v2/images/')) {
+          downloads++
+          throw new TypeError('Image transfer unavailable')
+        }
+
+        return cria.fetch(input, init)
+      },
+    })
+    equipment = createCriaEquipment(connection, [
+      { providerDeviceId: 'camera', id: 'camera', kind: 'camera', expectedName: 'Fake CCD' },
+    ])
+    connection.start()
+    await vi.advanceTimersByTimeAsync(10)
+
+    const captured = equipment.acquisition.capture({ cameraId: 'camera', exposureSeconds: 1 }).then(
+      () => undefined,
+      error => error,
+    )
+
+    await vi.advanceTimersByTimeAsync(3_000)
+    expect(await captured).toBeInstanceOf(EquipmentError)
+    expect(downloads).toBe(3)
+    expect(cria.received.filter(request => request.route === 'submit')).toHaveLength(1)
+  })
+
+  it('allows a fresh attempt after a preflight refusal that dispatched no exposure', async () => {
+    cria.reachable = false
+    await vi.advanceTimersByTimeAsync(3_100)
+    await expect(equipment.acquisition.capture({ cameraId: 'camera', exposureSeconds: 1 })).rejects.toBeInstanceOf(CaptureRetryableError)
+    expect(cria.received.filter(request => request.route === 'submit')).toHaveLength(0)
+
+    cria.reachable = true
+    await vi.advanceTimersByTimeAsync(2_000)
+    const captured = equipment.acquisition.capture({ cameraId: 'camera', exposureSeconds: 1 })
+
+    await vi.advanceTimersByTimeAsync(2_000)
+    expect(await captured).toMatchObject({ width: 4, height: 3, color: { kind: 'mono' } })
+    expect(cria.received.filter(request => request.route === 'submit')).toHaveLength(1)
   })
 
   it('keeps a pre-aborted focuser move stopped without sending it', async () => {
