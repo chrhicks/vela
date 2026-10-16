@@ -15,7 +15,10 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@cria/primitives": "catalog:",
+    "@cria/wire": "catalog:",
     "@vela/equipment": "workspace:*",
+    "effect": "4.0.3",
     "zod": "4.5.4"
   },
   "devDependencies": {

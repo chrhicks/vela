@@ -10,7 +10,9 @@ RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile
 RUN pnpm --filter '@vela/server...' build && pnpm --filter @vela/web build
 # `--legacy` because the workspace does not inject its packages; this copies the built packages in.
-RUN pnpm --filter @vela/server deploy --prod --legacy /out/server
+# The deploy makes `@vela/cria`'s git-hosted `@cria/*` subdependencies, which pnpm 11 blocks by
+# default. They are the commit pinned in pnpm-workspace.yaml, checked by the lockfile's integrity.
+RUN pnpm --config.block-exotic-subdeps=false --filter @vela/server deploy --prod --legacy /out/server
 
 FROM node:26-slim AS server
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=3001

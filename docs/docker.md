@@ -36,7 +36,9 @@ docker compose logs -f server
 
 Update: `git pull && docker compose up -d --build`. Both containers restart
 automatically (`unless-stopped`). The image build runs `pnpm install` and `pnpm build`
-inside Docker; nothing is needed on the host except Docker.
+inside Docker; nothing is needed on the host except Docker. The install downloads
+`@cria/primitives` and `@cria/wire` from GitHub at the commit pinned in
+`pnpm-workspace.yaml`, with no credentials.
 
 ## Moving from `vela-observing` on another machine
 
