@@ -8,11 +8,12 @@
  * with placeholders; `resolve` puts back values the schemas accept. Replace the
  * copy only together with the Cria pin.
  */
+import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
-import { Schema } from 'effect'
+import { Option, Schema } from 'effect'
 import { Device, ErrorBody, Health, Operation, OperationRequest, RecoveryRequest, State } from '@cria/wire'
-import { describe, expect, it } from 'vitest'
-import { routeOf, statusOf, type Route } from './fake-cria.js'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { FakeCria, routeOf, statusOf, type Route } from './fake-cria.js'
 
 const Entry = Schema.Struct({
   scenario: Schema.String,
@@ -65,7 +66,11 @@ function resolve(text: string): string {
     .replaceAll('<utc>', '2026-10-15T21:00:00')
 }
 
-const golden = Schema.decodeUnknownSync(Schema.Array(Entry))(JSON.parse(resolve(readFileSync(new URL('./wire.golden.json', import.meta.url), 'utf8'))))
+const text = readFileSync(new URL('./wire.golden.json', import.meta.url), 'utf8')
+
+const golden = Schema.decodeUnknownSync(Schema.Array(Entry))(JSON.parse(resolve(text)))
+
+const recorded = Schema.decodeUnknownSync(Schema.Array(Entry))(JSON.parse(text))
 
 function routeIn(entry: Entry): Route | undefined {
   const [method = '', path = ''] = entry.request.split(' ')
@@ -90,12 +95,11 @@ function step(scenario: string, number: number): Entry {
 }
 
 describe('the protocol 5 golden', () => {
-  it('decodes every reply and every well-formed request with @cria/wire, and every error to its one status', () => {
+  it('decodes every reply with @cria/wire, and every error to its one status', () => {
     const problems: string[] = []
 
     for (const entry of golden) {
       const route = routeIn(entry)
-      const wellFormed = entry.status !== 400 && entry.status !== 413
 
       try {
         if (!route) throw new Error(`${entry.request} is not a protocol 5 route`)
@@ -105,10 +109,6 @@ describe('the protocol 5 golden', () => {
 
           if (statusOf[code] !== entry.status) throw new Error(`${code} answered ${entry.status}, not ${statusOf[code]}`)
         } else decode(replies[route], entry, 'body')
-
-        if (route === 'submit' && wellFormed) decode(OperationRequest, entry, 'sent')
-
-        if (route === 'recover' && wellFormed) decode(RecoveryRequest, entry, 'sent')
       } catch (error) {
         problems.push(String(error))
       }
@@ -116,6 +116,27 @@ describe('the protocol 5 golden', () => {
 
     expect(problems).toEqual([])
     expect(golden).toHaveLength(127)
+  })
+
+  it('accepts every request body Cria accepted, and rejects the five Cria refused as malformed', () => {
+    const sent = golden.filter(entry => entry.sent !== undefined)
+    const strictly = { onExcessProperty: 'error' } as const
+
+    const accepted = (entry: Entry) =>
+      routeIn(entry) === 'recover'
+        ? Option.isSome(Schema.decodeUnknownOption(RecoveryRequest)(entry.sent, strictly))
+        : Option.isSome(Schema.decodeUnknownOption(OperationRequest)(entry.sent, strictly))
+
+    const malformed = sent.filter(entry => !accepted(entry))
+
+    expect(malformed.map(entry => [entry.scenario, entry.step, entry.status])).toEqual([
+      ['refused: invalid request', 1, 400],
+      ['refused: invalid request', 2, 400],
+      ['refused: invalid request', 3, 400],
+      ['refused: invalid request', 5, 413],
+      ['no acknowledgement: uncertain, held by quarantine, then recovered', 7, 400],
+    ])
+    expect(sent).toHaveLength(65)
   })
 
   it('serves each original with the length and SHA-256 its Image names', () => {
@@ -153,12 +174,74 @@ describe('the golden entries the design depends on', () => {
 
   it('answers recover on a domain that is not held 200 with a new binding (P11)', () => {
     const scenario = 'recover refused while a mount-stop runs'
+    const requests = golden.filter(entry => entry.scenario === scenario).map(entry => entry.request)
     const stop = decode(Operation, step(scenario, 3), 'body')
     const recover = step(scenario, 4)
     const sent = decode(RecoveryRequest, recover, 'sent')
     const device = decode(Device, recover, 'body')
 
+    // Each golden scenario runs on a fresh Cria, so this stop is the only operation the mount ever had.
+    expect(requests).toEqual(['POST /v2/operations', 'POST /v2/devices/mount/recover', `GET /v2/operations/${stop.id}`, 'POST /v2/devices/mount/recover'])
     expect(stop).toMatchObject({ kind: 'mount-stop', state: 'settled', outcome: { kind: 'confirmed' }, bindingId: sent.bindingId })
     expect([routeIn(recover), recover.status, device.quarantine, device.bindingId === sent.bindingId]).toEqual(['recover', 200, { held: false }, false])
+  })
+})
+
+const Identified = Schema.Struct({ id: Schema.String })
+
+/** Golden scenarios the fake replays, with the placeholders that stand for its live instance and binding. */
+const replayed = [
+  { scenario: 'refused: unknown operation, request and device', deviceId: 'camera' },
+  { scenario: 'duplicate request ID: same content returns the operation, changed content is refused', deviceId: 'camera' },
+  { scenario: 'refused: binding changed', deviceId: 'camera', binding: '<binding-2>' },
+  { scenario: 'refused: instance changed', deviceId: 'camera', instance: '<instance-2>' },
+  { scenario: 'refused: wrong device kind', deviceId: 'mount' },
+  { scenario: 'refused: invalid request', deviceId: 'camera' },
+  { scenario: 'refused: device busy', deviceId: 'camera' },
+  { scenario: 'refused: commands disabled', deviceId: 'camera' },
+  { scenario: 'cancel a running capture, then cancel it again', deviceId: 'camera' },
+  { scenario: 'recover refused while a mount-stop runs', deviceId: 'mount' },
+]
+
+describe('the fake against the golden', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it.each(replayed)('answers "$scenario" as Cria did', async ({ scenario, deviceId, instance = '<instance-1>', binding = '<binding-1>' }) => {
+    const cria = new FakeCria()
+
+    const live = new Map<string, string>([
+      [instance, cria.instanceId],
+      [binding, cria.bindingOf(deviceId)],
+    ])
+
+    const fill = (template: string) =>
+      template
+        .replace(/<(?:instance|binding|request|operation|id)-\d+>/g, placeholder => live.get(placeholder) ?? live.set(placeholder, randomUUID()).get(placeholder) ?? '')
+        .replace(/"<(\d+) characters>"/g, (_, length: string) => JSON.stringify('x'.repeat(Number(length))))
+
+    const answers = []
+
+    cria.commandsEnabled = scenario !== 'refused: commands disabled'
+    cria.durationMs['mount-stop'] = 1_500
+
+    for (const entry of recorded.filter(candidate => candidate.scenario === scenario)) {
+      await vi.advanceTimersByTimeAsync(1_000)
+      const [method = '', path = ''] = fill(entry.request).split(' ')
+      const body = entry.sent === undefined ? undefined : fill(JSON.stringify(entry.sent))
+      const response = await cria.fetch(`${cria.origin}${path}`, body === undefined ? { method } : { method, body })
+      const answer = await response.json()
+
+      if (Schema.is(Identified)(entry.body) && Schema.is(Identified)(answer)) live.set(entry.body.id, answer.id)
+      answers.push([response.status, Schema.is(ErrorBody)(answer) ? answer.error.code : null])
+    }
+
+    cria.close()
+    expect(answers).toEqual(golden.filter(entry => entry.scenario === scenario).map(entry => [entry.status, Schema.is(ErrorBody)(entry.body) ? entry.body.error.code : null]))
   })
 })

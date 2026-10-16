@@ -21,8 +21,6 @@ const slewTo = { rightAscensionDegrees: 120, declinationDegrees: 10, coordinateS
 
 const notStill = { kind: 'uncertain', reason: 'stop-not-confirmed', message: 'The mount did not stand still' } as const
 
-const names = { camera: 'Fake CCD', mount: 'ZWO AM5', focuser: 'Fake Focuser' } as const
-
 interface Sent {
   readonly instanceId: string
   readonly requestId: string
@@ -33,13 +31,13 @@ interface Sent {
   readonly parameters: Readonly<Record<string, number | boolean | string>>
 }
 
-function request(deviceId: keyof typeof names, kind: string, parameters: Sent['parameters'], requestId = `${kind}-1`): Sent {
+function request(deviceId: string, kind: string, parameters: Sent['parameters'], requestId = `${kind}-1`): Sent {
   return {
     instanceId: cria.instanceId,
     requestId,
     deviceId,
     bindingId: cria.bindingOf(deviceId),
-    expectedName: names[deviceId],
+    expectedName: cria.nameOf(deviceId),
     kind,
     parameters,
   }
@@ -94,7 +92,7 @@ async function device(id: string): Promise<Device> {
   return found
 }
 
-async function recover(deviceId: keyof typeof names, bindingId: string = cria.bindingOf(deviceId)): Promise<Response> {
+async function recover(deviceId: string, bindingId: string = cria.bindingOf(deviceId)): Promise<Response> {
   const body = { instanceId: cria.instanceId, bindingId, externalRecoveryConfirmed: true, note: 'Chris checked the rig' }
 
   return send('POST', `/v2/devices/${deviceId}/recover`, JSON.stringify(body))
@@ -130,7 +128,7 @@ async function subscribe(): Promise<State[]> {
 }
 
 describe('the snapshot cadence', () => {
-  it('sends a snapshot at once, then one a second, and one at once after a change', async () => {
+  it('sends a snapshot at once, then one a second, and coalesces changes into one within 250 ms', async () => {
     const start = Date.now()
     const states = await subscribe()
 
@@ -145,22 +143,23 @@ describe('the snapshot cadence', () => {
 
     await advance(400)
     await admitted(request('camera', 'cooling', { setpointC: -10 }))
-    await advance(0)
+    await advance(1_100)
 
     expect(states.slice(4).map(state => [state.generatedAt - start, state.operations.map(open => open.state)])).toEqual([
-      [3_400, ['running']],
-      [3_400, ['settled']],
+      [3_500, ['settled']],
+      [4_500, ['settled']],
     ])
   })
 })
 
 describe('admission', () => {
-  it('answers a repeated request ID with the same operation and refuses it with changed content', async () => {
+  it('answers a repeated request ID with the same operation, whatever its instance, and refuses changed content', async () => {
     const first = await admitted(request('mount', 'mount-slew', slewTo))
     const again = await admitted(request('mount', 'mount-slew', { coordinateSystem: 'topocentric', declinationDegrees: 10, rightAscensionDegrees: 120 }))
     const changed = await submit(request('mount', 'mount-slew', { ...slewTo, rightAscensionDegrees: 121 }))
+    const otherInstance = await admitted({ ...request('mount', 'mount-slew', slewTo), instanceId: randomUUID() })
 
-    expect(again.id).toBe(first.id)
+    expect([again.id, otherInstance.id]).toEqual([first.id, first.id])
     expect(await refusal(changed)).toEqual({ status: 409, code: 'request-conflict' })
   })
 
@@ -252,6 +251,25 @@ describe('cancel', () => {
       state: 'settled',
       outcome: { kind: 'confirmed', value: { image: { operationId: capture.id, exposureSeconds: 3 } } },
     })
+  })
+})
+
+describe('pruning', () => {
+  it('answers 410 result-expired for a pruned operation on get, cancel, lookup and its request ID', async () => {
+    const sent = request('camera', 'cooling', { setpointC: -10 }, 'cooling-pruned')
+    const cooling = await admitted(sent)
+
+    await advance(0)
+    cria.expire(cooling.id)
+
+    const answers = [
+      await send('GET', `/v2/operations/${cooling.id}`),
+      await cancel(cooling.id),
+      await lookup('cooling-pruned'),
+      await submit(sent),
+    ]
+
+    expect(await Promise.all(answers.map(refusal))).toEqual(Array(4).fill({ status: 410, code: 'result-expired' }))
   })
 })
 
@@ -418,6 +436,58 @@ describe('faults', () => {
 
     await advance(1_500)
     expect(await read(Operation, await lookup('slew-late'))).toMatchObject({ kind: 'mount-slew', requestId: 'slew-late' })
+  })
+
+  it('fails the caller at once when a delayed request also loses its reply, and the request still lands', async () => {
+    cria.delay('submit', 2_000)
+    cria.dropReply('submit')
+
+    await expect(submit(request('mount', 'mount-slew', slewTo, 'slew-gone'))).rejects.toThrow('the reply was lost')
+    expect(await refusal(await lookup('slew-gone'))).toEqual({ status: 404, code: 'not-found' })
+
+    await advance(2_000)
+    expect(await read(Operation, await lookup('slew-gone'))).toMatchObject({ requestId: 'slew-gone' })
+  })
+
+  it('loses a delayed request that would land after a restart or during a partition', async () => {
+    cria.delay('submit', 2_000)
+    const beforeRestart = submit(request('mount', 'mount-slew', slewTo, 'slew-restarted'))
+    const restarted = expect(beforeRestart).rejects.toThrow('the connection was lost')
+
+    await advance(500)
+    cria.restart()
+    await advance(1_500)
+    await restarted
+
+    cria.delay('submit', 2_000)
+    const partitioned = submit(request('mount', 'mount-slew', slewTo, 'slew-partitioned'))
+    const lost = expect(partitioned).rejects.toThrow('the connection was lost')
+
+    await advance(500)
+    cria.reachable = false
+    await advance(1_500)
+    await lost
+    cria.reachable = true
+    expect((await Promise.all([lookup('slew-restarted'), lookup('slew-partitioned')].map(async answer => refusal(await answer))))).toEqual([
+      { status: 404, code: 'not-found' },
+      { status: 404, code: 'not-found' },
+    ])
+  })
+
+  it('rejects a request whose signal already aborted, and ends an event stream when its caller aborts', async () => {
+    const caller = new AbortController()
+    const events = await cria.fetch(`${cria.origin}/v2/events`, { signal: caller.signal })
+    const reader = events.body?.getReader()
+
+    if (!reader) throw new Error('The event stream has no body')
+    expect((await reader.read()).done).toBe(false)
+
+    const next = reader.read()
+
+    caller.abort()
+    await expect(next).rejects.toMatchObject({ name: 'AbortError' })
+    await expect(cria.fetch(`${cria.origin}/v2/state`, { signal: caller.signal })).rejects.toMatchObject({ name: 'AbortError' })
+    expect(cria.received.map(received => received.route)).toEqual(['events'])
   })
 
   it('refuses a request that lands after a recovery with binding-changed, and never admits it', async () => {

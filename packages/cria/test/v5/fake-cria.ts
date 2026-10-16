@@ -6,19 +6,26 @@
  * with @cria/wire, so the fake cannot send a body Cria would not.
  *
  * - Clock: call vi.useFakeTimers() before `new FakeCria()`, then drive the fake
- *   and the client together with vi.advanceTimersByTimeAsync(ms). Every
- *   subscriber gets a snapshot at once, then each second, and at once after
- *   each change. Devices are read again on each second.
- * - Wiring: pass `fetch` and `origin` to the client. `received` lists every
- *   request that reached Cria, in order.
+ *   and the client together with vi.advanceTimersByTimeAsync(ms). As in Cria,
+ *   each subscriber gets a snapshot at once, then checks every 250 ms and gets
+ *   one when the ledger changed or a second has passed, so changes coalesce.
+ *   Devices are read again each second.
+ * - Wiring: pass `fetch` and `origin` to the client, and `token` to the
+ *   constructor to require a bearer token. `received` lists every request in
+ *   the order it was sent; a delayed one lands later. `nameOf` and `bindingOf`
+ *   give what a request must carry.
  * - Endings: a capture confirms after its exposure, with an image; any other
- *   kind confirms after `durationMs[kind]` (default 0). A cancel, or a halt
- *   queued behind a motion, stops it `stopMs` later unless it ends first.
- *   `settle(id, outcome)` ends a running operation now with any outcome.
- * - Faults: `dropReply(route)` loses the next reply on a route after applying
- *   it; `delay(route, ms)` makes the next request on a route land later;
- *   `restart()` is a new instance; `dropImage(id)` expires an image;
- *   `reachable = false` fails new requests and quiets open streams.
+ *   kind confirms after `durationMs[kind]` (default 0), with no values.
+ *   Readings stay as they started. A cancel, or a halt queued behind a motion,
+ *   stops it `stopMs` later unless it ends first. `settle(id, outcome)` ends a
+ *   running operation now with any outcome.
+ * - Faults: `dropReply(route)` applies the next request on a route and loses its
+ *   reply; `delay(route, ms)` makes the next one land `ms` later, and with
+ *   `dropReply` its caller fails at once. A delayed request is lost if Cria is
+ *   unreachable or restarted when it would land. `restart()` is a new
+ *   instance; `dropImage(id)` and `expire(id)` model Cria evicting an image or
+ *   pruning a settled operation; `reachable = false` fails new requests and
+ *   quiets open streams; `commandsEnabled = false` refuses commands.
  * - Call `close()` after each test.
  */
 import { createHash, randomUUID } from 'node:crypto'
@@ -126,6 +133,7 @@ interface Due {
 interface Instance {
   readonly id: InstanceId
   sequence: number
+  revision: number
   readAt: number
   readonly bindings: Map<FailureDomain, BindingId>
   readonly recoveredBindings: Map<BindingId, { readonly at: number; readonly note: string }>
@@ -135,11 +143,20 @@ interface Instance {
   readonly images: Map<ImageId, { readonly image: Image; readonly bytes: Uint8Array<ArrayBuffer> }>
 }
 
+interface Subscriber {
+  readonly stream: ReadableStreamDefaultController<Uint8Array>
+  readonly tick: ReturnType<typeof setInterval>
+  sentRevision: number
+  sentAt: number
+}
+
 const settledShown = 20
+
+const maxBodyBytes = 16 * 1024
 
 export class FakeCria {
   readonly origin = 'http://cria.fake:4319'
-  /** Every request Cria received, in order. A request sent while unreachable never arrived. */
+  /** Every request sent while Cria was reachable, in the order sent. A delayed one may land later, or be lost. */
   readonly received: Received[] = []
   /** False partitions the network: requests fail and open streams go quiet. */
   reachable = true
@@ -149,15 +166,19 @@ export class FakeCria {
   /** How long each kind runs before it confirms. A capture runs for its exposure. */
   readonly durationMs: Partial<Record<CommandKind, number>> = {}
   private instance = this.boot()
-  private readonly streams = new Set<ReadableStreamDefaultController<Uint8Array>>()
+  private readonly subscribers = new Set<Subscriber>()
   private readonly lostReplies = new Set<Route>()
   private readonly delays = new Map<Route, number>()
-  private readonly cadence = setInterval(() => this.read(), 1_000)
+  private readonly reads = setInterval(() => (this.instance.readAt = Date.now()), 1_000)
 
   constructor(private readonly token?: string) {}
 
   get instanceId(): InstanceId {
     return this.instance.id
+  }
+
+  nameOf(deviceId: string): string {
+    return this.rigged(deviceId).name
   }
 
   bindingOf(deviceId: string): BindingId {
@@ -190,7 +211,7 @@ export class FakeCria {
     const halt = this.openIn(operation.failureDomain).find(open => open.state === 'waiting')
 
     if (halt) this.start({ ...halt, state: 'running', startedAt: now, progress: { phase: 'preparing', elapsedSeconds: null } })
-    this.publish()
+    this.instance.revision++
   }
 
   /** Models Cria evicting an image from its rolling set. */
@@ -198,26 +219,33 @@ export class FakeCria {
     this.instance.images.delete(ImageId.make(imageId))
   }
 
+  expire(operationId: string): void {
+    const operation = this.instance.operations.get(OperationId.make(operationId))
+
+    if (operation?.state !== 'settled') throw new Error(`No settled operation ${operationId}`)
+    this.instance.operations.delete(operation.id)
+  }
+
   /** A new Cria process: a new instance with new bindings, remembering nothing. Open streams end. */
   restart(): void {
     for (const due of this.instance.due.values()) clearTimeout(due.timer)
 
-    for (const stream of this.streams) stream.error(new TypeError('Cria restarted'))
-    this.streams.clear()
+    for (const subscriber of this.subscribers) this.unsubscribe(subscriber, new TypeError('Cria restarted'))
     this.instance = this.boot()
   }
 
   close(): void {
-    clearInterval(this.cadence)
+    clearInterval(this.reads)
 
     for (const due of this.instance.due.values()) clearTimeout(due.timer)
 
-    for (const stream of this.streams) stream.close()
-    this.streams.clear()
+    for (const subscriber of this.subscribers) this.unsubscribe(subscriber, undefined)
   }
 
   readonly fetch: typeof globalThis.fetch = async (input, init) => {
     const request = new Request(input, init)
+
+    if (request.signal.aborted) throw request.signal.reason
 
     if (!this.reachable) throw new TypeError('fetch failed')
     const path = new URL(request.url).pathname
@@ -232,16 +260,28 @@ export class FakeCria {
 
     this.delays.delete(route)
 
-    const answered =
-      delayMs === undefined
-        ? this.answer(route, segments, request, body)
-        : unlessAborted(later(delayMs).then(() => this.answer(route, segments, request, body)), request.signal)
+    if (delayMs === undefined) {
+      const response = this.answer(route, segments, request, body)
 
-    const response = await answered
+      if (this.lostReplies.delete(route)) throw new TypeError('fetch failed: the reply was lost')
 
-    if (this.lostReplies.delete(route)) throw new TypeError('fetch failed: the reply was lost')
+      return response
+    }
 
-    return response
+    const sentTo = this.instance
+
+    const landing = later(delayMs).then(() => {
+      if (!this.reachable || this.instance !== sentTo) throw new TypeError('fetch failed: the connection was lost')
+
+      return this.answer(route, segments, request, body)
+    })
+
+    if (this.lostReplies.delete(route)) {
+      landing.catch(() => undefined)
+      throw new TypeError('fetch failed: the reply was lost')
+    }
+
+    return unlessAborted(landing, request.signal)
   }
 
   private answer(route: Route, segments: ReadonlyArray<string>, request: Request, body: string | undefined): Response {
@@ -250,13 +290,16 @@ export class FakeCria {
     if (this.token !== undefined && request.headers.get('authorization') !== `Bearer ${this.token}`)
       return this.refuse('unauthorized', 'Bearer token required')
 
+    if (body !== undefined && new TextEncoder().encode(body).byteLength > maxBodyBytes)
+      return this.refuse('request-too-large', 'Request body too large')
+
     const [first = '', second = ''] = segments
 
     switch (route) {
       case 'state':
         return this.reply(State, this.snapshot(), 200)
       case 'events':
-        return this.subscribe()
+        return this.subscribe(request.signal)
       case 'submit':
         return this.admit(body ?? '')
       case 'operation':
@@ -277,7 +320,8 @@ export class FakeCria {
     const request = decode(OperationRequest, body)
 
     if (!request) return this.refuse('request-error', 'Not an operation request')
-    const content = JSON.stringify(request, [...Object.keys(request), ...Object.keys(request.parameters)].sort())
+    const { instanceId: _, ...fingerprinted } = request
+    const content = JSON.stringify(fingerprinted, [...Object.keys(fingerprinted), ...Object.keys(request.parameters)].sort())
     const known = this.instance.requests.get(request.requestId)
 
     if (known) {
@@ -317,7 +361,7 @@ export class FakeCria {
       this.instance.operations.set(waiting.id, waiting)
 
       for (const operation of open) if (operation.state === 'running' && !isHalt(operation)) this.stop(operation)
-      this.publish()
+      this.instance.revision++
 
       return this.reply(Operation, waiting, 202)
     }
@@ -325,7 +369,7 @@ export class FakeCria {
     const running: Running = { ...accepted, state: 'running', startedAt: now, progress: { phase: 'preparing', elapsedSeconds: null } }
 
     this.start(running)
-    this.publish()
+    this.instance.revision++
 
     return this.reply(Operation, running, 202)
   }
@@ -417,7 +461,7 @@ export class FakeCria {
 
     this.instance.recoveredBindings.set(binding, { at: Date.now(), note: request.note })
     this.instance.bindings.set(device.failureDomain, BindingId.make(randomUUID()))
-    this.publish()
+    this.instance.revision++
 
     return this.reply(Device, this.device(device), 200)
   }
@@ -437,42 +481,46 @@ export class FakeCria {
     })
   }
 
-  private subscribe(): Response {
-    let subscriber: ReadableStreamDefaultController<Uint8Array> | undefined
+  private subscribe(signal: AbortSignal): Response {
+    let subscriber: Subscriber | undefined
+
+    signal.addEventListener('abort', () => subscriber && this.unsubscribe(subscriber, signal.reason), { once: true })
 
     return new Response(
       new ReadableStream<Uint8Array>({
-        start: controller => {
-          subscriber = controller
-          this.streams.add(controller)
-          controller.enqueue(this.event())
+        start: stream => {
+          const tick = setInterval(() => subscriber && this.tick(subscriber), 250)
+
+          subscriber = { stream, tick, sentRevision: -1, sentAt: 0 }
+          this.subscribers.add(subscriber)
+          this.send(subscriber)
         },
-        cancel: () => {
-          if (subscriber) this.streams.delete(subscriber)
-        },
+        cancel: () => subscriber && this.unsubscribe(subscriber, undefined),
       }),
       { headers: { 'content-type': 'text/event-stream' } },
     )
   }
 
-  private read(): void {
-    this.instance.readAt = Date.now()
-    this.publish()
+  private tick(subscriber: Subscriber): void {
+    if (this.instance.revision > subscriber.sentRevision || Date.now() - subscriber.sentAt >= 1_000) this.send(subscriber)
   }
 
-  private publish(): void {
-    if (this.streams.size === 0) return
-    const event = this.event()
-
-    if (!this.reachable) return
-
-    for (const stream of this.streams) stream.enqueue(event)
-  }
-
-  private event(): Uint8Array {
+  private send(subscriber: Subscriber): void {
     const state = Schema.encodeSync(State)(this.snapshot())
 
-    return new TextEncoder().encode(`event: state\ndata: ${JSON.stringify(state)}\n\n`)
+    subscriber.sentRevision = this.instance.revision
+    subscriber.sentAt = Date.now()
+
+    // A partition loses what Cria sends, so the sequence still counts it.
+    if (this.reachable) subscriber.stream.enqueue(new TextEncoder().encode(`event: state\ndata: ${JSON.stringify(state)}\n\n`))
+  }
+
+  private unsubscribe(subscriber: Subscriber, failure: Error | undefined): void {
+    if (!this.subscribers.delete(subscriber)) return
+    clearInterval(subscriber.tick)
+
+    if (failure) subscriber.stream.error(failure)
+    else subscriber.stream.close()
   }
 
   private snapshot(): State {
@@ -564,9 +612,13 @@ export class FakeCria {
   }
 
   private withOperation(operationId: string, found: (operation: Operation) => Response): Response {
-    const operation = Schema.is(OperationId)(operationId) ? this.instance.operations.get(operationId) : undefined
+    if (!Schema.is(OperationId)(operationId)) return this.refuse('not-found', 'No such operation')
+    const operation = this.instance.operations.get(operationId)
 
-    return operation ? found(operation) : this.refuse('not-found', 'No such operation')
+    if (operation) return found(operation)
+    const pruned = [...this.instance.requests.values()].some(request => request.operationId === operationId)
+
+    return pruned ? this.refuse('result-expired', 'The operation is no longer kept') : this.refuse('not-found', 'No such operation')
   }
 
   private binding(failureDomain: FailureDomain): BindingId {
@@ -589,6 +641,7 @@ export class FakeCria {
     return {
       id: InstanceId.make(randomUUID()),
       sequence: 0,
+      revision: 0,
       readAt: Date.now(),
       bindings: new Map(rig.map(device => [device.failureDomain, BindingId.make(randomUUID())])),
       recoveredBindings: new Map(),
@@ -621,6 +674,8 @@ function later(ms: number): Promise<void> {
 }
 
 function unlessAborted(reply: Promise<Response>, signal: AbortSignal): Promise<Response> {
+  if (signal.aborted) return Promise.reject(signal.reason)
+
   return new Promise((resolve, reject) => {
     signal.addEventListener('abort', () => reject(signal.reason), { once: true })
     reply.then(resolve, reject)
