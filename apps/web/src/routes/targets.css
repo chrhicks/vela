@@ -608,3 +608,26 @@
     width: 100%;
   }
 }
+@media (max-width: 600px) {
+  .vela-rig-page.targets-page {
+    padding: 16px 16px 24px;
+  }
+  .targets-page:has(.vela-target-use) {
+    padding-bottom: 104px;
+  }
+  .vela-target-use {
+    position: fixed;
+    inset: auto 0 var(--vela-navigation-tabs-height, 0px);
+    z-index: 9;
+    justify-items: stretch;
+    padding: 12px 16px 14px;
+    border-top: 1px solid var(--vela-line);
+    background: var(--vela-canvas);
+  }
+  .vela-target-use > .vela-button {
+    min-height: 52px;
+  }
+  .vela-target-use > p {
+    max-width: none;
+  }
+}

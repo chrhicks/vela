@@ -123,7 +123,8 @@ leave already loaded pixels visible. Source statistics come from that exposure;
 unavailable analysis is not zero stars.
 
 The framing header's Use this target records the same chosen target and opens
-Tonight at any time, with or without a framing check. Slew & check and Check
+Tonight at any time, with or without a framing check. On a phone it sits in a
+bar above the tab bar so it stays in reach while composing. Slew & check and Check
 current frame are the only framing actions that move the mount or take an image.
 Detailed sky inspection, centering history and frame nudges are retained
 in progressive disclosures; reference-view reset/zoom never edits composition.

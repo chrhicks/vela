@@ -161,3 +161,19 @@ test('a ready rig leads with Open Tonight and keeps preparation in reach on a ph
   await page.screenshot({ path: '/tmp/vela-p3/shots/after-rig-ready-768.png' })
   expect(scene.writes).toEqual([])
 })
+
+test('framing keeps Use this target above the tab bar while composing on a phone', async ({ page }) => {
+  await page.setViewportSize(phone)
+  const { scene } = await openExploreScene(page, 'framing-light')
+  const use = page.getByRole('button', { name: 'Use this target' })
+  await expect(use).toBeEnabled()
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+  await expect(use).toBeInViewport()
+  const bar = (await page.locator('.vela-target-use').boundingBox())!
+  expect(bar.y + bar.height).toBe(await tabBarTop(page))
+  const last = (await page.locator('.vela-target-context').boundingBox())!
+  expect(last.y + last.height).toBeLessThanOrEqual(bar.y)
+  await expect(page.getByRole('button', { name: 'Check current frame' })).toBeAttached()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  expect(scene.commands).toEqual([])
+})
