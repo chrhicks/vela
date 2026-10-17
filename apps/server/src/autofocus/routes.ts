@@ -136,7 +136,7 @@ export function registerAutofocus(
     })
 
     if (!rig.imagingCamera)
-      return unavailable('Choose an imaging camera on Observe before autofocus.')
+      return unavailable('Choose an imaging camera on the Rig page before autofocus.')
 
     const detail = await inspectRigDetail(catalog, rigId, { createInspector })
 

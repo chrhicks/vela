@@ -177,7 +177,7 @@ export function registerCapture(
     const target = cameraSettings(rig)
 
     if (!target)
-      return unavailable('Choose an imaging camera on Observe before taking an exposure.')
+      return unavailable('Choose an imaging camera on the Rig page before taking an exposure.')
 
     const detail = await inspectRigDetail(catalog, rigId, { createInspector })
 

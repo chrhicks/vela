@@ -13,9 +13,9 @@ name requires explicit reselection for Alpaca. Cria matches the saved camera by
 its stable device ID and checks the actual name against `cria.json` instead.
 A different device in the configured slot is not silently accepted.
 
-The Observe chooser is the setup path. It replaces the temporary
+The Rig page's Imaging setup is the setup path. It replaces the temporary
 `VELA_CAPTURE_ENDPOINT` / `VELA_CAPTURE_CAMERA_ID` environment configuration;
-previously environment-configured rigs need one explicit choice in Observe.
+previously environment-configured rigs need one explicit choice there.
 Route
 composition acquires the same Rig operation lease used by alignment and
 connection commands before checking the selected identity and connection. The lease
@@ -123,12 +123,11 @@ Choose the simulator imaging camera through the same Rig setup API used for a
 physical Rig: GET `/api/web/rigs/:rigId/imaging-camera` returns current choices;
 PUT `/api/rigs/:rigId/imaging-camera` with `{ id, name }` remembers an explicitly
 selected current choice. The name echo rejects a choice that changed since it
-was displayed. The Observe chooser uses those same routes. Use the isolated simulator review catalog and app proxy described
+was displayed. The Rig page's Imaging setup uses those same routes. Use the isolated simulator review catalog and app proxy described
 in `../alignment/README.md`.
 
-From Observe, open Capture, choose an exposure duration and take an image. Return
-to Observe during a longer exposure to see its activity and the previous-image
-thumbnail. Stop aborts the pending exposure; it does not discard the last
+From Tonight, choose an exposure duration and take an image. Return to Tonight
+during a longer exposure to see its activity and the previous image. Stop aborts the pending exposure; it does not discard the last
 completed image. Fit displays the whole frame, while 100% provides native-pixel
 scrolling. Preview age measures time since receipt; metadata also retains the
 exposure-start timestamp and its camera-reported or server-estimated source.
