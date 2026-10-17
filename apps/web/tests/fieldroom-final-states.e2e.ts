@@ -202,7 +202,7 @@ for (const mode of ['light', 'dark'] as const) {
     await expect(image.getByRole('img')).toHaveCount(0)
     await photograph(page, `capture-no-image-${mode}`)
     await page
-      .getByRole('button', { name: 'Start capture', exact: true })
+      .getByRole('button', { name: 'Take exposure', exact: true })
       .click()
     await expect(
       page.getByRole('button', { name: 'Sending command…', exact: true }),
@@ -252,12 +252,12 @@ for (const mode of ['light', 'dark'] as const) {
       'Waiting for the camera to confirm it has stopped.',
     )
     await expect(
-      page.getByRole('button', { name: 'Start capture', exact: true }),
+      page.getByRole('button', { name: 'Take exposure', exact: true }),
     ).toHaveCount(0)
     await photograph(page, `capture-stopping-${mode}`)
     scene.set({ phase: 'stopped', active: false })
     await expect(
-      page.getByRole('button', { name: 'Start capture', exact: true }),
+      page.getByRole('button', { name: 'Take exposure', exact: true }),
     ).toBeEnabled()
     await expect(operation).toContainText('1 completed')
     await expect(image.getByRole('img')).toHaveAttribute(
