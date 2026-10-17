@@ -59,12 +59,14 @@ export interface CaptureRunOptions {
 
 const tracer = trace.getTracer('vela.capture')
 
+type CaptureRunView = Omit<CaptureView, 'chosenTarget'>
+
 export function createCaptureController(
   settings: { rigId: string; rigName: string },
   now = Date.now,
   savedImages: SavedImageStore = createMemorySavedImageStore(),
 ) {
-  let view: CaptureView = {
+  let view: CaptureRunView = {
     rigId: settings.rigId,
     rigName: settings.rigName,
     camera: null,
@@ -103,7 +105,7 @@ export function createCaptureController(
     }
   >()
 
-  function patch(next: Partial<CaptureView>) {
+  function patch(next: Partial<CaptureRunView>) {
     view = { ...view, ...next }
   }
 
