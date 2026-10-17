@@ -113,16 +113,19 @@ export function AppNavigation() {
           ? [
               {
                 label: 'Tonight',
+                icon: tonightIcon,
                 ...routeLink(`${base}/observe/capture`),
                 current: pathname === `${base}/observe/capture` || inPreparation,
               },
               {
                 label: 'Targets',
+                icon: targetsIcon,
                 ...routeLink(`${base}/observe/targets${targetSearch}`),
                 current: inTargets,
               },
               {
                 label: 'Photographs',
+                icon: photographsIcon,
                 ...routeLink(`${base}/observe/saved-images`),
                 current: inPhotographs,
               },
@@ -130,6 +133,7 @@ export function AppNavigation() {
           : [
               {
                 label: 'Explore the sky',
+                icon: targetsIcon,
                 ...routeLink('/explore'),
                 current: pathname === '/explore',
               },
@@ -139,6 +143,27 @@ export function AppNavigation() {
     />
   )
 }
+
+const tonightIcon = (
+  <svg viewBox="0 0 22 22" aria-hidden="true">
+    <circle cx="11" cy="11" r="7" />
+    <circle cx="11" cy="11" r="2.2" fill="currentColor" stroke="none" />
+  </svg>
+)
+
+const targetsIcon = (
+  <svg viewBox="0 0 22 22" aria-hidden="true">
+    <circle cx="11" cy="11" r="8" />
+    <path d="M11 3v4M11 15v4M3 11h4M15 11h4" />
+  </svg>
+)
+
+const photographsIcon = (
+  <svg viewBox="0 0 22 22" aria-hidden="true">
+    <rect x="3" y="5" width="16" height="12" rx="2" />
+    <path d="M3 14l5-4 4 3 3-2 4 3" />
+  </svg>
+)
 
 type ActivityPresentation = Pick<NavigationActivity, 'status' | 'note' | 'progress'> & {
   interrupted: boolean

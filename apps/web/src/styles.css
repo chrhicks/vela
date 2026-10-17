@@ -45,6 +45,10 @@ body { background: var(--vela-canvas); color: var(--vela-text); }
 .vela-app > .vela-navigation { position: relative; }
 .vela-app > .vela-navigation::after { content: ""; position: absolute; bottom: 0; left: 0; right: 0; height: 1px; background: var(--vela-line); }
 .vela-app > .vela-navigation .vela-navigation__bar { border-bottom: 0; }
+.vela-app > main { padding-bottom: var(--vela-navigation-tabs-height, 0px); }
 @media (max-width: 700px) {
   .vela-app > .vela-navigation { padding-inline: 20px; }
+}
+@media (max-width: 600px) {
+  .vela-app > .vela-navigation { padding-inline: 16px; }
 }
