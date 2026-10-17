@@ -350,7 +350,7 @@ test('repeating capture restores server settings and can stop during image recei
   await page.goto('/rigs/rig-1/observe/capture')
   await expect(page.getByRole('checkbox', { name: 'Repeat until stopped' })).toBeChecked()
   await expect(page.getByRole('checkbox', { name: 'Save frames' })).toBeChecked()
-  await page.getByRole('button', { name: 'Start capture' }).click()
+  await page.getByRole('button', { name: 'Take exposure' }).click()
   expect(startBody).toEqual({ exposureSeconds: 2, repeat: true, saveFrames: true, targetId: null })
   await expect(page.getByRole('button', { name: 'Stop capture' })).toBeEnabled()
   current = { ...current, completedCount: 2, latestImage: firstImage, phase: 'reading' }
@@ -362,7 +362,7 @@ test('repeating capture restores server settings and can stop during image recei
     page.getByRole('region', { name: 'Latest image', exact: true }).getByRole('img'),
   ).toBeVisible()
   await page.getByRole('button', { name: 'Stop capture' }).click()
-  await expect(page.getByRole('button', { name: 'Start capture' })).toBeEnabled()
+  await expect(page.getByRole('button', { name: 'Take exposure' })).toBeEnabled()
   await expect(page.getByRole('region', { name: 'Capture images' })).toContainText('2 completed')
   await expect(
     page.getByRole('region', { name: 'Latest image', exact: true }).getByRole('img'),

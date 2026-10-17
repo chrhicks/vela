@@ -120,10 +120,7 @@ export function AppNavigation() {
               {
                 label: 'Tonight',
                 ...routeLink(`${base}/observe/capture`),
-                current:
-                  pathname === `${base}/observe/capture` ||
-                  pathname === `${base}/observe` ||
-                  inPreparation,
+                current: pathname === `${base}/observe/capture` || inPreparation,
               },
               {
                 label: 'Explore the sky',

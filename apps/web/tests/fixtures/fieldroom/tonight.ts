@@ -1,4 +1,5 @@
 import type { CaptureView, NavigationView, RigDetailView, TargetView } from '@vela/model/web'
+import { observation } from '../observation'
 
 export const reviewTime = '2026-09-30T01:43:44.000Z'
 
@@ -223,6 +224,9 @@ export function createTonightScene(name: TonightScene) {
 
       if (method === 'GET' && pathname === '/api/web/rigs/fra400')
         return { status: 200, json: reviewRig }
+
+      if (method === 'GET' && pathname === '/api/web/rigs/fra400/observe')
+        return { status: 200, json: observation('complete', 'fra400') }
 
       if (method === 'GET' && pathname === '/api/web/rigs/fra400/targets/ngc6888')
         return { status: 200, json: reviewTarget }

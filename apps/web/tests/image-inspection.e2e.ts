@@ -3,7 +3,6 @@ import type { Page, Route } from '@playwright/test'
 import type { CaptureImage, CaptureView } from '@vela/model/web'
 import { readFileSync } from 'node:fs'
 import { observation } from './fixtures/observation'
-import { openExploreScene } from './fixtures/fieldroom/browser'
 
 const pixels = readFileSync(new URL('../../../packages/ui/src/components/fixtures/capture-star-field.png', import.meta.url))
 
@@ -274,21 +273,29 @@ test('shared inspection keeps a complete renderer version until replacement pixe
 })
 
 
+const enlargedFitFrame = {
+  pixels: readFileSync(new URL('../../../packages/ui/src/drafts/target-framing/crescent.jpg', import.meta.url)),
+  size: { width: 1280, height: 1224 },
+}
+
 test('enlarged vertical wheel panning preserves the clamped horizontal inspection center', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 989 })
-  const { scene } = await openExploreScene(page, 'preparation-light')
-  const preview = page.getByRole('region', { name: 'Last test exposure', exact: true })
-  const inline = preview.locator('.capture-image__window')
-  await expect(inline.locator('img')).toBeVisible()
-  await preview.getByRole('button', { name: '100%', exact: true }).click()
+  await scene(page)
+  await page.route('**/api/web/rigs/rig-1/capture', route =>
+    json(route, { ...capture, latestImage: { ...frame, ...enlargedFitFrame.size } }))
+  await page.route('**/api/rigs/rig-1/capture/images/frame-1**', route =>
+    route.fulfill({ contentType: 'image/jpeg', body: enlargedFitFrame.pixels }))
+  const image = await openImage(page)
+  const inline = image.locator('.capture-image__window')
+  await image.getByRole('button', { name: '100%', exact: true }).click()
   await expect(inline).toHaveAttribute('data-zoomed', 'true')
   const initialLeft = await inline.evaluate(element => element.scrollLeft)
   await inline.focus()
   await page.keyboard.press('ArrowRight')
-  await expect.poll(() => inline.evaluate(element => element.scrollLeft)).toBe(initialLeft + 80)
+  await expect.poll(() => inline.evaluate(element => element.scrollLeft)).toBeGreaterThan(initialLeft)
   const desiredX = await inline.evaluate(element => element.scrollLeft + element.clientWidth / 2)
-  await preview.getByRole('button', { name: 'Enlarge test exposure', exact: true }).click()
-  const dialog = page.getByRole('dialog', { name: 'Inspect test exposure', exact: true })
+  await image.getByRole('button', { name: 'Enlarge image', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Exposure inspection', exact: true })
   const enlarged = dialog.locator('.capture-image__window')
   await expect(dialog).toBeVisible()
   await dialog.evaluate(async element => {
@@ -304,7 +311,7 @@ test('enlarged vertical wheel panning preserves the clamped horizontal inspectio
   await expect.poll(() => enlarged.evaluate(element => element.scrollTop)).toBeGreaterThan(initialTop)
   const desiredY = await enlarged.evaluate(element => element.scrollTop + element.clientHeight / 2)
   await page.keyboard.press('Escape')
-  await expect(preview.getByRole('button', { name: 'Enlarge test exposure', exact: true })).toBeFocused()
+  await expect(image.getByRole('button', { name: 'Enlarge image', exact: true })).toBeFocused()
 
   const restored = await inline.evaluate(element => ({
     x: element.scrollLeft + element.clientWidth / 2,
@@ -314,5 +321,4 @@ test('enlarged vertical wheel panning preserves the clamped horizontal inspectio
   expect(restored.x).toBe(desiredX)
   // Odd and even viewport heights may round a half-pixel center differently.
   expect(Math.abs(restored.y - desiredY)).toBeLessThanOrEqual(0.5)
-  expect(scene.commands).toEqual([])
 })

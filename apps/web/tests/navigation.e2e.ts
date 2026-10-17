@@ -69,7 +69,7 @@ test('activity reports loss, readout and confirmed end without inventing complet
   await page.route('**/api/web/navigation', route =>
     unavailable ? route.fulfill({ status: 503, json: {} }) : route.fulfill({ json: view }),
   )
-  await page.goto('/rigs/rig-1/observe')
+  await page.goto('/rigs/rig-1/observe/saved-images')
   const bar = page.locator('.vela-navigation')
   await expect(bar.locator('progress')).toHaveAttribute('value', '18')
   unavailable = true
@@ -92,7 +92,7 @@ test('activity reports loss, readout and confirmed end without inventing complet
 })
 
 
-test('preparation opens the confirmed active capture without starting another operation', async ({ page }) => {
+test('the old Observe address replaces itself with Tonight without starting another operation', async ({ page }) => {
   const writes: string[] = []
   const capture = { ...reviewCapture, rigId: 'rig-1', subject: null, latestImage: null }
   page.on('request', request => {
@@ -104,10 +104,10 @@ test('preparation opens the confirmed active capture without starting another op
   await page.route('**/api/web/navigation', route => route.fulfill({ json: initial }))
   await page.route('**/api/web/rigs/rig-1/capture', route => route.fulfill({ json: capture }))
   await page.goto('/rigs/rig-1/observe')
-  await expect(page.getByRole('region', { name: 'Last test exposure' })).toContainText('No test exposure yet')
-  await expect(page.getByRole('button', { name: 'Start capture', exact: true })).toHaveCount(0)
-  await page.getByRole('link', { name: 'Open active capture →', exact: true }).click()
   await expect(page).toHaveURL(/rigs\/rig-1\/observe\/capture$/)
+  await expect(page.locator('.vela-navigation').getByRole('link', { name: 'Tonight', exact: true })).toHaveAttribute('aria-current', 'page')
   await expect(page.getByRole('button', { name: 'Stop capture', exact: true })).toBeEnabled()
+  await page.goBack()
+  await expect(page).not.toHaveURL(/\/observe/)
   expect(writes).toEqual([])
 })
