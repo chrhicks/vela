@@ -86,7 +86,10 @@ Explore and Frame share the same phase presentation.
 `TargetBrowser` presents nine catalog cards and a selected-subject summary. View
 subject changes selection only. The summary's primary Use this target records the
 rig's chosen target on the server through `use-choose-target` and opens Tonight;
-it never moves the mount. The secondary Frame it first… opens framing. `use-discovery`
+it never moves the mount. The secondary Frame it first… opens framing. On a phone
+the cards become compact rows and these two actions sit in a bar above the tab
+bar, naming the selected subject. Tapping the selected row again opens its sky
+details below the list. `use-discovery`
 restores the last validated page from localStorage per rig, immediately and
 without a background recalculation. Type, optical preference, search and page
 requests share the server snapshot. Refresh deliberately replaces that snapshot
@@ -120,7 +123,8 @@ leave already loaded pixels visible. Source statistics come from that exposure;
 unavailable analysis is not zero stars.
 
 The framing header's Use this target records the same chosen target and opens
-Tonight at any time, with or without a framing check. Slew & check and Check
+Tonight at any time, with or without a framing check. On a phone it sits in a
+bar above the tab bar so it stays in reach while composing. Slew & check and Check
 current frame are the only framing actions that move the mount or take an image.
 Detailed sky inspection, centering history and frame nudges are retained
 in progressive disclosures; reference-view reset/zoom never edits composition.

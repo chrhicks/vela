@@ -98,5 +98,29 @@
 }
 @container equipment (width < 600px) {
   .equipment__management { flex-direction: column; align-items: start; }
-  .equipment__readiness .equipment__connection-actions { display: grid; }
+  .equipment__readiness .equipment__connection-actions { display: grid; justify-content: stretch; }
+}
+@container equipment (width < 600px) {
+  .equipment__heading { padding: 16px; }
+  .equipment__heading > div { gap: 4px 12px; }
+  .equipment__layout { padding-inline: 16px; }
+  .equipment__freshness { padding-inline: 16px; }
+  .equipment__readiness { gap: 12px; padding: 18px; }
+  .equipment__readiness .vela-button { min-height: 46px; }
+  .equipment__readiness .vela-button[data-tone="accent"] { min-height: 50px; }
+  .equipment__devices > header { padding: 20px 0 4px; }
+  .equipment__row { grid-template-columns: 36px minmax(0, 1fr) auto 44px; gap: 1px 12px; min-height: 0; padding: 14px 0; }
+  .equipment__row > svg { grid-row: 1 / 3; align-self: center; width: 36px; height: 36px; }
+  .equipment__name { gap: 1px; }
+  .equipment__name h3 { font-size: 15px; line-height: 20px; }
+  .equipment__name p, .equipment__summary, .equipment__connection { font-size: 13px; line-height: 18px; }
+  .equipment__summary { grid-column: 2; grid-row: 2; }
+  .equipment__connection { grid-column: 3; grid-row: 1 / 3; align-self: center; justify-self: end; white-space: nowrap; }
+  .equipment__row > .vela-icon-button { grid-column: 4; grid-row: 1 / 3; align-self: center; }
+  .equipment__device-details { padding-left: 48px; }
+  .equipment__preparation { order: 1; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px 24px; margin-top: 8px; padding-block: 12px; }
+  .equipment__preparation > div { gap: 4px 24px; }
+  .equipment__preparation > p { flex-basis: 100%; color: var(--vela-text-muted); font-size: 14px; line-height: 20px; }
+  .equipment__preparation .vela-button { min-height: 44px; padding: 0; border: 0; background: none; font-size: 14px; font-weight: 400; text-decoration: underline; text-underline-offset: 3px; }
+  .equipment__setup { order: 2; }
 }

@@ -15,7 +15,13 @@ page controller and commands remain independently owned by the capture feature.
 The bar follows its current active rig across routes. Another active rig is a
 catalog-order fallback; the summary always keeps the owning rig's identity.
 Chris's current workflow is one operating rig, so this is not a multi-activity
-control panel. With a rig selected, Tonight, Targets, and Photographs use their existing route addresses; without one, Explore the sky opens `/explore`. Preparation remains reachable from page context. Current exposure progress
+control panel. With a rig selected, Tonight, Targets, and Photographs use their existing route addresses; without one, Explore the sky opens `/explore`. Preparation remains reachable from page context.
+
+On a phone the header is one row with the brand and the rig chip, and the same
+links move to a bottom tab bar with the same current page. The bar publishes
+`--vela-navigation-tabs-height`, which the Shell reserves below `main` and sticky
+page actions sit above. Polar alignment and Autofocus use the compact `← Tonight`
+bar instead and keep the full height. Current exposure progress
 is server-reported elapsed time, never a client clock or total-run percentage.
 Only exposing shows timed progress. Reading/saving/stopping name their phase;
 failed state links to Capture for the outcome.

@@ -50,7 +50,10 @@ for (const width of [1440, 1024, 390]) {
     await expect(before.getByRole('link', { name: 'Polar alignment' })).toHaveAttribute('href', '/rigs/fra400/observe/alignment')
     await expect(before.getByRole('link', { name: 'Autofocus' })).toHaveAttribute('href', '/rigs/fra400/observe/autofocus')
     const steps = page.getByRole('list', { name: 'Tonight’s steps' })
-    await expect(steps.locator('[aria-current="step"]')).toContainText('RigNeeds attention')
+    const phone = width === 390
+
+    if (phone) await expect(steps).toBeHidden()
+    else await expect(steps.locator('[aria-current="step"]')).toContainText('RigNeeds attention')
     const take = page.getByRole('button', { name: 'Take exposure', exact: true })
     await expect(take).toBeDisabled()
     await expect(page.getByText('The imaging camera is disconnected.', { exact: false })).toBeVisible()
@@ -59,7 +62,8 @@ for (const width of [1440, 1024, 390]) {
     await page.getByRole('spinbutton', { name: 'Exposure · seconds' }).fill('120')
     await connect.click()
     await expect(take).toBeEnabled()
-    await expect(steps.locator('[aria-current="step"]')).toContainText('CaptureNow')
+
+    if (!phone) await expect(steps.locator('[aria-current="step"]')).toContainText('CaptureNow')
     await expect(page.getByRole('spinbutton', { name: 'Exposure · seconds' })).toHaveValue('120')
     expect(scene.commands).toEqual([{ method: 'POST', pathname: '/api/rigs/fra400/connections', body: undefined }])
     expect(scene.unknownRequests).toEqual([])

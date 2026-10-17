@@ -81,7 +81,7 @@ for (const width of [1040, 390]) {
     // specificity rule and shrink the specimen's command to the base size.
     await expect(page.getByRole('button', { name: 'Take exposure' })).toHaveCSS(
       'min-height',
-      '46px',
+      width === 390 ? '52px' : '46px',
     )
     await expect(page.locator('.tonight-capture')).toHaveCSS('border-radius', '6px')
     expect(

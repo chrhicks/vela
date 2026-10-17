@@ -6,6 +6,8 @@ export interface NavigationLink {
   label: string
   current?: boolean
   onClick?: MouseEventHandler<HTMLAnchorElement>
+  /** A line glyph for the phone tab bar. */
+  icon?: ReactNode
 }
 
 export interface NavigationActivity {
@@ -174,6 +176,21 @@ export function NavigationBar({
           )}
         </div>
       </header>
+      {links.length > 0 && (
+        <nav aria-label="Observing pages" className="vela-navigation__tabs">
+          {links.map(link => (
+            <a
+              key={link.href}
+              href={link.href}
+              aria-current={link.current ? 'page' : undefined}
+              onClick={link.onClick}
+            >
+              {link.icon}
+              {link.label}
+            </a>
+          ))}
+        </nav>
+      )}
     </div>
   )
 }

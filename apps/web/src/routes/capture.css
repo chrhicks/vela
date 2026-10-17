@@ -487,6 +487,52 @@
     padding: 20px;
   }
 }
+@media (max-width: 600px) {
+  .vela-rig-page.capture-page {
+    padding: 14px 16px 24px;
+  }
+}
+@container (max-width: 600px) {
+  .capture-page__layout,
+  .tonight-context {
+    gap: 14px;
+  }
+  .tonight-steps {
+    display: none;
+  }
+  .tonight-subject {
+    gap: 6px;
+  }
+  .tonight-subject .vela-type-subject {
+    font-size: 28px;
+    line-height: 32px;
+    letter-spacing: -0.6px;
+  }
+  .tonight-subject .tonight-context__heading,
+  .tonight-subject__clear {
+    min-height: 32px;
+  }
+  .tonight-subject__catalog {
+    display: none;
+  }
+  .tonight-capture {
+    gap: 14px;
+    padding: 16px;
+  }
+  .tonight-capture:not([data-active]) {
+    padding: 0;
+    background: none;
+  }
+  .tonight-capture form {
+    gap: 12px;
+  }
+  .tonight-capture form > .vela-field {
+    grid-template-columns: minmax(0, 1fr) 110px;
+  }
+  .tonight-capture form > .vela-button {
+    min-height: 52px;
+  }
+}
 
 .tonight-interruption.capture-page__warning {
   display: flex;
