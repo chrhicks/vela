@@ -167,7 +167,15 @@ test('pending target choice cannot relabel an active run and theme changes prese
 
     if (pathname.endsWith('/capture'))
       return route.fulfill({
-        json: { ...reviewCapture, active, phase: active ? 'exposing' : 'stopped' },
+        json: {
+          ...reviewCapture,
+          active,
+          phase: active ? 'exposing' : 'stopped',
+          chosenTarget: {
+            state: 'chosen',
+            subject: { targetId: 'next', name: 'Next subject', catalog: 'NGC 7000' },
+          },
+        },
       })
 
     if (pathname.endsWith('/targets/next'))
@@ -178,13 +186,25 @@ test('pending target choice cannot relabel an active run and theme changes prese
       ? route.fulfill({ contentType: 'image/jpeg', body: reference })
       : route.fulfill({ status: response.status, json: response.json })
   })
-  await page.goto(`${scene.route}?target=next`)
+  await page.goto(scene.route)
   await expect(page.getByRole('heading', { name: 'The Crescent Nebula' })).toBeVisible()
   await expect(page.locator('.tonight-subject')).toContainText(
     'Another target is selected for the next run',
   )
+  await expect(page.getByRole('note')).toHaveCount(0)
   active = false
   await expect(page.getByRole('heading', { name: 'Next subject' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Change target', exact: true })).toHaveAttribute(
+    'href',
+    '/rigs/fra400/observe/targets',
+  )
+  await expect(page.getByRole('note')).toHaveText(
+    'Mount pointing isn’t checkedFrames will be recorded as Next subject. Frame it first to slew and check.',
+  )
+  await expect(page.getByRole('link', { name: 'Frame it first' })).toHaveAttribute(
+    'href',
+    '/rigs/fra400/observe/targets/next',
+  )
   await page.getByRole('spinbutton', { name: 'Exposure · seconds' }).fill('42')
   await page.getByRole('button', { name: 'Appearance', exact: true }).click()
   await page.getByRole('radio', { name: 'Dark', exact: true }).check()
@@ -193,7 +213,44 @@ test('pending target choice cannot relabel an active run and theme changes prese
   await page.getByRole('button', { name: 'Start capture' }).click()
   await expect
     .poll(() => starts)
-    .toEqual([{ exposureSeconds: 42, repeat: true, saveFrames: false, targetId: 'next' }])
+    .toEqual([{ exposureSeconds: 42, repeat: true, saveFrames: true, targetId: 'next' }])
+})
+
+test('with no chosen target Tonight captures at the current position without a subject', async ({
+  page,
+}) => {
+  const starts: unknown[] = []
+  const scene = createTonightScene('tonight-light')
+  await page.route('**/api/**', (route) => {
+    const pathname = new URL(route.request().url()).pathname
+
+    if (pathname.endsWith('/capture/start')) {
+      starts.push(route.request().postDataJSON())
+
+      return route.fulfill({ json: reviewCapture })
+    }
+
+    if (pathname.endsWith('/capture'))
+      return route.fulfill({
+        json: { ...reviewCapture, active: false, phase: 'stopped', chosenTarget: { state: 'none' } },
+      })
+    const response = scene.respond(route.request().method(), pathname)
+
+    return response.image
+      ? route.fulfill({ contentType: 'image/jpeg', body: reference })
+      : route.fulfill({ status: response.status, json: response.json })
+  })
+  await page.goto(scene.route)
+
+  await expect(page.getByRole('heading', { name: 'Choose your subject' })).toBeVisible()
+  await expect(page.locator('.tonight-subject')).toContainText(
+    'Explore the sky, or capture at the current position.',
+  )
+  await expect(page.getByRole('note')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Start capture' }).click()
+  await expect
+    .poll(() => starts)
+    .toEqual([{ exposureSeconds: 180, repeat: true, saveFrames: true, targetId: null }])
 })
 
 

@@ -1,6 +1,6 @@
 import { Button, Checkbox, Input } from '@vela/ui'
 import { useState } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router'
+import { Link, useParams } from 'react-router'
 import { CaptureInterruption } from '../features/capture/CaptureInterruption'
 import { LatestImage } from '../features/capture/LatestImage'
 import { captureActivity, useCapture } from '../features/capture/use-capture'
@@ -21,25 +21,15 @@ export function Capture() {
 function CapturePage({ rigId }: { rigId: string }) {
   const capture = useCapture(rigId)
   const rig = useRigObservation()
-  const [params] = useSearchParams()
   const [exposure, setExposure] = useState<string | null>(null)
   const [saveFrames, setSaveFrames] = useState<boolean | null>(null)
   const [repeat, setRepeat] = useState<boolean | null>(null)
   const [coolingOpen, setCoolingOpen] = useState(false)
   const { view, offline, pending, refreshing, error, commandUnconfirmed } = capture
-  const chosenTargetId = params.get('target') ?? undefined
-
-  const targetId = view?.active
-    ? view.subject?.targetId
-    : (chosenTargetId ?? view?.subject?.targetId)
-
+  const chosen = view?.chosenTarget.state === 'chosen' ? view.chosenTarget.subject : null
+  const subject = view?.active ? view.subject : chosen
+  const targetId = subject?.targetId
   const { target, stale: skyStale } = useTonightTarget(rigId, targetId)
-
-  const subject = view?.active
-    ? view.subject
-    : chosenTargetId
-      ? target
-      : (target ?? view?.subject)
 
   const base = `/rigs/${encodeURIComponent(rigId)}`
 
@@ -129,8 +119,7 @@ function CapturePage({ rigId }: { rigId: string }) {
       ][Math.round(sky.currentAzimuthDegrees / 45) % 8]
     : null
 
-  const hasPendingChoice =
-    view.active && chosenTargetId && chosenTargetId !== view.subject?.targetId
+  const hasPendingChoice = view.active && chosen && chosen.targetId !== view.subject?.targetId
 
   return (
     <section className="vela-rig-page capture-page" aria-label="Tonight" data-interrupted={offline || undefined}>
@@ -146,13 +135,11 @@ function CapturePage({ rigId }: { rigId: string }) {
           <section className="tonight-subject" aria-label="Your subject">
             <div className="tonight-context__heading">
               <span>Your subject</span>
-              <Link className="tonight-link" to={`${base}/observe/targets`}>
-                Change target
+              <Link className="tonight-link" to={`${base}/observe/targets`} aria-label="Change target">
+                Change
               </Link>
             </div>
-            <h1 className="vela-type-subject">
-              {subject?.name ?? (chosenTargetId ? 'Selected subject' : 'Choose your subject')}
-            </h1>
+            <h1 className="vela-type-subject">{subject?.name ?? 'Choose your subject'}</h1>
             <p>
               {[subject?.catalog, target?.constellation, target?.kind]
                 .filter(Boolean)
@@ -163,6 +150,18 @@ function CapturePage({ rigId }: { rigId: string }) {
                 Another target is selected for the next run. This run keeps its original
                 subject.
               </p>
+            )}
+            {chosen && !view.active && !offline && (
+              <div className="tonight-pointing" role="note">
+                <strong>Mount pointing isn’t checked</strong>
+                <p>
+                  Frames will be recorded as {chosen.name}.{' '}
+                  <Link to={`${base}/observe/targets/${encodeURIComponent(chosen.targetId)}`}>
+                    Frame it first
+                  </Link>{' '}
+                  to slew and check.
+                </p>
+              </div>
             )}
           </section>
           {offline ? (
@@ -277,12 +276,7 @@ function CapturePage({ rigId }: { rigId: string }) {
                       event.preventDefault()
 
                       if (validExposure)
-                        void capture.start(
-                          seconds,
-                          repeating,
-                          savingFrames,
-                          chosenTargetId ?? view.subject?.targetId,
-                        )
+                        void capture.start(seconds, repeating, savingFrames, chosen?.targetId ?? null)
                     }}
                   >
                     <Input
@@ -313,9 +307,7 @@ function CapturePage({ rigId }: { rigId: string }) {
                     <Button
                       type="submit"
                       tone="accent"
-                      disabled={
-                        !capture.canStart || !validExposure || (!!chosenTargetId && !target)
-                      }
+                      disabled={!capture.canStart || !validExposure}
                     >
                       {pending
                         ? 'Sending command…'

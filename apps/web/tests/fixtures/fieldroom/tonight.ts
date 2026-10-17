@@ -29,6 +29,7 @@ export const reviewCapture: CaptureView = {
   subject,
   savedCount: 12,
   integrationSeconds: 2160,
+  chosenTarget: { state: 'none' },
   exposureSeconds: 180,
   elapsedSeconds: 96,
   error: null,
@@ -178,6 +179,7 @@ export function createTonightScene(name: TonightScene) {
       completedCount: 0,
       savedCount: 0,
       integrationSeconds: 0,
+      chosenTarget: { state: 'none' },
       subject: null,
     }
 
@@ -260,6 +262,7 @@ export function createTonightScene(name: TonightScene) {
           completedCount: 0,
           savedCount: 0,
           integrationSeconds: 0,
+          chosenTarget: { state: 'none' },
           subject: body?.targetId === subject.targetId ? subject : null,
         }
 
