@@ -70,9 +70,20 @@ The HTTP boundary accepts exposureSeconds from 0.1 through 600 and optional
 boolean repeat and saveFrames, plus an optional targetId. The injected subject
 lookup resolves that ID before acquiring the Rig lease or inspecting hardware.
 Unknown IDs are rejected. Omitting repeat retains the single-exposure API behavior; the web
-interface explicitly requests repetition by default. The server snapshots `subject` as target ID, name and catalog identity; targetless
-starts explicitly use null. This is chosen intent, never proof of pointing. Each
-image receives that snapshot, so later selections cannot relabel a retained frame.
+interface explicitly requests repetition by default. The server snapshots `subject` as target ID, name and catalog identity. A start
+without targetId uses the rig's chosen target, or null when none is chosen. A
+targetId of null starts without a subject; the web sends the subject it displayed
+so a choice made on another device cannot label a run it did not show. This
+is chosen intent, never proof of pointing. Each image receives that snapshot, so
+later selections cannot relabel a retained frame.
+
+Each rig has one chosen target, held in server memory beside its capture runs and
+projected as `chosenTarget` on the capture view so every browser sees the same
+choice. PUT `/api/rigs/:rigId/capture/target` with `{ targetId }` resolves the ID
+through the same subject lookup and rejects unknown targets; `{ targetId: null }`
+clears it. Choosing never moves the mount, takes no Rig lease and may change during
+a run: the active run keeps its own subject and the choice waits for the next start.
+A server restart forgets the choice.
 
 `savedCount` counts unique images retained from the current or most recent run;
 `integrationSeconds` sums only published exposure durations. Both reset on an

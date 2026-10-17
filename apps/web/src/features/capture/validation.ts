@@ -66,6 +66,10 @@ const captureView = z.object({
   exposureSeconds: z.number().min(0).max(600),
   repeat: z.boolean(),
   subject: subject.nullable(),
+  chosenTarget: z.discriminatedUnion('state', [
+    z.strictObject({ state: z.literal('none') }),
+    z.strictObject({ state: z.literal('chosen'), subject }),
+  ]),
   savedCount: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
   integrationSeconds: z.number().finite().nonnegative(),
   completedCount: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),

@@ -90,7 +90,7 @@ export function createExploreScene(name: ExploreScene) {
   const rigless = name === 'explore-no-rig'
 
   let capture: CaptureView = { ...structuredClone(reviewCapture), active: false, phase: 'idle',
-    completedCount: 0, savedCount: 0, integrationSeconds: 0, latestImage: null, subject: null, elapsedSeconds: 0 }
+    completedCount: 0, savedCount: 0, integrationSeconds: 0, chosenTarget: { state: 'none' }, latestImage: null, subject: null, elapsedSeconds: 0 }
 
   let framing = structuredClone(reviewFraming)
 
@@ -162,13 +162,15 @@ export function createExploreScene(name: ExploreScene) {
 
   if (name === 'preparation-unframed') framing = { ...framing, phase: 'idle', actual: null, preview: null, checkCurrent: false, canCenter: false }
 
+  if (name.startsWith('preparation')) capture = { ...capture, chosenTarget: { state: 'chosen', subject } }
+
   const json = <Body>(value: Body): ReviewResponse => ({ status: 200, json: value })
   const failure = (status: number, error: string): ReviewResponse => ({ status, json: { error } })
 
   return {
     name,
     route: rigless ? '/explore' : name.startsWith('explore') ? `${base}/targets` :
-      name.startsWith('framing') ? `${base}/targets/${subject.targetId}` : `${base}?target=${subject.targetId}`,
+      name.startsWith('framing') ? `${base}/targets/${subject.targetId}` : base,
     time: reviewTime, timezone: reviewTimezone, appearance: name.endsWith('-dark') ? 'dark' : 'light',
     commands, unknownRequests,
     respond(method: string, requestUrl: string, body?: ReviewCommand): ReviewResponse {
@@ -287,6 +289,15 @@ export function createExploreScene(name: ExploreScene) {
         capture = { ...capture, camera: { name: selected.name } }
 
         return json(camera)
+      }
+
+      if (method === 'PUT' && pathname === '/api/rigs/fra400/capture/target') {
+        const target = exploreTargets.find(item => item.id === body?.targetId)
+
+        if (!target) return failure(400, 'The chosen target was not found.')
+        capture = { ...capture, chosenTarget: { state: 'chosen', subject: { targetId: target.id, name: target.name, catalog: target.catalog } } }
+
+        return json(capture)
       }
 
       if (method === 'GET' && pathname === '/api/web/rigs/fra400/capture')

@@ -67,7 +67,7 @@ for (const width of [1040, 390]) {
       repeat: false,
       completedCount: 0,
       cooling: null,
-      subject: null, savedCount: 0, integrationSeconds: 0,
+      subject: null, savedCount: 0, integrationSeconds: 0, chosenTarget: { state: 'none' },
     }
 
     await page.route('**/api/web/rigs/rig-1/capture', route =>

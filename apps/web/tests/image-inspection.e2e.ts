@@ -37,7 +37,7 @@ const capture: CaptureView = {
   enabled: true, unavailableReason: null, phase: 'complete', active: false,
   captureReadState: 'current', exposureSeconds: 2, elapsedSeconds: 0, error: null,
   repeat: false, saveFrames: false, savedImageCount: 0, completedCount: 1, cooling: null,
-  subject: null, savedCount: 0, integrationSeconds: 2, latestImage: frame,
+  subject: null, savedCount: 0, integrationSeconds: 2, chosenTarget: { state: 'none' }, latestImage: frame,
 }
 
 function json<Body>(route: Route, value: Body) {

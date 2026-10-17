@@ -54,6 +54,7 @@ async function observe(page: Page) {
       subject: null,
       savedCount: 0,
       integrationSeconds: 0,
+      chosenTarget: { state: 'none' },
       completedCount: 0,
     }),
   )
