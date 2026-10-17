@@ -15,6 +15,9 @@ Connection eligibility and command outcomes come from `useObservation`, not
 from device cards. Equipment reuses `ConnectionResult` for per-device outcomes
 and refreshes the shell observation after a completed command or explicit check.
 An uncertain connection requires inspection before another explicit attempt.
+When the imaging camera is connected and no device needs a connection, the
+banner reads Ready to observe and leads to Tonight or Targets. Otherwise it
+keeps the current connection state with Connect devices first and Tonight second.
 Opening Equipment or a preparation link sends no device commands.
 
 Imaging setup composes the camera and focal-length configuration capabilities.

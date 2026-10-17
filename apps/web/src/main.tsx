@@ -12,6 +12,7 @@ import { SavedImages } from './routes/saved-images'
 import { Targets } from './routes/targets'
 import { Explore } from './routes/explore'
 import { Capture } from './routes/capture'
+import { NotFound } from './routes/not-found'
 import { Shell } from './components/app'
 import { HomeProvider } from './pages/HomeProvider'
 
@@ -45,6 +46,7 @@ const router = createBrowserRouter([
       { path: 'rigs/:rigId/observe/saved-images/:imageId?', Component: SavedImages },
       { path: 'rigs/:rigId/observe/alignment', Component: Alignment },
       { path: 'rigs/:rigId/observe/autofocus', Component: Autofocus },
+      { path: '*', Component: NotFound },
     ],
   },
 ])
