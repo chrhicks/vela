@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import type { TargetDiscoveryView } from '@vela/model/web'
+import type { CaptureView, TargetDiscoveryView } from '@vela/model/web'
 
 const saved: TargetDiscoveryView = {
   rigId: 'rig-1',
@@ -328,13 +328,84 @@ test('view subject only selects the summary, browser history restores it, and fr
   await second.getByRole('button', { name: 'View subject' }).click()
   await expect(page.getByRole('complementary', { name: 'Hercules Cluster details' })).toBeVisible()
   await expect(page).toHaveURL(/subject=m13/)
-  await expect(page.getByRole('link', { name: 'Frame this subject' })).toHaveAttribute(
+  await expect(page.getByRole('button', { name: 'Use this target' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Frame it first…' })).toHaveAttribute(
     'href',
     '/rigs/rig-1/observe/targets/m13?category=all&filter=all&subject=m13',
   )
   await page.goBack()
   await expect(page.getByRole('complementary', { name: 'Andromeda Galaxy details' })).toBeVisible()
   expect(writes).toEqual([])
+})
+
+const idleCapture: CaptureView = {
+  rigId: 'rig-1',
+  rigName: 'Test rig',
+  camera: { name: 'Main camera' },
+  enabled: true,
+  unavailableReason: null,
+  phase: 'idle',
+  captureReadState: 'current',
+  active: false,
+  repeat: true,
+  saveFrames: false,
+  savedImageCount: 0,
+  completedCount: 0,
+  subject: null,
+  chosenTarget: { state: 'none' },
+  savedCount: 0,
+  integrationSeconds: 0,
+  exposureSeconds: 2,
+  elapsedSeconds: 0,
+  error: null,
+  latestImage: null,
+  cooling: null,
+}
+
+test('use this target records the choice and opens Tonight without a framing command', async ({
+  page,
+}) => {
+  await seed(page)
+  const writes: Array<{ method: string; path: string; body: unknown }> = []
+  page.on('request', (request) => {
+    if (request.method() !== 'GET')
+      writes.push({
+        method: request.method(),
+        path: new URL(request.url()).pathname,
+        body: request.postDataJSON(),
+      })
+  })
+  await page.route('**/api/rigs/rig-1/capture/target', (route) =>
+    route.fulfill({
+      json: {
+        ...idleCapture,
+        chosenTarget: {
+          state: 'chosen',
+          subject: { targetId: 'm31', name: 'Andromeda Galaxy', catalog: 'M31' },
+        },
+      },
+    }),
+  )
+  await page.route('**/api/web/rigs/rig-1/capture', (route) => route.fulfill({ json: idleCapture }))
+  await page.goto('/rigs/rig-1/observe/targets')
+
+  await page.getByRole('button', { name: 'Use this target' }).click()
+  await expect(page).toHaveURL(/\/rigs\/rig-1\/observe\/capture$/)
+  expect(writes).toEqual([
+    { method: 'PUT', path: '/api/rigs/rig-1/capture/target', body: { targetId: 'm31' } },
+  ])
+})
+
+test('a rejected target choice stays on Targets and says why', async ({ page }) => {
+  await seed(page)
+  await page.route('**/api/rigs/rig-1/capture/target', (route) =>
+    route.fulfill({ status: 400, json: { error: 'The chosen target was not found.' } }),
+  )
+  await page.goto('/rigs/rig-1/observe/targets')
+
+  await page.getByRole('button', { name: 'Use this target' }).click()
+  await expect(page.getByRole('alert')).toHaveText('The chosen target was not found.')
+  await expect(page).toHaveURL(/\/rigs\/rig-1\/observe\/targets$/)
 })
 
 test('clearing empty-result filters preserves the search term', async ({ page }) => {

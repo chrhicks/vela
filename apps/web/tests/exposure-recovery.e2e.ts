@@ -35,6 +35,7 @@ const capture: CaptureView = {
   subject: null,
   savedCount: 0,
   integrationSeconds: 0,
+  chosenTarget: { state: 'none' },
   error: null,
   cooling: null,
   latestImage: {

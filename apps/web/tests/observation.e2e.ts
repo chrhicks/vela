@@ -28,6 +28,7 @@ test.beforeEach(async ({ page }) => {
       subject: null,
       savedCount: 0,
       integrationSeconds: 0,
+      chosenTarget: { state: 'none' },
       captureReadState: 'current',
       completedCount: 0,
       error: null,

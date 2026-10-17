@@ -67,6 +67,30 @@
 .tonight-subject .tonight-context__heading > span {
   font-weight: 500;
 }
+.tonight-pointing {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 6px;
+  background: var(--vela-warning-surface);
+}
+.tonight-pointing strong {
+  color: var(--vela-warning);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+}
+.tonight-pointing p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+}
+.tonight-pointing a {
+  color: var(--vela-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
 .tonight-capture {
   display: flex;
   flex-direction: column;

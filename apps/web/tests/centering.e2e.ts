@@ -233,7 +233,7 @@ for (const outcome of ['not-converging', 'limit-reached'] as const) {
     await expect(
       page.getByRole('button', { name: 'Center composition', exact: true }),
     ).toBeDisabled()
-    await expect(page.getByRole('link', { name: 'Continue to capture' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Adjust composition' })).toBeVisible()
     await page.getByRole('button', { name: 'Check current frame', exact: true }).click()
     await expect(page.locator('.vela-target-status')).toContainText(
       'Taking a 20-second test exposure',

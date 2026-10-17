@@ -550,6 +550,21 @@
   width: 22px;
   height: 22px;
 }
+.vela-target-use {
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+}
+.vela-target-use > .vela-button {
+  min-width: 200px;
+  min-height: 48px;
+}
+.vela-target-use > p {
+  max-width: 280px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 18px;
+}
 .vela-target-sky-dialog {
   max-width: 560px;
 }

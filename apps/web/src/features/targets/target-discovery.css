@@ -202,6 +202,22 @@
 .vela-discovery__subject > .vela-button {
   width: 100%;
 }
+.vela-discovery__use {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 18px;
+  border-top: 1px solid var(--vela-line);
+}
+.vela-discovery__use > .vela-button {
+  width: 100%;
+}
+.vela-discovery__use > p {
+  margin: 0;
+  color: var(--vela-text-muted);
+  font-size: 13px;
+  line-height: 18px;
+}
 .vela-discovery__subject-details {
   margin-top: 16px;
   font-size: 14px;
