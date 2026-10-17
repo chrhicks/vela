@@ -19,6 +19,7 @@ const view: CaptureView = {
   repeat: true,
   completedCount: 1,
   subject: null,
+  chosenTarget: { state: 'none' },
   savedCount: 0,
   integrationSeconds: 2,
   cooling: null,

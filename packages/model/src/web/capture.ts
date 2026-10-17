@@ -5,6 +5,11 @@ export interface CaptureSubject {
   readonly catalog: string
 }
 
+/** The rig's standing observing intent for its next run, held in server memory. Choosing never moves the mount. */
+export type ChosenTarget =
+  | { readonly state: 'none' }
+  | { readonly state: 'chosen'; readonly subject: CaptureSubject }
+
 /** Conservative star measurements from this image's linear samples. */
 export interface CaptureImageStatistics {
   detectedStars: number
@@ -117,6 +122,8 @@ export interface CaptureView {
   lostFrameCount?: number
   /** Snapshot of the selected subject for this run. */
   subject: CaptureSubject | null
+  /** Subject the next run starts with when no other is requested; an active run keeps its own. */
+  chosenTarget: ChosenTarget
   /** Images from this run durably retained, including explicit Keep. */
   savedCount: number
   /** Sum of exposure durations actually published during this run. */
