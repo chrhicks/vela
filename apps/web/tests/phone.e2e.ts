@@ -1,0 +1,185 @@
+import { expect, test, type Page } from '@playwright/test'
+import { readFileSync } from 'node:fs'
+import { openAlignmentScene, openEquipmentScene, openExploreScene } from './fixtures/fieldroom/browser'
+import { createTonightScene, referenceImage, reviewTime } from './fixtures/fieldroom/tonight'
+
+const phone = { width: 390, height: 844 }
+
+async function tabBarTop(page: Page) {
+  const box = await page.locator('.vela-navigation__tabs').boundingBox()
+
+  return box!.y
+}
+
+test('the phone tab bar presents the page links and follows the current page', async ({ page }) => {
+  await page.setViewportSize(phone)
+  await openExploreScene(page, 'preparation-light')
+  const tabs = page.getByRole('navigation', { name: 'Observing pages' })
+  await expect(tabs).toHaveCount(1)
+  await expect(tabs).toHaveClass('vela-navigation__tabs')
+  await expect(tabs.getByRole('link')).toHaveText(['Tonight', 'Targets', 'Photographs'])
+  await expect(tabs.getByRole('link', { name: 'Tonight' })).toHaveAttribute('aria-current', 'page')
+  expect(await page.locator('.vela-navigation__tabs').boundingBox()).toEqual({ x: 0, y: 776, width: 390, height: 68 })
+  await expect(page.locator('main')).toHaveCSS('padding-bottom', '68px')
+  expect((await page.locator('.vela-navigation__bar').boundingBox())!.height).toBe(60)
+
+  await tabs.getByRole('link', { name: 'Targets' }).click()
+  await expect(page).toHaveURL(/\/rigs\/fra400\/observe\/targets$/)
+  await expect(tabs.getByRole('link', { name: 'Targets' })).toHaveAttribute('aria-current', 'page')
+  await expect(tabs.getByRole('link', { name: 'Tonight' })).not.toHaveAttribute('aria-current')
+
+  await tabs.getByRole('link', { name: 'Photographs' }).click()
+  await expect(page).toHaveURL(/\/rigs\/fra400\/observe\/saved-images$/)
+  await expect(tabs.getByRole('link', { name: 'Photographs' })).toHaveAttribute('aria-current', 'page')
+
+  await tabs.getByRole('link', { name: 'Tonight' }).click()
+  await expect(page).toHaveURL(/\/rigs\/fra400\/observe\/capture$/)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+})
+
+test('desktop keeps the page links in the header without a tab bar', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await openExploreScene(page, 'preparation-light')
+  const pages = page.getByRole('navigation', { name: 'Observing pages' })
+  await expect(pages).toHaveClass('vela-navigation__pages')
+  await expect(pages.getByRole('link', { name: 'Tonight' })).toHaveAttribute('aria-current', 'page')
+  await expect(page.locator('.vela-navigation__tabs')).toBeHidden()
+  await expect(page.locator('main')).toHaveCSS('padding-bottom', '0px')
+})
+
+test('preparation keeps its own return bar and full height on a phone', async ({ page }) => {
+  await page.setViewportSize(phone)
+  await openAlignmentScene(page, 'alignment-phone-adjusting')
+  await expect(page.getByRole('link', { name: '← Tonight' })).toBeVisible()
+  await expect(page.getByRole('navigation', { name: 'Observing pages' })).toHaveCount(0)
+  await expect(page.locator('main')).toHaveCSS('padding-bottom', '0px')
+})
+
+test('without a rig the tab bar offers only Explore the sky', async ({ page }) => {
+  await page.setViewportSize(phone)
+  await openEquipmentScene(page, 'home-rigs')
+  const tabs = page.getByRole('navigation', { name: 'Observing pages' })
+  await expect(tabs.getByRole('link')).toHaveText(['Explore the sky'])
+  await expect(tabs.getByRole('link')).toHaveAttribute('href', '/explore')
+})
+
+for (const width of [390, 360]) {
+  test(`the rig menu opens from the one-row phone header at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: phone.height })
+    await openEquipmentScene(page, 'equipment-connected')
+    const chip = page.getByRole('button', { name: /^Viewing rig/ })
+    await expect(chip).toContainText('3 of 4 connected')
+    const brand = (await page.getByRole('link', { name: 'Vela · all rigs' }).boundingBox())!
+    expect(brand.x + brand.width).toBeLessThan((await chip.boundingBox())!.x)
+    await chip.click()
+    await expect(page.getByRole('link', { name: 'Rig & equipment', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'All rigs', exact: true })).toBeVisible()
+    const menu = (await page.locator('.vela-navigation__rig-menu').boundingBox())!
+    expect(menu.x).toBeGreaterThanOrEqual(0)
+    expect(menu.x + menu.width).toBeLessThanOrEqual(width)
+    expect(menu.y + menu.height).toBeLessThan(await tabBarTop(page))
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  })
+}
+
+test('Tonight with a target chosen shows Take exposure in the first phone screen', async ({ page }) => {
+  await page.setViewportSize(phone)
+  await openExploreScene(page, 'preparation-light')
+  await expect(page.getByRole('heading', { name: 'The Crescent Nebula' })).toBeVisible()
+  const take = page.getByRole('button', { name: 'Take exposure', exact: true })
+  await expect(take).toBeEnabled()
+  const button = (await take.boundingBox())!
+  expect(button.y + button.height).toBeLessThanOrEqual(await tabBarTop(page))
+  expect((await page.locator('.capture-image__window').boundingBox())!.height).toBe(200)
+  await expect(page.getByRole('button', { name: 'Capture without a target' })).toBeInViewport()
+  await expect(page.getByRole('link', { name: 'Change target' })).toBeInViewport()
+})
+
+test('a running capture keeps Stop and its progress in the first phone screen', async ({ page }) => {
+  const scene = createTonightScene('tonight-light')
+  const reference = readFileSync(new URL(`../../../${referenceImage.path}`, import.meta.url))
+  await page.setViewportSize(phone)
+  await page.clock.setFixedTime(new Date(reviewTime))
+  await page.route('**/api/**', route => {
+    const response = scene.respond(route.request().method(), new URL(route.request().url()).pathname)
+
+    return response.image
+      ? route.fulfill({ contentType: 'image/jpeg', body: reference })
+      : route.fulfill({ status: response.status, json: response.json })
+  })
+  await page.goto(scene.route)
+  const stop = page.getByRole('button', { name: 'Stop capture' })
+  await expect(stop).toBeEnabled()
+  await expect(page.getByRole('progressbar', { name: 'Exposure progress' })).toBeInViewport()
+  const button = (await stop.boundingBox())!
+  expect(button.y + button.height).toBeLessThanOrEqual(await tabBarTop(page))
+  await expect(page.getByRole('button', { name: 'Enlarge image' })).toBeInViewport()
+})
+
+test('Targets keeps the selected subject’s actions in a bar above the tab bar', async ({ page }) => {
+  await page.setViewportSize(phone)
+  const { scene } = await openExploreScene(page, 'explore-light')
+  const bar = page.locator('.vela-discovery__use')
+  await expect(page.getByRole('button', { name: 'Use The Crescent Nebula' })).toBeEnabled()
+
+  await page.locator('.vela-discovery__card').nth(1).getByRole('button').click()
+  await expect(page.locator('.vela-discovery__card').nth(1)).toHaveAttribute('data-selected', 'true')
+  const use = page.getByRole('button', { name: 'Use Andromeda Galaxy' })
+  await expect(use).toBeEnabled()
+  await expect(bar.getByRole('link', { name: 'Frame it first…' })).toHaveAttribute('href', /\/targets\/ngc0224\?/)
+  const box = (await bar.boundingBox())!
+  expect(box.y + box.height).toBe(await tabBarTop(page))
+
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+  await expect(use).toBeInViewport()
+  const last = (await page.locator('.vela-discovery__method').boundingBox())!
+  expect(last.y + last.height).toBeLessThanOrEqual((await bar.boundingBox())!.y)
+  await expect(page.getByRole('searchbox', { name: 'Find a target' })).toBeAttached()
+
+  await use.click()
+  await expect(page).toHaveURL(/\/rigs\/fra400\/observe\/capture$/)
+  expect(scene.commands).toEqual([expect.objectContaining({ method: 'PUT', body: { targetId: 'ngc0224' } })])
+})
+
+test('a ready rig leads with Open Tonight and keeps preparation in reach on a phone', async ({ page }) => {
+  await page.setViewportSize(phone)
+  const { scene } = await openEquipmentScene(page, 'equipment-connected')
+  const { rig } = scene.snapshot()
+  scene.setRig({ ...rig, devices: rig.devices.filter(device => device.connection === 'connected') })
+  await page.reload()
+  const readiness = page.getByRole('region', { name: 'Rig readiness', exact: true })
+  await expect(readiness.getByRole('heading', { name: 'Ready to observe', exact: true })).toBeVisible()
+  const open = readiness.getByRole('link', { name: 'Open Tonight →', exact: true })
+  const choose = readiness.getByRole('link', { name: 'Choose a target', exact: true })
+  const banner = (await readiness.boundingBox())!
+  const primary = (await open.boundingBox())!
+  const secondary = (await choose.boundingBox())!
+  expect(primary.width).toBe(banner.width - 36)
+  expect(secondary.y).toBeGreaterThan(primary.y + primary.height)
+  await expect(choose).toBeInViewport()
+  const rows = page.locator('.equipment__row')
+  await expect(rows).toHaveCount(3)
+  expect((await rows.first().boundingBox())!.height).toBeLessThanOrEqual(90)
+  await expect(page.getByRole('region', { name: 'Rig preparation' }).getByRole('link', { name: 'Polar alignment →' })).toHaveAttribute('href', '/rigs/fra400/observe/alignment')
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await page.screenshot({ path: '/tmp/vela-p3/shots/after-rig-ready-390.png' })
+  await page.setViewportSize({ width: 768, height: 1024 })
+  await page.screenshot({ path: '/tmp/vela-p3/shots/after-rig-ready-768.png' })
+  expect(scene.writes).toEqual([])
+})
+
+test('framing keeps Use this target above the tab bar while composing on a phone', async ({ page }) => {
+  await page.setViewportSize(phone)
+  const { scene } = await openExploreScene(page, 'framing-light')
+  const use = page.getByRole('button', { name: 'Use this target' })
+  await expect(use).toBeEnabled()
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+  await expect(use).toBeInViewport()
+  const bar = (await page.locator('.vela-target-use').boundingBox())!
+  expect(bar.y + bar.height).toBe(await tabBarTop(page))
+  const last = (await page.locator('.vela-target-context').boundingBox())!
+  expect(last.y + last.height).toBeLessThanOrEqual(bar.y)
+  await expect(page.getByRole('button', { name: 'Check current frame' })).toBeAttached()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  expect(scene.commands).toEqual([])
+})

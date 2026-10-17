@@ -76,25 +76,26 @@ function ReferenceImage({ target }: { target: TargetCatalogItem }) {
 
 function UseTarget({
   rigId,
-  targetId,
+  target,
   frameLink,
 }: {
   rigId: string
-  targetId: string
+  target: TargetCatalogItem
   frameLink: string
 }) {
-  const target = useChooseTarget(rigId)
+  const choice = useChooseTarget(rigId)
 
   return (
     <div className="vela-discovery__use">
-      <Button tone="accent" pending={target.pending} onClick={() => void target.choose(targetId)}>
-        Use this target
+      <Button tone="accent" pending={choice.pending} onClick={() => void choice.choose(target.id)}>
+        Use <span className="vela-discovery__use-this">this target</span>
+        <span className="vela-discovery__use-name">{target.name}</span>
       </Button>
       <Link className="vela-button" data-tone="neutral" to={frameLink}>
         Frame it first…
       </Link>
-      {target.error ? (
-        <p role="alert">{target.error}</p>
+      {choice.error ? (
+        <p role="alert">{choice.error}</p>
       ) : (
         <p>Using a target records it on your frames. It never moves the mount.</p>
       )}
@@ -152,7 +153,6 @@ function ExploreSubjects({
   const [input, setInput] = useState(selection.query)
   const resultsHeading = useRef<HTMLDivElement>(null)
   const subjectPanel = useRef<HTMLElement>(null)
-  const focusSelectedSubject = useRef(false)
   const pageNavigation = useRef<DiscoverySelection | null>(null)
   const discovery = view && 'snapshotId' in view ? view : null
   const displayed = view ? selectionOf(view) : selection
@@ -250,12 +250,6 @@ function ExploreSubjects({
     subjectPanel.current?.focus({ preventScroll: true })
   }
 
-  useEffect(() => {
-    if (!focusSelectedSubject.current) return
-    focusSelectedSubject.current = false
-    showSubjectOnPhone()
-  }, [selected?.id])
-
   const select = (id: string) => {
     if (id === selected?.id) {
       showSubjectOnPhone()
@@ -263,7 +257,6 @@ function ExploreSubjects({
       return
     }
 
-    focusSelectedSubject.current = true
     const values = browseParams(displayed)
     values.set('subject', id)
     setParams(values)
@@ -546,7 +539,7 @@ function ExploreSubjects({
               </>
             )}
             {rigId && frameLink ? (
-              <UseTarget key={selected.id} rigId={rigId} targetId={selected.id} frameLink={frameLink} />
+              <UseTarget key={selected.id} rigId={rigId} target={selected} frameLink={frameLink} />
             ) : (
               <Link className="vela-button" data-tone="accent" to="/">
                 Add or choose a rig →

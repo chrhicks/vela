@@ -106,10 +106,17 @@ for (const mode of ['light', 'dark'] as const) {
       expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(
         false,
       )
-      await page.locator('.vela-discovery__card').nth(1).getByRole('button').click()
+      const andromeda = page.locator('.vela-discovery__card').nth(1).getByRole('button')
+      await andromeda.click()
       await expect(page.locator('.vela-discovery__subject')).toContainText('Andromeda Galaxy')
 
-      if (width === 390) await expect(page.locator('.vela-discovery__subject')).toBeFocused()
+      if (width === 390) {
+        await expect(page.locator('.vela-discovery__subject')).not.toBeFocused()
+        await expect(page.getByRole('button', { name: 'Use Andromeda Galaxy' })).toBeInViewport()
+        await andromeda.click()
+        await expect(page.locator('.vela-discovery__subject')).toBeFocused()
+      }
+
       expect(scene.commands).toEqual([])
       await page.getByRole('link', { name: 'Frame it first…' }).click()
       await expect(page).toHaveURL(/\/targets\/ngc0224/)
