@@ -175,8 +175,8 @@ test('Home retains the previous catalog when confirmed Add is followed by a fail
   await page.getByRole('button', { name: 'Add rig', exact: true }).click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await expect(page.getByRole('alert')).toContainText('Showing the previous state')
-  await expect(page.getByRole('link', { name: 'View Askar FRA 400', exact: true })).toBeVisible()
-  await expect(page.getByRole('link', { name: 'View Seestar', exact: true })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Open Askar FRA 400', exact: true })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Open Seestar', exact: true })).toBeVisible()
   expect(added).toEqual([{ name: 'Second rig', endpoint }])
   expect(scene.unknownRequests).toEqual([])
 })
@@ -202,9 +202,9 @@ for (const mode of ['light', 'dark'] as const) {
           await expect(page.getByRole('dialog')).toHaveCount(0)
           expect(requests.some(request => /\/api\/(?:web\/)?rigs\//.test(request))).toBe(false)
         } else {
-          await expect(page.getByRole('link', { name: 'View Askar FRA 400', exact: true })).toBeVisible()
-          await expect(page.getByRole('link', { name: 'View Seestar', exact: true })).toHaveAttribute('href', '/rigs/seestar')
-          await expect(page.getByRole('link', { name: 'View Portable rig', exact: true })).toHaveAttribute('href', '/rigs/portable')
+          await expect(page.getByRole('link', { name: 'Open Askar FRA 400', exact: true })).toBeVisible()
+          await expect(page.getByRole('link', { name: 'Open Seestar', exact: true })).toHaveAttribute('href', '/rigs/seestar/observe/capture')
+          await expect(page.getByRole('link', { name: 'Open Portable rig', exact: true })).toHaveAttribute('href', '/rigs/portable/observe/capture')
         }
 
         await settledLayout(page)
