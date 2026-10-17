@@ -61,6 +61,17 @@ for (const width of [1440, 390]) {
   })
 }
 
+test('an unknown address says so and leads Home', async ({ page }) => {
+  await page.route('**/api/**', route =>
+    route.fulfill({ status: 503, json: { error: 'Unavailable' } }),
+  )
+  await page.route('**/api/web/navigation', route => route.fulfill({ json: initial }))
+  await page.goto('/no-such-page')
+  await expect(page.getByRole('heading', { level: 1, name: 'Page not found' })).toBeVisible()
+  await page.getByRole('link', { name: 'Go to all rigs', exact: true }).click()
+  await expect(page).toHaveURL(/\/$/)
+})
+
 test('activity reports loss, readout and confirmed end without inventing completion', async ({
   page,
 }) => {
