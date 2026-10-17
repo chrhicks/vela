@@ -3,7 +3,9 @@
 The Shell adopts the approved Fieldroom NavigationBar specimen under the configured application theme. The
 stable UI component owns responsive rendering; the app owns route links,
 selected rig, remembered target-query context, and the read-only navigation
-projection. Rig switching opens Tonight at the existing capture address and never connects or commands a rig.
+projection. The rig chip names the selected rig and its connection state. Its
+menu offers Rig & equipment, the other saved rigs and All rigs. Rig switching
+opens Tonight, or Photographs from Photographs, and never connects or commands a rig.
 
 `useNavigation` polls `/api/web/navigation` once per second after each completed
 read. The endpoint uses catalog identities and existing capture-controller
@@ -13,7 +15,7 @@ page controller and commands remain independently owned by the capture feature.
 The bar follows its current active rig across routes. Another active rig is a
 catalog-order fallback; the summary always keeps the owning rig's identity.
 Chris's current workflow is one operating rig, so this is not a multi-activity
-control panel. Tonight, Explore the sky, and Photographs use their existing route addresses. Preparation and equipment remain reachable from page context. Current exposure progress
+control panel. With a rig selected, Tonight, Targets, and Photographs use their existing route addresses; without one, Explore the sky opens `/explore`. Preparation remains reachable from page context. Current exposure progress
 is server-reported elapsed time, never a client clock or total-run percentage.
 Only exposing shows timed progress. Reading/saving/stopping name their phase;
 failed state links to Capture for the outcome.

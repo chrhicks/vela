@@ -16,10 +16,10 @@ for (const width of [390, 1440]) {
       await expect(
         navigation.getByRole('link', { name: '← Tonight', exact: true }),
       ).toHaveAttribute('href', '/rigs/fra400/observe/capture')
-      await expect(navigation.getByRole('combobox')).toBeHidden()
+      await expect(navigation.getByRole('button', { name: /^Viewing rig/ })).toBeHidden()
       expect((await navigation.boundingBox())!.height).toBe(48)
     } else {
-      await expect(navigation.getByRole('combobox')).toBeVisible()
+      await expect(navigation.getByRole('button', { name: /^Viewing rig/ })).toBeVisible()
       expect((await navigation.boundingBox())!.height).toBe(88)
     }
 
