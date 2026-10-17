@@ -61,7 +61,7 @@ export function registerTargets(
   }
 
   async function readiness(rig: RigCatalogRecord) {
-    if (!rig.imagingCamera) throw new Error('Choose an imaging camera on Observe before framing.')
+    if (!rig.imagingCamera) throw new Error('Choose an imaging camera on the Rig page before framing.')
 
     const detail = await inspectRigDetail(catalog, rig.id, { createInspector: options.createInspector })
 

@@ -9,6 +9,7 @@ import {
   reviewTarget,
   reviewTime,
   reviewTimezone,
+  subject,
 } from './fixtures/fieldroom/tonight'
 
 const reference = readFileSync(new URL(`../../../${referenceImage.path}`, import.meta.url))
@@ -40,7 +41,7 @@ for (const width of [1440, 390]) {
       await page.goto(scene.route)
       await expect(page.getByRole('heading', { name: 'The Crescent Nebula' })).toBeVisible()
       await expect(page.locator('.tonight-subject')).toContainText(
-        'NGC 6888 · Cygnus · Emission nebula',
+        'NGC 6888 · Emission nebula · Cygnus',
       )
       await expect(page.locator('.tonight-capture')).toContainText(
         '12 saved · 36 min collected',
@@ -48,7 +49,7 @@ for (const width of [1440, 390]) {
       await expect(page.locator('.tonight-capture')).toContainText('01:24')
       await expect(page.locator('.tonight-sky')).toContainText('68°')
       await expect(page.locator('.tonight-sky')).toContainText('Mount tracking')
-      await expect(page.locator('.tonight-equipment')).toContainText('32,842 · Idle')
+      await expect(page.locator('.tonight-before')).toContainText('Focuser 32,842')
       await expect(page.locator('.capture-image__window img')).toBeVisible()
       await page.evaluate(() => document.fonts.ready)
 
@@ -62,9 +63,9 @@ for (const width of [1440, 390]) {
 
       if (width === 1440) {
         expect(geometry.image.x).toBe(36)
-        expect(geometry.image.y).toBe(116)
-        expect(geometry.image.width).toBeCloseTo(888, 0)
-        expect(geometry.card.width).toBeCloseTo(452, 0)
+        expect(geometry.image.y).toBe(124)
+        expect(geometry.image.width).toBeCloseTo(912, 0)
+        expect(geometry.card.width).toBeCloseTo(420, 0)
         expect(geometry.card.height).toBe(214)
       }
 
@@ -142,9 +143,9 @@ for (const sceneName of [
       await expect(page.getByRole('button', { name: 'Stop capture' })).toHaveCount(0)
       const image = await page.locator('.capture-image').boundingBox()
       expect(image?.x).toBe(36)
-      expect(image?.y).toBe(116)
-      expect(image?.height).toBe(686)
-      await expect(page.locator('.tonight-equipment')).toContainText('last known')
+      expect(image?.y).toBe(124)
+      expect(image?.height).toBeCloseTo(700.5, 0)
+      await expect(page.locator('.tonight-before')).toContainText('last known')
       await page.screenshot({ path: '/tmp/vela-tonight-interrupted-1440.png', fullPage: true })
     }
   })
@@ -192,8 +193,11 @@ test('pending target choice cannot relabel an active run and theme changes prese
     'Another target is selected for the next run',
   )
   await expect(page.getByRole('note')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Capture without a target' })).toBeDisabled()
   active = false
   await expect(page.getByRole('heading', { name: 'Next subject' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Capture without a target' })).toBeEnabled()
+  await expect(page.getByRole('button', { name: 'Take exposure' })).toHaveAttribute('data-tone', 'accent')
   await expect(page.getByRole('link', { name: 'Change target', exact: true })).toHaveAttribute(
     'href',
     '/rigs/fra400/observe/targets',
@@ -210,7 +214,7 @@ test('pending target choice cannot relabel an active run and theme changes prese
   await page.getByRole('radio', { name: 'Dark', exact: true }).check()
   await page.keyboard.press('Escape')
   await expect(page.getByRole('spinbutton', { name: 'Exposure · seconds' })).toHaveValue('42')
-  await page.getByRole('button', { name: 'Start capture' }).click()
+  await page.getByRole('button', { name: 'Take exposure' }).click()
   await expect
     .poll(() => starts)
     .toEqual([{ exposureSeconds: 42, repeat: true, saveFrames: true, targetId: 'next' }])
@@ -242,17 +246,64 @@ test('with no chosen target Tonight captures at the current position without a s
   })
   await page.goto(scene.route)
 
-  await expect(page.getByRole('heading', { name: 'Choose your subject' })).toBeVisible()
-  await expect(page.locator('.tonight-subject')).toContainText(
-    'Explore the sky, or capture at the current position.',
+  await expect(page.getByRole('heading', { name: 'What are we imaging tonight?' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Choose a target →' })).toHaveAttribute(
+    'href',
+    '/rigs/fra400/observe/targets',
   )
+  await expect(page.getByRole('listitem').and(page.locator('[aria-current="step"]'))).toContainText('TargetChoose')
   await expect(page.getByRole('note')).toHaveCount(0)
-  await page.getByRole('button', { name: 'Start capture' }).click()
+  await expect(page.locator('.tonight-sky')).toHaveCount(0)
+  await page.getByRole('button', { name: 'or capture at the current position' }).click()
+  await expect(page.getByRole('spinbutton', { name: 'Exposure · seconds' })).toBeFocused()
+  await expect(page.getByRole('button', { name: 'Take exposure' })).toHaveAttribute('data-tone', 'neutral')
+  await page.getByRole('button', { name: 'Take exposure' }).click()
   await expect
     .poll(() => starts)
     .toEqual([{ exposureSeconds: 180, repeat: true, saveFrames: true, targetId: null }])
 })
 
+
+test('Capture without a target clears the chosen target and leaves Take exposure secondary', async ({
+  page,
+}) => {
+  const choices: unknown[] = []
+  let chosen = true
+  const scene = createTonightScene('tonight-light')
+
+  const view = () => ({
+    ...reviewCapture,
+    active: false,
+    phase: 'stopped',
+    subject: null,
+    chosenTarget: chosen ? { state: 'chosen', subject } : { state: 'none' },
+  })
+
+  await page.route('**/api/**', (route) => {
+    const pathname = new URL(route.request().url()).pathname
+
+    if (pathname.endsWith('/capture/target')) {
+      choices.push({ method: route.request().method(), body: route.request().postDataJSON() })
+      chosen = false
+
+      return route.fulfill({ json: view() })
+    }
+
+    if (pathname.endsWith('/capture')) return route.fulfill({ json: view() })
+    const response = scene.respond(route.request().method(), pathname)
+
+    return response.image
+      ? route.fulfill({ contentType: 'image/jpeg', body: reference })
+      : route.fulfill({ status: response.status, json: response.json })
+  })
+  await page.goto(scene.route)
+  await expect(page.getByRole('heading', { name: 'The Crescent Nebula' })).toBeVisible()
+  await expect(page.getByRole('listitem').and(page.locator('[aria-current="step"]'))).toContainText('CaptureNow')
+  await page.getByRole('button', { name: 'Capture without a target' }).click()
+  await expect(page.getByRole('heading', { name: 'What are we imaging tonight?' })).toBeVisible()
+  expect(choices).toEqual([{ method: 'PUT', body: { targetId: null } }])
+  await expect(page.getByRole('button', { name: 'Take exposure' })).toHaveAttribute('data-tone', 'neutral')
+})
 
 test('Tonight uses capture-camera cooling and current sky direction instead of inventory order or future samples', async ({ page }) => {
   const scene = createTonightScene('tonight-light')
@@ -296,11 +347,11 @@ test('Tonight uses capture-camera cooling and current sky direction instead of i
       : route.fulfill({ status: response.status, json: response.json })
   })
   await page.goto(scene.route)
-  await expect(page.locator('.tonight-equipment')).toContainText('-10.0°C · Cooler on')
-  await expect(page.locator('.tonight-equipment')).not.toContainText('25.0°C')
+  await expect(page.locator('.tonight-before')).toContainText('Cooler on, sensor -10.0°C')
+  await expect(page.locator('.tonight-before')).not.toContainText('25.0°C')
   await expect(page.locator('.tonight-sky')).toContainText('Northern sky')
   await expect(page.locator('.tonight-sky')).not.toContainText('Northeastern')
   coolingAvailable = false
-  await expect(page.locator('.tonight-equipment')).toContainText('Temperature / cooling unavailable')
-  await expect(page.locator('.tonight-equipment')).not.toContainText('25.0°C')
+  await expect(page.locator('.tonight-before')).toContainText('Cooling unavailable')
+  await expect(page.locator('.tonight-before')).not.toContainText('25.0°C')
 })

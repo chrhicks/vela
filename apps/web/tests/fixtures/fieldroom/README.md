@@ -85,32 +85,27 @@ read-retrying, centering, interrupted and preview-unavailable scenes. The unsolv
 scene retains the older footprint but supplies the newer acquisition's own image
 and null solved-check ID.
 
-Preparation scenes start with no active capture. The remembered imaging camera
-has a second available choice; changing the selection alone sends no command.
-Camera save, capture Start and cooling mutate only that session. Failed save,
-uncertain Start and uncertain cooling have distinct scenes; state-inspection GETs
-do not replay writes. The normal preparation scene's 10-second exposure,
-21:06:18 timestamp, 842 stars / 2.1px HFR and −8.6°C / −10°C / 62% cooling are
-explicit illustrative source fixtures. The old check is marked non-current,
-while the preview keeps its exact acquisition association and Temporary status.
+Preparation scenes open Tonight at `/rigs/fra400/observe/capture` with the
+Crescent chosen and no active capture. Capture Start and cooling mutate only that
+session. Uncertain Start and uncertain cooling have distinct scenes;
+state-inspection GETs do not replay writes. The normal preparation scene's
+−8.6°C / −10°C / 62% cooling values are explicit illustrative source fixtures.
 `preparation-disconnected` starts with disconnected devices and recovers after
 one explicit connection command. `preparation-connection-uncertain` simulates a
 lost response after a successful connection: the first reconciliation read
-fails, subsequent reads recover, and the application still requires an explicit
-state check before Start is available. These scenes preserve the entered exposure
-and last test image throughout recovery. No device commands reach hardware.
-No saved framing artifact is claimed. `preparation-unframed` exercises absent
-preview state rather than copying the latest capture into that region.
+fails, subsequent reads recover, and Tonight still requires an explicit state
+check before Take exposure is available. These scenes preserve the entered
+exposure throughout recovery. No device commands reach hardware.
 
-`fieldroom-explore.e2e.ts` and `preparation.e2e.ts` exercise real route behavior at
-1440px and 390px in both palettes. Captures await font loading, decoded images and
-finite control animations; Aladin captures additionally wait for exact tile
-requests, the real solved footprint and completed rendering frames. They emit
-`/tmp/vela-{explore,framing,preparation}-{light,dark}-{1440,390}.png`; framing also
-records the requested resource list beside each PNG. Preparation tests cover
-unsaved-camera Start blocking, failed save, exact subject handoff on accepted
-Start, no navigation/replay after an uncertain Start, independent cooling,
-Appearance draft/pixel preservation and Fit/native pan/enlargement return focus.
+`fieldroom-explore.e2e.ts` exercises real route behavior at 1440px and 390px in
+both palettes. Captures await font loading, decoded images and finite control
+animations; Aladin captures additionally wait for exact tile requests, the real
+solved footprint and completed rendering frames. They emit
+`/tmp/vela-{explore,framing}-{light,dark}-{1440,390}.png`; framing also records
+the requested resource list beside each PNG. `preparation.e2e.ts` covers no
+replay after an uncertain Take exposure, independent cooling, Before you shoot
+links and connection recovery, and the hold on Take exposure while a connection
+outcome is unknown.
 
 ## Photographs
 

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import type { Route } from '@playwright/test'
+import type { Page, Route } from '@playwright/test'
 import { device, observation, offlineObservation } from './fixtures/observation'
 
 const respond = <Body>(route: Route, body: Body, status = 200) =>
@@ -9,8 +9,7 @@ const respond = <Body>(route: Route, body: Body, status = 200) =>
     body: JSON.stringify(body),
   })
 
-// Keep adjacent Observe features deterministic; these tests own readiness only.
-test.beforeEach(async ({ page }) => {
+async function holdNeighbouringTonightFeatures(page: Page) {
   await page.route('**/api/web/rigs/*/capture', route =>
     respond(route, {
       rigId: route.request().url().split('/').at(-2),
@@ -46,7 +45,9 @@ test.beforeEach(async ({ page }) => {
       cameras: [],
     }),
   )
-})
+}
+
+test.beforeEach(({ page }) => holdNeighbouringTonightFeatures(page))
 
 test('enters and leaves observation without a hardware command', async ({ page }) => {
   let commands = 0
@@ -59,9 +60,10 @@ test('enters and leaves observation without a hardware command', async ({ page }
   await page.goto('/rigs/rig-1')
   await page.screenshot({ path: test.info().outputPath('rig-entry.png') })
   await expect(page.getByRole('link', { name: 'Open Tonight', exact: true })).toHaveAttribute('href', '/rigs/rig-1/observe/capture')
-  await page.goto('/rigs/rig-1/observe')
+  await page.getByRole('link', { name: 'Open Tonight', exact: true }).click()
+  await expect(page).toHaveURL(/\/rigs\/rig-1\/observe\/capture$/)
   await expect(page.getByRole('heading', { name: 'Connect this Rig’s devices' })).toBeVisible()
-  await page.getByRole('link', { name: 'Equipment & settings' }).click()
+  await page.getByRole('link', { name: 'Prepare your rig' }).click()
   await expect(page.getByRole('heading', { name: 'Your rig', exact: true })).toBeVisible()
   expect(commands).toBe(0)
 })
@@ -92,7 +94,7 @@ test('connects once, shows neutral progress, and focuses the confirmed result', 
       view: observation('complete'),
     })
   })
-  await page.goto('/rigs/rig-1/observe')
+  await page.goto('/rigs/rig-1/observe/capture')
   await page.getByRole('button', { name: 'Connect devices' }).dblclick()
   await expect(page.getByRole('button', { name: 'Connecting devices…' })).toBeDisabled()
   await expect(page.getByRole('region', { name: 'Rig readiness', exact: true }).getByRole('status')).toContainText(
@@ -123,7 +125,7 @@ test('renders partial rejection and only retries with a new explicit command', a
       view: observation(),
     })
   })
-  await page.goto('/rigs/rig-1/observe')
+  await page.goto('/rigs/rig-1/observe/capture')
   await page.getByRole('button', { name: 'Connect devices' }).click()
   await expect(page.getByRole('status').filter({ hasText: 'Focuser: connection rejected.' })).toBeVisible()
   await page.locator('.preparation-readiness__details > summary').click()
@@ -149,7 +151,7 @@ test('uncertainty requires a state check before offering another command', async
       view: observation('unavailable'),
     })
   })
-  await page.goto('/rigs/rig-1/observe')
+  await page.goto('/rigs/rig-1/observe/capture')
   await page.getByRole('button', { name: 'Connect devices' }).click()
   await expect(
     page.getByRole('heading', { name: 'Connection outcome unknown' }),
@@ -188,7 +190,7 @@ for (const failure of ['transport', 'malformed', 'conflicting-fields']) {
                 },
           )
     })
-    await page.goto('/rigs/rig-1/observe')
+    await page.goto('/rigs/rig-1/observe/capture')
     await page.getByRole('button', { name: 'Connect devices' }).click()
     await page.locator('.preparation-readiness__details > summary').click()
     await expect(page.getByText('3 confirmed connected', { exact: true })).toBeVisible()
@@ -205,8 +207,8 @@ test('handles already prepared, offline, missing and malformed observations', as
   let response: ReturnType<typeof observation> | null = observation('complete')
   let status = 200
   await page.route('**/api/web/rigs/rig-1/observe', route => respond(route, response ?? {}, status))
-  await page.goto('/rigs/rig-1/observe')
-  await expect(page.getByRole('heading', { name: 'Prepare a capture', exact: true })).toBeVisible()
+  await page.goto('/rigs/rig-1/observe/capture')
+  await expect(page.getByRole('heading', { name: 'What are we imaging tonight?', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Connect devices' })).toHaveCount(0)
   response = offlineObservation()
   await page.reload()
@@ -224,7 +226,7 @@ test('rejects an otherwise valid observation belonging to another Rig', async ({
   await page.route('**/api/web/rigs/rig-1/observe', route =>
     respond(route, observation('available', 'wrong-rig')),
   )
-  await page.goto('/rigs/rig-1/observe')
+  await page.goto('/rigs/rig-1/observe/capture')
   await expect(page.getByRole('heading', { name: 'Could not load this Rig' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Connect devices' })).toHaveCount(0)
 })
@@ -248,7 +250,7 @@ test('failed reconciliation keeps commands blocked until an explicit successful 
 
     return route.abort()
   })
-  await page.goto('/rigs/rig-1/observe')
+  await page.goto('/rigs/rig-1/observe/capture')
   await page.clock.runFor(1)
   await page.getByRole('button', { name: 'Connect devices' }).click()
   await expect(
@@ -293,7 +295,7 @@ test('retains last-known state during failed refresh and restores command eligib
   await page.route('**/api/web/rigs/rig-1/observe', route =>
     offline ? route.abort() : respond(route, observation()),
   )
-  await page.goto('/rigs/rig-1/observe')
+  await page.goto('/rigs/rig-1/observe/capture')
   await expect(page.getByRole('button', { name: 'Connect devices' })).toBeVisible()
   offline = true
   await page.getByRole('button', { name: 'Check state' }).click()
@@ -363,13 +365,13 @@ test('leaving a pending command cannot overwrite another Rig', async ({ page }) 
     }).catch(() => {})
     commandSettled()
   })
-  await page.goto('/rigs/rig-1/observe')
+  await page.goto('/rigs/rig-1/observe/capture')
   await page.evaluate(() => {
     document.documentElement.dataset.navigationTest = 'same-document'
   })
   await page.getByRole('button', { name: 'Connect devices' }).click()
   await started
-  await page.getByRole('link', { name: 'Equipment & settings' }).click()
+  await page.getByRole('link', { name: 'Prepare your rig' }).click()
   await page.getByRole('link', { name: 'Manage saved rigs' }).click()
   await page.getByRole('link', { name: 'Open Askar FRA 400' }).click()
   await page.getByRole('button', { name: /^Viewing rig/ }).click()
@@ -391,7 +393,7 @@ for (const width of [390, 768, 1280]) {
     await page.route('**/api/web/rigs/rig-1/observe', route =>
       respond(route, observation('in-progress')),
     )
-    await page.goto('/rigs/rig-1/observe')
+    await page.goto('/rigs/rig-1/observe/capture')
     await expect(page.getByRole('button', { name: 'Connecting devices…' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Connecting devices…' })).toBeDisabled()
     await page.locator('.preparation-readiness__details > summary').click()
@@ -408,7 +410,7 @@ test('failed reads stop presenting last-known progress as active', async ({ page
   await page.route('**/api/web/rigs/rig-1/observe', route =>
     fail ? route.abort() : respond(route, observation('in-progress')),
   )
-  await page.goto('/rigs/rig-1/observe')
+  await page.goto('/rigs/rig-1/observe/capture')
   await expect(page.getByRole('heading', { name: 'Connecting devices…' })).toBeVisible()
   fail = true
   await page.getByRole('button', { name: 'Check state' }).click()
@@ -433,7 +435,7 @@ for (const state of ['available', 'unavailable'] as const) {
         view: observation(state),
       }),
     )
-    await page.goto('/rigs/rig-1/observe')
+    await page.goto('/rigs/rig-1/observe/capture')
     await page.getByRole('button', { name: 'Connect devices' }).click()
     await page.locator('.preparation-readiness__details > summary').click()
     await expect(

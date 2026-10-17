@@ -3,19 +3,90 @@
   width: 100%;
   max-width: none;
   margin: 0;
-  padding: 28px 36px 8px;
+  padding: 36px 36px 8px;
 }
 .capture-page__layout {
   display: grid;
-  grid-template-columns: minmax(0, 888fr) minmax(0, 452fr);
-  gap: 28px;
+  grid-template-columns: minmax(0, 1fr) 420px;
+  gap: 36px;
   align-items: start;
 }
 .tonight-context {
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 26px;
   min-width: 0;
+}
+.tonight-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tonight-steps li {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px 8px;
+  min-width: 0;
+}
+.tonight-steps li::after {
+  content: '';
+  grid-area: 1 / 2;
+  height: 1px;
+  background: var(--vela-line);
+}
+.tonight-steps li > strong,
+.tonight-steps li > span:last-child {
+  grid-column: 1 / -1;
+  overflow-wrap: anywhere;
+}
+.tonight-steps li > strong {
+  font-size: 15px;
+  line-height: 21px;
+  font-weight: 500;
+}
+.tonight-steps li > span:last-child {
+  color: var(--vela-text-muted);
+  font-size: 13px;
+  line-height: 18px;
+}
+.tonight-steps__marker {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  box-sizing: border-box;
+  border: 1.5px solid var(--vela-line);
+  border-radius: 50%;
+  color: var(--vela-text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 16px;
+  place-items: center;
+}
+.tonight-steps__marker svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+.tonight-steps li[data-state='done'] .tonight-steps__marker {
+  border-color: var(--vela-accent);
+  color: var(--vela-accent-text);
+  background: var(--vela-accent);
+}
+.tonight-steps li[data-state='current'] .tonight-steps__marker {
+  border-color: var(--vela-text);
+  color: var(--vela-text);
+}
+.tonight-steps li[data-state='current'] > strong {
+  font-weight: 600;
+}
+.tonight-steps li[data-state='upcoming'] > strong {
+  color: var(--vela-text-muted);
 }
 .tonight-context p {
   margin: 0;
@@ -52,17 +123,41 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 2px 0 20px;
-  border-bottom: 1px solid var(--vela-line);
 }
 .tonight-subject h1 {
   margin: 0;
 }
 .tonight-subject > p,
+.tonight-subject__eyebrow,
 .tonight-subject .tonight-context__heading > span {
   color: var(--vela-text-muted);
   font-size: 14px;
   line-height: 20px;
+}
+.tonight-subject__choose {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+}
+.tonight-subject__choose > .vela-button {
+  align-self: stretch;
+  min-height: 48px;
+}
+.tonight-subject .tonight-link {
+  font-size: 14px;
+  font-weight: 400;
+}
+.tonight-subject__clear {
+  align-self: flex-start;
+  border: 0;
+  padding: 0;
+  background: none;
+}
+.tonight-subject__clear:disabled {
+  color: var(--vela-text-muted);
+  cursor: not-allowed;
 }
 .tonight-subject .tonight-context__heading > span {
   font-weight: 500;
@@ -172,6 +267,19 @@
   display: grid;
   gap: 16px;
 }
+.tonight-capture form > .vela-field {
+  grid-template-columns: minmax(0, 1fr) 150px;
+  align-items: center;
+  column-gap: 12px;
+}
+.tonight-capture form > .vela-field > .vela-field__message {
+  grid-column: 1 / -1;
+}
+.tonight-capture__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+}
 .tonight-capture__explanation,
 .tonight-capture > p {
   font-size: 14px;
@@ -244,30 +352,38 @@
   font-size: 14px;
   line-height: 20px;
 }
-.tonight-equipment {
-  margin-top: 24px;
-  padding-top: 20px;
-  border-top: 1px solid var(--vela-line);
+.tonight-before {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--vela-line);
   font-size: 14px;
   line-height: 20px;
+}
+.tonight-before > h2 {
+  margin: 0;
   color: var(--vela-text-muted);
 }
-.tonight-equipment > div {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 28px;
+.tonight-before > p {
+  color: var(--vela-text-muted);
 }
-.tonight-equipment strong {
-  color: var(--vela-text);
-  font-weight: 500;
+.tonight-before__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 14px;
+}
+.tonight-before__row .tonight-link {
+  min-height: 32px;
+  border: 0;
+  padding: 0;
+  background: none;
+  font-size: 14px;
+  font-weight: 400;
 }
 .tonight-cooling {
-  margin-top: 20px;
+  margin-top: 8px;
   color: var(--vela-text-muted);
   font-size: 14px;
 }
@@ -353,19 +469,10 @@
   .tonight-sky__facts {
     flex-wrap: wrap;
   }
-  .tonight-equipment {
-    align-items: flex-start;
-  }
 }
 @container (max-width: 760px) {
   .capture-page__layout {
     grid-template-columns: minmax(0, 1fr);
-  }
-  .tonight-equipment {
-    flex-direction: column;
-  }
-  .tonight-equipment > div {
-    gap: 12px 24px;
   }
   .tonight-sky__altitude {
     flex-basis: 140px;
@@ -405,4 +512,3 @@
 .tonight-capture > .capture-page__warning { margin: 0; }
 .capture-page[data-interrupted] .tonight-sky__altitude > span:not(.vela-type-metric),
 .capture-page[data-interrupted] .tonight-sky .tonight-context__heading strong { font-size: 14px; line-height: 20px; }
-.tonight-equipment > div > span { white-space: pre-wrap; }

@@ -3,6 +3,7 @@ import { Button } from '@vela/ui'
 import { useEffect, useRef } from 'react'
 import { readinessPresentation } from './presentation'
 import type { useObservation } from './use-observation'
+import './readiness.css'
 
 export function RigReadiness({
   observation,
@@ -15,8 +16,9 @@ export function RigReadiness({
   const checkingFromHere = useRef(false)
   const { view, result, connecting, refreshing, interrupted, commandUnconfirmed, completedCommands } = observation
 
-  const visible = !view || connecting || view.connectionPreparation.state !== 'complete' ||
-    interrupted || commandUnconfirmed || !!result
+  const visible = !view
+    ? !!observation.error
+    : connecting || view.connectionPreparation.state !== 'complete' || interrupted || commandUnconfirmed || !!result
 
   useEffect(() => {
     if (completedCommands > 0) heading.current?.focus()
@@ -50,14 +52,12 @@ export function RigReadiness({
         <h3 ref={heading} tabIndex={-1}>
           {observation.error === 'not-found'
             ? 'Rig not found'
-            : observation.error ? 'Could not load this Rig' : 'Checking Rig readiness…'}
+            : 'Could not load this Rig'}
         </h3>
       </div>
-      {observation.error && (
-        <Button type="button" disabled={refreshing} onClick={checkState}>
-          {refreshing ? 'Checking state…' : 'Check state'}
-        </Button>
-      )}
+      <Button type="button" disabled={refreshing} onClick={checkState}>
+        {refreshing ? 'Checking state…' : 'Check state'}
+      </Button>
     </section>
   )
 

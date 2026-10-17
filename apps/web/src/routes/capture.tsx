@@ -1,15 +1,19 @@
 import { Button, Checkbox, Input } from '@vela/ui'
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { CaptureInterruption } from '../features/capture/CaptureInterruption'
 import { LatestImage } from '../features/capture/LatestImage'
+import { TonightSteps } from '../features/capture/TonightSteps'
 import { captureActivity, useCapture } from '../features/capture/use-capture'
 import { CaptureCooling, coolingBlocker } from '../features/capture/CaptureCooling'
+import { BeforeYouShoot } from '../features/observation/BeforeYouShoot'
+import { RigReadiness } from '../features/observation/RigReadiness'
+import { useObservation } from '../features/observation/use-observation'
 import { useRigObservation } from '../features/rig-detail/RigContext'
+import { useClearTarget } from '../features/targets/use-clear-target'
 import { useTonightTarget } from '../features/targets/use-tonight-target'
 import { AltitudeTrace } from '../features/targets/AltitudeTrace'
 import { skyTime } from '../features/targets/sky-time'
-import { EquipmentSummary } from '../features/observation/EquipmentSummary'
 import './capture.css'
 
 export function Capture() {
@@ -20,7 +24,11 @@ export function Capture() {
 
 function CapturePage({ rigId }: { rigId: string }) {
   const capture = useCapture(rigId)
+  const observation = useObservation(rigId)
   const rig = useRigObservation()
+  const clearTarget = useClearTarget(rigId, () => void capture.refresh())
+  const exposureId = useId()
+  const takeExposureId = useId()
   const [exposure, setExposure] = useState<string | null>(null)
   const [saveFrames, setSaveFrames] = useState<boolean | null>(null)
   const [repeat, setRepeat] = useState<boolean | null>(null)
@@ -60,13 +68,22 @@ function CapturePage({ rigId }: { rigId: string }) {
             Check capture state
           </Button>
         )}
-        <Link className="tonight-link" to={`${base}/observe`}>
+        <Link className="tonight-link" to={base}>
           Prepare your rig
         </Link>
       </section>
     )
 
   const busy = view.active || pending
+
+  const connectionSettled =
+    !observation.connecting &&
+    observation.view?.connectionPreparation.state !== 'in-progress' &&
+    !observation.interrupted &&
+    !observation.commandUnconfirmed
+
+  const rigReady = view.enabled && !offline && connectionSettled
+  const canTakeExposure = capture.canStart && validExposure && connectionSettled
   const retrying = view.captureReadState === 'retrying'
   const interrupted = offline || commandUnconfirmed || retrying
 
@@ -132,38 +149,70 @@ function CapturePage({ rigId }: { rigId: string }) {
           interrupted={interrupted || !view.enabled}
         />
         <aside className="tonight-context">
-          <section className="tonight-subject" aria-label="Your subject">
-            <div className="tonight-context__heading">
-              <span>Your subject</span>
-              <Link className="tonight-link" to={`${base}/observe/targets`} aria-label="Change target">
-                Change
-              </Link>
-            </div>
-            <h1 className="vela-type-subject">{subject?.name ?? 'Choose your subject'}</h1>
-            <p>
-              {[subject?.catalog, target?.constellation, target?.kind]
-                .filter(Boolean)
-                .join(' · ') || 'Explore the sky, or capture at the current position.'}
-            </p>
-            {hasPendingChoice && (
-              <p>
-                Another target is selected for the next run. This run keeps its original
-                subject.
-              </p>
-            )}
-            {chosen && !view.active && !offline && (
-              <div className="tonight-pointing" role="note">
-                <strong>Mount pointing isn’t checked</strong>
-                <p>
-                  Frames will be recorded as {chosen.name}.{' '}
-                  <Link to={`${base}/observe/targets/${encodeURIComponent(chosen.targetId)}`}>
-                    Frame it first
-                  </Link>{' '}
-                  to slew and check.
-                </p>
+          <TonightSteps rigReady={rigReady} targetName={subject?.name ?? null} />
+          {subject || view.active ? (
+            <section className="tonight-subject" aria-label="Your subject">
+              <div className="tonight-context__heading">
+                <span>Your subject</span>
+                <Link className="tonight-link" to={`${base}/observe/targets`} aria-label="Change target">
+                  Change
+                </Link>
               </div>
-            )}
-          </section>
+              <h1 className="vela-type-subject">{subject?.name ?? 'Current position'}</h1>
+              <p>
+                {subject
+                  ? [subject.catalog, target?.kind, target?.constellation].filter(Boolean).join(' · ')
+                  : 'This run is recorded without a subject.'}
+              </p>
+              {hasPendingChoice && (
+                <p>
+                  Another target is selected for the next run. This run keeps its original
+                  subject.
+                </p>
+              )}
+              {chosen && !view.active && !offline && (
+                <div className="tonight-pointing" role="note">
+                  <strong>Mount pointing isn’t checked</strong>
+                  <p>
+                    Frames will be recorded as {chosen.name}.{' '}
+                    <Link to={`${base}/observe/targets/${encodeURIComponent(chosen.targetId)}`}>
+                      Frame it first
+                    </Link>{' '}
+                    to slew and check.
+                  </p>
+                </div>
+              )}
+              {chosen && (
+                <button
+                  className="tonight-link tonight-subject__clear"
+                  type="button"
+                  disabled={view.active || offline || clearTarget.pending}
+                  onClick={() => void clearTarget.clear()}
+                >
+                  Capture without a target
+                </button>
+              )}
+              {chosen && clearTarget.error && <p role="status">{clearTarget.error}</p>}
+            </section>
+          ) : (
+            <section className="tonight-subject" aria-label="Your subject">
+              <span className="tonight-subject__eyebrow">Your subject</span>
+              <h1 className="vela-type-subject">What are we imaging tonight?</h1>
+              <p>Pick a target to record it on your frames. Choosing a target never moves the mount.</p>
+              <div className="tonight-subject__choose">
+                <Link className="vela-button" data-tone="accent" to={`${base}/observe/targets`}>
+                  Choose a target →
+                </Link>
+                <button
+                  className="tonight-link"
+                  type="button"
+                  onClick={() => document.getElementById(exposureId)?.focus()}
+                >
+                  or capture at the current position
+                </button>
+              </div>
+            </section>
+          )}
           {offline ? (
             <CaptureInterruption
               view={view}
@@ -272,14 +321,17 @@ function CapturePage({ rigId }: { rigId: string }) {
                     </p>
                   )}
                   <form
+                    aria-label="Exposure settings"
+                    tabIndex={-1}
                     onSubmit={event => {
                       event.preventDefault()
 
-                      if (validExposure)
+                      if (canTakeExposure)
                         void capture.start(seconds, repeating, savingFrames, chosen?.targetId ?? null)
                     }}
                   >
                     <Input
+                      id={exposureId}
                       label="Exposure · seconds"
                       type="number"
                       min="0.1"
@@ -291,33 +343,31 @@ function CapturePage({ rigId }: { rigId: string }) {
                       message={validExposure ? '' : 'Choose 0.1–600 seconds.'}
                       onChange={event => setExposure(event.target.value)}
                     />
-                    <Checkbox
-                      label="Repeat until stopped"
-                      checked={repeating}
-                      disabled={busy || offline}
-                      onChange={event => setRepeat(event.target.checked)}
-                    />
-                    <Checkbox
-                      label="Save frames"
-                      description="Keep every completed image as FITS + preview."
-                      checked={savingFrames}
-                      disabled={busy || offline}
-                      onChange={event => setSaveFrames(event.target.checked)}
-                    />
+                    <div className="tonight-capture__options">
+                      <Checkbox
+                        label="Repeat until stopped"
+                        checked={repeating}
+                        disabled={busy || offline}
+                        onChange={event => setRepeat(event.target.checked)}
+                      />
+                      <Checkbox
+                        label="Save frames"
+                        checked={savingFrames}
+                        disabled={busy || offline}
+                        onChange={event => setSaveFrames(event.target.checked)}
+                      />
+                    </div>
                     <Button
+                      id={takeExposureId}
                       type="submit"
-                      tone="accent"
-                      disabled={!capture.canStart || !validExposure}
+                      tone={chosen ? 'accent' : 'neutral'}
+                      disabled={!canTakeExposure}
                     >
-                      {pending
-                        ? 'Sending command…'
-                        : repeating
-                          ? 'Start capture'
-                          : 'Take exposure'}
+                      {pending ? 'Sending command…' : 'Take exposure'}
                     </Button>
                   </form>
                   {!view.enabled && (
-                    <Link className="tonight-link" to={`${base}/observe`}>
+                    <Link className="tonight-link" to={base}>
                       Prepare your rig
                     </Link>
                   )}
@@ -325,105 +375,106 @@ function CapturePage({ rigId }: { rigId: string }) {
               )}
             </section>
           )}
-          <section className="tonight-sky" aria-label="In your sky">
-            <div className="tonight-context__heading">
-              <strong>In your sky</strong>
-              {target && (
-                <Link
+          <BeforeYouShoot
+            rigId={rigId}
+            cooling={view.cooling}
+            coolingStale={offline || capture.coolingUnconfirmed}
+            coolingAction={
+              (view.cooling || capture.coolingError) && (
+                <button
                   className="tonight-link"
-                  to={`${base}/observe/targets/${encodeURIComponent(target.id)}#sky`}
+                  type="button"
+                  aria-expanded={coolingOpen}
+                  aria-controls="tonight-cooling"
+                  onClick={() => setCoolingOpen(open => !open)}
                 >
-                  Open sky view
-                </Link>
-              )}
-            </div>
-            {sky ? (
-              <>
-                <div className="tonight-sky__position">
-                  <div className="tonight-sky__altitude">
-                    <span className="vela-type-metric">
-                      {Math.round(sky.currentAltitudeDegrees)}°
-                    </span>
-                    <span>
-                      {sky.currentAltitudeDegrees >= 0
-                        ? 'Above the horizon'
-                        : 'Below the horizon'}
-                    </span>
-                    <p>
-                      {direction} sky
-                      <br />
-                      {
-                        {
-                          on: 'Mount tracking',
-                          off: 'Mount not tracking',
-                          unknown: 'Tracking unconfirmed',
-                        }[tracking]
-                      }
-                    </p>
-                  </div>
-                  <AltitudeTrace sky={sky} stale={skyStale} />
-                </div>
-                <div className="tonight-sky__facts">
-                  <span>Distance unavailable</span>
-                  <span>
-                    {skyStale ? 'Last calculation' : 'Calculated'} {skyTime(sky.observedAt)}
-                  </span>
-                </div>
-                {skyStale && (
-                  <p role="status">Sky updates interrupted · last calculation shown.</p>
+                  Camera cooling
+                </button>
+              )
+            }
+          >
+            <RigReadiness observation={observation} startActionId={takeExposureId} />
+            {(view.cooling || capture.coolingError) && (
+              <div id="tonight-cooling" className="tonight-cooling" hidden={!coolingOpen}>
+                <CaptureCooling
+                  cooling={view.cooling}
+                  disabled={!capture.canCool}
+                  pending={capture.coolingPending}
+                  checking={refreshing}
+                  error={capture.coolingError}
+                  unconfirmed={capture.coolingUnconfirmed}
+                  runActive={view.active}
+                  stale={offline || capture.coolingUnconfirmed}
+                  blocker={coolingBlocker(view.cooling?.blockedBy, base)}
+                  onCooler={coolerOn => void capture.setCooler(coolerOn)}
+                  onSetpoint={setpointC => void capture.setCoolingTemperature(setpointC)}
+                  onCheck={() => void capture.refresh()}
+                />
+              </div>
+            )}
+          </BeforeYouShoot>
+          {targetId && (
+            <section className="tonight-sky" aria-label="In your sky">
+              <div className="tonight-context__heading">
+                <strong>In your sky</strong>
+                {target && (
+                  <Link
+                    className="tonight-link"
+                    to={`${base}/observe/targets/${encodeURIComponent(target.id)}#sky`}
+                  >
+                    Open sky view
+                  </Link>
                 )}
-              </>
-            ) : (
-              <p>
-                {targetId
-                  ? skyStale
+              </div>
+              {sky ? (
+                <>
+                  <div className="tonight-sky__position">
+                    <div className="tonight-sky__altitude">
+                      <span className="vela-type-metric">
+                        {Math.round(sky.currentAltitudeDegrees)}°
+                      </span>
+                      <span>
+                        {sky.currentAltitudeDegrees >= 0
+                          ? 'Above the horizon'
+                          : 'Below the horizon'}
+                      </span>
+                      <p>
+                        {direction} sky
+                        <br />
+                        {
+                          {
+                            on: 'Mount tracking',
+                            off: 'Mount not tracking',
+                            unknown: 'Tracking unconfirmed',
+                          }[tracking]
+                        }
+                      </p>
+                    </div>
+                    <AltitudeTrace sky={sky} stale={skyStale} />
+                  </div>
+                  <div className="tonight-sky__facts">
+                    <span>Distance unavailable</span>
+                    <span>
+                      {skyStale ? 'Last calculation' : 'Calculated'} {skyTime(sky.observedAt)}
+                    </span>
+                  </div>
+                  {skyStale && (
+                    <p role="status">Sky updates interrupted · last calculation shown.</p>
+                  )}
+                </>
+              ) : (
+                <p>
+                  {skyStale
                     ? 'Sky calculation unavailable. Retrying quietly.'
                     : target
                       ? 'Site unavailable · sky path unknown'
-                      : 'Loading sky context…'
-                  : 'Choose a target to see its path through your sky.'}
-              </p>
-            )}
-          </section>
+                      : 'Loading sky context…'}
+                </p>
+              )}
+            </section>
+          )}
         </aside>
       </div>
-      <EquipmentSummary
-        rigName={view.rigName}
-        rigId={rigId}
-        cooling={view.cooling}
-        coolingStale={offline || capture.coolingUnconfirmed}
-        coolingAction={
-          (view.cooling || capture.coolingError) && (
-            <button
-              className="tonight-link"
-              type="button"
-              aria-expanded={coolingOpen}
-              aria-controls="tonight-cooling"
-              onClick={() => setCoolingOpen(open => !open)}
-            >
-              Camera cooling
-            </button>
-          )
-        }
-      />
-      {(view.cooling || capture.coolingError) && (
-        <div id="tonight-cooling" className="tonight-cooling" hidden={!coolingOpen}>
-          <CaptureCooling
-            cooling={view.cooling}
-            disabled={!capture.canCool}
-            pending={capture.coolingPending}
-            checking={refreshing}
-            error={capture.coolingError}
-            unconfirmed={capture.coolingUnconfirmed}
-            runActive={view.active}
-            stale={offline || capture.coolingUnconfirmed}
-            blocker={coolingBlocker(view.cooling?.blockedBy, base)}
-            onCooler={coolerOn => void capture.setCooler(coolerOn)}
-            onSetpoint={setpointC => void capture.setCoolingTemperature(setpointC)}
-            onCheck={() => void capture.refresh()}
-          />
-        </div>
-      )}
     </section>
   )
 }

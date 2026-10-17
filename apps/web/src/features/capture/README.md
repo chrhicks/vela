@@ -7,8 +7,8 @@ form edits, Fit/100% presentation and loaded-image state.
 
 `useCapture` serializes commands and polls current state. A deliberate command
 supersedes a pending GET; request generations prevent its late result from
-replacing the newer state. Tonight and Observe read the rig's `chosenTarget` from
-the capture view and pass it to Start; the server returns its fixed `subject` intent
+replacing the newer state. Tonight reads the rig's `chosenTarget` from
+the capture view and passes it to Start; the server returns its fixed `subject` intent
 snapshot. During an active run the run's own subject stays the heading and a
 different choice shows as pending for the next run. Tonight notes that mount
 pointing isn't checked whenever a target is chosen and no run is active, because no
@@ -17,14 +17,24 @@ are server-owned per-run totals; `savedImageCount` still describes the archive.
 Image subject metadata may be absent on legacy artifacts. A missing or invalid command response is never
 replayed. Starting again requires an explicit read confirming no active exposure.
 
+Tonight is the one capture screen; `/observe` redirects to it. Its Rig · Target ·
+Capture steps are derived on every render: Rig is done when capture is enabled,
+the view is current and no connection is settling or uncertain; Target is done
+when a target is chosen. With no target, Choose a target leads and Take exposure
+is the secondary action. With a target, Take exposure leads and Capture without
+a target clears the choice through `use-clear-target`, which sends
+`{ targetId: null }` and accepts only a validated view with no choice. Clearing
+is unavailable during an active run, which keeps its own subject. Before you
+shoot holds the cooler and focuser summary, readiness when it needs attention,
+the camera cooling controls and links to Polar alignment and Autofocus.
+
 `useLoadedImage` preloads each immutable image URL and commits its metadata with
 the image only when loading succeeds. An in-flight download completes even when
 new frames arrive faster than image delivery; after settling, it loads only the
 newest pending frame. This keeps a running capture visibly advancing without an
 unbounded download queue. A failed new image leaves the previous
 frame and metadata together. GET retries are bounded; native dimensions drive
-100% scrolling. Preparation consumes the same command projection, with a separate temporary
-framing-exposure preview.
+100% scrolling.
 
 Large frames offer a smaller fitted preview. The image viewer requests it first;
 100% loads the native image on demand, preserving the fitted view until that

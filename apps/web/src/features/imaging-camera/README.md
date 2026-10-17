@@ -1,8 +1,6 @@
 # Imaging camera
 
-Preparation composes the saved camera as a Select with an explicit Use this
-camera action when the draft differs. Equipment can use the standalone
-ImagingCamera presentation over the same hook. The server projects camera identities, the remembered
+The Rig page composes the saved camera in `ImagingSetup`. The server projects camera identities, the remembered
 selection, identity problems, and whether editing is available. Explicitly saving a camera choice changes rig configuration; it does not connect the camera or establish
 capture readiness.
 
@@ -16,8 +14,7 @@ persisted, which is sufficient for this configuration operation.
 Equipment composes `ImagingSetup` with the same camera hook and the narrow
 `useFocalLengthSettings` capability. Both drafts are validated before writing;
 only changed settings are submitted, camera first. The camera save returns a
-typed confirmed/rejected/unconfirmed/unavailable result while retaining
-`confirmedSaves` for Preparation. A non-confirmed result stops the composition;
+typed confirmed/rejected/unconfirmed/unavailable result. A non-confirmed result stops the composition;
 a confirmed camera remains saved if the focal-length write fails. Drafts retain
 ID and reported name across reads and partial results. Checking saved setup is
 read-only and never repeats either write.

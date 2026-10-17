@@ -1,79 +1,23 @@
-import { expect, test, type Page, type Route } from '@playwright/test'
-import type { ImagingCameraView } from '@vela/model/web'
-import { observation } from './fixtures/observation'
+import { expect, test } from '@playwright/test'
+import { openEquipmentScene } from './fixtures/fieldroom/browser'
+import { reviewTimezone } from './fixtures/fieldroom/tonight'
 
-const respond = <Body>(route: Route, body: Body) =>
-  route.fulfill({
-    contentType: 'application/json',
-    body: JSON.stringify(body),
-  })
+test.use({ timezoneId: reviewTimezone })
 
-const cameras = [
-  { id: 'main', name: 'ZWO ASI2600MC Pro', configuredName: 'ASI Camera (1)' },
-  { id: 'guide', name: 'ZWO ASI220MM Mini', configuredName: 'ASI Camera (2)' },
-]
+const readPath = '/api/web/rigs/fra400/imaging-camera'
 
-const empty: ImagingCameraView = {
-  rigId: 'rig-1',
-  selected: null,
-  selectedDeviceId: null,
-  cameras,
-  state: 'unselected',
-  editable: true,
-}
-
-const saved: ImagingCameraView = {
-  ...empty,
-  selected: { id: 'main', name: cameras[0]!.name },
-  selectedDeviceId: 'rig-1-main',
-  state: 'ready',
-}
-
-async function observe(page: Page) {
-  await page.route('**/api/web/rigs/rig-1/observe', route =>
-    respond(route, observation('complete')),
-  )
-  await page.route('**/api/web/rigs/rig-1/capture', route =>
-    respond(route, {
-      rigId: 'rig-1',
-      rigName: 'Seestar S30',
-      camera: null,
-      enabled: false,
-      unavailableReason: 'Choose an imaging camera.',
-      phase: 'idle',
-      active: false,
-      exposureSeconds: 2,
-      elapsedSeconds: 0,
-      error: null,
-      latestImage: null,
-      cooling: null,
-      captureReadState: 'current',
-      repeat: false,
-      saveFrames: false,
-      savedImageCount: 0,
-      subject: null,
-      savedCount: 0,
-      integrationSeconds: 0,
-      chosenTarget: { state: 'none' },
-      completedCount: 0,
-    }),
-  )
-  await page.goto('/rigs/rig-1/observe')
-}
-
-test('remembers the server-confirmed choice after reload and rejects a late pre-save poll', async ({
+test('Imaging setup keeps the confirmed camera when a read from before the save arrives late', async ({
   page,
 }) => {
   // Exercise the generation guard even when cancelling transport loses the race.
   await page.addInitScript(() => {
     const original = window.fetch
     window.fetch = (input, init) =>
-      String(input).includes('/api/web/rigs/rig-1/imaging-camera')
+      String(input).includes('/api/web/rigs/fra400/imaging-camera')
         ? original(input, { ...init, signal: null })
         : original(input, init)
   })
-  let current = empty
-  let writes = 0
+  const { scene } = await openEquipmentScene(page, 'equipment-setup-save')
   let hold = false
   let held = false
   let released = false
@@ -83,8 +27,8 @@ test('remembers the server-confirmed choice after reload and rejects a late pre-
     release = resolve
   })
 
-  await page.route('**/api/web/rigs/rig-1/imaging-camera', async route => {
-    const snapshot = current
+  await page.route(`**${readPath}`, async route => {
+    const snapshot = scene.respond('GET', readPath)
     const delayed = hold && !held
 
     if (delayed) {
@@ -92,138 +36,52 @@ test('remembers the server-confirmed choice after reload and rejects a late pre-
       await waiting
     }
 
-    await respond(route, snapshot)
+    await route.fulfill({ status: snapshot.status, json: snapshot.json })
 
     if (delayed) released = true
   })
-  let finish!: () => void
-
-  const saving = new Promise<void>(resolve => {
-    finish = resolve
-  })
-
-  await page.route('**/api/rigs/rig-1/imaging-camera', async route => {
-    writes++
-    expect(route.request().postDataJSON()).toEqual(saved.selected)
-    await saving
-    current = saved
-    await respond(route, current)
-  })
-  await observe(page)
-  const panel = page.getByRole('form', { name: 'Capture settings' })
-  await panel.getByRole('combobox', { name: 'Imaging camera', exact: true }).selectOption('main')
+  const camera = page.getByRole('combobox', { name: 'Imaging camera', exact: true })
+  await expect(camera).toHaveValue('camera')
   hold = true
-  await expect.poll(() => held).toBe(true)
-  await panel.getByRole('button', { name: 'Use this camera' }).click()
-  await expect(panel.getByRole('button', { name: 'Saving camera…' })).toHaveAttribute('aria-busy', 'true')
-  finish()
-  await expect(panel.getByRole('combobox', { name: 'Imaging camera', exact: true })).toBeEnabled()
+  await expect.poll(() => held, { timeout: 15_000 }).toBe(true)
+  await camera.selectOption('other-camera')
+  await page.getByRole('button', { name: 'Save imaging setup', exact: true }).click()
+  await expect.poll(() => scene.writes.length).toBe(1)
+  await expect(camera).toBeEnabled()
   release()
   await expect.poll(() => released).toBe(true)
-  await expect(panel.getByRole('combobox', { name: 'Imaging camera', exact: true })).toHaveValue('main')
-  await expect(panel.getByRole('button', { name: 'Use this camera' })).toHaveCount(0)
-  await page.reload()
-  await expect(panel.getByRole('combobox', { name: 'Imaging camera', exact: true })).toBeEnabled()
-  await expect(panel.getByRole('combobox', { name: 'Imaging camera', exact: true })).toHaveValue('main')
-  expect(writes).toBe(1)
+  await expect(camera).toHaveValue('other-camera')
+  await page.getByRole('button', { name: 'Save imaging setup', exact: true }).click()
+  await expect(page.getByText('Imaging setup is already saved.', { exact: true })).toBeVisible()
+  expect(scene.writes).toEqual([
+    { method: 'PUT', pathname: '/api/rigs/fra400/imaging-camera', body: { id: 'other-camera', name: 'ZWO ASI220MM Mini' } },
+  ])
 })
 
-test('retains the saved camera offline and requires an explicit choice for changed identity', async ({
+test('Imaging setup keeps the saved camera through failed reads and asks for a choice after an identity change', async ({
   page,
 }) => {
-  let current = saved
+  const { scene } = await openEquipmentScene(page, 'equipment-connected')
   let offline = false
-  await page.route('**/api/web/rigs/rig-1/imaging-camera', route =>
-    offline ? route.abort() : respond(route, current),
-  )
-  await observe(page)
-  const panel = page.getByRole('form', { name: 'Capture settings' })
-  await expect(panel.getByRole('combobox', { name: 'Imaging camera', exact: true })).toBeEnabled()
+  await page.route(`**${readPath}`, route => {
+    if (offline) return route.abort()
+    const result = scene.respond('GET', readPath)
+
+    return route.fulfill({ status: result.status, json: result.json })
+  })
+  const camera = page.getByRole('combobox', { name: 'Imaging camera', exact: true })
+  await expect(camera).toHaveValue('camera')
   offline = true
-  await expect(panel.getByText(/saved camera could not be checked/)).toBeVisible()
-  await expect(panel.getByRole('combobox', { name: 'Imaging camera', exact: true })).toBeDisabled()
-  await expect(panel.getByRole('combobox', { name: 'Imaging camera', exact: true })).toHaveValue('main')
-  current = {
+  await expect(page.getByText('Setup updates are interrupted.', { exact: false })).toBeVisible({ timeout: 15_000 })
+  await expect(camera).toHaveValue('camera')
+  const saved = scene.snapshot().camera
+  scene.setCamera({
     ...saved,
     state: 'changed',
-    cameras: [{ ...cameras[0]!, name: 'Replacement camera' }],
-  }
+    selectedDeviceId: null,
+    cameras: saved.cameras.map(choice => choice.id === 'camera' ? { ...choice, name: 'Replacement camera' } : choice),
+  })
   offline = false
-  await expect(panel.getByText(/saved camera identity has changed/)).toBeVisible()
-  await expect(panel.getByRole('button', { name: 'Use this camera' })).toHaveCount(0)
-  await panel.getByRole('combobox', { name: 'Imaging camera', exact: true }).selectOption('main')
-  await expect(panel.getByRole('button', { name: 'Use this camera' })).toBeEnabled()
-})
-
-test('reconciles a lost save response from persisted selection without replaying the write', async ({
-  page,
-}) => {
-  let current = empty
-  let writes = 0
-  let check = false
-  let release!: () => void
-
-  const waiting = new Promise<void>(resolve => {
-    release = resolve
-  })
-
-  await page.route('**/api/web/rigs/rig-1/imaging-camera', async route => {
-    if (writes) {
-      check = true
-      await waiting
-    }
-
-    await respond(route, current)
-  })
-  await page.route('**/api/rigs/rig-1/imaging-camera', async route => {
-    writes++
-    current = saved
-    await route.abort()
-  })
-  await observe(page)
-  const panel = page.getByRole('form', { name: 'Capture settings' })
-  await panel.getByRole('combobox', { name: 'Imaging camera', exact: true }).selectOption('main')
-  await panel.getByRole('button', { name: 'Use this camera' }).click()
-  await expect.poll(() => check).toBe(true)
-  await expect(panel.getByText(/save response could not be confirmed/)).toBeVisible()
-  await expect(panel.getByRole('button', { name: 'Use this camera' })).toBeDisabled()
-  release()
-  await expect(panel.getByRole('combobox', { name: 'Imaging camera', exact: true })).toBeEnabled()
-  await expect(panel.getByText(/save response could not be confirmed/)).toHaveCount(0)
-  expect(writes).toBe(1)
-})
-
-test('an explicit check unlocks an unsaved uncertain choice without replaying it', async ({
-  page,
-}) => {
-  let current = empty
-  let writes = 0
-  await page.route('**/api/web/rigs/rig-1/imaging-camera', route => respond(route, current))
-  await page.route('**/api/rigs/rig-1/imaging-camera', async route => {
-    writes++
-
-    if (writes === 1) await route.abort()
-    else {
-      current = saved
-      await respond(route, current)
-    }
-  })
-  await observe(page)
-  const panel = page.getByRole('form', { name: 'Capture settings' })
-  await panel.getByRole('combobox', { name: 'Imaging camera', exact: true }).selectOption('main')
-  await panel.getByRole('button', { name: 'Use this camera' }).click()
-  await expect(panel.getByText(/save response could not be confirmed/)).toBeVisible()
-  await expect(panel.getByRole('button', { name: 'Use this camera' })).toBeDisabled()
-  current = { ...empty, editable: false }
-  await panel.getByRole('button', { name: 'Check saved camera' }).click()
-  await expect(panel.getByText(/Another rig operation/)).toBeVisible()
-  await expect(panel.getByRole('button', { name: 'Use this camera' })).toBeDisabled()
-  current = empty
-  await panel.getByRole('button', { name: 'Check saved camera' }).click()
-  await expect(panel.getByText(/requested camera is not the saved selection/)).toBeVisible()
-  await expect(panel.getByRole('button', { name: 'Use this camera' })).toBeEnabled()
-  expect(writes).toBe(1)
-  await panel.getByRole('button', { name: 'Use this camera' }).click()
-  await expect(panel.getByRole('combobox', { name: 'Imaging camera', exact: true })).toBeEnabled()
-  expect(writes).toBe(2)
+  await expect(page.getByText('The saved camera slot now reports a different camera.', { exact: false })).toBeVisible({ timeout: 15_000 })
+  expect(scene.writes).toEqual([])
 })

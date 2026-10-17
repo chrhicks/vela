@@ -182,7 +182,7 @@ export function registerAlignment(
     } else if (owner && owner !== 'alignment') {
       reason = operations.heldReason(rigId) ?? 'Another Rig operation is in progress.'
     } else if (settings?.mode === 'physical' && rig.imagingCamera?.uniqueId !== settings.cameraId) {
-      reason = 'Select the configured imaging camera on Observe before alignment.'
+      reason = 'Select the configured imaging camera on the Rig page before alignment.'
     } else if (settings?.mode === 'physical' && !rig.focalLengthMm) {
       reason = 'Set the effective focal length before alignment.'
     }

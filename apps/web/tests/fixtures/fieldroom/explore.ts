@@ -10,9 +10,8 @@ export const exploreScenes = [
   'explore-no-darkness', 'explore-empty', 'explore-thumbnail-failed', 'explore-expired', 'explore-offline',
   'framing-light', 'framing-dark', 'framing-unsolved', 'framing-interrupted',
   'framing-preview-failed', 'framing-read-retrying', 'framing-obsolete', 'framing-centering',
-  'preparation-light', 'preparation-dark', 'preparation-camera-save-failed',
-  'preparation-disconnected', 'preparation-connection-uncertain',
-  'preparation-start-uncertain', 'preparation-cooling-uncertain', 'preparation-unframed',
+  'preparation-light', 'preparation-disconnected', 'preparation-connection-uncertain',
+  'preparation-start-uncertain', 'preparation-cooling-uncertain',
 ] as const
 
 export type ExploreScene = (typeof exploreScenes)[number]
@@ -160,8 +159,6 @@ export function createExploreScene(name: ExploreScene) {
 
   if (name === 'preparation-disconnected' || name === 'preparation-connection-uncertain') capture.cooling = null
 
-  if (name === 'preparation-unframed') framing = { ...framing, phase: 'idle', actual: null, preview: null, checkCurrent: false, canCenter: false }
-
   if (name.startsWith('preparation')) capture = { ...capture, chosenTarget: { state: 'chosen', subject } }
 
   const json = <Body>(value: Body): ReviewResponse => ({ status: 200, json: value })
@@ -170,7 +167,7 @@ export function createExploreScene(name: ExploreScene) {
   return {
     name,
     route: rigless ? '/explore' : name.startsWith('explore') ? `${base}/targets` :
-      name.startsWith('framing') ? `${base}/targets/${subject.targetId}` : base,
+      name.startsWith('framing') ? `${base}/targets/${subject.targetId}` : `${base}/capture`,
     time: reviewTime, timezone: reviewTimezone, appearance: name.endsWith('-dark') ? 'dark' : 'light',
     commands, unknownRequests,
     respond(method: string, requestUrl: string, body?: ReviewCommand): ReviewResponse {
@@ -281,7 +278,6 @@ export function createExploreScene(name: ExploreScene) {
       if (method === 'GET' && pathname === '/api/web/rigs/fra400/imaging-camera') return json(camera)
 
       if (method === 'PUT' && pathname === '/api/rigs/fra400/imaging-camera') {
-        if (name === 'preparation-camera-save-failed') return failure(409, 'Camera selection could not be saved')
         const selected = camera.cameras.find(item => item.id === body?.id && item.name === body?.name)
 
         if (!selected?.name) return failure(400, 'Unknown imaging camera')
