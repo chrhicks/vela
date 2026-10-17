@@ -46,7 +46,7 @@ export function AppNavigation() {
     },
   })
 
-  const rigs = [{ id: '', name: 'All rigs' }, ...(view?.rigs ?? [])]
+  const rigs = [...(view?.rigs ?? []), { id: '', name: 'All rigs' }]
 
   if (rigId && !rigs.some(rig => rig.id === rigId)) rigs.push({ id: rigId, name: 'Current rig' })
   const presentation = activity ? activityPresentation(activity, offline, missing) : null
@@ -89,6 +89,10 @@ export function AppNavigation() {
             : '/',
         )
       }
+      rigStatus={connection}
+      rigPage={
+        rigId ? { label: 'Rig & equipment', ...routeLink(base), current: pathname === base } : undefined
+      }
       actions={
         <Appearance
           open={appearanceOpen}
@@ -100,19 +104,9 @@ export function AppNavigation() {
         />
       }
       utility={
-        <>
-          {connection && (
-            <span className="vela-app__connection" data-connected={connection === 'Connected'}>
-              <span className="vela-app__connection-dot" aria-hidden="true">
-                ●
-              </span>{' '}
-              {connection}
-            </span>
-          )}
-          {!rigId && view?.rigs.length === 0 && !offline && !missing && (
-            <span className="vela-app__connection">No rig added</span>
-          )}
-        </>
+        !rigId && view?.rigs.length === 0 && !offline && !missing && (
+          <span className="vela-app__connection">No rig added</span>
+        )
       }
       links={
         rigId
@@ -126,7 +120,7 @@ export function AppNavigation() {
                   inPreparation,
               },
               {
-                label: 'Explore the sky',
+                label: 'Targets',
                 ...routeLink(`${base}/observe/targets${targetSearch}`),
                 current: inTargets,
               },

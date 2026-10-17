@@ -4,7 +4,6 @@ import { Appearance } from './Appearance'
 import type { AppearancePreference } from './Appearance'
 import { NavigationBar, type NavigationActivity, type NavigationBarProps } from './NavigationBar'
 import type { ComponentSpecimen } from '../themes'
-import './NavigationBar.specimen.css'
 
 const connectionSchema = z.enum(['connected', 'interrupted', 'offline'])
 
@@ -15,16 +14,7 @@ function NavigationAppearance() {
   return <Appearance open={open} onOpenChange={setOpen} value={value} onValueChange={setValue} systemMode="light" persistence="visit" />
 }
 
-function NavigationUtility({ connection }: { connection: z.infer<typeof connectionSchema> }) {
-  const connectionLabels = { connected: 'Connected', interrupted: 'Updates lost', offline: 'Offline' }
-
-  return (
-    <span className="vela-navigation-specimen__connection" data-state={connection}>
-      <i aria-hidden="true" />
-      {connectionLabels[connection]}
-    </span>
-  )
-}
+const connectionLabels = { connected: 'Connected', interrupted: 'Updates lost', offline: 'Offline' }
 
 export const specimen: ComponentSpecimen = {
   componentId: 'navigation-bar',
@@ -36,7 +26,7 @@ export const specimen: ComponentSpecimen = {
   controls: {
     compact: { type: 'boolean', label: 'Focused phone task' },
     rig: { type: 'select', label: 'Viewing rig', options: ['askar', 'seestar', 'all'] },
-    page: { type: 'select', label: 'Current page', options: ['tonight', 'explore', 'photographs'] },
+    page: { type: 'select', label: 'Current page', options: ['tonight', 'explore', 'photographs', 'equipment'] },
     connection: { type: 'select', label: 'Connection', options: ['connected', 'interrupted', 'offline'] },
     activity: {
       type: 'select',
@@ -104,10 +94,22 @@ export const specimen: ComponentSpecimen = {
           label: props.rig === 'seestar' ? 'Seestar S30' : 'Askar FRA 400',
         } } : {})}
         onRigChange={rig => onPropsChange?.({ rig })}
+        {...(props.rig === 'all' ? {} : {
+          rigStatus: connectionLabels[connectionSchema.parse(props.connection)],
+          rigPage: {
+            href: '#equipment',
+            label: 'Rig & equipment',
+            current: props.page === 'equipment',
+            onClick: event => {
+              event.preventDefault()
+              onPropsChange?.({ page: 'equipment' })
+            },
+          },
+        })}
         links={
           props.rig === 'all'
             ? []
-            : [{ id: 'tonight', label: 'Tonight' }, { id: 'explore', label: 'Explore the sky' }, { id: 'photographs', label: 'Photographs' }].map(page => ({
+            : [{ id: 'tonight', label: 'Tonight' }, { id: 'explore', label: 'Targets' }, { id: 'photographs', label: 'Photographs' }].map(page => ({
                 href: `#${page.id}`,
                 label: page.label,
                 current: props.page === page.id,
@@ -118,7 +120,6 @@ export const specimen: ComponentSpecimen = {
               }))
         }
         actions={<NavigationAppearance />}
-        utility={<NavigationUtility connection={connectionSchema.parse(props.connection)} />}
         {...navigation}
       />
     )

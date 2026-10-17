@@ -4,41 +4,14 @@
   padding: calc(var(--vela-space) * 6) calc(var(--vela-space) * 6) calc(var(--vela-space) * 10);
 }
 
-.vela-rig-page__back {
-  display: inline-flex;
-  margin: 0 0 calc(var(--vela-space) * 4) calc(var(--vela-space) * -2.5);
-  padding: calc(var(--vela-space) * 1.5) calc(var(--vela-space) * 2.5);
-  border-radius: var(--vela-radius);
-  color: var(--vela-text-muted);
-  font-size: 0.72rem;
-  font-weight: 650;
-  text-decoration: none;
-}
-
-.vela-rig-page__back:hover {
-  color: var(--vela-text);
-  background: var(--vela-surface);
-}
-.vela-rig-page__back:focus-visible {
-  outline: 2px solid var(--vela-focus);
-  outline-offset: 2px;
-}
-
 @media (max-width: 47rem) {
   .vela-rig-page {
     padding: calc(var(--vela-space) * 5) calc(var(--vela-space) * 4) calc(var(--vela-space) * 8);
-  }
-  .vela-rig-page__back {
-    margin-left: calc(var(--vela-space) * -2.5);
   }
 }
 
 @media (max-width: 31rem) {
   .vela-rig-page {
     padding: calc(var(--vela-space) * 4) calc(var(--vela-space) * 3) calc(var(--vela-space) * 7);
-  }
-  .vela-rig-page__back {
-    margin-bottom: calc(var(--vela-space) * 3);
-    margin-left: calc(var(--vela-space) * -2.5);
   }
 }

@@ -33,6 +33,25 @@ test('Equipment matches the saved imaging camera through its rig-detail identity
   expect(scene.writes).toEqual([])
 })
 
+test('Equipment leads to Tonight once the imaging camera and every device are connected', async ({ page }) => {
+  const { scene } = await openEquipmentScene(page, 'equipment-connected')
+  const readiness = page.getByRole('region', { name: 'Rig readiness', exact: true })
+  await expect(readiness.getByRole('heading', { name: 'Imaging camera connected', exact: true })).toBeVisible()
+  await expect(readiness.getByRole('button', { name: 'Connect devices', exact: true })).toBeVisible()
+  await expect(readiness.getByRole('link', { name: 'Open Tonight', exact: true })).toHaveAttribute('href', '/rigs/fra400/observe/capture')
+
+  const { rig } = scene.snapshot()
+  scene.setRig({ ...rig, devices: rig.devices.filter(device => device.connection === 'connected') })
+  await page.reload()
+
+  await expect(readiness.getByRole('heading', { name: 'Ready to observe', exact: true })).toBeVisible()
+  await expect(readiness).toContainText('3 of 3 devices connected · State checked')
+  await expect(readiness.getByRole('link', { name: 'Open Tonight →', exact: true })).toHaveAttribute('href', '/rigs/fra400/observe/capture')
+  await expect(readiness.getByRole('link', { name: 'Choose a target', exact: true })).toHaveAttribute('href', '/rigs/fra400/observe/targets')
+  await expect(readiness.getByRole('button', { name: 'Connect devices', exact: true })).toHaveCount(0)
+  expect(scene.writes).toEqual([])
+})
+
 async function editSetup(page: Page) {
   await page.getByRole('combobox', { name: 'Imaging camera', exact: true }).selectOption(otherCamera.id)
   await page.getByRole('spinbutton', { name: 'Effective focal length', exact: true }).fill('500')
@@ -175,8 +194,8 @@ test('Home retains the previous catalog when confirmed Add is followed by a fail
   await page.getByRole('button', { name: 'Add rig', exact: true }).click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await expect(page.getByRole('alert')).toContainText('Showing the previous state')
-  await expect(page.getByRole('link', { name: 'View Askar FRA 400', exact: true })).toBeVisible()
-  await expect(page.getByRole('link', { name: 'View Seestar', exact: true })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Open Askar FRA 400', exact: true })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Open Seestar', exact: true })).toBeVisible()
   expect(added).toEqual([{ name: 'Second rig', endpoint }])
   expect(scene.unknownRequests).toEqual([])
 })
@@ -202,9 +221,9 @@ for (const mode of ['light', 'dark'] as const) {
           await expect(page.getByRole('dialog')).toHaveCount(0)
           expect(requests.some(request => /\/api\/(?:web\/)?rigs\//.test(request))).toBe(false)
         } else {
-          await expect(page.getByRole('link', { name: 'View Askar FRA 400', exact: true })).toBeVisible()
-          await expect(page.getByRole('link', { name: 'View Seestar', exact: true })).toHaveAttribute('href', '/rigs/seestar')
-          await expect(page.getByRole('link', { name: 'View Portable rig', exact: true })).toHaveAttribute('href', '/rigs/portable')
+          await expect(page.getByRole('link', { name: 'Open Askar FRA 400', exact: true })).toBeVisible()
+          await expect(page.getByRole('link', { name: 'Open Seestar', exact: true })).toHaveAttribute('href', '/rigs/seestar/observe/capture')
+          await expect(page.getByRole('link', { name: 'Open Portable rig', exact: true })).toHaveAttribute('href', '/rigs/portable/observe/capture')
         }
 
         await settledLayout(page)
