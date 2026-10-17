@@ -178,15 +178,19 @@ test('navigates through the complete Rig card and renders ordered responsive det
   await page.route('**/api/web/rigs/rig-1', route => fulfillJson(route, liveDetail()))
 
   await page.goto('/')
-  const rigLink = page.getByRole('link', { name: 'View Backyard rig' })
+  const rigLink = page.getByRole('link', { name: 'Open Backyard rig' })
   await expect(rigLink).toBeVisible()
   await expect(rigLink.getByText('7 of 7')).toBeVisible()
+  await expect(rigLink).toContainText('Open rig →')
   await rigLink.click()
+  await expect(page).toHaveURL(/\/rigs\/rig-1\/observe\/capture$/)
+
+  const navigation = page.locator('.vela-navigation')
+  await navigation.getByRole('button', { name: /^Viewing rig/ }).click()
+  await navigation.getByRole('link', { name: 'Rig & equipment', exact: true }).click()
 
   await expect(page).toHaveURL(/\/rigs\/rig-1$/)
-  await expect(
-    page.locator('.vela-navigation').getByRole('link', { name: 'Tonight', exact: true }),
-  ).toHaveAttribute('href', '/rigs/rig-1/observe/capture')
+  await expect(navigation.getByRole('link', { name: 'Tonight', exact: true })).toHaveAttribute('href', '/rigs/rig-1/observe/capture')
   await expect(page.getByRole('heading', { level: 1, name: 'Your rig' })).toBeVisible()
   await expect(page.locator('.equipment__name h3')).toHaveText([
     'Mount',

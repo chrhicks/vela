@@ -37,7 +37,7 @@ export function Home() {
           {firstNight
             ? 'Add the computer that serves your astronomy devices, then choose a camera.'
             : populated
-              ? 'Choose a rig to inspect its equipment. Adding a rig does not connect its devices.'
+              ? 'Choose a rig to start tonight’s session. Adding a rig does not connect its devices.'
               : 'Manage the computers that serve your astronomy devices.'}
         </p>
       </header>
@@ -91,7 +91,7 @@ function RigCard({ rig }: { readonly rig: RigView }) {
             : 'Not connected'
 
   return (
-    <Link aria-label={`View ${rig.name}`} to={`/rigs/${encodeURIComponent(rig.id)}`}>
+    <Link aria-label={`Open ${rig.name}`} to={`/rigs/${encodeURIComponent(rig.id)}/observe/capture`}>
       <div>
         <h2>{rig.name}</h2>
         <span>{status}</span>
@@ -102,7 +102,7 @@ function RigCard({ rig }: { readonly rig: RigView }) {
           : `${rig.connections.total} devices in saved inventory`}
       </p>
       <p>{rig.lastSeenAt ? `Last seen ${formatDateTime(rig.lastSeenAt)}` : 'Not yet seen'}</p>
-      <span>View equipment →</span>
+      <span>Open rig →</span>
     </Link>
   )
 }
