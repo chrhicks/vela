@@ -244,7 +244,7 @@
 .capture-image-dialog .capture-image__actions {
   padding: 4px 14px;
 }
-@media (min-width: 601px) {
+@container (min-width: 601px) {
   .capture-image--fieldroom[data-interrupted] .capture-image__window {
     aspect-ratio: 886 / 536;
   }
@@ -261,17 +261,63 @@
     grid-row: 2;
   }
 }
-@media (max-width: 600px) {
-  .capture-image--fieldroom > header {
-    padding: 8px 12px;
-  }
-  .capture-image--fieldroom .capture-image__window {
-    aspect-ratio: 4 / 3;
-  }
-  .capture-image__facts {
+@container (max-width: 600px) {
+  .capture-page .capture-image--fieldroom {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
     gap: 8px 12px;
+    border: 0;
+    border-radius: 0;
+    overflow: visible;
+    background: none;
   }
-  .capture-image__inspection-status {
+  .capture-page .capture-image--fieldroom > * {
+    grid-column: 1 / -1;
+  }
+  .capture-page .capture-image--fieldroom > header,
+  .capture-page .capture-image--fieldroom .capture-image__actions,
+  .capture-page .capture-image--fieldroom .capture-image__metadata {
+    display: contents;
+  }
+  .capture-page .capture-image--fieldroom .capture-image__window {
+    grid-row: 1;
+    height: 200px;
+    aspect-ratio: auto;
+    border-radius: 4px;
+  }
+  .capture-page .capture-image--fieldroom .capture-image__heading {
+    grid-row: 2;
+    grid-column: 1;
+    gap: 8px;
+  }
+  .capture-page .capture-image--fieldroom .capture-image__heading > * {
+    color: var(--vela-text-muted);
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 18px;
+  }
+  .capture-page .capture-image--fieldroom .capture-image__zoom,
+  .capture-page .capture-image--fieldroom .capture-image__actions > .vela-icon-button,
+  .capture-page .capture-image--fieldroom .capture-image__caption,
+  .capture-page .capture-image--fieldroom .capture-image__facts {
+    display: none;
+  }
+  .capture-page .capture-image--fieldroom .capture-image__enlarge {
+    z-index: 1;
+    grid-row: 1;
+    grid-column: 2;
+    align-self: end;
+    margin: 8px;
+    background: var(--vela-surface-raised);
+  }
+  .capture-page .capture-image--fieldroom .capture-image__saved,
+  .capture-page .capture-image--fieldroom .capture-image__keep {
+    grid-row: 2;
+    grid-column: 2;
+  }
+  .capture-page .capture-image--fieldroom :is(.capture-image__error, .capture-image__retention, .capture-image__inspection-status) {
     flex-wrap: wrap;
+    padding-inline: 0;
   }
 }

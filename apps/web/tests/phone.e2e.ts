@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
+import { readFileSync } from 'node:fs'
 import { openAlignmentScene, openEquipmentScene, openExploreScene } from './fixtures/fieldroom/browser'
+import { createTonightScene, referenceImage, reviewTime } from './fixtures/fieldroom/tonight'
 
 const phone = { width: 390, height: 844 }
 
@@ -72,4 +74,38 @@ test('the rig menu opens from the one-row phone header', async ({ page }) => {
   expect(menu.x).toBeGreaterThanOrEqual(0)
   expect(menu.x + menu.width).toBeLessThanOrEqual(phone.width)
   expect(menu.y + menu.height).toBeLessThan(await tabBarTop(page))
+})
+
+test('Tonight with a target chosen shows Take exposure in the first phone screen', async ({ page }) => {
+  await page.setViewportSize(phone)
+  await openExploreScene(page, 'preparation-light')
+  await expect(page.getByRole('heading', { name: 'The Crescent Nebula' })).toBeVisible()
+  const take = page.getByRole('button', { name: 'Take exposure', exact: true })
+  await expect(take).toBeEnabled()
+  const button = (await take.boundingBox())!
+  expect(button.y + button.height).toBeLessThanOrEqual(await tabBarTop(page))
+  expect((await page.locator('.capture-image__window').boundingBox())!.height).toBe(200)
+  await expect(page.getByRole('button', { name: 'Capture without a target' })).toBeInViewport()
+  await expect(page.getByRole('link', { name: 'Change target' })).toBeInViewport()
+})
+
+test('a running capture keeps Stop and its progress in the first phone screen', async ({ page }) => {
+  const scene = createTonightScene('tonight-light')
+  const reference = readFileSync(new URL(`../../../${referenceImage.path}`, import.meta.url))
+  await page.setViewportSize(phone)
+  await page.clock.setFixedTime(new Date(reviewTime))
+  await page.route('**/api/**', route => {
+    const response = scene.respond(route.request().method(), new URL(route.request().url()).pathname)
+
+    return response.image
+      ? route.fulfill({ contentType: 'image/jpeg', body: reference })
+      : route.fulfill({ status: response.status, json: response.json })
+  })
+  await page.goto(scene.route)
+  const stop = page.getByRole('button', { name: 'Stop capture' })
+  await expect(stop).toBeEnabled()
+  await expect(page.getByRole('progressbar', { name: 'Exposure progress' })).toBeInViewport()
+  const button = (await stop.boundingBox())!
+  expect(button.y + button.height).toBeLessThanOrEqual(await tabBarTop(page))
+  await expect(page.getByRole('button', { name: 'Enlarge image' })).toBeInViewport()
 })
