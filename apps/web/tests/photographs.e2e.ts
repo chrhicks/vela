@@ -56,6 +56,11 @@ async function expectSelected(page: Page, image: SavedImage) {
   await expect(displayDownload(page)).toHaveAttribute('href', image.previewDownloadUrl)
 }
 
+async function switchRig(page: Page, name: string) {
+  await page.getByRole('button', { name: /^Viewing rig/ }).click()
+  await page.getByRole('button', { name, exact: true }).click()
+}
+
 async function viewportPosition(viewport: Locator) {
   return viewport.evaluate(element => ({ left: element.scrollLeft, top: element.scrollTop }))
 }
@@ -351,8 +356,7 @@ test('switching rigs opens the new collection without carrying a foreign selecte
   await native.focus()
   await page.keyboard.press('ArrowRight')
   await expect.poll(async () => (await viewportPosition(native)).left).toBe(before.left + 80)
-  const selector = page.getByRole('combobox', { name: /Viewing rig/ })
-  await selector.selectOption('seestar')
+  await switchRig(page, 'Seestar review rig')
   await expect(page).toHaveURL(/\/rigs\/seestar\/observe\/saved-images$/)
   await expect(page.getByText(/Save frames/)).toBeVisible()
   await expect(preview(page).getByRole('img')).toHaveCount(0)
@@ -360,7 +364,7 @@ test('switching rigs opens the new collection without carrying a foreign selecte
   await expect(originalDownload(page)).toHaveCount(0)
   expect(requests.some(request => request.includes('/api/web/rigs/seestar/saved-images/'))).toBe(false)
   expect(scene.unknownRequests).toEqual([])
-  await selector.selectOption('fra400')
+  await switchRig(page, 'Askar FRA 400')
   await expect(library(page)).toBeVisible()
   await expect(preview(page)).toHaveCount(0)
   await library(page).getByRole('link').first().click()
