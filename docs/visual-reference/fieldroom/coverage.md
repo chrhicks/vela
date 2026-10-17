@@ -42,7 +42,7 @@ or remove a working route before that composition is implemented.
 | --- | --- | --- |
 | Home | `/` | `routes/home.tsx`, `pages/HomeProvider.tsx`, rig discovery/management |
 | Equipment | `/rigs/:rigId` | `routes/rig-detail.tsx`, rig detail and device telemetry |
-| Observe | `/rigs/:rigId/observe` | `routes/observe.tsx`, observation and imaging-camera |
+| Observe | `/rigs/:rigId/observe` | Redirects to Tonight at `/rigs/:rigId/observe/capture` |
 | Capture | `/rigs/:rigId/observe/capture` | `routes/capture.tsx`, capture controller and latest-image inspection |
 | Explore | `/rigs/:rigId/observe/targets` | `routes/targets.tsx`, target discovery/catalog |
 | Framing | `/rigs/:rigId/observe/targets/:targetId` | `routes/targets.tsx`, survey, sky and framing controller |

@@ -3,12 +3,11 @@ import './styles.css'
 import './routes/rig.css'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { RouterProvider, createBrowserRouter } from 'react-router'
+import { Navigate, RouterProvider, createBrowserRouter } from 'react-router'
 import { Home } from './routes/home'
 import { RigDetail } from './routes/rig-detail'
 import { Alignment } from './routes/alignment'
 import { Autofocus } from './routes/autofocus'
-import { Observe } from './routes/observe'
 import { SavedImages } from './routes/saved-images'
 import { Targets } from './routes/targets'
 import { Explore } from './routes/explore'
@@ -39,7 +38,7 @@ const router = createBrowserRouter([
       },
       { path: 'rigs/:rigId', Component: RigDetail },
       { path: 'explore', Component: Explore },
-      { path: 'rigs/:rigId/observe', Component: Observe },
+      { path: 'rigs/:rigId/observe', element: <Navigate replace to="capture" /> },
       { path: 'rigs/:rigId/observe/targets', Component: Targets },
       { path: 'rigs/:rigId/observe/targets/:targetId', Component: Targets },
       { path: 'rigs/:rigId/observe/capture', Component: Capture },
