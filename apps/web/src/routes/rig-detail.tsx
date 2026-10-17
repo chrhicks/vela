@@ -118,8 +118,11 @@ function Equipment({ rigId }: { rigId: string }) {
   const mountDevice = view.devices.find(device => device.kind === 'telescope')
   const cameraConnected = selectedDevice?.connection === 'connected' && !camera.offline && camera.view?.state === 'ready'
   const presentation = observation.view ? readinessPresentation(observation.view, busy, observation.interrupted) : null
+  const blocked = uncertain || interrupted || view.state === 'offline' || busy || observation.interrupted
+  const ready = !blocked && cameraConnected && observation.view?.connectionPreparation.state === 'complete'
 
-  const title = uncertain ? 'The connection result is uncertain'
+  const title = ready ? 'Ready to observe'
+    : uncertain ? 'The connection result is uncertain'
     : interrupted ? 'Live updates are interrupted'
       : view.state === 'offline' ? 'This Rig is offline'
         : busy ? 'Connecting devices…'
@@ -132,13 +135,12 @@ function Equipment({ rigId }: { rigId: string }) {
     <section className="equipment" aria-label="Rig equipment">
       <header className="equipment__heading">
         <div><h1>Your rig</h1><span>{view.name}</span></div>
-        <Link to={`${base}/observe/capture`}>← Back to Tonight</Link>
       </header>
       <div className="equipment__layout">
         <section className="equipment__readiness" aria-label="Rig readiness">
           <div role="status">
             <h2>{title}</h2>
-            <p>{connectionSummary(view)}</p>
+            <p>{ready ? `${connectionSummary(view)} · State checked ${formatAge(view.refreshedAt)}` : connectionSummary(view)}</p>
             {interrupted && <p>Showing the most recent values Vela received. They may no longer describe the Rig.</p>}
             {view.state === 'offline' && <p>Vela cannot reach {formatEndpoint(view)}. Device names come from the last successful inventory.</p>}
             {!cameraConnected && selectedDevice?.connection === 'disconnected' && <p>Saved photographs remain available.</p>}
@@ -147,13 +149,23 @@ function Equipment({ rigId }: { rigId: string }) {
             {observation.result && <ConnectionResult result={observation.result} />}
           </div>
           <div className="equipment__connection-actions">
-            <Button tone="accent" disabled={!observation.canConnect || busy || interrupted || settingsPending} aria-busy={busy} onClick={() => void observation.connect()}>
-              {busy ? 'Connecting devices…' : observation.result?.outcome === 'partial' || observation.result?.outcome === 'failed' ? 'Try remaining devices' : 'Connect devices'}
-            </Button>
-            {(uncertain || observation.interrupted || observation.error || observation.view?.connectionPreparation.state === 'unavailable') && (
-              <Button disabled={observation.refreshing || busy} onClick={() => {
-                void observation.refresh().then(() => refresh())
-              }}>Check rig state</Button>
+            {ready ? (
+              <>
+                <Link className="vela-button" data-tone="accent" to={`${base}/observe/capture`}>Open Tonight →</Link>
+                <Link className="vela-button" to={`${base}/observe/targets`}>Choose a target</Link>
+              </>
+            ) : (
+              <>
+                <Button tone="accent" disabled={!observation.canConnect || busy || interrupted || settingsPending} aria-busy={busy} onClick={() => void observation.connect()}>
+                  {busy ? 'Connecting devices…' : observation.result?.outcome === 'partial' || observation.result?.outcome === 'failed' ? 'Try remaining devices' : 'Connect devices'}
+                </Button>
+                {(uncertain || observation.interrupted || observation.error || observation.view?.connectionPreparation.state === 'unavailable') && (
+                  <Button disabled={observation.refreshing || busy} onClick={() => {
+                    void observation.refresh().then(() => refresh())
+                  }}>Check rig state</Button>
+                )}
+                <Link className="vela-button" to={`${base}/observe/capture`}>Open Tonight</Link>
+              </>
             )}
           </div>
         </section>
@@ -184,7 +196,6 @@ function Equipment({ rigId }: { rigId: string }) {
         <span>{interrupted ? 'Last updated' : 'State checked'} {formatAge(view.refreshedAt)} · Disconnected devices have no live measurements</span>
       <details className="equipment__rig-details">
         <summary>Rig details</summary>
-        <Link to={`${base}/observe`}>Capture preparation →</Link>
         <dl>
           <div><dt>Endpoint</dt><dd>{formatEndpoint(view)}</dd></div>
           <div><dt>Added to Vela</dt><dd>{formatDateTime(view.addedAt)}</dd></div>

@@ -5,7 +5,7 @@
 .equipment__heading > div { display: flex; align-items: baseline; flex-wrap: wrap; gap: 24px; }
 .equipment__heading h1 { font: 400 28px/34px var(--vela-font-heading); }
 .equipment__heading span { color: var(--vela-text-muted); }
-.equipment__heading > a, .equipment__setup a, .equipment__text-action { display: inline-flex; align-items: center; min-height: 44px; padding: 0; border: 0; color: var(--vela-text); background: transparent; font: 500 15px/20px var(--vela-font); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.equipment__setup a, .equipment__text-action { display: inline-flex; align-items: center; min-height: 44px; padding: 0; border: 0; color: var(--vela-text); background: transparent; font: 500 15px/20px var(--vela-font); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .equipment :focus-visible { outline: 2px solid var(--vela-focus); outline-offset: 2px; }
 .equipment__layout { display: grid; grid-template-columns: minmax(0, 1fr) 452px; grid-template-areas: 'readiness setup' 'devices setup' 'preparation setup'; column-gap: 28px; padding: 0 36px; }
 .equipment__readiness { grid-area: readiness; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 24px; border-radius: 6px; background: var(--vela-accent-surface); }
@@ -76,7 +76,7 @@
 .equipment__row > svg { flex-shrink: 0; }
 .equipment__device-details > p { color: var(--vela-text-muted); font-size: 14px; margin-bottom: 12px; }
 .equipment__device-details dl { margin-top: 12px; }
-.equipment__connection-actions { display: grid; flex-shrink: 0; gap: 12px; }
+.equipment__readiness .equipment__connection-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; flex-shrink: 0; gap: 12px; }
 .equipment__connection[data-tone="warning"], .equipment__setup-notice { color: var(--vela-text-muted); }
 .equipment__setup-notice { display: grid; gap: 10px; font-size: 14px; line-height: 20px; }
 .equipment__readiness .vela-observe-result { margin-top: 12px; }
@@ -98,4 +98,5 @@
 }
 @container equipment (width < 600px) {
   .equipment__management { flex-direction: column; align-items: start; }
+  .equipment__readiness .equipment__connection-actions { display: grid; }
 }
