@@ -134,3 +134,30 @@ test('Targets keeps the selected subject’s actions in a bar above the tab bar'
   await expect(page).toHaveURL(/\/rigs\/fra400\/observe\/capture$/)
   expect(scene.commands).toEqual([expect.objectContaining({ method: 'PUT', body: { targetId: 'ngc0224' } })])
 })
+
+test('a ready rig leads with Open Tonight and keeps preparation in reach on a phone', async ({ page }) => {
+  await page.setViewportSize(phone)
+  const { scene } = await openEquipmentScene(page, 'equipment-connected')
+  const { rig } = scene.snapshot()
+  scene.setRig({ ...rig, devices: rig.devices.filter(device => device.connection === 'connected') })
+  await page.reload()
+  const readiness = page.getByRole('region', { name: 'Rig readiness', exact: true })
+  await expect(readiness.getByRole('heading', { name: 'Ready to observe', exact: true })).toBeVisible()
+  const open = readiness.getByRole('link', { name: 'Open Tonight →', exact: true })
+  const choose = readiness.getByRole('link', { name: 'Choose a target', exact: true })
+  const banner = (await readiness.boundingBox())!
+  const primary = (await open.boundingBox())!
+  const secondary = (await choose.boundingBox())!
+  expect(primary.width).toBe(banner.width - 36)
+  expect(secondary.y).toBeGreaterThan(primary.y + primary.height)
+  await expect(choose).toBeInViewport()
+  const rows = page.locator('.equipment__row')
+  await expect(rows).toHaveCount(3)
+  expect((await rows.first().boundingBox())!.height).toBeLessThanOrEqual(90)
+  await expect(page.getByRole('region', { name: 'Rig preparation' }).getByRole('link', { name: 'Polar alignment →' })).toHaveAttribute('href', '/rigs/fra400/observe/alignment')
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await page.screenshot({ path: '/tmp/vela-p3/shots/after-rig-ready-390.png' })
+  await page.setViewportSize({ width: 768, height: 1024 })
+  await page.screenshot({ path: '/tmp/vela-p3/shots/after-rig-ready-768.png' })
+  expect(scene.writes).toEqual([])
+})
