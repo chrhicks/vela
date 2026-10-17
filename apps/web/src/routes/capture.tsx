@@ -159,7 +159,7 @@ function CapturePage({ rigId }: { rigId: string }) {
                 </Link>
               </div>
               <h1 className="vela-type-subject">{subject?.name ?? 'Current position'}</h1>
-              <p>
+              <p className="tonight-subject__catalog">
                 {subject
                   ? [subject.catalog, target?.kind, target?.constellation].filter(Boolean).join(' · ')
                   : 'This run is recorded without a subject.'}

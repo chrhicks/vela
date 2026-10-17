@@ -411,11 +411,8 @@ test.describe('touch inspection', () => {
     await page.setViewportSize({ width: 390, height: 782 })
     const scene = await captureScene(page, 'light')
 
-    const image = page.getByRole('region', {
-      name: 'Latest image',
-      exact: true,
-    })
-
+    await page.getByRole('button', { name: 'Enlarge image' }).click()
+    const image = page.getByRole('dialog', { name: 'Exposure inspection' })
     await image.getByRole('button', { name: '100%', exact: true }).click()
     const viewport = image.locator('.capture-image__window')
     await expect(viewport).toHaveAttribute('data-zoomed', 'true')
