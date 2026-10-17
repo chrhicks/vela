@@ -63,18 +63,24 @@ test('without a rig the tab bar offers only Explore the sky', async ({ page }) =
   await expect(tabs.getByRole('link')).toHaveAttribute('href', '/explore')
 })
 
-test('the rig menu opens from the one-row phone header', async ({ page }) => {
-  await page.setViewportSize(phone)
-  await openEquipmentScene(page, 'equipment-connected')
-  await page.getByRole('button', { name: /^Viewing rig/ }).click()
-  const rigPage = page.getByRole('link', { name: 'Rig & equipment', exact: true })
-  await expect(rigPage).toBeVisible()
-  await expect(page.getByRole('button', { name: 'All rigs', exact: true })).toBeVisible()
-  const menu = (await page.locator('.vela-navigation__rig-menu').boundingBox())!
-  expect(menu.x).toBeGreaterThanOrEqual(0)
-  expect(menu.x + menu.width).toBeLessThanOrEqual(phone.width)
-  expect(menu.y + menu.height).toBeLessThan(await tabBarTop(page))
-})
+for (const width of [390, 360]) {
+  test(`the rig menu opens from the one-row phone header at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: phone.height })
+    await openEquipmentScene(page, 'equipment-connected')
+    const chip = page.getByRole('button', { name: /^Viewing rig/ })
+    await expect(chip).toContainText('3 of 4 connected')
+    const brand = (await page.getByRole('link', { name: 'Vela · all rigs' }).boundingBox())!
+    expect(brand.x + brand.width).toBeLessThan((await chip.boundingBox())!.x)
+    await chip.click()
+    await expect(page.getByRole('link', { name: 'Rig & equipment', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'All rigs', exact: true })).toBeVisible()
+    const menu = (await page.locator('.vela-navigation__rig-menu').boundingBox())!
+    expect(menu.x).toBeGreaterThanOrEqual(0)
+    expect(menu.x + menu.width).toBeLessThanOrEqual(width)
+    expect(menu.y + menu.height).toBeLessThan(await tabBarTop(page))
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  })
+}
 
 test('Tonight with a target chosen shows Take exposure in the first phone screen', async ({ page }) => {
   await page.setViewportSize(phone)
