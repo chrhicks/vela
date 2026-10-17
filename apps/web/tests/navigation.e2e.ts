@@ -35,12 +35,16 @@ for (const width of [1440, 390]) {
     await page.route('**/api/web/navigation', route => route.fulfill({ json: initial }))
     await page.goto('/rigs/rig-1/observe/targets?q=M31&offset=24')
     const bar = page.locator('.vela-navigation')
-    await expect(bar.getByLabel('Viewing rig')).toHaveValue('rig-1')
+    const chip = bar.getByRole('button', { name: /^Viewing rig/ })
+    await expect(chip).toContainText('Askar FRA 400')
     await expect(bar.locator('progress')).toHaveAttribute('value', '18')
     await bar.getByRole('link', { name: 'Tonight', exact: true }).click()
-    await bar.getByRole('link', { name: 'Explore the sky', exact: true }).click()
+    await bar.getByRole('link', { name: 'Targets', exact: true }).click()
     await expect(page).toHaveURL(/targets\?q=M31&offset=24$/)
-    await bar.getByLabel('Viewing rig').selectOption('rig-2')
+    await chip.click()
+    await expect(bar.getByRole('link', { name: 'Rig & equipment', exact: true })).toHaveAttribute('href', '/rigs/rig-1')
+    await expect(bar.getByRole('button', { name: 'All rigs', exact: true })).toBeVisible()
+    await bar.getByRole('button', { name: 'Seestar S30', exact: true }).click()
     await expect(page).toHaveURL(/rigs\/rig-2\/observe\/capture$/)
     const activity = bar.getByRole('link', { name: /Askar FRA 400. 17 captured/ })
     await expect(activity).toContainText('Askar FRA 400')
@@ -56,6 +60,17 @@ for (const width of [1440, 390]) {
     expect(writes).toEqual([])
   })
 }
+
+test('an unknown address says so and leads Home', async ({ page }) => {
+  await page.route('**/api/**', route =>
+    route.fulfill({ status: 503, json: { error: 'Unavailable' } }),
+  )
+  await page.route('**/api/web/navigation', route => route.fulfill({ json: initial }))
+  await page.goto('/no-such-page')
+  await expect(page.getByRole('heading', { level: 1, name: 'Page not found' })).toBeVisible()
+  await page.getByRole('link', { name: 'Go to all rigs', exact: true }).click()
+  await expect(page).toHaveURL(/\/$/)
+})
 
 test('activity reports loss, readout and confirmed end without inventing completion', async ({
   page,
