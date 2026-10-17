@@ -109,3 +109,28 @@ test('a running capture keeps Stop and its progress in the first phone screen', 
   expect(button.y + button.height).toBeLessThanOrEqual(await tabBarTop(page))
   await expect(page.getByRole('button', { name: 'Enlarge image' })).toBeInViewport()
 })
+
+test('Targets keeps the selected subject’s actions in a bar above the tab bar', async ({ page }) => {
+  await page.setViewportSize(phone)
+  const { scene } = await openExploreScene(page, 'explore-light')
+  const bar = page.locator('.vela-discovery__use')
+  await expect(page.getByRole('button', { name: 'Use The Crescent Nebula' })).toBeEnabled()
+
+  await page.locator('.vela-discovery__card').nth(1).getByRole('button').click()
+  await expect(page.locator('.vela-discovery__card').nth(1)).toHaveAttribute('data-selected', 'true')
+  const use = page.getByRole('button', { name: 'Use Andromeda Galaxy' })
+  await expect(use).toBeEnabled()
+  await expect(bar.getByRole('link', { name: 'Frame it first…' })).toHaveAttribute('href', /\/targets\/ngc0224\?/)
+  const box = (await bar.boundingBox())!
+  expect(box.y + box.height).toBe(await tabBarTop(page))
+
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+  await expect(use).toBeInViewport()
+  const last = (await page.locator('.vela-discovery__method').boundingBox())!
+  expect(last.y + last.height).toBeLessThanOrEqual((await bar.boundingBox())!.y)
+  await expect(page.getByRole('searchbox', { name: 'Find a target' })).toBeAttached()
+
+  await use.click()
+  await expect(page).toHaveURL(/\/rigs\/fra400\/observe\/capture$/)
+  expect(scene.commands).toEqual([expect.objectContaining({ method: 'PUT', body: { targetId: 'ngc0224' } })])
+})
