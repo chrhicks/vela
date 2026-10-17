@@ -70,6 +70,7 @@ async function captureScene(page: Page, mode: 'light' | 'dark', ready = false) {
       completedCount: 0,
       savedCount: 0,
       integrationSeconds: 0,
+      chosenTarget: { state: 'none' },
       subject: null,
     }
   const commands: string[] = []
@@ -224,6 +225,7 @@ for (const mode of ['light', 'dark'] as const) {
       completedCount: 1,
       savedCount: 1,
       integrationSeconds: 180,
+      chosenTarget: { state: 'none' },
     })
     await expect(image.getByRole('img')).toHaveAttribute(
       'src',

@@ -14,6 +14,7 @@ import { skyTime } from './sky-time'
 import { SkyInspection } from './SkyInspection'
 import { useCatalog } from './use-catalog'
 import { savedDiscovery, selectionOf, useDiscovery, type DiscoverySelection } from './use-discovery'
+import { useChooseTarget } from './use-choose-target'
 import './target-discovery.css'
 
 const categories: Array<[TargetCategory | 'all', string]> = [
@@ -70,6 +71,34 @@ function ReferenceImage({ target }: { target: TargetCatalogItem }) {
       onError={() => setFailed(true)}
       draggable={false}
     />
+  )
+}
+
+function UseTarget({
+  rigId,
+  targetId,
+  frameLink,
+}: {
+  rigId: string
+  targetId: string
+  frameLink: string
+}) {
+  const target = useChooseTarget(rigId)
+
+  return (
+    <div className="vela-discovery__use">
+      <Button tone="accent" pending={target.pending} onClick={() => void target.choose(targetId)}>
+        Use this target
+      </Button>
+      <Link className="vela-button" data-tone="neutral" to={frameLink}>
+        Frame it first…
+      </Link>
+      {target.error ? (
+        <p role="alert">{target.error}</p>
+      ) : (
+        <p>Using a target records it on your frames. It never moves the mount.</p>
+      )}
+    </div>
   )
 }
 
@@ -516,10 +545,8 @@ function ExploreSubjects({
                 </p>
               </>
             )}
-            {frameLink ? (
-              <Link className="vela-button" data-tone="accent" to={frameLink}>
-                Frame this subject →
-              </Link>
+            {rigId && frameLink ? (
+              <UseTarget key={selected.id} rigId={rigId} targetId={selected.id} frameLink={frameLink} />
             ) : (
               <Link className="vela-button" data-tone="accent" to="/">
                 Add or choose a rig →

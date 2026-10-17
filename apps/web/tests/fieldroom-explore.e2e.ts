@@ -111,7 +111,7 @@ for (const mode of ['light', 'dark'] as const) {
 
       if (width === 390) await expect(page.locator('.vela-discovery__subject')).toBeFocused()
       expect(scene.commands).toEqual([])
-      await page.getByRole('link', { name: 'Frame this subject' }).click()
+      await page.getByRole('link', { name: 'Frame it first…' }).click()
       await expect(page).toHaveURL(/\/targets\/ngc0224/)
       expect(scene.commands).toEqual([])
     })
@@ -143,7 +143,7 @@ for (const mode of ['light', 'dark'] as const) {
       const { scene, missingResources, requests } = await openExploreScene(page, `framing-${mode}`)
       await expect(page.getByRole('heading', { name: /Frame/ }).first()).toBeVisible()
       await expect(page.locator('.framing-exposure img')).toBeVisible()
-      await expect(page.getByRole('link', { name: 'Continue to capture' })).toBeEnabled()
+      await expect(page.getByRole('button', { name: 'Use this target' })).toBeEnabled()
       await expect(page.locator('.aladin-container canvas').first()).toBeVisible()
       await expect(page.locator('.vela-target-footprint--actual')).toBeVisible()
       await expect
@@ -231,8 +231,11 @@ for (const mode of ['light', 'dark'] as const) {
       )
       expect(missingResources).toEqual([])
       expect(scene.commands).toEqual([])
-      await page.getByRole('link', { name: 'Continue to capture' }).click()
-      await expect(page).toHaveURL(/\/observe\?target=ngc6888/)
+      await page.getByRole('button', { name: 'Use this target' }).click()
+      await expect(page).toHaveURL(/\/observe\/capture$/)
+      expect(scene.commands).toEqual([
+        { method: 'PUT', pathname: '/api/rigs/fra400/capture/target', body: { targetId: 'ngc6888' } },
+      ])
     })
   }
 }
@@ -243,7 +246,7 @@ test('a newer unsolved exposure retains its own preview beside the older solved 
   const { scene, requests } = await openExploreScene(page, 'framing-unsolved')
   await expect(page.locator('.framing-exposure img')).toBeVisible()
   await expect(page.locator('.framing-exposure')).toContainText('No solved position')
-  await expect(page.getByRole('link', { name: 'Continue to capture' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Adjust composition' })).toHaveCount(0)
   expect(requests.some((request) => request.includes('/review-test-2/fit.png'))).toBe(true)
   expect(scene.commands).toEqual([])
 })

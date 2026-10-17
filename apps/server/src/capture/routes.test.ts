@@ -717,7 +717,7 @@ it('rejects malformed and unknown subjects before device inspection or acquiring
   const { start, operations, captures, inspections, bindings } = setup(record.imagingCamera, { lookupSubject })
   const acquire = vi.spyOn(operations, 'acquire')
 
-  for (const targetId of ['', '   ', 42, null, 'missing']) {
+  for (const targetId of ['', '   ', 42, 'missing']) {
     expect((await start({ exposureSeconds: 10, targetId })).statusCode).toBe(400)
   }
 
@@ -729,4 +729,101 @@ it('rejects malformed and unknown subjects before device inspection or acquiring
   expect(response.statusCode).toBe(200)
   expect(response.json()).toMatchObject({ subject, savedCount: 0, integrationSeconds: 0 })
   expect(captures).toHaveLength(1)
+})
+
+const andromeda = { targetId: 'ngc0224', name: 'Andromeda Galaxy', catalog: 'NGC 224' }
+
+const crescent = { targetId: 'ngc6888', name: 'Crescent Nebula', catalog: 'NGC 6888' }
+
+function setupWithCatalogSubjects() {
+  return setup(record.imagingCamera, {
+    lookupSubject: id => [andromeda, crescent].find(subject => subject.targetId === id),
+  })
+}
+
+function choose(app: ReturnType<typeof setup>['app'], targetId: string | null, rigId = 'sim') {
+  return app.inject({
+    method: 'PUT',
+    url: `/api/rigs/${rigId}/capture/target`,
+    payload: { targetId },
+  })
+}
+
+it('keeps a chosen target for the rig until it is cleared, and rejects targets the catalog does not know', async () => {
+  const { app, get, captures } = setupWithCatalogSubjects()
+  expect((await get()).json().chosenTarget).toEqual({ state: 'none' })
+
+  const chosen = await choose(app, 'ngc0224')
+  expect(chosen.statusCode).toBe(200)
+  expect(chosen.json().chosenTarget).toEqual({ state: 'chosen', subject: andromeda })
+  expect((await get()).json().chosenTarget).toEqual({ state: 'chosen', subject: andromeda })
+
+  const unknown = await choose(app, 'missing')
+  expect(unknown.statusCode).toBe(400)
+  expect(unknown.json()).toEqual({ error: 'The chosen target was not found.' })
+  expect((await choose(app, '')).statusCode).toBe(400)
+  expect((await choose(app, 'ngc0224', 'other')).statusCode).toBe(404)
+  expect((await get()).json().chosenTarget).toEqual({ state: 'chosen', subject: andromeda })
+
+  expect((await choose(app, null)).json().chosenTarget).toEqual({ state: 'none' })
+  expect((await get()).json().chosenTarget).toEqual({ state: 'none' })
+  expect(captures).toHaveLength(0)
+})
+
+it('starts a run with the chosen target as its subject and records it on saved frames', async () => {
+  const { app, start, captures, operations } = setupWithCatalogSubjects()
+  await choose(app, 'ngc6888')
+
+  const started = await start({ exposureSeconds: 10, saveFrames: true })
+  expect(started.json()).toMatchObject({
+    subject: crescent,
+    chosenTarget: { state: 'chosen', subject: crescent },
+  })
+  captures[0]!.resolve(frame)
+  await vi.waitFor(() => expect(operations.owner('sim')).toBeUndefined())
+
+  const saved = (await app.inject('/api/web/rigs/sim/saved-images')).json().images
+  expect(saved.map((image: { subject: unknown }) => image.subject)).toEqual([crescent])
+})
+
+it('lets an explicit start subject win, and a new choice during a run waits for the next run', async () => {
+  const { app, start, get, captures, operations } = setupWithCatalogSubjects()
+  await choose(app, 'ngc6888')
+  expect((await start({ exposureSeconds: 10, repeat: true, targetId: 'ngc0224' })).json().subject)
+    .toEqual(andromeda)
+
+  await choose(app, 'ngc0224')
+  await choose(app, 'ngc6888')
+  expect((await get()).json()).toMatchObject({
+    active: true,
+    subject: andromeda,
+    chosenTarget: { state: 'chosen', subject: crescent },
+  })
+
+  const stopping = app.inject({ method: 'POST', url: '/api/rigs/sim/capture/stop', payload: {} })
+  await vi.waitFor(() => expect(captures[0]!.signal.aborted).toBe(true))
+  captures[0]!.reject(new CaptureStoppedError())
+  await stopping
+  await vi.waitFor(() => expect(operations.owner('sim')).toBeUndefined())
+
+  expect((await start({ exposureSeconds: 10 })).json().subject).toEqual(crescent)
+})
+
+it('starts at the current position with no subject when nothing is chosen', async () => {
+  const { start } = setupWithCatalogSubjects()
+
+  expect((await start({ exposureSeconds: 10 })).json()).toMatchObject({
+    subject: null,
+    chosenTarget: { state: 'none' },
+  })
+})
+
+it('starts without a subject when the start explicitly asks for none, even with a target chosen', async () => {
+  const { app, start } = setupWithCatalogSubjects()
+  await choose(app, 'ngc6888')
+
+  expect((await start({ exposureSeconds: 10, targetId: null })).json()).toMatchObject({
+    subject: null,
+    chosenTarget: { state: 'chosen', subject: crescent },
+  })
 })

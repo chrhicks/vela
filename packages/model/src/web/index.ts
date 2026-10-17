@@ -53,6 +53,7 @@ export type {
   CaptureImage,
   CaptureImageStatistics,
   CapturePhase,
+  ChosenTarget,
   CaptureView,
   SavedImage,
   SavedImagesView,

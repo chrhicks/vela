@@ -8,6 +8,7 @@ import { skyTime } from '../features/targets/sky-time'
 import { SkyInspection } from '../features/targets/SkyInspection'
 import { SurveyField } from '../features/targets/SurveyField'
 import { useFraming } from '../features/targets/use-framing'
+import { useChooseTarget } from '../features/targets/use-choose-target'
 import { TargetBrowser } from '../features/targets/TargetBrowser'
 import { arcminutes, CenteringProgress, FramingStatus } from '../features/targets/CenteringFeedback'
 import { FramingExposure } from '../features/targets/FramingExposure'
@@ -40,6 +41,7 @@ function TargetComposition({ rigId, targetId }: { rigId: string; targetId: strin
   const [focalLength, setFocalLength] = useState('')
   const [seconds, setSeconds] = useState('2')
   const framing = useFraming(rigId)
+  const chosen = useChooseTarget(rigId)
   const { view, offline, pending, error, commandUnconfirmed } = framing
   const initialized = useRef(false)
   const heading = useRef<HTMLHeadingElement>(null)
@@ -195,6 +197,12 @@ function TargetComposition({ rigId, targetId }: { rigId: string; targetId: strin
               }
             />
           )}
+        </div>
+        <div className="vela-target-use">
+          <Button tone="accent" pending={chosen.pending} onClick={() => void chosen.choose(targetId)}>
+            Use this target
+          </Button>
+          {chosen.error && <p role="alert">{chosen.error}</p>}
         </div>
       </header>
       <div className="vela-target-layout">
@@ -424,21 +432,10 @@ function TargetComposition({ rigId, targetId }: { rigId: string; targetId: strin
                 <Button tone="quiet" disabled={pending} onClick={() => setAdjusting(true)}>
                   Adjust composition
                 </Button>
-                {!offline && !pending && !commandUnconfirmed && (
-                  <Link
-                    className="vela-button"
-                    to={`/rigs/${encodeURIComponent(rigId)}/observe?target=${encodeURIComponent(targetId)}`}
-                  >
-                    Continue to capture →
-                  </Link>
-                )}
               </div>
             )}
             {actual && !checked && !view?.active && (
-              <p>
-                This is the last solved exposure. Run a new framing check before continuing to
-                capture.
-              </p>
+              <p>This is the last solved exposure. Check the current frame to measure it again.</p>
             )}
             {(offline || commandUnconfirmed || error) && (
               <Button

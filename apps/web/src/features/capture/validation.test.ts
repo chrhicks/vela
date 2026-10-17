@@ -19,6 +19,7 @@ const view: CaptureView = {
   repeat: true,
   completedCount: 1,
   subject: null,
+  chosenTarget: { state: 'none' },
   savedCount: 0,
   integrationSeconds: 2,
   cooling: null,
@@ -45,6 +46,21 @@ describe('capture response validation', () => {
       expect(isCaptureView({ ...view, captureReadState }, 'rig-1')).toBe(false)
     }
   })
+  it('requires the chosen target to be none or a complete subject', () => {
+    const subject = { targetId: 'ngc6888', name: 'Crescent Nebula', catalog: 'NGC 6888' }
+    expect(isCaptureView({ ...view, chosenTarget: { state: 'chosen', subject } }, 'rig-1')).toBe(true)
+
+    for (const chosenTarget of [
+      undefined,
+      null,
+      { state: 'chosen' },
+      { state: 'chosen', subject: { ...subject, name: ' ' } },
+      { state: 'none', subject },
+    ]) {
+      expect(isCaptureView({ ...view, chosenTarget }, 'rig-1')).toBe(false)
+    }
+  })
+
   it('accepts a previous image with its own exposure metadata while another exposure runs', () => {
     expect(isCaptureView(view, 'rig-1')).toBe(true)
     expect(isCaptureView({ ...view, latestImage: null }, 'rig-1')).toBe(true)

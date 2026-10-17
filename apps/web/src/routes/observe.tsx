@@ -1,6 +1,6 @@
 import { Button, Checkbox, Input, Select } from '@vela/ui'
 import { useEffect, useId, useState } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
+import { Link, useNavigate, useParams } from 'react-router'
 import { captureActivity, useCapture } from '../features/capture/use-capture'
 import { PreparationCooling } from '../features/capture/PreparationCooling'
 import { coolingBlocker } from '../features/capture/CaptureCooling'
@@ -23,13 +23,16 @@ export function Observe() {
 
 function Preparation({ rigId }: { rigId: string }) {
   const navigate = useNavigate()
-  const [params] = useSearchParams()
-  const targetId = params.get('target') ?? undefined
-  const target = useTonightTarget(rigId, targetId)
   const observation = useObservation(rigId)
   const framing = useFraming(rigId)
   const camera = useImagingCamera(rigId)
   const capture = useCapture(rigId)
+
+  const chosen =
+    capture.view?.chosenTarget.state === 'chosen' ? capture.view.chosenTarget.subject : null
+
+  const targetId = chosen?.targetId
+  const target = useTonightTarget(rigId, targetId)
   const [choice, setChoice] = useState<{ id: string; name: string } | null>(null)
   const [exposure, setExposure] = useState<string | null>(null)
   const [repeat, setRepeat] = useState<boolean | null>(null)
@@ -68,8 +71,7 @@ function Preparation({ rigId }: { rigId: string }) {
     !cameraLocked &&
     !!validChoice &&
     !observation.interrupted &&
-    !observation.commandUnconfirmed &&
-    (!targetId || !!target.target)
+    !observation.commandUnconfirmed
 
   const preview = framing.view?.preview && (!targetId || framing.view.preview.targetId === targetId)
     ? framing.view.preview
@@ -91,7 +93,7 @@ function Preparation({ rigId }: { rigId: string }) {
 
   async function start() {
     if (!canStart) return
-    const accepted = await capture.start(seconds, repeatValue, saveValue, targetId)
+    const accepted = await capture.start(seconds, repeatValue, saveValue, targetId ?? null)
 
     if (accepted && accepted.phase !== 'failed') navigate(`${base}/observe/capture`)
   }
@@ -104,17 +106,13 @@ function Preparation({ rigId }: { rigId: string }) {
           <header className="tonight-subject">
             <div className="tonight-context__heading">
               <span>Your subject</span>
-              <Link className="tonight-link" to={`${base}/observe/targets`}>Change target</Link>
+              <Link className="tonight-link" to={`${base}/observe/targets`} aria-label="Change target">Change</Link>
             </div>
-            <h1 className="vela-type-subject">
-              {target.target?.name ?? (targetId ? 'Loading your subject…' : 'Prepare a capture')}
-            </h1>
+            <h1 className="vela-type-subject">{chosen?.name ?? 'Prepare a capture'}</h1>
             <p>
               {target.target
                 ? [target.target.catalog, target.target.constellation, target.target.kind].filter(Boolean).join(' · ')
-                : targetId
-                  ? 'The selected catalog subject is being checked.'
-                  : 'Choose a subject, or capture the current field.'}
+                : (chosen?.catalog ?? 'Choose a subject, or capture the current field.')}
             </p>
             {target.stale && (
               <p role="status">

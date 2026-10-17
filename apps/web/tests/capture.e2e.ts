@@ -32,6 +32,7 @@ const idle: CaptureView = {
   subject: null,
   savedCount: 0,
   integrationSeconds: 0,
+  chosenTarget: { state: 'none' },
   latestImage: null,
   repeat: false,
   completedCount: 0,
@@ -350,7 +351,7 @@ test('repeating capture restores server settings and can stop during image recei
   await expect(page.getByRole('checkbox', { name: 'Repeat until stopped' })).toBeChecked()
   await expect(page.getByRole('checkbox', { name: 'Save frames' })).toBeChecked()
   await page.getByRole('button', { name: 'Start capture' }).click()
-  expect(startBody).toEqual({ exposureSeconds: 2, repeat: true, saveFrames: true })
+  expect(startBody).toEqual({ exposureSeconds: 2, repeat: true, saveFrames: true, targetId: null })
   await expect(page.getByRole('button', { name: 'Stop capture' })).toBeEnabled()
   current = { ...current, completedCount: 2, latestImage: firstImage, phase: 'reading' }
   await page.reload()

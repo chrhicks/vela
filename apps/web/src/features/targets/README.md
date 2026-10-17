@@ -83,9 +83,10 @@ Explore and Frame share the same phase presentation.
 
 ## Discovery browsing
 
-`TargetBrowser` presents nine catalog cards, a selected-subject summary and an
-explicit Frame this subject link. View subject changes selection only; it never
-slews. `use-discovery`
+`TargetBrowser` presents nine catalog cards and a selected-subject summary. View
+subject changes selection only. The summary's primary Use this target records the
+rig's chosen target on the server through `use-choose-target` and opens Tonight;
+it never moves the mount. The secondary Frame it first… opens framing. `use-discovery`
 restores the last validated page from localStorage per rig, immediately and
 without a background recalculation. Type, optical preference, search and page
 requests share the server snapshot. Refresh deliberately replaces that snapshot
@@ -118,9 +119,10 @@ Saved claim. Image retries are exact GETs, not new exposures. Missing native byt
 leave already loaded pixels visible. Source statistics come from that exposure;
 unavailable analysis is not zero stars.
 
-Continue to capture keeps its exact current-check/target/composition guards and
-opens `/observe?target=…` for preparation. Starting remains a separate explicit
-command. Detailed sky inspection, centering history and frame nudges are retained
+The framing header's Use this target records the same chosen target and opens
+Tonight at any time, with or without a framing check. Slew & check and Check
+current frame are the only framing actions that move the mount or take an image.
+Detailed sky inspection, centering history and frame nudges are retained
 in progressive disclosures; reference-view reset/zoom never edits composition.
 
 Equipment edits effective focal length through `focal-length-api` and

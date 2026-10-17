@@ -7,8 +7,12 @@ form edits, Fit/100% presentation and loaded-image state.
 
 `useCapture` serializes commands and polls current state. A deliberate command
 supersedes a pending GET; request generations prevent its late result from
-replacing the newer state. Start accepts an optional selected target ID; the server
-returns its fixed `subject` intent snapshot. `savedCount` and `integrationSeconds`
+replacing the newer state. Tonight and Observe read the rig's `chosenTarget` from
+the capture view and pass it to Start; the server returns its fixed `subject` intent
+snapshot. During an active run the run's own subject stays the heading and a
+different choice shows as pending for the next run. Tonight notes that mount
+pointing isn't checked whenever a target is chosen and no run is active, because no
+view it reads compares the mount's position with the target. `savedCount` and `integrationSeconds`
 are server-owned per-run totals; `savedImageCount` still describes the archive.
 Image subject metadata may be absent on legacy artifacts. A missing or invalid command response is never
 replayed. Starting again requires an explicit read confirming no active exposure.

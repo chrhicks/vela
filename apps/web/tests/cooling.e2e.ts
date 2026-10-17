@@ -30,6 +30,7 @@ const idle: CaptureView = {
   subject: null,
   savedCount: 0,
   integrationSeconds: 0,
+  chosenTarget: { state: 'none' },
   latestImage: null,
   repeat: false,
   completedCount: 0,

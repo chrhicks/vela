@@ -25,7 +25,7 @@ Observe now composes Fieldroom capture preparation: the selected subject,
 last matching temporary framing exposure, capture settings, confirmed camera
 cooling and equipment context. One `useCapture` owns Start and cooling; the old
 CaptureHub is removed. Existing active capture opens Tonight instead of starting
-a second run. Framing Continue carries explicit target intent but takes no image.
+a second run. The subject is the rig's chosen target from the capture view.
 Only a confirmed successful Start response navigates to Tonight; uncertain or
 failed responses remain here with explicit state inspection and no replay.
 

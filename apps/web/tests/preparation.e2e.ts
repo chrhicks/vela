@@ -72,7 +72,7 @@ test('an uncertain start remains on preparation without command replay', async (
   const { scene } = await openExploreScene(page, 'preparation-start-uncertain')
   await page.getByRole('button', { name: 'Start capture', exact: true }).click()
   await expect(page.getByText('The command response could not be confirmed.', { exact: false })).toBeVisible()
-  await expect(page).toHaveURL(/\/observe\?target=ngc6888$/)
+  await expect(page).toHaveURL(/\/observe$/)
   await page.getByRole('button', { name: 'Check capture state', exact: true }).click()
   expect(scene.commands).toHaveLength(1)
   await expect(page.getByRole('button', { name: 'Start capture', exact: true })).toBeDisabled()

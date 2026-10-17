@@ -122,6 +122,65 @@ test('an untouched target and Reset frame send only the accepted slew fields', a
   )
 })
 
+test('use this target works without a framing check and sends no framing command', async ({ page }) => {
+  const writes: Array<{ method: string; path: string; body: unknown }> = []
+  page.on('request', (request) => {
+    if (request.method() !== 'GET')
+      writes.push({
+        method: request.method(),
+        path: new URL(request.url()).pathname,
+        body: request.postDataJSON(),
+      })
+  })
+  await page.route('**/api/web/rigs/rig-1/targets/m31', (route) => respond(route, target))
+  await page.route('**/api/web/rigs/rig-1/framing', (route) =>
+    respond(route, {
+      ...idle,
+      enabled: false,
+      unavailableReason: 'The mount is parked. Unpark it in Your Rig before framing.',
+    }),
+  )
+  await page.route('**/api/survey/**', (route) => route.abort())
+  await page.route('**/api/rigs/rig-1/capture/target', (route) =>
+    route.fulfill({
+      json: {
+        rigId: 'rig-1',
+        rigName: 'Test rig',
+        camera: { name: 'Test camera' },
+        enabled: true,
+        unavailableReason: null,
+        phase: 'idle',
+        captureReadState: 'current',
+        active: false,
+        repeat: true,
+        saveFrames: false,
+        savedImageCount: 0,
+        completedCount: 0,
+        subject: null,
+        chosenTarget: {
+          state: 'chosen',
+          subject: { targetId: 'm31', name: 'Andromeda Galaxy', catalog: 'M31' },
+        },
+        savedCount: 0,
+        integrationSeconds: 0,
+        exposureSeconds: 2,
+        elapsedSeconds: 0,
+        error: null,
+        latestImage: null,
+        cooling: null,
+      },
+    }),
+  )
+  await page.goto('/rigs/rig-1/observe/targets/m31')
+
+  await expect(page.getByRole('button', { name: 'Slew & check' })).toBeDisabled()
+  await page.getByRole('button', { name: 'Use this target' }).click()
+  await expect(page).toHaveURL(/\/rigs\/rig-1\/observe\/capture$/)
+  expect(writes).toEqual([
+    { method: 'PUT', path: '/api/rigs/rig-1/capture/target', body: { targetId: 'm31' } },
+  ])
+})
+
 test('catalog is paged and search updates use actual server results; missing site and image stay honest on mobile', async ({
   page,
 }) => {
@@ -327,11 +386,7 @@ test('checked framing offers centering, active operations lock edits, and stale 
   await page.goto('/rigs/rig-1/observe/targets/m31')
   await page.getByText('Frame position & controls', { exact: true }).click()
   await page.getByText('Framing details & state', { exact: true }).click()
-  await expect(page.getByRole('link', { name: 'Continue to capture' })).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Continue to capture' })).toHaveAttribute(
-    'href',
-    '/rigs/rig-1/observe?target=m31',
-  )
+  await expect(page.getByRole('button', { name: 'Adjust composition' })).toBeVisible()
   await page.getByRole('button', { name: 'Center composition' }).click()
   await expect(page.getByRole('button', { name: 'Stop framing' })).toBeEnabled()
   await expect(page.getByRole('button', { name: 'Reset frame' })).toBeDisabled()
@@ -392,7 +447,7 @@ test('a rejected adjusted composition cannot inherit the prior framing check aft
   await page.goto('/rigs/rig-1/observe/targets/m31')
   await page.getByText('Frame position & controls', { exact: true }).click()
   await page.getByText('Framing details & state', { exact: true }).click()
-  await expect(page.getByRole('link', { name: 'Continue to capture' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Adjust composition' })).toBeVisible()
   await page.getByRole('button', { name: 'Adjust composition' }).click()
   await page.getByRole('button', { name: 'Move frame →' }).click()
   const composition = page.locator('.vela-target-details').filter({ hasText: 'Center (J2000)' })
@@ -404,7 +459,7 @@ test('a rejected adjusted composition cannot inherit the prior framing check aft
   await page.getByRole('button', { name: 'Check rig state' }).click()
   await expect(page.getByRole('button', { name: 'Slew & check' })).toBeEnabled()
   await expect(composition).toHaveText(editedCoordinates)
-  await expect(page.getByRole('link', { name: 'Continue to capture' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Adjust composition' })).toHaveCount(0)
   await expect(page.getByText('Test frame solved', { exact: true })).toHaveCount(0)
   await expect(page.getByText('Composition not checked', { exact: true })).toBeVisible()
   expect(commands).toBe(1)
@@ -413,7 +468,7 @@ test('a rejected adjusted composition cannot inherit the prior framing check aft
   await page.getByRole('button', { name: 'Slew & check' }).click()
   await expect(page.getByRole('button', { name: 'Stop framing' })).toBeVisible()
   state = { ...state, phase: 'checked', active: false, checkCurrent: true }
-  await expect(page.getByRole('link', { name: 'Continue to capture' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Adjust composition' })).toBeVisible()
   expect(commands).toBe(2)
 })
 
@@ -444,15 +499,15 @@ test('an explicit read recovers a completed adjusted check after its command res
   await page.goto('/rigs/rig-1/observe/targets/m31')
   await page.getByText('Frame position & controls', { exact: true }).click()
   await page.getByText('Framing details & state', { exact: true }).click()
-  await expect(page.getByRole('link', { name: 'Continue to capture' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Adjust composition' })).toBeVisible()
   await page.getByRole('button', { name: 'Adjust composition' }).click()
   await page.getByRole('button', { name: 'Move frame →' }).click()
   await page.getByRole('button', { name: 'Slew & check' }).click()
   await expect(page.getByRole('alert')).toContainText('could not be confirmed')
-  await expect(page.getByRole('link', { name: 'Continue to capture' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Adjust composition' })).toHaveCount(0)
   await page.getByRole('button', { name: 'Check rig state' }).click()
   await expect(page.getByText('Test frame solved', { exact: true })).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Continue to capture' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Adjust composition' })).toBeVisible()
   expect(commands).toBe(1)
 })
 
@@ -589,7 +644,7 @@ test('Targets breadcrumb preserves search and results page through a detail relo
   await page.route('**/api/survey/**', (route) => route.abort())
   await page.goto('/rigs/rig-1/observe/targets?q=galaxy&offset=24')
   await expect(page.getByLabel('Find a target')).toHaveValue('galaxy')
-  await page.getByRole('link', { name: 'Frame this subject →', exact: true }).click()
+  await page.getByRole('link', { name: 'Frame it first…', exact: true }).click()
   await expect(page).toHaveURL(/targets\/m31\?/)
   await page.reload()
   await page.getByRole('link', { name: '← Explore the sky', exact: true }).click()
@@ -750,14 +805,14 @@ test('an edited composition can center using its current coordinates and the las
   await page.getByText('Framing details & state', { exact: true }).click()
   await page.getByRole('button', { name: 'Adjust composition' }).click()
   await page.getByRole('button', { name: 'Move frame →' }).click()
-  await expect(page.getByRole('link', { name: 'Continue to capture' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Adjust composition' })).toHaveCount(0)
   await page.getByRole('button', { name: 'Center composition' }).click()
   await expect(page.getByText('Waiting for the mount to settle', { exact: true })).toBeVisible()
   expect(command?.checkId).toBe('usable-check')
   expect(command?.raDegrees).not.toBe(target.raDegrees)
   expect(command?.decDegrees).toBeCloseTo(target.decDegrees, 2)
   state = { ...state, active: false, phase: 'checked', checkCurrent: true, canCenter: true }
-  await expect(page.getByRole('link', { name: 'Continue to capture' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Adjust composition' })).toBeVisible()
 })
 
 test('a recoverable check keeps the edited destination and offers a fresh exposure without a slew', async ({

@@ -6,6 +6,7 @@ import type {
   CaptureCoolingView,
   CaptureSubject,
   CaptureView,
+  ChosenTarget,
   NavigationCapture,
 } from '@vela/model/web'
 import type { RigCatalogRecord } from '../rig/contracts.js'
@@ -91,6 +92,7 @@ export function registerCapture(
   }: CaptureRouteOptions,
 ) {
   const controllers = new Map<string, ReturnType<typeof createCaptureController>>()
+  const chosenSubjects = new Map<string, CaptureSubject>()
   const cameraFactory = createCamera ?? (settings => configuredCamera(settings, createAcquisition(settings.rig)))
 
   /**
@@ -127,6 +129,12 @@ export function registerCapture(
     return undefined
   }
 
+  function chosenTarget(rigId: string): ChosenTarget {
+    const subject = chosenSubjects.get(rigId)
+
+    return subject ? { state: 'chosen', subject } : { state: 'none' }
+  }
+
   async function rigView(rigId: string): Promise<CaptureView | undefined> {
     const rig = await catalog.get(rigId)
 
@@ -156,6 +164,7 @@ export function registerCapture(
         captureReadState: 'current',
       }),
       savedImageCount,
+      chosenTarget: chosenTarget(rigId),
     })
 
     const unavailable = (reason: string): CaptureView => ({
@@ -229,6 +238,33 @@ export function registerCapture(
     return view ?? reply.code(404).send({ error: 'Rig not found' })
   })
 
+  app.put<{ Params: { rigId: string } }>(
+    '/api/rigs/:rigId/capture/target',
+    async (request, reply) => {
+      const parsed = z
+        .strictObject({ targetId: z.string().trim().min(1).max(100).nullable() })
+        .safeParse(request.body)
+
+      if (!request.headers['content-type']?.startsWith('application/json') || !parsed.success)
+        return reply.code(400).send({ error: 'Expected a targetId, or null to clear the choice.' })
+
+      const { rigId } = request.params
+
+      if (!(await catalog.get(rigId))) return reply.code(404).send({ error: 'Rig not found' })
+
+      if (parsed.data.targetId === null) {
+        chosenSubjects.delete(rigId)
+      } else {
+        const subject = lookupSubject?.(parsed.data.targetId)
+
+        if (!subject) return reply.code(400).send({ error: 'The chosen target was not found.' })
+        chosenSubjects.set(rigId, subject)
+      }
+
+      return (await rigView(rigId)) ?? reply.code(404).send({ error: 'Rig not found' })
+    },
+  )
+
   app.post<{ Params: { rigId: string } }>(
     '/api/rigs/:rigId/capture/start',
     async (request, reply) => {
@@ -237,19 +273,23 @@ export function registerCapture(
           exposureSeconds: z.number().min(0.1).max(600),
           repeat: z.boolean().optional(),
           saveFrames: z.boolean().optional(),
-          targetId: z.string().trim().min(1).max(100).optional(),
+          targetId: z.string().trim().min(1).max(100).nullable().optional(),
         })
         .safeParse(request.body)
 
       if (!request.headers['content-type']?.startsWith('application/json') || !parsed.success) {
         return reply.code(400).send({
           error:
-            'Expected exposureSeconds between 0.1 and 600 and optional boolean repeat and saveFrames, and optional targetId.',
+            'Expected exposureSeconds between 0.1 and 600, optional boolean repeat and saveFrames, and an optional targetId or null for no subject.',
         })
       }
 
       const body = parsed.data
-      const subject = body.targetId === undefined ? null : lookupSubject?.(body.targetId)
+
+      let subject: CaptureSubject | null | undefined = null
+
+      if (body.targetId === undefined) subject = chosenSubjects.get(request.params.rigId) ?? null
+      else if (body.targetId !== null) subject = lookupSubject?.(body.targetId)
 
       if (subject === undefined)
         return reply.code(400).send({ error: 'The selected capture subject was not found.' })
@@ -305,6 +345,7 @@ export function registerCapture(
         return {
           ...result,
           savedImageCount: view.savedImageCount,
+          chosenTarget: view.chosenTarget,
           // The run now owns the Rig, so cooling is re-marked after it started.
           cooling: withCoolingBlocker(view.rigId, view.cooling),
         }
