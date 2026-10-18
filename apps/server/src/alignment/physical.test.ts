@@ -1,4 +1,9 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  InMemorySpanExporter,
+  NodeTracerProvider,
+  SimpleSpanProcessor,
+} from '@opentelemetry/sdk-trace-node'
 import type {
   AlpacaAcquisition,
   AlpacaCameraGeometry,
@@ -9,7 +14,7 @@ import { createPhysicalAlignment } from './physical.js'
 
 const signal = new AbortController().signal
 
-function observatory(mechanicalSign = -1) {
+function observatory(mechanicalSign = -1, sweep: { sweepRateDegreesPerSecond?: number; maxLegSeconds?: number } = {}) {
   const mount: AlpacaTelescopeStatus = {
     rightAscensionDegrees: 10,
     declinationDegrees: 60,
@@ -91,6 +96,7 @@ function observatory(mechanicalSign = -1) {
     cameraName: 'Imager',
     telescopeId: 'mount',
     focalLengthMm: 400,
+    ...sweep,
   }
 
   const settle = vi.fn(async (_signal: AbortSignal) => {})
@@ -443,15 +449,216 @@ describe('reported Cria axis travel', () => {
     expect(fake.acquisition.move).toHaveBeenCalledExactlyOnceWith('mount', 0.2507, 1, signal)
     expect(fake.acquisition.rotateRightAscension).toHaveBeenCalledExactlyOnceWith('mount', -0.998, -57.25, signal)
   })
+})
 
-  it('refuses unsupported sweep rates before homing or moving the mount', async () => {
-    const fake = observatory()
-    fake.mount.primaryAxisRates = [{ name: '8x', degreesPerSecond: 0.2507 }, { name: '9x', degreesPerSecond: 3.008 }]
-    await expect(fake.alignment.prepare(signal)).rejects.toThrow('advertised sweep rate near 1°/s')
+const am5Rates = [
+  { name: '1x', degreesPerSecond: 0.0042 },
+  { name: '8x', degreesPerSecond: 0.2507 },
+  { name: '9x', degreesPerSecond: 3.008 },
+]
+
+describe('multi-leg sweep', () => {
+  function am5(sweep: { sweepRateDegreesPerSecond?: number; maxLegSeconds?: number } = {}) {
+    const fake = observatory(-1, sweep)
+    fake.mount.primaryAxisRates = am5Rates
+    vi.mocked(fake.acquisition.move).mockImplementation(async () => ({ travelledDegrees: 0.25 }))
+
+    return fake
+  }
+
+  const asked = (fake: ReturnType<typeof observatory>) =>
+    vi.mocked(fake.acquisition.rotateRightAscension).mock.calls.map(call => call[2])
+
+  function reportTravel(fake: ReturnType<typeof observatory>, travelled: (asked: number, leg: number) => number) {
+    let leg = 0
+
+    vi.mocked(fake.acquisition.rotateRightAscension).mockImplementation(async (_id, _rate, distance) => ({
+      travelledDegrees: travelled(distance, leg++),
+    }))
+  }
+
+  it('sweeps at the mount’s 8x in legs of at most the leg limit', async () => {
+    const fake = am5()
+    await fake.alignment.prepare(signal)
+    reportTravel(fake, distance => distance)
+    await fake.alignment.move(signal)
+    expect(fake.acquisition.move).toHaveBeenCalledExactlyOnceWith('mount', 0.2507, 1, signal)
+    expect(vi.mocked(fake.acquisition.rotateRightAscension).mock.calls.map(call => call[1])).toEqual([-0.2507, -0.2507, -0.2507])
+    const distances = asked(fake)
+    expect(distances).toHaveLength(3)
+
+    for (const distance of distances) {
+      expect(Math.abs(distance) / 0.2507).toBeLessThanOrEqual(100)
+      expect(distance).toBeLessThan(0)
+    }
+
+    expect(-distances.reduce((sum, distance) => sum + distance, 0)).toBeCloseTo(57.25)
+  })
+
+  it('makes up one leg’s overshoot in the next legs', async () => {
+    const fake = am5()
+    await fake.alignment.prepare(signal)
+    reportTravel(fake, (distance, leg) => distance - (leg === 0 ? 0.6 : 0))
+    await fake.alignment.move(signal)
+    // SAFETY: a 57° sweep at 8x with the default leg limit is always three legs, asserted by the first test.
+    const [first, second, third] = asked(fake) as [number, number, number]
+    expect(Math.abs(second)).toBeLessThan(Math.abs(first))
+    expect(first + second + third).toBeCloseTo(-57.25 + 0.6)
+  })
+
+  it('makes up one leg’s undershoot in the next legs', async () => {
+    const fake = am5()
+    await fake.alignment.prepare(signal)
+    reportTravel(fake, (distance, leg) => distance + (leg === 0 ? 0.6 : 0))
+    await fake.alignment.move(signal)
+    // SAFETY: a 57° sweep at 8x with the default leg limit is always three legs, asserted by the first test.
+    const [first, second, third] = asked(fake) as [number, number, number]
+    expect(Math.abs(second)).toBeGreaterThan(Math.abs(first))
+    expect(first + second + third).toBeCloseTo(-57.25 - 0.6)
+  })
+
+  it('sends no more legs once the corridor is reached', async () => {
+    const fake = am5()
+    await fake.alignment.prepare(signal)
+    reportTravel(fake, () => -55)
+    await fake.alignment.move(signal)
+    expect(fake.acquisition.rotateRightAscension).toHaveBeenCalledTimes(1)
+  })
+
+  it('fails when the sum of the legs is outside the corridor, naming each leg', async () => {
+    const fake = am5()
+    await fake.alignment.prepare(signal)
+    reportTravel(fake, distance => distance * 0.8)
+    await expect(fake.alignment.move(signal)).rejects.toThrow(/RA sweep expected 54–60° westward; mount reported \d+\.\d+° over 3 legs \(/)
+    expect(fake.acquisition.rotateRightAscension).toHaveBeenCalledTimes(3)
+  })
+
+  it('takes a configured advertised rate', async () => {
+    const fake = am5({ sweepRateDegreesPerSecond: 3.008 })
+    await fake.alignment.prepare(signal)
+    reportTravel(fake, distance => distance)
+    await fake.alignment.move(signal)
+    expect(fake.acquisition.rotateRightAscension).toHaveBeenCalledExactlyOnceWith('mount', -3.008, -57.25, signal)
+  })
+
+  it('splits into more legs when the leg limit is lowered', async () => {
+    const fake = am5({ maxLegSeconds: 50 })
+    await fake.alignment.prepare(signal)
+    reportTravel(fake, distance => distance)
+    await fake.alignment.move(signal)
+    expect(fake.acquisition.rotateRightAscension).toHaveBeenCalledTimes(5)
+  })
+
+  it('refuses a configured rate the mount does not advertise before homing or moving', async () => {
+    const fake = am5({ sweepRateDegreesPerSecond: 0.5 })
+    await expect(fake.alignment.prepare(signal)).rejects.toThrow('not one the mount advertises (0.0042°/s, 0.2507°/s, 3.008°/s)')
     expect(fake.device.home).not.toHaveBeenCalled()
     expect(fake.device.slew).not.toHaveBeenCalled()
     expect(fake.acquisition.move).not.toHaveBeenCalled()
     expect(fake.acquisition.rotateRightAscension).not.toHaveBeenCalled()
-    expect(fake.mount).toMatchObject({ rightAscensionDegrees: 10, declinationDegrees: 60, tracking: true })
+  })
+
+  it('never replays a failed leg and sends no later leg', async () => {
+    const fake = am5()
+    await fake.alignment.prepare(signal)
+    let leg = 0
+
+    vi.mocked(fake.acquisition.rotateRightAscension).mockImplementation(async (_id, _rate, distance) => {
+      if (leg++ === 1) throw new Error('Cria could not confirm the stop')
+
+      return { travelledDegrees: distance }
+    })
+    await expect(fake.alignment.move(signal)).rejects.toThrow('Cria could not confirm the stop')
+    expect(fake.acquisition.rotateRightAscension).toHaveBeenCalledTimes(2)
+  })
+
+  it('stops between legs when Stop arrives', async () => {
+    const fake = am5()
+    const controller = new AbortController()
+    await fake.alignment.prepare(signal)
+
+    vi.mocked(fake.acquisition.rotateRightAscension).mockImplementation(async (_id, _rate, distance) => {
+      controller.abort()
+
+      return { travelledDegrees: distance }
+    })
+    await expect(fake.alignment.move(controller.signal)).rejects.toThrow()
+    expect(fake.acquisition.rotateRightAscension).toHaveBeenCalledTimes(1)
+  })
+
+  it('ends the sweep when a leg changes the reported declination', async () => {
+    const fake = am5()
+    await fake.alignment.prepare(signal)
+
+    vi.mocked(fake.acquisition.rotateRightAscension).mockImplementation(async (_id, _rate, distance) => {
+      fake.mount.declinationDegrees += 0.5
+
+      return { travelledDegrees: distance }
+    })
+    await expect(fake.alignment.move(signal)).rejects.toThrow('changed reported DEC by 0.500° in leg 1 of 3')
+    expect(fake.acquisition.rotateRightAscension).toHaveBeenCalledTimes(1)
+  })
+
+  it('measures each leg from the mount position when the adapter reports no travel', async () => {
+    const fake = observatory(-1, { maxLegSeconds: 30 })
+    await fake.alignment.prepare(signal)
+    const startRa = fake.mount.rightAscensionDegrees
+    await fake.alignment.move(signal)
+    expect(fake.acquisition.rotateRightAscension).toHaveBeenCalledTimes(2)
+    expect((startRa - fake.mount.rightAscensionDegrees + 360) % 360).toBeCloseTo(57, 0)
+  })
+})
+
+describe('sweep leg trace', () => {
+  const exporter = new InMemorySpanExporter()
+
+  beforeAll(() => {
+    new NodeTracerProvider({ spanProcessors: [new SimpleSpanProcessor(exporter)] }).register()
+  })
+
+  beforeEach(() => exporter.reset())
+
+  function am5Fake() {
+    const fake = observatory(-1)
+    fake.mount.primaryAxisRates = am5Rates
+    vi.mocked(fake.acquisition.move).mockImplementation(async () => ({ travelledDegrees: 0.25 }))
+
+    return fake
+  }
+
+  const legs = () => exporter.getFinishedSpans().filter(span => span.name === 'alignment.sweep_leg')
+
+  it('records each successful leg’s asked distance, reported travel and duration', async () => {
+    const fake = am5Fake()
+    await fake.alignment.prepare(signal)
+    vi.mocked(fake.acquisition.rotateRightAscension).mockImplementation(async (_id, _rate, distance) => ({ travelledDegrees: distance - 0.1 }))
+    await fake.alignment.move(signal)
+
+    expect(legs().map(span => span.attributes)).toEqual(
+      [1, 2, 3].map(leg => expect.objectContaining({
+        'alignment.sweep.leg': leg,
+        'alignment.sweep.legs': 3,
+        'alignment.sweep.rate_degrees_per_second': -0.2507,
+        'alignment.sweep.asked_degrees': expect.any(Number),
+        'alignment.sweep.travelled_degrees': expect.any(Number),
+        'alignment.sweep.reported': true,
+        'alignment.sweep.duration_ms': expect.any(Number),
+      })),
+    )
+    const [first] = legs().map(span => span.attributes)
+    expect(first?.['alignment.sweep.asked_degrees']).toBeCloseTo(19.0833, 3)
+    expect(first?.['alignment.sweep.travelled_degrees']).toBeCloseTo(19.1833, 3)
+  })
+
+  it('records a failed leg with its error and duration', async () => {
+    const fake = am5Fake()
+    await fake.alignment.prepare(signal)
+    vi.mocked(fake.acquisition.rotateRightAscension).mockRejectedValue(new Error('Cria could not confirm the stop'))
+    await expect(fake.alignment.move(signal)).rejects.toThrow()
+
+    const [leg] = legs()
+    expect(leg?.status).toMatchObject({ code: 2, message: 'Cria could not confirm the stop' })
+    expect(leg?.attributes['alignment.sweep.duration_ms']).toEqual(expect.any(Number))
+    expect(leg?.attributes).not.toHaveProperty('alignment.sweep.travelled_degrees')
   })
 })

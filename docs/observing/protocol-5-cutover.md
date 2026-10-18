@@ -15,7 +15,7 @@ Follow these rules at every step:
 - Vela updates the saved `fra-cria` endpoint in `rigs.yaml` itself when it starts with the new URL in `cria.json`.
 - When an operation ends `uncertain`, Cria holds the device's failure domain until a person recovers it. Vela refuses rig operations while a hold exists, and it shows the hold's reason on **Your rig** and on the capture page.
 - Vela has no **Recover** button yet. A temporary route, `POST /api/rigs/:rigId/devices/:deviceId/recover`, clears a hold. [Recover a held device](#recover-a-held-device) shows the call.
-- Physical polar alignment on this AM5 remains unavailable. Preparation requires an advertised sweep rate near the existing 1°/s rate and refuses before homing or moving when none exists. The AM5's 8x rate (0.2507°/s) needs about 228 s per baseline leg, beyond the pinned Cria's 120 s rotation limit. Its 9x rate (3.008°/s) has stop error that can exceed Vela's 54–60° corridor. This session checks capture, autofocus and slew cancellation. Qualifying the physical baseline is deferred.
+- Physical polar alignment works on this AM5. It sweeps at the mount's advertised 8x rate (0.2507°/s) in several consecutive rotations of at most 100 s each, adds up the travel Cria reports, and aims the last leg at what is left. [Polar alignment sweep](#8-polar-alignment-sweep-optional) shows how to set the rate and the leg limit. This session's required checks are still capture, autofocus and slew cancellation.
 
 ## 0. Check the preconditions
 
@@ -232,3 +232,32 @@ A successful call returns HTTP 200 with `outcome: "confirmed"` and a `found` mes
 3. Ask the observer to set `commandsEnabled` the way Chris wants it for the party.
 4. Check the focuser position against P0 and the cooler against its starting value.
 5. Write down anything left changed.
+
+## 8. Polar alignment sweep (optional)
+
+Run this only when Chris wants it. It moves the mount: homing, an off-pole slew, a direction probe and two sweeps of about 57° westward in RA, each in several rotations. Stay at the rig and keep **Stop** within reach.
+
+By default Vela takes the sweep rate from the mount. It uses the fastest rate the mount advertises at or below 1°/s, which is 8x (0.2507°/s) on the AM5, and splits each sweep into rotations of at most 100 s. At 8x that is 3 rotations of about 19°, about 76 s each, and about 4 minutes of sweeping per step.
+
+To change either one, add fields to the rig's `alignment` block in `~/.config/vela/cria.json` and restart the server (`docker compose restart server`):
+
+```json
+"alignment": {
+  "mode": "physical", "cameraId": "primary", "telescopeId": "mount",
+  "sweepRateDegreesPerSecond": 0.2507,
+  "maxLegSeconds": 100
+}
+```
+
+- `sweepRateDegreesPerSecond` must be a rate the mount advertises, within 1%. Otherwise preparation refuses before it homes or moves, and lists the rates. A faster rate means fewer rotations but a larger stop error per rotation: Cria leads its stop by rate × 0.9 s, and the AM5 can still miss by rate × 1 s.
+- `maxLegSeconds` is the longest single rotation. Cria times a rotation out at 120 s, so keep it below that.
+
+After each rotation Vela adds up the travel Cria reports and checks that DEC has not moved. It sends the next rotation for what is left, divided by the rotations still to go, so one rotation's stop error is made up by the others. It stops sending rotations once the total reaches 54°, and the step must end with a total of 54 to 60°. A rotation that fails is never repeated: the measurement ends and the baseline starts again.
+
+To see how the rotations behaved, read the trace journal (see [local tracing](../local-tracing.md)). Each rotation is an `alignment.sweep_leg` span with `alignment.sweep.asked_degrees`, `alignment.sweep.travelled_degrees`, `alignment.sweep.duration_ms` and `alignment.sweep.rate_degrees_per_second`. Use it to tune the two settings:
+
+```sh
+jq 'select(.name == "alignment.sweep_leg") | {leg: .attributes["alignment.sweep.leg"], of: .attributes["alignment.sweep.legs"], asked: .attributes["alignment.sweep.asked_degrees"], travelled: .attributes["alignment.sweep.travelled_degrees"], ms: .attributes["alignment.sweep.duration_ms"], status}' /data/traces/observing.jsonl
+```
+
+On thuban the journal is `~/.local/share/vela/traces/observing.jsonl`.

@@ -1,4 +1,5 @@
 import { setTimeout as delay } from 'node:timers/promises'
+import { SpanStatusCode, trace } from '@opentelemetry/api'
 import type {
   Acquisition,
   CameraGeometry,
@@ -12,13 +13,28 @@ import {
   physicalAlignmentSample,
   projectPhysicalAlignmentTarget,
 } from './physical-coordinates.js'
+import {
+  DEFAULT_MAX_LEG_SECONDS,
+  SWEEP_MAXIMUM_DEGREES,
+  SWEEP_MINIMUM_DEGREES,
+  SWEEP_TARGET_DEGREES,
+  chooseSweepRate,
+  legCount,
+  nearestAdvertisedRate,
+} from './sweep.js'
 
 export interface PhysicalAlignmentSettings {
   cameraId: string
   cameraName: string
   telescopeId: string
   focalLengthMm: number
+  /** Must be a rate the mount advertises. Default: the fastest advertised rate at or below 1°/s. */
+  sweepRateDegreesPerSecond?: number
+  /** No single rotate lasts longer than this. */
+  maxLegSeconds?: number
 }
+
+const tracer = trace.getTracer('vela.alignment')
 
 const difference = (a: number, b: number) => ((a - b + 540) % 360) - 180
 
@@ -115,7 +131,7 @@ export function createPhysicalAlignment(
     reference = undefined
     westRate = undefined
     const initial = await status(signal, { allowTrackingOff: true })
-    requireSweepRate(initial)
+    chooseSweepRate(initial, settings.sweepRateDegreesPerSecond)
     site = {
       latitudeDegrees: initial.latitudeDegrees!,
       longitudeDegrees: initial.longitudeDegrees!,
@@ -213,12 +229,13 @@ export function createPhysicalAlignment(
   async function move(signal: AbortSignal) {
     const start = await status(signal)
     let current = start
-    let probeTravel = 0
+    // Degrees moved westward since `start`, the probe included.
+    let westward = 0
 
     if (westRate === undefined) {
       // ASCOM leaves MoveAxis sign to the driver. Observe a quarter-degree probe
       // before choosing the sign for the westward sweep.
-      const probeRate = advertisedRate(start, 0.25)
+      const probeRate = nearestAdvertisedRate(start, 0.25)
       const probe = await acquisition.move(settings.telescopeId, probeRate, 1, signal)
       await settle(signal)
       current = await status(signal, { allowMovement: true })
@@ -233,29 +250,92 @@ export function createPhysicalAlignment(
         throw new Error(
           `RA direction check changed reported DEC by ${(current.declinationDegrees - start.declinationDegrees).toFixed(3)}°`,
         )
-      probeTravel = -observed
-      const sweepRate = requireSweepRate(start)
+      westward = -observed
+      const sweepRate = chooseSweepRate(start, settings.sweepRateDegreesPerSecond)
       westRate = -Math.sign(observed) * sweepRate
     }
 
-    const rotation = await acquisition.rotateRightAscension(
-      settings.telescopeId,
-      westRate,
-      -(57 - probeTravel),
-      signal,
-    )
+    const signedRate = westRate
+    const rate = Math.abs(signedRate)
+    const maxLegSeconds = settings.maxLegSeconds ?? DEFAULT_MAX_LEG_SECONDS
+    let legsLeft = legCount(SWEEP_TARGET_DEGREES - westward, rate, maxLegSeconds)
+    const legs = legsLeft
+    const travels: number[] = []
 
-    await settle(signal)
-    current = await status(signal, { allowMovement: true })
-    const travelled = rotation ? probeTravel - rotation.travelledDegrees : -difference(current.rightAscensionDegrees, start.rightAscensionDegrees)
+    // Consecutive rotates, none past the leg limit. Each leg asks for what is left
+    // divided by the legs still to go, so one leg's stop error is made up by the others.
+    while (legsLeft > 0 && westward < SWEEP_MINIMUM_DEGREES) {
+      signal.throwIfAborted()
+      const distance = (SWEEP_TARGET_DEGREES - westward) / legsLeft
+      const leg = legs - legsLeft + 1
+
+      const reported = await tracer.startActiveSpan(
+        'alignment.sweep_leg',
+        {
+          attributes: {
+            'alignment.sweep.leg': leg,
+            'alignment.sweep.legs': legs,
+            'alignment.sweep.rate_degrees_per_second': signedRate,
+            'alignment.sweep.asked_degrees': distance,
+          },
+        },
+        async span => {
+          const startedAt = performance.now()
+
+          try {
+            const rotation = await acquisition.rotateRightAscension(
+              settings.telescopeId,
+              signedRate,
+              -distance,
+              signal,
+            )
+
+            await settle(signal)
+            current = await status(signal, { allowMovement: true })
+
+            if (Math.abs(current.declinationDegrees - start.declinationDegrees) > 0.1)
+              throw new Error(
+                `RA sweep changed reported DEC by ${(current.declinationDegrees - start.declinationDegrees).toFixed(3)}° in leg ${leg} of ${legs}`,
+              )
+
+            const travelled = rotation
+              ? -rotation.travelledDegrees
+              : -difference(current.rightAscensionDegrees, start.rightAscensionDegrees) - westward
+
+            span.setAttributes({
+              'alignment.sweep.travelled_degrees': travelled,
+              'alignment.sweep.reported': !!rotation,
+              'alignment.sweep.duration_ms': Math.round(performance.now() - startedAt),
+            })
+
+            return travelled
+          } catch (error) {
+            span.setAttribute('alignment.sweep.duration_ms', Math.round(performance.now() - startedAt))
+            span.setStatus({
+              code: SpanStatusCode.ERROR,
+              message: error instanceof Error ? error.message : 'RA sweep leg failed',
+            })
+
+            if (error instanceof Error) span.recordException(error)
+            throw error
+          } finally {
+            span.end()
+          }
+        },
+      )
+
+      westward += reported
+      travels.push(reported)
+      legsLeft--
+    }
 
     if (
-      travelled < 54 - 1e-6 ||
-      travelled > 60 ||
+      westward < SWEEP_MINIMUM_DEGREES - 1e-6 ||
+      westward > SWEEP_MAXIMUM_DEGREES ||
       Math.abs(current.declinationDegrees - start.declinationDegrees) > 0.1
     ) {
       throw new Error(
-        `RA sweep expected 54–60° westward; mount reported ${travelled.toFixed(3)}° and ${(current.declinationDegrees - start.declinationDegrees).toFixed(3)}° DEC change`,
+        `RA sweep expected ${SWEEP_MINIMUM_DEGREES}–${SWEEP_MAXIMUM_DEGREES}° westward; mount reported ${westward.toFixed(3)}° over ${travels.length} leg${travels.length === 1 ? '' : 's'} (${travels.map(travel => travel.toFixed(3)).join(', ')}°) and ${(current.declinationDegrees - start.declinationDegrees).toFixed(3)}° DEC change`,
       )
     }
 
@@ -307,24 +387,4 @@ function sameCameraGeometry(
     observed.startX === reference.startX &&
     observed.startY === reference.startY
   )
-}
-
-function requireSweepRate(mount: TelescopeStatus) {
-  const rate = advertisedRate(mount, 1)
-
-  if (Math.abs(rate - 1) > 0.01)
-    throw new Error('Physical polar alignment needs an advertised sweep rate near 1°/s. The current axis rates do not support this baseline.')
-
-  return rate
-}
-
-function advertisedRate(mount: TelescopeStatus, preferred: number) {
-  const rates = mount.primaryAxisRates
-
-  if (!rates) return preferred
-  const candidates = rates.map(rate => Math.abs(rate.degreesPerSecond)).filter(rate => rate > 0)
-
-  if (!candidates.length) throw new Error('The mount reports no supported primary axis rate')
-
-  return candidates.reduce((closest, rate) => Math.abs(rate - preferred) < Math.abs(closest - preferred) ? rate : closest)
 }

@@ -31,6 +31,8 @@ export interface AlignmentSettings {
   exposureSeconds: number
   fieldHeightDegrees: number
   diagnosticsPath?: string
+  sweepRateDegreesPerSecond?: number
+  maxLegSeconds?: number
 }
 
 type Solver = ReturnType<typeof createAstapSolver>
