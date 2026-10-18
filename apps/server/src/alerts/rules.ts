@@ -123,7 +123,9 @@ function watchFrames(frames: Frame[], t: AlertThresholds): AlertCondition[] {
     hfrBad = latch(hfrBad, hfr !== null && hfr > t.hfrBadPixels, hfr !== null && hfr < t.hfrBadClearPixels, t.confirmFrames)
 
     const bad = low || collapsed || (hfr !== null && hfr > t.hfrHighPixels)
-    const inEpisode = starsLow.raised || starsCollapsed.raised || hfrHigh.raised || hfrBad.raised
+
+    const inEpisode =
+      starsLow.raised || starsCollapsed.raised || starsDeclining.raised || hfrHigh.raised || hfrBad.raised
 
     if (!bad && !inEpisode) acceptedStars.push(frame.stars)
   }

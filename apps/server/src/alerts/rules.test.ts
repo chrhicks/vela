@@ -111,6 +111,12 @@ describe('frame rules on short synthetic runs', () => {
     expect(ids(history({ frames: cloudy }))).toEqual(expect.arrayContaining(['stars-low', 'stars-collapsed']))
   })
 
+  it('keeps frames from a declining episode out of the baseline so a deeper drop still goes critical', () => {
+    const thinningCloud = runOf([...Array<number>(10).fill(1000), 650, 650, 650, 250, 250])
+
+    expect(ids(history({ frames: thinningCloud }))).toContain('stars-collapsed')
+  })
+
   it('needs at least three frames before it has a baseline', () => {
     expect(ids(history({ frames: runOf([1200, 1200, 10]) }))).toEqual([])
     expect(ids(history({ frames: runOf([1200, 1200, 1200, 10]) }))).toEqual(['stars-low'])
