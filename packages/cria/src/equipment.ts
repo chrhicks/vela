@@ -253,8 +253,8 @@ export function createCriaEquipment(connection: CriaConnection, bindings: Readon
 
       if (options?.includeAlignmentObservations) {
         status.trackingRate = r.trackingRate()
-        status.rightAscensionRateSecondsPerSiderealSecond = r.number('rightAscensionRateSecondsPerSiderealSecond')
-        status.declinationRateArcsecondsPerSecond = r.number('declinationRateArcsecondsPerSecond')
+        status.rightAscensionRateSecondsPerSiderealSecond = r.trackingOffset('rightAscensionRateSecondsPerSiderealSecond', status.trackingRate)
+        status.declinationRateArcsecondsPerSecond = r.trackingOffset('declinationRateArcsecondsPerSecond', status.trackingRate)
       }
 
       return status
