@@ -358,7 +358,7 @@ function AlignmentPage({ rigId }: { rigId: string }) {
   const nextInstruction = view.active
     ? 'After the third solve, the adjustment view will show your alignment error and the target reticle.'
     : physical
-      ? 'Each attempt homes, then moves to a consistent starting field at Dec +80°. Prepare a clear movement corridor: after a small direction check, Vela makes two continuous westward RA rotations of roughly 54° at 1° per second. Allow up to 120° total westward travel and 1° on either side for the direction check.'
+      ? 'Each attempt homes, then moves to a consistent starting field at Dec +80°. Prepare a clear movement corridor: after a small direction check, Vela makes two westward RA sweeps of roughly 57°, each in several consecutive rotations at a rate the mount advertises. Allow up to 120° total westward travel and 1° on either side for the direction check.'
       : 'Start with the simulator’s large-error preset and clear camera. Keep its offsets unchanged until all three positions are measured.'
 
   const preparationInstruction =

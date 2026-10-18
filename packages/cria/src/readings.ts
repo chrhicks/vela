@@ -54,6 +54,18 @@ export class DeviceReadings {
     return this.number(key)
   }
 
+  /**
+   * A tracking-rate offset the driver cannot set is zero while the mount tracks at the sidereal
+   * rate. A stale or unreachable reading, or a non-sidereal rate, still fails.
+   */
+  trackingOffset(key: string, trackingRate: string) {
+    const reading = this.readings[key]
+
+    if (reading?.status === 'unavailable' && reading.reason === 'unsupported' && trackingRate === 'sidereal') return 0
+
+    return this.number(key)
+  }
+
   optionalInteger(key: string) { return this.optional(key, Schema.Int) }
 
   optionalBoolean(key: string) { return this.optional(key, Schema.Boolean) }
