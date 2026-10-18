@@ -224,6 +224,25 @@ describe('alignment routes', () => {
     expect(mocks.physical.mock.calls[0]?.[2]).toBe(framing)
   })
 
+  it('passes the configured sweep rate and leg limit to the physical alignment', async () => {
+    const criaRig: RigCatalogRecord = { ...rig, source: { kind: 'cria', configurationId: 'fixture' } }
+    const app = Fastify()
+    apps.push(app)
+    const acquisition = createAlpacaAcquisition({ baseUrl: 'http://unused.invalid' })
+    const framing = createAlpacaFraming({ baseUrl: 'http://unused.invalid' })
+    const settings = alignmentSettings({ ...env, VELA_ALIGNMENT_MODE: 'physical' })!
+
+    registerAlignment(app, createMemoryRigCatalog([criaRig]), undefined, createRigOperations(), mocks, {
+      ...equipment,
+      settingsForRig: () => ({ ...settings, rigId: criaRig.id, sweepRateDegreesPerSecond: 0.2507, maxLegSeconds: 80 }),
+      createAcquisition: () => acquisition,
+      createFraming: () => framing,
+    })
+
+    expect((await app.inject({ method: 'POST', url: '/api/rigs/rig/alignment/start', payload: {} })).statusCode).toBe(200)
+    expect(mocks.physical.mock.calls[0]?.[0]).toMatchObject({ sweepRateDegreesPerSecond: 0.2507, maxLegSeconds: 80 })
+  })
+
   it('expects the camera name Cria reports when the saved name predates protocol 5', async () => {
     const criaRig: RigCatalogRecord = {
       ...rig,

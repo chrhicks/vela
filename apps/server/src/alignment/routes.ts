@@ -107,6 +107,8 @@ export function registerAlignment(
         telescopeId: settings.telescopeId,
         cameraName: cameraName ?? rig.imagingCamera!.name,
         focalLengthMm: rig.focalLengthMm!,
+        ...(settings.sweepRateDegreesPerSecond !== undefined && { sweepRateDegreesPerSecond: settings.sweepRateDegreesPerSecond }),
+        ...(settings.maxLegSeconds !== undefined && { maxLegSeconds: settings.maxLegSeconds }),
       },
       acquisition,
       equipment.createFraming(rig),

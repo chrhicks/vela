@@ -85,14 +85,17 @@ westward travel and 1° on either side for the direction check. The starting fie
 leaves a nominal margin of at least 10° before the meridian after that travel at
 preparation time; this margin shrinks as time passes while tracking.
 
-Each leg uses one continuous primary-axis rotation. Cria needs an advertised
-axis rate within 1% of 1° per second for the sweep and uses the rate nearest
-0.25° per second for the probe. A missing sweep rate refuses preparation before
-homing or moving. The AM5's current rates do not meet this requirement, so its
-physical baseline remains unavailable in this cutover. Its 8x rate needs longer
-than Cria's 120-second rotation limit, and its 9x stop error can exceed the
-54–60° corridor. Qualifying that baseline remains separate work.
-Its settled `travelledDegrees` determines the endpoint; a later telemetry read
+Each leg is a sequence of primary-axis rotations, none lasting over the leg limit
+(`maxLegSeconds`, 100 s by default; Cria times a rotation out at 120 s). The sweep rate
+comes from the mount: `sweepRateDegreesPerSecond` if set (it must be an advertised
+rate, within 1%), otherwise the fastest advertised rate at or below 1° per second. A
+configured rate the mount does not advertise refuses preparation before homing or
+moving. After each rotation the reported travel is added up, DEC is checked, and the
+next rotation asks for what is left divided by the rotations still to go. No more
+rotations are sent once 54° is reached, and the total must land in 54–60°. The probe
+uses the rate nearest 0.25° per second. Each rotation is an `alignment.sweep_leg` span
+with its asked distance, reported travel and duration. A rotation's settled
+`travelledDegrees` determines its endpoint; a later telemetry read
 does not replace that measurement. Cria owns the operation deadline and confirms
 a stationary mount when a stop settles. Alpaca retains its 1° per second sweep
 and confirms travel from readings. Coordinate slews can move DEC to compensate
