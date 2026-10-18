@@ -29,6 +29,8 @@ const rigSchema = z.strictObject({
     cameraId: identifier.max(64),
     telescopeId: identifier.max(64),
     exposureSeconds: z.number().min(0.1).max(60).optional(),
+    sweepRateDegreesPerSecond: z.number().positive().optional(),
+    maxLegSeconds: z.number().positive().optional(),
   }).optional(),
 }).superRefine((rig, context) => {
   if (new Set(rig.devices.map(device => device.id)).size !== rig.devices.length)

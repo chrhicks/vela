@@ -145,6 +145,11 @@ export function createEquipmentComposition(
 
       if (options.diagnosticsPath) settings = { ...settings, diagnosticsPath: options.diagnosticsPath }
 
+      if (alignment.sweepRateDegreesPerSecond !== undefined)
+        settings = { ...settings, sweepRateDegreesPerSecond: alignment.sweepRateDegreesPerSecond }
+
+      if (alignment.maxLegSeconds !== undefined) settings = { ...settings, maxLegSeconds: alignment.maxLegSeconds }
+
       return settings
     },
   }

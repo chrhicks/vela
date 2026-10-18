@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { criaDeviceId, parseCriaConfiguration, registerConfiguredCriaRigs } from './config.js'
+import { createEquipmentComposition } from './composition.js'
 import { createMemoryRigCatalog, matchRigCandidate } from '../rig/catalog.js'
 import type { RigCatalogRecord } from '../rig/contracts.js'
 
@@ -100,4 +101,44 @@ describe('explicit Cria rig configuration', () => {
     await expect(registerConfiguredCriaRigs(catalog, configured)).rejects.toThrow('another equipment source')
     expect(await catalog.get(legacy.id)).toEqual(legacy)
   })
+})
+
+describe('polar alignment sweep settings', () => {
+  const sweep = { sweepRateDegreesPerSecond: 0.2507, maxLegSeconds: 80 }
+
+  function parse(alignment: Record<string, number>) {
+    return parseCriaConfiguration(
+      JSON.stringify({ rigs: [{ ...configuration, tokenEnv: undefined, alignment: { ...configuration.alignment, ...alignment } }] }),
+      {},
+    )
+  }
+
+  it('carries the sweep rate and leg limit from cria.json to the rig’s alignment settings', async () => {
+    const configured = parse(sweep)
+    const rig = (await registerAndGet(configured))!
+    const settings = createEquipmentComposition(configured, { solver: { executable: 'astap', catalogPath: '/catalog' } }).alignmentSettings(rig)
+
+    expect(settings).toMatchObject(sweep)
+  })
+
+  it('leaves both unset when cria.json sets neither', async () => {
+    const configured = parse({})
+    const rig = (await registerAndGet(configured))!
+    const settings = createEquipmentComposition(configured, { solver: { executable: 'astap', catalogPath: '/catalog' } }).alignmentSettings(rig)
+
+    expect(settings).not.toHaveProperty('sweepRateDegreesPerSecond')
+    expect(settings).not.toHaveProperty('maxLegSeconds')
+  })
+
+  it.each([{ sweepRateDegreesPerSecond: 0 }, { sweepRateDegreesPerSecond: -1 }, { maxLegSeconds: 0 }, { maxLegSeconds: -5 }])(
+    'rejects %o',
+    alignment => expect(() => parse(alignment)).toThrow(),
+  )
+
+  async function registerAndGet(configured: ReturnType<typeof parse>) {
+    const catalog = createMemoryRigCatalog([])
+    await registerConfiguredCriaRigs(catalog, configured)
+
+    return catalog.get(configuration.id)
+  }
 })
