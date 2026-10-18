@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CaptureRetryableError, EquipmentError, FocuserStoppedError } from '@vela/equipment'
 import { createCriaConnection } from '../src/connection.js'
 import { createCriaEquipment } from '../src/equipment.js'
+import type { Device } from '@cria/wire'
 import { FakeCria } from './v5/fake-cria.js'
 
 let cria: FakeCria
@@ -40,6 +41,72 @@ describe('protocol 5 Promise capabilities', () => {
       { telemetry: { values: { kind: 'telescope', parked: false, tracking: true } } },
       { telemetry: { values: { kind: 'focuser', minStep: 15500, maxStep: 38000 } } },
     ])
+  })
+
+  describe('alignment observations on a mount whose driver cannot set a tracking rate', () => {
+    function am5(readings: Partial<Extract<Device, { kind: 'mount' }>['readings']> = {}) {
+      cria.deviceView = device => device.kind === 'mount'
+        ? {
+          ...device,
+          readings: {
+            ...device.readings,
+            tracking: { status: 'fresh', value: false, observedAt: Date.now() },
+            pierSide: { status: 'fresh', value: 'unknown', observedAt: Date.now() },
+            rightAscensionRateSecondsPerSiderealSecond: { status: 'unavailable', reason: 'unsupported' },
+            declinationRateArcsecondsPerSecond: { status: 'unavailable', reason: 'unsupported' },
+            ...readings,
+          },
+        }
+        : device
+    }
+
+    it('reads both offsets as zero while the mount tracks at the sidereal rate', async () => {
+      am5()
+      await vi.advanceTimersByTimeAsync(1000)
+
+      expect(await equipment.framing.telescopeStatus('mount', undefined, { includeAlignmentObservations: true })).toMatchObject({
+        trackingRate: 'sidereal',
+        rightAscensionRateSecondsPerSiderealSecond: 0,
+        declinationRateArcsecondsPerSecond: 0,
+        pierSide: 'unknown',
+        tracking: false,
+      })
+    })
+
+    it('still reports an offset the driver does set', async () => {
+      am5({ rightAscensionRateSecondsPerSiderealSecond: { status: 'fresh', value: 0.5, observedAt: Date.now() } })
+      await vi.advanceTimersByTimeAsync(1000)
+
+      expect(await equipment.framing.telescopeStatus('mount', undefined, { includeAlignmentObservations: true })).toMatchObject({
+        rightAscensionRateSecondsPerSiderealSecond: 0.5,
+        declinationRateArcsecondsPerSecond: 0,
+      })
+    })
+
+    it.each([
+      ['stale', { status: 'stale', value: 0, observedAt: 1 } as const],
+      ['unreadable', { status: 'unavailable', reason: 'failed' } as const],
+      ['not yet read', { status: 'unavailable', reason: 'not-read' } as const],
+    ])('refuses a %s offset', async (_name, reading) => {
+      am5({ declinationRateArcsecondsPerSecond: reading })
+      await vi.advanceTimersByTimeAsync(1000)
+
+      await expect(equipment.framing.telescopeStatus('mount', undefined, { includeAlignmentObservations: true })).rejects.toMatchObject({ reason: 'transport' })
+    })
+
+    it('refuses an unsupported offset when the tracking rate is not sidereal', async () => {
+      am5({ trackingRate: { status: 'fresh', value: 'lunar', observedAt: Date.now() } })
+      await vi.advanceTimersByTimeAsync(1000)
+
+      await expect(equipment.framing.telescopeStatus('mount', undefined, { includeAlignmentObservations: true })).rejects.toMatchObject({ reason: 'transport' })
+    })
+
+    it('does not read the offsets for an ordinary status', async () => {
+      am5()
+      await vi.advanceTimersByTimeAsync(1000)
+
+      expect(await equipment.framing.telescopeStatus('mount')).not.toHaveProperty('rightAscensionRateSecondsPerSiderealSecond')
+    })
   })
 
   it('uses Cria availability for commands and keeps valid readings visible', async () => {
