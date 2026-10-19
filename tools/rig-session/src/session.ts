@@ -23,7 +23,7 @@ export interface SessionRequest {
 const whatMissingCosts = {
   'saved-images': 'There are no frames.',
   traces: 'There are no spans, and frames have no span link or run frame index.',
-  'mount-csv': 'The mount table is empty and frames have no mount link.',
+  'mount-csv': 'There are no polled mount samples: the mount table holds only what the INDI recording gives (nothing without one), and a frame links only to those.',
   'indi-recording': 'There are no Cria operations, INDI writes or device events, and no frame links exactly to its camera image.',
   'frame-records': 'Frames carry no request or operation ids, so none links exactly to a Cria operation.',
   'cria-journal': 'There are no requests Vela sent, no checks of the images it fetched, no state changes or stream events as Vela saw them, and no link from an attempt to its request or its image check.',
