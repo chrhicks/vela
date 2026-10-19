@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import type { Json } from './redact.ts'
+import type { Json } from './sanitize.ts'
 
 /** Hand-made recording lines for tests: made-up devices and a made-up site, never a real night. */
 export const recordingStart = Date.parse('2030-01-01T00:59:00Z')

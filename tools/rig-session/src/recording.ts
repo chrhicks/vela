@@ -2,6 +2,8 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { z } from 'zod'
 import { jsonText, linesOf, type ReadResult, type Skipped } from './inputs.ts'
+import { Secrets } from './sanitize.ts'
+import { learnFromMessage } from './traffic-secrets.ts'
 
 const epochMs = z.number().transform(ms => new Date(ms))
 
@@ -9,6 +11,7 @@ const manifestFile = z.object({
   instanceId: z.string(),
   startedAt: epochMs,
   devices: z.array(z.object({ id: z.string(), kind: z.string(), indiDevice: z.string() })),
+  indi: z.object({ host: z.string() }).optional(),
 })
 
 const operation = z.looseObject({
@@ -71,10 +74,14 @@ const kept = (line: RecordedLine) => line.k === 'op' || line.k === 'gap' || line
  * a table needs it: `items` holds the operation, gap and end lines. A last line with no newline is a
  * torn tail and is dropped. A line that ends with a newline but does not decode is damage: the lines
  * before it are kept, everything after is ignored and the damage is listed, because a reader that skips
- * it would join across a hole.
+ * it would join across a hole. What the traffic says that a package must not hold (the site, ports, serial
+ * numbers) is learned into `secrets` as the lines pass.
  */
-export async function readRecording(directory: string): Promise<Recording> {
+export async function readRecording(directory: string, secrets = new Secrets()): Promise<Recording> {
   const manifest = manifestFile.parse(JSON.parse(await readFile(join(directory, 'manifest.json'), 'utf8')))
+
+  if (manifest.indi && !['localhost', '127.0.0.1', '::1'].includes(manifest.indi.host)) secrets.addLiteral(manifest.indi.host)
+
   const path = join(directory, 'traffic.jsonl')
   const items: RecordedLine[] = []
   let damagedAt: number | null = null
@@ -101,6 +108,9 @@ export async function readRecording(directory: string): Promise<Recording> {
     if (parsed?.success) {
       linesRead += 1
       last = parsed.data
+
+      if (parsed.data.k === 'msg') learnFromMessage(parsed.data.xml, secrets)
+      else if (parsed.data.k === 'op') secrets.learnFromJson(jsonText(z.json()).parse(raw.text))
 
       if (kept(parsed.data)) items.push(parsed.data)
     } else damagedAt = raw.number

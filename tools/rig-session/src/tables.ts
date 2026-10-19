@@ -1,7 +1,6 @@
 import type { FrameRecord, MountSample, SavedImage, TraceSpan } from './inputs.ts'
 import { linkAttemptToFrame, linkAttemptToOperation, linkFrameToAttempt, linkFrameToSpan, linkMountAsOf, type Link, type MountLink } from './joins.ts'
 import { operationsOf, type RecordedOperation, type Recording } from './recording.ts'
-import { redactedJson, redactText } from './redact.ts'
 import type { AttemptRow, FrameRow, IndiOpRow, LinkKind, MountRow, SpanRow, Tables } from './schema.ts'
 
 export interface TimeWindow {
@@ -131,7 +130,7 @@ function attemptRow(session: string, record: FrameRecord, frameLink: Link<SavedI
     settled_at: record.settledAt,
     exposure_seconds: record.exposureSeconds,
     outcome: record.outcome,
-    message: record.message === null ? null : redactText(record.message),
+    message: record.message,
     request_id: record.requestId,
     operation_id: record.operationId,
     cria_image_id: record.criaImageId,
@@ -161,8 +160,8 @@ function operationRow(session: string, operation: RecordedOperation, recording: 
     settled_at: operation.settledAt,
     outcome: operation.outcome.kind,
     outcome_reason: operation.outcome.reason ?? null,
-    outcome_message: operation.outcome.message === undefined ? null : redactText(operation.outcome.message),
-    parameters: JSON.stringify(redactedJson(operation.parameters ?? null)),
+    outcome_message: operation.outcome.message ?? null,
+    parameters: JSON.stringify(operation.parameters ?? null),
     image_id: image?.id ?? null,
     image_bytes: image?.original?.bytes ?? null,
   }

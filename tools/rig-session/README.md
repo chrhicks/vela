@@ -47,7 +47,15 @@ The Vela journal is not read yet. `INPUTS.md` specifies how they will be, and th
 
 ## Privacy
 
-A package never holds the observing site or serial port paths. `redact.ts` replaces the values of the INDI properties `GEOGRAPHIC_COORD`, `DEVICE_PORT` and `SYSTEM_PORTS`, any `/dev/...` path, `LAT=`/`LONG=`/`ELEV=` pairs and site or port keys in operation parameters; a text that names the site in words (a driver's "Observer location updated: Latitude ...") is replaced whole. A recording is read for `manifest.json` and `traffic.jsonl` only; `blobs/` is never opened. A recording is streamed, so a tape larger than memory builds in constant space; only the lines a table needs are kept. A recording with a torn last line loses that line; one with a damaged line in the middle (or a line over 64 MiB) is read up to the damage and `session.json` lists it. The policy is stated once, in `INPUTS.md` ("Damage").
+A package never holds the observing site, serial port paths or serial numbers, host addresses or credentials. This is held at the one place rows are written, not field by field: `publishPackage` (`package.ts`) passes every string cell, and every string and key inside a JSON cell, through `sanitize` (`sanitize.ts`), and no table or column is named there. A new column or table is covered without touching it.
+
+`sanitize` has two layers. Learned values: the readers learn the secrets from the inputs themselves (the recording's site, ports and serial numbers, the journal's origin), and `Secrets` replaces each wherever it occurs, in the usual spellings (decimal rounded or truncated, signed or wrapped longitude, sexagesimal). Patterns: `/dev/` paths, `by-id` names, `LAT=`/`LONG=`/`ELEV=` pairs, URL credentials and tokens, bearer and key-looking strings; a text that names the site in words ("Observer location updated: Latitude ...") is replaced whole, and a JSON key that names the site, a port or a serial number loses its value.
+
+After the staged files are written and before the symlink switches, the package reads them back and scans every table and `session.json` for the learned secrets and the patterns. A hit fails the build with the table, column and rule (never the value), removes the staging directory, and leaves the previous package readable. It is the backstop; `sanitize` is the defence. `INPUTS.md` ("Privacy rule") has the whole rule.
+
+### The recording
+
+A recording is read for `manifest.json` and `traffic.jsonl` only; `blobs/` is never opened. It is streamed, so a tape larger than memory builds in constant space, and only the lines a table needs are kept. As the lines pass, the reader learns the site (`GEOGRAPHIC_COORD`), the ports (`DEVICE_PORT`, `SYSTEM_PORTS`, any `/dev/` path), serial numbers and the INDI host from the manifest into the package's `Secrets`. A torn last line is dropped; a damaged line in the middle (or a line over 64 MiB) keeps the lines before it and `session.json` lists it. That policy is stated once, in `INPUTS.md` ("Damage").
 
 ## Replay
 

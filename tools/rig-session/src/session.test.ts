@@ -4,6 +4,7 @@ import { basename, join } from 'node:path'
 import { expect, test } from 'vitest'
 import { publishPackage } from './package.ts'
 import { openPackage } from './query.ts'
+import { Secrets } from './sanitize.ts'
 import type { Tables } from './schema.ts'
 import { jsonLines, opLine, writeRecording } from './recording-fixture.ts'
 import { buildSession } from './session.ts'
@@ -209,7 +210,7 @@ test('a build that fails part way leaves the previous package readable, and the 
     ],
   }
 
-  await expect(publishPackage(root, unreadableSpan, '{}')).rejects.toThrow()
+  await expect(publishPackage(root, unreadableSpan, {}, new Secrets())).rejects.toThrow()
 
   expect(await readlink(join(root, 'package'))).toBe(join('builds', basename(published)))
 
@@ -307,5 +308,34 @@ test('an attempt message that names the site or a serial port is redacted in the
   expect(await session.rows("SELECT message FROM attempts WHERE outcome = 'failed'")).toEqual([
     { message: 'adapter failed: open [redacted] and set LAT=[redacted] LONG=[redacted]' },
   ])
+  session.close()
+})
+
+test('a site the recording carries is removed from every cell, whatever the field and however it is written', async () => {
+  const dir = await scratch()
+  const root = join(dir, 'out')
+
+  const coordinates = '<defNumberVector device="Test Mount" name="GEOGRAPHIC_COORD" state="Ok"><defNumber name="LAT">12.534</defNumber><defNumber name="LONG">-14.75</defNumber><defNumber name="ELEV">0</defNumber></defNumberVector>'
+
+  const recordingDir = await writeRecording(join(dir, 'recording'), jsonLines(
+    { k: 'msg', t: 1, at: Date.parse('2030-01-01T00:59:10Z'), conn: 1, dir: 'in', n: 0, xml: coordinates },
+    { k: 'msg', t: 2, at: Date.parse('2030-01-01T00:59:11Z'), conn: 1, dir: 'in', n: 1, xml: '<setTextVector device="Test Mount" name="DEVICE_PORT"><oneText name="PORT">tty-test-port-7</oneText></setTextVector>' },
+    opLine({
+      id: 'operation-1',
+      acceptedAt: '2030-01-01T01:00:00Z',
+      settledAt: '2030-01-01T01:00:50Z',
+      parameters: { exposureSeconds: 50, comment: 'rig at 12°32\'02.4" north, 14:45:00 west' },
+      outcome: { kind: 'failed', reason: 'invalid', message: 'site 12.534 and 345.25 on tty-test-port-7' },
+    }),
+  ))
+
+  await buildSession({ name: 'test-night', window, root, savedImagesDir: null, tracesFile: null, mountCsvFile: null, frameRecordsFile: null, recordingDir })
+
+  const session = await openPackage(join(root, 'package'))
+  const cells = JSON.stringify(await session.rows('SELECT * FROM indi_ops'))
+
+  expect(cells).not.toMatch(/12\.534|345\.25|12°32|14:45|tty-test-port-7/)
+  expect(cells).toContain('"exposureSeconds\\":50')
+  expect(cells).toContain('[redacted]')
   session.close()
 })
