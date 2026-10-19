@@ -53,6 +53,8 @@ export class CaptureFrameLostError extends Error {
 export interface CaptureRunOptions {
   subject?: CaptureSubject | null
   onSettled?: () => void
+  /** Called with each frame once it is published, whether or not it is saved. */
+  onFrame?: (image: CaptureImage) => void
   repeat?: boolean
   saveFrames?: boolean
 }
@@ -154,6 +156,7 @@ export function createCaptureController(
     saveFrames: boolean,
     subject: CaptureSubject | null,
     runGeneration: number,
+    onFrame: CaptureRunOptions['onFrame'],
   ) {
     let frameSpan: Span | undefined
 
@@ -325,6 +328,8 @@ export function createCaptureController(
           latestImage: metadata,
         })
 
+        onFrame?.(metadata)
+
         if (saveFrames) {
           const saveStartedAt = performance.now()
 
@@ -382,7 +387,7 @@ export function createCaptureController(
     exposureSeconds: number,
     camera: CaptureCamera,
     cameraName: string,
-    { onSettled, repeat = false, saveFrames = false, subject = null }: CaptureRunOptions = {},
+    { onSettled, onFrame, repeat = false, saveFrames = false, subject = null }: CaptureRunOptions = {},
   ) {
     if (running) throw new Error('An exposure is already running')
 
@@ -428,6 +433,7 @@ export function createCaptureController(
       saveFrames,
       runSubject,
       runGeneration,
+      onFrame,
     ).finally(() => {
       running = undefined
       onSettled?.()

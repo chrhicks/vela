@@ -1,6 +1,11 @@
 /** -1 is quiet, 0 is normal, 2 repeats on the phone until it is acknowledged or expires. */
 export type NotificationPriority = -1 | 0 | 2
 
+/** A priority 2 message repeats every 60 s for up to an hour, or until it is cancelled. */
+export const emergencyRetrySeconds = 60
+
+export const emergencyExpireSeconds = 3600
+
 export interface Notification {
   title: string
   message: string

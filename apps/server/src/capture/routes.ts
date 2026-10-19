@@ -15,6 +15,7 @@ import { confirmedCameraName } from '../rig/imaging-camera.js'
 import { inspectRigDetail, type RigDetailOptions } from '../rig/detail.js'
 import { CaptureFrameLostError, CaptureStoppedError, createCaptureController, type CaptureCamera } from './controller.js'
 import { createMemorySavedImageStore, type SavedImageStore } from '../saved-images/store.js'
+import type { AlertMonitor } from '../alerts/monitor.js'
 
 export interface CaptureSettings {
   rig: RigCatalogRecord
@@ -29,6 +30,8 @@ interface CaptureRouteOptions {
   createAcquisition: (rig: RigCatalogRecord) => Acquisition
   createInspector: RigDetailOptions['createInspector']
   createCooling: (settings: CaptureSettings) => CameraCooling
+  /** Watches each run for the alert rules. */
+  alerts?: { monitorFor(rig: RigCatalogRecord): Pick<AlertMonitor, 'runStarted' | 'frameCaptured' | 'runEnded'> }
 }
 
 function configuredCamera(settings: CaptureSettings, acquisition: Acquisition): CaptureCamera {
@@ -87,6 +90,7 @@ export function registerCapture(
     createAcquisition,
     createInspector,
     createCooling,
+    alerts,
     savedImages = createMemorySavedImageStore(),
   }: CaptureRouteOptions,
 ) {
@@ -288,17 +292,26 @@ export function registerCapture(
           controllers.set(view.rigId, controller)
         }
 
-        const result = await controller.start(
-          body.exposureSeconds,
-          cameraFactory(settings),
-          view.camera.name,
-          {
+        const watch = alerts?.monitorFor(rig)
+        const captureController = controller
+
+        watch?.runStarted(body.exposureSeconds)
+
+        const result = await controller
+          .start(body.exposureSeconds, cameraFactory(settings), view.camera.name, {
             subject,
-            onSettled: release,
+            onFrame: image => watch?.frameCaptured(image),
+            onSettled() {
+              watch?.runEnded(captureController.snapshot().phase === 'failed' ? 'failed' : 'stopped')
+              release()
+            },
             repeat: body.repeat === true,
             saveFrames: body.saveFrames === true,
-          },
-        )
+          })
+          .catch(error => {
+            watch?.runEnded('stopped')
+            throw error
+          })
 
         started = true
 

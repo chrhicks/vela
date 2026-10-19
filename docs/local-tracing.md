@@ -145,3 +145,21 @@ run with:
 ```sh
 jq 'select(.name | startswith("capture."))' data/traces/observing.jsonl
 ```
+
+## Alerts
+
+While a capture run is watched, each alert is an episode with three kinds of span, so a retro can
+count them. All carry `alert.rig.id` and `alert.id` (the rule, such as `stars-collapsed`).
+
+- `alert.raised`: the episode began; `alert.level` is `warn` or `critical`. It is written even when
+  the phone is not told, because a stronger alert covers it or there are no Pushover keys.
+- `alert.cleared`: the episode ended, with `alert.duration.ms` and `alert.acknowledged`.
+- `alert.delivery`: one call to Pushover, from request to answer. `alert.delivery.action` is `raise`,
+  `clear`, `cancel` (stopping an emergency's repeats), or `test`; `alert.delivery.priority` is the
+  Pushover priority; `alert.delivery.status` is `delivered` or `failed`. A failed call has an error
+  status and `alert.delivery.reason`, the same text Vela shows as "phone alerts failing". Keys and
+  message text are never recorded.
+
+```sh
+jq 'select(.name | startswith("alert."))' data/traces/observing.jsonl
+```

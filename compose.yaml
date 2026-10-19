@@ -1,5 +1,5 @@
 # Vela on one host. Config and data live in XDG directories on the host and are mounted in:
-#   ${VELA_CONFIG_DIR}  default $XDG_CONFIG_HOME/vela  (cria.json)
+#   ${VELA_CONFIG_DIR}  default $XDG_CONFIG_HOME/vela  (cria.json, alerts.json)
 #   ${VELA_DATA_DIR}    default $XDG_DATA_HOME/vela    (rigs.yaml, saved-images, survey-cache, traces,
 #                                                       alignment-diagnostics, astap/)
 # There is no login: whoever can reach VELA_PORT can drive the rig. See docs/docker.md.
@@ -19,6 +19,7 @@ services:
     environment:
       TZ: ${TZ:-America/New_York}
       VELA_CRIA_CONFIG_PATH: /config/cria.json
+      VELA_ALERTS_CONFIG_PATH: /config/alerts.json
       VELA_RIG_CATALOG_PATH: /data/rigs.yaml
       VELA_SAVED_IMAGES_PATH: /data/saved-images
       VELA_SURVEY_CACHE_PATH: /data/survey-cache

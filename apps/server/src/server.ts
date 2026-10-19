@@ -8,6 +8,8 @@ import { createSurveyCache } from './targets/survey.js'
 import { startTelemetry } from './telemetry.js'
 import { loadCriaConfiguration, registerConfiguredCriaRigs } from './equipment/config.js'
 import { createEquipmentComposition } from './equipment/composition.js'
+import { loadAlertsConfiguration } from './alerts/config.js'
+import { createPushoverNotifier } from './alerts/pushover.js'
 
 const telemetry = startTelemetry(process.env.VELA_TRACE_PATH)
 
@@ -53,6 +55,15 @@ try {
 
   await registerConfiguredCriaRigs(rigCatalog, cria)
 
+  const alertsConfiguration = await loadAlertsConfiguration(process.env.VELA_ALERTS_CONFIG_PATH)
+
+  const alerts = {
+    thresholds: alertsConfiguration.thresholds,
+    notifier: alertsConfiguration.pushover
+      ? createPushoverNotifier({ ...alertsConfiguration.pushover, fetch })
+      : null,
+  }
+
   const savedImages = await openFileSavedImageStore(
     process.env.VELA_SAVED_IMAGES_PATH
       ? resolve(process.env.VELA_SAVED_IMAGES_PATH)
@@ -88,7 +99,7 @@ try {
   const equipment = createEquipmentComposition(cria, equipmentOptions)
 
   if (!shutdownTask) {
-    const options = { rigCatalog, savedImages, targets, surveyCache, equipment }
+    const options = { rigCatalog, savedImages, targets, surveyCache, equipment, alerts }
     app = buildApp(alignment ? { ...options, alignment } : options)
     await app.listen({ port, host })
   }

@@ -23,6 +23,9 @@ import { createRigOperations } from './rig/operations.js'
 import { registerMountControls } from './rig/mount-control.js'
 import { getTarget } from './targets/catalog/index.js'
 import { registerCapture } from './capture/routes.js'
+import { registerAlerts, type AlertsOptions } from './alerts/routes.js'
+import { mountReaderFor } from './alerts/mount.js'
+import { defaultThresholds } from './alerts/thresholds.js'
 import { registerAutofocus } from './autofocus/routes.js'
 import { registerNavigation } from './navigation.js'
 import { registerImagingCamera } from './rig/imaging-camera.js'
@@ -39,6 +42,7 @@ interface BuildAppOptions {
   readonly surveyCache?: SurveyCache
   readonly savedImages?: SavedImageStore
   readonly alignment?: AlignmentSettings
+  readonly alerts?: Pick<AlertsOptions, 'thresholds' | 'notifier' | 'now'>
   readonly alpacaDiscovery?: AlpacaDiscovery
   readonly createConnector?: (rig: RigEquipmentSource) => EquipmentConnector
   readonly createInventory?: (rig: RigInventorySource) => RigDeviceInventory
@@ -59,6 +63,7 @@ export function buildApp({
   targets,
   surveyCache,
   alignment,
+  alerts: alertSettings = { thresholds: defaultThresholds, notifier: null },
   equipment = createEquipmentComposition(),
   alpacaDiscovery = equipment.alpacaDiscovery,
   createConnector = equipment.createConnector,
@@ -86,7 +91,13 @@ export function buildApp({
     createAlignmentEndpointAcquisition: equipment.createAlignmentEndpointAcquisition,
   })
 
+  const alerts = registerAlerts(app, rigCatalog, {
+    ...alertSettings,
+    mountReaderFor: rigId => mountReaderFor(rigId, rigCatalog, equipment),
+  })
+
   const capture = registerCapture(app, rigCatalog, operations, {
+    alerts,
     createInspector,
     createAcquisition: equipment.createAcquisition,
     createCooling: settings => equipment.createCooling(settings.rig),
