@@ -8,8 +8,7 @@ import type {
   FramingView,
   TargetPosition,
 } from '@vela/model/web'
-import { capturePreviews } from '../imaging/preview.js'
-import { measureStars } from '../imaging/statistics.js'
+import { frameImaging, type FrameImaging } from '../imaging/frame-imaging.js'
 import type { MonoFrame, PlateSolver } from '../plate-solving/solver.js'
 import { angularDistance, fromMount, plateCorners, toMount, type Site } from './sky.js'
 
@@ -118,7 +117,7 @@ export function createFramingController(
   now = () => new Date(),
   waitForMountObservation: (signal: AbortSignal) => Promise<void> = signal =>
     delay(1000, undefined, { signal }),
-  images = { render: capturePreviews, analyze: measureStars },
+  images: Pick<FrameImaging, 'render' | 'analyze'> = frameImaging,
 ) {
   let state: Pick<
     FramingView,
