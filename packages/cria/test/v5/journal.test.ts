@@ -264,21 +264,22 @@ describe('a journal that fails or stalls', () => {
       expect(onError.mock.calls[0]![0].message).toContain('stalled')
     })
 
-    it('closes at once after the journal has already turned itself off behind a stalled write', async () => {
+    it('still closes within its timeout after the journal turned itself off behind a stalled write', async () => {
       const { fifo, reader } = stalledFifo()
-      const journal = openJournalFile(fifo, { maxPendingBytes: 200, onError: () => {} })
-      let closed = false
+      const onError = vi.fn()
+      const journal = openJournalFile(fifo, { maxPendingBytes: 200, closeTimeoutMs: 100, onError })
 
       closers.push(async () => void closeSync(reader()))
       vi.useRealTimers()
       journal.record(entry)
       await new Promise(resolve => setTimeout(resolve, 50))
+
       for (let index = 0; index < 4; index += 1) journal.record(entry)
-      const closing = journal.close().then(() => void (closed = true))
 
-      await Promise.race([closing, new Promise(resolve => setTimeout(resolve, 50))])
+      await journal.close()
 
-      expect(closed).toBe(true)
+      expect(onError).toHaveBeenCalledTimes(1)
+      expect(onError.mock.calls[0]![0].message).toContain('fell behind')
     })
 
     it('does not write the stalled line if the disk wakes after close', async () => {
