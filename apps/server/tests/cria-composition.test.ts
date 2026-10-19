@@ -1,4 +1,7 @@
 import { createServer } from 'node:http'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { once } from 'node:events'
 import { expect, it, vi } from 'vitest'
 import { z } from 'zod'
@@ -83,4 +86,28 @@ it('shares one authenticated stream across configured rigs and closes it with th
     remote.closeAllConnections()
     await new Promise<void>(resolve => remote.close(() => resolve()))
   }
+})
+
+it('journals what every connection decodes, tagged with its origin, when given a path', async () => {
+  vi.useFakeTimers({ now: Date.UTC(2026, 9, 17, 3) })
+  const directory = await mkdtemp(join(tmpdir(), 'vela-composition-journal-'))
+  const path = join(directory, 'cria-journal.jsonl')
+  const service = new FakeCria()
+
+  const composition = createEquipmentComposition(
+    [{ id: 'fixture', name: 'Fixture', url: service.origin, devices: [{ id: 'camera', kind: 'camera', expectedName: 'Fake CCD' }] }],
+    { fetch: service.fetch, criaJournalPath: path },
+  )
+
+  composition.start()
+  await vi.advanceTimersByTimeAsync(2_500)
+  await composition.close()
+  service.close()
+  vi.useRealTimers()
+
+  const lines = (await readFile(path, 'utf8')).trimEnd().split('\n').map(line => JSON.parse(line))
+
+  await rm(directory, { recursive: true, force: true })
+  expect(lines.slice(0, 2).map(line => [line.origin, line.kind])).toEqual([[service.origin, 'stream'], [service.origin, 'state']])
+  expect(lines.filter(line => line.kind === 'state').length).toBeGreaterThan(1)
 })

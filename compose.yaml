@@ -24,6 +24,7 @@ services:
       VELA_SURVEY_CACHE_PATH: /data/survey-cache
       VELA_TRACE_PATH: /data/traces/observing.jsonl
       VELA_FRAME_RECORDS_PATH: /data/traces/frames.jsonl
+      VELA_CRIA_JOURNAL_PATH: /data/traces/cria-journal.jsonl
       VELA_ALIGNMENT_DIAGNOSTICS_PATH: /data/alignment-diagnostics/trials
       VELA_ASTAP: /astap/astap_cli
       VELA_STAR_CATALOG: /astap/catalog/opt/astap

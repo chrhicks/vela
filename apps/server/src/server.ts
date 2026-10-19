@@ -83,6 +83,9 @@ try {
 
   const equipmentOptions: NonNullable<Parameters<typeof createEquipmentComposition>[1]> = {}
 
+  if (process.env.VELA_CRIA_JOURNAL_PATH)
+    equipmentOptions.criaJournalPath = resolve(process.env.VELA_CRIA_JOURNAL_PATH)
+
   if (targets.solver) equipmentOptions.solver = targets.solver
 
   if (process.env.VELA_ALIGNMENT_DIAGNOSTICS_PATH) {
