@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import { FakeCria, type Route } from '../../../packages/cria/test/v5/fake-cria.js'
 import { buildApp } from '../src/app.js'
+import type { FrameImaging } from '../src/imaging/frame-imaging.js'
 import { createEquipmentComposition } from '../src/equipment/composition.js'
 import { registerConfiguredCriaRigs, type CriaRigConfiguration } from '../src/equipment/config.js'
 import type { PlateSolver } from '../src/plate-solving/solver.js'
@@ -25,6 +26,16 @@ afterEach(async () => {
   vi.unstubAllGlobals()
   vi.useRealTimers()
 })
+
+// The real frame pipeline yields to the event loop and waits on the zlib thread
+// pool. The fake clock advances neither, so it finished or not depending on how
+// busy the machine was. These settle in microtasks, which every advance drains.
+// The pipeline has its own tests.
+const images: FrameImaging = {
+  render: async () => ({ native: Buffer.from('native'), fit: undefined }),
+  analyze: async () => ({ detectedStars: 0, medianHfrPixels: null }),
+  encodeFits: async () => Buffer.from('fits'),
+}
 
 const slewToNgc7000 = { targetId: 'ngc7000', raDegrees: 314.7, decDegrees: 44.3, exposureSeconds: 1 }
 
@@ -71,6 +82,7 @@ async function openAndInspectRig(): Promise<void> {
   app = buildApp({
     equipment: createEquipmentComposition([configuration], { fetch: cria.fetch }),
     rigCatalog,
+    images,
     targets: { createSolver: () => solver, waitForMountObservation: async () => {} },
   })
 
