@@ -4,6 +4,7 @@ import { basename, join } from 'node:path'
 import { expect, test } from 'vitest'
 import { publishPackage } from './package.ts'
 import { openPackage } from './query.ts'
+import { Secrets } from './sanitize.ts'
 import type { Tables } from './schema.ts'
 import { buildSession } from './session.ts'
 
@@ -189,7 +190,7 @@ test('a build that fails part way leaves the previous package readable, and the 
     ],
   }
 
-  await expect(publishPackage(root, unreadableSpan, '{}')).rejects.toThrow()
+  await expect(publishPackage(root, unreadableSpan, {}, new Secrets())).rejects.toThrow()
 
   expect(await readlink(join(root, 'package'))).toBe(join('builds', basename(published)))
 
