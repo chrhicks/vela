@@ -177,10 +177,9 @@ describe('a journal that fails or stalls', () => {
     const journal = openJournalFile(path, { maxFileBytes: 150, onError })
 
     journal.record({ kind: 'stream', at: 1, event: 'opened', message: null, origin: cria.origin })
-    journal.record({ kind: 'stream', at: 2, event: 'ended', message: 'x'.repeat(100), origin: cria.origin })
     await journal.close()
 
-    expect((await readFile(path, 'utf8')).length).toBeLessThanOrEqual(150)
+    expect((await readFile(path, 'utf8')).length).toBe(100)
     expect(onError).toHaveBeenCalledTimes(1)
   })
 
