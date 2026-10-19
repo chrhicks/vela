@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, test } from 'vitest'
 import { readJournal } from './journal.ts'
+import { sanitizeText, Secrets } from './sanitize.ts'
 
 const exchange = {
   kind: 'exchange',
@@ -41,4 +42,29 @@ test('the journal reads exchanges, image checks, state changes and stream events
   expect(items.map(entry => entry.kind)).toEqual(['exchange', 'state', 'stream', 'image', 'exchange'])
   expect(JSON.stringify(items)).not.toContain('example.test')
   expect(skipped.map(entry => entry.where)).toEqual([`${file}:6`, `${file}:8`])
+})
+
+test('a journal is streamed and only the entries inside the window are kept; the origin is learned and never kept', async () => {
+  const file = join(await mkdtemp(join(tmpdir(), 'rig-session-journal-')), 'cria-journal.jsonl')
+  const secrets = new Secrets()
+  const day = (n: number) => Date.parse('2030-01-01T01:00:00Z') + n * 86_400_000
+
+  await writeFile(file, Array.from({ length: 3000 }, (_, n) => `${JSON.stringify({ ...exchange, at: day(n % 3) })}\n`).join('') + 'x'.repeat(2000) + '\n')
+
+  const { items, skipped } = await readJournal(file, { inWindow: time => time.getTime() === day(1), secrets })
+
+  expect(items).toHaveLength(1000)
+  expect(skipped.map(entry => entry.reason)).toEqual(['not JSON'])
+  expect(sanitizeText('cannot reach http://cria.example.test:4319/v2 or cria.example.test', secrets)).toBe('cannot reach [redacted]/v2 or [redacted]')
+})
+
+test('a journal of lines that do not decode lists a bounded number of them', async () => {
+  const file = join(await mkdtemp(join(tmpdir(), 'rig-session-journal-')), 'cria-journal.jsonl')
+
+  await writeFile(file, `${'garbage\n'.repeat(1500)}`)
+
+  const { skipped } = await readJournal(file)
+
+  expect(skipped).toHaveLength(1001)
+  expect(skipped.at(-1)?.reason).toBe('500 more lines did not decode and are not listed')
 })

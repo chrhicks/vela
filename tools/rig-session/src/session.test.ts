@@ -4,6 +4,7 @@ import { basename, join } from 'node:path'
 import { expect, test } from 'vitest'
 import { publishPackage } from './package.ts'
 import { openPackage } from './query.ts'
+import { Secrets } from './sanitize.ts'
 import type { Tables } from './schema.ts'
 import { jsonLines, msgLine, opLine, writeRecording } from './recording-fixture.ts'
 import { buildSession } from './session.ts'
@@ -109,6 +110,8 @@ async function syntheticNight() {
     opLine({ id: 'refused', kind: 'capture', acceptedAt: '2030-01-01T01:04:00Z', settledAt: '2030-01-01T01:04:01Z', outcome: { kind: 'failed', reason: 'invalid', message: 'needs a mono frame on /dev/ttyUSB0' } }),
     msgLine(0, '2030-01-01T00:59:10Z', 'out', '<newNumberVector device="Test Mount" name="GEOGRAPHIC_COORD"><oneNumber name="LAT">12.5</oneNumber><oneNumber name="LONG">345.25</oneNumber></newNumberVector>'),
     msgLine(0, '2030-01-01T00:59:11Z', 'in', '<defTextVector device="Test Mount" name="DEVICE_PORT" state="Ok"><defText name="PORT">/dev/serial/by-id/usb-Test_0001</defText></defTextVector>'),
+    msgLine(2, '2030-01-01T00:59:13Z', 'in', '<defTextVector device="Test Camera" name="FILTER_NAME" state="Ok"><defText name="FILTER_SLOT_NAME_1">Lum at /dev/ttyUSB0 LAT=12.5 LONG=345.25</defText><defText name="FILTER_SLOT_NAME_2">Red from 12:30:00 north</defText></defTextVector>'),
+    msgLine(3, '2030-01-01T00:59:14Z', 'in', '<defTextVector device="Test Camera" name="SOME_NEW_PROPERTY" state="Ok"><defText name="NOTE">kept out: 12.5</defText></defTextVector>'),
     msgLine(1, '2030-01-01T00:59:12Z', 'in', '<defNumberVector device="Test Camera" name="CCD_EXPOSURE" state="Idle"><defNumber name="CCD_EXPOSURE_VALUE">0</defNumber></defNumberVector>'),
     msgLine(0, '2030-01-01T01:01:01Z', 'out', '<newNumberVector device="Test Camera" name="CCD_EXPOSURE"><oneNumber name="CCD_EXPOSURE_VALUE">50</oneNumber></newNumberVector>'),
     msgLine(2, '2030-01-01T01:01:02Z', 'in', '<setNumberVector device="Test Camera" name="CCD_EXPOSURE" state="Busy"><oneNumber name="CCD_EXPOSURE_VALUE">50</oneNumber></setNumberVector>'),
@@ -210,7 +213,7 @@ test('session.json lists the inputs it found and the ones it lacks', async () =>
     ['frame-records', 'found'],
     ['cria-journal', 'found'],
   ])
-  expect(summary.rows).toEqual({ frames: 3, attempts: 3, indi_ops: 5, indi_events: 9, indi_images: 3, cria_requests: 5, cria_image_checks: 3, cria_state_changes: 4, cria_stream: 2, mount: 3, spans: 3 })
+  expect(summary.rows).toEqual({ frames: 3, attempts: 3, indi_ops: 5, indi_events: 11, indi_images: 3, cria_requests: 5, cria_image_checks: 3, cria_state_changes: 4, cria_stream: 2, mount: 3, spans: 3 })
   expect(summary.links.frame_to_span).toEqual({ exact: 0, inferred: 3, ambiguous: 0, none: 0 })
   expect(summary.links.frame_to_attempt).toEqual({ exact: 3, inferred: 0, ambiguous: 0, none: 0 })
   expect(summary.links.request_to_attempt).toEqual({ exact: 3, inferred: 0, ambiguous: 0, none: 2 })
@@ -266,7 +269,7 @@ test('a build that fails part way leaves the previous package readable, and the 
     ],
   }
 
-  await expect(publishPackage(root, unreadableSpan, '{}')).rejects.toThrow()
+  await expect(publishPackage(root, unreadableSpan, {}, new Secrets())).rejects.toThrow()
 
   expect(await readlink(join(root, 'package'))).toBe(join('builds', basename(published)))
 
@@ -348,6 +351,54 @@ test('no cell of the package holds the site or a serial path that the recording 
   session.close()
 })
 
+test('an attempt message that names the site or a serial port is redacted in the package', async () => {
+  const night = await syntheticNight()
+  const root = join(night.dir, 'out')
+
+  const message = 'adapter failed: open /dev/serial/by-id/usb-Test_0001 and set LAT=12.5 LONG=345.25'
+  const records = (await readFile(night.frameRecordsFile, 'utf8')).trim().split('\n')
+  const failed = { ...JSON.parse(records[0] ?? ''), outcome: 'failed', message, image: null, statistics: null }
+
+  await writeFile(night.frameRecordsFile, `${[JSON.stringify(failed), ...records.slice(1)].join('\n')}\n`)
+  await build(night, root)
+
+  const session = await openPackage(join(root, 'package'))
+
+  expect(await session.rows("SELECT message FROM attempts WHERE outcome = 'failed'")).toEqual([
+    { message: 'adapter failed: open [redacted] and set LAT=[redacted] LONG=[redacted]' },
+  ])
+  session.close()
+})
+
+test('a site the recording carries is removed from every cell, whatever the field and however it is written', async () => {
+  const dir = await scratch()
+  const root = join(dir, 'out')
+
+  const coordinates = '<defNumberVector device="Test Mount" name="GEOGRAPHIC_COORD" state="Ok"><defNumber name="LAT">12.534</defNumber><defNumber name="LONG">-14.75</defNumber><defNumber name="ELEV">0</defNumber></defNumberVector>'
+
+  const recordingDir = await writeRecording(join(dir, 'recording'), jsonLines(
+    { k: 'msg', t: 1, at: Date.parse('2030-01-01T00:59:10Z'), conn: 1, dir: 'in', n: 0, xml: coordinates },
+    { k: 'msg', t: 2, at: Date.parse('2030-01-01T00:59:11Z'), conn: 1, dir: 'in', n: 1, xml: '<setTextVector device="Test Mount" name="DEVICE_PORT"><oneText name="PORT">tty-test-port-7</oneText></setTextVector>' },
+    opLine({
+      id: 'operation-1',
+      acceptedAt: '2030-01-01T01:00:00Z',
+      settledAt: '2030-01-01T01:00:50Z',
+      parameters: { exposureSeconds: 50, comment: 'rig at 12°32\'02.4" north, 14:45:00 west' },
+      outcome: { kind: 'failed', reason: 'invalid', message: 'site 12.534 and 345.25 on tty-test-port-7' },
+    }),
+  ))
+
+  await buildSession({ name: 'test-night', window, root, savedImagesDir: null, tracesFile: null, mountCsvFile: null, frameRecordsFile: null, recordingDir, journalFile: null })
+
+  const session = await openPackage(join(root, 'package'))
+  const cells = JSON.stringify(await session.rows('SELECT * FROM indi_ops'))
+
+  expect(cells).not.toMatch(/12\.534|345\.25|12°32|14:45|tty-test-port-7/)
+  expect(cells).toContain('"exposureSeconds\\":50')
+  expect(cells).toContain('[redacted]')
+  session.close()
+})
+
 test('a query lists the writes and errors during a frame\'s exposure with the operation they belong to', async () => {
   const night = await syntheticNight()
   const root = join(night.dir, 'out')
@@ -380,9 +431,13 @@ test('no event holds the site, a serial path or the values of the properties tha
   const cells = JSON.stringify(await session.rows('SELECT * FROM indi_events'))
 
   expect(cells).not.toMatch(/12\.5|345\.25|serial|ttyUSB|Test_0001/)
-  expect(await session.rows("SELECT property, values FROM indi_events WHERE property IN ('GEOGRAPHIC_COORD', 'DEVICE_PORT') ORDER BY property")).toEqual([
-    { property: 'DEVICE_PORT', values: '{"*":"[redacted]"}' },
-    { property: 'GEOGRAPHIC_COORD', values: '{"*":"[redacted]"}' },
+  expect(await session.rows("SELECT property, values FROM indi_events WHERE property IN ('GEOGRAPHIC_COORD', 'DEVICE_PORT', 'SOME_NEW_PROPERTY') ORDER BY property")).toEqual([
+    { property: 'DEVICE_PORT', values: null },
+    { property: 'GEOGRAPHIC_COORD', values: null },
+    { property: 'SOME_NEW_PROPERTY', values: null },
+  ])
+  expect(await session.rows("SELECT values FROM indi_events WHERE property = 'FILTER_NAME'")).toEqual([
+    { values: '{"FILTER_SLOT_NAME_1":"Lum at [redacted] LAT=[redacted] LONG=[redacted]","FILTER_SLOT_NAME_2":"Red from [redacted] north"}' },
   ])
   session.close()
 })
@@ -423,6 +478,7 @@ test('a recording alone fills the mount table, and a frame links to the latest r
       msgLine(2, '2030-01-01T00:59:14Z', 'in', field('def', 'Switch', 'TELESCOPE_TRACK_STATE', 'Ok', { TRACK_ON: 'On', TRACK_OFF: 'Off' })),
       msgLine(3, '2030-01-01T01:00:56Z', 'in', field('set', 'Number', 'EQUATORIAL_EOD_COORD', 'Busy', { RA: '6.6' })),
       msgLine(4, '2030-01-01T01:02:00Z', 'in', field('set', 'Switch', 'TELESCOPE_TRACK_STATE', 'Ok', { TRACK_ON: 'Off', TRACK_OFF: 'On' })),
+      { k: 'end', t: 9, at: Date.parse('2030-01-01T01:10:00Z') },
     ),
   )
 
@@ -505,5 +561,73 @@ test('a query lists what Cria reported while a frame was exposing, with the oper
     { event: 'opened', message: null },
     { event: 'ended', message: 'reset on [redacted]' },
   ])
+  session.close()
+})
+
+/** A night whose recording follows the mount to 01:02:00 and is then cut short in the way `cut` says. */
+async function cutShortNight(cut: 'torn tail' | 'damaged middle' | 'no end') {
+  const night = await syntheticNight()
+  const root = join(night.dir, 'out')
+
+  const field = (type: 'Number' | 'Switch', name: string, elements: Record<string, string>) =>
+    `<def${type}Vector device="Test Mount" name="${name}" state="Ok">${Object.entries(elements).map(([element, value]) => `<def${type} name="${element}">${value}</def${type}>`).join('')}</def${type}Vector>`
+
+  const lines = jsonLines(
+    msgLine(0, '2030-01-01T00:59:13Z', 'in', field('Number', 'EQUATORIAL_EOD_COORD', { RA: '6.5', DEC: '10.25' })),
+    msgLine(1, '2030-01-01T00:59:14Z', 'in', field('Switch', 'TELESCOPE_TRACK_STATE', { TRACK_ON: 'On', TRACK_OFF: 'Off' })),
+    msgLine(2, '2030-01-01T01:01:30Z', 'in', field('Switch', 'TELESCOPE_PARK', { PARK: 'Off', UNPARK: 'On' })),
+  )
+
+  const recordingDir = await writeRecording(join(night.dir, 'cut-recording'), cut === 'damaged middle' ? [...lines, 'not json', ...jsonLines(msgLine(3, '2030-01-01T01:02:30Z', 'in', field('Switch', 'TELESCOPE_PARK', { PARK: 'On', UNPARK: 'Off' })))] : lines)
+
+  if (cut === 'torn tail') await writeFile(join(recordingDir, 'traffic.jsonl'), `${lines.join('\n')}\n{"k":"msg","t":6`)
+
+  await buildSession({ name: 'test-night', window, root, savedImagesDir: night.savedImagesDir, tracesFile: null, mountCsvFile: null, frameRecordsFile: null, recordingDir, journalFile: null })
+
+  const session = await openPackage(join(root, 'package'))
+  const frames = await session.rows('SELECT frame_id, mount_link FROM frames ORDER BY frame_id')
+
+  session.close()
+
+  return frames
+}
+
+test.each(['torn tail', 'damaged middle', 'no end'] as const)('frames after the last line of a recording with a %s get no mount link', async cut => {
+  // The frames are at 01:01:00, 01:02:00 and 01:03:00; the last line read is at 01:01:30.
+  expect(await cutShortNight(cut)).toEqual([
+    { frame_id: 'frame-0', mount_link: 'inferred' },
+    { frame_id: 'frame-1', mount_link: null },
+    { frame_id: 'frame-2', mount_link: null },
+  ])
+})
+
+test('a state cell that is not on the list is not exported, and the site a mount reported is removed from every text', async () => {
+  const dir = await scratch()
+  const root = join(dir, 'out')
+  const journalFile = join(dir, 'cria-journal.jsonl')
+  const origin = 'http://cria.example.test:4319'
+  const at = Date.parse('2030-01-01T01:02:30Z')
+
+  const lines = [
+    {
+      kind: 'state', at, generatedAt: at, sequence: 1, instanceId: 'instance-1', commandsEnabled: true, baseline: true, removed: [],
+      changed: {
+        'device/mount/readings.latitudeDegrees': { status: 'fresh', value: 12.534, observedAt: 1 },
+        'device/mount/readings.siderealTimeHours': { status: 'fresh', value: 6.25, observedAt: 1 },
+        'device/mount/readings.name': { status: 'fresh', value: 'Test Mount SN-TEST-4411', observedAt: 1 },
+        'device/mount/readings.tracking': { status: 'fresh', value: true, observedAt: 1 },
+        'device/mount/serialNumber': 'SN-TEST-4411',
+      },
+    },
+    { kind: 'stream', at, event: 'ended', message: `lost ${origin} while the mount at 12°32'02.4" was slewing` },
+  ]
+
+  await writeFile(journalFile, lines.map(line => `${JSON.stringify({ ...line, origin })}\n`).join(''))
+  await buildSession({ name: 'test-night', window, root, savedImagesDir: null, tracesFile: null, mountCsvFile: null, frameRecordsFile: null, recordingDir: null, journalFile })
+
+  const session = await openPackage(join(root, 'package'))
+
+  expect(await session.rows('SELECT cell FROM cria_state_changes')).toEqual([{ cell: 'device/mount/readings.tracking' }])
+  expect(await session.rows('SELECT message FROM cria_stream')).toEqual([{ message: 'lost [redacted] while the mount at [redacted] was slewing' }])
   session.close()
 })
