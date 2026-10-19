@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { z } from 'zod'
-import { jsonText, type ReadResult, type Skipped } from './inputs.ts'
+import { jsonText, linesOf, type ReadResult, type Skipped } from './inputs.ts'
 
 const epochMs = z.number().transform(ms => new Date(ms))
 
@@ -54,36 +54,59 @@ export interface Recording extends ReadResult<RecordedLine> {
   readonly instanceId: string
   readonly startedAt: Date
   readonly devices: readonly RecordedDevice[]
+  /** Lines that decoded; `items` holds only the ones a table needs (see `readRecording`). */
+  readonly linesRead: number
   /** The last line is not complete: Cria died in the middle of an append. */
   readonly tornTail: boolean
   /** The last line is `end`: Cria shut down cleanly. */
   readonly ended: boolean
 }
 
+/** The lines the tables are built from; the others are used as they stream by and not kept. */
+const kept = (line: RecordedLine) => line.k === 'op' || line.k === 'gap' || line.k === 'end'
+
 /**
  * Reads a recording folder written by Cria's recorder (`manifest.json` and `traffic.jsonl`; `blobs/`
- * is never opened). A last line with no newline is a torn tail and is dropped. A line that ends with
- * a newline but does not decode is damage: the lines before it are kept, everything after is ignored
- * and the damage is listed, because a reader that skips it would join across a hole.
+ * is never opened). A tape can be far larger than memory, so it is streamed and a line is kept only if
+ * a table needs it: `items` holds the operation, gap and end lines. A last line with no newline is a
+ * torn tail and is dropped. A line that ends with a newline but does not decode is damage: the lines
+ * before it are kept, everything after is ignored and the damage is listed, because a reader that skips
+ * it would join across a hole.
  */
 export async function readRecording(directory: string): Promise<Recording> {
   const manifest = manifestFile.parse(JSON.parse(await readFile(join(directory, 'manifest.json'), 'utf8')))
-  const text = await readFile(join(directory, 'traffic.jsonl'), 'utf8')
-  const lines = text.split('\n')
-  const tornTail = lines.pop() !== ''
+  const path = join(directory, 'traffic.jsonl')
   const items: RecordedLine[] = []
-  const skipped: Skipped[] = []
+  let damagedAt: number | null = null
+  let linesRead = 0
+  let ignored = 0
+  let tornTail = false
+  let last: RecordedLine | undefined
 
-  for (const [index, line] of lines.entries()) {
-    const parsed = jsonText(trafficLine).safeParse(line)
+  for await (const raw of linesOf(path)) {
+    if (!raw.complete) {
+      tornTail = true
 
-    if (!parsed.success) {
-      skipped.push({ where: `${directory}/traffic.jsonl:${index + 1}`, reason: `damaged; this line and the ${lines.length - index - 1} after it are ignored` })
       break
     }
 
-    items.push(parsed.data)
+    if (damagedAt !== null) {
+      ignored += 1
+
+      continue
+    }
+
+    const parsed = raw.tooLong ? null : jsonText(trafficLine).safeParse(raw.text)
+
+    if (parsed?.success) {
+      linesRead += 1
+      last = parsed.data
+
+      if (kept(parsed.data)) items.push(parsed.data)
+    } else damagedAt = raw.number
   }
+
+  const skipped: Skipped[] = damagedAt === null ? [] : [{ where: `${path}:${damagedAt}`, reason: `damaged; this line and the ${ignored} after it are ignored` }]
 
   return {
     items,
@@ -92,8 +115,9 @@ export async function readRecording(directory: string): Promise<Recording> {
     instanceId: manifest.instanceId,
     startedAt: manifest.startedAt,
     devices: manifest.devices,
+    linesRead,
     tornTail,
-    ended: items.at(-1)?.k === 'end',
+    ended: last?.k === 'end',
   }
 }
 

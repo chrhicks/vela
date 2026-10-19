@@ -270,6 +270,7 @@ function recordingOf(...operations: RecordedOperation[]): Recording {
     instanceId: 'instance-1',
     startedAt: at('00:00:00'),
     devices: [{ id: 'primary', kind: 'camera', indiDevice: 'Test Camera' }],
+    linesRead: operations.length,
     tornTail: false,
     ended: true,
   }
