@@ -34,7 +34,7 @@ const timestamp = z
 const savedImageFile = z.object({
   id: z.string(),
   capturedAt: timestamp,
-  capturedAtSource: z.enum(['camera', 'server-estimate']),
+  capturedAtSource: z.enum(['camera', 'server-estimate']).default('camera'),
   receivedAt: timestamp,
   exposureSeconds: z.number(),
   width: z.int(),
