@@ -693,7 +693,11 @@ describe('while the run is polled', () => {
       expect(phone.emergencies()).toHaveLength(0)
 
       phone.down = null
+      // Attempts came at 0, 1 and 3 minutes; the next is four minutes after the last.
       await vi.advanceTimersByTimeAsync(65_000)
+      expect(phone.emergencies()).toHaveLength(0)
+
+      await vi.advanceTimersByTimeAsync(3 * 60_000)
 
       expect(phone.emergencies()).toHaveLength(1)
       expect(monitor.view().phone).toEqual({ state: 'ready' })

@@ -23,12 +23,16 @@ until it is acknowledged, because Pushover does that, not Vela.
 - Overlapping alerts are separate episodes. A weaker alert that a stronger one covers
   (`stars-low`/`stars-declining` by `stars-collapsed`, `hfr-high` by `hfr-bad`, `meridian-near` by
   `meridian-imminent`) is hidden from the banner and not sent to the phone while the stronger stands.
-- An alert that failed to reach the phone is tried again once a minute, until it arrives, is
-  acknowledged or clears. That retry has its own timer, so it carries on after the run has ended:
-  a `run-failed` emergency refused during a phone outage still goes out when the phone is back.
-  The alerts view says "phone alerts failing" with the reason meanwhile. A "cleared" message is
-  only sent for an alert the phone was told about, and is sent once: it is a courtesy, and a
-  failure shows in the view without being retried.
+- An alert that failed to reach the phone is tried again, until it arrives, is acknowledged or
+  clears. The first retry comes after a minute, and each pause doubles up to five minutes. Vela
+  gives up once the next try would fall an hour (an emergency's `expire`) after the alert was raised,
+  because Pushover would have stopped repeating by then. Each alert in the alerts view carries its
+  `delivery`: `sent`, `sending`, `not-configured`, `retrying` (with `failures`, `nextAttemptAt` and
+  `giveUpAt`) or `gave-up`. The retry has its own timer, so it carries on after the run has ended:
+  a `run-failed` emergency refused during a phone outage still goes out when the phone is back, if
+  that is within the hour. The alerts view says "phone alerts failing" with the reason meanwhile.
+  A "cleared" message is only sent for an alert the phone was told about, and is sent once: it is a
+  courtesy, and a failure shows in the view without being retried.
 - If an alert clears but Pushover will not take the cancel, the emergency keeps repeating with
   nothing left in the banner. The monitor keeps retrying the cancel once a minute (until the hour
   is up) and the alerts view says phone alerts are failing until it succeeds.
