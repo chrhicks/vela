@@ -13,8 +13,11 @@ const run = promisify(execFile)
  * depend on their sibling packages and Cria commits no `dist/` for them, so they cannot be installed
  * that way. Replay therefore runs a checkout of Cria that the caller names, and refuses it unless
  * it is exactly this commit with no local changes.
+ *
+ * Not older than a182aac: before it, replay served the definitions with no device and no name that real drivers
+ * send as one malformed light, Cria dropped the connection on it, and every device of a real recording read as unavailable.
  */
-export const criaPin = '78b9e34a48bb4f8cba9bc4cc18613c74d16653d2'
+export const criaPin = 'a182aacca12fd4e6418a4f86558ffc85adaf4771'
 
 export interface CriaCheckout {
   /** Cria's `ts/` folder. */
