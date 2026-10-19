@@ -8,6 +8,10 @@ whether it was acknowledged and how the phone is getting on; the browser only pr
 - One `AlertsProvider` in the Shell polls `GET /api/web/rigs/:rigId/alerts` every second for the
   banner and the card. The rig is the route's rig; on pages without one (Home, Explore) it is the
   rig whose capture the navigation follows.
+- The provider is mounted once above the routes and keeps each rig's last view for the life of the
+  page, so switching pages during an outage cannot drop a known alert. A rig that is no longer
+  polled is marked interrupted until a fresh read lands. The poll loop belongs to its effect: one
+  loop per rig even when React sets the effect up twice.
 - A quiet rig shows no banner. If the poll fails after the server had been watching or showing
   alerts, the banner says the checks are interrupted and keeps the last view, with Acknowledge
   disabled, so silence never reads as safe.

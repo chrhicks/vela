@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import type { Page } from '@playwright/test'
+import type { Page, Route } from '@playwright/test'
 import type { AlertsView, HomeView, NavigationView, RigDetailView } from '@vela/model/web'
 import { reviewCapture } from './fixtures/fieldroom/tonight'
 
@@ -105,6 +105,14 @@ async function useRig(page: Page, initial: AlertsView) {
     set(next: AlertsView) {
       current = next
     },
+    /** The server goes away: every request fails until the returned function is called. */
+    async outage() {
+      const down = (route: Route) => route.fulfill({ status: 503, json: { error: 'Server down' } })
+
+      await page.route('**/api/**', down)
+
+      return () => page.unroute('**/api/**', down)
+    },
   }
 }
 
@@ -195,4 +203,98 @@ test('without phone keys the card says so and does not offer a test it cannot se
   await expect(card).toContainText('Not watching · starts with a capture run')
   await expect(card).toContainText('No active alerts, and nothing is being checked.')
   await expect(card.getByRole('button', { name: 'Send test' })).toBeDisabled()
+})
+
+test('a known critical alert stays on screen through navigation while the server is unreachable', async ({ page }) => {
+  const rig = await useRig(page, alertsView({ alerts: [collapsed] }))
+  const banner = page.getByRole('region', { name: 'Rig alerts' })
+
+  await page.goto('/rigs/rig-1/observe')
+  await expect(banner).toContainText('Stars dropped from about 1100 to 0')
+
+  const restore = await rig.outage()
+
+  await expect(banner).toContainText('Alert checks interrupted')
+  await expect(banner.getByRole('button', { name: /^Acknowledge/ })).toBeDisabled()
+
+  const settled = async () => {
+    await page.waitForTimeout(1500)
+    await expect(banner).toContainText('Alert checks interrupted')
+    await expect(banner).toContainText('Stars dropped from about 1100 to 0')
+    await expect(banner.getByRole('button', { name: /^Acknowledge/ })).toBeDisabled()
+  }
+
+  for (const link of ['Vela · all rigs', 'Explore the sky']) {
+    await page.getByRole('link', { name: link, exact: true }).click()
+    await settled()
+  }
+
+  for (let step = 0; step < 2; step++) {
+    await page.goBack()
+    await settled()
+  }
+
+  await expect(page).toHaveURL('/rigs/rig-1/observe')
+
+  await restore()
+  await expect(banner).not.toContainText('Alert checks interrupted')
+  await expect(banner.getByRole('button', { name: /^Acknowledge/ })).toBeEnabled()
+})
+
+test('one loop polls each rig’s alerts, however React sets the page up', async ({ page }) => {
+  const polls: number[] = []
+
+  await useRig(page, alertsView())
+  await page.route('**/api/web/rigs/rig-1/alerts', route => {
+    polls.push(Date.now())
+
+    return route.fulfill({ json: alertsView() })
+  })
+
+  await page.goto('/rigs/rig-1/observe')
+  await expect.poll(() => polls.length, { timeout: 8000 }).toBeGreaterThanOrEqual(5)
+
+  const gaps = polls.slice(1).map((at, index) => at - polls[index]!)
+
+  expect(Math.min(...gaps)).toBeGreaterThan(800)
+})
+
+test('a rig’s remembered alert is not shown as current once it is no longer being checked', async ({ page }) => {
+  await useRig(page, alertsView({ alerts: [collapsed] }))
+  await page.route('**/api/web/navigation', route =>
+    route.fulfill({
+      json: {
+        ...navigation,
+        rigs: [...navigation.rigs, { id: 'rig-2', name: 'Seestar S30' }],
+      } satisfies NavigationView,
+    }),
+  )
+  await page.route('**/api/web/rigs/rig-2/alerts', route => route.fulfill({ json: alertsView({ rigId: 'rig-2' }) }))
+
+  const banner = page.getByRole('region', { name: 'Rig alerts' })
+
+  await page.goto('/rigs/rig-1/observe')
+  await expect(banner).toContainText('Stars dropped from about 1100 to 0')
+  await expect(banner).not.toContainText('Alert checks interrupted')
+
+  await page.getByRole('combobox', { name: /Viewing rig/ }).selectOption('rig-2')
+  await expect(page).toHaveURL(/rig-2/)
+  await expect(banner).toHaveCount(0)
+
+  let release!: () => void
+  const held = new Promise<void>(resolve => (release = resolve))
+
+  await page.route('**/api/web/rigs/rig-1/alerts', async route => {
+    await held
+    await route.fulfill({ json: alertsView({ alerts: [collapsed] }) })
+  })
+
+  await page.getByRole('combobox', { name: /Viewing rig/ }).selectOption('rig-1')
+  await expect(banner).toContainText('Stars dropped from about 1100 to 0')
+  await expect(banner).toContainText('Alert checks interrupted')
+  await expect(banner.getByRole('button', { name: /^Acknowledge/ })).toBeDisabled()
+
+  release()
+  await expect(banner).not.toContainText('Alert checks interrupted')
+  await expect(banner.getByRole('button', { name: /^Acknowledge/ })).toBeEnabled()
 })

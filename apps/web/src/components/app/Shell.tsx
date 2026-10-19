@@ -26,23 +26,17 @@ export default function Shell() {
     </>
   )
 
-  const alerted = alertsRigId ? (
-    <AlertsProvider key={alertsRigId} rigId={alertsRigId}>
-      {content}
-    </AlertsProvider>
-  ) : (
-    content
-  )
-
   return (
     <div className="vela-theme vela-app min-h-screen" data-mode={mode}>
-      {rigId ? (
-        <RigObservationProvider key={rigId} rigId={rigId} paused={paused}>
-          {alerted}
-        </RigObservationProvider>
-      ) : (
-        alerted
-      )}
+      <AlertsProvider rigId={alertsRigId}>
+        {rigId ? (
+          <RigObservationProvider key={rigId} rigId={rigId} paused={paused}>
+            {content}
+          </RigObservationProvider>
+        ) : (
+          content
+        )}
+      </AlertsProvider>
     </div>
   )
 }
