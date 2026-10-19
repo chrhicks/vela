@@ -1,3 +1,4 @@
+import { constants } from 'node:fs'
 import { mkdir, open, stat } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import type { State } from '@cria/wire'
@@ -71,6 +72,8 @@ interface JournalFileOptions {
   readonly maxFileBytes?: number
   /** How long `close` waits for the disk before it drops a write that has not finished. */
   readonly closeTimeoutMs?: number
+  /** Opens the file for appending; replaceable so a test can stall the disk. */
+  readonly openFile?: typeof open
   readonly onError?: (error: Error) => void
 }
 
@@ -86,6 +89,7 @@ export function openJournalFile(
     maxPendingBytes = 4 * 1024 * 1024,
     maxFileBytes = 256 * 1024 * 1024,
     closeTimeoutMs = 2_000,
+    openFile = open,
     onError = error => console.error('Vela Cria journal:', error.message),
   }: JournalFileOptions = {},
 ): ClosableJournalSink {
@@ -95,7 +99,6 @@ export function openJournalFile(
   let writtenBytes = 0
   let sized = false
   let off = false
-  let abandoned = false
 
   function latchOff(reason: string) {
     if (off) return
@@ -140,10 +143,12 @@ export function openJournalFile(
 
           if (writtenBytes + size > maxFileBytes) return latchOff('Reached its size limit; the journal is off until restart')
 
-          const handle = await open(file, 'a', 0o600)
+          // Never block a thread on the open: a FIFO without a reader would hold its libuv worker
+          // forever, and that worker keeps the process from exiting. Without a reader it fails with ENXIO.
+          const handle = await openFile(file, constants.O_WRONLY | constants.O_APPEND | constants.O_CREAT | constants.O_NONBLOCK, 0o600)
 
           try {
-            if (abandoned) return
+            if (off) return
             await handle.appendFile(line)
             writtenBytes += size
           } finally {
@@ -168,7 +173,6 @@ export function openJournalFile(
       clearTimeout(timer)
 
       if (!flushed) {
-        abandoned = true
         latchOff('The disk stalled while closing; the unwritten entries were dropped')
       }
 

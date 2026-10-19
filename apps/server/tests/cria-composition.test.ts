@@ -1,7 +1,4 @@
-import { execFileSync } from 'node:child_process'
-import { closeSync, constants, openSync } from 'node:fs'
 import { createServer } from 'node:http'
-import { setTimeout as realDelay } from 'node:timers/promises'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -113,38 +110,4 @@ it('journals what every connection decodes, tagged with its origin, when given a
   await rm(directory, { recursive: true, force: true })
   expect(lines.slice(0, 2).map(line => [line.origin, line.kind])).toEqual([[service.origin, 'stream'], [service.origin, 'state']])
   expect(lines.filter(line => line.kind === 'state').length).toBeGreaterThan(1)
-})
-
-it('closes within a bound when the journal disk is stalled', async () => {
-  vi.useFakeTimers({ now: Date.UTC(2026, 9, 17, 3), toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date'] })
-  const directory = await mkdtemp(join(tmpdir(), 'vela-composition-journal-'))
-  const fifo = join(directory, 'cria-journal.jsonl')
-  const service = new FakeCria()
-
-  execFileSync('mkfifo', [fifo])
-
-  const composition = createEquipmentComposition(
-    [{ id: 'fixture', name: 'Fixture', url: service.origin, devices: [{ id: 'camera', kind: 'camera', expectedName: 'Fake CCD' }] }],
-    { fetch: service.fetch, criaJournalPath: fifo },
-  )
-
-  let closed = false
-
-  try {
-    composition.start()
-    await vi.advanceTimersByTimeAsync(2_500)
-    void composition.close().then(() => void (closed = true))
-
-    for (let step = 0; step < 100 && !closed; step += 1) {
-      await vi.advanceTimersByTimeAsync(100)
-      await realDelay(5)
-    }
-
-    expect(closed).toBe(true)
-  } finally {
-    closeSync(openSync(fifo, constants.O_RDWR | constants.O_NONBLOCK))
-    service.close()
-    vi.useRealTimers()
-    await rm(directory, { recursive: true, force: true })
-  }
 })
