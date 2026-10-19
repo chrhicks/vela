@@ -1,4 +1,3 @@
-import { redactText } from './redact.ts'
 import type { FrameRecord, MountSample, SavedImage, TraceSpan } from './inputs.ts'
 import { linkAttemptToFrame, linkAttemptToOperation, linkFrameToAttempt, linkFrameToSpan, linkMountAsOf, type Link, type MountLink } from './joins.ts'
 import { operationsOf, type RecordedOperation, type Recording } from './recording.ts'
