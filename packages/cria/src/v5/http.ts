@@ -26,63 +26,67 @@ export function request<S extends Decodable>(
   schema: S,
   body?: OperationRequest | RecoveryRequest,
 ): Effect.Effect<Reply<S['Type']>> {
-  const startedAt = Date.now()
+  return Effect.suspend(() => {
+    const startedAt = Date.now()
 
-  return exchange(connection, method, path, body).pipe(
-    Effect.map(exchanged => {
-      let reply: Reply<S['Type']>
+    return exchange(connection, method, path, body).pipe(
+      Effect.map(exchanged => {
+        let reply: Reply<S['Type']>
 
-      if (exchanged.kind === 'lost') reply = exchanged
-      else {
-        const text = new TextDecoder().decode(exchanged.bytes)
+        if (exchanged.kind === 'lost') reply = exchanged
+        else {
+          const text = new TextDecoder().decode(exchanged.bytes)
 
-        reply =
-          exchanged.status >= 200 && exchanged.status < 300 ? decoded(schema, text, path) : refusal(exchanged.status, text, path)
-      }
+          reply =
+            exchanged.status >= 200 && exchanged.status < 300 ? decoded(schema, text, path) : refusal(exchanged.status, text, path)
+        }
 
-      connection.journal.record({
-        kind: 'exchange',
-        at: startedAt,
-        ms: Date.now() - startedAt,
-        method,
-        route: path,
-        status: exchanged.kind === 'lost' ? null : exchanged.status,
-        command: body !== undefined && 'requestId' in body
-          ? { requestId: body.requestId, deviceId: body.deviceId, kind: body.kind, parameters: body.parameters }
-          : null,
-        reply,
-      })
+        connection.journal.record({
+          kind: 'exchange',
+          at: startedAt,
+          ms: Date.now() - startedAt,
+          method,
+          route: path,
+          status: exchanged.kind === 'lost' ? null : exchanged.status,
+          command: body !== undefined && 'requestId' in body
+            ? { requestId: body.requestId, deviceId: body.deviceId, kind: body.kind, parameters: body.parameters }
+            : null,
+          reply,
+        })
 
-      return reply
-    }),
-  )
+        return reply
+      }),
+    )
+  })
 }
 
 export function download(connection: CriaConnection, path: string): Effect.Effect<Reply<Uint8Array>> {
-  const startedAt = Date.now()
+  return Effect.suspend(() => {
+    const startedAt = Date.now()
 
-  return exchange(connection, 'GET', path, undefined).pipe(
-    Effect.map((exchanged): Reply<Uint8Array> => {
-      let reply: Reply<Uint8Array>
+    return exchange(connection, 'GET', path, undefined).pipe(
+      Effect.map((exchanged): Reply<Uint8Array> => {
+        let reply: Reply<Uint8Array>
 
-      if (exchanged.kind === 'lost') reply = exchanged
-      else if (exchanged.status === 200) reply = { kind: 'answered', body: exchanged.bytes }
-      else reply = refusal(exchanged.status, new TextDecoder().decode(exchanged.bytes), path)
+        if (exchanged.kind === 'lost') reply = exchanged
+        else if (exchanged.status === 200) reply = { kind: 'answered', body: exchanged.bytes }
+        else reply = refusal(exchanged.status, new TextDecoder().decode(exchanged.bytes), path)
 
-      connection.journal.record({
-        kind: 'exchange',
-        at: startedAt,
-        ms: Date.now() - startedAt,
-        method: 'GET',
-        route: path,
-        status: exchanged.kind === 'lost' ? null : exchanged.status,
-        command: null,
-        reply: reply.kind === 'answered' ? { kind: 'answered', body: { bytes: reply.body.byteLength } } : reply,
-      })
+        connection.journal.record({
+          kind: 'exchange',
+          at: startedAt,
+          ms: Date.now() - startedAt,
+          method: 'GET',
+          route: path,
+          status: exchanged.kind === 'lost' ? null : exchanged.status,
+          command: null,
+          reply: reply.kind === 'answered' ? { kind: 'answered', body: { bytes: reply.body.byteLength } } : reply,
+        })
 
-      return reply
-    }),
-  )
+        return reply
+      }),
+    )
+  })
 }
 
 type Exchanged =

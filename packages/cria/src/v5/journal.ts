@@ -1,4 +1,4 @@
-import { appendFile, mkdir } from 'node:fs/promises'
+import { appendFile, mkdir, stat } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import type { State } from '@cria/wire'
 
@@ -67,14 +67,14 @@ export const noJournal: Journal = { record() {} }
 interface JournalFileOptions {
   /** Serialized entries waiting for the disk. */
   readonly maxPendingBytes?: number
-  /** Bytes this process may append before it stops. */
+  /** Size the file may reach, counting what it held when the process opened it. */
   readonly maxFileBytes?: number
   readonly onError?: (error: Error) => void
 }
 
 /**
  * Appends one JSON line per entry. The first write failure, a backlog above `maxPendingBytes` or
- * `maxFileBytes` appended turns it off until the process restarts, so a line is never half written
+ * `maxFileBytes` in the file turns it off until the process restarts, so a line is never half written
  * in the middle of the file and a slow disk never holds memory or delays the client.
  */
 export function openJournalFile(
@@ -89,6 +89,7 @@ export function openJournalFile(
   let pending = Promise.resolve()
   let pendingBytes = 0
   let writtenBytes = 0
+  let sized = false
   let off = false
 
   function latchOff(reason: string) {
@@ -123,6 +124,16 @@ export function openJournalFile(
         .then(async () => {
           if (off) return
           await mkdir(dirname(file), { recursive: true })
+
+          if (!sized) {
+            writtenBytes = await stat(file).then(
+              info => info.size,
+              error => (error.code === 'ENOENT' ? 0 : Promise.reject(error)),
+            )
+            sized = true
+          }
+
+          if (writtenBytes + size > maxFileBytes) return latchOff('Reached its size limit; the journal is off until restart')
           await appendFile(file, line, { mode: 0o600 })
           writtenBytes += size
         })

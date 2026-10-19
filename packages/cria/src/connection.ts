@@ -41,13 +41,28 @@ export function outcomeOf<A>(work: Effect.Effect<A, Ending>, signal?: AbortSigna
   return Effect.runPromise(settle(work), signal ? { signal, uninterruptible: true } : { uninterruptible: true })
 }
 
-/** Names the Cria each entry came from, and keeps a failing journal from reaching the client. */
+/**
+ * Names the Cria each entry came from, and keeps a failing sink from reaching the client. A sink
+ * that throws, or returns a promise that rejects, is dropped for good.
+ */
 function originated(origin: string, sink: JournalSink): Journal {
+  let failed = false
+
+  function drop() {
+    failed = true
+  }
+
   return {
     record(entry) {
+      if (failed) return
+
       try {
-        sink.record({ ...entry, origin })
-      } catch {}
+        const returned: unknown = sink.record({ ...entry, origin })
+
+        if (returned instanceof Promise) returned.catch(drop)
+      } catch {
+        drop()
+      }
     },
   }
 }

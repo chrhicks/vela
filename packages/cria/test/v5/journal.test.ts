@@ -35,8 +35,8 @@ afterEach(async () => {
   await rm(directory, { recursive: true, force: true })
 })
 
-async function open(journal: JournalSink) {
-  const connection = createCriaConnection({ origin: cria.origin, token, fetch: cria.fetch, journal })
+async function open(journal: JournalSink, fetch: typeof globalThis.fetch = cria.fetch) {
+  const connection = createCriaConnection({ origin: cria.origin, token, fetch, journal })
   const equipment = createCriaEquipment(connection, bindings)
 
   closers.push(() => connection.close())
@@ -115,7 +115,75 @@ describe('what the journal keeps of one exposure', () => {
   })
 })
 
+describe('what the journal keeps of a retried download and of closing', () => {
+  it('keeps the verdict and the own start time of every download attempt', async () => {
+    const { entries, sink } = memory()
+    let damaged = false
+
+    const equipment = await open(sink, async (input, init) => {
+      const response = await cria.fetch(input, init)
+
+      if (damaged || !new Request(input, init).url.endsWith('/original')) return response
+      damaged = true
+
+      return new Response(new Uint8Array((await response.arrayBuffer()).byteLength), { status: 200 })
+    })
+
+    await exposeOnce(equipment)
+
+    expect(entries.flatMap(entry => (entry.kind === 'image' ? [entry.verdict] : []))).toEqual(['damaged', 'intact'])
+
+    const downloads = entries.flatMap(entry => (entry.kind === 'exchange' && entry.route.endsWith('/original') ? [entry] : []))
+
+    expect(downloads).toHaveLength(2)
+    expect(downloads[1]!.at).toBeGreaterThan(downloads[0]!.at)
+    expect(downloads[1]!.ms).toBeLessThan(500)
+  })
+
+  it('records the end of the stream when the connection closes', async () => {
+    const { entries, sink } = memory()
+    const connection = createCriaConnection({ origin: cria.origin, token, fetch: cria.fetch, journal: sink })
+
+    connection.start()
+    await vi.advanceTimersByTimeAsync(10)
+    await connection.close()
+
+    expect(entries.filter(entry => entry.kind === 'stream').map(entry => entry.event)).toEqual(['opened', 'ended'])
+  })
+})
+
 describe('a journal that fails or stalls', () => {
+  it('drops a sink whose promise rejects instead of letting it reach the process', async () => {
+    const calls = vi.fn()
+
+    const equipment = await open({
+      async record(entry) {
+        calls(entry.kind)
+        throw new Error('async sink failed')
+      },
+    })
+
+    const frame = await exposeOnce(equipment)
+
+    expect(frame).toMatchObject({ width: 4, height: 3 })
+    expect(calls).toHaveBeenCalledTimes(1)
+  })
+
+  it('counts what the file already holds toward its size limit across restarts', async () => {
+    const path = join(directory, 'journal.jsonl')
+    const onError = vi.fn()
+
+    await writeFile(path, 'x'.repeat(100))
+    const journal = openJournalFile(path, { maxFileBytes: 150, onError })
+
+    journal.record({ kind: 'stream', at: 1, event: 'opened', message: null, origin: cria.origin })
+    journal.record({ kind: 'stream', at: 2, event: 'ended', message: 'x'.repeat(100), origin: cria.origin })
+    await journal.close()
+
+    expect((await readFile(path, 'utf8')).length).toBeLessThanOrEqual(150)
+    expect(onError).toHaveBeenCalledTimes(1)
+  })
+
   it('leaves the exposure and the stream as they are when the journal throws', async () => {
     const equipment = await open({
       record() {

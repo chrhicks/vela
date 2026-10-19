@@ -164,11 +164,6 @@ export function openSession(connection: CriaConnection): Effect.Effect<Session, 
       }
 
       return download(connection, image.original.url).pipe(
-        Effect.repeat({
-          until: reply => reply.kind === 'refused' || (reply.kind === 'answered' && intact(reply.body)),
-          times: 2,
-          schedule: Schedule.spaced('500 millis'),
-        }),
         Effect.tap(reply =>
           Effect.sync(() =>
             connection.journal.record({
@@ -182,6 +177,11 @@ export function openSession(connection: CriaConnection): Effect.Effect<Session, 
             }),
           ),
         ),
+        Effect.repeat({
+          until: reply => reply.kind === 'refused' || (reply.kind === 'answered' && intact(reply.body)),
+          times: 2,
+          schedule: Schedule.spaced('500 millis'),
+        }),
         Effect.flatMap((reply): Effect.Effect<Uint8Array | 'gone', Failed> => {
           if (reply.kind === 'refused' && reply.code === 'image-gone') return Effect.succeed('gone')
 
@@ -265,6 +265,9 @@ function subscribe(
   })
 
   return Effect.scoped(connected).pipe(
+    Effect.onInterrupt(() =>
+      Effect.sync(() => connection.journal.record({ kind: 'stream', at: Date.now(), event: 'ended', message: 'Vela closed the connection' })),
+    ),
     Effect.catch(message => Effect.succeed(`Cria is unreachable: ${message}`)),
     Effect.flatMap(ended),
     Effect.andThen(Effect.sleep(reconnectEvery)),
