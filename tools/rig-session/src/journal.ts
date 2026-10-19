@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { jsonText, linesOf, type ReadResult, type Skipped } from './inputs.ts'
-import { Secrets } from './sanitize.ts'
+import { Secrets, type Json } from './sanitize.ts'
 
 const epochMs = z.number().transform(ms => new Date(ms))
 
@@ -29,13 +29,30 @@ const imageCheck = z.object({
   verdict: z.enum(['intact', 'damaged', 'gone', 'failed']),
 })
 
-const entry = z.discriminatedUnion('kind', [exchange, imageCheck])
+const stateChange = z.object({
+  kind: z.literal('state'),
+  at: epochMs,
+  generatedAt: epochMs,
+  sequence: z.int(),
+  instanceId: z.string(),
+  baseline: z.boolean(),
+  changed: z.record(z.string(), z.json()),
+  removed: z.array(z.string()),
+})
+
+const stream = z.object({ kind: z.literal('stream'), at: epochMs, event: z.enum(['opened', 'ended']), message: z.string().nullable() })
+
+const entry = z.discriminatedUnion('kind', [exchange, imageCheck, stateChange, stream])
 
 export type JournalEntry = z.infer<typeof entry>
 
 export type JournalExchange = z.infer<typeof exchange>
 
 export type JournalImageCheck = z.infer<typeof imageCheck>
+
+export type JournalStateChange = z.infer<typeof stateChange>
+
+export type JournalStream = z.infer<typeof stream>
 
 /** Lines that fail to decode are listed, but not without end: a journal of garbage must not fill the heap. */
 const maxSkippedListed = 1000
@@ -47,7 +64,17 @@ export interface JournalReadOptions {
   readonly secrets?: Secrets
 }
 
-const entryKinds = new Set<string>(['exchange', 'image'])
+/** A mount reports the site as readings; learn them so they are removed wherever they occur, even from a cell nobody lists. */
+function learnFromReadings(changed: Readonly<Record<string, Json>>, secrets: Secrets): void {
+  for (const [cell, reading] of Object.entries(changed)) {
+    const kind = /readings\.(latitude|longitude|elevation)/.exec(cell)?.[1]
+    const value = z.looseObject({ value: z.number() }).safeParse(reading)
+
+    if (value.success && (kind === 'latitude' || kind === 'longitude' || kind === 'elevation')) secrets.addCoordinate(kind, value.data.value)
+  }
+}
+
+const entryKinds = new Set<string>(['exchange', 'image', 'state', 'stream'])
 
 /**
  * Reads Vela's Cria journal (`cria-journal.jsonl`) as a stream, so a journal larger than memory builds in
@@ -96,7 +123,11 @@ export async function readJournal(path: string, { inWindow = () => true, secrets
     const parsed = entry.safeParse(json.data)
 
     if (!parsed.success) skip(where, z.prettifyError(parsed.error))
-    else if (inWindow(parsed.data.at)) items.push(parsed.data)
+    else {
+      if (parsed.data.kind === 'state') learnFromReadings(parsed.data.changed, secrets)
+
+      if (inWindow(parsed.data.at)) items.push(parsed.data)
+    }
   }
 
   if (notListed > 0) skipped.push({ where: path, reason: `${notListed} more lines did not decode and are not listed` })

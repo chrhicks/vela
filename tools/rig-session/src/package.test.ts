@@ -24,9 +24,9 @@ const leakyRow = (name: TableName): Record<string, Cell> =>
   )
 
 /** Naming each table keeps this test honest: a table added to the schema is a type error here until it is covered. */
-const emptyTables = (): TableRows => ({ frames: [], attempts: [], mount: [], spans: [], indi_ops: [], indi_events: [], indi_images: [], cria_requests: [], cria_image_checks: [] })
+const emptyTables = (): TableRows => ({ frames: [], attempts: [], mount: [], spans: [], indi_ops: [], indi_events: [], indi_images: [], cria_requests: [], cria_image_checks: [], cria_state_changes: [], cria_stream: [] })
 
-const leakyTables = (): TableRows => ({ frames: [leakyRow('frames')], attempts: [leakyRow('attempts')], mount: [leakyRow('mount')], spans: [leakyRow('spans')], indi_ops: [leakyRow('indi_ops')], indi_events: [leakyRow('indi_events')], indi_images: [leakyRow('indi_images')], cria_requests: [leakyRow('cria_requests')], cria_image_checks: [leakyRow('cria_image_checks')] })
+const leakyTables = (): TableRows => ({ frames: [leakyRow('frames')], attempts: [leakyRow('attempts')], mount: [leakyRow('mount')], spans: [leakyRow('spans')], indi_ops: [leakyRow('indi_ops')], indi_events: [leakyRow('indi_events')], indi_images: [leakyRow('indi_images')], cria_requests: [leakyRow('cria_requests')], cria_image_checks: [leakyRow('cria_image_checks')], cria_state_changes: [leakyRow('cria_state_changes')], cria_stream: [leakyRow('cria_stream')] })
 
 function secrets() {
   const learned = new Secrets()
