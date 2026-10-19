@@ -1,3 +1,4 @@
+import { redactText } from './redact.ts'
 import type { FrameRecord, MountSample, SavedImage, TraceSpan } from './inputs.ts'
 import { linkAttemptToFrame, linkFrameToAttempt, linkFrameToSpan, linkMountAsOf, type Link, type MountLink } from './joins.ts'
 import type { AttemptRow, FrameRow, LinkKind, MountRow, SpanRow, Tables } from './schema.ts'
@@ -118,7 +119,7 @@ function attemptRow(session: string, record: FrameRecord, frameLink: Link<SavedI
     settled_at: record.settledAt,
     exposure_seconds: record.exposureSeconds,
     outcome: record.outcome,
-    message: record.message,
+    message: record.message === null ? null : redactText(record.message),
     request_id: record.requestId,
     operation_id: record.operationId,
     cria_image_id: record.criaImageId,
