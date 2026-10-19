@@ -27,6 +27,7 @@ import { registerAlerts, type AlertsOptions } from './alerts/routes.js'
 import { mountReaderFor } from './alerts/mount.js'
 import { defaultThresholds } from './alerts/thresholds.js'
 import { noFrameRecords, type FrameRecords } from './capture/frame-records.js'
+import { frameImaging, type FrameImaging } from './imaging/frame-imaging.js'
 import { registerAutofocus } from './autofocus/routes.js'
 import { registerNavigation } from './navigation.js'
 import { registerImagingCamera } from './rig/imaging-camera.js'
@@ -43,6 +44,7 @@ interface BuildAppOptions {
   readonly surveyCache?: SurveyCache
   readonly savedImages?: SavedImageStore
   readonly frameRecords?: FrameRecords
+  readonly images?: FrameImaging
   readonly alignment?: AlignmentSettings
   readonly alerts?: Pick<AlertsOptions, 'thresholds' | 'notifier' | 'now'>
   readonly alpacaDiscovery?: AlpacaDiscovery
@@ -64,6 +66,7 @@ interface AddRigRequest {
 export function buildApp({
   targets,
   surveyCache,
+  images = frameImaging,
   alignment,
   alerts: alertSettings = { thresholds: defaultThresholds, notifier: null },
   equipment = createEquipmentComposition(),
@@ -106,6 +109,7 @@ export function buildApp({
     createCooling: settings => equipment.createCooling(settings.rig),
     savedImages,
     frameRecords,
+    images,
     lookupSubject(targetId) {
       const target = getTarget(targetId)
 
@@ -130,6 +134,7 @@ export function buildApp({
     createInspector,
     createAdapter: equipment.createFraming,
     createAcquisition: equipment.createAcquisition,
+    images,
     now,
   })
   registerSurvey(app, surveyCache ?? createSurveyCache())
