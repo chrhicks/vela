@@ -12,6 +12,15 @@ export interface CaptureImageStatistics {
   medianHfrPixels: number | null
 }
 
+/** The rig service's own ids for the request, operation and image that produced a frame. */
+export interface CaptureImageProvenance {
+  requestId: string
+  /** Null when the rig service never admitted the request. */
+  operationId: string | null
+  /** Null until the operation produced an image. */
+  imageId: string | null
+}
+
 /** Metadata belongs to this image, independent of any subsequent exposure. */
 export interface CaptureImage {
   id: string
@@ -34,6 +43,8 @@ export interface CaptureImage {
   statistics: CaptureImageStatistics | null
   /** Original data and preview have both been durably saved. */
   saved: boolean
+  /** Absent on legacy artifacts, so unknown; null means the camera adapter carries no ids (Alpaca). */
+  provenance?: CaptureImageProvenance | null
 }
 
 export interface SavedImage extends CaptureImage {

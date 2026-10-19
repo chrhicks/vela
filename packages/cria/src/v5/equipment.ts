@@ -2,7 +2,7 @@ import { Effect } from 'effect'
 import { Failed, type Ending, type ExternalRecovery } from '@cria/primitives'
 import type { HaltKind, OperationResult, ParamsOf } from '@cria/wire'
 import type { RecoveryToken } from './holds.js'
-import { capture, halt, remoteOperation, type Exposed, type Motion, type Target } from './operation.js'
+import { capture, halt, remoteOperation, type Exposed, type Motion, type Observe, type Target } from './operation.js'
 import { holdsOf, recover, type Hold, type Recovered } from './recovery.js'
 import type { Received, Session } from './session.js'
 
@@ -18,7 +18,7 @@ export interface CriaEquipment {
   readonly received: Effect.Effect<Received>
   readonly holds: Effect.Effect<ReadonlyArray<RigHold>>
   readonly run: (deviceId: string, command: Motion) => Effect.Effect<OperationResult, Ending>
-  readonly capture: (deviceId: string, parameters: ParamsOf<'capture'>) => Effect.Effect<Exposed, Ending>
+  readonly capture: (deviceId: string, parameters: ParamsOf<'capture'>, observe?: Observe) => Effect.Effect<Exposed, Ending>
   readonly halt: (deviceId: string, kind: HaltKind) => Effect.Effect<void, Ending>
   readonly recover: (token: RecoveryToken, recovery: ExternalRecovery) => Effect.Effect<Recovered, Failed>
 }
@@ -44,7 +44,7 @@ export function createCriaEquipment(session: Session, bindings: ReadonlyArray<Cr
       ),
     ),
     run: (deviceId, command) => Effect.flatMap(bound(deviceId), target => remoteOperation(session, target, command)),
-    capture: (deviceId, parameters) => Effect.flatMap(bound(deviceId), target => capture(session, target, parameters)),
+    capture: (deviceId, parameters, observe) => Effect.flatMap(bound(deviceId), target => capture(session, target, parameters, observe)),
     halt: (deviceId, kind) => Effect.flatMap(bound(deviceId), target => halt(session, target, kind)),
     recover: (token, recovery) => recover(session, token, recovery),
   }

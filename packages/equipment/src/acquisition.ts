@@ -16,6 +16,17 @@ export interface Frame {
   color: FrameColor
 }
 
+/**
+ * Which request, operation and image an adapter says one exposure came from. An adapter whose
+ * protocol hands out no such ids reports nothing. An id is null until the adapter learns it, and
+ * stays null when the exposure ends before it exists.
+ */
+export interface CaptureProvenance {
+  requestId: string
+  operationId: string | null
+  imageId: string | null
+}
+
 export interface CaptureOptions {
   cameraId: string
   /** Confirm the operational camera name when a driver slot can host different hardware. */
@@ -30,6 +41,8 @@ export interface CaptureOptions {
   onExposureRequested?: () => void
   /** Observation of this acknowledged exposure is interrupted; no new exposure is started. */
   onReadState?: (state: 'retrying' | 'current') => void
+  /** Called each time the adapter learns another id of this exposure, including when it then fails. */
+  onProvenance?: (provenance: CaptureProvenance) => void
 }
 
 export interface Pointing {
