@@ -16,7 +16,9 @@
     "test": "pnpm --filter @vela/model --filter @vela/cria --filter @vela/rig-session test:types && vitest run apps packages tools/oxlint tools/rig-session",
     "start": "pnpm --filter @vela/server start",
     "lint": "oxlint",
-    "check": "pnpm lint && pnpm test && pnpm build"
+    "check": "pnpm lint && pnpm test && pnpm build",
+    "replay": "pnpm --filter @vela/server... build && pnpm --filter @vela/rig-session replay",
+    "scenarios": "vitest run --config tools/rig-session/vitest.scenarios.mts"
   },
   "devDependencies": {
     "@oxlint/plugins": "1.82.0",
