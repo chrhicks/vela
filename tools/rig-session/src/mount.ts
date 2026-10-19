@@ -1,4 +1,4 @@
-import { attributesOf, elementsOf } from './indi.ts'
+import { attributesOf, elementsOf } from './wire.ts'
 import type { MountSample } from './inputs.ts'
 import type { RecordedDevice, RecordedLine } from './recording.ts'
 import { localSiderealHours } from './replay/sidereal.ts'
@@ -19,37 +19,80 @@ interface MountState {
 
 const on = (elements: Readonly<Record<string, string>>) => Object.entries(elements).find(([, value]) => value === 'On')?.[0] ?? null
 
+const emptyState = (): MountState => ({ raHours: null, decDegrees: null, slewing: null, tracking: null, parked: null, pierSide: null, trackMode: null, eastLongitudeDegrees: null })
+
 /**
  * The mount's readings over time, from the standard INDI telescope properties of the recording's
  * first mount: a sample whenever position, slewing (the position property is Busy), tracking, park,
  * pier side or track mode changes. Cria's mount has no `TIME_LST`, so sidereal time comes from the
- * recorded longitude and the time of the message; without a longitude it is null. A sample is valid until the connection closes, a gap or the end. Two changes in one
+ * recorded longitude and the time of the message; without a longitude it is null. Two changes in one
  * millisecond make one sample, the later one, because sample times are unique.
+ *
+ * The driver reports only changes, so a sample holds until the evidence is lost, and then it stops
+ * (`validUntil`) and what was accumulated is forgotten: a later message starts from nothing and a sample
+ * never carries a field from before the loss. Evidence is lost when a connection that carried the mount
+ * closes, at a gap or the end, when the mount's `CONNECTION` turns off, when its properties are
+ * deleted, and at the last line read of a recording that did not end cleanly (damage, a torn tail, a
+ * recording still being written): `finish` is told where.
  */
-export function mountSamplesOf(lines: readonly RecordedLine[], devices: readonly RecordedDevice[]): MountSample[] {
-  const indiDevice = devices.find(device => device.kind === 'mount')?.indiDevice
+export class MountTracker {
+  readonly #indiDevice: string | undefined
+  readonly #samples: Mutable<MountSample>[] = []
+  readonly #connections = new Set<number>()
+  #state = emptyState()
+  #open = 0
 
-  const state: MountState = { raHours: null, decDegrees: null, slewing: null, tracking: null, parked: null, pierSide: null, trackMode: null, eastLongitudeDegrees: null }
-  const samples: Mutable<MountSample>[] = []
+  constructor(devices: readonly RecordedDevice[]) {
+    this.#indiDevice = devices.find(device => device.kind === 'mount')?.indiDevice
+  }
 
-  let open = 0
+  accept(line: RecordedLine): void {
+    if (line.k === 'gap' || line.k === 'end') this.#lose(line.at)
+    else if (line.k === 'conn' && line.status === 'closed' && this.#connections.delete(line.conn) && this.#connections.size === 0) this.#lose(line.at)
+    else if (line.k === 'msg' && line.dir === 'in') this.#message(line)
+  }
 
-  for (const line of lines) {
-    if (line.k === 'gap' || line.k === 'end' || (line.k === 'conn' && line.status === 'closed')) {
-      for (const sample of samples.slice(open)) sample.validUntil = line.at
+  /** The samples. `evidenceEndsAt` is the last line read when the recording did not end cleanly, else null. */
+  finish(evidenceEndsAt: Date | null): MountSample[] {
+    if (evidenceEndsAt !== null) this.#lose(evidenceEndsAt)
 
-      open = samples.length
+    return this.#samples
+  }
+
+  /** The samples held so far stop being in force at `at`, and nothing accumulated is kept. */
+  #lose(at: Date): void {
+    for (const sample of this.#samples.slice(this.#open)) sample.validUntil = at
+
+    this.#open = this.#samples.length
+    this.#state = emptyState()
+    this.#connections.clear()
+  }
+
+  #message(line: Extract<RecordedLine, { k: 'msg' }>): void {
+    const deleted = /^\s*<delProperty\b([^>]*?)\/?>/.exec(line.xml)
+
+    if (deleted !== null) {
+      if (attributesOf(deleted[1] ?? '').device === this.#indiDevice) this.#lose(line.at)
+
+      return
     }
-
-    if (line.k !== 'msg' || line.dir !== 'in') continue
 
     const root = /^\s*<(def|set)\w+Vector\b([^>]*?)>/.exec(line.xml)
     const { device, name, state: propertyState } = attributesOf(root?.[2] ?? '')
 
-    if (root === null || device !== indiDevice || name === undefined) continue
+    if (root === null || device !== this.#indiDevice || name === undefined) return
 
+    this.#connections.add(line.conn)
+
+    const state = this.#state
     const before = JSON.stringify({ ...state, eastLongitudeDegrees: null })
     const elements = elementsOf(line.xml)
+
+    if (name === 'CONNECTION' && on(elements) === 'DISCONNECT') {
+      this.#lose(line.at)
+
+      return
+    }
 
     if (name === 'EQUATORIAL_EOD_COORD') {
       state.raHours = elements.RA === undefined ? state.raHours : Number(elements.RA)
@@ -61,7 +104,7 @@ export function mountSamplesOf(lines: readonly RecordedLine[], devices: readonly
     else if (name === 'TELESCOPE_TRACK_MODE') state.trackMode = on(elements)?.replace(/^TRACK_/, '').toLowerCase() ?? null
     else if (name === 'GEOGRAPHIC_COORD' && elements.LONG !== undefined) state.eastLongitudeDegrees = Number(elements.LONG)
 
-    if (JSON.stringify({ ...state, eastLongitudeDegrees: null }) === before || state.raHours === null || state.decDegrees === null) continue
+    if (JSON.stringify({ ...state, eastLongitudeDegrees: null }) === before || state.raHours === null || state.decDegrees === null) return
 
     const sample: MountSample = {
       source: 'indi',
@@ -77,13 +120,20 @@ export function mountSamplesOf(lines: readonly RecordedLine[], devices: readonly
       trackMode: state.trackMode,
     }
 
-    if (samples.at(-1)?.sampledAt.getTime() === line.at.getTime()) {
-      samples.pop()
-      open = Math.min(open, samples.length)
+    if (this.#samples.at(-1)?.sampledAt.getTime() === line.at.getTime()) {
+      this.#samples.pop()
+      this.#open = Math.min(this.#open, this.#samples.length)
     }
 
-    samples.push(sample)
+    this.#samples.push(sample)
   }
+}
 
-  return samples
+/** The samples of a run of lines. `evidenceEndsAt` is where the evidence stops if the run did not end cleanly. */
+export function mountSamplesOf(lines: readonly RecordedLine[], devices: readonly RecordedDevice[], evidenceEndsAt: Date | null = null): MountSample[] {
+  const tracker = new MountTracker(devices)
+
+  for (const line of lines) tracker.accept(line)
+
+  return tracker.finish(evidenceEndsAt)
 }

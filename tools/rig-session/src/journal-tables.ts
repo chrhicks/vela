@@ -2,7 +2,7 @@ import { linkToAttempt, linkToOperation, type Link } from './joins.ts'
 import type { JournalEntry, JournalExchange, JournalImageCheck, JournalStateChange, JournalStream } from './journal.ts'
 import type { FrameRecord } from './inputs.ts'
 import type { RecordedOperation } from './recording.ts'
-import { redactedJson, redactText, type Json } from './redact.ts'
+import type { Json } from './sanitize.ts'
 import type { CriaImageCheckRow, CriaRequestRow, CriaStateChangeRow, CriaStreamRow } from './schema.ts'
 import { z } from 'zod'
 
@@ -23,6 +23,57 @@ export interface JournalRows {
 
 const operationCell = /^operation\/(.+)$/
 
+/**
+ * The readings and device fields whose cells are exported. A state cell carries whatever Cria's device
+ * reports, and that includes the site (a mount's latitude, longitude, elevation and sidereal time) and
+ * the device's own name, so the list is of what is known to be safe; a field Cria adds later is not
+ * exported until someone adds it here.
+ */
+const exportedReadings: ReadonlySet<string> = new Set([
+  'connected',
+  'activity',
+  'temperatureC',
+  'setpointC',
+  'coolerOn',
+  'coolerPowerPercent',
+  'binX',
+  'binY',
+  'width',
+  'height',
+  'startX',
+  'startY',
+  'gain',
+  'offset',
+  'rightAscensionHours',
+  'declinationDegrees',
+  'slewing',
+  'tracking',
+  'parked',
+  'trackingRate',
+  'pierSide',
+  'coordinateSystem',
+  'position',
+  'moving',
+  'absolute',
+  'humidityPercent',
+  'dewPointC',
+  'pressureHpa',
+  'skyTemperatureC',
+])
+
+const exportedDeviceFields: ReadonlySet<string> = new Set(['availability', 'quarantine', 'lastCommandedSetpointC'])
+
+/** Whether a state cell is exported: any operation, and the device cells on the lists above. */
+export function isExportedCell(cell: string): boolean {
+  if (operationCell.test(cell)) return true
+
+  const field = /^device\/[^/]+\/(.+)$/.exec(cell)?.[1]
+
+  if (field === undefined) return false
+
+  return field.startsWith('readings.') ? exportedReadings.has(field.slice('readings.'.length)) : exportedDeviceFields.has(field)
+}
+
 /** A cell's value for the table. An operation's outcome value is dropped, as in `indi_ops`: device setup puts the site in it. */
 function cellValue(cell: string, value: Json): Json {
   const operation = operationCell.test(cell) ? z.record(z.string(), z.json()).safeParse(value) : null
@@ -31,10 +82,10 @@ function cellValue(cell: string, value: Json): Json {
   if (operation?.success && outcome?.success) {
     const { value: _dropped, ...kept } = outcome.data
 
-    return redactedJson({ ...operation.data, outcome: kept })
+    return { ...operation.data, outcome: kept }
   }
 
-  return redactedJson(value)
+  return value
 }
 
 /** One row per cell a snapshot changed or removed, with the device or operation its key names. */
@@ -42,7 +93,7 @@ function stateRows(session: string, change: JournalStateChange, operations: read
   const cells = [
     ...Object.entries(change.changed).map(([cell, value]) => ({ cell, value: cellValue(cell, value), removed: false })),
     ...change.removed.map(cell => ({ cell, value: null, removed: true })),
-  ]
+  ].filter(({ cell }) => isExportedCell(cell))
 
   const linked: RecordedOperation[] = []
 
@@ -129,15 +180,15 @@ export function journalRows(
         at: request.at,
         ms: request.ms,
         method: request.method,
-        route: redactText(request.route),
+        route: request.route,
         status: request.status,
         request_id: request.command?.requestId ?? null,
         device_id: request.command?.deviceId ?? null,
         kind: request.command?.kind ?? null,
-        parameters: request.command ? JSON.stringify(redactedJson(request.command.parameters ?? null)) : null,
+        parameters: request.command ? JSON.stringify(request.command.parameters ?? null) : null,
         reply_kind: request.reply.kind,
         reply_code: request.reply.kind === 'refused' ? request.reply.code : null,
-        reply_message: request.reply.kind === 'answered' ? null : redactText(request.reply.message),
+        reply_message: request.reply.kind === 'answered' ? null : request.reply.message,
         operation_id: operationId,
         ...operationColumns(operation),
         ...attemptColumns(attempt),
@@ -162,7 +213,7 @@ export function journalRows(
       }
     }),
     stateChanges: states.flatMap(({ rows }) => rows),
-    streamEvents: streams.map(event => ({ session, at: event.at, event: event.event, message: event.message === null ? null : redactText(event.message) })),
+    streamEvents: streams.map(event => ({ session, at: event.at, event: event.event, message: event.message })),
     linkedAttempts: [...requestLinks, ...checkLinks].flatMap(({ attempt }) => targets(attempt)),
     linkedOperations: [...[...requestLinks, ...checkLinks].flatMap(({ operation }) => targets(operation)), ...states.flatMap(({ linked }) => linked)],
   }
