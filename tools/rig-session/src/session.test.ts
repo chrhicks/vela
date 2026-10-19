@@ -114,6 +114,13 @@ async function syntheticNight() {
     msgLine(2, '2030-01-01T01:01:02Z', 'in', '<setNumberVector device="Test Camera" name="CCD_EXPOSURE" state="Busy"><oneNumber name="CCD_EXPOSURE_VALUE">50</oneNumber></setNumberVector>'),
     msgLine(3, '2030-01-01T01:01:03Z', 'in', '<setNumberVector device="Test Camera" name="CCD_EXPOSURE" state="Busy"><oneNumber name="CCD_EXPOSURE_VALUE">50</oneNumber></setNumberVector>'),
     msgLine(4, '2030-01-01T01:01:30Z', 'in', '<message device="Test Camera" timestamp="2030-01-01T01:01:30" message="[ERROR] Cooler fault at LAT=12.5 on /dev/ttyUSB0"/>'),
+    ...[
+      ['01:01:54', 5],
+      ['01:02:40', 6],
+      ['01:02:50', 7],
+    ].map(([time, n]) =>
+      msgLine(Number(n), `2030-01-01T${time}Z`, 'in', `<setBLOBVector device="Test Camera" name="CCD1" state="Ok"><oneBLOB name="CCD1" size="5100" format=".fits" len="5100" ref="blobs/1-${n}-0.blob"/></setBLOBVector>`, [`blobs/1-${n}-0.blob`]),
+    ),
     { k: 'end', t: 1, at: Date.parse('2030-01-01T01:10:00Z') },
   ))
 
@@ -169,9 +176,10 @@ test('session.json lists the inputs it found and the ones it lacks', async () =>
     ['indi-recording', 'found'],
     ['frame-records', 'found'],
   ])
-  expect(summary.rows).toEqual({ frames: 3, attempts: 3, indi_ops: 5, indi_events: 6, mount: 3, spans: 3 })
+  expect(summary.rows).toEqual({ frames: 3, attempts: 3, indi_ops: 5, indi_events: 9, indi_images: 3, mount: 3, spans: 3 })
   expect(summary.links.frame_to_span).toEqual({ exact: 0, inferred: 3, ambiguous: 0, none: 0 })
   expect(summary.links.frame_to_attempt).toEqual({ exact: 3, inferred: 0, ambiguous: 0, none: 0 })
+  expect(summary.links.frame_to_blob).toEqual({ exact: 0, inferred: 1, ambiguous: 1, none: 1 })
   expect(summary.links.frame_to_operation).toEqual({ exact: 3, inferred: 0, ambiguous: 0, none: 0 })
   expect(summary.recording).toMatchObject({ name: 'recording', instanceId: 'instance-1', ended: true, tornTail: false, gaps: 0 })
 })
@@ -201,6 +209,7 @@ test('a build that fails part way leaves the previous package readable, and the 
     attempts: [],
     indi_ops: [],
     indi_events: [],
+    indi_images: [],
     mount: [],
     spans: [
       {
@@ -316,6 +325,7 @@ test('a query lists the writes and errors during a frame\'s exposure with the op
     { kind: 'write', direction: 'out', property: 'CCD_EXPOSURE', state: null, operation_id: 'operation-0', operation_link: 'inferred' },
     { kind: 'update', direction: 'in', property: 'CCD_EXPOSURE', state: 'Busy', operation_id: 'operation-0', operation_link: 'inferred' },
     { kind: 'message', direction: 'in', property: null, state: null, operation_id: 'operation-0', operation_link: 'inferred' },
+    { kind: 'update', direction: 'in', property: 'CCD1', state: 'Ok', operation_id: 'operation-0', operation_link: 'inferred' },
   ])
   session.close()
 })
@@ -333,6 +343,27 @@ test('no event holds the site, a serial path or the values of the properties tha
   expect(await session.rows("SELECT property, values FROM indi_events WHERE property IN ('GEOGRAPHIC_COORD', 'DEVICE_PORT') ORDER BY property")).toEqual([
     { property: 'DEVICE_PORT', values: '{"*":"[redacted]"}' },
     { property: 'GEOGRAPHIC_COORD', values: '{"*":"[redacted]"}' },
+  ])
+  session.close()
+})
+
+test('a query finds the camera image of each frame: one image in the operation window is inferred, two are ambiguous, none is null', async () => {
+  const night = await syntheticNight()
+  const root = join(night.dir, 'out')
+
+  await build(night, root)
+
+  const session = await openPackage(join(root, 'package'))
+
+  expect(await session.rows('SELECT frame_id, blob_path, blob_link, blob_candidates FROM frames ORDER BY frame_id')).toEqual([
+    { frame_id: 'frame-0', blob_path: 'blobs/1-5-0.blob', blob_link: 'inferred', blob_candidates: null },
+    { frame_id: 'frame-1', blob_path: null, blob_link: 'ambiguous', blob_candidates: '["blobs/1-6-0.blob","blobs/1-7-0.blob"]' },
+    { frame_id: 'frame-2', blob_path: null, blob_link: null, blob_candidates: null },
+  ])
+  expect(await session.rows('SELECT blob_path, blob_bytes, operation_id, operation_link, image_id, image_bytes FROM indi_images ORDER BY "at"')).toEqual([
+    { blob_path: 'blobs/1-5-0.blob', blob_bytes: '5100', operation_id: 'operation-0', operation_link: 'inferred', image_id: 'image-operation-0', image_bytes: '5000' },
+    { blob_path: 'blobs/1-6-0.blob', blob_bytes: '5100', operation_id: 'operation-1', operation_link: 'inferred', image_id: 'image-operation-1', image_bytes: '5000' },
+    { blob_path: 'blobs/1-7-0.blob', blob_bytes: '5100', operation_id: 'operation-1', operation_link: 'inferred', image_id: 'image-operation-1', image_bytes: '5000' },
   ])
   session.close()
 })

@@ -118,6 +118,9 @@ test('a frame row carries its span and mount links, a frame without either carri
     attempt_candidates: null,
     operation_link: null,
     operation_candidates: null,
+    blob_path: null,
+    blob_link: null,
+    blob_candidates: null,
   })
   expect(tables.frames[1]).toMatchObject({
     span_id: null,

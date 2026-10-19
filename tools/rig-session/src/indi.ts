@@ -93,3 +93,37 @@ export function indiEvents(lines: readonly RecordedLine[]): IndiEvent[] {
 
   return events
 }
+
+/** One camera image the recording holds: an `in` BLOB message and the file it was saved to. */
+export interface IndiImage {
+  readonly at: Date
+  readonly conn: number
+  readonly n: number
+  readonly device: string | null
+  readonly property: string | null
+  readonly element: string
+  /** Relative to the recording folder. */
+  readonly path: string
+  /** The size INDI stated for the decoded file: a FITS, not Cria's ImageBytes. */
+  readonly bytes: number | null
+}
+
+export function indiImages(lines: readonly RecordedLine[]): IndiImage[] {
+  const images: IndiImage[] = []
+
+  for (const line of lines) {
+    if (line.k !== 'msg' || line.dir !== 'in') continue
+
+    const { device = null, name = null } = attributesOf(/^\s*<\w+\b([^>]*?)>/.exec(line.xml)?.[1] ?? '')
+
+    for (const [, attributes = ''] of line.xml.matchAll(/<oneBLOB\b([^>]*?)\/>/g)) {
+      const { name: element = '', size = '', ref } = attributesOf(attributes)
+
+      if (ref !== undefined && line.blobs?.includes(ref)) {
+        images.push({ at: line.at, conn: line.conn, n: line.n, device, property: name, element, path: ref, bytes: /^\d+$/.test(size) ? Number(size) : null })
+      }
+    }
+  }
+
+  return images
+}
