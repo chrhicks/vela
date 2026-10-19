@@ -1,3 +1,4 @@
+import { createReadStream } from 'node:fs'
 import { readdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { z } from 'zod'
@@ -10,6 +11,54 @@ export interface Skipped {
 export interface ReadResult<Item> {
   readonly items: readonly Item[]
   readonly skipped: readonly Skipped[]
+}
+
+/** One line of a file read as a stream. `complete` is false for a last line with no newline. */
+export interface FileLine {
+  readonly number: number
+  readonly text: string
+  readonly complete: boolean
+  /** The line passed `maxLineChars`; `text` is empty, because holding it is what streaming avoids. */
+  readonly tooLong: boolean
+}
+
+/**
+ * The lines of a text file, one at a time, so a file larger than a string can be (about 512 MiB) or than
+ * the heap is read in constant memory. A caller keeps only the lines it exports. Recorder and journal
+ * lines are small (a BLOB is stored beside the tape, not in it), so a line over `maxLineChars` is damage.
+ */
+export async function* linesOf(path: string, maxLineChars = 64 * 1024 * 1024): AsyncGenerator<FileLine> {
+  let pending = ''
+  let tooLong = false
+  let number = 0
+
+  for await (const piece of createReadStream(path, { encoding: 'utf8', highWaterMark: 1024 * 1024 })) {
+    const chunk = String(piece)
+    let start = 0
+
+    for (;;) {
+      const end = chunk.indexOf('\n', start)
+
+      if (!tooLong) {
+        pending += chunk.slice(start, end === -1 ? undefined : end)
+
+        if (pending.length > maxLineChars) {
+          tooLong = true
+          pending = ''
+        }
+      }
+
+      if (end === -1) break
+
+      number += 1
+      yield { number, text: pending, complete: true, tooLong }
+      pending = ''
+      tooLong = false
+      start = end + 1
+    }
+  }
+
+  if (tooLong || pending !== '') yield { number: number + 1, text: pending, complete: false, tooLong }
 }
 
 export const jsonText = <Schema extends z.ZodType>(schema: Schema) =>
