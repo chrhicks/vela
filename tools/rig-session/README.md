@@ -9,7 +9,8 @@ pnpm --filter @vela/rig-session rig-session build \
   --saved-images ~/.local/share/vela/saved-images \
   --traces ~/.local/share/vela/traces/observing.jsonl \
   --mount-csv path/to/mount-watch.csv \
-  --frame-records ~/.local/share/vela/traces/frames.jsonl
+  --frame-records ~/.local/share/vela/traces/frames.jsonl \
+  --recording ~/recordings/2030-01-01-example
 
 pnpm --filter @vela/rig-session rig-session query ~/.local/share/rig-sessions/2030-01-01-example/package \
   "SELECT detected_stars FROM frames ORDER BY captured_at"
@@ -19,7 +20,7 @@ The inputs are read-only. Every input is optional; `session.json` in the package
 
 ## Package layout
 
-`<out>/package` is a symlink to `<out>/builds/<time>`, which holds `frames.parquet`, `attempts.parquet`, `mount.parquet`, `spans.parquet` and `session.json`. A build writes into a fresh directory and switches the symlink with one rename, so a build that fails leaves the previous package readable. The next finished build removes the older directories.
+`<out>/package` is a symlink to `<out>/builds/<time>`, which holds `frames.parquet`, `attempts.parquet`, `indi_ops.parquet`, `mount.parquet`, `spans.parquet` and `session.json`. A build writes into a fresh directory and switches the symlink with one rename, so a build that fails leaves the previous package readable. The next finished build removes the older directories.
 
 Rebuilding the same inputs gives the same rows in the same files. Only `session.json` carries the build time.
 
@@ -39,9 +40,14 @@ A link with no match is null. The packager never guesses.
 
 - `frames.span_*` links a saved frame to the `capture.frame` span that was running when the camera started the exposure.
 - `frames.attempt_*` links a saved frame to the frame record (`attempts` table, one row per capture attempt of any outcome) that names its image: `exact`, by the image id. The frame then carries that attempt's `request_id`, `operation_id` and `cria_image_id`, so it names the Cria operation that produced it. `attempts.frame_id` is the same link seen from the attempt; a lost or failed attempt has none.
+- `frames.operation_*` and `attempts.operation_*` link to the Cria operation in `indi_ops` (one row per `op` line of the recording): `exact`, by the operation id the frame record carries, or by its request id when Cria never admitted the request. `indi_ops.outcome*` hold the kind, reason and message; an outcome's values are not exported, because device setup puts the site in them.
 - `frames.mount_*` links a frame to the latest mount sample not after the exposure start, and keeps the sample's age. A sample older than 30 seconds gives no link.
 
-The Cria recording and the Vela journal are not read yet. `INPUTS.md` specifies how they will be, and the tables and links they add.
+The Vela journal is not read yet. `INPUTS.md` specifies how they will be, and the tables and links they add.
+
+## Privacy
+
+A package never holds the observing site or serial port paths. `redact.ts` replaces the values of the INDI properties `GEOGRAPHIC_COORD`, `DEVICE_PORT` and `SYSTEM_PORTS`, any `/dev/...` path, `LAT=`/`LONG=`/`ELEV=` pairs and site or port keys in operation parameters. A recording is read for `manifest.json` and `traffic.jsonl` only; `blobs/` is never opened. A recording with a torn last line loses that line; one with a damaged line in the middle is read up to the damage and `session.json` lists it.
 
 ## Replay
 
