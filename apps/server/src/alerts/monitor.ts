@@ -17,8 +17,19 @@ const tracer = trace.getTracer('vela.alerts')
 /** A cleared alert may not come back this soon; a flapping HFR must not buzz all night. */
 const reRaiseGuardMs = 5 * 60_000
 
-/** How long before an alert, or a cancel, that never reached the phone is tried again. */
+/** How long before a stray emergency's cancel that Pushover refused is tried again. */
 const resendAfterFailureMs = 60_000
+
+/**
+ * An alert that never reached the phone is tried again after a minute, then after twice the
+ * pause each time, never more than five minutes apart. Vela stops once the alert is older than
+ * an emergency's hour: Pushover itself would have stopped repeating by then.
+ */
+const firstRetryMs = 60_000
+
+const longestRetryPauseMs = 5 * 60_000
+
+const giveUpAfterMs = emergencyExpireSeconds * 1000
 
 const mountPollMs = 10_000
 
@@ -35,6 +46,14 @@ const coveredBy: Partial<Record<AlertId, AlertId>> = {
   'meridian-near': 'meridian-imminent',
 }
 
+/** How the phone is getting on with one alert. */
+export type AlertDelivery =
+  | { state: 'sent' | 'sending' | 'covered' | 'not-configured' }
+  /** The phone refused it `failures` times. Vela tries again at `nextAttemptAt` and stops at `giveUpAt`. */
+  | { state: 'retrying'; failures: number; nextAttemptAt: number; giveUpAt: number }
+  /** Vela stopped trying: the hour ran out, or the alert was acknowledged before the phone took it. */
+  | { state: 'gave-up'; failures: number }
+
 export interface ActiveAlert {
   id: AlertId
   level: AlertLevel
@@ -42,6 +61,10 @@ export interface ActiveAlert {
   raisedAt: number
   /** Stops the phone repeating. The alert stays visible until its condition clears. */
   acknowledged: boolean
+}
+
+export interface ViewedAlert extends ActiveAlert {
+  delivery: AlertDelivery
 }
 
 export type PhoneAlerts =
@@ -54,7 +77,7 @@ export interface AlertsView {
   /** True while a capture run is being watched. When false, no alerts means nothing is being checked. */
   watching: boolean
   /** Critical first, then oldest first. */
-  alerts: ActiveAlert[]
+  alerts: ViewedAlert[]
   /** Watches that cannot run right now, such as "meridian watch unavailable: pier side". */
   unavailable: string[]
   phone: PhoneAlerts
@@ -87,8 +110,15 @@ export interface AlertMonitorOptions {
 
 /** One raised alert, from the evaluation that raised it until the one that clears it. */
 interface Episode extends ActiveAlert {
-  /** Unsent is retried on its own timer until it gets through. Skipped was covered by a stronger alert. */
-  delivery: 'unsent' | 'sending' | 'sent' | 'skipped'
+  /**
+   * Unsent is retried on its own schedule until it gets through, is acknowledged or runs out of
+   * time, which makes it gave-up. Skipped was covered by a stronger alert.
+   */
+  delivery: 'unsent' | 'sending' | 'sent' | 'skipped' | 'gave-up'
+  /** Sends the phone refused. */
+  failures: number
+  /** The pending retry. */
+  retry: { readonly at: number; readonly timer: ReturnType<typeof setTimeout> } | null
   /** The open emergency receipt, until it is cancelled. */
   receipt: string | null
   /** When the phone accepted the message. An emergency's hour starts here. */
@@ -136,7 +166,6 @@ export function createAlertMonitor({
   const clearedAt = new Map<AlertId, number>()
   const strayReceipts: StrayReceipt[] = []
   let strayTimer: ReturnType<typeof setTimeout> | undefined
-  let resendTimer: ReturnType<typeof setTimeout> | undefined
   let closed = false
 
   function evaluate() {
@@ -186,6 +215,8 @@ export function createAlertMonitor({
       raisedAt: at,
       acknowledged: false,
       delivery: 'unsent',
+      failures: 0,
+      retry: null,
       receipt: null,
       sentAt: null,
       phoneCalls: Promise.resolve(),
@@ -211,6 +242,7 @@ export function createAlertMonitor({
   function clear(episode: Episode, at: number) {
     episodes.delete(episode.id)
     clearedAt.set(episode.id, at)
+    stopRetrying(episode)
 
     tracer
       .startSpan('alert.cleared', {
@@ -240,22 +272,36 @@ export function createAlertMonitor({
   }
 
   /**
-   * An alert that failed to reach the phone is tried again once a minute until it arrives, is
-   * acknowledged or clears. This runs on its own timer: a failed run has no polling left to drive it.
+   * An alert that failed to reach the phone is tried again later, on its own timer: a failed run has
+   * no polling left to drive it. The pause doubles up to a cap, and the alert is given up once the
+   * next try would fall after the hour an emergency lasts.
    */
-  function resendUnsentSoon() {
+  function retrySoon(episode: Episode) {
     if (closed) return
 
-    resendTimer ??= setTimeout(resendUnsent, resendAfterFailureMs)
-    resendTimer.unref()
+    const pause = Math.min(firstRetryMs * 2 ** (episode.failures - 1), longestRetryPauseMs)
+    const at = now() + pause
+
+    if (at >= episode.raisedAt + giveUpAfterMs) {
+      episode.delivery = 'gave-up'
+
+      return
+    }
+
+    const timer = setTimeout(() => {
+      episode.retry = null
+
+      if (episode.delivery === 'unsent') sendRaised(episode)
+    }, pause)
+
+    timer.unref()
+    episode.retry = { at, timer }
   }
 
-  function resendUnsent() {
-    resendTimer = undefined
+  function stopRetrying(episode: Episode) {
+    if (episode.retry) clearTimeout(episode.retry.timer)
 
-    for (const episode of episodes.values()) {
-      if (episode.delivery === 'unsent' && !episode.acknowledged) sendRaised(episode)
-    }
+    episode.retry = null
   }
 
   function sendRaised(episode: Episode) {
@@ -274,13 +320,14 @@ export function createAlertMonitor({
         notifier.send(notification),
       )
 
-      episode.delivery = sent.ok ? 'sent' : 'unsent'
-
       if (sent.ok) {
+        episode.delivery = 'sent'
         episode.receipt = sent.value.receipt
         episode.sentAt = now()
       } else {
-        resendUnsentSoon()
+        episode.delivery = 'unsent'
+        episode.failures++
+        retrySoon(episode)
       }
     })
   }
@@ -380,6 +427,24 @@ export function createAlertMonitor({
       return { ok: false, reason }
     } finally {
       span.end()
+    }
+  }
+
+  function deliveryOf(episode: Episode): AlertDelivery {
+    if (!notifier) return { state: 'not-configured' }
+
+    switch (episode.delivery) {
+      case 'sent':
+      case 'sending':
+        return { state: episode.delivery }
+      case 'skipped':
+        return { state: 'covered' }
+      case 'gave-up':
+        return { state: 'gave-up', failures: episode.failures }
+      case 'unsent':
+        return episode.retry
+          ? { state: 'retrying', failures: episode.failures, nextAttemptAt: episode.retry.at, giveUpAt: episode.raisedAt + giveUpAfterMs }
+          : { state: 'gave-up', failures: episode.failures }
     }
   }
 
@@ -501,7 +566,11 @@ export function createAlertMonitor({
       const alerts = [...episodes.values()]
         .filter(episode => !isCovered(episode.id))
         .sort((a, b) => levelRank(b.level) - levelRank(a.level) || a.raisedAt - b.raisedAt)
-        .map(({ id, level, message, raisedAt, acknowledged }) => ({ id, level, message, raisedAt, acknowledged }))
+        .map(episode => {
+          const { id, level, message, raisedAt, acknowledged } = episode
+
+          return { id, level, message, raisedAt, acknowledged, delivery: deliveryOf(episode) }
+        })
 
       return {
         rigId,
@@ -526,6 +595,11 @@ export function createAlertMonitor({
 
         episode.acknowledged = true
 
+        if (episode.delivery === 'unsent') {
+          stopRetrying(episode)
+          episode.delivery = 'gave-up'
+        }
+
         return { outcome: 'acknowledged' }
       })
     },
@@ -545,9 +619,10 @@ export function createAlertMonitor({
       closed = true
       stopPolling()
       clearTimeout(strayTimer)
-      clearTimeout(resendTimer)
       strayTimer = undefined
-      resendTimer = undefined
+
+      for (const episode of episodes.values()) stopRetrying(episode)
+
       runToken++
     },
   }

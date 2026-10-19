@@ -206,7 +206,11 @@ describe('alerts routes', () => {
       await vi.advanceTimersByTimeAsync(0)
 
       const failing = await app.inject({ method: 'GET', url: '/api/web/rigs/sim/alerts' })
-      expect(failing.json()).toMatchObject({ watching: false, phone: { state: 'failing' } })
+      expect(failing.json()).toMatchObject({
+        watching: false,
+        phone: { state: 'failing' },
+        alerts: [{ id: 'run-failed', delivery: { state: 'retrying', failures: 1 } }],
+      })
       expect(phone.sent).toEqual([])
 
       phone.down = null
@@ -214,6 +218,7 @@ describe('alerts routes', () => {
 
       const recovered = await app.inject({ method: 'GET', url: '/api/web/rigs/sim/alerts' })
       expect(recovered.json().phone).toEqual({ state: 'ready' })
+      expect(recovered.json().alerts[0].delivery).toEqual({ state: 'sent' })
       expect(phone.sent).toEqual([{ title: 'Vela: Simulator', message: 'The capture run failed', priority: 2 }])
     })
 
