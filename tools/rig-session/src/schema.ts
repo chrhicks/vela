@@ -38,7 +38,7 @@ const required = <Kind extends ColumnKind>(kind: Kind): Column<Kind, false> => (
 
 const optional = <Kind extends ColumnKind>(kind: Kind): Column<Kind, true> => ({ kind, nullable: true })
 
-type AnyColumn = Column<ColumnKind, boolean>
+export type AnyColumn = Column<ColumnKind, boolean>
 
 type TableSchema = Readonly<Record<string, AnyColumn>>
 
@@ -249,6 +249,9 @@ export type CriaImageCheckRow = RowOf<typeof tables.cria_image_checks>
 export type MountRow = RowOf<typeof tables.mount>
 
 export type SpanRow = RowOf<typeof tables.spans>
+
+/** The rows of every table, whatever the row types: what the writer takes. */
+export type TableRows = Readonly<Record<TableName, readonly Readonly<Record<string, string | number | boolean | Date | null>>[]>>
 
 export interface Tables {
   readonly frames: readonly FrameRow[]
