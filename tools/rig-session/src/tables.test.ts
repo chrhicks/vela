@@ -275,6 +275,10 @@ function recordingOf(...operations: RecordedOperation[]): Recording {
     instanceId: 'instance-1',
     startedAt: at('00:00:00'),
     devices: [{ id: 'primary', kind: 'camera', indiDevice: 'Test Camera' }],
+    events: [],
+    images: [],
+    mountSamples: [],
+    linesRead: operations.length,
     tornTail: false,
     ended: true,
   }
@@ -319,4 +323,31 @@ test('an operation before the window is exported when an exported attempt links 
   })
 
   expect(tables.indi_ops.map(row => row.operation_id)).toEqual(['operation-1'])
+})
+
+test('an operation id that the recording does not hold is no match, even when the request id is there', () => {
+  const tables = buildTables('test-night', window, {
+    savedImages: [image('frame-1', '00:10:30')],
+    spans: [],
+    frameRecords: [{ ...record(1, 'frame-1'), operationId: 'different-operation', requestId: 'request-1' }],
+    recording: recordingOf(operation('operation-found', 'request-1', '00:10:01')),
+    mountSamples: [],
+  })
+
+  expect(tables.attempts[0]).toMatchObject({ operation_id: 'different-operation', operation_link: null, operation_candidates: null })
+  expect(tables.frames[0]).toMatchObject({ operation_id: 'different-operation', operation_link: null })
+  expect(tables.indi_ops.filter(row => row.operation_id === tables.attempts[0]?.operation_id)).toEqual([])
+})
+
+test('a request-only match is exact, and joins on the request id it used', () => {
+  const tables = buildTables('test-night', window, {
+    savedImages: [],
+    spans: [],
+    frameRecords: [{ ...record(1, null, 'failed'), operationId: null, requestId: 'request-1' }],
+    recording: recordingOf(operation('operation-found', 'request-1', '00:10:01')),
+    mountSamples: [],
+  })
+
+  expect(tables.attempts[0]).toMatchObject({ operation_id: null, request_id: 'request-1', operation_link: 'exact' })
+  expect(tables.indi_ops.map(row => row.request_id)).toEqual(['request-1'])
 })
