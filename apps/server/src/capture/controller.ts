@@ -328,7 +328,12 @@ export function createCaptureController(
           latestImage: metadata,
         })
 
-        onFrame?.(metadata)
+        // An observer of the frame must never end the run that produced it.
+        try {
+          onFrame?.(metadata)
+        } catch (error) {
+          console.warn('Capture frame observer failed', error)
+        }
 
         if (saveFrames) {
           const saveStartedAt = performance.now()

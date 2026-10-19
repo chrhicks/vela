@@ -302,8 +302,8 @@ export function registerCapture(
             subject,
             onFrame: image => watch?.frameCaptured(image),
             onSettled() {
-              watch?.runEnded(captureController.snapshot().phase === 'failed' ? 'failed' : 'stopped')
               release()
+              watch?.runEnded(captureController.snapshot().phase === 'failed' ? 'failed' : 'stopped')
             },
             repeat: body.repeat === true,
             saveFrames: body.saveFrames === true,

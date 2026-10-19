@@ -366,6 +366,36 @@ it.each(['readout', 'preview'] as const)(
   },
 )
 
+it('hands each published frame to its observer, and an observer that throws does not end the run', async () => {
+  const warning = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  const seen: Array<string | null> = []
+
+  try {
+    const { controller, requests, frame } = setup()
+
+    await controller.start(10, {
+      repeat: true,
+      onFrame(image) {
+        seen.push(image.id)
+        throw new Error('observer failed')
+      },
+    })
+
+    requests[0]!.resolve(frame)
+    await vi.waitFor(() => expect(requests).toHaveLength(2))
+
+    expect(seen).toEqual([controller.snapshot().latestImage!.id])
+    expect(controller.snapshot()).toMatchObject({ active: true, phase: 'exposing', completedCount: 1, error: null })
+    expect(warning).toHaveBeenCalledWith('Capture frame observer failed', expect.any(Error))
+
+    const stopping = controller.stop()
+    requests[1]!.reject(new CaptureStoppedError())
+    await stopping
+  } finally {
+    warning.mockRestore()
+  }
+})
+
 it('retains an acquired image when optional star analysis is unavailable', async () => {
   const measure = vi
     .spyOn(statistics, 'measureStars')
