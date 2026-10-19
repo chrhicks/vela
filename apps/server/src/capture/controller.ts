@@ -73,6 +73,8 @@ interface Attempt {
 export interface CaptureRunOptions {
   subject?: CaptureSubject | null
   onSettled?: () => void
+  /** Called with each frame once it is published, whether or not it is saved. */
+  onFrame?: (image: CaptureImage) => void
   repeat?: boolean
   saveFrames?: boolean
 }
@@ -176,6 +178,7 @@ export function createCaptureController(
     subject: CaptureSubject | null,
     runGeneration: number,
     runId: string,
+    onFrame: CaptureRunOptions['onFrame'],
   ) {
     let attempt: Attempt | undefined
 
@@ -398,6 +401,13 @@ export function createCaptureController(
           latestImage: metadata,
         })
 
+        // An observer of the frame must never end the run that produced it.
+        try {
+          onFrame?.(metadata)
+        } catch (error) {
+          console.warn('Capture frame observer failed', error)
+        }
+
         if (saveFrames) {
           const saveStartedAt = performance.now()
 
@@ -458,7 +468,7 @@ export function createCaptureController(
     exposureSeconds: number,
     camera: CaptureCamera,
     cameraName: string,
-    { onSettled, repeat = false, saveFrames = false, subject = null }: CaptureRunOptions = {},
+    { onSettled, onFrame, repeat = false, saveFrames = false, subject = null }: CaptureRunOptions = {},
   ) {
     if (running) throw new Error('An exposure is already running')
 
@@ -507,6 +517,7 @@ export function createCaptureController(
       runSubject,
       runGeneration,
       runId,
+      onFrame,
     ).finally(() => {
       running = undefined
       onSettled?.()
