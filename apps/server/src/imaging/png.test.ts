@@ -44,7 +44,7 @@ it('encodes lossless pixels and valid PNG checksums across multiple processing b
 
     if (kind === 'IDAT') {
       expect(length).toBeGreaterThan(262_144)
-      expect(inflateSync(payload)).toEqual(original)
+      expect(inflateSync(payload).equals(original)).toBe(true)
     }
 
     if (kind === 'IEND') expect(crc).toBe(0xae426082)
@@ -52,5 +52,5 @@ it('encodes lossless pixels and valid PNG checksums across multiple processing b
   }
 
   expect(kinds).toEqual(['IHDR', 'IDAT', 'IEND'])
-  expect(data).toEqual(original)
+  expect(data.equals(original)).toBe(true)
 })
