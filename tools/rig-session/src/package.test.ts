@@ -24,7 +24,9 @@ const leakyRow = (name: TableName): Record<string, Cell> =>
   )
 
 /** Naming each table keeps this test honest: a table added to the schema is a type error here until it is covered. */
-const leakyTables = (): TableRows => ({ frames: [leakyRow('frames')], attempts: [leakyRow('attempts')], mount: [leakyRow('mount')], spans: [leakyRow('spans')] })
+const emptyTables = (): TableRows => ({ frames: [], attempts: [], mount: [], spans: [], indi_ops: [] })
+
+const leakyTables = (): TableRows => ({ frames: [leakyRow('frames')], attempts: [leakyRow('attempts')], mount: [leakyRow('mount')], spans: [leakyRow('spans')], indi_ops: [leakyRow('indi_ops')] })
 
 function secrets() {
   const learned = new Secrets()
@@ -53,7 +55,7 @@ test('no cell of any table reaches the package with a secret in it, whichever co
 
 test('the check after the write fails the build closed when a cell still leaks, and the old package stays readable', async () => {
   const root = await scratch()
-  const first = await publishPackage(root, { ...leakyTables(), frames: [], attempts: [], mount: [], spans: [] }, {}, secrets())
+  const first = await publishPackage(root, emptyTables(), {}, secrets())
   const leaky = (row: Readonly<Record<string, Cell>>) => row
 
   await expect(publishPackage(root, leakyTables(), {}, secrets(), leaky)).rejects.toBeInstanceOf(PrivacyCheckError)
@@ -70,7 +72,7 @@ test('the check after the write fails the build closed when a cell still leaks, 
 
 test('session.json is sanitised like a table', async () => {
   const root = await scratch()
-  const directory = await publishPackage(root, { frames: [], attempts: [], mount: [], spans: [] }, { skipped: [{ reason: 'bad line near 12.534 on /dev/ttyUSB0' }] }, secrets())
+  const directory = await publishPackage(root, emptyTables(), { skipped: [{ reason: 'bad line near 12.534 on /dev/ttyUSB0' }] }, secrets())
 
   expect(JSON.parse(await readFile(join(directory, 'session.json'), 'utf8'))).toEqual({ skipped: [{ reason: 'bad line near [redacted] on [redacted]' }] })
 })

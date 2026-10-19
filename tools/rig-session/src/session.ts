@@ -4,6 +4,7 @@ import { jsonText, readFrameRecords, readMountCsv, readSavedImages, readTraces, 
 import { publishPackage } from './package.ts'
 import { Secrets } from './sanitize.ts'
 import type { LinkKind } from './schema.ts'
+import { readRecording } from './recording.ts'
 import { buildTables, type TimeWindow } from './tables.ts'
 
 export interface SessionRequest {
@@ -14,13 +15,14 @@ export interface SessionRequest {
   readonly tracesFile: string | null
   readonly mountCsvFile: string | null
   readonly frameRecordsFile: string | null
+  readonly recordingDir: string | null
 }
 
 const whatMissingCosts = {
   'saved-images': 'There are no frames.',
   traces: 'There are no spans, and frames have no span link or run frame index.',
   'mount-csv': 'The mount table is empty and frames have no mount link.',
-  'indi-recording': 'There are no INDI writes or device events, and no frame links exactly to its camera image.',
+  'indi-recording': 'There are no Cria operations, INDI writes or device events, and no frame links exactly to its camera image.',
   'frame-records': 'Frames carry no request or operation ids, so none links exactly to a Cria operation.',
 } as const
 
@@ -40,15 +42,17 @@ export async function buildSession(request: SessionRequest): Promise<string> {
   const traces = await readIfGiven(request.tracesFile, readTraces)
   const mount = await readIfGiven(request.mountCsvFile, readMountCsv)
   const frameRecords = await readIfGiven(request.frameRecordsFile, readFrameRecords)
+  const recording = await readIfGiven(request.recordingDir, directory => readRecording(directory, secrets))
 
   const tables = buildTables(request.name, request.window, {
     savedImages: savedImages?.items ?? [],
     spans: traces?.items ?? [],
     frameRecords: frameRecords?.items ?? [],
+    recording,
     mountSamples: mount?.items ?? [],
   })
 
-  const skipped = [savedImages, traces, mount, frameRecords].flatMap(result => result?.skipped ?? [])
+  const skipped = [savedImages, traces, mount, frameRecords, recording].flatMap(result => result?.skipped ?? [])
 
   const summary = {
     session: request.name,
@@ -58,12 +62,13 @@ export async function buildSession(request: SessionRequest): Promise<string> {
       reportInput('saved-images', request.savedImagesDir, savedImages),
       reportInput('traces', request.tracesFile, traces),
       reportInput('mount-csv', request.mountCsvFile, mount),
-      reportInput('indi-recording', null, null),
+      reportInput('indi-recording', request.recordingDir, recording, recording?.linesRead),
       reportInput('frame-records', request.frameRecordsFile, frameRecords),
     ],
     rows: {
       frames: tables.frames.length,
       attempts: tables.attempts.length,
+      indi_ops: tables.indi_ops.length,
       mount: tables.mount.length,
       spans: tables.spans.length,
     },
@@ -71,6 +76,16 @@ export async function buildSession(request: SessionRequest): Promise<string> {
       frame_to_span: countLinks(tables.frames.map(frame => frame.span_link)),
       frame_to_mount: countLinks(tables.frames.map(frame => frame.mount_link)),
       frame_to_attempt: countLinks(tables.frames.map(frame => frame.attempt_link)),
+      frame_to_operation: countLinks(tables.frames.map(frame => frame.operation_link)),
+      attempt_to_operation: countLinks(tables.attempts.map(attempt => attempt.operation_link)),
+    },
+    recording: recording && {
+      name: recording.name,
+      instanceId: recording.instanceId,
+      startedAt: recording.startedAt.toISOString(),
+      ended: recording.ended,
+      tornTail: recording.tornTail,
+      gaps: recording.items.filter(line => line.k === 'gap').length,
     },
     skipped: skipped.slice(0, maxSkippedListed),
   }
@@ -78,19 +93,20 @@ export async function buildSession(request: SessionRequest): Promise<string> {
   return publishPackage(request.root, tables, jsonText(z.json()).parse(JSON.stringify(summary)), secrets)
 }
 
-async function readIfGiven<Item>(
+async function readIfGiven<Result extends ReadResult<unknown>>(
   path: string | null,
-  read: (path: string) => Promise<ReadResult<Item>>,
-): Promise<ReadResult<Item> | null> {
+  read: (path: string) => Promise<Result>,
+): Promise<Result | null> {
   if (path === null || !existsSync(path)) return null
 
   return read(path)
 }
 
-function reportInput<Item>(input: InputName, path: string | null, result: ReadResult<Item> | null): InputReport {
+/** `read` counts what was read, which for a streamed input is more than the items it kept. */
+function reportInput<Item>(input: InputName, path: string | null, result: ReadResult<Item> | null, read = result?.items.length ?? 0): InputReport {
   if (path === null || result === null) return { input, status: 'missing', effect: whatMissingCosts[input] }
 
-  return { input, status: 'found', path, read: result.items.length, skipped: result.skipped.length }
+  return { input, status: 'found', path, read, skipped: result.skipped.length }
 }
 
 function countLinks(kinds: readonly (LinkKind | null)[]) {

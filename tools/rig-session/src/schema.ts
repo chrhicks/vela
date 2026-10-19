@@ -82,6 +82,8 @@ export const tables = {
     cria_image_id: optional('text'),
     attempt_link: optional('link'),
     attempt_candidates: optional('json'),
+    operation_link: optional('link'),
+    operation_candidates: optional('json'),
   },
   attempts: {
     session: required('text'),
@@ -99,8 +101,28 @@ export const tables = {
     frame_id: optional('text'),
     frame_link: optional('link'),
     frame_candidates: optional('json'),
+    operation_link: optional('link'),
+    operation_candidates: optional('json'),
     detected_stars: optional('int'),
     median_hfr_px: optional('real'),
+  },
+  indi_ops: {
+    session: required('text'),
+    operation_id: required('text'),
+    request_id: required('text'),
+    instance_id: required('text'),
+    device_id: required('text'),
+    indi_device: optional('text'),
+    kind: required('text'),
+    accepted_at: required('timestamp'),
+    started_at: optional('timestamp'),
+    settled_at: required('timestamp'),
+    outcome: required('text'),
+    outcome_reason: optional('text'),
+    outcome_message: optional('text'),
+    parameters: required('json'),
+    image_id: optional('text'),
+    image_bytes: optional('int'),
   },
   mount: {
     session: required('text'),
@@ -137,6 +159,8 @@ export type FrameRow = RowOf<typeof tables.frames>
 
 export type AttemptRow = RowOf<typeof tables.attempts>
 
+export type IndiOpRow = RowOf<typeof tables.indi_ops>
+
 export type MountRow = RowOf<typeof tables.mount>
 
 export type SpanRow = RowOf<typeof tables.spans>
@@ -147,6 +171,7 @@ export type TableRows = Readonly<Record<TableName, readonly Readonly<Record<stri
 export interface Tables {
   readonly frames: readonly FrameRow[]
   readonly attempts: readonly AttemptRow[]
+  readonly indi_ops: readonly IndiOpRow[]
   readonly mount: readonly MountRow[]
   readonly spans: readonly SpanRow[]
 }
