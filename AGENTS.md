@@ -96,5 +96,6 @@ The FRA 400 and Seestar are normally on and available for building Vela. Inspect
 - `packages/cria` — Cria HTTP/SSE client and wire validation.
 - `packages/model` — dependency-light contracts shared by server and browser.
 - `packages/ui` — design tokens, stable components and drafts.
+- `tools/rig-session` — offline packager that joins an outing's saved metadata, traces and mount log into Parquet tables for DuckDB. Outside the server's dependency graph.
 
 Read nearby READMEs before changing a boundary. See the [Rift workspace guide](docs/rift-workspaces.md) for parallel task workspaces. Linear project: **Vela - Main Development**.
