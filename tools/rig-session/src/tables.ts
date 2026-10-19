@@ -1,6 +1,6 @@
-import type { MountSample, SavedImage, TraceSpan } from './inputs.ts'
-import { linkFrameToSpan, linkMountAsOf, type Link, type MountLink } from './joins.ts'
-import type { FrameRow, LinkKind, MountRow, SpanRow, Tables } from './schema.ts'
+import type { FrameRecord, MountSample, SavedImage, TraceSpan } from './inputs.ts'
+import { linkAttemptToFrame, linkFrameToAttempt, linkFrameToSpan, linkMountAsOf, type Link, type MountLink } from './joins.ts'
+import type { AttemptRow, FrameRow, LinkKind, MountRow, SpanRow, Tables } from './schema.ts'
 
 export interface TimeWindow {
   readonly from: Date
@@ -10,6 +10,7 @@ export interface TimeWindow {
 export interface SessionInputs {
   readonly savedImages: readonly SavedImage[]
   readonly spans: readonly TraceSpan[]
+  readonly frameRecords: readonly FrameRecord[]
   readonly mountSamples: readonly MountSample[]
 }
 
@@ -31,14 +32,22 @@ export function buildTables(session: string, window: TimeWindow, inputs: Session
     const spanLink = linkFrameToSpan(image, inputs.spans)
     const mount = linkMountAsOf(image.capturedAt, inputs.mountSamples, mountFreshSeconds)
 
-    return { image, spanLink, mount }
+    const attemptLink = linkFrameToAttempt(image, inputs.frameRecords)
+
+    return { image, spanLink, mount, attemptLink }
   })
 
   const linkedSpans = new Set(frames.flatMap(({ spanLink }) => linkTargets(spanLink)))
   const linkedMountTimes = new Set(frames.flatMap(({ mount }) => linkTargets(mount?.link ?? null).map(time => time.getTime())))
 
+  const linkedAttempts = new Set(frames.flatMap(({ attemptLink }) => linkTargets(attemptLink)))
+  const exportedImages = frames.map(({ image }) => image)
+
   return {
-    frames: frames.map(({ image, spanLink, mount }) => frameRow(session, image, spanLink, mount)),
+    frames: frames.map(({ image, spanLink, mount, attemptLink }) => frameRow(session, image, spanLink, mount, attemptLink)),
+    attempts: inputs.frameRecords
+      .filter(record => inWindow(record.startedAt) || linkedAttempts.has(record))
+      .map(record => attemptRow(session, record, linkAttemptToFrame(record, exportedImages))),
     mount: inputs.mountSamples
       .filter(sample => inWindow(sample.sampledAt) || linkedMountTimes.has(sample.sampledAt.getTime()))
       .map(sample => mountRow(session, sample)),
@@ -52,8 +61,15 @@ function linkTargets<Target>(link: Link<Target> | null): readonly Target[] {
   return link.kind === 'ambiguous' ? link.candidates : [link.target]
 }
 
-function frameRow(session: string, image: SavedImage, spanLink: Link<TraceSpan> | null, mount: MountLink | null): FrameRow {
+function frameRow(
+  session: string,
+  image: SavedImage,
+  spanLink: Link<TraceSpan> | null,
+  mount: MountLink | null,
+  attemptLink: Link<FrameRecord> | null,
+): FrameRow {
   const span = spanLink?.kind === 'ambiguous' ? null : (spanLink?.target ?? null)
+  const attempt = attemptLink?.kind === 'ambiguous' ? null : (attemptLink?.target ?? null)
   const mountLink = mount?.link ?? null
 
   return {
@@ -80,6 +96,37 @@ function frameRow(session: string, image: SavedImage, spanLink: Link<TraceSpan> 
     mount_link: linkKind(mountLink),
     mount_candidates: candidates(mountLink, candidate => candidate.toISOString()),
     mount_age_seconds: mount?.ageSeconds ?? null,
+    run_id: attempt?.runId ?? null,
+    attempt: attempt?.attempt ?? null,
+    request_id: attempt?.requestId ?? null,
+    operation_id: attempt?.operationId ?? null,
+    cria_image_id: attempt?.criaImageId ?? null,
+    attempt_link: linkKind(attemptLink),
+    attempt_candidates: candidates(attemptLink, candidate => `${candidate.runId}/${candidate.attempt}`),
+  }
+}
+
+function attemptRow(session: string, record: FrameRecord, frameLink: Link<SavedImage> | null): AttemptRow {
+  const frame = frameLink?.kind === 'ambiguous' ? null : (frameLink?.target ?? null)
+
+  return {
+    session,
+    run_id: record.runId,
+    attempt: record.attempt,
+    rig_id: record.rigId,
+    started_at: record.startedAt,
+    settled_at: record.settledAt,
+    exposure_seconds: record.exposureSeconds,
+    outcome: record.outcome,
+    message: record.message,
+    request_id: record.requestId,
+    operation_id: record.operationId,
+    cria_image_id: record.criaImageId,
+    frame_id: frame?.id ?? null,
+    frame_link: linkKind(frameLink),
+    frame_candidates: candidates(frameLink, candidate => candidate.directory),
+    detected_stars: record.detectedStars,
+    median_hfr_px: record.medianHfrPixels,
   }
 }
 
