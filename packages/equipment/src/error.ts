@@ -64,3 +64,11 @@ export class CaptureRetryableError extends Error {
     this.name = 'CaptureRetryableError'
   }
 }
+
+/** The adapter cannot say whether the exposure ran. The camera needs a person's check before it is used again. */
+export class CaptureUncertainError extends EquipmentError {
+  constructor(message: string, options: EquipmentErrorOptions) {
+    super(message, options)
+    this.name = 'CaptureUncertainError'
+  }
+}

@@ -1,6 +1,13 @@
 import { z } from 'zod'
 import type { FastifyInstance } from 'fastify'
-import { CaptureStoppedError as EquipmentCaptureStoppedError, FrameLostError, type Acquisition, type CameraCooling, type DeviceTelemetry } from '@vela/equipment'
+import {
+  CaptureStoppedError as EquipmentCaptureStoppedError,
+  CaptureUncertainError as EquipmentCaptureUncertainError,
+  FrameLostError,
+  type Acquisition,
+  type CameraCooling,
+  type DeviceTelemetry,
+} from '@vela/equipment'
 import type {
   CaptureCoolingBlocker,
   CaptureCoolingView,
@@ -13,7 +20,14 @@ import type { RigCatalog } from '../rig/catalog.js'
 import type { RigOperations } from '../rig/operations.js'
 import { confirmedCameraName } from '../rig/imaging-camera.js'
 import { inspectRigDetail, type RigDetailOptions } from '../rig/detail.js'
-import { CaptureFrameLostError, CaptureStoppedError, createCaptureController, type CaptureCamera } from './controller.js'
+import {
+  CaptureFrameLostError,
+  CaptureStoppedError,
+  CaptureUncertainError,
+  createCaptureController,
+  type CaptureCamera,
+} from './controller.js'
+import type { FrameRecords } from './frame-records.js'
 import { createMemorySavedImageStore, type SavedImageStore } from '../saved-images/store.js'
 import type { AlertMonitor } from '../alerts/monitor.js'
 
@@ -26,6 +40,7 @@ export interface CaptureSettings {
 interface CaptureRouteOptions {
   lookupSubject?: (targetId: string) => CaptureSubject | undefined
   savedImages?: SavedImageStore
+  frameRecords?: FrameRecords
   createCamera?: (settings: CaptureSettings) => CaptureCamera
   createAcquisition: (rig: RigCatalogRecord) => Acquisition
   createInspector: RigDetailOptions['createInspector']
@@ -36,7 +51,7 @@ interface CaptureRouteOptions {
 
 function configuredCamera(settings: CaptureSettings, acquisition: Acquisition): CaptureCamera {
   return {
-    async capture({ exposureSeconds, signal, onProgress, onReadState }) {
+    async capture({ exposureSeconds, signal, onProgress, onReadState, onProvenance }) {
       try {
         return await acquisition.capture({
           cameraId: settings.cameraId,
@@ -46,9 +61,12 @@ function configuredCamera(settings: CaptureSettings, acquisition: Acquisition): 
           onProgress: elapsedSeconds => onProgress({ phase: 'exposing', elapsedSeconds }),
           onReadout: () => onProgress({ phase: 'reading', elapsedSeconds: exposureSeconds }),
           onReadState,
+          onProvenance,
         })
       } catch (error) {
         if (error instanceof EquipmentCaptureStoppedError) throw new CaptureStoppedError()
+
+        if (error instanceof EquipmentCaptureUncertainError) throw new CaptureUncertainError(error.message)
 
         if (error instanceof FrameLostError) throw new CaptureFrameLostError(error.message)
         throw error
@@ -92,6 +110,7 @@ export function registerCapture(
     createCooling,
     alerts,
     savedImages = createMemorySavedImageStore(),
+    frameRecords,
   }: CaptureRouteOptions,
 ) {
   const controllers = new Map<string, ReturnType<typeof createCaptureController>>()
@@ -288,6 +307,7 @@ export function registerCapture(
             { rigId: view.rigId, rigName: view.rigName },
             Date.now,
             savedImages,
+            frameRecords,
           )
           controllers.set(view.rigId, controller)
         }

@@ -4,6 +4,7 @@ import { resolveRigCatalogPath } from './rig/catalog-path.js'
 import { alignmentSettings } from './alignment/routes.js'
 import { dirname, isAbsolute, resolve } from 'node:path'
 import { openFileSavedImageStore } from './saved-images/store.js'
+import { noFrameRecords, openFrameRecords } from './capture/frame-records.js'
 import { createSurveyCache } from './targets/survey.js'
 import { startTelemetry } from './telemetry.js'
 import { loadCriaConfiguration, registerConfiguredCriaRigs } from './equipment/config.js'
@@ -12,6 +13,10 @@ import { loadAlertsConfiguration } from './alerts/config.js'
 import { createPushoverNotifier } from './alerts/pushover.js'
 
 const telemetry = startTelemetry(process.env.VELA_TRACE_PATH)
+
+const frameRecords = process.env.VELA_FRAME_RECORDS_PATH
+  ? openFrameRecords(process.env.VELA_FRAME_RECORDS_PATH)
+  : noFrameRecords
 
 let app: ReturnType<typeof buildApp> | undefined
 
@@ -23,6 +28,7 @@ function shutdown() {
     try {
       await app?.close()
     } finally {
+      await frameRecords.close()
       await telemetry.shutdown()
     }
   })()
@@ -88,6 +94,9 @@ try {
 
   const equipmentOptions: NonNullable<Parameters<typeof createEquipmentComposition>[1]> = {}
 
+  if (process.env.VELA_CRIA_JOURNAL_PATH)
+    equipmentOptions.criaJournalPath = resolve(process.env.VELA_CRIA_JOURNAL_PATH)
+
   if (targets.solver) equipmentOptions.solver = targets.solver
 
   if (process.env.VELA_ALIGNMENT_DIAGNOSTICS_PATH) {
@@ -99,7 +108,7 @@ try {
   const equipment = createEquipmentComposition(cria, equipmentOptions)
 
   if (!shutdownTask) {
-    const options = { rigCatalog, savedImages, targets, surveyCache, equipment, alerts }
+    const options = { rigCatalog, savedImages, frameRecords, targets, surveyCache, equipment, alerts }
     app = buildApp(alignment ? { ...options, alignment } : options)
     await app.listen({ port, host })
   }
