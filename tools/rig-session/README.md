@@ -59,7 +59,14 @@ Replay needs the Vela server built (`pnpm replay` does it first with `pnpm --fil
 
 ### Scenarios
 
-`runScenario(recording, options)` (`replay/scenario.ts`) starts the same rig, starts a capture, polls Vela's HTTP API until the attempts have settled, stops the run and tears the rig down. It returns the saved frames and their statistics as the API reports them, each attempt's outcome from the frame record file, the alerts Vela raised and the FITS bytes of each saved frame. A scenario is a `*.scenario.ts` file that asserts literal values; `pnpm scenarios` runs them (they start processes and take seconds each, so `pnpm test` does not).
+`runScenario(recording, options)` (`replay/scenario.ts`) starts the same rig, starts a capture, polls Vela's HTTP API until the attempts have settled, stops the run and tears the rig down. It returns the saved frames and their statistics as the API reports them, each attempt's outcome from the frame record file, the alerts Vela raised and the FITS bytes of each saved frame. A scenario is a `*.scenario.ts` file that asserts literal values; `pnpm scenarios` runs them (they start processes and take about three minutes together, so `pnpm test` does not). `result.alertChanges` lists the alerts Vela's alerts view showed, each time the set changed.
+
+| Scenario | The fault | What Vela reports |
+| --- | --- | --- |
+| `camera-snag` | `blank` frames from frame 6 | star counts `12 x 6, 0 x 6`; `stars-collapsed` (critical) within two frames of the first blank one; mount tracking throughout |
+| `am5-meridian-stop` | pre-meridian side, then a `set` fault turns tracking off at frame 7 | `meridian-near`, then `meridian-imminent`, then `tracking-stopped` |
+| `faults` (silent) | the mount `silent` for 40 s | `rig-unreachable` after 30 s, cleared when the mount answers; every capture still saved |
+| `faults` (disconnect) | every INDI connection closed during frame 3's exposure | the attempt ends `uncertain`, the run `failed` with Cria's reason, `run-failed` raised |
 
 `synthesizeTape` (`replay/tape.ts`) makes the recording with the pinned Cria's `indi-replay synthesize`: small frames, a made-up site, a camera and a mount. Committed scenarios use only these.
 
@@ -69,3 +76,9 @@ Two checks, both re-runnable:
 
 - `pnpm --filter @vela/rig-session exec tsx src/replay/containment.ts -- <command>` lists both repositories, `~/.local/share/rig-sessions` and `~/.config/vela` before and after the command, with `TMPDIR` pointing at a fresh folder, and exits 1 if anything outside that folder was added, removed or changed. (`~/.local/share/vela` is not watched by default: the live Vela writes it all day.)
 - `tools/rig-session/sandboxed-scenarios.sh` runs the scenarios with the whole file system read-only except a fresh temporary folder (bubblewrap), so a write anywhere else fails.
+
+### Scrub guard
+
+`pnpm --filter @vela/rig-session scrub [repository]` (and `scrub.test.ts`, which runs in `pnpm test`) fails if a committed fixture holds what must not be in a public repository: a real observing site, in any shape (INDI `GEOGRAPHIC_COORD` latitude and longitude, latitude or longitude fields, a mount log whose UTC and `lst_h` columns imply a longitude), FITS location cards (`SITELAT`, `SITELONG`, `OBSGEO-*`, `OBJCTRA`, `OBJCTDEC` and the like), and `/dev/serial/by-id` paths. The made-up sites that may be committed are `fakeSites` in `scrub.ts`; the serial placeholders are listed there too. A finding names the file, line and rule and never the value. A fixture is a tracked data file (`.fits`, `.blob`, `.csv`, `.jsonl`, `.xml`, or any file under a `fixtures`, `golden`, `recordings` or `tapes` folder). `synthesizeTape` runs the same check on the tape it writes.
+
+`knownExceptions` in `scrub-repository.ts` lists findings that were committed before the guard existed. An exception that no longer matches anything fails the test, so the list cannot outlive its cause.

@@ -19,8 +19,11 @@ export interface ScenarioResult {
   frames: SavedFrame[]
   /** One per settled attempt, successful or not, from Vela's frame record file. */
   attempts: Attempt[]
-  /** Each alert Vela raised, with how many attempts had settled the first time the alerts view showed it. */
-  alertsRaised: Array<{ id: string; level: 'warn' | 'critical'; message: string; afterAttempts: number }>
+  /**
+   * The alerts Vela's alerts view showed, each time the set of them changed, with how many attempts had
+   * settled when the change was seen. The view polls every 250 ms, so a change is seen within that of when it happened.
+   */
+  alertChanges: Array<{ afterAttempts: number; alerts: Array<{ id: string; level: 'warn' | 'critical'; message: string }> }>
   /** How the run ended, as the capture view reports it. */
   finalPhase: string
   finalError: string | null
@@ -65,7 +68,7 @@ async function get<T>(rig: ReplayRig, path: string, schema: z.ZodType<T>): Promi
 async function capture(rig: ReplayRig, exposureSeconds: number, wanted: number, timeoutMs: number): Promise<ScenarioResult> {
   const base = `/api/rigs/${rig.rigId}`
   const view = `/api/web/rigs/${rig.rigId}`
-  const alertsRaised: ScenarioResult['alertsRaised'] = []
+  const alertChanges: ScenarioResult['alertChanges'] = []
   const deadline = Date.now() + timeoutMs
   const start = await rig.api('POST', `${base}/capture/start`, captureView, { exposureSeconds, repeat: true, saveFrames: true })
 
@@ -89,10 +92,10 @@ async function capture(rig: ReplayRig, exposureSeconds: number, wanted: number, 
     attempts = await readAttempts(rig.paths.frameRecords)
     current = await get(rig, `${view}/capture`, captureView)
 
-    for (const alert of (await get(rig, `${view}/alerts`, alertsView)).alerts) {
-      if (!alertsRaised.some(seen => seen.id === alert.id))
-        alertsRaised.push({ id: alert.id, level: alert.level, message: alert.message, afterAttempts: attempts.length })
-    }
+    const alerts = (await get(rig, `${view}/alerts`, alertsView)).alerts
+    const shown = (alertChanges.at(-1)?.alerts ?? []).map(alert => alert.id).join()
+
+    if (alerts.map(alert => alert.id).join() !== shown) alertChanges.push({ afterAttempts: attempts.length, alerts })
   }
 
   if (current.active) await rig.api('POST', `${base}/capture/stop`, captureView, {})
@@ -109,5 +112,5 @@ async function capture(rig: ReplayRig, exposureSeconds: number, wanted: number, 
     frames.map(async frame => Buffer.from(await (await fetch(`${rig.urls.vela}${frame.fitsUrl}`)).arrayBuffer())),
   )
 
-  return { frames, attempts: await readAttempts(rig.paths.frameRecords), alertsRaised, finalPhase: current.phase, finalError: current.error, fits }
+  return { frames, attempts: await readAttempts(rig.paths.frameRecords), alertChanges, finalPhase: current.phase, finalError: current.error, fits }
 }
