@@ -1,8 +1,10 @@
 import { expect, test } from 'vitest'
-import { indiEvents } from './indi.ts'
+import { indiEvents, indiImages } from './indi.ts'
 import type { RecordedLine } from './recording.ts'
 
-const line = (n: number, dir: 'in' | 'out', xml: string): RecordedLine => ({ k: 'msg', at: new Date('2030-01-01T01:00:00Z'), conn: 1, dir, n, xml })
+type Message = Extract<RecordedLine, { k: 'msg' }>
+
+const line = (n: number, dir: 'in' | 'out', xml: string): Message => ({ k: 'msg', at: new Date('2030-01-01T01:00:00Z'), conn: 1, dir, n, xml })
 
 const number = (state: string, ...elements: [string, string][]) =>
   `<setNumberVector device="Mount" name="EQUATORIAL_EOD_COORD" state="${state}">${elements.map(([name, value]) => `<oneNumber name="${name}">${value}</oneNumber>`).join('')}</setNumberVector>`
@@ -71,5 +73,14 @@ test('what a property held is forgotten when its connection closes or the record
     [0, 'update', { RA: '1' }],
     [2, 'update', { RA: '1' }],
     [4, 'update', { RA: '1' }],
+  ])
+})
+
+test('images are the BLOB elements that name a file, with the size INDI stated', () => {
+  const xml = '<setBLOBVector device="Cam" name="CCD1" state="Ok"><oneBLOB name="CCD1" size="5000" format=".fits" len="5000" ref="blobs/1-5-0.blob"/></setBLOBVector>'
+  const named = { ...line(5, 'in', xml), blobs: ['blobs/1-5-0.blob'] }
+
+  expect(indiImages([named, line(6, 'in', xml), { ...named, n: 7, dir: 'out' }])).toEqual([
+    { at: new Date('2030-01-01T01:00:00Z'), conn: 1, n: 5, device: 'Cam', property: 'CCD1', element: 'CCD1', path: 'blobs/1-5-0.blob', bytes: 5000 },
   ])
 })

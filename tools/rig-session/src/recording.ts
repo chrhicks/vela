@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { z } from 'zod'
-import { IndiEventTracker, type IndiEvent } from './indi.ts'
+import { imagesOf, IndiEventTracker, type IndiEvent, type IndiImage } from './indi.ts'
 import { jsonText, linesOf, type ReadResult, type Skipped } from './inputs.ts'
 import { Secrets } from './sanitize.ts'
 import { learnFromMessage } from './traffic-secrets.ts'
@@ -60,6 +60,8 @@ export interface Recording extends ReadResult<RecordedLine> {
   readonly devices: readonly RecordedDevice[]
   /** The changes on the INDI wire, in order (`indi_events` before its window). */
   readonly events: readonly IndiEvent[]
+  /** The camera images the wire carried (`indi_images` before its window). */
+  readonly images: readonly IndiImage[]
   /** Lines that decoded; `items` holds only the ones a table needs (see `readRecording`). */
   readonly linesRead: number
   /** The last line is not complete: Cria died in the middle of an append. */
@@ -88,6 +90,7 @@ export async function readRecording(directory: string, secrets = new Secrets()):
   const path = join(directory, 'traffic.jsonl')
   const items: RecordedLine[] = []
   const events = new IndiEventTracker()
+  const images: IndiImage[] = []
   let damagedAt: number | null = null
   let linesRead = 0
   let ignored = 0
@@ -114,6 +117,7 @@ export async function readRecording(directory: string, secrets = new Secrets()):
       last = parsed.data
 
       events.accept(parsed.data)
+      images.push(...imagesOf(parsed.data))
 
       if (parsed.data.k === 'msg') learnFromMessage(parsed.data.xml, secrets)
       else if (parsed.data.k === 'op') secrets.learnFromJson(jsonText(z.json()).parse(raw.text))
@@ -132,6 +136,7 @@ export async function readRecording(directory: string, secrets = new Secrets()):
     startedAt: manifest.startedAt,
     devices: manifest.devices,
     events: events.events,
+    images,
     linesRead,
     tornTail,
     ended: last?.k === 'end',
