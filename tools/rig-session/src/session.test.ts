@@ -5,7 +5,7 @@ import { expect, test } from 'vitest'
 import { publishPackage } from './package.ts'
 import { openPackage } from './query.ts'
 import type { Tables } from './schema.ts'
-import { jsonLines, opLine, writeRecording } from './recording-fixture.ts'
+import { jsonLines, msgLine, opLine, writeRecording } from './recording-fixture.ts'
 import { buildSession } from './session.ts'
 
 const window = { from: new Date('2030-01-01T00:00:00Z'), to: new Date('2030-01-01T06:00:00Z') }
@@ -107,6 +107,13 @@ async function syntheticNight() {
       outcome: { kind: 'confirmed', value: { values: { setup: 'sent GEOGRAPHIC_COORD LAT=12.5 LONG=345.25 ELEV=0 on /dev/serial/by-id/usb-Test_0001' }, image: null } },
     }),
     opLine({ id: 'refused', kind: 'capture', acceptedAt: '2030-01-01T01:04:00Z', settledAt: '2030-01-01T01:04:01Z', outcome: { kind: 'failed', reason: 'invalid', message: 'needs a mono frame on /dev/ttyUSB0' } }),
+    msgLine(0, '2030-01-01T00:59:10Z', 'out', '<newNumberVector device="Test Mount" name="GEOGRAPHIC_COORD"><oneNumber name="LAT">12.5</oneNumber><oneNumber name="LONG">345.25</oneNumber></newNumberVector>'),
+    msgLine(0, '2030-01-01T00:59:11Z', 'in', '<defTextVector device="Test Mount" name="DEVICE_PORT" state="Ok"><defText name="PORT">/dev/serial/by-id/usb-Test_0001</defText></defTextVector>'),
+    msgLine(1, '2030-01-01T00:59:12Z', 'in', '<defNumberVector device="Test Camera" name="CCD_EXPOSURE" state="Idle"><defNumber name="CCD_EXPOSURE_VALUE">0</defNumber></defNumberVector>'),
+    msgLine(0, '2030-01-01T01:01:01Z', 'out', '<newNumberVector device="Test Camera" name="CCD_EXPOSURE"><oneNumber name="CCD_EXPOSURE_VALUE">50</oneNumber></newNumberVector>'),
+    msgLine(2, '2030-01-01T01:01:02Z', 'in', '<setNumberVector device="Test Camera" name="CCD_EXPOSURE" state="Busy"><oneNumber name="CCD_EXPOSURE_VALUE">50</oneNumber></setNumberVector>'),
+    msgLine(3, '2030-01-01T01:01:03Z', 'in', '<setNumberVector device="Test Camera" name="CCD_EXPOSURE" state="Busy"><oneNumber name="CCD_EXPOSURE_VALUE">50</oneNumber></setNumberVector>'),
+    msgLine(4, '2030-01-01T01:01:30Z', 'in', '<message device="Test Camera" timestamp="2030-01-01T01:01:30" message="[ERROR] Cooler fault at LAT=12.5 on /dev/ttyUSB0"/>'),
     { k: 'end', t: 1, at: Date.parse('2030-01-01T01:10:00Z') },
   ))
 
@@ -162,7 +169,7 @@ test('session.json lists the inputs it found and the ones it lacks', async () =>
     ['indi-recording', 'found'],
     ['frame-records', 'found'],
   ])
-  expect(summary.rows).toEqual({ frames: 3, attempts: 3, indi_ops: 5, mount: 3, spans: 3 })
+  expect(summary.rows).toEqual({ frames: 3, attempts: 3, indi_ops: 5, indi_events: 6, mount: 3, spans: 3 })
   expect(summary.links.frame_to_span).toEqual({ exact: 0, inferred: 3, ambiguous: 0, none: 0 })
   expect(summary.links.frame_to_attempt).toEqual({ exact: 3, inferred: 0, ambiguous: 0, none: 0 })
   expect(summary.links.frame_to_operation).toEqual({ exact: 3, inferred: 0, ambiguous: 0, none: 0 })
@@ -193,6 +200,7 @@ test('a build that fails part way leaves the previous package readable, and the 
     frames: [],
     attempts: [],
     indi_ops: [],
+    indi_events: [],
     mount: [],
     spans: [
       {
@@ -288,5 +296,43 @@ test('no cell of the package holds the site or a serial path that the recording 
 
   expect(cells).not.toMatch(/12\.5|345\.25|serial|ttyUSB|Test_0001/)
   expect(cells).toContain('connect')
+  session.close()
+})
+
+test('a query lists the writes and errors during a frame\'s exposure with the operation they belong to', async () => {
+  const night = await syntheticNight()
+  const root = join(night.dir, 'out')
+
+  await build(night, root)
+
+  const session = await openPackage(join(root, 'package'))
+
+  expect(
+    await session.rows(`
+      SELECT e.kind, e.direction, e.property, e.state, e.operation_id, e.operation_link
+      FROM frames f JOIN indi_events e ON e.device = 'Test Camera' AND e.at BETWEEN f.captured_at AND f.captured_at + f.exposure_seconds * INTERVAL 1 SECOND + INTERVAL 5 SECOND
+      WHERE f.frame_id = 'frame-0' ORDER BY e.at`),
+  ).toEqual([
+    { kind: 'write', direction: 'out', property: 'CCD_EXPOSURE', state: null, operation_id: 'operation-0', operation_link: 'inferred' },
+    { kind: 'update', direction: 'in', property: 'CCD_EXPOSURE', state: 'Busy', operation_id: 'operation-0', operation_link: 'inferred' },
+    { kind: 'message', direction: 'in', property: null, state: null, operation_id: 'operation-0', operation_link: 'inferred' },
+  ])
+  session.close()
+})
+
+test('no event holds the site, a serial path or the values of the properties that name them', async () => {
+  const night = await syntheticNight()
+  const root = join(night.dir, 'out')
+
+  await build(night, root)
+
+  const session = await openPackage(join(root, 'package'))
+  const cells = JSON.stringify(await session.rows('SELECT * FROM indi_events'))
+
+  expect(cells).not.toMatch(/12\.5|345\.25|serial|ttyUSB|Test_0001/)
+  expect(await session.rows("SELECT property, values FROM indi_events WHERE property IN ('GEOGRAPHIC_COORD', 'DEVICE_PORT') ORDER BY property")).toEqual([
+    { property: 'DEVICE_PORT', values: '{"*":"[redacted]"}' },
+    { property: 'GEOGRAPHIC_COORD', values: '{"*":"[redacted]"}' },
+  ])
   session.close()
 })

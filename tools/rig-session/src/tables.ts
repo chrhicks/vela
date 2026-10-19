@@ -1,8 +1,9 @@
 import type { FrameRecord, MountSample, SavedImage, TraceSpan } from './inputs.ts'
-import { linkAttemptToFrame, linkAttemptToOperation, linkFrameToAttempt, linkFrameToSpan, linkMountAsOf, type Link, type MountLink } from './joins.ts'
+import { indiEvents, type IndiEvent } from './indi.ts'
+import { linkAttemptToFrame, linkAttemptToOperation, linkEventToOperation, linkFrameToAttempt, linkFrameToSpan, linkMountAsOf, type Link, type MountLink } from './joins.ts'
 import { operationsOf, type RecordedOperation, type Recording } from './recording.ts'
 import { redactedJson, redactText } from './redact.ts'
-import type { AttemptRow, FrameRow, IndiOpRow, LinkKind, MountRow, SpanRow, Tables } from './schema.ts'
+import type { AttemptRow, FrameRow, IndiEventRow, IndiOpRow, LinkKind, MountRow, SpanRow, Tables } from './schema.ts'
 
 export interface TimeWindow {
   readonly from: Date
@@ -50,7 +51,13 @@ export function buildTables(session: string, window: TimeWindow, inputs: Session
   const exportedAttempts = inputs.frameRecords.filter(record => inWindow(record.startedAt) || linkedAttempts.has(record))
   const attemptOperations = exportedAttempts.map(record => linkAttemptToOperation(record, operations))
 
-  const linkedOperations = new Set([...frames.map(({ operationLink }) => operationLink), ...attemptOperations].flatMap(link => linkTargets(link)))
+  const devices = inputs.recording?.devices ?? []
+  const events = indiEvents(inputs.recording?.items ?? []).filter(event => inWindow(event.at))
+  const eventOperations = events.map(event => linkEventToOperation(event, operations, devices))
+
+  const linkedOperations = new Set(
+    [...frames.map(({ operationLink }) => operationLink), ...attemptOperations, ...eventOperations].flatMap(link => linkTargets(link)),
+  )
 
   return {
     frames: frames.map(({ image, spanLink, mount, attemptLink, operationLink }) => frameRow(session, image, spanLink, mount, attemptLink, operationLink)),
@@ -58,6 +65,7 @@ export function buildTables(session: string, window: TimeWindow, inputs: Session
     indi_ops: operations
       .filter(operation => inWindow(operation.acceptedAt) || linkedOperations.has(operation))
       .map(operation => operationRow(session, operation, inputs.recording)),
+    indi_events: events.map((event, index) => eventRow(session, event, eventOperations[index] ?? null)),
     mount: inputs.mountSamples
       .filter(sample => inWindow(sample.sampledAt) || linkedMountTimes.has(sample.sampledAt.getTime()))
       .map(sample => mountRow(session, sample)),
@@ -165,6 +173,28 @@ function operationRow(session: string, operation: RecordedOperation, recording: 
     parameters: JSON.stringify(redactedJson(operation.parameters ?? null)),
     image_id: image?.id ?? null,
     image_bytes: image?.original?.bytes ?? null,
+  }
+}
+
+function eventRow(session: string, event: IndiEvent, operationLink: Link<RecordedOperation> | null): IndiEventRow {
+  const operation = operationLink?.kind === 'ambiguous' ? null : (operationLink?.target ?? null)
+
+  return {
+    session,
+    at: event.at,
+    conn: event.conn,
+    direction: event.direction,
+    n: event.n,
+    kind: event.kind,
+    device: event.device,
+    property: event.property,
+    state: event.state,
+    values: event.values && JSON.stringify(event.values),
+    changed: event.changed && JSON.stringify(event.changed),
+    text: event.text,
+    operation_id: operation?.id ?? null,
+    operation_link: linkKind(operationLink),
+    operation_candidates: candidates(operationLink, candidate => candidate.id),
   }
 }
 
