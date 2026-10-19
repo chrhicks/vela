@@ -43,6 +43,22 @@ afterEach(async () => {
 })
 
 describe('saved image store', () => {
+  it('keeps the ids a frame came from, and reads an older file without them as unknown', async () => {
+    const path = await temporary()
+    const store = await openFileSavedImageStore(path)
+    const provenance = { requestId: 'request-1', operationId: 'operation-1', imageId: null }
+
+    await store.save('rig', { ...image, id: 'with-ids', provenance }, files)
+    await store.save('rig', { ...image, id: 'no-ids', provenance: null }, files)
+    await store.save('rig', { ...image, id: 'older' }, files)
+
+    const reopened = await openFileSavedImageStore(path)
+
+    expect((await reopened.get('rig', 'with-ids'))?.provenance).toEqual(provenance)
+    expect((await reopened.get('rig', 'no-ids'))?.provenance).toBeNull()
+    expect(await reopened.get('rig', 'older')).not.toHaveProperty('provenance')
+  })
+
   it.each(['memory', 'file'])(
     '%s preserves one artifact per rig/frame with isolated downloads',
     async kind => {

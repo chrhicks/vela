@@ -23,6 +23,7 @@ import { createRigOperations } from './rig/operations.js'
 import { registerMountControls } from './rig/mount-control.js'
 import { getTarget } from './targets/catalog/index.js'
 import { registerCapture } from './capture/routes.js'
+import { noFrameRecords, type FrameRecords } from './capture/frame-records.js'
 import { registerAutofocus } from './autofocus/routes.js'
 import { registerNavigation } from './navigation.js'
 import { registerImagingCamera } from './rig/imaging-camera.js'
@@ -38,6 +39,7 @@ interface BuildAppOptions {
   readonly targets?: Omit<TargetOptions, 'createAdapter' | 'createAcquisition' | 'createInspector'>
   readonly surveyCache?: SurveyCache
   readonly savedImages?: SavedImageStore
+  readonly frameRecords?: FrameRecords
   readonly alignment?: AlignmentSettings
   readonly alpacaDiscovery?: AlpacaDiscovery
   readonly createConnector?: (rig: RigEquipmentSource) => EquipmentConnector
@@ -67,6 +69,7 @@ export function buildApp({
   now = () => new Date(),
   rigCatalog = createMemoryRigCatalog(),
   savedImages = createMemorySavedImageStore(),
+  frameRecords = noFrameRecords,
 }: BuildAppOptions = {}) {
   const app = Fastify({ logger: true })
   app.addHook('onReady', async () => { equipment.start() })
@@ -91,6 +94,7 @@ export function buildApp({
     createAcquisition: equipment.createAcquisition,
     createCooling: settings => equipment.createCooling(settings.rig),
     savedImages,
+    frameRecords,
     lookupSubject(targetId) {
       const target = getTarget(targetId)
 
