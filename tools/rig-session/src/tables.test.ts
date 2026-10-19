@@ -121,14 +121,32 @@ test('hour angle is sidereal time minus right ascension, wrapped into (-12, 12]'
   expect(hourAngle(13, 0)).toBe(-11)
 })
 
-test('a frame at the start of the window still links to the mount sample and span just before it', () => {
+test('a frame at the start of the window exports the mount sample and span it links to, so a join finds them', () => {
   const tables = buildTables('test-night', window, {
     savedImages: [image('first', '00:00:01')],
-    spans: [{ ...span('started-early', '00:00:00', '00:01:00', 4), startedAt: new Date('2029-12-31T23:59:30Z') }],
-    mountSamples: [{ ...sample('00:00:00', true), sampledAt: new Date('2029-12-31T23:59:58Z') }],
+    spans: [
+      { ...span('started-early', '00:00:00', '00:01:00', 4), startedAt: new Date('2029-12-31T23:59:30Z') },
+      { ...span('unrelated', '00:00:00', '00:01:00', 3), startedAt: new Date('2029-12-31T22:00:00Z'), endedAt: new Date('2029-12-31T22:01:00Z') },
+    ],
+    mountSamples: [
+      { ...sample('00:00:00', true), sampledAt: new Date('2029-12-31T23:59:58Z') },
+      { ...sample('00:00:00', true), sampledAt: new Date('2029-12-31T23:59:50Z') },
+    ],
   })
 
   expect(tables.frames[0]).toMatchObject({ span_id: 'started-early', mount_link: 'inferred', mount_age_seconds: 3 })
-  expect(tables.spans).toEqual([])
-  expect(tables.mount).toEqual([])
+  expect(tables.spans.map(row => row.span_id)).toEqual(['started-early'])
+  expect(tables.mount.map(row => row.sampled_at)).toEqual([new Date('2029-12-31T23:59:58Z')])
+})
+
+test('a frame at the start of the window with an ambiguous span link exports every candidate span', () => {
+  const early = (spanId: string, index: number) => ({ ...span(spanId, '00:00:00', '00:01:00', index), startedAt: new Date('2029-12-31T23:59:30Z') })
+  const tables = buildTables('test-night', window, {
+    savedImages: [image('contested', '00:00:10')],
+    spans: [early('first', 1), early('second', 2)],
+    mountSamples: [],
+  })
+
+  expect(tables.frames[0]).toMatchObject({ span_link: 'ambiguous', span_candidates: '["first","second"]' })
+  expect(tables.spans.map(row => row.span_id)).toEqual(['first', 'second'])
 })
