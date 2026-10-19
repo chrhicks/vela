@@ -10,7 +10,8 @@ pnpm --filter @vela/rig-session rig-session build \
   --traces ~/.local/share/vela/traces/observing.jsonl \
   --mount-csv path/to/mount-watch.csv \
   --frame-records ~/.local/share/vela/traces/frames.jsonl \
-  --recording ~/recordings/2030-01-01-example
+  --recording ~/recordings/2030-01-01-example \
+  --journal ~/.local/share/vela/traces/cria-journal.jsonl
 
 pnpm --filter @vela/rig-session rig-session query ~/.local/share/rig-sessions/2030-01-01-example/package \
   "SELECT detected_stars FROM frames ORDER BY captured_at"
@@ -20,7 +21,7 @@ The inputs are read-only. Every input is optional; `session.json` in the package
 
 ## Package layout
 
-`<out>/package` is a symlink to `<out>/builds/<time>`, which holds `frames.parquet`, `attempts.parquet`, `indi_ops.parquet`, `indi_events.parquet`, `indi_images.parquet`, `mount.parquet`, `spans.parquet` and `session.json`. A build writes into a fresh directory and switches the symlink with one rename, so a build that fails leaves the previous package readable. The next finished build removes the older directories.
+`<out>/package` is a symlink to `<out>/builds/<time>`, which holds `frames.parquet`, `attempts.parquet`, `indi_ops.parquet`, `indi_events.parquet`, `indi_images.parquet`, `cria_requests.parquet`, `cria_image_checks.parquet`, `mount.parquet`, `spans.parquet` and `session.json`. A build writes into a fresh directory and switches the symlink with one rename, so a build that fails leaves the previous package readable. The next finished build removes the older directories.
 
 Rebuilding the same inputs gives the same rows in the same files. Only `session.json` carries the build time.
 
@@ -44,9 +45,11 @@ A link with no match is null. The packager never guesses.
 - `indi_events.operation_*` links a wire event (an update, a write, a message) to the Cria operation whose window covers it on the same device: `inferred`, by the times Cria wrote on its own clock; `ambiguous` when several cover it (a power box that is both weather and switch). To see the writes and errors during frame N, join `indi_events` on the device and `at` between the frame's `captured_at` and the end of its exposure.
   `indi_events` has one row per first definition of a property on a connection (`define`), per change of state or value (`update`, with `changed` listing the elements that differ), per client write (`write`), per `message` and per `delete`. A `set` that restates the same values is dropped, except a BLOB. `values` and `changed` are filled only for the properties in `exportedProperties` (`src/indi.ts`: position, tracking, exposure, temperature, binning, focus, filter); any other property, the site and the ports among them, is still an event with those two columns null, until someone adds it on purpose. What the tracker remembers of a property is forgotten when its connection closes or the recording has a gap, so the next message reads as a first sight.
 - `indi_images` has one row per camera image in the recording (the BLOB message, the file it was saved to under `blobs/`, the size INDI stated) and links it to the capture operation, `inferred`, whose window on that device covers its arrival (`ambiguous` if several do). `frames.blob_*` links a frame to the image of its operation: frame to operation is `exact`, operation to image is by time, so the chain is `inferred`, `ambiguous` if the operation window holds two images or an image fits two operations. It is not matched by content: Cria's `sha256` is over ImageBytes, not the FITS the recording keeps, and not by `DATE-OBS`, which Cria replaces with the dispatch time when the card is missing.
+- `cria_requests` has one row per exchange Vela had with Cria (`--journal`): the command it sent (request id, device, kind, parameters), how the reply ended (`answered`, `refused` with Cria's code and message, or `lost`) and the HTTP status. It links to the attempt that carries its request id (`attempt_link`, `exact`; `ambiguous` if two attempts carry it) and to the Cria operation named by the reply, the route or the request id (`operation_link`, `exact`, null when the recording does not have it). A lookup or a stop has no command and so no attempt.
+- `cria_image_checks` has one row per image Vela fetched: whether the original matched the size and digest its descriptor promised (`verdict`), linked `exact` to the attempt by the Cria image id and to the operation by its id. `sha_matches_operation` compares the digest Vela computed with the one Cria recorded for that operation, which is a content check of the frame (the BLOB in `indi_images` cannot be checked that way).
 - `frames.mount_*` links a frame to the latest mount sample not after the exposure start, and keeps the sample's age. A polled sample (the CSV, `source = 'csv'`) older than 30 seconds gives no link. A sample from the recording (`source = 'indi'`) is a change of the mount's INDI properties (position, the position property being Busy for slewing, tracking, park, pier side, track mode), and the driver reports only changes, so it holds until the next one or until the evidence is lost, and what was accumulated is forgotten then (a later sample never carries a field from before): a connection that carried the mount closed, a gap, the end, the mount's `CONNECTION` turning off, its properties deleted, or, for a recording that did not end cleanly (damage, a torn tail, still being written), the last line read; `mount_age_seconds` is then how long ago the mount last changed. Sidereal time (and so hour angle) comes from the recorded longitude, which is read and never written to a table; with none they are null. When both sources have a sample at the same millisecond the recording's is kept.
 
-The Vela journal is not read yet. `INPUTS.md` specifies how they will be, and the tables and links they add.
+`INPUTS.md` specifies how they will be, and the tables and links they add.
 
 ## Privacy
 
@@ -59,6 +62,10 @@ After the staged files are written and before the symlink switches, the package 
 ### The recording
 
 A recording is read for `manifest.json` and `traffic.jsonl` only; `blobs/` is never opened. It is streamed, so a tape larger than memory builds in constant space, and only the lines a table needs are kept. As the lines pass, the reader learns the site (`GEOGRAPHIC_COORD`), the ports (`DEVICE_PORT`, `SYSTEM_PORTS`, any `/dev/` path), serial numbers and the INDI host from the manifest into the package's `Secrets`. A torn last line is dropped; a damaged line in the middle (or a line over 64 MiB) keeps the lines before it and `session.json` lists it. That policy is stated once, in `INPUTS.md` ("Damage").
+
+### The journal
+
+The journal is read as a stream and only the entries that start in the build's window are kept, so a journal that spans months builds in constant space. Each entry's `origin` (a host address) is never read into a table; it is learned, so the address and its host are removed wherever they occur. Lines that do not decode are listed in `session.json` (the first 1000).
 
 ## Replay
 

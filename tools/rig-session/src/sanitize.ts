@@ -114,6 +114,22 @@ export class Secrets {
     return [...(literal?.test(text) ? ['learned value'] : []), ...(numbers?.test(text) ? ['learned coordinate'] : [])]
   }
 
+  /** A host address as the journal or the manifest states it: the text, and the host and host:port inside it if it is a URL. Loopback is not a secret. */
+  learnAddress(address: string): void {
+    const text = address.trim()
+
+    if (['localhost', '127.0.0.1', '::1'].includes(text)) return
+
+    this.addLiteral(text)
+
+    const url = URL.canParse(text) ? new URL(text) : null
+
+    if (url !== null && !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)) {
+      this.addLiteral(url.hostname)
+      this.addLiteral(url.host)
+    }
+  }
+
   /**
    * Learns the private values a JSON document holds under the keys that name them: a site coordinate under
    * `latitude`, `longitude` or `elevation`, a path, host or serial number under `port`, `origin`, `host` or `serial`.

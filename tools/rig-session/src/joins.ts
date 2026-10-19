@@ -53,17 +53,30 @@ export function linkAttemptToFrame(record: FrameRecord, images: readonly SavedIm
 }
 
 /**
- * An attempt belongs to the Cria operation it names. The operation id is the key, and the only one
- * while the record has it: an id this recording does not hold is no match, because the request id would
- * link the attempt to an operation that its own exported `operation_id` does not name. Only an attempt
- * with no operation id (Cria never admitted it, or the reply was lost) finds its operation by request id.
+ * An attempt or a journal request belongs to the Cria operation it names. The operation id is the key, and the only
+ * one while the record has it: an id this recording does not hold is no match, because the request id would link the
+ * record to an operation that its own exported `operation_id` does not name. Only a record with no operation id
+ * (Cria never admitted it, or the reply was lost) finds its operation by request id.
  */
-export function linkAttemptToOperation(record: FrameRecord, operations: readonly RecordedOperation[]): Link<RecordedOperation> | null {
+export function linkToOperation(
+  record: { readonly operationId: string | null; readonly requestId: string | null },
+  operations: readonly RecordedOperation[],
+): Link<RecordedOperation> | null {
   if (record.operationId !== null) return exactOrAmbiguous(operations.filter(operation => operation.id === record.operationId))
 
   if (record.requestId === null) return null
 
   return exactOrAmbiguous(operations.filter(operation => operation.requestId === record.requestId))
+}
+
+/**
+ * A request Vela sent belongs to the attempts that carry its request id, an image check to the attempts
+ * that carry the Cria image id. Both are keys, so a match is `exact`; two attempts with one id are `ambiguous`.
+ */
+export function linkToAttempt(key: { readonly requestId?: string; readonly criaImageId?: string }, records: readonly FrameRecord[]): Link<FrameRecord> | null {
+  return exactOrAmbiguous(
+    records.filter(record => (key.requestId !== undefined && record.requestId === key.requestId) || (key.criaImageId !== undefined && record.criaImageId === key.criaImageId)),
+  )
 }
 
 /**

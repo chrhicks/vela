@@ -31,7 +31,7 @@ const operation = z.looseObject({
     kind: z.string(),
     reason: z.string().optional(),
     message: z.string().optional(),
-    value: z.looseObject({ image: z.looseObject({ id: z.string(), original: z.looseObject({ bytes: z.int() }).optional() }).nullish() }).optional(),
+    value: z.looseObject({ image: z.looseObject({ id: z.string(), sha256: z.string().optional(), original: z.looseObject({ bytes: z.int() }).optional() }).nullish() }).optional(),
   }),
 })
 
@@ -89,7 +89,7 @@ const kept = (line: RecordedLine) => line.k === 'op' || line.k === 'gap' || line
 export async function readRecording(directory: string, secrets = new Secrets()): Promise<Recording> {
   const manifest = manifestFile.parse(JSON.parse(await readFile(join(directory, 'manifest.json'), 'utf8')))
 
-  if (manifest.indi && !['localhost', '127.0.0.1', '::1'].includes(manifest.indi.host)) secrets.addLiteral(manifest.indi.host)
+  if (manifest.indi) secrets.learnAddress(manifest.indi.host)
 
   const path = join(directory, 'traffic.jsonl')
   const items: RecordedLine[] = []

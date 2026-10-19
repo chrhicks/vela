@@ -127,7 +127,30 @@ async function syntheticNight() {
     { k: 'end', t: 1, at: Date.parse('2030-01-01T01:10:00Z') },
   ))
 
-  return { dir, savedImagesDir, tracesFile, mountCsvFile, frameRecordsFile, recordingDir }
+  const journalFile = join(dir, 'cria-journal.jsonl')
+  const origin = 'http://cria.example.test:4319'
+
+  await writeFile(
+    journalFile,
+    [
+      ...stars.flatMap((_, index) => [
+        {
+          kind: 'exchange', at: Date.parse(`2030-01-01T01:0${index + 1}:00Z`), ms: 12, method: 'POST', route: '/v2/operations', status: 202,
+          command: { requestId: `request-${index}`, deviceId: 'primary', kind: 'capture', parameters: { exposureSeconds: 50 } },
+          reply: { kind: 'answered', body: { id: `operation-${index}`, requestId: `request-${index}` } },
+        },
+        { kind: 'image', at: Date.parse(`2030-01-01T01:0${index + 1}:56Z`), imageId: `cria-image-${index}`, operationId: `operation-${index}`, bytes: 5000, sha256: index === 1 ? 'other' : `sha-operation-${index}`, verdict: index === 1 ? 'damaged' : 'intact' },
+      ]),
+      { kind: 'exchange', at: Date.parse('2030-01-01T01:04:00Z'), ms: 3, method: 'POST', route: '/v2/operations', status: 409, command: { requestId: 'request-unrecorded', deviceId: 'primary', kind: 'capture', parameters: { exposureSeconds: 50, site: { latitude: 12.5 } } }, reply: { kind: 'refused', code: 'busy', message: 'camera busy on /dev/ttyUSB0' } },
+      { kind: 'exchange', at: Date.parse('2030-01-01T01:02:30Z'), ms: 4, method: 'POST', route: '/v2/operations/operation-1/stop', status: 202, command: null, reply: { kind: 'answered', body: {} } },
+      { kind: 'state', at: Date.parse('2030-01-01T01:02:30Z'), generatedAt: 1, sequence: 1, instanceId: 'instance-1', commandsEnabled: true, baseline: true, changed: {}, removed: [] },
+      { kind: 'stream', at: Date.parse('2030-01-01T01:02:30Z'), event: 'opened', message: null },
+    ]
+      .map(line => `${JSON.stringify({ ...line, origin })}\n`)
+      .join(''),
+  )
+
+  return { dir, savedImagesDir, tracesFile, mountCsvFile, frameRecordsFile, recordingDir, journalFile }
 }
 
 async function build(night: Awaited<ReturnType<typeof syntheticNight>>, root: string) {
@@ -140,6 +163,7 @@ async function build(night: Awaited<ReturnType<typeof syntheticNight>>, root: st
     mountCsvFile: night.mountCsvFile,
     frameRecordsFile: night.frameRecordsFile,
     recordingDir: night.recordingDir,
+    journalFile: night.journalFile,
   })
 }
 
@@ -178,10 +202,13 @@ test('session.json lists the inputs it found and the ones it lacks', async () =>
     ['mount-csv', 'found'],
     ['indi-recording', 'found'],
     ['frame-records', 'found'],
+    ['cria-journal', 'found'],
   ])
-  expect(summary.rows).toEqual({ frames: 3, attempts: 3, indi_ops: 5, indi_events: 11, indi_images: 3, mount: 3, spans: 3 })
+  expect(summary.rows).toEqual({ frames: 3, attempts: 3, indi_ops: 5, indi_events: 11, indi_images: 3, cria_requests: 5, cria_image_checks: 3, mount: 3, spans: 3 })
   expect(summary.links.frame_to_span).toEqual({ exact: 0, inferred: 3, ambiguous: 0, none: 0 })
   expect(summary.links.frame_to_attempt).toEqual({ exact: 3, inferred: 0, ambiguous: 0, none: 0 })
+  expect(summary.links.request_to_attempt).toEqual({ exact: 3, inferred: 0, ambiguous: 0, none: 2 })
+  expect(summary.links.image_check_to_attempt).toEqual({ exact: 3, inferred: 0, ambiguous: 0, none: 0 })
   expect(summary.links.frame_to_blob).toEqual({ exact: 0, inferred: 1, ambiguous: 1, none: 1 })
   expect(summary.links.frame_to_operation).toEqual({ exact: 3, inferred: 0, ambiguous: 0, none: 0 })
   expect(summary.recording).toMatchObject({ name: 'recording', instanceId: 'instance-1', ended: true, tornTail: false, gaps: 0 })
@@ -213,6 +240,8 @@ test('a build that fails part way leaves the previous package readable, and the 
     indi_ops: [],
     indi_events: [],
     indi_images: [],
+    cria_requests: [],
+    cria_image_checks: [],
     mount: [],
     spans: [
       {
@@ -248,7 +277,7 @@ test('a night with no frame records lists them as missing with what that costs, 
   const night = await syntheticNight()
   const root = join(night.dir, 'out')
 
-  await buildSession({ name: 'test-night', window, root, savedImagesDir: night.savedImagesDir, tracesFile: null, mountCsvFile: null, frameRecordsFile: null, recordingDir: null })
+  await buildSession({ name: 'test-night', window, root, savedImagesDir: night.savedImagesDir, tracesFile: null, mountCsvFile: null, frameRecordsFile: null, recordingDir: null, journalFile: null })
 
   const summary = JSON.parse(await readFile(join(root, 'package', 'session.json'), 'utf8'))
   const session = await openPackage(join(root, 'package'))
@@ -348,7 +377,7 @@ test('a site the recording carries is removed from every cell, whatever the fiel
     }),
   ))
 
-  await buildSession({ name: 'test-night', window, root, savedImagesDir: null, tracesFile: null, mountCsvFile: null, frameRecordsFile: null, recordingDir })
+  await buildSession({ name: 'test-night', window, root, savedImagesDir: null, tracesFile: null, mountCsvFile: null, frameRecordsFile: null, recordingDir, journalFile: null })
 
   const session = await openPackage(join(root, 'package'))
   const cells = JSON.stringify(await session.rows('SELECT * FROM indi_ops'))
@@ -442,7 +471,7 @@ test('a recording alone fills the mount table, and a frame links to the latest r
     ),
   )
 
-  await buildSession({ name: 'test-night', window, root, savedImagesDir: night.savedImagesDir, tracesFile: null, mountCsvFile: null, frameRecordsFile: null, recordingDir })
+  await buildSession({ name: 'test-night', window, root, savedImagesDir: night.savedImagesDir, tracesFile: null, mountCsvFile: null, frameRecordsFile: null, recordingDir, journalFile: null })
 
   const summary = JSON.parse(await readFile(join(root, 'package', 'session.json'), 'utf8'))
 
@@ -464,6 +493,46 @@ test('a recording alone fills the mount table, and a frame links to the latest r
   session.close()
 })
 
+test('a query follows a frame to the request Vela sent for it, and to the check of the image it fetched', async () => {
+  const night = await syntheticNight()
+  const root = join(night.dir, 'out')
+
+  await build(night, root)
+
+  const session = await openPackage(join(root, 'package'))
+
+  expect(
+    await session.rows(`
+      SELECT f.frame_id, r.reply_kind, r.operation_id, r.operation_link, r.attempt_link, c.verdict, c.sha_matches_operation, c.attempt_link AS check_link
+      FROM frames f
+      JOIN cria_requests r ON r.run_id = f.run_id AND r.attempt = f.attempt
+      JOIN cria_image_checks c ON c.run_id = f.run_id AND c.attempt = f.attempt
+      ORDER BY f.frame_id`),
+  ).toEqual([
+    { frame_id: 'frame-0', reply_kind: 'answered', operation_id: 'operation-0', operation_link: 'exact', attempt_link: 'exact', verdict: 'intact', sha_matches_operation: true, check_link: 'exact' },
+    { frame_id: 'frame-1', reply_kind: 'answered', operation_id: 'operation-1', operation_link: 'exact', attempt_link: 'exact', verdict: 'damaged', sha_matches_operation: false, check_link: 'exact' },
+    { frame_id: 'frame-2', reply_kind: 'answered', operation_id: 'operation-2', operation_link: 'exact', attempt_link: 'exact', verdict: 'intact', sha_matches_operation: true, check_link: 'exact' },
+  ])
+  expect(await session.rows("SELECT request_id, reply_kind, reply_code, reply_message, attempt_link, operation_link FROM cria_requests WHERE reply_kind = 'refused'")).toEqual([
+    { request_id: 'request-unrecorded', reply_kind: 'refused', reply_code: 'busy', reply_message: 'camera busy on [redacted]', attempt_link: null, operation_link: null },
+  ])
+  expect(await session.rows("SELECT operation_id, operation_link, request_id FROM cria_requests WHERE route LIKE '%/stop'")).toEqual([{ operation_id: 'operation-1', operation_link: 'exact', request_id: null }])
+  session.close()
+})
+
+test('no cell of the journal tables holds the origin, the site or a serial path', async () => {
+  const night = await syntheticNight()
+  const root = join(night.dir, 'out')
+
+  await build(night, root)
+
+  const session = await openPackage(join(root, 'package'))
+  const cells = JSON.stringify([...(await session.rows('SELECT * FROM cria_requests')), ...(await session.rows('SELECT * FROM cria_image_checks'))])
+
+  expect(cells).not.toMatch(/example\.test|12\.5|ttyUSB/)
+  session.close()
+})
+
 /** A night whose recording follows the mount to 01:02:00 and is then cut short in the way `cut` says. */
 async function cutShortNight(cut: 'torn tail' | 'damaged middle' | 'no end') {
   const night = await syntheticNight()
@@ -482,7 +551,7 @@ async function cutShortNight(cut: 'torn tail' | 'damaged middle' | 'no end') {
 
   if (cut === 'torn tail') await writeFile(join(recordingDir, 'traffic.jsonl'), `${lines.join('\n')}\n{"k":"msg","t":6`)
 
-  await buildSession({ name: 'test-night', window, root, savedImagesDir: night.savedImagesDir, tracesFile: null, mountCsvFile: null, frameRecordsFile: null, recordingDir })
+  await buildSession({ name: 'test-night', window, root, savedImagesDir: night.savedImagesDir, tracesFile: null, mountCsvFile: null, frameRecordsFile: null, recordingDir, journalFile: null })
 
   const session = await openPackage(join(root, 'package'))
   const frames = await session.rows('SELECT frame_id, mount_link FROM frames ORDER BY frame_id')
