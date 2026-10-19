@@ -1,10 +1,9 @@
 import { randomUUID } from 'node:crypto'
 import { trace, SpanStatusCode, type Span } from '@opentelemetry/api'
 import type { CaptureImage, CaptureImageProvenance, CaptureSubject, CaptureView } from '@vela/model/web'
-import { capturePreviews, type ImageColor } from '../imaging/preview.js'
-import { measureStars } from '../imaging/statistics.js'
+import { frameImaging, type FrameImaging } from '../imaging/frame-imaging.js'
+import type { ImageColor } from '../imaging/preview.js'
 import { PREVIEW_VERSION } from '../imaging/background.js'
-import { encodeCaptureFits } from '../imaging/fits.js'
 import {
   createMemorySavedImageStore,
   type SavedImageStore,
@@ -86,6 +85,7 @@ export function createCaptureController(
   now = Date.now,
   savedImages: SavedImageStore = createMemorySavedImageStore(),
   frameRecords: FrameRecords = noFrameRecords,
+  imaging: FrameImaging = frameImaging,
 ) {
   let view: CaptureView = {
     rigId: settings.rigId,
@@ -349,13 +349,13 @@ export function createCaptureController(
         const processStartedAt = performance.now()
 
         const [previews, statistics, fits] = await Promise.all([
-          capturePreviews(frame.width, frame.height, frame.pixels, frame.color),
-          measureStars(frame.width, frame.height, frame.pixels, frame.color).catch(error => {
+          imaging.render(frame.width, frame.height, frame.pixels, frame.color),
+          imaging.analyze(frame.width, frame.height, frame.pixels, frame.color).catch(error => {
             console.warn('Capture image star measurements unavailable', error)
 
             return null
           }),
-          encodeCaptureFits(frame, { exposureSeconds, cameraName }),
+          imaging.encodeFits(frame, { exposureSeconds, cameraName }),
         ])
 
         span.setAttributes({
