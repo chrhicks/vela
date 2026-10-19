@@ -39,7 +39,7 @@ A link with no match is null. The packager never guesses.
 - `frames.span_*` links a saved frame to the `capture.frame` span that was running when the camera started the exposure.
 - `frames.mount_*` links a frame to the latest mount sample not after the exposure start, and keeps the sample's age. A sample older than 30 seconds gives no link.
 
-Frame records, the Cria recording and the Vela journal are not read yet. When they exist their formats add columns, tables and `exact` links here.
+Frame records, the Cria recording and the Vela journal are not read yet. `INPUTS.md` specifies how they will be, and the tables and links they add.
 
 ## Replay
 
