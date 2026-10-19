@@ -25,7 +25,7 @@ const operation = z.looseObject({
     kind: z.string(),
     reason: z.string().optional(),
     message: z.string().optional(),
-    value: z.looseObject({ image: z.looseObject({ id: z.string(), original: z.looseObject({ bytes: z.int() }).optional() }).nullish() }).optional(),
+    value: z.looseObject({ image: z.looseObject({ id: z.string(), sha256: z.string().optional(), original: z.looseObject({ bytes: z.int() }).optional() }).nullish() }).optional(),
   }),
 })
 

@@ -1,7 +1,9 @@
+import { journalRows } from './journal-tables.ts'
+import type { JournalEntry } from './journal.ts'
 import type { FrameRecord, MountSample, SavedImage, TraceSpan } from './inputs.ts'
 import { mountSamplesOf } from './mount.ts'
 import { indiEvents, indiImages, type IndiEvent, type IndiImage } from './indi.ts'
-import { linkAttemptToFrame, linkAttemptToOperation, linkEventToOperation, linkFrameToAttempt, linkOperationToImage, linkFrameToSpan, linkMountAsOf, type Link, type LinkedImage, type MountLink } from './joins.ts'
+import { linkAttemptToFrame, linkToOperation, linkEventToOperation, linkFrameToAttempt, linkOperationToImage, linkFrameToSpan, linkMountAsOf, type Link, type LinkedImage, type MountLink } from './joins.ts'
 import { operationsOf, type RecordedOperation, type Recording } from './recording.ts'
 import { redactedJson, redactText } from './redact.ts'
 import type { AttemptRow, FrameRow, IndiEventRow, IndiImageRow, IndiOpRow, LinkKind, MountRow, SpanRow, Tables } from './schema.ts'
@@ -16,6 +18,7 @@ export interface SessionInputs {
   readonly spans: readonly TraceSpan[]
   readonly frameRecords: readonly FrameRecord[]
   readonly recording: Recording | null
+  readonly journal: readonly JournalEntry[]
   readonly mountSamples: readonly MountSample[]
 }
 
@@ -51,7 +54,7 @@ export function buildTables(session: string, window: TimeWindow, inputs: Session
     const attemptLink = linkFrameToAttempt(image, inputs.frameRecords)
     const attempt = attemptLink?.kind === 'exact' ? attemptLink.target : null
 
-    const operationLink = attempt && linkAttemptToOperation(attempt, operations)
+    const operationLink = attempt && linkToOperation(attempt, operations)
     const blobLink = operationLink?.kind === 'exact' ? linkOperationToImage(operationLink.target, linkedImages) : null
 
     return { image, spanLink, mount, attemptLink, operationLink, blobLink }
@@ -60,10 +63,11 @@ export function buildTables(session: string, window: TimeWindow, inputs: Session
   const linkedSpans = new Set(frames.flatMap(({ spanLink }) => linkTargets(spanLink)))
   const linkedMountTimes = new Set(frames.flatMap(({ mount }) => linkTargets(mount?.link ?? null).map(time => time.getTime())))
 
-  const linkedAttempts = new Set(frames.flatMap(({ attemptLink }) => linkTargets(attemptLink)))
+  const journal = journalRows(session, inputs.journal, inWindow, inputs.frameRecords, operations)
+  const linkedAttempts = new Set([...frames.flatMap(({ attemptLink }) => linkTargets(attemptLink)), ...journal.linkedAttempts])
   const exportedImages = frames.map(({ image }) => image)
   const exportedAttempts = inputs.frameRecords.filter(record => inWindow(record.startedAt) || linkedAttempts.has(record))
-  const attemptOperations = exportedAttempts.map(record => linkAttemptToOperation(record, operations))
+  const attemptOperations = exportedAttempts.map(record => linkToOperation(record, operations))
 
   const events = indiEvents(inputs.recording?.items ?? []).filter(event => inWindow(event.at))
   const eventOperations = events.map(event => linkEventToOperation(event, operations, devices))
@@ -71,11 +75,8 @@ export function buildTables(session: string, window: TimeWindow, inputs: Session
   const linkedBlobs = new Set(frames.flatMap(({ blobLink }) => linkTargets(blobLink)))
   const exportedBlobs = linkedImages.filter(({ image }) => inWindow(image.at) || linkedBlobs.has(image))
 
-  const linkedOperations = new Set(
-    [...frames.map(({ operationLink }) => operationLink), ...attemptOperations, ...eventOperations, ...exportedBlobs.map(({ operation }) => operation)].flatMap(link =>
-      linkTargets(link),
-    ),
-  )
+  const operationLinks = [...frames.map(({ operationLink }) => operationLink), ...attemptOperations, ...eventOperations, ...exportedBlobs.map(({ operation }) => operation)]
+  const linkedOperations = new Set([...operationLinks.flatMap(link => linkTargets(link)), ...journal.linkedOperations])
 
   return {
     frames: frames.map(({ image, spanLink, mount, attemptLink, operationLink, blobLink }) =>
@@ -87,6 +88,8 @@ export function buildTables(session: string, window: TimeWindow, inputs: Session
       .map(operation => operationRow(session, operation, inputs.recording)),
     indi_events: events.map((event, index) => eventRow(session, event, eventOperations[index] ?? null)),
     indi_images: exportedBlobs.map(({ image, operation }) => imageRow(session, image, operation)),
+    cria_requests: journal.requests,
+    cria_image_checks: journal.imageChecks,
     mount: mountSamples.flatMap(sample =>
       inWindow(sample.sampledAt) || linkedMountTimes.has(sample.sampledAt.getTime()) ? [mountRow(session, sample)] : [],
     ),
@@ -198,6 +201,7 @@ function operationRow(session: string, operation: RecordedOperation, recording: 
     parameters: JSON.stringify(redactedJson(operation.parameters ?? null)),
     image_id: image?.id ?? null,
     image_bytes: image?.original?.bytes ?? null,
+    image_sha256: image?.sha256 ?? null,
   }
 }
 
