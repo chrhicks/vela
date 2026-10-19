@@ -306,20 +306,29 @@ export function createAlertMonitor({
   /** The alert is gone from the banner, so nothing else would ever stop the phone repeating. */
   function keepTryingToCancel(stray: StrayReceipt) {
     strayReceipts.push(stray)
+    retryStraysSoon()
+  }
+
+  function retryStraysSoon() {
     strayTimer ??= setTimeout(retryStrayReceipts, resendAfterFailureMs)
     strayTimer.unref()
   }
 
+  /** A stray stays in the list, so the view keeps saying so, until its cancel succeeds or it expires. */
   async function retryStrayReceipts() {
     strayTimer = undefined
 
-    for (const stray of strayReceipts.splice(0)) {
-      if (!notifier || receiptExpired(stray)) continue
+    for (const stray of strayReceipts.slice()) {
+      const cancelled =
+        notifier && !receiptExpired(stray)
+          ? await callPhone('cancel', 'stray-receipt', 2, () => notifier.cancel(stray.receipt))
+          : { ok: true as const, value: undefined }
 
-      const cancelled = await callPhone('cancel', 'stray-receipt', 2, () => notifier.cancel(stray.receipt))
-
-      if (!cancelled.ok) keepTryingToCancel({ ...stray, reason: cancelled.reason })
+      if (cancelled.ok) strayReceipts.splice(strayReceipts.indexOf(stray), 1)
+      else stray.reason = cancelled.reason
     }
+
+    if (strayReceipts.length > 0) retryStraysSoon()
   }
 
   function receiptExpired({ sentAt }: { sentAt: number | null }) {
@@ -525,6 +534,7 @@ export function createAlertMonitor({
     close() {
       stopPolling()
       clearTimeout(strayTimer)
+      strayTimer = undefined
       runToken++
     },
   }

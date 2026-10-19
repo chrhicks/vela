@@ -21,6 +21,8 @@ interface FakePhone {
   events: PhoneEvent[]
   /** While set, every call fails with this reason. */
   down: string | null
+  /** While set, a cancel waits for it before it answers. */
+  cancelGate: Promise<void> | null
   sends(): Array<Extract<PhoneEvent, { kind: 'send' }>>
   cancels(): Array<Extract<PhoneEvent, { kind: 'cancel' }>>
   emergencies(): Array<Extract<PhoneEvent, { kind: 'send' }>>
@@ -33,6 +35,7 @@ function fakePhone(clock: () => number) {
   const phone: FakePhone = {
     events,
     down: null,
+    cancelGate: null,
     sends: () => events.filter(event => event.kind === 'send'),
     cancels: () => events.filter(event => event.kind === 'cancel'),
     emergencies: () => phone.sends().filter(event => event.priority === 2),
@@ -47,6 +50,8 @@ function fakePhone(clock: () => number) {
       return { receipt: priority === 2 ? `receipt-${++receipts}` : null }
     },
     async cancel(receipt) {
+      await phone.cancelGate
+
       if (phone.down) throw new NotifierError(phone.down)
 
       events.push({ kind: 'cancel', receipt, at: clock() })
@@ -553,7 +558,15 @@ describe('while the run is polled', () => {
     await monitor.sendTest()
     expect(monitor.view().phone.state).toBe('failing')
 
+    // While the retried cancel is in flight the phone is still repeating.
+    let release!: () => void
+    const gate = new Promise<void>(resolve => (release = resolve))
+    phone.cancelGate = gate
     await vi.advanceTimersByTimeAsync(60_000)
+    expect(monitor.view().phone.state).toBe('failing')
+
+    release()
+    await vi.advanceTimersByTimeAsync(0)
 
     expect(phone.cancels()).toHaveLength(1)
     expect(monitor.view().phone).toEqual({ state: 'ready' })
