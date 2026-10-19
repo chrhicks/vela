@@ -17,6 +17,7 @@ import {
 } from './catalog/index.js'
 import { skyPath, type Site } from './sky.js'
 import { registerTargetDiscovery } from './discovery-routes.js'
+import type { FrameImaging } from '../imaging/frame-imaging.js'
 
 export interface TargetOptions {
   solver?: { executable: string; catalogPath: string }
@@ -26,6 +27,7 @@ export interface TargetOptions {
   createSolver?: (fieldHeightDegrees: number) => PlateSolver
   createInspector: RigDetailOptions['createInspector']
   now?: () => Date
+  images?: Pick<FrameImaging, 'render' | 'analyze'>
   waitForMountObservation?: (signal: AbortSignal) => Promise<void>
 }
 
@@ -400,7 +402,7 @@ export function registerTargets(
         let controller = controllers.get(rigId)
 
         if (!controller) {
-          controller = createFramingController(now, options.waitForMountObservation)
+          controller = createFramingController(now, options.waitForMountObservation, options.images)
           controllers.set(rigId, controller)
         }
 

@@ -28,6 +28,7 @@ import {
   type CaptureCamera,
 } from './controller.js'
 import type { FrameRecords } from './frame-records.js'
+import type { FrameImaging } from '../imaging/frame-imaging.js'
 import { createMemorySavedImageStore, type SavedImageStore } from '../saved-images/store.js'
 import type { AlertMonitor } from '../alerts/monitor.js'
 
@@ -41,6 +42,7 @@ interface CaptureRouteOptions {
   lookupSubject?: (targetId: string) => CaptureSubject | undefined
   savedImages?: SavedImageStore
   frameRecords?: FrameRecords
+  images?: FrameImaging
   createCamera?: (settings: CaptureSettings) => CaptureCamera
   createAcquisition: (rig: RigCatalogRecord) => Acquisition
   createInspector: RigDetailOptions['createInspector']
@@ -111,6 +113,7 @@ export function registerCapture(
     alerts,
     savedImages = createMemorySavedImageStore(),
     frameRecords,
+    images,
   }: CaptureRouteOptions,
 ) {
   const controllers = new Map<string, ReturnType<typeof createCaptureController>>()
@@ -308,6 +311,7 @@ export function registerCapture(
             Date.now,
             savedImages,
             frameRecords,
+            images,
           )
           controllers.set(view.rigId, controller)
         }
