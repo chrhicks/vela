@@ -1,6 +1,8 @@
 import { existsSync } from 'node:fs'
-import { readFrameRecords, readMountCsv, readSavedImages, readTraces, type ReadResult } from './inputs.ts'
+import { z } from 'zod'
+import { jsonText, readFrameRecords, readMountCsv, readSavedImages, readTraces, type ReadResult } from './inputs.ts'
 import { publishPackage } from './package.ts'
+import { Secrets } from './sanitize.ts'
 import type { LinkKind } from './schema.ts'
 import { readRecording } from './recording.ts'
 import { buildTables, type TimeWindow } from './tables.ts'
@@ -34,11 +36,13 @@ const maxSkippedListed = 20
 
 /** Reads the inputs it was given, joins them, and publishes the package. Returns the new package directory. */
 export async function buildSession(request: SessionRequest): Promise<string> {
+  // What the readers learn from the inputs is private; the package is sanitised and checked against it.
+  const secrets = new Secrets()
   const savedImages = await readIfGiven(request.savedImagesDir, readSavedImages)
   const traces = await readIfGiven(request.tracesFile, readTraces)
   const mount = await readIfGiven(request.mountCsvFile, readMountCsv)
   const frameRecords = await readIfGiven(request.frameRecordsFile, readFrameRecords)
-  const recording = await readIfGiven(request.recordingDir, readRecording)
+  const recording = await readIfGiven(request.recordingDir, directory => readRecording(directory, secrets))
 
   const tables = buildTables(request.name, request.window, {
     savedImages: savedImages?.items ?? [],
@@ -58,7 +62,7 @@ export async function buildSession(request: SessionRequest): Promise<string> {
       reportInput('saved-images', request.savedImagesDir, savedImages),
       reportInput('traces', request.tracesFile, traces),
       reportInput('mount-csv', request.mountCsvFile, mount),
-      reportInput('indi-recording', request.recordingDir, recording),
+      reportInput('indi-recording', request.recordingDir, recording, recording?.linesRead),
       reportInput('frame-records', request.frameRecordsFile, frameRecords),
     ],
     rows: {
@@ -91,7 +95,7 @@ export async function buildSession(request: SessionRequest): Promise<string> {
     skipped: skipped.slice(0, maxSkippedListed),
   }
 
-  return publishPackage(request.root, tables, `${JSON.stringify(summary, null, 2)}\n`)
+  return publishPackage(request.root, tables, jsonText(z.json()).parse(JSON.stringify(summary)), secrets)
 }
 
 async function readIfGiven<Result extends ReadResult<unknown>>(
@@ -103,10 +107,11 @@ async function readIfGiven<Result extends ReadResult<unknown>>(
   return read(path)
 }
 
-function reportInput<Item>(input: InputName, path: string | null, result: ReadResult<Item> | null): InputReport {
+/** `read` counts what was read, which for a streamed input is more than the items it kept. */
+function reportInput<Item>(input: InputName, path: string | null, result: ReadResult<Item> | null, read = result?.items.length ?? 0): InputReport {
   if (path === null || result === null) return { input, status: 'missing', effect: whatMissingCosts[input] }
 
-  return { input, status: 'found', path, read: result.items.length, skipped: result.skipped.length }
+  return { input, status: 'found', path, read, skipped: result.skipped.length }
 }
 
 function countLinks(kinds: readonly (LinkKind | null)[]) {
