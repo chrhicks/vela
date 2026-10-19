@@ -18,15 +18,16 @@ const exchange = {
 
 const image = { kind: 'image', at: Date.parse('2030-01-01T01:01:00Z'), imageId: 'image-1', operationId: 'operation-1', bytes: 5000, sha256: 'sha', verdict: 'intact', origin: 'x' }
 
-test('the journal reads exchanges and image checks, passes over other kinds, and lists the lines it cannot read', async () => {
+test('the journal reads exchanges, image checks, state changes and stream events, passes over other kinds, and lists the lines it cannot read', async () => {
   const file = join(await mkdtemp(join(tmpdir(), 'rig-session-journal-')), 'cria-journal.jsonl')
 
   await writeFile(
     file,
     [
       exchange,
-      { kind: 'state', at: 1, changed: {} },
+      { kind: 'state', at: 1, generatedAt: 1, sequence: 1, instanceId: 'i', baseline: true, changed: { 'device/a/availability': 'up' }, removed: [], origin: 'x' },
       { kind: 'stream', at: 2, event: 'opened', message: null },
+      { kind: 'metrics', at: 3 },
       image,
       { ...image, verdict: 'vanished' },
       { ...exchange, reply: { kind: 'lost', message: 'reset' }, status: null, command: null },
@@ -37,7 +38,7 @@ test('the journal reads exchanges and image checks, passes over other kinds, and
 
   const { items, skipped } = await readJournal(file)
 
-  expect(items.map(entry => entry.kind)).toEqual(['exchange', 'image', 'exchange'])
+  expect(items.map(entry => entry.kind)).toEqual(['exchange', 'state', 'stream', 'image', 'exchange'])
   expect(JSON.stringify(items)).not.toContain('example.test')
-  expect(skipped.map(entry => entry.where)).toEqual([`${file}:5`, `${file}:7`])
+  expect(skipped.map(entry => entry.where)).toEqual([`${file}:6`, `${file}:8`])
 })

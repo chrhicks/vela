@@ -140,8 +140,17 @@ async function syntheticNight() {
       ]),
       { kind: 'exchange', at: Date.parse('2030-01-01T01:04:00Z'), ms: 3, method: 'POST', route: '/v2/operations', status: 409, command: { requestId: 'request-unrecorded', deviceId: 'primary', kind: 'capture', parameters: { exposureSeconds: 50, site: { latitude: 12.5 } } }, reply: { kind: 'refused', code: 'busy', message: 'camera busy on /dev/ttyUSB0' } },
       { kind: 'exchange', at: Date.parse('2030-01-01T01:02:30Z'), ms: 4, method: 'POST', route: '/v2/operations/operation-1/stop', status: 202, command: null, reply: { kind: 'answered', body: {} } },
-      { kind: 'state', at: Date.parse('2030-01-01T01:02:30Z'), generatedAt: 1, sequence: 1, instanceId: 'instance-1', commandsEnabled: true, baseline: true, changed: {}, removed: [] },
+      {
+        kind: 'state', at: Date.parse('2030-01-01T01:02:30.500Z'), generatedAt: Date.parse('2030-01-01T01:02:30Z'), sequence: 7, instanceId: 'instance-1', commandsEnabled: true, baseline: true, removed: [],
+        changed: {
+          'device/primary/readings.activity': { status: 'fresh', value: 'exposing', observedAt: 1 },
+          'operation/operation-1': { id: 'operation-1', state: 'settled', outcome: { kind: 'confirmed', value: { values: { setup: 'sent GEOGRAPHIC_COORD LAT=12.5 LONG=345.25' } } } },
+          'operation/operation-elsewhere': { id: 'operation-elsewhere', state: 'running' },
+        },
+      },
+      { kind: 'state', at: Date.parse('2030-01-01T01:02:40Z'), generatedAt: Date.parse('2030-01-01T01:02:39Z'), sequence: 8, instanceId: 'instance-1', commandsEnabled: true, baseline: false, changed: {}, removed: ['device/old/availability'] },
       { kind: 'stream', at: Date.parse('2030-01-01T01:02:30Z'), event: 'opened', message: null },
+      { kind: 'stream', at: Date.parse('2030-01-01T01:05:00Z'), event: 'ended', message: 'reset on /dev/ttyUSB0' },
     ]
       .map(line => `${JSON.stringify({ ...line, origin })}\n`)
       .join(''),
@@ -201,7 +210,7 @@ test('session.json lists the inputs it found and the ones it lacks', async () =>
     ['frame-records', 'found'],
     ['cria-journal', 'found'],
   ])
-  expect(summary.rows).toEqual({ frames: 3, attempts: 3, indi_ops: 5, indi_events: 9, indi_images: 3, cria_requests: 5, cria_image_checks: 3, mount: 3, spans: 3 })
+  expect(summary.rows).toEqual({ frames: 3, attempts: 3, indi_ops: 5, indi_events: 9, indi_images: 3, cria_requests: 5, cria_image_checks: 3, cria_state_changes: 4, cria_stream: 2, mount: 3, spans: 3 })
   expect(summary.links.frame_to_span).toEqual({ exact: 0, inferred: 3, ambiguous: 0, none: 0 })
   expect(summary.links.frame_to_attempt).toEqual({ exact: 3, inferred: 0, ambiguous: 0, none: 0 })
   expect(summary.links.request_to_attempt).toEqual({ exact: 3, inferred: 0, ambiguous: 0, none: 2 })
@@ -239,6 +248,8 @@ test('a build that fails part way leaves the previous package readable, and the 
     indi_images: [],
     cria_requests: [],
     cria_image_checks: [],
+    cria_state_changes: [],
+    cria_stream: [],
     mount: [],
     spans: [
       {
@@ -470,5 +481,29 @@ test('no cell of the journal tables holds the origin, the site or a serial path'
   const cells = JSON.stringify([...(await session.rows('SELECT * FROM cria_requests')), ...(await session.rows('SELECT * FROM cria_image_checks'))])
 
   expect(cells).not.toMatch(/example\.test|12\.5|ttyUSB/)
+  session.close()
+})
+
+test('a query lists what Cria reported while a frame was exposing, with the operation cell linked and no site in it', async () => {
+  const night = await syntheticNight()
+  const root = join(night.dir, 'out')
+
+  await build(night, root)
+
+  const session = await openPackage(join(root, 'package'))
+
+  expect(await session.rows('SELECT cell, device_id, operation_id, operation_link, removed, baseline, sequence FROM cria_state_changes ORDER BY sequence, cell')).toEqual([
+    { cell: 'device/primary/readings.activity', device_id: 'primary', operation_id: null, operation_link: null, removed: false, baseline: true, sequence: '7' },
+    { cell: 'operation/operation-1', device_id: null, operation_id: 'operation-1', operation_link: 'exact', removed: false, baseline: true, sequence: '7' },
+    { cell: 'operation/operation-elsewhere', device_id: null, operation_id: 'operation-elsewhere', operation_link: null, removed: false, baseline: true, sequence: '7' },
+    { cell: 'device/old/availability', device_id: 'old', operation_id: null, operation_link: null, removed: true, baseline: false, sequence: '8' },
+  ])
+  expect(await session.rows("SELECT value FROM cria_state_changes WHERE cell = 'operation/operation-1'")).toEqual([
+    { value: '{"id":"operation-1","state":"settled","outcome":{"kind":"confirmed"}}' },
+  ])
+  expect(await session.rows('SELECT event, message FROM cria_stream ORDER BY "at"')).toEqual([
+    { event: 'opened', message: null },
+    { event: 'ended', message: 'reset on [redacted]' },
+  ])
   session.close()
 })

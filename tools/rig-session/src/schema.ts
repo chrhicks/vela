@@ -199,6 +199,28 @@ export const tables = {
     attempt_link: optional('link'),
     attempt_candidates: optional('json'),
   },
+  cria_state_changes: {
+    session: required('text'),
+    /** When the snapshot reached Vela. */
+    at: required('timestamp'),
+    generated_at: required('timestamp'),
+    sequence: required('int'),
+    instance_id: required('text'),
+    baseline: required('bool'),
+    cell: required('text'),
+    device_id: optional('text'),
+    operation_id: optional('text'),
+    operation_link: optional('link'),
+    operation_candidates: optional('json'),
+    removed: required('bool'),
+    value: optional('json'),
+  },
+  cria_stream: {
+    session: required('text'),
+    at: required('timestamp'),
+    event: required('text'),
+    message: optional('text'),
+  },
   mount: {
     session: required('text'),
     /** `csv` for the observer's mount-watch log, `indi` for the recording's mount properties. */
@@ -246,6 +268,10 @@ export type CriaRequestRow = RowOf<typeof tables.cria_requests>
 
 export type CriaImageCheckRow = RowOf<typeof tables.cria_image_checks>
 
+export type CriaStateChangeRow = RowOf<typeof tables.cria_state_changes>
+
+export type CriaStreamRow = RowOf<typeof tables.cria_stream>
+
 export type MountRow = RowOf<typeof tables.mount>
 
 export type SpanRow = RowOf<typeof tables.spans>
@@ -258,6 +284,8 @@ export interface Tables {
   readonly indi_images: readonly IndiImageRow[]
   readonly cria_requests: readonly CriaRequestRow[]
   readonly cria_image_checks: readonly CriaImageCheckRow[]
+  readonly cria_state_changes: readonly CriaStateChangeRow[]
+  readonly cria_stream: readonly CriaStreamRow[]
   readonly mount: readonly MountRow[]
   readonly spans: readonly SpanRow[]
 }
