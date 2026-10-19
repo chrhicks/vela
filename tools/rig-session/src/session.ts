@@ -69,6 +69,7 @@ export async function buildSession(request: SessionRequest): Promise<string> {
       frames: tables.frames.length,
       attempts: tables.attempts.length,
       indi_ops: tables.indi_ops.length,
+      indi_events: tables.indi_events.length,
       mount: tables.mount.length,
       spans: tables.spans.length,
     },
@@ -78,6 +79,7 @@ export async function buildSession(request: SessionRequest): Promise<string> {
       frame_to_attempt: countLinks(tables.frames.map(frame => frame.attempt_link)),
       frame_to_operation: countLinks(tables.frames.map(frame => frame.operation_link)),
       attempt_to_operation: countLinks(tables.attempts.map(attempt => attempt.operation_link)),
+      event_to_operation: countLinks(tables.indi_events.map(event => event.operation_link)),
     },
     recording: recording && {
       name: recording.name,

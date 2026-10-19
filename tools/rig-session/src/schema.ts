@@ -124,6 +124,23 @@ export const tables = {
     image_id: optional('text'),
     image_bytes: optional('int'),
   },
+  indi_events: {
+    session: required('text'),
+    at: required('timestamp'),
+    conn: required('int'),
+    direction: required('text'),
+    n: required('int'),
+    kind: required('text'),
+    device: optional('text'),
+    property: optional('text'),
+    state: optional('text'),
+    values: optional('json'),
+    changed: optional('json'),
+    text: optional('text'),
+    operation_id: optional('text'),
+    operation_link: optional('link'),
+    operation_candidates: optional('json'),
+  },
   mount: {
     session: required('text'),
     sampled_at: required('timestamp'),
@@ -161,6 +178,8 @@ export type AttemptRow = RowOf<typeof tables.attempts>
 
 export type IndiOpRow = RowOf<typeof tables.indi_ops>
 
+export type IndiEventRow = RowOf<typeof tables.indi_events>
+
 export type MountRow = RowOf<typeof tables.mount>
 
 export type SpanRow = RowOf<typeof tables.spans>
@@ -172,6 +191,7 @@ export interface Tables {
   readonly frames: readonly FrameRow[]
   readonly attempts: readonly AttemptRow[]
   readonly indi_ops: readonly IndiOpRow[]
+  readonly indi_events: readonly IndiEventRow[]
   readonly mount: readonly MountRow[]
   readonly spans: readonly SpanRow[]
 }

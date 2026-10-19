@@ -44,6 +44,13 @@ export function opLine({ id, requestId, deviceId = 'primary', kind = 'capture', 
   }
 }
 
+/** One INDI message `milliseconds` after the recording started. `n` counts per connection and direction. */
+export function msgLine(n: number, at: string, dir: 'in' | 'out', xml: string, blobs?: readonly string[]) {
+  const line = { k: 'msg', t: epoch(at) - recordingStart, at: epoch(at), conn: 1, dir, n, xml }
+
+  return blobs === undefined ? line : { ...line, blobs }
+}
+
 /** The wire text of each line, one JSON document per line. */
 export const jsonLines = (...lines: readonly object[]): string[] => lines.map(line => JSON.stringify(line))
 
