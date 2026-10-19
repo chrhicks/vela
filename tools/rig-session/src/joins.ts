@@ -1,5 +1,5 @@
 import type { FrameRecord, MountSample, SavedImage, TraceSpan } from './inputs.ts'
-import type { RecordedOperation } from './recording.ts'
+import type { RecordedDevice, RecordedOperation } from './recording.ts'
 
 /**
  * How one row found another. `exact` is a shared key. `inferred` is a rule over times, so
@@ -61,6 +61,31 @@ export function linkAttemptToOperation(record: FrameRecord, operations: readonly
   if (byId.length > 0 || record.requestId === null) return exactOrAmbiguous(byId)
 
   return exactOrAmbiguous(operations.filter(operation => operation.requestId === record.requestId))
+}
+
+/**
+ * A wire event belongs to the operation on its device whose window covers it. Both times are Cria's
+ * clock, so no cross-host offset enters. Cria's devices can share one INDI device (a power box that
+ * is both weather and switch), so several operations can cover one event: then none is picked.
+ */
+export function linkEventToOperation(
+  event: { readonly at: Date; readonly device: string | null },
+  operations: readonly RecordedOperation[],
+  devices: readonly RecordedDevice[],
+): Link<RecordedOperation> | null {
+  if (event.device === null) return null
+
+  const ids = new Set(devices.flatMap(device => (device.indiDevice === event.device ? [device.id] : [])))
+
+  const covering = operations.filter(
+    operation => ids.has(operation.deviceId) && operation.acceptedAt <= event.at && event.at <= operation.settledAt,
+  )
+
+  const [only] = covering
+
+  if (only === undefined) return null
+
+  return covering.length === 1 ? { kind: 'inferred', target: only } : { kind: 'ambiguous', candidates: covering }
 }
 
 function exactOrAmbiguous<Target>(candidates: readonly Target[]): Link<Target> | null {
