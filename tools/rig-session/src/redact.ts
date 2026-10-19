@@ -16,8 +16,16 @@ export function isPrivateProperty(name: string): boolean {
   return privateProperties.has(name)
 }
 
-/** Replaces `LAT=`/`LONG=`/`ELEV=` pairs and `/dev/` paths in free text. */
+/** A driver announcing the site in words ("Observer location updated: Latitude ... Longitude ...") has no safe part to keep. */
+const namesTheSite = /\b(latitude|longitude|observer location|geographic)/i
+
+/**
+ * Free text with `LAT=`/`LONG=`/`ELEV=` pairs and `/dev/` paths replaced. A text that names the site
+ * in words is replaced whole, because its numbers come in too many shapes (degrees, sexagesimal, decimal).
+ */
 export function redactText(text: string): string {
+  if (namesTheSite.test(text)) return `${redacted} (names the site)`
+
   return text.replaceAll(/\b(LAT|LONG|ELEV)=\S+/g, `$1=${redacted}`).replaceAll(/\/dev\/\S+/g, redacted)
 }
 
