@@ -294,11 +294,12 @@ export function registerCapture(
 
         const watch = alerts?.monitorFor(rig)
         const captureController = controller
+        const camera = cameraFactory(settings)
 
         watch?.runStarted(body.exposureSeconds)
 
         const result = await controller
-          .start(body.exposureSeconds, cameraFactory(settings), view.camera.name, {
+          .start(body.exposureSeconds, camera, view.camera.name, {
             subject,
             onFrame: image => watch?.frameCaptured(image),
             onSettled() {

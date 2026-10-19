@@ -227,7 +227,7 @@ describe('a capture run feeds the alerts', () => {
     return { promise, resolve, reject }
   }
 
-  function runningRig() {
+  function runningRig(options: { cameraFails?: boolean } = {}) {
     const app = Fastify()
     const catalog = createMemoryRigCatalog([rig])
     const { phone, notifier } = fakePhone()
@@ -252,7 +252,11 @@ describe('a capture run feeds the alerts', () => {
       createCooling: () => {
         throw new Error('This test configures no cooling')
       },
-      createCamera: () => capture,
+      createCamera: () => {
+        if (options.cameraFails) throw new Error('The configured Cria equipment connection is unavailable.')
+
+        return capture
+      },
       createInspector: () => ({
         async inspectDevices(): Promise<ReadonlyArray<AlpacaDeviceInspection>> {
           return [
@@ -321,6 +325,13 @@ describe('a capture run feeds the alerts', () => {
     expect(await subject.alerts()).toMatchObject({ watching: false, alerts: [] })
     expect(subject.phone.cancelled).toEqual(['receipt-2'])
     expect(subject.phone.sent.at(-1)).toMatchObject({ priority: -1 })
+  })
+
+  it('does not watch a run that never started', async () => {
+    const subject = runningRig({ cameraFails: true })
+
+    expect((await subject.start()).statusCode).toBe(409)
+    expect(await subject.alerts()).toMatchObject({ watching: false, alerts: [] })
   })
 
   it('raises run-failed when the camera fails mid-run, but not when Chris stops the run', async () => {

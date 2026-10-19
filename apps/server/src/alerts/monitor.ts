@@ -91,9 +91,19 @@ interface Episode extends ActiveAlert {
   delivery: 'unsent' | 'sending' | 'sent' | 'skipped'
   /** The open emergency receipt, until it is cancelled. */
   receipt: string | null
+  /** When the phone accepted the message. An emergency's hour starts here. */
+  sentAt: number | null
   lastSendAttemptAt: number | null
   /** Keeps this episode's phone calls in order: raise, then acknowledge, then clear. */
   phoneCalls: Promise<unknown>
+}
+
+/** An emergency that kept repeating because Pushover would not take its cancel. */
+interface StrayReceipt {
+  receipt: string
+  sentAt: number
+  reason: string
+  since: number
 }
 
 type PhoneOutcome<T> = { ok: true; value: T } | { ok: false; reason: string }
@@ -125,6 +135,8 @@ export function createAlertMonitor({
 
   const episodes = new Map<AlertId, Episode>()
   const clearedAt = new Map<AlertId, number>()
+  const strayReceipts: StrayReceipt[] = []
+  let strayTimer: ReturnType<typeof setTimeout> | undefined
 
   function evaluate() {
     const at = now()
@@ -157,6 +169,11 @@ export function createAlertMonitor({
 
     for (const episode of raised) announce(episode)
 
+    // A stronger alert that cleared leaves the weaker one it covered standing, and unheard.
+    for (const episode of episodes.values()) {
+      if (episode.delivery === 'skipped' && !isCovered(episode.id)) sendRaised(episode)
+    }
+
     resendUnsent(at)
   }
 
@@ -171,6 +188,7 @@ export function createAlertMonitor({
       acknowledged: false,
       delivery: 'unsent',
       receipt: null,
+      sentAt: null,
       lastSendAttemptAt: null,
       phoneCalls: Promise.resolve(),
     }
@@ -212,7 +230,10 @@ export function createAlertMonitor({
       // The phone is only told that an alert ended if it was told that it began.
       if (!notifier || episode.delivery !== 'sent') return
 
-      await cancelReceipt(episode)
+      const cancelled = await cancelReceipt(episode)
+
+      if (!cancelled.ok && episode.receipt !== null && episode.sentAt !== null)
+        keepTryingToCancel({ receipt: episode.receipt, sentAt: episode.sentAt, reason: cancelled.reason, since: now() })
 
       await callPhone('clear', episode.id, -1, () =>
         notifier.send({ title: title(), message: `cleared: ${episode.message}`, priority: -1 }),
@@ -249,7 +270,10 @@ export function createAlertMonitor({
 
       episode.delivery = sent.ok ? 'sent' : 'unsent'
 
-      if (sent.ok) episode.receipt = sent.value.receipt
+      if (sent.ok) {
+        episode.receipt = sent.value.receipt
+        episode.sentAt = now()
+      }
     })
   }
 
@@ -269,9 +293,8 @@ export function createAlertMonitor({
   /** A receipt past its expiry has stopped repeating on its own and cannot be cancelled. */
   async function cancelReceipt(episode: Episode): Promise<PhoneOutcome<void>> {
     const receipt = episode.receipt
-    const expired = now() - episode.raisedAt >= emergencyExpireSeconds * 1000
 
-    if (!notifier || receipt === null || expired) return { ok: true, value: undefined }
+    if (!notifier || receipt === null || receiptExpired(episode)) return { ok: true, value: undefined }
 
     const cancelled = await callPhone('cancel', episode.id, 2, () => notifier.cancel(receipt))
 
@@ -280,10 +303,33 @@ export function createAlertMonitor({
     return cancelled
   }
 
+  /** The alert is gone from the banner, so nothing else would ever stop the phone repeating. */
+  function keepTryingToCancel(stray: StrayReceipt) {
+    strayReceipts.push(stray)
+    strayTimer ??= setTimeout(retryStrayReceipts, resendAfterFailureMs)
+    strayTimer.unref()
+  }
+
+  async function retryStrayReceipts() {
+    strayTimer = undefined
+
+    for (const stray of strayReceipts.splice(0)) {
+      if (!notifier || receiptExpired(stray)) continue
+
+      const cancelled = await callPhone('cancel', 'stray-receipt', 2, () => notifier.cancel(stray.receipt))
+
+      if (!cancelled.ok) keepTryingToCancel({ ...stray, reason: cancelled.reason })
+    }
+  }
+
+  function receiptExpired({ sentAt }: { sentAt: number | null }) {
+    return sentAt !== null && now() - sentAt >= emergencyExpireSeconds * 1000
+  }
+
   /** Every call to the phone leaves a span and updates what Vela says about phone alerts. */
   async function callPhone<T>(
     action: 'raise' | 'clear' | 'cancel' | 'test',
-    alertId: AlertId | 'test',
+    alertId: AlertId | 'test' | 'stray-receipt',
     priority: number,
     call: () => Promise<T>,
   ): Promise<PhoneOutcome<T>> {
@@ -316,6 +362,15 @@ export function createAlertMonitor({
     } finally {
       span.end()
     }
+  }
+
+  /** An emergency still repeating on the phone is a failure, however recent calls went. */
+  function phoneWithStrays(): PhoneAlerts {
+    const stray = strayReceipts[0]
+
+    if (!stray) return phone
+
+    return { state: 'failing', reason: `could not stop an emergency repeating: ${stray.reason}`, since: stray.since }
   }
 
   function title() {
@@ -434,7 +489,7 @@ export function createAlertMonitor({
         watching: run.status === 'running',
         alerts,
         unavailable,
-        phone,
+        phone: phoneWithStrays(),
         thresholds,
       }
     },
@@ -469,6 +524,7 @@ export function createAlertMonitor({
     /** Stops the mount poll. Nothing is evaluated or sent. */
     close() {
       stopPolling()
+      clearTimeout(strayTimer)
       runToken++
     },
   }

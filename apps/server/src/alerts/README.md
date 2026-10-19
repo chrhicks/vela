@@ -26,6 +26,9 @@ until it is acknowledged, because Pushover does that, not Vela.
 - An alert that failed to reach the phone is tried again once a minute, until it arrives, is
   acknowledged or clears. The alerts view says "phone alerts failing" with the reason meanwhile.
   A "cleared" message is only sent for an alert the phone was told about.
+- If an alert clears but Pushover will not take the cancel, the emergency keeps repeating with
+  nothing left in the banner. The monitor keeps retrying the cancel once a minute (until the hour
+  is up) and the alerts view says phone alerts are failing until it succeeds.
 - When the run ends, everything clears. `run-failed` is raised for a run that failed (not for Stop)
   and clears when the next run starts.
 

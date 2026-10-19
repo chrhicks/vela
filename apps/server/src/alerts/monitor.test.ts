@@ -385,6 +385,32 @@ describe('phone delivery', () => {
     expect(fixture.phone.cancels()).toHaveLength(1)
   })
 
+  it('counts an emergency\'s hour from when Pushover took it, not from when the alert began', async () => {
+    const fixture = watched()
+    fixture.phone.down = 'could not reach Pushover'
+
+    await snagged(fixture)
+
+    fixture.phone.down = null
+    fixture.tick(61 * 60_000)
+    fixture.monitor.frameCaptured({ capturedAt: '', statistics: { detectedStars: 1200, medianHfrPixels: 7 } })
+    await settle()
+    expect(fixture.phone.emergencies()).toHaveLength(1)
+
+    expect(await fixture.monitor.acknowledge('hfr-bad')).toEqual({ outcome: 'acknowledged' })
+    expect(fixture.phone.cancels()).toHaveLength(1)
+  })
+
+  it('tells the phone about a weaker alert that is left standing when the stronger one clears', async () => {
+    const fixture = watched()
+    const frame = runOf(fixture, [3, 3, 3, 3, 3, 7, 7, 4.2])
+
+    for (let index = 0; index < 8; index++) await frame(index)
+
+    expect(fixture.monitor.view().alerts.map(alert => alert.id)).toEqual(['hfr-high'])
+    expect(fixture.phone.sends().map(event => event.priority).sort()).toEqual([-1, 0, 2])
+  })
+
   it('does not announce the end of an alert the phone never heard of', async () => {
     const fixture = watched()
     fixture.phone.down = 'timed out after 10 s'
@@ -445,7 +471,7 @@ describe('phone delivery', () => {
 
 describe('while the run is polled', () => {
   beforeEach(() => {
-    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] })
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'setTimeout', 'clearTimeout', 'Date'] })
     vi.setSystemTime(Date.parse('2026-10-18T03:00:00Z'))
   })
 
@@ -502,6 +528,35 @@ describe('while the run is polled', () => {
 
     expect(monitor.view().alerts).toEqual([])
     expect(phone.cancels()).toHaveLength(1)
+  })
+
+  it('keeps trying to stop an emergency that Pushover would not cancel, and says so meanwhile', async () => {
+    let mount = tracking({ tracking: false })
+    const { monitor, phone } = polled(async () => mount)
+
+    monitor.runStarted(1800)
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(phone.emergencies()).toHaveLength(1)
+
+    phone.down = 'could not reach Pushover'
+    mount = tracking()
+    await vi.advanceTimersByTimeAsync(10_000)
+
+    expect(monitor.view().alerts).toEqual([])
+    expect(monitor.view().phone).toMatchObject({
+      state: 'failing',
+      reason: 'could not stop an emergency repeating: could not reach Pushover',
+    })
+
+    // The "cleared" message getting through later does not mean the repeats stopped.
+    phone.down = null
+    await monitor.sendTest()
+    expect(monitor.view().phone.state).toBe('failing')
+
+    await vi.advanceTimersByTimeAsync(60_000)
+
+    expect(phone.cancels()).toHaveLength(1)
+    expect(monitor.view().phone).toEqual({ state: 'ready' })
   })
 
   it('says the meridian watch is unavailable instead of looking safe when the mount does not give its pier side', async () => {
