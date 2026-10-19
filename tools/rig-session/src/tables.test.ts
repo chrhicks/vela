@@ -120,3 +120,15 @@ test('hour angle is sidereal time minus right ascension, wrapped into (-12, 12]'
   expect(hourAngle(0, 12)).toBe(12)
   expect(hourAngle(13, 0)).toBe(-11)
 })
+
+test('a frame at the start of the window still links to the mount sample and span just before it', () => {
+  const tables = buildTables('test-night', window, {
+    savedImages: [image('first', '00:00:01')],
+    spans: [{ ...span('started-early', '00:00:00', '00:01:00', 4), startedAt: new Date('2029-12-31T23:59:30Z') }],
+    mountSamples: [{ ...sample('00:00:00', true), sampledAt: new Date('2029-12-31T23:59:58Z') }],
+  })
+
+  expect(tables.frames[0]).toMatchObject({ span_id: 'started-early', mount_link: 'inferred', mount_age_seconds: 3 })
+  expect(tables.spans).toEqual([])
+  expect(tables.mount).toEqual([])
+})

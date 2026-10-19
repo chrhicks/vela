@@ -16,17 +16,19 @@ export interface SessionInputs {
 /** The CSV logs every 10 seconds. A sample three times older than that has missed its beat. */
 export const mountFreshSeconds = 30
 
-/** Joins the raw inputs of one session into table rows. Pure: the same inputs give the same rows. */
+/**
+ * Joins the raw inputs of one session into table rows. Pure: the same inputs give the same rows.
+ * The window picks the rows that are output. Links look at every input, so a frame at the start of
+ * the window still finds the mount sample just before it.
+ */
 export function buildTables(session: string, window: TimeWindow, inputs: SessionInputs): Tables {
   const inWindow = (time: Date) => window.from <= time && time < window.to
-  const spans = inputs.spans.filter(span => inWindow(span.startedAt))
-  const mountSamples = inputs.mountSamples.filter(sample => inWindow(sample.sampledAt))
   const savedImages = inputs.savedImages.filter(image => inWindow(image.capturedAt))
 
   return {
-    frames: savedImages.map(image => frameRow(session, image, spans, mountSamples)),
-    mount: mountSamples.map(sample => mountRow(session, sample)),
-    spans: spans.map(span => spanRow(session, span)),
+    frames: savedImages.map(image => frameRow(session, image, inputs.spans, inputs.mountSamples)),
+    mount: inputs.mountSamples.filter(sample => inWindow(sample.sampledAt)).map(sample => mountRow(session, sample)),
+    spans: inputs.spans.filter(span => inWindow(span.startedAt)).map(span => spanRow(session, span)),
   }
 }
 

@@ -22,6 +22,19 @@ const metadata = {
   rigId: 'rig-a',
 }
 
+test('metadata saved before the timestamp source was recorded reads as camera-reported', async () => {
+  const root = await scratch()
+  const { capturedAtSource: _recorded, ...legacy } = metadata
+
+  await mkdir(join(root, 'library', 'legacy'), { recursive: true })
+  await writeFile(join(root, 'library', 'legacy', 'metadata.json'), JSON.stringify(legacy))
+
+  const { items, skipped } = await readSavedImages(root)
+
+  expect(skipped).toEqual([])
+  expect(items.map(image => image.capturedAtSource)).toEqual(['camera'])
+})
+
 test('saved images read their metadata and report the frames that cannot be read', async () => {
   const root = await scratch()
 
