@@ -1,6 +1,8 @@
 import { existsSync } from 'node:fs'
-import { readMountCsv, readSavedImages, readTraces, type ReadResult } from './inputs.ts'
+import { z } from 'zod'
+import { jsonText, readFrameRecords, readMountCsv, readSavedImages, readTraces, type ReadResult } from './inputs.ts'
 import { publishPackage } from './package.ts'
+import { Secrets } from './sanitize.ts'
 import type { LinkKind } from './schema.ts'
 import { buildTables, type TimeWindow } from './tables.ts'
 
@@ -11,6 +13,7 @@ export interface SessionRequest {
   readonly savedImagesDir: string | null
   readonly tracesFile: string | null
   readonly mountCsvFile: string | null
+  readonly frameRecordsFile: string | null
 }
 
 const whatMissingCosts = {
@@ -31,17 +34,21 @@ const maxSkippedListed = 20
 
 /** Reads the inputs it was given, joins them, and publishes the package. Returns the new package directory. */
 export async function buildSession(request: SessionRequest): Promise<string> {
+  // What the readers learn from the inputs is private; the package is sanitised and checked against it.
+  const secrets = new Secrets()
   const savedImages = await readIfGiven(request.savedImagesDir, readSavedImages)
   const traces = await readIfGiven(request.tracesFile, readTraces)
   const mount = await readIfGiven(request.mountCsvFile, readMountCsv)
+  const frameRecords = await readIfGiven(request.frameRecordsFile, readFrameRecords)
 
   const tables = buildTables(request.name, request.window, {
     savedImages: savedImages?.items ?? [],
     spans: traces?.items ?? [],
+    frameRecords: frameRecords?.items ?? [],
     mountSamples: mount?.items ?? [],
   })
 
-  const skipped = [savedImages, traces, mount].flatMap(result => result?.skipped ?? [])
+  const skipped = [savedImages, traces, mount, frameRecords].flatMap(result => result?.skipped ?? [])
 
   const summary = {
     session: request.name,
@@ -52,21 +59,23 @@ export async function buildSession(request: SessionRequest): Promise<string> {
       reportInput('traces', request.tracesFile, traces),
       reportInput('mount-csv', request.mountCsvFile, mount),
       reportInput('indi-recording', null, null),
-      reportInput('frame-records', null, null),
+      reportInput('frame-records', request.frameRecordsFile, frameRecords),
     ],
     rows: {
       frames: tables.frames.length,
+      attempts: tables.attempts.length,
       mount: tables.mount.length,
       spans: tables.spans.length,
     },
     links: {
       frame_to_span: countLinks(tables.frames.map(frame => frame.span_link)),
       frame_to_mount: countLinks(tables.frames.map(frame => frame.mount_link)),
+      frame_to_attempt: countLinks(tables.frames.map(frame => frame.attempt_link)),
     },
     skipped: skipped.slice(0, maxSkippedListed),
   }
 
-  return publishPackage(request.root, tables, `${JSON.stringify(summary, null, 2)}\n`)
+  return publishPackage(request.root, tables, jsonText(z.json()).parse(JSON.stringify(summary)), secrets)
 }
 
 async function readIfGiven<Item>(

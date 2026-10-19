@@ -8,7 +8,8 @@ pnpm --filter @vela/rig-session rig-session build \
   --out ~/.local/share/rig-sessions/2030-01-01-example \
   --saved-images ~/.local/share/vela/saved-images \
   --traces ~/.local/share/vela/traces/observing.jsonl \
-  --mount-csv path/to/mount-watch.csv
+  --mount-csv path/to/mount-watch.csv \
+  --frame-records ~/.local/share/vela/traces/frames.jsonl
 
 pnpm --filter @vela/rig-session rig-session query ~/.local/share/rig-sessions/2030-01-01-example/package \
   "SELECT detected_stars FROM frames ORDER BY captured_at"
@@ -18,7 +19,7 @@ The inputs are read-only. Every input is optional; `session.json` in the package
 
 ## Package layout
 
-`<out>/package` is a symlink to `<out>/builds/<time>`, which holds `frames.parquet`, `mount.parquet`, `spans.parquet` and `session.json`. A build writes into a fresh directory and switches the symlink with one rename, so a build that fails leaves the previous package readable. The next finished build removes the older directories.
+`<out>/package` is a symlink to `<out>/builds/<time>`, which holds `frames.parquet`, `attempts.parquet`, `mount.parquet`, `spans.parquet` and `session.json`. A build writes into a fresh directory and switches the symlink with one rename, so a build that fails leaves the previous package readable. The next finished build removes the older directories.
 
 Rebuilding the same inputs gives the same rows in the same files. Only `session.json` carries the build time.
 
@@ -37,9 +38,18 @@ Joins are plain functions in `src/joins.ts`. Each link records how it was found:
 A link with no match is null. The packager never guesses.
 
 - `frames.span_*` links a saved frame to the `capture.frame` span that was running when the camera started the exposure.
+- `frames.attempt_*` links a saved frame to the frame record (`attempts` table, one row per capture attempt of any outcome) that names its image: `exact`, by the image id. The frame then carries that attempt's `request_id`, `operation_id` and `cria_image_id`, so it names the Cria operation that produced it. `attempts.frame_id` is the same link seen from the attempt; a lost or failed attempt has none.
 - `frames.mount_*` links a frame to the latest mount sample not after the exposure start, and keeps the sample's age. A sample older than 30 seconds gives no link.
 
-Frame records, the Cria recording and the Vela journal are not read yet. `INPUTS.md` specifies how they will be, and the tables and links they add.
+The Cria recording and the Vela journal are not read yet. `INPUTS.md` specifies how they will be, and the tables and links they add.
+
+## Privacy
+
+A package never holds the observing site, serial port paths or serial numbers, host addresses or credentials. This is held at the one place rows are written, not field by field: `publishPackage` (`package.ts`) passes every string cell, and every string and key inside a JSON cell, through `sanitize` (`sanitize.ts`), and no table or column is named there. A new column or table is covered without touching it.
+
+`sanitize` has two layers. Learned values: the readers learn the secrets from the inputs themselves (the recording's site, ports and serial numbers, the journal's origin), and `Secrets` replaces each wherever it occurs, in the usual spellings (decimal rounded or truncated, signed or wrapped longitude, sexagesimal). Patterns: `/dev/` paths, `by-id` names, `LAT=`/`LONG=`/`ELEV=` pairs, URL credentials and tokens, bearer and key-looking strings; a text that names the site in words ("Observer location updated: Latitude ...") is replaced whole, and a JSON key that names the site, a port or a serial number loses its value.
+
+After the staged files are written and before the symlink switches, the package reads them back and scans every table and `session.json` for the learned secrets and the patterns. A hit fails the build with the table, column and rule (never the value), removes the staging directory, and leaves the previous package readable. It is the backstop; `sanitize` is the defence. `INPUTS.md` ("Privacy rule") has the whole rule.
 
 ## Replay
 

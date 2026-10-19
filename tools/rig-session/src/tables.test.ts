@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import type { MountSample, SavedImage, TraceSpan } from './inputs.ts'
+import type { FrameRecord, MountSample, SavedImage, TraceSpan } from './inputs.ts'
 import { buildTables, hourAngle } from './tables.ts'
 
 const at = (time: string) => new Date(`2030-01-01T${time}Z`)
@@ -22,6 +22,25 @@ function image(id: string, capturedAt: string): SavedImage {
     detectedStars: 12,
     medianHfrPixels: 3.5,
     directory: `/frames/${id}`,
+  }
+}
+
+function record(attempt: number, imageId: string | null, outcome: FrameRecord['outcome'] = 'saved'): FrameRecord {
+  return {
+    rigId: 'rig-a',
+    runId: 'run-1',
+    attempt,
+    startedAt: at('00:10:00'),
+    settledAt: at('00:11:00'),
+    exposureSeconds: 60,
+    outcome,
+    message: outcome === 'saved' ? null : 'Cria lost the image',
+    requestId: `request-${attempt}`,
+    operationId: outcome === 'failed' ? null : `operation-${attempt}`,
+    criaImageId: imageId === null ? null : `cria-${imageId}`,
+    imageId,
+    detectedStars: imageId === null ? null : 12,
+    medianHfrPixels: imageId === null ? null : 3.5,
   }
 }
 
@@ -57,6 +76,7 @@ test('a frame row carries its span and mount links, a frame without either carri
   const tables = buildTables('test-night', window, {
     savedImages: [image('linked', '00:10:30'), image('alone', '00:30:00'), image('too-late', '02:00:00')],
     spans: [span('span-7', '00:10:00', '00:11:00', 7), span('after-window', '03:00:00', '03:01:00', 8)],
+    frameRecords: [],
     mountSamples: [sample('00:10:20', true), sample('02:00:00', true)],
   })
 
@@ -87,6 +107,13 @@ test('a frame row carries its span and mount links, a frame without either carri
     mount_link: 'inferred',
     mount_candidates: null,
     mount_age_seconds: 10,
+    run_id: null,
+    attempt: null,
+    request_id: null,
+    operation_id: null,
+    cria_image_id: null,
+    attempt_link: null,
+    attempt_candidates: null,
   })
   expect(tables.frames[1]).toMatchObject({
     span_id: null,
@@ -102,6 +129,7 @@ test('an ambiguous span link names no span and lists its candidates', () => {
   const tables = buildTables('test-night', window, {
     savedImages: [image('contested', '00:10:30')],
     spans: [span('first', '00:10:00', '00:11:00', 1), span('second', '00:10:20', '00:11:20', 2)],
+    frameRecords: [],
     mountSamples: [],
   })
 
@@ -128,6 +156,7 @@ test('a frame at the start of the window exports the mount sample and span it li
       { ...span('started-early', '00:00:00', '00:01:00', 4), startedAt: new Date('2029-12-31T23:59:30Z') },
       { ...span('unrelated', '00:00:00', '00:01:00', 3), startedAt: new Date('2029-12-31T22:00:00Z'), endedAt: new Date('2029-12-31T22:01:00Z') },
     ],
+    frameRecords: [],
     mountSamples: [
       { ...sample('00:00:00', true), sampledAt: new Date('2029-12-31T23:59:58Z') },
       { ...sample('00:00:00', true), sampledAt: new Date('2029-12-31T23:59:50Z') },
@@ -145,9 +174,64 @@ test('a frame at the start of the window with an ambiguous span link exports eve
   const tables = buildTables('test-night', window, {
     savedImages: [image('contested', '00:00:10')],
     spans: [early('first', 1), early('second', 2)],
+    frameRecords: [],
     mountSamples: [],
   })
 
   expect(tables.frames[0]).toMatchObject({ span_link: 'ambiguous', span_candidates: '["first","second"]' })
   expect(tables.spans.map(row => row.span_id)).toEqual(['first', 'second'])
+})
+
+test('a frame links exactly to the attempt that saved its image, and a lost attempt is a row with no frame', () => {
+  const tables = buildTables('test-night', window, {
+    savedImages: [image('frame-1', '00:10:30'), image('frame-2', '00:20:30')],
+    spans: [],
+    frameRecords: [record(1, 'frame-1'), { ...record(2, null, 'lost'), startedAt: at('00:15:00') }, { ...record(3, 'frame-2'), startedAt: at('00:20:00') }],
+    mountSamples: [],
+  })
+
+  expect(tables.frames.map(frame => [frame.frame_id, frame.attempt, frame.attempt_link, frame.operation_id, frame.request_id, frame.cria_image_id])).toEqual([
+    ['frame-1', 1, 'exact', 'operation-1', 'request-1', 'cria-frame-1'],
+    ['frame-2', 3, 'exact', 'operation-3', 'request-3', 'cria-frame-2'],
+  ])
+  expect(tables.attempts.map(row => [row.attempt, row.outcome, row.frame_id, row.frame_link, row.message])).toEqual([
+    [1, 'saved', 'frame-1', 'exact', null],
+    [2, 'lost', null, null, 'Cria lost the image'],
+    [3, 'saved', 'frame-2', 'exact', null],
+  ])
+})
+
+test('a saved image with no record and a record whose image was not saved link to nothing', () => {
+  const tables = buildTables('test-night', window, {
+    savedImages: [image('orphan', '00:10:30')],
+    spans: [],
+    frameRecords: [record(1, 'never-saved', 'unsaved')],
+    mountSamples: [],
+  })
+
+  expect(tables.frames[0]).toMatchObject({ run_id: null, operation_id: null, attempt_link: null, attempt_candidates: null })
+  expect(tables.attempts[0]).toMatchObject({ frame_id: null, frame_link: null, outcome: 'unsaved' })
+})
+
+test('two records for one image are ambiguous: the frame names neither and lists both', () => {
+  const tables = buildTables('test-night', window, {
+    savedImages: [image('frame-1', '00:10:30')],
+    spans: [],
+    frameRecords: [record(1, 'frame-1'), record(2, 'frame-1')],
+    mountSamples: [],
+  })
+
+  expect(tables.frames[0]).toMatchObject({ run_id: null, operation_id: null, attempt_link: 'ambiguous', attempt_candidates: '["run-1/1","run-1/2"]' })
+  expect(tables.attempts.map(row => [row.frame_id, row.frame_link])).toEqual([['frame-1', 'exact'], ['frame-1', 'exact']])
+})
+
+test('an attempt that started before the window is exported when an exported frame links to it', () => {
+  const tables = buildTables('test-night', window, {
+    savedImages: [image('frame-1', '00:00:30')],
+    spans: [],
+    frameRecords: [{ ...record(1, 'frame-1'), startedAt: new Date('2029-12-31T23:59:30Z') }, { ...record(2, null, 'failed'), startedAt: new Date('2029-12-31T23:00:00Z') }],
+    mountSamples: [],
+  })
+
+  expect(tables.attempts.map(row => row.attempt)).toEqual([1])
 })
