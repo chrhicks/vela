@@ -15,6 +15,7 @@ Config and data live in XDG directories, mounted into the containers (override w
 | Host | In the container | What |
 |---|---|---|
 | `~/.config/vela/cria.json` | `/config/cria.json` (read-only) | Cria rigs; required, `{"rigs": []}` is the minimum |
+| `~/.config/vela/alerts.json` | `/config/alerts.json` (read-only) | Pushover keys and alert thresholds; optional, see below |
 | `~/.local/share/vela/rigs.yaml` | `/data/rigs.yaml` | rig catalog, written by Vela |
 | `~/.local/share/vela/saved-images/` | `/data/saved-images` | captured frames |
 | `~/.local/share/vela/survey-cache/`, `traces/`, `alignment-diagnostics/` | `/data/...` | caches, trace journal, evidence bundles |
@@ -23,6 +24,22 @@ Config and data live in XDG directories, mounted into the containers (override w
 The ASTAP binary and star catalog are not in git; copy them into `astap/`. Create the
 directories as the user that runs the stack: the containers run as `VELA_UID:VELA_GID`
 (default 1000:1000) so the files stay yours.
+
+### Phone alerts
+
+Without `alerts.json` alerts show in Vela only, and the alerts API says phone alerts are not
+configured. To send them to Pushover, create the file with the script, which prompts for the
+application token and user key without echoing them and writes the file with mode 600:
+
+```sh
+scripts/set-pushover-keys.sh
+docker compose restart server
+```
+
+Never paste the keys into chat, a commit or a log. The file may also set any number the alert
+rules use under `"thresholds"`; see `apps/server/src/alerts/thresholds.ts` for the names and
+defaults. Unknown keys are refused at start. `GET /api/web/rigs/<rig>/alerts` shows the thresholds in
+use, and `POST /api/rigs/<rig>/alerts/test` (an empty JSON object) sends a test message.
 
 The Cria URL in `cria.json` must be reachable from the host; containers use the host's
 routes, so a Tailscale address works if the host is on the tailnet.

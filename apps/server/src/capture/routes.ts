@@ -29,6 +29,7 @@ import {
 } from './controller.js'
 import type { FrameRecords } from './frame-records.js'
 import { createMemorySavedImageStore, type SavedImageStore } from '../saved-images/store.js'
+import type { AlertMonitor } from '../alerts/monitor.js'
 
 export interface CaptureSettings {
   rig: RigCatalogRecord
@@ -44,6 +45,8 @@ interface CaptureRouteOptions {
   createAcquisition: (rig: RigCatalogRecord) => Acquisition
   createInspector: RigDetailOptions['createInspector']
   createCooling: (settings: CaptureSettings) => CameraCooling
+  /** Watches each run for the alert rules. */
+  alerts?: { monitorFor(rig: RigCatalogRecord): Pick<AlertMonitor, 'runStarted' | 'frameCaptured' | 'runEnded'> }
 }
 
 function configuredCamera(settings: CaptureSettings, acquisition: Acquisition): CaptureCamera {
@@ -105,6 +108,7 @@ export function registerCapture(
     createAcquisition,
     createInspector,
     createCooling,
+    alerts,
     savedImages = createMemorySavedImageStore(),
     frameRecords,
   }: CaptureRouteOptions,
@@ -308,17 +312,27 @@ export function registerCapture(
           controllers.set(view.rigId, controller)
         }
 
-        const result = await controller.start(
-          body.exposureSeconds,
-          cameraFactory(settings),
-          view.camera.name,
-          {
+        const watch = alerts?.monitorFor(rig)
+        const captureController = controller
+        const camera = cameraFactory(settings)
+
+        watch?.runStarted(body.exposureSeconds)
+
+        const result = await controller
+          .start(body.exposureSeconds, camera, view.camera.name, {
             subject,
-            onSettled: release,
+            onFrame: image => watch?.frameCaptured(image),
+            onSettled() {
+              release()
+              watch?.runEnded(captureController.snapshot().phase === 'failed' ? 'failed' : 'stopped')
+            },
             repeat: body.repeat === true,
             saveFrames: body.saveFrames === true,
-          },
-        )
+          })
+          .catch(error => {
+            watch?.runEnded('stopped')
+            throw error
+          })
 
         started = true
 
