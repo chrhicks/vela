@@ -26,7 +26,7 @@ const whatMissingCosts = {
   'mount-csv': 'There are no polled mount samples: the mount table holds only what the INDI recording gives (nothing without one), and a frame links only to those.',
   'indi-recording': 'There are no Cria operations, INDI writes or device events, and no frame links exactly to its camera image.',
   'frame-records': 'Frames carry no request or operation ids, so none links exactly to a Cria operation.',
-  'cria-journal': 'There are no requests Vela sent, no checks of the images it fetched, and no link from an attempt to its request or its image check.',
+  'cria-journal': 'There are no requests Vela sent, no checks of the images it fetched, no state changes or stream events as Vela saw them, and no link from an attempt to its request or its image check.',
 } as const
 
 type InputName = keyof typeof whatMissingCosts
@@ -79,6 +79,8 @@ export async function buildSession(request: SessionRequest): Promise<string> {
       indi_images: tables.indi_images.length,
       cria_requests: tables.cria_requests.length,
       cria_image_checks: tables.cria_image_checks.length,
+      cria_state_changes: tables.cria_state_changes.length,
+      cria_stream: tables.cria_stream.length,
       mount: tables.mount.length,
       spans: tables.spans.length,
     },
@@ -92,6 +94,7 @@ export async function buildSession(request: SessionRequest): Promise<string> {
       image_to_operation: countLinks(tables.indi_images.map(image => image.operation_link)),
       request_to_attempt: countLinks(tables.cria_requests.map(request => request.attempt_link)),
       image_check_to_attempt: countLinks(tables.cria_image_checks.map(check => check.attempt_link)),
+      state_cell_to_operation: countLinks(tables.cria_state_changes.map(change => change.operation_link)),
       event_to_operation: countLinks(tables.indi_events.map(event => event.operation_link)),
     },
     recording: recording && {

@@ -88,6 +88,8 @@ export function buildTables(session: string, window: TimeWindow, inputs: Session
     indi_images: exportedBlobs.map(({ image, operation }) => imageRow(session, image, operation)),
     cria_requests: journal.requests,
     cria_image_checks: journal.imageChecks,
+    cria_state_changes: journal.stateChanges,
+    cria_stream: journal.streamEvents,
     mount: mountSamples.flatMap(sample =>
       inWindow(sample.sampledAt) || linkedMountTimes.has(sample.sampledAt.getTime()) ? [mountRow(session, sample)] : [],
     ),
