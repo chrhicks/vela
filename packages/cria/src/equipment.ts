@@ -1,7 +1,7 @@
 import { Effect, Exit, Schema } from 'effect'
 import type { Device, ParamsOf } from '@cria/wire'
 import {
-  CaptureStoppedError, CaptureRetryableError, EquipmentError, FocuserStoppedError,
+  CaptureStoppedError, CaptureRetryableError, CaptureUncertainError, EquipmentError, FocuserStoppedError,
   FrameLostError, FramingStoppedError,
   type Acquisition, type CameraCooling, type CameraCoolingObservation,
   type Focuser, type Framing, type TelescopeStatus,
@@ -130,7 +130,7 @@ export function createCriaEquipment(connection: CriaConnection, bindings: Readon
         let parameters: ParamsOf<'capture'> = { exposureSeconds: options.exposureSeconds, light: true }
 
         if (options.monochromeOnly !== undefined) parameters = { ...parameters, monochromeOnly: options.monochromeOnly }
-        const result = await outcomeOf(remote.capture(options.cameraId, parameters), options.signal)
+        const result = await outcomeOf(remote.capture(options.cameraId, parameters, options.onProvenance), options.signal)
 
         switch (result.kind) {
           case 'confirmed': {
@@ -152,7 +152,8 @@ export function createCriaEquipment(connection: CriaConnection, bindings: Readon
             if (!exposureRequested && (result.reason === 'unavailable' || result.reason === 'disconnected' || result.reason === 'busy'))
               throw new CaptureRetryableError(failure(result.message))
             throw failure(result.message)
-          case 'uncertain': throw failure(result.message)
+          case 'uncertain':
+            throw new CaptureUncertainError(result.message, { reason: 'protocol-error', endpoint: 'Cria' })
         }
       } finally {
         clearInterval(timer)

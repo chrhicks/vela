@@ -130,9 +130,12 @@ A capture run writes `capture.run.started` (rig, exposure seconds, `capture.run.
 `capture.run.saveFrames`) and `capture.run.ended` (final `capture.run.phase`, and the run's
 `completed`, `lost` and `saved` counts, plus `capture.run.error` if it failed). Each frame is one
 `capture.frame` span from the start of its exposure to the end of its save, with
-`capture.frame.index` and `capture.frame.outcome`: `saved`, `unsaved` (kept in memory only),
-`lost` (the camera driver no longer held the image; the span has an error status), `save-failed`,
-`stopped` or `failed`. `capture.acquire.ms` is the exposure plus readout and transfer, and
+`capture.run.id`, `capture.frame.index` and `capture.frame.outcome`: `saved`, `unsaved` (kept in
+memory only), `lost` (the camera driver no longer held the image; the span has an error status),
+`save-failed`, `stopped`, `uncertain` (Vela could not learn whether the exposure ran) or `failed`.
+A frame from a Cria rig also carries `capture.provenance.request.id`, `.operation.id` and
+`.image.id`, as far as Cria had given them when the frame ended, and `capture.image.id` (Vela's own
+ID for the image, the same as in its saved `metadata.json`) when an image arrived. `capture.acquire.ms` is the exposure plus readout and transfer, and
 `capture.overhead.ms` is the part beyond the exposure. `capture.process.ms` covers previews, star
 measurement and FITS encoding, `capture.save.ms` the write to the saved-image store (absent when
 frames are not saved), and `capture.fits.bytes` the size of the FITS file. When the camera's
@@ -145,3 +148,50 @@ run with:
 ```sh
 jq 'select(.name | startswith("capture."))' data/traces/observing.jsonl
 ```
+
+### Frame records
+
+Set `VELA_FRAME_RECORDS_PATH` to a JSONL file path and the server appends one line when each
+capture attempt settles, whatever the outcome. Unlike the trace journal, it holds the star
+statistics of every frame, not only the last three in memory. It is off when the variable is
+unset. If a write fails or falls behind by more than 1 MiB, recording stays off until the server
+restarts and the server logs why once; capture is never affected. Each line is:
+
+```json
+{
+  "version": 1,
+  "rigId": "fra 400",
+  "runId": "f3a1…",
+  "attempt": 3,
+  "startedAt": "2026-10-17T03:31:00.120Z",
+  "settledAt": "2026-10-17T03:31:12.480Z",
+  "exposureSeconds": 10,
+  "subject": { "targetId": "ngc7000", "name": "North America Nebula", "catalog": "NGC 7000" },
+  "outcome": "saved",
+  "message": null,
+  "provenance": { "requestId": "…", "operationId": "…", "imageId": "…" },
+  "image": {
+    "id": "…",
+    "capturedAt": "2026-10-17T03:31:00.050Z",
+    "capturedAtSource": "camera",
+    "receivedAt": "2026-10-17T03:31:12.470Z",
+    "width": 6248,
+    "height": 4176
+  },
+  "statistics": { "detectedStars": 412, "medianHfrPixels": 2.9 }
+}
+```
+
+- `runId` identifies the capture run; `attempt` counts from 1 within it, as `capture.frame.index`
+  does. `startedAt` and `settledAt` use the Vela server's clock.
+- `outcome` is one of the `capture.frame.outcome` values above. `saved`, `unsaved` and
+  `save-failed` hold an image. `lost`, `failed`, `uncertain` and `stopped` do not, so `image` and
+  `statistics` are null. `message` is why the attempt did not end well, and null for `saved` and
+  `unsaved`.
+- `provenance` holds the rig service's IDs: the Cria `requestId` Vela minted, the `operationId`
+  once Cria admitted it (null if it never did) and the `imageId` once the operation produced one
+  (null otherwise). A lost frame keeps all three. It is null when the rig's adapter has no such
+  IDs (Alpaca). `requestId` joins to Cria's operation record of the same exposure.
+- `image.id` is Vela's ID; `saved-images/<hash>/metadata.json` carries the same `id` and the same
+  `provenance`. `statistics` is null when star measurement was unavailable, and a starless frame
+  is `detectedStars: 0`.

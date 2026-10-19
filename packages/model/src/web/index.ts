@@ -51,6 +51,7 @@ export type {
   CaptureCoolingView,
   CaptureSubject,
   CaptureImage,
+  CaptureImageProvenance,
   CaptureImageStatistics,
   CapturePhase,
   CaptureView,

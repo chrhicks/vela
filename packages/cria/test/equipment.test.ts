@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { CaptureRetryableError, EquipmentError, FocuserStoppedError } from '@vela/equipment'
+import { CaptureRetryableError, CaptureUncertainError, EquipmentError, FocuserStoppedError, type CaptureProvenance } from '@vela/equipment'
 import { createCriaConnection } from '../src/connection.js'
 import { createCriaEquipment } from '../src/equipment.js'
 import type { Device } from '@cria/wire'
@@ -217,6 +217,39 @@ describe('protocol 5 Promise capabilities', () => {
     expect(await captured).toBeInstanceOf(EquipmentError)
     expect(downloads).toBe(3)
     expect(cria.received.filter(request => request.route === 'submit')).toHaveLength(1)
+  })
+
+  it('reports the request, operation and image IDs of an exposure as it learns them', async () => {
+    const seen: CaptureProvenance[] = []
+    const captured = equipment.acquisition.capture({ cameraId: 'camera', exposureSeconds: 1, onProvenance: provenance => seen.push(provenance) })
+
+    await vi.advanceTimersByTimeAsync(2_000)
+    await captured
+
+    const submitted = JSON.parse(cria.received.find(request => request.route === 'submit')!.body!)
+    const settled = (await (await cria.fetch(`${cria.origin}/v2/state`)).json()).operations[0]
+
+    expect(seen).toEqual([
+      { requestId: submitted.requestId, operationId: null, imageId: null },
+      { requestId: submitted.requestId, operationId: settled.id, imageId: null },
+      { requestId: submitted.requestId, operationId: settled.id, imageId: settled.outcome.value.image.id },
+    ])
+  })
+
+  it('throws an uncertain error, with the IDs it had, when Cria restarts under an exposure', async () => {
+    const seen: CaptureProvenance[] = []
+
+    const captured = equipment.acquisition.capture({ cameraId: 'camera', exposureSeconds: 10, onProvenance: provenance => seen.push(provenance) }).then(
+      () => undefined,
+      error => error,
+    )
+
+    await vi.advanceTimersByTimeAsync(1_000)
+    cria.restart()
+    await vi.advanceTimersByTimeAsync(2_000)
+
+    expect(await captured).toBeInstanceOf(CaptureUncertainError)
+    expect(seen.at(-1)).toEqual({ requestId: expect.any(String), operationId: expect.any(String), imageId: null })
   })
 
   it('allows a fresh attempt after a preflight refusal that dispatched no exposure', async () => {
