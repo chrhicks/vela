@@ -19,13 +19,7 @@ export function committedFixtures(tracked: ReadonlyArray<string>): string[] {
  * unpublish it, so each stays listed, with the reason, until Chris decides what to do about it. An
  * exception that no longer matches a finding is an error, so this list cannot outlive its cause.
  */
-export const knownExceptions: ReadonlyArray<{ path: string; rule: Rule; reason: string }> = [
-  {
-    path: 'apps/server/src/alerts/fixtures/night-20261018-mount.csv',
-    rule: 'implied-site-longitude',
-    reason: 'Recorded before the guard existed; Chris decides whether to replace it.',
-  },
-]
+export const knownExceptions: ReadonlyArray<{ path: string; rule: Rule; reason: string }> = []
 
 export interface ScrubReport {
   scanned: string[]

@@ -37,7 +37,12 @@ const number = '(-?\\d+(?:\\.\\d+)?)'
 
 const isFakeLatitude = (value: number) => fakeSites.some(site => site.latitude === value)
 
-const isFakeLongitude = (value: number) => fakeSites.some(site => (((site.longitude - value) % 360) + 360) % 360 < 1e-9)
+const longitudeGap = (a: number, b: number) => Math.abs(((((a - b) % 360) + 540) % 360) - 180)
+
+const isFakeLongitude = (value: number) => fakeSites.some(site => longitudeGap(site.longitude, value) < 1e-9)
+
+// A longitude derived from logged sidereal time carries the log's rounding and the sidereal formula's error.
+const isNearFakeLongitude = (value: number) => fakeSites.some(site => longitudeGap(site.longitude, value) < 0.1)
 
 /**
  * The text lines whose coordinates are a site: INDI `GEOGRAPHIC_COORD` elements (a recording holds them
@@ -110,7 +115,7 @@ function impliedLongitudeFindings(path: string, text: string): Finding[] {
     if (Number.isNaN(time) || cells[lst] === '' || Number.isNaN(sidereal)) return []
     const longitude = ((((sidereal - greenwichSiderealHours(time)) * 15 + 540) % 360) + 360) % 360 - 180
 
-    return isFakeLongitude(longitude) ? [] : [{ path, line: index + 2, rule: 'implied-site-longitude' as const }]
+    return isNearFakeLongitude(longitude) ? [] : [{ path, line: index + 2, rule: 'implied-site-longitude' as const }]
   }).slice(0, 1)
 }
 
