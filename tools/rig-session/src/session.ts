@@ -18,6 +18,8 @@ export interface SessionRequest {
   readonly frameRecordsFile: string | null
   readonly recordingDir: string | null
   readonly journalFile: string | null
+  /** Where the readers record what they learn from the inputs; give one to scan the package against it afterwards. */
+  readonly secrets?: Secrets
 }
 
 const whatMissingCosts = {
@@ -40,7 +42,7 @@ const maxSkippedListed = 20
 /** Reads the inputs it was given, joins them, and publishes the package. Returns the new package directory. */
 export async function buildSession(request: SessionRequest): Promise<string> {
   // What the readers learn from the inputs is private; the package is sanitised and checked against it.
-  const secrets = new Secrets()
+  const secrets = request.secrets ?? new Secrets()
   const savedImages = await readIfGiven(request.savedImagesDir, readSavedImages)
   const traces = await readIfGiven(request.tracesFile, readTraces)
   const mount = await readIfGiven(request.mountCsvFile, readMountCsv)
