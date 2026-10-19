@@ -39,7 +39,7 @@ export function opLine({ id, requestId, deviceId = 'primary', kind = 'capture', 
       startedAt: epoch(acceptedAt),
       settledAt: epoch(settledAt),
       state: 'settled',
-      outcome: outcome ?? { kind: 'confirmed', value: { values: {}, image: { id: `image-${id}`, original: { bytes: 5000 } } } },
+      outcome: outcome ?? { kind: 'confirmed', value: { values: {}, image: { id: `image-${id}`, sha256: `sha-${id}`, original: { bytes: 5000 } } } },
     },
   }
 }

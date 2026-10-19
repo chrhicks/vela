@@ -53,15 +53,28 @@ export function linkAttemptToFrame(record: FrameRecord, images: readonly SavedIm
 }
 
 /**
- * An attempt belongs to the Cria operation it names. The operation id is the key; an attempt that
+ * An attempt or a journal request belongs to the Cria operation it names. The operation id is the key; one that
  * has only a request id (Cria never admitted it, or the reply was lost) finds its operation by that.
  */
-export function linkAttemptToOperation(record: FrameRecord, operations: readonly RecordedOperation[]): Link<RecordedOperation> | null {
+export function linkToOperation(
+  record: { readonly operationId: string | null; readonly requestId: string | null },
+  operations: readonly RecordedOperation[],
+): Link<RecordedOperation> | null {
   const byId = operations.filter(operation => operation.id === record.operationId)
 
   if (byId.length > 0 || record.requestId === null) return exactOrAmbiguous(byId)
 
   return exactOrAmbiguous(operations.filter(operation => operation.requestId === record.requestId))
+}
+
+/**
+ * A request Vela sent belongs to the attempts that carry its request id, an image check to the attempts
+ * that carry the Cria image id. Both are keys, so a match is `exact`; two attempts with one id are `ambiguous`.
+ */
+export function linkToAttempt(key: { readonly requestId?: string; readonly criaImageId?: string }, records: readonly FrameRecord[]): Link<FrameRecord> | null {
+  return exactOrAmbiguous(
+    records.filter(record => (key.requestId !== undefined && record.requestId === key.requestId) || (key.criaImageId !== undefined && record.criaImageId === key.criaImageId)),
+  )
 }
 
 /**

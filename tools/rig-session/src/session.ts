@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs'
 import { readFrameRecords, readMountCsv, readSavedImages, readTraces, type ReadResult } from './inputs.ts'
 import { publishPackage } from './package.ts'
 import type { LinkKind } from './schema.ts'
+import { readJournal } from './journal.ts'
 import { readRecording } from './recording.ts'
 import { buildTables, type TimeWindow } from './tables.ts'
 
@@ -14,6 +15,7 @@ export interface SessionRequest {
   readonly mountCsvFile: string | null
   readonly frameRecordsFile: string | null
   readonly recordingDir: string | null
+  readonly journalFile: string | null
 }
 
 const whatMissingCosts = {
@@ -22,6 +24,7 @@ const whatMissingCosts = {
   'mount-csv': 'The mount table is empty and frames have no mount link.',
   'indi-recording': 'There are no Cria operations, INDI writes or device events, and no frame links exactly to its camera image.',
   'frame-records': 'Frames carry no request or operation ids, so none links exactly to a Cria operation.',
+  'cria-journal': 'There are no requests Vela sent, no checks of the images it fetched, and no link from an attempt to its request or its image check.',
 } as const
 
 type InputName = keyof typeof whatMissingCosts
@@ -39,16 +42,18 @@ export async function buildSession(request: SessionRequest): Promise<string> {
   const mount = await readIfGiven(request.mountCsvFile, readMountCsv)
   const frameRecords = await readIfGiven(request.frameRecordsFile, readFrameRecords)
   const recording = await readIfGiven(request.recordingDir, readRecording)
+  const journal = await readIfGiven(request.journalFile, readJournal)
 
   const tables = buildTables(request.name, request.window, {
     savedImages: savedImages?.items ?? [],
     spans: traces?.items ?? [],
     frameRecords: frameRecords?.items ?? [],
     recording,
+    journal: journal?.items ?? [],
     mountSamples: mount?.items ?? [],
   })
 
-  const skipped = [savedImages, traces, mount, frameRecords, recording].flatMap(result => result?.skipped ?? [])
+  const skipped = [savedImages, traces, mount, frameRecords, recording, journal].flatMap(result => result?.skipped ?? [])
 
   const summary = {
     session: request.name,
@@ -60,6 +65,7 @@ export async function buildSession(request: SessionRequest): Promise<string> {
       reportInput('mount-csv', request.mountCsvFile, mount),
       reportInput('indi-recording', request.recordingDir, recording),
       reportInput('frame-records', request.frameRecordsFile, frameRecords),
+      reportInput('cria-journal', request.journalFile, journal),
     ],
     rows: {
       frames: tables.frames.length,
@@ -67,6 +73,8 @@ export async function buildSession(request: SessionRequest): Promise<string> {
       indi_ops: tables.indi_ops.length,
       indi_events: tables.indi_events.length,
       indi_images: tables.indi_images.length,
+      cria_requests: tables.cria_requests.length,
+      cria_image_checks: tables.cria_image_checks.length,
       mount: tables.mount.length,
       spans: tables.spans.length,
     },
@@ -78,6 +86,8 @@ export async function buildSession(request: SessionRequest): Promise<string> {
       attempt_to_operation: countLinks(tables.attempts.map(attempt => attempt.operation_link)),
       frame_to_blob: countLinks(tables.frames.map(frame => frame.blob_link)),
       image_to_operation: countLinks(tables.indi_images.map(image => image.operation_link)),
+      request_to_attempt: countLinks(tables.cria_requests.map(request => request.attempt_link)),
+      image_check_to_attempt: countLinks(tables.cria_image_checks.map(check => check.attempt_link)),
       event_to_operation: countLinks(tables.indi_events.map(event => event.operation_link)),
     },
     recording: recording && {
