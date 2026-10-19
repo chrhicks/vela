@@ -47,7 +47,7 @@ The Vela journal is not read yet. `INPUTS.md` specifies how they will be, and th
 
 ## Privacy
 
-A package never holds the observing site or serial port paths. `redact.ts` replaces the values of the INDI properties `GEOGRAPHIC_COORD`, `DEVICE_PORT` and `SYSTEM_PORTS`, any `/dev/...` path, `LAT=`/`LONG=`/`ELEV=` pairs and site or port keys in operation parameters; a text that names the site in words (a driver's "Observer location updated: Latitude ...") is replaced whole. A recording is read for `manifest.json` and `traffic.jsonl` only; `blobs/` is never opened. A recording with a torn last line loses that line; one with a damaged line in the middle is read up to the damage and `session.json` lists it.
+A package never holds the observing site or serial port paths. `redact.ts` replaces the values of the INDI properties `GEOGRAPHIC_COORD`, `DEVICE_PORT` and `SYSTEM_PORTS`, any `/dev/...` path, `LAT=`/`LONG=`/`ELEV=` pairs and site or port keys in operation parameters; a text that names the site in words (a driver's "Observer location updated: Latitude ...") is replaced whole. A recording is read for `manifest.json` and `traffic.jsonl` only; `blobs/` is never opened. A recording is streamed, so a tape larger than memory builds in constant space; only the lines a table needs are kept. A recording with a torn last line loses that line; one with a damaged line in the middle (or a line over 64 MiB) is read up to the damage and `session.json` lists it. The policy is stated once, in `INPUTS.md` ("Damage").
 
 ## Replay
 

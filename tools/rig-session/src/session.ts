@@ -58,7 +58,7 @@ export async function buildSession(request: SessionRequest): Promise<string> {
       reportInput('saved-images', request.savedImagesDir, savedImages),
       reportInput('traces', request.tracesFile, traces),
       reportInput('mount-csv', request.mountCsvFile, mount),
-      reportInput('indi-recording', request.recordingDir, recording),
+      reportInput('indi-recording', request.recordingDir, recording, recording?.linesRead),
       reportInput('frame-records', request.frameRecordsFile, frameRecords),
     ],
     rows: {
@@ -98,10 +98,11 @@ async function readIfGiven<Result extends ReadResult<unknown>>(
   return read(path)
 }
 
-function reportInput<Item>(input: InputName, path: string | null, result: ReadResult<Item> | null): InputReport {
+/** `read` counts what was read, which for a streamed input is more than the items it kept. */
+function reportInput<Item>(input: InputName, path: string | null, result: ReadResult<Item> | null, read = result?.items.length ?? 0): InputReport {
   if (path === null || result === null) return { input, status: 'missing', effect: whatMissingCosts[input] }
 
-  return { input, status: 'found', path, read: result.items.length, skipped: result.skipped.length }
+  return { input, status: 'found', path, read, skipped: result.skipped.length }
 }
 
 function countLinks(kinds: readonly (LinkKind | null)[]) {
