@@ -38,10 +38,18 @@ Joins are plain functions in `src/joins.ts`. Each link records how it was found:
 A link with no match is null. The packager never guesses.
 
 - `frames.span_*` links a saved frame to the `capture.frame` span that was running when the camera started the exposure.
-- `frames.attempt_*` links a saved frame to the frame record (`attempts` table, one row per capture attempt of any outcome) that names its image: `exact`, by the image id. The frame then carries that attempt's `request_id`, `operation_id` and `cria_image_id`, so it names the Cria operation that produced it. `attempts.frame_id` is the same link seen from the attempt; a lost or failed attempt has none. `attempts.message` is the adapter's or driver's own text, so `/dev/` paths and `LAT=`/`LONG=` pairs in it are replaced, and a text that names the site in words is replaced whole.
+- `frames.attempt_*` links a saved frame to the frame record (`attempts` table, one row per capture attempt of any outcome) that names its image: `exact`, by the image id. The frame then carries that attempt's `request_id`, `operation_id` and `cria_image_id`, so it names the Cria operation that produced it. `attempts.frame_id` is the same link seen from the attempt; a lost or failed attempt has none.
 - `frames.mount_*` links a frame to the latest mount sample not after the exposure start, and keeps the sample's age. A sample older than 30 seconds gives no link.
 
 The Cria recording and the Vela journal are not read yet. `INPUTS.md` specifies how they will be, and the tables and links they add.
+
+## Privacy
+
+A package never holds the observing site, serial port paths or serial numbers, host addresses or credentials. This is held at the one place rows are written, not field by field: `publishPackage` (`package.ts`) passes every string cell, and every string and key inside a JSON cell, through `sanitize` (`sanitize.ts`), and no table or column is named there. A new column or table is covered without touching it.
+
+`sanitize` has two layers. Learned values: the readers learn the secrets from the inputs themselves (the recording's site, ports and serial numbers, the journal's origin), and `Secrets` replaces each wherever it occurs, in the usual spellings (decimal rounded or truncated, signed or wrapped longitude, sexagesimal). Patterns: `/dev/` paths, `by-id` names, `LAT=`/`LONG=`/`ELEV=` pairs, URL credentials and tokens, bearer and key-looking strings; a text that names the site in words ("Observer location updated: Latitude ...") is replaced whole, and a JSON key that names the site, a port or a serial number loses its value.
+
+After the staged files are written and before the symlink switches, the package reads them back and scans every table and `session.json` for the learned secrets and the patterns. A hit fails the build with the table, column and rule (never the value), removes the staging directory, and leaves the previous package readable. It is the backstop; `sanitize` is the defence. `INPUTS.md` ("Privacy rule") has the whole rule.
 
 ## Replay
 
