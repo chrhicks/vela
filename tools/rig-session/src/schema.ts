@@ -75,6 +75,32 @@ export const tables = {
     mount_link: optional('link'),
     mount_candidates: optional('json'),
     mount_age_seconds: optional('real'),
+    run_id: optional('text'),
+    attempt: optional('int'),
+    request_id: optional('text'),
+    operation_id: optional('text'),
+    cria_image_id: optional('text'),
+    attempt_link: optional('link'),
+    attempt_candidates: optional('json'),
+  },
+  attempts: {
+    session: required('text'),
+    run_id: required('text'),
+    attempt: required('int'),
+    rig_id: required('text'),
+    started_at: required('timestamp'),
+    settled_at: required('timestamp'),
+    exposure_seconds: required('real'),
+    outcome: required('text'),
+    message: optional('text'),
+    request_id: optional('text'),
+    operation_id: optional('text'),
+    cria_image_id: optional('text'),
+    frame_id: optional('text'),
+    frame_link: optional('link'),
+    frame_candidates: optional('json'),
+    detected_stars: optional('int'),
+    median_hfr_px: optional('real'),
   },
   mount: {
     session: required('text'),
@@ -109,12 +135,15 @@ export const tableNames = Object.keys(tables) as TableName[]
 
 export type FrameRow = RowOf<typeof tables.frames>
 
+export type AttemptRow = RowOf<typeof tables.attempts>
+
 export type MountRow = RowOf<typeof tables.mount>
 
 export type SpanRow = RowOf<typeof tables.spans>
 
 export interface Tables {
   readonly frames: readonly FrameRow[]
+  readonly attempts: readonly AttemptRow[]
   readonly mount: readonly MountRow[]
   readonly spans: readonly SpanRow[]
 }

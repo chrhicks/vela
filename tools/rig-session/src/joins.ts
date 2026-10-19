@@ -1,4 +1,4 @@
-import type { MountSample, SavedImage, TraceSpan } from './inputs.ts'
+import type { FrameRecord, MountSample, SavedImage, TraceSpan } from './inputs.ts'
 
 /**
  * How one row found another. `exact` is a shared key. `inferred` is a rule over times, so
@@ -31,6 +31,31 @@ export function linkFrameToSpan(image: SavedImage, spans: readonly TraceSpan[]):
   if (only !== undefined && candidates.length === 1) return { kind: 'inferred', target: only }
 
   return { kind: 'ambiguous', candidates }
+}
+
+/**
+ * A saved frame belongs to the attempt whose record names the image it saved. The image id is a
+ * key, so a match is `exact`. Two records for one image would be a Vela fault, and neither is picked.
+ */
+export function linkFrameToAttempt(image: SavedImage, records: readonly FrameRecord[]): Link<FrameRecord> | null {
+  const candidates = records.filter(record => record.rigId === image.rigId && record.imageId === image.id)
+
+  return exactOrAmbiguous(candidates)
+}
+
+/** An attempt that saved an image belongs to the saved frame with that id. */
+export function linkAttemptToFrame(record: FrameRecord, images: readonly SavedImage[]): Link<SavedImage> | null {
+  if (record.imageId === null) return null
+
+  return exactOrAmbiguous(images.filter(image => image.rigId === record.rigId && image.id === record.imageId))
+}
+
+function exactOrAmbiguous<Target>(candidates: readonly Target[]): Link<Target> | null {
+  const [only] = candidates
+
+  if (only === undefined) return null
+
+  return candidates.length === 1 ? { kind: 'exact', target: only } : { kind: 'ambiguous', candidates }
 }
 
 export interface MountLink {

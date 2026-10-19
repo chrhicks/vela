@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, test } from 'vitest'
-import { readMountCsv, readSavedImages, readTraces } from './inputs.ts'
+import { readFrameRecords, readMountCsv, readSavedImages, readTraces } from './inputs.ts'
 
 async function scratch(): Promise<string> {
   return mkdtemp(join(tmpdir(), 'rig-session-inputs-'))
@@ -125,4 +125,42 @@ test('mount samples read as UTC, and a repeated time or unreadable line is repor
     ['2030-01-01T00:00:20.000Z', false, true, 'west'],
   ])
   expect(skipped.map(entry => entry.where)).toEqual([`${file}:3`, `${file}:4`])
+})
+
+const frameRecord = {
+  version: 1,
+  rigId: 'rig-a',
+  runId: 'run-1',
+  attempt: 1,
+  startedAt: '2030-01-01T00:00:00.000Z',
+  settledAt: '2030-01-01T00:01:00.000Z',
+  exposureSeconds: 60,
+  subject: null,
+  outcome: 'saved',
+  message: null,
+  provenance: { requestId: 'request-1', operationId: 'operation-1', imageId: 'cria-image-1' },
+  image: { id: 'frame-1', capturedAt: '2030-01-01T00:00:01.500Z', capturedAtSource: 'camera', receivedAt: '2030-01-01T00:01:00.000Z', width: 100, height: 80 },
+  statistics: { detectedStars: 12, medianHfrPixels: 3.5 },
+}
+
+test('frame records read every outcome, with or without ids and an image, and skip what cannot be read', async () => {
+  const dir = await scratch()
+  const file = join(dir, 'frames.jsonl')
+  const lost = { ...frameRecord, attempt: 2, outcome: 'lost', message: 'gone', provenance: { requestId: 'request-2', operationId: null, imageId: null }, image: null, statistics: null }
+  const alpaca = { ...frameRecord, attempt: 3, provenance: null }
+
+  await writeFile(
+    file,
+    [frameRecord, lost, alpaca, { ...frameRecord }, { ...frameRecord, attempt: 4, outcome: 'vanished' }].map(line => JSON.stringify(line)).join('\n') + '\n{torn',
+  )
+
+  const { items, skipped } = await readFrameRecords(file)
+
+  expect(items.map(item => [item.attempt, item.outcome, item.requestId, item.operationId, item.criaImageId, item.imageId, item.detectedStars])).toEqual([
+    [1, 'saved', 'request-1', 'operation-1', 'cria-image-1', 'frame-1', 12],
+    [2, 'lost', 'request-2', null, null, null, null],
+    [3, 'saved', null, null, null, 'frame-1', 12],
+  ])
+  expect(skipped.map(entry => entry.where)).toEqual([`${file}:4`, `${file}:5`, `${file}:6`])
+  expect(skipped[0]?.reason).toBe('repeats the run and attempt of an earlier record')
 })

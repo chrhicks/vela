@@ -174,6 +174,83 @@ export async function readTraces(path: string): Promise<ReadResult<TraceSpan>> {
   return { items, skipped }
 }
 
+const frameRecordLine = z.object({
+  version: z.literal(1),
+  rigId: z.string(),
+  runId: z.string(),
+  attempt: z.int(),
+  startedAt: timestamp,
+  settledAt: timestamp,
+  exposureSeconds: z.number(),
+  outcome: z.enum(['saved', 'unsaved', 'save-failed', 'lost', 'failed', 'uncertain', 'stopped']),
+  message: z.string().nullable(),
+  provenance: z.object({ requestId: z.string(), operationId: z.string().nullable(), imageId: z.string().nullable() }).nullable(),
+  image: z.object({ id: z.string() }).nullable(),
+  statistics: z.object({ detectedStars: z.int(), medianHfrPixels: z.number().nullable() }).nullable(),
+})
+
+/** One settled capture attempt of Vela's, saved or not. The ids are Cria's, null when the adapter carried none. */
+export interface FrameRecord {
+  readonly rigId: string
+  readonly runId: string
+  readonly attempt: number
+  readonly startedAt: Date
+  readonly settledAt: Date
+  readonly exposureSeconds: number
+  readonly outcome: z.infer<typeof frameRecordLine>['outcome']
+  readonly message: string | null
+  readonly requestId: string | null
+  readonly operationId: string | null
+  readonly criaImageId: string | null
+  /** The id Vela gave the image; it is the saved image's `id`. */
+  readonly imageId: string | null
+  readonly detectedStars: number | null
+  readonly medianHfrPixels: number | null
+}
+
+/** Reads `frames.jsonl`. A record that repeats the run and attempt of an earlier one is skipped. */
+export async function readFrameRecords(path: string): Promise<ReadResult<FrameRecord>> {
+  const items: FrameRecord[] = []
+  const skipped: Skipped[] = []
+  const seen = new Set<string>()
+  const lines = (await readFile(path, 'utf8')).split('\n')
+
+  lines.forEach((line, index) => {
+    if (line.trim() === '') return
+
+    const where = `${path}:${index + 1}`
+    const parsed = jsonText(frameRecordLine).safeParse(line)
+
+    if (!parsed.success) return void skipped.push({ where, reason: z.prettifyError(parsed.error) })
+
+    const { provenance, image, statistics, ...record } = parsed.data
+    const key = `${record.runId}/${record.attempt}`
+
+    if (seen.has(key)) return void skipped.push({ where, reason: 'repeats the run and attempt of an earlier record' })
+
+    seen.add(key)
+
+    items.push({
+      rigId: record.rigId,
+      runId: record.runId,
+      attempt: record.attempt,
+      startedAt: record.startedAt,
+      settledAt: record.settledAt,
+      exposureSeconds: record.exposureSeconds,
+      outcome: record.outcome,
+      message: record.message,
+      requestId: provenance?.requestId ?? null,
+      operationId: provenance?.operationId ?? null,
+      criaImageId: provenance?.imageId ?? null,
+      imageId: image?.id ?? null,
+      detectedStars: statistics?.detectedStars ?? null,
+      medianHfrPixels: statistics?.medianHfrPixels ?? null,
+    })
+  })
+
+  return { items, skipped }
+}
+
 const flag = z.enum(['True', 'False']).transform(text => text === 'True')
 
 const mountLine = z.object({
