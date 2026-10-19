@@ -34,7 +34,7 @@ const maxSkippedListed = 20
 
 /** Reads the inputs it was given, joins them, and publishes the package. Returns the new package directory. */
 export async function buildSession(request: SessionRequest): Promise<string> {
-  /** What the readers learn is private (none of the inputs here teach it yet); the package is checked against it. */
+  // What the readers learn from the inputs is private; the package is sanitised and checked against it.
   const secrets = new Secrets()
   const savedImages = await readIfGiven(request.savedImagesDir, readSavedImages)
   const traces = await readIfGiven(request.tracesFile, readTraces)
