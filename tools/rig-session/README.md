@@ -35,7 +35,7 @@ The inputs are read-only. Every input is optional; `session.json` in the package
 ### Check your own set
 
 ```sh
-pnpm --filter @vela/rig-session accept \
+pnpm --silent --filter @vela/rig-session accept \
   --recording ~/recordings/<name> --frame-records <frames.jsonl> --journal <cria-journal.jsonl> \
   --traces <observing.jsonl> --saved-images <saved-images dir> [--mount-csv <file>] \
   --from 2030-01-01T18:00:00Z --to 2030-01-02T12:00:00Z
@@ -47,7 +47,7 @@ It takes the inputs of `build` (all optional), builds a package twice into a thr
 - the privacy scan of every table and `session.json`, against the values the packager learned from your inputs, finds one. The message names the table, column and rule, never the value;
 - an input changed while it ran (hashed before and after: the files the packager reads, not `blobs/` or the images). An input that only grew (Vela's live journal while Vela runs) fails too, with its own message: run on a copy, or pass `--allow-growth` to make it a warning.
 
-The output is counts and names only, never a cell of your data. Exit 0 means all three held.
+The output is counts and names only, never a cell of your data. (`--silent` stops pnpm echoing your arguments, which are your own paths, to the terminal.) Exit 0 means all three held.
 
 ## Package layout
 
