@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 const json = z.json()
 
-const apiFailure = z.object({ error: z.string() })
+const apiFailure = z.object({ error: z.string(), reason: z.string().optional() })
 
 const apiBaseUrl = import.meta.env.VITE_API_URL ?? '/api'
 
@@ -11,6 +11,7 @@ export class ApiError extends Error {
     message: string,
     readonly status: number,
     readonly code?: string,
+    readonly reason?: string,
   ) {
     super(message)
     this.name = 'ApiError'
@@ -29,16 +30,20 @@ export async function api(path: string, init?: RequestInit) {
 
   if (!response.ok) {
     let code: string | undefined
+    let reason: string | undefined
 
     try {
       const result = apiFailure.safeParse(await response.json())
 
-      if (result.success) code = result.data.error
+      if (result.success) {
+        code = result.data.error
+        reason = result.data.reason
+      }
     } catch {
       // An error response may have no JSON body.
     }
 
-    throw new ApiError(`Request failed with ${response.status}`, response.status, code)
+    throw new ApiError(`Request failed with ${response.status}`, response.status, code, reason)
   }
 
   if (response.status === 204) return undefined

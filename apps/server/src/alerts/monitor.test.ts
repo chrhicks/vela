@@ -169,7 +169,7 @@ describe('the real night: camera snagged a tripod leg', () => {
     expect(phone.cancels()).toEqual([
       { kind: 'cancel', receipt: 'receipt-1', at: night.find(frame => frame.time === '04:16:39')!.at },
     ])
-    expect(phone.sends()[3]!.message).toMatch(/^cleared: Star count collapsed/)
+    expect(phone.sends()[3]!.message).toMatch(/^cleared: Star count fell to/)
   })
 
   it('keeps the cloud-trend warning off the phone and the banner while the collapse already covers it', async () => {

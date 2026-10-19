@@ -1,5 +1,8 @@
 import { Outlet, matchPath, useLocation } from 'react-router'
+import { AlertBanner } from '../../features/alerts/AlertBanner'
+import { AlertsProvider } from '../../features/alerts/AlertsProvider'
 import { AppNavigation } from '../../features/navigation/AppNavigation'
+import { useNavigation } from '../../features/navigation/use-navigation'
 import { RigObservationProvider } from '../../features/rig-detail/RigContext'
 import { useAppearance } from '../../appearance/AppearanceProvider'
 
@@ -9,17 +12,31 @@ export default function Shell() {
   // Polar alignment reads the same devices every few seconds; a full inspection would compete.
   const paused = !!matchPath('/rigs/:rigId/observe/alignment', pathname)
   const { mode } = useAppearance()
-  const content = <><AppNavigation /><main><Outlet /></main></>
+  const navigation = useNavigation()
+  // Pages without a rig still show the alerts of the run being followed.
+  const alertsRigId = rigId ?? navigation.activity?.rigId
+
+  const content = (
+    <>
+      <AppNavigation navigation={navigation} />
+      <AlertBanner />
+      <main>
+        <Outlet />
+      </main>
+    </>
+  )
 
   return (
     <div className="vela-theme vela-app min-h-screen" data-mode={mode}>
-      {rigId ? (
-        <RigObservationProvider key={rigId} rigId={rigId} paused={paused}>
-          {content}
-        </RigObservationProvider>
-      ) : (
-        content
-      )}
+      <AlertsProvider rigId={alertsRigId}>
+        {rigId ? (
+          <RigObservationProvider key={rigId} rigId={rigId} paused={paused}>
+            {content}
+          </RigObservationProvider>
+        ) : (
+          content
+        )}
+      </AlertsProvider>
     </div>
   )
 }

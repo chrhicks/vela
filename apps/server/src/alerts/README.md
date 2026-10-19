@@ -7,7 +7,8 @@ or moves the mount.
   `thresholds.ts`.
 - `monitor.ts` keeps that history for one rig, feeds the rules, and turns conditions into episodes.
 - `pushover.ts` is the phone, behind the `Notifier` interface in `notifier.ts`. `config.ts` reads
-  `alerts.json`. `mount.ts` reads a Cria rig's mount. `routes.ts` is the HTTP surface.
+  `alerts.json`. `mount.ts` reads a Cria rig's mount. `routes.ts` is the HTTP surface. The browser side (banner and rig-page card) is
+  `apps/web/src/features/alerts`; its contract is `AlertsView` in `@vela/model/web`.
 
 ## Episodes
 

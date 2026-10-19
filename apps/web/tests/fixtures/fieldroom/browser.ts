@@ -8,6 +8,27 @@ import { reviewResources } from './resources'
 import { createAlignmentScene, type AlignmentScene } from './alignment'
 import { createAutofocusScene, type AutofocusScene } from './autofocus'
 
+/**
+ * The alert banner polls every rig page. Scenes model one feature each, so a quiet alerts view
+ * is answered here, after their routes (the last registered route wins), and never counts as unmapped.
+ */
+export async function routeQuietAlerts(page: Page) {
+  await page.route('**/api/web/rigs/*/alerts', route => {
+    const rigId = new URL(route.request().url()).pathname.split('/')[4]
+
+    return route.fulfill({
+      json: {
+        rigId,
+        watching: false,
+        alerts: [],
+        unavailable: [],
+        phone: { state: 'not-configured' },
+        thresholds: {},
+      },
+    })
+  })
+}
+
 const resources = new Map(reviewResources.map(resource => {
   const body = readFileSync(new URL(`../../../../../${resource.path}`, import.meta.url))
 
@@ -42,6 +63,7 @@ export async function openExploreScene(page: Page, name: ExploreScene) {
       ? route.fulfill({ status: result.status, contentType: resource.contentType, body: resource.body })
       : route.fulfill({ status: result.status, json: result.json })
   })
+  await routeQuietAlerts(page)
   await page.goto(scene.route)
 
   return { scene, requests, missingResources }
@@ -75,6 +97,7 @@ export async function openPhotographsScene(page: Page, name: PhotographsScene) {
       ? route.fulfill({ status: result.status, contentType: resource.contentType, body: resource.body })
       : route.fulfill({ status: result.status, json: result.json })
   })
+  await routeQuietAlerts(page)
   await page.goto(scene.route)
 
   return { scene, requests }
@@ -101,6 +124,7 @@ export async function openEquipmentScene(page: Page, name: EquipmentScene) {
 
     return route.fulfill({ status: result.status, json: result.json })
   })
+  await routeQuietAlerts(page)
   await page.goto(scene.route)
 
   return { scene, requests }
@@ -150,6 +174,7 @@ async function openPreparationScene<
         })
       : route.fulfill({ status: result.status, json: result.json })
   })
+  await routeQuietAlerts(page)
   await page.goto(scene.route)
 
   return { scene, requests }
