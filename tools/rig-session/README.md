@@ -49,6 +49,8 @@ Frame records, the Cria recording and the Vela journal are not read yet. When th
 CRIA_CHECKOUT=~/dev/personal/cria pnpm replay ~/recordings/<night> --from-frame 40
 ```
 
+A recording can hold frames of more than one size, because someone changed the camera's frame or binning while it ran. Replay does not replay what a client wrote, so it serves a frame only when the camera is set to that frame's size, and otherwise the exposure fails with the two sizes in its message. Start with `--from-frame` at the first frame of the size you want: replay then sets the camera as it was when that frame's exposure began.
+
 Every path the three programs write (Cria's images, Vela's rig catalog, saved images, frame records, journal, traces, survey cache) and `HOME`, `TMPDIR` and the XDG folders are inside one `vela-replay-*` folder in the temporary directory. They inherit nothing else of this process's environment, so no `VELA_*` variable or token leaks in. Their logs are in that folder's `logs/` (use `--keep` to read them after a stop). The Cria config is generated from the recording's `manifest.json`: its devices, none told to connect, no serial port and no site (a recording holds neither). A recorded switch device is left out because a recording does not name its channels.
 
 ### Running Cria at a pinned commit
