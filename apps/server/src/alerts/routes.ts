@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { AlertsView } from '@vela/model/web'
 import type { FastifyInstance } from 'fastify'
 import type { RigCatalog } from '../rig/catalog.js'
 import { createAlertMonitor, type AlertMonitor } from './monitor.js'
@@ -15,6 +16,9 @@ export interface AlertsOptions {
 }
 
 const emptyBody = z.strictObject({})
+
+// The browser reads this shape from @vela/model; the annotation keeps the monitor's view assignable to it.
+const viewOf = (monitor: AlertMonitor): AlertsView => monitor.view()
 
 export function registerAlerts(
   app: FastifyInstance,
@@ -47,7 +51,7 @@ export function registerAlerts(
 
     if (!rig) return reply.code(404).send({ error: 'rig-not-found' })
 
-    return monitorFor(rig).view()
+    return viewOf(monitorFor(rig))
   })
 
   app.post<{ Params: { rigId: string; id: string } }>(
@@ -69,7 +73,7 @@ export function registerAlerts(
       if (result.outcome === 'phone-failed')
         return reply.code(502).send({ error: 'phone-cancel-failed', reason: result.reason })
 
-      return monitor.view()
+      return viewOf(monitor)
     },
   )
 
@@ -90,7 +94,7 @@ export function registerAlerts(
     if (result.outcome === 'failed')
       return reply.code(502).send({ error: 'phone-alerts-failing', reason: result.reason })
 
-    return monitor.view()
+    return viewOf(monitor)
   })
 
   app.addHook('onClose', async () => {

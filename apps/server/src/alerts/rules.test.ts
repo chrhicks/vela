@@ -117,6 +117,20 @@ describe('frame rules on short synthetic runs', () => {
     expect(ids(history({ frames: thinningCloud }))).toContain('stars-collapsed')
   })
 
+  it('words each star-count alert as the count now against what is normal', () => {
+    const messages = (frames: number[]) =>
+      evaluateAlerts(history({ frames: runOf(frames) }), defaultThresholds, 0).conditions.map(c => c.message)
+
+    expect(messages([...healthy, 400])).toEqual(['Star count dropped to 400 (normal ≈1210 stars)'])
+    expect(messages([...healthy, 0, 0])).toEqual([
+      'Star count dropped to 0 (normal ≈1210 stars)',
+      'Star count fell to 0 (normal ≈1210 stars)',
+    ])
+    expect(messages([1200, 1200, 1200, 1200, 1200, 1000, 900, 800, 780, 760])).toEqual([
+      'Star count falling: median 800 (≈1200 just before)',
+    ])
+  })
+
   it('needs at least three frames before it has a baseline', () => {
     expect(ids(history({ frames: runOf([1200, 1200, 10]) }))).toEqual([])
     expect(ids(history({ frames: runOf([1200, 1200, 1200, 10]) }))).toEqual(['stars-low'])

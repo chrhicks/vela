@@ -135,18 +135,18 @@ function watchFrames(frames: Frame[], t: AlertThresholds): AlertCondition[] {
   if (!latest) return []
 
   const trend = starsTrend(allStars, t)
-  const was = `about ${Math.round(baseline)} before`
+  const normal = `normal ≈${Math.round(baseline)} stars`
   const hfr = latest.hfrPixels?.toFixed(1)
   const conditions: AlertCondition[] = []
 
   if (starsLow.raised)
-    conditions.push({ id: 'stars-low', level: 'warn', message: `Star count dropped to ${latest.stars}, ${was}` })
+    conditions.push({ id: 'stars-low', level: 'warn', message: `Star count dropped to ${latest.stars} (${normal})` })
 
   if (starsCollapsed.raised)
-    conditions.push({ id: 'stars-collapsed', level: 'critical', message: `Star count collapsed to ${latest.stars}, ${was}` })
+    conditions.push({ id: 'stars-collapsed', level: 'critical', message: `Star count fell to ${latest.stars} (${normal})` })
 
   if (starsDeclining.raised && trend)
-    conditions.push({ id: 'stars-declining', level: 'warn', message: `Star count falling: median ${Math.round(trend.recent)}, was ${Math.round(trend.before)}` })
+    conditions.push({ id: 'stars-declining', level: 'warn', message: `Star count falling: median ${Math.round(trend.recent)} (≈${Math.round(trend.before)} just before)` })
 
   if (hfrHigh.raised)
     conditions.push({ id: 'hfr-high', level: 'warn', message: `Stars are soft: HFR ${hfr ?? 'unmeasured'} px` })

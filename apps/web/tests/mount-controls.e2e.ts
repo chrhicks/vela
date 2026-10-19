@@ -1,7 +1,7 @@
 import { expect, test, type Page, type Route } from '@playwright/test'
 import type { MountControlView, RigTelescopeDeviceView } from '@vela/model/web'
 import { createEquipmentScene } from './fixtures/fieldroom/equipment'
-import { openExploreScene } from './fixtures/fieldroom/browser'
+import { openExploreScene, routeQuietAlerts } from './fixtures/fieldroom/browser'
 import { reviewFraming } from './fixtures/fieldroom/explore'
 
 const deviceId = 'fra400-mount'
@@ -82,6 +82,7 @@ async function mountScene(page: Page, mode: 'light' | 'dark' = 'light') {
     const response = scene.respond(request.method(), pathname, request.postData() ? request.postDataJSON() : undefined)
     await route.fulfill({ status: response.status, json: response.json })
   })
+  await routeQuietAlerts(page)
 
   return {
     scene, writes, checks, setMount,
