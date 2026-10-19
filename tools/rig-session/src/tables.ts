@@ -1,9 +1,9 @@
 import type { FrameRecord, MountSample, SavedImage, TraceSpan } from './inputs.ts'
-import { indiEvents, type IndiEvent } from './indi.ts'
-import { linkAttemptToFrame, linkAttemptToOperation, linkEventToOperation, linkFrameToAttempt, linkFrameToSpan, linkMountAsOf, type Link, type MountLink } from './joins.ts'
+import { indiEvents, indiImages, type IndiEvent, type IndiImage } from './indi.ts'
+import { linkAttemptToFrame, linkAttemptToOperation, linkEventToOperation, linkFrameToAttempt, linkOperationToImage, linkFrameToSpan, linkMountAsOf, type Link, type LinkedImage, type MountLink } from './joins.ts'
 import { operationsOf, type RecordedOperation, type Recording } from './recording.ts'
 import { redactedJson, redactText } from './redact.ts'
-import type { AttemptRow, FrameRow, IndiEventRow, IndiOpRow, LinkKind, MountRow, SpanRow, Tables } from './schema.ts'
+import type { AttemptRow, FrameRow, IndiEventRow, IndiImageRow, IndiOpRow, LinkKind, MountRow, SpanRow, Tables } from './schema.ts'
 
 export interface TimeWindow {
   readonly from: Date
@@ -32,6 +32,13 @@ export function buildTables(session: string, window: TimeWindow, inputs: Session
   const inWindow = (time: Date) => window.from <= time && time < window.to
   const operations = inputs.recording ? operationsOf(inputs.recording) : []
   const savedImages = inputs.savedImages.filter(image => inWindow(image.capturedAt))
+  const devices = inputs.recording?.devices ?? []
+  const imageOperations = operations.filter(operation => operation.outcome.value?.image)
+
+  const linkedImages: LinkedImage[] = indiImages(inputs.recording?.items ?? []).map(image => ({
+    image,
+    operation: linkEventToOperation(image, imageOperations, devices),
+  }))
 
   const frames = savedImages.map(image => {
     const spanLink = linkFrameToSpan(image, inputs.spans)
@@ -40,7 +47,10 @@ export function buildTables(session: string, window: TimeWindow, inputs: Session
     const attemptLink = linkFrameToAttempt(image, inputs.frameRecords)
     const attempt = attemptLink?.kind === 'exact' ? attemptLink.target : null
 
-    return { image, spanLink, mount, attemptLink, operationLink: attempt && linkAttemptToOperation(attempt, operations) }
+    const operationLink = attempt && linkAttemptToOperation(attempt, operations)
+    const blobLink = operationLink?.kind === 'exact' ? linkOperationToImage(operationLink.target, linkedImages) : null
+
+    return { image, spanLink, mount, attemptLink, operationLink, blobLink }
   })
 
   const linkedSpans = new Set(frames.flatMap(({ spanLink }) => linkTargets(spanLink)))
@@ -51,21 +61,28 @@ export function buildTables(session: string, window: TimeWindow, inputs: Session
   const exportedAttempts = inputs.frameRecords.filter(record => inWindow(record.startedAt) || linkedAttempts.has(record))
   const attemptOperations = exportedAttempts.map(record => linkAttemptToOperation(record, operations))
 
-  const devices = inputs.recording?.devices ?? []
   const events = indiEvents(inputs.recording?.items ?? []).filter(event => inWindow(event.at))
   const eventOperations = events.map(event => linkEventToOperation(event, operations, devices))
 
+  const linkedBlobs = new Set(frames.flatMap(({ blobLink }) => linkTargets(blobLink)))
+  const exportedBlobs = linkedImages.filter(({ image }) => inWindow(image.at) || linkedBlobs.has(image))
+
   const linkedOperations = new Set(
-    [...frames.map(({ operationLink }) => operationLink), ...attemptOperations, ...eventOperations].flatMap(link => linkTargets(link)),
+    [...frames.map(({ operationLink }) => operationLink), ...attemptOperations, ...eventOperations, ...exportedBlobs.map(({ operation }) => operation)].flatMap(link =>
+      linkTargets(link),
+    ),
   )
 
   return {
-    frames: frames.map(({ image, spanLink, mount, attemptLink, operationLink }) => frameRow(session, image, spanLink, mount, attemptLink, operationLink)),
+    frames: frames.map(({ image, spanLink, mount, attemptLink, operationLink, blobLink }) =>
+      frameRow(session, image, spanLink, mount, attemptLink, operationLink, blobLink),
+    ),
     attempts: exportedAttempts.map((record, index) => attemptRow(session, record, linkAttemptToFrame(record, exportedImages), attemptOperations[index] ?? null)),
     indi_ops: operations
       .filter(operation => inWindow(operation.acceptedAt) || linkedOperations.has(operation))
       .map(operation => operationRow(session, operation, inputs.recording)),
     indi_events: events.map((event, index) => eventRow(session, event, eventOperations[index] ?? null)),
+    indi_images: exportedBlobs.map(({ image, operation }) => imageRow(session, image, operation)),
     mount: inputs.mountSamples
       .filter(sample => inWindow(sample.sampledAt) || linkedMountTimes.has(sample.sampledAt.getTime()))
       .map(sample => mountRow(session, sample)),
@@ -86,6 +103,7 @@ function frameRow(
   mount: MountLink | null,
   attemptLink: Link<FrameRecord> | null,
   operationLink: Link<RecordedOperation> | null,
+  blobLink: Link<IndiImage> | null,
 ): FrameRow {
   const span = spanLink?.kind === 'ambiguous' ? null : (spanLink?.target ?? null)
   const attempt = attemptLink?.kind === 'ambiguous' ? null : (attemptLink?.target ?? null)
@@ -124,6 +142,9 @@ function frameRow(
     attempt_candidates: candidates(attemptLink, candidate => `${candidate.runId}/${candidate.attempt}`),
     operation_link: linkKind(operationLink),
     operation_candidates: candidates(operationLink, candidate => candidate.id),
+    blob_path: blobLink?.kind === 'ambiguous' ? null : (blobLink?.target.path ?? null),
+    blob_link: linkKind(blobLink),
+    blob_candidates: candidates(blobLink, candidate => candidate.path),
   }
 }
 
@@ -195,6 +216,27 @@ function eventRow(session: string, event: IndiEvent, operationLink: Link<Recorde
     operation_id: operation?.id ?? null,
     operation_link: linkKind(operationLink),
     operation_candidates: candidates(operationLink, candidate => candidate.id),
+  }
+}
+
+function imageRow(session: string, image: IndiImage, operationLink: Link<RecordedOperation> | null): IndiImageRow {
+  const operation = operationLink?.kind === 'ambiguous' ? null : (operationLink?.target ?? null)
+
+  return {
+    session,
+    at: image.at,
+    conn: image.conn,
+    n: image.n,
+    device: image.device,
+    property: image.property,
+    element: image.element,
+    blob_path: image.path,
+    blob_bytes: image.bytes,
+    operation_id: operation?.id ?? null,
+    operation_link: linkKind(operationLink),
+    operation_candidates: candidates(operationLink, candidate => candidate.id),
+    image_id: operation?.outcome.value?.image?.id ?? null,
+    image_bytes: operation?.outcome.value?.image?.original?.bytes ?? null,
   }
 }
 

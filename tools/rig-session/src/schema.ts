@@ -84,6 +84,9 @@ export const tables = {
     attempt_candidates: optional('json'),
     operation_link: optional('link'),
     operation_candidates: optional('json'),
+    blob_path: optional('text'),
+    blob_link: optional('link'),
+    blob_candidates: optional('json'),
   },
   attempts: {
     session: required('text'),
@@ -141,6 +144,22 @@ export const tables = {
     operation_link: optional('link'),
     operation_candidates: optional('json'),
   },
+  indi_images: {
+    session: required('text'),
+    at: required('timestamp'),
+    conn: required('int'),
+    n: required('int'),
+    device: optional('text'),
+    property: optional('text'),
+    element: required('text'),
+    blob_path: required('text'),
+    blob_bytes: optional('int'),
+    operation_id: optional('text'),
+    operation_link: optional('link'),
+    operation_candidates: optional('json'),
+    image_id: optional('text'),
+    image_bytes: optional('int'),
+  },
   mount: {
     session: required('text'),
     sampled_at: required('timestamp'),
@@ -180,6 +199,8 @@ export type IndiOpRow = RowOf<typeof tables.indi_ops>
 
 export type IndiEventRow = RowOf<typeof tables.indi_events>
 
+export type IndiImageRow = RowOf<typeof tables.indi_images>
+
 export type MountRow = RowOf<typeof tables.mount>
 
 export type SpanRow = RowOf<typeof tables.spans>
@@ -189,6 +210,7 @@ export interface Tables {
   readonly attempts: readonly AttemptRow[]
   readonly indi_ops: readonly IndiOpRow[]
   readonly indi_events: readonly IndiEventRow[]
+  readonly indi_images: readonly IndiImageRow[]
   readonly mount: readonly MountRow[]
   readonly spans: readonly SpanRow[]
 }

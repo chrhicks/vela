@@ -20,7 +20,7 @@ The inputs are read-only. Every input is optional; `session.json` in the package
 
 ## Package layout
 
-`<out>/package` is a symlink to `<out>/builds/<time>`, which holds `frames.parquet`, `attempts.parquet`, `indi_ops.parquet`, `indi_events.parquet`, `mount.parquet`, `spans.parquet` and `session.json`. A build writes into a fresh directory and switches the symlink with one rename, so a build that fails leaves the previous package readable. The next finished build removes the older directories.
+`<out>/package` is a symlink to `<out>/builds/<time>`, which holds `frames.parquet`, `attempts.parquet`, `indi_ops.parquet`, `indi_events.parquet`, `indi_images.parquet`, `mount.parquet`, `spans.parquet` and `session.json`. A build writes into a fresh directory and switches the symlink with one rename, so a build that fails leaves the previous package readable. The next finished build removes the older directories.
 
 Rebuilding the same inputs gives the same rows in the same files. Only `session.json` carries the build time.
 
@@ -43,6 +43,7 @@ A link with no match is null. The packager never guesses.
 - `frames.operation_*` and `attempts.operation_*` link to the Cria operation in `indi_ops` (one row per `op` line of the recording): `exact`, by the operation id the frame record carries, or by its request id when Cria never admitted the request. `indi_ops.outcome*` hold the kind, reason and message; an outcome's values are not exported, because device setup puts the site in them.
 - `indi_events.operation_*` links a wire event (an update, a write, a message) to the Cria operation whose window covers it on the same device: `inferred`, by the times Cria wrote on its own clock; `ambiguous` when several cover it (a power box that is both weather and switch). To see the writes and errors during frame N, join `indi_events` on the device and `at` between the frame's `captured_at` and the end of its exposure.
   `indi_events` has one row per first definition of a property on a connection (`define`), per change of state or value (`update`, with `changed` listing the elements that differ), per client write (`write`), per `message` and per `delete`. A `set` that restates the same values is dropped, except a BLOB. The values of `GEOGRAPHIC_COORD`, `DEVICE_PORT` and `SYSTEM_PORTS` are `[redacted]`.
+- `indi_images` has one row per camera image in the recording (the BLOB message, the file it was saved to under `blobs/`, the size INDI stated) and links it to the capture operation, `inferred`, whose window on that device covers its arrival (`ambiguous` if several do). `frames.blob_*` links a frame to the image of its operation: frame to operation is `exact`, operation to image is by time, so the chain is `inferred`, `ambiguous` if the operation window holds two images or an image fits two operations. It is not matched by content: Cria's `sha256` is over ImageBytes, not the FITS the recording keeps, and not by `DATE-OBS`, which Cria replaces with the dispatch time when the card is missing.
 - `frames.mount_*` links a frame to the latest mount sample not after the exposure start, and keeps the sample's age. A sample older than 30 seconds gives no link.
 
 The Vela journal is not read yet. `INPUTS.md` specifies how they will be, and the tables and links they add.

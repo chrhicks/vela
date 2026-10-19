@@ -1,4 +1,5 @@
 import type { FrameRecord, MountSample, SavedImage, TraceSpan } from './inputs.ts'
+import type { IndiImage } from './indi.ts'
 import type { RecordedDevice, RecordedOperation } from './recording.ts'
 
 /**
@@ -86,6 +87,30 @@ export function linkEventToOperation(
   if (only === undefined) return null
 
   return covering.length === 1 ? { kind: 'inferred', target: only } : { kind: 'ambiguous', candidates: covering }
+}
+
+export interface LinkedImage {
+  readonly image: IndiImage
+  readonly operation: Link<RecordedOperation> | null
+}
+
+/**
+ * The camera image of a frame is the one that arrived inside its operation's window. The frame
+ * reaches the operation by a key (`exact`) and the operation reaches the image by time, so the chain is
+ * `inferred`, and only as good as the clocks. A second image in the window, or an image that fits two
+ * operations, leaves it `ambiguous`. Cria's hash is over its own ImageBytes, not the FITS file the recording
+ * keeps, so the content cannot confirm it here.
+ */
+export function linkOperationToImage(operation: RecordedOperation, linked: readonly LinkedImage[]): Link<IndiImage> | null {
+  const fits = linked.filter(({ operation: link }) => link !== null && (link.kind === 'ambiguous' ? link.candidates : [link.target]).includes(operation))
+
+  const [only] = fits
+
+  if (only === undefined) return null
+
+  return fits.length === 1 && only.operation?.kind === 'inferred'
+    ? { kind: 'inferred', target: only.image }
+    : { kind: 'ambiguous', candidates: fits.map(({ image }) => image) }
 }
 
 function exactOrAmbiguous<Target>(candidates: readonly Target[]): Link<Target> | null {
