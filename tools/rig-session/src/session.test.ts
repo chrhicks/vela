@@ -4,6 +4,7 @@ import { basename, join } from 'node:path'
 import { expect, test } from 'vitest'
 import { publishPackage } from './package.ts'
 import { openPackage } from './query.ts'
+import { Secrets } from './sanitize.ts'
 import type { Tables } from './schema.ts'
 import { buildSession } from './session.ts'
 
@@ -69,7 +70,32 @@ async function syntheticNight() {
     ].join('\n'),
   )
 
-  return { dir, savedImagesDir, tracesFile, mountCsvFile }
+  const frameRecordsFile = join(dir, 'frames.jsonl')
+
+  await writeFile(
+    frameRecordsFile,
+    `${stars
+      .map((_, index) =>
+        JSON.stringify({
+          version: 1,
+          rigId: 'rig-a',
+          runId: 'run-1',
+          attempt: index + 1,
+          startedAt: `2030-01-01T01:0${index + 1}:00.000Z`,
+          settledAt: `2030-01-01T01:0${index + 1}:56.000Z`,
+          exposureSeconds: 50,
+          subject: null,
+          outcome: 'saved',
+          message: null,
+          provenance: { requestId: `request-${index}`, operationId: `operation-${index}`, imageId: `cria-image-${index}` },
+          image: { id: `frame-${index}`, capturedAt: '2030-01-01T01:00:00.000Z', capturedAtSource: 'camera', receivedAt: '2030-01-01T01:00:55.000Z', width: 100, height: 80 },
+          statistics: null,
+        }),
+      )
+      .join('\n')}\n`,
+  )
+
+  return { dir, savedImagesDir, tracesFile, mountCsvFile, frameRecordsFile }
 }
 
 async function build(night: Awaited<ReturnType<typeof syntheticNight>>, root: string) {
@@ -80,6 +106,7 @@ async function build(night: Awaited<ReturnType<typeof syntheticNight>>, root: st
     savedImagesDir: night.savedImagesDir,
     tracesFile: night.tracesFile,
     mountCsvFile: night.mountCsvFile,
+    frameRecordsFile: night.frameRecordsFile,
   })
 }
 
@@ -117,10 +144,11 @@ test('session.json lists the inputs it found and the ones it lacks', async () =>
     ['traces', 'found'],
     ['mount-csv', 'found'],
     ['indi-recording', 'missing'],
-    ['frame-records', 'missing'],
+    ['frame-records', 'found'],
   ])
-  expect(summary.rows).toEqual({ frames: 3, mount: 3, spans: 3 })
+  expect(summary.rows).toEqual({ frames: 3, attempts: 3, mount: 3, spans: 3 })
   expect(summary.links.frame_to_span).toEqual({ exact: 0, inferred: 3, ambiguous: 0, none: 0 })
+  expect(summary.links.frame_to_attempt).toEqual({ exact: 3, inferred: 0, ambiguous: 0, none: 0 })
 })
 
 test('rebuilding the same inputs gives the same rows in the same files', async () => {
@@ -145,6 +173,7 @@ test('a build that fails part way leaves the previous package readable, and the 
 
   const unreadableSpan: Tables = {
     frames: [],
+    attempts: [],
     mount: [],
     spans: [
       {
@@ -161,7 +190,7 @@ test('a build that fails part way leaves the previous package readable, and the 
     ],
   }
 
-  await expect(publishPackage(root, unreadableSpan, '{}')).rejects.toThrow()
+  await expect(publishPackage(root, unreadableSpan, {}, new Secrets())).rejects.toThrow()
 
   expect(await readlink(join(root, 'package'))).toBe(join('builds', basename(published)))
 
@@ -174,4 +203,59 @@ test('a build that fails part way leaves the previous package readable, and the 
   await build(night, root)
 
   expect(await readdir(join(root, 'builds'))).toHaveLength(1)
+})
+
+test('a night with no frame records lists them as missing with what that costs, and its frames carry no ids', async () => {
+  const night = await syntheticNight()
+  const root = join(night.dir, 'out')
+
+  await buildSession({ name: 'test-night', window, root, savedImagesDir: night.savedImagesDir, tracesFile: null, mountCsvFile: null, frameRecordsFile: null })
+
+  const summary = JSON.parse(await readFile(join(root, 'package', 'session.json'), 'utf8'))
+  const session = await openPackage(join(root, 'package'))
+
+  expect(summary.inputs.find((input: { input: string }) => input.input === 'frame-records')).toEqual({
+    input: 'frame-records',
+    status: 'missing',
+    effect: 'Frames carry no request or operation ids, so none links exactly to a Cria operation.',
+  })
+  expect(await session.rows('SELECT operation_id, attempt_link FROM frames ORDER BY frame_id')).toEqual(
+    [0, 1, 2].map(() => ({ operation_id: null, attempt_link: null })),
+  )
+  session.close()
+})
+
+test('a query names the Cria operation behind each saved frame', async () => {
+  const night = await syntheticNight()
+  const root = join(night.dir, 'out')
+
+  await build(night, root)
+
+  const session = await openPackage(join(root, 'package'))
+
+  expect(await session.rows('SELECT f.frame_id, a.operation_id, f.attempt_link FROM frames f JOIN attempts a ON a.frame_id = f.frame_id ORDER BY f.frame_id')).toEqual([
+    { frame_id: 'frame-0', operation_id: 'operation-0', attempt_link: 'exact' },
+    { frame_id: 'frame-1', operation_id: 'operation-1', attempt_link: 'exact' },
+    { frame_id: 'frame-2', operation_id: 'operation-2', attempt_link: 'exact' },
+  ])
+  session.close()
+})
+
+test('an attempt message that names the site or a serial port is redacted in the package', async () => {
+  const night = await syntheticNight()
+  const root = join(night.dir, 'out')
+
+  const message = 'adapter failed: open /dev/serial/by-id/usb-Test_0001 and set LAT=12.5 LONG=345.25'
+  const records = (await readFile(night.frameRecordsFile, 'utf8')).trim().split('\n')
+  const failed = { ...JSON.parse(records[0] ?? ''), outcome: 'failed', message, image: null, statistics: null }
+
+  await writeFile(night.frameRecordsFile, `${[JSON.stringify(failed), ...records.slice(1)].join('\n')}\n`)
+  await build(night, root)
+
+  const session = await openPackage(join(root, 'package'))
+
+  expect(await session.rows("SELECT message FROM attempts WHERE outcome = 'failed'")).toEqual([
+    { message: 'adapter failed: open [redacted] and set LAT=[redacted] LONG=[redacted]' },
+  ])
+  session.close()
 })
