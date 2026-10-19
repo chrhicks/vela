@@ -3,6 +3,8 @@ import { join } from 'node:path'
 import { z } from 'zod'
 import { imagesOf, IndiEventTracker, type IndiEvent, type IndiImage } from './indi.ts'
 import { jsonText, linesOf, type ReadResult, type Skipped } from './inputs.ts'
+import type { MountSample } from './inputs.ts'
+import { MountTracker } from './mount.ts'
 import { Secrets } from './sanitize.ts'
 import { learnFromMessage } from './traffic-secrets.ts'
 
@@ -62,6 +64,8 @@ export interface Recording extends ReadResult<RecordedLine> {
   readonly events: readonly IndiEvent[]
   /** The camera images the wire carried (`indi_images` before its window). */
   readonly images: readonly IndiImage[]
+  /** The mount's readings from the recording's INDI mount properties; each is in force until `validUntil` (see `MountTracker`). */
+  readonly mountSamples: readonly MountSample[]
   /** Lines that decoded; `items` holds only the ones a table needs (see `readRecording`). */
   readonly linesRead: number
   /** The last line is not complete: Cria died in the middle of an append. */
@@ -91,6 +95,7 @@ export async function readRecording(directory: string, secrets = new Secrets()):
   const items: RecordedLine[] = []
   const events = new IndiEventTracker()
   const images: IndiImage[] = []
+  const mount = new MountTracker(manifest.devices)
   let damagedAt: number | null = null
   let linesRead = 0
   let ignored = 0
@@ -117,6 +122,7 @@ export async function readRecording(directory: string, secrets = new Secrets()):
       last = parsed.data
 
       events.accept(parsed.data)
+      mount.accept(parsed.data)
       images.push(...imagesOf(parsed.data))
 
       if (parsed.data.k === 'msg') learnFromMessage(parsed.data.xml, secrets)
@@ -137,6 +143,7 @@ export async function readRecording(directory: string, secrets = new Secrets()):
     devices: manifest.devices,
     events: events.events,
     images,
+    mountSamples: mount.finish(last === undefined || last.k === 'end' ? null : last.at),
     linesRead,
     tornTail,
     ended: last?.k === 'end',
