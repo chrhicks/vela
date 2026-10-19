@@ -1,6 +1,8 @@
 import { expect, test } from 'vitest'
 import type { MountSample, SavedImage, TraceSpan } from './inputs.ts'
-import { linkFrameToSpan, linkMountAsOf } from './joins.ts'
+import type { IndiImage } from './indi.ts'
+import { linkEventToOperation, linkFrameToSpan, linkMountAsOf, linkOperationToImage } from './joins.ts'
+import type { RecordedOperation } from './recording.ts'
 
 const at = (time: string) => new Date(`2030-01-01T${time}Z`)
 
@@ -90,4 +92,26 @@ test('a mount sample older than the freshness limit, or none before the frame, g
 
   expect(linkMountAsOf(at('00:01:31'), samples, 30)).toBeNull()
   expect(linkMountAsOf(at('00:00:59'), samples, 30)).toBeNull()
+})
+
+const devices = [{ id: 'primary', kind: 'camera', indiDevice: 'Test Camera' }]
+
+function operation(id: string, acceptedAt: string, settledAt: string): RecordedOperation {
+  return { id, requestId: `request-${id}`, instanceId: 'i', deviceId: 'primary', kind: 'capture', acceptedAt: at(acceptedAt), settledAt: at(settledAt), outcome: { kind: 'confirmed' } }
+}
+
+function blob(time: string): IndiImage {
+  return { at: at(time), conn: 1, n: 1, device: 'Test Camera', property: 'CCD1', element: 'CCD1', path: `blobs/${time}.blob`, bytes: 1 }
+}
+
+test('an image that fits two operations leaves both frames ambiguous, and an image outside every window or on another device links to nothing', () => {
+  const first = operation('first', '00:00:00', '00:01:00')
+  const second = operation('second', '00:00:30', '00:02:00')
+  const operations = [first, second]
+  const linked = [blob('00:00:40'), blob('00:01:30'), blob('00:05:00')].map(image => ({ image, operation: linkEventToOperation(image, operations, devices) }))
+
+  expect(linked.map(({ operation: link }) => link?.kind ?? null)).toEqual(['ambiguous', 'inferred', null])
+  expect(linkOperationToImage(first, linked)).toEqual({ kind: 'ambiguous', candidates: [linked[0]?.image] })
+  expect(linkOperationToImage(second, linked)).toEqual({ kind: 'ambiguous', candidates: [linked[0]?.image, linked[1]?.image] })
+  expect(linkEventToOperation({ at: at('00:00:10'), device: 'Other' }, operations, devices)).toBeNull()
 })
