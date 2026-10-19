@@ -12,7 +12,7 @@ export interface ReadResult<Item> {
   readonly skipped: readonly Skipped[]
 }
 
-const jsonText = <Schema extends z.ZodType>(schema: Schema) =>
+export const jsonText = <Schema extends z.ZodType>(schema: Schema) =>
   z
     .string()
     .transform((text, context) => {

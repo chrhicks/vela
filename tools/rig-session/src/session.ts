@@ -1,6 +1,8 @@
 import { existsSync } from 'node:fs'
-import { readFrameRecords, readMountCsv, readSavedImages, readTraces, type ReadResult } from './inputs.ts'
+import { z } from 'zod'
+import { jsonText, readFrameRecords, readMountCsv, readSavedImages, readTraces, type ReadResult } from './inputs.ts'
 import { publishPackage } from './package.ts'
+import { Secrets } from './sanitize.ts'
 import type { LinkKind } from './schema.ts'
 import { buildTables, type TimeWindow } from './tables.ts'
 
@@ -32,6 +34,8 @@ const maxSkippedListed = 20
 
 /** Reads the inputs it was given, joins them, and publishes the package. Returns the new package directory. */
 export async function buildSession(request: SessionRequest): Promise<string> {
+  /** What the readers learn is private (none of the inputs here teach it yet); the package is checked against it. */
+  const secrets = new Secrets()
   const savedImages = await readIfGiven(request.savedImagesDir, readSavedImages)
   const traces = await readIfGiven(request.tracesFile, readTraces)
   const mount = await readIfGiven(request.mountCsvFile, readMountCsv)
@@ -71,7 +75,7 @@ export async function buildSession(request: SessionRequest): Promise<string> {
     skipped: skipped.slice(0, maxSkippedListed),
   }
 
-  return publishPackage(request.root, tables, `${JSON.stringify(summary, null, 2)}\n`)
+  return publishPackage(request.root, tables, jsonText(z.json()).parse(JSON.stringify(summary)), secrets)
 }
 
 async function readIfGiven<Item>(
