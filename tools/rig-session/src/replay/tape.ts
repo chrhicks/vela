@@ -1,7 +1,8 @@
 import { execFile } from 'node:child_process'
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
+import { scrubFile } from '../scrub.ts'
 import { criaProgram, type CriaCheckout } from './cria-checkout.ts'
 
 const run = promisify(execFile)
@@ -36,6 +37,11 @@ export async function synthesizeTape(cria: CriaCheckout, spec: TapeSpec, directo
   await mkdir(directory, { recursive: true })
   await writeFile(specFile, JSON.stringify(spec))
   await run(program.command, [...program.args, 'synthesize', specFile, tape])
+
+  const files = ['traffic.jsonl', 'manifest.json', ...(await readdir(join(tape, 'blobs'))).map(name => join('blobs', name))]
+  const findings = (await Promise.all(files.map(async file => scrubFile(file, await readFile(join(tape, file)))))).flat()
+
+  if (findings.length) throw new Error(`The synthetic tape holds what the scrub guard refuses: ${JSON.stringify(findings)}. Use a made-up site (see scrub.ts).`)
 
   return tape
 }
