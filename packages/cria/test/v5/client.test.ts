@@ -2,6 +2,7 @@ import { Effect, Exit, Fiber, Scope } from 'effect'
 import { settle, type Ending, type Outcome } from '@cria/primitives'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createCriaEquipment, type CriaEquipment } from '../../src/v5/equipment.js'
+import { noJournal } from '../../src/v5/journal.js'
 import { openSession, type Session } from '../../src/v5/session.js'
 import { FakeCria, type Route } from './fake-cria.js'
 
@@ -34,7 +35,7 @@ interface Opened {
 }
 
 function open(): Opened {
-  const session = Effect.runSync(Scope.provide(scope)(openSession({ origin: cria.origin, token: undefined, fetch: cria.fetch })))
+  const session = Effect.runSync(Scope.provide(scope)(openSession({ origin: cria.origin, token: undefined, fetch: cria.fetch, journal: noJournal })))
 
   const rig = createCriaEquipment(session, [
     { deviceId: 'fra-camera', criaDeviceId: 'camera', expectedName: 'Fake CCD' },

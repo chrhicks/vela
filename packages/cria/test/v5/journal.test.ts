@@ -1,0 +1,184 @@
+import { execFileSync } from 'node:child_process'
+import { closeSync, openSync } from 'node:fs'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { createCriaConnection } from '../../src/connection.js'
+import { createCriaEquipment } from '../../src/equipment.js'
+import { openJournalFile, type JournalSink } from '../../src/v5/journal.js'
+import { FakeCria } from './fake-cria.js'
+
+const token = 'test-only-token-for-the-in-memory-fixture'
+
+const bindings = [
+  { providerDeviceId: 'camera', id: 'camera', kind: 'camera', expectedName: 'Fake CCD' },
+  { providerDeviceId: 'mount', id: 'mount', kind: 'mount', expectedName: 'ZWO AM5' },
+] as const
+
+let cria: FakeCria
+
+let directory: string
+
+const closers: Array<() => Promise<void>> = []
+
+beforeEach(async () => {
+  vi.useFakeTimers({ now: Date.UTC(2026, 9, 17, 3) })
+  cria = new FakeCria(token)
+  directory = await mkdtemp(join(tmpdir(), 'vela-cria-journal-'))
+})
+
+afterEach(async () => {
+  await Promise.all(closers.splice(0).map(close => close()))
+  cria.close()
+  vi.useRealTimers()
+  await rm(directory, { recursive: true, force: true })
+})
+
+async function open(journal: JournalSink) {
+  const connection = createCriaConnection({ origin: cria.origin, token, fetch: cria.fetch, journal })
+  const equipment = createCriaEquipment(connection, bindings)
+
+  closers.push(() => connection.close())
+  connection.start()
+  await vi.advanceTimersByTimeAsync(10)
+
+  return equipment
+}
+
+async function exposeOnce(equipment: Awaited<ReturnType<typeof open>>, seconds = 1) {
+  const captured = equipment.acquisition.capture({ cameraId: 'camera', exposureSeconds: seconds })
+
+  await vi.advanceTimersByTimeAsync(seconds * 1_000 + 1_000)
+
+  return captured
+}
+
+function memory() {
+  const entries: Array<Parameters<JournalSink['record']>[0]> = []
+
+  return { entries, sink: { record: entry => void entries.push(entry) } satisfies JournalSink }
+}
+
+describe('what the journal keeps of one exposure', () => {
+  it('records the request with its reply, the image check, and each state as changes with arrival times', async () => {
+    const { entries, sink } = memory()
+    const equipment = await open(sink)
+
+    await exposeOnce(equipment)
+
+    const exchange = entries.find(entry => entry.kind === 'exchange' && entry.route === '/v2/operations')
+    const submitted = JSON.parse(cria.received.find(received => received.route === 'submit')!.body!)
+
+    expect(exchange).toMatchObject({
+      origin: cria.origin,
+      method: 'POST',
+      status: 202,
+      command: { requestId: submitted.requestId, deviceId: 'camera', kind: 'capture', parameters: { exposureSeconds: 1 } },
+      reply: { kind: 'answered', body: { requestId: submitted.requestId, state: 'running' } },
+    })
+
+    const image = entries.flatMap(entry => (entry.kind === 'image' ? [entry] : []))[0]
+    const download = entries.find(entry => entry.kind === 'exchange' && entry.route.endsWith('/original'))
+
+    expect(image).toMatchObject({ verdict: 'intact', bytes: expect.any(Number), sha256: expect.stringMatching(/^[a-f0-9]{64}$/) })
+    expect(download).toMatchObject({ status: 200, reply: { kind: 'answered', body: { bytes: image!.bytes } } })
+
+    const states = entries.flatMap(entry => (entry.kind === 'state' ? [entry] : []))
+
+    expect(states[0]).toMatchObject({ baseline: true })
+    expect(Object.keys(states[0]!.changed)).toContain('device/camera/readings.temperatureC')
+    expect(states.slice(1).every(state => !state.baseline)).toBe(true)
+    expect(states.length).toBeGreaterThan(2)
+    expect(states.map(state => state.at)).toEqual(states.map(state => state.at).sort((a, b) => a - b))
+    expect(new Set(states.slice(1).flatMap(state => Object.keys(state.changed)).filter(key => key.startsWith('device/')))).toEqual(new Set(['device/camera/availability']))
+    expect(states.flatMap(state => Object.keys(state.changed)).some(key => key.startsWith('operation/'))).toBe(true)
+    expect(entries.find(entry => entry.kind === 'stream')).toMatchObject({ event: 'opened' })
+  })
+
+  it('never holds the token or the image bytes', async () => {
+    const { entries, sink } = memory()
+    const equipment = await open(sink)
+
+    await exposeOnce(equipment)
+
+    const route = entries.flatMap(entry => (entry.kind === 'exchange' && entry.route.endsWith('/original') ? [entry.route] : []))[0]!
+    const original = await cria.fetch(`${cria.origin}${route}`, { headers: { authorization: `Bearer ${token}` } })
+    const bytes = Buffer.from(await original.arrayBuffer())
+    const written = JSON.stringify(entries)
+
+    expect(bytes.byteLength).toBeGreaterThan(0)
+    expect(written).not.toContain(token)
+    expect(written).not.toContain(bytes.toString('base64'))
+    expect(written).not.toContain(bytes.toString('hex'))
+    expect(written).not.toMatch(/authorization|bearer/i)
+  })
+})
+
+describe('a journal that fails or stalls', () => {
+  it('leaves the exposure and the stream as they are when the journal throws', async () => {
+    const equipment = await open({
+      record() {
+        throw new Error('journal exploded')
+      },
+    })
+
+    const frame = await exposeOnce(equipment)
+
+    expect(frame).toMatchObject({ width: 4, height: 3, color: { kind: 'mono' } })
+    expect(cria.received.filter(received => received.route === 'submit')).toHaveLength(1)
+  })
+
+  it('turns itself off once, and captures as before, when its file cannot be written', async () => {
+    const blocked = join(directory, 'blocked')
+
+    await writeFile(blocked, '')
+    const onError = vi.fn()
+    const journal = openJournalFile(join(blocked, 'journal.jsonl'), { onError })
+    const equipment = await open(journal)
+    const frame = await exposeOnce(equipment)
+
+    await journal.close()
+
+    expect(frame).toMatchObject({ width: 4, height: 3 })
+    expect(onError).toHaveBeenCalledTimes(1)
+  })
+
+  it('stops queueing at its byte bound while the disk stalls, and the exposure still completes', async () => {
+    const fifo = join(directory, 'stalled.jsonl')
+
+    execFileSync('mkfifo', [fifo])
+    const onError = vi.fn()
+    const journal = openJournalFile(fifo, { maxPendingBytes: 8 * 1024, onError })
+
+    closers.push(async () => {
+      closeSync(openSync(fifo, 'r+'))
+      await journal.close()
+    })
+
+    const equipment = await open(journal)
+    const frame = await exposeOnce(equipment, 30)
+
+    expect(frame).toMatchObject({ width: 4, height: 3 })
+    expect(onError).toHaveBeenCalledTimes(1)
+    expect(onError.mock.calls[0]![0].message).toContain('fell behind')
+    expect(cria.received.filter(received => received.route === 'submit')).toHaveLength(1)
+  })
+
+  it('writes JSON lines to its file and stops at its size limit', async () => {
+    const path = join(directory, 'journal.jsonl')
+    const onError = vi.fn()
+    const journal = openJournalFile(path, { maxFileBytes: 4_000, onError })
+    const equipment = await open(journal)
+
+    await exposeOnce(equipment, 10)
+    await journal.close()
+
+    const lines = (await readFile(path, 'utf8')).trimEnd().split('\n')
+
+    expect(lines.every(line => JSON.parse(line).kind)).toBe(true)
+    expect(Buffer.byteLength(lines.join('\n'))).toBeLessThanOrEqual(4_000)
+    expect(onError).toHaveBeenCalledTimes(1)
+    expect(onError.mock.calls[0]![0].message).toContain('size limit')
+  })
+})

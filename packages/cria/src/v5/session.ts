@@ -14,6 +14,7 @@ import {
 } from '@cria/wire'
 import { makeLocalHolds, type LocalHolds } from './holds.js'
 import { download, request, type CriaConnection, type Reply } from './http.js'
+import { journalStates } from './journal.js'
 
 export type Received =
   | { readonly state: 'live'; readonly snapshot: State; readonly receivedAt: number }
@@ -71,7 +72,7 @@ export function openSession(connection: CriaConnection): Effect.Effect<Session, 
         Effect.asVoid,
       )
 
-    yield* Effect.forkScoped(Effect.forever(subscribe(connection, received)))
+    yield* Effect.forkScoped(Effect.forever(subscribe(connection, received, journalStates(connection.journal))))
     yield* Effect.forkScoped(Effect.forever(watchCadence(received, nextChange)))
 
     const lookup = (instanceId: InstanceId, requestId: RequestId) =>
@@ -156,12 +157,31 @@ export function openSession(connection: CriaConnection): Effect.Effect<Session, 
       const intact = (bytes: Uint8Array) =>
         bytes.byteLength === image.original.bytes && createHash('sha256').update(bytes).digest('hex') === image.sha256
 
+      const verdict = (reply: Reply<Uint8Array>): 'intact' | 'damaged' | 'gone' | 'failed' => {
+        if (reply.kind === 'answered') return intact(reply.body) ? 'intact' : 'damaged'
+
+        return reply.kind === 'refused' && reply.code === 'image-gone' ? 'gone' : 'failed'
+      }
+
       return download(connection, image.original.url).pipe(
         Effect.repeat({
           until: reply => reply.kind === 'refused' || (reply.kind === 'answered' && intact(reply.body)),
           times: 2,
           schedule: Schedule.spaced('500 millis'),
         }),
+        Effect.tap(reply =>
+          Effect.sync(() =>
+            connection.journal.record({
+              kind: 'image',
+              at: Date.now(),
+              imageId: image.id,
+              operationId: image.operationId,
+              bytes: image.original.bytes,
+              sha256: image.sha256,
+              verdict: verdict(reply),
+            }),
+          ),
+        ),
         Effect.flatMap((reply): Effect.Effect<Uint8Array | 'gone', Failed> => {
           if (reply.kind === 'refused' && reply.code === 'image-gone') return Effect.succeed('gone')
 
@@ -187,9 +207,16 @@ export function openSession(connection: CriaConnection): Effect.Effect<Session, 
   })
 }
 
-function subscribe(connection: CriaConnection, received: SubscriptionRef.SubscriptionRef<Received>) {
+function subscribe(
+  connection: CriaConnection,
+  received: SubscriptionRef.SubscriptionRef<Received>,
+  journalState: (state: State, arrivedAt: number) => void,
+) {
   const ended = (message: string) =>
-    SubscriptionRef.update(received, current => (current.state === 'interrupted' ? { ...current, message } : current))
+    Effect.andThen(
+      Effect.sync(() => connection.journal.record({ kind: 'stream', at: Date.now(), event: 'ended', message })),
+      SubscriptionRef.update(received, current => (current.state === 'interrupted' ? { ...current, message } : current)),
+    )
 
   const connected = Effect.gen(function* () {
     const aborter = yield* Effect.acquireRelease(
@@ -204,6 +231,8 @@ function subscribe(connection: CriaConnection, received: SubscriptionRef.Subscri
 
     if (response.status !== 200 || !response.body) return `Cria refused the event stream with ${response.status}`
     const body = response.body
+
+    connection.journal.record({ kind: 'stream', at: Date.now(), event: 'opened', message: null })
 
     const reader = yield* Effect.acquireRelease(
       Effect.sync(() => body.getReader()),
@@ -227,7 +256,10 @@ function subscribe(connection: CriaConnection, received: SubscriptionRef.Subscri
         const decoded = Schema.decodeUnknownExit(Schema.fromJsonString(State))(data)
 
         if (Exit.isFailure(decoded)) return 'Cria sent a state that is not protocol 5'
-        yield* SubscriptionRef.set(received, { state: 'live', snapshot: decoded.value, receivedAt: Date.now() })
+        const receivedAt = Date.now()
+
+        journalState(decoded.value, receivedAt)
+        yield* SubscriptionRef.set(received, { state: 'live', snapshot: decoded.value, receivedAt })
       }
     }
   })
