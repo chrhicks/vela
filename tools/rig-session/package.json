@@ -6,7 +6,8 @@
   "scripts": {
     "rig-session": "tsx src/cli.ts",
     "test:types": "tsc -p tsconfig.json",
-    "replay": "tsx src/replay-cli.ts"
+    "replay": "tsx src/replay-cli.ts",
+    "scrub": "tsx src/scrub-cli.ts"
   },
   "dependencies": {
     "@duckdb/node-api": "1.5.6-r.1",
