@@ -32,6 +32,9 @@ export function buildTables(session: string, window: TimeWindow, inputs: Session
   const operations = inputs.recording ? operationsOf(inputs.recording) : []
   const savedImages = inputs.savedImages.filter(image => inWindow(image.capturedAt))
   const devices = inputs.recording?.devices ?? []
+  const indiMount = inputs.recording?.mountSamples ?? []
+  const indiTimes = new Set(indiMount.map(sample => sample.sampledAt.getTime()))
+  const mountSamples = [...inputs.mountSamples.filter(sample => !indiTimes.has(sample.sampledAt.getTime())), ...indiMount]
   const imageOperations = operations.filter(operation => operation.outcome.value?.image)
 
   const linkedImages: LinkedImage[] = (inputs.recording?.images ?? []).map(image => ({
@@ -41,7 +44,7 @@ export function buildTables(session: string, window: TimeWindow, inputs: Session
 
   const frames = savedImages.map(image => {
     const spanLink = linkFrameToSpan(image, inputs.spans)
-    const mount = linkMountAsOf(image.capturedAt, inputs.mountSamples, mountFreshSeconds)
+    const mount = linkMountAsOf(image.capturedAt, mountSamples, mountFreshSeconds)
 
     const attemptLink = linkFrameToAttempt(image, inputs.frameRecords)
     const attempt = attemptLink?.kind === 'exact' ? attemptLink.target : null
@@ -82,9 +85,9 @@ export function buildTables(session: string, window: TimeWindow, inputs: Session
       .map(operation => operationRow(session, operation, inputs.recording)),
     indi_events: events.map((event, index) => eventRow(session, event, eventOperations[index] ?? null)),
     indi_images: exportedBlobs.map(({ image, operation }) => imageRow(session, image, operation)),
-    mount: inputs.mountSamples
-      .filter(sample => inWindow(sample.sampledAt) || linkedMountTimes.has(sample.sampledAt.getTime()))
-      .map(sample => mountRow(session, sample)),
+    mount: mountSamples.flatMap(sample =>
+      inWindow(sample.sampledAt) || linkedMountTimes.has(sample.sampledAt.getTime()) ? [mountRow(session, sample)] : [],
+    ),
     spans: inputs.spans.filter(span => inWindow(span.startedAt) || linkedSpans.has(span)).map(span => spanRow(session, span)),
   }
 }
@@ -242,11 +245,12 @@ function imageRow(session: string, image: IndiImage, operationLink: Link<Recorde
 function mountRow(session: string, sample: MountSample): MountRow {
   return {
     session,
+    source: sample.source,
     sampled_at: sample.sampledAt,
     ra_hours: sample.raHours,
     dec_degrees: sample.decDegrees,
     lst_hours: sample.lstHours,
-    hour_angle_hours: hourAngle(sample.lstHours, sample.raHours),
+    hour_angle_hours: sample.lstHours === null ? null : hourAngle(sample.lstHours, sample.raHours),
     tracking: sample.tracking,
     slewing: sample.slewing,
     parked: sample.parked,

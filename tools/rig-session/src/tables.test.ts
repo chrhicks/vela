@@ -61,7 +61,9 @@ function span(spanId: string, start: string, end: string, index: number): TraceS
 
 function sample(time: string, tracking: boolean): MountSample {
   return {
+    source: 'csv',
     sampledAt: at(time),
+    validUntil: null,
     raHours: 23,
     decDegrees: 10.25,
     lstHours: 1,
@@ -275,6 +277,7 @@ function recordingOf(...operations: RecordedOperation[]): Recording {
     devices: [{ id: 'primary', kind: 'camera', indiDevice: 'Test Camera' }],
     events: [],
     images: [],
+    mountSamples: [],
     linesRead: operations.length,
     tornTail: false,
     ended: true,

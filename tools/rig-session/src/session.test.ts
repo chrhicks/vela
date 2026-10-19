@@ -422,3 +422,81 @@ test('a query finds the camera image of each frame: one image in the operation w
   ])
   session.close()
 })
+
+test('a recording alone fills the mount table, and a frame links to the latest reading with its age', async () => {
+  const night = await syntheticNight()
+  const root = join(night.dir, 'out')
+
+  const field = (kind: 'def' | 'set', type: 'Number' | 'Switch', name: string, state: string, elements: Record<string, string>) =>
+    `<${kind}${type}Vector device="Test Mount" name="${name}" state="${state}">${Object.entries(elements).map(([element, value]) => `<${kind === 'def' ? 'def' : 'one'}${type} name="${element}">${value}</${kind === 'def' ? 'def' : 'one'}${type}>`).join('')}</${kind}${type}Vector>`
+
+  const recordingDir = await writeRecording(
+    join(night.dir, 'mount-recording'),
+    jsonLines(
+      msgLine(0, '2030-01-01T00:59:12Z', 'in', field('def', 'Number', 'GEOGRAPHIC_COORD', 'Ok', { LAT: '12.5', LONG: '15' })),
+      msgLine(1, '2030-01-01T00:59:13Z', 'in', field('def', 'Number', 'EQUATORIAL_EOD_COORD', 'Ok', { RA: '6.5', DEC: '10.25' })),
+      msgLine(2, '2030-01-01T00:59:14Z', 'in', field('def', 'Switch', 'TELESCOPE_TRACK_STATE', 'Ok', { TRACK_ON: 'On', TRACK_OFF: 'Off' })),
+      msgLine(3, '2030-01-01T01:00:56Z', 'in', field('set', 'Number', 'EQUATORIAL_EOD_COORD', 'Busy', { RA: '6.6' })),
+      msgLine(4, '2030-01-01T01:02:00Z', 'in', field('set', 'Switch', 'TELESCOPE_TRACK_STATE', 'Ok', { TRACK_ON: 'Off', TRACK_OFF: 'On' })),
+      { k: 'end', t: 9, at: Date.parse('2030-01-01T01:10:00Z') },
+    ),
+  )
+
+  await buildSession({ name: 'test-night', window, root, savedImagesDir: night.savedImagesDir, tracesFile: null, mountCsvFile: null, frameRecordsFile: null, recordingDir })
+
+  const summary = JSON.parse(await readFile(join(root, 'package', 'session.json'), 'utf8'))
+
+  expect(summary.inputs.find((input: { input: string }) => input.input === 'mount-csv').effect).toContain('holds only what the INDI recording gives')
+
+  const session = await openPackage(join(root, 'package'))
+
+  expect(await session.rows('SELECT source, tracking, slewing FROM mount ORDER BY sampled_at')).toEqual([
+    { source: 'indi', tracking: null, slewing: false },
+    { source: 'indi', tracking: true, slewing: false },
+    { source: 'indi', tracking: true, slewing: true },
+    { source: 'indi', tracking: false, slewing: true },
+  ])
+  expect(await session.rows('SELECT f.frame_id, f.mount_link, f.mount_age_seconds, m.tracking, m.hour_angle_hours IS NOT NULL AS has_hour_angle FROM frames f LEFT JOIN mount m ON m.sampled_at = f.mount_sampled_at ORDER BY f.frame_id')).toEqual([
+    { frame_id: 'frame-0', mount_link: 'inferred', mount_age_seconds: 4, tracking: true, has_hour_angle: true },
+    { frame_id: 'frame-1', mount_link: 'inferred', mount_age_seconds: 0, tracking: false, has_hour_angle: true },
+    { frame_id: 'frame-2', mount_link: 'inferred', mount_age_seconds: 60, tracking: false, has_hour_angle: true },
+  ])
+  session.close()
+})
+
+/** A night whose recording follows the mount to 01:02:00 and is then cut short in the way `cut` says. */
+async function cutShortNight(cut: 'torn tail' | 'damaged middle' | 'no end') {
+  const night = await syntheticNight()
+  const root = join(night.dir, 'out')
+
+  const field = (type: 'Number' | 'Switch', name: string, elements: Record<string, string>) =>
+    `<def${type}Vector device="Test Mount" name="${name}" state="Ok">${Object.entries(elements).map(([element, value]) => `<def${type} name="${element}">${value}</def${type}>`).join('')}</def${type}Vector>`
+
+  const lines = jsonLines(
+    msgLine(0, '2030-01-01T00:59:13Z', 'in', field('Number', 'EQUATORIAL_EOD_COORD', { RA: '6.5', DEC: '10.25' })),
+    msgLine(1, '2030-01-01T00:59:14Z', 'in', field('Switch', 'TELESCOPE_TRACK_STATE', { TRACK_ON: 'On', TRACK_OFF: 'Off' })),
+    msgLine(2, '2030-01-01T01:01:30Z', 'in', field('Switch', 'TELESCOPE_PARK', { PARK: 'Off', UNPARK: 'On' })),
+  )
+
+  const recordingDir = await writeRecording(join(night.dir, 'cut-recording'), cut === 'damaged middle' ? [...lines, 'not json', ...jsonLines(msgLine(3, '2030-01-01T01:02:30Z', 'in', field('Switch', 'TELESCOPE_PARK', { PARK: 'On', UNPARK: 'Off' })))] : lines)
+
+  if (cut === 'torn tail') await writeFile(join(recordingDir, 'traffic.jsonl'), `${lines.join('\n')}\n{"k":"msg","t":6`)
+
+  await buildSession({ name: 'test-night', window, root, savedImagesDir: night.savedImagesDir, tracesFile: null, mountCsvFile: null, frameRecordsFile: null, recordingDir })
+
+  const session = await openPackage(join(root, 'package'))
+  const frames = await session.rows('SELECT frame_id, mount_link FROM frames ORDER BY frame_id')
+
+  session.close()
+
+  return frames
+}
+
+test.each(['torn tail', 'damaged middle', 'no end'] as const)('frames after the last line of a recording with a %s get no mount link', async cut => {
+  // The frames are at 01:01:00, 01:02:00 and 01:03:00; the last line read is at 01:01:30.
+  expect(await cutShortNight(cut)).toEqual([
+    { frame_id: 'frame-0', mount_link: 'inferred' },
+    { frame_id: 'frame-1', mount_link: null },
+    { frame_id: 'frame-2', mount_link: null },
+  ])
+})
