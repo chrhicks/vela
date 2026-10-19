@@ -321,6 +321,14 @@ const savedImageSchema = z
       catalog: z.string().trim().min(1),
     }).nullable().optional(),
     capturedAtSource: z.enum(['camera', 'server-estimate']).optional(),
+    provenance: z
+      .object({
+        requestId: z.string(),
+        operationId: z.string().nullable(),
+        imageId: z.string().nullable(),
+      })
+      .nullable()
+      .optional(),
     width: z.number().int().positive(),
     height: z.number().int().positive(),
     cameraName: z.string(),
@@ -337,8 +345,10 @@ const savedImageSchema = z
     fitsUrl: z.string(),
     previewDownloadUrl: z.string(),
   })
-  .transform(({ capturedAtSource, fitImageUrl, subject, ...required }): SavedImage => {
+  .transform(({ capturedAtSource, fitImageUrl, subject, provenance, ...required }): SavedImage => {
     let image: SavedImage = required
+
+    if (provenance !== undefined) image = { ...image, provenance }
 
     if (subject !== undefined) image = { ...image, subject }
 
