@@ -2,6 +2,7 @@ export {
   EquipmentError,
   CaptureStoppedError,
   CaptureRetryableError,
+  CaptureUncertainError,
   FocuserStoppedError,
   FramingStoppedError,
   FrameLostError,
@@ -9,7 +10,14 @@ export {
 
 export type { EquipmentErrorReason, EquipmentErrorOptions } from './error.js'
 
-export type { Acquisition, CaptureOptions, Frame, FrameColor, Pointing } from './acquisition.js'
+export type {
+  Acquisition,
+  CaptureOptions,
+  CaptureProvenance,
+  Frame,
+  FrameColor,
+  Pointing,
+} from './acquisition.js'
 
 export type {
   Framing,

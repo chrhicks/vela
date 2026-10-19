@@ -1,4 +1,5 @@
 import { Cause, Deferred, Effect, Exit, Fiber, Option, Schedule } from 'effect'
+import type { CaptureProvenance } from '@vela/equipment'
 import { Failed, Stopped, Uncertain, type Ending, type FailedReason } from '@cria/primitives'
 import {
   RequestId,
@@ -29,6 +30,9 @@ export type Motion = Exclude<Command, HaltCommand>
 export type Exposed =
   | { readonly kind: 'frame'; readonly image: Image; readonly bytes: Uint8Array }
   | { readonly kind: 'lost'; readonly message: string }
+
+/** Called as an operation's ids become known: its request ID just before it is sent, then its operation ID. */
+export type Observe = (provenance: CaptureProvenance) => void
 
 const onStop = {
   capture: 'cancel',
@@ -83,7 +87,12 @@ const stopRequested = Effect.exit(Effect.interruptible(Effect.void)).pipe(Effect
  * replace it with Stopped as soon as its own halt succeeded. Uninterruptible
  * except while it follows an operation a Stop cancels.
  */
-export function remoteOperation(session: Session, target: Target, command: Motion): Effect.Effect<OperationResult, Ending> {
+export function remoteOperation(
+  session: Session,
+  target: Target,
+  command: Motion,
+  observe?: Observe,
+): Effect.Effect<OperationResult, Ending> {
   const cancelsOnStop = onStop[command.kind] === 'cancel'
 
   return Effect.uninterruptible(
@@ -97,7 +106,12 @@ export function remoteOperation(session: Session, target: Target, command: Motio
       const held = (yield* session.holds.all).find(hold => hold.failureDomain === device.failureDomain)
 
       if (held) return yield* new Failed({ reason: 'blocked', message: held.reason })
+      const requested = { requestId: request.requestId, operationId: null, imageId: null }
+
+      observe?.(requested)
       const operation = yield* admit(session, request, device)
+
+      observe?.({ ...requested, operationId: operation.id })
       const settled = yield* follow(session, operation, cancelsOnStop)
 
       return yield* outcomeOf(settled)
@@ -105,12 +119,24 @@ export function remoteOperation(session: Session, target: Target, command: Motio
   )
 }
 
-export function capture(session: Session, target: Target, parameters: ParamsOf<'capture'>): Effect.Effect<Exposed, Ending> {
+export function capture(
+  session: Session,
+  target: Target,
+  parameters: ParamsOf<'capture'>,
+  observe?: Observe,
+): Effect.Effect<Exposed, Ending> {
   return Effect.uninterruptible(
     Effect.gen(function* () {
-      const { image } = yield* remoteOperation(session, target, { kind: 'capture', parameters })
+      let operationSeen: CaptureProvenance | undefined
+
+      const { image } = yield* remoteOperation(session, target, { kind: 'capture', parameters }, seen => {
+        operationSeen = seen
+        observe?.(seen)
+      })
 
       if (!image) return yield* new Failed({ reason: 'unavailable', message: 'Cria confirmed the capture without an image' })
+
+      if (operationSeen) observe?.({ ...operationSeen, imageId: image.id })
       const bytes = yield* session.original(image)
 
       if (bytes === 'gone') return { kind: 'lost', message: `Cria dropped image ${image.id} before Vela fetched it` }
