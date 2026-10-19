@@ -473,6 +473,10 @@ test('a recording alone fills the mount table, and a frame links to the latest r
 
   await buildSession({ name: 'test-night', window, root, savedImagesDir: night.savedImagesDir, tracesFile: null, mountCsvFile: null, frameRecordsFile: null, recordingDir, journalFile: null })
 
+  const summary = JSON.parse(await readFile(join(root, 'package', 'session.json'), 'utf8'))
+
+  expect(summary.inputs.find((input: { input: string }) => input.input === 'mount-csv').effect).toContain('holds only what the INDI recording gives')
+
   const session = await openPackage(join(root, 'package'))
 
   expect(await session.rows('SELECT source, tracking, slewing FROM mount ORDER BY sampled_at')).toEqual([
