@@ -127,22 +127,23 @@ export interface MountLink {
 }
 
 /**
- * The mount sample in force at `at`: the latest one not after it, and only if it is no older
- * than `maxAgeSeconds`. An older sample would show where the mount was, not where it is.
- * Sample times are unique.
+ * The mount sample in force at `at`: the latest one not after it. A polled sample (the CSV) is
+ * only in force for `maxAgeSeconds`, because an older one would show where the mount was. A
+ * sample from the INDI recording holds until the next change, since the driver reports only
+ * changes, so it stays in force until its connection closed or the recording stopped
+ * (`validUntil`). The age is always the time since the sample. Sample times are unique.
  */
 export function linkMountAsOf(at: Date, samples: readonly MountSample[], maxAgeSeconds: number): MountLink | null {
-  let latest: Date | null = null
+  let latest: MountSample | null = null
 
-  for (const { sampledAt } of samples) {
-    if (sampledAt <= at && (latest === null || sampledAt > latest)) latest = sampledAt
+  for (const sample of samples) {
+    if (sample.sampledAt <= at && (latest === null || sample.sampledAt > latest.sampledAt)) latest = sample
   }
 
   if (latest === null) return null
 
-  const ageSeconds = (at.getTime() - latest.getTime()) / 1000
+  const ageSeconds = (at.getTime() - latest.sampledAt.getTime()) / 1000
+  const inForce = latest.source === 'indi' ? latest.validUntil === null || at < latest.validUntil : ageSeconds <= maxAgeSeconds
 
-  if (ageSeconds > maxAgeSeconds) return null
-
-  return { link: { kind: 'inferred', target: latest }, ageSeconds }
+  return inForce ? { link: { kind: 'inferred', target: latest.sampledAt }, ageSeconds } : null
 }
