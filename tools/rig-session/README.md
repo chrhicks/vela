@@ -9,7 +9,8 @@ pnpm --filter @vela/rig-session rig-session build \
   --saved-images ~/.local/share/vela/saved-images \
   --traces ~/.local/share/vela/traces/observing.jsonl \
   --mount-csv path/to/mount-watch.csv \
-  --frame-records ~/.local/share/vela/traces/frames.jsonl
+  --frame-records ~/.local/share/vela/traces/frames.jsonl \
+  --recording ~/recordings/2030-01-01-example
 
 pnpm --filter @vela/rig-session rig-session query ~/.local/share/rig-sessions/2030-01-01-example/package \
   "SELECT detected_stars FROM frames ORDER BY captured_at"
@@ -19,7 +20,7 @@ The inputs are read-only. Every input is optional; `session.json` in the package
 
 ## Package layout
 
-`<out>/package` is a symlink to `<out>/builds/<time>`, which holds `frames.parquet`, `attempts.parquet`, `mount.parquet`, `spans.parquet` and `session.json`. A build writes into a fresh directory and switches the symlink with one rename, so a build that fails leaves the previous package readable. The next finished build removes the older directories.
+`<out>/package` is a symlink to `<out>/builds/<time>`, which holds `frames.parquet`, `attempts.parquet`, `indi_ops.parquet`, `mount.parquet`, `spans.parquet` and `session.json`. A build writes into a fresh directory and switches the symlink with one rename, so a build that fails leaves the previous package readable. The next finished build removes the older directories.
 
 Rebuilding the same inputs gives the same rows in the same files. Only `session.json` carries the build time.
 
@@ -38,10 +39,11 @@ Joins are plain functions in `src/joins.ts`. Each link records how it was found:
 A link with no match is null. The packager never guesses.
 
 - `frames.span_*` links a saved frame to the `capture.frame` span that was running when the camera started the exposure.
-- `frames.attempt_*` links a saved frame to the frame record (`attempts` table, one row per capture attempt of any outcome) that names its image: `exact`, by the image id. The frame then carries that attempt's `request_id`, `operation_id` and `cria_image_id`, so it names the Cria operation that produced it. `attempts.frame_id` is the same link seen from the attempt; a lost or failed attempt has none.
+- `frames.attempt_*` links a saved frame to the frame record (`attempts` table, one row per capture attempt of any outcome) that names its image: `exact`, by the image id. The frame then carries that attempt's `request_id`, `operation_id` and `cria_image_id`, so it names the Cria operation that produced it. `attempts.frame_id` is the same link seen from the attempt; a lost or failed attempt has none. `attempts.message` is the adapter's or driver's own text, so `/dev/` paths and `LAT=`/`LONG=` pairs in it are replaced, and a text that names the site in words is replaced whole.
+- `frames.operation_*` and `attempts.operation_*` link to the Cria operation in `indi_ops` (one row per `op` line of the recording): `exact`, by the operation id the frame record carries, or by its request id only when the record has no operation id (Cria never admitted the request). An operation id that the recording does not hold is no match: the request id is not tried, so `operation_id` is always the key the link used. `indi_ops.outcome*` hold the kind, reason and message; an outcome's values are not exported, because device setup puts the site in them.
 - `frames.mount_*` links a frame to the latest mount sample not after the exposure start, and keeps the sample's age. A sample older than 30 seconds gives no link.
 
-The Cria recording and the Vela journal are not read yet. `INPUTS.md` specifies how they will be, and the tables and links they add.
+The Vela journal is not read yet. `INPUTS.md` specifies how they will be, and the tables and links they add.
 
 ## Privacy
 
@@ -50,6 +52,10 @@ A package never holds the observing site, serial port paths or serial numbers, h
 `sanitize` has two layers. Learned values: the readers learn the secrets from the inputs themselves (the recording's site, ports and serial numbers, the journal's origin), and `Secrets` replaces each wherever it occurs, in the usual spellings (decimal rounded or truncated, signed or wrapped longitude, sexagesimal). Patterns: `/dev/` paths, `by-id` names, `LAT=`/`LONG=`/`ELEV=` pairs, URL credentials and tokens, bearer and key-looking strings; a text that names the site in words ("Observer location updated: Latitude ...") is replaced whole, and a JSON key that names the site, a port or a serial number loses its value.
 
 After the staged files are written and before the symlink switches, the package reads them back and scans every table and `session.json` for the learned secrets and the patterns. A hit fails the build with the table, column and rule (never the value), removes the staging directory, and leaves the previous package readable. It is the backstop; `sanitize` is the defence. `INPUTS.md` ("Privacy rule") has the whole rule.
+
+### The recording
+
+A recording is read for `manifest.json` and `traffic.jsonl` only; `blobs/` is never opened. It is streamed, so a tape larger than memory builds in constant space, and only the lines a table needs are kept. As the lines pass, the reader learns the site (`GEOGRAPHIC_COORD`), the ports (`DEVICE_PORT`, `SYSTEM_PORTS`, any `/dev/` path), serial numbers and the INDI host from the manifest into the package's `Secrets`. A torn last line is dropped; a damaged line in the middle (or a line over 64 MiB) keeps the lines before it and `session.json` lists it. That policy is stated once, in `INPUTS.md` ("Damage").
 
 ## Replay
 

@@ -114,6 +114,44 @@ export class Secrets {
     return [...(literal?.test(text) ? ['learned value'] : []), ...(numbers?.test(text) ? ['learned coordinate'] : [])]
   }
 
+  /**
+   * Learns the private values a JSON document holds under the keys that name them: a site coordinate under
+   * `latitude`, `longitude` or `elevation`, a path, host or serial number under `port`, `origin`, `host` or `serial`.
+   */
+  learnFromJson(value: Json, key = ''): void {
+    const asNumber = numberSchema.safeParse(value)
+
+    if (asNumber.success) {
+      const kind = coordinateKey(key)
+
+      if (kind !== null) this.addCoordinate(kind, asNumber.data)
+
+      return
+    }
+
+    const asText = textSchema.safeParse(value)
+
+    if (asText.success) {
+      if (literalKey.test(key)) this.addLiteral(asText.data)
+
+      return
+    }
+
+    const asList = listSchema.safeParse(value)
+
+    if (asList.success) {
+      for (const item of asList.data) this.learnFromJson(item, key)
+
+      return
+    }
+
+    const asRecord = recordSchema.safeParse(value)
+
+    if (asRecord.success) {
+      for (const [name, inner] of Object.entries(asRecord.data)) this.learnFromJson(inner, name)
+    }
+  }
+
   #compile() {
     if (this.#compiled !== null) return this.#compiled
 
@@ -166,6 +204,17 @@ const patterns: readonly Pattern[] = [
 
 /** JSON keys whose value is private whatever it looks like. */
 const privateKey = /^(?:site|latitude|longitude|elevation|port|serial|lat|long|lon|lng|elev)/i
+
+/** JSON keys whose string value is a path, host or serial number. */
+const literalKey = /^(?:port|origin|host|hostname|serial)/i
+
+function coordinateKey(key: string): Coordinate | null {
+  if (/^(?:lat|latitude)/i.test(key)) return 'latitude'
+
+  if (/^(?:long|lon|lng|longitude)/i.test(key)) return 'longitude'
+
+  return /^(?:elev|elevation)/i.test(key) ? 'elevation' : null
+}
 
 /** `text` with learned values and private-looking patterns replaced. Replacing again changes nothing. */
 export function sanitizeText(text: string, secrets: Secrets): string {

@@ -1,4 +1,5 @@
 import type { FrameRecord, MountSample, SavedImage, TraceSpan } from './inputs.ts'
+import type { RecordedOperation } from './recording.ts'
 
 /**
  * How one row found another. `exact` is a shared key. `inferred` is a rule over times, so
@@ -48,6 +49,20 @@ export function linkAttemptToFrame(record: FrameRecord, images: readonly SavedIm
   if (record.imageId === null) return null
 
   return exactOrAmbiguous(images.filter(image => image.rigId === record.rigId && image.id === record.imageId))
+}
+
+/**
+ * An attempt belongs to the Cria operation it names. The operation id is the key, and the only one
+ * while the record has it: an id this recording does not hold is no match, because the request id would
+ * link the attempt to an operation that its own exported `operation_id` does not name. Only an attempt
+ * with no operation id (Cria never admitted it, or the reply was lost) finds its operation by request id.
+ */
+export function linkAttemptToOperation(record: FrameRecord, operations: readonly RecordedOperation[]): Link<RecordedOperation> | null {
+  if (record.operationId !== null) return exactOrAmbiguous(operations.filter(operation => operation.id === record.operationId))
+
+  if (record.requestId === null) return null
+
+  return exactOrAmbiguous(operations.filter(operation => operation.requestId === record.requestId))
 }
 
 function exactOrAmbiguous<Target>(candidates: readonly Target[]): Link<Target> | null {

@@ -4,7 +4,7 @@ import { openPackage } from './query.ts'
 
 const usage = `Usage:
   rig-session build --name <session> --from <iso> --to <iso> --out <dir>
-                    [--saved-images <dir>] [--traces <file>] [--mount-csv <file>] [--frame-records <file>]
+                    [--saved-images <dir>] [--traces <file>] [--mount-csv <file>] [--frame-records <file>] [--recording <dir>]
   rig-session query <package-dir> <sql>`
 
 const [command, ...rest] = process.argv.slice(2)
@@ -28,6 +28,7 @@ async function build(args: string[]) {
       traces: { type: 'string' },
       'mount-csv': { type: 'string' },
       'frame-records': { type: 'string' },
+      recording: { type: 'string' },
     },
   })
 
@@ -46,6 +47,7 @@ async function build(args: string[]) {
     tracesFile: values.traces ?? null,
     mountCsvFile: values['mount-csv'] ?? null,
     frameRecordsFile: values['frame-records'] ?? null,
+    recordingDir: values.recording ?? null,
   })
 
   console.log(`Built ${directory}`)
