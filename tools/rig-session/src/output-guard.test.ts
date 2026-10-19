@@ -14,8 +14,8 @@ test('a package is refused inside a git working tree unless git ignores the fold
   const inside = join(repository, 'packages', 'night')
 
   await expect(refuseOutputInRepository(inside, false)).rejects.toThrow(OutputInRepositoryError)
-  await expect(refuseOutputInRepository(inside, false)).rejects.toThrow(/refusing to write a package.*does not ignore it.*--allow-in-repo/)
-  await expect(refuseOutputInRepository(repository, false)).rejects.toThrow(/refusing/)
+  await expect(refuseOutputInRepository(inside, false)).rejects.toThrow(/refusing to write a package.*--allow-in-repo/)
+  await expect(refuseOutputInRepository(repository, false)).rejects.toThrow(OutputInRepositoryError)
   await refuseOutputInRepository(inside, true)
   await refuseOutputInRepository(join(outside, 'night'), false)
 

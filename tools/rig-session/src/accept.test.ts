@@ -78,7 +78,7 @@ test('builds that differ fail the run and name the file', async () => {
   expect(result.problems).toEqual(['the second build differs in frames.parquet'])
 })
 
-test('an input changed by the run fails it; an input another process appended to only warns', async () => {
+test('an input changed by the run fails it; one another process appended to fails too unless growth is allowed', async () => {
   const request = await night()
   const records = request.frameRecordsFile ?? ''
   const original = await readFile(records, 'utf8')
@@ -93,8 +93,18 @@ test('an input changed by the run fails it; an input another process appended to
 
   await writeFile(records, original)
 
-  const appended = await acceptSession(request, touching(`${original}\n`))
+  expect((await acceptSession(request, touching(`${original}\n`))).problems).toEqual([expect.stringContaining('frame-records grew while the command ran')])
 
-  expect(appended.problems).toEqual([])
-  expect(appended.warnings).toEqual([expect.stringContaining('frame-records grew while the command ran')])
+  await writeFile(records, original)
+
+  const allowed = await acceptSession({ ...request, allowGrowth: true }, touching(`${original}\n`))
+
+  expect(allowed.problems).toEqual([])
+  expect(allowed.warnings).toEqual([expect.stringContaining('frame-records grew while the command ran')])
+})
+
+test('a run that found no input fails: a mistyped path must not pass', async () => {
+  const result = await acceptSession({ ...(await night()), recordingDir: '/nonexistent/recording', frameRecordsFile: null, savedImagesDir: null })
+
+  expect(result.problems).toEqual(['no input was found, so nothing was checked'])
 })

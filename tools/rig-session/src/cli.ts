@@ -1,6 +1,6 @@
 import { parseArgs } from 'node:util'
 import { tmpdir } from 'node:os'
-import { acceptSession, formatAcceptance } from './accept.ts'
+import { acceptSession, describe, formatAcceptance } from './accept.ts'
 import { OutputInRepositoryError, refuseOutputInRepository } from './output-guard.ts'
 import { buildSession } from './session.ts'
 import { openPackage } from './query.ts'
@@ -9,7 +9,7 @@ const usage = `Usage:
   rig-session build --name <session> --from <iso> --to <iso> --out <dir>
                     [--saved-images <dir>] [--traces <file>] [--mount-csv <file>] [--frame-records <file>] [--recording <dir>] [--journal <file>]
                     [--allow-in-repo]
-  rig-session accept --from <iso> --to <iso> [--scratch <dir>] [--allow-in-repo]
+  rig-session accept --from <iso> --to <iso> [--scratch <dir>] [--allow-in-repo] [--allow-growth]
                     [--saved-images <dir>] [--traces <file>] [--mount-csv <file>] [--frame-records <file>] [--recording <dir>] [--journal <file>]
   rig-session query <package-dir> <sql>`
 
@@ -23,13 +23,14 @@ const inputOptions = {
   recording: { type: 'string' },
   journal: { type: 'string' },
   'allow-in-repo': { type: 'boolean' },
+  'allow-growth': { type: 'boolean' },
 } as const
 
 const [command, ...rest] = process.argv.slice(2)
 
 try {
   if (command === 'build') await build(rest)
-  else if (command === 'accept') await accept(rest)
+  else if (command === 'accept') await accept(rest).catch(reportWithoutData)
   else if (command === 'query') await query(rest)
   else {
     console.error(usage)
@@ -42,8 +43,14 @@ try {
   process.exitCode = 1
 }
 
+/** `accept` runs on private data, so an error it ends with is reduced to its kind: no path, no text from a file. */
+function reportWithoutData(error: Error) {
+  console.error(error instanceof OutputInRepositoryError ? error.message : `FAIL: ${describe(error)}`)
+  process.exitCode = 1
+}
+
 /** The inputs and window both commands take, or null when the window is missing or not a time. */
-function inputs(values: { readonly [Option in Exclude<keyof typeof inputOptions, 'allow-in-repo'>]?: string | undefined }) {
+function inputs(values: { readonly [Option in Exclude<keyof typeof inputOptions, 'allow-in-repo' | 'allow-growth'>]?: string | undefined }) {
   const window = { from: new Date(values.from ?? ''), to: new Date(values.to ?? '') }
 
   if (Number.isNaN(window.from.getTime()) || Number.isNaN(window.to.getTime())) return null
@@ -90,7 +97,7 @@ async function accept(args: string[]) {
 
   await refuseOutputInRepository(scratch, values['allow-in-repo'] ?? false)
 
-  const result = await acceptSession({ ...request, scratch })
+  const result = await acceptSession({ ...request, scratch, allowGrowth: values['allow-growth'] ?? false })
 
   console.log(formatAcceptance(result))
   process.exitCode = result.problems.length === 0 ? 0 : 1
