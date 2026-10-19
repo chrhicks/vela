@@ -19,14 +19,13 @@ export async function refuseOutputInRepository(directory: string, allowInRepo: b
   const target = resolve(directory)
   const base = nearestExisting(target)
   const real = join(await realpath(base), relative(base, target))
-  const top = await run(base, ['rev-parse', '--show-toplevel'])
 
-  if (top === null) return
+  if ((await run(base, ['rev-parse', '--show-toplevel'])) === null) return
 
   for (const written of [join(real, 'package'), join(real, 'builds', 'x')]) {
     if ((await run(base, ['check-ignore', '-q', '--', written])) === null) {
       throw new OutputInRepositoryError(
-        `refusing to write a package into ${directory}: it is inside the git working tree ${top.trim()} and git does not ignore it. ` +
+        'refusing to write a package into an output folder inside a git working tree that git does not ignore. ' +
           'A package holds the observing site and must not be committed. Use a folder outside every repository (for example ~/.local/share/rig-sessions/<name>), ignore the folder, or pass --allow-in-repo.',
       )
     }

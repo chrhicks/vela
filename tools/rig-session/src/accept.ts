@@ -10,6 +10,8 @@ import { buildSession, type SessionRequest } from './session.ts'
 export type AcceptRequest = Omit<SessionRequest, 'name' | 'root' | 'secrets'> & {
   /** Where the two throwaway builds go. */
   readonly scratch: string
+  /** Count an input that only grew (Vela's live journal) as a warning instead of a failure. */
+  readonly allowGrowth?: boolean
 }
 
 const summary = z.object({
@@ -33,20 +35,24 @@ type Fingerprint = ReadonlyMap<string, { readonly input: string; readonly size: 
  * the builds are byte-identical, nothing the packager learned from the inputs is in the package, and no input changed.
  */
 export async function acceptSession(request: AcceptRequest, build: typeof buildSession = buildSession): Promise<Acceptance> {
-  const files = await inputFiles(request)
-  const before = await fingerprint(files)
-  const work = await mkdtemp(join(request.scratch, 'rig-session-accept-'))
   const problems: string[] = []
   const warnings: string[] = []
   let built: z.infer<typeof summary> | null = null
+  let before: Fingerprint = new Map()
+  let work: string | null = null
 
   try {
+    before = await fingerprint(await inputFiles(request))
+    work = await mkdtemp(join(request.scratch, 'rig-session-accept-'))
+
     const secrets = new Secrets()
     const shared = { ...request, name: 'acceptance' }
     const one = await build({ ...shared, root: join(work, 'one'), secrets })
     const two = await build({ ...shared, root: join(work, 'two') })
 
     built = summary.parse(JSON.parse(await readFile(join(one, 'session.json'), 'utf8')))
+
+    if (!built.inputs.some(input => input.status === 'found')) problems.push('no input was found, so nothing was checked')
     problems.push(...(await findLeaks(one, secrets)).map(finding => `privacy scan: ${finding}`))
 
     const different = await differingFiles(one, two)
@@ -55,13 +61,14 @@ export async function acceptSession(request: AcceptRequest, build: typeof buildS
   } catch (error) {
     problems.push(describe(error instanceof Error ? error : new Error()))
   } finally {
-    await rm(work, { recursive: true, force: true })
+    if (work !== null) await rm(work, { recursive: true, force: true })
   }
 
   for (const [path, { input, size, sha256 }] of before) {
     const after = await changed(path, size, sha256)
 
-    if (after === 'appended') warnings.push(`${input} grew while the command ran; its first ${size} bytes are unchanged (another process is writing it)`)
+    if (after === 'appended' && request.allowGrowth !== true) problems.push(`${input} grew while the command ran (another process is writing it; its first ${size} bytes are unchanged). Run on a copy, or pass --allow-growth`)
+    else if (after === 'appended') warnings.push(`${input} grew while the command ran; its first ${size} bytes are unchanged (another process is writing it)`)
     else if (after === 'changed') problems.push(`${input} changed while the command ran`)
   }
 
@@ -69,7 +76,7 @@ export async function acceptSession(request: AcceptRequest, build: typeof buildS
 }
 
 /** A privacy failure names its findings (table.column: rule); any other error is reduced to what cannot quote the data. */
-function describe(error: Error): string {
+export function describe(error: Error): string {
   if (error instanceof PrivacyCheckError) return `privacy scan: ${error.findings.join('; ')} (the build failed closed, nothing was published)`
 
   const system = z.object({ code: z.string() }).safeParse(error)
