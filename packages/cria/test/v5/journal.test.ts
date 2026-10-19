@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { closeSync, openSync } from 'node:fs'
+import { closeSync, constants, openSync, readSync } from 'node:fs'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -230,6 +230,86 @@ describe('a journal that fails or stalls', () => {
     expect(onError).toHaveBeenCalledTimes(1)
     expect(onError.mock.calls[0]![0].message).toContain('fell behind')
     expect(cria.received.filter(received => received.route === 'submit')).toHaveLength(1)
+  })
+
+  describe('closing while the disk is stalled', () => {
+    const entry = { kind: 'stream', at: 0, event: 'opened', message: null, origin: 'test' } as const
+
+    function stalledFifo() {
+      const fifo = join(directory, 'stalled.jsonl')
+
+      execFileSync('mkfifo', [fifo])
+      const reader = () => openSync(fifo, constants.O_RDWR | constants.O_NONBLOCK)
+
+      return { fifo, reader }
+    }
+
+    it('gives up on a write the disk will not take, after its close timeout, and says so once', async () => {
+      const { fifo, reader } = stalledFifo()
+      const onError = vi.fn()
+      const journal = openJournalFile(fifo, { closeTimeoutMs: 100, onError })
+      let closed = false
+
+      closers.push(async () => void closeSync(reader()))
+      journal.record(entry)
+      const closing = journal.close().then(() => void (closed = true))
+
+      await vi.advanceTimersByTimeAsync(99)
+      expect(closed).toBe(false)
+      await vi.advanceTimersByTimeAsync(1)
+      await closing
+
+      expect(closed).toBe(true)
+      expect(onError).toHaveBeenCalledTimes(1)
+      expect(onError.mock.calls[0]![0].message).toContain('stalled')
+    })
+
+    it('closes at once after the journal has already turned itself off behind a stalled write', async () => {
+      const { fifo, reader } = stalledFifo()
+      const journal = openJournalFile(fifo, { maxPendingBytes: 200, onError: () => {} })
+      let closed = false
+
+      closers.push(async () => void closeSync(reader()))
+      vi.useRealTimers()
+      journal.record(entry)
+      await new Promise(resolve => setTimeout(resolve, 50))
+      for (let index = 0; index < 4; index += 1) journal.record(entry)
+      const closing = journal.close().then(() => void (closed = true))
+
+      await Promise.race([closing, new Promise(resolve => setTimeout(resolve, 50))])
+
+      expect(closed).toBe(true)
+    })
+
+    it('does not write the stalled line if the disk wakes after close', async () => {
+      vi.useRealTimers()
+      const { fifo, reader } = stalledFifo()
+      const journal = openJournalFile(fifo, { closeTimeoutMs: 20, onError: () => {} })
+
+      journal.record(entry)
+      await journal.close()
+      const fd = reader()
+
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      try {
+        expect(() => readSync(fd, Buffer.alloc(1024))).toThrow(/EAGAIN/)
+      } finally {
+        closeSync(fd)
+      }
+    })
+
+    it('still flushes everything it was given when the disk keeps up', async () => {
+      const path = join(directory, 'journal.jsonl')
+      const journal = openJournalFile(path)
+
+      journal.record(entry)
+      journal.record({ ...entry, event: 'ended' })
+      await journal.close()
+      journal.record(entry)
+
+      expect((await readFile(path, 'utf8')).trimEnd().split('\n').map(line => JSON.parse(line).event)).toEqual(['opened', 'ended'])
+    })
   })
 
   it('writes JSON lines to its file and stops at its size limit', async () => {
