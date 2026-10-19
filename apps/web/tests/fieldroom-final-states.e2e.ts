@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import {
   openEquipmentScene,
   openPhotographsScene,
+  routeQuietAlerts,
 } from './fixtures/fieldroom/browser'
 import {
   createTonightScene,
@@ -127,6 +128,7 @@ async function captureScene(page: Page, mode: 'light' | 'dark', ready = false) {
       ? route.fulfill({ contentType: 'image/jpeg', body: pixels })
       : route.fulfill({ status: response.status, json: response.json })
   })
+  await routeQuietAlerts(page)
   await page.goto(scene.route)
   await expect(
     page.getByRole('region', { name: 'Capture images' }),

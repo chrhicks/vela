@@ -10,6 +10,8 @@ type State = {
   missing: boolean
 }
 
+export type NavigationState = ReturnType<typeof useNavigation>
+
 export function useNavigation() {
   const [state, setState] = useState<State>({
     view: null,

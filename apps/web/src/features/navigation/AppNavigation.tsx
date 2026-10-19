@@ -11,16 +11,16 @@ import { matchPath, useLocation, useNavigate } from 'react-router'
 import { useAppearance } from '../../appearance/AppearanceProvider'
 import { useRigObservation } from '../rig-detail/RigContext'
 import { rigConnectionLabel } from './rig-connection'
-import { useNavigation } from './use-navigation'
+import type { NavigationState } from './use-navigation'
 
-export function AppNavigation() {
+export function AppNavigation({ navigation }: { navigation: NavigationState }) {
   const appearance = useAppearance()
   const [appearanceOpen, setAppearanceOpen] = useState(false)
   const rig = useRigObservation()
   const connection = rig ? rigConnectionLabel(rig) : undefined
   const { pathname, search } = useLocation()
   const navigate = useNavigate()
-  const { view, activity, offline, missing } = useNavigation()
+  const { view, activity, offline, missing } = navigation
   const rigId = matchPath('/rigs/:rigId/*', pathname)?.params.rigId ?? ''
   const base = rigId ? `/rigs/${encodeURIComponent(rigId)}` : ''
   const targets = useRef(new Map<string, string>())

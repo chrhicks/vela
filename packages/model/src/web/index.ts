@@ -86,3 +86,11 @@ export type {
 export type { NavigationCapture, NavigationView } from './navigation.js'
 
 export type { MountControlAction, MountControlAvailability, MountControlView } from './mount-control.js'
+
+export type {
+  AlertDelivery,
+  AlertLevel,
+  AlertsView,
+  AlertView,
+  PhoneAlertsView,
+} from './alerts.js'
