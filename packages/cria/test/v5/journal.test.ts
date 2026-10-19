@@ -1,6 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { closeSync, openSync } from 'node:fs'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, open as actualOpen, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -211,34 +210,165 @@ describe('a journal that fails or stalls', () => {
     expect(onError).toHaveBeenCalledTimes(1)
   })
 
-  it('stops queueing at its byte bound while the disk stalls, and the exposure still completes', async () => {
-    const fifo = join(directory, 'stalled.jsonl')
+  describe('a disk that stalls', () => {
+    const entry = { kind: 'stream', at: 0, event: 'opened', message: null, origin: 'test' } as const
 
-    execFileSync('mkfifo', [fifo])
-    const onError = vi.fn()
-    const journal = openJournalFile(fifo, { maxPendingBytes: 8 * 1024, onError })
+    /** The first open hangs, as one on a dead disk does, until `wake` lets it through. */
+    function stalledDisk() {
+      const path = join(directory, 'woken.jsonl')
+      let reached = false
+      let release = async () => {}
 
-    closers.push(async () => {
-      closeSync(openSync(fifo, 'r+'))
-      await journal.close()
+      let first = true
+
+      const openFile: typeof actualOpen = (...args) => {
+        if (!first) return actualOpen(...args)
+
+        first = false
+
+        return new Promise(resolve => {
+          reached = true
+          release = async () => resolve(await actualOpen(path, 'a'))
+        })
+      }
+
+      closers.push(() => release())
+
+      const stalled = () => vi.waitFor(() => expect(reached).toBe(true))
+
+      return {
+        path,
+        openFile,
+        stalled,
+        async wake() {
+          await stalled()
+          await release()
+        },
+      }
+    }
+
+    it('stops queueing at its byte bound while the disk stalls, and the exposure still completes', async () => {
+      const { openFile } = stalledDisk()
+      const onError = vi.fn()
+      const journal = openJournalFile(join(directory, 'stalled.jsonl'), { maxPendingBytes: 8 * 1024, openFile, onError })
+
+      closers.push(() => journal.close())
+
+      const equipment = await open(journal)
+      const frame = await exposeOnce(equipment, 30)
+
+      expect(frame).toMatchObject({ width: 4, height: 3 })
+      expect(onError).toHaveBeenCalledTimes(1)
+      expect(onError.mock.calls[0]![0].message).toContain('fell behind')
+      expect(cria.received.filter(received => received.route === 'submit')).toHaveLength(1)
     })
 
-    const equipment = await open(journal)
-    const frame = await exposeOnce(equipment, 30)
+    it('gives up on a write the disk will not take, after its close timeout, and says so once', async () => {
+      const { openFile } = stalledDisk()
+      const onError = vi.fn()
+      const journal = openJournalFile(join(directory, 'stalled.jsonl'), { closeTimeoutMs: 100, openFile, onError })
+      let closed = false
 
-    expect(frame).toMatchObject({ width: 4, height: 3 })
-    expect(onError).toHaveBeenCalledTimes(1)
-    expect(onError.mock.calls[0]![0].message).toContain('fell behind')
-    expect(cria.received.filter(received => received.route === 'submit')).toHaveLength(1)
+      journal.record(entry)
+      const closing = journal.close().then(() => void (closed = true))
+
+      await vi.advanceTimersByTimeAsync(99)
+      expect(closed).toBe(false)
+      await vi.advanceTimersByTimeAsync(1)
+      await closing
+
+      expect(closed).toBe(true)
+      expect(onError).toHaveBeenCalledTimes(1)
+      expect(onError.mock.calls[0]![0].message).toContain('stalled')
+    })
+
+    it('still closes within its timeout after the journal turned itself off behind a stalled write', async () => {
+      const { openFile } = stalledDisk()
+      const onError = vi.fn()
+      const journal = openJournalFile(join(directory, 'stalled.jsonl'), { maxPendingBytes: 200, closeTimeoutMs: 100, openFile, onError })
+
+      journal.record(entry)
+
+      for (let index = 0; index < 4; index += 1) journal.record(entry)
+
+      await vi.advanceTimersByTimeAsync(100)
+      await journal.close()
+
+      expect(onError).toHaveBeenCalledTimes(1)
+      expect(onError.mock.calls[0]![0].message).toContain('fell behind')
+    })
+
+    it('does not write a queued line after the backlog latch even if the disk wakes later', async () => {
+      const { path, openFile, stalled, wake } = stalledDisk()
+      const onError = vi.fn()
+      const journal = openJournalFile(join(directory, 'stalled.jsonl'), { maxPendingBytes: 200, openFile, onError })
+
+      journal.record(entry)
+      await stalled()
+
+      for (let index = 0; index < 4; index += 1) journal.record(entry)
+
+      expect(onError.mock.calls[0]![0].message).toContain('fell behind')
+      await wake()
+      await journal.close()
+
+      expect(await readFile(path, 'utf8')).toBe('')
+    })
+
+    it('does not write the stalled line if the disk wakes after close', async () => {
+      const { path, openFile, wake } = stalledDisk()
+      const journal = openJournalFile(join(directory, 'stalled.jsonl'), { closeTimeoutMs: 20, openFile, onError: () => {} })
+
+      journal.record(entry)
+      const closing = journal.close()
+
+      await vi.advanceTimersByTimeAsync(20)
+      await closing
+      await wake()
+      await journal.close()
+
+      expect(await readFile(path, 'utf8')).toBe('')
+    })
+
+    it('turns itself off at once, holding no thread, when its file is a FIFO nobody reads', async () => {
+      vi.useRealTimers()
+      const fifo = join(directory, 'unread.jsonl')
+
+      execFileSync('mkfifo', [fifo])
+      const onError = vi.fn()
+      const journal = openJournalFile(fifo, { onError })
+
+      journal.record(entry)
+      await vi.waitFor(() => expect(onError).toHaveBeenCalledTimes(1))
+      await journal.close()
+
+      expect(onError.mock.calls[0]![0].message).toContain('ENXIO')
+    })
+
+    it('still flushes everything it was given when the disk keeps up', async () => {
+      const path = join(directory, 'journal.jsonl')
+      const journal = openJournalFile(path)
+
+      journal.record(entry)
+      journal.record({ ...entry, event: 'ended' })
+      await journal.close()
+      journal.record(entry)
+
+      expect((await readFile(path, 'utf8')).trimEnd().split('\n').map(line => JSON.parse(line).event)).toEqual(['opened', 'ended'])
+    })
   })
 
   it('writes JSON lines to its file and stops at its size limit', async () => {
     const path = join(directory, 'journal.jsonl')
     const onError = vi.fn()
     const journal = openJournalFile(path, { maxFileBytes: 4_000, onError })
-    const equipment = await open(journal)
+    const entry = { kind: 'stream', at: 0, event: 'opened', message: null, origin: 'test' } as const
 
-    await exposeOnce(equipment, 10)
+    journal.record(entry)
+    await vi.waitFor(async () => expect((await readFile(path, 'utf8')).length).toBeGreaterThan(0))
+
+    for (let index = 0; index < 100; index += 1) journal.record(entry)
+
     await journal.close()
 
     const lines = (await readFile(path, 'utf8')).trimEnd().split('\n')

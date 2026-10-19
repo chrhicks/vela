@@ -1,4 +1,5 @@
-import { appendFile, mkdir, stat } from 'node:fs/promises'
+import { constants } from 'node:fs'
+import { mkdir, open, stat } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import type { State } from '@cria/wire'
 
@@ -69,19 +70,26 @@ interface JournalFileOptions {
   readonly maxPendingBytes?: number
   /** Size the file may reach, counting what it held when the process opened it. */
   readonly maxFileBytes?: number
+  /** How long `close` waits for the disk before it drops a write that has not finished. */
+  readonly closeTimeoutMs?: number
+  /** Opens the file for appending; replaceable so a test can stall the disk. */
+  readonly openFile?: typeof open
   readonly onError?: (error: Error) => void
 }
 
 /**
  * Appends one JSON line per entry. The first write failure, a backlog above `maxPendingBytes` or
  * `maxFileBytes` in the file turns it off until the process restarts, so a line is never half written
- * in the middle of the file and a slow disk never holds memory or delays the client.
+ * in the middle of the file and a slow disk never holds memory or delays the client. `close` waits
+ * `closeTimeoutMs` for the disk, then drops the write it is stuck on, so shutdown is bounded.
  */
 export function openJournalFile(
   path: string,
   {
     maxPendingBytes = 4 * 1024 * 1024,
     maxFileBytes = 256 * 1024 * 1024,
+    closeTimeoutMs = 2_000,
+    openFile = open,
     onError = error => console.error('Vela Cria journal:', error.message),
   }: JournalFileOptions = {},
 ): ClosableJournalSink {
@@ -134,15 +142,42 @@ export function openJournalFile(
           }
 
           if (writtenBytes + size > maxFileBytes) return latchOff('Reached its size limit; the journal is off until restart')
-          await appendFile(file, line, { mode: 0o600 })
-          writtenBytes += size
+
+          // Never block a thread on the open: a FIFO without a reader would hold its libuv worker
+          // forever, and that worker keeps the process from exiting. Without a reader it fails with ENXIO.
+          const handle = await openFile(file, constants.O_WRONLY | constants.O_APPEND | constants.O_CREAT | constants.O_NONBLOCK, 0o600)
+
+          try {
+            if (off) return
+            await handle.appendFile(line)
+            writtenBytes += size
+          } finally {
+            await handle.close()
+          }
         })
         .catch(error => latchOff(error instanceof Error ? error.message : String(error)))
         .finally(() => {
           if (!off) pendingBytes -= size
         })
     },
-    close: () => pending,
+    async close() {
+      let timer: NodeJS.Timeout | undefined
+
+      const flushed = await Promise.race([
+        pending.then(() => true),
+        new Promise<boolean>(resolve => {
+          timer = setTimeout(resolve, closeTimeoutMs, false)
+        }),
+      ])
+
+      clearTimeout(timer)
+
+      if (!flushed) {
+        latchOff('The disk stalled while closing; the unwritten entries were dropped')
+      }
+
+      off = true
+    },
   }
 }
 
