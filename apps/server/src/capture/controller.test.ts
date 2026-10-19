@@ -10,12 +10,14 @@ import { inflateSync } from 'node:zlib'
 import {
   CaptureFrameLostError,
   CaptureStoppedError,
+  CaptureUncertainError,
   createCaptureController,
   type CaptureCamera,
   type CaptureFrame,
   type CaptureRunOptions,
 } from './controller.js'
 import { createMemorySavedImageStore, type SavedImageStore } from '../saved-images/store.js'
+import type { FrameRecord, FrameRecords } from './frame-records.js'
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -29,7 +31,7 @@ function deferred<T>() {
   return { promise, resolve, reject }
 }
 
-function setup(savedImages: SavedImageStore = createMemorySavedImageStore()) {
+function setup(savedImages: SavedImageStore = createMemorySavedImageStore(), frameRecords?: FrameRecords) {
   const requests: Array<
     Parameters<CaptureCamera['capture']>[0] & ReturnType<typeof deferred<CaptureFrame>>
   > = []
@@ -47,6 +49,7 @@ function setup(savedImages: SavedImageStore = createMemorySavedImageStore()) {
     { rigId: 'fra 400', rigName: 'FRA 400' },
     () => Date.parse('2026-09-05T16:00:10Z'),
     savedImages,
+    frameRecords,
   )
 
   const controller = {
@@ -638,6 +641,54 @@ describe('capture telemetry', () => {
     expect(unsaved!.attributes).toMatchObject({ 'capture.frame.index': 2, 'capture.frame.outcome': 'unsaved' })
     expect(unsaved!.attributes['capture.save.ms']).toBeUndefined()
     expect(spans('capture.run.ended')[0]!.attributes).toMatchObject({ 'capture.run.completed': 1, 'capture.run.lost': 1 })
+  })
+
+  it('puts the ids the camera reported on the frame span, the image and the frame record', async () => {
+    const records: FrameRecord[] = []
+    const { controller, requests, frame } = setup(undefined, { append: record => records.push(record), close: async () => {} })
+    await controller.start(10)
+    requests[0]!.onProvenance({ requestId: 'request-1', operationId: null, imageId: null })
+    requests[0]!.onProvenance({ requestId: 'request-1', operationId: 'operation-1', imageId: 'image-1' })
+    requests[0]!.resolve(frame)
+    await vi.waitFor(() => expect(controller.active()).toBe(false))
+
+    expect(spans('capture.frame')[0]!.attributes).toMatchObject({
+      'capture.provenance.request.id': 'request-1',
+      'capture.provenance.operation.id': 'operation-1',
+      'capture.provenance.image.id': 'image-1',
+      'capture.image.id': controller.snapshot().latestImage!.id,
+    })
+    expect(controller.snapshot().latestImage!.provenance).toEqual({
+      requestId: 'request-1',
+      operationId: 'operation-1',
+      imageId: 'image-1',
+    })
+    expect(records).toHaveLength(1)
+    expect(records[0]!.provenance).toEqual(controller.snapshot().latestImage!.provenance)
+  })
+
+  it('records a camera that reports no ids as carrying none', async () => {
+    const records: FrameRecord[] = []
+    const { controller, requests, frame } = setup(undefined, { append: record => records.push(record), close: async () => {} })
+    await controller.start(10)
+    requests[0]!.resolve(frame)
+    await vi.waitFor(() => expect(controller.active()).toBe(false))
+
+    expect(controller.snapshot().latestImage!.provenance).toBeNull()
+    expect(records[0]!.provenance).toBeNull()
+    expect(spans('capture.frame')[0]!.attributes['capture.provenance.request.id']).toBeUndefined()
+  })
+
+  it('records an exposure the adapter could not account for as uncertain', async () => {
+    const records: FrameRecord[] = []
+    const { controller, requests } = setup(undefined, { append: record => records.push(record), close: async () => {} })
+    await controller.start(10, { repeat: true })
+    requests[0]!.reject(new CaptureUncertainError('Cria restarted while capture was running'))
+    await vi.waitFor(() => expect(controller.active()).toBe(false))
+
+    expect(records).toHaveLength(1)
+    expect(records[0]).toMatchObject({ outcome: 'uncertain', message: 'Cria restarted while capture was running' })
+    expect(controller.snapshot()).toMatchObject({ phase: 'failed' })
   })
 
   it('records when the camera reads retry during a frame and how long', async () => {

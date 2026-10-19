@@ -4,12 +4,17 @@ import { resolveRigCatalogPath } from './rig/catalog-path.js'
 import { alignmentSettings } from './alignment/routes.js'
 import { dirname, isAbsolute, resolve } from 'node:path'
 import { openFileSavedImageStore } from './saved-images/store.js'
+import { noFrameRecords, openFrameRecords } from './capture/frame-records.js'
 import { createSurveyCache } from './targets/survey.js'
 import { startTelemetry } from './telemetry.js'
 import { loadCriaConfiguration, registerConfiguredCriaRigs } from './equipment/config.js'
 import { createEquipmentComposition } from './equipment/composition.js'
 
 const telemetry = startTelemetry(process.env.VELA_TRACE_PATH)
+
+const frameRecords = process.env.VELA_FRAME_RECORDS_PATH
+  ? openFrameRecords(process.env.VELA_FRAME_RECORDS_PATH)
+  : noFrameRecords
 
 let app: ReturnType<typeof buildApp> | undefined
 
@@ -21,6 +26,7 @@ function shutdown() {
     try {
       await app?.close()
     } finally {
+      await frameRecords.close()
       await telemetry.shutdown()
     }
   })()
@@ -88,7 +94,7 @@ try {
   const equipment = createEquipmentComposition(cria, equipmentOptions)
 
   if (!shutdownTask) {
-    const options = { rigCatalog, savedImages, targets, surveyCache, equipment }
+    const options = { rigCatalog, savedImages, frameRecords, targets, surveyCache, equipment }
     app = buildApp(alignment ? { ...options, alignment } : options)
     await app.listen({ port, host })
   }

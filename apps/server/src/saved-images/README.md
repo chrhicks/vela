@@ -35,6 +35,10 @@ the optional fitted preview is used for collection thumbnails. New images retain
 an optional `subject` snapshot of the selected target ID, name and catalog identity.
 It records observing intent, not a measured pointing or solved frame. Explicit null
 means no chosen subject; absent legacy metadata remains valid and is not rewritten.
+New images also keep `provenance`, the rig service's request, operation and image IDs for the
+exposure. Null means the camera adapter carries none (Alpaca). Absent legacy metadata means
+unknown, and is not rewritten. The same IDs appear in the capture frame record
+(`docs/local-tracing.md`).
 Collection and detail projections include the Vela server's system `timeZone`.
 The browser uses this explicit zone for capture dates, times and noon-to-noon
 observing-night groups, consistently across clients. It is labeled server time,

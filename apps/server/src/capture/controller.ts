@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { trace, SpanStatusCode, type Span } from '@opentelemetry/api'
-import type { CaptureImage, CaptureSubject, CaptureView } from '@vela/model/web'
+import type { CaptureImage, CaptureImageProvenance, CaptureSubject, CaptureView } from '@vela/model/web'
 import { capturePreviews, type ImageColor } from '../imaging/preview.js'
 import { measureStars } from '../imaging/statistics.js'
 import { PREVIEW_VERSION } from '../imaging/background.js'
@@ -10,6 +10,7 @@ import {
   type SavedImageStore,
   type SavedImageFiles,
 } from '../saved-images/store.js'
+import { noFrameRecords, type FrameOutcome, type FrameRecords } from './frame-records.js'
 
 export interface CaptureFrame {
   width: number
@@ -31,6 +32,8 @@ export interface CaptureCamera {
     signal: AbortSignal
     onProgress: (progress: CaptureProgress) => void
     onReadState: (state: CaptureView['captureReadState']) => void
+    /** The adapter's ids for this exposure as it learns them; an adapter without ids never calls it. */
+    onProvenance: (provenance: CaptureImageProvenance) => void
   }): Promise<CaptureFrame>
 }
 
@@ -42,12 +45,29 @@ export class CaptureStoppedError extends Error {
   }
 }
 
+/** The adapter cannot say whether the exposure ran, so the camera needs a person's check. */
+export class CaptureUncertainError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'CaptureUncertainError'
+  }
+}
+
 /** The exposure finished but its frame was lost before it could be fetched. */
 export class CaptureFrameLostError extends Error {
   constructor(message: string) {
     super(message)
     this.name = 'CaptureFrameLostError'
   }
+}
+
+/** What one exposure attempt knows while it is in flight; `endFrame` settles it. */
+interface Attempt {
+  span: Span
+  index: number
+  startedAt: string
+  provenance: CaptureImageProvenance | null
+  image: CaptureImage | null
 }
 
 export interface CaptureRunOptions {
@@ -63,6 +83,7 @@ export function createCaptureController(
   settings: { rigId: string; rigName: string },
   now = Date.now,
   savedImages: SavedImageStore = createMemorySavedImageStore(),
+  frameRecords: FrameRecords = noFrameRecords,
 ) {
   let view: CaptureView = {
     rigId: settings.rigId,
@@ -154,19 +175,55 @@ export function createCaptureController(
     saveFrames: boolean,
     subject: CaptureSubject | null,
     runGeneration: number,
+    runId: string,
   ) {
-    let frameSpan: Span | undefined
+    let attempt: Attempt | undefined
 
-    // One span per frame, ended exactly once with how the frame turned out.
-    function endFrame(outcome: string, failure?: string) {
-      if (!frameSpan) return
+    // One span and one frame record per attempt, both settled exactly once with how it turned out.
+    function endFrame(outcome: FrameOutcome, failure?: string) {
+      if (!attempt) return
+      const { span, image } = attempt
 
-      frameSpan.setAttribute('capture.frame.outcome', outcome)
+      span.setAttribute('capture.frame.outcome', outcome)
 
-      if (failure !== undefined) frameSpan.setStatus({ code: SpanStatusCode.ERROR, message: failure })
+      if (attempt.provenance) {
+        span.setAttributes({
+          'capture.provenance.request.id': attempt.provenance.requestId,
+          ...(attempt.provenance.operationId && { 'capture.provenance.operation.id': attempt.provenance.operationId }),
+          ...(attempt.provenance.imageId && { 'capture.provenance.image.id': attempt.provenance.imageId }),
+        })
+      }
 
-      frameSpan.end()
-      frameSpan = undefined
+      if (image) span.setAttribute('capture.image.id', image.id)
+
+      if (failure !== undefined) span.setStatus({ code: SpanStatusCode.ERROR, message: failure })
+
+      span.end()
+
+      frameRecords.append({
+        version: 1,
+        rigId: settings.rigId,
+        runId,
+        attempt: attempt.index,
+        startedAt: attempt.startedAt,
+        settledAt: new Date(now()).toISOString(),
+        exposureSeconds,
+        subject,
+        outcome,
+        message: failure ?? null,
+        provenance: attempt.provenance,
+        image: image && {
+          id: image.id,
+          capturedAt: image.capturedAt,
+          capturedAtSource: image.capturedAtSource ?? 'camera',
+          receivedAt: image.receivedAt,
+          width: image.width,
+          height: image.height,
+        },
+        statistics: image?.statistics ?? null,
+      })
+
+      attempt = undefined
     }
 
     // Records when the camera's reads go from current to retrying and back, and how long they retried.
@@ -211,15 +268,26 @@ export function createCaptureController(
         patch({ phase: 'exposing', elapsedSeconds: 0, captureReadState: 'current' })
         let capturePending = true
 
+        const index = view.completedCount + (view.lostFrameCount ?? 0) + 1
+
         const span = tracer.startSpan('capture.frame', {
           attributes: {
             'capture.rig.id': settings.rigId,
-            'capture.frame.index': view.completedCount + (view.lostFrameCount ?? 0) + 1,
+            'capture.run.id': runId,
+            'capture.frame.index': index,
             'capture.exposure.seconds': exposureSeconds,
           },
         })
 
-        frameSpan = span
+        const current: Attempt = {
+          span,
+          index,
+          startedAt: new Date(now()).toISOString(),
+          provenance: null,
+          image: null,
+        }
+
+        attempt = current
         const frameStartedAt = performance.now()
         const reads = watchReads(span, frameStartedAt)
 
@@ -238,6 +306,9 @@ export function createCaptureController(
                 reads.state(captureReadState)
 
                 if (capturePending && !signal.aborted) patch({ captureReadState })
+              },
+              onProvenance(provenance) {
+                current.provenance = provenance
               },
             })
             .finally(() => {
@@ -302,6 +373,7 @@ export function createCaptureController(
           color: frame.color?.kind === 'bayer' ? 'color' : 'mono',
           statistics,
           saved: false,
+          provenance: current.provenance,
         }
 
         if (previews.fit) {
@@ -314,6 +386,7 @@ export function createCaptureController(
         if (frame.capturedAtSource)
           metadata = { ...metadata, capturedAtSource: frame.capturedAtSource }
 
+        current.image = metadata
         images.set(id, { ...previews, fits, metadata, generation: runGeneration })
 
         while (images.size > 3) images.delete(images.keys().next().value!)
@@ -348,10 +421,12 @@ export function createCaptureController(
     } catch (error) {
       const stopped = signal.aborted && error instanceof CaptureStoppedError
 
-      endFrame(
-        stopped ? 'stopped' : 'failed',
-        stopped ? undefined : error instanceof Error ? error.message : 'Exposure failed',
-      )
+      if (stopped) endFrame('stopped')
+      else
+        endFrame(
+          error instanceof CaptureUncertainError ? 'uncertain' : 'failed',
+          error instanceof Error ? error.message : 'Exposure failed',
+        )
 
       if (stopped) patch({ phase: 'stopped' })
       else
@@ -366,6 +441,7 @@ export function createCaptureController(
       const ended = tracer.startSpan('capture.run.ended', {
         attributes: {
           'capture.rig.id': settings.rigId,
+          'capture.run.id': runId,
           'capture.run.phase': view.phase,
           'capture.run.completed': view.completedCount,
           'capture.run.lost': view.lostFrameCount ?? 0,
@@ -390,6 +466,7 @@ export function createCaptureController(
       throw new Error('Exposure duration must be positive')
     const runSubject = subject ? Object.freeze({ ...subject }) : null
     const runGeneration = ++generation
+    const runId = randomUUID()
     cancellation = new AbortController()
     patch({
       camera: { name: cameraName },
@@ -412,6 +489,7 @@ export function createCaptureController(
       .startSpan('capture.run.started', {
         attributes: {
           'capture.rig.id': settings.rigId,
+          'capture.run.id': runId,
           'capture.exposure.seconds': exposureSeconds,
           'capture.run.repeat': repeat,
           'capture.run.saveFrames': saveFrames,
@@ -428,6 +506,7 @@ export function createCaptureController(
       saveFrames,
       runSubject,
       runGeneration,
+      runId,
     ).finally(() => {
       running = undefined
       onSettled?.()
