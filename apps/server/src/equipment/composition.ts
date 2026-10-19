@@ -8,7 +8,7 @@ import {
   createAlpacaProvider,
   type AlpacaDiscovery,
 } from '@vela/alpaca'
-import { createCriaConnection, createCriaEquipment, type CriaConnection, type CriaConnectionOptions } from '@vela/cria'
+import { createCriaConnection, createCriaEquipment, openJournalFile, type CriaConnection, type CriaConnectionOptions } from '@vela/cria'
 import {
   EquipmentError,
   type Acquisition,
@@ -48,6 +48,8 @@ interface CompositionOptions {
   solver?: { executable: string; catalogPath: string }
   diagnosticsPath?: string
   fetch?: typeof globalThis.fetch
+  /** Where each Cria connection appends what it decodes; off when absent. */
+  criaJournalPath?: string
 }
 
 /** Select equipment ownership at composition; workflows receive only the capabilities they use. */
@@ -57,6 +59,7 @@ export function createEquipmentComposition(
 ): EquipmentComposition {
   const clients = new Map<string, CriaConnection>()
   const equipment = new Map<string, ReturnType<typeof createCriaEquipment>>()
+  const journal = options.criaJournalPath ? openJournalFile(options.criaJournalPath) : undefined
 
   for (const configuration of configurations) {
     let client = clients.get(configuration.url)
@@ -67,6 +70,8 @@ export function createEquipmentComposition(
       if (configuration.token) connection = { ...connection, token: configuration.token }
 
       if (options.fetch) connection = { ...connection, fetch: options.fetch }
+
+      if (journal) connection = { ...connection, journal }
       client = createCriaConnection(connection)
       clients.set(configuration.url, client)
     }
@@ -104,6 +109,7 @@ export function createEquipmentComposition(
     },
     async close() {
       await Promise.all([...clients.values()].map(client => client.close()))
+      await journal?.close()
     },
     alpacaDiscovery: createAlpacaDiscovery(),
     createInventory: rig => createRigDeviceInventory(rig, { provider: provider(rig) }),
