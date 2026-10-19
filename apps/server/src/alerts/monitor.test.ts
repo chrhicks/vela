@@ -1,6 +1,5 @@
 import { readFileSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { trace } from '@opentelemetry/api'
 import { InMemorySpanExporter, NodeTracerProvider, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-node'
 import { createAlertMonitor, type AlertMonitor } from './monitor.js'
 import { NotifierError, type Notification, type Notifier } from './notifier.js'
@@ -18,12 +17,22 @@ type PhoneEvent =
   | { kind: 'send'; priority: Notification['priority']; title: string; message: string; at: number }
   | { kind: 'cancel'; receipt: string; at: number }
 
+interface FakePhone {
+  events: PhoneEvent[]
+  /** While set, every call fails with this reason. */
+  down: string | null
+  sends(): Array<Extract<PhoneEvent, { kind: 'send' }>>
+  cancels(): Array<Extract<PhoneEvent, { kind: 'cancel' }>>
+  emergencies(): Array<Extract<PhoneEvent, { kind: 'send' }>>
+}
+
 function fakePhone(clock: () => number) {
   const events: PhoneEvent[] = []
   let receipts = 0
-  const phone = {
+
+  const phone: FakePhone = {
     events,
-    down: null as string | null,
+    down: null,
     sends: () => events.filter(event => event.kind === 'send'),
     cancels: () => events.filter(event => event.kind === 'cancel'),
     emergencies: () => phone.sends().filter(event => event.priority === 2),
@@ -94,13 +103,16 @@ function watched(options: Parameters<typeof rig>[0] = {}) {
 // ---------------------------------------------------------------------------
 // The 2026-10-17 night
 
-const night = (
-  JSON.parse(readFileSync(new URL('./fixtures/night-20261018-frames.json', import.meta.url), 'utf8')) as Array<{
-    capturedAt: string
-    stars: number
-    hfrPixels: number | null
-  }>
-).map(row => ({
+interface NightFrame {
+  time: string
+  capturedAt: string
+  at: number
+  statistics: { detectedStars: number; medianHfrPixels: number | null }
+}
+
+const night: NightFrame[] = JSON.parse(
+  readFileSync(new URL('./fixtures/night-20261018-frames.json', import.meta.url), 'utf8'),
+).map((row: { capturedAt: string; stars: number; hfrPixels: number | null }) => ({
   time: row.capturedAt.slice(11, 19),
   capturedAt: row.capturedAt,
   at: Date.parse(row.capturedAt),
@@ -412,6 +424,7 @@ describe('phone delivery', () => {
 
   it('never shows an unexpected error, which could carry a key', async () => {
     const fixture = rig()
+
     const leaky: Notifier = {
       async send() {
         throw new Error('POST https://api.pushover.net token=secret-token failed')
@@ -502,6 +515,7 @@ describe('while the run is polled', () => {
 
   it('treats a mount that will not answer as a rig that went away, and recovers quietly when it answers', async () => {
     let answering = false
+
     const { monitor, phone } = polled(async () => {
       if (!answering) throw new Error('timed out')
 

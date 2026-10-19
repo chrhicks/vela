@@ -120,7 +120,7 @@ describe('Pushover notifier', () => {
     await expect(sending).rejects.toMatchObject({ reason: 'could not reach Pushover' })
   })
 
-  it('reports HTTP throttling without reading or exposing an error body', async () => {
+  it('reports an HTTP failure without exposing a body that is not Pushover\'s explanation', async () => {
     const fake = fakePushover(new Map([
       [messagesUrl, new Response(`${token} ${user}`, { status: 429 })]
     ]))
@@ -128,6 +128,18 @@ describe('Pushover notifier', () => {
     const notifier = createPushoverNotifier({ token, user, fetch: fake.fetch })
 
     await expect(notifier.send(notification)).rejects.toEqual(new NotifierError('Pushover answered HTTP 429'))
+  })
+
+  it('gives the reason Pushover sends with a rejected request, such as a wrong token', async () => {
+    const fake = fakePushover(new Map([
+      [messagesUrl, Response.json({ status: 0, errors: [`application token ${token} is invalid`] }, { status: 400 })]
+    ]))
+
+    const notifier = createPushoverNotifier({ token, user, fetch: fake.fetch })
+
+    await expect(notifier.send(notification)).rejects.toEqual(
+      new NotifierError('Pushover answered HTTP 400: application token [key] is invalid'),
+    )
   })
 
   it('surfaces all Pushover rejection reasons while redacting every occurrence of either key', async () => {

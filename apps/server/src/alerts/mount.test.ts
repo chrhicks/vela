@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { Acquisition, Framing, TelescopeStatus } from '@vela/equipment'
+import type { Acquisition, Framing, Pointing, TelescopeStatus } from '@vela/equipment'
 import { createMemoryRigCatalog } from '../rig/catalog.js'
+import type { RigCatalogRecord } from '../rig/contracts.js'
 import { mountReaderFor } from './mount.js'
 
 const mount = { uniqueId: 'cria:fra:mount', kind: 'telescope' as const, name: 'AM5' }
 
-const rig = {
+const rig: RigCatalogRecord = {
   id: 'fra',
   name: 'FRA 400',
   endpoint: { host: 'cria.local', port: 80 },
@@ -28,13 +29,42 @@ function status(overrides: Partial<TelescopeStatus> = {}): TelescopeStatus {
   }
 }
 
-function reader(options: { rig?: typeof rig; status?: TelescopeStatus } = {}) {
+function unused(): never {
+  throw new Error('The alert mount reader should not call this')
+}
+
+function reader(options: { rig?: RigCatalogRecord; status?: TelescopeStatus } = {}) {
   const telescopeStatus = vi.fn(async () => options.status ?? status())
-  const pointing = vi.fn(async () => ({ siderealTimeDegrees: 15 }))
+
+  const pointing = vi.fn(async (): Promise<Pointing> => ({
+    rightAscensionDegrees: 30,
+    declinationDegrees: 42,
+    siderealTimeDegrees: 15,
+    latitudeDegrees: 40,
+    tracking: true,
+    coordinateSystem: 'topocentric',
+  }))
+
+  const framing: Framing = {
+    telescopeStatus,
+    cameraGeometry: unused,
+    setTracking: unused,
+    slew: unused,
+    home: unused,
+    abortTelescope: unused,
+  }
+
+  const acquisition: Acquisition = {
+    pointing,
+    capture: unused,
+    move: unused,
+    rotateRightAscension: unused,
+    abort: unused,
+  }
 
   const read = mountReaderFor('fra', createMemoryRigCatalog([options.rig ?? rig]), {
-    createFraming: () => ({ telescopeStatus }) as unknown as Framing,
-    createAcquisition: () => ({ pointing }) as unknown as Acquisition,
+    createFraming: () => framing,
+    createAcquisition: () => acquisition,
   })
 
   return { read, telescopeStatus, pointing }
@@ -73,7 +103,7 @@ describe('reading a Cria rig mount for the alert rules', () => {
   it('reads nothing from an Alpaca rig or a rig without exactly one telescope', async () => {
     const { source: _, ...alpaca } = rig
 
-    const none = reader({ rig: alpaca as typeof rig })
+    const none = reader({ rig: alpaca })
     expect(await none.read(signal)).toBeNull()
 
     const two = reader({ rig: { ...rig, lastObservedInventory: { ...rig.lastObservedInventory, devices: [mount, { ...mount, uniqueId: 'other' }] } } })

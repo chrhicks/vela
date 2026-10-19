@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { NotifierError } from './notifier.js'
+import { emergencyExpireSeconds, emergencyRetrySeconds, NotifierError } from './notifier.js'
 import type { Notifier } from './notifier.js'
 
 interface PushoverOptions {
@@ -28,6 +28,14 @@ export function createPushoverNotifier({ token, user, fetch, timeoutMs = 10_000 
     return new NotifierError(keyPattern ? reason.replace(keyPattern, '[key]') : reason)
   }
 
+  /** Pushover explains a rejected request in its body, such as an invalid token. */
+  async function rejectionDetail(response: Response) {
+    const answer = responseSchema.safeParse(await response.json().catch(() => null))
+    const errors = answer.success ? answer.data.errors : undefined
+
+    return errors?.length ? `: ${errors.join('; ')}` : ''
+  }
+
   async function post(path: string, body: URLSearchParams) {
     const signal = AbortSignal.timeout(timeoutMs)
     const timeoutReason = `Pushover timed out after ${timeoutMs / 1000} s`
@@ -44,7 +52,7 @@ export function createPushoverNotifier({ token, user, fetch, timeoutMs = 10_000 
       throw failure(signal.aborted ? timeoutReason : 'could not reach Pushover')
     }
 
-    if (!response.ok) throw failure(`Pushover answered HTTP ${response.status}`)
+    if (!response.ok) throw failure(`Pushover answered HTTP ${response.status}${await rejectionDetail(response)}`)
 
     let answer: unknown
 
@@ -77,8 +85,8 @@ export function createPushoverNotifier({ token, user, fetch, timeoutMs = 10_000 
       })
 
       if (notification.priority === 2) {
-        body.set('retry', '60')
-        body.set('expire', '3600')
+        body.set('retry', String(emergencyRetrySeconds))
+        body.set('expire', String(emergencyExpireSeconds))
       }
 
       const answer = await post('messages', body)

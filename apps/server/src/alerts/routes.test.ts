@@ -31,10 +31,17 @@ afterEach(async () => {
   await Promise.all(cleanups.splice(0).map(cleanup => cleanup()))
 })
 
+interface FakePhone {
+  sent: Notification[]
+  cancelled: string[]
+  /** While set, every call fails with this reason. */
+  down: string | null
+}
+
 function fakePhone() {
   const sent: Notification[] = []
   const cancelled: string[] = []
-  const phone = { sent, cancelled, down: null as string | null }
+  const phone: FakePhone = { sent, cancelled, down: null }
 
   const notifier: Notifier = {
     async send(notification) {
@@ -68,8 +75,7 @@ function setup(options: { keys?: boolean } = {}) {
 
   cleanups.push(() => app.close())
 
-  const post = (url: string, payload: object = {}) =>
-    app.inject({ method: 'POST', url, headers: jsonBody, payload })
+  const post = (url: string) => app.inject({ method: 'POST', url, headers: jsonBody, payload: {} })
 
   return { app, catalog, alerts, phone, post }
 }
@@ -289,7 +295,7 @@ describe('a capture run feeds the alerts', () => {
     vi.spyOn(statistics, 'measureStars').mockImplementation(async () => ({
       detectedStars: remaining.shift() ?? 0,
       medianHfrPixels: 3,
-    }) as Awaited<ReturnType<typeof statistics.measureStars>>)
+    }))
   }
 
   it('raises one emergency when the stars vanish, and clears it when the run is stopped', async () => {

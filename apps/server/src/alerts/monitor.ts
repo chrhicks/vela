@@ -146,7 +146,7 @@ export function createAlertMonitor({
   function reconcile(conditions: AlertCondition[], at: number) {
     const current = new Map(conditions.map(condition => [condition.id, condition]))
 
-    for (const episode of [...episodes.values()]) {
+    for (const episode of episodes.values()) {
       const condition = current.get(episode.id)
 
       if (condition) episode.message = condition.message
