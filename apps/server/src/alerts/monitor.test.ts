@@ -19,6 +19,8 @@ type PhoneEvent =
 
 interface FakePhone {
   events: PhoneEvent[]
+  /** When each send was tried, whether or not the phone took it. */
+  sendAttempts: number[]
   /** While set, every call fails with this reason. */
   down: string | null
   /** While set, a cancel waits for it before it answers. */
@@ -36,6 +38,7 @@ function fakePhone(clock: () => number) {
 
   const phone: FakePhone = {
     events,
+    sendAttempts: [],
     down: null,
     cancelGate: null,
     sendGate: null,
@@ -46,6 +49,7 @@ function fakePhone(clock: () => number) {
 
   const notifier: Notifier = {
     async send({ priority, title, message }) {
+      phone.sendAttempts.push(clock())
       await phone.sendGate
 
       if (phone.down) throw new NotifierError(phone.down)
@@ -380,6 +384,91 @@ describe('phone delivery', () => {
     const failures = exporter.getFinishedSpans().filter(span => span.name === 'alert.delivery' && span.attributes['alert.delivery.status'] === 'failed')
     expect(failures).toHaveLength(1)
     expect(failures[0]!.attributes['alert.delivery.reason']).toBe('Pushover answered HTTP 500')
+  })
+
+  /** Moves the clock and the timers on together, a minute at a time, so a retry sees the time it fires at. */
+  async function passMinutes(fixture: ReturnType<typeof watched>, minutes: number) {
+    for (let minute = 0; minute < minutes; minute++) {
+      fixture.tick(60_000)
+      await vi.advanceTimersByTimeAsync(60_000)
+    }
+  }
+
+  it('backs off between attempts to an alert the phone will not take, up to a five minute pause', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+
+    const fixture = watched()
+    fixture.phone.down = 'Pushover answered HTTP 503'
+
+    await snagged(fixture)
+
+    const first = fixture.phone.sendAttempts[0]!
+
+    await passMinutes(fixture, 20)
+
+    const minutesAfterFirst = fixture.phone.sendAttempts.map(at => (at - first) / 60_000)
+
+    expect(minutesAfterFirst).toEqual([0, 1, 3, 7, 12, 17])
+  })
+
+  it('shows when the next attempt is due and when Vela will stop trying', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+
+    const fixture = watched()
+    fixture.phone.down = 'Pushover answered HTTP 503'
+
+    await snagged(fixture)
+
+    const [alert] = fixture.monitor.view().alerts
+
+    expect(alert!.delivery).toEqual({
+      state: 'retrying',
+      failures: 1,
+      nextAttemptAt: fixture.phone.sendAttempts[0]! + 60_000,
+      giveUpAt: alert!.raisedAt + 3_600_000,
+    })
+
+    await passMinutes(fixture, 1)
+    expect(fixture.monitor.view().alerts[0]!.delivery).toMatchObject({ state: 'retrying', failures: 2 })
+
+    fixture.phone.down = null
+    await passMinutes(fixture, 2)
+    expect(fixture.monitor.view().alerts[0]!.delivery).toEqual({ state: 'sent' })
+  })
+
+  it('stops retrying an emergency after the hour Pushover would have repeated it, and says so', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+
+    const fixture = watched()
+    fixture.phone.down = 'Pushover answered HTTP 503'
+
+    await snagged(fixture)
+    await passMinutes(fixture, 70)
+
+    const attempts = fixture.phone.sendAttempts.length
+    const raisedAt = fixture.monitor.view().alerts[0]!.raisedAt
+
+    expect(fixture.phone.sendAttempts.every(at => at < raisedAt + 3_600_000)).toBe(true)
+    expect(fixture.monitor.view().alerts[0]!.delivery).toEqual({ state: 'gave-up', failures: attempts })
+
+    fixture.phone.down = null
+    await passMinutes(fixture, 30)
+
+    expect(fixture.phone.sendAttempts).toHaveLength(attempts)
+    expect(fixture.phone.events).toEqual([])
+    expect(fixture.monitor.view().alerts.map(alert => alert.id)).toEqual(['hfr-bad'])
+  })
+
+  it('reports delivery as sent for an alert the phone took and as not configured without keys', async () => {
+    const delivered = watched()
+
+    await snagged(delivered)
+    expect(delivered.monitor.view().alerts[0]!.delivery).toEqual({ state: 'sent' })
+
+    const keyless = watched({ connected: false })
+
+    await snagged(keyless)
+    expect(keyless.monitor.view().alerts[0]!.delivery).toEqual({ state: 'not-configured' })
   })
 
   it('is not acknowledged while the phone could not be told to stop, so it can be tried again', async () => {
