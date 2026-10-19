@@ -53,16 +53,18 @@ export function linkAttemptToFrame(record: FrameRecord, images: readonly SavedIm
 }
 
 /**
- * An attempt or a journal request belongs to the Cria operation it names. The operation id is the key; one that
- * has only a request id (Cria never admitted it, or the reply was lost) finds its operation by that.
+ * An attempt or a journal request belongs to the Cria operation it names. The operation id is the key, and the only
+ * one while the record has it: an id this recording does not hold is no match, because the request id would link the
+ * record to an operation that its own exported `operation_id` does not name. Only a record with no operation id
+ * (Cria never admitted it, or the reply was lost) finds its operation by request id.
  */
 export function linkToOperation(
   record: { readonly operationId: string | null; readonly requestId: string | null },
   operations: readonly RecordedOperation[],
 ): Link<RecordedOperation> | null {
-  const byId = operations.filter(operation => operation.id === record.operationId)
+  if (record.operationId !== null) return exactOrAmbiguous(operations.filter(operation => operation.id === record.operationId))
 
-  if (byId.length > 0 || record.requestId === null) return exactOrAmbiguous(byId)
+  if (record.requestId === null) return null
 
   return exactOrAmbiguous(operations.filter(operation => operation.requestId === record.requestId))
 }

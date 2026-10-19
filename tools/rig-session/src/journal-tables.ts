@@ -2,7 +2,6 @@ import { linkToAttempt, linkToOperation, type Link } from './joins.ts'
 import type { JournalEntry, JournalExchange, JournalImageCheck } from './journal.ts'
 import type { FrameRecord } from './inputs.ts'
 import type { RecordedOperation } from './recording.ts'
-import { redactedJson, redactText } from './redact.ts'
 import type { CriaImageCheckRow, CriaRequestRow } from './schema.ts'
 import { z } from 'zod'
 
@@ -74,15 +73,15 @@ export function journalRows(
         at: request.at,
         ms: request.ms,
         method: request.method,
-        route: redactText(request.route),
+        route: request.route,
         status: request.status,
         request_id: request.command?.requestId ?? null,
         device_id: request.command?.deviceId ?? null,
         kind: request.command?.kind ?? null,
-        parameters: request.command ? JSON.stringify(redactedJson(request.command.parameters ?? null)) : null,
+        parameters: request.command ? JSON.stringify(request.command.parameters ?? null) : null,
         reply_kind: request.reply.kind,
         reply_code: request.reply.kind === 'refused' ? request.reply.code : null,
-        reply_message: request.reply.kind === 'answered' ? null : redactText(request.reply.message),
+        reply_message: request.reply.kind === 'answered' ? null : request.reply.message,
         operation_id: operationId,
         ...operationColumns(operation),
         ...attemptColumns(attempt),
