@@ -17,7 +17,7 @@ const tracer = trace.getTracer('vela.alerts')
 /** A cleared alert may not come back this soon; a flapping HFR must not buzz all night. */
 const reRaiseGuardMs = 5 * 60_000
 
-/** How long before an alert that never reached the phone is sent again. */
+/** How long before an alert, or a cancel, that never reached the phone is tried again. */
 const resendAfterFailureMs = 60_000
 
 const mountPollMs = 10_000
@@ -87,13 +87,12 @@ export interface AlertMonitorOptions {
 
 /** One raised alert, from the evaluation that raised it until the one that clears it. */
 interface Episode extends ActiveAlert {
-  /** Unsent is retried after a failure. Skipped was covered by a stronger alert. */
+  /** Unsent is retried on its own timer until it gets through. Skipped was covered by a stronger alert. */
   delivery: 'unsent' | 'sending' | 'sent' | 'skipped'
   /** The open emergency receipt, until it is cancelled. */
   receipt: string | null
   /** When the phone accepted the message. An emergency's hour starts here. */
   sentAt: number | null
-  lastSendAttemptAt: number | null
   /** Keeps this episode's phone calls in order: raise, then acknowledge, then clear. */
   phoneCalls: Promise<unknown>
 }
@@ -137,6 +136,8 @@ export function createAlertMonitor({
   const clearedAt = new Map<AlertId, number>()
   const strayReceipts: StrayReceipt[] = []
   let strayTimer: ReturnType<typeof setTimeout> | undefined
+  let resendTimer: ReturnType<typeof setTimeout> | undefined
+  let closed = false
 
   function evaluate() {
     const at = now()
@@ -173,8 +174,6 @@ export function createAlertMonitor({
     for (const episode of episodes.values()) {
       if (episode.delivery === 'skipped' && !isCovered(episode.id)) sendRaised(episode)
     }
-
-    resendUnsent(at)
   }
 
   function raise(condition: AlertCondition, at: number): Episode[] {
@@ -189,7 +188,6 @@ export function createAlertMonitor({
       delivery: 'unsent',
       receipt: null,
       sentAt: null,
-      lastSendAttemptAt: null,
       phoneCalls: Promise.resolve(),
     }
 
@@ -241,13 +239,22 @@ export function createAlertMonitor({
     })
   }
 
-  /** An alert that failed to reach the phone is tried again, paced, until it does or clears. */
-  function resendUnsent(at: number) {
-    for (const episode of episodes.values()) {
-      const waited = at - (episode.lastSendAttemptAt ?? at)
+  /**
+   * An alert that failed to reach the phone is tried again once a minute until it arrives, is
+   * acknowledged or clears. This runs on its own timer: a failed run has no polling left to drive it.
+   */
+  function resendUnsentSoon() {
+    if (closed) return
 
-      if (episode.delivery === 'unsent' && !episode.acknowledged && waited >= resendAfterFailureMs)
-        sendRaised(episode)
+    resendTimer ??= setTimeout(resendUnsent, resendAfterFailureMs)
+    resendTimer.unref()
+  }
+
+  function resendUnsent() {
+    resendTimer = undefined
+
+    for (const episode of episodes.values()) {
+      if (episode.delivery === 'unsent' && !episode.acknowledged) sendRaised(episode)
     }
   }
 
@@ -255,7 +262,6 @@ export function createAlertMonitor({
     if (!notifier) return
 
     episode.delivery = 'sending'
-    episode.lastSendAttemptAt = now()
 
     const notification: Notification = {
       title: title(),
@@ -273,6 +279,8 @@ export function createAlertMonitor({
       if (sent.ok) {
         episode.receipt = sent.value.receipt
         episode.sentAt = now()
+      } else {
+        resendUnsentSoon()
       }
     })
   }
@@ -310,6 +318,8 @@ export function createAlertMonitor({
   }
 
   function retryStraysSoon() {
+    if (closed) return
+
     strayTimer ??= setTimeout(retryStrayReceipts, resendAfterFailureMs)
     strayTimer.unref()
   }
@@ -530,11 +540,14 @@ export function createAlertMonitor({
       return sent.ok ? { outcome: 'delivered' } : { outcome: 'failed', reason: sent.reason }
     },
 
-    /** Stops the mount poll. Nothing is evaluated or sent. */
+    /** Stops the mount poll and every retry. Nothing is evaluated or sent. */
     close() {
+      closed = true
       stopPolling()
       clearTimeout(strayTimer)
+      clearTimeout(resendTimer)
       strayTimer = undefined
+      resendTimer = undefined
       runToken++
     },
   }

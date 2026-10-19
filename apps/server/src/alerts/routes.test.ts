@@ -28,6 +28,7 @@ const cleanups: Array<() => Promise<void>> = []
 
 afterEach(async () => {
   vi.restoreAllMocks()
+  vi.useRealTimers()
   await Promise.all(cleanups.splice(0).map(cleanup => cleanup()))
 })
 
@@ -191,6 +192,29 @@ describe('alerts routes', () => {
 
       const view = await app.inject({ method: 'GET', url: '/api/web/rigs/sim/alerts' })
       expect(view.json().alerts[0]).toMatchObject({ id: 'run-failed', acknowledged: false })
+    })
+
+    it('sends the emergency once the phone is back, though the run has ended and nothing else is polling', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+
+      const { app, alerts, phone } = setup()
+      const monitor = alerts.monitorFor({ id: 'sim', name: 'Simulator' })
+      phone.down = 'Pushover answered HTTP 503'
+
+      monitor.runStarted(60)
+      monitor.runEnded('failed')
+      await vi.advanceTimersByTimeAsync(0)
+
+      const failing = await app.inject({ method: 'GET', url: '/api/web/rigs/sim/alerts' })
+      expect(failing.json()).toMatchObject({ watching: false, phone: { state: 'failing' } })
+      expect(phone.sent).toEqual([])
+
+      phone.down = null
+      await vi.advanceTimersByTimeAsync(65_000)
+
+      const recovered = await app.inject({ method: 'GET', url: '/api/web/rigs/sim/alerts' })
+      expect(recovered.json().phone).toEqual({ state: 'ready' })
+      expect(phone.sent).toEqual([{ title: 'Vela: Simulator', message: 'The capture run failed', priority: 2 }])
     })
 
     it('answers 404 for an alert that is not raised', async () => {

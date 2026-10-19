@@ -23,6 +23,8 @@ interface FakePhone {
   down: string | null
   /** While set, a cancel waits for it before it answers. */
   cancelGate: Promise<void> | null
+  /** While set, a send waits for it before it answers. */
+  sendGate: Promise<void> | null
   sends(): Array<Extract<PhoneEvent, { kind: 'send' }>>
   cancels(): Array<Extract<PhoneEvent, { kind: 'cancel' }>>
   emergencies(): Array<Extract<PhoneEvent, { kind: 'send' }>>
@@ -36,6 +38,7 @@ function fakePhone(clock: () => number) {
     events,
     down: null,
     cancelGate: null,
+    sendGate: null,
     sends: () => events.filter(event => event.kind === 'send'),
     cancels: () => events.filter(event => event.kind === 'cancel'),
     emergencies: () => phone.sends().filter(event => event.priority === 2),
@@ -43,6 +46,8 @@ function fakePhone(clock: () => number) {
 
   const notifier: Notifier = {
     async send({ priority, title, message }) {
+      await phone.sendGate
+
       if (phone.down) throw new NotifierError(phone.down)
 
       events.push({ kind: 'send', priority, title, message, at: clock() })
@@ -62,7 +67,7 @@ function fakePhone(clock: () => number) {
 }
 
 /** Lets the monitor's queued phone calls finish. */
-const settle = () => new Promise(resolve => setTimeout(resolve, 0))
+const settle = () => (vi.isFakeTimers() ? vi.advanceTimersByTimeAsync(0) : new Promise(resolve => setTimeout(resolve, 0)))
 
 function rig(options: { readMount?: (signal: AbortSignal) => Promise<MountReading | null>; connected?: boolean } = {}) {
   let clock = Date.parse('2026-10-18T02:00:00Z')
@@ -94,6 +99,8 @@ const monitors: AlertMonitor[] = []
 
 afterEach(() => {
   for (const monitor of monitors.splice(0)) monitor.close()
+
+  vi.useRealTimers()
 
   exporter.reset()
 })
@@ -346,6 +353,8 @@ describe('phone delivery', () => {
   }
 
   it('says phone alerts are failing with the reason, keeps the alert up, and sends it once Pushover answers', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+
     const fixture = watched()
     fixture.phone.down = 'Pushover answered HTTP 500'
 
@@ -357,15 +366,13 @@ describe('phone delivery', () => {
 
     fixture.phone.down = null
     fixture.tick(30_000)
-    fixture.monitor.frameCaptured({ capturedAt: '', statistics: { detectedStars: 1200, medianHfrPixels: 7 } })
-    await settle()
+    await vi.advanceTimersByTimeAsync(30_000)
 
     // Not yet: a minute has not passed since the last attempt.
     expect(fixture.phone.events).toEqual([])
 
     fixture.tick(31_000)
-    fixture.monitor.frameCaptured({ capturedAt: '', statistics: { detectedStars: 1200, medianHfrPixels: 7 } })
-    await settle()
+    await vi.advanceTimersByTimeAsync(31_000)
 
     expect(fixture.phone.emergencies()).toHaveLength(1)
     expect(fixture.monitor.view().phone).toEqual({ state: 'ready' })
@@ -391,6 +398,8 @@ describe('phone delivery', () => {
   })
 
   it('counts an emergency\'s hour from when Pushover took it, not from when the alert began', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+
     const fixture = watched()
     fixture.phone.down = 'could not reach Pushover'
 
@@ -398,8 +407,7 @@ describe('phone delivery', () => {
 
     fixture.phone.down = null
     fixture.tick(61 * 60_000)
-    fixture.monitor.frameCaptured({ capturedAt: '', statistics: { detectedStars: 1200, medianHfrPixels: 7 } })
-    await settle()
+    await vi.advanceTimersByTimeAsync(60_000)
     expect(fixture.phone.emergencies()).toHaveLength(1)
 
     expect(await fixture.monitor.acknowledge('hfr-bad')).toEqual({ outcome: 'acknowledged' })
@@ -570,6 +578,89 @@ describe('while the run is polled', () => {
 
     expect(phone.cancels()).toHaveLength(1)
     expect(monitor.view().phone).toEqual({ state: 'ready' })
+  })
+
+  describe('after the run has ended', () => {
+    async function failedDuringOutage() {
+      const { monitor, phone } = polled(async () => tracking())
+
+      monitor.runStarted(60)
+      await vi.advanceTimersByTimeAsync(0)
+
+      phone.down = 'Pushover answered HTTP 503'
+      monitor.runEnded('failed')
+      await vi.advanceTimersByTimeAsync(0)
+
+      expect(monitor.view()).toMatchObject({ watching: false, phone: { state: 'failing' } })
+      expect(monitor.view().alerts).toEqual([expect.objectContaining({ id: 'run-failed', level: 'critical' })])
+
+      return { monitor, phone }
+    }
+
+    it('keeps retrying an emergency the phone refused, with no run left to drive it, until it gets through', async () => {
+      const { monitor, phone } = await failedDuringOutage()
+
+      await vi.advanceTimersByTimeAsync(3 * 60_000)
+      expect(phone.emergencies()).toHaveLength(0)
+
+      phone.down = null
+      await vi.advanceTimersByTimeAsync(65_000)
+
+      expect(phone.emergencies()).toHaveLength(1)
+      expect(monitor.view().phone).toEqual({ state: 'ready' })
+
+      await vi.advanceTimersByTimeAsync(10 * 60_000)
+      expect(phone.emergencies()).toHaveLength(1)
+    })
+
+    it('stops retrying once acknowledged', async () => {
+      const { monitor, phone } = await failedDuringOutage()
+
+      expect(await monitor.acknowledge('run-failed')).toEqual({ outcome: 'acknowledged' })
+
+      phone.down = null
+      await vi.advanceTimersByTimeAsync(5 * 60_000)
+      expect(phone.events).toEqual([])
+    })
+
+    it('does not retry an alert the next run has already cleared', async () => {
+      const { monitor, phone } = await failedDuringOutage()
+
+      monitor.runStarted(60)
+      phone.down = null
+      await vi.advanceTimersByTimeAsync(2 * 60_000)
+
+      expect(monitor.view().alerts).toEqual([])
+      expect(phone.sends()).toEqual([])
+    })
+
+    it('does not start a retry from a send that was still in flight when the monitor closed', async () => {
+      const { monitor, phone } = polled(async () => tracking())
+      let release!: () => void
+      phone.down = 'Pushover answered HTTP 503'
+      phone.sendGate = new Promise<void>(resolve => (release = resolve))
+
+      monitor.runStarted(60)
+      monitor.runEnded('failed')
+      await vi.advanceTimersByTimeAsync(0)
+
+      monitor.close()
+      release()
+      await vi.advanceTimersByTimeAsync(0)
+
+      expect(vi.getTimerCount()).toBe(0)
+    })
+
+    it('stops its retries when the monitor closes', async () => {
+      const { monitor, phone } = await failedDuringOutage()
+
+      monitor.close()
+      phone.down = null
+      await vi.advanceTimersByTimeAsync(5 * 60_000)
+
+      expect(phone.events).toEqual([])
+      expect(vi.getTimerCount()).toBe(0)
+    })
   })
 
   it('says the meridian watch is unavailable instead of looking safe when the mount does not give its pier side', async () => {

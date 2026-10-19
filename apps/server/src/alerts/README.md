@@ -24,11 +24,17 @@ until it is acknowledged, because Pushover does that, not Vela.
   (`stars-low`/`stars-declining` by `stars-collapsed`, `hfr-high` by `hfr-bad`, `meridian-near` by
   `meridian-imminent`) is hidden from the banner and not sent to the phone while the stronger stands.
 - An alert that failed to reach the phone is tried again once a minute, until it arrives, is
-  acknowledged or clears. The alerts view says "phone alerts failing" with the reason meanwhile.
-  A "cleared" message is only sent for an alert the phone was told about.
+  acknowledged or clears. That retry has its own timer, so it carries on after the run has ended:
+  a `run-failed` emergency refused during a phone outage still goes out when the phone is back.
+  The alerts view says "phone alerts failing" with the reason meanwhile. A "cleared" message is
+  only sent for an alert the phone was told about, and is sent once: it is a courtesy, and a
+  failure shows in the view without being retried.
 - If an alert clears but Pushover will not take the cancel, the emergency keeps repeating with
   nothing left in the banner. The monitor keeps retrying the cancel once a minute (until the hour
   is up) and the alerts view says phone alerts are failing until it succeeds.
+- Alerts, receipts and retries live in the server's memory. After a restart nothing is retried
+  and the monitor has no receipt to cancel, so an emergency Pushover already holds repeats until
+  its hour is up. Chris can stop it in the Pushover app.
 - When the run ends, everything clears. `run-failed` is raised for a run that failed (not for Stop)
   and clears when the next run starts.
 
