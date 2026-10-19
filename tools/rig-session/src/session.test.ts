@@ -290,3 +290,22 @@ test('no cell of the package holds the site or a serial path that the recording 
   expect(cells).toContain('connect')
   session.close()
 })
+
+test('an attempt message that names the site or a serial port is redacted in the package', async () => {
+  const night = await syntheticNight()
+  const root = join(night.dir, 'out')
+
+  const message = 'adapter failed: open /dev/serial/by-id/usb-Test_0001 and set LAT=12.5 LONG=345.25'
+  const records = (await readFile(night.frameRecordsFile, 'utf8')).trim().split('\n')
+  const failed = { ...JSON.parse(records[0] ?? ''), outcome: 'failed', message, image: null, statistics: null }
+
+  await writeFile(night.frameRecordsFile, `${[JSON.stringify(failed), ...records.slice(1)].join('\n')}\n`)
+  await build(night, root)
+
+  const session = await openPackage(join(root, 'package'))
+
+  expect(await session.rows("SELECT message FROM attempts WHERE outcome = 'failed'")).toEqual([
+    { message: 'adapter failed: open [redacted] and set LAT=[redacted] LONG=[redacted]' },
+  ])
+  session.close()
+})
