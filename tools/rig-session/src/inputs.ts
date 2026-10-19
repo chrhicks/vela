@@ -265,16 +265,20 @@ const mountLine = z.object({
   track_mode: z.string(),
 })
 
+/** Where a mount reading came from. A field the source never reported is null. */
 export interface MountSample {
+  readonly source: 'csv' | 'indi'
   readonly sampledAt: Date
+  /** An `indi` sample holds until the next change, or until this time when the recording lost the mount. Null: no end known. */
+  readonly validUntil: Date | null
   readonly raHours: number
   readonly decDegrees: number
-  readonly lstHours: number
-  readonly tracking: boolean
-  readonly slewing: boolean
-  readonly parked: boolean
-  readonly pierSide: 'east' | 'west'
-  readonly trackMode: string
+  readonly lstHours: number | null
+  readonly tracking: boolean | null
+  readonly slewing: boolean | null
+  readonly parked: boolean | null
+  readonly pierSide: 'east' | 'west' | null
+  readonly trackMode: string | null
 }
 
 /** Reads the observer's mount-watch CSV. Its fields are never quoted, so a comma always separates. */
@@ -309,7 +313,9 @@ export async function readMountCsv(path: string): Promise<ReadResult<MountSample
     seen.add(time)
 
     items.push({
+      source: 'csv',
       sampledAt: row.utc,
+      validUntil: null,
       raHours: row.ra_h,
       decDegrees: row.dec_deg,
       lstHours: row.lst_h,

@@ -36,10 +36,10 @@ const entities = new Map([
 
 const decode = (text: string) => text.replaceAll(/&(amp|lt|gt|quot|apos);/g, (_, name: string) => entities.get(name) ?? '')
 
-const attributesOf = (text: string) => Object.fromEntries([...text.matchAll(/([\w.:-]+)="([^"]*)"/g)].map(([, name = '', value = '']) => [name, decode(value)]))
+export const attributesOf = (text: string) => Object.fromEntries([...text.matchAll(/([\w.:-]+)="([^"]*)"/g)].map(([, name = '', value = '']) => [name, decode(value)]))
 
 /** The elements of one INDI vector: `<oneNumber name="RA">1.5</oneNumber>` and the like. */
-function elementsOf(xml: string) {
+export function elementsOf(xml: string) {
   const elements: Record<string, string> = {}
 
   for (const [, tag = '', attributes = '', body = ''] of xml.matchAll(/<((?:one|def)(?:Number|Text|Switch|Light|BLOB))\b([^>]*?)(?:\/>|>([\s\S]*?)<\/\1>)/g)) {

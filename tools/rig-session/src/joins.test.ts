@@ -41,7 +41,9 @@ function frameSpan(spanId: string, start: string, end: string, outcome = 'saved'
 
 function sample(time: string): MountSample {
   return {
+    source: 'csv',
     sampledAt: at(time),
+    validUntil: null,
     raHours: 6.5,
     decDegrees: 10.25,
     lstHours: 7,
