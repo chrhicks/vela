@@ -19,6 +19,36 @@ pnpm --filter @vela/rig-session rig-session query ~/.local/share/rig-sessions/20
 
 The inputs are read-only. Every input is optional; `session.json` in the package lists the ones it found and, for each missing one, what that costs.
 
+## Out of the box and your own data
+
+**This repository holds no recordings and no packages, and everything here passes without them.** `pnpm test` and `pnpm scenarios` use synthetic tapes made by `synthesizeTape` (made-up site, camera and mount). They need `CRIA_CHECKOUT`, a clean Cria checkout at the pin in `src/replay/cria-checkout.ts` (see [Running Cria at a pinned commit](#running-cria-at-a-pinned-commit)). That is what CI covers; nothing in it comes from a real night.
+
+**Your own set.** To verify against a real rig, record your own:
+
+1. Turn on Cria's `record` config on the rig (the setting is in Cria's docs) and do a session.
+2. Copy the recording to a folder outside every repository, for example `~/recordings/<name>`.
+3. Build the package into `~/.local/share/rig-sessions/<name>` (the `build` command above).
+4. Replay it with `pnpm replay ~/recordings/<name>`, and check the set with the command below.
+
+**Privacy contract.** A recording and a package hold the site: coordinates, serial ports and hosts, and `mount.lst_hours` next to a UTC time gives the longitude. They are private. Never commit them, and never paste them, or a query result from them, into an issue or a pull request. The packager sanitises free text and fails the build closed when it sees a value it learned from the recording, but that does not make a package safe to publish; what it cannot recognise is listed in [Known limits](INPUTS.md#known-limits). The [scrub guard](#scrub-guard) protects committed fixtures only. The tools say so themselves: `build` and `accept` refuse an output folder inside a git working tree unless git ignores it (`--allow-in-repo` overrides).
+
+### Check your own set
+
+```sh
+pnpm --filter @vela/rig-session accept \
+  --recording ~/recordings/<name> --frame-records <frames.jsonl> --journal <cria-journal.jsonl> \
+  --traces <observing.jsonl> --saved-images <saved-images dir> [--mount-csv <file>] \
+  --from 2030-01-01T18:00:00Z --to 2030-01-02T12:00:00Z
+```
+
+It takes the inputs of `build` (all optional), builds a package twice into a throwaway folder (`--scratch`, default the temporary directory) and prints the row count of every table, the link counts per link (`exact`, `inferred`, `ambiguous`, none) and the inputs that were missing with what that costs. It exits 1, with the reason, if
+
+- the second build is not byte-identical to the first (`session.json` apart from its build time);
+- the privacy scan of every table and `session.json`, against the values the packager learned from your inputs, finds one. The message names the table, column and rule, never the value;
+- an input changed while it ran (hashed before and after: the files the packager reads, not `blobs/` or the images). An input that only grew, like Vela's live journal, is a warning.
+
+The output is counts and names only, never a cell of your data. Exit 0 means all three held.
+
 ## Package layout
 
 `<out>/package` is a symlink to `<out>/builds/<time>`, which holds `frames.parquet`, `attempts.parquet`, `indi_ops.parquet`, `indi_events.parquet`, `indi_images.parquet`, `cria_requests.parquet`, `cria_image_checks.parquet`, `cria_state_changes.parquet`, `cria_stream.parquet`, `mount.parquet`, `spans.parquet` and `session.json`. A build writes into a fresh directory and switches the symlink with one rename, so a build that fails leaves the previous package readable. The next finished build removes the older directories.

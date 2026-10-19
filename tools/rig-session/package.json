@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "rig-session": "tsx src/cli.ts",
+    "accept": "tsx src/cli.ts accept",
     "test:types": "tsc -p tsconfig.json",
     "replay": "tsx src/replay-cli.ts",
     "scrub": "tsx src/scrub-cli.ts"

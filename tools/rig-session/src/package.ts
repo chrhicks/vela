@@ -80,7 +80,7 @@ async function writeParquet(directory: string, tables: TableRows, secrets: Secre
 }
 
 /** Reads the staged Parquet files and `session.json` back and lists where a string cell still leaks. */
-async function findLeaks(directory: string, secrets: Secrets): Promise<string[]> {
+export async function findLeaks(directory: string, secrets: Secrets): Promise<string[]> {
   const instance = await DuckDBInstance.create(':memory:')
   const connection = await instance.connect()
   const findings: string[] = []
