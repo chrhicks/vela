@@ -141,6 +141,7 @@ test('a frame at the start of the window exports the mount sample and span it li
 
 test('a frame at the start of the window with an ambiguous span link exports every candidate span', () => {
   const early = (spanId: string, index: number) => ({ ...span(spanId, '00:00:00', '00:01:00', index), startedAt: new Date('2029-12-31T23:59:30Z') })
+
   const tables = buildTables('test-night', window, {
     savedImages: [image('contested', '00:00:10')],
     spans: [early('first', 1), early('second', 2)],
