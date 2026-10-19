@@ -81,6 +81,7 @@ test('a frame row carries its span and mount links, a frame without either carri
     spans: [span('span-7', '00:10:00', '00:11:00', 7), span('after-window', '03:00:00', '03:01:00', 8)],
     frameRecords: [],
     recording: null,
+    journal: [],
     mountSamples: [sample('00:10:20', true), sample('02:00:00', true)],
   })
 
@@ -140,6 +141,7 @@ test('an ambiguous span link names no span and lists its candidates', () => {
     spans: [span('first', '00:10:00', '00:11:00', 1), span('second', '00:10:20', '00:11:20', 2)],
     frameRecords: [],
     recording: null,
+    journal: [],
     mountSamples: [],
   })
 
@@ -168,6 +170,7 @@ test('a frame at the start of the window exports the mount sample and span it li
     ],
     frameRecords: [],
     recording: null,
+    journal: [],
     mountSamples: [
       { ...sample('00:00:00', true), sampledAt: new Date('2029-12-31T23:59:58Z') },
       { ...sample('00:00:00', true), sampledAt: new Date('2029-12-31T23:59:50Z') },
@@ -187,6 +190,7 @@ test('a frame at the start of the window with an ambiguous span link exports eve
     spans: [early('first', 1), early('second', 2)],
     frameRecords: [],
     recording: null,
+    journal: [],
     mountSamples: [],
   })
 
@@ -200,6 +204,7 @@ test('a frame links exactly to the attempt that saved its image, and a lost atte
     spans: [],
     frameRecords: [record(1, 'frame-1'), { ...record(2, null, 'lost'), startedAt: at('00:15:00') }, { ...record(3, 'frame-2'), startedAt: at('00:20:00') }],
     recording: null,
+    journal: [],
     mountSamples: [],
   })
 
@@ -220,6 +225,7 @@ test('a saved image with no record and a record whose image was not saved link t
     spans: [],
     frameRecords: [record(1, 'never-saved', 'unsaved')],
     recording: null,
+    journal: [],
     mountSamples: [],
   })
 
@@ -233,6 +239,7 @@ test('two records for one image are ambiguous: the frame names neither and lists
     spans: [],
     frameRecords: [record(1, 'frame-1'), record(2, 'frame-1')],
     recording: null,
+    journal: [],
     mountSamples: [],
   })
 
@@ -246,6 +253,7 @@ test('an attempt that started before the window is exported when an exported fra
     spans: [],
     frameRecords: [{ ...record(1, 'frame-1'), startedAt: new Date('2029-12-31T23:59:30Z') }, { ...record(2, null, 'failed'), startedAt: new Date('2029-12-31T23:00:00Z') }],
     recording: null,
+    journal: [],
     mountSamples: [],
   })
 
@@ -289,6 +297,7 @@ test('a frame and its attempt link exactly to the operation they name, and an at
     savedImages: [image('frame-1', '00:10:30')],
     spans: [],
     frameRecords: [record(1, 'frame-1'), { ...record(2, null, 'failed'), operationId: null, requestId: 'request-2' }, { ...record(3, null, 'lost'), operationId: 'operation-elsewhere' }],
+    journal: [],
     recording: recordingOf(operation('operation-1', 'request-1', '00:10:01'), operation('operation-2', 'request-2', '00:10:02')),
     mountSamples: [],
   })
@@ -306,6 +315,7 @@ test('two operations with one request id leave the request-only attempt ambiguou
     savedImages: [],
     spans: [],
     frameRecords: [{ ...record(1, null, 'failed'), operationId: null, requestId: 'shared' }],
+    journal: [],
     recording: recordingOf(operation('operation-a', 'shared', '00:10:01'), operation('operation-b', 'shared', '00:10:02')),
     mountSamples: [],
   })
@@ -318,6 +328,7 @@ test('an operation before the window is exported when an exported attempt links 
     savedImages: [image('frame-1', '00:00:30')],
     spans: [],
     frameRecords: [{ ...record(1, 'frame-1'), startedAt: at('00:00:01') }],
+    journal: [],
     recording: recordingOf(operation('operation-1', 'request-1', '23:59:59'), operation('operation-unrelated', 'request-9', '23:00:00')),
     mountSamples: [],
   })
@@ -332,6 +343,7 @@ test('an operation id that the recording does not hold is no match, even when th
     frameRecords: [{ ...record(1, 'frame-1'), operationId: 'different-operation', requestId: 'request-1' }],
     recording: recordingOf(operation('operation-found', 'request-1', '00:10:01')),
     mountSamples: [],
+    journal: [],
   })
 
   expect(tables.attempts[0]).toMatchObject({ operation_id: 'different-operation', operation_link: null, operation_candidates: null })
@@ -346,6 +358,7 @@ test('a request-only match is exact, and joins on the request id it used', () =>
     frameRecords: [{ ...record(1, null, 'failed'), operationId: null, requestId: 'request-1' }],
     recording: recordingOf(operation('operation-found', 'request-1', '00:10:01')),
     mountSamples: [],
+    journal: [],
   })
 
   expect(tables.attempts[0]).toMatchObject({ operation_id: null, request_id: 'request-1', operation_link: 'exact' })

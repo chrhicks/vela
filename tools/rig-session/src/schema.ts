@@ -126,6 +126,7 @@ export const tables = {
     parameters: required('json'),
     image_id: optional('text'),
     image_bytes: optional('int'),
+    image_sha256: optional('text'),
   },
   indi_events: {
     session: required('text'),
@@ -159,6 +160,44 @@ export const tables = {
     operation_candidates: optional('json'),
     image_id: optional('text'),
     image_bytes: optional('int'),
+  },
+  cria_requests: {
+    session: required('text'),
+    at: required('timestamp'),
+    ms: required('real'),
+    method: required('text'),
+    route: required('text'),
+    status: optional('int'),
+    request_id: optional('text'),
+    device_id: optional('text'),
+    kind: optional('text'),
+    parameters: optional('json'),
+    reply_kind: required('text'),
+    reply_code: optional('text'),
+    reply_message: optional('text'),
+    operation_id: optional('text'),
+    operation_link: optional('link'),
+    operation_candidates: optional('json'),
+    run_id: optional('text'),
+    attempt: optional('int'),
+    attempt_link: optional('link'),
+    attempt_candidates: optional('json'),
+  },
+  cria_image_checks: {
+    session: required('text'),
+    at: required('timestamp'),
+    image_id: required('text'),
+    operation_id: required('text'),
+    bytes: required('int'),
+    sha256: required('text'),
+    verdict: required('text'),
+    sha_matches_operation: optional('bool'),
+    operation_link: optional('link'),
+    operation_candidates: optional('json'),
+    run_id: optional('text'),
+    attempt: optional('int'),
+    attempt_link: optional('link'),
+    attempt_candidates: optional('json'),
   },
   mount: {
     session: required('text'),
@@ -203,6 +242,10 @@ export type IndiEventRow = RowOf<typeof tables.indi_events>
 
 export type IndiImageRow = RowOf<typeof tables.indi_images>
 
+export type CriaRequestRow = RowOf<typeof tables.cria_requests>
+
+export type CriaImageCheckRow = RowOf<typeof tables.cria_image_checks>
+
 export type MountRow = RowOf<typeof tables.mount>
 
 export type SpanRow = RowOf<typeof tables.spans>
@@ -216,6 +259,8 @@ export interface Tables {
   readonly indi_ops: readonly IndiOpRow[]
   readonly indi_events: readonly IndiEventRow[]
   readonly indi_images: readonly IndiImageRow[]
+  readonly cria_requests: readonly CriaRequestRow[]
+  readonly cria_image_checks: readonly CriaImageCheckRow[]
   readonly mount: readonly MountRow[]
   readonly spans: readonly SpanRow[]
 }
