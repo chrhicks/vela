@@ -62,7 +62,7 @@ function sexagesimalSources(value: number): string[] {
   const magnitude = Math.abs(value)
   const degrees = Math.floor(magnitude)
   const minutes = Math.floor((magnitude - degrees) * 60)
-  const lead = `(?<![\\dT:.])[-+]?\\s?0?${degrees}`
+  const lead = `(?<![\\dT:.])[-+]?0?${degrees}`
   const middle = `0?${minutes}`
 
   return [
