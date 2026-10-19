@@ -1,6 +1,8 @@
 import type { FrameRecord, MountSample, SavedImage, TraceSpan } from './inputs.ts'
-import { linkAttemptToFrame, linkFrameToAttempt, linkFrameToSpan, linkMountAsOf, type Link, type MountLink } from './joins.ts'
-import type { AttemptRow, FrameRow, LinkKind, MountRow, SpanRow, Tables } from './schema.ts'
+import { linkAttemptToFrame, linkAttemptToOperation, linkFrameToAttempt, linkFrameToSpan, linkMountAsOf, type Link, type MountLink } from './joins.ts'
+import { operationsOf, type RecordedOperation, type Recording } from './recording.ts'
+import { redactedJson, redactText } from './redact.ts'
+import type { AttemptRow, FrameRow, IndiOpRow, LinkKind, MountRow, SpanRow, Tables } from './schema.ts'
 
 export interface TimeWindow {
   readonly from: Date
@@ -11,6 +13,7 @@ export interface SessionInputs {
   readonly savedImages: readonly SavedImage[]
   readonly spans: readonly TraceSpan[]
   readonly frameRecords: readonly FrameRecord[]
+  readonly recording: Recording | null
   readonly mountSamples: readonly MountSample[]
 }
 
@@ -26,6 +29,7 @@ export const mountFreshSeconds = 30
  */
 export function buildTables(session: string, window: TimeWindow, inputs: SessionInputs): Tables {
   const inWindow = (time: Date) => window.from <= time && time < window.to
+  const operations = inputs.recording ? operationsOf(inputs.recording) : []
   const savedImages = inputs.savedImages.filter(image => inWindow(image.capturedAt))
 
   const frames = savedImages.map(image => {
@@ -33,8 +37,9 @@ export function buildTables(session: string, window: TimeWindow, inputs: Session
     const mount = linkMountAsOf(image.capturedAt, inputs.mountSamples, mountFreshSeconds)
 
     const attemptLink = linkFrameToAttempt(image, inputs.frameRecords)
+    const attempt = attemptLink?.kind === 'exact' ? attemptLink.target : null
 
-    return { image, spanLink, mount, attemptLink }
+    return { image, spanLink, mount, attemptLink, operationLink: attempt && linkAttemptToOperation(attempt, operations) }
   })
 
   const linkedSpans = new Set(frames.flatMap(({ spanLink }) => linkTargets(spanLink)))
@@ -42,12 +47,17 @@ export function buildTables(session: string, window: TimeWindow, inputs: Session
 
   const linkedAttempts = new Set(frames.flatMap(({ attemptLink }) => linkTargets(attemptLink)))
   const exportedImages = frames.map(({ image }) => image)
+  const exportedAttempts = inputs.frameRecords.filter(record => inWindow(record.startedAt) || linkedAttempts.has(record))
+  const attemptOperations = exportedAttempts.map(record => linkAttemptToOperation(record, operations))
+
+  const linkedOperations = new Set([...frames.map(({ operationLink }) => operationLink), ...attemptOperations].flatMap(link => linkTargets(link)))
 
   return {
-    frames: frames.map(({ image, spanLink, mount, attemptLink }) => frameRow(session, image, spanLink, mount, attemptLink)),
-    attempts: inputs.frameRecords
-      .filter(record => inWindow(record.startedAt) || linkedAttempts.has(record))
-      .map(record => attemptRow(session, record, linkAttemptToFrame(record, exportedImages))),
+    frames: frames.map(({ image, spanLink, mount, attemptLink, operationLink }) => frameRow(session, image, spanLink, mount, attemptLink, operationLink)),
+    attempts: exportedAttempts.map((record, index) => attemptRow(session, record, linkAttemptToFrame(record, exportedImages), attemptOperations[index] ?? null)),
+    indi_ops: operations
+      .filter(operation => inWindow(operation.acceptedAt) || linkedOperations.has(operation))
+      .map(operation => operationRow(session, operation, inputs.recording)),
     mount: inputs.mountSamples
       .filter(sample => inWindow(sample.sampledAt) || linkedMountTimes.has(sample.sampledAt.getTime()))
       .map(sample => mountRow(session, sample)),
@@ -67,6 +77,7 @@ function frameRow(
   spanLink: Link<TraceSpan> | null,
   mount: MountLink | null,
   attemptLink: Link<FrameRecord> | null,
+  operationLink: Link<RecordedOperation> | null,
 ): FrameRow {
   const span = spanLink?.kind === 'ambiguous' ? null : (spanLink?.target ?? null)
   const attempt = attemptLink?.kind === 'ambiguous' ? null : (attemptLink?.target ?? null)
@@ -103,10 +114,12 @@ function frameRow(
     cria_image_id: attempt?.criaImageId ?? null,
     attempt_link: linkKind(attemptLink),
     attempt_candidates: candidates(attemptLink, candidate => `${candidate.runId}/${candidate.attempt}`),
+    operation_link: linkKind(operationLink),
+    operation_candidates: candidates(operationLink, candidate => candidate.id),
   }
 }
 
-function attemptRow(session: string, record: FrameRecord, frameLink: Link<SavedImage> | null): AttemptRow {
+function attemptRow(session: string, record: FrameRecord, frameLink: Link<SavedImage> | null, operationLink: Link<RecordedOperation> | null): AttemptRow {
   const frame = frameLink?.kind === 'ambiguous' ? null : (frameLink?.target ?? null)
 
   return {
@@ -125,8 +138,33 @@ function attemptRow(session: string, record: FrameRecord, frameLink: Link<SavedI
     frame_id: frame?.id ?? null,
     frame_link: linkKind(frameLink),
     frame_candidates: candidates(frameLink, candidate => candidate.directory),
+    operation_link: linkKind(operationLink),
+    operation_candidates: candidates(operationLink, candidate => candidate.id),
     detected_stars: record.detectedStars,
     median_hfr_px: record.medianHfrPixels,
+  }
+}
+
+function operationRow(session: string, operation: RecordedOperation, recording: Recording | null): IndiOpRow {
+  const image = operation.outcome.value?.image ?? null
+
+  return {
+    session,
+    operation_id: operation.id,
+    request_id: operation.requestId,
+    instance_id: operation.instanceId,
+    device_id: operation.deviceId,
+    indi_device: recording?.devices.find(device => device.id === operation.deviceId)?.indiDevice ?? null,
+    kind: operation.kind,
+    accepted_at: operation.acceptedAt,
+    started_at: operation.startedAt ?? null,
+    settled_at: operation.settledAt,
+    outcome: operation.outcome.kind,
+    outcome_reason: operation.outcome.reason ?? null,
+    outcome_message: operation.outcome.message === undefined ? null : redactText(operation.outcome.message),
+    parameters: JSON.stringify(redactedJson(operation.parameters ?? null)),
+    image_id: image?.id ?? null,
+    image_bytes: image?.original?.bytes ?? null,
   }
 }
 

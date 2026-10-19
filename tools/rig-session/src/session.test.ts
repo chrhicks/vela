@@ -5,6 +5,7 @@ import { expect, test } from 'vitest'
 import { publishPackage } from './package.ts'
 import { openPackage } from './query.ts'
 import type { Tables } from './schema.ts'
+import { jsonLines, opLine, writeRecording } from './recording-fixture.ts'
 import { buildSession } from './session.ts'
 
 const window = { from: new Date('2030-01-01T00:00:00Z'), to: new Date('2030-01-01T06:00:00Z') }
@@ -94,7 +95,22 @@ async function syntheticNight() {
       .join('\n')}\n`,
   )
 
-  return { dir, savedImagesDir, tracesFile, mountCsvFile, frameRecordsFile }
+  const recordingDir = await writeRecording(join(dir, 'recording'), jsonLines(
+    ...stars.map((_, index) => opLine({ id: `operation-${index}`, requestId: `request-${index}`, acceptedAt: `2030-01-01T01:0${index + 1}:00Z`, settledAt: `2030-01-01T01:0${index + 1}:55Z` })),
+    opLine({
+      id: 'connect',
+      deviceId: 'mount',
+      kind: 'device-connect',
+      acceptedAt: '2030-01-01T00:59:10Z',
+      settledAt: '2030-01-01T00:59:11Z',
+      parameters: { connected: true },
+      outcome: { kind: 'confirmed', value: { values: { setup: 'sent GEOGRAPHIC_COORD LAT=12.5 LONG=345.25 ELEV=0 on /dev/serial/by-id/usb-Test_0001' }, image: null } },
+    }),
+    opLine({ id: 'refused', kind: 'capture', acceptedAt: '2030-01-01T01:04:00Z', settledAt: '2030-01-01T01:04:01Z', outcome: { kind: 'failed', reason: 'invalid', message: 'needs a mono frame on /dev/ttyUSB0' } }),
+    { k: 'end', t: 1, at: Date.parse('2030-01-01T01:10:00Z') },
+  ))
+
+  return { dir, savedImagesDir, tracesFile, mountCsvFile, frameRecordsFile, recordingDir }
 }
 
 async function build(night: Awaited<ReturnType<typeof syntheticNight>>, root: string) {
@@ -106,6 +122,7 @@ async function build(night: Awaited<ReturnType<typeof syntheticNight>>, root: st
     tracesFile: night.tracesFile,
     mountCsvFile: night.mountCsvFile,
     frameRecordsFile: night.frameRecordsFile,
+    recordingDir: night.recordingDir,
   })
 }
 
@@ -142,12 +159,14 @@ test('session.json lists the inputs it found and the ones it lacks', async () =>
     ['saved-images', 'found'],
     ['traces', 'found'],
     ['mount-csv', 'found'],
-    ['indi-recording', 'missing'],
+    ['indi-recording', 'found'],
     ['frame-records', 'found'],
   ])
-  expect(summary.rows).toEqual({ frames: 3, attempts: 3, mount: 3, spans: 3 })
+  expect(summary.rows).toEqual({ frames: 3, attempts: 3, indi_ops: 5, mount: 3, spans: 3 })
   expect(summary.links.frame_to_span).toEqual({ exact: 0, inferred: 3, ambiguous: 0, none: 0 })
   expect(summary.links.frame_to_attempt).toEqual({ exact: 3, inferred: 0, ambiguous: 0, none: 0 })
+  expect(summary.links.frame_to_operation).toEqual({ exact: 3, inferred: 0, ambiguous: 0, none: 0 })
+  expect(summary.recording).toMatchObject({ name: 'recording', instanceId: 'instance-1', ended: true, tornTail: false, gaps: 0 })
 })
 
 test('rebuilding the same inputs gives the same rows in the same files', async () => {
@@ -173,6 +192,7 @@ test('a build that fails part way leaves the previous package readable, and the 
   const unreadableSpan: Tables = {
     frames: [],
     attempts: [],
+    indi_ops: [],
     mount: [],
     spans: [
       {
@@ -208,7 +228,7 @@ test('a night with no frame records lists them as missing with what that costs, 
   const night = await syntheticNight()
   const root = join(night.dir, 'out')
 
-  await buildSession({ name: 'test-night', window, root, savedImagesDir: night.savedImagesDir, tracesFile: null, mountCsvFile: null, frameRecordsFile: null })
+  await buildSession({ name: 'test-night', window, root, savedImagesDir: night.savedImagesDir, tracesFile: null, mountCsvFile: null, frameRecordsFile: null, recordingDir: null })
 
   const summary = JSON.parse(await readFile(join(root, 'package', 'session.json'), 'utf8'))
   const session = await openPackage(join(root, 'package'))
@@ -237,5 +257,36 @@ test('a query names the Cria operation behind each saved frame', async () => {
     { frame_id: 'frame-1', operation_id: 'operation-1', attempt_link: 'exact' },
     { frame_id: 'frame-2', operation_id: 'operation-2', attempt_link: 'exact' },
   ])
+  session.close()
+})
+
+test('a query lists the operations of the recording around each frame and joins a frame to its operation', async () => {
+  const night = await syntheticNight()
+  const root = join(night.dir, 'out')
+
+  await build(night, root)
+
+  const session = await openPackage(join(root, 'package'))
+
+  expect(await session.rows('SELECT f.frame_id, f.operation_link, o.kind, o.outcome, o.image_id FROM frames f JOIN indi_ops o ON o.operation_id = f.operation_id ORDER BY f.frame_id')).toEqual(
+    [0, 1, 2].map(index => ({ frame_id: `frame-${index}`, operation_link: 'exact', kind: 'capture', outcome: 'confirmed', image_id: `image-operation-${index}` })),
+  )
+  expect(await session.rows("SELECT operation_id, outcome, outcome_reason, outcome_message FROM indi_ops WHERE outcome = 'failed'")).toEqual([
+    { operation_id: 'refused', outcome: 'failed', outcome_reason: 'invalid', outcome_message: 'needs a mono frame on [redacted]' },
+  ])
+  session.close()
+})
+
+test('no cell of the package holds the site or a serial path that the recording carried', async () => {
+  const night = await syntheticNight()
+  const root = join(night.dir, 'out')
+
+  await build(night, root)
+
+  const session = await openPackage(join(root, 'package'))
+  const cells = JSON.stringify(await session.rows('SELECT * FROM indi_ops'))
+
+  expect(cells).not.toMatch(/12\.5|345\.25|serial|ttyUSB|Test_0001/)
+  expect(cells).toContain('connect')
   session.close()
 })
