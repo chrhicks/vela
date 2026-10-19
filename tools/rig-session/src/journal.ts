@@ -29,7 +29,20 @@ const imageCheck = z.object({
   verdict: z.enum(['intact', 'damaged', 'gone', 'failed']),
 })
 
-const entry = z.discriminatedUnion('kind', [exchange, imageCheck])
+const stateChange = z.object({
+  kind: z.literal('state'),
+  at: epochMs,
+  generatedAt: epochMs,
+  sequence: z.int(),
+  instanceId: z.string(),
+  baseline: z.boolean(),
+  changed: z.record(z.string(), z.json()),
+  removed: z.array(z.string()),
+})
+
+const stream = z.object({ kind: z.literal('stream'), at: epochMs, event: z.enum(['opened', 'ended']), message: z.string().nullable() })
+
+const entry = z.discriminatedUnion('kind', [exchange, imageCheck, stateChange, stream])
 
 export type JournalEntry = z.infer<typeof entry>
 
@@ -37,9 +50,13 @@ export type JournalExchange = z.infer<typeof exchange>
 
 export type JournalImageCheck = z.infer<typeof imageCheck>
 
+export type JournalStateChange = z.infer<typeof stateChange>
+
+export type JournalStream = z.infer<typeof stream>
+
 /**
- * Reads Vela's Cria journal (`cria-journal.jsonl`). A line of a kind this packager does not use is
- * passed over, one of a used kind that does not decode is skipped and listed. A torn last line is
+ * Reads Vela's Cria journal (`cria-journal.jsonl`). A line of a kind this packager does not know is
+ * passed over, one of a known kind that does not decode is skipped and listed. A torn last line is
  * one of those. The `origin` field, a host address, is never read.
  */
 export async function readJournal(path: string): Promise<ReadResult<JournalEntry>> {
@@ -52,7 +69,7 @@ export async function readJournal(path: string): Promise<ReadResult<JournalEntry
 
     const kind = jsonText(z.looseObject({ kind: z.string() })).safeParse(line)
 
-    if (kind.success && !['exchange', 'image'].includes(kind.data.kind)) return
+    if (kind.success && !['exchange', 'image', 'state', 'stream'].includes(kind.data.kind)) return
 
     const parsed = jsonText(entry).safeParse(line)
 

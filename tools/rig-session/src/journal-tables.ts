@@ -1,9 +1,9 @@
 import { linkToAttempt, linkToOperation, type Link } from './joins.ts'
-import type { JournalEntry, JournalExchange, JournalImageCheck } from './journal.ts'
+import type { JournalEntry, JournalExchange, JournalImageCheck, JournalStateChange, JournalStream } from './journal.ts'
 import type { FrameRecord } from './inputs.ts'
 import type { RecordedOperation } from './recording.ts'
-import { redactedJson, redactText } from './redact.ts'
-import type { CriaImageCheckRow, CriaRequestRow } from './schema.ts'
+import { redactedJson, redactText, type Json } from './redact.ts'
+import type { CriaImageCheckRow, CriaRequestRow, CriaStateChangeRow, CriaStreamRow } from './schema.ts'
 import { z } from 'zod'
 
 const answeredBody = z.looseObject({ id: z.string().optional() })
@@ -14,9 +14,61 @@ const routedOperation = (route: string) => /^\/v2\/operations\/([^/?]+)/.exec(ro
 export interface JournalRows {
   readonly requests: readonly CriaRequestRow[]
   readonly imageChecks: readonly CriaImageCheckRow[]
+  readonly stateChanges: readonly CriaStateChangeRow[]
+  readonly streamEvents: readonly CriaStreamRow[]
   /** What the exported rows link to, so the tables they link to export them too. */
   readonly linkedAttempts: readonly FrameRecord[]
   readonly linkedOperations: readonly RecordedOperation[]
+}
+
+const operationCell = /^operation\/(.+)$/
+
+/** A cell's value for the table. An operation's outcome value is dropped, as in `indi_ops`: device setup puts the site in it. */
+function cellValue(cell: string, value: Json): Json {
+  const operation = operationCell.test(cell) ? z.record(z.string(), z.json()).safeParse(value) : null
+  const outcome = operation?.success ? z.record(z.string(), z.json()).safeParse(operation.data.outcome) : null
+
+  if (operation?.success && outcome?.success) {
+    const { value: _dropped, ...kept } = outcome.data
+
+    return redactedJson({ ...operation.data, outcome: kept })
+  }
+
+  return redactedJson(value)
+}
+
+/** One row per cell a snapshot changed or removed, with the device or operation its key names. */
+function stateRows(session: string, change: JournalStateChange, operations: readonly RecordedOperation[]) {
+  const cells = [
+    ...Object.entries(change.changed).map(([cell, value]) => ({ cell, value: cellValue(cell, value), removed: false })),
+    ...change.removed.map(cell => ({ cell, value: null, removed: true })),
+  ]
+
+  const linked: RecordedOperation[] = []
+
+  const rows = cells.map(({ cell, value, removed }): CriaStateChangeRow => {
+    const operationId = operationCell.exec(cell)?.[1] ?? null
+    const operation = operationId === null ? null : linkToOperation({ operationId, requestId: null }, operations)
+
+    linked.push(...targets(operation))
+
+    return {
+      session,
+      at: change.at,
+      generated_at: change.generatedAt,
+      sequence: change.sequence,
+      instance_id: change.instanceId,
+      baseline: change.baseline,
+      cell,
+      device_id: /^device\/([^/]+)\//.exec(cell)?.[1] ?? null,
+      operation_id: operationId,
+      ...operationColumns(operation),
+      removed,
+      value: value === null ? null : JSON.stringify(value),
+    }
+  })
+
+  return { rows, linked }
 }
 
 const targets = <Target>(link: Link<Target> | null): readonly Target[] => (link === null ? [] : link.kind === 'ambiguous' ? link.candidates : [link.target])
@@ -47,6 +99,9 @@ export function journalRows(
 ): JournalRows {
   const requests = entries.filter((entry): entry is JournalExchange => entry.kind === 'exchange' && inWindow(entry.at))
   const checks = entries.filter((entry): entry is JournalImageCheck => entry.kind === 'image' && inWindow(entry.at))
+
+  const states = entries.flatMap(entry => (entry.kind === 'state' && inWindow(entry.at) ? [stateRows(session, entry, operations)] : []))
+  const streams = entries.filter((entry): entry is JournalStream => entry.kind === 'stream' && inWindow(entry.at))
 
   const requestLinks = requests.map(request => {
     const body = request.reply.kind === 'answered' ? answeredBody.safeParse(request.reply.body) : null
@@ -106,7 +161,9 @@ export function journalRows(
         ...attemptColumns(attempt),
       }
     }),
+    stateChanges: states.flatMap(({ rows }) => rows),
+    streamEvents: streams.map(event => ({ session, at: event.at, event: event.event, message: event.message === null ? null : redactText(event.message) })),
     linkedAttempts: [...requestLinks, ...checkLinks].flatMap(({ attempt }) => targets(attempt)),
-    linkedOperations: [...requestLinks, ...checkLinks].flatMap(({ operation }) => targets(operation)),
+    linkedOperations: [...[...requestLinks, ...checkLinks].flatMap(({ operation }) => targets(operation)), ...states.flatMap(({ linked }) => linked)],
   }
 }
