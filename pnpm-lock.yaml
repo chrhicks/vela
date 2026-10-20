@@ -7,10 +7,10 @@ settings:
 catalogs:
   default:
     '@cria/primitives':
-      specifier: github:chrhicks/cria#86624908a57573b4953c2f759713b04d606defcd&path:/ts/packages/primitives
+      specifier: github:chrhicks/cria#c4660b85ebe20d8976c55c419f39f674171a3743&path:/ts/packages/primitives
       version: 0.0.0
     '@cria/wire':
-      specifier: github:chrhicks/cria#86624908a57573b4953c2f759713b04d606defcd&path:/ts/packages/cria-wire
+      specifier: github:chrhicks/cria#c4660b85ebe20d8976c55c419f39f674171a3743&path:/ts/packages/cria-wire
       version: 0.0.0
 
 importers:
@@ -240,10 +240,10 @@ importers:
     dependencies:
       '@cria/primitives':
         specifier: 'catalog:'
-        version: https://codeload.github.com/chrhicks/cria/tar.gz/86624908a57573b4953c2f759713b04d606defcd#path:/ts/packages/primitives(effect@4.0.3)
+        version: https://codeload.github.com/chrhicks/cria/tar.gz/c4660b85ebe20d8976c55c419f39f674171a3743#path:/ts/packages/primitives(effect@4.0.3)
       '@cria/wire':
         specifier: 'catalog:'
-        version: https://codeload.github.com/chrhicks/cria/tar.gz/86624908a57573b4953c2f759713b04d606defcd#path:/ts/packages/cria-wire(@cria/primitives@https://codeload.github.com/chrhicks/cria/tar.gz/86624908a57573b4953c2f759713b04d606defcd#path:/ts/packages/primitives(effect@4.0.3))(effect@4.0.3)
+        version: https://codeload.github.com/chrhicks/cria/tar.gz/c4660b85ebe20d8976c55c419f39f674171a3743#path:/ts/packages/cria-wire(@cria/primitives@https://codeload.github.com/chrhicks/cria/tar.gz/c4660b85ebe20d8976c55c419f39f674171a3743#path:/ts/packages/primitives(effect@4.0.3))(effect@4.0.3)
       '@opentelemetry/api':
         specifier: 1.9.1
         version: 1.9.1
@@ -316,14 +316,14 @@ importers:
 
 packages:
 
-  '@cria/primitives@https://codeload.github.com/chrhicks/cria/tar.gz/86624908a57573b4953c2f759713b04d606defcd#path:/ts/packages/primitives':
-    resolution: {gitHosted: true, integrity: sha512-zpL7jaLHk7gQFJiTTNulGxCtNHo1jRABKrWWH6IZ3kHoH5vVaM13vVrD0ymDi4dPSNOAgFDOWhdBkwHZAY67ZA==, path: /ts/packages/primitives, tarball: https://codeload.github.com/chrhicks/cria/tar.gz/86624908a57573b4953c2f759713b04d606defcd}
+  '@cria/primitives@https://codeload.github.com/chrhicks/cria/tar.gz/c4660b85ebe20d8976c55c419f39f674171a3743#path:/ts/packages/primitives':
+    resolution: {gitHosted: true, integrity: sha512-yvnSWlcRytp5jF6KPJNYQccoCHnLpIRwJ/myDGAixcMbiGPRULt7teruIoIJmEa1vNeRgKbg69mEBl8K+AC2fw==, path: /ts/packages/primitives, tarball: https://codeload.github.com/chrhicks/cria/tar.gz/c4660b85ebe20d8976c55c419f39f674171a3743}
     version: 0.0.0
     peerDependencies:
       effect: 4.0.3
 
-  '@cria/wire@https://codeload.github.com/chrhicks/cria/tar.gz/86624908a57573b4953c2f759713b04d606defcd#path:/ts/packages/cria-wire':
-    resolution: {gitHosted: true, integrity: sha512-zpL7jaLHk7gQFJiTTNulGxCtNHo1jRABKrWWH6IZ3kHoH5vVaM13vVrD0ymDi4dPSNOAgFDOWhdBkwHZAY67ZA==, path: /ts/packages/cria-wire, tarball: https://codeload.github.com/chrhicks/cria/tar.gz/86624908a57573b4953c2f759713b04d606defcd}
+  '@cria/wire@https://codeload.github.com/chrhicks/cria/tar.gz/c4660b85ebe20d8976c55c419f39f674171a3743#path:/ts/packages/cria-wire':
+    resolution: {gitHosted: true, integrity: sha512-yvnSWlcRytp5jF6KPJNYQccoCHnLpIRwJ/myDGAixcMbiGPRULt7teruIoIJmEa1vNeRgKbg69mEBl8K+AC2fw==, path: /ts/packages/cria-wire, tarball: https://codeload.github.com/chrhicks/cria/tar.gz/c4660b85ebe20d8976c55c419f39f674171a3743}
     version: 0.0.0
     peerDependencies:
       '@cria/primitives': '*'
@@ -1723,13 +1723,13 @@ packages:
 
 snapshots:
 
-  '@cria/primitives@https://codeload.github.com/chrhicks/cria/tar.gz/86624908a57573b4953c2f759713b04d606defcd#path:/ts/packages/primitives(effect@4.0.3)':
+  '@cria/primitives@https://codeload.github.com/chrhicks/cria/tar.gz/c4660b85ebe20d8976c55c419f39f674171a3743#path:/ts/packages/primitives(effect@4.0.3)':
     dependencies:
       effect: 4.0.3
 
-  '@cria/wire@https://codeload.github.com/chrhicks/cria/tar.gz/86624908a57573b4953c2f759713b04d606defcd#path:/ts/packages/cria-wire(@cria/primitives@https://codeload.github.com/chrhicks/cria/tar.gz/86624908a57573b4953c2f759713b04d606defcd#path:/ts/packages/primitives(effect@4.0.3))(effect@4.0.3)':
+  '@cria/wire@https://codeload.github.com/chrhicks/cria/tar.gz/c4660b85ebe20d8976c55c419f39f674171a3743#path:/ts/packages/cria-wire(@cria/primitives@https://codeload.github.com/chrhicks/cria/tar.gz/c4660b85ebe20d8976c55c419f39f674171a3743#path:/ts/packages/primitives(effect@4.0.3))(effect@4.0.3)':
     dependencies:
-      '@cria/primitives': https://codeload.github.com/chrhicks/cria/tar.gz/86624908a57573b4953c2f759713b04d606defcd#path:/ts/packages/primitives(effect@4.0.3)
+      '@cria/primitives': https://codeload.github.com/chrhicks/cria/tar.gz/c4660b85ebe20d8976c55c419f39f674171a3743#path:/ts/packages/primitives(effect@4.0.3)
       effect: 4.0.3
 
   '@duckdb/node-api@1.5.6-r.1':
