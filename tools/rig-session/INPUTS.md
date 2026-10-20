@@ -89,4 +89,4 @@ What the packager does and does not promise, so nobody has to read the code to f
 
 ## Real-data acceptance
 
-A script outside the repository builds a package from a real night, prints row counts and each frame's linked operation and link kind, runs a DuckDB query that joins a frame to the INDI events during its exposure, and rebuilds twice to compare rows. It is kept with the observer's scripts, not here.
+`pnpm --filter @vela/rig-session accept` ([README](README.md#check-your-own-set)) builds a package from a real night twice, compares the builds, scans every table for the values the packager learned and checks that the inputs were not changed. It prints counts only.
