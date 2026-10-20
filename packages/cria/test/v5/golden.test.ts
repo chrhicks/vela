@@ -2,8 +2,8 @@
  * Cria's recorded protocol 5 wire, decoded with @cria/wire.
  *
  * wire.golden.json is a verbatim copy of ts/testing/golden/wire.golden.json in
- * public Cria at 86624908a57573b4953c2f759713b04d606defcd, so `git hash-object`
- * on it prints that file's blob, cd6e94cc204eabb6315c61fed17920801a6a17c3.
+ * public Cria at c4660b85ebe20d8976c55c419f39f674171a3743, so `git hash-object`
+ * on it prints that file's blob, 0ba9cd294c35a862d5074192ba73fca978450227.
  * Cria's golden test recorded it from a running Cria and replaced IDs and times
  * with placeholders; `resolve` puts back values the schemas accept. Replace the
  * copy only together with the Cria pin.
@@ -115,7 +115,7 @@ describe('the protocol 5 golden', () => {
     }
 
     expect(problems).toEqual([])
-    expect(golden).toHaveLength(127)
+    expect(golden).toHaveLength(130)
   })
 
   it('accepts every request body Cria accepted, and rejects the five Cria refused as malformed', () => {
@@ -170,6 +170,16 @@ describe('the golden entries the design depends on', () => {
     const cancel = step('refused: unknown operation, request and device', 2)
 
     expect([routeIn(cancel), cancel.status, decode(ErrorBody, cancel, 'body').error.code]).toEqual(['cancel', 404, 'not-found'])
+  })
+
+  it('shows a skipped bad update as an unavailable focuser temperature on a device that stays ready, then recovered', () => {
+    const scenario = 'skipped bad update: the focuser temperature reads unavailable until a good definition comes back'
+    const focuser = (number: number) => decode(State, step(scenario, number), 'body').devices.find(device => device.kind === 'focuser')
+
+    expect(focuser(1)?.readings.temperatureC).toMatchObject({ status: 'fresh' })
+    expect(focuser(2)?.readings.temperatureC).toEqual({ status: 'unavailable', reason: 'not-read' })
+    expect(focuser(2)?.availability).toEqual({ ready: true })
+    expect(focuser(3)?.readings.temperatureC).toMatchObject({ status: 'fresh' })
   })
 
   it('answers recover on a domain that is not held 200 with a new binding (P11)', () => {
