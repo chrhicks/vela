@@ -322,7 +322,7 @@ class DamageTest(TraceCase):
     def test_capture_line_missing_keys_is_rejected_and_warned(self):
         spans = night(saved=3, stopped=False)
         broken = frame("run-1", 4, at(60), 9000)
-        del broken["attributes"]["capture.run.id"]
+        del broken["attributes"]["capture.rig.id"]
         wrong_type = frame("run-1", 5, at(70), 9000)
         wrong_type["attributes"]["capture.frame.index"] = "five"
         report = self.report(self.write("observing.jsonl", spans + [broken, wrong_type]))
@@ -331,7 +331,7 @@ class DamageTest(TraceCase):
         warning = [w for w in report["warnings"] if w["code"] == "capture-line-missing-keys"][0]
         self.assertEqual(warning["lines"], [
             {"name": "capture.frame", "key": "capture.frame.index", "count": 1},
-            {"name": "capture.frame", "key": "capture.run.id", "count": 1},
+            {"name": "capture.frame", "key": "capture.rig.id", "count": 1},
         ])
 
     def test_missing_known_span_name_is_warned(self):
@@ -346,6 +346,45 @@ class DamageTest(TraceCase):
         report = self.report(self.write("observing.jsonl", spans))
         self.assertEqual([w for w in report["warnings"] if w["code"] == "unknown-capture-span"][0]["names"],
                          ["capture.attempt"])
+
+
+def without_run_id(spans):
+    for s in spans:
+        s["attributes"].pop("capture.run.id", None)
+    return spans
+
+
+class OlderBuildTest(TraceCase):
+    def two_runs(self):
+        first = without_run_id(night("a", saved=4, stopped=True, start=0))
+        second = without_run_id(night("b", saved=3, stopped=False, start=200))
+        stray = without_run_id([frame("z", 1, at(150), 9000, "saved")])
+        return first + second + stray
+
+    def test_runs_without_a_run_id_are_grouped_by_rig_and_time(self):
+        report = self.report(self.write("observing.jsonl", self.two_runs()))
+        by_source = [(r["runIdSource"], r["framesAttempted"], r["framesCompleted"], r["agrees"]) for r in report["runs"]]
+        self.assertEqual(by_source, [
+            ("inferred", 5, 4, {"completed": True, "lost": True, "saved": True}),
+            ("inferred", 1, 1, None),
+            ("inferred", 3, 3, {"completed": True, "lost": True, "saved": True}),
+        ])
+        self.assertEqual([r["runId"] for r in report["runs"]],
+                         ["inferred:rig-a:1", "inferred:rig-a:unattributed", "inferred:rig-a:2"])
+        self.assertEqual(report["runs"][1]["incomplete"], ["start-marker-missing", "end-marker-missing"])
+        self.assertEqual(report["totals"]["framesAttempted"], 9)
+        warning = [w for w in report["warnings"] if w["code"] == "capture-run-id-missing"][0]
+        self.assertEqual(warning["lines"], {"capture.frame": 9, "capture.run.ended": 2, "capture.run.started": 2})
+
+    def test_journal_is_compared_by_totals_when_trace_runs_are_inferred(self):
+        trace = self.write("observing.jsonl", without_run_id(night(saved=3, stopped=True)))
+        journal = self.dir / "frames.jsonl"
+        rows = [{"version": 1, "runId": "r", "attempt": i, "outcome": "saved", "startedAt": stamp(at(i))} for i in (1, 2, 3)]
+        rows.append({"version": 1, "runId": "r", "attempt": 4, "outcome": "stopped", "startedAt": stamp(at(4))})
+        journal.write_text("".join(json.dumps(r) + "\n" for r in rows))
+        check = self.report(trace, "--frames", journal)["framesJournal"]
+        self.assertEqual((check["attemptsInJournal"], check["attemptsInTrace"], check["agrees"]), (4, 4, True))
+        self.assertTrue(check["runs"].startswith("unavailable"))
 
 
 class ObservationTest(TraceCase):

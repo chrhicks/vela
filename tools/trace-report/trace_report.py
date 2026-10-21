@@ -68,7 +68,7 @@ COMPLETED = frozenset({FrameOutcome.SAVED, FrameOutcome.UNSAVED, FrameOutcome.SA
 @dataclass(frozen=True, slots=True)
 class Frame:
     span_id: str
-    run_id: str
+    run_id: str | None
     rig_id: str
     index: int
     outcome_name: str
@@ -86,7 +86,7 @@ class Frame:
 
 @dataclass(frozen=True, slots=True)
 class RunStarted:
-    run_id: str
+    run_id: str | None
     rig_id: str
     at: datetime
     exposure_seconds: float
@@ -96,7 +96,7 @@ class RunStarted:
 
 @dataclass(frozen=True, slots=True)
 class RunEnded:
-    run_id: str
+    run_id: str | None
     rig_id: str
     at: datetime
     phase: str
@@ -129,6 +129,7 @@ class Interruption:
 class Run:
     run_id: str
     rig_id: str
+    inferred: bool
     started: RunStarted | None
     ended: RunEnded | None
     frames: tuple[Frame, ...]
@@ -215,13 +216,18 @@ def _num_or_none(attrs: dict, key: str) -> float | None:
     return float(value) if _number(value) else None
 
 
+def _run_id(attrs: dict) -> str | None:
+    run_id = attrs.get("capture.run.id")
+    return run_id if _text(run_id) else None
+
+
 def _build_frame(base: dict, attrs: dict) -> Frame:
     outcome_name = attrs["capture.frame.outcome"]
     duration = base["duration_ms"]
     retry_count = attrs.get("capture.read.retrying.count")
     return Frame(
         span_id=base["span_id"],
-        run_id=attrs["capture.run.id"],
+        run_id=_run_id(attrs),
         rig_id=attrs["capture.rig.id"],
         index=attrs["capture.frame.index"],
         outcome_name=outcome_name,
@@ -240,7 +246,7 @@ def _build_frame(base: dict, attrs: dict) -> Frame:
 
 def _build_run_started(base: dict, attrs: dict) -> RunStarted:
     return RunStarted(
-        run_id=attrs["capture.run.id"],
+        run_id=_run_id(attrs),
         rig_id=attrs["capture.rig.id"],
         at=base["start"],
         exposure_seconds=float(attrs["capture.exposure.seconds"]),
@@ -252,7 +258,7 @@ def _build_run_started(base: dict, attrs: dict) -> RunStarted:
 def _build_run_ended(base: dict, attrs: dict) -> RunEnded:
     error = attrs.get("capture.run.error")
     return RunEnded(
-        run_id=attrs["capture.run.id"],
+        run_id=_run_id(attrs),
         rig_id=attrs["capture.rig.id"],
         at=base["start"],
         phase=attrs["capture.run.phase"],
@@ -285,10 +291,11 @@ class SpanSpec:
 
 
 # Trace lines carry no schema version, so the keys each known span needs are checked on every line.
+# capture.run.id is expected but not required: builds before it was added wrote capture spans without it,
+# and those runs are grouped by rig and time instead (see infer_rig_runs).
 SPANS: dict[str, SpanSpec] = {
     "capture.frame": SpanSpec(
         {
-            "capture.run.id": _text,
             "capture.rig.id": _text,
             "capture.frame.index": _integer,
             "capture.frame.outcome": _text,
@@ -297,7 +304,6 @@ SPANS: dict[str, SpanSpec] = {
     ),
     "capture.run.started": SpanSpec(
         {
-            "capture.run.id": _text,
             "capture.rig.id": _text,
             "capture.exposure.seconds": _number,
             "capture.run.repeat": _flag,
@@ -307,7 +313,6 @@ SPANS: dict[str, SpanSpec] = {
     ),
     "capture.run.ended": SpanSpec(
         {
-            "capture.run.id": _text,
             "capture.rig.id": _text,
             "capture.run.phase": _text,
             "capture.run.completed": _integer,
@@ -408,10 +413,10 @@ class Collected:
     duplicates: int = 0
     first_span: datetime | None = None
     last_span: datetime | None = None
-    run_starts: dict[str, RunStarted] = field(default_factory=dict)
-    run_ends: dict[str, RunEnded] = field(default_factory=dict)
+    run_starts: list[RunStarted] = field(default_factory=list)
+    run_ends: list[RunEnded] = field(default_factory=list)
     frames: list[Frame] = field(default_factory=list)
-    frames_outside: Counter = field(default_factory=Counter)
+    without_run_id: Counter = field(default_factory=Counter)
     markers: list[DeviceMarker] = field(default_factory=list)
     span_names: Counter = field(default_factory=Counter)
     name_range: dict[str, tuple[datetime, datetime]] = field(default_factory=dict)
@@ -444,13 +449,15 @@ class Collected:
 
         record = parsed.record
         if isinstance(record, RunStarted):
-            self.run_starts.setdefault(record.run_id, record)
+            self.run_starts.append(record)
         elif isinstance(record, RunEnded):
-            self.run_ends.setdefault(record.run_id, record)
+            self.run_ends.append(record)
+        elif isinstance(record, Frame):
+            self.frames.append(record)
+        if isinstance(record, (Frame, RunStarted, RunEnded)) and record.run_id is None:
+            self.without_run_id[parsed.name] += 1
 
         if not self.window.contains(parsed.start):
-            if isinstance(record, Frame):
-                self.frames_outside[record.run_id] += 1
             return
 
         self.span_names[parsed.name] += 1
@@ -462,9 +469,7 @@ class Collected:
         )
         if parsed.device:
             self.name_devices[parsed.name][parsed.device] += 1
-        if isinstance(record, Frame):
-            self.frames.append(record)
-        elif isinstance(record, DeviceMarker):
+        if isinstance(record, DeviceMarker):
             self.markers.append(record)
         if parsed.discovery_timeout:
             self.discovery_timeouts += 1
@@ -535,22 +540,90 @@ def timing_samples(frames: list[Frame]) -> dict[str, list[float]]:
     }
 
 
+@dataclass
+class RunDraft:
+    run_id: str
+    inferred: bool
+    rig_id: str
+    started: RunStarted | None = None
+    ended: RunEnded | None = None
+    frames: list[Frame] = field(default_factory=list)
+
+
+def infer_rig_runs(
+    rig: str, starts: list[RunStarted], ends: list[RunEnded], frames: list[Frame]
+) -> list[RunDraft]:
+    """Builds before capture.run.id wrote run events and frames without it: a run is a started event
+    to the next ended event on the same rig, and a frame belongs to the run it began inside."""
+    segments: list[list] = []
+    events = sorted([(s.at, 0, s) for s in starts] + [(e.at, 1, e) for e in ends], key=lambda x: x[:2])
+    for _, kind, event in events:
+        if kind == 0:
+            segments.append([event, None])
+        elif segments and segments[-1][1] is None:
+            segments[-1][1] = event
+        else:
+            segments.append([None, event])
+
+    drafts = [RunDraft(f"inferred:{rig}:{n}", True, rig, s, e) for n, (s, e) in enumerate(segments, 1)]
+    unattributed = RunDraft(f"inferred:{rig}:unattributed", True, rig)
+    earliest = datetime.min.replace(tzinfo=timezone.utc)
+    latest = datetime.max.replace(tzinfo=timezone.utc)
+    for frame in sorted(frames, key=lambda f: (f.start, f.span_id)):
+        for n, (started, ended) in enumerate(segments):
+            lower = started.at if started else (segments[n - 1][1].at if n and segments[n - 1][1] else earliest)
+            upper = ended.at if ended else (segments[n + 1][0].at if n + 1 < len(segments) and segments[n + 1][0] else latest)
+            if lower <= frame.start <= upper:
+                drafts[n].frames.append(frame)
+                break
+        else:
+            unattributed.frames.append(frame)
+    return drafts + ([unattributed] if unattributed.frames else [])
+
+
+def group_runs(collected: Collected) -> list[RunDraft]:
+    drafts: dict[str, RunDraft] = {}
+
+    def explicit(run_id: str, rig_id: str) -> RunDraft:
+        return drafts.setdefault(run_id, RunDraft(run_id, False, rig_id))
+
+    for started in collected.run_starts:
+        if started.run_id:
+            draft = explicit(started.run_id, started.rig_id)
+            draft.started = draft.started or started
+    for ended in collected.run_ends:
+        if ended.run_id:
+            draft = explicit(ended.run_id, ended.rig_id)
+            draft.ended = draft.ended or ended
+    for frame in collected.frames:
+        if frame.run_id:
+            explicit(frame.run_id, frame.rig_id).frames.append(frame)
+
+    rigs = {x.rig_id for x in (*collected.run_starts, *collected.run_ends, *collected.frames) if x.run_id is None}
+    inferred = []
+    for rig in sorted(rigs):
+        inferred += infer_rig_runs(
+            rig,
+            [x for x in collected.run_starts if x.run_id is None and x.rig_id == rig],
+            [x for x in collected.run_ends if x.run_id is None and x.rig_id == rig],
+            [x for x in collected.frames if x.run_id is None and x.rig_id == rig],
+        )
+    return [*drafts.values(), *inferred]
+
+
 def build_runs(collected: Collected) -> list[Run]:
     window = collected.window
-    by_run: dict[str, list[Frame]] = defaultdict(list)
-    for frame in collected.frames:
-        by_run[frame.run_id].append(frame)
-    ids = set(by_run)
-    ids.update(r for r, s in collected.run_starts.items() if window.contains(s.at))
-    ids.update(r for r, e in collected.run_ends.items() if window.contains(e.at))
-
     runs = []
-    for run_id in ids:
-        started, ended = collected.run_starts.get(run_id), collected.run_ends.get(run_id)
-        frames = tuple(sorted(by_run.get(run_id, ()), key=lambda f: (f.start, f.span_id)))
-        marker = started or ended
-        rig = marker.rig_id if marker else frames[0].rig_id
-        runs.append(Run(run_id, rig, started, ended, frames, collected.frames_outside[run_id]))
+    for draft in group_runs(collected):
+        inside = tuple(sorted((f for f in draft.frames if window.contains(f.start)), key=lambda f: (f.start, f.span_id)))
+        touched = (
+            inside
+            or (draft.started and window.contains(draft.started.at))
+            or (draft.ended and window.contains(draft.ended.at))
+        )
+        if touched:
+            runs.append(Run(draft.run_id, draft.rig_id, draft.inferred, draft.started, draft.ended,
+                            inside, len(draft.frames) - len(inside)))
     return sorted(runs, key=lambda r: (run_first_moment(r), r.run_id))
 
 
@@ -738,6 +811,7 @@ def run_block(run: Run) -> tuple[dict, list[dict]]:
 
     block = {
         "runId": run.run_id,
+        "runIdSource": "inferred" if run.inferred else "trace",
         "rigId": run.rig_id,
         "startedAt": iso(run.started.at) if run.started else None,
         "endedAt": iso(ended.at) if ended else None,
@@ -788,28 +862,29 @@ def read_journal(path: str, window: Window) -> dict:
 
 
 def journal_block(path: str, journal: dict, runs: list[Run]) -> dict:
-    trace = {r.run_id: outcome_counts(r.frames) for r in runs if r.frames}
-    journal_runs = journal["perRun"]
+    trace_totals = outcome_counts([f for r in runs for f in r.frames])
+    journal_totals = Counter()
+    for counts in journal["perRun"].values():
+        journal_totals.update(counts)
+
+    per_run_possible = not any(r.inferred for r in runs)
     rows = []
-    for run_id in sorted(set(trace) | set(journal_runs)):
-        mine, theirs = trace.get(run_id, Counter()), journal_runs.get(run_id, Counter())
-        rows.append({
-            "runId": run_id,
-            "trace": sum(mine.values()),
-            "journal": sum(theirs.values()),
-            "agrees": mine == theirs,
-        })
-    trace_total = sum(r["trace"] for r in rows)
-    journal_total = sum(r["journal"] for r in rows)
+    if per_run_possible:
+        trace = {r.run_id: outcome_counts(r.frames) for r in runs if r.frames}
+        for run_id in sorted(set(trace) | set(journal["perRun"])):
+            mine, theirs = trace.get(run_id, Counter()), journal["perRun"].get(run_id, Counter())
+            rows.append({"runId": run_id, "trace": sum(mine.values()), "journal": sum(theirs.values()),
+                         "agrees": mine == theirs})
     return {
         "path": path,
         "lines": journal["lines"],
         "skippedLines": journal["skippedLines"],
-        "attemptsInJournal": journal_total,
-        "attemptsInTrace": trace_total,
-        "difference": journal_total - trace_total,
-        "agrees": all(r["agrees"] for r in rows),
-        "runs": rows,
+        "attemptsInJournal": sum(journal_totals.values()),
+        "attemptsInTrace": sum(trace_totals.values()),
+        "difference": sum(journal_totals.values()) - sum(trace_totals.values()),
+        "agrees": trace_totals == journal_totals and all(r["agrees"] for r in rows),
+        "outcomes": {"trace": outcomes_block(trace_totals), "journal": outcomes_block(journal_totals)},
+        "runs": rows if per_run_possible else "unavailable: trace runs have no capture.run.id, so only totals are compared",
     }
 
 
@@ -897,22 +972,12 @@ def resolve_inputs(paths: list[str]) -> tuple[list[str], list[dict]]:
     return files, warnings
 
 
-def build_report(args: argparse.Namespace, now: datetime) -> dict:
-    files, warnings = resolve_inputs(args.paths)
-    collected = Collected(window=args.window)
-    for path in files:
-        read_file(collected, path)
-
-    if sum(f.spans for f in collected.files) == 0:
-        raise Refused("not-a-trace", "no line in the given files parsed as a span: not a Vela trace, or empty")
-
-    runs = build_runs(collected)
-    warnings.append({
+def input_warnings(collected: Collected, window: Window, now: datetime) -> tuple[list[dict], list[str]]:
+    warnings = [{
         "code": "open-spans-absent",
         "message": "a span is written only when it ends, so unfinished spans (a frame or run still going, "
         "or lost in a crash) are absent. Counts from a file still being written are provisional.",
-    })
-
+    }]
     live = [
         f.path for f in collected.files
         if f.modified and (now - f.modified).total_seconds() < LIVE_FILE_SECONDS
@@ -923,16 +988,13 @@ def build_report(args: argparse.Namespace, now: datetime) -> dict:
             "files": live,
             "message": f"modified within the last {LIVE_FILE_SECONDS}s: probably being written, so counts are provisional.",
         })
-
-    since = args.window.since
-    if since and collected.first_span and since < collected.first_span:
+    if window.since and collected.first_span and window.since < collected.first_span:
         warnings.append({
             "code": "since-before-oldest-span",
             "oldestSpan": iso(collected.first_span),
             "message": "--since is earlier than the oldest retained span. Rotation may have dropped the start, "
             "or the server had not started yet.",
         })
-
     for file in collected.files:
         if file.torn_tail:
             warnings.append({"code": "torn-tail", "file": file.path,
@@ -943,7 +1005,11 @@ def build_report(args: argparse.Namespace, now: datetime) -> dict:
     if collected.duplicates:
         warnings.append({"code": "duplicate-spans", "count": collected.duplicates,
                          "message": "spans with an already-seen spanId were dropped (rotation overlap or a copied file)."})
+    return warnings, live
 
+
+def capture_warnings(collected: Collected, frames: list[Frame]) -> list[dict]:
+    warnings = []
     if collected.rejected:
         warnings.append({
             "code": "capture-line-missing-keys",
@@ -951,7 +1017,7 @@ def build_report(args: argparse.Namespace, now: datetime) -> dict:
             "message": "known spans missing a required attribute (or holding the wrong type) were dropped. "
             "The writer probably changed; trace lines carry no version.",
         })
-    unknown_outcomes = Counter(f.outcome_name for f in collected.frames if f.outcome is None)
+    unknown_outcomes = Counter(f.outcome_name for f in frames if f.outcome is None)
     if unknown_outcomes:
         warnings.append({
             "code": "unknown-frame-outcome",
@@ -964,15 +1030,23 @@ def build_report(args: argparse.Namespace, now: datetime) -> dict:
     if unknown_spans:
         warnings.append({"code": "unknown-capture-span", "names": unknown_spans,
                          "message": "capture.* spans this script does not read."})
-    if capture_names:
-        absent = [n for n in KNOWN_CAPTURE_SPANS if n not in capture_names]
-        if absent:
-            warnings.append({"code": "known-span-missing", "names": absent,
-                             "message": "capture.* activity is present but these known spans never appear in the window."})
+    absent = [n for n in KNOWN_CAPTURE_SPANS if n not in capture_names] if capture_names else []
+    if absent:
+        warnings.append({"code": "known-span-missing", "names": absent,
+                         "message": "capture.* activity is present but these known spans never appear in the window."})
+    if collected.without_run_id:
+        warnings.append({
+            "code": "capture-run-id-missing",
+            "lines": dict(sorted(collected.without_run_id.items())),
+            "message": "capture spans without capture.run.id (a build before it was added). Those runs are grouped "
+            "by rig and time between run.started and run.ended: an inference, shown as runIdSource inferred.",
+        })
+    return warnings
 
-    observation = observation_block(collected)
-    interrupted = collected.span_names.get("cria.observation.interrupted", 0)
-    if observation["epoch"] == "interrupted-only" and interrupted:
+
+def observation_warnings(collected: Collected, observation: dict) -> list[dict]:
+    warnings = []
+    if observation["epoch"] == "interrupted-only":
         warnings.append({
             "code": "interruptions-may-include-refreshes",
             "message": "no cria.observation.refreshing/refreshed spans in the window. Builds before them reported "
@@ -994,6 +1068,23 @@ def build_report(args: argparse.Namespace, now: datetime) -> dict:
             "refreshed": refreshed,
             "message": "refreshing and refreshed counts differ: spans still open or lost in a crash.",
         })
+    return warnings
+
+
+def build_report(args: argparse.Namespace, now: datetime) -> dict:
+    files, warnings = resolve_inputs(args.paths)
+    collected = Collected(window=args.window)
+    for path in files:
+        read_file(collected, path)
+
+    if sum(f.spans for f in collected.files) == 0:
+        raise Refused("not-a-trace", "no line in the given files parsed as a span: not a Vela trace, or empty")
+
+    runs = build_runs(collected)
+    window_frames = [f for r in runs for f in r.frames]
+    observation = observation_block(collected)
+    gathered, live = input_warnings(collected, args.window, now)
+    warnings += gathered + capture_warnings(collected, window_frames) + observation_warnings(collected, observation)
 
     run_blocks = []
     for run in runs:
@@ -1001,7 +1092,7 @@ def build_report(args: argparse.Namespace, now: datetime) -> dict:
         run_blocks.append(block)
         warnings.extend(run_warnings)
 
-    frames = collected.frames
+    frames = window_frames
     counts = outcome_counts(frames)
     pooled: dict[str, list[float]] = defaultdict(list)
     for run in runs:
