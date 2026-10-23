@@ -89,5 +89,5 @@ pnpm exec vitest run apps/server/tests/cria-protocol5.test.ts
 
 `test/v5/fake-cria.ts` is the typed HTTP/SSE fake used by the client and server
 route scenarios. The golden corpus comes from Cria commit
-`c4660b85ebe20d8976c55c419f39f674171a3743`. Update it only with the dependency pin.
+`f82674d6efbc56c3f71e9533968d1f73590919fa`. Update it only with the dependency pin.
 All tests use fakes or local fixtures and never contact observatory hardware.
