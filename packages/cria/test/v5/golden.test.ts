@@ -2,7 +2,7 @@
  * Cria's recorded protocol 5 wire, decoded with @cria/wire.
  *
  * wire.golden.json is a verbatim copy of ts/testing/golden/wire.golden.json in
- * public Cria at c4660b85ebe20d8976c55c419f39f674171a3743, so `git hash-object`
+ * public Cria at f82674d6efbc56c3f71e9533968d1f73590919fa, so `git hash-object`
  * on it prints that file's blob, 0ba9cd294c35a862d5074192ba73fca978450227.
  * Cria's golden test recorded it from a running Cria and replaced IDs and times
  * with placeholders; `resolve` puts back values the schemas accept. Replace the

@@ -14,12 +14,12 @@ const run = promisify(execFile)
  * that way. Replay therefore runs a checkout of Cria that the caller names, and refuses it unless
  * it is exactly this commit with no local changes.
  *
- * Not older than c4660b8. It holds the INDI bad-input hardening (a skipped bad update leaves one reading unavailable and
+ * Not older than f82674d. It holds the INDI bad-input hardening (a skipped bad update leaves one reading unavailable and
  * the device ready), which real recordings benefit from. a182aac was the oldest usable: before it, replay served the
  * definitions with no device and no name that real drivers send as one malformed light, Cria dropped the connection
  * on it, and every device of a real recording read as unavailable.
  */
-export const criaPin = 'c4660b85ebe20d8976c55c419f39f674171a3743'
+export const criaPin = 'f82674d6efbc56c3f71e9533968d1f73590919fa'
 
 export interface CriaCheckout {
   /** Cria's `ts/` folder. */
