@@ -95,6 +95,36 @@ for (const width of [1100, 390]) {
     await page.keyboard.press('Escape')
     await expect(page.getByText(/Adjust the mount manually/)).toBeVisible()
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+
+    const readout = await page.evaluate(() => {
+      const box = (selector: string) => {
+        const element = document.querySelector(selector)!
+
+        return {
+          top: element.getBoundingClientRect().top,
+          bottom: element.getBoundingClientRect().bottom,
+          fontSize: parseFloat(getComputedStyle(element.querySelector('strong')!).fontSize),
+        }
+      }
+
+      return {
+        total: box('.vela-polar-total'),
+        directions: box('.vela-polar-directions'),
+        imageTop: document.querySelector('.vela-polar-image')!.getBoundingClientRect().top,
+      }
+    })
+
+    if (width === 390) {
+      expect(readout.total.bottom).toBeLessThanOrEqual(readout.directions.top)
+      expect(readout.directions.bottom).toBeLessThanOrEqual(readout.imageTop)
+      expect(readout.total.fontSize).toBeGreaterThanOrEqual(40)
+      expect(readout.directions.fontSize).toBeGreaterThanOrEqual(40)
+    } else {
+      expect(readout.imageTop).toBeLessThan(readout.directions.top)
+      expect(readout.directions.fontSize).toBe(16)
+      expect(readout.total.fontSize).toBe(46)
+    }
+
     await page.screenshot({ path: `/tmp/alignment-app-adjusting-${width}.png`, fullPage: true })
 
     Object.assign(view, {
@@ -104,6 +134,7 @@ for (const width of [1100, 390]) {
     await expect(page.getByText('Measurements interrupted', { exact: true })).toBeVisible()
     await expect(page.locator('.vela-polar-status')).toContainText('Retrying camera reads')
     await expect(page.getByRole('alert')).toHaveCount(0)
+    await expect(page.locator('.vela-polar-directions strong').first()).toContainText('Last:')
     await expect(page.getByText(/Wait for a fresh measurement before adjusting/)).toBeVisible()
     await expect(page.getByRole('button', { name: 'Stop session' })).toBeEnabled()
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)

@@ -461,4 +461,33 @@
   .vela-polar-inspection-tools {
   flex-wrap: wrap;
 }
+  .vela-polar-total {
+  order: -3;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+  .vela-polar-total strong {
+  font-size: 11vw;
+  line-height: 1.1;
+  letter-spacing: -0.04em;
+}
+  .vela-polar-directions {
+  order: -2;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+  .vela-polar-directions span {
+  font-size: 16px;
+}
+  .vela-polar-directions strong {
+  color: var(--vela-text);
+  font-size: 13vw;
+  line-height: 1.1;
+  font-weight: 600;
+  text-wrap: balance;
+}
+  .vela-polar-status {
+  order: -1;
+}
 }
