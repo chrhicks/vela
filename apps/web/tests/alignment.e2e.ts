@@ -95,9 +95,11 @@ for (const width of [1100, 390]) {
     await page.keyboard.press('Escape')
     await expect(page.getByText(/Adjust the mount manually/)).toBeVisible()
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+
     const readout = await page.evaluate(() => {
       const box = (selector: string) => {
         const element = document.querySelector(selector)!
+
         return {
           top: element.getBoundingClientRect().top,
           bottom: element.getBoundingClientRect().bottom,

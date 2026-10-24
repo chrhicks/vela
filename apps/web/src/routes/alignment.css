@@ -485,6 +485,7 @@
   font-size: 13vw;
   line-height: 1.1;
   font-weight: 600;
+  text-wrap: balance;
 }
   .vela-polar-status {
   order: -1;
