@@ -1,4 +1,4 @@
-import Fastify from 'fastify'
+import Fastify, { type InjectOptions } from 'fastify'
 import { afterEach, expect, it, vi } from 'vitest'
 import type { AlpacaDeviceInspection } from '@vela/alpaca'
 import { createMemoryRigCatalog } from '../rig/catalog.js'
@@ -6,6 +6,7 @@ import { createRigOperations } from '../rig/operations.js'
 import { registerAutofocus } from './routes.js'
 import type { AutofocusCamera, AutofocusFocuser } from './controller.js'
 import { hyperbola } from './hyperbola.js'
+import { emptyHaltRequests, refusedHaltRequests } from '../http/halt-requests.fixture.js'
 
 const record = {
   id: 'fra',
@@ -138,7 +139,8 @@ function setup(
         url: '/api/rigs/fra/autofocus/start',
         payload: body,
       }),
-    stop: () => app.inject({ method: 'POST', url: '/api/rigs/fra/autofocus/stop', payload: {} }),
+    stop: (options: InjectOptions = { payload: {} }) =>
+      app.inject({ method: 'POST', url: '/api/rigs/fra/autofocus/stop', ...options }),
     land: async () => {
       await vi.waitFor(() => expect(captures.length).toBeGreaterThan(0))
       captures.shift()!.resolve()
@@ -178,6 +180,24 @@ it('rejects malformed start bodies before acquiring the rig', async () => {
   }
 
   expect(subject.operations.owner('fra')).toBeUndefined()
+})
+
+it.each(emptyHaltRequests)('accepts a stop with %s', async (_name, options) => {
+  const subject = setup()
+  expect((await subject.start()).statusCode).toBe(200)
+  await vi.waitFor(() => expect(subject.get().then(response => response.json().active)).resolves.toBe(true))
+  const stopping = subject.stop(options)
+  await subject.finish()
+  expect((await stopping).statusCode).toBe(200)
+  expect((await subject.get()).json()).toMatchObject({ active: false })
+})
+
+it.each(refusedHaltRequests)('refuses a stop with %s and leaves the walk going', async (_name, options) => {
+  const subject = setup()
+  expect((await subject.start()).statusCode).toBe(200)
+  expect((await subject.stop(options)).statusCode).toBe(400)
+  expect((await subject.get()).json()).toMatchObject({ active: true })
+  await subject.finish()
 })
 
 it('publishes samples onto the live view as the walk runs', async () => {

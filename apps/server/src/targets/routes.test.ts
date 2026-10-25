@@ -8,6 +8,7 @@ import type { MonoFrame, PlateSolver } from '../plate-solving/solver.js'
 import type { FramingView } from '@vela/model/web'
 import type { FramingHardware } from './framing.js'
 import { registerTargets, type TargetOptions } from './routes.js'
+import { emptyHaltRequests, refusedHaltRequests } from '../http/halt-requests.fixture.js'
 
 const stamp = '2026-09-07T22:00:00.000Z'
 
@@ -181,6 +182,26 @@ function command(
 }
 
 describe('target and framing HTTP boundary', () => {
+  it.each(emptyHaltRequests)('stops framing on %s', async (_name, options) => {
+    const subject = setup()
+    const stopped = await subject.app.inject({ method: 'POST', url: '/api/rigs/rig/framing/stop', ...options })
+    expect(stopped.statusCode).toBe(200)
+    expect(stopped.json()).toMatchObject({ phase: expect.any(String) })
+  })
+
+  it.each(refusedHaltRequests)('refuses a framing stop with %s', async (_name, options) => {
+    const subject = setup()
+    const stopped = await subject.app.inject({ method: 'POST', url: '/api/rigs/rig/framing/stop', ...options })
+    expect(stopped.statusCode).toBe(400)
+  })
+
+  it.each(emptyHaltRequests)('still refuses a framing start on %s', async (_name, options) => {
+    const subject = setup()
+    const started = await subject.app.inject({ method: 'POST', url: '/api/rigs/rig/framing/start', ...options })
+    expect(started.statusCode).toBe(400)
+    expect(subject.operations.owner('rig')).toBeUndefined()
+  })
+
   it('links only observed parked or tracking-off prerequisites to mount controls', async () => {
     const subject = setup()
     subject.mount.tracking = false

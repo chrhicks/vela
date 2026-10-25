@@ -13,6 +13,7 @@ import { createAlignmentController, type AlignmentSettings } from './controller.
 import { createAstapSolver } from './solver.js'
 import { createPhysicalAlignment } from './physical.js'
 import { createAlignmentDiagnostics } from './diagnostics.js'
+import { haltBody, haltBodyError, registerHaltRoutes } from '../http/halt-body.js'
 
 export interface AlignmentFactories {
   physical: typeof createPhysicalAlignment
@@ -234,7 +235,7 @@ export function registerAlignment(
       return view ?? reply.code(404).send({ error: 'Rig not found' })
     },
   )
-  app.post<{ Params: { rigId: string; command: string } }>(
+  registerHaltRoutes(app, scope => scope.post<{ Params: { rigId: string; command: string } }>(
     '/api/rigs/:rigId/alignment/:command',
     async (request, reply) =>
       trace.getTracer('vela.alignment').startActiveSpan(
@@ -248,9 +249,15 @@ export function registerAlignment(
         },
         async span => {
           try {
+            const halting = request.params.command === 'stop' || request.params.command === 'finish'
+
+            if (halting && !haltBody.safeParse(request.body).success)
+              return reply.code(400).send({ error: haltBodyError })
+
             if (
-              !request.headers['content-type']?.startsWith('application/json') ||
-              !emptyCommand.safeParse(request.body).success
+              !halting &&
+              (!request.headers['content-type']?.startsWith('application/json') ||
+                !emptyCommand.safeParse(request.body).success)
             )
               return reply.code(400).send({ error: 'Expected an empty JSON object' })
 
@@ -327,6 +334,7 @@ export function registerAlignment(
           }
         },
       ),
+    ),
   )
 
   async function sendImage(
