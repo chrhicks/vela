@@ -1,4 +1,5 @@
 import { Button } from '@vela/ui'
+import { pagingNote } from './presentation'
 import type { AlertsState } from './use-alerts'
 import './alerts.css'
 
@@ -14,7 +15,7 @@ export function PhoneAlertsSwitch({ alerts }: { alerts: AlertsState }) {
     <div className="phone-alerts-switch" data-phone-alerts={on ? 'on' : 'off'}>
       <p>
         Phone alerts: <strong>{on ? 'on' : 'off'}</strong>
-        {!on && <span className="phone-alerts-switch__note"> · alerts show here only</span>}
+        <span className="phone-alerts-switch__note"> · {on ? pagingNote(view.pagingWindow) : 'alerts show here only'}</span>
       </p>
 
       <Button disabled={offline} pending={switching} onClick={() => void setPhoneAlerts(!on)}>

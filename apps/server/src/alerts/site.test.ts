@@ -63,9 +63,10 @@ describe('reading where a rig is from its mount', () => {
 
   it('does not know the site when the mount gives no location', async () => {
     const { latitudeDegrees: _, longitudeDegrees: __, ...without } = status()
+    const { longitudeDegrees: ___, ...withoutLongitude } = status()
 
     expect(await reader({ status: without }).read(signal)).toBeNull()
-    expect(await reader({ status: status({ longitudeDegrees: undefined as never }) }).read(signal)).toBeNull()
+    expect(await reader({ status: withoutLongitude }).read(signal)).toBeNull()
   })
 
   it('does not trust 0 N 0 E, which a mount with no location set reports', async () => {

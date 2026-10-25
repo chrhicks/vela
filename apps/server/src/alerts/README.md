@@ -7,7 +7,7 @@ or moves the mount.
   `thresholds.ts`.
 - `monitor.ts` keeps that history for one rig, feeds the rules, and turns conditions into episodes.
 - `pushover.ts` is the phone, behind the `Notifier` interface in `notifier.ts`. `config.ts` reads
-  `alerts.json`. `preference.ts` keeps the phone alerts switch. `mount.ts` reads a Cria rig's mount. `routes.ts` is the HTTP surface. The browser side (banner and rig-page card) is
+  `alerts.json`. `preference.ts` keeps the phone alerts switch. `mount.ts` reads a Cria rig's mount. `site.ts` reads where a rig is. `routes.ts` is the HTTP surface. The browser side (banner and rig-page card) is
   `apps/web/src/features/alerts`; its contract is `AlertsView` in `@vela/model/web`.
 
 ## Star counts
@@ -50,7 +50,7 @@ until it is acknowledged, because Pushover does that, not Vela.
   clears. The first retry comes after a minute, and each pause doubles up to five minutes. Vela
   gives up once the next try would fall an hour (an emergency's `expire`) after the alert was raised,
   because Pushover would have stopped repeating by then. Each alert in the alerts view carries its
-  `delivery`: `sent`, `sending`, `not-configured`, `retrying` (with `failures`, `nextAttemptAt` and
+  `delivery`: `sent`, `sending`, `not-configured`, `outside-dark`, `retrying` (with `failures`, `nextAttemptAt` and
   `giveUpAt`) or `gave-up`. The retry has its own timer, so it carries on after the run has ended:
   a `run-failed` emergency refused during a phone outage still goes out when the phone is back, if
   that is within the hour. The alerts view says "phone alerts failing" with the reason meanwhile.
@@ -86,6 +86,42 @@ by then.
   The server will not start on a file it cannot read, rather than page a phone Chris turned off.
   `alerts.json` is never touched.
 - With no Pushover keys there is nothing to switch, and the browser hides the control.
+
+## Astronomical darkness
+
+The phone is paged only while the sun is below -18 degrees (`astronomicalDarkDegrees` in
+`../astronomy/sun.ts`, fixed in code) at the rig's site, because that is the only time a rig is
+left unattended. Outside it, alerts still raise, clear and show in the banner, with delivery
+`outside-dark` ("Not sent · outside astro dark"). The switch comes first: off is `muted`, and
+only a switch that is on goes on to ask about the sun. A test message is Chris asking for a page,
+so it ignores the sun.
+
+- **Site.** `site.ts` asks the rig's only telescope for the latitude and longitude its mount
+  already reports, so Chris types no coordinates. A mount reporting nothing, a value off the globe,
+  or exactly 0 N 0 E (what a mount with no location set says) counts as no site. The monitor reads
+  it when the alerts view is asked for and the site is unknown (no more often than every 30 s),
+  and again when a run starts. A site that is known is not read again between runs.
+- **Unknown site fails open.** A missed alert on an unattended rig costs more than an extra page, so
+  an unknown site pages at any hour, as before. The view says `pagingWindow: site-unknown` and the
+  switch reads "pages at any hour · rig location unknown". Learning the site later in daylight
+  takes the same step as dawn, below.
+- **Sun.** `sunAltitudeDegrees` and `darkOutlook` use Astronomy Engine, already a dependency, with
+  no refraction, as twilight is defined. `darkOutlook` also finds the coming dusk and dawn, or null
+  when the sun does not cross -18 within two days (a Greenwich midsummer, or a polar winter).
+- **Held alerts.** An alert raised in daylight has delivery `held`. The view shows `outside-dark`.
+  An alert that cleared before dark was never sent, so it never pages.
+- **Dusk.** When dark begins, every alert still standing that was held and not acknowledged is
+  told to the phone, once, as if raised then. Its retry hour starts at dusk. The monitor notices
+  from its next evaluation (a frame or a mount poll) or from its own timer, which sleeps until the
+  next crossing (never more than 6 h), so a failed run's alert still pages at dusk with no poll
+  running.
+- **Dawn.** When dark ends, an emergency repeating on the phone is cancelled through the same path
+  as turning the switch off, and is held again; one waiting to go out, or being retried, is held.
+  A warn that was already sent stays sent. There is no `cleared` message in daylight.
+- **Nights after the first.** An alert still standing at the next dusk pages again, once, because
+  its emergency was stopped by the sun, not by Chris. One he acknowledged does not.
+- **Switch and sun.** Turning the switch off mutes held alerts too, so turning it on again before
+  dusk does not page them. Turning it on pages nothing it had not already.
 
 ## What feeds the monitor
 

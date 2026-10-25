@@ -68,6 +68,7 @@ function alertsView(patch: Partial<AlertsView> = {}): AlertsView {
     unavailable: [],
     phone: { state: 'ready' },
     phoneAlertsOn: true,
+    pagingWindow: { state: 'astro-dark', until: null },
     thresholds: { starsCollapsedRatio: 0.3, hfrBadPixels: 6, meridianNearMinutes: 20 },
     ...patch,
   }
@@ -285,6 +286,34 @@ test('the capture page switches phone alerts off and on, on a phone-width screen
   const width = await page.evaluate(() => document.documentElement.scrollWidth)
   expect(width).toBeLessThanOrEqual(390)
   expect(rig.posts).toEqual(['phone-off', 'phone-on'])
+})
+
+test('the capture page says when the phone is paged, and an alert held for darkness says so, on a phone-width screen', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 800 })
+
+  const dusk = Date.parse('2026-10-25T19:42:00')
+  const dawn = Date.parse('2026-10-26T05:31:00')
+  const held = { ...collapsed, delivery: { state: 'outside-dark' } } as const
+
+  const rig = await useRig(page, alertsView({ alerts: [held], pagingWindow: { state: 'not-dark', from: dusk, until: dawn } }))
+  await page.goto('/rigs/rig-1/observe/capture')
+  const banner = page.getByRole('region', { name: 'Rig alerts' })
+
+  await expect(banner).toContainText(/Phone alerts: on · pages in astro dark, .+ to .+/)
+  await expect(banner.getByRole('button', { name: 'Turn off' })).toBeInViewport()
+
+  const width = await page.evaluate(() => document.documentElement.scrollWidth)
+  expect(width).toBeLessThanOrEqual(390)
+
+  rig.set(alertsView({ pagingWindow: { state: 'astro-dark', until: dawn } }))
+  await expect(banner).toContainText(/Phone alerts: on · paging now \(astro dark until .+\)/)
+
+  rig.set(alertsView({ pagingWindow: { state: 'site-unknown' } }))
+  await expect(banner).toContainText('Phone alerts: on · pages at any hour · rig location unknown')
+
+  rig.set(alertsView({ alerts: [held], pagingWindow: { state: 'not-dark', from: dusk, until: dawn } }))
+  await page.goto('/rigs/rig-1')
+  await expect(page.getByRole('region', { name: 'Alerts', exact: true })).toContainText('Not sent · outside astro dark')
 })
 
 test('without phone keys there is no switch, since there is no phone to hold back', async ({ page }) => {
