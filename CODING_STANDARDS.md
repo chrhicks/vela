@@ -327,9 +327,11 @@ When a change crosses several workspace boundaries, run the full check:
 pnpm check
 ```
 
-This runs lint, tests (including model type contracts), then the workspace build
-and its TypeScript checks, stopping on the first failure. Report failures
+This runs lint, the workspace build and its TypeScript checks, then tests
+(including model type contracts), stopping on the first failure. The build comes
+first because the type tests import the built workspace packages. Report failures
 explicitly rather than suppressing them or claiming the check passed.
-`pnpm test` and `pnpm build` remain available individually for focused validation.
+`pnpm test` and `pnpm build` remain available individually for focused validation;
+run `pnpm build` once before `pnpm test` on a fresh clone.
 
 A documentation-only change normally needs link, path, and content review rather than a code build.
