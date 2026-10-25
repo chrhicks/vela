@@ -14,6 +14,28 @@ This slice does not read or write focuser backlash compensation, so setup does
 not present it as a device fact. “Backlash zero” would mean compensation off,
 not EAF position 0.
 
+## Final approach from above
+
+The EAF has backlash, so the side a move arrives from changes where the optics
+land. The walk samples every position after a downward move (it starts at the top
+of the window and steps down), so the fit describes the focuser as it sits after
+coming down. Every move that ends a run therefore comes down onto its target too:
+
+- the confirming move to the fitted best focus;
+- the return to the start after a failed fit, a failure or Stop.
+
+Each goes first to `target + APPROACH_OVERSHOOT_STEPS` (300, in `walk.ts`), then
+down onto the target, so the slack is taken up the same way the samples saw it.
+The overshoot is clamped to the focuser travel. It may pass above the walk window
+by up to that amount, never beyond travel. At the very top of travel there is no
+room above, and the move goes direct. The 300 is a guess at several times the EAF
+backlash, not a measurement on this rig. The curve fit is unchanged.
+
+The view's `finalApproach` records the last such move (`purpose`, `target`, `via`;
+`via` is null for a direct move), so a real night can confirm it. The walk's first
+sample still follows an upward move from the start to the top of the window, so it
+carries any backlash offset the later samples do not.
+
 Each short exposure appends `(position, HFR)` to the view immediately so the
 Observe graph can grow as the walk runs. The fit is the hyperbola minimum inside
 the sampled window. The lowest sampled HFR is comparison only.

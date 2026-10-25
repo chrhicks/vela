@@ -6,6 +6,7 @@ import {
   type AutofocusFocuser,
 } from './controller.js'
 import { hyperbola } from './hyperbola.js'
+import { APPROACH_OVERSHOOT_STEPS } from './walk.js'
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -28,9 +29,15 @@ afterEach(async () => {
 function setup(
   start = 32842,
   maxStep = 60000,
-  { holdMoves = false, holdFinalMeasurement = false } = {},
+  {
+    holdMoves = false,
+    holdFinalMeasurement = false,
+    backlash = 0,
+    hfrAt = (optical: number) => hyperbola(optical, 2.18, 95, 32838),
+  } = {},
 ) {
   let position = start
+  let lag = 0
   const moves: number[] = []
 
   const captures: Array<
@@ -58,6 +65,7 @@ function setup(
         await gate.promise
       }
 
+      lag = Math.min(0, Math.max(-backlash, lag - (target - position)))
       position = target
       moves.push(target)
 
@@ -95,7 +103,7 @@ function setup(
         await finalMeasurement.promise
       }
 
-      return { detectedStars: 40, medianHfrPixels: hyperbola(position, 2.18, 95, 32838) }
+      return { detectedStars: 40, medianHfrPixels: hfrAt(position + lag) }
     },
   )
 
@@ -129,6 +137,7 @@ function setup(
     finalMeasurement,
     measuringFinal,
     position: () => position,
+    optical: () => position + lag,
   }
 }
 
@@ -231,6 +240,7 @@ it('lands each (position, HFR) sample on the view before the next move, then fit
   }
 
   await vi.waitFor(() => expect(controller.snapshot().fit).not.toBeNull())
+  await arrive()
   await arrive()
   await land()
   await vi.waitFor(() => expect(controller.active()).toBe(false))
@@ -357,4 +367,87 @@ it('returns to setup when the focuser is not absolute, instead of leftover walki
   })
   expect(view.error).toMatch(/absolute/)
   expect(moves).toEqual([])
+})
+
+const backlash = 150
+
+it('lands on best focus from above, taking up the backlash the way the samples saw it', async () => {
+  const { controller, camera, focuser, land, moves, optical } = setup(32842, 60000, { backlash })
+  await controller.start(camera, focuser)
+
+  for (let count = 0; count < 10; count++) await land()
+
+  await vi.waitFor(() => expect(controller.active()).toBe(false))
+  const view = controller.snapshot()
+  const target = view.fit!.position
+  expect(view.phase).toBe('complete')
+  expect(moves.slice(-2)).toEqual([target + APPROACH_OVERSHOOT_STEPS, target])
+  expect(optical()).toBe(target)
+  expect(view.currentPosition).toBe(target)
+  expect(view.finalApproach).toEqual({
+    purpose: 'best-focus',
+    target,
+    via: target + APPROACH_OVERSHOOT_STEPS,
+  })
+})
+
+it('would land short of best focus by the backlash if the last move came up from below', async () => {
+  const { focuser, optical } = setup(32842, 60000, { backlash })
+  const window = { minPosition: 1, maxPosition: 60000 }
+  await focuser.move(32700, window)
+  await focuser.move(32900, window)
+  expect(optical()).toBe(32900 - backlash)
+  await focuser.move(32900 + APPROACH_OVERSHOOT_STEPS, window)
+  await focuser.move(32900, window)
+  expect(optical()).toBe(32900)
+})
+
+it('returns to the start from above after a failed fit', async () => {
+  const { controller, camera, focuser, land, moves, optical } = setup(32842, 60000, {
+    backlash,
+    hfrAt: () => 5,
+  })
+
+  await controller.start(camera, focuser)
+
+  for (let count = 0; count < 9; count++) await land()
+
+  await vi.waitFor(() => expect(controller.active()).toBe(false))
+  expect(controller.snapshot()).toMatchObject({
+    phase: 'failed',
+    restoredStart: true,
+    currentPosition: 32842,
+    finalApproach: { purpose: 'restore-start', target: 32842, via: 32842 + APPROACH_OVERSHOOT_STEPS },
+  })
+  expect(moves.slice(-2)).toEqual([32842 + APPROACH_OVERSHOOT_STEPS, 32842])
+  expect(optical()).toBe(32842)
+})
+
+it('returns to the start from above after Stop below the start', async () => {
+  const { controller, camera, focuser, land, moves, optical } = setup(32842, 60000, { backlash })
+  await controller.start(camera, focuser)
+
+  for (let count = 0; count < 7; count++) await land()
+
+  await vi.waitFor(() => expect(controller.snapshot().samples).toHaveLength(7))
+  expect(controller.snapshot().currentPosition).toBeLessThan(32842)
+  await controller.stop()
+  expect(controller.snapshot()).toMatchObject({
+    phase: 'stopped',
+    restoredStart: true,
+    finalApproach: { purpose: 'restore-start', target: 32842, via: 32842 + APPROACH_OVERSHOOT_STEPS },
+  })
+  expect(moves.slice(-2)).toEqual([32842 + APPROACH_OVERSHOOT_STEPS, 32842])
+  expect(optical()).toBe(32842)
+})
+
+it('shortens the overshoot to stay inside the focuser travel', async () => {
+  const { controller, camera, focuser, land, moves } = setup(32842, 33100, { hfrAt: () => 5 })
+  await controller.start(camera, focuser)
+
+  for (let count = 0; count < 9; count++) await land()
+
+  await vi.waitFor(() => expect(controller.active()).toBe(false))
+  expect(moves.slice(-2)).toEqual([33099, 32842])
+  expect(controller.snapshot().finalApproach).toMatchObject({ target: 32842, via: 33099 })
 })

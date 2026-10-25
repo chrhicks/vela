@@ -1,10 +1,11 @@
-import type { AutofocusFit, AutofocusSample, AutofocusView } from '@vela/model/web'
+import type { AutofocusApproach, AutofocusFit, AutofocusSample, AutofocusView } from '@vela/model/web'
 import type { CaptureFrame } from '../capture/controller.js'
 import { measureAutofocusStars } from '../imaging/statistics.js'
 import { fitHyperbola } from './hyperbola.js'
 import {
   DEFAULT_OFFSET_STEPS,
   DEFAULT_STEP_SIZE,
+  approachFromAbove,
   extraInwardPosition,
   planStarHfrWalk,
   assertCommandedPosition,
@@ -81,15 +82,11 @@ export function createAutofocusController(
 
     try {
       if (plan) {
-        assertCommandedPosition(start, plan)
-
-        const arrived = await focuser.move(
-          start,
-          { minPosition: plan.minPosition, maxPosition: plan.maxPosition },
+        const arrived = await approach(focuser, plan, start, 'restore-start', () =>
           AbortSignal.timeout(60_000),
         )
 
-        patch({ currentPosition: arrived.position, restoredStart: arrived.position === start })
+        patch({ currentPosition: arrived, restoredStart: arrived === start })
       } else {
         const status = await focuser.status(AbortSignal.timeout(15_000))
         patch({ currentPosition: status.position, restoredStart: status.position === start })
@@ -177,6 +174,31 @@ export function createAutofocusController(
     return arrived.position
   }
 
+  async function approach(
+    focuser: AutofocusFocuser,
+    plan: AutofocusWalkPlan,
+    target: number,
+    purpose: AutofocusApproach['purpose'],
+    signal: () => AbortSignal,
+  ) {
+    const route = approachFromAbove(plan, target)
+    const floor = extraFloor(plan)
+    const window = { minPosition: Math.max(plan.travel.min, floor), maxPosition: plan.approachMax }
+    patch({ finalApproach: { purpose, ...route } })
+
+    async function moveTo(position: number) {
+      assertCommandedPosition(position, plan, floor, plan.approachMax)
+      const arrived = await focuser.move(position, window, signal())
+      patch({ currentPosition: arrived.position })
+
+      return arrived.position
+    }
+
+    if (route.via !== null) await moveTo(route.via)
+
+    return moveTo(target)
+  }
+
   function abortStart(
     message: string,
     status?: { position: number; minStep?: number; maxStep: number },
@@ -248,6 +270,7 @@ export function createAutofocusController(
         stepSize: plan.stepSize,
         offsetSteps: plan.offsetSteps,
         restoredStart: false,
+        finalApproach: null,
         samples: [],
         fit: null,
         error: null,
@@ -287,8 +310,8 @@ export function createAutofocusController(
         )
       patch({ fit })
       signal.throwIfAborted()
-      patch({ phase: 'confirming' })
-      await go(focuser, plan, fit.position, signal)
+      patch({ phase: 'confirming', activity: 'moving' })
+      await approach(focuser, plan, fit.position, 'best-focus', () => signal)
       await sample(camera, fit.position, exposureSeconds, signal)
       signal.throwIfAborted()
       patch({
@@ -446,6 +469,7 @@ function emptyView(
     samples: [],
     fit: null,
     restoredStart: false,
+    finalApproach: null,
     error: null,
   }
 }

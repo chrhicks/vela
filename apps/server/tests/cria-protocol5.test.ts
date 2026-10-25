@@ -403,7 +403,7 @@ describe('a halt through autofocus', () => {
     cria.dropReply('submit')
     const stopping = send(post('/api/rigs/fixture/autofocus/stop'))
 
-    await vi.advanceTimersByTimeAsync(5_000)
+    await vi.advanceTimersByTimeAsync(9_000)
 
     expect((await drainImmediateWork(stopping.reply)).json()).toMatchObject({
       active: false,
@@ -412,7 +412,7 @@ describe('a halt through autofocus', () => {
       currentPosition: 20_000,
       error: null,
     })
-    expect(submitted()).toEqual(['focuser focuser-move', 'focuser focuser-halt', 'focuser focuser-halt', 'focuser focuser-move'])
+    expect(submitted()).toEqual(['focuser focuser-move', 'focuser focuser-halt', 'focuser focuser-halt', 'focuser focuser-move', 'focuser focuser-move'])
 
     const [halt, again] = cria.received.flatMap(received => (received.route === 'submit' && received.body?.includes('focuser-halt') ? [received.body] : []))
 

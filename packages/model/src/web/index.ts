@@ -40,6 +40,7 @@ export type {
 
 export type {
   AutofocusActivity,
+  AutofocusApproach,
   AutofocusFit,
   AutofocusPhase,
   AutofocusSample,
