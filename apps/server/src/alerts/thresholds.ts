@@ -32,6 +32,11 @@ export const thresholdsSchema = z.strictObject({
   // field. Below this baseline only an empty frame raises an alert.
   minBaselineStarsForRatios: positive.default(10),
   minBaselineStarsForEmptyFrame: positive.default(3),
+  // A run that has not built a baseline of at least `minBaselineStarsForEmptyFrame` stars by
+  // this many frames has none of the star alerts working. 5 is `baselineFrames`: the window a
+  // baseline is taken from. It is 7.5 min of the 90 s frames from 2026-10-23, and a cloud over
+  // the first three frames clears itself as soon as the baseline fills with sky.
+  noStarsFrames: z.number().int().positive().default(5),
   confirmFrames: z.number().int().positive().default(2),
 
   starsSmoothingFrames: z.number().int().positive().default(3),

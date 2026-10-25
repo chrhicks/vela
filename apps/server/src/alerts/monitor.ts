@@ -739,7 +739,8 @@ export function createAlertMonitor({
   // -------------------------------------------------------------------------
 
   return {
-    runStarted(exposureSeconds: number) {
+    /** `imaging` is a repeating run that saves its frames: the unattended kind, where no stars is a lost night. */
+    runStarted(exposureSeconds: number, imaging: boolean) {
       stopPolling()
       runToken++
       autofocusing = false
@@ -747,7 +748,7 @@ export function createAlertMonitor({
       focuserPosition = null
       mountReadings = []
       observationsInterruptedSince = null
-      run = { status: 'running', exposureSeconds, waitingForFrameSince: now() }
+      run = { status: 'running', exposureSeconds, waitingForFrameSince: now(), imaging }
       evaluate()
 
       // Everything from the last run has cleared by now. A new run starts with no guard.

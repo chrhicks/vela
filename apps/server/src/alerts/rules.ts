@@ -3,6 +3,7 @@ import type { AlertThresholds } from './thresholds.js'
 export type AlertLevel = 'warn' | 'critical'
 
 export type AlertId =
+  | 'no-stars'
   | 'stars-dropping'
   | 'stars-collapsed'
   | 'stars-declining'
@@ -39,7 +40,7 @@ export interface MountReading {
 }
 
 export type RunState =
-  | { status: 'running'; exposureSeconds: number; waitingForFrameSince: number }
+  | { status: 'running'; exposureSeconds: number; waitingForFrameSince: number; imaging: boolean }
   | { status: 'stopped' }
   | { status: 'failed' }
 
@@ -68,10 +69,12 @@ export function evaluateAlerts(history: RigHistory, thresholds: AlertThresholds,
   if (run.status === 'stopped') return { conditions: [], unavailable: [] }
 
   const meridian = watchMeridian(history.mountReadings.at(-1), thresholds)
+  const frames = watchFrames(history.frames, thresholds)
 
   return {
     conditions: [
-      ...watchFrames(history.frames, thresholds),
+      ...frames.conditions,
+      ...(run.imaging ? watchStarBaseline(history.frames.length, frames.baselineFormed, thresholds) : []),
       ...watchTracking(history.mountReadings, thresholds),
       ...meridian.conditions,
       ...watchReachability(history.observationsInterruptedSince, thresholds, now),
@@ -90,7 +93,7 @@ export function evaluateAlerts(history: RigHistory, thresholds: AlertThresholds,
  * accepted when neither it nor an alert standing says the sky or camera is off, so a stretch of
  * cloud or a snagged camera never becomes the new normal.
  */
-function watchFrames(frames: Frame[], t: AlertThresholds): AlertCondition[] {
+function watchFrames(frames: Frame[], t: AlertThresholds) {
   const acceptedStars: number[] = []
   const smoothed: number[] = []
   let starsDropping = calm
@@ -99,10 +102,12 @@ function watchFrames(frames: Frame[], t: AlertThresholds): AlertCondition[] {
   let hfrHigh = calm
   let hfrBad = calm
   let baseline = 0
+  let baselineFormed = false
   let trendFrom = 0
 
   for (const [index, frame] of frames.entries()) {
     baseline = baselineStars(acceptedStars, t)
+    baselineFormed ||= hasStars(baseline, t)
     smoothed.push(smoothedStars(frames, index, t))
 
     const stars = smoothed[index]!
@@ -139,7 +144,9 @@ function watchFrames(frames: Frame[], t: AlertThresholds): AlertCondition[] {
 
   const latest = frames.at(-1)
 
-  if (!latest) return []
+  if (!latest) return { conditions: [], baselineFormed }
+
+  baselineFormed ||= hasStars(baselineStars(acceptedStars, t), t)
 
   const trend = starsTrend(frames, trendFrom, frames.length - 1, t)
   const median = Math.round(smoothed.at(-1)!)
@@ -162,7 +169,23 @@ function watchFrames(frames: Frame[], t: AlertThresholds): AlertCondition[] {
   if (hfrBad.raised)
     conditions.push({ id: 'hfr-bad', level: 'critical', message: `Stars are badly out of focus: HFR ${hfr ?? 'unmeasured'} px` })
 
-  return conditions
+  return { conditions, baselineFormed }
+}
+
+/**
+ * Below `minBaselineStarsForEmptyFrame` stars no star alert can fire, so a baseline that is that
+ * thin is no baseline. A run that has none after `noStarsFrames` frames (cap on, cloud from the
+ * start, far out of focus, the wrong target) would otherwise be silent all night. Once a baseline
+ * has formed, a later loss of stars is the star alerts' to report, so this one clears for good.
+ */
+function watchStarBaseline(frameCount: number, baselineFormed: boolean, t: AlertThresholds): AlertCondition[] {
+  if (baselineFormed || frameCount < t.noStarsFrames) return []
+
+  return [{ id: 'no-stars', level: 'critical', message: `No stars after ${t.noStarsFrames} frames` }]
+}
+
+function hasStars(baseline: number, t: AlertThresholds) {
+  return baseline >= t.minBaselineStarsForEmptyFrame
 }
 
 /** Median of the last accepted frames, or 0 until there are enough to trust. */

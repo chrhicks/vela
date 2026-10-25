@@ -14,7 +14,7 @@ function fixture(name: string) {
   return readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8')
 }
 
-const running: RunState = { status: 'running', exposureSeconds: 60, waitingForFrameSince: 0 }
+const running: RunState = { status: 'running', exposureSeconds: 60, waitingForFrameSince: 0, imaging: true }
 
 function history(parts: Partial<RigHistory>): RigHistory {
   return { run: running, frames: [], mountReadings: [], observationsInterruptedSince: null, ...parts }
@@ -40,7 +40,7 @@ const night: Array<Frame & { time: string }> = JSON.parse(fixture('night-2026101
 function replay(frames: typeof night) {
   return frames.map((frame, index) => {
     const seen = frames.slice(0, index + 1)
-    const run: RunState = { status: 'running', exposureSeconds: 60, waitingForFrameSince: frame.capturedAt }
+    const run: RunState = { status: 'running', exposureSeconds: 60, waitingForFrameSince: frame.capturedAt, imaging: true }
 
     return { time: frame.time, ids: ids(history({ run, frames: seen }), frame.capturedAt) }
   })
@@ -253,8 +253,8 @@ describe('frame rules on short synthetic runs', () => {
     expect(ids(history({ frames: runOf([...sparse, 0, 0]) }))).toEqual(['stars-collapsed'])
   })
 
-  it('does not alert on an empty field when the baseline is below 3 stars', () => {
-    expect(ids(history({ frames: runOf([2, 1, 2, 0, 0, 0]) }))).toEqual([])
+  it('has no star alert to give on a field with fewer than 3 stars, so it says there is no baseline', () => {
+    expect(ids(history({ frames: runOf([2, 1, 2, 0, 0, 0]) }))).toEqual(['no-stars'])
   })
 
   it('warns when the last 30 minutes sit below 0.6 of the 30 before, and clears above 0.8', () => {
@@ -475,11 +475,65 @@ describe('rig-unreachable', () => {
 
 describe('frames-stalled', () => {
   it('raises after 2 x (exposure + 30 s) without a frame and clears when one arrives', () => {
-    const waiting = (since: number): RunState => ({ status: 'running', exposureSeconds: 60, waitingForFrameSince: since })
+    const waiting = (since: number): RunState => ({ status: 'running', exposureSeconds: 60, waitingForFrameSince: since, imaging: true })
 
     expect(ids(history({ run: waiting(0) }), 180_000)).not.toContain('frames-stalled')
     expect(ids(history({ run: waiting(0) }), 181_000)).toContain('frames-stalled')
     expect(ids(history({ run: waiting(181_000) }), 182_000)).not.toContain('frames-stalled')
+  })
+})
+
+describe('no-stars', () => {
+  const frames = (counts: number[]): Frame[] =>
+    counts.map((stars, index) => ({ capturedAt: index * 60_000, stars, hfrPixels: null }))
+
+  const idsFor = (counts: number[], run: RunState = running) => ids(history({ run, frames: frames(counts) }))
+
+  it('raises on the fifth frame of a run that has had no stars, and not on the fourth', () => {
+    expect(idsFor([0, 0, 0, 0])).not.toContain('no-stars')
+    expect(idsFor([0, 0, 0, 0, 0])).toContain('no-stars')
+  })
+
+  it('says how many frames it waited and is critical', () => {
+    const [condition] = evaluateAlerts(history({ frames: frames([0, 0, 0, 0, 0, 0, 0]) }), defaultThresholds, 0).conditions
+
+    expect(condition).toEqual({ id: 'no-stars', level: 'critical', message: 'No stars after 5 frames' })
+  })
+
+  it('never raises once a baseline has formed', () => {
+    expect(idsFor([40, 40, 40, 40, 40])).not.toContain('no-stars')
+    expect(idsFor([40, 40, 40, 0, 0, 0, 0, 0, 0])).not.toContain('no-stars')
+  })
+
+  it('clears when a baseline forms after a cloudy start', () => {
+    expect(idsFor([0, 0, 0, 0, 0])).toContain('no-stars')
+    expect(idsFor([0, 0, 0, 0, 0, 90])).toContain('no-stars')
+    expect(idsFor([0, 0, 0, 0, 0, 90, 90])).toContain('no-stars')
+    expect(idsFor([0, 0, 0, 0, 0, 90, 90, 90])).not.toContain('no-stars')
+  })
+
+  it('stays quiet once a run that formed a baseline loses the sky, leaving that to stars-collapsed', () => {
+    const found = idsFor([60, 60, 60, 60, 60, 0, 0, 0])
+
+    expect(found).toContain('stars-collapsed')
+    expect(found).not.toContain('no-stars')
+  })
+
+  it('never raises for a run that is not an imaging run', () => {
+    const test: RunState = { status: 'running', exposureSeconds: 60, waitingForFrameSince: 0, imaging: false }
+
+    expect(idsFor([0, 0, 0, 0, 0, 0, 0], test)).not.toContain('no-stars')
+  })
+
+  it('is raised by a lower noStarsFrames from alerts.json', () => {
+    const quick = thresholdsSchema.parse({ noStarsFrames: 2 })
+
+    expect(ids(history({ frames: frames([0, 0]) }), 0, quick)).toContain('no-stars')
+    expect(ids(history({ frames: frames([0]) }), 0, quick)).not.toContain('no-stars')
+  })
+
+  it('clears with the run', () => {
+    expect(idsFor([0, 0, 0, 0, 0], { status: 'stopped' })).toEqual([])
   })
 })
 
@@ -504,7 +558,7 @@ describe('levels', () => {
   it('gives each condition the level the spec assigns it', () => {
     const everything = evaluateAlerts(
       history({
-        run: { status: 'running', exposureSeconds: 60, waitingForFrameSince: 0 },
+        run: { status: 'running', exposureSeconds: 60, waitingForFrameSince: 0, imaging: true },
         frames: [[1200, 3], [1200, 3], [1200, 3], [0, 7], [0, 7], [0, 7]].map(
           ([stars, hfrPixels], index): Frame => ({ capturedAt: index, stars: stars!, hfrPixels: hfrPixels! }),
         ),

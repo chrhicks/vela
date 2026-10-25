@@ -324,7 +324,7 @@ export function registerCapture(
         const captureController = controller
         const camera = cameraFactory(settings)
 
-        watch?.runStarted(body.exposureSeconds)
+        watch?.runStarted(body.exposureSeconds, body.repeat === true && body.saveFrames === true)
 
         const result = await controller
           .start(body.exposureSeconds, camera, view.camera.name, {
