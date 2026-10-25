@@ -25,8 +25,8 @@ from is `fixtures/night-20261023-frames.json`.
 
 The baseline is the median of the last five frames that no alert called bad, so a long cloud never
 becomes normal. A weaker alert is hidden while a stronger one covers it (`stars-dropping` and
-`stars-declining` by `stars-collapsed`). A collapse also starts the declining trend over, so the
-frames of a cloud-out are not read as a slope when it ends.
+`stars-declining` by `stars-collapsed`). A drop or collapse also starts the declining trend over, so
+the frames of a cloud-out or haze are not read again as a slope once it has passed.
 
 Star counts rise as focus worsens (167 to 278 stars while HFR went 1.55 to 2.12), so a refocus
 makes them fall. The history starts over, as it does when autofocus ends, whenever the focuser

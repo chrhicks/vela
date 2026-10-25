@@ -147,6 +147,10 @@ describe('the real night of 2026-10-23: star counts that swing without anything 
     expect(firstRaised('hfr-high', steps)).toBeUndefined()
   })
 
+  it('does not report the haze again as a slow decline once it has passed', () => {
+    expect(firstRaised('stars-declining', replay(heartRun))).toBeUndefined()
+  })
+
   it('keeps warning through the haze and stops once the median is back above half the baseline', () => {
     const steps = replay(heartRun)
     const during = steps.filter(step => step.time >= '01:30:12' && step.time <= '01:38:21')

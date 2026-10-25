@@ -114,8 +114,9 @@ function watchFrames(frames: Frame[], t: AlertThresholds): AlertCondition[] {
     const collapsed = empty || (canCompare && stars < t.starsCollapsedRatio * baseline)
     const recovered = stars >= t.starsRecoveredRatio * baseline
 
-    // A collapse is a break in the sky or the camera, not a slope: the trend starts over after it.
-    if (collapsed) trendFrom = index + 1
+    // A drop or collapse is a break in the sky or the camera, not a slope: the trend starts over
+    // after it, so a haze that has passed is not reported again as a decline.
+    if (dropping || collapsed) trendFrom = index + 1
 
     starsDropping = latch(starsDropping, dropping, recovered, t.confirmFrames, t.confirmFrames)
     starsCollapsed = latch(starsCollapsed, collapsed, recovered, t.confirmFrames, t.confirmFrames)

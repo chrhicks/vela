@@ -12,17 +12,18 @@ const positive = z.number().positive()
  * 2026-10-23, 90 s frames through a 3 nm dual-band filter (fixtures/night-20261023-frames.json):
  * - Healthy frames swing about 2x with HFR flat: 101, 88, 181, 126, 84. A single frame says
  *   nothing, so every star comparison uses the median of `starsSmoothingFrames` frames.
- * - Smoothed that way, the 00:01Z run holds between about 65 and 125 stars until 01:25Z, so the
- *   largest honest fall is under 50% and `starsDropFraction` 0.5 stays quiet. The haze at 01:26Z
- *   takes the smoothed count from 93 to 37 in 3 minutes (a 60% fall) and keeps it near 25-40.
+ * - Smoothed that way, the 00:01Z run stays between 67 and 134 stars until 01:25Z, and its worst
+ *   fall within 10 minutes is to 0.54 of the peak. `starsDropFraction` 0.5 sits just under that.
+ *   The haze at 01:26Z takes the smoothed count from 93 to 37 (0.40) in under 3 minutes and then
+ *   to 24-27, so it warns at 01:30Z, after `confirmFrames`.
  * - A window of 10 minutes is about 6 frames at 90 s and still 3 at 180 s, enough to see a fall
  *   start without the slow wander of the sky counting as one.
- * - The slow wander is `stars-declining`: 30 minutes against the 30 before. In the same run the
- *   smoothed count slides from about 115 to 90 over an hour (ratio 0.78), so 0.6 stays quiet.
+ * - The slow wander is `stars-declining`: the median of 30 minutes against the 30 before. In that
+ *   run the 30-minute medians go 110, 101, 88 (0.8 to 0.9 of the one before), so 0.6 stays quiet.
  * - The count rises as focus gets worse (167 to 278 stars while HFR goes 1.55 to 2.12), so a
  *   refocus makes it fall. The monitor starts the history over when the focuser moves.
- * - Real clouds take the count to a few stars, so `stars-collapsed` at 0.15 of the baseline
- *   stays well below the haze minimum (about 0.25) and well above an empty frame.
+ * - Real clouds take the count to a few stars, so `stars-collapsed` at 0.15 of the baseline stays
+ *   below the haze minimum (24 of about 100) and above a cloud-out (a few stars).
  */
 export const thresholdsSchema = z.strictObject({
   baselineFrames: z.number().int().positive().default(5),
