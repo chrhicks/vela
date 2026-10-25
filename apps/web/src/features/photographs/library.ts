@@ -1,4 +1,5 @@
 import type { SavedImage } from '@vela/model/web'
+import { frameTypeChoices, isCalibration } from '../capture/frame-types'
 import { photographDate } from './format'
 
 export type PhotographBrowse = 'nights' | 'targets'
@@ -28,7 +29,11 @@ export function photographNightTitle(key: string) {
   return photographDate(`${key}T12:00:00Z`, true, 'UTC')
 }
 
+/** Calibration frames group by type, never under a target: `calibration:dark` holds every dark. */
 export function photographTarget(image: SavedImage) {
+  if (isCalibration(image.frameType))
+    return { id: `calibration:${image.frameType}`, title: frameTypeChoices[image.frameType].frames }
+
   return image.subject
     ? { id: `target:${image.subject.targetId}`, title: image.subject.name }
     : { id: 'unrecorded', title: 'No recorded target' }

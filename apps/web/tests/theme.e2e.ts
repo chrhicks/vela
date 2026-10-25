@@ -62,6 +62,7 @@ for (const width of [1040, 390]) {
       elapsedSeconds: 0,
       error: null,
       saveFrames: false,
+      frameType: 'light',
       savedImageCount: 0,
       latestImage: null,
       repeat: false,

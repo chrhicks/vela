@@ -7,7 +7,7 @@ const zone = 'America/New_York'
 
 function image(id: string, capturedAt: string, targetId?: string): SavedImage {
   return {
-    id, capturedAt, receivedAt: capturedAt, savedAt: capturedAt,
+    id, frameType: 'light', capturedAt, receivedAt: capturedAt, savedAt: capturedAt,
     subject: targetId ? { targetId, name: 'Same display name', catalog: 'Test' } : null,
     rigId: 'rig', cameraName: 'Camera', color: 'mono', width: 1, height: 1,
     exposureSeconds: 1, statistics: null, saved: true,
@@ -66,4 +66,31 @@ it('groups existing metadata without changing server order or combining target i
   expect(targets.at(-1)?.title).toBe('No recorded target')
   expect(photographTarget(image('collision', '2026-10-01T00:00:00Z', 'unrecorded')).id).toBe('target:unrecorded')
   expect(groupPhotographs([], 'nights', zone)).toEqual([])
+})
+
+it('keeps calibration frames out of every target and groups them by type', () => {
+  const images = [
+    { ...image('dark-new', '2026-10-02T05:00:00Z'), frameType: 'dark' as const },
+    image('light', '2026-10-02T04:00:00Z', 'one'),
+    { ...image('flat', '2026-10-02T03:00:00Z'), frameType: 'flat' as const },
+    { ...image('dark-old', '2026-10-01T05:00:00Z'), frameType: 'dark' as const },
+    { ...image('dark-flat', '2026-10-01T04:00:00Z'), frameType: 'dark-flat' as const },
+    { ...image('bias', '2026-10-01T03:00:00Z'), frameType: 'bias' as const },
+  ]
+
+  const targets = groupPhotographs(images, 'targets', zone)
+  expect(targets.map(group => [group.id, group.title, group.images.map(item => item.id)])).toEqual([
+    ['calibration:dark', 'Dark frames', ['dark-new', 'dark-old']],
+    ['target:one', 'Same display name', ['light']],
+    ['calibration:flat', 'Flat frames', ['flat']],
+    ['calibration:dark-flat', 'Dark flat frames', ['dark-flat']],
+    ['calibration:bias', 'Bias frames', ['bias']],
+  ])
+
+  const night = groupPhotographs(images, 'nights', zone)[0]!
+  expect(groupPhotographs(night.images, 'targets', zone).map(group => group.id)).toEqual([
+    'calibration:dark',
+    'target:one',
+    'calibration:flat',
+  ])
 })

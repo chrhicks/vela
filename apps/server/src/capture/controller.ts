@@ -1,6 +1,12 @@
 import { randomUUID } from 'node:crypto'
 import { trace, SpanStatusCode, type Span } from '@opentelemetry/api'
-import type { CaptureImage, CaptureImageProvenance, CaptureSubject, CaptureView } from '@vela/model/web'
+import type {
+  CaptureImage,
+  CaptureImageProvenance,
+  CaptureSubject,
+  CaptureView,
+  FrameType,
+} from '@vela/model/web'
 import { frameImaging, type FrameImaging } from '../imaging/frame-imaging.js'
 import type { ImageColor } from '../imaging/preview.js'
 import { PREVIEW_VERSION } from '../imaging/background.js'
@@ -70,6 +76,8 @@ interface Attempt {
 }
 
 export interface CaptureRunOptions {
+  /** What the run takes; default `light`. Only a light run has a subject. */
+  frameType?: FrameType
   subject?: CaptureSubject | null
   onSettled?: () => void
   /** Called with each frame once it is published, whether or not it is saved. */
@@ -99,6 +107,7 @@ export function createCaptureController(
     active: false,
     captureReadState: 'current',
     repeat: true,
+    frameType: 'light',
     saveFrames: false,
     savedImageCount: 0,
     completedCount: 0,
@@ -178,6 +187,7 @@ export function createCaptureController(
     repeat: boolean,
     frameCount: number | undefined,
     saveFrames: boolean,
+    frameType: FrameType,
     subject: CaptureSubject | null,
     runGeneration: number,
     runId: string,
@@ -214,6 +224,7 @@ export function createCaptureController(
         startedAt: attempt.startedAt,
         settledAt: new Date(now()).toISOString(),
         exposureSeconds,
+        frameType,
         subject,
         outcome,
         message: failure ?? null,
@@ -281,6 +292,7 @@ export function createCaptureController(
             'capture.rig.id': settings.rigId,
             'capture.run.id': runId,
             'capture.frame.index': index,
+            'capture.frame.type': frameType,
             'capture.exposure.seconds': exposureSeconds,
           },
         })
@@ -358,7 +370,7 @@ export function createCaptureController(
 
             return null
           }),
-          imaging.encodeFits(frame, { exposureSeconds, cameraName }),
+          imaging.encodeFits(frame, { exposureSeconds, cameraName, frameType }),
         ])
 
         span.setAttributes({
@@ -368,6 +380,7 @@ export function createCaptureController(
 
         let metadata: CaptureImage = {
           id,
+          frameType,
           subject,
           imageUrl: `/api/rigs/${encodeURIComponent(settings.rigId)}/capture/images/${id}`,
           width: frame.width,
@@ -472,7 +485,15 @@ export function createCaptureController(
     exposureSeconds: number,
     camera: CaptureCamera,
     cameraName: string,
-    { onSettled, onFrame, repeat = false, frameCount, saveFrames = false, subject = null }: CaptureRunOptions = {},
+    {
+      onSettled,
+      onFrame,
+      repeat = false,
+      frameCount,
+      saveFrames = false,
+      frameType = 'light',
+      subject = null,
+    }: CaptureRunOptions = {},
   ) {
     if (running) throw new Error('An exposure is already running')
 
@@ -489,6 +510,7 @@ export function createCaptureController(
       repeat,
       frameCount: frameCount ?? null,
       saveFrames,
+      frameType,
       completedCount: 0,
       lostFrameCount: 0,
       subject: runSubject,
@@ -507,6 +529,7 @@ export function createCaptureController(
           'capture.run.id': runId,
           'capture.exposure.seconds': exposureSeconds,
           'capture.run.repeat': repeat,
+          'capture.run.frameType': frameType,
           ...(frameCount !== undefined && { 'capture.run.frameCount': frameCount }),
           'capture.run.saveFrames': saveFrames,
         },
@@ -521,6 +544,7 @@ export function createCaptureController(
       repeat,
       frameCount,
       saveFrames,
+      frameType,
       runSubject,
       runGeneration,
       runId,

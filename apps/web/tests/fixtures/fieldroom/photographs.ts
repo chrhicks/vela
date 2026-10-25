@@ -54,6 +54,7 @@ function photograph(index: number, total: number, manyDates: boolean): SavedImag
     capturedAtSource: 'camera',
     receivedAt: new Date(captured + 180_000).toISOString(),
     savedAt: new Date(captured + 181_000).toISOString(),
+    frameType: 'light',
     cameraName: 'Reference image · Mock saved exposure',
     color: 'color', statistics: { detectedStars: 842, medianHfrPixels: 2.1 },
     saved: true, fitsUrl: `${base}/fits`, previewDownloadUrl: `${base}/download-preview`,

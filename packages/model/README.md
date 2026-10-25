@@ -82,6 +82,11 @@ inside the sampled window; `minSamplePosition` is comparison only. `restoredStar
 is true only after a failed or cancelled walk confirmed return to start. A walk
 that never left the current position stays in setup with an error.
 
+`FrameType` is `light`, `dark`, `flat`, `dark-flat` or `bias`. `CaptureView.frameType`
+is the current or most recent run's type, `light` before any run. Every `CaptureImage`
+carries its own `frameType`, and a saved image from before frame types reads as `light`.
+Only a `light` image has a `subject`; a calibration frame belongs to no target.
+
 The Capture view describes one ephemeral capture run, its readiness and phase,
 its repeat setting and count of published images in that run,
 and the latest completed image with its own duration, camera, dimensions and

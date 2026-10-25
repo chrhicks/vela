@@ -39,6 +39,12 @@ New images also keep `provenance`, the rig service's request, operation and imag
 exposure. Null means the camera adapter carries none (Alpaca). Absent legacy metadata means
 unknown, and is not rewritten. The same IDs appear in the capture frame record
 (`docs/local-tracing.md`).
+Every image records its `frameType`: `light`, `dark`, `flat`, `dark-flat` or `bias`.
+Metadata saved before frame types existed has none and reads as `light`; reading it
+does not rewrite the file. The FITS `IMAGETYP` card carries the same type (`LIGHT`,
+`DARK`, `FLAT`, `DARKFLAT`, `BIAS`). Originals saved before this have no card; they are
+lights. A calibration image has a null `subject`. The library groups calibration
+frames by type, never under a target (see [photographs](../../../web/src/features/photographs/README.md)).
 Collection and detail projections include the Vela server's system `timeZone`.
 The browser uses this explicit zone for capture dates, times and noon-to-noon
 observing-night groups, consistently across clients. It is labeled server time,

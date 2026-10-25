@@ -5,6 +5,7 @@ import type {
   CaptureImageProvenance,
   CaptureImageStatistics,
   CaptureSubject,
+  FrameType,
 } from '@vela/model/web'
 
 /**
@@ -32,6 +33,8 @@ export interface FrameRecord {
   startedAt: string
   settledAt: string
   exposureSeconds: number
+  /** Lines written before frame types existed lack it; they are lights. */
+  frameType: FrameType
   subject: CaptureSubject | null
   outcome: FrameOutcome
   /** Why the attempt did not end well; null for `saved` and `unsaved`. */

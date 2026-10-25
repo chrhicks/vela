@@ -21,6 +21,7 @@ export async function readRetainedFits(bytes: Buffer): Promise<PreviewFrame> {
     'DATE-OBS',
     'EXPTIME',
     'INSTRUME',
+    'IMAGETYP',
     'ROWORDER',
     'TIMESRC',
     'BAYERPAT',

@@ -5,6 +5,12 @@ export interface CaptureSubject {
   readonly catalog: string
 }
 
+/**
+ * What a frame is for. Only `light` frames belong to a target; the rest calibrate lights
+ * and carry no subject.
+ */
+export type FrameType = 'light' | 'dark' | 'flat' | 'dark-flat' | 'bias'
+
 /** Conservative star measurements from this image's linear samples. */
 export interface CaptureImageStatistics {
   detectedStars: number
@@ -24,7 +30,9 @@ export interface CaptureImageProvenance {
 /** Metadata belongs to this image, independent of any subsequent exposure. */
 export interface CaptureImage {
   id: string
-  /** Absent on legacy artifacts; null explicitly means no selected subject. */
+  /** Saved images from before frame types existed read as `light`. */
+  frameType: FrameType
+  /** Absent on legacy artifacts; null explicitly means no selected subject. Always null unless `light`. */
   subject?: CaptureSubject | null
   imageUrl: string
   /** Smaller display preview; imageUrl always retains native resolution. */
@@ -120,6 +128,8 @@ export interface CaptureView {
   captureReadState: 'current' | 'retrying'
   active: boolean
   repeat: boolean
+  /** What the current or most recent run takes; `light` before any run. */
+  frameType: FrameType
   /** Frames after which the run ends by itself; null when it repeats until stopped. */
   frameCount?: number | null
   saveFrames: boolean

@@ -177,3 +177,20 @@ it.each([{ pixels: frame.pixels }, { pixels: [0, 1, 32_767, 32_768, 65_534, 65_5
     }
   },
 )
+
+describe('IMAGETYP', () => {
+  it.each([
+    ['light', 'LIGHT'],
+    ['dark', 'DARK'],
+    ['flat', 'FLAT'],
+    ['dark-flat', 'DARKFLAT'],
+    ['bias', 'BIAS'],
+  ] as const)('writes %s as %s', async (frameType, keyword) => {
+    const fits = await encodeCaptureFits(frame, { ...metadata, frameType })
+    expect(header(fits)).toContain(`IMAGETYP= '${keyword}'`.padEnd(80))
+  })
+
+  it('writes LIGHT when the caller names no type', async () => {
+    expect(header(await encodeCaptureFits(frame, metadata))).toContain("IMAGETYP= 'LIGHT'".padEnd(80))
+  })
+})

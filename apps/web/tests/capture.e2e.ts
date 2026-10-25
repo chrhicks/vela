@@ -28,6 +28,7 @@ const idle: CaptureView = {
   elapsedSeconds: 0,
   error: null,
   saveFrames: false,
+  frameType: 'light',
   savedImageCount: 0,
   subject: null,
   savedCount: 0,
@@ -102,6 +103,7 @@ const firstImage = {
   exposureSeconds: 2,
   capturedAt: '2026-09-05T18:00:00.000Z',
   receivedAt: '2026-09-05T18:00:03.000Z',
+  frameType: 'light',
   cameraName: 'Simulator Camera',
   color: 'mono',
   statistics: { detectedStars: 12, medianHfrPixels: 2.35 },
@@ -350,7 +352,7 @@ test('repeating capture restores server settings and can stop during image recei
   await expect(page.getByRole('checkbox', { name: 'Repeat until stopped' })).toBeChecked()
   await expect(page.getByRole('checkbox', { name: 'Save frames' })).toBeChecked()
   await page.getByRole('button', { name: 'Start capture' }).click()
-  expect(startBody).toEqual({ exposureSeconds: 2, repeat: true, saveFrames: true })
+  expect(startBody).toEqual({ exposureSeconds: 2, repeat: true, saveFrames: true, frameType: 'light' })
   await expect(page.getByRole('button', { name: 'Stop capture' })).toBeEnabled()
   current = { ...current, completedCount: 2, latestImage: firstImage, phase: 'reading' }
   await page.reload()
@@ -404,8 +406,65 @@ test('starts with a frame count, shows progress, and fits a 390 px page', async 
   ).toBeLessThanOrEqual(0)
 
   await page.getByRole('button', { name: 'Start capture' }).click()
-  expect(starts).toEqual([{ exposureSeconds: 2, repeat: true, saveFrames: true, frameCount: 30 }])
+  expect(starts).toEqual([{ exposureSeconds: 2, repeat: true, saveFrames: true, frameType: 'light', frameCount: 30 }])
   await expect(page.getByRole('region', { name: 'Capture images' })).toContainText('12 of 30 frames')
+  await expect(page.getByRole('button', { name: 'Stop capture' })).toBeInViewport()
+
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth),
+  ).toBeLessThanOrEqual(0)
+})
+
+test('chooses a frame type at 390 px, says to cap darks and bias, and starts a calibration run with no target', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 800 })
+  let current: CaptureView = { ...idle, repeat: true }
+  const starts: unknown[] = []
+  await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, current))
+  await page.route('**/api/rigs/rig-1/capture/start', route => {
+    const body = route.request().postDataJSON()
+    starts.push(body)
+    current = { ...current, phase: 'exposing', active: true, frameType: body.frameType }
+
+    return respond(route, current)
+  })
+  await page.goto('/rigs/rig-1/observe/capture?target=ngc0224')
+  const frameType = page.getByLabel('Frame type')
+  await expect(frameType).toBeEnabled()
+  await expect(frameType).toHaveValue('light')
+  await expect(page.getByText('Cap the telescope or camera first.')).toHaveCount(0)
+
+  expect(
+    await frameType.locator('option').allTextContents(),
+  ).toEqual(['Light · target images', 'Dark', 'Flat', 'Dark flat', 'Bias'])
+
+  for (const [value, reminder] of [
+    ['dark', 'Cap the telescope or camera first. Vela cannot see the cap.'],
+    ['dark-flat', 'Cap the telescope or camera first. Use the same exposure as your flats.'],
+    ['bias', 'Cap the telescope or camera first. Use the shortest exposure, 0.1 seconds here.'],
+  ]) {
+    await frameType.selectOption(value!)
+    await expect(page.getByText(reminder!)).toBeVisible()
+  }
+
+  await frameType.selectOption('flat')
+  await expect(page.getByText('Aim at an evenly lit panel or sky.', { exact: false })).toBeVisible()
+  await expect(page.getByText('Cap the telescope or camera first.')).toHaveCount(0)
+  await frameType.selectOption('dark')
+  await expect(page.getByRole('heading', { name: 'Dark frames' })).toBeVisible()
+  await expect(page.getByText('Calibration frames are not tied to a target.')).toBeVisible()
+
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth),
+  ).toBeLessThanOrEqual(0)
+
+  const box = await frameType.boundingBox()
+  expect(box!.x).toBeGreaterThanOrEqual(0)
+  expect(box!.x + box!.width).toBeLessThanOrEqual(390)
+
+  await page.getByRole('button', { name: 'Start capture' }).click()
+  expect(starts).toEqual([{ exposureSeconds: 2, repeat: true, saveFrames: true, frameType: 'dark' }])
+  await expect(page.getByRole('region', { name: 'Capture images' })).toContainText('Dark · Exposure 1')
+  await expect(page.getByLabel('Frame type')).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Stop capture' })).toBeInViewport()
 
   expect(
@@ -425,7 +484,7 @@ test('a single exposure ignores an invalid Frames entry', async ({ page }) => {
   await page.getByLabel('Frames · optional').fill('2.5')
   await page.getByText('Repeat until stopped', { exact: true }).click()
   await page.getByRole('button', { name: 'Take exposure' }).click()
-  await expect.poll(() => body).toEqual({ exposureSeconds: 2, repeat: false, saveFrames: true })
+  await expect.poll(() => body).toEqual({ exposureSeconds: 2, repeat: false, saveFrames: true, frameType: 'light' })
 })
 
 test('omits frameCount when the field is blank', async ({ page }) => {
@@ -438,7 +497,7 @@ test('omits frameCount when the field is blank', async ({ page }) => {
   })
   await page.goto('/rigs/rig-1/observe/capture')
   await page.getByRole('button', { name: 'Start capture' }).click()
-  await expect.poll(() => body).toEqual({ exposureSeconds: 2, repeat: true, saveFrames: true })
+  await expect.poll(() => body).toEqual({ exposureSeconds: 2, repeat: true, saveFrames: true, frameType: 'light' })
 })
 
 test('displays completed downloads during faster frame arrivals and coalesces pending images without mislabeling Fit', async ({

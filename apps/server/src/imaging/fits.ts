@@ -1,5 +1,6 @@
 import { setImmediate } from 'node:timers/promises'
-import type { CaptureImage } from '@vela/model/web'
+import type { CaptureImage, FrameType } from '@vela/model/web'
+import { imageTypeKeyword } from './frame-type.js'
 import type { ImageColor } from './preview.js'
 
 /** Export acquisition samples without stretching, calibration, or row reversal. */
@@ -12,7 +13,7 @@ export async function encodeCaptureFits(
     capturedAtSource?: CaptureImage['capturedAtSource']
     color?: ImageColor
   },
-  metadata: { exposureSeconds: number; cameraName: string },
+  metadata: { exposureSeconds: number; cameraName: string; frameType?: FrameType },
 ): Promise<Buffer> {
   const { width, height, pixels } = frame
 
@@ -64,6 +65,7 @@ export async function encodeCaptureFits(
     numberCard('NAXIS2', height),
     textCard('DATE-OBS', start.toISOString()),
     numberCard('EXPTIME', metadata.exposureSeconds),
+    textCard('IMAGETYP', imageTypeKeyword[metadata.frameType ?? 'light']),
     textCard('INSTRUME', metadata.cameraName),
     textCard('ROWORDER', 'TOP-DOWN'),
   ]

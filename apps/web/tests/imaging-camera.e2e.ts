@@ -50,6 +50,7 @@ async function observe(page: Page) {
       captureReadState: 'current',
       repeat: false,
       saveFrames: false,
+      frameType: 'light',
       savedImageCount: 0,
       subject: null,
       savedCount: 0,

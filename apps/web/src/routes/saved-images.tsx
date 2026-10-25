@@ -141,7 +141,7 @@ function PhotographsPage({ rigId, imageId }: { rigId: string; imageId?: string }
               <p>{visible.length} photographs{filter ? ' matching filter' : ''} · Newest first</p>
             </div>
             {!imageId && <Select
-              label={browse === 'nights' ? 'Target' : 'Observing night'}
+              label={browse === 'nights' ? 'Target or frame type' : 'Observing night'}
               value={filter}
               options={[
                 { value: '', label: `All ${opposite}` },

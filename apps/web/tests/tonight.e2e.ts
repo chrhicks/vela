@@ -193,7 +193,7 @@ test('pending target choice cannot relabel an active run and theme changes prese
   await page.getByRole('button', { name: 'Start capture' }).click()
   await expect
     .poll(() => starts)
-    .toEqual([{ exposureSeconds: 42, repeat: true, saveFrames: false, targetId: 'next' }])
+    .toEqual([{ exposureSeconds: 42, repeat: true, saveFrames: false, frameType: 'light', targetId: 'next' }])
 })
 
 

@@ -24,6 +24,13 @@ library. These are derived groups, not saved observing sessions or capture runs.
 Targets use recorded subject IDs, not display names or solved pointing. Null or
 absent legacy subject metadata remains under No recorded target.
 
+Calibration frames (dark, flat, dark flat, bias) never group under a target. On the
+Targets tab each type is its own group, "Dark frames" and so on, listed with the targets
+in order of first appearance. On the Nights tab a night holds everything taken that
+night, and the filter beside the group title lists the night's targets and its
+calibration types, so one choice shows only the darks or only a target's lights.
+Saved images from before frame types read as lights, so they group as before.
+
 The endpoint still returns the complete collection. Grouping, search and filters
 are browser presentation, not server pagination. Thumbnails load lazily, with
 no per-thumbnail detail reads or archive preview conversion. There is no
