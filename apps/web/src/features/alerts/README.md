@@ -22,8 +22,9 @@ whether it was acknowledged and how the phone is getting on; the browser only pr
 - The card's Send test is disabled while no Pushover keys are configured, because the server would
   refuse it.
 - The phone alerts switch is `PhoneAlertsSwitch`: "Phone alerts: on" or "off" beside a Turn off / Turn on
-  button. It sits on the card always, and on the banner only while phone alerts are off, so a quiet capture
-  page still says Chris will not be paged and offers the way back. It is hidden while no Pushover keys are
+  button. It sits on the card always. On the banner it shows on the capture page always (Chris starts runs
+  there and can turn the phone off or on without leaving), and on other pages only while phone alerts are
+  off, so a quiet page still says Chris will not be paged and offers the way back. It is hidden while no Pushover keys are
   set up, and disabled while the view is stale. The control PUTs `{ on }` to
   `/api/rigs/:rigId/alerts/phone` and shows the view the server answers with. Alerts stay in the banner
   while it is off, with delivery "Not sent · phone alerts are off". Send test is disabled while off.

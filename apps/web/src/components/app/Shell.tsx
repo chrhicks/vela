@@ -11,6 +11,7 @@ export default function Shell() {
   const rigId = matchPath('/rigs/:rigId/*', pathname)?.params.rigId
   // Polar alignment reads the same devices every few seconds; a full inspection would compete.
   const paused = !!matchPath('/rigs/:rigId/observe/alignment', pathname)
+  const onCapturePage = !!matchPath('/rigs/:rigId/observe/capture', pathname)
   const { mode } = useAppearance()
   const navigation = useNavigation()
   // Pages without a rig still show the alerts of the run being followed.
@@ -19,7 +20,7 @@ export default function Shell() {
   const content = (
     <>
       <AppNavigation navigation={navigation} />
-      <AlertBanner />
+      <AlertBanner alwaysShowPhoneSwitch={onCapturePage} />
       <main>
         <Outlet />
       </main>

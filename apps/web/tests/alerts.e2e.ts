@@ -263,6 +263,30 @@ test('a quiet rig with phone alerts off says so on the capture page, on a phone-
   expect(rig.posts).toEqual(['phone-on'])
 })
 
+test('the capture page switches phone alerts off and on, on a phone-width screen', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 800 })
+
+  const rig = await useRig(page, alertsView())
+  await page.goto('/rigs/rig-1/observe/capture')
+  const banner = page.getByRole('region', { name: 'Rig alerts' })
+
+  await expect(banner).toContainText('Phone alerts: on')
+  await expect(banner.getByRole('button', { name: 'Turn off' })).toBeInViewport()
+
+  await banner.getByRole('button', { name: 'Turn off' }).click()
+
+  await expect(banner).toContainText('Phone alerts: off')
+  await expect(banner).toContainText('alerts show here only')
+  await banner.getByRole('button', { name: 'Turn on' }).click()
+
+  await expect(banner).toContainText('Phone alerts: on')
+  await expect(banner.getByRole('button', { name: 'Turn off' })).toBeInViewport()
+
+  const width = await page.evaluate(() => document.documentElement.scrollWidth)
+  expect(width).toBeLessThanOrEqual(390)
+  expect(rig.posts).toEqual(['phone-off', 'phone-on'])
+})
+
 test('without phone keys there is no switch, since there is no phone to hold back', async ({ page }) => {
   await useRig(page, alertsView({ phone: { state: 'not-configured' }, phoneAlertsOn: false }))
   await page.goto('/rigs/rig-1')
