@@ -154,7 +154,13 @@ export function useCapture(rigId: string) {
   async function post(
     path: 'start' | 'stop' | 'cooling',
     body:
-      | { exposureSeconds: number; repeat: boolean; saveFrames: boolean; targetId?: string }
+      | {
+          exposureSeconds: number
+          repeat: boolean
+          saveFrames: boolean
+          targetId?: string
+          frameCount?: number
+        }
       | { coolerOn: boolean }
       | { setpointC: number }
       | Record<string, never>,
@@ -263,12 +269,22 @@ export function useCapture(rigId: string) {
     canStart,
     canStop,
     canCool,
-    start: (seconds: number, repeat: boolean, saveFrames: boolean, targetId?: string) => {
+    start: (
+      seconds: number,
+      repeat: boolean,
+      saveFrames: boolean,
+      targetId?: string,
+      frameCount?: number,
+    ) => {
       if (!Number.isFinite(seconds) || seconds < 0.1 || seconds > 600) return Promise.resolve()
 
-      const body = { exposureSeconds: seconds, repeat, saveFrames }
-
-      return post('start', targetId === undefined ? body : { ...body, targetId })
+      return post('start', {
+        exposureSeconds: seconds,
+        repeat,
+        saveFrames,
+        ...(targetId !== undefined && { targetId }),
+        ...(frameCount !== undefined && { frameCount }),
+      })
     },
     stop: () => post('stop', {}),
     setCooler: (coolerOn: boolean) => post('cooling', { coolerOn }),

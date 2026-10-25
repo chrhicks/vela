@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import type { CaptureView } from '@vela/model/web'
-import { isCaptureView, isSavedImage, isSavedImageView, isSavedImagesView } from './validation'
+import {
+  isCaptureView,
+  isSavedImage,
+  isSavedImageView,
+  isSavedImagesView,
+  parseFrameCount,
+} from './validation'
 
 const view: CaptureView = {
   captureReadState: 'current',
@@ -65,6 +71,9 @@ describe('capture response validation', () => {
 
     for (const patch of [
       { repeat: 'true' },
+      { frameCount: 0 },
+      { frameCount: 2.5 },
+      { frameCount: -1 },
       { completedCount: -1 },
       { completedCount: 1.5 },
       { completedCount: undefined },
@@ -243,4 +252,22 @@ it('requires a usable, explicit time zone for both saved-image projections', () 
   }
 
   expect(isSavedImageView({ rigId: 'rig-1', rigName: 'Rig', timeZone: 'UTC', image: savedImage }, 'rig-1')).toBe(true)
+})
+
+describe('frame count', () => {
+  it('accepts a target, none and null in a capture view', () => {
+    expect(isCaptureView({ ...view, frameCount: 30 }, 'rig-1')).toBe(true)
+    expect(isCaptureView({ ...view, frameCount: null }, 'rig-1')).toBe(true)
+    expect(isCaptureView(view, 'rig-1')).toBe(true)
+  })
+
+  it('reads the Frames field: blank repeats until stopped, anything else is a whole number in range', () => {
+    expect(parseFrameCount('')).toEqual({ valid: true })
+    expect(parseFrameCount('  ')).toEqual({ valid: true })
+    expect(parseFrameCount('30')).toEqual({ valid: true, frameCount: 30 })
+    expect(parseFrameCount('10000')).toEqual({ valid: true, frameCount: 10_000 })
+
+    for (const input of ['0', '-2', '2.5', 'abc', '1e1x', '10001'])
+      expect(parseFrameCount(input)).toEqual({ valid: false })
+  })
 })

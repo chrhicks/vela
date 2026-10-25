@@ -120,6 +120,8 @@ export interface CaptureView {
   captureReadState: 'current' | 'retrying'
   active: boolean
   repeat: boolean
+  /** Frames after which the run ends by itself; null when it repeats until stopped. */
+  frameCount?: number | null
   saveFrames: boolean
   savedImageCount: number | null
   /** Completed images published during the current or most recent run. */

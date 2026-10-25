@@ -51,6 +51,8 @@ interface CaptureRouteOptions {
   alerts?: { monitorFor(rig: RigCatalogRecord): Pick<AlertMonitor, 'runStarted' | 'frameCaptured' | 'runEnded'> }
 }
 
+const MAX_FRAME_COUNT = 10_000
+
 function configuredCamera(settings: CaptureSettings, acquisition: Acquisition): CaptureCamera {
   return {
     async capture({ exposureSeconds, signal, onProgress, onReadState, onProvenance }) {
@@ -262,15 +264,17 @@ export function registerCapture(
         .strictObject({
           exposureSeconds: z.number().min(0.1).max(600),
           repeat: z.boolean().optional(),
+          frameCount: z.number().int().min(1).max(MAX_FRAME_COUNT).optional(),
           saveFrames: z.boolean().optional(),
           targetId: z.string().trim().min(1).max(100).optional(),
         })
+        .refine(value => value.frameCount === undefined || value.repeat === true)
         .safeParse(request.body)
 
       if (!request.headers['content-type']?.startsWith('application/json') || !parsed.success) {
         return reply.code(400).send({
           error:
-            'Expected exposureSeconds between 0.1 and 600 and optional boolean repeat and saveFrames, and optional targetId.',
+            `Expected exposureSeconds between 0.1 and 600, optional boolean repeat and saveFrames, optional targetId, and optional frameCount (a whole number from 1 to ${MAX_FRAME_COUNT}, only with repeat: true).`,
         })
       }
 
@@ -331,6 +335,7 @@ export function registerCapture(
               watch?.runEnded(captureController.snapshot().phase === 'failed' ? 'failed' : 'stopped')
             },
             repeat: body.repeat === true,
+            frameCount: body.frameCount,
             saveFrames: body.saveFrames === true,
           })
           .catch(error => {

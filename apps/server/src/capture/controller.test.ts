@@ -321,6 +321,96 @@ it('counts a lost frame and takes the next one while the run repeats', async () 
   await stopping
 })
 
+describe('frame count', () => {
+  it('ends the run cleanly after exactly N finished frames, with N records and no error', async () => {
+    const records: FrameRecord[] = []
+    const settled = vi.fn()
+    const { controller, requests, frame } = setup(createMemorySavedImageStore(), { append: record => void records.push(record), close: async () => {} })
+    await controller.start(10, { repeat: true, frameCount: 2, onSettled: settled })
+    expect(controller.snapshot().frameCount).toBe(2)
+    requests[0]!.resolve(frame)
+    await vi.waitFor(() => expect(requests).toHaveLength(2))
+    expect(controller.snapshot()).toMatchObject({ active: true, completedCount: 1 })
+    requests[1]!.resolve(frame)
+    await vi.waitFor(() => expect(controller.active()).toBe(false))
+    expect(requests).toHaveLength(2)
+    expect(settled).toHaveBeenCalledOnce()
+    expect(controller.snapshot()).toMatchObject({
+      active: false,
+      phase: 'complete',
+      completedCount: 2,
+      frameCount: 2,
+      integrationSeconds: 20,
+      error: null,
+    })
+    expect(records.map(record => record.outcome)).toEqual(['unsaved', 'unsaved'])
+  })
+
+  it('saves the Nth frame before it ends the run', async () => {
+    const store = createMemorySavedImageStore()
+    const { controller, requests, frame } = setup(store)
+    await controller.start(10, { repeat: true, saveFrames: true, frameCount: 2 })
+    requests[0]!.resolve(frame)
+    await vi.waitFor(() => expect(requests).toHaveLength(2))
+    requests[1]!.resolve(frame)
+    await vi.waitFor(() => expect(controller.active()).toBe(false))
+    expect(controller.snapshot()).toMatchObject({ phase: 'complete', savedCount: 2, error: null })
+    expect(await store.count('fra 400')).toBe(2)
+  })
+
+  it('keeps repeating when no frame count is given, and forgets the last run\'s count', async () => {
+    const { controller, requests, frame } = setup()
+    await controller.start(10, { repeat: true, frameCount: 1 })
+    requests[0]!.resolve(frame)
+    await vi.waitFor(() => expect(controller.active()).toBe(false))
+    await controller.start(10, { repeat: true })
+    expect(controller.snapshot().frameCount).toBeNull()
+
+    for (let index = 1; index <= 3; index++) {
+      requests[index]!.resolve(frame)
+      await vi.waitFor(() => expect(requests).toHaveLength(index + 2))
+    }
+
+    expect(controller.snapshot()).toMatchObject({ active: true, completedCount: 3 })
+    const stopping = controller.stop()
+    requests.at(-1)!.reject(new CaptureStoppedError())
+    await stopping
+  })
+
+  it('does not count a lost frame, so the run takes another to reach N', async () => {
+    const { controller, requests, frame } = setup()
+    await controller.start(10, { repeat: true, frameCount: 1 })
+    requests[0]!.reject(new CaptureFrameLostError('Cria no longer holds this image; the frame is lost'))
+    await vi.waitFor(() => expect(requests).toHaveLength(2))
+    expect(controller.snapshot()).toMatchObject({ active: true, completedCount: 0, lostFrameCount: 1 })
+    requests[1]!.resolve(frame)
+    await vi.waitFor(() => expect(controller.active()).toBe(false))
+    expect(controller.snapshot()).toMatchObject({ phase: 'complete', completedCount: 1, lostFrameCount: 1, error: null })
+  })
+
+  it('does not count a frame whose save failed, and ends the run failed', async () => {
+    const store = createMemorySavedImageStore()
+    vi.spyOn(store, 'save').mockRejectedValueOnce(new Error('Disk full'))
+    const { controller, requests, frame } = setup(store)
+    await controller.start(10, { repeat: true, saveFrames: true, frameCount: 1 })
+    requests[0]!.resolve(frame)
+    await vi.waitFor(() => expect(controller.active()).toBe(false))
+    expect(requests).toHaveLength(1)
+    expect(controller.snapshot()).toMatchObject({ phase: 'failed', savedCount: 0 })
+    expect(controller.snapshot().error).toContain('Disk full')
+  })
+
+  it('keeps what a manual stop before N already took', async () => {
+    const { controller, requests, frame } = setup()
+    await controller.start(10, { repeat: true, frameCount: 3 })
+    requests[0]!.resolve(frame)
+    await vi.waitFor(() => expect(requests).toHaveLength(2))
+    const stopping = controller.stop()
+    requests[1]!.reject(new CaptureStoppedError())
+    expect(await stopping).toMatchObject({ phase: 'stopped', completedCount: 1, frameCount: 3, error: null })
+  })
+})
+
 it('ends a single exposure whose frame was lost, and says so', async () => {
   const { controller, requests } = setup()
   await controller.start(10, { repeat: false })

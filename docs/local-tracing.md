@@ -127,7 +127,7 @@ jq 'select(.name | startswith("cria."))' data/traces/observing.jsonl
 ## Capture runs and frames
 
 A capture run writes `capture.run.started` (rig, exposure seconds, `capture.run.repeat`,
-`capture.run.saveFrames`) and `capture.run.ended` (final `capture.run.phase`, and the run's
+`capture.run.saveFrames`, and `capture.run.frameCount` when the run has a target) and `capture.run.ended` (final `capture.run.phase`, and the run's
 `completed`, `lost` and `saved` counts, plus `capture.run.error` if it failed). Each frame is one
 `capture.frame` span from the start of its exposure to the end of its save, with
 `capture.run.id`, `capture.frame.index` and `capture.frame.outcome`: `saved`, `unsaved` (kept in
