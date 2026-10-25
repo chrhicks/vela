@@ -92,7 +92,8 @@ meaning of legacy images. Null measurements mean
 analysis unavailable; zero detected stars with null HFR is a valid measured
 result. HFR is the median half-flux radius in native image pixels. It is shared by the Observe thumbnail and Capture
 page. The count resets on start, while the latest image remains until a new image is
-published. The saveFrames flag is the active run's retention choice; savedImageCount
+published. `frameCount` is the number of frames after which the run ends by itself, null
+when it repeats until stopped. The saveFrames flag is the active run's retention choice; savedImageCount
 is null when storage cannot be inspected. The saving phase remains active while
 the server writes an image. CaptureImage.saved confirms retention of that image's
 original data and preview. `cooling` is confirmed CoolerOn plus optional sensor

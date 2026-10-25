@@ -1,7 +1,8 @@
 # Capture
 
 Capture owns one server-side capture run and its most recent image. A run takes
-one exposure or repeats the requested duration until stopped. Browser requests
+one exposure, repeats the requested duration until stopped, or repeats until it
+has finished a requested number of frames. Browser requests
 start the work and read its projection; disconnecting the browser does not stop
 acquisition. A server restart loses the operation and in-memory previews;
 explicitly saved images remain available through the saved-images boundary.
@@ -105,6 +106,25 @@ Whenever any operation owns the Rig, the cooling projection carries `blockedBy`:
 other short command. It uses the same condition under which the cooling command is
 refused, so the browser can disable the control and name the reason instead of
 discovering a 409. A confirmed cooling response is read after its own lease ends.
+
+### Frame count
+
+`frameCount` is an optional whole number from 1 to 10000 on start, valid only with
+`repeat: true`; anything else, including `frameCount` without repeat, is a 400.
+Omitted means repeat until stopped. The view carries it as `frameCount` for the
+run (null when there is none), so a client can show `completedCount` of
+`frameCount`.
+
+A frame counts toward the target once it is published and, when `saveFrames` is
+on, saved. A lost frame never counts: the run takes another, as it does today. A
+failed read or a failed save ends the run as `failed`, so it never reaches the
+target. After the Nth finished frame no further exposure starts and the run
+ends the way a single exposure does: phase `complete`, `active: false`, no error,
+the frames saved and one frame record each, and the Rig lease released. A manual
+Stop before then ends it as `stopped` and keeps the count taken so far. A run that
+reached its target is told from one stopped early by `completedCount` against
+`frameCount`. `completedCount` counts a frame as it is published, so while the
+last frame is saving it already reads N; a failed save then ends the run `failed`.
 
 ## Local review
 

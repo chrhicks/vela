@@ -7,6 +7,26 @@ import type {
   SavedImageView,
 } from '@vela/model/web'
 
+/** The server's limit on `frameCount`. */
+export const MAX_FRAME_COUNT = 10_000
+
+export interface FrameCountInput {
+  valid: boolean
+  frameCount?: number
+}
+
+/** Reads the Frames field: blank means repeat until stopped; anything else must be a whole number in range. */
+export function parseFrameCount(input: string): FrameCountInput {
+  const trimmed = input.trim()
+
+  if (trimmed === '') return { valid: true }
+  const count = Number(trimmed)
+
+  if (!Number.isInteger(count) || count < 1 || count > MAX_FRAME_COUNT) return { valid: false }
+
+  return { valid: true, frameCount: count }
+}
+
 const text = z.string().refine(value => value.trim().length > 0)
 
 const subject = z.object({ targetId: text, name: text, catalog: text })
@@ -65,6 +85,7 @@ const captureView = z.object({
   captureReadState: z.enum(['current', 'retrying']),
   exposureSeconds: z.number().min(0).max(600),
   repeat: z.boolean(),
+  frameCount: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).nullable().optional(),
   subject: subject.nullable(),
   savedCount: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
   integrationSeconds: z.number().finite().nonnegative(),

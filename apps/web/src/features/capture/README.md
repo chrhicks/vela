@@ -45,6 +45,13 @@ star count/HFR. Image pixels, exposure metadata and measurements commit together
 including when a newer image fails to load or intermediate arrivals are skipped.
 Zero measured stars and unavailable analysis have distinct presentations.
 
+The optional Frames field sits under the repeat checkbox and is disabled when
+repeat is off. Blank repeats until stopped and sends no `frameCount`; otherwise it
+must be a whole number from 1 to 10000, and an invalid entry disables Start. While
+a run with a target is active, the run summary reads "12 of 30 frames" from the
+server's `completedCount` and `frameCount`. The server ends the run at the target;
+the page never stops it.
+
 Save frames is an explicit per-run option, off on a new controller and restored
 from the active server projection. Keep this image targets the image whose pixels
 have actually loaded. Its idempotent storage request has separate pending/error

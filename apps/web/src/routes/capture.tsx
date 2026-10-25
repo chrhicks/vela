@@ -4,6 +4,7 @@ import { Link, useParams, useSearchParams } from 'react-router'
 import { CaptureInterruption } from '../features/capture/CaptureInterruption'
 import { LatestImage } from '../features/capture/LatestImage'
 import { captureActivity, useCapture } from '../features/capture/use-capture'
+import { MAX_FRAME_COUNT, parseFrameCount } from '../features/capture/validation'
 import { CaptureCooling, coolingBlocker } from '../features/capture/CaptureCooling'
 import { useRigObservation } from '../features/rig-detail/RigContext'
 import { useTonightTarget } from '../features/targets/use-tonight-target'
@@ -25,6 +26,7 @@ function CapturePage({ rigId }: { rigId: string }) {
   const [exposure, setExposure] = useState<string | null>(null)
   const [saveFrames, setSaveFrames] = useState<boolean | null>(null)
   const [repeat, setRepeat] = useState<boolean | null>(null)
+  const [frames, setFrames] = useState('')
   const [coolingOpen, setCoolingOpen] = useState(false)
   const { view, offline, pending, refreshing, error, commandUnconfirmed } = capture
   const chosenTargetId = params.get('target') ?? undefined
@@ -51,6 +53,7 @@ function CapturePage({ rigId }: { rigId: string }) {
   // Saved by default: an unsaved frame past the last three is gone, and a night's frames cannot be retaken.
   const savingFrames = view?.active ? view.saveFrames : (saveFrames ?? true)
   const seconds = Number(exposureValue)
+  const frameCount = parseFrameCount(frames)
 
   const validExposure =
     exposureValue.trim() !== '' && Number.isFinite(seconds) && seconds >= 0.1 && seconds <= 600
@@ -247,7 +250,11 @@ function CapturePage({ rigId }: { rigId: string }) {
                       collected
                       {(view.lostFrameCount ?? 0) > 0 && <> · {view.lostFrameCount} lost</>}
                       <br />
-                      {view.repeat ? 'Repeats until you stop' : 'One exposure'}
+                      {view.frameCount
+                        ? `${view.completedCount} of ${view.frameCount} frames`
+                        : view.repeat
+                          ? 'Repeats until you stop'
+                          : 'One exposure'}
                     </div>
                     <Button
                       tone="accent"
@@ -276,12 +283,13 @@ function CapturePage({ rigId }: { rigId: string }) {
                     onSubmit={event => {
                       event.preventDefault()
 
-                      if (validExposure)
+                      if (validExposure && (!repeating || frameCount.valid))
                         void capture.start(
                           seconds,
                           repeating,
                           savingFrames,
                           chosenTargetId ?? view.subject?.targetId,
+                          repeating ? frameCount.frameCount : undefined,
                         )
                     }}
                   >
@@ -303,6 +311,24 @@ function CapturePage({ rigId }: { rigId: string }) {
                       disabled={busy || offline}
                       onChange={event => setRepeat(event.target.checked)}
                     />
+                    <Input
+                      label="Frames · optional"
+                      type="number"
+                      inputMode="numeric"
+                      min="1"
+                      max={MAX_FRAME_COUNT}
+                      step="1"
+                      placeholder="Until stopped"
+                      value={frames}
+                      disabled={busy || offline || !repeating}
+                      invalid={repeating && !frameCount.valid}
+                      message={
+                        repeating && !frameCount.valid
+                          ? `Choose a whole number from 1 to ${MAX_FRAME_COUNT}, or leave blank.`
+                          : ''
+                      }
+                      onChange={event => setFrames(event.target.value)}
+                    />
                     <Checkbox
                       label="Save frames"
                       description="Keep every completed image as FITS + preview."
@@ -314,7 +340,10 @@ function CapturePage({ rigId }: { rigId: string }) {
                       type="submit"
                       tone="accent"
                       disabled={
-                        !capture.canStart || !validExposure || (!!chosenTargetId && !target)
+                        !capture.canStart ||
+                        !validExposure ||
+                        (repeating && !frameCount.valid) ||
+                        (!!chosenTargetId && !target)
                       }
                     >
                       {pending

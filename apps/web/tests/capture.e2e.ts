@@ -371,6 +371,76 @@ test('repeating capture restores server settings and can stop during image recei
   await expect(page.getByRole('button', { name: 'Take exposure' })).toBeEnabled()
 })
 
+test('starts with a frame count, shows progress, and fits a 390 px page', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 800 })
+  let current: CaptureView = { ...idle, repeat: true }
+  const starts: unknown[] = []
+  await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, current))
+  await page.route('**/api/rigs/rig-1/capture/start', route => {
+    starts.push(route.request().postDataJSON())
+    current = { ...current, phase: 'exposing', active: true, frameCount: 30, completedCount: 12 }
+
+    return respond(route, current)
+  })
+  await page.goto('/rigs/rig-1/observe/capture')
+  const frames = page.getByLabel('Frames · optional')
+  await expect(frames).toBeEnabled()
+  await expect(frames).toHaveValue('')
+
+  await frames.fill('2.5')
+  await expect(page.getByText('Choose a whole number from 1 to 10000, or leave blank.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Start capture' })).toBeDisabled()
+
+  await page.getByText('Repeat until stopped', { exact: true }).click()
+  await expect(frames).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Take exposure' })).toBeEnabled()
+  await page.getByText('Repeat until stopped', { exact: true }).click()
+
+  await frames.fill('30')
+  await expect(frames).toBeVisible()
+
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth),
+  ).toBeLessThanOrEqual(0)
+
+  await page.getByRole('button', { name: 'Start capture' }).click()
+  expect(starts).toEqual([{ exposureSeconds: 2, repeat: true, saveFrames: true, frameCount: 30 }])
+  await expect(page.getByRole('region', { name: 'Capture images' })).toContainText('12 of 30 frames')
+  await expect(page.getByRole('button', { name: 'Stop capture' })).toBeInViewport()
+
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth),
+  ).toBeLessThanOrEqual(0)
+})
+
+test('a single exposure ignores an invalid Frames entry', async ({ page }) => {
+  let body: unknown
+  await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, { ...idle, repeat: true }))
+  await page.route('**/api/rigs/rig-1/capture/start', route => {
+    body = route.request().postDataJSON()
+
+    return respond(route, { ...idle, phase: 'exposing', active: true })
+  })
+  await page.goto('/rigs/rig-1/observe/capture')
+  await page.getByLabel('Frames · optional').fill('2.5')
+  await page.getByText('Repeat until stopped', { exact: true }).click()
+  await page.getByRole('button', { name: 'Take exposure' }).click()
+  await expect.poll(() => body).toEqual({ exposureSeconds: 2, repeat: false, saveFrames: true })
+})
+
+test('omits frameCount when the field is blank', async ({ page }) => {
+  let body: unknown
+  await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, { ...idle, repeat: true }))
+  await page.route('**/api/rigs/rig-1/capture/start', route => {
+    body = route.request().postDataJSON()
+
+    return respond(route, { ...idle, repeat: true, phase: 'exposing', active: true })
+  })
+  await page.goto('/rigs/rig-1/observe/capture')
+  await page.getByRole('button', { name: 'Start capture' }).click()
+  await expect.poll(() => body).toEqual({ exposureSeconds: 2, repeat: true, saveFrames: true })
+})
+
 test('displays completed downloads during faster frame arrivals and coalesces pending images without mislabeling Fit', async ({
   page,
 }) => {

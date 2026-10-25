@@ -192,10 +192,22 @@ it('rejects malformed input before acquiring or operating a camera', async () =>
     { exposureSeconds: 1, repeat: null },
     { exposureSeconds: 1, saveFrames: 'true' },
     { exposureSeconds: 1, saveFrames: null },
+    { exposureSeconds: 1, repeat: true, frameCount: 0 },
+    { exposureSeconds: 1, repeat: true, frameCount: -3 },
+    { exposureSeconds: 1, repeat: true, frameCount: 2.5 },
+    { exposureSeconds: 1, repeat: true, frameCount: '5' },
+    { exposureSeconds: 1, repeat: true, frameCount: null },
+    { exposureSeconds: 1, repeat: true, frameCount: 10_001 },
+    { exposureSeconds: 1, frameCount: 5 },
+    { exposureSeconds: 1, repeat: false, frameCount: 5 },
     [],
   ]) {
     expect((await subject.start(body)).statusCode).toBe(400)
   }
+
+  expect((await subject.start({ exposureSeconds: 1, frameCount: 5 })).json().error).toContain(
+    'frameCount (a whole number from 1 to 10000, only with repeat: true)',
+  )
 
   expect(subject.inspections()).toBe(0)
   expect(subject.captures).toHaveLength(0)
@@ -370,6 +382,27 @@ it('owns repeated capture across reads and releases the Rig lease only after con
     latestImage: current.latestImage,
   })
   expect(subject.operations.owner('sim')).toBeUndefined()
+  expect(subject.captures).toHaveLength(2)
+})
+
+it('ends a repeating run by itself after frameCount frames and reports the target', async () => {
+  const subject = setup()
+  expect((await subject.start({ exposureSeconds: 10, repeat: true, frameCount: 2 })).json()).toMatchObject({
+    active: true,
+    frameCount: 2,
+  })
+  subject.captures[0]!.resolve(frame)
+  await vi.waitFor(() => expect(subject.captures).toHaveLength(2))
+  expect((await subject.get()).json()).toMatchObject({ active: true, completedCount: 1, frameCount: 2 })
+  subject.captures[1]!.resolve(frame)
+  await vi.waitFor(() => expect(subject.operations.owner('sim')).toBeUndefined())
+  expect((await subject.get()).json()).toMatchObject({
+    active: false,
+    phase: 'complete',
+    completedCount: 2,
+    frameCount: 2,
+    error: null,
+  })
   expect(subject.captures).toHaveLength(2)
 })
 

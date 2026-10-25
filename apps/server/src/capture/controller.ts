@@ -75,6 +75,8 @@ export interface CaptureRunOptions {
   /** Called with each frame once it is published, whether or not it is saved. */
   onFrame?: (image: CaptureImage) => void
   repeat?: boolean
+  /** Ends a repeating run after this many finished frames; omitted means until stopped. */
+  frameCount?: number | undefined
   saveFrames?: boolean
 }
 
@@ -174,6 +176,7 @@ export function createCaptureController(
     camera: CaptureCamera,
     cameraName: string,
     repeat: boolean,
+    frameCount: number | undefined,
     saveFrames: boolean,
     subject: CaptureSubject | null,
     runGeneration: number,
@@ -426,8 +429,9 @@ export function createCaptureController(
           patch({ phase: 'complete' })
         }
 
+        // Only a published frame, saved when saving, reaches here, so completedCount is the finished count.
         endFrame(saveFrames ? 'saved' : 'unsaved')
-      } while (repeat && !signal.aborted)
+      } while (repeat && !signal.aborted && (frameCount === undefined || view.completedCount < frameCount))
     } catch (error) {
       const stopped = signal.aborted && error instanceof CaptureStoppedError
 
@@ -468,7 +472,7 @@ export function createCaptureController(
     exposureSeconds: number,
     camera: CaptureCamera,
     cameraName: string,
-    { onSettled, onFrame, repeat = false, saveFrames = false, subject = null }: CaptureRunOptions = {},
+    { onSettled, onFrame, repeat = false, frameCount, saveFrames = false, subject = null }: CaptureRunOptions = {},
   ) {
     if (running) throw new Error('An exposure is already running')
 
@@ -483,6 +487,7 @@ export function createCaptureController(
       phase: 'exposing',
       active: true,
       repeat,
+      frameCount: frameCount ?? null,
       saveFrames,
       completedCount: 0,
       lostFrameCount: 0,
@@ -502,6 +507,7 @@ export function createCaptureController(
           'capture.run.id': runId,
           'capture.exposure.seconds': exposureSeconds,
           'capture.run.repeat': repeat,
+          ...(frameCount !== undefined && { 'capture.run.frameCount': frameCount }),
           'capture.run.saveFrames': saveFrames,
         },
       })
@@ -513,6 +519,7 @@ export function createCaptureController(
       camera,
       cameraName,
       repeat,
+      frameCount,
       saveFrames,
       runSubject,
       runGeneration,
