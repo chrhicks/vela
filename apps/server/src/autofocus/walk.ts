@@ -120,7 +120,7 @@ export function planStarHfrWalk(
 }
 
 /**
- * Every sample is taken after a downward move, so the curve fit describes the focuser as it sits
+ * All samples but the first are taken after a downward move, so the curve fit describes the focuser as it sits
  * after coming down. The final move to best focus, and the return to the start, come down the same
  * way. `via` is null only when the target is at the top of travel and there is nowhere above it.
  */
