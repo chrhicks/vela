@@ -314,6 +314,10 @@ test('the capture page says when the phone is paged, and an alert held for darkn
   rig.set(alertsView({ alerts: [held], pagingWindow: { state: 'not-dark', from: dusk, until: dawn } }))
   await page.goto('/rigs/rig-1')
   await expect(page.getByRole('region', { name: 'Alerts', exact: true })).toContainText('Not sent · outside astro dark')
+
+  rig.set(alertsView({ alerts: [{ ...collapsed, delivery: { state: 'stopped-at-dawn' } }], pagingWindow: { state: 'not-dark', from: dusk, until: dawn } }))
+  await page.goto('/rigs/rig-1')
+  await expect(page.getByRole('region', { name: 'Alerts', exact: true })).toContainText('Sent once · stopped at dawn')
 })
 
 test('without phone keys there is no switch, since there is no phone to hold back', async ({ page }) => {

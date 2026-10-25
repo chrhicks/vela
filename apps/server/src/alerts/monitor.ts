@@ -60,6 +60,8 @@ const coveredBy: Partial<Record<AlertId, AlertId>> = {
 /** How the phone is getting on with one alert. */
 export type AlertDelivery =
   | { state: 'sent' | 'sending' | 'covered' | 'not-configured' | 'muted' | 'outside-dark' }
+  /** The emergency reached the phone and was cancelled at dawn. It is not sent again. */
+  | { state: 'stopped-at-dawn' }
   /** The phone refused it `failures` times. Vela tries again at `nextAttemptAt` and stops at `giveUpAt`. */
   | { state: 'retrying'; failures: number; nextAttemptAt: number; giveUpAt: number }
   /** Vela stopped trying: the hour ran out, or the alert was acknowledged before the phone took it. */
@@ -140,9 +142,11 @@ interface Episode extends ActiveAlert {
    * Unsent is retried on its own schedule until it gets through, is acknowledged or runs out of
    * time, which makes it gave-up. Skipped was covered by a stronger alert. Muted was silenced
    * by Chris's switch and is never sent, even when the switch comes back on. Held waits for
-   * astronomical darkness, and is sent when it begins if the alert still stands.
+   * astronomical darkness, and is sent when it begins if the alert still stands. Stopped reached
+   * the phone as an emergency that dawn then cancelled: that was its one page, so dusk does not
+   * release it.
    */
-  delivery: 'unsent' | 'sending' | 'sent' | 'skipped' | 'muted' | 'held' | 'gave-up'
+  delivery: 'unsent' | 'sending' | 'sent' | 'skipped' | 'muted' | 'held' | 'stopped' | 'gave-up'
   /** When the phone could first be told: the raise, or the dusk that released it. The retry hour counts from here. */
   eligibleAt: number
   /** Sends the phone refused. */
@@ -444,7 +448,7 @@ export function createAlertMonitor({
 
     if (episode.delivery === 'sent' && episode.receipt !== null) {
       await cancelOrKeepTrying(episode)
-      episode.delivery = closedDelivery(gate)
+      episode.delivery = gate === 'off' ? 'muted' : 'stopped'
     } else if (episode.delivery === 'unsent' || episode.delivery === 'skipped' || episode.delivery === 'held') {
       stopRetrying(episode)
       episode.delivery = closedDelivery(gate)
@@ -470,8 +474,8 @@ export function createAlertMonitor({
 
   /**
    * Acts when the sun crosses the dark line. At dusk, or when the site turns out unknown, every alert
-   * still standing that waited for dark is told to the phone, once. At dawn what repeats on the phone is cancelled and what waits is held for
-   * the next dusk.
+   * still standing that waited for dark is told to the phone, once. At dawn what repeats on the phone is cancelled
+   * for good and what waits is held for the next dusk.
    */
   function syncSun() {
     const sun = sunNow()
@@ -639,6 +643,8 @@ export function createAlertMonitor({
         return { state: 'muted' }
       case 'held':
         return { state: 'outside-dark' }
+      case 'stopped':
+        return { state: 'stopped-at-dawn' }
       case 'gave-up':
         return { state: 'gave-up', failures: episode.failures }
       case 'unsent':
