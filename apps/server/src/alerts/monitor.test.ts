@@ -151,7 +151,7 @@ async function replayNight(fixture: ReturnType<typeof watched>, until = '23:59:5
   const frames = night.filter(frame => frame.time <= until)
 
   fixture.at(frames[0]!.at)
-  fixture.monitor.runStarted(60)
+  fixture.monitor.runStarted(60, true)
 
   for (const frame of frames) {
     fixture.at(frame.at)
@@ -259,7 +259,7 @@ describe('the real night: camera snagged a tripod leg', () => {
 // Episodes
 
 function runOf(fixture: ReturnType<typeof watched>, hfr: Array<number | null>, stars = 1200) {
-  fixture.monitor.runStarted(60)
+  fixture.monitor.runStarted(60, true)
 
   return async (index: number) => {
     fixture.tick(60_000)
@@ -270,6 +270,72 @@ function runOf(fixture: ReturnType<typeof watched>, hfr: Array<number | null>, s
     await settle()
   }
 }
+
+describe('no stars from the first frame', () => {
+  async function frames(fixture: ReturnType<typeof watched>, count: number, stars: number) {
+    for (let index = 0; index < count; index++) {
+      fixture.tick(60_000)
+      fixture.monitor.frameCaptured({
+        capturedAt: new Date(fixture.clock()).toISOString(),
+        statistics: { detectedStars: stars, medianHfrPixels: null },
+      })
+      await settle()
+    }
+  }
+
+  const raised = (fixture: ReturnType<typeof watched>) => fixture.monitor.view().alerts.map(alert => alert.id)
+
+  it('pages once on the fifth frame, and says cleared when the run ends', async () => {
+    const fixture = watched()
+
+    fixture.monitor.runStarted(60, true)
+    await frames(fixture, 4, 0)
+    expect(raised(fixture)).toEqual([])
+
+    await frames(fixture, 1, 0)
+    expect(fixture.monitor.view().alerts).toEqual([expect.objectContaining({ id: 'no-stars', level: 'critical', message: 'No stars after 5 frames' })])
+    expect(fixture.phone.sends().map(event => [event.message, event.priority])).toEqual([['No stars after 5 frames', 2]])
+
+    await frames(fixture, 3, 0)
+    expect(fixture.phone.sends()).toHaveLength(1)
+
+    fixture.monitor.runEnded('stopped')
+    await settle()
+    expect(raised(fixture)).toEqual([])
+    expect(fixture.phone.sends().map(event => event.message)).toEqual(['No stars after 5 frames', 'cleared: No stars after 5 frames'])
+  })
+
+  it('clears when the stars come in', async () => {
+    const fixture = watched()
+
+    fixture.monitor.runStarted(60, true)
+    await frames(fixture, 5, 0)
+    expect(raised(fixture)).toEqual(['no-stars'])
+
+    await frames(fixture, 3, 90)
+    expect(raised(fixture)).toEqual([])
+  })
+
+  it('stays quiet for a run that does not save its frames', async () => {
+    const fixture = watched()
+
+    fixture.monitor.runStarted(60, false)
+    await frames(fixture, 8, 0)
+
+    expect(raised(fixture)).toEqual([])
+    expect(fixture.phone.sends()).toEqual([])
+  })
+
+  it('stays quiet for a single exposure', async () => {
+    const fixture = watched()
+
+    fixture.monitor.runStarted(60, false)
+    await frames(fixture, 1, 0)
+    fixture.monitor.runEnded('stopped')
+
+    expect(raised(fixture)).toEqual([])
+  })
+})
 
 describe('episodes', () => {
   const healthy = [3, 3, 3, 3, 3]
@@ -321,7 +387,7 @@ describe('episodes', () => {
 
   it('raises run-failed as an emergency when the run fails, and drops it when the next run starts', async () => {
     const fixture = watched()
-    fixture.monitor.runStarted(60)
+    fixture.monitor.runStarted(60, true)
 
     fixture.monitor.runEnded('failed')
     await settle()
@@ -330,7 +396,7 @@ describe('episodes', () => {
     expect(fixture.phone.emergencies()).toHaveLength(1)
 
     fixture.tick(60_000)
-    fixture.monitor.runStarted(60)
+    fixture.monitor.runStarted(60, true)
     await settle()
 
     expect(fixture.monitor.view().alerts).toEqual([])
@@ -622,7 +688,7 @@ describe('while the run is polled', () => {
     let mount = tracking()
     const { monitor, phone } = polled(async () => mount)
 
-    monitor.runStarted(1800)
+    monitor.runStarted(1800, true)
     await vi.advanceTimersByTimeAsync(0)
     expect(monitor.view().alerts).toEqual([])
 
@@ -647,7 +713,7 @@ describe('while the run is polled', () => {
     let mount = tracking({ tracking: false })
     const { monitor, phone } = polled(async () => mount)
 
-    monitor.runStarted(1800)
+    monitor.runStarted(1800, true)
     await vi.advanceTimersByTimeAsync(10_000)
     expect(phone.emergencies()).toHaveLength(1)
 
@@ -684,7 +750,7 @@ describe('while the run is polled', () => {
     async function failedDuringOutage() {
       const { monitor, phone } = polled(async () => tracking())
 
-      monitor.runStarted(60)
+      monitor.runStarted(60, true)
       await vi.advanceTimersByTimeAsync(0)
 
       phone.down = 'Pushover answered HTTP 503'
@@ -730,7 +796,7 @@ describe('while the run is polled', () => {
     it('does not retry an alert the next run has already cleared', async () => {
       const { monitor, phone } = await failedDuringOutage()
 
-      monitor.runStarted(60)
+      monitor.runStarted(60, true)
       phone.down = null
       await vi.advanceTimersByTimeAsync(2 * 60_000)
 
@@ -744,7 +810,7 @@ describe('while the run is polled', () => {
       phone.down = 'Pushover answered HTTP 503'
       phone.sendGate = new Promise<void>(resolve => (release = resolve))
 
-      monitor.runStarted(60)
+      monitor.runStarted(60, true)
       monitor.runEnded('failed')
       await vi.advanceTimersByTimeAsync(0)
 
@@ -770,7 +836,7 @@ describe('while the run is polled', () => {
   it('says the meridian watch is unavailable instead of looking safe when the mount does not give its pier side', async () => {
     const { monitor } = polled(async () => tracking({ pierSide: null }))
 
-    monitor.runStarted(60)
+    monitor.runStarted(60, true)
     await vi.advanceTimersByTimeAsync(0)
 
     expect(monitor.view().unavailable).toEqual(['meridian watch unavailable: pier side'])
@@ -785,7 +851,7 @@ describe('while the run is polled', () => {
       return tracking()
     })
 
-    monitor.runStarted(1800)
+    monitor.runStarted(1800, true)
     await vi.advanceTimersByTimeAsync(30_000)
     expect(monitor.view().alerts).toEqual([])
 
@@ -803,10 +869,10 @@ describe('while the run is polled', () => {
     let finish!: (reading: MountReading) => void
     const { monitor } = polled(() => new Promise<MountReading>(resolve => (finish = resolve)))
 
-    monitor.runStarted(60)
+    monitor.runStarted(60, true)
     await vi.advanceTimersByTimeAsync(0)
     monitor.runEnded('stopped')
-    monitor.runStarted(60)
+    monitor.runStarted(60, true)
     expect(monitor.view().unavailable).toEqual(['meridian watch unavailable: mount readings'])
 
     finish(tracking({ pierSide: null }))
@@ -818,7 +884,7 @@ describe('while the run is polled', () => {
   it('warns when frames stop coming, but not while autofocus runs inside the run', async () => {
     const { monitor, phone } = polled(async () => tracking())
 
-    monitor.runStarted(60)
+    monitor.runStarted(60, true)
     await vi.advanceTimersByTimeAsync(0)
 
     monitor.autofocusStarted()
@@ -848,7 +914,7 @@ describe('while the run is polled', () => {
       monitor.frameCaptured({ capturedAt: new Date().toISOString(), statistics: { detectedStars: stars, medianHfrPixels: 3 } })
     }
 
-    monitor.runStarted(60)
+    monitor.runStarted(60, true)
 
     for (let index = 0; index < 6; index++) {
       await vi.advanceTimersByTimeAsync(60_000)
@@ -874,7 +940,7 @@ describe('while the run is polled', () => {
       const { monitor, phone } = polled(async () => tracking(), readFocuser)
       let stars = 1500
 
-      monitor.runStarted(60)
+      monitor.runStarted(60, true)
 
       for (let index = 0; index < 12; index++) {
         if (index === 6) stars = 300
@@ -924,7 +990,7 @@ describe('while the run is polled', () => {
         throw new Error('Cria did not answer')
       })
 
-      monitor.runStarted(1800)
+      monitor.runStarted(1800, true)
       await vi.advanceTimersByTimeAsync(120_000)
 
       expect(monitor.view().alerts.map(alert => alert.id)).not.toContain('rig-unreachable')
@@ -937,7 +1003,7 @@ describe('while the run is polled', () => {
 
 describe('the phone alerts switch', () => {
   function failedRun(fixture: ReturnType<typeof watched>) {
-    fixture.monitor.runStarted(60)
+    fixture.monitor.runStarted(60, true)
     fixture.monitor.runEnded('failed')
 
     return settle()
@@ -973,7 +1039,7 @@ describe('the phone alerts switch', () => {
       alerts: [expect.objectContaining({ id: 'run-failed', delivery: { state: 'muted' } })],
     })
 
-    fixture.monitor.runStarted(60)
+    fixture.monitor.runStarted(60, true)
     await settle()
 
     expect(fixture.monitor.view().alerts).toEqual([])
@@ -1019,7 +1085,7 @@ describe('the phone alerts switch', () => {
     let release!: () => void
     fixture.phone.sendGate = new Promise<void>(resolve => (release = resolve))
 
-    fixture.monitor.runStarted(60)
+    fixture.monitor.runStarted(60, true)
     fixture.monitor.runEnded('failed')
     await settle()
 
@@ -1106,8 +1172,24 @@ describe('paging only in astronomical darkness', () => {
     return fixture
   }
 
+  it('holds a no-stars alert raised in daylight and pages it once from the frame that crosses dusk', async () => {
+    const fixture = await atGreenwich(dusk - 7.5 * 60_000)
+    const frame = runOf(fixture, [], 0)
+
+    for (let index = 0; index < 5; index++) await frame(index)
+
+    expect(fixture.monitor.view().alerts).toEqual([expect.objectContaining({ id: 'no-stars', delivery: { state: 'outside-dark' } })])
+    expect(fixture.phone.events).toEqual([])
+
+    for (let index = 5; index < 10; index++) await frame(index)
+
+    expect(fixture.phone.emergencies()).toHaveLength(1)
+    expect(fixture.phone.sends()).toHaveLength(1)
+    expect(deliveryOfFirst(fixture)).toEqual({ state: 'sent' })
+  })
+
   function failedRun(fixture: ReturnType<typeof watched>) {
-    fixture.monitor.runStarted(60)
+    fixture.monitor.runStarted(60, true)
     fixture.monitor.runEnded('failed')
 
     return settle()
@@ -1195,7 +1277,7 @@ describe('paging only in astronomical darkness', () => {
 
     await failedRun(fixture)
     fixture.at(dusk + 10_000)
-    fixture.monitor.runStarted(60)
+    fixture.monitor.runStarted(60, true)
     await settle()
 
     expect(fixture.monitor.view().alerts).toEqual([])
@@ -1208,7 +1290,7 @@ describe('paging only in astronomical darkness', () => {
     const fixture = await atGreenwich(noon)
 
     await failedRun(fixture)
-    fixture.monitor.runStarted(60)
+    fixture.monitor.runStarted(60, true)
     await settle()
 
     expect(fixture.monitor.view().alerts).toEqual([])
@@ -1251,7 +1333,7 @@ describe('paging only in astronomical darkness', () => {
     expect(deliveryOfFirst(fixture)).toEqual({ state: 'stopped-at-dawn' })
     expect(fixture.monitor.view().pagingWindow).toMatchObject({ state: 'not-dark', from: secondDusk })
 
-    fixture.monitor.runStarted(60)
+    fixture.monitor.runStarted(60, true)
     await settle()
 
     expect(fixture.phone.sends()).toHaveLength(1)
@@ -1331,7 +1413,7 @@ describe('paging only in astronomical darkness', () => {
 
     expect(deliveryOfFirst(fixture)).toEqual({ state: 'stopped-at-dawn' })
 
-    fixture.monitor.runStarted(60)
+    fixture.monitor.runStarted(60, true)
     await settle()
 
     expect(fixture.monitor.view().alerts).toEqual([])
@@ -1447,7 +1529,7 @@ describe('paging only in astronomical darkness', () => {
       const fixture = await atGreenwich(noon, { readSite: async () => answer })
 
       answer = null
-      fixture.monitor.runStarted(60)
+      fixture.monitor.runStarted(60, true)
       await settle()
       fixture.monitor.runEnded('failed')
       await settle()
@@ -1461,7 +1543,7 @@ describe('paging only in astronomical darkness', () => {
       const fixture = await atGreenwich(noon, { readSite: async () => answer })
 
       answer = null
-      fixture.monitor.runStarted(60)
+      fixture.monitor.runStarted(60, true)
       fixture.monitor.runEnded('failed')
 
       expect(fixture.phone.events).toEqual([])
@@ -1483,7 +1565,7 @@ describe('paging only in astronomical darkness', () => {
       })
 
       broken = true
-      fixture.monitor.runStarted(60)
+      fixture.monitor.runStarted(60, true)
       await settle()
 
       expect(fixture.monitor.view().pagingWindow.state).toBe('not-dark')
@@ -1493,7 +1575,7 @@ describe('paging only in astronomical darkness', () => {
       const readSite = vi.fn(async () => greenwich)
       const fixture = await atGreenwich(noon, { readSite })
 
-      fixture.monitor.runStarted(60)
+      fixture.monitor.runStarted(60, true)
       await settle()
 
       expect(readSite).toHaveBeenCalledTimes(2)

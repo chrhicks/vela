@@ -23,6 +23,21 @@ from is `fixtures/night-20261023-frames.json`.
 | `stars-collapsed` | critical | The smoothed count is below `starsCollapsedRatio` (0.15) of the baseline, or the frame is empty (0 stars on a baseline of 3 or more, counted at once, not smoothed), for `confirmFrames` frames. | Same as `stars-dropping`. |
 | `stars-declining` | warn | The median of the last `starsDecliningWindowMinutes` (30) is below `starsDecliningRatio` (0.6) of the median of the 30 before. A slow slide. | It is back above `starsDecliningClearRatio` (0.8). |
 
+A run can also never get a baseline to compare with: the cap left on, cloud from the first frame,
+stars far out of focus, the wrong target. Every star alert is then silent (an empty frame needs a
+baseline of 3 stars, a ratio needs 10), so a whole night is lost without a word.
+
+| Alert | Level | Raised when | Clears when |
+| --- | --- | --- | --- |
+| `no-stars` | critical | A run that repeats and saves its frames has `noStarsFrames` (5, the `baselineFrames` window) frames with star measurements and still no baseline of `minBaselineStarsForEmptyFrame` (3) stars. Says "No stars after 5 frames". | A baseline forms: a cloudy start clears about three frames after the sky does, as the baseline fills with sky. Once one has formed it does not return. A loss of stars after that is `stars-collapsed`'s. It also clears when the run ends or the history starts over (a focuser move, autofocus ending), which counts the frames again. |
+
+Only an imaging run is watched: the capture route calls `runStarted(exposureSeconds, imaging)` with
+`imaging` true for a run that repeats and saves its frames. A single exposure, a repeating run that
+saves nothing (framing, focusing) and a run with `frameCount` below `noStarsFrames` never raise it.
+A frame whose star measurement failed does not count as a frame without stars. Calibration frames
+(darks, bias) have stars in no frame, so they must not be an imaging run; the capture view has no
+frame types yet, and when it does the route should pass `imaging: false` for them.
+
 The baseline is the median of the last five frames that no alert called bad, so a long cloud never
 becomes normal. A weaker alert is hidden while a stronger one covers it (`stars-dropping` and
 `stars-declining` by `stars-collapsed`). A drop or collapse also starts the declining trend over, so

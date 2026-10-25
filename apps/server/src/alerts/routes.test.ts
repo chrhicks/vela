@@ -171,7 +171,7 @@ describe('alerts routes', () => {
       const { app, alerts, phone, post } = setup()
       const monitor = alerts.monitorFor({ id: 'sim', name: 'Simulator' })
 
-      monitor.runStarted(60)
+      monitor.runStarted(60, true)
       monitor.runEnded('failed')
       await settle()
       expect(phone.sent).toHaveLength(1)
@@ -183,7 +183,7 @@ describe('alerts routes', () => {
       expect(test.statusCode).toBe(409)
       expect(test.json()).toEqual({ error: 'phone-alerts-off' })
 
-      monitor.runStarted(60)
+      monitor.runStarted(60, true)
       monitor.runEnded('failed')
       await settle()
       expect(phone.sent).toHaveLength(1)
@@ -198,7 +198,7 @@ describe('alerts routes', () => {
       const view = await restarted.app.inject({ method: 'GET', url: '/api/web/rigs/sim/alerts' })
       expect(view.json().phoneAlertsOn).toBe(false)
 
-      restarted.alerts.monitorFor({ id: 'sim', name: 'Simulator' }).runStarted(60)
+      restarted.alerts.monitorFor({ id: 'sim', name: 'Simulator' }).runStarted(60, true)
       restarted.alerts.monitorFor({ id: 'sim', name: 'Simulator' }).runEnded('failed')
       await settle()
       expect(restarted.phone.sent).toEqual([])
@@ -256,7 +256,7 @@ describe('alerts routes', () => {
       const fixture = setup()
       const monitor = fixture.alerts.monitorFor({ id: 'sim', name: 'Simulator' })
 
-      monitor.runStarted(60)
+      monitor.runStarted(60, true)
       monitor.runEnded('failed')
       await settle()
 
@@ -300,7 +300,7 @@ describe('alerts routes', () => {
       const monitor = alerts.monitorFor({ id: 'sim', name: 'Simulator' })
       phone.down = 'Pushover answered HTTP 503'
 
-      monitor.runStarted(60)
+      monitor.runStarted(60, true)
       monitor.runEnded('failed')
       await vi.advanceTimersByTimeAsync(0)
 

@@ -62,6 +62,7 @@ function setup(
     }
     sensorTemperatureC?: number
     createCooling?: (settings: CaptureSettings) => AlpacaCameraCooling
+    alerts?: NonNullable<Parameters<typeof registerCapture>[3]>['alerts']
   } = {},
 ) {
   const app = Fastify()
@@ -135,6 +136,8 @@ function setup(
 
   if (options.lookupSubject) captureOptions.lookupSubject = options.lookupSubject
 
+  if (options.alerts) captureOptions.alerts = options.alerts
+
   const capture = registerCapture(app, catalog, operations, captureOptions)
 
   registerNavigation(app, catalog, capture)
@@ -178,6 +181,24 @@ function setup(
     inspections: () => inspections,
   }
 }
+
+it('tells the alert monitor a run is an imaging run only when it repeats and saves its frames', async () => {
+  for (const [body, imaging] of [
+    [{ exposureSeconds: 10 }, false],
+    [{ exposureSeconds: 10, repeat: true }, false],
+    [{ exposureSeconds: 10, saveFrames: true }, false],
+    [{ exposureSeconds: 10, repeat: true, saveFrames: true }, true],
+  ] as const) {
+    const runStarted = vi.fn()
+
+    const subject = setup(undefined, {
+      alerts: { monitorFor: () => ({ runStarted, frameCaptured: vi.fn(), runEnded: vi.fn() }) },
+    })
+
+    expect((await subject.start(body)).statusCode).toBe(200)
+    expect(runStarted).toHaveBeenCalledExactlyOnceWith(10, imaging)
+  }
+})
 
 it('rejects malformed input before acquiring or operating a camera', async () => {
   const subject = setup()
