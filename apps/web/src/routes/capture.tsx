@@ -283,7 +283,7 @@ function CapturePage({ rigId }: { rigId: string }) {
                     onSubmit={event => {
                       event.preventDefault()
 
-                      if (validExposure && frameCount.valid)
+                      if (validExposure && (!repeating || frameCount.valid))
                         void capture.start(
                           seconds,
                           repeating,

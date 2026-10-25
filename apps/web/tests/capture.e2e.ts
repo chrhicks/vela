@@ -413,6 +413,21 @@ test('starts with a frame count, shows progress, and fits a 390 px page', async 
   ).toBeLessThanOrEqual(0)
 })
 
+test('a single exposure ignores an invalid Frames entry', async ({ page }) => {
+  let body: unknown
+  await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, { ...idle, repeat: true }))
+  await page.route('**/api/rigs/rig-1/capture/start', route => {
+    body = route.request().postDataJSON()
+
+    return respond(route, { ...idle, phase: 'exposing', active: true })
+  })
+  await page.goto('/rigs/rig-1/observe/capture')
+  await page.getByLabel('Frames · optional').fill('2.5')
+  await page.getByText('Repeat until stopped', { exact: true }).click()
+  await page.getByRole('button', { name: 'Take exposure' }).click()
+  await expect.poll(() => body).toEqual({ exposureSeconds: 2, repeat: false, saveFrames: true })
+})
+
 test('omits frameCount when the field is blank', async ({ page }) => {
   let body: unknown
   await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, { ...idle, repeat: true }))
