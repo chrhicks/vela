@@ -73,7 +73,13 @@ function fakePhone(clock: () => number) {
 /** Lets the monitor's queued phone calls finish. */
 const settle = () => (vi.isFakeTimers() ? vi.advanceTimersByTimeAsync(0) : new Promise(resolve => setTimeout(resolve, 0)))
 
-function rig(options: { readMount?: (signal: AbortSignal) => Promise<MountReading | null>; connected?: boolean } = {}) {
+function rig(
+  options: {
+    readMount?: (signal: AbortSignal) => Promise<MountReading | null>
+    connected?: boolean
+    phoneAlertsOn?: boolean
+  } = {},
+) {
   let clock = Date.parse('2026-10-18T02:00:00Z')
   const { phone, notifier } = fakePhone(() => clock)
 
@@ -82,6 +88,7 @@ function rig(options: { readMount?: (signal: AbortSignal) => Promise<MountReadin
     rigName: 'FRA 400',
     thresholds: defaultThresholds,
     notifier: options.connected === false ? null : notifier,
+    ...(options.phoneAlertsOn !== undefined && { phoneAlertsOn: options.phoneAlertsOn }),
     now: () => clock,
     ...(options.readMount && { readMount: options.readMount }),
   })
@@ -918,5 +925,153 @@ describe('while the run is polled', () => {
 
       expect(monitor.view().alerts.map(alert => alert.id)).not.toContain('rig-unreachable')
     })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The phone alerts switch
+
+describe('the phone alerts switch', () => {
+  function failedRun(fixture: ReturnType<typeof watched>) {
+    fixture.monitor.runStarted(60)
+    fixture.monitor.runEnded('failed')
+
+    return settle()
+  }
+
+  it('is on until Chris turns it off', () => {
+    expect(watched().monitor.view().phoneAlertsOn).toBe(true)
+    expect(watched({ phoneAlertsOn: false }).monitor.view().phoneAlertsOn).toBe(false)
+  })
+
+  it('sends nothing for an alert raised while off, and still shows it', async () => {
+    const fixture = watched({ phoneAlertsOn: false })
+
+    await failedRun(fixture)
+
+    expect(fixture.phone.events).toEqual([])
+    expect(fixture.monitor.view().alerts).toEqual([
+      expect.objectContaining({ id: 'run-failed', level: 'critical', delivery: { state: 'muted' } }),
+    ])
+  })
+
+  it('cancels an emergency that is repeating when turned off, and says nothing when the alert clears', async () => {
+    const fixture = watched()
+
+    await failedRun(fixture)
+    expect(fixture.phone.emergencies()).toHaveLength(1)
+
+    await fixture.monitor.setPhoneAlerts(false)
+
+    expect(fixture.phone.cancels()).toEqual([expect.objectContaining({ receipt: 'receipt-1' })])
+    expect(fixture.monitor.view()).toMatchObject({
+      phoneAlertsOn: false,
+      alerts: [expect.objectContaining({ id: 'run-failed', delivery: { state: 'muted' } })],
+    })
+
+    fixture.monitor.runStarted(60)
+    await settle()
+
+    expect(fixture.monitor.view().alerts).toEqual([])
+    expect(fixture.phone.sends().map(event => event.priority)).toEqual([2])
+  })
+
+  it('pages only alerts raised after it comes back on, not the one raised while off', async () => {
+    const fixture = watched({ phoneAlertsOn: false })
+
+    await failedRun(fixture)
+    await fixture.monitor.setPhoneAlerts(true)
+    await settle()
+
+    expect(fixture.phone.events).toEqual([])
+    expect(fixture.monitor.view().alerts[0]!.delivery).toEqual({ state: 'muted' })
+
+    await failedRun(fixture)
+
+    expect(fixture.phone.emergencies()).toHaveLength(1)
+    expect(fixture.monitor.view().alerts[0]!.delivery).toEqual({ state: 'sent' })
+  })
+
+  it('stops a retry that was waiting for the phone when turned off', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+
+    const fixture = watched()
+    fixture.phone.down = 'Pushover answered HTTP 500'
+
+    await failedRun(fixture)
+    expect(fixture.monitor.view().alerts[0]!.delivery.state).toBe('retrying')
+
+    await fixture.monitor.setPhoneAlerts(false)
+    fixture.phone.down = null
+    fixture.tick(5 * 60_000)
+    await vi.advanceTimersByTimeAsync(5 * 60_000)
+
+    expect(fixture.phone.events).toEqual([])
+    expect(fixture.monitor.view().alerts[0]!.delivery).toEqual({ state: 'muted' })
+  })
+
+  it('cancels an emergency whose send was still in flight when turned off', async () => {
+    const fixture = watched()
+    let release!: () => void
+    fixture.phone.sendGate = new Promise<void>(resolve => (release = resolve))
+
+    fixture.monitor.runStarted(60)
+    fixture.monitor.runEnded('failed')
+    await settle()
+
+    const turnedOff = fixture.monitor.setPhoneAlerts(false)
+
+    release()
+    await turnedOff
+
+    expect(fixture.phone.emergencies()).toHaveLength(1)
+    expect(fixture.phone.cancels()).toEqual([expect.objectContaining({ receipt: 'receipt-1' })])
+  })
+
+  it('keeps trying to cancel an emergency the phone would not stop, and says it is still repeating', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+
+    const fixture = watched()
+
+    await failedRun(fixture)
+    fixture.phone.down = 'could not reach Pushover'
+
+    await fixture.monitor.setPhoneAlerts(false)
+
+    expect(fixture.monitor.view().phone).toMatchObject({
+      state: 'failing',
+      reason: 'could not stop an emergency repeating: could not reach Pushover',
+    })
+
+    fixture.phone.down = null
+    fixture.tick(61_000)
+    await vi.advanceTimersByTimeAsync(61_000)
+
+    expect(fixture.phone.cancels()).toEqual([expect.objectContaining({ receipt: 'receipt-1' })])
+    expect(fixture.monitor.view().phone).toEqual({ state: 'ready' })
+  })
+
+  it('does not tell the phone an alert cleared when that alert was sent before it was turned off', async () => {
+    const fixture = watched()
+    const frame = runOf(fixture, [3, 3, 3, 3, 3, 4.5, 4.5])
+
+    for (let index = 0; index < 7; index++) await frame(index)
+
+    expect(fixture.phone.sends().map(event => event.priority)).toEqual([0])
+
+    const sent = fixture.phone.sends().length
+
+    await fixture.monitor.setPhoneAlerts(false)
+    fixture.monitor.runEnded('stopped')
+    await settle()
+
+    expect(fixture.phone.sends()).toHaveLength(sent)
+  })
+
+  it('refuses a test while off', async () => {
+    const fixture = watched({ phoneAlertsOn: false })
+
+    expect(await fixture.monitor.sendTest()).toEqual({ outcome: 'off' })
+    expect(fixture.phone.events).toEqual([])
   })
 })

@@ -1,6 +1,7 @@
 import { Button } from '@vela/ui'
 import { clockTime, deliveryLabel, phoneLabel, thresholdRows } from './presentation'
 import { useRigAlerts } from './AlertsProvider'
+import { PhoneAlertsSwitch } from './PhoneAlertsSwitch'
 import './alerts.css'
 
 export function AlertsCard() {
@@ -19,6 +20,7 @@ export function AlertsCard() {
     )
 
   const phoneNotSetUp = view.phone.state === 'not-configured'
+  const phoneOff = !view.phoneAlertsOn
 
   return (
     <section className="alerts-card" aria-label="Alerts">
@@ -33,9 +35,13 @@ export function AlertsCard() {
         </p>
       </header>
 
-      <p data-phone={view.phone.state} role={view.phone.state === 'failing' ? 'alert' : undefined}>
-        {phoneLabel(view.phone)}
-      </p>
+      <PhoneAlertsSwitch alerts={alerts} />
+
+      {view.phone.state !== 'ready' && (
+        <p data-phone={view.phone.state} role={view.phone.state === 'failing' ? 'alert' : undefined}>
+          {phoneLabel(view.phone)}
+        </p>
+      )}
 
       {view.alerts.length === 0 ? (
         <p className="alerts-card__muted">
@@ -66,7 +72,7 @@ export function AlertsCard() {
 
       <div className="alerts-card__test">
         <Button
-          disabled={phoneNotSetUp || offline}
+          disabled={phoneNotSetUp || phoneOff || offline}
           pending={test.state === 'sending'}
           onClick={() => void sendTest()}
         >
@@ -77,6 +83,7 @@ export function AlertsCard() {
           {test.state === 'sent' && 'Test sent · Pushover accepted it'}
           {test.state === 'failed' && test.message}
           {test.state === 'idle' && phoneNotSetUp && 'Set up phone alerts to send a test.'}
+          {test.state === 'idle' && !phoneNotSetUp && phoneOff && 'Turn phone alerts on to send a test.'}
         </p>
       </div>
 

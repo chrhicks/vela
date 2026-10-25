@@ -2,7 +2,7 @@ export type AlertLevel = 'warn' | 'critical'
 
 /** How the phone is getting on with one alert. */
 export type AlertDelivery =
-  | { state: 'sent' | 'sending' | 'covered' | 'not-configured' }
+  | { state: 'sent' | 'sending' | 'covered' | 'not-configured' | 'muted' }
   | { state: 'retrying'; failures: number; nextAttemptAt: number; giveUpAt: number }
   | { state: 'gave-up'; failures: number }
 
@@ -32,6 +32,8 @@ export interface AlertsView {
   /** Watches that cannot run, such as "meridian watch unavailable: pier side". */
   unavailable: string[]
   phone: PhoneAlertsView
+  /** Chris's switch for this rig. Off means Vela sends nothing to the phone; alerts still show here. */
+  phoneAlertsOn: boolean
   /** Every number the rules use, by name. */
   thresholds: Readonly<Record<string, number>>
 }

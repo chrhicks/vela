@@ -7,6 +7,7 @@ import { registerCapture } from '../capture/routes.js'
 import { createMemoryRigCatalog } from '../rig/catalog.js'
 import { createRigOperations } from '../rig/operations.js'
 import { NotifierError, type Notification, type Notifier } from './notifier.js'
+import { createMemoryPhoneAlertsPreference, type PhoneAlertsPreference } from './preference.js'
 import { registerAlerts } from './routes.js'
 import { defaultThresholds } from './thresholds.js'
 
@@ -64,7 +65,7 @@ function fakePhone() {
 
 const settle = () => new Promise(resolve => setTimeout(resolve, 0))
 
-function setup(options: { keys?: boolean } = {}) {
+function setup(options: { keys?: boolean; phoneAlerts?: PhoneAlertsPreference } = {}) {
   const app = Fastify()
   const catalog = createMemoryRigCatalog([rig])
   const { phone, notifier } = fakePhone()
@@ -72,6 +73,7 @@ function setup(options: { keys?: boolean } = {}) {
   const alerts = registerAlerts(app, catalog, {
     thresholds: defaultThresholds,
     notifier: options.keys === false ? null : notifier,
+    ...(options.phoneAlerts && { phoneAlerts: options.phoneAlerts }),
   })
 
   cleanups.push(() => app.close())
@@ -129,6 +131,87 @@ describe('alerts routes', () => {
 
     const view = await app.inject({ method: 'GET', url: '/api/web/rigs/sim/alerts' })
     expect(view.json().phone).toMatchObject({ state: 'failing', reason: 'Pushover answered HTTP 429' })
+  })
+
+  describe('the phone alerts switch', () => {
+    const put = (app: ReturnType<typeof setup>['app'], payload: string, url = '/api/rigs/sim/alerts/phone') =>
+      app.inject({ method: 'PUT', url, headers: jsonBody, payload })
+
+    it('is on in the view until it is turned off, and the choice shows in the view it answers with', async () => {
+      const { app } = setup()
+
+      const before = await app.inject({ method: 'GET', url: '/api/web/rigs/sim/alerts' })
+      expect(before.json().phoneAlertsOn).toBe(true)
+
+      const off = await put(app, JSON.stringify({ on: false }))
+      expect(off.statusCode).toBe(200)
+      expect(off.json().phoneAlertsOn).toBe(false)
+
+      const after = await app.inject({ method: 'GET', url: '/api/web/rigs/sim/alerts' })
+      expect(after.json().phoneAlertsOn).toBe(false)
+    })
+
+    it('stops an alert reaching the phone, cancels a repeating emergency, and refuses a test', async () => {
+      const { app, alerts, phone, post } = setup()
+      const monitor = alerts.monitorFor({ id: 'sim', name: 'Simulator' })
+
+      monitor.runStarted(60)
+      monitor.runEnded('failed')
+      await settle()
+      expect(phone.sent).toHaveLength(1)
+
+      await put(app, JSON.stringify({ on: false }))
+      expect(phone.cancelled).toEqual(['receipt-1'])
+
+      const test = await post('/api/rigs/sim/alerts/test')
+      expect(test.statusCode).toBe(409)
+      expect(test.json()).toEqual({ error: 'phone-alerts-off' })
+
+      monitor.runStarted(60)
+      monitor.runEnded('failed')
+      await settle()
+      expect(phone.sent).toHaveLength(1)
+    })
+
+    it('is remembered by a server that starts again with the same preference', async () => {
+      const phoneAlerts = createMemoryPhoneAlertsPreference()
+
+      await put(setup({ phoneAlerts }).app, JSON.stringify({ on: false }))
+
+      const restarted = setup({ phoneAlerts })
+      const view = await restarted.app.inject({ method: 'GET', url: '/api/web/rigs/sim/alerts' })
+      expect(view.json().phoneAlertsOn).toBe(false)
+
+      restarted.alerts.monitorFor({ id: 'sim', name: 'Simulator' }).runStarted(60)
+      restarted.alerts.monitorFor({ id: 'sim', name: 'Simulator' }).runEnded('failed')
+      await settle()
+      expect(restarted.phone.sent).toEqual([])
+    })
+
+    it('does not change the monitor when the choice could not be saved', async () => {
+      const phoneAlerts: PhoneAlertsPreference = {
+        isOn: () => true,
+        set: () => Promise.reject(new Error('disk full')),
+      }
+
+      const { app } = setup({ phoneAlerts })
+
+      const response = await put(app, JSON.stringify({ on: false }))
+      expect(response.statusCode).toBe(500)
+      expect(response.json()).toEqual({ error: 'phone-alerts-not-saved' })
+
+      const view = await app.inject({ method: 'GET', url: '/api/web/rigs/sim/alerts' })
+      expect(view.json().phoneAlertsOn).toBe(true)
+    })
+
+    it('rejects a body that is not exactly { on: boolean }, and an unknown rig', async () => {
+      const { app } = setup()
+
+      expect((await put(app, JSON.stringify({}))).statusCode).toBe(400)
+      expect((await put(app, JSON.stringify({ on: 'no' }))).statusCode).toBe(400)
+      expect((await put(app, JSON.stringify({ on: false, extra: 1 }))).statusCode).toBe(400)
+      expect((await put(app, JSON.stringify({ on: false }), '/api/rigs/nope/alerts/phone')).statusCode).toBe(404)
+    })
   })
 
   it('answers 404 for an unknown rig on every route', async () => {

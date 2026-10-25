@@ -17,6 +17,7 @@ const view: AlertsView = {
   ],
   unavailable: ['meridian watch unavailable: pier side'],
   phone: { state: 'failing', reason: 'Pushover answered 500', since: 1_760_758_340_000 },
+  phoneAlertsOn: true,
   thresholds: { hfrBadPixels: 6 },
 }
 
@@ -30,5 +31,10 @@ describe('alerts boundary', () => {
     expect(isAlertsView({ ...view, alerts: [{ ...view.alerts[0], level: 'info' }] }, 'fra')).toBe(false)
     expect(isAlertsView({ ...view, alerts: [{ ...view.alerts[0], delivery: { state: 'lost' } }] }, 'fra')).toBe(false)
     expect(isAlertsView({ ...view, phone: { state: 'failing', since: 1 } }, 'fra')).toBe(false)
+  })
+
+  it('accepts a muted alert and requires the switch state', () => {
+    expect(isAlertsView({ ...view, phoneAlertsOn: false, alerts: [{ ...view.alerts[0], delivery: { state: 'muted' } }] }, 'fra')).toBe(true)
+    expect(isAlertsView({ ...view, phoneAlertsOn: undefined }, 'fra')).toBe(false)
   })
 })

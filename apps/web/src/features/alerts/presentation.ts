@@ -28,6 +28,8 @@ export function deliveryLabel(alert: AlertView) {
       return 'Covered by a stronger alert'
     case 'not-configured':
       return 'Not sent · phone alerts are not set up'
+    case 'muted':
+      return 'Not sent · phone alerts are off'
     case 'retrying':
       return `Phone has not taken it (${delivery.failures}×) · trying again at ${clockTime(delivery.nextAttemptAt)}`
     case 'gave-up':
