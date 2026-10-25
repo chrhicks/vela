@@ -29,7 +29,10 @@ describe('alerts configuration', () => {
     expect(configuration.thresholds).toMatchObject({
       baselineFrames: 5,
       minBaselineFrames: 3,
-      starsLowRatio: 0.6,
+      starsSmoothingFrames: 3,
+      starsDropFraction: 0.5,
+      starsDropWindowMinutes: 10,
+      starsCollapsedRatio: 0.15,
       hfrHighPixels: 4,
       meridianTrackLimitHours: 0.0669,
       rigUnreachableSeconds: 30
@@ -64,6 +67,29 @@ describe('alerts configuration', () => {
     })
   })
 
+  it('still starts with the starsLowRatio an older alerts.json carries, ignoring it and saying so once', async () => {
+    const path = await configurationFile(JSON.stringify({
+      pushover: { token: 'fake-token-for-tests', user: 'fake-user-for-tests' },
+      thresholds: { starsLowRatio: 0.15, starsCollapsedRatio: 0.05, starsRecoveredRatio: 0.3, starsDecliningRatio: 0.2, starsDecliningClearRatio: 0.3, meridianTrackLimitHours: 1 }
+    }))
+
+    const warnings: string[] = []
+    const configuration = await loadAlertsConfiguration(path, message => warnings.push(message))
+
+    expect(configuration.thresholds).toMatchObject({ starsCollapsedRatio: 0.05, starsRecoveredRatio: 0.3, meridianTrackLimitHours: 1, starsDropFraction: 0.5 })
+    expect(configuration.thresholds).not.toHaveProperty('starsLowRatio')
+    expect(warnings).toEqual([expect.stringContaining('thresholds.starsLowRatio')])
+    expect(warnings.join()).not.toContain('fake-token-for-tests')
+  })
+
+  it('says nothing when the removed starsLowRatio is absent', async () => {
+    const warnings: string[] = []
+
+    await loadAlertsConfiguration(await configurationFile('{"thresholds":{"hfrBadPixels":7}}'), message => warnings.push(message))
+
+    expect(warnings).toEqual([])
+  })
+
   it.each(['{}', '{"thresholds":{}}'])('uses default thresholds without requiring phone keys in %s', async contents => {
     const path = await configurationFile(contents)
 
@@ -82,7 +108,7 @@ describe('alerts configuration', () => {
     ['unknown Pushover fields', { pushover: { token: 'fake-token-for-tests', user: 'fake-user-for-tests', unexpected: true } }, 'pushover: Unrecognized keys'],
     ['unknown threshold fields', { thresholds: { unexpected: 4 } }, 'thresholds: Unrecognized keys'],
     ['invalid threshold numbers', { thresholds: { confirmFrames: 0 } }, 'thresholds.confirmFrames'],
-    ['contradictory thresholds', { thresholds: { starsCollapsedRatio: 0.9 } }, 'starsCollapsedRatio must be below starsLowRatio']
+    ['contradictory thresholds', { thresholds: { starsCollapsedRatio: 0.9 } }, 'starsCollapsedRatio must be below starsRecoveredRatio']
   ])('rejects %s with the configuration path and the relevant issue', async (_description, input, issue) => {
     const path = await configurationFile(JSON.stringify(input))
 

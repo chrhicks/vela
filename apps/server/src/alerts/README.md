@@ -10,6 +10,28 @@ or moves the mount.
   `alerts.json`. `mount.ts` reads a Cria rig's mount. `routes.ts` is the HTTP surface. The browser side (banner and rig-page card) is
   `apps/web/src/features/alerts`; its contract is `AlertsView` in `@vela/model/web`.
 
+## Star counts
+
+Frames from a real night swing about 2x with nothing wrong (101, 88, 181, 126, 84 stars, HFR flat),
+so no rule compares one frame. Every comparison uses the median of the last `starsSmoothingFrames`
+(3) frames. The numbers and their reasons are in `thresholds.ts`; the 2026-10-23 night they come
+from is `fixtures/night-20261023-frames.json`.
+
+| Alert | Level | Raised when | Clears when |
+| --- | --- | --- | --- |
+| `stars-dropping` | warn | The smoothed count is below `1 - starsDropFraction` (0.5) of its highest value within the last `starsDropWindowMinutes` (10), for `confirmFrames` frames. A rate of change, in time, so it means the same at 30 s and 180 s exposures. | The smoothed count is back above `starsRecoveredRatio` (0.5) of the baseline for `confirmFrames` frames. |
+| `stars-collapsed` | critical | The smoothed count is below `starsCollapsedRatio` (0.15) of the baseline, or the frame is empty (0 stars on a baseline of 3 or more, counted at once, not smoothed), for `confirmFrames` frames. | Same as `stars-dropping`. |
+| `stars-declining` | warn | The median of the last `starsDecliningWindowMinutes` (30) is below `starsDecliningRatio` (0.6) of the median of the 30 before. A slow slide. | It is back above `starsDecliningClearRatio` (0.8). |
+
+The baseline is the median of the last five frames that no alert called bad, so a long cloud never
+becomes normal. A weaker alert is hidden while a stronger one covers it (`stars-dropping` and
+`stars-declining` by `stars-collapsed`). A collapse also starts the declining trend over, so the
+frames of a cloud-out are not read as a slope when it ends.
+
+Star counts rise as focus worsens (167 to 278 stars while HFR went 1.55 to 2.12), so a refocus
+makes them fall. The history starts over, as it does when autofocus ends, whenever the focuser
+position changes between two mount polls.
+
 ## Episodes
 
 A condition that starts to hold raises an alert; one that stops holding clears it. Each alert is
@@ -22,7 +44,7 @@ until it is acknowledged, because Pushover does that, not Vela.
 - Acknowledging stops the repeats by cancelling the emergency's receipt. The alert stays in the
   banner until it clears. If the phone cannot be told to stop, the alert is not marked acknowledged.
 - Overlapping alerts are separate episodes. A weaker alert that a stronger one covers
-  (`stars-low`/`stars-declining` by `stars-collapsed`, `hfr-high` by `hfr-bad`, `meridian-near` by
+  (`stars-dropping`/`stars-declining` by `stars-collapsed`, `hfr-high` by `hfr-bad`, `meridian-near` by
   `meridian-imminent`) is hidden from the banner and not sent to the phone while the stronger stands.
 - An alert that failed to reach the phone is tried again, until it arrives, is acknowledged or
   clears. The first retry comes after a minute, and each pause doubles up to five minutes. Vela
@@ -50,6 +72,11 @@ The capture routes call `runStarted`, `frameCaptured` (from the controller's `on
 the rig as not answering, which becomes `rig-unreachable` after 30 s. Only Cria rigs have mount
 readings here; for others the mount watches say they are unavailable.
 
+On the same poll it reads the focuser position (`focuser.ts`, for a rig with exactly one focuser).
+A changed position starts the frame history over. A failed or missing read is skipped: it says
+nothing about the rig answering, and it never counts as a move. The poll is every 10 s, so a frame
+exposed across a move lands in whichever history is current when it arrives.
+
 `autofocusStarted` and `autofocusEnded` are for an autofocus inside a run: frames do not arrive
 meanwhile, so `frames-stalled` waits, and the frame baseline starts over afterwards. Nothing calls
 them yet, because autofocus and capture hold the same rig lease and cannot overlap today. A new
@@ -58,5 +85,8 @@ target would reset the frame history the same way.
 ## Keys
 
 `alerts.json` sits next to `cria.json` (`VELA_ALERTS_CONFIG_PATH`): `pushover.token`,
-`pushover.user` and optional `thresholds`. `scripts/set-pushover-keys.sh` writes it. The keys go
+`pushover.user` and optional `thresholds`. An older file may still set `thresholds.starsLowRatio`
+for the removed single-frame `stars-low` alert: the server ignores it, logs one warning at start,
+and runs. Delete it. Overrides written to quiet that alert (a `starsCollapsedRatio` of 0.05, say)
+still apply and now make `stars-collapsed` less sensitive than its defaults, so delete them too. `scripts/set-pushover-keys.sh` writes it. The keys go
 nowhere else: not into logs, traces, errors or API responses.

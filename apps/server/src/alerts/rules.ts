@@ -3,7 +3,7 @@ import type { AlertThresholds } from './thresholds.js'
 export type AlertLevel = 'warn' | 'critical'
 
 export type AlertId =
-  | 'stars-low'
+  | 'stars-dropping'
   | 'stars-collapsed'
   | 'stars-declining'
   | 'hfr-high'
@@ -85,33 +85,39 @@ export function evaluateAlerts(history: RigHistory, thresholds: AlertThresholds,
 // Frames
 
 /**
- * Compares each frame with the run's own baseline: the median star count of
- * its last accepted frames. A frame is accepted when it is not itself bad, so
- * a stretch of cloud or a snagged camera never becomes the new normal.
+ * Compares the run's star count with itself. One frame is never compared: a count is the median of
+ * the last few frames. The baseline is the median of the last accepted frames, and a frame is
+ * accepted when neither it nor an alert standing says the sky or camera is off, so a stretch of
+ * cloud or a snagged camera never becomes the new normal.
  */
 function watchFrames(frames: Frame[], t: AlertThresholds): AlertCondition[] {
   const acceptedStars: number[] = []
-  const allStars: number[] = []
-  let starsLow = calm
+  const smoothed: number[] = []
+  let starsDropping = calm
   let starsCollapsed = calm
   let starsDeclining = calm
   let hfrHigh = calm
   let hfrBad = calm
   let baseline = 0
+  let trendFrom = 0
 
-  for (const frame of frames) {
+  for (const [index, frame] of frames.entries()) {
     baseline = baselineStars(acceptedStars, t)
-    allStars.push(frame.stars)
+    smoothed.push(smoothedStars(frames, index, t))
 
+    const stars = smoothed[index]!
     const hfr = frame.hfrPixels
-    const trend = starsTrend(allStars, t)
+    const trend = starsTrend(frames, trendFrom, index, t)
     const canCompare = baseline >= t.minBaselineStarsForRatios
     const empty = frame.stars === 0 && baseline >= t.minBaselineStarsForEmptyFrame
-    const low = canCompare && frame.stars < t.starsLowRatio * baseline
-    const collapsed = empty || (canCompare && frame.stars < t.starsCollapsedRatio * baseline)
-    const recovered = frame.stars >= t.starsRecoveredRatio * baseline
+    const dropping = starsFell(frames, smoothed, index, t)
+    const collapsed = empty || (canCompare && stars < t.starsCollapsedRatio * baseline)
+    const recovered = stars >= t.starsRecoveredRatio * baseline
 
-    starsLow = latch(starsLow, low, recovered, 1)
+    // A collapse is a break in the sky or the camera, not a slope: the trend starts over after it.
+    if (collapsed) trendFrom = index + 1
+
+    starsDropping = latch(starsDropping, dropping, recovered, t.confirmFrames, t.confirmFrames)
     starsCollapsed = latch(starsCollapsed, collapsed, recovered, t.confirmFrames, t.confirmFrames)
     starsDeclining = latch(
       starsDeclining,
@@ -122,10 +128,10 @@ function watchFrames(frames: Frame[], t: AlertThresholds): AlertCondition[] {
     hfrHigh = latch(hfrHigh, hfr !== null && hfr > t.hfrHighPixels, hfr !== null && hfr < t.hfrHighClearPixels, t.confirmFrames)
     hfrBad = latch(hfrBad, hfr !== null && hfr > t.hfrBadPixels, hfr !== null && hfr < t.hfrBadClearPixels, t.confirmFrames)
 
-    const bad = low || collapsed || (hfr !== null && hfr > t.hfrHighPixels)
+    const bad = dropping || collapsed || (hfr !== null && hfr > t.hfrHighPixels)
 
     const inEpisode =
-      starsLow.raised || starsCollapsed.raised || starsDeclining.raised || hfrHigh.raised || hfrBad.raised
+      starsDropping.raised || starsCollapsed.raised || starsDeclining.raised || hfrHigh.raised || hfrBad.raised
 
     if (!bad && !inEpisode) acceptedStars.push(frame.stars)
   }
@@ -134,19 +140,20 @@ function watchFrames(frames: Frame[], t: AlertThresholds): AlertCondition[] {
 
   if (!latest) return []
 
-  const trend = starsTrend(allStars, t)
+  const trend = starsTrend(frames, trendFrom, frames.length - 1, t)
+  const median = Math.round(smoothed.at(-1)!)
   const normal = `normal ≈${Math.round(baseline)} stars`
   const hfr = latest.hfrPixels?.toFixed(1)
   const conditions: AlertCondition[] = []
 
-  if (starsLow.raised)
-    conditions.push({ id: 'stars-low', level: 'warn', message: `Star count dropped to ${latest.stars} (${normal})` })
+  if (starsDropping.raised)
+    conditions.push({ id: 'stars-dropping', level: 'warn', message: `Star count dropping: median ${median} (${normal})` })
 
   if (starsCollapsed.raised)
-    conditions.push({ id: 'stars-collapsed', level: 'critical', message: `Star count fell to ${latest.stars} (${normal})` })
+    conditions.push({ id: 'stars-collapsed', level: 'critical', message: `Star count fell to ${latest.stars} (median ${median}, ${normal})` })
 
   if (starsDeclining.raised && trend)
-    conditions.push({ id: 'stars-declining', level: 'warn', message: `Star count falling: median ${Math.round(trend.recent)} (≈${Math.round(trend.before)} just before)` })
+    conditions.push({ id: 'stars-declining', level: 'warn', message: `Star count falling: median ${Math.round(trend.recent)} (≈${Math.round(trend.before)} the ${t.starsDecliningWindowMinutes} min before)` })
 
   if (hfrHigh.raised)
     conditions.push({ id: 'hfr-high', level: 'warn', message: `Stars are soft: HFR ${hfr ?? 'unmeasured'} px` })
@@ -164,16 +171,52 @@ function baselineStars(acceptedStars: number[], t: AlertThresholds) {
   return median(acceptedStars.slice(-t.baselineFrames))
 }
 
-/** The latest frames' median against the same number of frames before them. */
-function starsTrend(allStars: number[], t: AlertThresholds) {
-  const span = t.baselineFrames
+/** The median star count of the frame at `index` and the frames just before it. */
+function smoothedStars(frames: Frame[], index: number, t: AlertThresholds) {
+  return median(frames.slice(Math.max(0, index - t.starsSmoothingFrames + 1), index + 1).map(frame => frame.stars))
+}
 
-  if (allStars.length < 2 * span) return null
+/**
+ * Whether the smoothed count at frame `index` has fallen below its allowed share of the highest
+ * smoothed count within the drop window before it. Smoothing needs a full set of frames, so the
+ * first frames of a history are neither the fall nor what it fell from.
+ */
+function starsFell(frames: Frame[], smoothed: number[], index: number, t: AlertThresholds) {
+  const firstSmoothed = t.starsSmoothingFrames - 1
 
-  const recent = median(allStars.slice(-span))
-  const before = median(allStars.slice(-2 * span, -span))
+  if (index <= firstSmoothed) return false
 
-  return before >= t.minBaselineStarsForRatios ? { recent, before } : null
+  const windowStart = frames[index]!.capturedAt - t.starsDropWindowMinutes * 60_000
+  let peak = 0
+
+  for (let earlier = firstSmoothed; earlier < index; earlier++)
+    if (frames[earlier]!.capturedAt >= windowStart) peak = Math.max(peak, smoothed[earlier]!)
+
+  return peak >= t.minBaselineStarsForRatios && smoothed[index]! < (1 - t.starsDropFraction) * peak
+}
+
+/**
+ * The median star count of the last `starsDecliningWindowMinutes` against the same time before
+ * it. Time, not frame count, so the trend means the same at 30 s and 180 s exposures.
+ */
+function starsTrend(frames: Frame[], from: number, index: number, t: AlertThresholds) {
+  const spanMs = t.starsDecliningWindowMinutes * 60_000
+  const now = frames[index]!.capturedAt
+  const recent: number[] = []
+  const before: number[] = []
+
+  for (const frame of frames.slice(from, index + 1)) {
+    const age = now - frame.capturedAt
+
+    if (age < spanMs) recent.push(frame.stars)
+    else if (age < 2 * spanMs) before.push(frame.stars)
+  }
+
+  if (recent.length < t.minBaselineFrames || before.length < t.minBaselineFrames) return null
+
+  const trend = { recent: median(recent), before: median(before) }
+
+  return trend.before >= t.minBaselineStarsForRatios ? trend : null
 }
 
 // ---------------------------------------------------------------------------
