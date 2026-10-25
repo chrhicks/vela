@@ -49,8 +49,11 @@ pnpm build
 pnpm start
 ```
 
-Run `pnpm check` for lint, tests, and the workspace build (including TypeScript
-checks), in that order. It stops at the first failure and does not modify source.
+Run `pnpm check` for lint, the workspace build (including TypeScript checks), and
+tests, in that order. The build comes before the tests because workspace packages
+resolve through their built `dist`, so a fresh clone needs no manual build step.
+It stops at the first failure and does not modify source. `pnpm test` on its own
+needs the packages built first (`pnpm build`).
 Use `pnpm lint` to inspect findings or `pnpm lint --fix` to apply available fixes
 for review.
 
