@@ -100,7 +100,9 @@ so it ignores the sun.
   already reports, so Chris types no coordinates. A mount reporting nothing, a value off the globe,
   or exactly 0 N 0 E (what a mount with no location set says) counts as no site. The monitor reads
   it when the alerts view is asked for and the site is unknown (no more often than every 30 s),
-  and again when a run starts. A site that is known is not read again between runs.
+  and again when a run starts. A site that is known is not read again between runs. If the mount
+  answers at run start with no usable location, the old site is dropped (the rig may have moved)
+  and the rig pages at any hour; a mount that does not answer leaves the old site.
 - **Unknown site fails open.** A missed alert on an unattended rig costs more than an extra page, so
   an unknown site pages at any hour, as before. The view says `pagingWindow: site-unknown` and the
   switch reads "pages at any hour · rig location unknown". Learning the site later in daylight
@@ -110,8 +112,9 @@ so it ignores the sun.
   when the sun does not cross -18 within two days (a Greenwich midsummer, or a polar winter).
 - **Held alerts.** An alert raised in daylight has delivery `held`. The view shows `outside-dark`.
   An alert that cleared before dark was never sent, so it never pages.
-- **Dusk.** When dark begins, every alert still standing that was held and not acknowledged is
-  told to the phone, once, as if raised then. Its retry hour starts at dusk. The monitor notices
+- **Dusk.** When dark begins, or the site becomes unknown, every alert still standing that was held
+  and not acknowledged is told to the phone, once, as if raised then. An evaluation reconciles the
+  conditions first, so an alert it clears is never released. Its retry hour starts at dusk. The monitor notices
   from its next evaluation (a frame or a mount poll) or from its own timer, which sleeps until the
   next crossing (never more than 6 h), so a failed run's alert still pages at dusk with no poll
   running.

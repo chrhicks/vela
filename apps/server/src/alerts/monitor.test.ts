@@ -1190,6 +1190,18 @@ describe('paging only in astronomical darkness', () => {
     expect(fixture.phone.sends()).toHaveLength(1)
   })
 
+  it('does not page an alert the evaluation at dusk clears, before the timer has noticed dusk', async () => {
+    const fixture = await atGreenwich(noon)
+
+    await failedRun(fixture)
+    fixture.at(dusk + 10_000)
+    fixture.monitor.runStarted(60)
+    await settle()
+
+    expect(fixture.monitor.view().alerts).toEqual([])
+    expect(fixture.phone.events).toEqual([])
+  })
+
   it('does not page an alert that cleared before dark', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
 
@@ -1355,6 +1367,53 @@ describe('paging only in astronomical darkness', () => {
 
       expect(fixture.phone.cancels()).toEqual([expect.objectContaining({ receipt: 'receipt-1' })])
       expect(deliveryOfFirst(fixture)).toEqual({ state: 'outside-dark' })
+    })
+
+    it('forgets a site the mount no longer reports, and pages at any hour again', async () => {
+      let answer: Site | null = greenwich
+      const fixture = await atGreenwich(noon, { readSite: async () => answer })
+
+      answer = null
+      fixture.monitor.runStarted(60)
+      await settle()
+      fixture.monitor.runEnded('failed')
+      await settle()
+
+      expect(fixture.phone.emergencies()).toHaveLength(1)
+      expect(fixture.monitor.view().pagingWindow).toEqual({ state: 'site-unknown' })
+    })
+
+    it('pages what was held under the old site as soon as the mount says the site is unknown', async () => {
+      let answer: Site | null = greenwich
+      const fixture = await atGreenwich(noon, { readSite: async () => answer })
+
+      answer = null
+      fixture.monitor.runStarted(60)
+      fixture.monitor.runEnded('failed')
+
+      expect(fixture.phone.events).toEqual([])
+
+      await settle()
+
+      expect(fixture.phone.emergencies()).toHaveLength(1)
+    })
+
+    it('keeps the old site when the mount cannot be reached', async () => {
+      let broken = false
+
+      const fixture = await atGreenwich(noon, {
+        readSite: async () => {
+          if (broken) throw new Error('Cria is not answering')
+
+          return greenwich
+        },
+      })
+
+      broken = true
+      fixture.monitor.runStarted(60)
+      await settle()
+
+      expect(fixture.monitor.view().pagingWindow.state).toBe('not-dark')
     })
 
     it('reads the site again when a run starts, since the mount may have been set since', async () => {

@@ -216,8 +216,6 @@ export function createAlertMonitor({
   function evaluate() {
     const at = now()
 
-    syncSun()
-
     // The camera is not expected to produce frames during autofocus.
     const watched: RunState =
       run.status === 'running' && autofocusing ? { ...run, waitingForFrameSince: at } : run
@@ -230,6 +228,9 @@ export function createAlertMonitor({
 
     unavailable = evaluation.unavailable
     reconcile(evaluation.conditions, at)
+
+    // After reconcile, so an alert this evaluation clears is not released to the phone first.
+    syncSun()
   }
 
   function reconcile(conditions: AlertCondition[], at: number) {
@@ -468,8 +469,8 @@ export function createAlertMonitor({
   }
 
   /**
-   * Acts when the sun crosses the dark line. At dusk every alert still standing that waited for it is
-   * told to the phone, once. At dawn what repeats on the phone is cancelled and what waits is held for
+   * Acts when the sun crosses the dark line. At dusk, or when the site turns out unknown, every alert
+   * still standing that waited for dark is told to the phone, once. At dawn what repeats on the phone is cancelled and what waits is held for
    * the next dusk.
    */
   function syncSun() {
@@ -479,7 +480,7 @@ export function createAlertMonitor({
 
     sunSeen = sun
 
-    if (sun === 'dark') {
+    if (sun !== 'light') {
       for (const episode of episodes.values()) {
         if (episode.delivery !== 'held' || episode.acknowledged) continue
 
@@ -487,7 +488,7 @@ export function createAlertMonitor({
         episode.eligibleAt = now()
         announce(episode)
       }
-    } else if (sun === 'light') {
+    } else {
       for (const episode of episodes.values()) void afterPreviousCalls(episode, () => holdBack(episode))
     }
   }
@@ -510,7 +511,7 @@ export function createAlertMonitor({
     sunTimer.unref()
   }
 
-  /** Reads where the rig is from its mount. A site that is known is read again when a run starts. */
+  /** Reads where the rig is from its mount. A site that is known is read again when a run starts. A mount that cannot be reached leaves it as it was. */
   async function learnSite(startingRun = false) {
     if (!readSite || !notifier || closed || siteRead) return
 
@@ -526,8 +527,10 @@ export function createAlertMonitor({
       try {
         const read = await readSite(AbortSignal.timeout(mountReadTimeoutMs))
 
-        if (!read || closed) return
+        if (closed) return
 
+        // A mount that answers with no usable location drops the old site: the rig may have moved,
+        // and daylight at the old place must not hold back a page.
         site = read
         syncSun()
         watchSun()
