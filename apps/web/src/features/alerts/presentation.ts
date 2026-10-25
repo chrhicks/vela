@@ -57,11 +57,14 @@ export function phoneLabel(phone: AlertsView['phone']) {
 }
 
 const thresholdLabels: [key: string, label: string, unit: string][] = [
-  ['starsLowRatio', 'Stars low (warn) below', '× baseline'],
+  ['starsSmoothingFrames', 'Star count is the median of', 'frames'],
+  ['starsDropFraction', 'Stars dropping (warn) when down by', 'of the recent peak'],
+  ['starsDropWindowMinutes', 'Stars dropping window', 'min'],
   ['starsCollapsedRatio', 'Stars collapsed (critical) below', '× baseline'],
-  ['starsRecoveredRatio', 'Stars clear at', '× baseline'],
-  ['starsDecliningRatio', 'Stars declining below', '× earlier frames'],
-  ['starsDecliningClearRatio', 'Stars declining clears at', '× earlier frames'],
+  ['starsRecoveredRatio', 'Stars dropping and collapsed clear at', '× baseline'],
+  ['starsDecliningRatio', 'Stars declining below', '× the window before'],
+  ['starsDecliningClearRatio', 'Stars declining clears at', '× the window before'],
+  ['starsDecliningWindowMinutes', 'Stars declining window', 'min'],
   ['confirmFrames', 'Frames to confirm collapse or HFR', 'frames'],
   ['baselineFrames', 'Baseline from last', 'frames'],
   ['minBaselineFrames', 'Frames needed for a baseline', 'frames'],

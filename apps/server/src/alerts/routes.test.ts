@@ -96,7 +96,7 @@ describe('alerts routes', () => {
       alerts: [],
       unavailable: [],
       phone: { state: 'ready' },
-      thresholds: { starsCollapsedRatio: 0.3, hfrBadPixels: 6, meridianTrackLimitHours: 0.0669 },
+      thresholds: { starsCollapsedRatio: 0.15, hfrBadPixels: 6, meridianTrackLimitHours: 0.0669 },
     })
   })
 
@@ -435,7 +435,7 @@ describe('a capture run feeds the alerts', () => {
     await settle()
 
     expect(await subject.alerts()).toMatchObject({ watching: false, alerts: [] })
-    expect(subject.phone.cancelled).toEqual(['receipt-2'])
+    expect(subject.phone.cancelled).toEqual(['receipt-1'])
     expect(subject.phone.sent.at(-1)).toMatchObject({ priority: -1 })
   })
 

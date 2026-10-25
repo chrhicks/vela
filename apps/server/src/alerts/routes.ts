@@ -15,6 +15,7 @@ export interface AlertsOptions {
   /** Whether each rig's alerts may page the phone; defaults to on and is lost on restart. */
   phoneAlerts?: PhoneAlertsPreference
   mountReaderFor?: (rigId: string) => (signal: AbortSignal) => Promise<MountReading | null>
+  focuserReaderFor?: (rigId: string) => (signal: AbortSignal) => Promise<number | null>
   now?: () => number
 }
 
@@ -28,7 +29,14 @@ const viewOf = (monitor: AlertMonitor): AlertsView => monitor.view()
 export function registerAlerts(
   app: FastifyInstance,
   catalog: RigCatalog,
-  { thresholds, notifier, phoneAlerts = createMemoryPhoneAlertsPreference(), mountReaderFor, now }: AlertsOptions,
+  {
+    thresholds,
+    notifier,
+    phoneAlerts = createMemoryPhoneAlertsPreference(),
+    mountReaderFor,
+    focuserReaderFor,
+    now,
+  }: AlertsOptions,
 ) {
   const monitors = new Map<string, AlertMonitor>()
 
@@ -43,6 +51,7 @@ export function registerAlerts(
         notifier,
         phoneAlertsOn: phoneAlerts.isOn(rig.id),
         ...(mountReaderFor && { readMount: mountReaderFor(rig.id) }),
+        ...(focuserReaderFor && { readFocuser: focuserReaderFor(rig.id) }),
         ...(now && { now }),
       })
 

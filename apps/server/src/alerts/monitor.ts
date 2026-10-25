@@ -40,7 +40,7 @@ const mountReadTimeoutMs = 5_000
  * off the phone while the stronger one stands. Both still run their own episodes.
  */
 const coveredBy: Partial<Record<AlertId, AlertId>> = {
-  'stars-low': 'stars-collapsed',
+  'stars-dropping': 'stars-collapsed',
   'stars-declining': 'stars-collapsed',
   'hfr-high': 'hfr-bad',
   'meridian-near': 'meridian-imminent',
@@ -108,6 +108,11 @@ export interface AlertMonitorOptions {
    * so the mount watches report themselves unavailable instead.
    */
   readMount?: (signal: AbortSignal) => Promise<MountReading | null>
+  /**
+   * The focuser's position, or null when the rig has none to read. A failed read is skipped:
+   * the mount read is what says the rig stopped answering.
+   */
+  readFocuser?: (signal: AbortSignal) => Promise<number | null>
   now?: () => number
   mountPollMs?: number
 }
@@ -154,6 +159,7 @@ export function createAlertMonitor({
   notifier,
   phoneAlertsOn = true,
   readMount,
+  readFocuser,
   now = Date.now,
   mountPollMs: pollMs = mountPollMs,
 }: AlertMonitorOptions) {
@@ -161,6 +167,7 @@ export function createAlertMonitor({
   let runToken = 0
   let autofocusing = false
   let frames: Frame[] = []
+  let focuserPosition: number | null = null
   let mountReadings: MountReading[] = []
   let observationsInterruptedSince: number | null = null
   let unavailable: string[] = []
@@ -529,10 +536,35 @@ export function createAlertMonitor({
         }
       }
 
+      if (readFocuser) {
+        try {
+          const position = await readFocuser(AbortSignal.timeout(mountReadTimeoutMs))
+
+          if (token !== runToken) return
+
+          focuserMovedTo(position)
+        } catch {
+          if (token !== runToken) return
+        }
+      }
+
       evaluate()
     } finally {
       polling = false
     }
+  }
+
+  /**
+   * Star counts rise as focus worsens and fall after a refocus, so a moved focuser, by hand or by
+   * autofocus, starts the history over like autofocus ending does. A frame exposed across the
+   * move, within one poll, lands in whichever history is current when it arrives.
+   */
+  function focuserMovedTo(position: number | null) {
+    if (position === null) return
+
+    if (focuserPosition !== null && position !== focuserPosition) frames = []
+
+    focuserPosition = position
   }
 
   function startPolling() {
@@ -556,6 +588,7 @@ export function createAlertMonitor({
       runToken++
       autofocusing = false
       frames = []
+      focuserPosition = null
       mountReadings = []
       observationsInterruptedSince = null
       run = { status: 'running', exposureSeconds, waitingForFrameSince: now() }

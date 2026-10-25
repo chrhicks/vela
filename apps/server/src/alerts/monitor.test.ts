@@ -166,35 +166,33 @@ describe('the real night: camera snagged a tripod leg', () => {
     await replayNight(fixture)
 
     expect(phone.sends().map(event => [clockTime(event.at), event.priority])).toEqual([
-      ['03:31:10', 0],
-      ['03:32:17', 2],
-      ['04:12:09', -1],
-      ['04:16:39', -1],
+      ['03:33:25', 2],
+      ['04:14:24', -1],
     ])
 
     expect(phone.emergencies()).toHaveLength(1)
     expect(phone.cancels()).toEqual([
-      { kind: 'cancel', receipt: 'receipt-1', at: night.find(frame => frame.time === '04:16:39')!.at },
+      { kind: 'cancel', receipt: 'receipt-1', at: night.find(frame => frame.time === '04:14:24')!.at },
     ])
-    expect(phone.sends()[3]!.message).toMatch(/^cleared: Star count fell to/)
+    expect(phone.sends()[1]!.message).toMatch(/^cleared: Star count fell to/)
   })
 
-  it('keeps the cloud-trend warning off the phone and the banner while the collapse already covers it', async () => {
+  it('keeps the drop warning off the phone and the banner while the collapse already covers it', async () => {
     const fixture = watched()
 
     await replayNight(fixture, '03:39:02')
 
     expect(fixture.monitor.view().alerts.map(alert => alert.id)).toEqual(['stars-collapsed'])
-    expect(fixture.phone.sends().map(event => event.priority)).toEqual([0, 2])
+    expect(fixture.phone.sends().map(event => event.priority)).toEqual([2])
   })
 
   it('shows the snag as one red alert, hiding the weaker warning it grew from', async () => {
     const fixture = watched()
 
-    await replayNight(fixture, '03:31:10')
-    expect(fixture.monitor.view().alerts.map(alert => [alert.id, alert.level])).toEqual([['stars-low', 'warn']])
-
     await replayNight(fixture, '03:32:17')
+    expect(fixture.monitor.view().alerts).toEqual([])
+
+    await replayNight(fixture, '03:33:25')
     expect(fixture.monitor.view().alerts.map(alert => [alert.id, alert.level])).toEqual([['stars-collapsed', 'critical']])
   })
 
@@ -210,13 +208,13 @@ describe('the real night: camera snagged a tripod leg', () => {
   it('stops the phone repeating when acknowledged, keeps the alert up, and still says cleared', async () => {
     const fixture = watched()
 
-    await replayNight(fixture, '03:32:17')
+    await replayNight(fixture, '03:33:25')
 
     expect(await fixture.monitor.acknowledge('stars-collapsed')).toEqual({ outcome: 'acknowledged' })
     expect(fixture.phone.cancels()).toEqual([expect.objectContaining({ receipt: 'receipt-1' })])
     expect(fixture.monitor.view().alerts).toEqual([expect.objectContaining({ id: 'stars-collapsed', acknowledged: true })])
 
-    const afterSnag = night.filter(frame => frame.time > '03:32:17')
+    const afterSnag = night.filter(frame => frame.time > '03:33:25')
 
     for (const frame of afterSnag) {
       fixture.at(frame.at)
@@ -238,17 +236,15 @@ describe('the real night: camera snagged a tripod leg', () => {
     const spans = exporter.getFinishedSpans().filter(span => span.name.startsWith('alert.'))
     const named = (name: string) => spans.filter(span => span.name === name).map(span => span.attributes['alert.id'])
 
-    expect(named('alert.raised')).toEqual(['stars-low', 'stars-collapsed', 'stars-declining'])
-    expect(named('alert.cleared')).toEqual(['stars-declining', 'stars-low', 'stars-collapsed'])
+    expect(named('alert.raised')).toEqual(['stars-dropping', 'stars-collapsed'])
+    expect(named('alert.cleared')).toEqual(['stars-dropping', 'stars-collapsed'])
 
     expect(
       spans
         .filter(span => span.name === 'alert.delivery')
         .map(span => [span.attributes['alert.id'], span.attributes['alert.delivery.action'], span.attributes['alert.delivery.status']]),
     ).toEqual([
-      ['stars-low', 'raise', 'delivered'],
       ['stars-collapsed', 'raise', 'delivered'],
-      ['stars-low', 'clear', 'delivered'],
       ['stars-collapsed', 'cancel', 'delivered'],
       ['stars-collapsed', 'clear', 'delivered'],
     ])
@@ -598,7 +594,10 @@ describe('while the run is polled', () => {
     ...overrides,
   })
 
-  function polled(readMount: (signal: AbortSignal) => Promise<MountReading | null>) {
+  function polled(
+    readMount: (signal: AbortSignal) => Promise<MountReading | null>,
+    readFocuser?: (signal: AbortSignal) => Promise<number | null>,
+  ) {
     const { phone, notifier } = fakePhone(() => Date.now())
 
     const monitor = createAlertMonitor({
@@ -607,6 +606,7 @@ describe('while the run is polled', () => {
       thresholds: defaultThresholds,
       notifier,
       readMount,
+      ...(readFocuser && { readFocuser }),
     })
 
     monitors.push(monitor)
@@ -862,6 +862,69 @@ describe('while the run is polled', () => {
 
     expect(monitor.view().alerts).toEqual([])
     expect(phone.sends()).toEqual([])
+  })
+
+  describe('when the focuser moves', () => {
+    /** Six frames at 1500 stars, then six at 300 as if a refocus had changed the count. */
+    async function refocused(readFocuser: (signal: AbortSignal) => Promise<number | null>) {
+      const { monitor, phone } = polled(async () => tracking(), readFocuser)
+      let stars = 1500
+
+      monitor.runStarted(60)
+
+      for (let index = 0; index < 12; index++) {
+        if (index === 6) stars = 300
+
+        await vi.advanceTimersByTimeAsync(60_000)
+        monitor.frameCaptured({ capturedAt: new Date().toISOString(), statistics: { detectedStars: stars, medianHfrPixels: 3 } })
+      }
+
+      return { monitor, phone }
+    }
+
+    it('starts the history over so the new count is not read as a fall', async () => {
+      let position = 5000
+
+      const { monitor, phone } = await refocused(async () => {
+        if (Date.now() >= Date.parse('2026-10-18T03:06:30Z')) position = 5200
+
+        return position
+      })
+
+      expect(monitor.view().alerts).toEqual([])
+      expect(phone.sends()).toEqual([])
+    })
+
+    it('leaves the fall standing when the focuser has not moved', async () => {
+      const { monitor } = await refocused(async () => 5000)
+
+      expect(monitor.view().alerts.map(alert => alert.id)).toEqual(['stars-dropping'])
+    })
+
+    it('does not mistake a rig with no focuser to read, or a read that failed, for a move', async () => {
+      const { monitor: none } = await refocused(async () => null)
+      let reads = 0
+
+      const { monitor: failing } = await refocused(async () => {
+        if (++reads % 2 === 0) throw new Error('Cria did not answer')
+
+        return 5000
+      })
+
+      expect(failing.view().alerts.map(alert => alert.id)).toContain('stars-dropping')
+      expect(none.view().alerts.map(alert => alert.id)).toContain('stars-dropping')
+    })
+
+    it('does not call a failed focuser read an unreachable rig', async () => {
+      const { monitor } = polled(async () => tracking(), async () => {
+        throw new Error('Cria did not answer')
+      })
+
+      monitor.runStarted(1800)
+      await vi.advanceTimersByTimeAsync(120_000)
+
+      expect(monitor.view().alerts.map(alert => alert.id)).not.toContain('rig-unreachable')
+    })
   })
 })
 

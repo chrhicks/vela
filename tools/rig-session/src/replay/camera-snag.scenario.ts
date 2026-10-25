@@ -50,14 +50,14 @@ test('a camera that sends blank frames from frame 6 drops the star count to 0 an
 
   const collapsed = result.alertChanges.find(change => change.alerts.some(alert => alert.id === 'stars-collapsed'))
 
-  expect(collapsed?.alerts).toEqual([{ id: 'stars-collapsed', level: 'critical', message: 'Star count fell to 0 (normal ≈12 stars)' }])
+  expect(collapsed?.alerts).toEqual([{ id: 'stars-collapsed', level: 'critical', message: 'Star count fell to 0 (median 0, normal ≈12 stars)' }])
   // The first blank frame is the 7th attempt; two blank frames confirm the collapse.
   expect([7, 8]).toContain(collapsed?.afterAttempts)
 
-  // Before the collapse, nothing but the one-frame warning, and never before the snag.
+  // Before the collapse, nothing, and never before the snag.
   const before = result.alertChanges.slice(0, result.alertChanges.indexOf(collapsed!))
 
-  expect(before.flatMap(change => change.alerts.map(alert => alert.id)).filter(id => id !== 'stars-low')).toEqual([])
+  expect(before.flatMap(change => change.alerts.map(alert => alert.id))).toEqual([])
   expect(result.alertChanges.every(change => change.afterAttempts >= snagAt)).toBe(true)
   expect(result.alertChanges.flatMap(change => change.alerts.map(alert => alert.id))).not.toContain('tracking-stopped')
 })
