@@ -264,7 +264,7 @@ it('walks from the low end of the reported travel and commands MinStep itself', 
     .toMatchObject({ active: true, phase: 'walking', minStep: 15500 })
   await subject.finish()
 
-  expect(subject.moves).toEqual([15900, 15850, 15800, 15750, 15700, 15650, 15600, 15550, 15500, 15700])
+  expect(subject.moves).toEqual([15900, 15850, 15800, 15750, 15700, 15650, 15600, 15550, 15500, 16000, 15700])
   expect(Math.min(...subject.windows.map(window => window.minPosition))).toBe(15500)
   expect((await subject.get()).json()).toMatchObject({ phase: 'failed', restoredStart: true })
 })

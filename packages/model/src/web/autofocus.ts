@@ -17,6 +17,14 @@ export interface AutofocusFit {
   minSamplePosition: number
 }
 
+/** How the last run-ending move reached its target: through `via` (above it), then down onto `target`. */
+export interface AutofocusApproach {
+  purpose: 'best-focus' | 'restore-start'
+  target: number
+  /** Position passed through before coming down onto the target. Null when nothing fit above the target, so the move was direct. */
+  via: number | null
+}
+
 export type AutofocusPhase =
   | 'setup'
   | 'walking'
@@ -62,5 +70,7 @@ export interface AutofocusView {
   fit: AutofocusFit | null
   /** True only after a failed or cancelled walk confirmed return to start. False if restore was not attempted or not confirmed. */
   restoredStart: boolean
+  /** The last run-ending move and its route. Absent from older servers; null until a run reaches one. */
+  finalApproach?: AutofocusApproach | null
   error: string | null
 }

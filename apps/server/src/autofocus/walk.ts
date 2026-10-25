@@ -2,6 +2,13 @@ export const DEFAULT_OFFSET_STEPS = 4
 
 export const DEFAULT_STEP_SIZE = 50
 
+/**
+ * How far past a final target the focuser goes before coming back down onto it. Must exceed the
+ * focuser's backlash so the gear slack is always taken up the same way. A guess at several times
+ * the EAF backlash we expect; not measured on this rig, so confirm on a real night.
+ */
+export const APPROACH_OVERSHOOT_STEPS = 300
+
 /** The positions Vela may command, inclusive. Distinct from the planned autofocus window inside it. */
 export interface FocuserTravel {
   min: number
@@ -15,7 +22,15 @@ export interface AutofocusWalkPlan {
   travel: FocuserTravel
   minPosition: number
   maxPosition: number
+  /** Highest position a final approach may pass through: the window plus the overshoot, inside travel. */
+  approachMax: number
   positions: number[]
+}
+
+/** The route of a run-ending move: pass through `via` (above the target), then come down onto `target`. */
+export interface FinalApproach {
+  target: number
+  via: number | null
 }
 
 export type AutofocusWalkPlanning =
@@ -91,14 +106,35 @@ export function planStarHfrWalk(
 
   return {
     ok: true,
-    plan: { start, stepSize, offsetSteps, travel, minPosition, maxPosition, positions },
+    plan: {
+      start,
+      stepSize,
+      offsetSteps,
+      travel,
+      minPosition,
+      maxPosition,
+      approachMax: Math.min(maxPosition + APPROACH_OVERSHOOT_STEPS, travel.max),
+      positions,
+    },
   }
+}
+
+/**
+ * All samples but the first are taken after a downward move, so the curve fit describes the focuser as it sits
+ * after coming down. The final move to best focus, and the return to the start, come down the same
+ * way. `via` is null only when the target is at the top of travel and there is nowhere above it.
+ */
+export function approachFromAbove(plan: AutofocusWalkPlan, target: number): FinalApproach {
+  const via = Math.min(target + APPROACH_OVERSHOOT_STEPS, plan.approachMax)
+
+  return { target, via: via > target ? via : null }
 }
 
 export function assertCommandedPosition(
   position: number,
   plan: AutofocusWalkPlan,
   extraMin?: number,
+  ceiling = plan.maxPosition,
 ) {
   if (position === 0) {
     throw new Error(
@@ -116,7 +152,7 @@ export function assertCommandedPosition(
 
   const floor = extraMin ?? plan.minPosition
 
-  if (position < floor || position > plan.maxPosition) {
+  if (position < floor || position > ceiling) {
     throw new Error(
       'That focuser move would leave the autofocus window around the starting position.',
     )

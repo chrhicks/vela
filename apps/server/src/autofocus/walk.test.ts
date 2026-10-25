@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { extraInwardPosition, planStarHfrWalk, assertCommandedPosition } from './walk.js'
+import {
+  APPROACH_OVERSHOOT_STEPS,
+  approachFromAbove,
+  extraInwardPosition,
+  planStarHfrWalk,
+  assertCommandedPosition,
+} from './walk.js'
 
 describe('autofocus walk window', () => {
   it('plans a window around the current EAF position and never includes 0', () => {
@@ -127,5 +133,46 @@ describe('autofocus walk window', () => {
     expect(extraInwardPosition(planned.plan, inner)).toBe(32592)
     inner.push({ position: 32592, hfrPixels: 2.4 })
     expect(extraInwardPosition(planned.plan, inner)).toBeUndefined()
+  })
+})
+
+describe('autofocus final approach', () => {
+  function planned(start: number, maxStep: number, minStep?: number) {
+    const result = planStarHfrWalk(start, 50, 4, maxStep, minStep)
+
+    if (!result.ok) throw new Error(result.message)
+
+    return result.plan
+  }
+
+  it('passes through a position above the target, past the window if it must', () => {
+    const plan = planned(32842, 60000)
+
+    expect(approachFromAbove(plan, 32838)).toEqual({
+      target: 32838,
+      via: 32838 + APPROACH_OVERSHOOT_STEPS,
+    })
+    expect(approachFromAbove(plan, plan.maxPosition)).toEqual({
+      target: plan.maxPosition,
+      via: plan.maxPosition + APPROACH_OVERSHOOT_STEPS,
+    })
+    expect(plan.approachMax).toBe(plan.maxPosition + APPROACH_OVERSHOOT_STEPS)
+  })
+
+  it('clamps the overshoot to the travel and goes direct from the top of it', () => {
+    const plan = planned(37800, 38000, 15500)
+
+    expect(approachFromAbove(plan, 37800)).toEqual({ target: 37800, via: 38000 })
+    expect(approachFromAbove(plan, 38000)).toEqual({ target: 38000, via: null })
+  })
+
+  it('only lets a final approach above the walk window up to approachMax', () => {
+    const plan = planned(32842, 60000)
+
+    expect(() => assertCommandedPosition(plan.approachMax, plan, undefined, plan.approachMax)).not.toThrow()
+    expect(() => assertCommandedPosition(plan.approachMax + 1, plan, undefined, plan.approachMax)).toThrow(
+      /leave the autofocus window/,
+    )
+    expect(() => assertCommandedPosition(plan.maxPosition + 1, plan)).toThrow(/leave the autofocus window/)
   })
 })
