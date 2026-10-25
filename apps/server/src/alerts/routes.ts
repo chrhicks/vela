@@ -12,6 +12,7 @@ export interface AlertsOptions {
   /** Null when no Pushover keys are configured: alerts then show in Vela only. */
   notifier: Notifier | null
   mountReaderFor?: (rigId: string) => (signal: AbortSignal) => Promise<MountReading | null>
+  focuserReaderFor?: (rigId: string) => (signal: AbortSignal) => Promise<number | null>
   now?: () => number
 }
 
@@ -23,7 +24,7 @@ const viewOf = (monitor: AlertMonitor): AlertsView => monitor.view()
 export function registerAlerts(
   app: FastifyInstance,
   catalog: RigCatalog,
-  { thresholds, notifier, mountReaderFor, now }: AlertsOptions,
+  { thresholds, notifier, mountReaderFor, focuserReaderFor, now }: AlertsOptions,
 ) {
   const monitors = new Map<string, AlertMonitor>()
 
@@ -37,6 +38,7 @@ export function registerAlerts(
         thresholds,
         notifier,
         ...(mountReaderFor && { readMount: mountReaderFor(rig.id) }),
+        ...(focuserReaderFor && { readFocuser: focuserReaderFor(rig.id) }),
         ...(now && { now }),
       })
 

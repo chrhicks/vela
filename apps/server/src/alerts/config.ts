@@ -16,7 +16,24 @@ const configurationSchema = z.strictObject({
   thresholds: thresholdsSchema.optional()
 })
 
-export async function loadAlertsConfiguration(path: string | undefined): Promise<AlertsConfiguration> {
+/**
+ * `starsLowRatio` set the single-frame `stars-low` warning, which is gone. Files written while it
+ * existed still carry it, and an unknown key would stop the server starting.
+ */
+const fileWithRemovedThresholds = z.looseObject({
+  thresholds: z.looseObject({ starsLowRatio: z.unknown().optional() }).optional()
+})
+
+function withoutStarsLowRatio(file: z.infer<typeof fileWithRemovedThresholds>) {
+  const { starsLowRatio: _removed, ...thresholds } = file.thresholds ?? {}
+
+  return { ...file, thresholds }
+}
+
+export async function loadAlertsConfiguration(
+  path: string | undefined,
+  warn: (message: string) => void = console.warn
+): Promise<AlertsConfiguration> {
   const defaults = { pushover: null, thresholds: defaultThresholds }
 
   if (path === undefined) return defaults
@@ -38,7 +55,12 @@ export async function loadAlertsConfiguration(path: string | undefined): Promise
     throw new Error(`Invalid alerts configuration in ${path}: (root): Invalid JSON`)
   }
 
-  const parsed = configurationSchema.safeParse(input)
+  const older = fileWithRemovedThresholds.safeParse(input)
+  const removed = older.success && older.data.thresholds !== undefined && 'starsLowRatio' in older.data.thresholds
+
+  if (removed) warn(`Ignoring thresholds.starsLowRatio in ${path}: the single-frame stars-low alert was replaced by stars-dropping (starsDropFraction, starsDropWindowMinutes). Delete the key.`)
+
+  const parsed = configurationSchema.safeParse(removed ? withoutStarsLowRatio(older.data!) : input)
 
   if (!parsed.success) {
     const issues = parsed.error.issues.map(issue => {

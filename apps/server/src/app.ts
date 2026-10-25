@@ -24,6 +24,7 @@ import { registerMountControls } from './rig/mount-control.js'
 import { getTarget } from './targets/catalog/index.js'
 import { registerCapture } from './capture/routes.js'
 import { registerAlerts, type AlertsOptions } from './alerts/routes.js'
+import { focuserReaderFor } from './alerts/focuser.js'
 import { mountReaderFor } from './alerts/mount.js'
 import { defaultThresholds } from './alerts/thresholds.js'
 import { noFrameRecords, type FrameRecords } from './capture/frame-records.js'
@@ -100,6 +101,7 @@ export function buildApp({
   const alerts = registerAlerts(app, rigCatalog, {
     ...alertSettings,
     mountReaderFor: rigId => mountReaderFor(rigId, rigCatalog, equipment),
+    focuserReaderFor: rigId => focuserReaderFor(rigId, rigCatalog, equipment),
   })
 
   const capture = registerCapture(app, rigCatalog, operations, {
