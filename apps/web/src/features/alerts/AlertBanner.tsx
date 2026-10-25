@@ -7,7 +7,8 @@ import './alerts.css'
 
 const levelLabel = { critical: 'Critical', warn: 'Warning' }
 
-export function AlertBanner() {
+/** `alwaysShowPhoneSwitch`: the capture page, where Chris starts runs, offers the switch even when all is quiet. */
+export function AlertBanner({ alwaysShowPhoneSwitch = false }: { alwaysShowPhoneSwitch?: boolean }) {
   const alerts = useRigAlerts()
 
   if (!alerts?.view) return null
@@ -15,15 +16,16 @@ export function AlertBanner() {
   const { view, offline, acknowledging, acknowledgeError, acknowledge } = alerts
   const interrupted = offline && (view.watching || view.alerts.length > 0)
 
-  const phoneOff = view.phone.state !== 'not-configured' && !view.phoneAlertsOn
+  const phoneConfigured = view.phone.state !== 'not-configured'
+  const showSwitch = phoneConfigured && (alwaysShowPhoneSwitch || !view.phoneAlertsOn)
 
-  if (view.alerts.length === 0 && !interrupted && !phoneOff) return null
+  if (view.alerts.length === 0 && !interrupted && !showSwitch) return null
 
   const now = Date.now()
 
   return (
     <section className="alert-banner" aria-label="Rig alerts">
-      {phoneOff && <PhoneAlertsSwitch alerts={alerts} />}
+      {showSwitch && <PhoneAlertsSwitch alerts={alerts} />}
 
       {interrupted && (
         <p className="alert-banner__interrupted" role="status">
