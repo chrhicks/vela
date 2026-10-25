@@ -2,7 +2,7 @@ export type AlertLevel = 'warn' | 'critical'
 
 /** How the phone is getting on with one alert. */
 export type AlertDelivery =
-  | { state: 'sent' | 'sending' | 'covered' | 'not-configured' | 'muted' }
+  | { state: 'sent' | 'sending' | 'covered' | 'not-configured' | 'muted' | 'outside-dark' }
   | { state: 'retrying'; failures: number; nextAttemptAt: number; giveUpAt: number }
   | { state: 'gave-up'; failures: number }
 
@@ -22,6 +22,16 @@ export type PhoneAlertsView =
   | { state: 'ready' }
   | { state: 'failing'; reason: string; since: number }
 
+/**
+ * When the phone is paged for this rig: only while the sun is below -18 degrees at the rig's site.
+ * Times are epoch milliseconds; null means the sun does not cross that line within two days.
+ */
+export type PagingWindow =
+  /** The mount gave no location, so alerts page at any hour. */
+  | { state: 'site-unknown' }
+  | { state: 'astro-dark'; until: number | null }
+  | { state: 'not-dark'; from: number | null; until: number | null }
+
 /** The server's watch on one rig: what is wrong now, what cannot be watched, and the phone. */
 export interface AlertsView {
   rigId: string
@@ -34,6 +44,8 @@ export interface AlertsView {
   phone: PhoneAlertsView
   /** Chris's switch for this rig. Off means Vela sends nothing to the phone; alerts still show here. */
   phoneAlertsOn: boolean
+  /** When the switch, if on, actually pages. Alerts raised outside it show here with delivery `outside-dark`. */
+  pagingWindow: PagingWindow
   /** Every number the rules use, by name. */
   thresholds: Readonly<Record<string, number>>
 }

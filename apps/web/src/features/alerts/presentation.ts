@@ -30,6 +30,8 @@ export function deliveryLabel(alert: AlertView) {
       return 'Not sent · phone alerts are not set up'
     case 'muted':
       return 'Not sent · phone alerts are off'
+    case 'outside-dark':
+      return 'Not sent · outside astro dark'
     case 'retrying':
       return `Phone has not taken it (${delivery.failures}×) · trying again at ${clockTime(delivery.nextAttemptAt)}`
     case 'gave-up':
@@ -43,6 +45,22 @@ export function bannerPhoneNote(alert: AlertView) {
   const repeating = state === 'sent' && alert.level === 'critical' && !alert.acknowledged
 
   return repeating || state === 'retrying' || state === 'gave-up' ? deliveryLabel(alert) : null
+}
+
+/** When the phone is paged with the switch on, short enough for a phone-width screen. */
+export function pagingNote(paging: AlertsView['pagingWindow']) {
+  switch (paging.state) {
+    case 'site-unknown':
+      return 'pages at any hour · rig location unknown'
+    case 'astro-dark':
+      return paging.until === null ? 'paging now (astro dark)' : `paging now (astro dark until ${clockTime(paging.until)})`
+    case 'not-dark':
+      if (paging.from === null) return 'no astro dark soon, so no pages'
+
+      return paging.until === null
+        ? `pages in astro dark from ${clockTime(paging.from)}`
+        : `pages in astro dark, ${clockTime(paging.from)} to ${clockTime(paging.until)}`
+  }
 }
 
 export function phoneLabel(phone: AlertsView['phone']) {

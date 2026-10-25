@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AlertView } from '@vela/model/web'
-import { ageLabel, bannerPhoneNote, deliveryLabel, phoneLabel, thresholdRows } from './presentation'
+import { ageLabel, bannerPhoneNote, clockTime, deliveryLabel, pagingNote, phoneLabel, thresholdRows } from './presentation'
 
 const critical: AlertView = {
   id: 'stars-collapsed',
@@ -34,11 +34,40 @@ describe('alert delivery wording', () => {
     )
   })
 
+  it('says an alert held for darkness was not sent, and keeps it out of the banner note', () => {
+    const held: AlertView = { ...critical, delivery: { state: 'outside-dark' } }
+
+    expect(deliveryLabel(held)).toBe('Not sent · outside astro dark')
+    expect(bannerPhoneNote(held)).toBeNull()
+  })
+
   it('reports a failing phone with its reason', () => {
     expect(phoneLabel({ state: 'failing', reason: 'Pushover answered 500', since: 0 })).toMatch(
       /^Phone alerts failing: Pushover answered 500 · since /,
     )
     expect(phoneLabel({ state: 'not-configured' })).toBe('Phone alerts are not set up · alerts show here only')
+  })
+})
+
+describe('when the phone is paged', () => {
+  const dusk = Date.parse('2026-10-18T19:42:00')
+  const dawn = Date.parse('2026-10-19T05:31:00')
+
+  it('gives the window when the sun is up', () => {
+    expect(pagingNote({ state: 'not-dark', from: dusk, until: dawn })).toBe(
+      `pages in astro dark, ${clockTime(dusk)} to ${clockTime(dawn)}`,
+    )
+    expect(pagingNote({ state: 'not-dark', from: dusk, until: null })).toBe(`pages in astro dark from ${clockTime(dusk)}`)
+    expect(pagingNote({ state: 'not-dark', from: null, until: null })).toBe('no astro dark soon, so no pages')
+  })
+
+  it('says it is paging now, and until when', () => {
+    expect(pagingNote({ state: 'astro-dark', until: dawn })).toBe(`paging now (astro dark until ${clockTime(dawn)})`)
+    expect(pagingNote({ state: 'astro-dark', until: null })).toBe('paging now (astro dark)')
+  })
+
+  it('says every hour pages when the rig location is not known', () => {
+    expect(pagingNote({ state: 'site-unknown' })).toBe('pages at any hour · rig location unknown')
   })
 })
 

@@ -5,6 +5,7 @@ import type { RigCatalog } from '../rig/catalog.js'
 import { createAlertMonitor, type AlertMonitor } from './monitor.js'
 import type { Notifier } from './notifier.js'
 import { createMemoryPhoneAlertsPreference, type PhoneAlertsPreference } from './preference.js'
+import type { Site } from '../astronomy/coordinates.js'
 import type { MountReading } from './rules.js'
 import type { AlertThresholds } from './thresholds.js'
 
@@ -16,6 +17,8 @@ export interface AlertsOptions {
   phoneAlerts?: PhoneAlertsPreference
   mountReaderFor?: (rigId: string) => (signal: AbortSignal) => Promise<MountReading | null>
   focuserReaderFor?: (rigId: string) => (signal: AbortSignal) => Promise<number | null>
+  /** Where the rig is, so the phone is paged only in astronomical darkness there. Without it, at any hour. */
+  siteReaderFor?: (rigId: string) => (signal: AbortSignal) => Promise<Site | null>
   now?: () => number
 }
 
@@ -35,6 +38,7 @@ export function registerAlerts(
     phoneAlerts = createMemoryPhoneAlertsPreference(),
     mountReaderFor,
     focuserReaderFor,
+    siteReaderFor,
     now,
   }: AlertsOptions,
 ) {
@@ -52,6 +56,7 @@ export function registerAlerts(
         phoneAlertsOn: phoneAlerts.isOn(rig.id),
         ...(mountReaderFor && { readMount: mountReaderFor(rig.id) }),
         ...(focuserReaderFor && { readFocuser: focuserReaderFor(rig.id) }),
+        ...(siteReaderFor && { readSite: siteReaderFor(rig.id) }),
         ...(now && { now }),
       })
 
@@ -66,7 +71,11 @@ export function registerAlerts(
 
     if (!rig) return reply.code(404).send({ error: 'rig-not-found' })
 
-    return viewOf(monitorFor(rig))
+    const monitor = monitorFor(rig)
+
+    void monitor.learnSite()
+
+    return viewOf(monitor)
   })
 
   app.post<{ Params: { rigId: string; id: string } }>(

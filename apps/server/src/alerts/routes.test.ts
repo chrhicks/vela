@@ -4,6 +4,7 @@ import type { AlpacaDeviceInspection } from '@vela/alpaca'
 import * as statistics from '../imaging/statistics.js'
 import { CaptureStoppedError, type CaptureCamera, type CaptureFrame } from '../capture/controller.js'
 import { registerCapture } from '../capture/routes.js'
+import type { Site } from '../astronomy/coordinates.js'
 import { createMemoryRigCatalog } from '../rig/catalog.js'
 import { createRigOperations } from '../rig/operations.js'
 import { NotifierError, type Notification, type Notifier } from './notifier.js'
@@ -65,7 +66,7 @@ function fakePhone() {
 
 const settle = () => new Promise(resolve => setTimeout(resolve, 0))
 
-function setup(options: { keys?: boolean; phoneAlerts?: PhoneAlertsPreference } = {}) {
+function setup(options: { keys?: boolean; phoneAlerts?: PhoneAlertsPreference; site?: Site; now?: () => number } = {}) {
   const app = Fastify()
   const catalog = createMemoryRigCatalog([rig])
   const { phone, notifier } = fakePhone()
@@ -74,6 +75,8 @@ function setup(options: { keys?: boolean; phoneAlerts?: PhoneAlertsPreference } 
     thresholds: defaultThresholds,
     notifier: options.keys === false ? null : notifier,
     ...(options.phoneAlerts && { phoneAlerts: options.phoneAlerts }),
+    ...(options.site && { siteReaderFor: () => async () => options.site! }),
+    ...(options.now && { now: options.now }),
   })
 
   cleanups.push(() => app.close())
@@ -98,6 +101,19 @@ describe('alerts routes', () => {
       phone: { state: 'ready' },
       thresholds: { starsCollapsedRatio: 0.15, hfrBadPixels: 6, meridianTrackLimitHours: 0.0669 },
     })
+  })
+
+  it('says the site is unknown until the mount gives one, then when the phone is paged', async () => {
+    const greenwich = { latitudeDegrees: 51.4769, longitudeDegrees: -0.0005 }
+    const { app } = setup({ site: greenwich, now: () => Date.parse('2026-10-18T12:00:00Z') })
+
+    const first = await app.inject({ method: 'GET', url: '/api/web/rigs/sim/alerts' })
+    expect(first.json().pagingWindow).toEqual({ state: 'site-unknown' })
+
+    await settle()
+
+    const second = await app.inject({ method: 'GET', url: '/api/web/rigs/sim/alerts' })
+    expect(second.json().pagingWindow).toMatchObject({ state: 'not-dark', from: expect.any(Number), until: expect.any(Number) })
   })
 
   it('says phone alerts are not configured when there are no keys, and refuses a test', async () => {

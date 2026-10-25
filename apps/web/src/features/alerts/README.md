@@ -28,3 +28,10 @@ whether it was acknowledged and how the phone is getting on; the browser only pr
   set up, and disabled while the view is stale. The control PUTs `{ on }` to
   `/api/rigs/:rigId/alerts/phone` and shows the view the server answers with. Alerts stay in the banner
   while it is off, with delivery "Not sent · phone alerts are off". Send test is disabled while off.
+- The server pages only in astronomical darkness (sun below -18 degrees at the rig's site), so the
+  switch says when it actually pages, from the view's `pagingWindow`: "on · pages in astro dark,
+  19:42 to 05:31", "on · paging now (astro dark until 05:31)", "on · no astro dark soon, so no pages", or
+  "on · pages at any hour · rig location unknown" when the mount gave no location. Times are in the
+  browser's time zone. The note is one short line that wraps beside the button, so it fits a 390 px
+  screen. An alert raised in daylight shows on the card with delivery "Not sent · outside astro dark"
+  and is not mentioned in the banner, like one muted by the switch.
