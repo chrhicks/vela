@@ -4,7 +4,7 @@ import type { AlertsView } from '@vela/model/web'
 const text = z.string().refine(value => value.trim().length > 0)
 
 const delivery = z.discriminatedUnion('state', [
-  z.object({ state: z.enum(['sent', 'sending', 'covered', 'not-configured', 'muted', 'outside-dark']) }),
+  z.object({ state: z.enum(['sent', 'sending', 'covered', 'not-configured', 'muted', 'outside-dark', 'stopped-at-dawn']) }),
   z.object({
     state: z.literal('retrying'),
     failures: z.number().int().positive(),

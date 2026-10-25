@@ -1248,7 +1248,7 @@ describe('paging only in astronomical darkness', () => {
     await passUntil(fixture, dawn + 60_000)
 
     expect(fixture.phone.cancels()).toEqual([expect.objectContaining({ receipt: 'receipt-1' })])
-    expect(deliveryOfFirst(fixture)).toEqual({ state: 'outside-dark' })
+    expect(deliveryOfFirst(fixture)).toEqual({ state: 'stopped-at-dawn' })
     expect(fixture.monitor.view().pagingWindow).toMatchObject({ state: 'not-dark', from: secondDusk })
 
     fixture.monitor.runStarted(60)
@@ -1257,18 +1257,91 @@ describe('paging only in astronomical darkness', () => {
     expect(fixture.phone.sends()).toHaveLength(1)
   })
 
-  it('pages an alert that stands through the day again at the next dusk', async () => {
+  it('does not page again at the next dusk an emergency dawn stopped, however many nights it stands', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
 
     const fixture = await atGreenwich(dawn - 600_000)
 
     await failedRun(fixture)
-    await passUntil(fixture, secondDusk - 60_000)
+    await passUntil(fixture, secondDusk + 600_000)
 
     expect(fixture.phone.emergencies()).toHaveLength(1)
     expect(fixture.phone.cancels()).toHaveLength(1)
+    expect(deliveryOfFirst(fixture)).toEqual({ state: 'stopped-at-dawn' })
+  })
 
-    await passUntil(fixture, secondDusk + 60_000)
+  it('does not page an emergency dawn stopped when the switch goes off and on again before dusk', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+
+    const fixture = await atGreenwich(dawn - 600_000)
+
+    await failedRun(fixture)
+    await passUntil(fixture, dawn + 60_000)
+    await fixture.monitor.setPhoneAlerts(false)
+    await fixture.monitor.setPhoneAlerts(true)
+    await passUntil(fixture, secondDusk + 600_000)
+
+    expect(fixture.phone.emergencies()).toHaveLength(1)
+    expect(deliveryOfFirst(fixture)).toEqual({ state: 'stopped-at-dawn' })
+  })
+
+  it('pages an alert raised in daylight that never reached the phone at the next dusk, once', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+
+    const fixture = await atGreenwich(dawn + 600_000)
+
+    await failedRun(fixture)
+    await passUntil(fixture, secondDusk - 60_000)
+
+    expect(fixture.phone.events).toEqual([])
+    expect(deliveryOfFirst(fixture)).toEqual({ state: 'outside-dark' })
+
+    await passUntil(fixture, secondDusk + 600_000)
+
+    expect(fixture.phone.emergencies()).toHaveLength(1)
+    expect(deliveryOfFirst(fixture)).toEqual({ state: 'sent' })
+  })
+
+  it('pages at the next dusk an alert whose first page was still failing when dark ended', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+
+    const fixture = await atGreenwich(dawn - 600_000)
+
+    fixture.phone.down = 'Pushover answered HTTP 500'
+    await failedRun(fixture)
+    await passUntil(fixture, dawn + 60_000)
+
+    expect(fixture.phone.emergencies()).toHaveLength(0)
+    expect(deliveryOfFirst(fixture)).toEqual({ state: 'outside-dark' })
+
+    fixture.phone.down = null
+    await passUntil(fixture, secondDusk + 600_000)
+
+    expect(fixture.phone.emergencies()).toHaveLength(1)
+    expect(deliveryOfFirst(fixture)).toEqual({ state: 'sent' })
+  })
+
+  it('pages a condition that clears and raises again as a new alert, even after dawn stopped the first', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+
+    const fixture = await atGreenwich(dawn - 600_000)
+
+    await failedRun(fixture)
+    await passUntil(fixture, dawn + 60_000)
+
+    expect(deliveryOfFirst(fixture)).toEqual({ state: 'stopped-at-dawn' })
+
+    fixture.monitor.runStarted(60)
+    await settle()
+
+    expect(fixture.monitor.view().alerts).toEqual([])
+
+    fixture.monitor.runEnded('failed')
+    await settle()
+
+    expect(deliveryOfFirst(fixture)).toEqual({ state: 'outside-dark' })
+
+    await passUntil(fixture, secondDusk + 600_000)
 
     expect(fixture.phone.emergencies()).toHaveLength(2)
     expect(deliveryOfFirst(fixture)).toEqual({ state: 'sent' })
@@ -1366,7 +1439,7 @@ describe('paging only in astronomical darkness', () => {
       await settle()
 
       expect(fixture.phone.cancels()).toEqual([expect.objectContaining({ receipt: 'receipt-1' })])
-      expect(deliveryOfFirst(fixture)).toEqual({ state: 'outside-dark' })
+      expect(deliveryOfFirst(fixture)).toEqual({ state: 'stopped-at-dawn' })
     })
 
     it('forgets a site the mount no longer reports, and pages at any hour again', async () => {

@@ -34,4 +34,5 @@ whether it was acknowledged and how the phone is getting on; the browser only pr
   "on · pages at any hour · rig location unknown" when the mount gave no location. Times are in the
   browser's time zone. The note is one short line that wraps beside the button, so it fits a 390 px
   screen. An alert raised in daylight shows on the card with delivery "Not sent · outside astro dark"
-  and is not mentioned in the banner, like one muted by the switch.
+  and is not mentioned in the banner, like one muted by the switch. An emergency that was paged and then
+  cancelled at dawn shows "Sent once · stopped at dawn" and is not paged again.

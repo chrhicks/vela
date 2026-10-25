@@ -2,7 +2,7 @@ export type AlertLevel = 'warn' | 'critical'
 
 /** How the phone is getting on with one alert. */
 export type AlertDelivery =
-  | { state: 'sent' | 'sending' | 'covered' | 'not-configured' | 'muted' | 'outside-dark' }
+  | { state: 'sent' | 'sending' | 'covered' | 'not-configured' | 'muted' | 'outside-dark' | 'stopped-at-dawn' }
   | { state: 'retrying'; failures: number; nextAttemptAt: number; giveUpAt: number }
   | { state: 'gave-up'; failures: number }
 

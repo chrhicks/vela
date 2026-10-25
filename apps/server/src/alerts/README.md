@@ -50,7 +50,7 @@ until it is acknowledged, because Pushover does that, not Vela.
   clears. The first retry comes after a minute, and each pause doubles up to five minutes. Vela
   gives up once the next try would fall an hour (an emergency's `expire`) after the alert was raised,
   because Pushover would have stopped repeating by then. Each alert in the alerts view carries its
-  `delivery`: `sent`, `sending`, `not-configured`, `outside-dark`, `retrying` (with `failures`, `nextAttemptAt` and
+  `delivery`: `sent`, `sending`, `not-configured`, `outside-dark`, `stopped-at-dawn`, `retrying` (with `failures`, `nextAttemptAt` and
   `giveUpAt`) or `gave-up`. The retry has its own timer, so it carries on after the run has ended:
   a `run-failed` emergency refused during a phone outage still goes out when the phone is back, if
   that is within the hour. The alerts view says "phone alerts failing" with the reason meanwhile.
@@ -119,10 +119,15 @@ so it ignores the sun.
   next crossing (never more than 6 h), so a failed run's alert still pages at dusk with no poll
   running.
 - **Dawn.** When dark ends, an emergency repeating on the phone is cancelled through the same path
-  as turning the switch off, and is held again; one waiting to go out, or being retried, is held.
-  A warn that was already sent stays sent. There is no `cleared` message in daylight.
-- **Nights after the first.** An alert still standing at the next dusk pages again, once, because
-  its emergency was stopped by the sun, not by Chris. One he acknowledged does not.
+  as turning the switch off. That was its page, so its delivery becomes `stopped-at-dawn` ("Sent once
+  · stopped at dawn") and it stays that way until it clears. One waiting to go out, or being retried,
+  is held. A warn that was already sent stays sent. There is no `cleared` message in daylight, and a
+  stopped emergency gets none when it clears later.
+- **One page per alert.** An alert that reached the phone never pages again: not at the next dusk, not
+  after the switch goes off and on. An alert that never did (raised in daylight, waiting, or still
+  failing to send at dawn) pages once at the next dusk. A condition that clears and raises again is a
+  new alert and may page. Learning in daylight that the site is not dark stops what was paged at any
+  hour the same way.
 - **Switch and sun.** Turning the switch off mutes held alerts too, so turning it on again before
   dusk does not page them. Turning it on pages nothing it had not already.
 

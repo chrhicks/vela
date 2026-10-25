@@ -44,6 +44,7 @@ describe('alerts boundary', () => {
       expect(isAlertsView({ ...view, pagingWindow }, 'fra')).toBe(true)
 
     expect(isAlertsView({ ...view, alerts: [{ ...view.alerts[0], delivery: { state: 'outside-dark' } }] }, 'fra')).toBe(true)
+    expect(isAlertsView({ ...view, alerts: [{ ...view.alerts[0], delivery: { state: 'stopped-at-dawn' } }] }, 'fra')).toBe(true)
     expect(isAlertsView({ ...view, pagingWindow: undefined }, 'fra')).toBe(false)
     expect(isAlertsView({ ...view, pagingWindow: { state: 'not-dark', from: 1 } }, 'fra')).toBe(false)
   })

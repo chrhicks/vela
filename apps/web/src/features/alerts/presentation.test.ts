@@ -41,6 +41,13 @@ describe('alert delivery wording', () => {
     expect(bannerPhoneNote(held)).toBeNull()
   })
 
+  it('says an emergency dawn stopped was sent once, and keeps it out of the banner note', () => {
+    const stopped: AlertView = { ...critical, delivery: { state: 'stopped-at-dawn' } }
+
+    expect(deliveryLabel(stopped)).toBe('Sent once · stopped at dawn')
+    expect(bannerPhoneNote(stopped)).toBeNull()
+  })
+
   it('reports a failing phone with its reason', () => {
     expect(phoneLabel({ state: 'failing', reason: 'Pushover answered 500', since: 0 })).toMatch(
       /^Phone alerts failing: Pushover answered 500 · since /,

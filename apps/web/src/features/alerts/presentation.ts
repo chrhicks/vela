@@ -32,6 +32,8 @@ export function deliveryLabel(alert: AlertView) {
       return 'Not sent · phone alerts are off'
     case 'outside-dark':
       return 'Not sent · outside astro dark'
+    case 'stopped-at-dawn':
+      return 'Sent once · stopped at dawn'
     case 'retrying':
       return `Phone has not taken it (${delivery.failures}×) · trying again at ${clockTime(delivery.nextAttemptAt)}`
     case 'gave-up':
