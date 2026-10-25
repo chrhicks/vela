@@ -16,6 +16,7 @@ import {
 } from './controller.js'
 import { measureAutofocusStars } from '../imaging/statistics.js'
 import { DEFAULT_OFFSET_STEPS, DEFAULT_STEP_SIZE } from './walk.js'
+import { haltBody, haltBodyError, registerHaltRoutes } from '../http/halt-body.js'
 
 interface AutofocusRouteOptions {
   createInspector: RigDetailOptions['createInspector']
@@ -333,15 +334,10 @@ export function registerAutofocus(
     },
   )
 
-  app.post<{ Params: { rigId: string } }>(
-    '/api/rigs/:rigId/autofocus/stop',
-    async (request, reply) => {
-      if (
-        !request.headers['content-type']?.startsWith('application/json') ||
-        !z.strictObject({}).safeParse(request.body).success
-      ) {
-        return reply.code(400).send({ error: 'Expected an empty JSON object' })
-      }
+  registerHaltRoutes(app, scope =>
+    scope.post<{ Params: { rigId: string } }>('/api/rigs/:rigId/autofocus/stop', async (request, reply) => {
+      if (!haltBody.safeParse(request.body).success)
+        return reply.code(400).send({ error: haltBodyError })
 
       const controller = controllers.get(request.params.rigId)
 
@@ -349,7 +345,7 @@ export function registerAutofocus(
       const { view } = await readiness(request.params.rigId)
 
       return view ?? reply.code(404).send({ error: 'Rig not found' })
-    },
+    }),
   )
 
   app.addHook('onClose', async () => {

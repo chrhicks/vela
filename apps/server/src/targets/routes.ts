@@ -17,6 +17,7 @@ import {
 } from './catalog/index.js'
 import { skyPath, type Site } from './sky.js'
 import { registerTargetDiscovery } from './discovery-routes.js'
+import { registerHaltRoutes } from '../http/halt-body.js'
 import type { FrameImaging } from '../imaging/frame-imaging.js'
 
 export interface TargetOptions {
@@ -337,7 +338,7 @@ export function registerTargets(
       }
     },
   )
-  app.post<{ Params: { rigId: string; command: string } }>(
+  registerHaltRoutes(app, scope => scope.post<{ Params: { rigId: string; command: string } }>(
     '/api/rigs/:rigId/framing/:command',
     async (request, reply) => {
       const { rigId, command } = request.params
@@ -354,10 +355,12 @@ export function registerTargets(
       }
 
       const expectedKeys = commandFields[operation.data]
-      const bodyEnvelope = z.looseObject({}).safeParse(request.body)
+      const halting = operation.data === 'stop'
+      const body = halting && request.body === undefined ? {} : request.body
+      const bodyEnvelope = z.looseObject({}).safeParse(body)
 
       if (
-        !request.headers['content-type']?.startsWith('application/json') ||
+        (!halting && !request.headers['content-type']?.startsWith('application/json')) ||
         !bodyEnvelope.success ||
         Object.keys(bodyEnvelope.data).length !== expectedKeys.length ||
         Object.keys(bodyEnvelope.data).some(key => !expectedKeys.some(expected => expected === key))
@@ -365,7 +368,7 @@ export function registerTargets(
         return reply.code(400).send({ error: 'Invalid framing command body' })
       }
 
-      const parsed = framingCommandSchema.safeParse({ command, body: request.body })
+      const parsed = framingCommandSchema.safeParse({ command, body })
 
       if (!parsed.success) {
         const error =
@@ -466,7 +469,9 @@ export function registerTargets(
         if (!started) release()
       }
     },
+    ),
   )
+
   app.addHook('onClose', async () => {
     await Promise.all([...controllers.values()].map(controller => controller.stop()))
   })

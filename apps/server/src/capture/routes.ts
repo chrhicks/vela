@@ -20,6 +20,7 @@ import type { RigCatalog } from '../rig/catalog.js'
 import type { RigOperations } from '../rig/operations.js'
 import { confirmedCameraName } from '../rig/imaging-camera.js'
 import { inspectRigDetail, type RigDetailOptions } from '../rig/detail.js'
+import { haltBody, haltBodyError, registerHaltRoutes } from '../http/halt-body.js'
 import {
   CaptureFrameLostError,
   CaptureStoppedError,
@@ -450,15 +451,10 @@ export function registerCapture(
     },
   )
 
-  app.post<{ Params: { rigId: string } }>(
-    '/api/rigs/:rigId/capture/stop',
-    async (request, reply) => {
-      if (
-        !request.headers['content-type']?.startsWith('application/json') ||
-        !z.strictObject({}).safeParse(request.body).success
-      ) {
-        return reply.code(400).send({ error: 'Expected an empty JSON object' })
-      }
+  registerHaltRoutes(app, scope =>
+    scope.post<{ Params: { rigId: string } }>('/api/rigs/:rigId/capture/stop', async (request, reply) => {
+      if (!haltBody.safeParse(request.body).success)
+        return reply.code(400).send({ error: haltBodyError })
 
       // Stopping an owned operation must remain possible if readiness changed.
       const controller = controllers.get(request.params.rigId)
@@ -467,7 +463,7 @@ export function registerCapture(
       const view = await rigView(request.params.rigId)
 
       return view ?? reply.code(404).send({ error: 'Rig not found' })
-    },
+    }),
   )
 
   app.get<{ Params: { rigId: string; imageId: string } }>(

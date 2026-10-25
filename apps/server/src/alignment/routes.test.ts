@@ -9,6 +9,7 @@ import { createMemoryRigCatalog } from '../rig/catalog.js'
 import type { RigCatalogRecord } from '../rig/contracts.js'
 import { createRigOperations } from '../rig/operations.js'
 import { alpacaEndpoint } from '../equipment/source.js'
+import { emptyHaltRequests, refusedHaltRequests } from '../http/halt-requests.fixture.js'
 import { alignmentSettings, registerAlignment, type AlignmentEquipmentOptions } from './routes.js'
 
 const initialState: AlignmentView = {
@@ -397,6 +398,31 @@ describe('alignment routes', () => {
       await command(name, 'other')
       expect(mocks.stop).not.toHaveBeenCalled()
       expect(mocks.state.active).toBe(true)
+    },
+  )
+  describe.each(['stop', 'finish'])('%s with an empty body', name => {
+    it.each(emptyHaltRequests)('is accepted on %s', async (_name, options) => {
+      const { app, command } = setup()
+      await command('start')
+      const halted = await app.inject({ method: 'POST', url: `/api/rigs/rig/alignment/${name}`, ...options })
+      expect(halted.statusCode).toBe(200)
+      expect(mocks.stop).toHaveBeenCalledWith(name === 'finish')
+    })
+    it.each(refusedHaltRequests)('is refused on %s', async (_name, options) => {
+      const { app, command } = setup()
+      await command('start')
+      const halted = await app.inject({ method: 'POST', url: `/api/rigs/rig/alignment/${name}`, ...options })
+      expect(halted.statusCode).toBe(400)
+      expect(mocks.stop).not.toHaveBeenCalled()
+    })
+  })
+  it.each(emptyHaltRequests.filter(([, options]) => options.headers === undefined))(
+    'still requires a JSON object to start on %s',
+    async (_name, options) => {
+      const { app, operations } = setup()
+      const started = await app.inject({ method: 'POST', url: '/api/rigs/rig/alignment/start', ...options })
+      expect(started.statusCode).toBe(400)
+      expect(operations.owner('rig')).toBeUndefined()
     },
   )
   it('rejects unknown and malformed commands without constructing hardware', async () => {

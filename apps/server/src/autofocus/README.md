@@ -26,6 +26,9 @@ the current position and the operation lease remain intact. Stop clears the read
 indicator and waits for camera cleanup and restoration; settled or cancelled
 capture callbacks cannot revive it.
 
+Stop needs no body, the same as capture stop: a bare POST, an empty body or `{}` are
+accepted, and any other body is refused with 400 while the walk keeps going.
+
 Stop during measurement still restores the start, including the final confirmation
 measurement. Only typed cancellation confirmed by a device boundary is reported
 as stopped; camera abort or cleanup failures remain failed even when return to the

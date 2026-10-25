@@ -44,6 +44,11 @@ read failures in place without another exposure command. The controller projects
 Read recovery is not image completion: it preserves the last image, count and lease.
 Stop clears the interruption indicator immediately and still waits for cleanup;
 late callbacks cannot update a cancelled or settled acquisition.
+A stop request needs no body: a bare `curl -X POST .../capture/stop`, an empty body
+under any content type, or `{}` all stop the run. A body with any field, or one that is not
+JSON, is refused with 400 and the run keeps going, as every other Vela command refuses
+unknown fields. The same rule covers autofocus stop, alignment stop and finish, and framing
+stop; `../http/halt-body.ts` holds it.
 Any terminal acquisition or preview failure ends the run without replay. Preview stretching preserves native dimensions for 100% inspection;
 only the latest three image pairs and their temporary original FITS buffers remain
 in memory. Saving releases the temporary FITS buffer after the saved-image store confirms

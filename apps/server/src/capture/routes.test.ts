@@ -11,6 +11,7 @@ import { CaptureStoppedError, type CaptureCamera, type CaptureFrame } from './co
 import { registerCapture, type CaptureSettings } from './routes.js'
 import { registerNavigation } from '../navigation.js'
 import { createMemorySavedImageStore } from '../saved-images/store.js'
+import { emptyHaltRequests, refusedHaltRequests } from '../http/halt-requests.fixture.js'
 import { registerSavedImages } from '../saved-images/routes.js'
 
 const record = {
@@ -252,6 +253,36 @@ it('holds mutual exclusion before readiness awaits and through pending cleanup',
   subject.captures[0]!.reject(new CaptureStoppedError())
   expect((await stopping).json()).toMatchObject({ active: false, phase: 'stopped' })
   expect(subject.operations.owner('sim')).toBeUndefined()
+})
+
+it.each(emptyHaltRequests)('stops a running capture on %s', async (_name, options) => {
+  const subject = setup()
+  expect((await subject.start()).statusCode).toBe(200)
+
+  const stopping = subject.app.inject({
+    method: 'POST',
+    url: '/api/rigs/sim/capture/stop',
+    ...options,
+  })
+
+  void stopping.then(() => {})
+  await vi.waitFor(() => expect(subject.captures[0]!.signal.aborted).toBe(true))
+  subject.captures[0]!.reject(new CaptureStoppedError())
+  expect((await stopping).json()).toMatchObject({ active: false, phase: 'stopped' })
+})
+
+it.each(refusedHaltRequests)('refuses a stop with %s and leaves the run going', async (_name, options) => {
+  const subject = setup()
+  expect((await subject.start()).statusCode).toBe(200)
+
+  const stopped = await subject.app.inject({
+    method: 'POST',
+    url: '/api/rigs/sim/capture/stop',
+    ...options,
+  })
+
+  expect(stopped.statusCode).toBe(400)
+  expect(subject.captures[0]!.signal.aborted).toBe(false)
 })
 
 it('reports another owner as unavailable without starting a second operation', async () => {
