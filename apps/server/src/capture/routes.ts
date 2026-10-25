@@ -325,17 +325,18 @@ export function registerCapture(
           controllers.set(view.rigId, controller)
         }
 
-        // The alert rules judge stars, which a calibration frame has none of.
-        const watch = frameType === 'light' ? alerts?.monitorFor(rig) : undefined
+        const watch = alerts?.monitorFor(rig)
+        const light = frameType === 'light'
         const captureController = controller
         const camera = cameraFactory(settings)
 
-        watch?.runStarted(body.exposureSeconds, body.repeat === true && body.saveFrames === true)
+        watch?.runStarted(body.exposureSeconds, light && body.repeat === true && body.saveFrames === true)
 
         const result = await controller
           .start(body.exposureSeconds, camera, view.camera.name, {
             subject,
-            onFrame: image => watch?.frameCaptured(image),
+            // A calibration frame has no stars to judge, but still shows the camera is producing.
+            onFrame: image => watch?.frameCaptured(light ? image : { capturedAt: image.capturedAt, statistics: null }),
             onSettled() {
               release()
               watch?.runEnded(captureController.snapshot().phase === 'failed' ? 'failed' : 'stopped')

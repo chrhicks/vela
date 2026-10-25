@@ -151,7 +151,9 @@ camera for dark, dark-flat and bias runs; Vela cannot see the cap. The ZWO camer
 here have no shutter, so the cap is what makes the frame dark.
 
 The alert rules judge stars, which a calibration frame lacks. A calibration run is
-not watched by them, so it cannot raise a star-count or HFR alert.
+never an imaging run for the monitor, so it raises no no-stars alert, and its frames
+reach the monitor without star measurements, so they cannot raise a star-count or HFR
+trend alert. They still show the camera is producing frames.
 
 ## Local review
 
