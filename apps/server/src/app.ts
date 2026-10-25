@@ -46,7 +46,7 @@ interface BuildAppOptions {
   readonly frameRecords?: FrameRecords
   readonly images?: FrameImaging
   readonly alignment?: AlignmentSettings
-  readonly alerts?: Pick<AlertsOptions, 'thresholds' | 'notifier' | 'now'>
+  readonly alerts?: Pick<AlertsOptions, 'thresholds' | 'notifier' | 'phoneAlerts' | 'now'>
   readonly alpacaDiscovery?: AlpacaDiscovery
   readonly createConnector?: (rig: RigEquipmentSource) => EquipmentConnector
   readonly createInventory?: (rig: RigInventorySource) => RigDeviceInventory

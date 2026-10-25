@@ -24,6 +24,8 @@ describe('alert delivery wording', () => {
 
     expect(bannerPhoneNote(warn)).toBeNull()
     expect(bannerPhoneNote({ ...warn, delivery: { state: 'not-configured' } })).toBeNull()
+    expect(bannerPhoneNote({ ...warn, delivery: { state: 'muted' } })).toBeNull()
+    expect(deliveryLabel({ ...warn, delivery: { state: 'muted' } })).toBe('Not sent · phone alerts are off')
     expect(bannerPhoneNote({ ...warn, delivery: { state: 'gave-up', failures: 3 } })).toBe(
       'Not delivered to your phone · Vela stopped trying',
     )

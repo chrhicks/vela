@@ -48,7 +48,7 @@ const coveredBy: Partial<Record<AlertId, AlertId>> = {
 
 /** How the phone is getting on with one alert. */
 export type AlertDelivery =
-  | { state: 'sent' | 'sending' | 'covered' | 'not-configured' }
+  | { state: 'sent' | 'sending' | 'covered' | 'not-configured' | 'muted' }
   /** The phone refused it `failures` times. Vela tries again at `nextAttemptAt` and stops at `giveUpAt`. */
   | { state: 'retrying'; failures: number; nextAttemptAt: number; giveUpAt: number }
   /** Vela stopped trying: the hour ran out, or the alert was acknowledged before the phone took it. */
@@ -81,6 +81,7 @@ export interface AlertsView {
   /** Watches that cannot run right now, such as "meridian watch unavailable: pier side". */
   unavailable: string[]
   phone: PhoneAlerts
+  phoneAlertsOn: boolean
   thresholds: AlertThresholds
 }
 
@@ -92,6 +93,7 @@ export type AcknowledgeResult =
 export type TestResult =
   | { outcome: 'delivered' }
   | { outcome: 'not-configured' }
+  | { outcome: 'off' }
   | { outcome: 'failed'; reason: string }
 
 export interface AlertMonitorOptions {
@@ -99,6 +101,8 @@ export interface AlertMonitorOptions {
   rigName: string
   thresholds: AlertThresholds
   notifier: Notifier | null
+  /** Off sends nothing to the phone. Defaults to on. */
+  phoneAlertsOn?: boolean
   /**
    * A failed read means the rig stopped answering. Null means this rig has no mount to read,
    * so the mount watches report themselves unavailable instead.
@@ -112,9 +116,10 @@ export interface AlertMonitorOptions {
 interface Episode extends ActiveAlert {
   /**
    * Unsent is retried on its own schedule until it gets through, is acknowledged or runs out of
-   * time, which makes it gave-up. Skipped was covered by a stronger alert.
+   * time, which makes it gave-up. Skipped was covered by a stronger alert. Muted was silenced
+   * by Chris's switch and is never sent, even when the switch comes back on.
    */
-  delivery: 'unsent' | 'sending' | 'sent' | 'skipped' | 'gave-up'
+  delivery: 'unsent' | 'sending' | 'sent' | 'skipped' | 'muted' | 'gave-up'
   /** Sends the phone refused. */
   failures: number
   /** The pending retry. */
@@ -147,6 +152,7 @@ export function createAlertMonitor({
   rigName,
   thresholds,
   notifier,
+  phoneAlertsOn = true,
   readMount,
   now = Date.now,
   mountPollMs: pollMs = mountPollMs,
@@ -159,6 +165,7 @@ export function createAlertMonitor({
   let observationsInterruptedSince: number | null = null
   let unavailable: string[] = []
   let phone: PhoneAlerts = notifier ? { state: 'ready' } : { state: 'not-configured' }
+  let phoneOn = phoneAlertsOn
   let pollTimer: ReturnType<typeof setInterval> | undefined
   let polling = false
 
@@ -235,7 +242,7 @@ export function createAlertMonitor({
 
   /** Tells the phone, unless a stronger alert already does. */
   function announce(episode: Episode) {
-    if (isCovered(episode.id)) episode.delivery = 'skipped'
+    if (phoneOn && isCovered(episode.id)) episode.delivery = 'skipped'
     else sendRaised(episode)
   }
 
@@ -260,10 +267,9 @@ export function createAlertMonitor({
       // The phone is only told that an alert ended if it was told that it began.
       if (!notifier || episode.delivery !== 'sent') return
 
-      const cancelled = await cancelReceipt(episode)
+      await cancelOrKeepTrying(episode)
 
-      if (!cancelled.ok && episode.receipt !== null && episode.sentAt !== null)
-        keepTryingToCancel({ receipt: episode.receipt, sentAt: episode.sentAt, reason: cancelled.reason, since: now() })
+      if (!phoneOn) return
 
       await callPhone('clear', episode.id, -1, () =>
         notifier.send({ title: title(), message: `cleared: ${episode.message}`, priority: -1 }),
@@ -307,6 +313,12 @@ export function createAlertMonitor({
   function sendRaised(episode: Episode) {
     if (!notifier) return
 
+    if (!phoneOn) {
+      episode.delivery = 'muted'
+
+      return
+    }
+
     episode.delivery = 'sending'
 
     const notification: Notification = {
@@ -316,6 +328,12 @@ export function createAlertMonitor({
     }
 
     afterPreviousCalls(episode, async () => {
+      if (!phoneOn) {
+        episode.delivery = 'muted'
+
+        return
+      }
+
       const sent = await callPhone('raise', episode.id, notification.priority, () =>
         notifier.send(notification),
       )
@@ -356,6 +374,29 @@ export function createAlertMonitor({
     if (cancelled.ok) episode.receipt = null
 
     return cancelled
+  }
+
+  /** Hands a receipt Pushover would not cancel to the stray list, which keeps trying. */
+  async function cancelOrKeepTrying(episode: Episode) {
+    const cancelled = await cancelReceipt(episode)
+
+    if (!cancelled.ok && episode.receipt !== null && episode.sentAt !== null) {
+      keepTryingToCancel({ receipt: episode.receipt, sentAt: episode.sentAt, reason: cancelled.reason, since: now() })
+      episode.receipt = null
+    }
+  }
+
+  /** The switch is off: stop what is repeating on the phone and what is still waiting to go out. */
+  async function silence(episode: Episode) {
+    if (phoneOn) return
+
+    if (episode.delivery === 'sent' && episode.receipt !== null) {
+      await cancelOrKeepTrying(episode)
+      episode.delivery = 'muted'
+    } else if (episode.delivery === 'unsent' || episode.delivery === 'skipped') {
+      stopRetrying(episode)
+      episode.delivery = 'muted'
+    }
   }
 
   /** The alert is gone from the banner, so nothing else would ever stop the phone repeating. */
@@ -439,6 +480,8 @@ export function createAlertMonitor({
         return { state: episode.delivery }
       case 'skipped':
         return { state: 'covered' }
+      case 'muted':
+        return { state: 'muted' }
       case 'gave-up':
         return { state: 'gave-up', failures: episode.failures }
       case 'unsent':
@@ -578,6 +621,7 @@ export function createAlertMonitor({
         alerts,
         unavailable,
         phone: phoneWithStrays(),
+        phoneAlertsOn: phoneOn,
         thresholds,
       }
     },
@@ -604,8 +648,22 @@ export function createAlertMonitor({
       })
     },
 
+    /**
+     * Turning it off first stops every message from here on, then cancels the emergencies already
+     * repeating. Turning it on again pages only alerts raised after that.
+     */
+    async setPhoneAlerts(on: boolean) {
+      phoneOn = on
+
+      if (on) return
+
+      await Promise.all([...episodes.values()].map(episode => afterPreviousCalls(episode, () => silence(episode))))
+    },
+
     async sendTest(): Promise<TestResult> {
       if (!notifier) return { outcome: 'not-configured' }
+
+      if (!phoneOn) return { outcome: 'off' }
 
       const sent = await callPhone('test', 'test', 0, () =>
         notifier.send({ title: title(), message: 'test', priority: 0 }),

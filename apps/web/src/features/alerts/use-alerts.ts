@@ -18,11 +18,20 @@ type Action = {
   acknowledging: string | null
   acknowledgeError: string | null
   test: TestOutcome
+  switching: boolean
+  switchError: string | null
 }
 
 const noView: RigAlerts = { view: null, offline: false }
 
-const idle = (rigId: string): Action => ({ rigId, acknowledging: null, acknowledgeError: null, test: { state: 'idle' } })
+const idle = (rigId: string): Action => ({
+  rigId,
+  acknowledging: null,
+  acknowledgeError: null,
+  test: { state: 'idle' },
+  switching: false,
+  switchError: null,
+})
 
 const alertsPath = (rigId: string) => `rigs/${encodeURIComponent(rigId)}/alerts`
 
@@ -87,11 +96,11 @@ export function useAlerts(rigId: string | undefined) {
   const { view, offline } = (rigId && rigs[rigId]) || noView
   const current = action?.rigId === rigId ? action : null
 
-  async function post(rig: string, path: string) {
+  async function send(rig: string, path: string, method: 'POST' | 'PUT', body: string) {
     const next = await api(`${alertsPath(rig)}/${path}`, {
-      method: 'POST',
+      method,
       headers: { 'Content-Type': 'application/json' },
-      body: '{}',
+      body,
       signal: AbortSignal.timeout(15_000),
     })
 
@@ -99,6 +108,8 @@ export function useAlerts(rigId: string | undefined) {
 
     record(rig, { view: next })
   }
+
+  const post = (rig: string, path: string) => send(rig, path, 'POST', '{}')
 
   async function reread(rig: string) {
     try {
@@ -161,6 +172,21 @@ export function useAlerts(rigId: string | undefined) {
     }
   }
 
+  async function setPhoneAlerts(on: boolean) {
+    if (!rigId) return
+
+    act(rigId, { switching: true, switchError: null })
+
+    try {
+      await send(rigId, 'phone', 'PUT', JSON.stringify({ on }))
+    } catch {
+      act(rigId, { switchError: 'Vela could not confirm the change. The next update shows whether phone alerts are on.' })
+      void reread(rigId)
+    } finally {
+      act(rigId, { switching: false })
+    }
+  }
+
   return {
     view,
     offline,
@@ -168,7 +194,10 @@ export function useAlerts(rigId: string | undefined) {
     acknowledgeError: current?.acknowledgeError ?? null,
     test: current?.test ?? ({ state: 'idle' } satisfies TestOutcome),
     acknowledge,
+    switching: current?.switching ?? false,
+    switchError: current?.switchError ?? null,
     sendTest,
+    setPhoneAlerts,
   }
 }
 

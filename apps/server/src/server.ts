@@ -11,6 +11,7 @@ import { loadCriaConfiguration, registerConfiguredCriaRigs } from './equipment/c
 import { createEquipmentComposition } from './equipment/composition.js'
 import { loadAlertsConfiguration } from './alerts/config.js'
 import { createPushoverNotifier } from './alerts/pushover.js'
+import { openFilePhoneAlertsPreference } from './alerts/preference.js'
 
 const telemetry = startTelemetry(process.env.VELA_TRACE_PATH)
 
@@ -68,6 +69,7 @@ try {
     notifier: alertsConfiguration.pushover
       ? createPushoverNotifier({ ...alertsConfiguration.pushover, fetch })
       : null,
+    phoneAlerts: await openFilePhoneAlertsPreference(resolve(dirname(rigCatalogPath), 'phone-alerts.json')),
   }
 
   const savedImages = await openFileSavedImageStore(

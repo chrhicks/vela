@@ -7,7 +7,7 @@ or moves the mount.
   `thresholds.ts`.
 - `monitor.ts` keeps that history for one rig, feeds the rules, and turns conditions into episodes.
 - `pushover.ts` is the phone, behind the `Notifier` interface in `notifier.ts`. `config.ts` reads
-  `alerts.json`. `mount.ts` reads a Cria rig's mount. `routes.ts` is the HTTP surface. The browser side (banner and rig-page card) is
+  `alerts.json`. `preference.ts` keeps the phone alerts switch. `mount.ts` reads a Cria rig's mount. `routes.ts` is the HTTP surface. The browser side (banner and rig-page card) is
   `apps/web/src/features/alerts`; its contract is `AlertsView` in `@vela/model/web`.
 
 ## Episodes
@@ -42,6 +42,28 @@ until it is acknowledged, because Pushover does that, not Vela.
   its hour is up. Chris can stop it in the Pushover app.
 - When the run ends, everything clears. `run-failed` is raised for a run that failed (not for Stop)
   and clears when the next run starts.
+
+## The phone alerts switch
+
+Each rig has a switch, on unless Chris turns it off from the app. Off means Vela sends that rig
+nothing to Pushover: no new alert, no retry, no `cleared` message and no test. Alerts still raise,
+clear and show in the banner, with delivery `muted`. Turning it off while an emergency repeats
+cancels its receipt the same way acknowledging does; if Pushover will not take the cancel, the
+receipt joins the strays above and the view says phone alerts are failing until it succeeds.
+
+Turning it back on does not replay anything. An alert raised or silenced while off stays `muted`
+until it clears, and only alerts raised afterwards page. An alert the phone was told about as a
+quiet message before the switch went off still gets its `cleared` message if the switch is on again
+by then.
+
+- `PUT /api/rigs/:rigId/alerts/phone` with `{ "on": boolean }` saves the choice, applies it to
+  the monitor and answers with the alerts view (`phoneAlertsOn`). A save that fails answers 500
+  and changes nothing.
+- The choice is stored in `phone-alerts.json` next to the rig catalog (`rigs.yaml`), as
+  `{ "phoneAlerts": { "<rigId>": false } }`, so it survives a restart. A rig with no entry is on.
+  The server will not start on a file it cannot read, rather than page a phone Chris turned off.
+  `alerts.json` is never touched.
+- With no Pushover keys there is nothing to switch, and the browser hides the control.
 
 ## What feeds the monitor
 
