@@ -84,6 +84,8 @@ export function createCriaProvider(connection: CriaConnection, bindings: Readonl
 
         if (message) observation = { ...observation, message }
 
+        if (hold) observation = { ...observation, hold: { deviceId: hold.deviceId, reason: hold.reason } }
+
         const inspection: EquipmentInspection = {
           providerDeviceId: binding.providerDeviceId,
           kind: kinds[binding.kind],

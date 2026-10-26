@@ -8,7 +8,7 @@ import {
   createAlpacaProvider,
   type AlpacaDiscovery,
 } from '@vela/alpaca'
-import { createCriaConnection, createCriaEquipment, openJournalFile, type CriaConnection, type CriaConnectionOptions } from '@vela/cria'
+import { createCriaConnection, createCriaEquipment, openJournalFile, type CriaConnection, type CriaConnectionOptions, type CriaRecovery } from '@vela/cria'
 import {
   EquipmentError,
   type Acquisition,
@@ -28,7 +28,7 @@ import { alpacaEndpoint } from './source.js'
 
 export interface EquipmentComposition {
   holdsOf(rigId: string): ReadonlyArray<{ readonly deviceId: string; readonly reason: string }>
-  recover(rig: RigCatalogRecord, deviceId: string, note: string): Promise<{ outcome: 'confirmed'; found: string } | { outcome: 'failed'; message: string }>
+  recover(rig: RigCatalogRecord, deviceId: string, note: string): Promise<CriaRecovery>
   start(): void
   close(): Promise<void>
   readonly alpacaDiscovery: AlpacaDiscovery
@@ -103,7 +103,7 @@ export function createEquipmentComposition(
     holdsOf: rigId => equipment.get(rigId)?.holds() ?? [],
     recover: (rig, deviceId, note) => rig.source
       ? cria(rig).recover(deviceId, note)
-      : Promise.resolve({ outcome: 'failed', message: 'This rig has no Cria recovery.' }),
+      : Promise.resolve({ outcome: 'failed', busy: false, message: 'This rig has no Cria recovery.' }),
     start() {
       for (const client of clients.values()) client.start()
     },

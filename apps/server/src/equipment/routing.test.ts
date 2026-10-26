@@ -180,7 +180,7 @@ function setup({ savedCameraName = 'Camera' }: { savedCameraName?: string } = {}
 
   const recover = vi.fn<EquipmentComposition['recover']>(async (_rig, deviceId) => {
     if (!holds.some(hold => hold.deviceId === deviceId))
-      return { outcome: 'failed', message: 'That device is not held.' }
+      return { outcome: 'failed', busy: false, message: 'That device is not held.' }
     holds = holds.filter(hold => hold.deviceId !== deviceId)
 
     return { outcome: 'confirmed', found: 'The mount is stationary.' }
@@ -414,7 +414,18 @@ describe('device holds through the lease routes', () => {
     })
 
     expect(failed.statusCode).toBe(409)
-    expect(failed.json()).toEqual({ outcome: 'failed', message: 'That device is not held.' })
+    expect(failed.json()).toEqual({ error: 'recovery-failed', reason: 'That device is not held.' })
+
+    subject.recover.mockResolvedValueOnce({ outcome: 'failed', busy: true, message: 'Another operation is open.' })
+
+    const busy = await subject.app.inject({
+      method: 'POST',
+      url: recoverUrl,
+      payload: { externalRecoveryConfirmed: true, note: 'Checked the mount.' },
+    })
+
+    expect(busy.statusCode).toBe(409)
+    expect(busy.json()).toEqual({ error: 'device-busy', reason: 'Another operation is open.' })
   })
 })
 

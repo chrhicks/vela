@@ -126,7 +126,12 @@ Composition supplies `holdsOf` to `createRigOperations`. Any hold refuses new
 lease-taking work and supplies its reason to the page and refusal. The temporary
 `POST /api/rigs/:rigId/devices/:deviceId/recover` takes no lease. It requires
 `{ externalRecoveryConfirmed: true, note }` and calls the Cria recovery client,
-including its fence for an unknown admission. PR 8 replaces this route.
+including its fence for an unknown admission. It answers 200
+`{ outcome: 'confirmed', found }`, or 409 `{ error, reason }` where `error` is
+`device-busy` (Cria refused because an operation is open on the device) or
+`recovery-failed`, and `reason` is the message for a person. Rig detail marks a
+held device with `observation.hold` (`deviceId` is the id this route takes), and
+the Equipment page's Clear hold button calls it. PR 8 replaces this route.
 
 Your Rig mount controls receive a separate `MountControl` capability at this same
 composition boundary. The server validates the rig-scoped device identity and
