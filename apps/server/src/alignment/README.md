@@ -23,7 +23,8 @@ operator to pause adjustments until a fresh measurement arrives. Read-only point
 and validation are retried in place; preparation and motion are never replayed.
 Stop and Finish take no input. Send them as a POST with an empty body. Any non-empty body, `{}`
 included, is refused with 400 under every content type and the request does nothing; a
-`Content-Type` header on an empty body is ignored. Start still requires a JSON `{}`.
+`Content-Type` header on an empty body is ignored. Start requires a JSON object whose only
+field is the optional `exposureSeconds`; every other body is refused with 400.
 A no-solution starts another exposure. Known transport read failures during an
 acknowledged exposure retry inside acquisition without replacing that exposure.
 The controller shows `retrying`, clears the exposure timer, and preserves its
@@ -33,6 +34,26 @@ is allowed only when the adapter explicitly reports a safe pre-start failure.
 That retry refreshes and validates the mount observation and solve hint before
 requesting exposure. Preparation and motion are not repeated. Lost command responses, failed cleanup, invalid data,
 unsupported capabilities and subprocess errors still stop the operation.
+### Exposure time
+
+Start carries an optional `exposureSeconds`: a number from 1 to 10, or the rig's
+configured default (2 seconds unless the rig's alignment settings say otherwise) when it
+is omitted. Anything else is a 400 with a plain message and nothing starts. The server
+validates it once; the controller then takes that one value for every baseline and
+adjustment exposure of the run, shows it as the view's `exposureSeconds`, and records it
+in the diagnostic run record. A later Start chooses its own. Physical and offline
+modes both honour it.
+
+A longer exposure slows the cadence by the extra seconds. One reading takes about 12
+seconds at 2 seconds: the exposure, the solve and the three-second adjustment window.
+Nothing else in the loop is sized for 2 seconds. The Alpaca adapter lets an exposure
+run its duration plus 60 seconds, Cria bounds its own capture, and the ASTAP solve limit
+starts after the pixels arrive. The settling wait and the adjustment window stay at three
+seconds whatever the exposure, and the correction maths does not change.
+The sample is still timed at the exposure *midpoint*, which moves with the chosen
+duration, so a longer exposure does not add to the timing uncertainty described under
+the physical trial below.
+
 ### Corrections before images
 
 A correction never waits for its image. After an exposure's pixels arrive, the
@@ -105,7 +126,7 @@ and confirms travel from readings. Coordinate slews can move DEC to compensate
 a pointing model and are unsuitable for this baseline. A rejected, ambiguous or unexpected move ends the measurement without
 replay. Stop waits for the acquisition adapter's stop confirmation. The acquisition
 uses Cria's settled outcome, which waits up to 20 seconds for a stationary
-mount, or Alpaca's existing stop confirmation. Before each 2-second physical exposure, alignment waits
+mount, or Alpaca's existing stop confirmation. Before each physical exposure, alignment waits
 three seconds for settling and rechecks mount state and camera geometry; this
 settling allowance does not claim to measure vibration. During steady adjustment the
 three-second adjustment window after each reading is that allowance; the separate
@@ -224,7 +245,7 @@ and replay indoors; a fresh sky comparison is still required for physical accura
 
 Configure the endpoint and stable device IDs deliberately. The first model uses
 northern latitude, the simulator's fixed catalog frame (`EquatorialSystem=J2000`, synthetic sidereal clock),
-2-second mono exposures, a 3-degree camera field, and a prepared baseline near RA 12°, 30° and 48° at nominal Dec 60°. Reset the simulator
+mono exposures (2 seconds unless chosen at Start), a 3-degree camera field, and a prepared baseline near RA 12°, 30° and 48° at nominal Dec 60°. Reset the simulator
 after target framing before starting this workflow. Axis movement uses
 1.5 degrees/second with observed pointing for the first position. These assumptions must not silently carry over to physical
 rigs: epoch conversion, mount direction, field calibration and actual device
