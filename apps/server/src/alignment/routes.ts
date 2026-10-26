@@ -35,7 +35,12 @@ export interface AlignmentEquipmentOptions {
   createInspector?: RigDetailOptions['createInspector']
 }
 
-const emptyCommand = z.object({}).strict()
+const startCommand = z
+  .object({ exposureSeconds: z.number().min(1).max(10).optional() })
+  .strict()
+
+const startCommandError =
+  'Expected a JSON object with an optional exposureSeconds from 1 to 10'
 
 export function registerAlignment(
   app: FastifyInstance,
@@ -254,12 +259,13 @@ export function registerAlignment(
             if (halting && request.body !== undefined)
               return reply.code(400).send({ error: haltBodyError })
 
+            const command = startCommand.safeParse(request.body)
+
             if (
               !halting &&
-              (!request.headers['content-type']?.startsWith('application/json') ||
-                !emptyCommand.safeParse(request.body).success)
+              (!request.headers['content-type']?.startsWith('application/json') || !command.success)
             )
-              return reply.code(400).send({ error: 'Expected an empty JSON object' })
+              return reply.code(400).send({ error: startCommandError })
 
             const release =
               request.params.command === 'start'
@@ -301,7 +307,14 @@ export function registerAlignment(
                   alignment = createRun(rig, settings, view.cameraName)
 
                 if (!alignment) throw new Error('Polar alignment is not configured')
-                const result = await alignment.start(view.rigId, view.rigName, release)
+
+                const result = await alignment.start(
+                  view.rigId,
+                  view.rigName,
+                  release,
+                  command.data?.exposureSeconds ?? settings.exposureSeconds,
+                )
+
                 started = true
 
                 return result

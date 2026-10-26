@@ -67,6 +67,8 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
 
   const physical = options.mode === 'physical' ? options.physical : undefined
   let fieldHeightDegrees = settings.fieldHeightDegrees
+  /** Each run takes the exposure chosen at Start; every exposure of the run uses it. */
+  let exposureSeconds = settings.exposureSeconds
 
   let view: AlignmentView = {
     rigId: '',
@@ -78,7 +80,7 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
     active: false,
     position: 0,
     solvedPositions: 0,
-    exposureSeconds: settings.exposureSeconds,
+    exposureSeconds,
     exposureStartedAt: null,
     measuredAt: null,
     warning: null,
@@ -185,8 +187,14 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
     }
   }
 
-  async function start(rigId: string, rigName: string, onSettled?: () => void) {
+  async function start(
+    rigId: string,
+    rigName: string,
+    onSettled?: () => void,
+    chosenExposureSeconds = settings.exposureSeconds,
+  ) {
     if (running) throw new Error('A measurement is already running')
+    exposureSeconds = chosenExposureSeconds
     controller = new AbortController()
     previousSample = undefined
     diagnostics = undefined
@@ -199,6 +207,7 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
       activity: 'idle',
       position: 1,
       solvedPositions: 0,
+      exposureSeconds,
       measurement: null,
       preview: null,
       measuredAt: null,
@@ -224,7 +233,7 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
         cameraId: settings.cameraId,
         telescopeId: settings.telescopeId,
         cameraName: physical?.cameraName ?? 'Configured offline camera',
-        exposureSeconds: settings.exposureSeconds,
+        exposureSeconds,
       })
       signal.throwIfAborted()
       await run(signal)
@@ -307,7 +316,7 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
           () =>
             hardware.capture({
               cameraId: settings.cameraId,
-              exposureSeconds: settings.exposureSeconds,
+              exposureSeconds,
               signal,
               ...(physical
                 ? { expectedCameraName: physical.cameraName }
@@ -535,7 +544,7 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
       const sample: AlignmentSample = physical
         ? physical.sample(solved, {
             capturedAt: frame.capturedAt,
-            exposureSeconds: settings.exposureSeconds,
+            exposureSeconds,
           })
         : {
             raDegrees: solved.raDegrees,

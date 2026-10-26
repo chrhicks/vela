@@ -131,6 +131,37 @@
 .vela-polar-actions .vela-button {
   width: 100%;
 }
+.vela-polar-exposure {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.vela-polar-exposure legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.vela-polar-exposure .vela-button {
+  min-width: 44px;
+  padding-inline: 10px;
+}
+.vela-polar-exposure [aria-pressed='true'] {
+  background: var(--vela-accent-surface);
+  font-weight: 600;
+}
+.vela-polar-actions .vela-polar-exposure {
+  margin-bottom: 12px;
+}
+.vela-polar-actions .vela-polar-exposure .vela-button {
+  width: auto;
+  flex: 1;
+}
 .vela-polar-operation-detail {
   grid-column: 2;
   font-size: 14px;
@@ -335,6 +366,13 @@
 }
 .vela-polar-setup-facts dd {
   margin: 0;
+}
+.vela-polar-setup-facts__exposure {
+  flex-wrap: wrap;
+  align-items: center;
+}
+.vela-polar-setup-facts__exposure dd {
+  margin-left: auto;
 }
 .vela-polar-activity__line {
   display: flex;

@@ -11,6 +11,10 @@ import {
 } from '../features/alignment/AlignmentImage'
 import './alignment.css'
 
+const exposurePresets = [1, 2, 3, 5, 10] as const
+
+const defaultExposureSeconds = 2
+
 function useAlignment(rigId: string) {
   const [view, setView] = useState<AlignmentView | null>(null)
   const [offline, setOffline] = useState(false)
@@ -70,7 +74,7 @@ function useAlignment(rigId: string) {
     }
   }, [rigId])
 
-  async function command(action: 'start' | 'stop' | 'finish') {
+  async function command(action: 'start' | 'stop' | 'finish', exposureSeconds?: number) {
     if (writing.current || offline || endUnconfirmed.current || view?.activity === 'stopping')
       return
     writing.current = true
@@ -81,7 +85,10 @@ function useAlignment(rigId: string) {
     try {
       const result = await api(`rigs/${encodeURIComponent(rigId)}/alignment/${action}`, {
         method: 'POST',
-        ...(action === 'start' && { headers: { 'Content-Type': 'application/json' }, body: '{}' }),
+        ...(action === 'start' && {
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ exposureSeconds }),
+        }),
         signal: AbortSignal.timeout(15000),
       })
 
@@ -304,6 +311,27 @@ function alignmentActivity(view: AlignmentView, offline: boolean) {
   return 'Preparing measurement…'
 }
 
+function ExposureChoice({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: number
+  disabled: boolean
+  onChange: (seconds: number) => void
+}) {
+  return (
+    <fieldset className="vela-polar-exposure" disabled={disabled}>
+      <legend>Exposure in seconds</legend>
+      {exposurePresets.map(seconds => (
+        <Button key={seconds} aria-pressed={seconds === value} onClick={() => onChange(seconds)}>
+          {seconds} s
+        </Button>
+      ))}
+    </fieldset>
+  )
+}
+
 export function Alignment() {
   const { rigId = '' } = useParams()
 
@@ -314,6 +342,7 @@ function AlignmentPage({ rigId }: { rigId: string }) {
   const { view, offline, pending, error, endUnconfirmed, command } = useAlignment(rigId)
   const { displayed, imageError } = useDisplayedMeasurement(view)
   const [now, setNow] = useState(Date.now())
+  const [chosenExposureSeconds, setChosenExposureSeconds] = useState(defaultExposureSeconds)
   const [expandedImage, setExpandedImage] = useState<ExpandedAlignmentImage | null>(null)
   const imageOpenerId = useId()
   useEffect(() => {
@@ -420,6 +449,7 @@ function AlignmentPage({ rigId }: { rigId: string }) {
         <strong>{pending ? 'Sending command…' : activity}</strong>
       </div>
       <p>{view.solvedPositions} of 3 positions solved · Alignment error not yet available</p>
+      <p>Exposure: {view.exposureSeconds} seconds</p>
       {view.activity === 'exposing' && !interrupted && !pending && (
         <p>{elapsed.toFixed(1)} / {view.exposureSeconds} seconds</p>
       )}
@@ -507,9 +537,15 @@ function AlignmentPage({ rigId }: { rigId: string }) {
                       : 'Configured imaging camera'}
                   </dd>
                 </div>
-                <div>
+                <div className="vela-polar-setup-facts__exposure">
                   <dt>Exposure</dt>
-                  <dd>{view.exposureSeconds} seconds</dd>
+                  <dd>
+                    <ExposureChoice
+                      value={chosenExposureSeconds}
+                      disabled={disabled}
+                      onChange={setChosenExposureSeconds}
+                    />
+                  </dd>
                 </div>
                 <div>
                   <dt>Starting point</dt>
@@ -549,7 +585,7 @@ function AlignmentPage({ rigId }: { rigId: string }) {
               <Button
                 tone="accent"
                 disabled={disabled || !view.enabled}
-                onClick={() => void command('start')}
+                onClick={() => void command('start', chosenExposureSeconds)}
               >
                 {view.phase === 'setup' ? 'Start measurement' : 'Start again'}
               </Button>
@@ -635,12 +671,19 @@ function AlignmentPage({ rigId }: { rigId: string }) {
                 )}
               </div>
             ) : (
-              <Button
-                disabled={disabled || !view.enabled}
-                onClick={() => void command('start')}
-              >
-                Measure again
-              </Button>
+              <>
+                <ExposureChoice
+                  value={chosenExposureSeconds}
+                  disabled={disabled}
+                  onChange={setChosenExposureSeconds}
+                />
+                <Button
+                  disabled={disabled || !view.enabled}
+                  onClick={() => void command('start', chosenExposureSeconds)}
+                >
+                  Measure again
+                </Button>
+              </>
             )}
           </div>
           {view.activity === 'exposing' && !interrupted && !pending && (

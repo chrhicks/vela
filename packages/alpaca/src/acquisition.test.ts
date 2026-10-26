@@ -604,6 +604,24 @@ describe('normalized Alpaca acquisition', () => {
     expect(rig.state.aborts).toBe(0)
   })
 
+  it('allows a 10 second exposure the minute past its duration that a 1 second exposure would not get', async () => {
+    const rig = observatory()
+    const monotonic = vi.spyOn(performance, 'now').mockReturnValue(0)
+
+    try {
+      const result = rig.acquisition.capture({ cameraId: 'camera-id', exposureSeconds: 10 })
+      await started(rig)
+      monotonic.mockReturnValue(65_000)
+      const polls = rig.state.pendingReadyReads
+      await vi.waitFor(() => expect(rig.state.pendingReadyReads).toBeGreaterThan(polls))
+      rig.complete()
+      await expect(result).resolves.toMatchObject({ width: 2, height: 2 })
+      expect(rig.state.aborts).toBe(0)
+    } finally {
+      monotonic.mockRestore()
+    }
+  })
+
   it('waits for a new completed exposure and transposes x/y wire pixels into row-major pixels', async () => {
     const rig = observatory()
     let resolved = false

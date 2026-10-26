@@ -204,8 +204,8 @@ function setup(openDiagnostics?: AlignmentDiagnosticsFactory) {
     return requests.shift()!
   }
 
-  async function baseline(onSettled?: () => void) {
-    await controller.start('physical', 'Physical rig', onSettled)
+  async function baseline(onSettled?: () => void, exposureSeconds?: number) {
+    await controller.start('physical', 'Physical rig', onSettled, exposureSeconds)
 
     for (let index = 0; index < 3; index++) (await nextSolve()).complete()
   }
@@ -263,6 +263,23 @@ it('uses physical optics, selected Bayer camera, and midpoint geometry while pre
   const png = (await subject.controller.image(imageId, 'native'))!
   expect([...png.subarray(0, 8)]).toEqual([137, 80, 78, 71, 13, 10, 26, 10])
   expect(png[25]).toBe(2) // PNG IHDR color type: RGB, not grayscale Bayer samples.
+})
+
+it('requests a chosen exposure and centres every sample on its midpoint', async () => {
+  const subject = setup()
+  await subject.baseline(undefined, 10)
+  await vi.waitFor(() => expect(subject.controller.snapshot().measurement).not.toBeNull())
+  expect(subject.controller.snapshot().exposureSeconds).toBe(10)
+  expect(subject.captures.map(capture => capture.exposureSeconds)).toEqual([10, 10, 10])
+
+  for (const [index, [, capture]] of subject.sample.mock.calls.entries()) {
+    expect(capture.exposureSeconds).toBe(10)
+
+    expect(
+      Date.parse(subject.sample.mock.results[index]!.value.capturedAt) -
+        Date.parse(capture.capturedAt),
+    ).toBe(5000)
+  }
 })
 
 it.each(['during solve', 'during preview'] as const)(
