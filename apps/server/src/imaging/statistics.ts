@@ -22,6 +22,12 @@ interface StarPolicy {
   mergeBlends: boolean
 }
 
+/**
+ * Stamped on every measurement so records from different revisions stay apart.
+ * 1: unstamped records, with a Bayer capture HFR floor of 1.4 px. 2: that floor is 1.0 px.
+ */
+const starAlgorithmVersion = 2
+
 const capturePolicy: StarPolicy = {
   aperture: 12,
   patchRadius: 16,
@@ -34,7 +40,7 @@ const capturePolicy: StarPolicy = {
   outerFluxFraction: 0.04,
   elongation: 0.65,
   minHfrMono: 0.9,
-  minHfrBayer: 1.4,
+  minHfrBayer: 1.0,
   mergeBlends: false,
 }
 
@@ -214,6 +220,7 @@ export async function measureStars(
   }
 
   return {
+    algorithm: { version: starAlgorithmVersion },
     detectedStars: radii.length,
     medianHfrPixels: radii.length ? median(radii) : null,
   }

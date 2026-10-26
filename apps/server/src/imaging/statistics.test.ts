@@ -159,6 +159,25 @@ describe('measureStars', () => {
     }
   })
 
+  it('counts a sharp Bayer star that measures 1.2 px HFR, which the old 1.4 px floor rejected', async () => {
+    for (const pattern of ['rggb', 'grbg', 'gbrg', 'bggr'] as const) {
+      const color: ImageColor = { kind: 'bayer', pattern }
+      // The 3x3 Bayer luminance widens a star this sharp: a Gaussian of 0.84 px HFR reads about 1.2.
+      const frame = image([{ x: 46.23, y: 47.5, sigma: 0.84 / expected(1), amplitude: 5000 }], { color, noise: 1 })
+      const result = await measureStars(frame.width, frame.height, frame.pixels, color)
+
+      expect(result.detectedStars).toBe(1)
+      expect(Math.abs(result.medianHfrPixels! - 1.2)).toBeLessThan(0.1)
+    }
+  })
+
+  it('stamps its measurements with the algorithm version', async () => {
+    const frame = image([{ x: 46, y: 47, sigma: 2 }])
+
+    expect((await measureStars(frame.width, frame.height, frame.pixels)).algorithm).toEqual({ version: 2 })
+    expect((await measureAutofocusStars(frame.width, frame.height, frame.pixels)).algorithm).toEqual({ version: 2 })
+  })
+
   it('returns no measurement for blank, noisy, invalid and isolated hot-pixel images', async () => {
     for (const color of [
       { kind: 'mono' },
@@ -166,12 +185,12 @@ describe('measureStars', () => {
     ] satisfies ImageColor[]) {
       for (const noise of [0, 10]) {
         const frame = image([], { color, noise })
-        expect(await measureStars(frame.width, frame.height, frame.pixels, color)).toEqual({
+        expect(await measureStars(frame.width, frame.height, frame.pixels, color)).toMatchObject({
           detectedStars: 0,
           medianHfrPixels: null,
         })
         frame.pixels[47 * frame.width + 46] = 50000
-        expect(await measureStars(frame.width, frame.height, frame.pixels, color)).toEqual({
+        expect(await measureStars(frame.width, frame.height, frame.pixels, color)).toMatchObject({
           detectedStars: 0,
           medianHfrPixels: null,
         })
@@ -187,7 +206,7 @@ describe('measureStars', () => {
     for (const pattern of ['rggb', 'grbg', 'gbrg', 'bggr'] as const) {
       const color: ImageColor = { kind: 'bayer', pattern }
       const clipped = image([{ x: 45, y: 45, sigma: 3, amplitude: 10000 }], { color, clip: 500 })
-      expect(await measureStars(clipped.width, clipped.height, clipped.pixels, color)).toEqual({
+      expect(await measureStars(clipped.width, clipped.height, clipped.pixels, color)).toMatchObject({
         detectedStars: 0,
         medianHfrPixels: null,
       })
@@ -205,7 +224,7 @@ describe('measureStars', () => {
 
     await new Promise<void>(resolve => setImmediate(resolve))
     expect(complete).toBe(false)
-    expect(await operation).toEqual({ detectedStars: 0, medianHfrPixels: null })
+    expect(await operation).toMatchObject({ detectedStars: 0, medianHfrPixels: null })
   })
 
   it('rejects incomplete edge apertures, close blends, flat clipped cores and unconverged broad profiles', async () => {
@@ -220,7 +239,7 @@ describe('measureStars', () => {
     ]
 
     for (const frame of frames) {
-      expect(await measureStars(frame.width, frame.height, frame.pixels)).toEqual({
+      expect(await measureStars(frame.width, frame.height, frame.pixels)).toMatchObject({
         detectedStars: 0,
         medianHfrPixels: null,
       })
@@ -233,7 +252,7 @@ describe('measureStars', () => {
       { width: 200, height: 200 },
     )
 
-    expect(await measureStars(frame.width, frame.height, frame.pixels)).toEqual({
+    expect(await measureStars(frame.width, frame.height, frame.pixels)).toMatchObject({
       detectedStars: 0,
       medianHfrPixels: null,
     })

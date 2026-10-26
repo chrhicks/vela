@@ -15,7 +15,7 @@ const solved: SolveResult = {
 
 function setup() {
   const render = vi.fn(async () => ({ native: Buffer.from('native'), fit: Buffer.from('fit') }))
-  const analyze = vi.fn(async () => ({ detectedStars: 2, medianHfrPixels: 1.2 }))
+  const analyze = vi.fn(async () => ({ algorithm: { version: 2 }, detectedStars: 2, medianHfrPixels: 1.2 }))
   const controller = createFramingController(() => new Date(capturedAt), async () => {}, { render, analyze })
 
   const hardware: FramingHardware = {
@@ -42,7 +42,7 @@ it('solves, renders and measures the same acquisition with distinct immutable re
   const { preview, actual } = s.controller.snapshot()
   expect(preview).toMatchObject({ rigId: 'rig', targetId: 'target', width: 3, height: 2,
     cameraName: 'Selected camera', capturedAt, capturedAtSource: 'server-estimate', exposureSeconds: 2,
-    checkId: actual!.checkId, statistics: { detectedStars: 2, medianHfrPixels: 1.2 } })
+    checkId: actual!.checkId, statistics: { algorithm: { version: 2 }, detectedStars: 2, medianHfrPixels: 1.2 } })
   expect(s.render).toHaveBeenCalledWith(3, 2, frame.pixels, undefined)
   expect(s.analyze).toHaveBeenCalledWith(3, 2, frame.pixels, undefined)
   expect(s.solve.mock.calls[0]![0]).toBe(frame)

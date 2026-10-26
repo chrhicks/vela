@@ -39,6 +39,7 @@ const timestamp = z
 
 const statistics = z
   .object({
+    algorithm: z.object({ version: z.number().int().positive() }).default({ version: 1 }),
     detectedStars: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
     medianHfrPixels: z.number().positive().nullable(),
   })

@@ -18,7 +18,7 @@ const metadata = {
   receivedAt: '2030-01-01T00:01:05.000Z',
   cameraName: 'Test camera',
   capturedAtSource: 'camera',
-  statistics: { detectedStars: 12, medianHfrPixels: null },
+  statistics: { algorithm: { version: 2 }, detectedStars: 12, medianHfrPixels: null },
   rigId: 'rig-a',
 }
 
@@ -33,6 +33,19 @@ test('metadata saved before the timestamp source was recorded reads as camera-re
 
   expect(skipped).toEqual([])
   expect(items.map(image => image.capturedAtSource)).toEqual(['camera'])
+})
+
+test('statistics saved before the algorithm stamp existed read as version 1', async () => {
+  const root = await scratch()
+  const { algorithm: _stamped, ...legacy } = metadata.statistics
+
+  await mkdir(join(root, 'library', 'legacy'), { recursive: true })
+  await writeFile(join(root, 'library', 'legacy', 'metadata.json'), JSON.stringify({ ...metadata, statistics: legacy }))
+
+  const { items, skipped } = await readSavedImages(root)
+
+  expect(skipped).toEqual([])
+  expect(items.map(image => [image.starAlgorithmVersion, image.detectedStars])).toEqual([[1, 12]])
 })
 
 test('saved images read their metadata and report the frames that cannot be read', async () => {
@@ -59,6 +72,7 @@ test('saved images read their metadata and report the frames that cannot be read
       rigId: 'rig-a',
       targetId: 'target-1',
       targetName: 'Test target',
+      starAlgorithmVersion: 2,
       detectedStars: 12,
       medianHfrPixels: null,
       directory: join(root, 'library', 'good'),
@@ -140,8 +154,19 @@ const frameRecord = {
   message: null,
   provenance: { requestId: 'request-1', operationId: 'operation-1', imageId: 'cria-image-1' },
   image: { id: 'frame-1', capturedAt: '2030-01-01T00:00:01.500Z', capturedAtSource: 'camera', receivedAt: '2030-01-01T00:01:00.000Z', width: 100, height: 80 },
-  statistics: { detectedStars: 12, medianHfrPixels: 3.5 },
+  statistics: { algorithm: { version: 2 }, detectedStars: 12, medianHfrPixels: 3.5 },
 }
+
+test('frame records written before the algorithm stamp existed read as version 1', async () => {
+  const dir = await scratch()
+  const file = join(dir, 'frames.jsonl')
+
+  await writeFile(file, JSON.stringify({ ...frameRecord, statistics: { detectedStars: 12, medianHfrPixels: 3.5 } }))
+
+  const { items } = await readFrameRecords(file)
+
+  expect(items.map(item => item.starAlgorithmVersion)).toEqual([1])
+})
 
 test('frame records read every outcome, with or without ids and an image, and skip what cannot be read', async () => {
   const dir = await scratch()
@@ -156,10 +181,10 @@ test('frame records read every outcome, with or without ids and an image, and sk
 
   const { items, skipped } = await readFrameRecords(file)
 
-  expect(items.map(item => [item.attempt, item.outcome, item.requestId, item.operationId, item.criaImageId, item.imageId, item.detectedStars])).toEqual([
-    [1, 'saved', 'request-1', 'operation-1', 'cria-image-1', 'frame-1', 12],
-    [2, 'lost', 'request-2', null, null, null, null],
-    [3, 'saved', null, null, null, 'frame-1', 12],
+  expect(items.map(item => [item.attempt, item.outcome, item.requestId, item.operationId, item.criaImageId, item.imageId, item.detectedStars, item.starAlgorithmVersion])).toEqual([
+    [1, 'saved', 'request-1', 'operation-1', 'cria-image-1', 'frame-1', 12, 2],
+    [2, 'lost', 'request-2', null, null, null, null, null],
+    [3, 'saved', null, null, null, 'frame-1', 12, 2],
   ])
   expect(skipped.map(entry => entry.where)).toEqual([`${file}:4`, `${file}:5`, `${file}:6`])
   expect(skipped[0]?.reason).toBe('repeats the run and attempt of an earlier record')

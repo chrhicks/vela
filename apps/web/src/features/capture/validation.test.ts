@@ -41,7 +41,7 @@ const view: CaptureView = {
     receivedAt: '2026-09-05T18:00:03.000Z',
     cameraName: 'Simulator Camera',
     color: 'mono',
-    statistics: { detectedStars: 12, medianHfrPixels: 2.35 },
+    statistics: { algorithm: { version: 2 }, detectedStars: 12, medianHfrPixels: 2.35 },
   },
 }
 
@@ -61,6 +61,18 @@ describe('capture response validation', () => {
       expect(
         isCaptureView({ ...view, latestImage: { ...view.latestImage, statistics } }, 'rig-1'),
       ).toBe(true)
+    }
+  })
+
+  it('accepts statistics without an algorithm stamp and rejects an unusable one', () => {
+    const measured = { detectedStars: 12, medianHfrPixels: 2.35 }
+
+    expect(isCaptureView({ ...view, latestImage: { ...view.latestImage, statistics: measured } }, 'rig-1')).toBe(true)
+
+    for (const algorithm of [null, {}, { version: 0 }, { version: 1.5 }, { version: '2' }]) {
+      const statistics = { ...measured, algorithm }
+
+      expect(isCaptureView({ ...view, latestImage: { ...view.latestImage, statistics } }, 'rig-1')).toBe(false)
     }
   })
 

@@ -122,6 +122,7 @@ function setup(
       return focuser
     },
     measure: async () => ({
+      algorithm: { version: 2 },
       detectedStars: 40,
       medianHfrPixels: hyperbola(position, 2.18, 95, bestFocus),
     }),

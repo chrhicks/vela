@@ -19,6 +19,7 @@ function image(capturedAt: string, rigId = 'rig-a'): SavedImage {
     rigId,
     targetId: null,
     targetName: null,
+    starAlgorithmVersion: null,
     detectedStars: null,
     medianHfrPixels: null,
     directory: '/nowhere',

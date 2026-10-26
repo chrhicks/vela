@@ -13,6 +13,9 @@
   "exposureSeconds": 90,
   "color": "color",
   "statistics": {
+    "algorithm": {
+      "version": 2
+    },
     "detectedStars": 0,
     "medianHfrPixels": null
   }

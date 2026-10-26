@@ -338,6 +338,7 @@ const savedImageSchema = z
     color: z.enum(['mono', 'color']),
     statistics: z
       .object({
+        algorithm: z.object({ version: z.number().int().positive() }).default({ version: 1 }),
         detectedStars: z.number().int().nonnegative(),
         medianHfrPixels: z.number().nonnegative().nullable(),
       })
