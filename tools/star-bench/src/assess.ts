@@ -45,10 +45,12 @@ export function assessNight(labels: NightLabels, runs: Run[], options: ReplayOpt
   if (matched.length === 0) return { labels, runs: matched, windows: [], unlabelled: [], passed: false }
 
   const episodes = matched.flatMap(run => replayAlerts(run, options)).sort((a, b) => a.from - b.from)
-  const framesIn = (window: LabelWindow) =>
-    matched.reduce((sum, run) => sum + run.frames.filter(frame => frame.capturedAt >= window.from && frame.capturedAt <= window.to).length, 0)
+  const inWindow = (window: LabelWindow, at: number) => at >= window.from && at <= window.to
 
-  const within = (window: LabelWindow) => episodes.filter(episode => episode.from >= window.from && episode.from <= window.to)
+  const framesIn = (window: LabelWindow) =>
+    matched.flatMap(run => run.frames).filter(frame => inWindow(window, frame.capturedAt)).length
+
+  const within = (window: LabelWindow) => episodes.filter(episode => inWindow(window, episode.from))
 
   const windows = labels.windows.map((window): WindowAssessment => {
     const started = within(window)
