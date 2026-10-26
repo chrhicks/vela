@@ -192,7 +192,7 @@ function renderLabelled(runs: Run[], labels: NightLabels[], { replay, sweep }: R
 
   for (const night of nights) lines.push(...renderNight(night))
 
-  const labelled = new Set(nights.flatMap(night => (night.run ? [night.run] : [])))
+  const labelled = new Set(nights.flatMap(night => night.runs))
   const unlabelled = runs.filter(run => !labelled.has(run))
 
   if (unlabelled.length)
@@ -205,17 +205,17 @@ function renderLabelled(runs: Run[], labels: NightLabels[], { replay, sweep }: R
   return lines
 }
 
-function renderNight({ labels, run, windows, unlabelled, passed }: NightAssessment) {
+function renderNight({ labels, runs, windows, unlabelled, passed }: NightAssessment) {
   const lines = [`${labels.night}, ${labels.exposureSeconds} s, ${labels.use}: ${passed ? 'pass' : 'FAIL'}`]
 
-  if (!run) return [...lines, `  NO RUN: no ${labels.target} run of ${labels.exposureSeconds} s overlaps the labelled windows`]
+  if (runs.length === 0) return [...lines, `  NO RUN: no ${labels.target} run of ${labels.exposureSeconds} s overlaps the labelled windows`]
 
-  for (const { window, required, unexpected, allowed } of windows) {
+  for (const { window, required, unexpected, allowed, frames } of windows) {
     const name = window.kind === 'event' ? `event ${window.name}` : window.kind
     const span = `${time(window.from)} to ${time(window.to)}`
     const quiet = unexpected.length === 0 && allowed.length === 0 && required.length === 0
 
-    lines.push(`  ${name} ${span}${quiet ? ': quiet' : ''}`)
+    lines.push(`  ${name} ${span}${frames === 0 ? ': NO FRAMES' : quiet ? ': quiet' : ''}`)
 
     for (const { id, episode } of required) {
       if (!episode) lines.push(`    ${id} NOT RAISED`)

@@ -15,7 +15,8 @@ const positive = z.number().positive()
  *
  * That is 717 saved frames from five nights. The labels in `tools/star-bench/labels` pick the
  * thresholds on 2026-10-18 Andromeda, 2026-10-24 Heart and 2026-10-25 Soul, and hold out 2026-10-24
- * North America and the 2026-10-23 Heart evening, which must raise nothing.
+ * North America and the 2026-10-23 Heart evening, which must raise nothing. The held-out nights were
+ * seen while the count was chosen, so they are regression evidence, not independent validation.
  *
  * The count is `strong` stars (flux S/N 100 or more), not `measured`:
  * - Steadiness, the spread of log(count / previous count), measured then strong: Andromeda 0.048

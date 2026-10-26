@@ -11,44 +11,49 @@ export interface WindowAssessment {
   unexpected: AlertEpisode[]
   /** Episodes that started in the window and are allowed. */
   allowed: AlertEpisode[]
+  /** Frames of the matched runs inside the window. A window with none judged nothing, so it fails. */
+  frames: number
 }
 
 export interface NightAssessment {
   labels: NightLabels
-  /** Null when no run of the label's target and exposure overlaps its windows. That is a failure, never a pass. */
-  run: Run | null
+  /** Every run of the label's target and exposure that overlaps its windows, each replayed with its own history. None is a failure, never a pass. */
+  runs: Run[]
   windows: WindowAssessment[]
   /** Episodes that started in no window, so nothing said they were fine. */
   unlabelled: AlertEpisode[]
   passed: boolean
 }
 
-/** The run the labels describe: the same target and exposure, overlapping the span the windows cover. */
-export function runOfNight(labels: NightLabels, runs: Run[]) {
+/** The runs the labels describe: the same target and exposure, overlapping the span the windows cover. A reset splits a night into several. */
+export function runsOfNight(labels: NightLabels, runs: Run[]) {
   const from = labels.windows[0]!.from
   const to = labels.windows.at(-1)!.to
 
-  return runs.find(
+  return runs.filter(
     run =>
       run.target === labels.target &&
       run.exposureSeconds === labels.exposureSeconds &&
       run.frames[0]!.capturedAt <= to &&
       run.frames.at(-1)!.capturedAt >= from,
-  ) ?? null
+  )
 }
 
 export function assessNight(labels: NightLabels, runs: Run[], options: ReplayOptions): NightAssessment {
-  const run = runOfNight(labels, runs)
+  const matched = runsOfNight(labels, runs)
 
-  if (!run) return { labels, run, windows: [], unlabelled: [], passed: false }
+  if (matched.length === 0) return { labels, runs: matched, windows: [], unlabelled: [], passed: false }
 
-  const episodes = replayAlerts(run, options)
+  const episodes = matched.flatMap(run => replayAlerts(run, options)).sort((a, b) => a.from - b.from)
+  const framesIn = (window: LabelWindow) =>
+    matched.reduce((sum, run) => sum + run.frames.filter(frame => frame.capturedAt >= window.from && frame.capturedAt <= window.to).length, 0)
+
   const within = (window: LabelWindow) => episodes.filter(episode => episode.from >= window.from && episode.from <= window.to)
 
   const windows = labels.windows.map((window): WindowAssessment => {
     const started = within(window)
 
-    if (window.kind === 'healthy') return { window, required: [], unexpected: started, allowed: [] }
+    if (window.kind === 'healthy') return { window, required: [], unexpected: started, allowed: [], frames: framesIn(window) }
 
     if (window.kind === 'transition') {
       return {
@@ -56,6 +61,7 @@ export function assessNight(labels: NightLabels, runs: Run[], options: ReplayOpt
         required: [],
         unexpected: started.filter(episode => !window.allow.includes(episode.id)),
         allowed: started.filter(episode => window.allow.includes(episode.id)),
+        frames: framesIn(window),
       }
     }
 
@@ -64,6 +70,7 @@ export function assessNight(labels: NightLabels, runs: Run[], options: ReplayOpt
       required: window.expect.map(id => ({ id, episode: started.find(episode => episode.id === id) ?? null })),
       unexpected: started.filter(episode => !window.expect.includes(episode.id)),
       allowed: [],
+      frames: framesIn(window),
     }
   })
 
@@ -71,19 +78,20 @@ export function assessNight(labels: NightLabels, runs: Run[], options: ReplayOpt
 
   const passed =
     unlabelled.length === 0 &&
-    windows.every(({ required, unexpected }) => unexpected.length === 0 && required.every(({ episode }) => episode !== null))
+    windows.every(({ required, unexpected, frames }) => frames > 0 && unexpected.length === 0 && required.every(({ episode }) => episode !== null))
 
-  return { labels, run, windows, unlabelled, passed }
+  return { labels, runs: matched, windows, unlabelled, passed }
 }
 
 /** Whether the night holds for one alert alone: it is raised where it is needed and nowhere it is not. */
 export function passedFor(night: NightAssessment, id: FrameAlertId) {
-  if (!night.run) return false
+  if (night.runs.length === 0) return false
 
   return (
     night.unlabelled.every(episode => episode.id !== id) &&
     night.windows.every(
-      ({ required, unexpected }) =>
+      ({ required, unexpected, frames }) =>
+        frames > 0 &&
         unexpected.every(episode => episode.id !== id) &&
         required.every(need => need.id !== id || need.episode !== null),
     )

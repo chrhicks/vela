@@ -69,7 +69,7 @@ The replay differs from the live monitor in two ways. It has no focuser log, so 
 - `event`: every alert in `expect` must start in it. The report gives the delay from the window's start, when the alert cleared and what it said, cause included.
 - `transition`: only the alerts in `allow` may start in it.
 
-An alert that starts in no window fails the night, so the files must cover it. A label with no matching run (same target and exposure, overlapping the windows) fails. A file that does not parse stops the run before anything is measured. `use` is `calibration` for the nights the thresholds are picked on and `holdout` for the nights that only check them. To label a new night, add a file; do not widen a window to make a night pass.
+An alert that starts in no window fails the night, so the files must cover it. A label with no matching run (same target and exposure, overlapping the windows) fails. Every matching run is replayed with its own history, so a reset inside the night is judged too, and a window with no frames fails. A file that does not parse stops the run before anything is measured. `use` is `calibration` for the nights the thresholds are picked on and `holdout` for the nights that only check them. To label a new night, add a file; do not widen a window to make a night pass.
 
 ```
 Labelled nights (alert count: strong)

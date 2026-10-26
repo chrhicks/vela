@@ -34,7 +34,7 @@ zero stars.
 | --- | --- | --- | --- |
 | `stars-dropping` | warn | The smoothed count is below `1 - starsDropFraction` (0.5) of its highest value within the last `starsDropWindowMinutes` (10), for `confirmFrames` frames. A rate of change, in time, so it means the same at 30 s and 180 s exposures. | The smoothed count is back above `starsRecoveredRatio` (0.5) of the baseline for `confirmFrames` frames. |
 | `stars-collapsed` | critical | The smoothed count is below `starsCollapsedRatio` (0.15) of the baseline, or the frame is empty (0 stars on a baseline of 3 or more, counted at once, not smoothed), for `confirmFrames` frames. | Same as `stars-dropping`. |
-| `stars-declining` | warn | The median of the last `starsDecliningWindowMinutes` (30) is below `starsDecliningRatio` (0.6) of the median of the 30 before. A slow slide. | It is back above `starsDecliningClearRatio` (0.8). |
+| `stars-declining` | warn | The median of the last `starsDecliningWindowMinutes` (30) is below `starsDecliningRatio` (0.62) of the median of the 30 before. A slow slide. | It is back above `starsDecliningClearRatio` (0.8). |
 
 ### The cause of a star alert
 

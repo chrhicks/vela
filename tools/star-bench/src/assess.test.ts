@@ -70,7 +70,7 @@ describe('assessNight', () => {
   it('does not pass a night whose run is missing, whatever the labels say', () => {
     const night = assessNight(labels([healthyBefore]), [], shippedReplay)
 
-    expect(night.run).toBeNull()
+    expect(night.runs).toEqual([])
     expect(night.passed).toBe(false)
   })
 
@@ -78,8 +78,36 @@ describe('assessNight', () => {
     const other = { ...syntheticRun(counts), target: 'Other Nebula' }
     const short = { ...syntheticRun(counts), exposureSeconds: 30 }
 
-    expect(assessNight(labels([healthyBefore, hazeEvent, healthyAfter]), [other, short, run], shippedReplay).run).toBe(run)
-    expect(assessNight(labels([healthyBefore, hazeEvent, healthyAfter]), [other, short], shippedReplay).run).toBeNull()
+    expect(assessNight(labels([healthyBefore, hazeEvent, healthyAfter]), [other, short, run], shippedReplay).runs).toEqual([run])
+    expect(assessNight(labels([healthyBefore, hazeEvent, healthyAfter]), [other, short], shippedReplay).runs).toEqual([])
+  })
+})
+
+describe('a night split by a reset', () => {
+  const first = syntheticRun(Array(10).fill(100))
+
+  const second = {
+    ...syntheticRun(haze(30, 100, 10, 12, 20)),
+    frames: haze(30, 100, 10, 12, 20).map((stars, index) => ({ capturedAt: at(10 + index), stars, hfrPixels: 2 })),
+  }
+
+  it('assesses every run of the night with its own history, not only the first', () => {
+    const windows: NightLabels['windows'] = [{ kind: 'healthy', from: at(0), to: at(39), note: 'all fine' }]
+    const night = assessNight(labels(windows), [first, second], shippedReplay)
+
+    expect(night.runs).toHaveLength(2)
+    expect(night.passed).toBe(false)
+    expect(night.windows[0]!.unexpected.map(episode => episode.id)).toEqual(['stars-dropping'])
+  })
+})
+
+describe('a window with no frames', () => {
+  it('fails, because a night with nothing in the window proved nothing', () => {
+    const empty: NightLabels['windows'][number] = { kind: 'healthy', from: at(100), to: at(110), note: 'after the run' }
+    const night = assessNight(labels([healthyBefore, empty]), [syntheticRun(Array(50).fill(100))], shippedReplay)
+
+    expect(night.windows[1]!.frames).toBe(0)
+    expect(night.passed).toBe(false)
   })
 })
 
