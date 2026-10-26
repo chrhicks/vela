@@ -18,6 +18,7 @@ import {
 } from './controller.js'
 import { createMemorySavedImageStore, type SavedImageStore } from '../saved-images/store.js'
 import type { FrameRecord, FrameRecords } from './frame-records.js'
+import { createMemoryCaptureRunStore, type CaptureRunStore } from './run-store.js'
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -31,7 +32,11 @@ function deferred<T>() {
   return { promise, resolve, reject }
 }
 
-function setup(savedImages: SavedImageStore = createMemorySavedImageStore(), frameRecords?: FrameRecords) {
+function setup(
+  savedImages: SavedImageStore = createMemorySavedImageStore(),
+  frameRecords?: FrameRecords,
+  runs?: CaptureRunStore,
+) {
   const requests: Array<
     Parameters<CaptureCamera['capture']>[0] & ReturnType<typeof deferred<CaptureFrame>>
   > = []
@@ -50,6 +55,8 @@ function setup(savedImages: SavedImageStore = createMemorySavedImageStore(), fra
     () => Date.parse('2026-09-05T16:00:10Z'),
     savedImages,
     frameRecords,
+    undefined,
+    runs,
   )
 
   const controller = {
@@ -904,5 +911,112 @@ describe('frame types', () => {
     requests[1]!.resolve(frame)
     await vi.waitFor(() => expect(controller.active()).toBe(false))
     expect(controller.snapshot().latestImage!.frameType).toBe('light')
+  })
+})
+
+describe('a server restart', () => {
+  async function takeFrames(controller: ReturnType<typeof setup>, count: number) {
+    for (let taken = 0; taken < count; taken++) {
+      const index = controller.requests.length - 1
+      controller.requests[index]!.resolve(controller.frame)
+      await vi.waitFor(() => expect(controller.controller.snapshot().completedCount).toBe(taken + 1))
+      await vi.waitFor(() => expect(controller.requests).toHaveLength(index + 2))
+    }
+  }
+
+  const subject = { targetId: 'm31', name: 'Andromeda Galaxy', catalog: 'M 31' }
+
+  it('reports the run that was active as interrupted, with how far it got, and exposes nothing', async () => {
+    const runs = createMemoryCaptureRunStore()
+    const before = setup(undefined, undefined, runs)
+
+    await before.controller.start(30, { repeat: true, frameCount: 5, saveFrames: true, subject })
+    await takeFrames(before, 2)
+
+    const after = setup(undefined, undefined, runs)
+
+    expect(after.controller.snapshot()).toMatchObject({
+      phase: 'interrupted',
+      active: false,
+      error: null,
+      repeat: true,
+      frameCount: 5,
+      saveFrames: true,
+      frameType: 'light',
+      exposureSeconds: 30,
+      completedCount: 2,
+      savedCount: 2,
+      integrationSeconds: 60,
+      subject,
+      latestImage: null,
+      interruption: { reason: 'Vela restarted', remainingCount: 3 },
+    })
+
+    expect(after.controller.active()).toBe(false)
+    expect(after.requests).toEqual([])
+  })
+
+  it('keeps a run that a server shutdown stopped, but not one that Chris stopped', async () => {
+    const runs = createMemoryCaptureRunStore()
+    const shutdown = setup(undefined, undefined, runs)
+
+    await shutdown.controller.start(30, { repeat: true })
+    shutdown.requests[0]!.reject(new CaptureStoppedError())
+    await shutdown.controller.close()
+    expect(setup(undefined, undefined, runs).controller.snapshot().phase).toBe('interrupted')
+
+    const stoppedRuns = createMemoryCaptureRunStore()
+    const stopped = setup(undefined, undefined, stoppedRuns)
+
+    await stopped.controller.start(30, { repeat: true })
+    stopped.requests[0]!.reject(new CaptureStoppedError())
+    await stopped.controller.stop()
+    expect(stopped.controller.snapshot().phase).toBe('stopped')
+    expect(setup(undefined, undefined, stoppedRuns).controller.snapshot().phase).toBe('idle')
+  })
+
+  it.each([
+    ['finishes', (run: ReturnType<typeof setup>) => run.requests[0]!.resolve(run.frame), {}],
+    ['fails', (run: ReturnType<typeof setup>) => run.requests[0]!.reject(new Error('camera lost')), { repeat: true }],
+  ])('does not report a run that %s before the restart', async (_, end, options) => {
+    const runs = createMemoryCaptureRunStore()
+    const before = setup(undefined, undefined, runs)
+
+    await before.controller.start(10, options)
+    end(before)
+    await vi.waitFor(() => expect(before.controller.active()).toBe(false))
+
+    expect(setup(undefined, undefined, runs).controller.snapshot().phase).toBe('idle')
+  })
+
+  it('starts a new run over the interrupted one, which is then no longer reported', async () => {
+    const runs = createMemoryCaptureRunStore()
+    const before = setup(undefined, undefined, runs)
+
+    await before.controller.start(30, { repeat: true, frameCount: 5, frameType: 'dark' })
+
+    const after = setup(undefined, undefined, runs)
+
+    expect(after.controller.interrupted()).toMatchObject({ frameType: 'dark', completedCount: 0 })
+
+    await after.controller.start(10)
+
+    expect(after.controller.interrupted()).toBeUndefined()
+    expect(after.controller.snapshot()).toMatchObject({ phase: 'exposing', interruption: null, frameType: 'light' })
+    expect(runs.unfinished('fra 400')).toMatchObject({ exposureSeconds: 10, frameType: 'light' })
+  })
+
+  it('carries a calibration frame type and an uncounted run through the restart', async () => {
+    const runs = createMemoryCaptureRunStore()
+
+    await setup(undefined, undefined, runs).controller.start(5, { repeat: true, frameType: 'bias' })
+
+    expect(setup(undefined, undefined, runs).controller.snapshot()).toMatchObject({
+      phase: 'interrupted',
+      frameType: 'bias',
+      subject: null,
+      frameCount: null,
+      interruption: { remainingCount: null },
+    })
   })
 })

@@ -17,6 +17,7 @@ export function captureActivity(view: CaptureView, offline: boolean) {
     complete: 'Image received',
     stopped: 'Capture stopped',
     failed: 'Capture stopped · error',
+    interrupted: 'Capture interrupted',
   }[view.phase]
 }
 
@@ -138,6 +139,8 @@ export function useCapture(rigId: string) {
     !coolingPending &&
     !commandUnconfirmed
 
+  const canResume = canStart && view?.phase === 'interrupted' && view.interruption?.remainingCount !== 0
+
   const canStop = !!view?.active && view.phase !== 'stopping' && !offline && !pending
 
   // The server marks cooling blocked whenever its command would be refused.
@@ -152,7 +155,7 @@ export function useCapture(rigId: string) {
     !commandUnconfirmed
 
   async function post(
-    path: 'start' | 'stop' | 'cooling',
+    path: 'start' | 'stop' | 'resume' | 'cooling',
     body:
       | {
           exposureSeconds: number
@@ -173,6 +176,8 @@ export function useCapture(rigId: string) {
     if (path === 'start') allowed = canStart
 
     if (path === 'stop') allowed = canStop
+
+    if (path === 'resume') allowed = canResume
 
     if (!allowed) return
 
@@ -268,6 +273,7 @@ export function useCapture(rigId: string) {
     commandUnconfirmed,
     coolingUnconfirmed,
     canStart,
+    canResume,
     canStop,
     canCool,
     start: ({
@@ -297,6 +303,7 @@ export function useCapture(rigId: string) {
       })
     },
     stop: () => post('stop', {}),
+    resume: () => post('resume', {}),
     setCooler: (coolerOn: boolean) => post('cooling', { coolerOn }),
     setCoolingTemperature: (setpointC: number) => post('cooling', { setpointC }),
     refresh: () => read(true),

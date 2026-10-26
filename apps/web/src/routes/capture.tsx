@@ -1,4 +1,4 @@
-import type { FrameType } from '@vela/model/web'
+import type { CaptureView, FrameType } from '@vela/model/web'
 import { Button, Checkbox, Input, Select } from '@vela/ui'
 import { useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
@@ -287,6 +287,33 @@ function CapturePage({ rigId }: { rigId: string }) {
                 </>
               ) : (
                 <>
+                  {view.interruption && (
+                    <div
+                      className="capture-page__warning"
+                      role="status"
+                      aria-label="Interrupted capture run"
+                    >
+                      <p>
+                        {view.interruption.reason} during this run, and nothing has been exposed
+                        since. {interruptedProgress(view)}
+                      </p>
+                      {view.interruption.remainingCount === 0 ? (
+                        <p>It had taken all its frames.</p>
+                      ) : (
+                        <Button
+                          tone="accent"
+                          disabled={!capture.canResume}
+                          onClick={() => void capture.resume()}
+                        >
+                          {pending
+                            ? 'Sending command…'
+                            : view.interruption.remainingCount === null
+                              ? 'Resume · repeat until stopped'
+                              : `Resume · ${view.interruption.remainingCount} ${view.interruption.remainingCount === 1 ? 'frame' : 'frames'} left`}
+                        </Button>
+                      )}
+                    </div>
+                  )}
                   {view.completedCount > 0 && (
                     <p>
                       {view.savedCount} saved · {integrationTime(view.integrationSeconds)}{' '}
@@ -496,6 +523,16 @@ function CapturePage({ rigId }: { rigId: string }) {
       )}
     </section>
   )
+}
+
+function interruptedProgress(view: CaptureView) {
+  const taken = view.frameCount
+    ? `${view.completedCount} of ${view.frameCount} frames taken`
+    : `${view.completedCount} ${view.completedCount === 1 ? 'frame' : 'frames'} taken`
+
+  const what = view.frameType === 'light' ? (view.subject?.name ?? 'Light frames') : frameTypeChoices[view.frameType].frames
+
+  return `${what} · ${taken} · ${view.exposureSeconds} s each.`
 }
 
 function integrationTime(seconds: number) {

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { FastifyInstance } from 'fastify'
+import type { FastifyInstance, FastifyReply } from 'fastify'
 import {
   CaptureStoppedError as EquipmentCaptureStoppedError,
   CaptureUncertainError as EquipmentCaptureUncertainError,
@@ -27,9 +27,11 @@ import {
   CaptureStoppedError,
   CaptureUncertainError,
   createCaptureController,
+  interruptedReason,
   type CaptureCamera,
 } from './controller.js'
 import type { FrameRecords } from './frame-records.js'
+import { noCaptureRuns, resumeRequest, type CaptureRunRecord, type CaptureRunRequest, type CaptureRunStore } from './run-store.js'
 import type { FrameImaging } from '../imaging/frame-imaging.js'
 import { createMemorySavedImageStore, type SavedImageStore } from '../saved-images/store.js'
 import type { AlertMonitor } from '../alerts/monitor.js'
@@ -44,13 +46,15 @@ interface CaptureRouteOptions {
   lookupSubject?: (targetId: string) => CaptureSubject | undefined
   savedImages?: SavedImageStore
   frameRecords?: FrameRecords
+  /** Where an active run's request and progress are kept, so a restart can report it. */
+  runs?: CaptureRunStore
   images?: FrameImaging
   createCamera?: (settings: CaptureSettings) => CaptureCamera
   createAcquisition: (rig: RigCatalogRecord) => Acquisition
   createInspector: RigDetailOptions['createInspector']
   createCooling: (settings: CaptureSettings) => CameraCooling
   /** Watches each run for the alert rules. */
-  alerts?: { monitorFor(rig: RigCatalogRecord): Pick<AlertMonitor, 'runStarted' | 'frameCaptured' | 'runEnded'> }
+  alerts?: { monitorFor(rig: RigCatalogRecord): Pick<AlertMonitor, 'runStarted' | 'frameCaptured' | 'runEnded' | 'runInterrupted'> }
 }
 
 const MAX_FRAME_COUNT = 10_000
@@ -79,6 +83,12 @@ function configuredCamera(settings: CaptureSettings, acquisition: Acquisition): 
       }
     },
   }
+}
+
+function interruptionAlert({ completedCount, frameCount }: CaptureRunRecord) {
+  const frames = frameCount === null ? `${completedCount} frames` : `${completedCount} of ${frameCount} frames`
+
+  return `Capture was interrupted: ${interruptedReason} (${frames} taken)`
 }
 
 function captureCooling(telemetry: DeviceTelemetry | undefined): CaptureCoolingView | null {
@@ -117,11 +127,31 @@ export function registerCapture(
     alerts,
     savedImages = createMemorySavedImageStore(),
     frameRecords,
+    runs = noCaptureRuns,
     images,
   }: CaptureRouteOptions,
 ) {
   const controllers = new Map<string, ReturnType<typeof createCaptureController>>()
   const cameraFactory = createCamera ?? (settings => configuredCamera(settings, createAcquisition(settings.rig)))
+
+  function controllerFor(rigId: string, rigName: string) {
+    let controller = controllers.get(rigId)
+
+    if (!controller) {
+      controller = createCaptureController(
+        { rigId, rigName },
+        Date.now,
+        savedImages,
+        frameRecords,
+        images,
+        runs,
+      )
+
+      controllers.set(rigId, controller)
+    }
+
+    return controller
+  }
 
   /**
    * Marks observed cooling with whatever owns the Rig's commands right now. It
@@ -284,91 +314,118 @@ export function registerCapture(
       }
 
       const body = parsed.data
-      const frameType = body.frameType ?? 'light'
       const subject = body.targetId === undefined ? null : lookupSubject?.(body.targetId)
 
       if (subject === undefined)
         return reply.code(400).send({ error: 'The selected capture subject was not found.' })
 
-      const release = operations.acquire(request.params.rigId, 'capture')
-
-      if (!release) {
-        return reply.code(409).send({
-          error: operations.heldReason(request.params.rigId) ?? 'Another Rig operation is in progress.',
-        })
-      }
-
-      let started = false
-
-      try {
-        const view = await rigView(request.params.rigId)
-
-        if (!view) return reply.code(404).send({ error: 'Rig not found' })
-
-        if (!view.enabled || !view.camera)
-          return reply.code(409).send({ error: view.unavailableReason })
-        const rig = await catalog.get(view.rigId)
-        const target = rig && cameraSettings(rig)
-
-        if (!target)
-          return reply.code(409).send({ error: 'Imaging camera selection is unavailable.' })
-        const settings = { ...target, expectedCameraName: view.camera.name }
-        let controller = controllers.get(view.rigId)
-
-        if (!controller) {
-          controller = createCaptureController(
-            { rigId: view.rigId, rigName: view.rigName },
-            Date.now,
-            savedImages,
-            frameRecords,
-            images,
-          )
-          controllers.set(view.rigId, controller)
-        }
-
-        const watch = alerts?.monitorFor(rig)
-        const light = frameType === 'light'
-        const captureController = controller
-        const camera = cameraFactory(settings)
-
-        watch?.runStarted(body.exposureSeconds, light && body.repeat === true && body.saveFrames === true)
-
-        const result = await controller
-          .start(body.exposureSeconds, camera, view.camera.name, {
-            subject,
-            // A calibration frame has no stars to judge, but still shows the camera is producing.
-            onFrame: image => watch?.frameCaptured(light ? image : { capturedAt: image.capturedAt, statistics: null }),
-            onSettled() {
-              release()
-              watch?.runEnded(captureController.snapshot().phase === 'failed' ? 'failed' : 'stopped')
-            },
-            repeat: body.repeat === true,
-            frameCount: body.frameCount,
-            saveFrames: body.saveFrames === true,
-            frameType,
-          })
-          .catch(error => {
-            watch?.runEnded('stopped')
-            throw error
-          })
-
-        started = true
-
-        return {
-          ...result,
-          savedImageCount: view.savedImageCount,
-          // The run now owns the Rig, so cooling is re-marked after it started.
-          cooling: withCoolingBlocker(view.rigId, view.cooling),
-        }
-      } catch (error) {
-        return reply
-          .code(409)
-          .send({ error: error instanceof Error ? error.message : 'Could not start exposure' })
-      } finally {
-        if (!started) release()
-      }
+      return startRun(request.params.rigId, reply, {
+        exposureSeconds: body.exposureSeconds,
+        repeat: body.repeat === true,
+        ...(body.frameCount !== undefined && { frameCount: body.frameCount }),
+        saveFrames: body.saveFrames === true,
+        frameType: body.frameType ?? 'light',
+        subject,
+      })
     },
   )
+
+  // Starts a new run with the interrupted run's settings and what is left of its count. It is an
+  // ordinary start: the lease, the camera checks and the alert monitor apply as for any other.
+  registerHaltRoutes(app, scope =>
+    scope.post<{ Params: { rigId: string } }>('/api/rigs/:rigId/capture/resume', async (request, reply) => {
+      if (!haltBody.safeParse(request.body).success)
+        return reply.code(400).send({ error: haltBodyError })
+
+      const interrupted = () => controllers.get(request.params.rigId)?.interrupted()
+      const record = interrupted()
+
+      if (!record) return reply.code(409).send({ error: 'There is no interrupted run to resume.' })
+
+      const resumed = resumeRequest(record)
+
+      if (!resumed) return reply.code(409).send({ error: 'The interrupted run had already taken all its frames.' })
+
+      return startRun(request.params.rigId, reply, resumed, () =>
+        interrupted() === record ? undefined : 'The interrupted run is no longer waiting to resume.',
+      )
+    }),
+  )
+
+  async function startRun(
+    rigId: string,
+    reply: FastifyReply,
+    run: CaptureRunRequest,
+    refuse: () => string | undefined = () => undefined,
+  ) {
+    const release = operations.acquire(rigId, 'capture')
+
+    if (!release) {
+      return reply.code(409).send({
+        error: operations.heldReason(rigId) ?? 'Another Rig operation is in progress.',
+      })
+    }
+
+    let started = false
+
+    try {
+      const refusal = refuse()
+
+      if (refusal) return reply.code(409).send({ error: refusal })
+      const view = await rigView(rigId)
+
+      if (!view) return reply.code(404).send({ error: 'Rig not found' })
+
+      if (!view.enabled || !view.camera)
+        return reply.code(409).send({ error: view.unavailableReason })
+      const rig = await catalog.get(view.rigId)
+      const target = rig && cameraSettings(rig)
+
+      if (!target)
+        return reply.code(409).send({ error: 'Imaging camera selection is unavailable.' })
+      const settings = { ...target, expectedCameraName: view.camera.name }
+      const controller = controllerFor(view.rigId, view.rigName)
+      const watch = alerts?.monitorFor(rig)
+      const light = run.frameType === 'light'
+      const camera = cameraFactory(settings)
+
+      watch?.runStarted(run.exposureSeconds, light && run.repeat && run.saveFrames)
+
+      const result = await controller
+        .start(run.exposureSeconds, camera, view.camera.name, {
+          subject: run.subject,
+          // A calibration frame has no stars to judge, but still shows the camera is producing.
+          onFrame: image => watch?.frameCaptured(light ? image : { capturedAt: image.capturedAt, statistics: null }),
+          onSettled() {
+            release()
+            watch?.runEnded(controller.snapshot().phase === 'failed' ? 'failed' : 'stopped')
+          },
+          repeat: run.repeat,
+          frameCount: run.frameCount,
+          saveFrames: run.saveFrames,
+          frameType: run.frameType,
+        })
+        .catch(error => {
+          watch?.runEnded('stopped')
+          throw error
+        })
+
+      started = true
+
+      return {
+        ...result,
+        savedImageCount: view.savedImageCount,
+        // The run now owns the Rig, so cooling is re-marked after it started.
+        cooling: withCoolingBlocker(view.rigId, view.cooling),
+      }
+    } catch (error) {
+      return reply
+        .code(409)
+        .send({ error: error instanceof Error ? error.message : 'Could not start exposure' })
+    } finally {
+      if (!started) release()
+    }
+  }
 
   app.post<{ Params: { rigId: string } }>(
     '/api/rigs/:rigId/capture/cooling',
@@ -548,8 +605,22 @@ export function registerCapture(
     },
   )
 
+  // A run that was active when the server went down is shown as interrupted, and a light run
+  // is told to the phone. Nothing exposes: only Chris's start or resume does.
+  app.addHook('onReady', async () => {
+    for (const rig of await catalog.list()) {
+      const record = runs.unfinished(rig.id)
+
+      if (!record) continue
+      controllerFor(rig.id, rig.name)
+
+      if (record.frameType === 'light')
+        void alerts?.monitorFor(rig).runInterrupted(interruptionAlert(record))
+    }
+  })
+
   app.addHook('onClose', async () => {
-    await Promise.all([...controllers.values()].map(controller => controller.stop()))
+    await Promise.all([...controllers.values()].map(controller => controller.close()))
   })
 
   return {

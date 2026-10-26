@@ -29,6 +29,7 @@ import { mountReaderFor } from './alerts/mount.js'
 import { siteReaderFor } from './alerts/site.js'
 import { defaultThresholds } from './alerts/thresholds.js'
 import { noFrameRecords, type FrameRecords } from './capture/frame-records.js'
+import { noCaptureRuns, type CaptureRunStore } from './capture/run-store.js'
 import { frameImaging, type FrameImaging } from './imaging/frame-imaging.js'
 import { registerAutofocus } from './autofocus/routes.js'
 import { registerNavigation } from './navigation.js'
@@ -46,6 +47,7 @@ interface BuildAppOptions {
   readonly surveyCache?: SurveyCache
   readonly savedImages?: SavedImageStore
   readonly frameRecords?: FrameRecords
+  readonly captureRuns?: CaptureRunStore
   readonly images?: FrameImaging
   readonly alignment?: AlignmentSettings
   readonly alerts?: Pick<AlertsOptions, 'thresholds' | 'notifier' | 'phoneAlerts' | 'now'>
@@ -80,6 +82,7 @@ export function buildApp({
   rigCatalog = createMemoryRigCatalog(),
   savedImages = createMemorySavedImageStore(),
   frameRecords = noFrameRecords,
+  captureRuns = noCaptureRuns,
 }: BuildAppOptions = {}) {
   const app = Fastify({ logger: true })
   app.addHook('onReady', async () => { equipment.start() })
@@ -113,6 +116,7 @@ export function buildApp({
     createCooling: settings => equipment.createCooling(settings.rig),
     savedImages,
     frameRecords,
+    runs: captureRuns,
     images,
     lookupSubject(targetId) {
       const target = getTarget(targetId)

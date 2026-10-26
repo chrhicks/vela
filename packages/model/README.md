@@ -105,7 +105,11 @@ original data and preview. `cooling` is confirmed CoolerOn plus optional sensor
 temperature, requested setpoint and power; a near-setpoint sensor is not cooler-on.
 Optional `blockedBy` names the operation that currently owns the Rig's commands and
 would refuse a cooling command.
-Null cooling means the imaging camera does not report cooler state. SavedImage and SavedImagesView describe durable artifacts
+Null cooling means the imaging camera does not report cooler state.
+The `interrupted` phase is terminal: the server restarted while a run was active. The run's
+settings and counts stay on the view, and `interruption` carries the reason and the frames a
+resumed run would take (`remainingCount`: null for a run that repeated until stopped, 0 when
+it had taken them all). It is a record of what was lost, not a running or resumable operation. SavedImage and SavedImagesView describe durable artifacts
 and their download resources separately from the ephemeral capture run. Neither
 contract represents a durable sequence or resumable execution. Collection and
 detail projections carry `timeZone`, the Vela server's system time zone for

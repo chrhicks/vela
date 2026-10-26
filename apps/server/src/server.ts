@@ -5,6 +5,7 @@ import { alignmentSettings } from './alignment/routes.js'
 import { dirname, isAbsolute, resolve } from 'node:path'
 import { openFileSavedImageStore } from './saved-images/store.js'
 import { noFrameRecords, openFrameRecords } from './capture/frame-records.js'
+import { noCaptureRuns, openFileCaptureRunStore, type CaptureRunStore } from './capture/run-store.js'
 import { createSurveyCache } from './targets/survey.js'
 import { startTelemetry } from './telemetry.js'
 import { loadCriaConfiguration, registerConfiguredCriaRigs } from './equipment/config.js'
@@ -21,6 +22,8 @@ const frameRecords = process.env.VELA_FRAME_RECORDS_PATH
 
 let app: ReturnType<typeof buildApp> | undefined
 
+let captureRuns: CaptureRunStore = noCaptureRuns
+
 let shutdownTask: Promise<void> | undefined
 
 function shutdown() {
@@ -29,6 +32,7 @@ function shutdown() {
     try {
       await app?.close()
     } finally {
+      await captureRuns.close()
       await frameRecords.close()
       await telemetry.shutdown()
     }
@@ -72,6 +76,8 @@ try {
     phoneAlerts: await openFilePhoneAlertsPreference(resolve(dirname(rigCatalogPath), 'phone-alerts.json')),
   }
 
+  captureRuns = await openFileCaptureRunStore(resolve(dirname(rigCatalogPath), 'capture-runs.json'))
+
   const savedImages = await openFileSavedImageStore(
     process.env.VELA_SAVED_IMAGES_PATH
       ? resolve(process.env.VELA_SAVED_IMAGES_PATH)
@@ -110,7 +116,7 @@ try {
   const equipment = createEquipmentComposition(cria, equipmentOptions)
 
   if (!shutdownTask) {
-    const options = { rigCatalog, savedImages, frameRecords, targets, surveyCache, equipment, alerts }
+    const options = { rigCatalog, savedImages, frameRecords, captureRuns, targets, surveyCache, equipment, alerts }
     app = buildApp(alignment ? { ...options, alignment } : options)
     await app.listen({ port, host })
   }

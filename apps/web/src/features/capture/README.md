@@ -62,6 +62,18 @@ frames" and the page sends no `targetId`. While a run is active the field is gon
 the run's own type shows beside the exposure count. The field is a single select, so it
 fits 390 px without wrapping.
 
+An interrupted run (phase `interrupted`, `interruption` set) shows a notice above the form:
+the reason ("Vela restarted during this run, and nothing has been exposed since"), the subject
+or frame type, how many frames were taken and the exposure. Its Resume button reads "Resume · 18
+frames left", or "Resume · repeat until stopped" for a run with no count, and posts to
+`capture/resume` with no body. A run that had taken all its frames shows no button. Resume is
+enabled under the same conditions as Start (`canStart`), so a refusal keeps the notice and the
+server's reason shows in the usual warning. The form below it still starts a different run, which
+replaces the interrupted one. The notice is a status region with the label "Interrupted capture
+run" and the button fits 390 px. This replaces the earlier "no longer tracks the exposure" check
+only for runs the server reports as interrupted; that check still covers a controller the server
+lost with no record.
+
 Save frames is an explicit per-run option, off on a new controller and restored
 from the active server projection. Keep this image targets the image whose pixels
 have actually loaded. Its idempotent storage request has separate pending/error

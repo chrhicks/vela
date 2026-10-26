@@ -50,6 +50,7 @@ export type {
 export type {
   CaptureCoolingBlocker,
   CaptureCoolingView,
+  CaptureInterruption,
   CaptureSubject,
   CaptureImage,
   CaptureImageProvenance,

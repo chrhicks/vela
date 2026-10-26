@@ -16,6 +16,7 @@ const capture = z
       'complete',
       'stopped',
       'failed',
+      'interrupted',
     ]),
     active: z.boolean(),
     captureReadState: z.enum(['current', 'retrying']),

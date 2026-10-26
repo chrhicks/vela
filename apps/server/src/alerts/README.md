@@ -80,6 +80,20 @@ until it is acknowledged, because Pushover does that, not Vela.
 - When the run ends, everything clears. `run-failed` is raised for a run that failed (not for Stop)
   and clears when the next run starts.
 
+## An interrupted run
+
+A server restart that finds a capture run unfinished (see [capture restarts](../capture/README.md#restarts))
+calls `runInterrupted(message)` for a light run, and the rules raise `run-interrupted` (critical,
+an emergency) with "Capture was interrupted: Vela restarted (12 of 30 frames taken)". A
+calibration run raises nothing. It clears when a run starts, like `run-failed`, and obeys the
+switch, astro dark and one page per alert like every alert.
+
+A server that has only just started often cannot reach the mount yet, and an unknown site pages at any hour. So
+the alert first asks for the site, up to four tries 30 s apart, and only then evaluates: a daytime
+deploy does not buzz the phone. If the mount never answers the alert fails open, as any alert does
+for an unknown site. A run started during the wait supersedes it. The episode is in memory, so every
+server start with an unfinished record raises it again.
+
 ## The phone alerts switch
 
 Each rig has a switch, on unless Chris turns it off from the app. Off means Vela sends that rig

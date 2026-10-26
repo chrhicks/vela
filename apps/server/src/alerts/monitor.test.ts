@@ -1641,3 +1641,111 @@ describe('paging only in astronomical darkness', () => {
     expect(fixture.monitor.view().pagingWindow).toEqual({ state: 'site-unknown' })
   })
 })
+
+// ---------------------------------------------------------------------------
+// A server restart ends the run
+
+describe('an interrupted run', () => {
+  const greenwich: Site = { latitudeDegrees: 51.4769, longitudeDegrees: -0.0005 }
+  const noon = Date.parse('2026-10-18T12:00:00Z')
+  const night = Date.parse('2026-10-19T00:00:00Z')
+  const message = 'Capture was interrupted: Vela restarted (12 of 30 frames taken)'
+
+  it('raises one run-interrupted emergency, and drops it when the next run starts', async () => {
+    const fixture = watched()
+
+    await fixture.monitor.runInterrupted(message)
+    await settle()
+
+    expect(fixture.monitor.view().alerts).toEqual([
+      expect.objectContaining({ id: 'run-interrupted', level: 'critical', message }),
+    ])
+
+    expect(fixture.phone.emergencies()).toHaveLength(1)
+
+    fixture.tick(60_000)
+    fixture.monitor.runStarted(60, true)
+    await settle()
+
+    expect(fixture.monitor.view().alerts).toEqual([])
+    expect(fixture.phone.cancels()).toHaveLength(1)
+  })
+
+  it('does not page in daylight once the rig has said where it is', async () => {
+    const fixture = watched({ readSite: async () => greenwich })
+
+    fixture.at(noon)
+    await fixture.monitor.runInterrupted(message)
+    await settle()
+
+    expect(fixture.phone.events).toEqual([])
+
+    expect(fixture.monitor.view().alerts).toEqual([
+      expect.objectContaining({ id: 'run-interrupted', delivery: { state: 'outside-dark' } }),
+    ])
+  })
+
+  it('pages at night once the rig has said where it is', async () => {
+    const fixture = watched({ readSite: async () => greenwich })
+
+    fixture.at(night)
+    await fixture.monitor.runInterrupted(message)
+    await settle()
+
+    expect(fixture.phone.emergencies()).toHaveLength(1)
+  })
+
+  it('waits for a mount that has not answered yet before it decides whether it is dark', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+
+    const readSite = vi.fn<() => Promise<Site | null>>().mockRejectedValueOnce(new Error('starting up')).mockResolvedValue(greenwich)
+    const fixture = watched({ readSite })
+
+    fixture.at(noon)
+
+    const raising = fixture.monitor.runInterrupted(message)
+
+    await settle()
+
+    expect(fixture.monitor.view().alerts).toEqual([])
+
+    await vi.advanceTimersByTimeAsync(30_000)
+    await raising
+
+    expect(readSite).toHaveBeenCalledTimes(2)
+    expect(fixture.phone.events).toEqual([])
+    expect(fixture.monitor.view().alerts).toEqual([expect.objectContaining({ delivery: { state: 'outside-dark' } })])
+  })
+
+  it('pages at any hour when the mount never answers, as every alert does for an unknown site', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+
+    const readSite = vi.fn<() => Promise<Site | null>>().mockRejectedValue(new Error('unreachable'))
+    const fixture = watched({ readSite })
+
+    fixture.at(noon)
+
+    const raising = fixture.monitor.runInterrupted(message)
+
+    await vi.advanceTimersByTimeAsync(3 * 30_000)
+    await raising
+
+    expect(readSite).toHaveBeenCalledTimes(4)
+    expect(fixture.phone.emergencies()).toHaveLength(1)
+  })
+
+  it('gives way to a run that starts while it waits', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+
+    const fixture = watched({ readSite: vi.fn().mockRejectedValue(new Error('starting up')) })
+    const raising = fixture.monitor.runInterrupted(message)
+
+    await settle()
+    fixture.monitor.runStarted(60, true)
+    await vi.advanceTimersByTimeAsync(3 * 30_000)
+    await raising
+
+    expect(fixture.monitor.view().alerts).toEqual([])
+    expect(fixture.phone.events).toEqual([])
+  })
+})

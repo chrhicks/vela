@@ -15,6 +15,7 @@ export type AlertId =
   | 'rig-unreachable'
   | 'frames-stalled'
   | 'run-failed'
+  | 'run-interrupted'
 
 export interface AlertCondition {
   id: AlertId
@@ -43,6 +44,8 @@ export type RunState =
   | { status: 'running'; exposureSeconds: number; waitingForFrameSince: number; imaging: boolean }
   | { status: 'stopped' }
   | { status: 'failed' }
+  /** The server restarted while the run was active; `message` says how far it got. */
+  | { status: 'interrupted'; message: string }
 
 export interface RigHistory {
   run: RunState
@@ -65,6 +68,9 @@ export function evaluateAlerts(history: RigHistory, thresholds: AlertThresholds,
 
   if (run.status === 'failed')
     return { conditions: [{ id: 'run-failed', level: 'critical', message: 'The capture run failed' }], unavailable: [] }
+
+  if (run.status === 'interrupted')
+    return { conditions: [{ id: 'run-interrupted', level: 'critical', message: run.message }], unavailable: [] }
 
   if (run.status === 'stopped') return { conditions: [], unavailable: [] }
 
