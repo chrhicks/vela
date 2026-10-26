@@ -1,8 +1,13 @@
 import { replayAlerts } from './alerts.ts'
 import type { FrameResult } from './compare.ts'
 import type { SkippedDirectory } from './frames.ts'
-import { groupRuns } from './runs.ts'
+import { groupRuns, type Run } from './runs.ts'
 import { jumpFactor, median, steadiness } from './steadiness.ts'
+
+/** The first-failed-gate reasons in the order the gates run. */
+const rejections = ['blended', 'edge', 'unconverged', 'faint', 'saturated', 'wings', 'elongated', 'floor'] as const
+
+const namedOutputColumns = 3 + rejections.length + 2
 
 /** One row per frame, tab separated. It holds no timings, so two runs of the same code are identical. */
 export function renderTable(results: FrameResult[]) {
@@ -17,6 +22,12 @@ export function renderTable(results: FrameResult[]) {
     'recorded_detected_stars',
     'recorded_median_hfr_pixels',
     'comparison',
+    'detections',
+    'measured',
+    'strong',
+    ...rejections.map(reason => `rejected_${reason}`),
+    'sky_level',
+    'sky_noise',
   ]
 
   const rows = results.map(({ frame, measurement, comparison }) => [
@@ -30,6 +41,16 @@ export function renderTable(results: FrameResult[]) {
     String(frame.recorded?.detectedStars ?? ''),
     String(frame.recorded?.medianHfrPixels ?? ''),
     comparison.status,
+    ...(measurement.status === 'measured'
+      ? [
+          measurement.detections,
+          measurement.measured,
+          measurement.strong,
+          ...rejections.map(reason => measurement.rejected[reason]),
+          measurement.sky,
+          measurement.noise,
+        ].map(String)
+      : Array(namedOutputColumns).fill('')),
   ])
 
   return [header, ...rows].map(row => row.join('\t')).join('\n') + '\n'
@@ -93,6 +114,8 @@ function renderRuns(results: FrameResult[], gapMinutes: number, restartTimes: nu
     lines.push(
       `${run.target}, ${run.exposureSeconds} s: ${run.frames.length} frames, ${time(first.capturedAt)} to ${time(last.capturedAt)}`,
       `  stars median ${median(run.frames.map(frame => frame.stars))}, spread ${spread === null ? 'n/a' : spread.toFixed(3)}, ${jumps} of ${pairs} pairs jump over ${jumpFactor}x`,
+      `  per frame, median: peaks ${medianOf(run, 'detections')}, measured ${medianOf(run, 'measured')}, strong ${medianOf(run, 'strong')}, sky ${medianOf(run, 'sky')}, noise ${medianOf(run, 'noise')}`,
+      `  rejected by first failed gate, median: ${rejections.map(reason => `${reason} ${median(run.statistics.map(statistics => statistics.rejected[reason]))}`).join(', ')}`,
     )
 
     if (episodes.length === 0) lines.push('  alerts none')
@@ -108,6 +131,10 @@ function renderRuns(results: FrameResult[], gapMinutes: number, restartTimes: nu
   lines.push(`Frames outside any run: ${outside.length}${describeTypes(outside)}`)
 
   return lines
+}
+
+function medianOf(run: Run, name: 'detections' | 'measured' | 'strong' | 'sky' | 'noise') {
+  return Number(median(run.statistics.map(statistics => statistics[name])).toPrecision(4))
 }
 
 function describeTypes(results: FrameResult[]) {

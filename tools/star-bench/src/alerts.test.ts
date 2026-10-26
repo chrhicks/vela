@@ -11,6 +11,7 @@ function run(counts: number[], hfrPixels = 2): Run {
     target: 'Fixture Nebula',
     exposureSeconds: 90,
     frames: counts.map((stars, index) => ({ capturedAt: start + index * interval, stars, hfrPixels })),
+    statistics: [],
   }
 }
 

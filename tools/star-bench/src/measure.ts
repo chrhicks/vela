@@ -4,9 +4,12 @@ import { Worker } from 'node:worker_threads'
 import { readRetainedFits } from '@vela/server/imaging/read-retained-fits'
 import { measureStars } from '@vela/server/imaging/statistics'
 
-/** The two numbers Vela records for a frame, measured again, and what it cost. */
+/** What `measureStars` returns for a frame: the two recorded numbers and the named outputs. */
+export type StarStatistics = Awaited<ReturnType<typeof measureStars>>
+
+/** Vela's measurement of a frame, measured again, and what it cost. */
 export type Measurement =
-  | { status: 'measured'; detectedStars: number; medianHfrPixels: number | null; milliseconds: number }
+  | ({ status: 'measured'; milliseconds: number } & StarStatistics)
   | { status: 'failed'; reason: string }
 
 /** Vela's own capture measurement of one saved frame's `original.fits`. */

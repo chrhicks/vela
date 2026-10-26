@@ -21,6 +21,21 @@
       "version": 2
     },
     "detectedStars": 26,
-    "medianHfrPixels": 2.7566561182326406
+    "medianHfrPixels": 2.7566561182326406,
+    "detections": 35,
+    "measured": 26,
+    "strong": 26,
+    "rejected": {
+      "blended": 0,
+      "edge": 5,
+      "unconverged": 0,
+      "faint": 0,
+      "saturated": 0,
+      "wings": 4,
+      "elongated": 0,
+      "floor": 0
+    },
+    "sky": 1003.625,
+    "noise": 9.822225
   }
 }

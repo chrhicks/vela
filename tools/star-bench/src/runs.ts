@@ -1,11 +1,14 @@
 import type { Frame } from '@vela/server/alerts/rules'
 import type { FrameResult } from './compare.ts'
+import type { StarStatistics } from './measure.ts'
 
 /** Light frames of one target and exposure, as the alert monitor would see them in one run. */
 export interface Run {
   target: string
   exposureSeconds: number
   frames: Frame[]
+  /** Each frame's full measurement, in the order of `frames`. */
+  statistics: StarStatistics[]
 }
 
 /**
@@ -32,7 +35,7 @@ export function groupRuns(results: FrameResult[], gapMinutes: number, restartTim
         restartTimes.some(time => last.capturedAt < time && time <= frame.capturedAt))
 
     if (!run || !last || restarted) {
-      run = { target, exposureSeconds: frame.exposureSeconds, frames: [] }
+      run = { target, exposureSeconds: frame.exposureSeconds, frames: [], statistics: [] }
       open.set(key, run)
       runs.push(run)
     }
@@ -42,6 +45,7 @@ export function groupRuns(results: FrameResult[], gapMinutes: number, restartTim
       stars: measurement.detectedStars,
       hfrPixels: measurement.medianHfrPixels,
     })
+    run.statistics.push(measurement)
   }
 
   return runs.sort((a, b) => a.frames[0]!.capturedAt - b.frames[0]!.capturedAt)
