@@ -3,6 +3,13 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "exports": {
+    "./alerts/rules": "./src/alerts/rules.ts",
+    "./alerts/thresholds": "./src/alerts/thresholds.ts",
+    "./imaging/fits": "./src/imaging/fits.ts",
+    "./imaging/read-retained-fits": "./src/imaging/read-retained-fits.ts",
+    "./imaging/statistics": "./src/imaging/statistics.ts"
+  },
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json",
