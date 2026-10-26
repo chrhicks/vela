@@ -109,8 +109,12 @@ Both are an `AutofocusRun` (`packages/model/src/web/autofocus.ts`):
 - A sample whose measurement failed, or one recorded by a build before this, has
   `detectedStars: 0` or an empty `stars`. Read an empty list as "no table", not "no
   stars".
-- A run that fails, is stopped, or fits nothing is recorded too, with its `phase`,
-  `error` and a null `fit`. `settledAt` is null only in the live route, during the walk.
+- A run that fails or is stopped is recorded too, with its `phase` and `error`. Its
+  `fit` is the fit the walk had reached, or null if it reached none. A stop or failure
+  during the confirming sample keeps the fit, yet the focuser went back to
+  `startPosition`, so `fit.position` is where the run chose to go, not where the
+  focuser ended. Only a `complete` run ended at `fit.position`. `settledAt` is null
+  only in the live route, during the walk.
 
 Size: a star is about 50 bytes of JSON. A simulated 10-sample run of about 25 stars a
 sample is 12.6 KB. A run of 12 samples with the cap reached is at most about 60 KB,
@@ -120,7 +124,7 @@ runs is under 1 MB.
 To list a run's chosen focus and star counts:
 
 ```sh
-jq -c '{startedAt, phase, fit: .fit.position, stars: [.samples[] | [.position, .detectedStars, (.stars | length)]]}' autofocus.jsonl
+jq -c 'select(.phase == "complete") | {startedAt, fit: .fit.position, stars: [.samples[] | [.position, .detectedStars, (.stars | length)]]}' autofocus.jsonl
 ```
 
 Stop needs no body, the same as capture stop: a bare POST, an empty body or `{}` are
