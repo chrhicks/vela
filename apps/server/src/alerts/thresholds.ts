@@ -35,7 +35,7 @@ const positive = z.number().positive()
  * together, with the margin to each end. A margin under 0.05 moves the default to the middle:
  * - `starsDropFraction` 0.5: 0.42 to 0.65 (-0.08 / +0.15). The low end is the deepest fall on a
  *   healthy night; the high end is where the Heart haze stops raising it.
- * - `starsCollapsedRatio` 0.15: nothing fails below it; 0.31 and over raises on the Heart haze (-0.14 /
+ * - `starsCollapsedRatio` 0.15: nothing fails below it, and from 0.32 the Heart haze raises it (-0.14 /
  *   +0.16). Clouds that take the count to a few stars stay far under it.
  * - `starsDecliningRatio` 0.62: 0.57 to 0.66 (-0.05 / +0.04). It was 0.6, which left 0.03 to the creep
  *   on the low side.

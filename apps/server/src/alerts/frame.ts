@@ -6,9 +6,9 @@ import type { Frame } from './rules.js'
 export type AlertCountInput = 'measured' | 'strong'
 
 /**
- * The star count the star alerts compare. `strong` (flux S/N 100 or more) sinks with a haze, steadies
- * `stars-declining` (the gap between a slow fall and a healthy night is 0.095, against 0.01 for
- * `measured`) and goes to zero at once when stars smear. The numbers are in `thresholds.ts`.
+ * The star count the star alerts compare. `strong` (flux S/N 100 or more) leaves `stars-declining` a
+ * range of 0.09 to sit in where `measured` leaves a single value, and goes to zero a frame sooner when
+ * stars smear. The bench numbers, and what it costs, are in `thresholds.ts`.
  */
 export const alertCountInput: AlertCountInput = 'strong'
 

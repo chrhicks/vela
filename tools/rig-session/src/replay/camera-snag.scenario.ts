@@ -50,7 +50,7 @@ test('a camera that sends blank frames from frame 6 drops the star count to 0 an
 
   const collapsed = result.alertChanges.find(change => change.alerts.some(alert => alert.id === 'stars-collapsed'))
 
-  expect(collapsed?.alerts).toEqual([{ id: 'stars-collapsed', level: 'critical', message: 'Star count fell to 0 (median 0, normal ≈12 stars)' }])
+  expect(collapsed?.alerts).toEqual([{ id: 'stars-collapsed', level: 'critical', message: 'Star count fell to 0 (median 0, normal ≈12 stars), few peaks' }])
   // The first blank frame is the 7th attempt; two blank frames confirm the collapse.
   expect([7, 8]).toContain(collapsed?.afterAttempts)
 
