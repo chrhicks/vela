@@ -6,6 +6,8 @@ import { autofocusScenes } from './fixtures/fieldroom/autofocus'
 
 test.use({ timezoneId: reviewTimezone })
 
+const haltRefusal = 'Send this request as a POST with an empty body.'
+
 for (const width of [1440, 768, 390]) {
   for (const mode of ['light', 'dark'] as const) {
     for (const name of ['autofocus-ready', 'autofocus-running', 'autofocus-interrupted', 'autofocus-result', 'autofocus-restored', 'autofocus-invalid-window', 'autofocus-restore-unconfirmed', 'autofocus-offline'] as const) {
@@ -137,8 +139,24 @@ test('confirmed stopping and restoration keep Stop disabled without another comm
   await expect(page.getByText('Stopping…', { exact: true }).first()).toBeVisible()
   await expect(stop).toBeDisabled()
   expect(scene.writes).toHaveLength(1)
+  expect(scene.writes[0]!.body).toBeUndefined()
   scene.setView({ ...scene.snapshot(), activity: 'restoring' })
   await expect(page.getByText('Restoring start…', { exact: true })).toBeVisible()
   await expect(stop).toBeDisabled()
   expect(scene.writes).toHaveLength(1)
+})
+
+test('a refused Stop shows the server message and sends no body', async ({ page }) => {
+  await openAutofocusScene(page, 'autofocus-running')
+
+  const requests: Array<{ body: string | null; contentType: string | undefined }> = []
+
+  await page.route('**/api/rigs/fra400/autofocus/stop', route => {
+    requests.push({ body: route.request().postData(), contentType: route.request().headers()['content-type'] })
+
+    return route.fulfill({ status: 400, json: { error: haltRefusal } })
+  })
+  await page.getByRole('button', { name: 'Stop and restore start', exact: true }).click()
+  await expect(page.getByText(haltRefusal.replace(/\.$/, ''), { exact: false }).first()).toBeVisible()
+  expect(requests).toEqual([{ body: null, contentType: undefined }])
 })

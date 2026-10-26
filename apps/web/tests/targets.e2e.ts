@@ -302,6 +302,7 @@ test('checked framing offers centering, active operations lock edits, and stale 
   let offline = false
   let corrections = 0
   let stops = 0
+  const stopRequests: Array<{ body: string | null; contentType: string | undefined }> = []
   await page.route('**/api/web/rigs/rig-1/targets/m31', (route) => respond(route, target))
   await page.route('**/api/web/rigs/rig-1/framing', (route) =>
     offline ? route.abort() : respond(route, state),
@@ -320,6 +321,7 @@ test('checked framing offers centering, active operations lock edits, and stale 
   })
   await page.route('**/api/rigs/rig-1/framing/stop', (route) => {
     stops++
+    stopRequests.push({ body: route.request().postData(), contentType: route.request().headers()['content-type'] })
     state = { ...state, phase: 'stopped', active: false }
 
     return respond(route, state)
@@ -345,7 +347,23 @@ test('checked framing offers centering, active operations lock edits, and stale 
   await page.getByRole('button', { name: 'Stop framing' }).click()
   await expect(page.getByText('Framing stopped', { exact: true })).toBeVisible()
   expect(stops).toBe(1)
+  expect(stopRequests).toEqual([{ body: null, contentType: undefined }])
   expect(corrections).toBe(1)
+})
+
+test('a refused framing Stop shows the server message', async ({ page }) => {
+  const active: FramingView = { ...idle, phase: 'slewing', active: true, desired: target, targetId: target.id }
+
+  await page.route('**/api/web/rigs/rig-1/targets/m31', (route) => respond(route, target))
+  await page.route('**/api/web/rigs/rig-1/framing', (route) => respond(route, active))
+  await page.route('**/api/survey/**', (route) => route.abort())
+  await page.route('**/api/rigs/rig-1/framing/stop', (route) =>
+    route.fulfill({ status: 400, json: { error: 'Send this request as a POST with an empty body.' } }),
+  )
+  await page.goto('/rigs/rig-1/observe/targets/m31')
+  await page.getByText('Frame position & controls', { exact: true }).click()
+  await page.getByRole('button', { name: 'Stop framing' }).click()
+  await expect(page.getByText(/Send this request as a POST with an empty body\./)).toBeVisible()
 })
 
 test('a rejected adjusted composition cannot inherit the prior framing check after recovery', async ({
