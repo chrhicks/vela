@@ -428,12 +428,12 @@ describe('a capture run feeds the alerts', () => {
       const stars = remaining.shift() ?? 0
 
       return {
-        algorithm: { version: 2 },
+        algorithm: { version: statistics.starAlgorithmVersion },
         detectedStars: stars,
         medianHfrPixels: 3,
         detections: stars,
         measured: stars,
-        strong: 0,
+        strong: stars,
         rejected: { blended: 0, edge: 0, unconverged: 0, faint: 0, saturated: 0, wings: 0, elongated: 0, floor: 0 },
         sky: 100,
         noise: 1,

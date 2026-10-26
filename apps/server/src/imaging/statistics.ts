@@ -76,7 +76,7 @@ export interface StarPolicy {
  * The named outputs (detections, strong, rejected, sky, noise) are additive and leave the value of
  * every older field as it was, so they did not bump it.
  */
-const starAlgorithmVersion = 3
+export const starAlgorithmVersion = 3
 
 /** A measured star with at least this flux signal-to-noise is strong. */
 const strongSnr = 100

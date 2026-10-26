@@ -4,6 +4,7 @@ import { InMemorySpanExporter, NodeTracerProvider, SimpleSpanProcessor } from '@
 import { darkOutlook } from '../astronomy/sun.js'
 import { createAlertMonitor, type AlertMonitor } from './monitor.js'
 import { NotifierError, type Notification, type Notifier } from './notifier.js'
+import { starStatistics } from './test-statistics.js'
 import type { Site } from '../astronomy/coordinates.js'
 import type { CaptureImageStatistics } from '@vela/model/web'
 import type { MountReading } from './rules.js'
@@ -144,7 +145,7 @@ const night: NightFrame[] = JSON.parse(
   time: row.capturedAt.slice(11, 19),
   capturedAt: row.capturedAt,
   at: Date.parse(row.capturedAt),
-  statistics: { algorithm: { version: 1 }, detectedStars: row.stars, medianHfrPixels: row.hfrPixels },
+  statistics: starStatistics(row.stars, row.hfrPixels),
 }))
 
 /** Feeds the night to the monitor as it happened, one frame at a time, up to and including `until`. */
@@ -266,7 +267,7 @@ function runOf(fixture: ReturnType<typeof watched>, hfr: Array<number | null>, s
     fixture.tick(60_000)
     fixture.monitor.frameCaptured({
       capturedAt: new Date(fixture.clock()).toISOString(),
-      statistics: { algorithm: { version: 2 }, detectedStars: stars, medianHfrPixels: hfr[index] ?? 3 },
+      statistics: starStatistics(stars, hfr[index] ?? 3),
     })
     await settle()
   }
@@ -278,7 +279,7 @@ describe('no stars from the first frame', () => {
       fixture.tick(60_000)
       fixture.monitor.frameCaptured({
         capturedAt: new Date(fixture.clock()).toISOString(),
-        statistics: { algorithm: { version: 2 }, detectedStars: stars, medianHfrPixels: null },
+        statistics: starStatistics(stars, null),
       })
       await settle()
     }
@@ -314,6 +315,23 @@ describe('no stars from the first frame', () => {
     expect(raised(fixture)).toEqual(['no-stars'])
 
     await frames(fixture, 3, 90)
+    expect(raised(fixture)).toEqual([])
+  })
+
+  it('does not count a frame whose statistics are of another algorithm version, or lack the named outputs', async () => {
+    const fixture = watched()
+    const { strong: _strong, ...withoutStrong } = starStatistics(0, null)
+
+    fixture.monitor.runStarted(60, true)
+
+    for (const statistics of [{ ...starStatistics(0, null), algorithm: { version: 2 } }, withoutStrong]) {
+      for (let index = 0; index < 8; index++) {
+        fixture.tick(60_000)
+        fixture.monitor.frameCaptured({ capturedAt: new Date(fixture.clock()).toISOString(), statistics })
+        await settle()
+      }
+    }
+
     expect(raised(fixture)).toEqual([])
   })
 
@@ -912,7 +930,7 @@ describe('while the run is polled', () => {
     let stars = 1500
 
     function frame() {
-      monitor.frameCaptured({ capturedAt: new Date().toISOString(), statistics: { algorithm: { version: 2 }, detectedStars: stars, medianHfrPixels: 3 } })
+      monitor.frameCaptured({ capturedAt: new Date().toISOString(), statistics: starStatistics(stars, 3) })
     }
 
     monitor.runStarted(60, true)
@@ -947,7 +965,7 @@ describe('while the run is polled', () => {
         if (index === 6) stars = 300
 
         await vi.advanceTimersByTimeAsync(60_000)
-        monitor.frameCaptured({ capturedAt: new Date().toISOString(), statistics: { algorithm: { version: 2 }, detectedStars: stars, medianHfrPixels: 3 } })
+        monitor.frameCaptured({ capturedAt: new Date().toISOString(), statistics: starStatistics(stars, 3) })
       }
 
       return { monitor, phone }

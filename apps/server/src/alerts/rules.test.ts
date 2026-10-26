@@ -8,6 +8,7 @@ import {
   type RigHistory,
   type RunState,
 } from './rules.js'
+import type { FrameEvidence } from './cause.js'
 import { defaultThresholds, thresholdsSchema, type AlertThresholds } from './thresholds.js'
 
 function fixture(name: string) {
@@ -603,5 +604,65 @@ describe('thresholds', () => {
     expect(thresholdsSchema.safeParse({ hfrHighClearPixels: 4.5 }).success).toBe(false)
     expect(thresholdsSchema.safeParse({ starsCollapsedRatio: 0.6 }).success).toBe(false)
     expect(thresholdsSchema.safeParse({ starsLowRatio: 0.15 }).success).toBe(false)
+  })
+})
+
+describe('the cause of a star alert', () => {
+  const usual: FrameEvidence = { peaks: 500, blended: 15, sky: 680, axisRatio: 1.2 }
+
+  /** Strong counts with the evidence each frame carried, one frame a minute. */
+  function runOf(parts: Array<[stars: number, evidence?: Partial<FrameEvidence>]>) {
+    return parts.map(([stars, change], index): Frame => ({
+      capturedAt: index * 60_000,
+      stars,
+      hfrPixels: 3,
+      evidence: { ...usual, ...change },
+    }))
+  }
+
+  const healthy: Array<[number]> = [[100], [104], [98], [102], [100]]
+
+  function messages(parts: Array<[stars: number, evidence?: Partial<FrameEvidence>]>) {
+    return Object.fromEntries(
+      evaluateAlerts(history({ frames: runOf(parts) }), defaultThresholds, 0).conditions.map(condition => [condition.id, condition.message]),
+    )
+  }
+
+  it('says the sky brightened when a flash raised the sky and the stars fell', () => {
+    const flash: Partial<FrameEvidence> = { sky: 7148, peaks: 56 }
+
+    expect(messages([...healthy, [20, flash], [30], [25]])['stars-dropping']).toBe(
+      'Star count dropping: median 25 (normal ≈100 stars), sky brightened',
+    )
+  })
+
+  it('says few peaks when the peaks fell with the stars and the sky and shape are as usual', () => {
+    const thin: Partial<FrameEvidence> = { peaks: 150 }
+
+    expect(messages([...healthy, [30, thin], [28, thin], [25, thin]])['stars-dropping']).toMatch(/, few peaks$/)
+  })
+
+  it('names the cause on a collapse as well', () => {
+    const smeared: Partial<FrameEvidence> = { peaks: 5000, blended: 4800, axisRatio: null }
+
+    expect(messages([...healthy, [0, smeared], [0, smeared], [0, smeared]])['stars-collapsed']).toBe(
+      'Star count fell to 0 (median 0, normal ≈100 stars), stars smeared or soft',
+    )
+  })
+
+  it('names nothing when the evidence is as usual, and nothing without any evidence', () => {
+    expect(messages([...healthy, [20], [30], [25]])['stars-dropping']).toBe('Star count dropping: median 25 (normal ≈100 stars)')
+
+    const bare = [...healthy, [20], [30], [25]].map(([stars], index): Frame => ({ capturedAt: index * 60_000, stars: stars!, hfrPixels: 3 }))
+    const [dropping] = evaluateAlerts(history({ frames: bare }), defaultThresholds, 0).conditions
+
+    expect(dropping!.message).toBe('Star count dropping: median 25 (normal ≈100 stars)')
+  })
+
+  it('compares with frames no alert called bad, so a cloud does not become the normal sky', () => {
+    const cloud: Partial<FrameEvidence> = { sky: 7148, peaks: 56 }
+    const parts: Array<[number, Partial<FrameEvidence>?]> = [...healthy, [20, cloud], [20, cloud], [20, cloud], [20, cloud], [20, cloud], [20, cloud]]
+
+    expect(messages(parts)['stars-dropping']).toMatch(/sky brightened$/)
   })
 })

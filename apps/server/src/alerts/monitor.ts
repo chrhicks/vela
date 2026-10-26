@@ -2,6 +2,7 @@ import { trace, SpanStatusCode } from '@opentelemetry/api'
 import type { CaptureImage, PagingWindow } from '@vela/model/web'
 import type { Site } from '../astronomy/coordinates.js'
 import { astronomicalDarkDegrees, darkOutlook, sunAltitudeDegrees } from '../astronomy/sun.js'
+import { alertFrame } from './frame.js'
 import { emergencyExpireSeconds, NotifierError, type Notification, type Notifier } from './notifier.js'
 import {
   evaluateAlerts,
@@ -769,13 +770,9 @@ export function createAlertMonitor({
 
       run = { ...run, waitingForFrameSince: now() }
 
-      if (image.statistics) {
-        frames.push({
-          capturedAt: Date.parse(image.capturedAt),
-          stars: image.statistics.detectedStars,
-          hfrPixels: image.statistics.medianHfrPixels,
-        })
-      }
+      const frame = image.statistics && alertFrame(Date.parse(image.capturedAt), image.statistics)
+
+      if (frame) frames.push(frame)
 
       evaluate()
     },
