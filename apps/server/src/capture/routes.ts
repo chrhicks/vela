@@ -59,8 +59,14 @@ interface CaptureRouteOptions {
 
 const MAX_FRAME_COUNT = 10_000
 
-export function configuredCamera(settings: CaptureSettings, acquisition: Pick<Acquisition, 'capture'>): CaptureCamera {
+export function configuredCamera(
+  settings: CaptureSettings,
+  acquisition: Pick<Acquisition, 'capture' | 'biasExposureSeconds'>,
+): CaptureCamera {
   return {
+    ...(acquisition.biasExposureSeconds && {
+      biasExposureSeconds: signal => acquisition.biasExposureSeconds!(settings.cameraId, signal),
+    }),
     async capture({ exposureSeconds, frameType, signal, onProgress, onReadState, onProvenance }) {
       try {
         return await acquisition.capture({

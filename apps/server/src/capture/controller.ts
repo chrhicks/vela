@@ -42,6 +42,11 @@ export interface CaptureCamera {
     /** The adapter's ids for this exposure as it learns them; an adapter without ids never calls it. */
     onProvenance: (provenance: CaptureImageProvenance) => void
   }): Promise<CaptureFrame>
+  /**
+   * What the camera really exposes for a bias frame, whatever time is requested, read when called.
+   * A camera that is not told the frame type has no such time and omits this.
+   */
+  biasExposureSeconds?(signal: AbortSignal): Promise<number>
 }
 
 /** Only the acquisition boundary can confirm cancellation finished cleanup. */
@@ -73,6 +78,8 @@ interface Attempt {
   span: Span
   index: number
   startedAt: string
+  /** What the sensor integrated, which for a bias frame is not the time requested. */
+  exposureSeconds: number
   provenance: CaptureImageProvenance | null
   image: CaptureImage | null
 }
@@ -219,8 +226,36 @@ export function createCaptureController(
     return saved
   }
 
+  /** A bias frame is exposed for the camera's own minimum; a camera that cannot say gets the request. */
+  async function exposedSeconds(
+    camera: CaptureCamera,
+    frameType: FrameType,
+    requestedSeconds: number,
+    signal: AbortSignal,
+  ) {
+    if (frameType !== 'bias' || !camera.biasExposureSeconds) return requestedSeconds
+
+    let minimum: number
+
+    try {
+      minimum = await camera.biasExposureSeconds(signal)
+    } catch (error) {
+      if (signal.aborted) throw new CaptureStoppedError()
+
+      throw new Error(
+        `The camera's minimum exposure could not be read, so the bias frame was not taken: ${error instanceof Error ? error.message : 'unknown error'}`,
+        { cause: error },
+      )
+    }
+
+    if (!Number.isFinite(minimum) || minimum <= 0)
+      throw new Error(`The camera reported ${minimum} s as its minimum exposure, so the bias frame was not taken.`)
+
+    return minimum
+  }
+
   async function acquire(
-    exposureSeconds: number,
+    requestedSeconds: number,
     signal: AbortSignal,
     camera: CaptureCamera,
     cameraName: string,
@@ -263,7 +298,7 @@ export function createCaptureController(
         attempt: attempt.index,
         startedAt: attempt.startedAt,
         settledAt: new Date(now()).toISOString(),
-        exposureSeconds,
+        exposureSeconds: attempt.exposureSeconds,
         frameType,
         subject,
         outcome,
@@ -325,6 +360,8 @@ export function createCaptureController(
         patch({ phase: 'exposing', elapsedSeconds: 0, captureReadState: 'current' })
         let capturePending = true
 
+        const exposureSeconds = await exposedSeconds(camera, frameType, requestedSeconds, signal)
+
         const index = view.completedCount + (view.lostFrameCount ?? 0) + 1
 
         const span = tracer.startSpan('capture.frame', {
@@ -341,6 +378,7 @@ export function createCaptureController(
           span,
           index,
           startedAt: new Date(now()).toISOString(),
+          exposureSeconds,
           provenance: null,
           image: null,
         }
@@ -354,7 +392,7 @@ export function createCaptureController(
         try {
           frame = await camera
             .capture({
-              exposureSeconds,
+              exposureSeconds: requestedSeconds,
               frameType,
               signal,
               onProgress(progress) {
@@ -454,7 +492,7 @@ export function createCaptureController(
           phase: saveFrames ? 'saving' : 'complete',
           completedCount: view.completedCount + 1,
           integrationSeconds: view.integrationSeconds + exposureSeconds,
-          elapsedSeconds: exposureSeconds,
+          elapsedSeconds: requestedSeconds,
           latestImage: metadata,
         })
         persist()

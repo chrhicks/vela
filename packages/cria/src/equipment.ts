@@ -172,6 +172,9 @@ export function createCriaEquipment(connection: CriaConnection, bindings: Readon
         clearInterval(timer)
       }
     },
+    async biasExposureSeconds(id, signal) {
+      return (await observed(id, 'camera', signal)).number('exposureMinimum')
+    },
     async pointing(id, signal) {
       const readings = await observed(id, 'mount', signal)
       const coordinateSystem = readings.coordinateSystem(true)

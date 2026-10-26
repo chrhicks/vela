@@ -292,6 +292,32 @@ describe('protocol 5 Promise capabilities', () => {
       expect(submitted()).toEqual([parameters])
     })
 
+    describe('the exposure a bias frame gets', () => {
+      type Minimum = { status: 'fresh'; value: number; observedAt: number } | { status: 'unavailable'; reason: 'unsupported' }
+
+      const camera = (exposureMinimum: Minimum) => {
+        cria.deviceView = device => device.kind === 'camera'
+          ? { ...device, readings: { ...device.readings, exposureMinimum } }
+          : device
+      }
+
+      it('is the camera minimum Cria publishes now, not a value read earlier', async () => {
+        expect(await equipment.acquisition.biasExposureSeconds!('camera')).toBe(0.000032)
+
+        camera({ status: 'fresh', value: 0.0001, observedAt: Date.now() })
+        await vi.advanceTimersByTimeAsync(1000)
+
+        expect(await equipment.acquisition.biasExposureSeconds!('camera')).toBe(0.0001)
+      })
+
+      it('is refused, not guessed, when Cria has no fresh minimum', async () => {
+        camera({ status: 'unavailable', reason: 'unsupported' })
+        await vi.advanceTimersByTimeAsync(1000)
+
+        await expect(equipment.acquisition.biasExposureSeconds!('camera')).rejects.toMatchObject({ reason: 'transport' })
+      })
+    })
+
     describe('against a Cria from before the frame type', () => {
       beforeEach(() => {
         cria.acceptsFrameType = false

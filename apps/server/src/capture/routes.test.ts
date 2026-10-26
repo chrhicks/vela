@@ -870,6 +870,17 @@ it.each(['light', 'dark', 'flat', 'dark-flat', 'bias'] as const)('hands the %s f
   expect(options).toMatchObject([{ cameraId: 'camera', expectedCameraName: 'Main camera', exposureSeconds: 10, frameType }])
 })
 
+it('reads the bias exposure from the acquisition for the configured camera, and offers none when the acquisition has none', async () => {
+  const settings = { rig: record, cameraId: 'camera', expectedCameraName: 'Main camera' }
+  const capture: Acquisition['capture'] = async () => expect.unreachable('not exposing')
+  const biasExposureSeconds = vi.fn(async () => 0.000032)
+  const signal = new AbortController().signal
+
+  expect(await configuredCamera(settings, { capture, biasExposureSeconds }).biasExposureSeconds!(signal)).toBe(0.000032)
+  expect(biasExposureSeconds).toHaveBeenCalledExactlyOnceWith('camera', signal)
+  expect(configuredCamera(settings, { capture })).not.toHaveProperty('biasExposureSeconds')
+})
+
 it('never lets a calibration run raise star alerts, yet still shows the camera is producing', async () => {
   for (const frameType of ['dark', 'flat', 'dark-flat', 'bias'] as const) {
     const monitor = { runStarted: vi.fn(), frameCaptured: vi.fn(), runEnded: vi.fn(), runInterrupted: vi.fn() }

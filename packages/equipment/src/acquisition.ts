@@ -61,6 +61,11 @@ export interface Pointing {
 
 export interface Acquisition {
   capture(options: CaptureOptions): Promise<Frame>
+  /**
+   * The exposure the camera takes for a `bias` frame whatever time is requested, read when called.
+   * An adapter whose camera is not told the frame type has none and omits this.
+   */
+  biasExposureSeconds?(cameraId: string, signal?: AbortSignal): Promise<number>
   pointing(telescopeId: string, signal?: AbortSignal): Promise<Pointing>
   move(
     telescopeId: string,
