@@ -91,19 +91,19 @@ try {
 
   async function command(
     command: string,
-    payload: {
+    payload?: {
       targetId?: string
       raDegrees?: number
       decDegrees?: number
       exposureSeconds?: number
       checkId?: string
-    } = {},
+    },
   ) {
-    const response = await vela.inject({
-      method: 'POST',
-      url: `/api/rigs/proof/framing/${command}`,
-      payload,
-    })
+    const url = `/api/rigs/proof/framing/${command}`
+
+    // Stop takes an empty POST and nothing else, so it passes no payload.
+    const response =
+      payload === undefined ? await vela.inject({ method: 'POST', url }) : await vela.inject({ method: 'POST', url, payload })
 
     assert.equal(response.statusCode, 200, response.body)
 
