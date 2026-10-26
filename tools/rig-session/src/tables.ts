@@ -132,6 +132,12 @@ function frameRow(
     star_algorithm_version: image.starAlgorithmVersion,
     detected_stars: image.detectedStars,
     median_hfr_px: image.medianHfrPixels,
+    star_detections: image.starDetections,
+    star_measured: image.starMeasured,
+    star_strong: image.starStrong,
+    star_rejected: image.starRejected,
+    sky_level: image.skyLevel,
+    sky_noise: image.skyNoise,
     saved_dir: image.directory,
     span_id: span?.spanId ?? null,
     span_link: linkKind(spanLink),
@@ -180,6 +186,12 @@ function attemptRow(session: string, record: FrameRecord, frameLink: Link<SavedI
     star_algorithm_version: record.starAlgorithmVersion,
     detected_stars: record.detectedStars,
     median_hfr_px: record.medianHfrPixels,
+    star_detections: record.starDetections,
+    star_measured: record.starMeasured,
+    star_strong: record.starStrong,
+    star_rejected: record.starRejected,
+    sky_level: record.skyLevel,
+    sky_noise: record.skyNoise,
   }
 }
 

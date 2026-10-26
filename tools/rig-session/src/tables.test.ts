@@ -23,6 +23,12 @@ function image(id: string, capturedAt: string): SavedImage {
     starAlgorithmVersion: 2,
     detectedStars: 12,
     medianHfrPixels: 3.5,
+    starDetections: 40,
+    starMeasured: 12,
+    starStrong: 5,
+    starRejected: '{"blended":3,"faint":25}',
+    skyLevel: 540.5,
+    skyNoise: 4.25,
     directory: `/frames/${id}`,
   }
 }
@@ -44,6 +50,12 @@ function record(attempt: number, imageId: string | null, outcome: FrameRecord['o
     starAlgorithmVersion: imageId === null ? null : 2,
     detectedStars: imageId === null ? null : 12,
     medianHfrPixels: imageId === null ? null : 3.5,
+    starDetections: imageId === null ? null : 40,
+    starMeasured: imageId === null ? null : 12,
+    starStrong: imageId === null ? null : 5,
+    starRejected: imageId === null ? null : '{"blended":3,"faint":25}',
+    skyLevel: imageId === null ? null : 540.5,
+    skyNoise: imageId === null ? null : 4.25,
   }
 }
 
@@ -106,6 +118,12 @@ test('a frame row carries its span and mount links, a frame without either carri
     star_algorithm_version: 2,
     detected_stars: 12,
     median_hfr_px: 3.5,
+    star_detections: 40,
+    star_measured: 12,
+    star_strong: 5,
+    star_rejected: '{"blended":3,"faint":25}',
+    sky_level: 540.5,
+    sky_noise: 4.25,
     saved_dir: '/frames/linked',
     span_id: 'span-7',
     span_link: 'inferred',

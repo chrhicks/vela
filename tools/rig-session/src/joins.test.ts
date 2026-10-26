@@ -22,6 +22,12 @@ function image(capturedAt: string, rigId = 'rig-a'): SavedImage {
     starAlgorithmVersion: null,
     detectedStars: null,
     medianHfrPixels: null,
+    starDetections: null,
+    starMeasured: null,
+    starStrong: null,
+    starRejected: null,
+    skyLevel: null,
+    skyNoise: null,
     directory: '/nowhere',
   }
 }
