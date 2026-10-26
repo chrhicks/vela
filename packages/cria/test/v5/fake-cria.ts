@@ -25,7 +25,9 @@
  *   unreachable or restarted when it would land. `restart()` is a new
  *   instance; `dropImage(id)` and `expire(id)` model Cria evicting an image or
  *   pruning a settled operation; `reachable = false` fails new requests and
- *   quiets open streams; `commandsEnabled = false` refuses commands.
+ *   quiets open streams; `commandsEnabled = false` refuses commands;
+ *   `acceptsFrameType = false` is a Cria from before the capture `frameType`,
+ *   which refuses any capture that carries it.
  * - Call `close()` after each test.
  */
 import { createHash, randomUUID } from 'node:crypto'
@@ -161,6 +163,7 @@ export class FakeCria {
   /** False partitions the network: requests fail and open streams go quiet. */
   reachable = true
   commandsEnabled = true
+  acceptsFrameType = true
   deviceView: (device: Device) => Device = device => device
   /** How long a running motion or capture takes to stand still once asked to stop. */
   stopMs = 0
@@ -321,6 +324,10 @@ export class FakeCria {
     const request = decode(OperationRequest, body)
 
     if (!request) return this.refuse('request-error', 'Not an operation request')
+
+    if (!this.acceptsFrameType && request.kind === 'capture' && 'frameType' in request.parameters)
+      return this.refuse('request-error', 'Not an operation request')
+
     const { instanceId: _, ...fingerprinted } = request
     const content = JSON.stringify(fingerprinted, [...Object.keys(fingerprinted), ...Object.keys(request.parameters)].sort())
     const known = this.instance.requests.get(request.requestId)

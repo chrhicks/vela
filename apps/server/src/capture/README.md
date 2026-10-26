@@ -151,11 +151,15 @@ The saved-image record gets `frameType`, and so does each frame record line and
 the `capture.frame` span. Vela writes the FITS itself from the pixels it fetched,
 so `IMAGETYP` is always right, whatever Cria's own file says.
 
-Vela does not yet ask the camera for the type. Cria's capture command takes only
-`light` true or false, and Vela's equipment layer sends light every time. A camera
-with a shutter would therefore still open it for a dark. Cap the telescope or
-camera for dark, dark-flat and bias runs; Vela cannot see the cap. The ZWO cameras
-here have no shutter, so the cap is what makes the frame dark.
+The run's type also reaches the camera. Through Cria, the adapter sets the camera's
+INDI frame type before each exposure (see `packages/cria/README.md`), so a dark, dark
+flat or bias frame is a closed-shutter exposure and a flat is an open one. An Alpaca
+camera is not told: it exposes with the shutter open whatever the type. Against a Cria
+that has not been updated, darks and dark flats still work, and a flat or bias run fails
+on its first frame.
+
+Cap the telescope or camera for dark, dark-flat and bias runs; Vela cannot see the cap.
+The ZWO cameras here have no shutter, so the cap is what makes the frame dark.
 
 The alert rules judge stars, which a calibration frame lacks. A calibration run is
 never an imaging run for the monitor, so it raises no no-stars alert, and its frames

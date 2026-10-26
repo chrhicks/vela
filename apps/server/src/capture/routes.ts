@@ -59,14 +59,15 @@ interface CaptureRouteOptions {
 
 const MAX_FRAME_COUNT = 10_000
 
-function configuredCamera(settings: CaptureSettings, acquisition: Acquisition): CaptureCamera {
+export function configuredCamera(settings: CaptureSettings, acquisition: Pick<Acquisition, 'capture'>): CaptureCamera {
   return {
-    async capture({ exposureSeconds, signal, onProgress, onReadState, onProvenance }) {
+    async capture({ exposureSeconds, frameType, signal, onProgress, onReadState, onProvenance }) {
       try {
         return await acquisition.capture({
           cameraId: settings.cameraId,
           expectedCameraName: settings.expectedCameraName,
           exposureSeconds,
+          frameType,
           signal,
           onProgress: elapsedSeconds => onProgress({ phase: 'exposing', elapsedSeconds }),
           onReadout: () => onProgress({ phase: 'reading', elapsedSeconds: exposureSeconds }),

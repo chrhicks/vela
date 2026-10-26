@@ -35,6 +35,7 @@ export interface CaptureProgress {
 export interface CaptureCamera {
   capture(input: {
     exposureSeconds: number
+    frameType: FrameType
     signal: AbortSignal
     onProgress: (progress: CaptureProgress) => void
     onReadState: (state: CaptureView['captureReadState']) => void
@@ -354,6 +355,7 @@ export function createCaptureController(
           frame = await camera
             .capture({
               exposureSeconds,
+              frameType,
               signal,
               onProgress(progress) {
                 if (capturePending && !signal.aborted)

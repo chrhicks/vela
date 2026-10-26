@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { CaptureRetryableError, CaptureUncertainError, EquipmentError, FocuserStoppedError, type CaptureProvenance } from '@vela/equipment'
+import { CaptureRetryableError, CaptureUncertainError, EquipmentError, FocuserStoppedError, type CaptureFrameType, type CaptureProvenance } from '@vela/equipment'
 import { createCriaConnection } from '../src/connection.js'
 import { createCriaEquipment } from '../src/equipment.js'
 import type { Device } from '@cria/wire'
@@ -265,6 +265,52 @@ describe('protocol 5 Promise capabilities', () => {
     await vi.advanceTimersByTimeAsync(2_000)
     expect(await captured).toMatchObject({ width: 4, height: 3, color: { kind: 'mono' } })
     expect(cria.received.filter(request => request.route === 'submit')).toHaveLength(1)
+  })
+
+  describe('frame type', () => {
+    const submitted = () => cria.received.filter(request => request.route === 'submit').map(request => JSON.parse(request.body!).parameters)
+
+    async function capture(frameType?: CaptureFrameType) {
+      const options = { cameraId: 'camera', exposureSeconds: 1 }
+      const captured = equipment.acquisition.capture(frameType ? { ...options, frameType } : options).catch((error: EquipmentError) => error)
+
+      await vi.advanceTimersByTimeAsync(2_000)
+
+      return captured
+    }
+
+    it.each([
+      [undefined, { exposureSeconds: 1, light: true }],
+      ['light', { exposureSeconds: 1, light: true }],
+      ['dark', { exposureSeconds: 1, light: false }],
+      ['dark-flat', { exposureSeconds: 1, light: false }],
+      ['flat', { exposureSeconds: 1, light: true, frameType: 'flat' }],
+      ['bias', { exposureSeconds: 1, light: false, frameType: 'bias' }],
+    ] as const)('sends %s to Cria as %o', async (frameType, parameters) => {
+      await capture(frameType)
+
+      expect(submitted()).toEqual([parameters])
+    })
+
+    describe('against a Cria from before the frame type', () => {
+      beforeEach(() => {
+        cria.acceptsFrameType = false
+      })
+
+      it.each([undefined, 'light', 'dark', 'dark-flat'] as const)('still takes %s', async frameType => {
+        expect(await capture(frameType)).toMatchObject({ width: 4, height: 3 })
+      })
+
+      it.each(['flat', 'bias'] as const)('refuses %s with Cria\'s answer and exposes nothing', async frameType => {
+        const refused = await capture(frameType)
+
+        expect(refused).toBeInstanceOf(EquipmentError)
+        expect(refused).not.toBeInstanceOf(CaptureUncertainError)
+        expect(refused).toMatchObject({ message: 'Not an operation request' })
+        expect(cria.received.filter(request => request.route === 'submit')).toHaveLength(1)
+        expect((await (await cria.fetch(`${cria.origin}/v2/state`)).json()).operations).toEqual([])
+      })
+    })
   })
 
   it('keeps a pre-aborted focuser move stopped without sending it', async () => {

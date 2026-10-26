@@ -7,10 +7,10 @@ settings:
 catalogs:
   default:
     '@cria/primitives':
-      specifier: github:chrhicks/cria#f82674d6efbc56c3f71e9533968d1f73590919fa&path:/ts/packages/primitives
+      specifier: github:chrhicks/cria#0e77983698e11b2c55e54d48e1a1c19e0e018f88&path:/ts/packages/primitives
       version: 0.0.0
     '@cria/wire':
-      specifier: github:chrhicks/cria#f82674d6efbc56c3f71e9533968d1f73590919fa&path:/ts/packages/cria-wire
+      specifier: github:chrhicks/cria#0e77983698e11b2c55e54d48e1a1c19e0e018f88&path:/ts/packages/cria-wire
       version: 0.0.0
 
 importers:
@@ -240,10 +240,10 @@ importers:
     dependencies:
       '@cria/primitives':
         specifier: 'catalog:'
-        version: https://codeload.github.com/chrhicks/cria/tar.gz/f82674d6efbc56c3f71e9533968d1f73590919fa#path:/ts/packages/primitives(effect@4.0.3)
+        version: https://codeload.github.com/chrhicks/cria/tar.gz/0e77983698e11b2c55e54d48e1a1c19e0e018f88#path:/ts/packages/primitives(effect@4.0.3)
       '@cria/wire':
         specifier: 'catalog:'
-        version: https://codeload.github.com/chrhicks/cria/tar.gz/f82674d6efbc56c3f71e9533968d1f73590919fa#path:/ts/packages/cria-wire(@cria/primitives@https://codeload.github.com/chrhicks/cria/tar.gz/f82674d6efbc56c3f71e9533968d1f73590919fa#path:/ts/packages/primitives(effect@4.0.3))(effect@4.0.3)
+        version: https://codeload.github.com/chrhicks/cria/tar.gz/0e77983698e11b2c55e54d48e1a1c19e0e018f88#path:/ts/packages/cria-wire(@cria/primitives@https://codeload.github.com/chrhicks/cria/tar.gz/0e77983698e11b2c55e54d48e1a1c19e0e018f88#path:/ts/packages/primitives(effect@4.0.3))(effect@4.0.3)
       '@opentelemetry/api':
         specifier: 1.9.1
         version: 1.9.1
@@ -316,14 +316,14 @@ importers:
 
 packages:
 
-  '@cria/primitives@https://codeload.github.com/chrhicks/cria/tar.gz/f82674d6efbc56c3f71e9533968d1f73590919fa#path:/ts/packages/primitives':
-    resolution: {gitHosted: true, integrity: sha512-B25t578CC9ApgwOnxzde/FwjB21A7zThoSl4iXCS8NVv1B3mBZjFqevVSd20bx0T463vXv2Tq+xdaNXUxqaJxA==, path: /ts/packages/primitives, tarball: https://codeload.github.com/chrhicks/cria/tar.gz/f82674d6efbc56c3f71e9533968d1f73590919fa}
+  '@cria/primitives@https://codeload.github.com/chrhicks/cria/tar.gz/0e77983698e11b2c55e54d48e1a1c19e0e018f88#path:/ts/packages/primitives':
+    resolution: {gitHosted: true, integrity: sha512-j8U0murP9MbialzdF7VUxDW1PyYCMabunHUloINNiluVLwC7R7dedCCVPC++QXZ6n9JrNLzviAlTIA+lNO9eJA==, path: /ts/packages/primitives, tarball: https://codeload.github.com/chrhicks/cria/tar.gz/0e77983698e11b2c55e54d48e1a1c19e0e018f88}
     version: 0.0.0
     peerDependencies:
       effect: 4.0.3
 
-  '@cria/wire@https://codeload.github.com/chrhicks/cria/tar.gz/f82674d6efbc56c3f71e9533968d1f73590919fa#path:/ts/packages/cria-wire':
-    resolution: {gitHosted: true, integrity: sha512-B25t578CC9ApgwOnxzde/FwjB21A7zThoSl4iXCS8NVv1B3mBZjFqevVSd20bx0T463vXv2Tq+xdaNXUxqaJxA==, path: /ts/packages/cria-wire, tarball: https://codeload.github.com/chrhicks/cria/tar.gz/f82674d6efbc56c3f71e9533968d1f73590919fa}
+  '@cria/wire@https://codeload.github.com/chrhicks/cria/tar.gz/0e77983698e11b2c55e54d48e1a1c19e0e018f88#path:/ts/packages/cria-wire':
+    resolution: {gitHosted: true, integrity: sha512-j8U0murP9MbialzdF7VUxDW1PyYCMabunHUloINNiluVLwC7R7dedCCVPC++QXZ6n9JrNLzviAlTIA+lNO9eJA==, path: /ts/packages/cria-wire, tarball: https://codeload.github.com/chrhicks/cria/tar.gz/0e77983698e11b2c55e54d48e1a1c19e0e018f88}
     version: 0.0.0
     peerDependencies:
       '@cria/primitives': '*'
@@ -594,12 +594,14 @@ packages:
   '@opentelemetry/sdk-trace-base@2.11.0':
     resolution: {integrity: sha512-H19x/TX/LZdqiYOjM7fqtSxwlplC5pgelavqbQdHbhdq0q/AI/TGkM2dfGuuynTXmJPeF2HoZVoPDu+TGoW78A==}
     engines: {node: ^18.19.0 || >=20.6.0}
+    deprecated: Use @opentelemetry/sdk-trace package
     peerDependencies:
       '@opentelemetry/api': '>=1.3.0 <1.10.0'
 
   '@opentelemetry/sdk-trace-node@2.11.0':
     resolution: {integrity: sha512-CuvCMJmZxswhNLlM2LfuLOW3h3fZujA4hsG4B+Sz4dX2zvaXO8Ng74cnDHWD64gLszTlhiG3c0iNUjj4g+0/sA==}
     engines: {node: ^18.19.0 || >=20.6.0}
+    deprecated: Use @opentelemetry/sdk-trace package
     peerDependencies:
       '@opentelemetry/api': '>=1.0.0 <1.10.0'
 
@@ -1723,13 +1725,13 @@ packages:
 
 snapshots:
 
-  '@cria/primitives@https://codeload.github.com/chrhicks/cria/tar.gz/f82674d6efbc56c3f71e9533968d1f73590919fa#path:/ts/packages/primitives(effect@4.0.3)':
+  '@cria/primitives@https://codeload.github.com/chrhicks/cria/tar.gz/0e77983698e11b2c55e54d48e1a1c19e0e018f88#path:/ts/packages/primitives(effect@4.0.3)':
     dependencies:
       effect: 4.0.3
 
-  '@cria/wire@https://codeload.github.com/chrhicks/cria/tar.gz/f82674d6efbc56c3f71e9533968d1f73590919fa#path:/ts/packages/cria-wire(@cria/primitives@https://codeload.github.com/chrhicks/cria/tar.gz/f82674d6efbc56c3f71e9533968d1f73590919fa#path:/ts/packages/primitives(effect@4.0.3))(effect@4.0.3)':
+  '@cria/wire@https://codeload.github.com/chrhicks/cria/tar.gz/0e77983698e11b2c55e54d48e1a1c19e0e018f88#path:/ts/packages/cria-wire(@cria/primitives@https://codeload.github.com/chrhicks/cria/tar.gz/0e77983698e11b2c55e54d48e1a1c19e0e018f88#path:/ts/packages/primitives(effect@4.0.3))(effect@4.0.3)':
     dependencies:
-      '@cria/primitives': https://codeload.github.com/chrhicks/cria/tar.gz/f82674d6efbc56c3f71e9533968d1f73590919fa#path:/ts/packages/primitives(effect@4.0.3)
+      '@cria/primitives': https://codeload.github.com/chrhicks/cria/tar.gz/0e77983698e11b2c55e54d48e1a1c19e0e018f88#path:/ts/packages/primitives(effect@4.0.3)
       effect: 4.0.3
 
   '@duckdb/node-api@1.5.6-r.1':
