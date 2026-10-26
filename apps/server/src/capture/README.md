@@ -45,11 +45,11 @@ read failures in place without another exposure command. The controller projects
 Read recovery is not image completion: it preserves the last image, count and lease.
 Stop clears the interruption indicator immediately and still waits for cleanup;
 late callbacks cannot update a cancelled or settled acquisition.
-A stop request needs no body, so `curl -X POST .../capture/stop` stops the run. A bare POST, an
-empty body or `{}` is accepted under any content type except `text/plain`, and every other
-request is refused with 400, a `text/plain` one included. A refused stop leaves the run going, as
-every other Vela command refuses unknown fields. The same rule covers autofocus stop, alignment
-stop and finish, and framing stop; `../http/halt-body.ts` holds it.
+Stop and Resume take no input. Send them as a POST with an empty body, for example
+`curl -X POST .../capture/stop`. Any non-empty body, `{}` included, is refused with 400 under every
+content type and the request does nothing; a `Content-Type` header on an empty body is ignored. A
+refused stop leaves the run going. The same rule covers autofocus stop, alignment stop and finish,
+and framing stop; `../http/halt-body.ts` holds it.
 Any terminal acquisition or preview failure ends the run without replay. Preview stretching preserves native dimensions for 100% inspection;
 only the latest three image pairs and their temporary original FITS buffers remain
 in memory. Saving releases the temporary FITS buffer after the saved-image store confirms
@@ -200,7 +200,7 @@ startup is a run that did not end: after a deploy (SIGTERM) or a crash alike.
   `interruption: { reason: "Vela restarted", remainingCount }`. The camera is not asked for
   anything until Chris starts or resumes a run. Starting any new run replaces the record. There
   is no dismiss: the interrupted view stays, across further restarts, until a run starts.
-- **Resume.** `POST /api/rigs/:rigId/capture/resume` takes no body (as stop does) and starts a
+- **Resume.** `POST /api/rigs/:rigId/capture/resume` takes no input (the halt rule above) and starts a
   new run with the same exposure, repeat, `saveFrames`, frame type and subject snapshot. A run
   with a count resumes with `frameCount - completedCount`; a repeat with no count repeats until
   stopped; an unfinished single exposure repeats once. It is an ordinary start: the Rig lease,

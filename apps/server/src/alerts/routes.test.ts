@@ -414,8 +414,7 @@ describe('a capture run feeds the alerts', () => {
           headers: jsonBody,
           payload: { exposureSeconds: 60, repeat: true },
         }),
-      stop: () =>
-        app.inject({ method: 'POST', url: '/api/rigs/sim/capture/stop', headers: jsonBody, payload: {} }),
+      stop: () => app.inject({ method: 'POST', url: '/api/rigs/sim/capture/stop' }),
       alerts: async () => (await app.inject({ method: 'GET', url: '/api/web/rigs/sim/alerts' })).json(),
     }
   }

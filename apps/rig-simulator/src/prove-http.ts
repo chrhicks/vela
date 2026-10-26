@@ -342,7 +342,6 @@ async function proveCapture() {
     const stopped = await vela.inject({
       method: 'POST',
       url: '/api/rigs/proof/capture/stop',
-      payload: {},
     })
 
     assert.equal(stopped.json<CaptureView>().phase, 'stopped', stopped.body)
@@ -361,7 +360,7 @@ async function proveCapture() {
       },
     })
   } finally {
-    await vela.inject({ method: 'POST', url: '/api/rigs/proof/capture/stop', payload: {} })
+    await vela.inject({ method: 'POST', url: '/api/rigs/proof/capture/stop' })
     await vela.close()
     await hardware.abort(colorId, telescopeId)
   }

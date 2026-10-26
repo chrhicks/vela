@@ -21,9 +21,9 @@ until recovery or Stop, preserving the baseline, last solved image and its origi
 timestamp. The interface marks the device connection interrupted and asks the
 operator to pause adjustments until a fresh measurement arrives. Read-only pointing
 and validation are retried in place; preparation and motion are never replayed.
-Stop and Finish need no body. A bare POST, an empty body or `{}` is accepted under any
-content type except `text/plain`, and every other request is refused with 400, a `text/plain`
-one included. Start still requires a JSON `{}`.
+Stop and Finish take no input. Send them as a POST with an empty body. Any non-empty body, `{}`
+included, is refused with 400 under every content type and the request does nothing; a
+`Content-Type` header on an empty body is ignored. Start still requires a JSON `{}`.
 A no-solution starts another exposure. Known transport read failures during an
 acknowledged exposure retry inside acquisition without replacing that exposure.
 The controller shows `retrying`, clears the exposure timer, and preserves its

@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { equipmentRig } from './equipment'
+import { haltBodyError } from './halt'
 import type { AlignmentView } from '@vela/model/web'
 import { reviewTimezone, type ReviewResponse } from './tonight'
 
@@ -279,8 +280,8 @@ export function createAlignmentScene(name: AlignmentScene) {
       ) {
         writes.push({ method, pathname, body: structuredClone(body) })
 
-        if (!z.strictObject({}).safeParse(body).success)
-          return result(400, { error: 'Expected an empty JSON object' })
+        if (command === 'start' ? !z.strictObject({}).safeParse(body).success : body !== undefined)
+          return result(400, { error: command === 'start' ? 'Expected an empty JSON object' : haltBodyError })
 
         if (
           outcomes[command] === 'rejected' ||

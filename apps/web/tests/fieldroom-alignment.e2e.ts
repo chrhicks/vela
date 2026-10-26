@@ -6,6 +6,8 @@ import type { AlignmentScene } from './fixtures/fieldroom/alignment'
 
 test.use({ timezoneId: reviewTimezone })
 
+const haltRefusal = 'Send this request as a POST with an empty body.'
+
 for (const width of [1440, 768, 390]) {
   for (const mode of ['light', 'dark'] as const) {
     for (const name of ['alignment-phone-adjusting', 'alignment-phone-read-interrupted'] as const) {
@@ -251,7 +253,7 @@ test('pending alignment Stop shows command intent while retaining the last measu
   let release!: () => void
   const responseGate = new Promise<void>(resolve => { release = resolve })
   await page.route('**/api/rigs/fra400/alignment/stop', async route => {
-    const result = scene.respond('POST', '/api/rigs/fra400/alignment/stop', {})
+    const result = scene.respond('POST', '/api/rigs/fra400/alignment/stop')
     await responseGate
     await route.fulfill({ status: result.status, json: result.json })
   })
@@ -266,3 +268,20 @@ test('pending alignment Stop shows command intent while retaining the last measu
   await expect(page.getByRole('button', { name: 'Measure again', exact: true })).toBeEnabled()
   expect(scene.writes).toHaveLength(1)
 })
+
+for (const action of ['stop', 'finish'] as const) {
+  test(`a refused alignment ${action} shows the server message and sends no body`, async ({ page }) => {
+    await openAlignmentScene(page, 'alignment-phone-adjusting')
+
+    const requests: Array<{ body: string | null; contentType: string | undefined }> = []
+
+    await page.route(`**/api/rigs/fra400/alignment/${action}`, route => {
+      requests.push({ body: route.request().postData(), contentType: route.request().headers()['content-type'] })
+
+      return route.fulfill({ status: 400, json: { error: haltRefusal } })
+    })
+    await page.getByRole('button', { name: action === 'stop' ? 'Stop' : 'Finish alignment', exact: true }).click()
+    await expect(page.getByText(haltRefusal.replace(/\.$/, ''), { exact: false }).first()).toBeVisible()
+    expect(requests).toEqual([{ body: null, contentType: undefined }])
+  })
+}

@@ -80,7 +80,7 @@ const startCapture = (payload: { exposureSeconds: number; repeat?: boolean; save
   request({ method: 'POST', url: '/api/rigs/fixture/capture/start', payload })
 
 const stopCapture = () =>
-  request({ method: 'POST', url: '/api/rigs/fixture/capture/stop', payload: {} })
+  request({ method: 'POST', url: '/api/rigs/fixture/capture/stop' })
 
 const ledgerSchema = z.object({
   operations: z.array(

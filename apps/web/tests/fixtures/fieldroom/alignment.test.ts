@@ -49,7 +49,7 @@ describe('Fieldroom alignment scene boundary', () => {
     expect(Date.parse(retry.time) - Date.parse(alignmentMeasuredAt)).toBe(45000)
     expect(active.snapshot().measurement).toEqual(retry.snapshot().measurement)
     expect(retry.snapshot().activity).toBe('retrying')
-    expect(retry.respond('POST', stop, {}).status).toBe(200)
+    expect(retry.respond('POST', stop).status).toBe(200)
     expect(retry.snapshot().phase).toBe('stopped')
   })
 
@@ -70,14 +70,14 @@ describe('Fieldroom alignment scene boundary', () => {
 
   it('preserves pending and unknown outcomes for explicit state inspection, and blocks unknown routes', () => {
     const scene = createAlignmentScene('alignment-stop-pending')
-    expect(scene.respond('POST', stop, {}).status).toBe(200)
+    expect(scene.respond('POST', stop).status).toBe(200)
     expect(scene.snapshot().activity).toBe('stopping')
     expect(scene.snapshot().active).toBe(true)
     scene.setCommandOutcome('stop', 'unconfirmed')
-    expect(scene.respond('POST', stop, {}).status).toBe(503)
+    expect(scene.respond('POST', stop).status).toBe(503)
     expect(scene.respond('GET', read).json).toMatchObject({ phase: 'stopped', active: false })
     expect(scene.writes).toHaveLength(2)
-    expect(scene.respond('POST', '/api/rigs/other/alignment/stop', {}).status).toBe(501)
+    expect(scene.respond('POST', '/api/rigs/other/alignment/stop').status).toBe(501)
     expect(scene.unknownRequests).toHaveLength(1)
     const offline = createAlignmentScene('alignment-offline')
     expect([offline.respond('GET', read).status, offline.respond('GET', read).status, offline.respond('GET', read).status]).toEqual([200, 200, 503])

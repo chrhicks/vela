@@ -332,6 +332,7 @@ test('repeating capture restores server settings and can stop during image recei
   let current: CaptureView = { ...idle, repeat: true }
   let startBody: unknown
   let stops = 0
+  const stopRequests: Array<{ body: string | null; contentType: string | undefined }> = []
   await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, current))
   await page.route('**/api/rigs/rig-1/capture/images/frame-1', route =>
     route.fulfill({ contentType: 'image/png', body: preview }),
@@ -344,6 +345,7 @@ test('repeating capture restores server settings and can stop during image recei
   })
   await page.route('**/api/rigs/rig-1/capture/stop', route => {
     stops++
+    stopRequests.push({ body: route.request().postData(), contentType: route.request().headers()['content-type'] })
     current = { ...current, phase: 'stopped', active: false }
 
     return respond(route, current)
@@ -369,6 +371,7 @@ test('repeating capture restores server settings and can stop during image recei
     page.getByRole('region', { name: 'Latest image', exact: true }).getByRole('img'),
   ).toHaveAttribute('src', firstImage.imageUrl)
   expect(stops).toBe(1)
+  expect(stopRequests).toEqual([{ body: null, contentType: undefined }])
   await page.getByText('Repeat until stopped', { exact: true }).click()
   await expect(page.getByRole('button', { name: 'Take exposure' })).toBeEnabled()
 })
@@ -902,6 +905,7 @@ for (const width of [390, 1100]) {
     await page.setViewportSize({ width, height: 844 })
 
     let resumes = 0
+    const resumeRequests: Array<{ body: string | null; contentType: string | undefined }> = []
 
     const resumed: CaptureView = {
       ...interrupted,
@@ -917,6 +921,7 @@ for (const width of [390, 1100]) {
     await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, resumes ? resumed : interrupted))
     await page.route('**/api/rigs/rig-1/capture/resume', route => {
       resumes++
+      resumeRequests.push({ body: route.request().postData(), contentType: route.request().headers()['content-type'] })
 
       return respond(route, resumed)
     })
@@ -942,6 +947,7 @@ for (const width of [390, 1100]) {
     await expect(page.getByRole('button', { name: 'Stop capture' })).toBeEnabled()
     await expect(page.getByText('0 of 18 frames')).toBeVisible()
     expect(resumes).toBe(1)
+    expect(resumeRequests).toEqual([{ body: null, contentType: undefined }])
   })
 }
 
@@ -956,4 +962,27 @@ test('offers no Resume for an interrupted run that had taken all its frames, or 
   view = { ...interrupted, frameCount: null, interruption: { reason: 'Vela restarted', remainingCount: null } }
   await page.reload()
   await expect(page.getByRole('button', { name: 'Resume · repeat until stopped' })).toBeEnabled()
+})
+
+const haltRefusal = 'Send this request as a POST with an empty body.'
+
+test('a refused Stop shows the server message and leaves Stop available', async ({ page }) => {
+  const exposing: CaptureView = { ...idle, phase: 'exposing', active: true }
+
+  await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, exposing))
+  await page.route('**/api/rigs/rig-1/capture/stop', route => respond(route, { error: haltRefusal }, 400))
+  await page.goto('/rigs/rig-1/observe/capture')
+  await page.getByRole('button', { name: 'Stop capture' }).click()
+  await expect(page.getByText(haltRefusal)).toBeVisible()
+  await expect(page.getByText(/could not be confirmed/)).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Stop capture' })).toBeEnabled()
+})
+
+test('a refused Resume shows the server message and leaves Resume available', async ({ page }) => {
+  await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, interrupted))
+  await page.route('**/api/rigs/rig-1/capture/resume', route => respond(route, { error: haltRefusal }, 400))
+  await page.goto('/rigs/rig-1/observe/capture')
+  await page.getByRole('button', { name: 'Resume · 18 frames left' }).click()
+  await expect(page.getByText(haltRefusal)).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Resume · 18 frames left' })).toBeEnabled()
 })

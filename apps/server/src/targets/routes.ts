@@ -17,7 +17,7 @@ import {
 } from './catalog/index.js'
 import { skyPath, type Site } from './sky.js'
 import { registerTargetDiscovery } from './discovery-routes.js'
-import { registerHaltRoutes } from '../http/halt-body.js'
+import { haltBodyError, registerHaltRoutes } from '../http/halt-body.js'
 import type { FrameImaging } from '../imaging/frame-imaging.js'
 
 export interface TargetOptions {
@@ -356,7 +356,10 @@ export function registerTargets(
 
       const expectedKeys = commandFields[operation.data]
       const halting = operation.data === 'stop'
-      const body = halting && request.body === undefined ? {} : request.body
+
+      if (halting && request.body !== undefined) return reply.code(400).send({ error: haltBodyError })
+
+      const body = halting ? {} : request.body
       const bodyEnvelope = z.looseObject({}).safeParse(body)
 
       if (

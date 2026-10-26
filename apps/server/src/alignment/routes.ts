@@ -13,7 +13,7 @@ import { createAlignmentController, type AlignmentSettings } from './controller.
 import { createAstapSolver } from './solver.js'
 import { createPhysicalAlignment } from './physical.js'
 import { createAlignmentDiagnostics } from './diagnostics.js'
-import { haltBody, haltBodyError, registerHaltRoutes } from '../http/halt-body.js'
+import { haltBodyError, registerHaltRoutes } from '../http/halt-body.js'
 
 export interface AlignmentFactories {
   physical: typeof createPhysicalAlignment
@@ -251,7 +251,7 @@ export function registerAlignment(
           try {
             const halting = request.params.command === 'stop' || request.params.command === 'finish'
 
-            if (halting && !haltBody.safeParse(request.body).success)
+            if (halting && request.body !== undefined)
               return reply.code(400).send({ error: haltBodyError })
 
             if (
