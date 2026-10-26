@@ -39,7 +39,7 @@ async function syntheticNight() {
         receivedAt: `2030-01-01T01:${minute}:55.000Z`,
         cameraName: 'Test camera',
         capturedAtSource: 'camera',
-        statistics: { detectedStars: count, medianHfrPixels: count === 0 ? null : 3 },
+        statistics: { algorithm: { version: 2 }, detectedStars: count, medianHfrPixels: count === 0 ? null : 3 },
         rigId: 'rig-a',
       }),
     )

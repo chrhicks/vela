@@ -15,3 +15,5 @@ Recorded on the night of 2026-10-23 local (2026-10-23T23:22Z to 2026-10-24T05:58
   Healthy consecutive frames swing about 2x with HFR flat. Heart 23:22Z-23:54Z is a focus drift: HFR 1.55 to 2.12 while stars rise 167 to 278
   (a refocus then dropped them, so the 00:01Z frame starts a new run). Heart 00:01Z-01:25Z is a noisy healthy run (52-187 stars). Heart 01:26Z-01:38Z is haze:
   counts of 14-46 with HFR unchanged. North America is a healthy run (127-325 stars).
+
+These counts and HFRs were recorded by star measurement version 1 (Bayer HFR floor 1.4 px). Frames measured today read higher counts and lower HFRs on sharp frames, so do not mix the two without checking `statistics.algorithm.version`.

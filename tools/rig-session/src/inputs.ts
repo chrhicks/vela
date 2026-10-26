@@ -80,6 +80,8 @@ const timestamp = z
   .transform(text => new Date(text))
   .refine(date => !Number.isNaN(date.getTime()), 'not a timestamp')
 
+const starAlgorithm = z.object({ version: z.int().positive() }).default({ version: 1 })
+
 const savedImageFile = z.object({
   id: z.string(),
   capturedAt: timestamp,
@@ -91,7 +93,9 @@ const savedImageFile = z.object({
   cameraName: z.string(),
   rigId: z.string(),
   subject: z.object({ targetId: z.string(), name: z.string() }).nullish(),
-  statistics: z.object({ detectedStars: z.int(), medianHfrPixels: z.number().nullable() }).nullish(),
+  statistics: z
+    .object({ algorithm: starAlgorithm, detectedStars: z.int(), medianHfrPixels: z.number().nullable() })
+    .nullish(),
 })
 
 export interface SavedImage {
@@ -106,6 +110,8 @@ export interface SavedImage {
   readonly rigId: string
   readonly targetId: string | null
   readonly targetName: string | null
+  /** Null when the frame has no statistics. 1 for frames saved before the stamp existed. */
+  readonly starAlgorithmVersion: number | null
   readonly detectedStars: number | null
   readonly medianHfrPixels: number | null
   readonly directory: string
@@ -133,6 +139,7 @@ export async function readSavedImages(root: string): Promise<ReadResult<SavedIma
         ...file,
         targetId: subject?.targetId ?? null,
         targetName: subject?.name ?? null,
+        starAlgorithmVersion: statistics?.algorithm.version ?? null,
         detectedStars: statistics?.detectedStars ?? null,
         medianHfrPixels: statistics?.medianHfrPixels ?? null,
         directory,
@@ -235,7 +242,9 @@ const frameRecordLine = z.object({
   message: z.string().nullable(),
   provenance: z.object({ requestId: z.string(), operationId: z.string().nullable(), imageId: z.string().nullable() }).nullable(),
   image: z.object({ id: z.string() }).nullable(),
-  statistics: z.object({ detectedStars: z.int(), medianHfrPixels: z.number().nullable() }).nullable(),
+  statistics: z
+    .object({ algorithm: starAlgorithm, detectedStars: z.int(), medianHfrPixels: z.number().nullable() })
+    .nullable(),
 })
 
 /** One settled capture attempt of Vela's, saved or not. The ids are Cria's, null when the adapter carried none. */
@@ -253,6 +262,8 @@ export interface FrameRecord {
   readonly criaImageId: string | null
   /** The id Vela gave the image; it is the saved image's `id`. */
   readonly imageId: string | null
+  /** Null when the record has no statistics. 1 for records written before the stamp existed. */
+  readonly starAlgorithmVersion: number | null
   readonly detectedStars: number | null
   readonly medianHfrPixels: number | null
 }
@@ -292,6 +303,7 @@ export async function readFrameRecords(path: string): Promise<ReadResult<FrameRe
       operationId: provenance?.operationId ?? null,
       criaImageId: provenance?.imageId ?? null,
       imageId: image?.id ?? null,
+      starAlgorithmVersion: statistics?.algorithm.version ?? null,
       detectedStars: statistics?.detectedStars ?? null,
       medianHfrPixels: statistics?.medianHfrPixels ?? null,
     })

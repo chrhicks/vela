@@ -103,7 +103,7 @@ function setup(
         await finalMeasurement.promise
       }
 
-      return { detectedStars: 40, medianHfrPixels: hfrAt(position + lag) }
+      return { algorithm: { version: 2 }, detectedStars: 40, medianHfrPixels: hfrAt(position + lag) }
     },
   )
 

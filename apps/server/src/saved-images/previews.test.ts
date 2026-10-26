@@ -28,7 +28,7 @@ const image: CaptureImage = {
   exposureSeconds: 180,
   cameraName: 'Retained camera',
   color: 'color',
-  statistics: { detectedStars: 42, medianHfrPixels: 4 },
+  statistics: { algorithm: { version: 2 }, detectedStars: 42, medianHfrPixels: 4 },
   saved: true,
 }
 

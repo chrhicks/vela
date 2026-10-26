@@ -20,6 +20,7 @@ function image(id: string, capturedAt: string): SavedImage {
     rigId: 'rig-a',
     targetId: 'target-1',
     targetName: 'Test target',
+    starAlgorithmVersion: 2,
     detectedStars: 12,
     medianHfrPixels: 3.5,
     directory: `/frames/${id}`,
@@ -40,6 +41,7 @@ function record(attempt: number, imageId: string | null, outcome: FrameRecord['o
     operationId: outcome === 'failed' ? null : `operation-${attempt}`,
     criaImageId: imageId === null ? null : `cria-${imageId}`,
     imageId,
+    starAlgorithmVersion: imageId === null ? null : 2,
     detectedStars: imageId === null ? null : 12,
     medianHfrPixels: imageId === null ? null : 3.5,
   }
@@ -101,6 +103,7 @@ test('a frame row carries its span and mount links, a frame without either carri
     rig_id: 'rig-a',
     target_id: 'target-1',
     target_name: 'Test target',
+    star_algorithm_version: 2,
     detected_stars: 12,
     median_hfr_px: 3.5,
     saved_dir: '/frames/linked',

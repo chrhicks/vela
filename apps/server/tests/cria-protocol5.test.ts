@@ -33,7 +33,7 @@ afterEach(async () => {
 // The pipeline has its own tests.
 const images: FrameImaging = {
   render: async () => ({ native: Buffer.from('native'), fit: undefined }),
-  analyze: async () => ({ detectedStars: 0, medianHfrPixels: null }),
+  analyze: async () => ({ algorithm: { version: 2 }, detectedStars: 0, medianHfrPixels: null }),
   encodeFits: async () => Buffer.from('fits'),
 }
 

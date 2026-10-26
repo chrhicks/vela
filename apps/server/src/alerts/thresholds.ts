@@ -9,21 +9,28 @@ const positive = z.number().positive()
  *
  * 2026-10-17 (healthy frames: 1100-1600 stars, HFR 2.5-3.1 px) and its failures.
  *
- * 2026-10-23, 90 s frames through a 3 nm dual-band filter (fixtures/night-20261023-frames.json):
- * - Healthy frames swing about 2x with HFR flat: 101, 88, 181, 126, 84. A single frame says
- *   nothing, so every star comparison uses the median of `starsSmoothingFrames` frames.
- * - Smoothed that way, the 00:01Z run stays between 67 and 134 stars until 01:25Z, and its worst
- *   fall within 10 minutes is to 0.54 of the peak. `starsDropFraction` 0.5 sits just under that.
- *   The haze at 01:26Z takes the smoothed count from 93 to 37 (0.40) in under 3 minutes and then
- *   to 24-27, so it warns at 01:30Z, after `confirmFrames`.
+ * 2026-10-23, 90 s frames through a 3 nm dual-band filter (fixtures/night-20261023-frames.json holds
+ * the counts as star measurement version 1 recorded them). The numbers below are `tools/star-bench`
+ * output for version 2, the same frames with the Bayer HFR floor at 1.0 px instead of 1.4:
+ * - Healthy frames swing 2x with HFR flat in version 1 (101, 88, 181, 126, 84) and little in version 2
+ *   (187, 192, 210, 215, 211; spread 0.531 down to 0.120). A single frame still says little, so every
+ *   star comparison uses the median of `starsSmoothingFrames` frames.
+ * - Smoothed that way, the 00:01Z run stays between 100 and 215 stars until 01:25Z (version 1: 67 to
+ *   134), and its worst fall within 10 minutes is to 0.75 of the peak (version 1: 0.54).
+ *   `starsDropFraction` 0.5 sits well under that. The haze at 01:26Z takes the smoothed count from
+ *   122 to 41 (0.34) in about 6 minutes and then to 34, so it warns at 01:31Z, after `confirmFrames`
+ *   (version 1: 93 to 37 in under 3 minutes, warned at 01:30Z).
  * - A window of 10 minutes is about 6 frames at 90 s and still 3 at 180 s, enough to see a fall
  *   start without the slow wander of the sky counting as one.
  * - The slow wander is `stars-declining`: the median of 30 minutes against the 30 before. In that
- *   run the 30-minute medians go 110, 101, 88 (0.8 to 0.9 of the one before), so 0.6 stays quiet.
- * - The count rises as focus gets worse (167 to 278 stars while HFR goes 1.55 to 2.12), so a
- *   refocus makes it fall. The monitor starts the history over when the focuser moves.
+ *   run, before the haze, it never goes below 0.66 of the one before (version 1: 0.70), so 0.6
+ *   stays quiet.
+ * - The count rises as focus gets worse (219 to 278 stars while HFR goes 1.50 to 2.12; version 1:
+ *   167 to 278), so a refocus makes it fall. The monitor starts the history over when the focuser
+ *   moves.
  * - Real clouds take the count to a few stars, so `stars-collapsed` at 0.15 of the baseline stays
- *   below the haze minimum (24 of about 100) and above a cloud-out (a few stars).
+ *   below the haze minimum (34 of 123, 0.28; version 1: 24 of 87, 0.28) and above a cloud-out (a
+ *   few stars).
  */
 export const thresholdsSchema = z.strictObject({
   baselineFrames: z.number().int().positive().default(5),

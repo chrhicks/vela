@@ -425,6 +425,7 @@ describe('a capture run feeds the alerts', () => {
     const remaining = [...counts]
 
     vi.spyOn(statistics, 'measureStars').mockImplementation(async () => ({
+      algorithm: { version: 2 },
       detectedStars: remaining.shift() ?? 0,
       medianHfrPixels: 3,
     }))

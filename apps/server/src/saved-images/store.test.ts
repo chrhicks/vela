@@ -240,3 +240,27 @@ it('keeps a calibration frame type across reopen and reads metadata without one 
   expect((await reopened.get('rig', image.id))?.frameType).toBe('light')
   expect(await fs.readFile(metadataPath, 'utf8')).toBe(legacyText)
 })
+
+it('reads statistics saved before the algorithm stamp as version 1 without rewriting the file', async () => {
+  const root = await temporary()
+  const store = await openFileSavedImageStore(root)
+  const statistics = { algorithm: { version: 2 }, detectedStars: 12, medianHfrPixels: 1.2 }
+  const saved = await store.save('rig', { ...image, statistics }, files)
+  const reopened = await openFileSavedImageStore(root)
+
+  expect((await reopened.get('rig', image.id))?.statistics).toEqual(statistics)
+
+  const metadataPath = join(
+    root,
+    createHash('sha256').update('rig').digest('hex'),
+    createHash('sha256').update(image.id).digest('hex'),
+    'metadata.json',
+  )
+
+  const { algorithm: _algorithm, ...legacyStatistics } = statistics
+  const legacyText = JSON.stringify({ ...saved, statistics: legacyStatistics })
+  await writeFile(metadataPath, legacyText)
+
+  expect((await reopened.get('rig', image.id))?.statistics).toEqual({ ...legacyStatistics, algorithm: { version: 1 } })
+  expect(await fs.readFile(metadataPath, 'utf8')).toBe(legacyText)
+})

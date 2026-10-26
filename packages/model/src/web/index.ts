@@ -55,6 +55,7 @@ export type {
   CaptureImage,
   CaptureImageProvenance,
   CaptureImageStatistics,
+  StarAlgorithm,
   CapturePhase,
   CaptureView,
   FrameType,

@@ -11,8 +11,18 @@ export interface CaptureSubject {
  */
 export type FrameType = 'light' | 'dark' | 'flat' | 'dark-flat' | 'bias'
 
+/**
+ * Which revision of the star measurement produced a frame's numbers. A count or HFR from one
+ * version is not comparable with another. Records saved before the stamp existed are version 1.
+ * Version 2 lowers the Bayer HFR floor from 1.4 to 1.0 px.
+ */
+export interface StarAlgorithm {
+  version: number
+}
+
 /** Conservative star measurements from this image's linear samples. */
 export interface CaptureImageStatistics {
+  algorithm: StarAlgorithm
   detectedStars: number
   /** Median radius enclosing half a measured star's light, in native image pixels. */
   medianHfrPixels: number | null

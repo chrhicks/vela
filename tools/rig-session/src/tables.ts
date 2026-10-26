@@ -129,6 +129,7 @@ function frameRow(
     rig_id: image.rigId,
     target_id: image.targetId,
     target_name: image.targetName,
+    star_algorithm_version: image.starAlgorithmVersion,
     detected_stars: image.detectedStars,
     median_hfr_px: image.medianHfrPixels,
     saved_dir: image.directory,
@@ -176,6 +177,7 @@ function attemptRow(session: string, record: FrameRecord, frameLink: Link<SavedI
     frame_candidates: candidates(frameLink, candidate => candidate.directory),
     operation_link: linkKind(operationLink),
     operation_candidates: candidates(operationLink, candidate => candidate.id),
+    star_algorithm_version: record.starAlgorithmVersion,
     detected_stars: record.detectedStars,
     median_hfr_px: record.medianHfrPixels,
   }
