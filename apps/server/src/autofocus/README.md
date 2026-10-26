@@ -48,6 +48,85 @@ the current position and the operation lease remain intact. Stop clears the read
 indicator and waits for camera cleanup and restoration; settled or cancelled
 capture callbacks cannot revive it.
 
+## Star tables
+
+Each sample is measured from a list of stars, and only the count and the median HFR
+reach the walk and the fit. The list is also recorded, so a later estimator can be
+tried on real runs without a new night. Recording changes nothing the walk does:
+the measurement policy, the samples, the fit and the final approach are the same
+with or without it.
+
+Where to read a run:
+
+- `GET /api/web/rigs/:rigId/autofocus/run` returns the current or last run held in
+  memory, growing as the walk takes samples. It is 404 until the first sample, and
+  lost on a restart. The polled `AutofocusView` carries no star lists, to stay small.
+- `VELA_AUTOFOCUS_RECORDS_PATH` names a JSONL file. When it is set, the server
+  appends one line when a run settles, whatever the outcome, if it took at least one
+  sample. It is off when unset. A write failure, or a backlog over 1 MiB, turns
+  recording off until restart and logs why once. The walk is never affected. It uses
+  the same appender as the frame records (`apps/server/src/records.ts`).
+
+Both are an `AutofocusRun` (`packages/model/src/web/autofocus.ts`):
+
+```json
+{
+  "version": 1,
+  "rigId": "fra 400",
+  "startedAt": "2026-10-26T03:10:00.000Z",
+  "settledAt": "2026-10-26T03:11:05.000Z",
+  "phase": "complete",
+  "error": null,
+  "startPosition": 32842,
+  "stepSize": 50,
+  "offsetSteps": 4,
+  "exposureSeconds": 2,
+  "fit": { "position": 32838, "p": 32837.9, "a": 2.27, "b": 99.9, "rSquared": 0.999, "minSamplePosition": 32842 },
+  "samples": [
+    {
+      "position": 33042,
+      "detectedStars": 35,
+      "hfrPixels": 5.184,
+      "capturedAt": "2026-10-26T03:10:04.000Z",
+      "stars": [{ "x": 99, "y": 274, "snr": 1025.6, "hfr": 5.185 }]
+    }
+  ]
+}
+```
+
+- `samples` are in the order measured, the confirming sample last. The same position
+  can appear twice, so match a sample by its index, not its position. Each sample is
+  exactly the `AutofocusSample` of the view, plus `stars`.
+- `stars` lists the stars that passed every gate of the autofocus policy, brightest
+  flux S/N first, capped at `autofocusStarTableLimit` (100, in
+  `apps/server/src/imaging/statistics.ts`). `detectedStars` still counts every star
+  that passed, so `stars` is shorter than it only when the cap bit.
+- A star is `x` and `y` in native sensor pixels (a merged blend is its centre), `snr`
+  the flux signal-to-noise in the 40 px aperture, and `hfr` the half-flux radius in
+  pixels. They are rounded to 0.1 px, 0.1 and 0.001. `hfrPixels` is the median of the
+  unrounded HFRs of all passing stars, so the table's median can differ in the last
+  digit, and by more when the cap bit.
+- A sample whose measurement failed, or one recorded by a build before this, has
+  `detectedStars: 0` or an empty `stars`. Read an empty list as "no table", not "no
+  stars".
+- A run that fails or is stopped is recorded too, with its `phase` and `error`. Its
+  `fit` is the fit the walk had reached, or null if it reached none. A stop or failure
+  during the confirming sample keeps the fit, yet the focuser went back to
+  `startPosition`, so `fit.position` is where the run chose to go, not where the
+  focuser ended. Only a `complete` run ended at `fit.position`. `settledAt` is null
+  only in the live route, during the walk.
+
+Size: a star is about 50 bytes of JSON. A simulated 10-sample run of about 25 stars a
+sample is 12.6 KB. A run of 12 samples with the cap reached is at most about 60 KB,
+and a rich field out of focus usually has 20 to 60 stars a sample. A night of ten
+runs is under 1 MB.
+
+To list a run's chosen focus and star counts:
+
+```sh
+jq -c 'select(.phase == "complete") | {startedAt, fit: .fit.position, stars: [.samples[] | [.position, .detectedStars, (.stars | length)]]}' autofocus.jsonl
+```
+
 Stop needs no body, the same as capture stop: a bare POST, an empty body or `{}` are
 accepted, and any other body is refused with 400 while the walk keeps going.
 
@@ -57,5 +136,5 @@ as stopped; camera abort or cleanup failures remain failed even when return to t
 starting focuser position succeeds.
 
 ```sh
-pnpm exec vitest run apps/server/src/autofocus apps/server/src/imaging/statistics.test.ts packages/alpaca/src/focuser.test.ts
+pnpm exec vitest run apps/server/src/autofocus apps/server/src/imaging/statistics.test.ts apps/server/src/capture/frame-records.test.ts packages/alpaca/src/focuser.test.ts
 ```

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   autofocusPolicy,
+  autofocusStarTableLimit,
   capturePolicy,
   classify,
   findPeaks,
@@ -236,6 +237,54 @@ describe('measureStars', () => {
     expect(result.detections).toBe(2)
     expect(result.measured + Object.values(result.rejected).reduce((a, b) => a + b, 0)).toBe(1)
   })
+
+  it('lists the stars behind an autofocus sample, brightest first, and leaves its statistics as they were', async () => {
+    const placed = [
+      { x: 60, y: 60, sigma: 2.5, amplitude: 400 },
+      { x: 160, y: 60, sigma: 2.5, amplitude: 1600 },
+      { x: 60, y: 160, sigma: 2.5, amplitude: 900 },
+      { x: 160, y: 160, sigma: 2.5, amplitude: 2500 },
+    ]
+
+    const frame = image(placed, { width: 220, height: 220, noise: 1 })
+    const measured = await measureAutofocusStars(frame.width, frame.height, frame.pixels)
+    const { stars, ...statistics } = measured
+
+    expect(statistics).toEqual(
+      await measureStars(frame.width, frame.height, frame.pixels, { kind: 'mono' }, autofocusPolicy),
+    )
+    expect(stars).toHaveLength(measured.detectedStars)
+
+    const snrs = stars.map(({ snr }) => snr)
+
+    expect(snrs).toEqual(snrs.slice().sort((a, b) => b - a))
+    expect(stars.map(({ x, y }) => [Math.round(x), Math.round(y)])).toEqual([
+      [160, 160],
+      [160, 60],
+      [60, 160],
+      [60, 60],
+    ])
+
+    for (const { hfr } of stars) expect(Math.abs(hfr - 2.5 * 1.177)).toBeLessThan(0.3)
+  })
+
+  it('keeps only the brightest stars of a crowded autofocus sample', async () => {
+    const placed = Array.from({ length: autofocusStarTableLimit + 10 }, (_, index) => ({
+      x: 100 + (index % 11) * 100,
+      y: 100 + Math.floor(index / 11) * 100,
+      sigma: 2.5,
+      amplitude: 500 + index * 20,
+    }))
+
+    const frame = image(placed, { width: 1200, height: 1100, noise: 1 })
+    const result = await measureAutofocusStars(frame.width, frame.height, frame.pixels)
+
+    expect(result.detectedStars).toBeGreaterThan(autofocusStarTableLimit)
+    expect(result.stars).toHaveLength(autofocusStarTableLimit)
+
+    // The faintest star placed is among those left out.
+    expect(result.stars.some(({ x, y }) => Math.round(x) === 100 && Math.round(y) === 100)).toBe(false)
+  }, 30_000)
 
   it('returns no measurement for blank, noisy, invalid and isolated hot-pixel images', async () => {
     for (const color of [

@@ -1,9 +1,13 @@
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import Fastify, { type InjectOptions } from 'fastify'
 import { afterEach, expect, it, vi } from 'vitest'
 import type { AlpacaDeviceInspection } from '@vela/alpaca'
 import { createMemoryRigCatalog } from '../rig/catalog.js'
 import { createRigOperations } from '../rig/operations.js'
-import { registerAutofocus } from './routes.js'
+import { openJsonlRecords } from '../records.js'
+import { noAutofocusRecords, registerAutofocus, type AutofocusRecords } from './routes.js'
 import type { AutofocusCamera, AutofocusFocuser } from './controller.js'
 import { hyperbola } from './hyperbola.js'
 import { emptyHaltRequests, refusedHaltRequests } from '../http/halt-requests.fixture.js'
@@ -42,9 +46,10 @@ function deferred() {
 function setup(
   start = 32842,
   inventory = record.lastObservedInventory,
-  { travel = { maxStep: 60000 }, bestFocus = 32838 }: {
+  { travel = { maxStep: 60000 }, bestFocus = 32838, records = noAutofocusRecords }: {
     travel?: { minStep?: number; maxStep: number }
     bestFocus?: number
+    records?: AutofocusRecords
   } = {},
 ) {
   const app = Fastify()
@@ -125,7 +130,9 @@ function setup(
       algorithm: { version: 2 },
       detectedStars: 40,
       medianHfrPixels: hyperbola(position, 2.18, 95, bestFocus),
+      stars: [{ x: 10, y: 20, snr: 300, hfr: position / 10000 }],
     }),
+    records,
   })
 
   cleanups.push(async () => {
@@ -134,6 +141,7 @@ function setup(
 
   return {
     get: () => app.inject({ method: 'GET', url: '/api/web/rigs/fra/autofocus' }),
+    getRun: () => app.inject({ method: 'GET', url: '/api/web/rigs/fra/autofocus/run' }),
     start: (body: { stepSize?: number; exposureSeconds?: number } = { stepSize: 50 }) =>
       app.inject({
         method: 'POST',
@@ -232,6 +240,37 @@ it('publishes samples onto the live view as the walk runs', async () => {
   expect(done.phase).toBe('complete')
   expect(done.fit.position).not.toBe(0)
   expect(subject.moves).not.toContain(0)
+})
+
+it('serves the run so far with its star tables, and appends the settled run to the records file', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'vela-autofocus-records-test-'))
+  cleanups.push(() => rm(directory, { recursive: true, force: true }))
+  const file = join(directory, 'nested', 'autofocus.jsonl')
+  const records: AutofocusRecords = openJsonlRecords(file, { name: 'autofocus records' })
+  const subject = setup(32842, undefined, { records })
+
+  expect((await subject.getRun()).statusCode).toBe(404)
+  await subject.start({ stepSize: 50, exposureSeconds: 2 })
+  await subject.land()
+  await vi.waitFor(async () => expect((await subject.get()).json().samples).toHaveLength(1))
+
+  const mid = (await subject.getRun()).json()
+  expect(mid).toMatchObject({ version: 1, rigId: 'fra', settledAt: null, phase: 'walking' })
+  expect(mid.samples).toHaveLength(1)
+  expect(mid.samples[0].stars).toEqual([{ x: 10, y: 20, snr: 300, hfr: mid.samples[0].position / 10000 }])
+  expect((await subject.get()).json().samples[0]).not.toHaveProperty('stars')
+
+  await subject.finish()
+  const done = (await subject.getRun()).json()
+  expect(done).toMatchObject({ phase: 'complete', fit: { position: expect.any(Number) } })
+  expect(done.settledAt).not.toBeNull()
+  expect(done.samples).toHaveLength(10)
+  await records.close()
+
+  const lines = (await readFile(file, 'utf8')).trimEnd().split('\n')
+
+  expect(lines).toHaveLength(1)
+  expect(JSON.parse(lines[0]!)).toEqual(done)
 })
 
 it('returns to setup for a travel-limit start without moving', async () => {

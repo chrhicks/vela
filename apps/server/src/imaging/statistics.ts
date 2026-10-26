@@ -1,6 +1,6 @@
 import { setImmediate } from 'node:timers/promises'
 
-import type { StarRejection } from '@vela/model/web'
+import type { AutofocusStar, StarRejection } from '@vela/model/web'
 
 import type { ImageColor } from './preview.js'
 
@@ -142,6 +142,16 @@ export async function measureStars(
   color: ImageColor = { kind: 'mono' },
   policy: StarPolicy = capturePolicy,
 ) {
+  return (await measureFrame(width, height, pixels, color, policy)).statistics
+}
+
+async function measureFrame(
+  width: number,
+  height: number,
+  pixels: ArrayLike<number>,
+  color: ImageColor,
+  policy: StarPolicy,
+) {
   if (
     !Number.isInteger(width) ||
     !Number.isInteger(height) ||
@@ -161,6 +171,7 @@ export async function measureStars(
 
   const { peaks, sky } = await findPeaks(width, height, pixels, color, policy)
   const verdicts: Verdict[] = []
+  const stars: AutofocusStar[] = []
   const axisRatios: number[] = []
   const candidates = groupPeaks(peaks, policy)
 
@@ -172,7 +183,11 @@ export async function measureStars(
       const measurement = measureStar(width, height, pixels, color, peak, policy)
       const axisRatio = axisRatioOf(measurement, policy)
 
-      verdicts.push(classify(measurement, policy, color))
+      const verdict = classify(measurement, policy, color)
+
+      verdicts.push(verdict)
+
+      if (verdict.ok) stars.push({ x: peak.x, y: peak.y, snr: verdict.snr, hfr: verdict.hfr })
 
       if (axisRatio !== null) axisRatios.push(axisRatio)
     }
@@ -180,17 +195,42 @@ export async function measureStars(
     if (index % 8 === 0) await setImmediate()
   }
 
-  return summarize(verdicts, peaks.length, sky, axisRatios)
+  return { statistics: summarize(verdicts, peaks.length, sky, axisRatios), stars }
 }
 
-/** Defocus-capable HFR for an autofocus walk. Capture continues to use measureStars. */
+/**
+ * The most stars of one autofocus sample that its star table keeps, brightest first. A typical
+ * sample measures 20 to 100 stars, so the cap rarely bites; the sample's `detectedStars` still
+ * counts every star that passed.
+ */
+export const autofocusStarTableLimit = 100
+
+/**
+ * Defocus-capable HFR for an autofocus walk, with the sample's star table. Capture continues to
+ * use measureStars.
+ */
 export async function measureAutofocusStars(
   width: number,
   height: number,
   pixels: ArrayLike<number>,
   color: ImageColor = { kind: 'mono' },
 ) {
-  return measureStars(width, height, pixels, color, autofocusPolicy)
+  const { statistics, stars } = await measureFrame(width, height, pixels, color, autofocusPolicy)
+
+  return { ...statistics, stars: starTable(stars) }
+}
+
+/** The brightest stars by flux signal-to-noise, rounded to what a later replay can use. */
+function starTable(stars: AutofocusStar[]): AutofocusStar[] {
+  return stars
+    .sort((a, b) => b.snr - a.snr)
+    .slice(0, autofocusStarTableLimit)
+    .map(star => ({
+      x: Math.round(star.x * 10) / 10,
+      y: Math.round(star.y * 10) / 10,
+      snr: Math.round(star.snr * 10) / 10,
+      hfr: Math.round(star.hfr * 1000) / 1000,
+    }))
 }
 
 /**

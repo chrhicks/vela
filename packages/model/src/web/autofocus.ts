@@ -6,6 +6,39 @@ export interface AutofocusSample {
   capturedAt: string
 }
 
+/** One star measured in an autofocus sample: native pixel position, flux signal-to-noise, half-flux radius in pixels. */
+export interface AutofocusStar {
+  x: number
+  y: number
+  snr: number
+  hfr: number
+}
+
+/** An autofocus sample and the stars behind it, brightest first and capped, so `stars` can be shorter than `detectedStars`. */
+export interface AutofocusStarSample extends AutofocusSample {
+  stars: AutofocusStar[]
+}
+
+/**
+ * Everything a replay needs from one autofocus run: how it was set up, each sample with its star
+ * table in the order measured, and the fit it chose. `version` changes only when a field's meaning does.
+ */
+export interface AutofocusRun {
+  version: 1
+  rigId: string
+  startedAt: string
+  /** Null while the run is still going. */
+  settledAt: string | null
+  phase: AutofocusPhase
+  error: string | null
+  startPosition: number | null
+  stepSize: number
+  offsetSteps: number
+  exposureSeconds: number
+  fit: AutofocusFit | null
+  samples: AutofocusStarSample[]
+}
+
 export interface AutofocusFit {
   /** Integer focuser step to command. */
   position: number

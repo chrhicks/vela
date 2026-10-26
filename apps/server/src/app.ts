@@ -31,7 +31,7 @@ import { defaultThresholds } from './alerts/thresholds.js'
 import { noFrameRecords, type FrameRecords } from './capture/frame-records.js'
 import { noCaptureRuns, type CaptureRunStore } from './capture/run-store.js'
 import { frameImaging, type FrameImaging } from './imaging/frame-imaging.js'
-import { registerAutofocus } from './autofocus/routes.js'
+import { noAutofocusRecords, registerAutofocus, type AutofocusRecords } from './autofocus/routes.js'
 import { registerNavigation } from './navigation.js'
 import { registerImagingCamera } from './rig/imaging-camera.js'
 import { registerAlignment } from './alignment/routes.js'
@@ -47,6 +47,7 @@ interface BuildAppOptions {
   readonly surveyCache?: SurveyCache
   readonly savedImages?: SavedImageStore
   readonly frameRecords?: FrameRecords
+  readonly autofocusRecords?: AutofocusRecords
   readonly captureRuns?: CaptureRunStore
   readonly images?: FrameImaging
   readonly alignment?: AlignmentSettings
@@ -82,6 +83,7 @@ export function buildApp({
   rigCatalog = createMemoryRigCatalog(),
   savedImages = createMemorySavedImageStore(),
   frameRecords = noFrameRecords,
+  autofocusRecords = noAutofocusRecords,
   captureRuns = noCaptureRuns,
 }: BuildAppOptions = {}) {
   const app = Fastify({ logger: true })
@@ -133,6 +135,7 @@ export function buildApp({
     createInspector,
     createAcquisition: equipment.createAcquisition,
     createFocuserAdapter: equipment.createFocuser,
+    records: autofocusRecords,
   })
   registerNavigation(app, rigCatalog, capture)
   registerSavedImages(app, rigCatalog, savedImages)
