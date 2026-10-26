@@ -76,6 +76,41 @@ describe('capture response validation', () => {
     }
   })
 
+  it('accepts the named star outputs, including peaks found with no star measured, and rejects malformed ones', () => {
+    const rejected = { blended: 3, edge: 1, unconverged: 0, faint: 30, saturated: 0, wings: 4, elongated: 2, floor: 0 }
+
+    const named = {
+      detections: 41,
+      measured: 1,
+      strong: 1,
+      rejected,
+      sky: 540.25,
+      noise: 4.1,
+    }
+
+    const base = { detectedStars: 1, medianHfrPixels: 2.35 }
+
+    for (const statistics of [
+      { ...base, ...named },
+      { detectedStars: 0, medianHfrPixels: null, ...named, measured: 0, strong: 0 },
+    ])
+      expect(isCaptureView({ ...view, latestImage: { ...view.latestImage, statistics } }, 'rig-1')).toBe(true)
+
+    for (const broken of [
+      { detections: -1 },
+      { measured: 1.5 },
+      { strong: '1' },
+      { rejected: { ...rejected, faint: -1 } },
+      { rejected: { blended: 3 } },
+      { sky: '540' },
+      { noise: -1 },
+    ]) {
+      const statistics = { ...base, ...named, ...broken }
+
+      expect(isCaptureView({ ...view, latestImage: { ...view.latestImage, statistics } }, 'rig-1')).toBe(false)
+    }
+  })
+
   it('rejects mismatched rigs, contradictory active states, and invalid exposure progress', () => {
     expect(isCaptureView(view, 'other-rig')).toBe(false)
     expect(isCaptureView({ ...view, active: false }, 'rig-1')).toBe(false)

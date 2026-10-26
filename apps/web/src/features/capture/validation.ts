@@ -7,6 +7,7 @@ import type {
   SavedImageView,
 } from '@vela/model/web'
 import { frameTypes } from './frame-types'
+import { starStatistics } from './star-statistics'
 
 /** The server's limit on `frameCount`. */
 export const MAX_FRAME_COUNT = 10_000
@@ -37,17 +38,6 @@ const timestamp = z
   .regex(/^\d{4}-\d{2}-\d{2}T.+Z$/)
   .refine(value => Number.isFinite(Date.parse(value)))
 
-const statistics = z
-  .object({
-    algorithm: z.object({ version: z.number().int().positive() }).default({ version: 1 }),
-    detectedStars: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
-    medianHfrPixels: z.number().positive().nullable(),
-  })
-  .refine(value =>
-    value.detectedStars === 0 ? value.medianHfrPixels === null : value.medianHfrPixels !== null,
-  )
-  .nullable()
-
 const captureImage = z
   .object({
     id: text,
@@ -61,7 +51,7 @@ const captureImage = z
     width: z.number().refine(Number.isInteger).positive(),
     height: z.number().refine(Number.isInteger).positive(),
     exposureSeconds: z.number().min(0.1).max(600),
-    statistics,
+    statistics: starStatistics.nullable(),
     capturedAtSource: z.enum(['camera', 'server-estimate']).optional(),
     capturedAt: timestamp,
     receivedAt: timestamp,
