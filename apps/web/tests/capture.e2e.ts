@@ -579,6 +579,43 @@ test('displays completed downloads during faster frame arrivals and coalesces pe
 
 })
 
+test('shows how many peaks were measured and the sky level, within 390 px', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+
+  const current: CaptureView = {
+    ...idle,
+    phase: 'complete',
+    latestImage: {
+      ...firstImage,
+      statistics: {
+        algorithm: { version: 2 },
+        detectedStars: 264,
+        medianHfrPixels: 1.6,
+        detections: 1141,
+        measured: 264,
+        strong: 134,
+        rejected: { blended: 39, edge: 24, unconverged: 3, faint: 601, saturated: 0, wings: 106, elongated: 90, floor: 12 },
+        sky: 539.25,
+        noise: 4.2,
+      },
+    },
+  }
+
+  await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, current))
+  await page.route('**/api/rigs/rig-1/capture/images/*', route =>
+    route.fulfill({ contentType: 'image/png', body: preview }),
+  )
+  await page.goto('/rigs/rig-1/observe/capture')
+  const facts = page.locator('.capture-image__facts')
+  await expect(facts).toContainText('264 measured of 1141 peaks')
+  await expect(facts).toContainText('Sky 539.3')
+  await expect(facts).toContainText('1.6 px HFR')
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  const box = await facts.boundingBox()
+
+  expect(box!.x + box!.width).toBeLessThanOrEqual(390)
+})
+
 test('distinguishes unavailable star measurements from an image with no measurable stars', async ({
   page,
 }) => {

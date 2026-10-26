@@ -2,6 +2,7 @@ import type { FramingPreview } from '@vela/model/web'
 import { Button, IconButton } from '@vela/ui'
 import { useId, useRef, useState } from 'react'
 import { CameraMark } from '../capture/LatestImage'
+import { skyLevel, starCounts } from '../capture/star-statistics'
 import { ImageEnlargement, ImageViewport } from '../image-inspection/ImageViewport'
 import { useImageInspection } from '../image-inspection/useImageInspection'
 import './framing-exposure.css'
@@ -32,6 +33,8 @@ export function FramingExposure({
     inspection.hold()
     setExpanded(true)
   }
+
+  const sky = frame?.statistics && skyLevel(frame.statistics)
 
   const time = frame
     ? new Date(frame.capturedAt).toLocaleTimeString(undefined, { hour12: false })
@@ -130,8 +133,9 @@ export function FramingExposure({
             Star size{'   '}{frame.statistics?.medianHfrPixels?.toFixed(1) ?? '—'} px HFR
           </span>
           <span>
-            {frame.statistics ? `${frame.statistics.detectedStars} stars` : 'Star measurements unavailable'}
+            {frame.statistics ? starCounts(frame.statistics) : 'Star measurements unavailable'}
           </span>
+          {sky && <span>Sky {sky}</span>}
         </div>
         <span>Temporary</span>
       </div>

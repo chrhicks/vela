@@ -4,6 +4,7 @@ import { useId, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { ImageEnlargement, ImageViewport } from '../image-inspection/ImageViewport'
 import { useImageInspection } from '../image-inspection/useImageInspection'
 import { frameTypeChoices, isCalibration } from '../capture/frame-types'
+import { skyLevel, starCounts } from '../capture/star-statistics'
 import { photographDate, photographTime } from './format'
 
 export function SelectedPhotograph({ image, rigId, position, viewerRef, timeZone, night, navigation }: {
@@ -23,6 +24,7 @@ export function SelectedPhotograph({ image, rigId, position, viewerRef, timeZone
   const openerId = useId()
   const original = displayed.previewRendering?.status !== 'current'
   const fallback = displayed.previewRendering?.status === 'unavailable'
+  const sky = displayed.statistics && skyLevel(displayed.statistics)
 
   const tools = (
     <div className="photographs__tools">
@@ -165,10 +167,11 @@ export function SelectedPhotograph({ image, rigId, position, viewerRef, timeZone
             <dt>Stars · HFR</dt>
             <dd>
               {displayed.statistics
-                ? `${displayed.statistics.detectedStars} stars · ${displayed.statistics.medianHfrPixels === null ? 'HFR unavailable' : `${displayed.statistics.medianHfrPixels.toFixed(2)} px`}`
+                ? `${starCounts(displayed.statistics)} · ${displayed.statistics.medianHfrPixels === null ? 'HFR unavailable' : `${displayed.statistics.medianHfrPixels.toFixed(2)} px`}`
                 : 'Measurements unavailable'}
             </dd>
           </div>
+          {sky && <div><dt>Sky</dt><dd>{sky}</dd></div>}
         </dl>
         <div className="photographs__downloads">
           {fallback ? (

@@ -61,6 +61,30 @@ describe('the bench on the committed fixture', () => {
     expect(frames.map(row => row[header!.indexOf('frame_type')])).toEqual(['light', 'light', 'light', 'dark'])
   })
 
+  it('fills the named outputs for every frame and accounts for every peak', async () => {
+    const result = await runBench(options(fixture))
+    const [header, ...frames] = result.table.trimEnd().split('\n').map(row => row.split('\t'))
+    const column = (name: string) => header!.indexOf(name)
+    const number = (row: string[], name: string) => Number(row[column(name)])
+    const reasons = header!.filter(name => name.startsWith('rejected_'))
+
+    expect(reasons).toHaveLength(8)
+
+    for (const row of frames) {
+      for (const name of ['detections', 'measured', 'strong', 'sky_level', 'sky_noise', ...reasons])
+        expect(row[column(name)], name).toMatch(/^-?\d+(\.\d+)?$/)
+
+      expect(number(row, 'measured')).toBe(number(row, 'detected_stars'))
+      expect(number(row, 'strong')).toBeLessThanOrEqual(number(row, 'measured'))
+      const rejected = reasons.reduce((sum, name) => sum + number(row, name), 0)
+
+      expect(number(row, 'detections')).toBe(number(row, 'measured') + rejected)
+    }
+
+    expect(result.report).toMatch(/per frame, median: peaks \d+, measured 26, strong \d+, sky \d+/)
+    expect(result.report).toMatch(/rejected by first failed gate, median: blended \d+, edge \d+, unconverged \d+, faint \d+/)
+  })
+
   it('reports a record that no longer equals the measurement, and does not pass', async () => {
     await record('fixture-light-2', { detectedStars: 99, medianHfrPixels: 2.7495413665640918 })
 

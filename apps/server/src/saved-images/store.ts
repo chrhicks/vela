@@ -308,6 +308,8 @@ async function readMetadata(
 
 const timestamp = z.string().refine(value => Number.isFinite(Date.parse(value)))
 
+const count = z.number().int().nonnegative()
+
 const savedImageSchema = z
   .object({
     id: z.string(),
@@ -341,6 +343,23 @@ const savedImageSchema = z
         algorithm: z.object({ version: z.number().int().positive() }).default({ version: 1 }),
         detectedStars: z.number().int().nonnegative(),
         medianHfrPixels: z.number().nonnegative().nullable(),
+        detections: count.optional(),
+        measured: count.optional(),
+        strong: count.optional(),
+        rejected: z
+          .object({
+            blended: count,
+            edge: count,
+            unconverged: count,
+            faint: count,
+            saturated: count,
+            wings: count,
+            elongated: count,
+            floor: count,
+          })
+          .optional(),
+        sky: z.number().optional(),
+        noise: z.number().nonnegative().optional(),
       })
       .nullable(),
     imageUrl: z.string(),

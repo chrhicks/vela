@@ -7,6 +7,7 @@ import type {
   TargetView,
   TargetsView,
 } from '@vela/model/web'
+import { starStatistics } from '../capture/star-statistics'
 
 const date = z.string().refine(value => Number.isFinite(Date.parse(value)))
 
@@ -129,10 +130,7 @@ const preview = z.object({
   checkId: z.string().min(1).nullable(),
   previewUrl: z.string().startsWith('/api/').nullable(),
   nativePreviewUrl: z.string().startsWith('/api/').nullable(),
-  statistics: z.object({
-    detectedStars: z.number().int().nonnegative(),
-    medianHfrPixels: z.number().positive().nullable(),
-  }).nullable(),
+  statistics: starStatistics.nullable(),
 }).refine(value => (value.previewUrl === null) === (value.nativePreviewUrl === null))
 
 const pointingSide = z.enum(['east', 'west', 'unknown'])

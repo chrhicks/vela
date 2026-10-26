@@ -1,3 +1,5 @@
+import type { CaptureImageStatistics } from '@vela/model/web'
+
 import { encodeCaptureFits } from './fits.js'
 import { capturePreviews } from './preview.js'
 import { measureStars } from './statistics.js'
@@ -10,7 +12,7 @@ import { measureStars } from './statistics.js'
  */
 export interface FrameImaging {
   readonly render: typeof capturePreviews
-  readonly analyze: typeof measureStars
+  readonly analyze: (...args: Parameters<typeof measureStars>) => Promise<CaptureImageStatistics>
   readonly encodeFits: typeof encodeCaptureFits
 }
 

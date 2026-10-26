@@ -1,3 +1,5 @@
+import type { CaptureImageStatistics } from './capture.js'
+
 /** Catalog and framing positions are fixed J2000 equatorial degrees. */
 export interface TargetPosition {
   raDegrees: number
@@ -128,7 +130,7 @@ export interface FramingPreview {
   checkId: string | null
   previewUrl: string | null
   nativePreviewUrl: string | null
-  statistics: { detectedStars: number; medianHfrPixels: number | null } | null
+  statistics: CaptureImageStatistics | null
 }
 
 export type FramingPointingSide = 'east' | 'west' | 'unknown'

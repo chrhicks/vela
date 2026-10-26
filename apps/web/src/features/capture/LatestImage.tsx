@@ -4,6 +4,7 @@ import type { CaptureImage } from '@vela/model/web'
 import './latest-image.css'
 import { api, ApiError } from '../../lib/api'
 import { isSavedImage } from './validation'
+import { skyLevel, starCounts } from './star-statistics'
 import { useLoadedPixels } from '../image-inspection/useLoadedPixels'
 import { useImageInspection } from '../image-inspection/useImageInspection'
 import { ImageViewport, ImageEnlargement } from '../image-inspection/ImageViewport'
@@ -65,6 +66,7 @@ function LegacyLatestImage({
   const { loadedImage: frame, loadedUrl, loading, failed } = useLoadedImage(image, zoomed)
   const nativeVisible = !!frame && zoomed && loadedUrl === frame.imageUrl
   const loadingNative = zoomed && !nativeVisible && loading
+  const sky = frame?.statistics && skyLevel(frame.statistics)
   const [now, setNow] = useState(Date.now)
   const imageWindow = useRef<HTMLDivElement>(null)
   const retention = useImageRetention(rigId)
@@ -227,13 +229,19 @@ function LegacyLatestImage({
               </dd>
             </div>
             <div>
-              <dt title="Detected stars with a reliable measurement">Stars</dt>
-              <dd>{frame.statistics?.detectedStars ?? '—'}</dd>
+              <dt title="Stars that passed every check, of all the peaks found above the sky">Stars</dt>
+              <dd>{frame.statistics ? starCounts(frame.statistics) : '—'}</dd>
             </div>
             <div>
               <dt title="Median half-flux radius in native image pixels">HFR · px</dt>
               <dd>{frame.statistics?.medianHfrPixels?.toFixed(2) ?? '—'}</dd>
             </div>
+            {sky && (
+              <div>
+                <dt title="Median background level of the frame, in raw sample units">Sky</dt>
+                <dd>{sky}</dd>
+              </div>
+            )}
           </dl>
           {frame.capturedAtSource === 'server-estimate' && <p>Start time estimated</p>}
           {!frame.statistics ? (
@@ -341,6 +349,7 @@ function FieldroomLatestImage({ image, busy, interrupted, rigId, savedDetail = f
   const [now, setNow] = useState(Date.now)
   const lastKnown = interrupted && !savedDetail && !!frame
   const hfr = frame?.statistics?.medianHfrPixels
+  const sky = frame?.statistics && skyLevel(frame.statistics)
   const expired = native.result?.state === 'missing'
   const retention = useImageRetention(rigId)
 
@@ -464,7 +473,8 @@ function FieldroomLatestImage({ image, busy, interrupted, rigId, savedDetail = f
           <span className="capture-image__star-size" title="Median half-flux radius in native image pixels">
             Star size{'   '}{hfr == null ? '—' : Number(hfr.toFixed(2))} px HFR
           </span>
-          <span>{frame.statistics ? `${frame.statistics.detectedStars} stars` : 'Star measurements unavailable'}</span>
+          <span>{frame.statistics ? starCounts(frame.statistics) : 'Star measurements unavailable'}</span>
+          {sky && <span>Sky {sky}</span>}
         </div>
         {saved ? (
           <span className="capture-image__saved">

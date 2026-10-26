@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { FrameResult } from './compare.ts'
 import type { SavedFrame } from './frames.ts'
 import { groupRuns } from './runs.ts'
+import { starStatistics } from './test-statistics.ts'
 
 const start = Date.parse('2030-01-01T02:00:00Z')
 
@@ -21,7 +22,7 @@ function result(
       recorded: null,
       ...overrides,
     },
-    measurement: { status: 'measured', detectedStars: stars, medianHfrPixels: 2, milliseconds: 1 },
+    measurement: { status: 'measured', milliseconds: 1, ...starStatistics(stars, 2) },
     comparison: { status: 'unrecorded' },
   }
 }

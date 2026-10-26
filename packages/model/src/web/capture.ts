@@ -20,8 +20,44 @@ export interface StarAlgorithm {
   version: number
 }
 
-/** Conservative star measurements from this image's linear samples. */
-export interface CaptureImageStatistics {
+/** Every field optional, and allowed to be `undefined`, as parsed JSON reads. */
+type Optional<T> = { [Name in keyof T]?: T[Name] | undefined }
+
+/** Why a peak is left out of the measured stars: the first gate it failed, in the order listed. */
+export type StarRejection =
+  | 'blended'
+  | 'edge'
+  | 'unconverged'
+  | 'faint'
+  | 'saturated'
+  | 'wings'
+  | 'elongated'
+  | 'floor'
+
+/**
+ * What one star measurement found, by name. Frames saved before these were recorded have none of
+ * them, so every field is optional on a statistics record.
+ */
+export interface StarOutputs {
+  /** Peaks found above the sky, before any gate. */
+  detections: number
+  /** Peaks that passed every gate. Equals `detectedStars`. */
+  measured: number
+  /** Measured stars with a flux signal-to-noise of 100 or more. */
+  strong: number
+  /** Peaks left out, by the first gate each failed. */
+  rejected: Record<StarRejection, number>
+  /** Median of the frame's 64 px tile backgrounds, in raw sample units (a Bayer cell is the mean of its four samples). */
+  sky: number
+  /** Median of the same tiles' noise estimates. */
+  noise: number
+}
+
+/**
+ * Conservative star measurements from this image's linear samples. `detectedStars` and
+ * `medianHfrPixels` are the alert and autofocus inputs; the named outputs explain them.
+ */
+export interface CaptureImageStatistics extends Optional<StarOutputs> {
   algorithm: StarAlgorithm
   detectedStars: number
   /** Median radius enclosing half a measured star's light, in native image pixels. */

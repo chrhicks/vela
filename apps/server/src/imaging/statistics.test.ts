@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   capturePolicy,
   classify,
@@ -186,6 +186,49 @@ describe('measureStars', () => {
     expect((await measureAutofocusStars(frame.width, frame.height, frame.pixels)).algorithm).toEqual({ version: 2 })
   })
 
+  it('records what it found beside the count and accounts for every peak', async () => {
+    const frame = image(
+      [
+        { x: 30, y: 30, sigma: 2, amplitude: 1000 },
+        { x: 65, y: 30, sigma: 2, amplitude: 60 },
+        { x: 30, y: 65, sigma: 2, amplitude: 14 },
+        { x: 62, y: 65, sigma: 2 },
+        { x: 68, y: 65, sigma: 2 },
+        { x: 10, y: 45, sigma: 2 },
+      ],
+      { noise: 1 },
+    )
+
+    const result = await measureStars(frame.width, frame.height, frame.pixels)
+
+    expect(result).toMatchObject({
+      detectedStars: 2,
+      detections: 6,
+      measured: 2,
+      strong: 1,
+      rejected: { blended: 2, edge: 1, faint: 1, unconverged: 0, saturated: 0, wings: 0, elongated: 0, floor: 0 },
+    })
+    expect(Math.abs(result.sky - 100)).toBeLessThan(1)
+    expect(Math.abs(result.noise - 1)).toBeLessThan(0.3)
+
+    expect(result.detections).toBe(result.measured + Object.values(result.rejected).reduce((a, b) => a + b, 0))
+  })
+
+  it('counts blends merged for autofocus as one peak measured', async () => {
+    const frame = image(
+      [
+        { x: 90, y: 100, sigma: 2 },
+        { x: 98, y: 100, sigma: 2 },
+      ],
+      { width: 200, height: 200, noise: 1 },
+    )
+
+    const result = await measureAutofocusStars(frame.width, frame.height, frame.pixels)
+
+    expect(result.detections).toBe(2)
+    expect(result.measured + Object.values(result.rejected).reduce((a, b) => a + b, 0)).toBe(1)
+  })
+
   it('returns no measurement for blank, noisy, invalid and isolated hot-pixel images', async () => {
     for (const color of [
       { kind: 'mono' },
@@ -273,9 +316,12 @@ describe('measureStars', () => {
 describe('star measurement stages', () => {
   const mono: ImageColor = { kind: 'mono' }
 
-  async function verdictFor(star: Star, options: Parameters<typeof image>[1] = {}) {
-    const frame = image([star], { noise: 1, ...options })
-    const peaks = await findPeaks(frame.width, frame.height, frame.pixels, mono, capturePolicy)
+  /** Measures the peak nearest the first star; later stars overlap it. */
+  async function verdictFor(stars: Star | Star[], options: Parameters<typeof image>[1] = {}) {
+    const list = [stars].flat()
+    const star = list[0]!
+    const frame = image(list, { noise: 1, ...options })
+    const { peaks } = await findPeaks(frame.width, frame.height, frame.pixels, mono, capturePolicy)
     const distance = (peak: { x: number; y: number }) => Math.hypot(peak.x - star.x, peak.y - star.y)
     const nearest = peaks.sort((a, b) => distance(a) - distance(b))[0]!
 
@@ -300,10 +346,20 @@ describe('star measurement stages', () => {
       { noise: 1 },
     )
 
-    expect(await findPeaks(frame.width, frame.height, frame.pixels, mono, capturePolicy)).toEqual([
+    const { peaks } = await findPeaks(frame.width, frame.height, frame.pixels, mono, capturePolicy)
+
+    expect(peaks).toEqual([
       { x: 24, y: 30 },
       { x: 66, y: 60 },
     ])
+  })
+
+  it('reports the frame sky as the median tile background', async () => {
+    const frame = image([{ x: 24, y: 30, sigma: 2 }], { background: 340, noise: 2 })
+    const { sky } = await findPeaks(frame.width, frame.height, frame.pixels, mono, capturePolicy)
+
+    expect(Math.abs(sky.level - 340)).toBeLessThan(1)
+    expect(Math.abs(sky.noise - 2)).toBeLessThan(0.6)
   })
 
   it('accepts a measured star and keeps its half-flux radius', async () => {
@@ -337,20 +393,91 @@ describe('star measurement stages', () => {
       expect((await verdictFor(star, options)).verdict).toEqual({ ok: false, reason })
   })
 
-  it('summarizes the stars that passed, ignoring rejected ones', () => {
-    expect(
-      summarize([
-        { ok: true, hfr: 3 },
-        { ok: false, reason: 'blended' },
-        { ok: true, hfr: 1 },
-        { ok: false, reason: 'shape' },
-      ]),
-    ).toEqual({ algorithm: { version: 2 }, detectedStars: 2, medianHfrPixels: 2 })
+  it('names the earlier gate when a star fails two', async () => {
+    const cases = [
+      {
+        // Clipped just above the detection threshold: a flat plateau of too little light.
+        reason: 'faint',
+        star: { x: 45, y: 45, sigma: 2, amplitude: 20 },
+        options: { clip: 112 },
+      },
+      {
+        // A clipped core inside a broad halo that also fails the wings gate.
+        reason: 'saturated',
+        star: [
+          { x: 45, y: 45, sigma: 2, amplitude: 1000 },
+          { x: 45, y: 45, sigma: 8, amplitude: 300 },
+        ],
+        options: { clip: 400 },
+      },
+    ]
 
-    expect(summarize([{ ok: false, reason: 'faint' }])).toEqual({
+    for (const { reason, star, options } of cases)
+      expect((await verdictFor(star, options)).verdict).toEqual({ ok: false, reason })
+  })
+
+  it('leaves the half-flux radius uncomputed for every star a cheaper gate rejects', async () => {
+    const cases = [
+      { star: { x: 46, y: 47, sigma: 2, amplitude: 8 }, options: {} },
+      { star: { x: 45, y: 45, sigma: 2 }, options: { clip: 400 } },
+      { star: { x: 45, y: 45, sigma: 8 }, options: {} },
+    ]
+
+    for (const { star, options } of cases) {
+      const { measurement } = await verdictFor(star, options)
+
+      if (!measurement.ok) throw new Error('expected a measurement')
+      const halfFluxRadius = vi.fn(measurement.halfFluxRadius)
+
+      expect(classify({ ...measurement, halfFluxRadius }, capturePolicy, mono).ok).toBe(false)
+      expect(halfFluxRadius).not.toHaveBeenCalled()
+    }
+  })
+
+  it('summarizes the stars that passed and counts the rest by the gate that rejected them', () => {
+    const sky = { level: 340, noise: 4 }
+
+    expect(
+      summarize(
+        [
+          { ok: true, hfr: 3, snr: 250 },
+          { ok: false, reason: 'blended' },
+          { ok: true, hfr: 1, snr: 100 },
+          { ok: false, reason: 'elongated' },
+          { ok: true, hfr: 2, snr: 99.9 },
+          { ok: false, reason: 'blended' },
+        ],
+        9,
+        sky,
+      ),
+    ).toEqual({
       algorithm: { version: 2 },
+      detectedStars: 3,
+      medianHfrPixels: 2,
+      detections: 9,
+      measured: 3,
+      strong: 2,
+      rejected: {
+        blended: 2,
+        edge: 0,
+        unconverged: 0,
+        faint: 0,
+        saturated: 0,
+        wings: 0,
+        elongated: 1,
+        floor: 0,
+      },
+      sky: 340,
+      noise: 4,
+    })
+
+    expect(summarize([{ ok: false, reason: 'faint' }], 1, sky)).toMatchObject({
       detectedStars: 0,
       medianHfrPixels: null,
+      detections: 1,
+      measured: 0,
+      strong: 0,
+      rejected: { faint: 1 },
     })
   })
 })

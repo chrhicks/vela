@@ -142,7 +142,17 @@ describe('one frame record for every capture attempt', () => {
           width: 4,
           height: 3,
         },
-        statistics: { algorithm: { version: 2 }, detectedStars: expect.any(Number), medianHfrPixels: expect.toBeOneOf([null, expect.any(Number)]) },
+        statistics: {
+          algorithm: { version: 2 },
+          detectedStars: expect.any(Number),
+          medianHfrPixels: expect.toBeOneOf([null, expect.any(Number)]),
+          detections: expect.any(Number),
+          measured: expect.any(Number),
+          strong: expect.any(Number),
+          rejected: expect.objectContaining({ blended: expect.any(Number), elongated: expect.any(Number) }),
+          sky: expect.any(Number),
+          noise: expect.any(Number),
+        },
       },
     ])
 

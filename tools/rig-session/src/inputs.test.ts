@@ -48,6 +48,53 @@ test('statistics saved before the algorithm stamp existed read as version 1', as
   expect(items.map(image => [image.starAlgorithmVersion, image.detectedStars])).toEqual([[1, 12]])
 })
 
+const namedOutputs = {
+  detections: 40,
+  measured: 12,
+  strong: 5,
+  rejected: { blended: 3, faint: 25 },
+  sky: 540.5,
+  noise: 4.25,
+}
+
+const namedColumns = {
+  starDetections: 40,
+  starMeasured: 12,
+  starStrong: 5,
+  starRejected: '{"blended":3,"faint":25}',
+  skyLevel: 540.5,
+  skyNoise: 4.25,
+}
+
+test('saved images carry the named star outputs when the frame recorded them', async () => {
+  const root = await scratch()
+
+  await mkdir(join(root, 'library', 'named'), { recursive: true })
+  await writeFile(
+    join(root, 'library', 'named', 'metadata.json'),
+    JSON.stringify({ ...metadata, statistics: { ...metadata.statistics, ...namedOutputs } }),
+  )
+
+  const { items } = await readSavedImages(root)
+
+  expect(items).toMatchObject([namedColumns])
+})
+
+test('saved images report a malformed star output instead of reading it', async () => {
+  const root = await scratch()
+
+  await mkdir(join(root, 'library', 'broken'), { recursive: true })
+  await writeFile(
+    join(root, 'library', 'broken', 'metadata.json'),
+    JSON.stringify({ ...metadata, statistics: { ...metadata.statistics, detections: -1 } }),
+  )
+
+  const { items, skipped } = await readSavedImages(root)
+
+  expect(items).toEqual([])
+  expect(skipped.map(entry => entry.where)).toEqual([join(root, 'library', 'broken')])
+})
+
 test('saved images read their metadata and report the frames that cannot be read', async () => {
   const root = await scratch()
 
@@ -75,6 +122,12 @@ test('saved images read their metadata and report the frames that cannot be read
       starAlgorithmVersion: 2,
       detectedStars: 12,
       medianHfrPixels: null,
+      starDetections: null,
+      starMeasured: null,
+      starStrong: null,
+      starRejected: null,
+      skyLevel: null,
+      skyNoise: null,
       directory: join(root, 'library', 'good'),
     },
   ])
@@ -166,6 +219,28 @@ test('frame records written before the algorithm stamp existed read as version 1
   const { items } = await readFrameRecords(file)
 
   expect(items.map(item => item.starAlgorithmVersion)).toEqual([1])
+})
+
+test('frame records carry the named star outputs, and none when the record lacks them', async () => {
+  const dir = await scratch()
+  const file = join(dir, 'frames.jsonl')
+  const named = { ...frameRecord, statistics: { ...frameRecord.statistics, ...namedOutputs } }
+
+  await writeFile(file, [named, { ...frameRecord, attempt: 2 }].map(line => JSON.stringify(line)).join('\n'))
+
+  const { items } = await readFrameRecords(file)
+
+  expect(items).toMatchObject([
+    namedColumns,
+    {
+      starDetections: null,
+      starMeasured: null,
+      starStrong: null,
+      starRejected: null,
+      skyLevel: null,
+      skyNoise: null,
+    },
+  ])
 })
 
 test('frame records read every outcome, with or without ids and an image, and skip what cannot be read', async () => {

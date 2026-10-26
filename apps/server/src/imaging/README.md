@@ -44,7 +44,19 @@ analysis is a separate result. Dim or very defocused stars may not be measurable
 The measurement runs in four steps. `findPeaks` lists the candidate peaks.
 `measureStar` returns every quantity around a peak without judging it.
 `classify` names the first gate that peak fails, or accepts it with its HFR.
-`summarize` turns the verdicts into the recorded count and median HFR.
+`summarize` turns the verdicts into the recorded statistics.
+
+Besides the count and median HFR, the statistics name what the measurement found.
+`detections` is every peak above the sky, before any gate. `measured` is the peaks
+that passed every gate, and equals `detectedStars`. `strong` is the measured stars
+whose flux signal-to-noise is 100 or more, the same signal-to-noise the faint gate
+uses at 30. `rejected` counts the peaks each gate turned away, under the first gate
+a peak fails, so a star that fails two is counted under the earlier. `sky` and
+`noise` are the medians of the 64 px tile backgrounds the peaks were judged
+against. Only `detectedStars` and `medianHfrPixels` feed alerts and autofocus. A
+peak that a gate before the half-flux radius step turns away never has its radius
+computed, so these outputs add no measurement cost. They are additive: the values of the older fields are unchanged,
+so `algorithm.version` stays 2, and records saved without them still read.
 
 Bayer detection uses cell averages, but HFR uses native bilinear RGB luminance
 before stretching. Interpolation can broaden an undersampled star; native pixels

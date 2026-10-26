@@ -82,6 +82,57 @@ const timestamp = z
 
 const starAlgorithm = z.object({ version: z.int().positive() }).default({ version: 1 })
 
+const count = z.int().nonnegative()
+
+/** What a star measurement recorded. The named outputs are absent on frames measured before they existed. */
+const starStatistics = z.object({
+  algorithm: starAlgorithm,
+  detectedStars: z.int(),
+  medianHfrPixels: z.number().nullable(),
+  detections: count.optional(),
+  measured: count.optional(),
+  strong: count.optional(),
+  rejected: z.record(z.string(), count).optional(),
+  sky: z.number().optional(),
+  noise: z.number().optional(),
+})
+
+type StarStatistics = z.infer<typeof starStatistics>
+
+/** The statistics as the tables carry them; every named output is null when the record lacks it. */
+function starColumns(statistics: StarStatistics | null | undefined) {
+  return {
+    starAlgorithmVersion: statistics?.algorithm.version ?? null,
+    detectedStars: statistics?.detectedStars ?? null,
+    medianHfrPixels: statistics?.medianHfrPixels ?? null,
+    starDetections: statistics?.detections ?? null,
+    starMeasured: statistics?.measured ?? null,
+    starStrong: statistics?.strong ?? null,
+    starRejected: statistics?.rejected === undefined ? null : JSON.stringify(statistics.rejected),
+    skyLevel: statistics?.sky ?? null,
+    skyNoise: statistics?.noise ?? null,
+  }
+}
+
+/** Star columns shared by saved images and frame records. */
+interface StarColumns {
+  /** Null when there are no statistics. 1 for records written before the stamp existed. */
+  readonly starAlgorithmVersion: number | null
+  readonly detectedStars: number | null
+  readonly medianHfrPixels: number | null
+  /** Peaks found before any gate. */
+  readonly starDetections: number | null
+  /** Peaks that passed every gate; equals `detectedStars`. */
+  readonly starMeasured: number | null
+  /** Measured stars with a flux signal-to-noise of 100 or more. */
+  readonly starStrong: number | null
+  /** JSON object of peaks left out, by the first gate each failed. */
+  readonly starRejected: string | null
+  /** Median tile background of the frame, in raw sample units. */
+  readonly skyLevel: number | null
+  readonly skyNoise: number | null
+}
+
 const savedImageFile = z.object({
   id: z.string(),
   capturedAt: timestamp,
@@ -93,12 +144,10 @@ const savedImageFile = z.object({
   cameraName: z.string(),
   rigId: z.string(),
   subject: z.object({ targetId: z.string(), name: z.string() }).nullish(),
-  statistics: z
-    .object({ algorithm: starAlgorithm, detectedStars: z.int(), medianHfrPixels: z.number().nullable() })
-    .nullish(),
+  statistics: starStatistics.nullish(),
 })
 
-export interface SavedImage {
+export interface SavedImage extends StarColumns {
   readonly id: string
   readonly capturedAt: Date
   readonly capturedAtSource: 'camera' | 'server-estimate'
@@ -110,10 +159,6 @@ export interface SavedImage {
   readonly rigId: string
   readonly targetId: string | null
   readonly targetName: string | null
-  /** Null when the frame has no statistics. 1 for frames saved before the stamp existed. */
-  readonly starAlgorithmVersion: number | null
-  readonly detectedStars: number | null
-  readonly medianHfrPixels: number | null
   readonly directory: string
 }
 
@@ -139,9 +184,7 @@ export async function readSavedImages(root: string): Promise<ReadResult<SavedIma
         ...file,
         targetId: subject?.targetId ?? null,
         targetName: subject?.name ?? null,
-        starAlgorithmVersion: statistics?.algorithm.version ?? null,
-        detectedStars: statistics?.detectedStars ?? null,
-        medianHfrPixels: statistics?.medianHfrPixels ?? null,
+        ...starColumns(statistics),
         directory,
       })
     }
@@ -242,13 +285,11 @@ const frameRecordLine = z.object({
   message: z.string().nullable(),
   provenance: z.object({ requestId: z.string(), operationId: z.string().nullable(), imageId: z.string().nullable() }).nullable(),
   image: z.object({ id: z.string() }).nullable(),
-  statistics: z
-    .object({ algorithm: starAlgorithm, detectedStars: z.int(), medianHfrPixels: z.number().nullable() })
-    .nullable(),
+  statistics: starStatistics.nullable(),
 })
 
 /** One settled capture attempt of Vela's, saved or not. The ids are Cria's, null when the adapter carried none. */
-export interface FrameRecord {
+export interface FrameRecord extends StarColumns {
   readonly rigId: string
   readonly runId: string
   readonly attempt: number
@@ -262,10 +303,6 @@ export interface FrameRecord {
   readonly criaImageId: string | null
   /** The id Vela gave the image; it is the saved image's `id`. */
   readonly imageId: string | null
-  /** Null when the record has no statistics. 1 for records written before the stamp existed. */
-  readonly starAlgorithmVersion: number | null
-  readonly detectedStars: number | null
-  readonly medianHfrPixels: number | null
 }
 
 /** Reads `frames.jsonl`. A record that repeats the run and attempt of an earlier one is skipped. */
@@ -303,9 +340,7 @@ export async function readFrameRecords(path: string): Promise<ReadResult<FrameRe
       operationId: provenance?.operationId ?? null,
       criaImageId: provenance?.imageId ?? null,
       imageId: image?.id ?? null,
-      starAlgorithmVersion: statistics?.algorithm.version ?? null,
-      detectedStars: statistics?.detectedStars ?? null,
-      medianHfrPixels: statistics?.medianHfrPixels ?? null,
+      ...starColumns(statistics),
     })
   })
 

@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { compareStatistics } from './compare.ts'
 import type { Measurement } from './measure.ts'
+import { starStatistics } from './test-statistics.ts'
 
 function measured(detectedStars: number, medianHfrPixels: number | null): Measurement {
-  return { status: 'measured', detectedStars, medianHfrPixels, milliseconds: 1 }
+  return { status: 'measured', milliseconds: 1, ...starStatistics(detectedStars, medianHfrPixels) }
 }
 
 describe('compareStatistics', () => {
