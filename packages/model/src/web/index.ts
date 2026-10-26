@@ -43,7 +43,10 @@ export type {
   AutofocusApproach,
   AutofocusFit,
   AutofocusPhase,
+  AutofocusRun,
   AutofocusSample,
+  AutofocusStar,
+  AutofocusStarSample,
   AutofocusView,
 } from './autofocus.js'
 

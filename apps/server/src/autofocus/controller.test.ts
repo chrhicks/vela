@@ -4,7 +4,9 @@ import {
   createAutofocusController,
   type AutofocusCamera,
   type AutofocusFocuser,
+  type AutofocusRecord,
 } from './controller.js'
+import type { AutofocusStar } from '@vela/model/web'
 import { hyperbola } from './hyperbola.js'
 import { APPROACH_OVERSHOOT_STEPS } from './walk.js'
 
@@ -34,6 +36,15 @@ function setup(
     holdFinalMeasurement = false,
     backlash = 0,
     hfrAt = (optical: number) => hyperbola(optical, 2.18, 95, 32838),
+    starsAt,
+    record,
+  }: {
+    holdMoves?: boolean
+    holdFinalMeasurement?: boolean
+    backlash?: number
+    hfrAt?: (optical: number) => number
+    starsAt?: (position: number) => AutofocusStar[]
+    record?: AutofocusRecord
   } = {},
 ) {
   let position = start
@@ -103,8 +114,15 @@ function setup(
         await finalMeasurement.promise
       }
 
-      return { algorithm: { version: 2 }, detectedStars: 40, medianHfrPixels: hfrAt(position + lag) }
+      const found = {
+        algorithm: { version: 2 },
+        detectedStars: 40,
+        medianHfrPixels: hfrAt(position + lag),
+      }
+
+      return starsAt ? { ...found, stars: starsAt(position) } : found
     },
+    record,
   )
 
   async function land() {
@@ -254,6 +272,95 @@ it('lands each (position, HFR) sample on the view before the next move, then fit
   expect(moves[0]).toBe(33042)
   expect(moves).not.toContain(0)
   expect(view.restoredStart).toBe(false)
+})
+
+const starsAt = (position: number): AutofocusStar[] => [
+  { x: 120.5, y: 80, snr: 900, hfr: position / 10000 },
+  { x: 40, y: 300.2, snr: 150.5, hfr: position / 9000 },
+]
+
+it('keeps each sample\'s star table beside the view and records the run once when it settles', async () => {
+  const recorded = vi.fn()
+  const { controller, camera, focuser, land } = setup(32842, 60000, { starsAt, record: recorded })
+
+  expect(controller.run()).toBeNull()
+  await controller.start(camera, focuser)
+
+  for (let count = 0; count < 10; count++) await land()
+
+  await vi.waitFor(() => expect(controller.active()).toBe(false))
+  const view = controller.snapshot()
+  const run = controller.run()!
+
+  expect(view.samples.every(sample => !('stars' in sample))).toBe(true)
+  expect(run).toMatchObject({
+    version: 1,
+    rigId: 'fra',
+    startedAt: '2026-09-17T00:00:00.000Z',
+    settledAt: '2026-09-17T00:00:00.000Z',
+    phase: 'complete',
+    error: null,
+    startPosition: 32842,
+    stepSize: 50,
+    offsetSteps: 4,
+    exposureSeconds: 2,
+    fit: view.fit,
+  })
+  expect(run.samples).toEqual(
+    view.samples.map(sample => ({ ...sample, stars: starsAt(sample.position) })),
+  )
+  expect(run.samples).toHaveLength(10)
+  expect(recorded).toHaveBeenCalledExactlyOnceWith(run)
+})
+
+it('records a stopped run with the samples it had', async () => {
+  const recorded = vi.fn()
+  const { controller, camera, focuser, land } = setup(32842, 60000, { starsAt, record: recorded })
+
+  await controller.start(camera, focuser)
+  await land()
+  await vi.waitFor(() => expect(controller.snapshot().samples).toHaveLength(1))
+  expect(controller.run()).toMatchObject({ settledAt: null, phase: 'walking' })
+  await controller.stop()
+
+  expect(recorded).toHaveBeenCalledOnce()
+  expect(recorded.mock.calls[0]![0]).toMatchObject({ phase: 'stopped', fit: null })
+  expect(recorded.mock.calls[0]![0].samples).toHaveLength(1)
+})
+
+it('records nothing for a run that took no sample', async () => {
+  const recorded = vi.fn()
+  const { controller, camera, focuser } = setup(80, 60000, { record: recorded })
+
+  await controller.start(camera, focuser)
+  expect(controller.run()).toBeNull()
+  expect(recorded).not.toHaveBeenCalled()
+})
+
+it('reads a sample measured without a star table as an empty one', async () => {
+  const { controller, camera, focuser, land } = setup()
+
+  await controller.start(camera, focuser)
+  await land()
+  await vi.waitFor(() => expect(controller.snapshot().samples).toHaveLength(1))
+  expect(controller.run()!.samples[0]!.stars).toEqual([])
+})
+
+it('walks and fits the same whether or not the measurement lists its stars', async () => {
+  const outcome = async (withStars: boolean) => {
+    const { controller, camera, focuser, land } = setup(32842, 60000, withStars ? { starsAt } : {})
+
+    await controller.start(camera, focuser)
+
+    for (let count = 0; count < 10; count++) await land()
+
+    await vi.waitFor(() => expect(controller.active()).toBe(false))
+    const { samples, fit, finalApproach, phase } = controller.snapshot()
+
+    return { samples, fit, finalApproach, phase }
+  }
+
+  expect(await outcome(true)).toEqual(await outcome(false))
 })
 
 it('restores the start position on cancel and never commands 0', async () => {

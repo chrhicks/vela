@@ -5,6 +5,8 @@ import { alignmentSettings } from './alignment/routes.js'
 import { dirname, isAbsolute, resolve } from 'node:path'
 import { openFileSavedImageStore } from './saved-images/store.js'
 import { noFrameRecords, openFrameRecords } from './capture/frame-records.js'
+import { noAutofocusRecords, type AutofocusRecords } from './autofocus/routes.js'
+import { openJsonlRecords } from './records.js'
 import { noCaptureRuns, openFileCaptureRunStore, type CaptureRunStore } from './capture/run-store.js'
 import { createSurveyCache } from './targets/survey.js'
 import { startTelemetry } from './telemetry.js'
@@ -20,6 +22,10 @@ const frameRecords = process.env.VELA_FRAME_RECORDS_PATH
   ? openFrameRecords(process.env.VELA_FRAME_RECORDS_PATH)
   : noFrameRecords
 
+const autofocusRecords: AutofocusRecords = process.env.VELA_AUTOFOCUS_RECORDS_PATH
+  ? openJsonlRecords(process.env.VELA_AUTOFOCUS_RECORDS_PATH, { name: 'autofocus records' })
+  : noAutofocusRecords
+
 let app: ReturnType<typeof buildApp> | undefined
 
 let captureRuns: CaptureRunStore = noCaptureRuns
@@ -34,6 +40,7 @@ function shutdown() {
     } finally {
       await captureRuns.close()
       await frameRecords.close()
+      await autofocusRecords.close()
       await telemetry.shutdown()
     }
   })()
@@ -116,7 +123,7 @@ try {
   const equipment = createEquipmentComposition(cria, equipmentOptions)
 
   if (!shutdownTask) {
-    const options = { rigCatalog, savedImages, frameRecords, captureRuns, targets, surveyCache, equipment, alerts }
+    const options = { rigCatalog, savedImages, frameRecords, autofocusRecords, captureRuns, targets, surveyCache, equipment, alerts }
     app = buildApp(alignment ? { ...options, alignment } : options)
     await app.listen({ port, host })
   }

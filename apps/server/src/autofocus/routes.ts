@@ -2,7 +2,7 @@ import { z } from 'zod'
 import type { FastifyInstance } from 'fastify'
 import { CaptureStoppedError, FocuserStoppedError, type Acquisition, type Focuser, type FocuserMove } from '@vela/equipment'
 import type { RigCatalogRecord } from '../rig/contracts.js'
-import type { AutofocusView } from '@vela/model/web'
+import type { AutofocusRun, AutofocusView } from '@vela/model/web'
 import type { RigCatalog } from '../rig/catalog.js'
 import { inspectRigDetail, type RigDetailOptions } from '../rig/detail.js'
 import type { RigOperations } from '../rig/operations.js'
@@ -16,6 +16,7 @@ import {
   type AutofocusRunOptions,
 } from './controller.js'
 import { measureAutofocusStars } from '../imaging/statistics.js'
+import { noRecords, type JsonlRecords } from '../records.js'
 import { DEFAULT_OFFSET_STEPS, DEFAULT_STEP_SIZE } from './walk.js'
 import { haltBody, haltBodyError, registerHaltRoutes } from '../http/halt-body.js'
 
@@ -30,7 +31,12 @@ interface AutofocusRouteOptions {
   }) => AutofocusCamera
   createFocuser?: (settings: { rig: RigCatalogRecord; focuserId: string }) => AutofocusFocuser
   measure?: AutofocusMeasure
+  records?: AutofocusRecords
 }
+
+export type AutofocusRecords = JsonlRecords<AutofocusRun>
+
+export const noAutofocusRecords: AutofocusRecords = noRecords
 
 function configuredCamera(settings: {
   rig: RigCatalogRecord
@@ -86,6 +92,7 @@ export function registerAutofocus(
     createAcquisition,
     createFocuserAdapter,
     measure,
+    records = noAutofocusRecords,
   }: AutofocusRouteOptions,
 ) {
   const controllers = new Map<string, ReturnType<typeof createAutofocusController>>()
@@ -250,6 +257,15 @@ export function registerAutofocus(
     },
   )
 
+  app.get<{ Params: { rigId: string } }>(
+    '/api/web/rigs/:rigId/autofocus/run',
+    async (request, reply) => {
+      const run = controllers.get(request.params.rigId)?.run()
+
+      return run ?? reply.code(404).send({ error: 'No autofocus samples yet' })
+    },
+  )
+
   app.post<{ Params: { rigId: string } }>(
     '/api/rigs/:rigId/autofocus/start',
     async (request, reply) => {
@@ -299,6 +315,7 @@ export function registerAutofocus(
             },
             Date.now,
             measure ?? measureAutofocusStars,
+            run => records.append(run),
           )
           controllers.set(view.rigId, controller)
         }

@@ -1,7 +1,9 @@
 import type {
   AutofocusApproach,
   AutofocusFit,
+  AutofocusRun,
   AutofocusSample,
+  AutofocusStar,
   AutofocusView,
   CaptureImageStatistics,
 } from '@vela/model/web'
@@ -60,10 +62,17 @@ export interface AutofocusRunOptions {
 
 const rSquaredGate = 0.7
 
-/** What the walk reads from a frame: the count and median HFR, whatever else the measurement found. */
+/**
+ * What the walk reads from a frame: the count and median HFR. The stars behind them are only
+ * recorded, never fed back into the walk or the fit.
+ */
 export type AutofocusMeasure = (
   ...args: Parameters<typeof measureAutofocusStars>
-) => Promise<Pick<CaptureImageStatistics, 'detectedStars' | 'medianHfrPixels'>>
+) => Promise<
+  Pick<CaptureImageStatistics, 'detectedStars' | 'medianHfrPixels'> & { stars?: AutofocusStar[] }
+>
+
+export type AutofocusRecord = (run: AutofocusRun) => void
 
 export function createAutofocusController(
   settings: {
@@ -74,8 +83,13 @@ export function createAutofocusController(
   },
   now = Date.now,
   measure: AutofocusMeasure = measureAutofocusStars,
+  record: AutofocusRecord = () => {},
 ) {
   let view: AutofocusView = emptyView(settings, DEFAULT_STEP_SIZE, DEFAULT_OFFSET_STEPS)
+  let startedAt: string | undefined
+  let settledAt: string | null = null
+  /** The star table of `view.samples[i]`, kept apart so the polled view stays small. */
+  let starTables: AutofocusStar[][] = []
   let running: Promise<void> | undefined
   let cancellation: AbortController | undefined
   let plannedReady: { resolve: () => void; reject: (error: Error) => void } | undefined
@@ -143,10 +157,12 @@ export function createAutofocusController(
 
     patch({ activity: 'measuring', elapsedSeconds: exposureSeconds })
 
-    const stars = await measure(frame.width, frame.height, frame.pixels, frame.color).catch(() => ({
-      detectedStars: 0,
-      medianHfrPixels: null,
-    }))
+    const stars: Awaited<ReturnType<AutofocusMeasure>> = await measure(
+      frame.width,
+      frame.height,
+      frame.pixels,
+      frame.color,
+    ).catch(() => ({ detectedStars: 0, medianHfrPixels: null }))
 
     signal.throwIfAborted()
 
@@ -157,9 +173,30 @@ export function createAutofocusController(
       capturedAt: frame.capturedAt,
     }
 
+    starTables.push(stars.stars ?? [])
     patch({ samples: [...view.samples, point] })
 
     return point
+  }
+
+  /** The run so far, or the last one: its setup, fit and every sample with its star table. Null before a first sample. */
+  function currentRun(): AutofocusRun | null {
+    if (!startedAt || !view.samples.length) return null
+
+    return {
+      version: 1,
+      rigId: view.rigId,
+      startedAt,
+      settledAt,
+      phase: view.phase,
+      error: view.error,
+      startPosition: view.startPosition,
+      stepSize: view.stepSize,
+      offsetSteps: view.offsetSteps,
+      exposureSeconds: view.exposureSeconds,
+      fit: view.fit,
+      samples: view.samples.map((sample, index) => ({ ...sample, stars: starTables[index] ?? [] })),
+    }
   }
 
   async function go(
@@ -388,6 +425,9 @@ export function createAutofocusController(
     if (!Number.isFinite(exposureSeconds) || exposureSeconds < 0.1 || exposureSeconds > 30)
       throw new Error('Exposure duration must be between 0.1 and 30 seconds')
     cancellation = new AbortController()
+    startedAt = new Date(now()).toISOString()
+    settledAt = null
+    starTables = []
     patch({
       ...emptyView(settings, stepSize, offsetSteps),
       cameraName: settings.cameraName,
@@ -411,6 +451,7 @@ export function createAutofocusController(
       cancellation.signal,
     ).finally(() => {
       running = undefined
+      settledAt = new Date(now()).toISOString()
       patch({
         active: false,
         captureReadState: 'current',
@@ -422,6 +463,10 @@ export function createAutofocusController(
               : view.activity,
       })
       onSettled?.()
+
+      const settled = currentRun()
+
+      if (settled) record(settled)
     })
 
     try {
@@ -444,7 +489,7 @@ export function createAutofocusController(
     return view
   }
 
-  return { start, stop, snapshot: () => view, active: () => !!running }
+  return { start, stop, snapshot: () => view, run: currentRun, active: () => !!running }
 }
 
 function emptyView(
