@@ -82,6 +82,7 @@ const captureView = z.object({
     'complete',
     'stopped',
     'failed',
+    'interrupted',
   ]),
   active: z.boolean(),
   captureReadState: z.enum(['current', 'retrying']),
@@ -98,6 +99,13 @@ const captureView = z.object({
   savedImageCount: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).nullable(),
   elapsedSeconds: z.number().nonnegative(),
   error: text.nullable(),
+  interruption: z
+    .strictObject({
+      reason: text,
+      remainingCount: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).nullable(),
+    })
+    .nullable()
+    .optional(),
   latestImage: captureImage.nullable(),
   cooling: z
     .object({
@@ -125,6 +133,7 @@ export function isCaptureView(value: unknown, rigId: string): value is CaptureVi
   return (
     view.rigId === rigId &&
     view.active === ['exposing', 'reading', 'saving', 'stopping'].includes(view.phase) &&
+    (view.phase === 'interrupted') === !!view.interruption &&
     (!view.active || view.exposureSeconds >= 0.1) &&
     (view.latestImage === null || isCaptureImage(view.latestImage, rigId))
   )

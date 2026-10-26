@@ -4,8 +4,9 @@ Capture owns one server-side capture run and its most recent image. A run takes
 one exposure, repeats the requested duration until stopped, or repeats until it
 has finished a requested number of frames. Browser requests
 start the work and read its projection; disconnecting the browser does not stop
-acquisition. A server restart loses the operation and in-memory previews;
-explicitly saved images remain available through the saved-images boundary.
+acquisition. A server restart ends the operation and loses in-memory previews, and the run
+is reported as interrupted (see [Restarts](#restarts)); explicitly saved images remain
+available through the saved-images boundary.
 
 The imaging-camera setup API remembers an explicitly selected camera in the
 Rig catalog by stable provider ID and its reported camera name. An inventory
@@ -85,8 +86,9 @@ image receives that snapshot, so later selections cannot relabel a retained fram
 accepted start along with `completedCount`. A private generation on cached frames
 keeps an older run's Keep completion from incrementing the new run's saved count.
 Concurrent manual/automatic Keep counts once after archive confirmation. The
-archive-wide `savedImageCount` remains separate. Runs and counts are ephemeral,
-with no durable sequence or resumption after server restart. saveFrames defaults
+archive-wide `savedImageCount` remains separate. Runs and counts are ephemeral: only the
+active run's request and progress are kept so a restart can report it, never a sequence or
+history. saveFrames defaults
 to false. When enabled, each completed image is published and saved before another
 exposure starts. The saving phase remains active and keeps the Rig lease; Stop
 waits for that save to settle. A failed automatic save ends the run while retaining
@@ -159,6 +161,51 @@ The alert rules judge stars, which a calibration frame lacks. A calibration run 
 never an imaging run for the monitor, so it raises no no-stars alert, and its frames
 reach the monitor without star measurements, so they cannot raise a star-count or HFR
 trend alert. They still show the camera is producing frames.
+
+### Restarts
+
+A restart used to drop a running capture and show idle, so an unattended night could be lost
+unseen. Now the active run is written to `capture-runs.json` next to the rig catalog
+(`rigs.yaml`; `run-store.ts`), as `{ "runs": { "<rigId>": record } }`. A record holds the
+request (exposure, repeat, `frameCount`, `frameType`, `saveFrames`, the `subject` snapshot), the
+start time and the progress (`completedCount`, `savedCount`, `integrationSeconds`). It is
+written when the run starts and after each completed frame and each save, and removed when the
+run ends by itself, fails or is stopped by Chris. A run that ends because the server is shutting
+down (`controller.close()`, from the app's close hook) keeps its record. So a record found at
+startup is a run that did not end: after a deploy (SIGTERM) or a crash alike.
+
+- **Nothing exposes after a restart.** At startup each such rig's controller reports phase
+  `interrupted` (terminal, `active: false`) with the run's settings and counts, and
+  `interruption: { reason: "Vela restarted", remainingCount }`. The camera is not asked for
+  anything until Chris starts or resumes a run. Starting any new run replaces the record. There
+  is no dismiss: the interrupted view stays, across further restarts, until a run starts.
+- **Resume.** `POST /api/rigs/:rigId/capture/resume` takes no body (as stop does) and starts a
+  new run with the same exposure, repeat, `saveFrames`, frame type and subject snapshot. A run
+  with a count resumes with `frameCount - completedCount`; a repeat with no count repeats until
+  stopped; an unfinished single exposure repeats once. It is an ordinary start: the Rig lease,
+  camera connected and idle, and the alert monitor all apply, so a refusal leaves the run
+  interrupted and Resume available. 409 when nothing is interrupted or nothing is left. The
+  subject is the stored snapshot, not a fresh lookup, so a target removed meanwhile does not
+  block it. The new run counts from zero; the earlier frames stay in the saved-images
+  gallery, and a second interruption reports what is left of the resumed run.
+- **A light run raises one alert.** On startup the route tells the rig's monitor
+  (`runInterrupted`), which raises `run-interrupted` (critical) through the usual phone rules:
+  the switch, astro dark and one page per alert. See [alerts](../alerts/README.md#an-interrupted-run).
+  A calibration run raises none. The alert is raised once per server start while the record
+  stands, because the monitor's episode is memory only: an alert held for daylight is not
+  lost if the server restarts again before dusk.
+- **A frame in flight at the restart.** Cria keeps exposing: it owns the camera and its
+  operation ledger holds the capture after Vela's connection is gone. Vela cannot see that
+  operation after a restart, never fetches its image, and does not count it. The camera
+  reports exposing, so the start checks refuse a resume ("The camera has not confirmed it is
+  idle") until the exposure and its readout end; the orphaned image then ages out of Cria's
+  newest images. A resumed run therefore never starts an exposure on a busy camera, and
+  never replays or tries to recover the lost one: it takes a fresh frame, and `remainingCount`
+  counts only frames Vela published. If Cria restarted too, its ledger is empty and the camera
+  settles on its own. Either way what was in flight is unknown, as the product rules say.
+- **Bad state starts clean.** A missing, unreadable or corrupt file means no unfinished runs,
+  with a line in the log; an unreadable record is dropped on its own. A failed write is logged
+  and never ends the run. The file is rewritten whole through a temporary file with mode 0600.
 
 ## Local review
 

@@ -29,6 +29,7 @@ export function CaptureInterruption({
     stopped: 'capture stopped',
     complete: 'image received',
     failed: 'capture stopped with an error',
+    interrupted: 'capture interrupted by a restart',
   }[view.phase]
 
   return (

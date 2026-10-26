@@ -845,3 +845,78 @@ test('shows cooler off when the sensor is near the requested temperature and tur
   await expect.poll(() => commands).toEqual([{ coolerOn: true }])
   await expect(region.getByText('On', { exact: true })).toBeVisible()
 })
+
+const interrupted: CaptureView = {
+  ...idle,
+  phase: 'interrupted',
+  repeat: true,
+  frameCount: 30,
+  saveFrames: true,
+  exposureSeconds: 120,
+  completedCount: 12,
+  savedCount: 12,
+  integrationSeconds: 1440,
+  subject: { targetId: 'm31', name: 'Andromeda Galaxy', catalog: 'M 31' },
+  interruption: { reason: 'Vela restarted', remainingCount: 18 },
+}
+
+for (const width of [390, 1100]) {
+  test(`shows an interrupted run and resumes it with what is left at ${width} px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 })
+
+    let resumes = 0
+
+    const resumed: CaptureView = {
+      ...interrupted,
+      phase: 'exposing',
+      active: true,
+      frameCount: 18,
+      completedCount: 0,
+      savedCount: 0,
+      integrationSeconds: 0,
+      interruption: null,
+    }
+
+    await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, resumes ? resumed : interrupted))
+    await page.route('**/api/rigs/rig-1/capture/resume', route => {
+      resumes++
+
+      return respond(route, resumed)
+    })
+    await page.goto('/rigs/rig-1/observe/capture')
+
+    const card = page.getByRole('status', { name: 'Interrupted capture run' })
+
+    await expect(card).toContainText('Vela restarted during this run')
+    await expect(card).toContainText('Andromeda Galaxy · 12 of 30 frames taken · 120 s each.')
+
+    const resume = page.getByRole('button', { name: 'Resume · 18 frames left' })
+
+    await expect(resume).toBeEnabled()
+    await resume.scrollIntoViewIfNeeded()
+
+    const box = (await resume.boundingBox())!
+
+    expect(box.x).toBeGreaterThanOrEqual(0)
+    expect(box.x + box.width).toBeLessThanOrEqual(width)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width)
+
+    await resume.click()
+    await expect(page.getByRole('button', { name: 'Stop capture' })).toBeEnabled()
+    await expect(page.getByText('0 of 18 frames')).toBeVisible()
+    expect(resumes).toBe(1)
+  })
+}
+
+test('offers no Resume for an interrupted run that had taken all its frames, or a repeat with no count', async ({ page }) => {
+  let view: CaptureView = { ...interrupted, interruption: { reason: 'Vela restarted', remainingCount: 0 } }
+
+  await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, view))
+  await page.goto('/rigs/rig-1/observe/capture')
+  await expect(page.getByText('It had taken all its frames.')).toBeVisible()
+  await expect(page.getByRole('button', { name: /Resume/ })).toHaveCount(0)
+
+  view = { ...interrupted, frameCount: null, interruption: { reason: 'Vela restarted', remainingCount: null } }
+  await page.reload()
+  await expect(page.getByRole('button', { name: 'Resume · repeat until stopped' })).toBeEnabled()
+})

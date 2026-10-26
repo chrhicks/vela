@@ -158,7 +158,7 @@ async function readRecords(path: string, onError: (error: Error) => void) {
   try {
     contents = await readFile(path, 'utf8')
   } catch (error) {
-    if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) onError(asError(error))
+    if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) onError(error instanceof Error ? error : new Error(String(error)))
 
     return records
   }
@@ -195,8 +195,4 @@ async function writeRecords(path: string, runs: Record<string, CaptureRunRecord>
     await rm(temporaryPath, { force: true }).catch(() => {})
     throw error
   }
-}
-
-function asError(error: unknown) {
-  return error instanceof Error ? error : new Error(String(error))
 }
