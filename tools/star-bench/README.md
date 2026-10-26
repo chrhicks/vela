@@ -44,7 +44,7 @@ Directories without usable `metadata.json` are listed as skipped and are not fra
 Then, for each run of light frames (one target and exposure, a new run after a gap):
 
 ```
-Soul Nebula, 90 s: 262 frames, 2026-10-25T02:03:10Z to 2026-10-25T06:36:44Z
+Soul Nebula, 90 s: 262 frames, 2026-10-25T02:22:04Z to 2026-10-25T09:32:22Z
   stars median 264, spread 0.114, 43 of 261 pairs jump over 1.5x
   alert stars-dropping 2026-10-25T02:30:14Z to 2026-10-25T02:36:46Z
 ```
@@ -53,7 +53,7 @@ Soul Nebula, 90 s: 262 frames, 2026-10-25T02:03:10Z to 2026-10-25T06:36:44Z
 - **jump** is a pair of neighbouring frames whose counts differ by more than 1.5 times. A count of zero reads as one.
 - **alert** is an episode of a frame-derived alert (`no-stars`, `stars-dropping`, `stars-collapsed`, `stars-declining`, `hfr-high`, `hfr-bad`) from replaying the run's frames, in order, through the real `evaluateAlerts` with the default thresholds. The episode starts at the capture time of the frame that raised the alert and ends at the capture time of the frame that cleared it, or at `end of run`. Compare episodes before and after a change; they should agree within one frame (about one exposure).
 
-The replay differs from the live monitor in two ways. It has no focuser log, so a run is not restarted at an autofocus unless you name the time with `--restart-at` (the review's Heart night needs `--restart-at 2026-10-24T00:00:00Z`, the autofocus at 23:54Z to 00:01Z). And it uses capture times, not the times the server received the frames. `Frames outside any run` counts darks, flats and bias frames, and light frames that could not be measured.
+The replay differs from the live monitor in two ways. It has no focuser log, so a run is not restarted at an autofocus unless you name the time with `--restart-at` (the review's Heart night needs `--restart-at 2026-10-24T00:00:00Z`, the autofocus at 23:54Z to 00:01Z). And it uses capture times, not the times the server received the frames. `Frames outside any run` counts darks, flats and bias frames, and light frames that could not be measured. Frames saved before Vela recorded a frame type read as lights, so old dark frames show up as runs of `(no target)` that raise `no-stars`.
 
 ## The per-frame table
 
