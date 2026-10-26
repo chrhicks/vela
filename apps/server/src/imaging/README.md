@@ -37,7 +37,11 @@ mean radius approximation used by ASTAP's HFD output.
 Detection uses a fixed noise-relative threshold and local median/MAD background.
 Close candidates, incomplete edges, obvious clipping, strongly elongated or
 undersampled profiles, and stars whose outer aperture has not converged are
-excluded. The count is this measured population, not a catalog of every star in
+excluded. A capture star with a flux signal-to-noise below 200 is not judged on
+elongation, because the second moments of a faint star are mostly noise: on a sharp
+Soul frame half the stars at S/N 30 to 60 failed the gate while the bright stars on
+the same frame read round. Those stars count, with unknown shape. An autofocus
+measurement still judges every star. The count is this measured population, not a catalog of every star in
 the field. A valid image with none reports zero stars and no HFR. An unavailable
 analysis is a separate result. Dim or very defocused stars may not be measurable.
 
@@ -55,13 +59,15 @@ a peak fails, so a star that fails two is counted under the earlier. `sky` and
 `noise` are the medians of the 64 px tile backgrounds the peaks were judged
 against. Only `detectedStars` and `medianHfrPixels` feed alerts and autofocus. A
 peak that a gate before the half-flux radius step turns away never has its radius
-computed, so these outputs add no measurement cost. They are additive: the values of the older fields are unchanged,
-so `algorithm.version` stays 2, and records saved without them still read.
+computed, so these outputs add no measurement cost. They are additive: the named outputs leave the values of the older fields
+as they were, and records saved without them still read. `algorithm.version` is 3: the
+elongation gate on faint stars raised the count (606 of 717 recorded frames, a median of
+84 stars more per frame), so a count from version 2 or 1 is not comparable with it.
 
 `axisRatio` is the median ratio of the principal axes of the stars with a flux signal-to-noise
 of 200 or more that pass the faint, clipping and wings gates, whether or not the elongation
 gate then rejects them. It is null when fewer than 10 stars qualify, and it is recorded only:
-the count, the elongation gate and every alert read what they read before. Each star's ratio
+no alert reads it. The elongation gate judges the same stars. Each star's ratio
 comes from second moments under a Gaussian window that follows the star (adaptive moments),
 because a hard aperture adds the noise of its corners to the moments and a round window pulls an
 elongated star toward 1. The moments run only for stars that reach the elongation gate at
