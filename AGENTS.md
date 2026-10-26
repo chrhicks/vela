@@ -30,7 +30,7 @@ During an observation, Vela should make it easy to answer:
 
 ### Capture runs, not durable sequences
 
-A capture run repeats exposures with the requested parameters until Chris stops it. It lives in the Vela server's memory, so a browser can disconnect and reconnect without ending it. If the Vela server or the rig's Cria service crashes or restarts, the run is interrupted and Vela reports that honestly. Nothing more: no durable sessions, restart continuation, rebuild-and-reconcile, run history or general workflow engine.
+A capture run repeats exposures with the requested parameters until Chris stops it. It lives in the Vela server's memory, so a browser can disconnect and reconnect without ending it. If the Vela server or the rig's Cria service crashes or restarts, the run is interrupted and Vela reports that honestly. To report it after its own restart, Vela keeps one small record of the active run's request and progress; on start it shows that run as interrupted, raises one alert, and offers Resume, which starts a new run for the remaining frames only when Chris asks (vela#169). Vela never starts exposures by itself after a restart. Nothing more: no durable sessions, automatic continuation, rebuild-and-reconcile, run history or general workflow engine.
 
 ### Local network before deployment
 
@@ -65,7 +65,7 @@ See [CODING_STANDARDS.md](./CODING_STANDARDS.md) for concrete coding defaults.
 
 ## State, failure and physical devices
 
-Persist durable user facts and valuable artifacts: rig configuration, preferences, saved images and their metadata. Connection status, command progress and capture runs are ephemeral.
+Persist durable user facts and valuable artifacts: rig configuration, preferences, saved images and their metadata. Connection status, command progress and capture runs are ephemeral, except the one interrupted-run record above.
 
 - A transient read failure during an interactive workflow keeps the session and its context, marks measurements as interrupted and retries at a paced, cancellable interval. Polar alignment keeps its baseline and revalidates device state before publishing another measurement.
 - A substantive or uncertain operation stops rather than entering a retry engine.
