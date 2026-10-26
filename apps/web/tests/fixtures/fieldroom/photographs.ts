@@ -56,7 +56,13 @@ function photograph(index: number, total: number, manyDates: boolean): SavedImag
     savedAt: new Date(captured + 181_000).toISOString(),
     frameType: 'light',
     cameraName: 'Reference image · Mock saved exposure',
-    color: 'color', statistics: { detectedStars: 842, medianHfrPixels: 2.1 },
+    color: 'color',
+    statistics: {
+      algorithm: { version: 2 }, detectedStars: 842, medianHfrPixels: 2.1,
+      detections: 3104, measured: 842, strong: 311,
+      rejected: { blended: 120, edge: 31, unconverged: 7, faint: 1700, saturated: 4, wings: 230, elongated: 160, floor: 10 },
+      sky: 540.25, noise: 4.2,
+    },
     saved: true, fitsUrl: `${base}/fits`, previewDownloadUrl: `${base}/download-preview`,
   }, 'current')
 }

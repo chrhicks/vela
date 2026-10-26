@@ -154,7 +154,12 @@ export function createExploreScene(name: ExploreScene) {
       actual: { ...framing.actual!, capturedAt },
       preview: { ...framing.preview!, exposureSeconds: 10, capturedAt,
         cameraName: 'Reference image · mock exposure',
-        statistics: { detectedStars: 842, medianHfrPixels: 2.1 } } }
+        statistics: {
+          algorithm: { version: 2 }, detectedStars: 842, medianHfrPixels: 2.1,
+          detections: 3104, measured: 842, strong: 311,
+          rejected: { blended: 120, edge: 31, unconverged: 7, faint: 1700, saturated: 4, wings: 230, elongated: 160, floor: 10 },
+          sky: 540.25, noise: 4.2,
+        } } }
     capture = { ...capture, cooling: { ...capture.cooling!, sensorTemperatureC: -8.6, setpointC: -10, powerPercent: 62 } }
   }
 

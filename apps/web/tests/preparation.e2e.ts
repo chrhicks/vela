@@ -12,6 +12,8 @@ for (const mode of ['light', 'dark'] as const) {
       await expect(page.getByRole('heading', { name: 'The Crescent Nebula' })).toBeVisible()
       const pixels = page.locator('.framing-exposure img')
       await expect(pixels).toBeVisible()
+      await expect(page.locator('.framing-exposure')).toContainText('842 measured of 3104 peaks')
+      await expect(page.locator('.framing-exposure')).toContainText('Sky 540.3')
       await expect(page.getByRole('button', { name: 'Start capture', exact: true })).toBeEnabled()
       await page.evaluate(async () => {
         await document.fonts.ready
