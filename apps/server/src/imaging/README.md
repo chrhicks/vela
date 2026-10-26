@@ -41,6 +41,11 @@ excluded. The count is this measured population, not a catalog of every star in
 the field. A valid image with none reports zero stars and no HFR. An unavailable
 analysis is a separate result. Dim or very defocused stars may not be measurable.
 
+The measurement runs in four steps. `findPeaks` lists the candidate peaks.
+`measureStar` returns every quantity around a peak without judging it.
+`classify` names the first gate that peak fails, or accepts it with its HFR.
+`summarize` turns the verdicts into the recorded count and median HFR.
+
 Bayer detection uses cell averages, but HFR uses native bilinear RGB luminance
 before stretching. Interpolation can broaden an undersampled star; native pixels
 are the measurement units, not an optical calibration. Counts and HFR are useful

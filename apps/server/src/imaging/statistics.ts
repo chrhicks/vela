@@ -6,7 +6,49 @@ type Background = { level: number; noise: number }
 
 type Peak = { x: number; y: number }
 
-interface StarPolicy {
+/** A peak to measure. A blended peak is left unmeasured; with mergeBlends, blends merge into one. */
+type Candidate = { peak: Peak; blended: boolean }
+
+/** Why a star is left out of the count. Each is the first gate the star failed, in the order listed. */
+export type Rejection =
+  | 'blended'
+  | 'edge'
+  | 'unconverged'
+  | 'faint'
+  | 'saturated'
+  | 'wings'
+  | 'shape'
+  | 'floor'
+
+export type Verdict = { ok: true; hfr: number } | { ok: false; reason: Rejection }
+
+/** The result of measuring a peak: the measurement, or why none could be formed. */
+export type Measurement =
+  | StarMeasurement
+  | { ok: false; reason: Extract<Rejection, 'edge' | 'unconverged'> }
+
+/** Everything measured around one peak, before any gate decides whether the star counts. */
+export interface StarMeasurement {
+  ok: true
+  /** Background in the annulus around the star. */
+  sky: Background
+  /** Background-subtracted flux inside the aperture. */
+  flux: number
+  /** Background-subtracted flux between the aperture and the patch edge. */
+  outerFlux: number
+  /** Aperture pixels sharing the brightest value; many means a clipped plateau. */
+  plateauPixels: number
+  /** Second moments of the aperture flux: trace, and the separation of the principal axes. */
+  trace: number
+  separation: number
+  /**
+   * Half-flux radius in native pixels, or null when the enclosed flux has no half.
+   * Computed on first call: it costs more than every other quantity together.
+   */
+  halfFluxRadius: () => number | null
+}
+
+export interface StarPolicy {
   aperture: number
   patchRadius: number
   isolation: number
@@ -28,7 +70,7 @@ interface StarPolicy {
  */
 const starAlgorithmVersion = 2
 
-const capturePolicy: StarPolicy = {
+export const capturePolicy: StarPolicy = {
   aperture: 12,
   patchRadius: 16,
   isolation: 12,
@@ -44,7 +86,7 @@ const capturePolicy: StarPolicy = {
   mergeBlends: false,
 }
 
-const autofocusPolicy: StarPolicy = {
+export const autofocusPolicy: StarPolicy = {
   aperture: 40,
   patchRadius: 48,
   isolation: 48,
@@ -85,6 +127,43 @@ export async function measureStars(
     if (index % 131072 === 0) await setImmediate()
   }
 
+  const peaks = await findPeaks(width, height, pixels, color, policy)
+  const verdicts: Verdict[] = []
+  const candidates = groupPeaks(peaks, policy)
+
+  for (let index = 0; index < candidates.length; index++) {
+    const { peak, blended } = candidates[index]!
+
+    verdicts.push(
+      blended
+        ? { ok: false, reason: 'blended' }
+        : classify(measureStar(width, height, pixels, color, peak, policy), policy, color),
+    )
+
+    if (index % 8 === 0) await setImmediate()
+  }
+
+  return summarize(verdicts)
+}
+
+/** Defocus-capable HFR for an autofocus walk. Capture continues to use measureStars. */
+export async function measureAutofocusStars(
+  width: number,
+  height: number,
+  pixels: ArrayLike<number>,
+  color: ImageColor = { kind: 'mono' },
+) {
+  return measureStars(width, height, pixels, color, autofocusPolicy)
+}
+
+/** Local maxima above the sky that have neighbours, as positions in native image pixels. */
+export async function findPeaks(
+  width: number,
+  height: number,
+  pixels: ArrayLike<number>,
+  color: ImageColor,
+  policy: StarPolicy,
+): Promise<Peak[]> {
   const scale = color.kind === 'bayer' ? 2 : 1
 
   const sample = (x: number, y: number) => {
@@ -155,18 +234,12 @@ export async function measureStars(
     if (y % 32 === 0) await setImmediate()
   }
 
-  const radii: number[] = []
-  // Spatial buckets keep blend rejection linear even in a rich field.
-  const buckets = new Map<string, Peak[]>()
+  return peaks
+}
 
-  for (const peak of peaks) {
-    const key = `${Math.floor(peak.x / policy.isolation)},${Math.floor(peak.y / policy.isolation)}`
-    const bucket = buckets.get(key) ?? []
-    bucket.push(peak)
-    buckets.set(key, bucket)
-  }
-
+function groupPeaks(peaks: Peak[], policy: StarPolicy): Candidate[] {
   if (policy.mergeBlends) {
+    const candidates: Candidate[] = []
     const remaining = [...peaks]
 
     while (remaining.length) {
@@ -182,58 +255,83 @@ export async function measureStars(
         }
       }
 
-      const merged = {
-        x: cluster.reduce((sum, peak) => sum + peak.x, 0) / cluster.length,
-        y: cluster.reduce((sum, peak) => sum + peak.y, 0) / cluster.length,
-      }
-
-      const hfr = measureStar(width, height, pixels, color, merged, policy)
-
-      if (hfr !== null) radii.push(hfr)
-
-      if (remaining.length % 8 === 0) await setImmediate()
+      candidates.push({
+        peak: {
+          x: cluster.reduce((sum, peak) => sum + peak.x, 0) / cluster.length,
+          y: cluster.reduce((sum, peak) => sum + peak.y, 0) / cluster.length,
+        },
+        blended: false,
+      })
     }
-  } else {
-    for (let index = 0; index < peaks.length; index++) {
-      const peak = peaks[index]!
-      const bx = Math.floor(peak.x / policy.isolation)
-      const by = Math.floor(peak.y / policy.isolation)
-      let blended = false
 
-      for (let dy = -1; dy <= 1; dy++) {
-        for (let dx = -1; dx <= 1; dx++) {
-          for (const other of buckets.get(`${bx + dx},${by + dy}`) ?? []) {
-            if (other !== peak && Math.hypot(other.x - peak.x, other.y - peak.y) < policy.isolation)
-              blended = true
-          }
+    return candidates
+  }
+
+  // Spatial buckets keep blend rejection linear even in a rich field.
+  const buckets = new Map<string, Peak[]>()
+
+  for (const peak of peaks) {
+    const key = `${Math.floor(peak.x / policy.isolation)},${Math.floor(peak.y / policy.isolation)}`
+    const bucket = buckets.get(key) ?? []
+    bucket.push(peak)
+    buckets.set(key, bucket)
+  }
+
+  return peaks.map(peak => {
+    const bx = Math.floor(peak.x / policy.isolation)
+    const by = Math.floor(peak.y / policy.isolation)
+    let blended = false
+
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        for (const other of buckets.get(`${bx + dx},${by + dy}`) ?? []) {
+          if (other !== peak && Math.hypot(other.x - peak.x, other.y - peak.y) < policy.isolation)
+            blended = true
         }
       }
-
-      if (!blended) {
-        const hfr = measureStar(width, height, pixels, color, peak, policy)
-
-        if (hfr !== null) radii.push(hfr)
-      }
-
-      if (index % 8 === 0) await setImmediate()
     }
-  }
+
+    return { peak, blended }
+  })
+}
+
+/** The first gate the measurement fails, or the star's HFR when it passes them all. */
+export function classify(
+  measurement: Measurement,
+  policy: StarPolicy,
+  color: ImageColor,
+): Verdict {
+  if (!measurement.ok) return measurement
+  const { sky, flux, outerFlux, plateauPixels, trace, separation, halfFluxRadius } = measurement
+
+  if (!(flux > 30 * sky.noise * Math.sqrt(Math.PI * policy.aperture ** 2)))
+    return { ok: false, reason: 'faint' }
+
+  // Reject an obvious flat clipping plateau; sensor saturation levels are not assumed.
+  if (plateauPixels >= 5) return { ok: false, reason: 'saturated' }
+
+  if (Math.abs(outerFlux) > flux * policy.outerFluxFraction) return { ok: false, reason: 'wings' }
+
+  if (!(trace > 0) || separation > trace * policy.elongation) return { ok: false, reason: 'shape' }
+
+  const hfr = halfFluxRadius()
+
+  if (hfr === null) return { ok: false, reason: 'unconverged' }
+
+  return hfr >= (color.kind === 'mono' ? policy.minHfrMono : policy.minHfrBayer)
+    ? { ok: true, hfr }
+    : { ok: false, reason: 'floor' }
+}
+
+/** The frame's recorded statistics: the stars that passed, counted, and their median HFR. */
+export function summarize(verdicts: Verdict[]) {
+  const radii = verdicts.flatMap(verdict => (verdict.ok ? [verdict.hfr] : []))
 
   return {
     algorithm: { version: starAlgorithmVersion },
     detectedStars: radii.length,
     medianHfrPixels: radii.length ? median(radii) : null,
   }
-}
-
-/** Defocus-capable HFR for an autofocus walk. Capture continues to use measureStars. */
-export async function measureAutofocusStars(
-  width: number,
-  height: number,
-  pixels: ArrayLike<number>,
-  color: ImageColor = { kind: 'mono' },
-) {
-  return measureStars(width, height, pixels, color, autofocusPolicy)
 }
 
 function median(values: number[]) {
@@ -284,14 +382,15 @@ function luminance(
   return (center + green + opposite) / 3
 }
 
-function measureStar(
+/** Measures the star at a peak with no gate applied; fails only if no patch or centroid forms. */
+export function measureStar(
   width: number,
   height: number,
   pixels: ArrayLike<number>,
   color: ImageColor,
   peak: Peak,
   policy: StarPolicy,
-): number | null {
+): Measurement {
   const ox = Math.round(peak.x)
   const oy = Math.round(peak.y)
   const { aperture, patchRadius } = policy
@@ -302,7 +401,7 @@ function measureStar(
     ox >= width - patchRadius - 1 ||
     oy >= height - patchRadius - 1
   )
-    return null
+    return { ok: false, reason: 'edge' }
   const patch: { x: number; y: number; value: number }[] = []
   const annulus: number[] = []
 
@@ -310,7 +409,7 @@ function measureStar(
     for (let x = -patchRadius; x <= patchRadius; x++) {
       const value = luminance(width, pixels, color, ox + x, oy + y)
 
-      if (!Number.isFinite(value)) return null
+      if (!Number.isFinite(value)) return { ok: false, reason: 'unconverged' }
       patch.push({ x, y, value })
 
       if (Math.hypot(x, y) >= policy.annulusInner) annulus.push(value)
@@ -334,20 +433,20 @@ function measureStar(
       my += pixel.y * signal
     }
 
-    if (!(flux > 0)) return null
+    if (!(flux > 0)) return { ok: false, reason: 'unconverged' }
     cx = mx / flux
     cy = my / flux
 
-    if (Math.hypot(cx, cy) > policy.centroidWander) return null
+    if (Math.hypot(cx, cy) > policy.centroidWander) return { ok: false, reason: 'unconverged' }
   }
 
-  let total = 0
-  let outer = 0
+  let flux = 0
+  let outerFlux = 0
   let mxx = 0
   let myy = 0
   let mxy = 0
   let maximum = -Infinity
-  let maximumCount = 0
+  let plateauPixels = 0
 
   for (const pixel of patch) {
     const dx = pixel.x - cx
@@ -356,27 +455,37 @@ function measureStar(
     const signal = pixel.value - sky.level
 
     if (radius <= aperture) {
-      total += signal
+      flux += signal
       mxx += signal * dx * dx
       myy += signal * dy * dy
       mxy += signal * dx * dy
 
       if (pixel.value > maximum) {
         maximum = pixel.value
-        maximumCount = 1
-      } else if (pixel.value === maximum) maximumCount++
-    } else if (radius <= patchRadius) outer += signal
+        plateauPixels = 1
+      } else if (pixel.value === maximum) plateauPixels++
+    } else if (radius <= patchRadius) outerFlux += signal
   }
 
-  if (!(total > 30 * sky.noise * Math.sqrt(Math.PI * aperture ** 2))) return null
+  return {
+    ok: true,
+    sky,
+    flux,
+    outerFlux,
+    plateauPixels,
+    trace: mxx + myy,
+    separation: Math.hypot(mxx - myy, 2 * mxy),
+    halfFluxRadius: once(() => halfFluxRadius(patch, cx, cy, sky, aperture)),
+  }
+}
 
-  // Reject an obvious flat clipping plateau; sensor saturation levels are not assumed.
-  if (maximumCount >= 5 || Math.abs(outer) > total * policy.outerFluxFraction) return null
-  const trace = mxx + myy
-  const separation = Math.hypot(mxx - myy, 2 * mxy)
-
-  if (!(trace > 0) || separation > trace * policy.elongation) return null
-
+function halfFluxRadius(
+  patch: { x: number; y: number; value: number }[],
+  cx: number,
+  cy: number,
+  sky: Background,
+  aperture: number,
+): number | null {
   // Each pixel contributes signed, background-subtracted flux across its actual square area.
   // A fine radial histogram gives circular enclosed flux, not a weighted mean star radius.
   const binsPerPixel = 32
@@ -385,7 +494,7 @@ function measureStar(
 
   for (const pixel of patch) {
     if (Math.hypot(pixel.x - cx, pixel.y - cy) > aperture + 1) continue
-    const flux = (pixel.value - sky.level) / subdivisions ** 2
+    const binFlux = (pixel.value - sky.level) / subdivisions ** 2
 
     for (let sy = 0; sy < subdivisions; sy++) {
       for (let sx = 0; sx < subdivisions; sx++) {
@@ -393,27 +502,30 @@ function measureStar(
         const dy = pixel.y - cy + (sy + 0.5) / subdivisions - 0.5
         const bin = Math.floor(Math.hypot(dx, dy) * binsPerPixel)
 
-        if (bin < bins.length) bins[bin]! += flux
+        if (bin < bins.length) bins[bin]! += binFlux
       }
     }
   }
 
-  total = bins.reduce((sum, flux) => sum + flux, 0)
+  const total = bins.reduce((sum, binFlux) => sum + binFlux, 0)
+
+  if (!(total > 0)) return null
   let enclosed = 0
 
   for (let bin = 0; bin < bins.length; bin++) {
-    const flux = bins[bin]!
+    const binFlux = bins[bin]!
 
-    if (enclosed + flux >= total / 2) {
-      const radius = (bin + (total / 2 - enclosed) / flux) / binsPerPixel
+    if (enclosed + binFlux >= total / 2)
+      return (bin + (total / 2 - enclosed) / binFlux) / binsPerPixel
 
-      return radius >= (color.kind === 'mono' ? policy.minHfrMono : policy.minHfrBayer)
-        ? radius
-        : null
-    }
-
-    enclosed += flux
+    enclosed += binFlux
   }
 
   return null
+}
+
+function once<T>(compute: () => T): () => T {
+  let result: { value: T } | undefined
+
+  return () => (result ??= { value: compute() }).value
 }
