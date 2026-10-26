@@ -78,8 +78,10 @@ const starAlgorithmVersion = 2
 const strongSnr = 100
 
 /**
- * A capture star with at least this flux signal-to-noise gets an axis ratio. Below it the moments
- * are mostly noise: a round star at S/N 30 to 60 reads 1.5 on average.
+ * A capture star with at least this flux signal-to-noise gets an axis ratio. Chosen when the moments
+ * used a hard aperture, whose noise made a round star at S/N 30 to 60 read 1.5 on average. Windowed
+ * moments on synthetic stars are steadier: 90% of readings at S/N 35 lie within 0.13 of the median.
+ * Lowering it is a bench question.
  */
 const axisRatioMinSnr = 200
 
@@ -338,7 +340,7 @@ function signalToNoise({ flux, sky }: StarMeasurement, policy: StarPolicy) {
   return flux / (sky.noise * Math.sqrt(Math.PI * policy.aperture ** 2))
 }
 
-/** The gates before the shape gate, in order: faint, saturated, wings. Null when the star passes them. */
+/** The gates before the elongation gate, in order: faint, saturated, wings. Null when the star passes them. */
 function earlyRejection(measurement: StarMeasurement, policy: StarPolicy) {
   const { sky, flux, outerFlux, plateauPixels } = measurement
 
@@ -353,8 +355,9 @@ function earlyRejection(measurement: StarMeasurement, policy: StarPolicy) {
 }
 
 /**
- * The axis ratio of a star that reaches the shape gate with at least `axisRatioMinSnr`, whether or not
- * the gate then rejects it: a trailed star must not drop out of the frame's shape. Null otherwise.
+ * The axis ratio of a star that reaches the elongation gate with at least `axisRatioMinSnr`, whether
+ * or not the gate then rejects it: a trailed star must not drop out of the frame's axis ratio.
+ * Null otherwise.
  */
 export function axisRatioOf(measurement: Measurement, policy: StarPolicy) {
   if (!measurement.ok || earlyRejection(measurement, policy) !== null) return null
@@ -388,7 +391,7 @@ export function classify(
 /**
  * The frame's recorded statistics. `detectedStars` and `medianHfrPixels` are the stars that passed
  * every gate; the named outputs say how many peaks there were, how many were strong, why the rest
- * were left out, and what sky they stood on. `axisRatio` is the median over the stars with a shape
+ * were left out, and what sky they stood on. `axisRatio` is the median over the stars that have one
  * and is null from fewer than `minAxisRatioStars` of them. With `mergeBlends`, merged peaks yield one
  * verdict.
  */
@@ -586,7 +589,7 @@ export function measureStar(
 /**
  * Ratio of the principal axes from second moments under a Gaussian window that follows the star
  * (adaptive moments). The window starts round and is reset each pass to twice the weighted
- * moments, which a Gaussian star in a window of its own shape reproduces; a round window would pull
+ * moments, which a Gaussian star in a window of its own form reproduces; a round window would pull
  * an elongated star toward 1, and the hard aperture's corners add noise to a bright one. Null when
  * the moments are not positive, the iteration does not settle, or the window outgrows the patch.
  */
@@ -598,6 +601,8 @@ function windowedAxisRatio(
   patchRadius: number,
 ): number | null {
   const largestVariance = (patchRadius / 3) ** 2
+  // The window weighs a pixel by exp(-distance / 2); beyond this the weight is below 5e-5.
+  const negligibleDistance = 20
   let wxx = 4
   let wyy = 4
   let wxy = 0
@@ -621,7 +626,7 @@ function windowedAxisRatio(
       const dy = pixel.y - centerY
       const distance = ixx * dx * dx + 2 * ixy * dx * dy + iyy * dy * dy
 
-      if (distance > 20) continue
+      if (distance > negligibleDistance) continue
       const signal = Math.exp(-distance / 2) * (pixel.value - sky.level)
       total += signal
       sx += signal * dx
