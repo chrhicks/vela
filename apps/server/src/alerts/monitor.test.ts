@@ -144,7 +144,7 @@ const night: NightFrame[] = JSON.parse(
   time: row.capturedAt.slice(11, 19),
   capturedAt: row.capturedAt,
   at: Date.parse(row.capturedAt),
-  statistics: { algorithm: { version: 2 }, detectedStars: row.stars, medianHfrPixels: row.hfrPixels },
+  statistics: { algorithm: { version: 1 }, detectedStars: row.stars, medianHfrPixels: row.hfrPixels },
 }))
 
 /** Feeds the night to the monitor as it happened, one frame at a time, up to and including `until`. */
