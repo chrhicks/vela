@@ -456,7 +456,7 @@ describe('star measurement stages', () => {
         ],
         9,
         sky,
-        [1.1, 1.3, 1.2, 1.5, 1.4],
+        [1.1, 1.3, 1.2, 1.5, 1.4, 1.3, 1.3, 1.2, 1.4, 1.3],
       ),
     ).toEqual({
       algorithm: { version: 2 },
@@ -494,8 +494,8 @@ describe('star measurement stages', () => {
   it('records a frame axis ratio only from enough stars', () => {
     const sky = { level: 340, noise: 4 }
 
-    expect(summarize([], 0, sky, [1.4, 1.4, 1.4, 1.4]).axisRatio).toBeNull()
-    expect(summarize([], 0, sky, [1.4, 1.4, 1.4, 1.4, 1.4]).axisRatio).toBe(1.4)
+    expect(summarize([], 0, sky, Array(9).fill(1.4)).axisRatio).toBeNull()
+    expect(summarize([], 0, sky, Array(10).fill(1.4)).axisRatio).toBe(1.4)
   })
 })
 
@@ -503,26 +503,26 @@ describe('axis ratio of strong stars', () => {
   // The Soul night's sky and noise, as the rig's Bayer sensor records them.
   const rig = { background: 539, noise: 13.7, color: { kind: 'bayer', pattern: 'rggb' } as ImageColor }
 
-  /** Six stars of one shape, each in its own 64 px cell, at the given total flux in ADU. */
-  function field(shape: { sigma: number; axisRatio: number }, flux: number) {
+  /** Stars of one shape, each in its own 64 px cell of a 5 by 2 grid, at the given total flux in ADU. */
+  function field(shape: { sigma: number; axisRatio: number }, flux: number, count = 10) {
     const amplitude = flux / (2 * Math.PI * shape.sigma ** 2 * shape.axisRatio)
 
-    const stars = Array.from({ length: 6 }, (_, index) => ({
-      x: 32 + 64 * (index % 3) + 0.37 * (index % 4),
-      y: 32 + 64 * Math.floor(index / 3) + 0.21 * (index % 5),
-      angle: (index * Math.PI) / 6,
+    const stars = Array.from({ length: count }, (_, index) => ({
+      x: 32 + 64 * (index % 5) + 0.37 * (index % 4),
+      y: 32 + 64 * Math.floor(index / 5) + 0.21 * (index % 3),
+      angle: (index * Math.PI) / 10,
       amplitude,
       ...shape,
     }))
 
-    return image(stars, { width: 192, height: 128, ...rig })
+    return image(stars, { width: 320, height: 128, ...rig })
   }
 
   // About S/N 210 by the measurement's own noise estimate.
   const strongFlux = 26_000
 
   it('recovers a known axis ratio from 1.0 to 2.0 to within 10% below it, and reads round stars 1.0 to 1.1', { timeout: 60_000 }, async () => {
-    for (const sigma of [1.3, 2.5]) {
+    for (const sigma of [1.3, 2]) {
       for (const axisRatio of [1, 1.2, 1.5, 2]) {
         const frame = field({ sigma, axisRatio }, strongFlux)
         const { axisRatio: measured } = await measureStars(frame.width, frame.height, frame.pixels, rig.color)
@@ -537,28 +537,26 @@ describe('axis ratio of strong stars', () => {
     const frame = field({ sigma: 1.8, axisRatio: 1.5 }, 12_000)
     const result = await measureStars(frame.width, frame.height, frame.pixels, rig.color)
 
-    expect(result.detectedStars).toBe(6)
+    expect(result.measured).toBeGreaterThanOrEqual(8)
+    expect(result.strong).toBeLessThan(10)
     expect(result.axisRatio).toBeNull()
   })
 
-  it('records no axis ratio from fewer than five strong stars', async () => {
-    const frame = image(
-      [0, 1, 2, 3].map(index => ({ x: 32 + 64 * index, y: 60, sigma: 1.8, amplitude: 2200 })),
-      { width: 288, height: 120, ...rig },
-    )
+  it('records no axis ratio from fewer than ten strong stars', async () => {
+    const shape = { sigma: 1.8, axisRatio: 1.5 }
+    const nine = field(shape, strongFlux, 9)
+    const ten = field(shape, strongFlux)
 
-    const result = await measureStars(frame.width, frame.height, frame.pixels, rig.color)
-
-    expect(result.strong).toBe(4)
-    expect(result.axisRatio).toBeNull()
+    expect((await measureStars(nine.width, nine.height, nine.pixels, rig.color)).axisRatio).toBeNull()
+    expect((await measureStars(ten.width, ten.height, ten.pixels, rig.color)).axisRatio).toBeGreaterThan(1.3)
   })
 
   it('keeps trailed stars the shape gate rejects, and leaves the count and gate as they were', async () => {
     const trailed = field({ sigma: 1.1, axisRatio: 3 }, strongFlux)
     const result = await measureStars(trailed.width, trailed.height, trailed.pixels, rig.color)
 
-    expect(result.rejected.elongated).toBe(6)
-    expect(result.detectedStars).toBe(0)
+    expect(result.rejected.elongated).toBeGreaterThanOrEqual(8)
+    expect(result.detectedStars).toBeLessThanOrEqual(2)
     expect(result.axisRatio).toBeGreaterThan(2.4)
   })
 

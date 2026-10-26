@@ -12,5 +12,6 @@ export function starStatistics(detectedStars: number, medianHfrPixels: number | 
     rejected: { blended: 0, edge: 0, unconverged: 0, faint: detectedStars * 2, saturated: 0, wings: 0, elongated: 0, floor: 0 },
     sky: 500,
     noise: 4,
+    axisRatio: detectedStars >= 10 ? 1.1 : null,
   }
 }
