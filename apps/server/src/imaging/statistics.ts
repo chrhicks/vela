@@ -37,6 +37,11 @@ export interface StarMeasurement {
   trace: number
   separation: number
   /**
+   * Ratio of the principal axes under a Gaussian window that adapts to the star, or null when the
+   * moments are not valid. Computed on first call.
+   */
+  axisRatio: () => number | null
+  /**
    * Half-flux radius in native pixels, or null when the enclosed flux has no half.
    * Computed on first call: it costs more than every other quantity together.
    */
@@ -57,6 +62,8 @@ export interface StarPolicy {
   minHfrMono: number
   minHfrBayer: number
   mergeBlends: boolean
+  /** Stars with at least this flux signal-to-noise get an axis ratio. */
+  shapeMinSnr: number
 }
 
 /**
@@ -69,6 +76,18 @@ const starAlgorithmVersion = 2
 
 /** A measured star with at least this flux signal-to-noise is strong. */
 const strongSnr = 100
+
+/**
+ * A capture star with at least this flux signal-to-noise gets an axis ratio. Below it the moments
+ * are mostly noise: a round star at S/N 30 to 60 reads 1.5 on average.
+ */
+const shapeMinSnr = 200
+
+/**
+ * The frame's axis ratio is recorded only from at least this many stars, so a median over a few
+ * never reads as a confident shape. A capture frame has a median of 65 such stars.
+ */
+const minShapeStars = 5
 
 export const capturePolicy: StarPolicy = {
   aperture: 12,
@@ -84,6 +103,7 @@ export const capturePolicy: StarPolicy = {
   minHfrMono: 0.9,
   minHfrBayer: 1.0,
   mergeBlends: false,
+  shapeMinSnr,
 }
 
 export const autofocusPolicy: StarPolicy = {
@@ -100,6 +120,7 @@ export const autofocusPolicy: StarPolicy = {
   minHfrMono: 0.5,
   minHfrBayer: 0.8,
   mergeBlends: true,
+  shapeMinSnr: Infinity,
 }
 
 /** Conservative measurements of isolated, adequately sampled stars in linear image data. */
@@ -129,21 +150,26 @@ export async function measureStars(
 
   const { peaks, sky } = await findPeaks(width, height, pixels, color, policy)
   const verdicts: Verdict[] = []
+  const axisRatios: number[] = []
   const candidates = groupPeaks(peaks, policy)
 
   for (let index = 0; index < candidates.length; index++) {
     const { peak, blended } = candidates[index]!
 
-    verdicts.push(
-      blended
-        ? { ok: false, reason: 'blended' }
-        : classify(measureStar(width, height, pixels, color, peak, policy), policy, color),
-    )
+    if (blended) verdicts.push({ ok: false, reason: 'blended' })
+    else {
+      const measurement = measureStar(width, height, pixels, color, peak, policy)
+      const axisRatio = shapeOf(measurement, policy)
+
+      verdicts.push(classify(measurement, policy, color))
+
+      if (axisRatio !== null) axisRatios.push(axisRatio)
+    }
 
     if (index % 8 === 0) await setImmediate()
   }
 
-  return summarize(verdicts, peaks.length, sky)
+  return summarize(verdicts, peaks.length, sky, axisRatios)
 }
 
 /** Defocus-capable HFR for an autofocus walk. Capture continues to use measureStars. */
@@ -306,6 +332,34 @@ function groupPeaks(peaks: Peak[], policy: StarPolicy): Candidate[] {
   })
 }
 
+function signalToNoise({ flux, sky }: StarMeasurement, policy: StarPolicy) {
+  return flux / (sky.noise * Math.sqrt(Math.PI * policy.aperture ** 2))
+}
+
+/** The gates before the shape gate, in order: faint, saturated, wings. Null when the star passes them. */
+function earlyRejection(measurement: StarMeasurement, policy: StarPolicy) {
+  const { sky, flux, outerFlux, plateauPixels } = measurement
+
+  if (!(flux > 30 * sky.noise * Math.sqrt(Math.PI * policy.aperture ** 2))) return 'faint'
+
+  // Reject an obvious flat clipping plateau; sensor saturation levels are not assumed.
+  if (plateauPixels >= 5) return 'saturated'
+
+  if (Math.abs(outerFlux) > flux * policy.outerFluxFraction) return 'wings'
+
+  return null
+}
+
+/**
+ * The axis ratio of a star that reaches the shape gate with at least `shapeMinSnr`, whether or not
+ * the gate then rejects it: a trailed star must not drop out of the frame's shape. Null otherwise.
+ */
+export function shapeOf(measurement: Measurement, policy: StarPolicy) {
+  if (!measurement.ok || earlyRejection(measurement, policy) !== null) return null
+
+  return signalToNoise(measurement, policy) >= policy.shapeMinSnr ? measurement.axisRatio() : null
+}
+
 /** The first gate the measurement fails, or the star's HFR when it passes them all. */
 export function classify(
   measurement: Measurement,
@@ -313,15 +367,10 @@ export function classify(
   color: ImageColor,
 ): Verdict {
   if (!measurement.ok) return measurement
-  const { sky, flux, outerFlux, plateauPixels, trace, separation, halfFluxRadius } = measurement
+  const { trace, separation, halfFluxRadius } = measurement
+  const early = earlyRejection(measurement, policy)
 
-  if (!(flux > 30 * sky.noise * Math.sqrt(Math.PI * policy.aperture ** 2)))
-    return { ok: false, reason: 'faint' }
-
-  // Reject an obvious flat clipping plateau; sensor saturation levels are not assumed.
-  if (plateauPixels >= 5) return { ok: false, reason: 'saturated' }
-
-  if (Math.abs(outerFlux) > flux * policy.outerFluxFraction) return { ok: false, reason: 'wings' }
+  if (early !== null) return { ok: false, reason: early }
 
   if (!(trace > 0) || separation > trace * policy.elongation) return { ok: false, reason: 'elongated' }
 
@@ -330,16 +379,23 @@ export function classify(
   if (hfr === null) return { ok: false, reason: 'unconverged' }
 
   return hfr >= (color.kind === 'mono' ? policy.minHfrMono : policy.minHfrBayer)
-    ? { ok: true, hfr, snr: flux / (sky.noise * Math.sqrt(Math.PI * policy.aperture ** 2)) }
+    ? { ok: true, hfr, snr: signalToNoise(measurement, policy) }
     : { ok: false, reason: 'floor' }
 }
 
 /**
  * The frame's recorded statistics. `detectedStars` and `medianHfrPixels` are the stars that passed
  * every gate; the named outputs say how many peaks there were, how many were strong, why the rest
- * were left out, and what sky they stood on. With `mergeBlends`, merged peaks yield one verdict.
+ * were left out, and what sky they stood on. `axisRatio` is the median over the stars with a shape
+ * and is null from fewer than `minShapeStars` of them. With `mergeBlends`, merged peaks yield one
+ * verdict.
  */
-export function summarize(verdicts: Verdict[], detections: number, sky: Background) {
+export function summarize(
+  verdicts: Verdict[],
+  detections: number,
+  sky: Background,
+  axisRatios: number[],
+) {
   const radii: number[] = []
   let strong = 0
 
@@ -375,6 +431,7 @@ export function summarize(verdicts: Verdict[], detections: number, sky: Backgrou
     rejected,
     sky: sky.level,
     noise: sky.noise,
+    axisRatio: axisRatios.length >= minShapeStars ? median(axisRatios) : null,
   }
 }
 
@@ -519,8 +576,85 @@ export function measureStar(
     plateauPixels,
     trace: mxx + myy,
     separation: Math.hypot(mxx - myy, 2 * mxy),
+    axisRatio: once(() => windowedAxisRatio(patch, cx, cy, sky, patchRadius)),
     halfFluxRadius: once(() => halfFluxRadius(patch, cx, cy, sky, aperture)),
   }
+}
+
+/**
+ * Ratio of the principal axes from second moments under a Gaussian window that follows the star
+ * (adaptive moments). The window starts round and is reset each pass to twice the weighted
+ * moments, which a Gaussian star in a window of its own shape reproduces; a round window would pull
+ * an elongated star toward 1, and the hard aperture's corners add noise to a bright one. Null when
+ * the moments are not positive, the iteration does not settle, or the window outgrows the patch.
+ */
+function windowedAxisRatio(
+  patch: { x: number; y: number; value: number }[],
+  cx: number,
+  cy: number,
+  sky: Background,
+  patchRadius: number,
+): number | null {
+  const largestVariance = (patchRadius / 3) ** 2
+  let wxx = 4
+  let wyy = 4
+  let wxy = 0
+  let centerX = cx
+  let centerY = cy
+
+  for (let iteration = 0; iteration < 40; iteration++) {
+    const determinant = wxx * wyy - wxy * wxy
+    const ixx = wyy / determinant
+    const iyy = wxx / determinant
+    const ixy = -wxy / determinant
+    let total = 0
+    let sx = 0
+    let sy = 0
+    let sxx = 0
+    let syy = 0
+    let sxy = 0
+
+    for (const pixel of patch) {
+      const dx = pixel.x - centerX
+      const dy = pixel.y - centerY
+      const distance = ixx * dx * dx + 2 * ixy * dx * dy + iyy * dy * dy
+
+      if (distance > 20) continue
+      const signal = Math.exp(-distance / 2) * (pixel.value - sky.level)
+      total += signal
+      sx += signal * dx
+      sy += signal * dy
+      sxx += signal * dx * dx
+      syy += signal * dy * dy
+      sxy += signal * dx * dy
+    }
+
+    if (!(total > 0)) return null
+    const mx = sx / total
+    const my = sy / total
+    const mxx = sxx / total - mx * mx
+    const myy = syy / total - my * my
+    const mxy = sxy / total - mx * my
+    const spread = Math.hypot((mxx - myy) / 2, mxy)
+    const mean = (mxx + myy) / 2
+    const minor = mean - spread
+
+    if (!(minor > 0) || mean + spread > largestVariance / 2) return null
+
+    const settled =
+      Math.abs(2 * mxx - wxx) + Math.abs(2 * myy - wyy) + Math.abs(2 * mxy - wxy) <
+        1e-3 * (wxx + wyy) && Math.hypot(mx, my) < 1e-3
+
+    if (settled) return Math.sqrt((mean + spread) / minor)
+
+    wxx = 2 * mxx
+    wyy = 2 * myy
+    wxy = 2 * mxy
+    centerX += 2 * mx
+    centerY += 2 * my
+  }
+
+  return null
 }
 
 function halfFluxRadius(
