@@ -1,0 +1,22 @@
+{
+  "name": "@vela/star-bench",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "star-bench": "tsx src/cli.ts",
+    "make-fixture": "tsx src/make-fixture.ts",
+    "test:types": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@vela/server": "workspace:*",
+    "zod": "4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "@vela/model": "workspace:*",
+    "tsx": "^4.21.0",
+    "typescript": "^7.0.2"
+  }
+}
+

@@ -1,0 +1,19 @@
+{
+  "id": "fixture-dark",
+  "rigId": "fixture-rig",
+  "saved": true,
+  "frameType": "dark",
+  "subject": null,
+  "capturedAt": "2030-01-01T02:09:00.000Z",
+  "receivedAt": "2030-01-01T02:09:00.000Z",
+  "savedAt": "2030-01-01T02:09:00.000Z",
+  "width": 192,
+  "height": 144,
+  "cameraName": "Fixture Camera",
+  "exposureSeconds": 90,
+  "color": "color",
+  "statistics": {
+    "detectedStars": 0,
+    "medianHfrPixels": null
+  }
+}

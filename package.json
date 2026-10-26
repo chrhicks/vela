@@ -13,7 +13,7 @@
     "build": "pnpm -r --if-present run build",
     "dev:web": "pnpm --filter @vela/web dev",
     "dev:server": "pnpm --filter @vela/server dev",
-    "test": "pnpm --filter @vela/model --filter @vela/cria --filter @vela/rig-session test:types && vitest run apps packages tools/oxlint tools/rig-session",
+    "test": "pnpm --filter @vela/model --filter @vela/cria --filter @vela/rig-session --filter @vela/star-bench test:types && vitest run apps packages tools/oxlint tools/rig-session tools/star-bench",
     "start": "pnpm --filter @vela/server start",
     "lint": "oxlint",
     "check": "pnpm lint && pnpm build && pnpm test",

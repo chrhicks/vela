@@ -314,6 +314,28 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
 
+  tools/star-bench:
+    dependencies:
+      '@vela/server':
+        specifier: workspace:*
+        version: link:../../apps/server
+      zod:
+        specifier: 4.5.4
+        version: 4.5.4
+    devDependencies:
+      '@types/node':
+        specifier: ^26.2.0
+        version: 26.2.0
+      '@vela/model':
+        specifier: workspace:*
+        version: link:../../packages/model
+      tsx:
+        specifier: ^4.21.0
+        version: 4.23.12
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
 packages:
 
   '@cria/primitives@https://codeload.github.com/chrhicks/cria/tar.gz/0e77983698e11b2c55e54d48e1a1c19e0e018f88#path:/ts/packages/primitives':
