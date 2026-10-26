@@ -26,6 +26,7 @@ export const starStatistics = z
       .optional(),
     sky: z.number().optional(),
     noise: z.number().nonnegative().optional(),
+    axisRatio: z.number().min(1).nullable().optional(),
   })
   .refine(value =>
     value.detectedStars === 0 ? value.medianHfrPixels === null : value.medianHfrPixels !== null,
@@ -36,6 +37,11 @@ export function starCounts({ detectedStars, detections }: CaptureImageStatistics
   return detections === undefined
     ? `${detectedStars} stars`
     : `${detectedStars} measured of ${detections} ${detections === 1 ? 'peak' : 'peaks'}`
+}
+
+/** "1.24", or null on a frame without enough strong stars or measured before the axis ratio was recorded. */
+export function axisRatio({ axisRatio }: CaptureImageStatistics) {
+  return axisRatio == null ? null : axisRatio.toFixed(2)
 }
 
 /** The frame's sky level in raw sample units, or null on a frame measured before it was recorded. */

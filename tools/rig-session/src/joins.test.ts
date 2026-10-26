@@ -28,6 +28,7 @@ function image(capturedAt: string, rigId = 'rig-a'): SavedImage {
     starRejected: null,
     skyLevel: null,
     skyNoise: null,
+    starAxisRatio: null,
     directory: '/nowhere',
   }
 }

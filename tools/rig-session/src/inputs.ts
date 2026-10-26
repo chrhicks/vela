@@ -95,6 +95,7 @@ const starStatistics = z.object({
   rejected: z.record(z.string(), count).optional(),
   sky: z.number().optional(),
   noise: z.number().optional(),
+  axisRatio: z.number().nullable().optional(),
 })
 
 type StarStatistics = z.infer<typeof starStatistics>
@@ -111,6 +112,7 @@ function starColumns(statistics: StarStatistics | null | undefined) {
     starRejected: statistics?.rejected === undefined ? null : JSON.stringify(statistics.rejected),
     skyLevel: statistics?.sky ?? null,
     skyNoise: statistics?.noise ?? null,
+    starAxisRatio: statistics?.axisRatio ?? null,
   }
 }
 
@@ -131,6 +133,8 @@ interface StarColumns {
   /** Median tile background of the frame, in raw sample units. */
   readonly skyLevel: number | null
   readonly skyNoise: number | null
+  /** Median axis ratio of the stars with a flux S/N of 200 or more; null with fewer than 10 of them. */
+  readonly starAxisRatio: number | null
 }
 
 const savedImageFile = z.object({

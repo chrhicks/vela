@@ -63,7 +63,7 @@ export interface StarPolicy {
   minHfrBayer: number
   mergeBlends: boolean
   /** Stars with at least this flux signal-to-noise get an axis ratio. */
-  shapeMinSnr: number
+  axisRatioMinSnr: number
 }
 
 /**
@@ -81,7 +81,7 @@ const strongSnr = 100
  * A capture star with at least this flux signal-to-noise gets an axis ratio. Below it the moments
  * are mostly noise: a round star at S/N 30 to 60 reads 1.5 on average.
  */
-const shapeMinSnr = 200
+const axisRatioMinSnr = 200
 
 /**
  * The frame's axis ratio is recorded only from at least this many stars. On the 717 recorded
@@ -89,7 +89,7 @@ const shapeMinSnr = 200
  * a median of 5 within 0.09. Only 2 of 631 light frames have 5 to 9 such stars, since a capture
  * frame has a median of 66.
  */
-const minShapeStars = 10
+const minAxisRatioStars = 10
 
 export const capturePolicy: StarPolicy = {
   aperture: 12,
@@ -105,7 +105,7 @@ export const capturePolicy: StarPolicy = {
   minHfrMono: 0.9,
   minHfrBayer: 1.0,
   mergeBlends: false,
-  shapeMinSnr,
+  axisRatioMinSnr,
 }
 
 export const autofocusPolicy: StarPolicy = {
@@ -122,7 +122,7 @@ export const autofocusPolicy: StarPolicy = {
   minHfrMono: 0.5,
   minHfrBayer: 0.8,
   mergeBlends: true,
-  shapeMinSnr: Infinity,
+  axisRatioMinSnr: Infinity,
 }
 
 /** Conservative measurements of isolated, adequately sampled stars in linear image data. */
@@ -161,7 +161,7 @@ export async function measureStars(
     if (blended) verdicts.push({ ok: false, reason: 'blended' })
     else {
       const measurement = measureStar(width, height, pixels, color, peak, policy)
-      const axisRatio = shapeOf(measurement, policy)
+      const axisRatio = axisRatioOf(measurement, policy)
 
       verdicts.push(classify(measurement, policy, color))
 
@@ -353,13 +353,13 @@ function earlyRejection(measurement: StarMeasurement, policy: StarPolicy) {
 }
 
 /**
- * The axis ratio of a star that reaches the shape gate with at least `shapeMinSnr`, whether or not
+ * The axis ratio of a star that reaches the shape gate with at least `axisRatioMinSnr`, whether or not
  * the gate then rejects it: a trailed star must not drop out of the frame's shape. Null otherwise.
  */
-export function shapeOf(measurement: Measurement, policy: StarPolicy) {
+export function axisRatioOf(measurement: Measurement, policy: StarPolicy) {
   if (!measurement.ok || earlyRejection(measurement, policy) !== null) return null
 
-  return signalToNoise(measurement, policy) >= policy.shapeMinSnr ? measurement.axisRatio() : null
+  return signalToNoise(measurement, policy) >= policy.axisRatioMinSnr ? measurement.axisRatio() : null
 }
 
 /** The first gate the measurement fails, or the star's HFR when it passes them all. */
@@ -389,7 +389,7 @@ export function classify(
  * The frame's recorded statistics. `detectedStars` and `medianHfrPixels` are the stars that passed
  * every gate; the named outputs say how many peaks there were, how many were strong, why the rest
  * were left out, and what sky they stood on. `axisRatio` is the median over the stars with a shape
- * and is null from fewer than `minShapeStars` of them. With `mergeBlends`, merged peaks yield one
+ * and is null from fewer than `minAxisRatioStars` of them. With `mergeBlends`, merged peaks yield one
  * verdict.
  */
 export function summarize(
@@ -433,7 +433,7 @@ export function summarize(
     rejected,
     sky: sky.level,
     noise: sky.noise,
-    axisRatio: axisRatios.length >= minShapeStars ? median(axisRatios) : null,
+    axisRatio: axisRatios.length >= minAxisRatioStars ? median(axisRatios) : null,
   }
 }
 

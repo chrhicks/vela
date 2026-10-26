@@ -6,7 +6,7 @@ import {
   measureAutofocusStars,
   measureStar,
   measureStars,
-  shapeOf,
+  axisRatioOf,
   summarize,
 } from './statistics.js'
 import type { ImageColor } from './preview.js'
@@ -501,18 +501,18 @@ describe('star measurement stages', () => {
 
 describe('axis ratio of strong stars', () => {
   // The Soul night's sky and noise, as the rig's Bayer sensor records them.
-  const rig = { background: 539, noise: 13.7, color: { kind: 'bayer', pattern: 'rggb' } as ImageColor }
+  const rig = { background: 539, noise: 13.7, color: { kind: 'bayer', pattern: 'rggb' } satisfies ImageColor }
 
-  /** Stars of one shape, each in its own 64 px cell of a 5 by 2 grid, at the given total flux in ADU. */
-  function field(shape: { sigma: number; axisRatio: number }, flux: number, count = 10) {
-    const amplitude = flux / (2 * Math.PI * shape.sigma ** 2 * shape.axisRatio)
+  /** Stars of one profile, each in its own 64 px cell of a 5 by 2 grid, at the given total flux in ADU. */
+  function field(profile: { sigma: number; axisRatio: number }, flux: number, count = 10) {
+    const amplitude = flux / (2 * Math.PI * profile.sigma ** 2 * profile.axisRatio)
 
     const stars = Array.from({ length: count }, (_, index) => ({
       x: 32 + 64 * (index % 5) + 0.37 * (index % 4),
       y: 32 + 64 * Math.floor(index / 5) + 0.21 * (index % 3),
       angle: (index * Math.PI) / 10,
       amplitude,
-      ...shape,
+      ...profile,
     }))
 
     return image(stars, { width: 320, height: 128, ...rig })
@@ -533,7 +533,7 @@ describe('axis ratio of strong stars', () => {
     }
   })
 
-  it('records no axis ratio from stars below the S/N the shape needs', async () => {
+  it('records no axis ratio from stars below the S/N the profile needs', async () => {
     const frame = field({ sigma: 1.8, axisRatio: 1.5 }, 12_000)
     const result = await measureStars(frame.width, frame.height, frame.pixels, rig.color)
 
@@ -543,15 +543,15 @@ describe('axis ratio of strong stars', () => {
   })
 
   it('records no axis ratio from fewer than ten strong stars', async () => {
-    const shape = { sigma: 1.8, axisRatio: 1.5 }
-    const nine = field(shape, strongFlux, 9)
-    const ten = field(shape, strongFlux)
+    const profile = { sigma: 1.8, axisRatio: 1.5 }
+    const nine = field(profile, strongFlux, 9)
+    const ten = field(profile, strongFlux)
 
     expect((await measureStars(nine.width, nine.height, nine.pixels, rig.color)).axisRatio).toBeNull()
     expect((await measureStars(ten.width, ten.height, ten.pixels, rig.color)).axisRatio).toBeGreaterThan(1.3)
   })
 
-  it('keeps trailed stars the shape gate rejects, and leaves the count and gate as they were', async () => {
+  it('keeps trailed stars the profile gate rejects, and leaves the count and gate as they were', async () => {
     const trailed = field({ sigma: 1.1, axisRatio: 3 }, strongFlux)
     const result = await measureStars(trailed.width, trailed.height, trailed.pixels, rig.color)
 
@@ -560,7 +560,7 @@ describe('axis ratio of strong stars', () => {
     expect(result.axisRatio).toBeGreaterThan(2.4)
   })
 
-  it('computes the moments only for stars that reach the shape gate with S/N 200 or more', async () => {
+  it('computes the moments only for stars that reach the profile gate with S/N 200 or more', async () => {
     const mono: ImageColor = { kind: 'mono' }
 
     const cases = [
@@ -581,7 +581,7 @@ describe('axis ratio of strong stars', () => {
       if (!measurement.ok) throw new Error('expected a measurement')
       const axisRatio = vi.fn(measurement.axisRatio)
 
-      expect(shapeOf({ ...measurement, axisRatio }, capturePolicy) !== null).toBe(computed)
+      expect(axisRatioOf({ ...measurement, axisRatio }, capturePolicy) !== null).toBe(computed)
       expect(axisRatio).toHaveBeenCalledTimes(computed ? 1 : 0)
     }
   })

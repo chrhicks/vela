@@ -437,6 +437,7 @@ describe('a capture run feeds the alerts', () => {
         rejected: { blended: 0, edge: 0, unconverged: 0, faint: 0, saturated: 0, wings: 0, elongated: 0, floor: 0 },
         sky: 100,
         noise: 1,
+        axisRatio: null,
       }
     })
   }

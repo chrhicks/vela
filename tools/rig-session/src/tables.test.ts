@@ -29,6 +29,7 @@ function image(id: string, capturedAt: string): SavedImage {
     starRejected: '{"blended":3,"faint":25}',
     skyLevel: 540.5,
     skyNoise: 4.25,
+    starAxisRatio: 1.24,
     directory: `/frames/${id}`,
   }
 }
@@ -56,6 +57,7 @@ function record(attempt: number, imageId: string | null, outcome: FrameRecord['o
     starRejected: imageId === null ? null : '{"blended":3,"faint":25}',
     skyLevel: imageId === null ? null : 540.5,
     skyNoise: imageId === null ? null : 4.25,
+    starAxisRatio: imageId === null ? null : 1.24,
   }
 }
 
@@ -124,6 +126,7 @@ test('a frame row carries its span and mount links, a frame without either carri
     star_rejected: '{"blended":3,"faint":25}',
     sky_level: 540.5,
     sky_noise: 4.25,
+    star_axis_ratio: 1.24,
     saved_dir: '/frames/linked',
     span_id: 'span-7',
     span_link: 'inferred',
