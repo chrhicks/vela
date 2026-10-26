@@ -12,6 +12,7 @@ import {
   createAutofocusController,
   type AutofocusCamera,
   type AutofocusFocuser,
+  type AutofocusMeasure,
   type AutofocusRunOptions,
 } from './controller.js'
 import { measureAutofocusStars } from '../imaging/statistics.js'
@@ -28,7 +29,7 @@ interface AutofocusRouteOptions {
     expectedCameraName: string
   }) => AutofocusCamera
   createFocuser?: (settings: { rig: RigCatalogRecord; focuserId: string }) => AutofocusFocuser
-  measure?: typeof measureAutofocusStars
+  measure?: AutofocusMeasure
 }
 
 function configuredCamera(settings: {

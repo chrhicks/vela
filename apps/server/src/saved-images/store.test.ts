@@ -264,3 +264,31 @@ it('reads statistics saved before the algorithm stamp as version 1 without rewri
   expect((await reopened.get('rig', image.id))?.statistics).toEqual({ ...legacyStatistics, algorithm: { version: 1 } })
   expect(await fs.readFile(metadataPath, 'utf8')).toBe(legacyText)
 })
+
+it('keeps the named star outputs and reads statistics saved without them', async () => {
+  const root = await temporary()
+  const store = await openFileSavedImageStore(root)
+
+  const named = {
+    algorithm: { version: 2 },
+    detectedStars: 264,
+    medianHfrPixels: 1.6,
+    detections: 1141,
+    measured: 264,
+    strong: 134,
+    rejected: { blended: 39, edge: 24, unconverged: 3, faint: 601, saturated: 0, wings: 106, elongated: 90, floor: 12 },
+    sky: 539.5,
+    noise: 4.25,
+  }
+
+  await store.save('rig', { ...image, statistics: named }, files)
+  const reopened = await openFileSavedImageStore(root)
+
+  expect((await reopened.get('rig', image.id))?.statistics).toEqual(named)
+
+  const later = { ...image, id: 'frame-without-outputs' }
+  const { detections: _d, measured: _m, strong: _s, rejected: _r, sky: _sky, noise: _n, ...recorded } = named
+  await store.save('rig', { ...later, statistics: recorded }, files)
+
+  expect((await reopened.get('rig', later.id))?.statistics).toEqual(recorded)
+})

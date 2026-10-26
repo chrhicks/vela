@@ -1,4 +1,10 @@
-import type { AutofocusApproach, AutofocusFit, AutofocusSample, AutofocusView } from '@vela/model/web'
+import type {
+  AutofocusApproach,
+  AutofocusFit,
+  AutofocusSample,
+  AutofocusView,
+  CaptureImageStatistics,
+} from '@vela/model/web'
 import type { CaptureFrame } from '../capture/controller.js'
 import { measureAutofocusStars } from '../imaging/statistics.js'
 import { fitHyperbola } from './hyperbola.js'
@@ -54,6 +60,11 @@ export interface AutofocusRunOptions {
 
 const rSquaredGate = 0.7
 
+/** What the walk reads from a frame: the count and median HFR, whatever else the measurement found. */
+export type AutofocusMeasure = (
+  ...args: Parameters<typeof measureAutofocusStars>
+) => Promise<Pick<CaptureImageStatistics, 'detectedStars' | 'medianHfrPixels'>>
+
 export function createAutofocusController(
   settings: {
     rigId: string
@@ -62,7 +73,7 @@ export function createAutofocusController(
     focuserName: string
   },
   now = Date.now,
-  measure = measureAutofocusStars,
+  measure: AutofocusMeasure = measureAutofocusStars,
 ) {
   let view: AutofocusView = emptyView(settings, DEFAULT_STEP_SIZE, DEFAULT_OFFSET_STEPS)
   let running: Promise<void> | undefined

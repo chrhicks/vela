@@ -1,5 +1,7 @@
 import { setImmediate } from 'node:timers/promises'
 
+import type { StarRejection } from '@vela/model/web'
+
 import type { ImageColor } from './preview.js'
 
 type Background = { level: number; noise: number }
@@ -9,18 +11,11 @@ type Peak = { x: number; y: number }
 /** A peak to measure. A blended peak is left unmeasured; with mergeBlends, blends merge into one. */
 type Candidate = { peak: Peak; blended: boolean }
 
-/** Why a star is left out of the count. Each is the first gate the star failed, in the order listed. */
-export type Rejection =
-  | 'blended'
-  | 'edge'
-  | 'unconverged'
-  | 'faint'
-  | 'saturated'
-  | 'wings'
-  | 'shape'
-  | 'floor'
+/** Why a star is left out of the count: the first gate it failed. */
+export type Rejection = StarRejection
 
-export type Verdict = { ok: true; hfr: number } | { ok: false; reason: Rejection }
+/** A passing star carries its half-flux radius and its flux signal-to-noise. */
+export type Verdict = { ok: true; hfr: number; snr: number } | { ok: false; reason: Rejection }
 
 /** The result of measuring a peak: the measurement, or why none could be formed. */
 export type Measurement =
@@ -67,8 +62,13 @@ export interface StarPolicy {
 /**
  * Stamped on every measurement so records from different revisions stay apart.
  * 1: unstamped records, with a Bayer capture HFR floor of 1.4 px. 2: that floor is 1.0 px.
+ * The named outputs (detections, strong, rejected, sky, noise) are additive and leave the value of
+ * every older field as it was, so they did not bump it.
  */
 const starAlgorithmVersion = 2
+
+/** A measured star with at least this flux signal-to-noise is strong. */
+const strongSnr = 100
 
 export const capturePolicy: StarPolicy = {
   aperture: 12,
@@ -127,7 +127,7 @@ export async function measureStars(
     if (index % 131072 === 0) await setImmediate()
   }
 
-  const peaks = await findPeaks(width, height, pixels, color, policy)
+  const { peaks, sky } = await findPeaks(width, height, pixels, color, policy)
   const verdicts: Verdict[] = []
   const candidates = groupPeaks(peaks, policy)
 
@@ -143,7 +143,7 @@ export async function measureStars(
     if (index % 8 === 0) await setImmediate()
   }
 
-  return summarize(verdicts)
+  return summarize(verdicts, peaks.length, sky)
 }
 
 /** Defocus-capable HFR for an autofocus walk. Capture continues to use measureStars. */
@@ -156,14 +156,17 @@ export async function measureAutofocusStars(
   return measureStars(width, height, pixels, color, autofocusPolicy)
 }
 
-/** Local maxima above the sky that have neighbours, as positions in native image pixels. */
+/**
+ * Local maxima above the sky that have neighbours, as positions in native image pixels, and the
+ * frame's sky: the median level and noise of the tile backgrounds the peaks are judged against.
+ */
 export async function findPeaks(
   width: number,
   height: number,
   pixels: ArrayLike<number>,
   color: ImageColor,
   policy: StarPolicy,
-): Promise<Peak[]> {
+): Promise<{ peaks: Peak[]; sky: Background }> {
   const scale = color.kind === 'bayer' ? 2 : 1
 
   const sample = (x: number, y: number) => {
@@ -234,7 +237,15 @@ export async function findPeaks(
     if (y % 32 === 0) await setImmediate()
   }
 
-  return peaks
+  return {
+    peaks,
+    sky: backgrounds.length
+      ? {
+          level: median(backgrounds.map(tile => tile.level)),
+          noise: median(backgrounds.map(tile => tile.noise)),
+        }
+      : { level: 0, noise: 0 },
+  }
 }
 
 function groupPeaks(peaks: Peak[], policy: StarPolicy): Candidate[] {
@@ -312,25 +323,58 @@ export function classify(
 
   if (Math.abs(outerFlux) > flux * policy.outerFluxFraction) return { ok: false, reason: 'wings' }
 
-  if (!(trace > 0) || separation > trace * policy.elongation) return { ok: false, reason: 'shape' }
+  if (!(trace > 0) || separation > trace * policy.elongation) return { ok: false, reason: 'elongated' }
 
   const hfr = halfFluxRadius()
 
   if (hfr === null) return { ok: false, reason: 'unconverged' }
 
   return hfr >= (color.kind === 'mono' ? policy.minHfrMono : policy.minHfrBayer)
-    ? { ok: true, hfr }
+    ? { ok: true, hfr, snr: flux / (sky.noise * Math.sqrt(Math.PI * policy.aperture ** 2)) }
     : { ok: false, reason: 'floor' }
 }
 
-/** The frame's recorded statistics: the stars that passed, counted, and their median HFR. */
-export function summarize(verdicts: Verdict[]) {
-  const radii = verdicts.flatMap(verdict => (verdict.ok ? [verdict.hfr] : []))
+/**
+ * The frame's recorded statistics. `detectedStars` and `medianHfrPixels` are the stars that passed
+ * every gate; the named outputs say how many peaks there were, how many were strong, why the rest
+ * were left out, and what sky they stood on. With `mergeBlends`, merged peaks yield one verdict.
+ */
+export function summarize(verdicts: Verdict[], detections: number, sky: Background) {
+  const radii: number[] = []
+  let strong = 0
+
+  const rejected: Record<Rejection, number> = {
+    blended: 0,
+    edge: 0,
+    unconverged: 0,
+    faint: 0,
+    saturated: 0,
+    wings: 0,
+    elongated: 0,
+    floor: 0,
+  }
+
+  for (const verdict of verdicts) {
+    if (!verdict.ok) {
+      rejected[verdict.reason]++
+      continue
+    }
+
+    radii.push(verdict.hfr)
+
+    if (verdict.snr >= strongSnr) strong++
+  }
 
   return {
     algorithm: { version: starAlgorithmVersion },
     detectedStars: radii.length,
     medianHfrPixels: radii.length ? median(radii) : null,
+    detections,
+    measured: radii.length,
+    strong,
+    rejected,
+    sky: sky.level,
+    noise: sky.noise,
   }
 }
 

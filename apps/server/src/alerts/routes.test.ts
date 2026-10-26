@@ -424,11 +424,21 @@ describe('a capture run feeds the alerts', () => {
   function measuredStars(counts: number[]) {
     const remaining = [...counts]
 
-    vi.spyOn(statistics, 'measureStars').mockImplementation(async () => ({
-      algorithm: { version: 2 },
-      detectedStars: remaining.shift() ?? 0,
-      medianHfrPixels: 3,
-    }))
+    vi.spyOn(statistics, 'measureStars').mockImplementation(async () => {
+      const stars = remaining.shift() ?? 0
+
+      return {
+        algorithm: { version: 2 },
+        detectedStars: stars,
+        medianHfrPixels: 3,
+        detections: stars,
+        measured: stars,
+        strong: 0,
+        rejected: { blended: 0, edge: 0, unconverged: 0, faint: 0, saturated: 0, wings: 0, elongated: 0, floor: 0 },
+        sky: 100,
+        noise: 1,
+      }
+    })
   }
 
   it('raises one emergency when the stars vanish, and clears it when the run is stopped', async () => {
