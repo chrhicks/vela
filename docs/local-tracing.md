@@ -166,6 +166,7 @@ restarts and the server logs why once; capture is never affected. Each line is:
   "startedAt": "2026-10-17T03:31:00.120Z",
   "settledAt": "2026-10-17T03:31:12.480Z",
   "exposureSeconds": 10,
+  "frameType": "light",
   "subject": { "targetId": "ngc7000", "name": "North America Nebula", "catalog": "NGC 7000" },
   "outcome": "saved",
   "message": null,
@@ -178,7 +179,18 @@ restarts and the server logs why once; capture is never affected. Each line is:
     "width": 6248,
     "height": 4176
   },
-  "statistics": { "detectedStars": 412, "medianHfrPixels": 2.9 }
+  "statistics": {
+    "algorithm": { "version": 3 },
+    "detectedStars": 412,
+    "medianHfrPixels": 2.9,
+    "detections": 1141,
+    "measured": 412,
+    "strong": 180,
+    "rejected": { "…": 0 },
+    "sky": 539,
+    "noise": 13.7,
+    "axisRatio": 1.21
+  }
 }
 ```
 
@@ -195,6 +207,19 @@ restarts and the server logs why once; capture is never affected. Each line is:
 - `image.id` is Vela's ID; `saved-images/<hash>/metadata.json` carries the same `id` and the same
   `provenance`. `statistics` is null when star measurement was unavailable, and a starless frame
   is `detectedStars: 0`.
+- `frameType` is `light`, `dark`, `flat`, `dark-flat` or `bias`; records from before frame types read as `light`.
+- `statistics.algorithm.version` says which star measurement produced the numbers; counts from different versions are
+  not comparable, and records without it are version 1. `detections` (peaks found), `measured` (equal to
+  `detectedStars`), `strong` (S/N 100 or more), `rejected` (counts by first failed gate), `sky`, `noise` and `axisRatio`
+  (null with too few S/N 200 stars) are absent on records written before they existed.
+  `apps/server/src/imaging/README.md` defines each.
+
+### Autofocus records
+
+Set `VELA_AUTOFOCUS_RECORDS_PATH` to a JSONL file path and the server appends one line per autofocus run when it
+settles, with the brightest stars of every sample (position, S/N, HFR). It is off when the variable is unset. The format,
+size and a `jq` example are in `apps/server/src/autofocus/README.md`. `compose.yaml` writes it to
+`data/traces/autofocus.jsonl`.
 
 ## Alerts
 
