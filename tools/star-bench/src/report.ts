@@ -1,8 +1,11 @@
-import { replayAlerts } from './alerts.ts'
+import { replayAlerts, type ReplayOptions } from './alerts.ts'
+import { assessNight, type NightAssessment } from './assess.ts'
 import type { FrameResult } from './compare.ts'
 import type { SkippedDirectory } from './frames.ts'
+import type { NightLabels } from './labels.ts'
 import { groupRuns, type Run } from './runs.ts'
 import { jumpFactor, median, steadiness } from './steadiness.ts'
+import { sweeps, sweepThreshold, type SweepRange } from './sweep.ts'
 
 /** The first-failed-gate reasons in the order the gates run. */
 const rejections = ['blended', 'edge', 'unconverged', 'faint', 'saturated', 'wings', 'elongated', 'floor'] as const
@@ -63,13 +66,26 @@ export function renderTable(results: FrameResult[]) {
 
 const listedFrames = 10
 
-export function renderReport(
-  results: FrameResult[],
-  skipped: SkippedDirectory[],
-  gapMinutes: number,
-  restartTimes: number[],
-) {
-  const lines = [...renderComparison(results, skipped), '', ...renderRuns(results, gapMinutes, restartTimes)]
+/** What the report replays and checks beyond the comparison with the records. */
+export interface ReportOptions {
+  gapMinutes: number
+  restartTimes: number[]
+  replay: ReplayOptions
+  /** Labelled nights to check the alerts against, or null for a report without that section. */
+  labels: NightLabels[] | null
+  /** Also find how far each star threshold can move before a labelled night fails. Slow. */
+  sweep: boolean
+}
+
+export function renderReport(results: FrameResult[], skipped: SkippedDirectory[], options: ReportOptions) {
+  const runs = groupRuns(results, options.gapMinutes, options.restartTimes)
+
+  const lines = [
+    ...renderComparison(results, skipped),
+    '',
+    ...renderRuns(results, runs, options),
+    ...(options.labels ? ['', ...renderLabelled(runs, options.labels, options)] : []),
+  ]
 
   return lines.join('\n') + '\n'
 }
@@ -105,20 +121,19 @@ function renderComparison(results: FrameResult[], skipped: SkippedDirectory[]) {
   return lines
 }
 
-function renderRuns(results: FrameResult[], gapMinutes: number, restartTimes: number[]) {
-  const runs = groupRuns(results, gapMinutes, restartTimes)
+function renderRuns(results: FrameResult[], runs: Run[], { gapMinutes, restartTimes, replay }: ReportOptions) {
   const restarts = restartTimes.map(restart => `, or at ${time(restart)}`).join('')
   const lines = [`Light-frame runs (same target and exposure, a new run after a gap over ${gapMinutes} min${restarts})`]
 
   for (const run of runs) {
     const first = run.frames[0]!
     const last = run.frames.at(-1)!
-    const { pairs, jumps, spread } = steadiness(run.frames.map(frame => frame.stars))
-    const episodes = replayAlerts(run)
+    const episodes = replayAlerts(run, replay)
 
     lines.push(
       `${run.target}, ${run.exposureSeconds} s: ${run.frames.length} frames, ${time(first.capturedAt)} to ${time(last.capturedAt)}`,
-      `  stars median ${median(run.frames.map(frame => frame.stars))}, spread ${spread === null ? 'n/a' : spread.toFixed(3)}, ${jumps} of ${pairs} pairs jump over ${jumpFactor}x`,
+      `  stars median ${median(run.frames.map(frame => frame.stars))}, ${steadinessLine(run.frames.map(frame => frame.stars))}`,
+      `  strong stars median ${medianOf(run, 'strong')}, ${steadinessLine(run.statistics.map(statistics => statistics.strong))}`,
       `  per frame, median: peaks ${medianOf(run, 'detections')}, measured ${medianOf(run, 'measured')}, strong ${medianOf(run, 'strong')}, sky ${medianOf(run, 'sky')}, noise ${medianOf(run, 'noise')}`,
       `  axis ratio of strong stars: ${axisRatioLine(run)}`,
       `  rejected by first failed gate, median: ${rejections.map(reason => `${reason} ${median(run.statistics.map(statistics => statistics.rejected[reason]))}`).join(', ')}`,
@@ -137,6 +152,12 @@ function renderRuns(results: FrameResult[], gapMinutes: number, restartTimes: nu
   lines.push(`Frames outside any run: ${outside.length}${describeTypes(outside)}`)
 
   return lines
+}
+
+function steadinessLine(counts: number[]) {
+  const { pairs, jumps, spread } = steadiness(counts)
+
+  return `spread ${spread === null ? 'n/a' : spread.toFixed(3)}, ${jumps} of ${pairs} pairs jump over ${jumpFactor}x`
 }
 
 /** The frames with a recorded axis ratio, and how many of them read over `elongatedAxisRatio`. */
@@ -163,4 +184,94 @@ function describeTypes(results: FrameResult[]) {
 
 function time(epochMilliseconds: number) {
   return `${new Date(epochMilliseconds).toISOString().slice(0, 19)}Z`
+}
+
+function renderLabelled(runs: Run[], labels: NightLabels[], { replay, sweep }: ReportOptions) {
+  const nights = labels.map(night => assessNight(night, runs, replay))
+  const lines = [`Labelled nights (alert count: ${replay.count})`]
+
+  for (const night of nights) lines.push(...renderNight(night))
+
+  const labelled = new Set(nights.flatMap(night => (night.run ? [night.run] : [])))
+  const unlabelled = runs.filter(run => !labelled.has(run))
+
+  if (unlabelled.length)
+    lines.push(`Runs without labels: ${unlabelled.map(run => `${run.target}, ${run.exposureSeconds} s from ${time(run.frames[0]!.capturedAt)}`).join('; ')}`)
+
+  lines.push(...renderSummary(nights))
+
+  if (sweep) lines.push('', ...renderSweep(nights.map(night => night.labels), runs, replay))
+
+  return lines
+}
+
+function renderNight({ labels, run, windows, unlabelled, passed }: NightAssessment) {
+  const lines = [`${labels.night}, ${labels.exposureSeconds} s, ${labels.use}: ${passed ? 'pass' : 'FAIL'}`]
+
+  if (!run) return [...lines, `  NO RUN: no ${labels.target} run of ${labels.exposureSeconds} s overlaps the labelled windows`]
+
+  for (const { window, required, unexpected, allowed } of windows) {
+    const name = window.kind === 'event' ? `event ${window.name}` : window.kind
+    const span = `${time(window.from)} to ${time(window.to)}`
+    const quiet = unexpected.length === 0 && allowed.length === 0 && required.length === 0
+
+    lines.push(`  ${name} ${span}${quiet ? ': quiet' : ''}`)
+
+    for (const { id, episode } of required) {
+      if (!episode) lines.push(`    ${id} NOT RAISED`)
+      else lines.push(`    ${id} raised ${time(episode.from)} (+${minutesAfter(episode.from, window.from)} min), ${cleared(episode.until)}: ${episode.message}`)
+    }
+
+    for (const episode of allowed) lines.push(`    allowed ${episode.id} raised ${time(episode.from)}, ${cleared(episode.until)}: ${episode.message}`)
+
+    for (const episode of unexpected) lines.push(`    UNEXPECTED ${episode.id} raised ${time(episode.from)}, ${cleared(episode.until)}: ${episode.message}`)
+  }
+
+  for (const episode of unlabelled) lines.push(`  UNLABELLED ${episode.id} raised ${time(episode.from)}, ${cleared(episode.until)}: ${episode.message}`)
+
+  return lines
+}
+
+function renderSummary(nights: NightAssessment[]) {
+  const lines: string[] = []
+
+  for (const use of ['calibration', 'holdout'] as const) {
+    const chosen = nights.filter(night => night.labels.use === use)
+    const required = chosen.flatMap(night => night.windows.flatMap(({ required }) => required))
+    const raised = required.filter(({ episode }) => episode !== null).length
+    const unexpected = chosen.reduce((sum, night) => sum + night.windows.reduce((count, { unexpected }) => count + unexpected.length, 0) + night.unlabelled.length, 0)
+
+    lines.push(`${use === 'holdout' ? 'Held out' : 'Calibration'}: ${chosen.filter(night => night.passed).length} of ${chosen.length} nights pass, ${raised} of ${required.length} expected alerts raised, ${unexpected} unexpected`)
+  }
+
+  return lines
+}
+
+function renderSweep(labels: NightLabels[], runs: Run[], replay: ReplayOptions) {
+  const lines = ['Threshold ranges: the values at which the alert it governs passes every labelled night of that kind, in steps of 0.01 (the margins are from the default to each end; * means the end of the values tried)']
+
+  for (const spec of sweeps) {
+    const result = sweepThreshold(labels, runs, spec, replay)
+
+    lines.push(`  ${spec.threshold} default ${result.default}: calibration ${range(result.calibration, result.default)}, held out ${range(result.holdout, result.default)}, both ${range(result.both, result.default)}`)
+  }
+
+  return lines
+}
+
+function range(found: SweepRange | null, centre: number) {
+  if (!found) return 'none'
+  const span = `${found.lowest.toFixed(2)}${found.openBelow ? '*' : ''} to ${found.highest.toFixed(2)}${found.openAbove ? '*' : ''}`
+
+  return found.holdsAtDefault
+    ? `${span} (-${(centre - found.lowest).toFixed(2)} / +${(found.highest - centre).toFixed(2)})`
+    : `${span}, not the default`
+}
+
+function minutesAfter(at: number, start: number) {
+  return ((at - start) / 60_000).toFixed(1)
+}
+
+function cleared(until: number | null) {
+  return until === null ? 'still standing at the end of the run' : `cleared ${time(until)}`
 }

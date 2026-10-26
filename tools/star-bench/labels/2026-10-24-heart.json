@@ -1,0 +1,40 @@
+{
+  "night": "2026-10-24 Heart Nebula",
+  "target": "Heart Nebula",
+  "exposureSeconds": 90,
+  "use": "calibration",
+  "windows": [
+    {
+      "kind": "healthy",
+      "from": "2026-10-24T00:01:00Z",
+      "to": "2026-10-24T00:44:00Z",
+      "note": "Sky level 662 to 670 and noise 8.2 to 8.9."
+    },
+    {
+      "kind": "event",
+      "name": "creeping haze",
+      "from": "2026-10-24T00:48:00Z",
+      "to": "2026-10-24T01:25:00Z",
+      "expect": [
+        "stars-declining"
+      ],
+      "note": "Sky noise climbs from 8.9 to 10.7 and the sky level by 4% before the stars drop; the observer log of 2026-10-24 records haze and the Moon."
+    },
+    {
+      "kind": "event",
+      "name": "haze",
+      "from": "2026-10-24T01:26:00Z",
+      "to": "2026-10-24T01:40:30Z",
+      "expect": [
+        "stars-dropping"
+      ],
+      "note": "Haze from 01:26Z (star-measurement review); sky noise peaks at 12.8."
+    },
+    {
+      "kind": "healthy",
+      "from": "2026-10-24T01:41:00Z",
+      "to": "2026-10-24T02:11:00Z",
+      "note": "The haze has passed: sky level 671 to 688, noise back to 8.9 to 10.4."
+    }
+  ]
+}

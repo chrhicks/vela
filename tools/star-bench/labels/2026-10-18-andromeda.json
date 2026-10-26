@@ -1,0 +1,40 @@
+{
+  "night": "2026-10-18 Andromeda Galaxy",
+  "target": "Andromeda Galaxy",
+  "exposureSeconds": 60,
+  "use": "calibration",
+  "windows": [
+    {
+      "kind": "transition",
+      "from": "2026-10-18T02:11:00Z",
+      "to": "2026-10-18T02:30:00Z",
+      "allow": [
+        "hfr-high"
+      ],
+      "note": "First light. The stars are soft (HFR 4.2 px) while focus is found, so hfr-high is fair."
+    },
+    {
+      "kind": "healthy",
+      "from": "2026-10-18T02:30:30Z",
+      "to": "2026-10-18T03:30:30Z",
+      "note": "Focused: 1100 to 1600 stars, HFR 2.5 to 3.1 px (night-20261018 fixtures README)."
+    },
+    {
+      "kind": "event",
+      "name": "camera snag",
+      "from": "2026-10-18T03:31:00Z",
+      "to": "2026-10-18T04:02:00Z",
+      "expect": [
+        "stars-collapsed",
+        "stars-dropping"
+      ],
+      "note": "The camera hooked on the tripod leg and the frames streaked from 03:31:10Z (observer log 2026-10-18)."
+    },
+    {
+      "kind": "healthy",
+      "from": "2026-10-18T04:12:00Z",
+      "to": "2026-10-18T05:12:00Z",
+      "note": "The camera is free again and the frames are sharp."
+    }
+  ]
+}

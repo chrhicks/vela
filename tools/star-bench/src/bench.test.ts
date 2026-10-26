@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { cp, mkdtemp, readFile, rm, truncate, writeFile } from 'node:fs/promises'
+import { cp, mkdir, mkdtemp, readFile, rm, truncate, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -29,7 +29,19 @@ const options = (savedImages: string, listFile: string | null = null): BenchOpti
   jobs: 1,
   gapMinutes: 30,
   restartTimes: [],
+  count: 'strong',
+  labelsDirectory: null,
+  sweep: false,
 })
+
+async function labelled(windows: unknown[], target = 'Fixture Nebula') {
+  const directory = join(copy, 'labels')
+
+  await mkdir(directory)
+  await writeFile(join(directory, 'fixture.json'), JSON.stringify({ night: 'Fixture night', target, exposureSeconds: 90, use: 'calibration', windows }))
+
+  return directory
+}
 
 async function record(id: string, statistics: RecordedStatistics | null) {
   const path = join(copy, frame(id), 'metadata.json')
@@ -135,6 +147,38 @@ describe('the bench on the committed fixture', () => {
 
     await writeFile(list, `${join(copy, frame('fixture-light-1'))}\n${join(copy, frame('gone'))}\n`)
     await expect(runBench(options(copy, list))).rejects.toThrow('1 listed frames are not in the saved images')
+  })
+
+  it('checks the alert replay against labelled windows and says which night passed', async () => {
+    const labelsDirectory = await labelled([
+      { kind: 'healthy', from: '2030-01-01T01:59:00Z', to: '2030-01-01T02:10:00Z', note: 'quiet' },
+    ])
+
+    const { report } = await runBench({ ...options(copy), labelsDirectory })
+
+    expect(report).toContain('Labelled nights (alert count: strong)')
+    expect(report).toContain('Fixture night, 90 s, calibration: pass')
+    expect(report).toContain('healthy 2030-01-01T01:59:00Z to 2030-01-01T02:10:00Z: quiet')
+    expect(report).toContain('Calibration: 1 of 1 nights pass, 0 of 0 expected alerts raised, 0 unexpected')
+  })
+
+  it('does not pass a labelled night that has no run in the saved frames', async () => {
+    const labelsDirectory = await labelled(
+      [{ kind: 'healthy', from: '2030-01-01T01:59:00Z', to: '2030-01-01T02:10:00Z', note: 'quiet' }],
+      'Missing Nebula',
+    )
+
+    const { report } = await runBench({ ...options(copy), labelsDirectory })
+
+    expect(report).toContain('Fixture night, 90 s, calibration: FAIL')
+    expect(report).toContain('NO RUN: no Missing Nebula run of 90 s overlaps the labelled windows')
+    expect(report).toContain('Calibration: 0 of 1 nights pass')
+  })
+
+  it('reads the labels before it measures anything, so a bad label file is quick to find', async () => {
+    const labelsDirectory = await labelled([{ kind: 'healthy', from: 'later', to: '2030-01-01T02:10:00Z', note: 'quiet' }])
+
+    await expect(runBench({ ...options(copy), labelsDirectory })).rejects.toThrow('fixture.json')
   })
 
   it('gives the same report from the command line on worker threads', async () => {
