@@ -79,6 +79,8 @@ for (const mode of ['light', 'dark'] as const) {
       await expect(details(page)).toContainText('1280 × 1224')
       await expect(details(page)).toContainText('842 measured of 3104 peaks')
       await expect(details(page)).toContainText('540.3')
+      await expect(details(page)).toContainText('Star axis ratio')
+      await expect(details(page)).toContainText('1.24')
       await expect(page.locator('html')).toHaveAttribute('data-mode', mode)
       await settledRendering(page)
 
