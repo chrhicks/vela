@@ -54,8 +54,8 @@ uses at 30. `rejected` counts the peaks each gate turned away, under the first g
 a peak fails, so a star that fails two is counted under the earlier. `sky` and
 `noise` are the medians of the 64 px tile backgrounds the peaks were judged
 against. Only `detectedStars` and `medianHfrPixels` feed alerts and autofocus. A
-rejected peak never has its half-flux radius computed, so these outputs add no
-measurement cost. They are additive: the values of the older fields are unchanged,
+peak that a gate before the half-flux radius step turns away never has its radius
+computed, so these outputs add no measurement cost. They are additive: the values of the older fields are unchanged,
 so `algorithm.version` stays 2, and records saved without them still read.
 
 Bayer detection uses cell averages, but HFR uses native bilinear RGB luminance
