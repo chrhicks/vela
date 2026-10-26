@@ -16,6 +16,7 @@ import {
   type SavedImageFiles,
 } from '../saved-images/store.js'
 import { noFrameRecords, type FrameOutcome, type FrameRecords } from './frame-records.js'
+import { noCaptureRuns, remainingFrames, type CaptureRunRecord, type CaptureRunStore } from './run-store.js'
 
 export interface CaptureFrame {
   width: number
@@ -90,12 +91,15 @@ export interface CaptureRunOptions {
 
 const tracer = trace.getTracer('vela.capture')
 
+export const interruptedReason = 'Vela restarted'
+
 export function createCaptureController(
   settings: { rigId: string; rigName: string },
   now = Date.now,
   savedImages: SavedImageStore = createMemorySavedImageStore(),
   frameRecords: FrameRecords = noFrameRecords,
   imaging: FrameImaging = frameImaging,
+  runs: CaptureRunStore = noCaptureRuns,
 ) {
   let view: CaptureView = {
     rigId: settings.rigId,
@@ -125,6 +129,12 @@ export function createCaptureController(
   let generation = 0
   let running: Promise<void> | undefined
   let cancellation: AbortController | undefined
+  let runRecord: CaptureRunRecord | undefined
+  let closing = false
+
+  // A run that was active when the server went down is reported, never resumed: nothing exposes
+  // until Chris starts a run.
+  const unfinished = runs.unfinished(settings.rigId)
 
   const images = new Map<
     string,
@@ -139,6 +149,33 @@ export function createCaptureController(
 
   function patch(next: Partial<CaptureView>) {
     view = { ...view, ...next }
+  }
+
+  if (unfinished) {
+    patch({
+      phase: 'interrupted',
+      repeat: unfinished.repeat,
+      frameCount: unfinished.frameCount,
+      saveFrames: unfinished.saveFrames,
+      frameType: unfinished.frameType,
+      completedCount: unfinished.completedCount,
+      subject: unfinished.subject,
+      savedCount: unfinished.savedCount,
+      integrationSeconds: unfinished.integrationSeconds,
+      exposureSeconds: unfinished.exposureSeconds,
+      interruption: { reason: interruptedReason, remainingCount: remainingFrames(unfinished) },
+    })
+  }
+
+  /** The run's request and progress, kept so a restart can report how far it got. */
+  function persist() {
+    if (runRecord)
+      runs.save({
+        ...runRecord,
+        completedCount: view.completedCount,
+        savedCount: view.savedCount,
+        integrationSeconds: view.integrationSeconds,
+      })
   }
 
   async function keep(imageId: string) {
@@ -174,6 +211,8 @@ export function createCaptureController(
       }
 
       patch(view.latestImage?.id === imageId ? { ...next, latestImage: image.metadata } : next)
+
+      if (view.active) persist()
     }
 
     return saved
@@ -416,6 +455,7 @@ export function createCaptureController(
           elapsedSeconds: exposureSeconds,
           latestImage: metadata,
         })
+        persist()
 
         // An observer of the frame must never end the run that produced it.
         try {
@@ -464,6 +504,12 @@ export function createCaptureController(
     } finally {
       patch({ active: false, captureReadState: 'current' })
 
+      // A run that ends because the server is shutting down is the one a restart reports.
+      if (!closing) {
+        runs.clear(settings.rigId)
+        runRecord = undefined
+      }
+
       // Bounds a run and totals it, so a long run reads as one line.
       const ended = tracer.startSpan('capture.run.ended', {
         attributes: {
@@ -503,7 +549,26 @@ export function createCaptureController(
     const runGeneration = ++generation
     const runId = randomUUID()
     cancellation = new AbortController()
+
+    runRecord = {
+      version: 1,
+      rigId: settings.rigId,
+      runId,
+      startedAt: new Date(now()).toISOString(),
+      exposureSeconds,
+      repeat,
+      frameCount: frameCount ?? null,
+      frameType,
+      saveFrames,
+      subject: runSubject,
+      completedCount: 0,
+      savedCount: 0,
+      integrationSeconds: 0,
+    }
+
+    runs.save(runRecord)
     patch({
+      interruption: null,
       camera: { name: cameraName },
       phase: 'exposing',
       active: true,
@@ -567,9 +632,19 @@ export function createCaptureController(
     return view
   }
 
+  /** Ends the run for a server shutdown, leaving its record behind so the next start reports it. */
+  async function close() {
+    closing = true
+
+    return stop()
+  }
+
   return {
     start,
     stop,
+    close,
+    /** The unfinished run this controller found at startup, while no run has started since. */
+    interrupted: () => (view.phase === 'interrupted' ? unfinished : undefined),
     keep,
     snapshot: () => view,
     image: (id: string) => images.get(id)?.native,

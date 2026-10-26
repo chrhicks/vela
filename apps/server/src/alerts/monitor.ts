@@ -42,6 +42,12 @@ const sunTimerMarginMs = 1_000
 /** The longest the sun timer sleeps before it looks again, so a clock that jumped cannot strand it. */
 const sunRecheckMs = 6 * 3_600_000
 
+/**
+ * A server that has just started may not have reached the mount yet. An interruption waits this
+ * many times for the site before it gives up and pages at any hour, so a daytime deploy does not buzz the phone.
+ */
+const siteAttemptsAtStart = 4
+
 const mountPollMs = 10_000
 
 const mountReadTimeoutMs = 5_000
@@ -771,6 +777,30 @@ export function createAlertMonitor({
         })
       }
 
+      evaluate()
+    },
+
+    /**
+     * The server restarted while a run was active. The alert waits for the rig's site, because the
+     * phone is paged only in astronomical darkness; a run started meanwhile supersedes it.
+     */
+    async runInterrupted(message: string) {
+      stopPolling()
+      const token = ++runToken
+
+      for (let attempt = 1; attempt <= siteAttemptsAtStart && !site && notifier && readSite && !closed; attempt++) {
+        if (attempt > 1) await new Promise(resolve => setTimeout(resolve, siteRetryMs).unref())
+
+        if (token !== runToken) return
+
+        await learnSite(true)
+
+        if (token !== runToken) return
+      }
+
+      if (closed) return
+
+      run = { status: 'interrupted', message }
       evaluate()
     },
 

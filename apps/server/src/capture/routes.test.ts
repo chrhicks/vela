@@ -1,5 +1,5 @@
 import Fastify, { type InjectOptions } from 'fastify'
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type {
   AlpacaCameraCooling,
   AlpacaDeviceInspection,
@@ -11,6 +11,7 @@ import { CaptureStoppedError, type CaptureCamera, type CaptureFrame } from './co
 import { registerCapture, type CaptureSettings } from './routes.js'
 import { registerNavigation } from '../navigation.js'
 import { createMemorySavedImageStore } from '../saved-images/store.js'
+import { createMemoryCaptureRunStore, type CaptureRunStore } from './run-store.js'
 import { emptyHaltRequests, refusedHaltRequests } from '../http/halt-requests.fixture.js'
 import { registerSavedImages } from '../saved-images/routes.js'
 
@@ -64,6 +65,7 @@ function setup(
     sensorTemperatureC?: number
     createCooling?: (settings: CaptureSettings) => AlpacaCameraCooling
     alerts?: NonNullable<Parameters<typeof registerCapture>[3]>['alerts']
+    runs?: CaptureRunStore
   } = {},
 ) {
   const app = Fastify()
@@ -139,6 +141,8 @@ function setup(
 
   if (options.alerts) captureOptions.alerts = options.alerts
 
+  if (options.runs) captureOptions.runs = options.runs
+
   const capture = registerCapture(app, catalog, operations, captureOptions)
 
   registerNavigation(app, catalog, capture)
@@ -193,7 +197,7 @@ it('tells the alert monitor a run is an imaging run only when it repeats and sav
     const runStarted = vi.fn()
 
     const subject = setup(undefined, {
-      alerts: { monitorFor: () => ({ runStarted, frameCaptured: vi.fn(), runEnded: vi.fn() }) },
+      alerts: { monitorFor: () => ({ runStarted, frameCaptured: vi.fn(), runEnded: vi.fn(), runInterrupted: vi.fn() }) },
     })
 
     expect((await subject.start(body)).statusCode).toBe(200)
@@ -845,7 +849,7 @@ it('takes lights unless asked otherwise', async () => {
 
 it('never lets a calibration run raise star alerts, yet still shows the camera is producing', async () => {
   for (const frameType of ['dark', 'flat', 'dark-flat', 'bias'] as const) {
-    const monitor = { runStarted: vi.fn(), frameCaptured: vi.fn(), runEnded: vi.fn() }
+    const monitor = { runStarted: vi.fn(), frameCaptured: vi.fn(), runEnded: vi.fn(), runInterrupted: vi.fn() }
     const subject = setup(record.imagingCamera, { alerts: { monitorFor: () => monitor } })
     const body = { exposureSeconds: 10, repeat: true, saveFrames: true, frameType }
     expect((await subject.start(body)).statusCode).toBe(200)
@@ -857,7 +861,7 @@ it('never lets a calibration run raise star alerts, yet still shows the camera i
 })
 
 it('keeps star alerts for a light run that repeats and saves', async () => {
-  const monitor = { runStarted: vi.fn(), frameCaptured: vi.fn(), runEnded: vi.fn() }
+  const monitor = { runStarted: vi.fn(), frameCaptured: vi.fn(), runEnded: vi.fn(), runInterrupted: vi.fn() }
   const subject = setup(record.imagingCamera, { alerts: { monitorFor: () => monitor } })
   const body = { exposureSeconds: 10, repeat: true, saveFrames: true, frameType: 'light' }
   expect((await subject.start(body)).statusCode).toBe(200)
@@ -865,4 +869,195 @@ it('keeps star alerts for a light run that repeats and saves', async () => {
   subject.captures[0]!.resolve(frame)
   await vi.waitFor(() => expect(monitor.frameCaptured).toHaveBeenCalledOnce())
   expect(monitor.frameCaptured.mock.calls[0]![0].statistics).not.toBeNull()
+})
+
+describe('after the server restarts', () => {
+  const monitor = () => ({ runStarted: vi.fn(), frameCaptured: vi.fn(), runEnded: vi.fn(), runInterrupted: vi.fn() })
+
+  /** A server that was killed with a run half done, and the one that replaces it. */
+  async function restarted(
+    body: InjectOptions['payload'] = { exposureSeconds: 30, repeat: true, frameCount: 5, saveFrames: true },
+    framesTaken = 2,
+  ) {
+    const runs = createMemoryCaptureRunStore()
+    const before = setup(record.imagingCamera, { runs })
+
+    expect((await before.start(body)).statusCode).toBe(200)
+
+    for (let taken = 0; taken < framesTaken; taken++) {
+      before.captures[taken]!.resolve(frame)
+      await vi.waitFor(() => expect(before.captures).toHaveLength(taken + 2))
+    }
+
+    const alerts = monitor()
+    const after = setup(record.imagingCamera, { runs, alerts: { monitorFor: () => alerts } })
+    const resume = () => after.app.inject({ method: 'POST', url: '/api/rigs/sim/capture/resume' })
+
+    return { after, alerts, resume, runs }
+  }
+
+  it('shows the run as interrupted, with how far it got, and takes no exposure by itself', async () => {
+    const { after } = await restarted()
+    const view = (await after.get()).json()
+
+    expect(view).toMatchObject({
+      phase: 'interrupted',
+      active: false,
+      enabled: true,
+      completedCount: 2,
+      frameCount: 5,
+      savedCount: 2,
+      exposureSeconds: 30,
+      interruption: { reason: 'Vela restarted', remainingCount: 3 },
+    })
+
+    expect(after.captures).toEqual([])
+    expect(after.operations.owner('sim')).toBeUndefined()
+
+    expect((await after.app.inject('/api/web/navigation')).json().captures).toMatchObject([
+      { rigId: 'sim', phase: 'interrupted', active: false, completedCount: 2 },
+    ])
+  })
+
+  it('resumes with the same settings and the frames that are left, under the usual lease', async () => {
+    const { after, resume } = await restarted()
+    const response = await resume()
+
+    expect(response.statusCode).toBe(200)
+
+    expect(response.json()).toMatchObject({
+      phase: 'exposing',
+      active: true,
+      repeat: true,
+      saveFrames: true,
+      frameType: 'light',
+      exposureSeconds: 30,
+      frameCount: 3,
+      completedCount: 0,
+      interruption: null,
+    })
+
+    expect(after.captures).toHaveLength(1)
+    expect(after.captures[0]).toMatchObject({ exposureSeconds: 30 })
+    expect(after.operations.owner('sim')).toBe('capture')
+    expect((await resume()).statusCode).toBe(409)
+    expect(after.captures).toHaveLength(1)
+  })
+
+  it('resumes a calibration run as the same frame type, and a run with no count with none', async () => {
+    const { after, resume } = await restarted({ exposureSeconds: 5, repeat: true, frameType: 'dark' }, 1)
+
+    expect((await resume()).json()).toMatchObject({ frameType: 'dark', subject: null, frameCount: null, repeat: true })
+    expect(after.captures).toHaveLength(1)
+  })
+
+  it('resumes the subject the run had, even if it can no longer be looked up', async () => {
+    const subject = { targetId: 'm31', name: 'Andromeda Galaxy', catalog: 'M 31' }
+    const runs = createMemoryCaptureRunStore()
+    const before = setup(record.imagingCamera, { runs, lookupSubject: () => subject })
+
+    await before.start({ exposureSeconds: 30, repeat: true, targetId: 'm31' })
+
+    const after = setup(record.imagingCamera, { runs, lookupSubject: () => undefined })
+
+    expect((await after.app.inject({ method: 'POST', url: '/api/rigs/sim/capture/resume' })).json()).toMatchObject({ subject })
+  })
+
+  it('obeys every start check: the lease, a busy camera and a disconnected one all refuse it', async () => {
+    const { after, resume } = await restarted()
+
+    const release = after.operations.acquire('sim', 'autofocus')!
+    expect((await resume()).statusCode).toBe(409)
+    release()
+
+    after.externallyBusy()
+    expect((await resume()).json().error).toMatch(/not confirmed it is idle/)
+
+    after.disconnect()
+    expect((await resume()).statusCode).toBe(409)
+    expect(after.captures).toEqual([])
+    expect((await after.get()).json().phase).toBe('interrupted')
+  })
+
+  it('refuses to resume when nothing was interrupted or nothing is left', async () => {
+    const idle = setup()
+
+    expect((await idle.app.inject({ method: 'POST', url: '/api/rigs/sim/capture/resume' })).json().error).toMatch(/no interrupted run/)
+
+    const runs = createMemoryCaptureRunStore()
+
+    runs.save({
+      version: 1,
+      rigId: 'sim',
+      runId: 'run-1',
+      startedAt: '2026-10-25T03:00:00.000Z',
+      exposureSeconds: 30,
+      repeat: true,
+      frameCount: 2,
+      frameType: 'light',
+      saveFrames: true,
+      subject: null,
+      completedCount: 2,
+      savedCount: 2,
+      integrationSeconds: 60,
+    })
+
+    const after = setup(record.imagingCamera, { runs })
+    const response = await after.app.inject({ method: 'POST', url: '/api/rigs/sim/capture/resume' })
+
+    expect(response.statusCode).toBe(409)
+    expect(response.json().error).toMatch(/already taken all its frames/)
+    expect(after.captures).toEqual([])
+  })
+
+  it('accepts a bare or empty resume and refuses a body with a field', async () => {
+    const { after } = await restarted()
+    const post = (payload?: string) => after.app.inject({ method: 'POST', url: '/api/rigs/sim/capture/resume', ...(payload && { payload, headers: { 'content-type': 'application/json' } }) })
+
+    expect((await post('{"exposureSeconds":1}')).statusCode).toBe(400)
+    expect(after.captures).toEqual([])
+    expect((await post('{}')).statusCode).toBe(200)
+  })
+
+  it('tells the monitor once about an interrupted light run', async () => {
+    const { after, alerts } = await restarted()
+
+    await after.get()
+    await after.get()
+
+    expect(alerts.runInterrupted).toHaveBeenCalledExactlyOnceWith(
+      'Capture was interrupted: Vela restarted (2 of 5 frames taken)',
+    )
+  })
+
+  it('does not tell the monitor about an interrupted calibration run', async () => {
+    const { after, alerts } = await restarted({ exposureSeconds: 5, repeat: true, frameType: 'flat' }, 1)
+
+    expect((await after.get()).json().phase).toBe('interrupted')
+    expect(alerts.runInterrupted).not.toHaveBeenCalled()
+  })
+
+  it('reports a run that a graceful shutdown ended, and not one that Chris stopped', async () => {
+    const runs = createMemoryCaptureRunStore()
+    const shutdown = setup(record.imagingCamera, { runs })
+
+    await shutdown.start({ exposureSeconds: 30, repeat: true })
+    const exposure = shutdown.captures[0]!
+
+    exposure.signal.addEventListener('abort', () => exposure.reject(new CaptureStoppedError()))
+    await shutdown.app.close()
+
+    expect((await setup(record.imagingCamera, { runs }).get()).json().phase).toBe('interrupted')
+
+    const stoppedRuns = createMemoryCaptureRunStore()
+    const stopped = setup(record.imagingCamera, { runs: stoppedRuns })
+
+    await stopped.start({ exposureSeconds: 30, repeat: true })
+    const pending = stopped.captures[0]!
+
+    pending.signal.addEventListener('abort', () => pending.reject(new CaptureStoppedError()))
+    await stopped.app.inject({ method: 'POST', url: '/api/rigs/sim/capture/stop' })
+
+    expect((await setup(record.imagingCamera, { runs: stoppedRuns }).get()).json().phase).toBe('idle')
+  })
 })

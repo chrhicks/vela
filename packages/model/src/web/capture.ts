@@ -92,6 +92,7 @@ export type CapturePhase =
   | 'complete'
   | 'stopped'
   | 'failed'
+  | 'interrupted'
 
 /** Confirmed imaging-camera cooling. Sensor temperature near a setpoint does not mean the cooler is on. */
 export interface CaptureCoolingView {
@@ -115,6 +116,14 @@ export type CaptureCoolingBlocker =
   | 'framing'
   | 'rig'
   | { readonly kind: 'hold'; readonly reason: string }
+
+/** Why a run ended without Chris stopping it or the camera failing, and what is left of it to take. */
+export interface CaptureInterruption {
+  /** Plain words, such as "Vela restarted". */
+  reason: string
+  /** Frames a resumed run would take; null when the run repeated until stopped, 0 when none are left. */
+  remainingCount: number | null
+}
 
 /** Server-owned ephemeral capture run and the most recent retained image. */
 export interface CaptureView {
@@ -147,6 +156,8 @@ export interface CaptureView {
   exposureSeconds: number
   elapsedSeconds: number
   error: string | null
+  /** Set while `phase` is `interrupted`: the run's settings and counts above are what it had done. */
+  interruption?: CaptureInterruption | null
   latestImage: CaptureImage | null
   /** Null when the imaging camera does not report cooler state. */
   cooling: CaptureCoolingView | null

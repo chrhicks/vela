@@ -549,6 +549,13 @@ describe('run state', () => {
     expect(result.conditions).toEqual([{ id: 'run-failed', level: 'critical', message: 'The capture run failed' }])
   })
 
+  it('reports run-interrupted, and only that, when the server restarted during the run', () => {
+    const run = { status: 'interrupted', message: 'Capture was interrupted' } as const
+    const result = evaluateAlerts({ ...trouble, run }, defaultThresholds, 60_000)
+
+    expect(result.conditions).toEqual([{ id: 'run-interrupted', level: 'critical', message: 'Capture was interrupted' }])
+  })
+
   it('reports nothing once the run is stopped by the user', () => {
     expect(evaluateAlerts({ ...trouble, run: { status: 'stopped' } }, defaultThresholds, 60_000).conditions).toEqual([])
   })
