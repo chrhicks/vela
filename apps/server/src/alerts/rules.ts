@@ -1,3 +1,5 @@
+import { normalEvidence, starCause, type FrameEvidence } from './cause.js'
+import { median } from './median.js'
 import type { AlertThresholds } from './thresholds.js'
 
 export type AlertLevel = 'warn' | 'critical'
@@ -28,6 +30,8 @@ export interface Frame {
   capturedAt: number
   stars: number
   hfrPixels: number | null
+  /** What the measurement says about why the stars changed. Absent when it did not say. */
+  evidence?: FrameEvidence
 }
 
 /** One poll of the mount. A reading the mount did not give is null. */
@@ -101,6 +105,7 @@ export function evaluateAlerts(history: RigHistory, thresholds: AlertThresholds,
  */
 function watchFrames(frames: Frame[], t: AlertThresholds) {
   const acceptedStars: number[] = []
+  const acceptedEvidence: FrameEvidence[] = []
   const smoothed: number[] = []
   let starsDropping = calm
   let starsCollapsed = calm
@@ -145,7 +150,11 @@ function watchFrames(frames: Frame[], t: AlertThresholds) {
     const inEpisode =
       starsDropping.raised || starsCollapsed.raised || starsDeclining.raised || hfrHigh.raised || hfrBad.raised
 
-    if (!bad && !inEpisode) acceptedStars.push(frame.stars)
+    if (!bad && !inEpisode) {
+      acceptedStars.push(frame.stars)
+
+      if (frame.evidence) acceptedEvidence.push(frame.evidence)
+    }
   }
 
   const latest = frames.at(-1)
@@ -155,19 +164,23 @@ function watchFrames(frames: Frame[], t: AlertThresholds) {
   baselineFormed ||= hasStars(baselineStars(acceptedStars, t), t)
 
   const trend = starsTrend(frames, trendFrom, frames.length - 1, t)
-  const median = Math.round(smoothed.at(-1)!)
+  const medianStars = Math.round(smoothed.at(-1)!)
   const normal = `normal ≈${Math.round(baseline)} stars`
   const hfr = latest.hfrPixels?.toFixed(1)
   const conditions: AlertCondition[] = []
 
+  const recentEvidence = frames.slice(-t.starsSmoothingFrames).flatMap(frame => (frame.evidence ? [frame.evidence] : []))
+  const cause = starCause(recentEvidence, normalEvidence(acceptedEvidence, t), t)
+  const because = cause === null ? '' : `, ${cause}`
+
   if (starsDropping.raised)
-    conditions.push({ id: 'stars-dropping', level: 'warn', message: `Star count dropping: median ${median} (${normal})` })
+    conditions.push({ id: 'stars-dropping', level: 'warn', message: `Star count dropping: median ${medianStars} (${normal})${because}` })
 
   if (starsCollapsed.raised)
-    conditions.push({ id: 'stars-collapsed', level: 'critical', message: `Star count fell to ${latest.stars} (median ${median}, ${normal})` })
+    conditions.push({ id: 'stars-collapsed', level: 'critical', message: `Star count fell to ${latest.stars} (median ${medianStars}, ${normal})${because}` })
 
   if (starsDeclining.raised && trend)
-    conditions.push({ id: 'stars-declining', level: 'warn', message: `Star count falling: median ${Math.round(trend.recent)} (≈${Math.round(trend.before)} the ${t.starsDecliningWindowMinutes} min before)` })
+    conditions.push({ id: 'stars-declining', level: 'warn', message: `Star count falling: median ${Math.round(trend.recent)} (≈${Math.round(trend.before)} the ${t.starsDecliningWindowMinutes} min before)${because}` })
 
   if (hfrHigh.raised)
     conditions.push({ id: 'hfr-high', level: 'warn', message: `Stars are soft: HFR ${hfr ?? 'unmeasured'} px` })
@@ -361,13 +374,6 @@ function latch(previous: Latch, trips: boolean, clears: boolean, toRaise: number
   const streak = clears ? previous.streak + 1 : 0
 
   return streak >= toClear ? calm : { raised: true, streak }
-}
-
-function median(values: number[]) {
-  const sorted = [...values].sort((a, b) => a - b)
-  const middle = Math.floor(sorted.length / 2)
-
-  return sorted.length % 2 === 1 ? sorted[middle]! : (sorted[middle - 1]! + sorted[middle]!) / 2
 }
 
 /** Wraps an hour angle into [-12, 12). */

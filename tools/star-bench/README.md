@@ -20,6 +20,9 @@ Add `--frames LIST` to measure only the frames in a list file (one path per line
 | `--jobs N` | Worker threads. Default 8, or fewer cores. Each holds one 26 MP frame, about 300 MB. |
 | `--gap-minutes N` | A gap between light frames longer than this starts a new run. Default 30. |
 | `--restart-at TIME` | Start a new run at this UTC time, as the monitor does when autofocus ends. Repeatable. |
+| `--labels DIR` | Check the alert replay against the per-night label files in `DIR` (`labels/` in this tool). |
+| `--count INPUT` | The star count the alert replay reads, `measured` or `strong`. Default is what the monitor reads (`alertCountInput`). |
+| `--sweep` | With `--labels`, find how far each star threshold can move before a labelled night fails. A few seconds. |
 
 The report goes to stdout and is repeatable: two runs of the same code on the same frames print the same text, so `diff` shows what a change did. Progress and timing go to stderr. Exit code 0 means every frame was measured and equals its record, 1 means not, 2 means bad arguments.
 
@@ -53,9 +56,31 @@ Soul Nebula, 90 s: 262 frames, 2026-10-25T02:22:04Z to 2026-10-25T09:32:22Z
 - **jump** is a pair of neighbouring frames whose counts differ by more than 1.5 times. A count of zero reads as one.
 - **per frame, median** and **rejected by first failed gate** are the named outputs of each frame, as a median over the run: peaks found, measured (equal to `detectedStars`), strong (measured with a flux S/N of 100 or more), the sky level and noise, and how many peaks each gate turned away. A peak is counted under the first gate it fails, so a star that fails two shows only the earlier. Merged blends in the autofocus policy are not in a capture run.
 - **axis ratio of strong stars** is the frame's recorded `axisRatio` (the median axis ratio of its stars at S/N 200 or more), as the number of frames in the run that have one, their median, and how many of them read over 1.3. A frame with fewer than 10 such stars has none. Recorded only; it feeds no alert.
-- **alert** is an episode of a frame-derived alert (`no-stars`, `stars-dropping`, `stars-collapsed`, `stars-declining`, `hfr-high`, `hfr-bad`) from replaying the run's frames, in order, through the real `evaluateAlerts` with the default thresholds. The episode starts at the capture time of the frame that raised the alert and ends at the capture time of the frame that cleared it, or at `end of run`. Compare episodes before and after a change; they should agree within one frame (about one exposure).
+- **strong stars median** is the same line for the strong count, which the star alerts read.
+- **alert** is an episode of a frame-derived alert (`no-stars`, `stars-dropping`, `stars-collapsed`, `stars-declining`, `hfr-high`, `hfr-bad`) from replaying the run's frames, in order, through the real `evaluateAlerts` with the default thresholds. The episode starts at the capture time of the frame that raised the alert and ends at the capture time of the frame that cleared it, or at `end of run`. Compare episodes before and after a change; they should agree within one frame (about one exposure). The replay reads the count named by `--count`, through the same `alertFrame` the monitor uses, so a frame of another algorithm version or without its named outputs is left out as it is live.
 
 The replay differs from the live monitor in two ways. It has no focuser log, so a run is not restarted at an autofocus unless you name the time with `--restart-at` (the review's Heart night needs `--restart-at 2026-10-24T00:00:00Z`, the autofocus at 23:54Z to 00:01Z). And it uses capture times, not the times the server received the frames. `Frames outside any run` counts darks, flats and bias frames, and light frames that could not be measured. Frames saved before Vela recorded a frame type read as lights, so old dark frames show up as runs of `(no target)` that raise `no-stars`.
+
+## Labelled nights
+
+`--labels DIR` reads one JSON file per night from `DIR` and checks the replayed alerts against it. The files in `labels/` say what a person knows about the night, not what the counter says, and each window carries the evidence in its `note`. A window is one of:
+
+- `healthy`: nothing may start in it.
+- `event`: every alert in `expect` must start in it. The report gives the delay from the window's start, when the alert cleared and what it said, cause included.
+- `transition`: only the alerts in `allow` may start in it.
+
+An alert that starts in no window fails the night, so the files must cover it. A label with no matching run (same target and exposure, overlapping the windows) fails. Every matching run is replayed with its own history, so a reset inside the night is judged too, and a window with no frames fails. A file that does not parse stops the run before anything is measured. `use` is `calibration` for the nights the thresholds are picked on and `holdout` for the nights that only check them. To label a new night, add a file; do not widen a window to make a night pass.
+
+```
+Labelled nights (alert count: strong)
+2026-10-24 Heart Nebula, 90 s, calibration: pass
+  healthy 2026-10-24T00:01:00Z to 2026-10-24T00:44:00Z: quiet
+  event haze 2026-10-24T01:26:00Z to 2026-10-24T01:40:30Z
+    stars-dropping raised 2026-10-24T01:33:27Z (+7.5 min), cleared 2026-10-24T01:38:21Z: Star count dropping: ..., few peaks
+Calibration: 3 of 3 nights pass, 5 of 5 expected alerts raised, 0 unexpected
+```
+
+With `--sweep` the report ends with the range each star threshold can move through before the alert it governs fails a night: `calibration`, `held out` and `both`, with the distance from the default to each end. This is what `thresholds.ts` quotes. Only that alert is judged for its threshold, so another alert's miss on a night does not hide the range.
 
 ## The per-frame table
 

@@ -1,9 +1,10 @@
+import { starAlgorithmVersion } from '@vela/server/imaging/statistics'
 import type { StarStatistics } from './measure.ts'
 
 /** A frame's statistics with the named outputs filled in plausibly from its count and HFR. */
 export function starStatistics(detectedStars: number, medianHfrPixels: number | null): StarStatistics {
   return {
-    algorithm: { version: 2 },
+    algorithm: { version: starAlgorithmVersion },
     detectedStars,
     medianHfrPixels,
     detections: detectedStars * 3,

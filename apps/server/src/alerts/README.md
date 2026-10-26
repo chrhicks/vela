@@ -12,16 +12,48 @@ or moves the mount.
 
 ## Star counts
 
-Frames from a real night swing about 2x with nothing wrong (101, 88, 181, 126, 84 stars, HFR flat),
-so no rule compares one frame. Every comparison uses the median of the last `starsSmoothingFrames`
-(3) frames. The numbers and their reasons are in `thresholds.ts`; the 2026-10-23 night they come
-from is `fixtures/night-20261023-frames.json`.
+The count every star alert compares is the run's `strong` stars: measured stars with a flux
+signal-to-noise of 100 or more (`alertCountInput` in `frame.ts`). It is steadier than `measured` where
+it matters. The usable `stars-declining` threshold range is 0.09 wide with it (a slow fall caught at
+0.57, a healthy night quiet to 0.66) and no wider than a point with `measured`. A camera that smears
+the stars takes it to zero one frame sooner. The bench numbers are in `thresholds.ts`.
+
+Frames from a real night swing about 2x with nothing wrong, so no rule compares one frame. Every
+comparison uses the median of the last `starsSmoothingFrames` (3) frames. The numbers and their
+reasons are in `thresholds.ts`; the 2026-10-18 night they were first checked against is
+`fixtures/night-20261018-frames.json`.
+
+A frame enters the history only through `alertFrame` (`frame.ts`), and only if its statistics are of
+the running algorithm version and carry the named outputs. The history is in memory and starts over
+with each run, a new server and an autofocus, so a count of one version never meets a count of
+another; `alertFrame` keeps that true if a record of another version ever arrives. A frame without
+its named outputs is a frame whose measurement failed: it is not in the history, and it is never
+zero stars.
 
 | Alert | Level | Raised when | Clears when |
 | --- | --- | --- | --- |
 | `stars-dropping` | warn | The smoothed count is below `1 - starsDropFraction` (0.5) of its highest value within the last `starsDropWindowMinutes` (10), for `confirmFrames` frames. A rate of change, in time, so it means the same at 30 s and 180 s exposures. | The smoothed count is back above `starsRecoveredRatio` (0.5) of the baseline for `confirmFrames` frames. |
 | `stars-collapsed` | critical | The smoothed count is below `starsCollapsedRatio` (0.15) of the baseline, or the frame is empty (0 stars on a baseline of 3 or more, counted at once, not smoothed), for `confirmFrames` frames. | Same as `stars-dropping`. |
-| `stars-declining` | warn | The median of the last `starsDecliningWindowMinutes` (30) is below `starsDecliningRatio` (0.6) of the median of the 30 before. A slow slide. | It is back above `starsDecliningClearRatio` (0.8). |
+| `stars-declining` | warn | The median of the last `starsDecliningWindowMinutes` (30) is below `starsDecliningRatio` (0.62) of the median of the 30 before. A slow slide. | It is back above `starsDecliningClearRatio` (0.8). |
+
+### The cause of a star alert
+
+`stars-dropping`, `stars-collapsed` and `stars-declining` end their message with a cause when the
+last three frames show it: `Star count dropping: median 20 (normal ≈49 stars), few peaks`. No cause
+is named when the evidence is not clear, and the message is as it was. `cause.ts` holds the table,
+checked in this order; the first that holds is named, and each compares the last three frames with
+the frames no alert called bad.
+
+| Cause | Evidence | Threshold |
+| --- | --- | --- |
+| `sky brightened` | The brightest sky of the three frames against the normal sky | `causeSkyRatio` (1.5) |
+| `stars trailed` | The axis ratio of the strong stars, from at least two frames, all of them elongated | `causeTrailedAxisRatio` (1.7) |
+| `stars smeared or soft` | The share of peaks left out as blended rose above the normal share | `causeBlendedShareRise` (0.4) |
+| `few peaks` | The peaks found before any gate, against the normal | `causePeaksRatio` (0.5) |
+
+Smeared and soft stars look the same to these outputs (every peak blended, no strong star to take a
+shape from), so the label says both. The noise output adds nothing: it moves with the sky level
+(14.7x with the flash), and in the haze it rises 1.16x, which healthy frames reach too (1.15x).
 
 A run can also never get a baseline to compare with: the cap left on, cloud from the first frame,
 stars far out of focus, the wrong target. Every star alert is then silent (an empty frame needs a

@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "exports": {
+    "./alerts/frame": "./src/alerts/frame.ts",
     "./alerts/rules": "./src/alerts/rules.ts",
     "./alerts/thresholds": "./src/alerts/thresholds.ts",
     "./imaging/fits": "./src/imaging/fits.ts",

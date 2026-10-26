@@ -1,0 +1,14 @@
+{
+  "night": "2026-10-24 North America Nebula",
+  "target": "North America Nebula",
+  "exposureSeconds": 90,
+  "use": "holdout",
+  "windows": [
+    {
+      "kind": "healthy",
+      "from": "2026-10-24T02:16:00Z",
+      "to": "2026-10-24T06:00:00Z",
+      "note": "The whole night: sky level 662 to 692, noise 8.5 to 10.6. Single frames with an axis ratio over 1.8 are trailing and must not alert."
+    }
+  ]
+}

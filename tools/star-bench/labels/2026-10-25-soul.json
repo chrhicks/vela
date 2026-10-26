@@ -1,0 +1,30 @@
+{
+  "night": "2026-10-25 Soul Nebula",
+  "target": "Soul Nebula",
+  "exposureSeconds": 90,
+  "use": "calibration",
+  "windows": [
+    {
+      "kind": "healthy",
+      "from": "2026-10-25T02:22:00Z",
+      "to": "2026-10-25T02:29:30Z",
+      "note": "The first frames. The frames at 02:22:04Z and 02:26:58Z are trailed (axis ratio 2.8 and 2.9) and must not alert."
+    },
+    {
+      "kind": "event",
+      "name": "flash",
+      "from": "2026-10-25T02:30:00Z",
+      "to": "2026-10-25T02:33:00Z",
+      "expect": [
+        "stars-dropping"
+      ],
+      "note": "One frame at 02:30:14Z with a sky level of 7148 against 544, followed by a trailed frame."
+    },
+    {
+      "kind": "healthy",
+      "from": "2026-10-25T02:38:00Z",
+      "to": "2026-10-25T09:33:00Z",
+      "note": "Sky level 537 to 543 all night. Single trailed frames (axis ratio 2.5 to 3.0 at 03:19Z, 03:24Z and 04:01Z) must not alert."
+    }
+  ]
+}
