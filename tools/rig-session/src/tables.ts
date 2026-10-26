@@ -138,6 +138,7 @@ function frameRow(
     star_rejected: image.starRejected,
     sky_level: image.skyLevel,
     sky_noise: image.skyNoise,
+    star_axis_ratio: image.starAxisRatio,
     saved_dir: image.directory,
     span_id: span?.spanId ?? null,
     span_link: linkKind(spanLink),
@@ -192,6 +193,7 @@ function attemptRow(session: string, record: FrameRecord, frameLink: Link<SavedI
     star_rejected: record.starRejected,
     sky_level: record.skyLevel,
     sky_noise: record.skyNoise,
+    star_axis_ratio: record.starAxisRatio,
   }
 }
 

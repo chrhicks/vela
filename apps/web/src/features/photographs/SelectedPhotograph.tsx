@@ -4,7 +4,7 @@ import { useId, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { ImageEnlargement, ImageViewport } from '../image-inspection/ImageViewport'
 import { useImageInspection } from '../image-inspection/useImageInspection'
 import { frameTypeChoices, isCalibration } from '../capture/frame-types'
-import { skyLevel, starCounts } from '../capture/star-statistics'
+import { axisRatio as starAxisRatio, skyLevel, starCounts } from '../capture/star-statistics'
 import { photographDate, photographTime } from './format'
 
 export function SelectedPhotograph({ image, rigId, position, viewerRef, timeZone, night, navigation }: {
@@ -25,6 +25,7 @@ export function SelectedPhotograph({ image, rigId, position, viewerRef, timeZone
   const original = displayed.previewRendering?.status !== 'current'
   const fallback = displayed.previewRendering?.status === 'unavailable'
   const sky = displayed.statistics && skyLevel(displayed.statistics)
+  const axisRatio = displayed.statistics && starAxisRatio(displayed.statistics)
 
   const tools = (
     <div className="photographs__tools">
@@ -172,6 +173,7 @@ export function SelectedPhotograph({ image, rigId, position, viewerRef, timeZone
             </dd>
           </div>
           {sky && <div><dt>Sky</dt><dd>{sky}</dd></div>}
+          {axisRatio && <div><dt>Star axis ratio</dt><dd>{axisRatio}</dd></div>}
         </dl>
         <div className="photographs__downloads">
           {fallback ? (

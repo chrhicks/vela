@@ -6,6 +6,7 @@ import {
   measureAutofocusStars,
   measureStar,
   measureStars,
+  axisRatioOf,
   summarize,
 } from './statistics.js'
 import type { ImageColor } from './preview.js'
@@ -17,6 +18,10 @@ type Star = {
   amplitude?: number
   profile?: 'exponential' | 'doughnut'
   width?: number
+  /** A Gaussian with this ratio of major to minor axis; sigma is the minor axis. */
+  axisRatio?: number
+  /** Direction of the major axis, in radians from the x axis. */
+  angle?: number
 }
 
 function image(
@@ -47,19 +52,21 @@ function image(
 
       // Independently integrate the continuous Gaussian over detector pixel area.
       for (const star of stars) {
-        if (Math.hypot(x - star.x, y - star.y) > star.sigma * 9) continue
+        if (Math.hypot(x - star.x, y - star.y) > star.sigma * (star.axisRatio ?? 1) * 9) continue
 
         for (let sy = 0; sy < 12; sy++) {
           for (let sx = 0; sx < 12; sx++) {
-            const r2 =
-              (x + (sx + 0.5) / 12 - 0.5 - star.x) ** 2 + (y + (sy + 0.5) / 12 - 0.5 - star.y) ** 2
-
+            const dx = x + (sx + 0.5) / 12 - 0.5 - star.x
+            const dy = y + (sy + 0.5) / 12 - 0.5 - star.y
+            const r2 = dx ** 2 + dy ** 2
             const r = Math.sqrt(r2)
+            const along = dx * Math.cos(star.angle ?? 0) + dy * Math.sin(star.angle ?? 0)
+            const ratio = star.axisRatio ?? 1
 
             const exponents = {
               exponential: -r / star.sigma,
               doughnut: -((r - star.sigma) ** 2) / (2 * (star.width ?? 3) ** 2),
-              gaussian: -r2 / (2 * star.sigma ** 2),
+              gaussian: -((along / ratio) ** 2 + (r2 - along ** 2)) / (2 * star.sigma ** 2),
             }
 
             const exponent = exponents[star.profile ?? 'gaussian']
@@ -449,6 +456,7 @@ describe('star measurement stages', () => {
         ],
         9,
         sky,
+        [1.1, 1.3, 1.2, 1.5, 1.4, 1.3, 1.3, 1.2, 1.4, 1.3],
       ),
     ).toEqual({
       algorithm: { version: 2 },
@@ -469,15 +477,118 @@ describe('star measurement stages', () => {
       },
       sky: 340,
       noise: 4,
+      axisRatio: 1.3,
     })
 
-    expect(summarize([{ ok: false, reason: 'faint' }], 1, sky)).toMatchObject({
+    expect(summarize([{ ok: false, reason: 'faint' }], 1, sky, [])).toMatchObject({
       detectedStars: 0,
       medianHfrPixels: null,
       detections: 1,
       measured: 0,
       strong: 0,
       rejected: { faint: 1 },
+      axisRatio: null,
     })
+  })
+
+  it('records a frame axis ratio only from enough stars', () => {
+    const sky = { level: 340, noise: 4 }
+
+    expect(summarize([], 0, sky, Array(9).fill(1.4)).axisRatio).toBeNull()
+    expect(summarize([], 0, sky, Array(10).fill(1.4)).axisRatio).toBe(1.4)
+  })
+})
+
+describe('axis ratio of strong stars', () => {
+  // The Soul night's sky and noise, as the rig's Bayer sensor records them.
+  const rig = { background: 539, noise: 13.7, color: { kind: 'bayer', pattern: 'rggb' } satisfies ImageColor }
+
+  /** Stars of one profile, each in its own 64 px cell of a 5 by 2 grid, at the given total flux in ADU. */
+  function field(profile: { sigma: number; axisRatio: number }, flux: number, count = 10) {
+    const amplitude = flux / (2 * Math.PI * profile.sigma ** 2 * profile.axisRatio)
+
+    const stars = Array.from({ length: count }, (_, index) => ({
+      x: 32 + 64 * (index % 5) + 0.37 * (index % 4),
+      y: 32 + 64 * Math.floor(index / 5) + 0.21 * (index % 3),
+      angle: (index * Math.PI) / 10,
+      amplitude,
+      ...profile,
+    }))
+
+    return image(stars, { width: 320, height: 128, ...rig })
+  }
+
+  // About S/N 210 by the measurement's own noise estimate.
+  const strongFlux = 26_000
+
+  it('recovers a known axis ratio from 1.0 to 2.0 to within 10% below it, and reads round stars 1.0 to 1.1', { timeout: 60_000 }, async () => {
+    for (const sigma of [1.3, 2]) {
+      for (const axisRatio of [1, 1.2, 1.5, 2]) {
+        const frame = field({ sigma, axisRatio }, strongFlux)
+        const { axisRatio: measured } = await measureStars(frame.width, frame.height, frame.pixels, rig.color)
+
+        expect(measured, `sigma ${sigma}, axis ratio ${axisRatio}`).toBeGreaterThan(axisRatio * 0.9)
+        expect(measured).toBeLessThan(axisRatio === 1 ? 1.1 : axisRatio * 1.02)
+      }
+    }
+  })
+
+  it('records no axis ratio from stars below the S/N the profile needs', async () => {
+    const frame = field({ sigma: 1.8, axisRatio: 1.5 }, 12_000)
+    const result = await measureStars(frame.width, frame.height, frame.pixels, rig.color)
+
+    expect(result.measured).toBeGreaterThanOrEqual(8)
+    expect(result.strong).toBeLessThan(10)
+    expect(result.axisRatio).toBeNull()
+  })
+
+  it('records no axis ratio from fewer than ten strong stars', async () => {
+    const profile = { sigma: 1.8, axisRatio: 1.5 }
+    const nine = field(profile, strongFlux, 9)
+    const ten = field(profile, strongFlux)
+
+    expect((await measureStars(nine.width, nine.height, nine.pixels, rig.color)).axisRatio).toBeNull()
+    expect((await measureStars(ten.width, ten.height, ten.pixels, rig.color)).axisRatio).toBeGreaterThan(1.3)
+  })
+
+  it('keeps trailed stars the profile gate rejects, and leaves the count and gate as they were', async () => {
+    const trailed = field({ sigma: 1.1, axisRatio: 3 }, strongFlux)
+    const result = await measureStars(trailed.width, trailed.height, trailed.pixels, rig.color)
+
+    expect(result.rejected.elongated).toBeGreaterThanOrEqual(8)
+    expect(result.detectedStars).toBeLessThanOrEqual(2)
+    expect(result.axisRatio).toBeGreaterThan(2.4)
+  })
+
+  it('computes the moments only for stars that reach the profile gate with S/N 200 or more', async () => {
+    const mono: ImageColor = { kind: 'mono' }
+
+    const cases = [
+      { star: { x: 46, y: 47, sigma: 2, amplitude: 8 }, options: {}, computed: false },
+      { star: { x: 45, y: 45, sigma: 2 }, options: { clip: 400 }, computed: false },
+      { star: { x: 45, y: 45, sigma: 8 }, options: {}, computed: false },
+      { star: { x: 46, y: 47, sigma: 2, amplitude: 150 }, options: {}, computed: false },
+      { star: { x: 46, y: 47, sigma: 2, amplitude: 400 }, options: {}, computed: true },
+    ]
+
+    for (const { star, options, computed } of cases) {
+      const frame = image([star], { noise: 1, ...options })
+      const { peaks } = await findPeaks(frame.width, frame.height, frame.pixels, mono, capturePolicy)
+      const distance = (peak: { x: number; y: number }) => Math.hypot(peak.x - star.x, peak.y - star.y)
+      const nearest = peaks.sort((a, b) => distance(a) - distance(b))[0]!
+      const measurement = measureStar(frame.width, frame.height, frame.pixels, mono, nearest, capturePolicy)
+
+      if (!measurement.ok) throw new Error('expected a measurement')
+      const axisRatio = vi.fn(measurement.axisRatio)
+
+      expect(axisRatioOf({ ...measurement, axisRatio }, capturePolicy) !== null).toBe(computed)
+      expect(axisRatio).toHaveBeenCalledTimes(computed ? 1 : 0)
+    }
+  })
+
+  it('reads no axis ratio in an autofocus measurement', async () => {
+    const frame = field({ sigma: 1.8, axisRatio: 1.5 }, strongFlux)
+
+    expect((await measureAutofocusStars(frame.width, frame.height, frame.pixels, rig.color)).axisRatio).toBeNull()
   })
 })

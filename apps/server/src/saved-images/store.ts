@@ -360,6 +360,7 @@ const savedImageSchema = z
           .optional(),
         sky: z.number().optional(),
         noise: z.number().nonnegative().optional(),
+        axisRatio: z.number().min(1).nullable().optional(),
       })
       .nullable(),
     imageUrl: z.string(),

@@ -51,6 +51,11 @@ export interface StarOutputs {
   sky: number
   /** Median of the same tiles' noise estimates. */
   noise: number
+  /**
+   * Median ratio of the principal axes of the stars with a flux signal-to-noise of 200 or more,
+   * 1 for round. Null when fewer than 10 such stars were measured. Recorded only: it feeds no alert.
+   */
+  axisRatio: number | null
 }
 
 /**

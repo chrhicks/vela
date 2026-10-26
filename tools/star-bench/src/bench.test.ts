@@ -81,6 +81,11 @@ describe('the bench on the committed fixture', () => {
       expect(number(row, 'detections')).toBe(number(row, 'measured') + rejected)
     }
 
+    const ratios = frames.map(row => row[column('axis_ratio')] ?? '')
+
+    for (const ratio of ratios) expect(ratio === '' || Number(ratio) >= 1).toBe(true)
+
+    expect(result.report).toMatch(/axis ratio of strong stars: (\d+ of \d+ frames, median \d\.\d{3}, \d+ over 1\.3|none recorded in \d+ frames)/)
     expect(result.report).toMatch(/per frame, median: peaks \d+, measured 26, strong \d+, sky \d+/)
     expect(result.report).toMatch(/rejected by first failed gate, median: blended \d+, edge \d+, unconverged \d+, faint \d+/)
   })

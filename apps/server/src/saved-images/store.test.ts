@@ -279,6 +279,7 @@ it('keeps the named star outputs and reads statistics saved without them', async
     rejected: { blended: 39, edge: 24, unconverged: 3, faint: 601, saturated: 0, wings: 106, elongated: 90, floor: 12 },
     sky: 539.5,
     noise: 4.25,
+    axisRatio: 1.24,
   }
 
   await store.save('rig', { ...image, statistics: named }, files)
@@ -287,7 +288,7 @@ it('keeps the named star outputs and reads statistics saved without them', async
   expect((await reopened.get('rig', image.id))?.statistics).toEqual(named)
 
   const later = { ...image, id: 'frame-without-outputs' }
-  const { detections: _d, measured: _m, strong: _s, rejected: _r, sky: _sky, noise: _n, ...recorded } = named
+  const { detections: _d, measured: _m, strong: _s, rejected: _r, sky: _sky, noise: _n, axisRatio: _a, ...recorded } = named
   await store.save('rig', { ...later, statistics: recorded }, files)
 
   expect((await reopened.get('rig', later.id))?.statistics).toEqual(recorded)

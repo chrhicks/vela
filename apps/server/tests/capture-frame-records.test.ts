@@ -152,6 +152,7 @@ describe('one frame record for every capture attempt', () => {
           rejected: expect.objectContaining({ blended: expect.any(Number), elongated: expect.any(Number) }),
           sky: expect.any(Number),
           noise: expect.any(Number),
+          axisRatio: expect.toBeOneOf([null, expect.any(Number)]),
         },
       },
     ])

@@ -55,6 +55,7 @@ const namedOutputs = {
   rejected: { blended: 3, faint: 25 },
   sky: 540.5,
   noise: 4.25,
+  axisRatio: 1.24,
 }
 
 const namedColumns = {
@@ -64,6 +65,7 @@ const namedColumns = {
   starRejected: '{"blended":3,"faint":25}',
   skyLevel: 540.5,
   skyNoise: 4.25,
+  starAxisRatio: 1.24,
 }
 
 test('saved images carry the named star outputs when the frame recorded them', async () => {
@@ -128,6 +130,7 @@ test('saved images read their metadata and report the frames that cannot be read
       starRejected: null,
       skyLevel: null,
       skyNoise: null,
+      starAxisRatio: null,
       directory: join(root, 'library', 'good'),
     },
   ])
@@ -239,6 +242,7 @@ test('frame records carry the named star outputs, and none when the record lacks
       starRejected: null,
       skyLevel: null,
       skyNoise: null,
+      starAxisRatio: null,
     },
   ])
 })

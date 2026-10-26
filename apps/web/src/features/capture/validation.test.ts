@@ -86,6 +86,7 @@ describe('capture response validation', () => {
       rejected,
       sky: 540.25,
       noise: 4.1,
+      axisRatio: 1.24,
     }
 
     const base = { detectedStars: 1, medianHfrPixels: 2.35 }
@@ -93,6 +94,7 @@ describe('capture response validation', () => {
     for (const statistics of [
       { ...base, ...named },
       { detectedStars: 0, medianHfrPixels: null, ...named, measured: 0, strong: 0 },
+      { ...base, ...named, axisRatio: null },
     ])
       expect(isCaptureView({ ...view, latestImage: { ...view.latestImage, statistics } }, 'rig-1')).toBe(true)
 
@@ -104,6 +106,8 @@ describe('capture response validation', () => {
       { rejected: { blended: 3 } },
       { sky: '540' },
       { noise: -1 },
+      { axisRatio: 0.9 },
+      { axisRatio: '1.2' },
     ]) {
       const statistics = { ...base, ...named, ...broken }
 

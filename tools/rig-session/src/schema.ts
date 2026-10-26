@@ -73,6 +73,7 @@ export const tables = {
     star_rejected: optional('json'),
     sky_level: optional('real'),
     sky_noise: optional('real'),
+    star_axis_ratio: optional('real'),
     saved_dir: required('text'),
     span_id: optional('text'),
     span_link: optional('link'),
@@ -122,6 +123,7 @@ export const tables = {
     star_rejected: optional('json'),
     sky_level: optional('real'),
     sky_noise: optional('real'),
+    star_axis_ratio: optional('real'),
   },
   indi_ops: {
     session: required('text'),

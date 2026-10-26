@@ -58,6 +58,18 @@ peak that a gate before the half-flux radius step turns away never has its radiu
 computed, so these outputs add no measurement cost. They are additive: the values of the older fields are unchanged,
 so `algorithm.version` stays 2, and records saved without them still read.
 
+`axisRatio` is the median ratio of the principal axes of the stars with a flux signal-to-noise
+of 200 or more that pass the faint, clipping and wings gates, whether or not the elongation
+gate then rejects them. It is null when fewer than 10 stars qualify, and it is recorded only:
+the count, the elongation gate and every alert read what they read before. Each star's ratio
+comes from second moments under a Gaussian window that follows the star (adaptive moments),
+because a hard aperture adds the noise of its corners to the moments and a round window pulls an
+elongated star toward 1. The moments run only for stars that reach the elongation gate at
+that signal-to-noise, about 65 per 26 MP frame. A ratio reads below the star's true axis ratio
+by the blur of the Bayer luminance, up to 9% at 2.0, and round stars read 1.00 to 1.02. On the
+recorded Soul frames the scale is higher than the hard aperture's, which gave a median 1.19 where
+the windowed estimate gives 1.40; the independent Siril PSF fits of the same stars give 1.38.
+
 Bayer detection uses cell averages, but HFR uses native bilinear RGB luminance
 before stretching. Interpolation can broaden an undersampled star; native pixels
 are the measurement units, not an optical calibration. Counts and HFR are useful
