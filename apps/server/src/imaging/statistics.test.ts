@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { measureAutofocusStars, measureStars } from './statistics.js'
+import {
+  capturePolicy,
+  classify,
+  findPeaks,
+  measureAutofocusStars,
+  measureStar,
+  measureStars,
+  summarize,
+} from './statistics.js'
 import type { ImageColor } from './preview.js'
 
 type Star = {
@@ -259,5 +267,90 @@ describe('measureStars', () => {
     const autofocus = await measureAutofocusStars(frame.width, frame.height, frame.pixels)
     expect(autofocus.detectedStars).toBeGreaterThan(0)
     expect(autofocus.medianHfrPixels).toBeGreaterThan(6)
+  })
+})
+
+describe('star measurement stages', () => {
+  const mono: ImageColor = { kind: 'mono' }
+
+  async function verdictFor(star: Star, options: Parameters<typeof image>[1] = {}) {
+    const frame = image([star], { noise: 1, ...options })
+    const peaks = await findPeaks(frame.width, frame.height, frame.pixels, mono, capturePolicy)
+    const distance = (peak: { x: number; y: number }) => Math.hypot(peak.x - star.x, peak.y - star.y)
+    const nearest = peaks.sort((a, b) => distance(a) - distance(b))[0]!
+
+    const measurement = measureStar(
+      frame.width,
+      frame.height,
+      frame.pixels,
+      mono,
+      nearest,
+      capturePolicy,
+    )
+
+    return { measurement, verdict: classify(measurement, capturePolicy, mono) }
+  }
+
+  it('finds one peak at each star center', async () => {
+    const frame = image(
+      [
+        { x: 24, y: 30, sigma: 2 },
+        { x: 66, y: 60, sigma: 2 },
+      ],
+      { noise: 1 },
+    )
+
+    expect(await findPeaks(frame.width, frame.height, frame.pixels, mono, capturePolicy)).toEqual([
+      { x: 24, y: 30 },
+      { x: 66, y: 60 },
+    ])
+  })
+
+  it('accepts a measured star and keeps its half-flux radius', async () => {
+    const { measurement, verdict } = await verdictFor({ x: 46, y: 47, sigma: 2 })
+
+    expect(measurement).toMatchObject({ ok: true })
+    expect(verdict.ok).toBe(true)
+    expect(Math.abs((verdict.ok ? verdict.hfr : NaN) - expected(2))).toBeLessThan(0.11)
+  })
+
+  it('measures a faint star fully and names the gate that rejects it', async () => {
+    const { measurement, verdict } = await verdictFor({ x: 46, y: 47, sigma: 2, amplitude: 8 })
+
+    expect(measurement.ok && measurement.halfFluxRadius()).toEqual(expect.any(Number))
+    expect(verdict).toEqual({ ok: false, reason: 'faint' })
+  })
+
+  it('names the first gate a star fails', async () => {
+    const cases = [
+      { reason: 'edge', star: { x: 10, y: 45, sigma: 2 }, options: { noise: 0 } },
+      { reason: 'saturated', star: { x: 45, y: 45, sigma: 2 }, options: { clip: 400 } },
+      { reason: 'wings', star: { x: 45, y: 45, sigma: 8 }, options: {} },
+      {
+        reason: 'floor',
+        star: { x: 45.3, y: 45.4, sigma: 0.55, amplitude: 20000 },
+        options: {},
+      },
+    ]
+
+    for (const { reason, star, options } of cases)
+      expect((await verdictFor(star, options)).verdict).toEqual({ ok: false, reason })
+  })
+
+  it('summarizes the stars that passed, ignoring rejected ones', () => {
+    expect(
+      summarize([
+        { ok: true, hfr: 3 },
+        { ok: false, reason: 'blended' },
+        { ok: true, hfr: 1 },
+        { ok: false, reason: 'shape' },
+      ]),
+    ).toEqual({ algorithm: { version: 2 }, detectedStars: 2, medianHfrPixels: 2 })
+
+    expect(summarize([{ ok: false, reason: 'faint' }])).toEqual({
+      algorithm: { version: 2 },
+      detectedStars: 0,
+      medianHfrPixels: null,
+    })
   })
 })
