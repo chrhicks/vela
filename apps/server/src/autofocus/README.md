@@ -127,8 +127,9 @@ To list a run's chosen focus and star counts:
 jq -c 'select(.phase == "complete") | {startedAt, fit: .fit.position, stars: [.samples[] | [.position, .detectedStars, (.stars | length)]]}' autofocus.jsonl
 ```
 
-Stop needs no body, the same as capture stop: a bare POST, an empty body or `{}` are
-accepted, and any other body is refused with 400 while the walk keeps going.
+Stop needs no body, the same as capture stop. A bare POST, an empty body or `{}` is accepted
+under any content type except `text/plain`, and every other request is refused with 400, a
+`text/plain` one included. A refused stop leaves the walk going.
 
 Stop during measurement still restores the start, including the final confirmation
 measurement. Only typed cancellation confirmed by a device boundary is reported
