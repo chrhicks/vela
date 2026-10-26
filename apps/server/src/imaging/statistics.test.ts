@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+  autofocusPolicy,
   capturePolicy,
   classify,
   findPeaks,
@@ -189,8 +190,8 @@ describe('measureStars', () => {
   it('stamps its measurements with the algorithm version', async () => {
     const frame = image([{ x: 46, y: 47, sigma: 2 }])
 
-    expect((await measureStars(frame.width, frame.height, frame.pixels)).algorithm).toEqual({ version: 2 })
-    expect((await measureAutofocusStars(frame.width, frame.height, frame.pixels)).algorithm).toEqual({ version: 2 })
+    expect((await measureStars(frame.width, frame.height, frame.pixels)).algorithm).toEqual({ version: 3 })
+    expect((await measureAutofocusStars(frame.width, frame.height, frame.pixels)).algorithm).toEqual({ version: 3 })
   })
 
   it('records what it found beside the count and accounts for every peak', async () => {
@@ -459,7 +460,7 @@ describe('star measurement stages', () => {
         [1.1, 1.3, 1.2, 1.5, 1.4, 1.3, 1.3, 1.2, 1.4, 1.3],
       ),
     ).toEqual({
-      algorithm: { version: 2 },
+      algorithm: { version: 3 },
       detectedStars: 3,
       medianHfrPixels: 2,
       detections: 9,
@@ -558,6 +559,25 @@ describe('axis ratio of strong stars', () => {
     expect(result.rejected.elongated).toBeGreaterThanOrEqual(8)
     expect(result.detectedStars).toBeLessThanOrEqual(2)
     expect(result.axisRatio).toBeGreaterThan(2.4)
+  })
+
+  it('counts trailed stars below the S/N the profile needs, with no axis ratio', async () => {
+    const trailed = field({ sigma: 1.1, axisRatio: 3 }, 18_000)
+    const result = await measureStars(trailed.width, trailed.height, trailed.pixels, rig.color)
+
+    expect(result.rejected.elongated).toBe(0)
+    expect(result.detectedStars).toBeGreaterThanOrEqual(8)
+    expect(result.strong).toBe(result.detectedStars)
+    expect(result.axisRatio).toBeNull()
+  })
+
+  it('judges the shape of every star in an autofocus measurement', () => {
+    const star = { x: 80, y: 80, sigma: 1.1, axisRatio: 5, amplitude: 18_000 / (2 * Math.PI * 1.1 ** 2 * 5) }
+    const frame = image([star], { width: 160, height: 160, ...rig })
+    const verdict = (policy: typeof capturePolicy) => classify(measureStar(frame.width, frame.height, frame.pixels, rig.color, star, policy), policy, rig.color)
+
+    expect(verdict(capturePolicy)).toMatchObject({ ok: true })
+    expect(verdict(autofocusPolicy)).toEqual({ ok: false, reason: 'elongated' })
   })
 
   it('computes the moments only for stars that reach the profile gate with S/N 200 or more', async () => {
