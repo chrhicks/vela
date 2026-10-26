@@ -40,7 +40,7 @@ A capture carries its frame type. Cria's `capture` takes `light` (the shutter is
 open) and, for a flat or bias, a `frameType` that Cria sets on the camera's INDI frame
 type. A dark flat goes as a dark. `frameType` is sent only for a flat or bias, because a
 Cria from before that field refuses a request that carries it. Against such a Cria
-lights, darks and dark flats work as before, and a flat or bias fails with Cria's
+lights, darks and dark flats still work, and a flat or bias fails with Cria's
 refusal before any exposure. Update Cria on the rig to take them. The adapter never
 retries a flat or bias as a light, so a calibration frame is never taken under the
 wrong type.
