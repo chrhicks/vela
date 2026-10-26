@@ -48,7 +48,7 @@ describe('Fieldroom autofocus scene boundary', () => {
 
   it('keeps restoration pending/failed separate from confirmed return and response uncertainty', () => {
     const scene = createAutofocusScene('autofocus-stop-pending')
-    scene.respond('POST', stop, {})
+    scene.respond('POST', stop)
     expect(scene.snapshot()).toMatchObject({ activity: 'stopping', active: true, restoredStart: false })
     const failed = createAutofocusScene('autofocus-restore-unconfirmed').snapshot()
     expect(failed.restoredStart).toBe(false)
@@ -56,7 +56,7 @@ describe('Fieldroom autofocus scene boundary', () => {
     scene.setView(failed)
     expect(scene.respond('GET', read).json).toMatchObject({ phase: 'failed', restoredStart: false })
     const unknown = createAutofocusScene('autofocus-stop-unconfirmed')
-    expect(unknown.respond('POST', stop, {}).status).toBe(503)
+    expect(unknown.respond('POST', stop).status).toBe(503)
     expect(unknown.respond('GET', read).json).toMatchObject({ active: true, activity: 'stopping', restoredStart: false })
     unknown.setView(createAutofocusScene('autofocus-restored').snapshot())
     expect(unknown.respond('GET', read).json).toMatchObject({ phase: 'stopped', restoredStart: true, currentPosition: 32842 })

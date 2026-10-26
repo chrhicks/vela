@@ -3,7 +3,7 @@ import type { AlignmentView } from '@vela/model/web'
 import { Button, Panel } from '@vela/ui'
 import { useEffect, useId, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
-import { api } from '../lib/api'
+import { api, ApiError } from '../lib/api'
 import {
   AlignmentImage,
   AlignmentImageDialog,
@@ -81,8 +81,7 @@ function useAlignment(rigId: string) {
     try {
       const result = await api(`rigs/${encodeURIComponent(rigId)}/alignment/${action}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: '{}',
+        ...(action === 'start' && { headers: { 'Content-Type': 'application/json' }, body: '{}' }),
         signal: AbortSignal.timeout(15000),
       })
 
@@ -95,10 +94,18 @@ function useAlignment(rigId: string) {
     } catch (cause) {
       if (action !== 'start') endUnconfirmed.current = true
 
-      if (alive.current)
+      if (alive.current) {
+        const message =
+          cause instanceof ApiError && cause.code
+            ? cause.code
+            : cause instanceof Error
+              ? cause.message
+              : 'Command response unavailable'
+
         setError(
-          `${cause instanceof Error ? cause.message : 'Command response unavailable'}. The command was not repeated; check the current state before trying again.`,
+          `${message.replace(/\.$/, '')}. The command was not repeated; check the current state before trying again.`,
         )
+      }
       await read()
     } finally {
       writing.current = false

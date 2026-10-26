@@ -18,7 +18,7 @@ import {
 import { measureAutofocusStars } from '../imaging/statistics.js'
 import { noRecords, type JsonlRecords } from '../records.js'
 import { DEFAULT_OFFSET_STEPS, DEFAULT_STEP_SIZE } from './walk.js'
-import { haltBody, haltBodyError, registerHaltRoutes } from '../http/halt-body.js'
+import { haltBodyError, registerHaltRoutes } from '../http/halt-body.js'
 
 interface AutofocusRouteOptions {
   createInspector: RigDetailOptions['createInspector']
@@ -354,7 +354,7 @@ export function registerAutofocus(
 
   registerHaltRoutes(app, scope =>
     scope.post<{ Params: { rigId: string } }>('/api/rigs/:rigId/autofocus/stop', async (request, reply) => {
-      if (!haltBody.safeParse(request.body).success)
+      if (request.body !== undefined)
         return reply.code(400).send({ error: haltBodyError })
 
       const controller = controllers.get(request.params.rigId)

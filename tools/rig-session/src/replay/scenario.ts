@@ -98,7 +98,7 @@ async function capture(rig: ReplayRig, exposureSeconds: number, wanted: number, 
     if (alerts.map(alert => alert.id).join() !== shown) alertChanges.push({ afterAttempts: attempts.length, alerts })
   }
 
-  if (current.active) await rig.api('POST', `${base}/capture/stop`, captureView, {})
+  if (current.active) await rig.api('POST', `${base}/capture/stop`, captureView)
 
   while (current.active && Date.now() <= deadline) {
     await pause()

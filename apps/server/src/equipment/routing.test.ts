@@ -302,7 +302,7 @@ describe('equipment selection at server composition', () => {
     for (const capability of capabilities)
       expect(subject.selected.some(call => call.capability === capability)).toBe(true)
     expect(subject.capture.mock.calls[0]![0].cameraId).toBe('cria:camera')
-    expect((await subject.app.inject({ method: 'POST', url: `/api/rigs/${rig.id}/${workflow}/stop`, payload: {} })).statusCode).toBe(200)
+    expect((await subject.app.inject({ method: 'POST', url: `/api/rigs/${rig.id}/${workflow}/stop` })).statusCode).toBe(200)
     expect(subject.unexpectedFetch).not.toHaveBeenCalled()
   })
 
@@ -382,7 +382,7 @@ describe('device holds through the lease routes', () => {
     expect(started.statusCode).toBe(200)
     await vi.waitFor(() => expect(subject.capture).toHaveBeenCalledOnce())
     expect(subject.focuser.move.mock.calls[0]![0].position).toBe(1040)
-    expect((await subject.app.inject({ method: 'POST', url: `/api/rigs/${rig.id}/autofocus/stop`, payload: {} })).statusCode).toBe(200)
+    expect((await subject.app.inject({ method: 'POST', url: `/api/rigs/${rig.id}/autofocus/stop` })).statusCode).toBe(200)
   })
 
   it('validates the temporary recover request and reports a recovery that did not confirm', async () => {
@@ -441,6 +441,6 @@ describe('a Cria rig whose saved camera name predates protocol 5', () => {
     expect(start.statusCode).toBe(200)
     await vi.waitFor(() => expect(subject.capture).toHaveBeenCalledOnce())
     expect(subject.capture.mock.calls[0]![0].expectedCameraName).toBe('Camera')
-    expect((await subject.app.inject({ method: 'POST', url: `/api/rigs/${rig.id}/${workflow}/stop`, payload: {} })).statusCode).toBe(200)
+    expect((await subject.app.inject({ method: 'POST', url: `/api/rigs/${rig.id}/${workflow}/stop` })).statusCode).toBe(200)
   })
 })

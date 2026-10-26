@@ -46,9 +46,10 @@ exposure without repeating the slew. Stop cancels that wait. Tracking remains on
 capture. Stop cancels the owned operation and waits for boundary cleanup; it
 does not park the mount or turn tracking off. Failed cleanup remains a failure.
 No physical write is automatically replayed.
-Framing stop needs no body. A bare POST, an empty body or `{}` is accepted under any
-content type except `text/plain`, and every other request is refused with 400, a `text/plain`
-one included. Start, check and center still require their exact JSON fields.
+Framing stop takes no input. Send it as a POST with an empty body. Any non-empty body, `{}`
+included, is refused with 400 under every content type and the request does nothing; a
+`Content-Type` header on an empty body is ignored. Start, check and center still require their
+exact JSON fields.
 
 Centering is a separate user command, bound to the exact solved-check ID and the
 current edited composition coordinates. One request refines automatically until

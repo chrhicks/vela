@@ -154,8 +154,10 @@ export function useFraming(rigId: string) {
     try {
       const next = await api(`rigs/${encodeURIComponent(rigId)}/framing/${action}`, {
         method: action === 'settings' ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        ...(action !== 'stop' && {
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        }),
         signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]),
       })
 

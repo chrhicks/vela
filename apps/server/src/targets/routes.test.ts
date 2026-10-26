@@ -8,6 +8,7 @@ import type { MonoFrame, PlateSolver } from '../plate-solving/solver.js'
 import type { FramingView } from '@vela/model/web'
 import type { FramingHardware } from './framing.js'
 import { registerTargets, type TargetOptions } from './routes.js'
+import { haltBodyError } from '../http/halt-body.js'
 import { emptyHaltRequests, refusedHaltRequests } from '../http/halt-requests.fixture.js'
 
 const stamp = '2026-09-07T22:00:00.000Z'
@@ -193,6 +194,7 @@ describe('target and framing HTTP boundary', () => {
     const subject = setup()
     const stopped = await subject.app.inject({ method: 'POST', url: '/api/rigs/rig/framing/stop', ...options })
     expect(stopped.statusCode).toBe(400)
+    expect(stopped.json()).toEqual({ error: haltBodyError })
   })
 
   it.each(emptyHaltRequests)('still refuses a framing start on %s', async (_name, options) => {

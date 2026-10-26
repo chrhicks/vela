@@ -9,6 +9,7 @@ import { createMemoryRigCatalog } from '../rig/catalog.js'
 import type { RigCatalogRecord } from '../rig/contracts.js'
 import { createRigOperations } from '../rig/operations.js'
 import { alpacaEndpoint } from '../equipment/source.js'
+import { haltBodyError } from '../http/halt-body.js'
 import { emptyHaltRequests, refusedHaltRequests } from '../http/halt-requests.fixture.js'
 import { alignmentSettings, registerAlignment, type AlignmentEquipmentOptions } from './routes.js'
 
@@ -147,8 +148,10 @@ function setup(
     app.inject({
       method: 'POST',
       url: `/api/rigs/${rigId}/alignment/${name}`,
-      headers: { 'content-type': 'application/json' },
-      payload: JSON.stringify(payload),
+      ...(name !== 'stop' && name !== 'finish' && {
+        headers: { 'content-type': 'application/json' },
+        payload: JSON.stringify(payload),
+      }),
     })
 
   return { app, catalog, operations, command }
@@ -413,10 +416,11 @@ describe('alignment routes', () => {
       await command('start')
       const halted = await app.inject({ method: 'POST', url: `/api/rigs/rig/alignment/${name}`, ...options })
       expect(halted.statusCode).toBe(400)
+      expect(halted.json()).toEqual({ error: haltBodyError })
       expect(mocks.stop).not.toHaveBeenCalled()
     })
   })
-  it.each(emptyHaltRequests.filter(([, options]) => options.headers === undefined))(
+  it.each(emptyHaltRequests)(
     'still requires a JSON object to start on %s',
     async (_name, options) => {
       const { app, operations } = setup()

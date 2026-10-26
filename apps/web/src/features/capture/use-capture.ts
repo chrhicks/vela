@@ -156,7 +156,7 @@ export function useCapture(rigId: string) {
 
   async function post(
     path: 'start' | 'stop' | 'resume' | 'cooling',
-    body:
+    body?:
       | {
           exposureSeconds: number
           repeat: boolean
@@ -166,8 +166,7 @@ export function useCapture(rigId: string) {
           frameCount?: number
         }
       | { coolerOn: boolean }
-      | { setpointC: number }
-      | Record<string, never>,
+      | { setpointC: number },
   ) {
     if (writing.current || !alive.current) return
 
@@ -201,8 +200,7 @@ export function useCapture(rigId: string) {
     try {
       const next = await api(`rigs/${encodeURIComponent(rigId)}/capture/${path}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        ...(body && { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
         signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]),
       })
 
@@ -235,11 +233,22 @@ export function useCapture(rigId: string) {
         setCoolingError(message)
         const uncertain = /could not be confirmed/i.test(message)
         unconfirmedCoolingField.current = uncertain
-          ? 'coolerOn' in body
+          ? body && 'coolerOn' in body
             ? 'coolerOn'
             : 'setpointC'
           : null
         setCoolingUnconfirmed(uncertain)
+
+        return
+      }
+
+      if (
+        (path === 'stop' || path === 'resume') &&
+        cause instanceof ApiError &&
+        cause.status === 400 &&
+        cause.code
+      ) {
+        setError(cause.code)
 
         return
       }
@@ -302,8 +311,8 @@ export function useCapture(rigId: string) {
         ...(frameCount !== undefined && { frameCount }),
       })
     },
-    stop: () => post('stop', {}),
-    resume: () => post('resume', {}),
+    stop: () => post('stop'),
+    resume: () => post('resume'),
     setCooler: (coolerOn: boolean) => post('cooling', { coolerOn }),
     setCoolingTemperature: (setpointC: number) => post('cooling', { setpointC }),
     refresh: () => read(true),

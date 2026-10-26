@@ -10,6 +10,7 @@ import { openJsonlRecords } from '../records.js'
 import { noAutofocusRecords, registerAutofocus, type AutofocusRecords } from './routes.js'
 import type { AutofocusCamera, AutofocusFocuser } from './controller.js'
 import { hyperbola } from './hyperbola.js'
+import { haltBodyError } from '../http/halt-body.js'
 import { emptyHaltRequests, refusedHaltRequests } from '../http/halt-requests.fixture.js'
 
 const record = {
@@ -148,7 +149,7 @@ function setup(
         url: '/api/rigs/fra/autofocus/start',
         payload: body,
       }),
-    stop: (options: InjectOptions = { payload: {} }) =>
+    stop: (options: InjectOptions = {}) =>
       app.inject({ method: 'POST', url: '/api/rigs/fra/autofocus/stop', ...options }),
     land: async () => {
       await vi.waitFor(() => expect(captures.length).toBeGreaterThan(0))
@@ -204,7 +205,9 @@ it.each(emptyHaltRequests)('accepts a stop with %s', async (_name, options) => {
 it.each(refusedHaltRequests)('refuses a stop with %s and leaves the walk going', async (_name, options) => {
   const subject = setup()
   expect((await subject.start()).statusCode).toBe(200)
-  expect((await subject.stop(options)).statusCode).toBe(400)
+  const refused = await subject.stop(options)
+  expect(refused.statusCode).toBe(400)
+  expect(refused.json()).toEqual({ error: haltBodyError })
   expect((await subject.get()).json()).toMatchObject({ active: true })
   await subject.finish()
 })

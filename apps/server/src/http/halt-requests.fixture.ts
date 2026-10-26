@@ -1,25 +1,30 @@
 import type { InjectOptions } from 'fastify'
 
-const json = { 'content-type': 'application/json' }
-
-const text = { 'content-type': 'text/plain' }
-
-const binary = { 'content-type': 'application/octet-stream' }
-
-export const emptyHaltRequests: ReadonlyArray<readonly [string, InjectOptions]> = [
-  ['a bare POST', {}],
-  ['an empty JSON object', { headers: json, payload: '{}' }],
-  ['a JSON content type with no body', { headers: json }],
-  ['an empty object with no content type', { payload: '{}' }],
-  ['an empty body under a non-JSON content type', { headers: binary }],
-  ['an empty object under a non-JSON content type', { headers: binary, payload: '{}' }],
+const contentTypes = [
+  undefined,
+  'application/json',
+  'text/plain',
+  'application/x-www-form-urlencoded',
+  'application/octet-stream',
 ]
 
-export const refusedHaltRequests: ReadonlyArray<readonly [string, InjectOptions]> = [
-  ['an unknown field', { headers: json, payload: '{"extra":true}' }],
-  ['a null body', { headers: json, payload: 'null' }],
-  ['an array', { headers: json, payload: '[]' }],
-  ['malformed JSON', { headers: json, payload: '{' }],
-  ['an empty body under text/plain', { headers: text }],
-  ['an empty object under text/plain', { headers: text, payload: '{}' }],
-]
+const bodies = ['{}', 'null', '[]', '{"a":1}', 'not json']
+
+function request(contentType: string | undefined, payload?: string): InjectOptions {
+  return {
+    ...(contentType && { headers: { 'content-type': contentType } }),
+    ...(payload !== undefined && { payload }),
+  }
+}
+
+export const emptyHaltRequests: ReadonlyArray<readonly [string, InjectOptions]> = contentTypes.map(contentType => [
+  `an empty body under ${contentType ?? 'no content type'}`,
+  request(contentType),
+])
+
+export const refusedHaltRequests: ReadonlyArray<readonly [string, InjectOptions]> = contentTypes.flatMap(contentType =>
+  bodies.map((body): readonly [string, InjectOptions] => [
+    `${body} under ${contentType ?? 'no content type'}`,
+    request(contentType, body),
+  ]),
+)

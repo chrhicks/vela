@@ -251,7 +251,7 @@ test('pending alignment Stop shows command intent while retaining the last measu
   let release!: () => void
   const responseGate = new Promise<void>(resolve => { release = resolve })
   await page.route('**/api/rigs/fra400/alignment/stop', async route => {
-    const result = scene.respond('POST', '/api/rigs/fra400/alignment/stop', {})
+    const result = scene.respond('POST', '/api/rigs/fra400/alignment/stop')
     await responseGate
     await route.fulfill({ status: result.status, json: result.json })
   })

@@ -96,7 +96,7 @@ export function useAutofocus(rigId: string) {
     }
   }, [rigId])
 
-  async function command(action: 'start' | 'stop', body: Record<string, number> = {}) {
+  async function command(action: 'start' | 'stop', body?: Record<string, number>) {
     if (writing.current || offline || stopUnconfirmed.current) return
     writing.current = true
     stopUnconfirmed.current = false
@@ -107,8 +107,7 @@ export function useAutofocus(rigId: string) {
     try {
       const result = await api(`rigs/${encodeURIComponent(rigId)}/autofocus/${action}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(action === 'start' ? body : {}),
+        ...(body && { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
         signal: AbortSignal.timeout(15000),
       })
 
@@ -129,7 +128,7 @@ export function useAutofocus(rigId: string) {
       if (alive.current) {
         stopUnconfirmed.current = action === 'stop'
         setError(
-          `${message}. The command was not repeated; check the current state before trying again.`,
+          `${message.replace(/\.$/, '')}. The command was not repeated; check the current state before trying again.`,
         )
       }
 

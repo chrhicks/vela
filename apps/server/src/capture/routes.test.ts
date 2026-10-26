@@ -13,6 +13,7 @@ import { configuredCamera, registerCapture, type CaptureSettings } from './route
 import { registerNavigation } from '../navigation.js'
 import { createMemorySavedImageStore } from '../saved-images/store.js'
 import { createMemoryCaptureRunStore, type CaptureRunStore } from './run-store.js'
+import { haltBodyError } from '../http/halt-body.js'
 import { emptyHaltRequests, refusedHaltRequests } from '../http/halt-requests.fixture.js'
 import { registerSavedImages } from '../saved-images/routes.js'
 
@@ -275,7 +276,6 @@ it('holds mutual exclusion before readiness awaits and through pending cleanup',
   const stopping = subject.app.inject({
     method: 'POST',
     url: '/api/rigs/sim/capture/stop',
-    payload: {},
   })
 
   void stopping.then(() => {})
@@ -313,6 +313,7 @@ it.each(refusedHaltRequests)('refuses a stop with %s and leaves the run going', 
   })
 
   expect(stopped.statusCode).toBe(400)
+  expect(stopped.json()).toEqual({ error: haltBodyError })
   expect(subject.captures[0]!.signal.aborted).toBe(false)
 })
 
@@ -362,7 +363,6 @@ it('retains image metadata across failure and serves it while disconnected, whil
   const stopping = subject.app.inject({
     method: 'POST',
     url: '/api/rigs/sim/capture/stop',
-    payload: {},
   })
 
   void stopping.then(() => {})
@@ -431,7 +431,6 @@ it('owns repeated capture across reads and releases the Rig lease only after con
   const stopping = subject.app.inject({
     method: 'POST',
     url: '/api/rigs/sim/capture/stop',
-    payload: {},
   })
 
   void stopping.then(() => {})
@@ -1044,13 +1043,20 @@ describe('after the server restarts', () => {
     expect(after.captures).toEqual([])
   })
 
-  it('accepts a bare or empty resume and refuses a body with a field', async () => {
+  it.each(emptyHaltRequests)('resumes on %s', async (_name, options) => {
     const { after } = await restarted()
-    const post = (payload?: string) => after.app.inject({ method: 'POST', url: '/api/rigs/sim/capture/resume', ...(payload && { payload, headers: { 'content-type': 'application/json' } }) })
 
-    expect((await post('{"exposureSeconds":1}')).statusCode).toBe(400)
+    expect((await after.app.inject({ method: 'POST', url: '/api/rigs/sim/capture/resume', ...options })).statusCode).toBe(200)
+    expect(after.captures).toHaveLength(1)
+  })
+
+  it.each(refusedHaltRequests)('refuses a resume with %s and starts nothing', async (_name, options) => {
+    const { after } = await restarted()
+    const refused = await after.app.inject({ method: 'POST', url: '/api/rigs/sim/capture/resume', ...options })
+
+    expect(refused.statusCode).toBe(400)
+    expect(refused.json()).toEqual({ error: haltBodyError })
     expect(after.captures).toEqual([])
-    expect((await post('{}')).statusCode).toBe(200)
   })
 
   it('tells the monitor once about an interrupted light run', async () => {

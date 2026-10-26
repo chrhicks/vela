@@ -129,6 +129,10 @@ function post(url: string, payload: InjectOptions['payload'] = {}): InjectOption
   return { method: 'POST', url, payload }
 }
 
+function postNoBody(url: string): InjectOptions {
+  return { method: 'POST', url }
+}
+
 function recoverPath(device: 'camera' | 'mount') {
   return `/api/rigs/fixture/devices/${encodeURIComponent(`cria:fixture:${device}`)}/recover`
 }
@@ -196,7 +200,7 @@ describe('a slew through framing', () => {
       unavailableReason: expect.stringContaining('Cria has not shown whether it admitted mount-slew'),
     })
 
-    const stopping = send(post('/api/rigs/fixture/framing/stop'))
+    const stopping = send(postNoBody('/api/rigs/fixture/framing/stop'))
 
     await vi.advanceTimersByTimeAsync(2_400)
 
@@ -219,7 +223,7 @@ describe('a slew through framing', () => {
     cria.delay('submit', 10_000)
     await request(post('/api/rigs/fixture/framing/start', slewToNgc7000))
     await vi.advanceTimersByTimeAsync(2_500)
-    const stopping = stop ? send(post('/api/rigs/fixture/framing/stop')) : undefined
+    const stopping = stop ? send(postNoBody('/api/rigs/fixture/framing/stop')) : undefined
     const recovering = send(post(recoverPath('mount'), { externalRecoveryConfirmed: true, note: 'Checked the mount at the pier' }))
 
     await vi.advanceTimersByTimeAsync(500)
@@ -263,7 +267,7 @@ describe('a slew through framing', () => {
     await request(post('/api/rigs/fixture/framing/start', slewToNgc7000))
     await vi.advanceTimersByTimeAsync(100)
     cria.dropReply('cancel')
-    const stopping = send(post('/api/rigs/fixture/framing/stop'))
+    const stopping = send(postNoBody('/api/rigs/fixture/framing/stop'))
 
     await vi.advanceTimersByTimeAsync(10_000)
 
@@ -277,7 +281,7 @@ describe('a slew through framing', () => {
     cria.stopMs = stopMs
     await request(post('/api/rigs/fixture/framing/start', slewToNgc7000))
     await vi.advanceTimersByTimeAsync(100)
-    const stopping = send(post('/api/rigs/fixture/framing/stop'))
+    const stopping = send(postNoBody('/api/rigs/fixture/framing/stop'))
 
     await vi.advanceTimersByTimeAsync(stopMs - 100)
 
@@ -296,7 +300,7 @@ describe('exposures through capture', () => {
     cria.stopMs = 5_000
     await request(post('/api/rigs/fixture/capture/start', { exposureSeconds: 2 }))
     await vi.advanceTimersByTimeAsync(1_000)
-    const stopping = send(post('/api/rigs/fixture/capture/stop'))
+    const stopping = send(postNoBody('/api/rigs/fixture/capture/stop'))
 
     await vi.advanceTimersByTimeAsync(1_500)
 
@@ -401,7 +405,7 @@ describe('a halt through autofocus', () => {
 
     await vi.advanceTimersByTimeAsync(1_000)
     cria.dropReply('submit')
-    const stopping = send(post('/api/rigs/fixture/autofocus/stop'))
+    const stopping = send(postNoBody('/api/rigs/fixture/autofocus/stop'))
 
     await vi.advanceTimersByTimeAsync(9_000)
 
@@ -495,7 +499,7 @@ describe("a mount hold through today's lease routes", () => {
 
     expect(submitted()).toEqual([`mount ${kind}`, 'focuser focuser-move', 'camera capture'])
 
-    const stopping = send(post('/api/rigs/fixture/autofocus/stop'))
+    const stopping = send(postNoBody('/api/rigs/fixture/autofocus/stop'))
 
     await vi.advanceTimersByTimeAsync(2_000)
 

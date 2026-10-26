@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { equipmentRig } from './equipment'
+import { haltBodyError } from './halt'
 import type { AutofocusView } from '@vela/model/web'
 import { previewAutofocusWindow } from '../../../src/features/autofocus/window'
 import { reviewTimezone, type ReviewResponse } from './tonight'
@@ -342,8 +343,7 @@ export function createAutofocusScene(name: AutofocusScene) {
             elapsedSeconds: 0,
           }
         } else {
-          if (!z.strictObject({}).safeParse(body).success)
-            return result(400, { error: 'Expected an empty JSON object' })
+          if (body !== undefined) return result(400, { error: haltBodyError })
 
           if (outcomes.stop === 'pending' || outcomes.stop === 'unconfirmed-active')
             view = { ...view, activity: 'stopping', captureReadState: 'current' }
