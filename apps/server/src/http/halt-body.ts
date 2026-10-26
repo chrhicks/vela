@@ -2,13 +2,11 @@ import type { FastifyInstance } from 'fastify'
 
 export const haltBodyError = 'Send this request as a POST with an empty body.'
 
-// A halt route takes no input, so its one accepted form is a POST whose body is zero bytes, under
-// any content type or none (clients add a Content-Type out of habit). A route refuses anything
-// else with haltBodyError when request.body is not undefined. Fastify would otherwise reject an
-// empty body under application/json, and parse text/plain on its own, before the handler runs.
-// The routes in this scope that do take a body (the framing and alignment start, check and
-// center commands) read it as JSON, or as the raw text when it is not JSON, and validate it
-// themselves.
+// A halt route takes no input: its one accepted form is a POST with a zero-byte body, under any
+// content type or none. A route refuses any other body (request.body !== undefined) with
+// haltBodyError. Without this scope Fastify refuses an empty body under application/json and parses
+// text/plain itself, before the handler runs. A body that is not JSON arrives as its raw text, so
+// the framing and alignment commands that do take JSON fail their own validation on it.
 export function registerHaltRoutes(app: FastifyInstance, routes: (scope: FastifyInstance) => void) {
   void app.register(async scope => {
     const parseJson = scope.getDefaultJsonParser('error', 'error')

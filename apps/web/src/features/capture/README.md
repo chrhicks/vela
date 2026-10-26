@@ -66,7 +66,7 @@ An interrupted run (phase `interrupted`, `interruption` set) shows a notice abov
 the reason ("Vela restarted during this run, and nothing has been exposed since"), the subject
 or frame type, how many frames were taken and the exposure. Its Resume button reads "Resume · 18
 frames left", or "Resume · repeat until stopped" for a run with no count, and posts to
-`capture/resume` with no body. A run that had taken all its frames shows no button. Resume is
+`capture/resume` with no body. A 400 refusal of Stop or Resume shows the server's message and leaves the button available. A run that had taken all its frames shows no button. Resume is
 enabled under the same conditions as Start (`canStart`), so a refusal keeps the notice and the
 server's reason shows in the usual warning. The form below it still starts a different run, which
 replaces the interrupted one. The notice is a status region with the label "Interrupted capture

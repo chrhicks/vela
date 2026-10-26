@@ -106,6 +106,7 @@ function useAlignment(rigId: string) {
           `${message.replace(/\.$/, '')}. The command was not repeated; check the current state before trying again.`,
         )
       }
+
       await read()
     } finally {
       writing.current = false
