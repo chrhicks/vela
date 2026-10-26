@@ -3,6 +3,7 @@ import { Button, IconButton } from '@vela/ui'
 import { useId, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { ImageEnlargement, ImageViewport } from '../image-inspection/ImageViewport'
 import { useImageInspection } from '../image-inspection/useImageInspection'
+import { frameTypeChoices, isCalibration } from '../capture/frame-types'
 import { photographDate, photographTime } from './format'
 
 export function SelectedPhotograph({ image, rigId, position, viewerRef, timeZone, night, navigation }: {
@@ -133,8 +134,17 @@ export function SelectedPhotograph({ image, rigId, position, viewerRef, timeZone
       </section>
       <section className="photographs__details" aria-label="Exposure details">
         <header>
-          <h2>{displayed.subject?.name ?? 'No recorded target'}</h2>
-          <p>{displayed.subject?.catalog ?? 'Saved on this Vela server'}</p>
+          {isCalibration(displayed.frameType) ? (
+            <>
+              <h2>{frameTypeChoices[displayed.frameType].frames}</h2>
+              <p>Calibration · not tied to a target</p>
+            </>
+          ) : (
+            <>
+              <h2>{displayed.subject?.name ?? 'No recorded target'}</h2>
+              <p>{displayed.subject?.catalog ?? 'Saved on this Vela server'}</p>
+            </>
+          )}
         </header>
         <dl>
           <div><dt>Observing night</dt><dd>{night}</dd></div>

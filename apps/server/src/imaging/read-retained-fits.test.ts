@@ -30,6 +30,11 @@ function fixture(bitpix: 16 | 32, samples: number[], extra: string[] = []) {
 }
 
 describe('bounded retained Vela FITS reader', () => {
+  it.each(['LIGHT', 'DARK', 'FLAT', 'DARKFLAT', 'BIAS'])('reads a frame whose IMAGETYP is %s', async keyword => {
+    const bytes = fixture(16, [0, 1, 2, 3], [`IMAGETYP= '${keyword}'`.padEnd(80)])
+    expect(Array.from((await readRetainedFits(bytes)).pixels)).toEqual([0, 1, 2, 3])
+  })
+
   it.each([16, 32] as const)(
     'decodes BITPIX %s in acquisition ADU and preserves row/Bayer origin',
     async bitpix => {

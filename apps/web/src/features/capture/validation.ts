@@ -6,6 +6,7 @@ import type {
   SavedImagesView,
   SavedImageView,
 } from '@vela/model/web'
+import { frameTypes } from './frame-types'
 
 /** The server's limit on `frameCount`. */
 export const MAX_FRAME_COUNT = 10_000
@@ -49,6 +50,7 @@ const statistics = z
 const captureImage = z
   .object({
     id: text,
+    frameType: z.enum(frameTypes),
     subject: subject.nullable().optional(),
     cameraName: text,
     saved: z.boolean(),
@@ -85,6 +87,7 @@ const captureView = z.object({
   captureReadState: z.enum(['current', 'retrying']),
   exposureSeconds: z.number().min(0).max(600),
   repeat: z.boolean(),
+  frameType: z.enum(frameTypes),
   frameCount: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).nullable().optional(),
   subject: subject.nullable(),
   savedCount: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),

@@ -131,6 +131,35 @@ reached its target is told from one stopped early by `completedCount` against
 `frameCount`. `completedCount` counts a frame as it is published, so while the
 last frame is saving it already reads N; a failed save then ends the run `failed`.
 
+### Frame type
+
+A run takes one frame type: `light` (the default), `dark`, `flat`, `dark-flat` or
+`bias`. Start accepts it as the optional `frameType` field. Any other value is a 400.
+The view carries `frameType` for the current or most recent run, `light` before any
+run. Each image carries its own `frameType`, so a later run never relabels an earlier
+frame.
+
+Only a light run has a subject. `targetId` with any other type is a 400, and a
+calibration run's `subject` is null. A calibration frame therefore never joins a
+target's light set.
+
+The type reaches the frame in two places, and both are written on the Vela side.
+The FITS header gets `IMAGETYP`: `LIGHT`, `DARK`, `FLAT`, `DARKFLAT` or `BIAS`.
+The saved-image record gets `frameType`, and so does each frame record line and
+the `capture.frame` span. Vela writes the FITS itself from the pixels it fetched,
+so `IMAGETYP` is always right, whatever Cria's own file says.
+
+Vela does not yet ask the camera for the type. Cria's capture command takes only
+`light` true or false, and Vela's equipment layer sends light every time. A camera
+with a shutter would therefore still open it for a dark. Cap the telescope or
+camera for dark, dark-flat and bias runs; Vela cannot see the cap. The ZWO cameras
+here have no shutter, so the cap is what makes the frame dark.
+
+The alert rules judge stars, which a calibration frame lacks. A calibration run is
+never an imaging run for the monitor, so it raises no no-stars alert, and its frames
+reach the monitor without star measurements, so they cannot raise a star-count or HFR
+trend alert. They still show the camera is producing frames.
+
 ## Local review
 
 Choose the simulator imaging camera through the same Rig setup API used for a

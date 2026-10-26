@@ -91,7 +91,14 @@ function Preparation({ rigId }: { rigId: string }) {
 
   async function start() {
     if (!canStart) return
-    const accepted = await capture.start(seconds, repeatValue, saveValue, targetId)
+
+    const accepted = await capture.start({
+      seconds,
+      repeat: repeatValue,
+      saveFrames: saveValue,
+      frameType: 'light',
+      targetId,
+    })
 
     if (accepted && accepted.phase !== 'failed') navigate(`${base}/observe/capture`)
   }

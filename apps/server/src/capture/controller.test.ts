@@ -860,3 +860,49 @@ describe('capture telemetry', () => {
     expect(spans('capture.run.ended')[0]!.attributes['capture.run.error']).toContain('disk full')
   })
 })
+
+describe('frame types', () => {
+  it('takes lights unless asked otherwise, and writes that into the FITS', async () => {
+    const { controller, requests, frame, savedImages } = setup()
+    expect(controller.snapshot().frameType).toBe('light')
+    expect(await controller.start(10, { saveFrames: true })).toMatchObject({ frameType: 'light' })
+    requests[0]!.resolve(frame)
+    await vi.waitFor(() => expect(controller.active()).toBe(false))
+    const image = controller.snapshot().latestImage!
+    expect(image.frameType).toBe('light')
+    const fits = (await savedImages.file('fra 400', image.id, 'fits'))!.toString('ascii', 0, 2880)
+    expect(fits).toContain("IMAGETYP= 'LIGHT'")
+  })
+
+  it.each([
+    ['dark', 'DARK'],
+    ['flat', 'FLAT'],
+    ['dark-flat', 'DARKFLAT'],
+    ['bias', 'BIAS'],
+  ] as const)('carries %s into the run, the frame, the saved record, the FITS and the frame record', async (frameType, keyword) => {
+    const records: FrameRecord[] = []
+    const { controller, requests, frame, savedImages } = setup(undefined, { append: record => void records.push(record), close: async () => {} })
+    expect(await controller.start(10, { saveFrames: true, frameType })).toMatchObject({ frameType, subject: null })
+    requests[0]!.resolve(frame)
+    await vi.waitFor(() => expect(controller.active()).toBe(false))
+    const view = controller.snapshot()
+    expect(view).toMatchObject({ frameType, latestImage: { frameType, subject: null, saved: true } })
+    expect(await savedImages.get('fra 400', view.latestImage!.id)).toMatchObject({ frameType })
+    const fits = (await savedImages.file('fra 400', view.latestImage!.id, 'fits'))!.toString('ascii', 0, 2880)
+    expect(fits).toContain(`IMAGETYP= '${keyword}'`)
+    expect(records).toMatchObject([{ frameType, outcome: 'saved' }])
+  })
+
+  it('returns to light for the next run and keeps the earlier frame as it was taken', async () => {
+    const { controller, requests, frame } = setup()
+    await controller.start(10, { frameType: 'dark' })
+    requests[0]!.resolve(frame)
+    await vi.waitFor(() => expect(controller.active()).toBe(false))
+    const dark = controller.snapshot().latestImage!
+    await controller.start(10)
+    expect(controller.snapshot()).toMatchObject({ frameType: 'light', latestImage: dark })
+    requests[1]!.resolve(frame)
+    await vi.waitFor(() => expect(controller.active()).toBe(false))
+    expect(controller.snapshot().latestImage!.frameType).toBe('light')
+  })
+})

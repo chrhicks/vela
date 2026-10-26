@@ -15,6 +15,7 @@ import type {
   CaptureView,
   NavigationCapture,
 } from '@vela/model/web'
+import { frameTypes } from '../imaging/frame-type.js'
 import type { RigCatalogRecord } from '../rig/contracts.js'
 import type { RigCatalog } from '../rig/catalog.js'
 import type { RigOperations } from '../rig/operations.js'
@@ -172,6 +173,7 @@ export function registerCapture(
         phase: 'idle',
         active: false,
         repeat: true,
+        frameType: 'light',
         saveFrames: false,
         completedCount: 0,
         subject: null,
@@ -267,19 +269,22 @@ export function registerCapture(
           repeat: z.boolean().optional(),
           frameCount: z.number().int().min(1).max(MAX_FRAME_COUNT).optional(),
           saveFrames: z.boolean().optional(),
+          frameType: z.enum(frameTypes).optional(),
           targetId: z.string().trim().min(1).max(100).optional(),
         })
         .refine(value => value.frameCount === undefined || value.repeat === true)
+        .refine(value => value.targetId === undefined || (value.frameType ?? 'light') === 'light')
         .safeParse(request.body)
 
       if (!request.headers['content-type']?.startsWith('application/json') || !parsed.success) {
         return reply.code(400).send({
           error:
-            `Expected exposureSeconds between 0.1 and 600, optional boolean repeat and saveFrames, optional targetId, and optional frameCount (a whole number from 1 to ${MAX_FRAME_COUNT}, only with repeat: true).`,
+            `Expected exposureSeconds between 0.1 and 600, optional boolean repeat and saveFrames, optional frameType (${frameTypes.join(', ')}; default light), optional targetId (only for light), and optional frameCount (a whole number from 1 to ${MAX_FRAME_COUNT}, only with repeat: true).`,
         })
       }
 
       const body = parsed.data
+      const frameType = body.frameType ?? 'light'
       const subject = body.targetId === undefined ? null : lookupSubject?.(body.targetId)
 
       if (subject === undefined)
@@ -322,15 +327,17 @@ export function registerCapture(
         }
 
         const watch = alerts?.monitorFor(rig)
+        const light = frameType === 'light'
         const captureController = controller
         const camera = cameraFactory(settings)
 
-        watch?.runStarted(body.exposureSeconds, body.repeat === true && body.saveFrames === true)
+        watch?.runStarted(body.exposureSeconds, light && body.repeat === true && body.saveFrames === true)
 
         const result = await controller
           .start(body.exposureSeconds, camera, view.camera.name, {
             subject,
-            onFrame: image => watch?.frameCaptured(image),
+            // A calibration frame has no stars to judge, but still shows the camera is producing.
+            onFrame: image => watch?.frameCaptured(light ? image : { capturedAt: image.capturedAt, statistics: null }),
             onSettled() {
               release()
               watch?.runEnded(captureController.snapshot().phase === 'failed' ? 'failed' : 'stopped')
@@ -338,6 +345,7 @@ export function registerCapture(
             repeat: body.repeat === true,
             frameCount: body.frameCount,
             saveFrames: body.saveFrames === true,
+            frameType,
           })
           .catch(error => {
             watch?.runEnded('stopped')

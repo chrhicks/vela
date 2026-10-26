@@ -52,6 +52,16 @@ a run with a target is active, the run summary reads "12 of 30 frames" from the
 server's `completedCount` and `frameCount`. The server ends the run at the target;
 the page never stops it.
 
+The Frame type field sits above the exposure. It lists Light, Dark, Flat, Dark flat
+and Bias, and a new page always starts on Light: a calibration run has no target, so it
+is never a carried-over default. Dark, dark flat and bias show "Cap the telescope or
+camera first" under the field, because Vela cannot see the cap. Flat says to aim at an
+evenly lit panel or sky. `frame-types.ts` holds the labels and reminders in one table
+keyed by type. A calibration choice hides the target: the subject card reads "Dark
+frames" and the page sends no `targetId`. While a run is active the field is gone and
+the run's own type shows beside the exposure count. The field is a single select, so it
+fits 390 px without wrapping.
+
 Save frames is an explicit per-run option, off on a new controller and restored
 from the active server projection. Keep this image targets the image whose pixels
 have actually loaded. Its idempotent storage request has separate pending/error

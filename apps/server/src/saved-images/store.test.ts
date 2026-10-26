@@ -9,6 +9,7 @@ import { createMemorySavedImageStore, openFileSavedImageStore } from './store.js
 
 const image: CaptureImage = {
   id: 'frame-1',
+  frameType: 'light',
   imageUrl: '/temporary.png',
   fitImageUrl: '/temporary-fit.png',
   width: 3,
@@ -213,5 +214,29 @@ it('retains subject intent across reopen, rejects malformed snapshots, and reads
   const legacyText = JSON.stringify(legacy)
   await writeFile(metadataPath, legacyText)
   expect((await reopened.get('rig', image.id))?.subject).toBeUndefined()
+  expect(await fs.readFile(metadataPath, 'utf8')).toBe(legacyText)
+})
+
+it('keeps a calibration frame type across reopen and reads metadata without one as a light', async () => {
+  const root = await temporary()
+  const store = await openFileSavedImageStore(root)
+  const saved = await store.save('rig', { ...image, frameType: 'dark' }, files)
+  const reopened = await openFileSavedImageStore(root)
+  expect((await reopened.get('rig', image.id))?.frameType).toBe('dark')
+  expect((await reopened.list('rig')).map(item => item.frameType)).toEqual(['dark'])
+
+  const metadataPath = join(
+    root,
+    createHash('sha256').update('rig').digest('hex'),
+    createHash('sha256').update(image.id).digest('hex'),
+    'metadata.json',
+  )
+
+  await writeFile(metadataPath, JSON.stringify({ ...saved, frameType: 'sky-flat' }))
+  await expect(reopened.get('rig', image.id)).rejects.toThrow('Invalid saved image metadata')
+  const { frameType: _frameType, ...legacy } = saved
+  const legacyText = JSON.stringify(legacy)
+  await writeFile(metadataPath, legacyText)
+  expect((await reopened.get('rig', image.id))?.frameType).toBe('light')
   expect(await fs.readFile(metadataPath, 'utf8')).toBe(legacyText)
 })

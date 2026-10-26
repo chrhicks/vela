@@ -18,6 +18,7 @@ const digest = (value: string | Buffer) => createHash('sha256').update(value).di
 
 const image: CaptureImage = {
   id: 'retained',
+  frameType: 'light',
   imageUrl: '/old-preview',
   width: 1602,
   height: 32,

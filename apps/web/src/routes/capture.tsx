@@ -1,9 +1,11 @@
-import { Button, Checkbox, Input } from '@vela/ui'
+import type { FrameType } from '@vela/model/web'
+import { Button, Checkbox, Input, Select } from '@vela/ui'
 import { useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { CaptureInterruption } from '../features/capture/CaptureInterruption'
 import { LatestImage } from '../features/capture/LatestImage'
 import { captureActivity, useCapture } from '../features/capture/use-capture'
+import { frameTypeChoices, frameTypes, isCalibration } from '../features/capture/frame-types'
 import { MAX_FRAME_COUNT, parseFrameCount } from '../features/capture/validation'
 import { CaptureCooling, coolingBlocker } from '../features/capture/CaptureCooling'
 import { useRigObservation } from '../features/rig-detail/RigContext'
@@ -27,6 +29,8 @@ function CapturePage({ rigId }: { rigId: string }) {
   const [saveFrames, setSaveFrames] = useState<boolean | null>(null)
   const [repeat, setRepeat] = useState<boolean | null>(null)
   const [frames, setFrames] = useState('')
+  // Always light until chosen: a calibration run has no target, so it is never the carried-over default.
+  const [chosenFrameType, setChosenFrameType] = useState<FrameType>('light')
   const [coolingOpen, setCoolingOpen] = useState(false)
   const { view, offline, pending, refreshing, error, commandUnconfirmed } = capture
   const chosenTargetId = params.get('target') ?? undefined
@@ -52,6 +56,8 @@ function CapturePage({ rigId }: { rigId: string }) {
   const repeating = view?.active ? view.repeat : (repeat ?? view?.repeat ?? true)
   // Saved by default: an unsaved frame past the last three is gone, and a night's frames cannot be retaken.
   const savingFrames = view?.active ? view.saveFrames : (saveFrames ?? true)
+  const frameType = view?.active ? view.frameType : chosenFrameType
+  const calibration = isCalibration(frameType)
   const seconds = Number(exposureValue)
   const frameCount = parseFrameCount(frames)
 
@@ -133,7 +139,7 @@ function CapturePage({ rigId }: { rigId: string }) {
     : null
 
   const hasPendingChoice =
-    view.active && chosenTargetId && chosenTargetId !== view.subject?.targetId
+    view.active && !calibration && chosenTargetId && chosenTargetId !== view.subject?.targetId
 
   return (
     <section className="vela-rig-page capture-page" aria-label="Tonight" data-interrupted={offline || undefined}>
@@ -154,12 +160,16 @@ function CapturePage({ rigId }: { rigId: string }) {
               </Link>
             </div>
             <h1 className="vela-type-subject">
-              {subject?.name ?? (chosenTargetId ? 'Selected subject' : 'Choose your subject')}
+              {calibration
+                ? frameTypeChoices[frameType].frames
+                : (subject?.name ?? (chosenTargetId ? 'Selected subject' : 'Choose your subject'))}
             </h1>
             <p>
-              {[subject?.catalog, target?.constellation, target?.kind]
-                .filter(Boolean)
-                .join(' · ') || 'Explore the sky, or capture at the current position.'}
+              {calibration
+                ? 'Calibration frames are not tied to a target.'
+                : [subject?.catalog, target?.constellation, target?.kind]
+                    .filter(Boolean)
+                    .join(' · ') || 'Explore the sky, or capture at the current position.'}
             </p>
             {hasPendingChoice && (
               <p>
@@ -211,7 +221,12 @@ function CapturePage({ rigId }: { rigId: string }) {
                 <strong role="status">
                   {showProgress ? <><span className="tonight-capture__dot" aria-hidden="true" />Capturing</> : activity}
                 </strong>
-                {view.active && <span>Exposure {view.completedCount + 1}</span>}
+                {view.active && (
+                  <span>
+                    {calibration && `${frameTypeChoices[frameType].label} · `}Exposure{' '}
+                    {view.completedCount + 1}
+                  </span>
+                )}
               </div>
               {view.active ? (
                 <>
@@ -284,15 +299,33 @@ function CapturePage({ rigId }: { rigId: string }) {
                       event.preventDefault()
 
                       if (validExposure && (!repeating || frameCount.valid))
-                        void capture.start(
+                        void capture.start({
                           seconds,
-                          repeating,
-                          savingFrames,
-                          chosenTargetId ?? view.subject?.targetId,
-                          repeating ? frameCount.frameCount : undefined,
-                        )
+                          repeat: repeating,
+                          saveFrames: savingFrames,
+                          frameType,
+                          targetId: calibration
+                            ? undefined
+                            : (chosenTargetId ?? view.subject?.targetId),
+                          frameCount: repeating ? frameCount.frameCount : undefined,
+                        })
                     }}
                   >
+                    <Select
+                      label="Frame type"
+                      value={frameType}
+                      options={frameTypes.map(value => ({
+                        value,
+                        label: frameTypeChoices[value].label,
+                      }))}
+                      message={frameTypeChoices[frameType].reminder ?? ''}
+                      disabled={busy || offline}
+                      onChange={event => {
+                        const next = frameTypes.find(value => value === event.target.value)
+
+                        if (next) setChosenFrameType(next)
+                      }}
+                    />
                     <Input
                       label="Exposure · seconds"
                       type="number"
@@ -343,7 +376,7 @@ function CapturePage({ rigId }: { rigId: string }) {
                         !capture.canStart ||
                         !validExposure ||
                         (repeating && !frameCount.valid) ||
-                        (!!chosenTargetId && !target)
+                        (!calibration && !!chosenTargetId && !target)
                       }
                     >
                       {pending

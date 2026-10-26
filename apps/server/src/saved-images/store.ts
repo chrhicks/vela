@@ -4,6 +4,7 @@ import { mkdir, mkdtemp, open, readFile, readdir, rename, rm, stat } from 'node:
 import { join } from 'node:path'
 import type { CaptureImage, SavedImage } from '@vela/model/web'
 import { PREVIEW_VERSION } from '../imaging/background.js'
+import { frameTypes } from '../imaging/frame-type.js'
 import { createRetainedPreviews, currentPreview, markCurrentPreview } from './previews.js'
 import { syncDirectory, writeDurable } from './durable-files.js'
 
@@ -312,6 +313,7 @@ const savedImageSchema = z
     id: z.string(),
     rigId: z.string(),
     saved: z.literal(true),
+    frameType: z.enum(frameTypes).default('light'),
     savedAt: timestamp,
     capturedAt: timestamp,
     receivedAt: timestamp,

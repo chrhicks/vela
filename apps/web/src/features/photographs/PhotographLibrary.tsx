@@ -29,7 +29,7 @@ export function PhotographGroups({
 
   const matching = groups.filter(group => {
     const terms = [group.title, ...group.images.flatMap(image => [
-      image.subject?.name ?? 'No recorded target',
+      photographTarget(image).title,
       image.subject?.catalog ?? '',
       photographNightTitle(photographNight(image.capturedAt, timeZone)),
       photographDay(`${photographNight(image.capturedAt, timeZone)}T12:00:00Z`, 'UTC'),
@@ -55,7 +55,7 @@ export function PhotographGroups({
       <div className="photographs__groups">
         {matching.map(group => {
           const related = groupPhotographs(group.images, byNight ? 'targets' : 'nights', timeZone)
-          const recordedCount = byNight ? related.filter(item => item.id !== 'unrecorded').length : related.length
+          const recordedCount = byNight ? related.filter(item => item.id.startsWith('target:')).length : related.length
           const relatedKind = byNight ? 'recorded target' : 'night'
           const cover = group.images[0]!
 

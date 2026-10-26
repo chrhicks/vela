@@ -23,6 +23,7 @@ const view: CaptureView = {
   saveFrames: false,
   savedImageCount: 0,
   repeat: true,
+  frameType: 'light',
   completedCount: 1,
   subject: null,
   savedCount: 0,
@@ -30,6 +31,7 @@ const view: CaptureView = {
   cooling: null,
   latestImage: {
     id: 'frame-1',
+    frameType: 'light',
     saved: false,
     imageUrl: '/api/rigs/rig-1/capture/images/frame-1',
     width: 1600,
@@ -79,6 +81,19 @@ describe('capture response validation', () => {
       { completedCount: undefined },
     ]) {
       expect(isCaptureView({ ...view, ...patch }, 'rig-1')).toBe(false)
+    }
+  })
+
+  it('requires a known frame type on the run and on its images', () => {
+    for (const frameType of ['light', 'dark', 'flat', 'dark-flat', 'bias'] as const) {
+      expect(isCaptureView({ ...view, frameType }, 'rig-1')).toBe(true)
+      expect(isSavedImage({ ...savedImage, frameType }, 'rig-1')).toBe(true)
+    }
+
+    for (const frameType of [undefined, null, 'DARK', 'sky-flat']) {
+      expect(isCaptureView({ ...view, frameType }, 'rig-1')).toBe(false)
+      expect(isCaptureView({ ...view, latestImage: { ...view.latestImage, frameType } }, 'rig-1')).toBe(false)
+      expect(isSavedImage({ ...savedImage, frameType }, 'rig-1')).toBe(false)
     }
   })
 

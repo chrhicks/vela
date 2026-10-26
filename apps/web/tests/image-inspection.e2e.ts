@@ -16,6 +16,7 @@ const frame: CaptureImage = {
   exposureSeconds: 2,
   capturedAt: '2026-09-05T18:00:00.000Z',
   receivedAt: '2026-09-05T18:00:03.000Z',
+  frameType: 'light',
   cameraName: 'Inspection camera',
   color: 'mono',
   statistics: { detectedStars: 12, medianHfrPixels: 2.35 },
@@ -36,7 +37,7 @@ const capture: CaptureView = {
   rigId: 'rig-1', rigName: 'Seestar S30', camera: { name: 'Inspection camera' },
   enabled: true, unavailableReason: null, phase: 'complete', active: false,
   captureReadState: 'current', exposureSeconds: 2, elapsedSeconds: 0, error: null,
-  repeat: false, saveFrames: false, savedImageCount: 0, completedCount: 1, cooling: null,
+  repeat: false, saveFrames: false, frameType: 'light', savedImageCount: 0, completedCount: 1, cooling: null,
   subject: null, savedCount: 0, integrationSeconds: 2, latestImage: frame,
 }
 

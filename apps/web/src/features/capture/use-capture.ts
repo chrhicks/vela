@@ -1,4 +1,4 @@
-import type { CaptureView } from '@vela/model/web'
+import type { CaptureView, FrameType } from '@vela/model/web'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, ApiError } from '../../lib/api'
 import { isCaptureView } from './validation'
@@ -158,6 +158,7 @@ export function useCapture(rigId: string) {
           exposureSeconds: number
           repeat: boolean
           saveFrames: boolean
+          frameType: FrameType
           targetId?: string
           frameCount?: number
         }
@@ -269,19 +270,28 @@ export function useCapture(rigId: string) {
     canStart,
     canStop,
     canCool,
-    start: (
-      seconds: number,
-      repeat: boolean,
-      saveFrames: boolean,
-      targetId?: string,
-      frameCount?: number,
-    ) => {
+    start: ({
+      seconds,
+      repeat,
+      saveFrames,
+      frameType,
+      targetId,
+      frameCount,
+    }: {
+      seconds: number
+      repeat: boolean
+      saveFrames: boolean
+      frameType: FrameType
+      targetId?: string | undefined
+      frameCount?: number | undefined
+    }) => {
       if (!Number.isFinite(seconds) || seconds < 0.1 || seconds > 600) return Promise.resolve()
 
       return post('start', {
         exposureSeconds: seconds,
         repeat,
         saveFrames,
+        frameType,
         ...(targetId !== undefined && { targetId }),
         ...(frameCount !== undefined && { frameCount }),
       })

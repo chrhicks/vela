@@ -222,6 +222,11 @@ it('rejects malformed input before acquiring or operating a camera', async () =>
     { exposureSeconds: 1, repeat: true, frameCount: 10_001 },
     { exposureSeconds: 1, frameCount: 5 },
     { exposureSeconds: 1, repeat: false, frameCount: 5 },
+    { exposureSeconds: 1, frameType: 'sky-flat' },
+    { exposureSeconds: 1, frameType: 'DARK' },
+    { exposureSeconds: 1, frameType: null },
+    { exposureSeconds: 1, frameType: 'dark', targetId: 'ngc0224' },
+    { exposureSeconds: 1, frameType: 'bias', targetId: 'ngc0224' },
     [],
   ]) {
     expect((await subject.start(body)).statusCode).toBe(400)
@@ -814,4 +819,50 @@ it('rejects malformed and unknown subjects before device inspection or acquiring
   expect(response.statusCode).toBe(200)
   expect(response.json()).toMatchObject({ subject, savedCount: 0, integrationSeconds: 0 })
   expect(captures).toHaveLength(1)
+})
+
+it.each(['light', 'dark', 'flat', 'dark-flat', 'bias'] as const)(
+  'carries the %s frame type into the run, the frame and its saved record',
+  async frameType => {
+    const subject = setup()
+    const started = await subject.start({ exposureSeconds: 10, saveFrames: true, frameType })
+    expect(started.statusCode).toBe(200)
+    expect(started.json()).toMatchObject({ frameType, subject: null })
+    subject.captures[0]!.resolve(frame)
+    await vi.waitFor(() => expect(subject.operations.owner('sim')).toBeUndefined())
+    const view = (await subject.get()).json()
+    expect(view).toMatchObject({ frameType, latestImage: { frameType, saved: true } })
+
+    const listed = (await subject.app.inject({ method: 'GET', url: '/api/web/rigs/sim/saved-images' })).json()
+    expect(listed.images).toMatchObject([{ id: view.latestImage.id, frameType }])
+  },
+)
+
+it('takes lights unless asked otherwise', async () => {
+  const subject = setup()
+  expect((await subject.start({ exposureSeconds: 10 })).json()).toMatchObject({ frameType: 'light' })
+})
+
+it('never lets a calibration run raise star alerts, yet still shows the camera is producing', async () => {
+  for (const frameType of ['dark', 'flat', 'dark-flat', 'bias'] as const) {
+    const monitor = { runStarted: vi.fn(), frameCaptured: vi.fn(), runEnded: vi.fn() }
+    const subject = setup(record.imagingCamera, { alerts: { monitorFor: () => monitor } })
+    const body = { exposureSeconds: 10, repeat: true, saveFrames: true, frameType }
+    expect((await subject.start(body)).statusCode).toBe(200)
+    expect(monitor.runStarted).toHaveBeenCalledExactlyOnceWith(10, false)
+    subject.captures[0]!.resolve(frame)
+    await vi.waitFor(() => expect(monitor.frameCaptured).toHaveBeenCalledOnce())
+    expect(monitor.frameCaptured).toHaveBeenCalledWith({ capturedAt: frame.capturedAt, statistics: null })
+  }
+})
+
+it('keeps star alerts for a light run that repeats and saves', async () => {
+  const monitor = { runStarted: vi.fn(), frameCaptured: vi.fn(), runEnded: vi.fn() }
+  const subject = setup(record.imagingCamera, { alerts: { monitorFor: () => monitor } })
+  const body = { exposureSeconds: 10, repeat: true, saveFrames: true, frameType: 'light' }
+  expect((await subject.start(body)).statusCode).toBe(200)
+  expect(monitor.runStarted).toHaveBeenCalledExactlyOnceWith(10, true)
+  subject.captures[0]!.resolve(frame)
+  await vi.waitFor(() => expect(monitor.frameCaptured).toHaveBeenCalledOnce())
+  expect(monitor.frameCaptured.mock.calls[0]![0].statistics).not.toBeNull()
 })
