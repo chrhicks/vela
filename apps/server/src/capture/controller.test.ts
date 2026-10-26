@@ -16,6 +16,7 @@ import {
   type CaptureFrame,
   type CaptureRunOptions,
 } from './controller.js'
+import type { FrameType } from '@vela/model/web'
 import { createMemorySavedImageStore, type SavedImageStore } from '../saved-images/store.js'
 import type { FrameRecord, FrameRecords } from './frame-records.js'
 import { createMemoryCaptureRunStore, type CaptureRunStore } from './run-store.js'
@@ -36,6 +37,7 @@ function setup(
   savedImages: SavedImageStore = createMemorySavedImageStore(),
   frameRecords?: FrameRecords,
   runs?: CaptureRunStore,
+  biasExposureSeconds?: CaptureCamera['biasExposureSeconds'],
 ) {
   const requests: Array<
     Parameters<CaptureCamera['capture']>[0] & ReturnType<typeof deferred<CaptureFrame>>
@@ -48,6 +50,7 @@ function setup(
 
       return result.promise
     },
+    ...(biasExposureSeconds && { biasExposureSeconds }),
   }
 
   const actual = createCaptureController(
@@ -751,6 +754,19 @@ describe('capture telemetry', () => {
     })
   })
 
+  it('records the exposure the camera took for a bias frame, not the one requested', async () => {
+    const { controller, requests, frame } = setup(undefined, undefined, undefined, async () => 0.000032)
+    await controller.start(0.1, { frameType: 'bias' })
+    await vi.waitFor(() => expect(requests).toHaveLength(1))
+    requests[0]!.resolve(frame)
+    await vi.waitFor(() => expect(controller.active()).toBe(false))
+
+    expect(spans('capture.frame')[0]!.attributes).toMatchObject({
+      'capture.frame.type': 'bias',
+      'capture.exposure.seconds': 0.000032,
+    })
+  })
+
   it('marks a lost frame as an error and a frame that is not saved as unsaved', async () => {
     const { controller, requests, frame } = setup()
     await controller.start(10, { repeat: true })
@@ -899,6 +915,106 @@ describe('frame types', () => {
     const fits = (await savedImages.file('fra 400', view.latestImage!.id, 'fits'))!.toString('ascii', 0, 2880)
     expect(fits).toContain(`IMAGETYP= '${keyword}'`)
     expect(records).toMatchObject([{ frameType, outcome: 'saved' }])
+  })
+
+  describe('the exposure a frame records', () => {
+    const exptime = (fits: Buffer) => Number(/EXPTIME =\s+(\S+)/.exec(fits.toString('ascii', 0, 2880))![1])
+
+    function withMinimum(biasExposureSeconds?: CaptureCamera['biasExposureSeconds']) {
+      const records: FrameRecord[] = []
+      const frameRecords = { append: (record: FrameRecord) => void records.push(record), close: async () => {} }
+
+      return { ...setup(undefined, frameRecords, undefined, biasExposureSeconds), records }
+    }
+
+    async function settle(test: ReturnType<typeof withMinimum>, seconds: number, frameType: FrameType) {
+      await test.controller.start(seconds, { saveFrames: true, frameType })
+      await vi.waitFor(() => expect(test.requests).toHaveLength(1))
+      test.requests[0]!.resolve(test.frame)
+      await vi.waitFor(() => expect(test.controller.active()).toBe(false))
+      const image = test.controller.snapshot().latestImage!
+
+      return { image, fits: (await test.savedImages.file('fra 400', image.id, 'fits'))! }
+    }
+
+    it('is the camera minimum for a bias, in the FITS, the image, the frame record and the integration', async () => {
+      const test = withMinimum(async () => 0.000032)
+      const { image, fits } = await settle(test, 0.1, 'bias')
+
+      expect(test.requests[0]).toMatchObject({ exposureSeconds: 0.1, frameType: 'bias' })
+      expect(exptime(fits)).toBe(0.000032)
+      expect(image.exposureSeconds).toBe(0.000032)
+      expect(test.controller.snapshot()).toMatchObject({ integrationSeconds: 0.000032, exposureSeconds: 0.1, elapsedSeconds: 0.1 })
+      expect(await test.savedImages.get('fra 400', image.id)).toMatchObject({ exposureSeconds: 0.000032 })
+      expect(test.records).toMatchObject([{ frameType: 'bias', exposureSeconds: 0.000032, outcome: 'saved' }])
+    })
+
+    it('is read again for every bias frame', async () => {
+      const minimums = [0.000032, 0.0001]
+      const test = withMinimum(async () => minimums.shift()!)
+      await test.controller.start(0.1, { repeat: true, frameCount: 2, frameType: 'bias' })
+      await vi.waitFor(() => expect(test.requests).toHaveLength(1))
+      test.requests[0]!.resolve(test.frame)
+      await vi.waitFor(() => expect(test.requests).toHaveLength(2))
+      test.requests[1]!.resolve(test.frame)
+      await vi.waitFor(() => expect(test.controller.active()).toBe(false))
+
+      expect(test.controller.snapshot().integrationSeconds).toBeCloseTo(0.000132, 9)
+      expect(test.records.map(record => record.exposureSeconds)).toEqual([0.000032, 0.0001])
+    })
+
+    it.each(['light', 'dark', 'flat', 'dark-flat'] as const)('stays the requested time for %s, even when the camera could say a minimum', async frameType => {
+      const minimum = vi.fn(async () => 0.000032)
+      const test = withMinimum(minimum)
+      const { image, fits } = await settle(test, 10, frameType)
+
+      expect(minimum).not.toHaveBeenCalled()
+      expect(exptime(fits)).toBe(10)
+      expect(image.exposureSeconds).toBe(10)
+      expect(test.controller.snapshot().integrationSeconds).toBe(10)
+      expect(test.records).toMatchObject([{ frameType, exposureSeconds: 10 }])
+    })
+
+    it('stays the requested time for a bias on a camera that is not told the frame type', async () => {
+      const test = withMinimum()
+      const { image, fits } = await settle(test, 0.1, 'bias')
+
+      expect(exptime(fits)).toBe(0.1)
+      expect(image.exposureSeconds).toBe(0.1)
+      expect(test.records).toMatchObject([{ frameType: 'bias', exposureSeconds: 0.1 }])
+    })
+
+    it.each([
+      ['cannot be read', () => Promise.reject(new Error('Cria has no fresh exposureMinimum')), 'could not be read'],
+      ['is zero', async () => 0, 'reported 0 s'],
+      ['is not a number', async () => Number.NaN, 'reported NaN s'],
+    ])('ends a bias run before any exposure when the minimum %s', async (_name, biasExposureSeconds, message) => {
+      const test = withMinimum(biasExposureSeconds)
+      await test.controller.start(0.1, { saveFrames: true, frameType: 'bias' })
+      await vi.waitFor(() => expect(test.controller.active()).toBe(false))
+
+      expect(test.requests).toHaveLength(0)
+      expect(test.records).toEqual([])
+      expect(test.controller.snapshot()).toMatchObject({
+        phase: 'failed',
+        completedCount: 0,
+        integrationSeconds: 0,
+        latestImage: null,
+        error: expect.stringContaining(message),
+      })
+    })
+
+    it('is a stop, not a failure, when Stop arrives while the minimum is being read', async () => {
+      const reading = deferred<number>()
+      const test = withMinimum(async () => reading.promise)
+      await test.controller.start(0.1, { frameType: 'bias' })
+      const stopping = test.controller.stop()
+      reading.reject(new Error('aborted'))
+      await stopping
+
+      expect(test.requests).toHaveLength(0)
+      expect(test.controller.snapshot()).toMatchObject({ phase: 'stopped', error: null })
+    })
   })
 
   it('returns to light for the next run and keeps the earlier frame as it was taken', async () => {

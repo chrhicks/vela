@@ -158,6 +158,23 @@ camera is not told: it exposes with the shutter open whatever the type. Against 
 that has not been updated, darks and dark flats still work, and a flat or bias run fails
 on its first frame.
 
+A Cria bias frame is exposed for the camera's own minimum, whatever time was requested
+(3.2e-5 s on the ASI2600MC Pro). The frame's exposure is that minimum, not the request.
+Before each bias exposure the adapter reads the camera's `exposureMinimum` from Cria's
+current state, the reading Cria uses for the same exposure, and the controller records it
+as the frame's exposure: the FITS `EXPTIME`, the image's `exposureSeconds`, the frame
+record's `exposureSeconds`, the `capture.frame` span's `capture.exposure.seconds` and the
+run's `integrationSeconds`. The requested time stays validated as before (0.1 to 600) and
+goes to the camera unchanged; it is also what the run view, the interrupted-run record, a
+resume and the frames-stalled alert use. The other frame types record the requested time.
+
+If the minimum cannot be read (no fresh reading, or not a positive number), the bias run
+ends `failed` before its first exposure with a message that says so, and nothing is
+exposed or recorded for that attempt. Vela does not fall back to the request: that would
+write an exposure the sensor never integrated into a file Chris may stack later. An Alpaca
+camera is not told the frame type, so its "bias" is a short exposure for the requested
+time; it records that time, because that is what the camera did.
+
 Cap the telescope or camera for dark, dark-flat and bias runs; Vela cannot see the cap.
 The ZWO cameras here have no shutter, so the cap is what makes the frame dark.
 

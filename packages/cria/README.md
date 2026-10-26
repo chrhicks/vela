@@ -45,6 +45,12 @@ refusal before any exposure. Update Cria on the rig to take them. The adapter ne
 retries a flat or bias as a light, so a calibration frame is never taken under the
 wrong type.
 
+Cria exposes a bias at the camera's minimum whatever time is requested, and its returned
+`Image.exposureSeconds` still echoes the request. `acquisition.biasExposureSeconds(cameraId)`
+gives the time the camera really used: the `exposureMinimum` reading in Cria's current
+state, read when called. It throws when that reading is not fresh, and never answers with
+the request.
+
 Capture downloads the confirmed original before returning its frame. An image 410
 is one lost frame and never starts another exposure. A Cria restart leaves an
 in-flight operation uncertain with a local hold; nothing is resubmitted.
