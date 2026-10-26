@@ -27,11 +27,16 @@ export interface CaptureProvenance {
   imageId: string | null
 }
 
+/** What an exposure is for. An adapter that cannot tell its camera ignores it. */
+export type CaptureFrameType = 'light' | 'dark' | 'flat' | 'dark-flat' | 'bias'
+
 export interface CaptureOptions {
   cameraId: string
   /** Confirm the operational camera name when a driver slot can host different hardware. */
   expectedCameraName?: string
   exposureSeconds: number
+  /** Defaults to `light`. */
+  frameType?: CaptureFrameType
   /** Reject color before starting when the consumer requires monochrome samples. */
   monochromeOnly?: boolean
   signal?: AbortSignal

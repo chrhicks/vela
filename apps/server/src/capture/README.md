@@ -149,6 +149,10 @@ The saved-image record gets `frameType`, and so does each frame record line and
 the `capture.frame` span. Vela writes the FITS itself from the pixels it fetched,
 so `IMAGETYP` is always right, whatever Cria's own file says.
 
+The run's type also reaches the camera. Through Cria, the adapter sets the camera's
+INDI frame type before each exposure (see `packages/cria/README.md`). An Alpaca
+camera is not told: it exposes with the shutter open whatever the type.
+
 Vela does not yet ask the camera for the type. Cria's capture command takes only
 `light` true or false, and Vela's equipment layer sends light every time. A camera
 with a shutter would therefore still open it for a dark. Cap the telescope or

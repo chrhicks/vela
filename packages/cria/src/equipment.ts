@@ -3,7 +3,7 @@ import type { Device, ParamsOf } from '@cria/wire'
 import {
   CaptureStoppedError, CaptureRetryableError, CaptureUncertainError, EquipmentError, FocuserStoppedError,
   FrameLostError, FramingStoppedError,
-  type Acquisition, type CameraCooling, type CameraCoolingObservation,
+  type Acquisition, type CameraCooling, type CaptureFrameType, type CameraCoolingObservation,
   type Focuser, type Framing, type TelescopeStatus,
 } from '@vela/equipment'
 import { imageBytesPixels } from '@vela/equipment/image-bytes'
@@ -21,6 +21,19 @@ export interface CriaEquipmentBinding {
   readonly kind: Device['kind']
   readonly expectedName: string
 }
+
+/**
+ * The capture parameters for each frame type. `light` is the shutter flag every Cria reads.
+ * `frameType` goes on the wire only for the two types `light` cannot say, because a Cria from
+ * before the field refuses a request that carries it. A dark flat is a dark at the flats' exposure.
+ */
+const criaFrame = {
+  light: { light: true },
+  dark: { light: false },
+  'dark-flat': { light: false },
+  flat: { light: true, frameType: 'flat' },
+  bias: { light: false, frameType: 'bias' },
+} as const satisfies Record<CaptureFrameType, Pick<ParamsOf<'capture'>, 'light' | 'frameType'>>
 
 function failure(message: string) {
   return new EquipmentError(message, { reason: 'protocol-error', endpoint: 'Cria' })
@@ -127,7 +140,7 @@ export function createCriaEquipment(connection: CriaConnection, bindings: Readon
       const timer = setInterval(report, 250)
 
       try {
-        let parameters: ParamsOf<'capture'> = { exposureSeconds: options.exposureSeconds, light: true }
+        let parameters: ParamsOf<'capture'> = { exposureSeconds: options.exposureSeconds, ...criaFrame[options.frameType ?? 'light'] }
 
         if (options.monochromeOnly !== undefined) parameters = { ...parameters, monochromeOnly: options.monochromeOnly }
         const result = await outcomeOf(remote.capture(options.cameraId, parameters, options.onProvenance), options.signal)

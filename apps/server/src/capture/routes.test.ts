@@ -5,10 +5,11 @@ import type {
   AlpacaDeviceInspection,
   AlpacaDeviceTelemetry,
 } from '@vela/alpaca'
+import type { Acquisition } from '@vela/equipment'
 import { createMemoryRigCatalog } from '../rig/catalog.js'
 import { createRigOperations } from '../rig/operations.js'
 import { CaptureStoppedError, type CaptureCamera, type CaptureFrame } from './controller.js'
-import { registerCapture, type CaptureSettings } from './routes.js'
+import { configuredCamera, registerCapture, type CaptureSettings } from './routes.js'
 import { registerNavigation } from '../navigation.js'
 import { createMemorySavedImageStore } from '../saved-images/store.js'
 import { emptyHaltRequests, refusedHaltRequests } from '../http/halt-requests.fixture.js'
@@ -828,6 +829,7 @@ it.each(['light', 'dark', 'flat', 'dark-flat', 'bias'] as const)(
     const started = await subject.start({ exposureSeconds: 10, saveFrames: true, frameType })
     expect(started.statusCode).toBe(200)
     expect(started.json()).toMatchObject({ frameType, subject: null })
+    expect(subject.captures[0]).toMatchObject({ frameType })
     subject.captures[0]!.resolve(frame)
     await vi.waitFor(() => expect(subject.operations.owner('sim')).toBeUndefined())
     const view = (await subject.get()).json()
@@ -841,6 +843,27 @@ it.each(['light', 'dark', 'flat', 'dark-flat', 'bias'] as const)(
 it('takes lights unless asked otherwise', async () => {
   const subject = setup()
   expect((await subject.start({ exposureSeconds: 10 })).json()).toMatchObject({ frameType: 'light' })
+  expect(subject.captures[0]).toMatchObject({ frameType: 'light' })
+})
+
+it.each(['light', 'dark', 'flat', 'dark-flat', 'bias'] as const)('hands the %s frame type to the acquisition', async frameType => {
+  const options: Parameters<Acquisition['capture']>[0][] = []
+
+  const acquisition: Pick<Acquisition, 'capture'> = {
+    capture: async request => {
+      options.push(request)
+
+      return { width: 2, height: 2, pixels: Float64Array.of(0, 100, 400, 1000), capturedAt: frame.capturedAt, color: { kind: 'mono' } }
+    },
+  }
+
+
+  await configuredCamera(
+    { rig: record, cameraId: 'camera', expectedCameraName: 'Main camera' },
+    acquisition,
+  ).capture({ exposureSeconds: 10, frameType, signal: new AbortController().signal, onProgress: () => {}, onReadState: () => {}, onProvenance: () => {} })
+
+  expect(options).toMatchObject([{ cameraId: 'camera', expectedCameraName: 'Main camera', exposureSeconds: 10, frameType }])
 })
 
 it('never lets a calibration run raise star alerts, yet still shows the camera is producing', async () => {

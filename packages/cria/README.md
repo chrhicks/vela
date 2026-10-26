@@ -36,6 +36,15 @@ recovery resolves it. Cancel is resent until a 2xx, 404, or 410, and Vela follow
 the actual ending. The remote operation has no Vela completion deadline while
 snapshots arrive. Cria owns settling, including the mount's bounded stop.
 
+A capture carries its frame type. Cria's `capture` takes `light` (the shutter is
+open) and, for a flat or bias, a `frameType` that Cria sets on the camera's INDI frame
+type. A dark flat goes as a dark. `frameType` is sent only for a flat or bias, because a
+Cria from before that field refuses a request that carries it. Against such a Cria
+lights, darks and dark flats work as before, and a flat or bias fails with Cria's
+refusal before any exposure. Update Cria on the rig to take them. The adapter never
+retries a flat or bias as a light, so a calibration frame is never taken under the
+wrong type.
+
 Capture downloads the confirmed original before returning its frame. An image 410
 is one lost frame and never starts another exposure. A Cria restart leaves an
 in-flight operation uncertain with a local hold; nothing is resubmitted.

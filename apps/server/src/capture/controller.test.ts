@@ -883,6 +883,7 @@ describe('frame types', () => {
     const records: FrameRecord[] = []
     const { controller, requests, frame, savedImages } = setup(undefined, { append: record => void records.push(record), close: async () => {} })
     expect(await controller.start(10, { saveFrames: true, frameType })).toMatchObject({ frameType, subject: null })
+    expect(requests[0]).toMatchObject({ frameType })
     requests[0]!.resolve(frame)
     await vi.waitFor(() => expect(controller.active()).toBe(false))
     const view = controller.snapshot()

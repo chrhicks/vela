@@ -12,6 +12,7 @@ export type { EquipmentErrorReason, EquipmentErrorOptions } from './error.js'
 
 export type {
   Acquisition,
+  CaptureFrameType,
   CaptureOptions,
   CaptureProvenance,
   Frame,
