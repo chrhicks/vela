@@ -443,3 +443,114 @@ test('a stalled Forget check permits dismissal without forgetting the unknown ou
   expect(deletes).toBe(1)
   expect(reads).toBe(3)
 })
+
+const holdReason = 'Blocked until a person recovers it: home on ZWO AM5: stop was not confirmed within 20s'
+
+function heldDetail(): RigDetailView {
+  const detail = liveDetail()
+
+  return {
+    ...detail,
+    devices: detail.devices.map(device => device.id === 'telescope-0'
+      ? {
+        ...device,
+        observation: {
+          state: 'current' as const,
+          observedAt: now,
+          commandReady: false,
+          message: holdReason,
+          hold: { deviceId: 'cria:rig-1:mount', reason: holdReason },
+        },
+      }
+      : device),
+  }
+}
+
+test.describe('clearing a device hold', () => {
+  const recoverUrl = '**/api/rigs/rig-1/devices/cria%3Arig-1%3Amount/recover'
+
+  test('offers Clear hold on the held device only, and sends nothing until it is confirmed', async ({ page }) => {
+    let recovers = 0
+    await page.route('**/api/web/rigs/rig-1', route => fulfillJson(route, heldDetail()))
+    await page.route(recoverUrl, async route => {
+      recovers++
+      await fulfillJson(route, { outcome: 'confirmed', found: 'Cria recovered ZWO AM5' })
+    })
+
+    await page.goto('/rigs/rig-1')
+    const held = page.getByRole('group', { name: 'Mount is held' })
+
+    await expect(held).toContainText(holdReason)
+    await expect(page.getByRole('button', { name: 'Clear hold' })).toHaveCount(1)
+    await expect(held.getByRole('button', { name: 'Clear hold' })).toBeVisible()
+
+    await held.getByRole('button', { name: 'Clear hold' }).click()
+    const dialog = page.getByRole('dialog', { name: 'Clear the hold on Mount?' })
+
+    await expect(dialog).toContainText(holdReason)
+    await expect(dialog).toContainText('Clearing the hold tells Cria it is safe to command Mount again. Only do this after you have checked the equipment.')
+    await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeFocused()
+
+    await dialog.getByRole('button', { name: 'Cancel' }).click()
+    await expect(dialog).toHaveCount(0)
+    expect(recovers).toBe(0)
+  })
+
+  test('clears once however often the button is pressed, then drops the hold', async ({ page }) => {
+    let recovers = 0
+    let cleared = false
+    let note = ''
+    await page.route('**/api/web/rigs/rig-1', route => fulfillJson(route, cleared ? liveDetail() : heldDetail()))
+    await page.route(recoverUrl, async route => {
+      recovers++
+      note = JSON.parse(route.request().postData() ?? '{}').note
+      await new Promise(resolve => setTimeout(resolve, 300))
+      cleared = true
+      await fulfillJson(route, { outcome: 'confirmed', found: 'Cria recovered ZWO AM5' })
+    })
+
+    await page.goto('/rigs/rig-1')
+    await page.getByRole('button', { name: 'Clear hold' }).click()
+    const dialog = page.getByRole('dialog', { name: 'Clear the hold on Mount?' })
+    const confirm = dialog.getByRole('button', { name: 'I have checked it, clear the hold' })
+
+    await confirm.dblclick()
+    await expect(dialog.getByRole('button', { name: 'Clearing the hold…' })).toBeDisabled()
+    await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeDisabled()
+
+    await expect(dialog).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Clear hold' })).toHaveCount(0)
+    await expect(page.getByRole('group', { name: 'Mount is held' })).toHaveCount(0)
+    expect(recovers).toBe(1)
+    expect(note).toMatch(/^Cleared from the Vela page by the operator at \d{4}-\d{2}-\d{2}T/)
+  })
+
+  test('says an operation is still running, and keeps the hold, when Cria is busy', async ({ page }) => {
+    await page.route('**/api/web/rigs/rig-1', route => fulfillJson(route, heldDetail()))
+    await page.route(recoverUrl, route => fulfillJson(route, { error: 'device-busy', reason: 'Cria: An operation is open' }, 409))
+
+    await page.goto('/rigs/rig-1')
+    await page.getByRole('button', { name: 'Clear hold' }).click()
+    const dialog = page.getByRole('dialog', { name: 'Clear the hold on Mount?' })
+
+    await dialog.getByRole('button', { name: 'I have checked it, clear the hold' }).click()
+    await expect(dialog.getByRole('alert')).toHaveText('An operation is still running on this device. Stop it first.')
+    await dialog.getByRole('button', { name: 'Cancel' }).click()
+    await expect(page.getByRole('group', { name: 'Mount is held' })).toContainText(holdReason)
+  })
+
+  test('shows the server message and keeps the hold when clearing fails', async ({ page }) => {
+    await page.route('**/api/web/rigs/rig-1', route => fulfillJson(route, heldDetail()))
+    await page.route(recoverUrl, route => fulfillJson(route, { error: 'recovery-failed', reason: 'This hold has changed. Check it again before you recover.' }, 409))
+
+    await page.goto('/rigs/rig-1')
+    await page.getByRole('button', { name: 'Clear hold' }).click()
+    const dialog = page.getByRole('dialog', { name: 'Clear the hold on Mount?' })
+
+    await dialog.getByRole('button', { name: 'I have checked it, clear the hold' }).click()
+    await expect(dialog.getByRole('alert')).toHaveText('This hold has changed. Check it again before you recover.')
+    await expect(dialog.getByRole('button', { name: 'I have checked it, clear the hold' })).toBeEnabled()
+    await dialog.getByRole('button', { name: 'Cancel' }).click()
+    await expect(page.getByRole('button', { name: 'Clear hold' })).toBeVisible()
+  })
+})

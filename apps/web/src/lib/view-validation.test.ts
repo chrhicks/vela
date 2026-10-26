@@ -89,6 +89,10 @@ describe('web View validation', () => {
     expect(isRigDetailView(retained)).toBe(true)
     expect(isRigDetailView({ ...retained, connections: view.connections })).toBe(false)
 
+    const held = { ...observation, state: 'current', commandReady: false, hold: { deviceId: 'mount', reason: 'Check it' } }
+
+    expect(isRigDetailView({ ...view, devices: [{ ...view.devices[0], observation: held }, view.devices[1]] })).toBe(true)
+
     for (const invalid of [
       null,
       { ...observation, state: 'fresh' },
@@ -96,6 +100,7 @@ describe('web View validation', () => {
       { ...observation, commandReady: undefined },
       { ...observation, commandReady: 'false' },
       { ...observation, message: 42 },
+      { ...observation, hold: { deviceId: 'mount' } },
     ]) {
       expect(isRigDetailView({
         ...retained,
