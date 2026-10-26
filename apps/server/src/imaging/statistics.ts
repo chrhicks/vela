@@ -59,6 +59,8 @@ export interface StarPolicy {
   annulusInner: number
   outerFluxFraction: number
   elongation: number
+  /** Stars below this flux signal-to-noise are not judged on shape: the elongation gate lets them pass. */
+  elongationMinSnr: number
   minHfrMono: number
   minHfrBayer: number
   mergeBlends: boolean
@@ -69,21 +71,24 @@ export interface StarPolicy {
 /**
  * Stamped on every measurement so records from different revisions stay apart.
  * 1: unstamped records, with a Bayer capture HFR floor of 1.4 px. 2: that floor is 1.0 px.
+ * 3: the elongation gate judges only capture stars with a flux signal-to-noise of `elongationMinSnr` or
+ * more; fainter stars count with unknown shape.
  * The named outputs (detections, strong, rejected, sky, noise) are additive and leave the value of
  * every older field as it was, so they did not bump it.
  */
-const starAlgorithmVersion = 2
+const starAlgorithmVersion = 3
 
 /** A measured star with at least this flux signal-to-noise is strong. */
 const strongSnr = 100
 
 /**
- * A capture star with at least this flux signal-to-noise gets an axis ratio. Chosen when the moments
- * used a hard aperture, whose noise made a round star at S/N 30 to 60 read 1.5 on average. Windowed
- * moments on synthetic stars are steadier: 90% of readings at S/N 35 lie within 0.13 of the median.
- * Lowering it is a bench question.
+ * A capture star with at least this flux signal-to-noise has its shape judged: it gets an axis ratio
+ * and the elongation gate can reject it. Chosen when the moments used a hard aperture, whose noise
+ * made a round star at S/N 30 to 60 read 1.5 on average and 50% of the stars there fail the gate on
+ * a sharp frame. Windowed moments on synthetic stars are steadier: 90% of readings at S/N 35 lie
+ * within 0.13 of the median. Lowering it is a bench question.
  */
-const axisRatioMinSnr = 200
+const elongationMinSnr = 200
 
 /**
  * The frame's axis ratio is recorded only from at least this many stars. On the 717 recorded
@@ -104,10 +109,11 @@ export const capturePolicy: StarPolicy = {
   annulusInner: 13,
   outerFluxFraction: 0.04,
   elongation: 0.65,
+  elongationMinSnr,
   minHfrMono: 0.9,
   minHfrBayer: 1.0,
   mergeBlends: false,
-  axisRatioMinSnr,
+  axisRatioMinSnr: elongationMinSnr,
 }
 
 export const autofocusPolicy: StarPolicy = {
@@ -121,6 +127,7 @@ export const autofocusPolicy: StarPolicy = {
   annulusInner: 41,
   outerFluxFraction: 0.4,
   elongation: 0.9,
+  elongationMinSnr: 0,
   minHfrMono: 0.5,
   minHfrBayer: 0.8,
   mergeBlends: true,
@@ -365,7 +372,10 @@ export function axisRatioOf(measurement: Measurement, policy: StarPolicy) {
   return signalToNoise(measurement, policy) >= policy.axisRatioMinSnr ? measurement.axisRatio() : null
 }
 
-/** The first gate the measurement fails, or the star's HFR when it passes them all. */
+/**
+ * The first gate the measurement fails, or the star's HFR when it passes them all. The elongation
+ * gate applies only from `elongationMinSnr`: the moments of a fainter star are mostly noise.
+ */
 export function classify(
   measurement: Measurement,
   policy: StarPolicy,
@@ -377,7 +387,11 @@ export function classify(
 
   if (early !== null) return { ok: false, reason: early }
 
-  if (!(trace > 0) || separation > trace * policy.elongation) return { ok: false, reason: 'elongated' }
+  if (
+    signalToNoise(measurement, policy) >= policy.elongationMinSnr &&
+    (!(trace > 0) || separation > trace * policy.elongation)
+  )
+    return { ok: false, reason: 'elongated' }
 
   const hfr = halfFluxRadius()
 

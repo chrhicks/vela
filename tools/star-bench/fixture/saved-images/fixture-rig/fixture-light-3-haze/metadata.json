@@ -18,7 +18,7 @@
   "color": "color",
   "statistics": {
     "algorithm": {
-      "version": 2
+      "version": 3
     },
     "detectedStars": 6,
     "medianHfrPixels": 2.7490969769646596,
@@ -36,6 +36,7 @@
       "floor": 0
     },
     "sky": 1000.5,
-    "noise": 5.837737499999999
+    "noise": 5.837737499999999,
+    "axisRatio": null
   }
 }

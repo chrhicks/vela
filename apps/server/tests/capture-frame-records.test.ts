@@ -143,7 +143,7 @@ describe('one frame record for every capture attempt', () => {
           height: 3,
         },
         statistics: {
-          algorithm: { version: 2 },
+          algorithm: { version: 3 },
           detectedStars: expect.any(Number),
           medianHfrPixels: expect.toBeOneOf([null, expect.any(Number)]),
           detections: expect.any(Number),
