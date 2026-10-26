@@ -353,3 +353,133 @@ test('unknown alignment Stop waits for a terminal observation before another com
   await expect(page.getByText(/The command was not repeated/)).toHaveCount(0)
   expect(writes).toBe(1)
 })
+
+for (const width of [1100, 390]) {
+  test(`good-enough note follows the live total and never gates the controls at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 1100 })
+
+    const measurementAt = (totalArcsec: number): NonNullable<AlignmentView['measurement']> => ({
+      capturedAtSource: 'server-estimate',
+      altitudeArcsec: 9,
+      azimuthArcsec: 11,
+      totalArcsec,
+      solvedAt: '2026-09-21T01:00:30Z',
+      imageUrl: '/api/alignment-fixture.png',
+      fitImageUrl: '/api/alignment-fixture.png',
+      frameId: '/api/alignment-fixture.png',
+      fitImageScale: 1,
+      imageWidth: 640,
+      imageHeight: 400,
+      targetX: 310,
+      targetY: 190,
+      fieldHeightDegrees: 1,
+    })
+
+    const view: AlignmentView = {
+      mode: 'physical',
+      cameraName: 'ASI2600MC Pro',
+      rigId: 'rig-1',
+      rigName: 'Askar FRA 400',
+      enabled: true,
+      unavailableReason: null,
+      phase: 'setup',
+      activity: 'idle',
+      active: false,
+      position: 0,
+      solvedPositions: 0,
+      exposureSeconds: 3,
+      exposureStartedAt: null,
+      measuredAt: null,
+      warning: null,
+      error: null,
+      measurement: null,
+    }
+
+    await page.route('**/api/web/rigs/rig-1/alignment', route => route.fulfill({ json: view }))
+    await page.route('**/api/alignment-fixture.png', route =>
+      route.fulfill({
+        contentType: 'image/svg+xml',
+        body: '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400"><rect width="640" height="400" fill="#090e18"/></svg>',
+      }),
+    )
+
+    const note = page.locator('.vela-polar-good-enough')
+    const directions = page.locator('.vela-polar-directions strong')
+    const finish = page.getByRole('button', { name: 'Finish alignment' })
+
+    await page.goto('/rigs/rig-1/observe/alignment')
+    await expect(page.getByText('Find your starting alignment')).toBeVisible()
+    await expect(note).toHaveCount(0)
+
+    Object.assign(view, { phase: 'baseline', active: true, activity: 'exposing', position: 1 })
+    await expect(page.getByText('Measuring your alignment')).toBeVisible()
+    await expect(note).toHaveCount(0)
+
+    Object.assign(view, {
+      phase: 'adjusting',
+      activity: 'waiting',
+      solvedPositions: 3,
+      measuredAt: new Date().toISOString(),
+      measurement: measurementAt(119),
+    })
+    await expect(note).toContainText('Good enough')
+    await expect(note).toContainText('Drift is about 1.6 arcseconds over a 3 minute exposure.')
+    await expect(note).toContainText('You can stop here, or keep refining.')
+    await expect(directions.first()).toContainText('Move left')
+    await expect(directions.last()).toContainText('Move down')
+    await expect(finish).toBeEnabled()
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+
+    const bounds = await page.evaluate(() => {
+      const top = (selector: string) => document.querySelector(selector)!.getBoundingClientRect()
+
+      return {
+        total: top('.vela-polar-total'),
+        note: top('.vela-polar-good-enough'),
+        directions: top('.vela-polar-directions'),
+      }
+    })
+
+    expect(bounds.total.bottom).toBeLessThanOrEqual(bounds.note.top)
+    expect(bounds.note.bottom).toBeLessThanOrEqual(bounds.directions.top)
+
+    await page.screenshot({ path: `/tmp/alignment-good-enough-${width}.png`, fullPage: true })
+
+    Object.assign(view, { measurement: measurementAt(60) })
+    await expect(note).toContainText('Drift is about 0.8 arcseconds')
+
+    Object.assign(view, { measurement: measurementAt(120) })
+    await expect(page.locator('.vela-polar-total strong')).toHaveText('2′ 0″')
+    await expect(note).toHaveCount(0)
+    await expect(directions.first()).toContainText('Move left')
+    await expect(finish).toBeEnabled()
+
+    Object.assign(view, { measurement: measurementAt(300) })
+    await expect(page.locator('.vela-polar-total strong')).toHaveText('5′ 0″')
+    await expect(note).toHaveCount(0)
+
+    Object.assign(view, { measurement: measurementAt(90) })
+    await expect(note).toContainText('Drift is about 1.2 arcseconds')
+
+    Object.assign(view, {
+      activity: 'retrying',
+      warning: 'Device connection interrupted. Retrying automatically.',
+    })
+    await expect(directions.first()).toContainText('Last:')
+    await expect(note).toHaveCount(0)
+
+    Object.assign(view, { activity: 'waiting', warning: null })
+    await expect(note).toContainText('Good enough')
+
+    Object.assign(view, { active: false, phase: 'stopped', activity: 'idle' })
+    await expect(page.getByRole('button', { name: 'Measure again' })).toBeVisible()
+    await expect(directions.first()).toContainText('Last:')
+    await expect(note).toHaveCount(0)
+
+    Object.assign(view, { phase: 'finished' })
+    await expect(page.getByText('Alignment ended by you')).toBeVisible()
+    await expect(note).toHaveCount(0)
+  })
+}

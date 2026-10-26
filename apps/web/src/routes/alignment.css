@@ -90,6 +90,26 @@
   font: 400 46px/56px var(--vela-font-heading);
   letter-spacing: -2px;
 }
+.vela-polar-good-enough {
+  grid-column: 2;
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-left: 3px solid var(--vela-positive);
+  border-radius: 6px;
+  background: var(--vela-accent-surface);
+}
+.vela-polar-good-enough strong {
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+}
+.vela-polar-good-enough p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--vela-text-muted);
+}
 .vela-polar-directions {
   grid-column: 2;
   display: grid;
@@ -138,7 +158,7 @@
 }
 .vela-polar-image {
   grid-column: 1;
-  grid-row: 1 / 6;
+  grid-row: 1 / 7;
   margin: 0;
   min-width: 0;
 }
@@ -471,6 +491,9 @@
   font-size: 11vw;
   line-height: 1.1;
   letter-spacing: -0.04em;
+}
+  .vela-polar-good-enough {
+  order: -3;
 }
   .vela-polar-directions {
   order: -2;
