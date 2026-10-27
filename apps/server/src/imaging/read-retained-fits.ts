@@ -27,6 +27,17 @@ export async function readRetainedFits(bytes: Buffer): Promise<PreviewFrame> {
     'BAYERPAT',
     'BZERO',
     'BSCALE',
+    'GAIN',
+    'OFFSET',
+    'XBINNING',
+    'YBINNING',
+    'XPIXSZ',
+    'YPIXSZ',
+    'CCD-TEMP',
+    'SET-TEMP',
+    'FOCALLEN',
+    'OBJECT',
+    'PIERSIDE',
   ])
 
   let headerEnd = 0

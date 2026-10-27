@@ -16,6 +16,45 @@ samples. Both validation and writing yield between batches, and header/data
 padding remains FITS-compliant. Exposure time, UTC start and its provenance,
 camera, `ROWORDER=TOP-DOWN` and origin-adjusted Bayer pattern are preserved.
 
+### Settings in the header
+
+A captured original also records what the frame was taken with, because stacking and
+calibration software matches darks, flats and bias frames to lights by gain, offset,
+temperature, binning, exposure and filter. Each key below is written only when its value
+was read for that frame. A value that could not be read is left out. Nothing is defaulted
+or carried over from an earlier frame.
+
+| Key | Value | Source |
+|---|---|---|
+| `GAIN`, `OFFSET` | Camera gain and offset | Camera reading |
+| `XBINNING`, `YBINNING` | Binning on each axis | Camera reading |
+| `XPIXSZ`, `YPIXSZ` | Pixel size in micrometres, after binning | Camera reading, scaled by the binning |
+| `CCD-TEMP` | Measured sensor temperature in °C | Camera reading |
+| `SET-TEMP` | Cooler setpoint in °C | The last setpoint the camera driver acknowledged |
+| `FOCALLEN` | Effective focal length in mm | The rig's configured value |
+| `OBJECT` | The subject's name | The run's subject. Light frames only; a dark, flat, dark flat or bias has none |
+| `PIERSIDE` | `EAST` or `WEST` | Mount reading. Tells a meridian flip, which turns the image 180 degrees |
+
+Which keys are omitted, by rig:
+
+| Rig | Omitted keys |
+|---|---|
+| Cria | `SET-TEMP` until a setpoint has been sent, `PIERSIDE` when the rig has not reported exactly one telescope or the mount reports no side, and any camera key whose reading is not fresh. If the camera cannot be read at all, every camera key and `PIERSIDE` |
+| Alpaca | `GAIN`, `OFFSET`, `XBINNING`, `YBINNING`, `XPIXSZ`, `YPIXSZ`, `CCD-TEMP`, `SET-TEMP`, `PIERSIDE`. Its adapter does not read them |
+| Either, no focal length configured | `FOCALLEN` |
+
+`FILTER` and `TELESCOP` are not written. Cria does not know the filter, and the rig record
+has no scope name. A read that fails or takes longer than two seconds costs the frame its
+settings keys and nothing else: the frame is still saved. The frame record does not note
+which keys were left out; the server logs a warning when a read fails.
+
+The site and the mount's pointing are never written: no `SITELAT`, `SITELONG`, `LAT`,
+`LONG`, `ELEVATION` or similar, and no right ascension or declination. Chris shares these
+files. A test fails if a key outside the lists above is ever written.
+
+`SET-TEMP` is the last setpoint Cria sent that the driver acknowledged, since INDI does not
+report the target back. After a Cria restart it is absent until a new setpoint is sent.
+
 Already-retained FITS originals are immutable and are not rewritten. Future
 retained-preview readers must support both Vela encodings above and apply the
 unsigned offset exactly once; preview treatment must not alter original samples.
@@ -125,7 +164,7 @@ inputs remain independent. Rendering and compression retain cooperative yields.
 
 `read-retained-fits.ts` is a bounded reader for Vela's exact original encodings:
 signed `BITPIX=32` without scaling, or `BITPIX=16` with `BZERO=32768` and `BSCALE=1`.
-It applies that unsigned offset once, preserves row order and the declared Bayer
+It accepts the settings keys above and ignores their values. It applies that unsigned offset once, preserves row order and the declared Bayer
 origin, and checks header shape, allowed cards, dimensions, exact payload/padding
 and a 30-million-sample bound. It rejects other encodings rather than approximating
 them. It is not a universal FITS import library. Saved-image refresh owns file

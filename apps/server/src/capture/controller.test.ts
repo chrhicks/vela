@@ -38,6 +38,7 @@ function setup(
   frameRecords?: FrameRecords,
   runs?: CaptureRunStore,
   biasExposureSeconds?: CaptureCamera['biasExposureSeconds'],
+  frameSettings?: CaptureCamera['frameSettings'],
 ) {
   const requests: Array<
     Parameters<CaptureCamera['capture']>[0] & ReturnType<typeof deferred<CaptureFrame>>
@@ -51,6 +52,7 @@ function setup(
       return result.promise
     },
     ...(biasExposureSeconds && { biasExposureSeconds }),
+    ...(frameSettings && { frameSettings }),
   }
 
   const actual = createCaptureController(
@@ -1028,6 +1030,129 @@ describe('frame types', () => {
     requests[1]!.resolve(frame)
     await vi.waitFor(() => expect(controller.active()).toBe(false))
     expect(controller.snapshot().latestImage!.frameType).toBe('light')
+  })
+})
+
+describe('the settings written into the FITS header', () => {
+  const subject = { targetId: 'm31', name: 'Andromeda Galaxy', catalog: 'M 31' }
+
+  const headerOf = (fits: Buffer) =>
+    Object.fromEntries(
+      fits
+        .toString('ascii', 0, 2880)
+        .match(/.{80}/g)!
+        .filter(card => card[8] === '=')
+        .map(card => [card.slice(0, 8).trim(), card.slice(10).trim()]),
+    )
+
+  async function take(
+    frameSettings: CaptureCamera['frameSettings'] | undefined,
+    options: CaptureRunOptions = {},
+  ) {
+    const test = setup(undefined, undefined, undefined, undefined, frameSettings)
+    await test.controller.start(10, { saveFrames: true, ...options })
+    await vi.waitFor(() => expect(test.requests).toHaveLength(1))
+    test.requests[0]!.resolve(test.frame)
+    await vi.waitFor(() => expect(test.controller.active()).toBe(false))
+    const image = test.controller.snapshot().latestImage!
+
+    return { ...test, image, header: headerOf((await test.savedImages.file('fra 400', image.id, 'fits'))!) }
+  }
+
+  it('carries what the camera reported, the rig focal length and the subject on a light frame', async () => {
+    const { header, image } = await take(async () => ({ gain: 100, offset: 10, binX: 1, sensorTemperatureC: -10, pierSide: 'east' }), {
+      subject,
+      focalLengthMm: 400,
+    })
+
+    expect(image.saved).toBe(true)
+
+    expect(header).toMatchObject({
+      GAIN: '100',
+      OFFSET: '10',
+      XBINNING: '1',
+      'CCD-TEMP': '-10',
+      PIERSIDE: "'EAST'",
+      FOCALLEN: '400',
+      OBJECT: "'Andromeda Galaxy'",
+    })
+  })
+
+  it('reads the settings for each frame, not once for the run', async () => {
+    const gains = [100, 250]
+    const test = setup(undefined, undefined, undefined, undefined, async () => ({ gain: gains.shift()! }))
+    await test.controller.start(10, { repeat: true, frameCount: 2, saveFrames: true })
+    await vi.waitFor(() => expect(test.requests).toHaveLength(1))
+    test.requests[0]!.resolve(test.frame)
+    await vi.waitFor(() => expect(test.requests).toHaveLength(2))
+    test.requests[1]!.resolve(test.frame)
+    await vi.waitFor(() => expect(test.controller.active()).toBe(false))
+
+    const saved = await test.savedImages.list('fra 400')
+
+    const gain = await Promise.all(
+      saved.map(async image => headerOf((await test.savedImages.file('fra 400', image.id, 'fits'))!).GAIN),
+    )
+
+    expect(gain.sort()).toEqual(['100', '250'])
+  })
+
+  it('names no subject on a calibration frame', async () => {
+    const { header } = await take(async () => ({ gain: 100 }), { frameType: 'dark' })
+
+    expect(header).toMatchObject({ IMAGETYP: "'DARK'", GAIN: '100' })
+    expect(header).not.toHaveProperty('OBJECT')
+  })
+
+  it('saves the frame with the settings left out when the camera cannot be read', async () => {
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const records: FrameRecord[] = []
+    const frameRecords = { append: (record: FrameRecord) => void records.push(record), close: async () => {} }
+    const test = setup(undefined, frameRecords, undefined, undefined, () => Promise.reject(new Error('Cria has no fresh gain')))
+    await test.controller.start(10, { saveFrames: true, subject, focalLengthMm: 400 })
+    await vi.waitFor(() => expect(test.requests).toHaveLength(1))
+    test.requests[0]!.resolve(test.frame)
+    await vi.waitFor(() => expect(test.controller.active()).toBe(false))
+    const image = test.controller.snapshot().latestImage!
+    const header = headerOf((await test.savedImages.file('fra 400', image.id, 'fits'))!)
+
+    expect(test.controller.snapshot()).toMatchObject({ phase: 'complete', error: null, completedCount: 1, savedCount: 1 })
+    expect(records).toMatchObject([{ outcome: 'saved' }])
+    expect(header).toMatchObject({ FOCALLEN: '400', OBJECT: "'Andromeda Galaxy'" })
+    expect(header).not.toHaveProperty('GAIN')
+    expect(warning).toHaveBeenCalledWith(expect.stringContaining('Frame settings unavailable'), expect.any(Error))
+    warning.mockRestore()
+  })
+
+  it('saves the frame without waiting past the limit for a read that hangs', async () => {
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+
+    try {
+      const test = setup(undefined, undefined, undefined, undefined, signal =>
+        new Promise((_resolve, reject) => signal.addEventListener('abort', () => reject(new Error('read timed out')))),
+      )
+
+      await test.controller.start(10, { saveFrames: true })
+      await vi.waitFor(() => expect(test.requests).toHaveLength(1))
+      test.requests[0]!.resolve(test.frame)
+      await vi.advanceTimersByTimeAsync(1999)
+      expect(test.controller.snapshot().completedCount).toBe(0)
+      await vi.advanceTimersByTimeAsync(1)
+      await vi.waitFor(() => expect(test.controller.active()).toBe(false))
+
+      expect(test.controller.snapshot()).toMatchObject({ phase: 'complete', savedCount: 1, error: null })
+    } finally {
+      vi.useRealTimers()
+      warning.mockRestore()
+    }
+  })
+
+  it('writes the rig focal length and subject for a camera that cannot read settings', async () => {
+    const { header } = await take(undefined, { subject, focalLengthMm: 400 })
+
+    expect(header).toMatchObject({ FOCALLEN: '400', OBJECT: "'Andromeda Galaxy'" })
+    expect(header).not.toHaveProperty('GAIN')
   })
 })
 

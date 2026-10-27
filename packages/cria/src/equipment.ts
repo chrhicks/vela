@@ -4,7 +4,7 @@ import {
   CaptureStoppedError, CaptureRetryableError, CaptureUncertainError, EquipmentError, FocuserStoppedError,
   FrameLostError, FramingStoppedError,
   type Acquisition, type CameraCooling, type CaptureFrameType, type CameraCoolingObservation,
-  type Focuser, type Framing, type TelescopeStatus,
+  type ExposureSettings, type Focuser, type Framing, type TelescopeStatus,
 } from '@vela/equipment'
 import { imageBytesPixels } from '@vela/equipment/image-bytes'
 import { outcomeOf, type CriaConnection } from './connection.js'
@@ -54,7 +54,7 @@ export function createCriaEquipment(connection: CriaConnection, bindings: Readon
     return selected
   }
 
-  async function observed(id: string, kind: Device['kind'], signal?: AbortSignal) {
+  async function observed(id: string, kind: Device['kind'], signal?: AbortSignal, waitForRefresh = true) {
     const selected = binding(id, kind)
 
     for (;;) {
@@ -71,7 +71,7 @@ export function createCriaEquipment(connection: CriaConnection, bindings: Readon
 
       if (hold) throw failure(hold.reason)
 
-      if (!device.availability.ready && device.availability.reason === 'refreshing') {
+      if (waitForRefresh && !device.availability.ready && device.availability.reason === 'refreshing') {
         await Effect.runPromise(Effect.sleep('100 millis'), signal ? { signal } : undefined)
         continue
       }
@@ -105,6 +105,17 @@ export function createCriaEquipment(connection: CriaConnection, bindings: Readon
       case 'stopped': throw new FramingStoppedError()
       case 'failed':
       case 'uncertain': throw failure(result.message)
+    }
+  }
+
+  /** A mount that cannot be read leaves out its pier side and never costs the camera's settings. */
+  async function mountPierSide(id: string, signal?: AbortSignal) {
+    try {
+      const side = (await observed(id, 'mount', signal, false)).pierSide()
+
+      return side === 'east' || side === 'west' ? side : undefined
+    } catch {
+      return undefined
     }
   }
 
@@ -174,6 +185,15 @@ export function createCriaEquipment(connection: CriaConnection, bindings: Readon
     },
     async biasExposureSeconds(id, signal) {
       return (await observed(id, 'camera', signal)).number('exposureMinimum')
+    },
+    async exposureSettings({ cameraId, telescopeId }, signal) {
+      const settings = cameraSettings(await observed(cameraId, 'camera', signal, false))
+
+      const pierSide = telescopeId === undefined ? undefined : await mountPierSide(telescopeId, signal)
+
+      if (pierSide) settings.pierSide = pierSide
+
+      return settings
     },
     async pointing(id, signal) {
       const readings = await observed(id, 'mount', signal)
@@ -408,6 +428,40 @@ export function createCriaEquipment(connection: CriaConnection, bindings: Readon
     },
   }
 }
+
+/** Camera settings that are read fresh; a pixel size needs the binning that scales it. */
+function cameraSettings(r: DeviceReadings): ExposureSettings {
+  const settings: ExposureSettings = {}
+  const gain = r.optionalNumber('gain')
+  const offset = r.optionalNumber('offset')
+  const binX = r.optionalInteger('binX')
+  const binY = r.optionalInteger('binY')
+  const pixelWidth = r.optionalNumber('pixelWidthMicrons')
+  const pixelHeight = r.optionalNumber('pixelHeightMicrons')
+  const temperature = r.optionalNumber('temperatureC')
+  const setpoint = r.device.kind === 'camera' ? r.device.lastCommandedSetpointC?.value : undefined
+
+  if (gain !== undefined) settings.gain = gain
+
+  if (offset !== undefined) settings.offset = offset
+
+  if (binX !== undefined) settings.binX = binX
+
+  if (binY !== undefined) settings.binY = binY
+
+  if (binX !== undefined && pixelWidth !== undefined) settings.pixelWidthMicrons = micrometres(pixelWidth * binX)
+
+  if (binY !== undefined && pixelHeight !== undefined) settings.pixelHeightMicrons = micrometres(pixelHeight * binY)
+
+  if (temperature !== undefined) settings.sensorTemperatureC = temperature
+
+  if (setpoint !== undefined) settings.setpointC = setpoint
+
+  return settings
+}
+
+/** Drops the float noise a binning multiple adds, such as 3.76 x 3 = 11.280000000000001. */
+const micrometres = (value: number) => Math.round(value * 1e6) / 1e6
 
 function coolingObservation(r: DeviceReadings): CameraCoolingObservation | undefined {
   const on = r.optionalBoolean('coolerOn')

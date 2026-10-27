@@ -61,11 +61,23 @@ const MAX_FRAME_COUNT = 10_000
 
 export function configuredCamera(
   settings: CaptureSettings,
-  acquisition: Pick<Acquisition, 'capture' | 'biasExposureSeconds'>,
+  acquisition: Pick<Acquisition, 'capture' | 'biasExposureSeconds' | 'exposureSettings'>,
 ): CaptureCamera {
+  const telescopes = settings.rig.lastObservedInventory.devices.filter(device => device.kind === 'telescope')
+  const telescopeId = telescopes.length === 1 ? telescopes[0]!.uniqueId : undefined
+
   return {
     ...(acquisition.biasExposureSeconds && {
       biasExposureSeconds: signal => acquisition.biasExposureSeconds!(settings.cameraId, signal),
+    }),
+    ...(acquisition.exposureSettings && {
+      frameSettings: signal =>
+        acquisition.exposureSettings!(
+          telescopeId === undefined
+            ? { cameraId: settings.cameraId }
+            : { cameraId: settings.cameraId, telescopeId },
+          signal,
+        ),
     }),
     async capture({ exposureSeconds, frameType, signal, onProgress, onReadState, onProvenance }) {
       try {
@@ -401,6 +413,7 @@ export function registerCapture(
       const result = await controller
         .start(run.exposureSeconds, camera, view.camera.name, {
           subject: run.subject,
+          focalLengthMm: settings.rig.focalLengthMm,
           // A calibration frame has no stars to judge, but still shows the camera is producing.
           onFrame: image => watch?.frameCaptured(light ? image : { capturedAt: image.capturedAt, statistics: null }),
           onSettled() {

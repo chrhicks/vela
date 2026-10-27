@@ -318,6 +318,101 @@ describe('protocol 5 Promise capabilities', () => {
       })
     })
 
+    describe('the settings a frame was taken with', () => {
+      type Camera = Extract<Device, { kind: 'camera' }>
+
+      const fresh = (value: number) => ({ status: 'fresh', value, observedAt: Date.now() }) as const
+      const unsupported = { status: 'unavailable', reason: 'unsupported' } as const
+      const ids = { cameraId: 'camera', telescopeId: 'mount' }
+
+      async function viewed(camera: Partial<Camera['readings']> = {}, lastCommandedSetpointC: Camera['lastCommandedSetpointC'] = null) {
+        cria.deviceView = device => device.kind === 'camera'
+          ? { ...device, readings: { ...device.readings, ...camera }, lastCommandedSetpointC }
+          : device
+        await vi.advanceTimersByTimeAsync(1000)
+      }
+
+      it('reads the camera and the mount pier side as Cria publishes them now', async () => {
+        await viewed({}, { value: -10, commandedAt: Date.now() })
+
+        expect(await equipment.acquisition.exposureSettings!(ids)).toEqual({
+          gain: 100,
+          offset: 10,
+          binX: 1,
+          binY: 1,
+          pixelWidthMicrons: 3.76,
+          pixelHeightMicrons: 3.76,
+          sensorTemperatureC: -10,
+          setpointC: -10,
+          pierSide: 'east',
+        })
+
+        await viewed({ gain: fresh(250), temperatureC: fresh(-9.5) })
+
+        expect(await equipment.acquisition.exposureSettings!(ids)).toMatchObject({ gain: 250, sensorTemperatureC: -9.5 })
+      })
+
+      it('scales the pixel size by the binning without float noise', async () => {
+        await viewed({ binX: fresh(3), binY: fresh(2) })
+
+        expect(await equipment.acquisition.exposureSettings!(ids)).toMatchObject({
+          binX: 3,
+          binY: 2,
+          pixelWidthMicrons: 11.28,
+          pixelHeightMicrons: 7.52,
+        })
+      })
+
+      it('omits the setpoint when Cria has none, and what the camera does not support', async () => {
+        await viewed({ gain: unsupported, offset: unsupported })
+
+        const settings = await equipment.acquisition.exposureSettings!(ids)
+
+        expect(settings).toMatchObject({ binX: 1, sensorTemperatureC: -10 })
+        expect(settings).not.toHaveProperty('gain')
+        expect(settings).not.toHaveProperty('offset')
+        expect(settings).not.toHaveProperty('setpointC')
+      })
+
+      it('omits a pixel size it cannot scale, rather than assuming no binning', async () => {
+        await viewed({ binX: unsupported })
+
+        const settings = await equipment.acquisition.exposureSettings!(ids)
+
+        expect(settings).not.toHaveProperty('binX')
+        expect(settings).not.toHaveProperty('pixelWidthMicrons')
+        expect(settings).toMatchObject({ binY: 1, pixelHeightMicrons: 3.76 })
+      })
+
+      it.each([
+        ['unknown', { status: 'fresh', value: 'unknown', observedAt: Date.now() }],
+        ['unsupported', unsupported],
+      ] as const)('has no pier side when the mount reports it %s', async (_name, pierSide) => {
+        cria.deviceView = device => device.kind === 'mount' ? { ...device, readings: { ...device.readings, pierSide } } : device
+        await vi.advanceTimersByTimeAsync(1000)
+
+        expect(await equipment.acquisition.exposureSettings!(ids)).not.toHaveProperty('pierSide')
+      })
+
+      it('keeps the camera settings when the mount cannot be read, and reads no mount without a telescope', async () => {
+        expect(await equipment.acquisition.exposureSettings!({ cameraId: 'camera', telescopeId: 'unbound' })).toMatchObject({ gain: 100 })
+        expect(await equipment.acquisition.exposureSettings!({ cameraId: 'camera' })).not.toHaveProperty('pierSide')
+      })
+
+      it('answers while Cria is still reading the device again after an exposure, instead of waiting for it', async () => {
+        cria.deviceView = device => device.kind === 'camera'
+          ? { ...device, availability: { ready: false, reason: 'refreshing', message: 'Reading again' } }
+          : device
+        await vi.advanceTimersByTimeAsync(1000)
+
+        expect(await equipment.acquisition.exposureSettings!(ids)).toMatchObject({ gain: 100, binX: 1 })
+      })
+
+      it('is refused when the camera cannot be read', async () => {
+        await expect(equipment.acquisition.exposureSettings!({ cameraId: 'unbound' })).rejects.toThrow('does not match')
+      })
+    })
+
     describe('against a Cria from before the frame type', () => {
       beforeEach(() => {
         cria.acceptsFrameType = false

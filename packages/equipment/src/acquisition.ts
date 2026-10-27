@@ -59,6 +59,25 @@ export interface Pointing {
   coordinateSystem: Exclude<CoordinateSystem, 'unknown'>
 }
 
+/**
+ * What the camera and mount were set to for an exposure, as read when asked. A member is present
+ * only when its reading was fresh; an unread value is absent, never defaulted.
+ */
+export interface ExposureSettings {
+  gain?: number
+  offset?: number
+  binX?: number
+  binY?: number
+  /** Effective pixel size in micrometres, after binning. */
+  pixelWidthMicrons?: number
+  pixelHeightMicrons?: number
+  sensorTemperatureC?: number
+  /** The cooler setpoint, when the camera has one. */
+  setpointC?: number
+  /** Which side of the pier the mount sits on, when it reports one. */
+  pierSide?: 'east' | 'west'
+}
+
 export interface Acquisition {
   capture(options: CaptureOptions): Promise<Frame>
   /**
@@ -66,6 +85,16 @@ export interface Acquisition {
    * An adapter whose camera is not told the frame type has none and omits this.
    */
   biasExposureSeconds?(cameraId: string, signal?: AbortSignal): Promise<number>
+  /**
+   * The camera's settings, and the mount's pier side when `telescopeId` is given, read when called.
+   * Called right after an exposure, it answers from the latest fresh readings and does not wait
+   * for the device to be read again after the exposure.
+   * Rejects when the camera cannot be read at all. An adapter that cannot read them omits this.
+   */
+  exposureSettings?(
+    options: { cameraId: string; telescopeId?: string },
+    signal?: AbortSignal,
+  ): Promise<ExposureSettings>
   pointing(telescopeId: string, signal?: AbortSignal): Promise<Pointing>
   move(
     telescopeId: string,

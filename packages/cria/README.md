@@ -51,6 +51,16 @@ gives the time the camera really used: the `exposureMinimum` reading in Cria's c
 state, read when called. It throws when that reading is not fresh, and never answers with
 the request.
 
+`acquisition.exposureSettings({ cameraId, telescopeId })` reads what the camera is set to from Cria's
+current state, when called: gain, offset, binning, pixel size after binning, sensor temperature,
+and the last driver-acknowledged setpoint (`lastCommandedSetpointC`; `setpointC` is always
+unsupported under INDI). With a `telescopeId` it adds the mount's pier side, `east` or `west`.
+Each value is present only when its reading is fresh and supported. A pixel size needs the binning
+that scales it, so it is omitted with the binning. A mount that cannot be read, or reports
+`unknown`, costs only the pier side. A camera that cannot be read rejects the call. It answers
+from the latest fresh readings and does not wait for the refresh that follows an exposure, so a
+frame is not held up by it.
+
 Capture downloads the confirmed original before returning its frame. An image 410
 is one lost frame and never starts another exposure. A Cria restart leaves an
 in-flight operation uncertain with a local hold; nothing is resubmitted.
