@@ -6,6 +6,7 @@ import type {
   AlpacaDeviceTelemetry,
 } from '@vela/alpaca'
 import type { Acquisition } from '@vela/equipment'
+import type { RigFilter } from '@vela/model/web'
 import { createMemoryRigCatalog } from '../rig/catalog.js'
 import { createRigOperations } from '../rig/operations.js'
 import { CaptureStoppedError, type CaptureCamera, type CaptureFrame } from './controller.js'
@@ -69,11 +70,17 @@ function setup(
     alerts?: NonNullable<Parameters<typeof registerCapture>[3]>['alerts']
     runs?: CaptureRunStore
     focalLengthMm?: number
+    filters?: ReadonlyArray<RigFilter>
   } = {},
 ) {
   const app = Fastify()
   const { imagingCamera: _, ...unselected } = record
-  const configured = options.focalLengthMm === undefined ? unselected : { ...unselected, focalLengthMm: options.focalLengthMm }
+
+  const configured = {
+    ...unselected,
+    ...(options.focalLengthMm !== undefined && { focalLengthMm: options.focalLengthMm }),
+    ...(options.filters && { filters: options.filters }),
+  }
 
   const catalog = createMemoryRigCatalog([
     selection ? { ...configured, imagingCamera: selection } : configured,
@@ -927,6 +934,126 @@ it('writes the rig\'s focal length into the saved FITS', async () => {
   const fits = (await subject.savedImages.file('sim', saved!.id, 'fits'))!.toString('ascii', 0, 2880)
 
   expect(fits).toContain('FOCALLEN=                  400')
+})
+
+describe('the filter in front of the camera', () => {
+  const filters = [
+    { name: 'L-Ultimate', description: 'Optolong L-Ultimate, dual-band H-alpha + OIII, 3 nm' },
+    { name: 'UV/IR cut' },
+  ]
+
+  async function savedFits(subject: ReturnType<typeof setup>) {
+    subject.captures[0]!.resolve(frame)
+    await vi.waitFor(async () => expect(await subject.savedImages.list('sim')).toHaveLength(1))
+
+    const [saved] = await subject.savedImages.list('sim')
+    const fits = (await subject.savedImages.file('sim', saved!.id, 'fits'))!.toString('ascii', 0, 2880)
+
+    return { saved: saved!, fits }
+  }
+
+  it('offers the rig\'s filters in its capture view, and none for a rig without a list', async () => {
+    expect((await setup(record.imagingCamera, { filters }).get()).json().filters).toEqual(filters)
+    expect((await setup().get()).json().filters).toEqual([])
+  })
+
+  it.each(['light', 'flat'] as const)('writes the chosen filter on a %s run into the FITS, the saved image, the run record and the view', async frameType => {
+    const runs = createMemoryCaptureRunStore()
+    const subject = setup(record.imagingCamera, { filters, runs })
+    const started = await subject.start({ exposureSeconds: 10, saveFrames: true, frameType, filter: 'L-Ultimate' })
+
+    expect(started.statusCode).toBe(200)
+    expect(started.json()).toMatchObject({ filter: 'L-Ultimate', filters })
+    expect(runs.unfinished('sim')).toMatchObject({ filter: 'L-Ultimate' })
+
+    const { saved, fits } = await savedFits(subject)
+
+    expect(fits).toContain("FILTER  = 'L-Ultimate'")
+    expect(saved).toMatchObject({ filter: 'L-Ultimate' })
+    expect((await subject.get()).json()).toMatchObject({ filter: 'L-Ultimate', latestImage: { filter: 'L-Ultimate' } })
+  })
+
+  it.each([
+    ['omitted', {}],
+    ['null', { filter: null }],
+  ])('records no filter, and never the word None, when it is %s', async (_name, choice) => {
+    const runs = createMemoryCaptureRunStore()
+    const subject = setup(record.imagingCamera, { filters, runs })
+
+    expect((await subject.start({ exposureSeconds: 10, saveFrames: true, ...choice })).json()).toMatchObject({ filter: null })
+    expect(runs.unfinished('sim')).toMatchObject({ filter: null })
+
+    const { saved, fits } = await savedFits(subject)
+
+    expect(fits).not.toContain('FILTER')
+    expect(fits).not.toMatch(/none/i)
+    expect(saved).toMatchObject({ filter: null })
+  })
+
+  it('refuses a filter the rig does not list, and starts nothing', async () => {
+    const subject = setup(record.imagingCamera, { filters })
+
+    for (const filter of ['Ha 7nm', 'l-ultimate', '', 'None'])
+      expect((await subject.start({ exposureSeconds: 10, filter })).statusCode).toBe(400)
+
+    expect((await setup().start({ exposureSeconds: 10, filter: 'L-Ultimate' })).statusCode).toBe(400)
+    expect(subject.captures).toEqual([])
+    expect(subject.operations.owner('sim')).toBeUndefined()
+  })
+
+  it.each(['dark', 'dark-flat', 'bias'] as const)('refuses a filter on a %s run, which has none, but accepts None', async frameType => {
+    const subject = setup(record.imagingCamera, { filters })
+
+    expect((await subject.start({ exposureSeconds: 10, frameType, filter: 'L-Ultimate' })).statusCode).toBe(400)
+    expect(subject.captures).toEqual([])
+    expect((await subject.start({ exposureSeconds: 10, frameType, filter: null })).json()).toMatchObject({ filter: null })
+  })
+
+  it('resumes an interrupted run with its filter, even if the rig no longer lists it', async () => {
+    const runs = createMemoryCaptureRunStore()
+    const before = setup(record.imagingCamera, { filters, runs })
+
+    await before.start({ exposureSeconds: 30, repeat: true, frameCount: 5, saveFrames: true, filter: 'L-Ultimate' })
+
+    const after = setup(record.imagingCamera, { runs })
+
+    expect((await after.get()).json()).toMatchObject({ phase: 'interrupted', filter: 'L-Ultimate' })
+
+    const resumed = await after.app.inject({ method: 'POST', url: '/api/rigs/sim/capture/resume' })
+
+    expect(resumed.json()).toMatchObject({ phase: 'exposing', filter: 'L-Ultimate' })
+    expect(runs.unfinished('sim')).toMatchObject({ filter: 'L-Ultimate' })
+  })
+
+  it('resumes a run recorded before filters as unknown, not None', async () => {
+    const runs = createMemoryCaptureRunStore()
+
+    runs.save({
+      version: 1,
+      rigId: 'sim',
+      runId: 'run-1',
+      startedAt: '2026-10-25T03:00:00.000Z',
+      exposureSeconds: 30,
+      repeat: true,
+      frameCount: 5,
+      frameType: 'light',
+      saveFrames: true,
+      subject: null,
+      unattended: false,
+      completedCount: 2,
+      savedCount: 2,
+      integrationSeconds: 60,
+    })
+
+    const after = setup(record.imagingCamera, { runs })
+
+    expect((await after.get()).json()).not.toHaveProperty('filter')
+
+    const resumed = (await after.app.inject({ method: 'POST', url: '/api/rigs/sim/capture/resume' })).json()
+
+    expect(resumed.phase).toBe('exposing')
+    expect(resumed).not.toHaveProperty('filter')
+  })
 })
 
 it('tells the alert monitor a calibration run is one, never lets it raise star alerts, and still shows the camera is producing', async () => {

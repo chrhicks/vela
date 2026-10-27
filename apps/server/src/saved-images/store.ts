@@ -324,6 +324,7 @@ const savedImageSchema = z
       name: z.string().trim().min(1),
       catalog: z.string().trim().min(1),
     }).nullable().optional(),
+    filter: z.string().nullable().optional(),
     capturedAtSource: z.enum(['camera', 'server-estimate']).optional(),
     provenance: z
       .object({
@@ -368,12 +369,14 @@ const savedImageSchema = z
     fitsUrl: z.string(),
     previewDownloadUrl: z.string(),
   })
-  .transform(({ capturedAtSource, fitImageUrl, subject, provenance, ...required }): SavedImage => {
+  .transform(({ capturedAtSource, fitImageUrl, subject, filter, provenance, ...required }): SavedImage => {
     let image: SavedImage = required
 
     if (provenance !== undefined) image = { ...image, provenance }
 
     if (subject !== undefined) image = { ...image, subject }
+
+    if (filter !== undefined) image = { ...image, filter }
 
     if (capturedAtSource !== undefined) image = { ...image, capturedAtSource }
 

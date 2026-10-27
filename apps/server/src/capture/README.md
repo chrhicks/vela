@@ -197,12 +197,54 @@ never an imaging run for the monitor, so it raises no no-stars alert, and its fr
 reach the monitor without star measurements, so they cannot raise a star-count or HFR
 trend alert. They still show the camera is producing frames.
 
+### Filter
+
+The rig has one manual filter slot. No filter wheel exists and nothing reports which filter is in,
+so Chris says which one when he starts a run. Vela records that word and never checks it against the
+camera.
+
+**The list.** Each rig lists its filters in the rig catalog, `rigs.yaml` (the same file as the
+imaging camera and focal length), under the rig's `filters`:
+
+```yaml
+filters:
+  - name: L-Ultimate
+    description: Optolong L-Ultimate, dual-band H-alpha + OIII, 3 nm
+```
+
+`name` is what goes into FITS: short, printable ASCII, 30 characters at most, no outer spaces and
+unique within the rig. Choose it once and keep it, because Siril and PixInsight group lights with
+the flats that match them by that string. `description` is optional, up to 200 characters, and only
+the app shows it. `None` is always offered and cannot be a name. A rig without `filters` has only
+None. The catalog refuses to open with a malformed list, so a typo never reaches a header.
+
+To edit the list, stop Vela, edit `rigs.yaml` and start Vela. The server holds the catalog in memory
+and rewrites the file whenever the catalog changes, so an edit made while it runs is lost. There is
+no edit screen yet. The view carries the list as `filters`, in file order.
+
+**Starting a run.** `filter` is an optional string on start: one of the rig's names, or null (or
+omitted) for None. A name not in the list is a 400. `filter` with a frame type other than `light`
+or `flat` is a 400 unless it is null: a filter matters for a light and for the flat that
+calibrates it, and a dark, dark flat or bias has none. The run keeps the choice for all its frames.
+Resume starts the new run with the interrupted run's filter, even if the list has since changed.
+
+**Where it is recorded.**
+
+| Place | Value |
+|---|---|
+| FITS `FILTER` | The name, on a light or flat frame with a filter. With None no key, never the word `None` ([header](../imaging/README.md#settings-in-the-header)) |
+| Saved image `metadata.json` and `CaptureImage.filter` | The name, or null for none, and null on a dark, dark flat or bias |
+| Run record (`capture-runs.json`) and `CaptureView.filter` | The name, or null for none |
+
+A saved image or run record from before filters has no `filter`. It reads as unknown, not None.
+A client must not show it as None. Frames already saved are not rewritten.
+
 ### Restarts
 
 A restart used to drop a running capture and show idle, so an unattended night could be lost
 unseen. Now the active run is written to `capture-runs.json` next to the rig catalog
 (`rigs.yaml`; `run-store.ts`), as `{ "runs": { "<rigId>": record } }`. A record holds the
-request (exposure, repeat, `frameCount`, `frameType`, `saveFrames`, the `subject` snapshot), whether
+request (exposure, repeat, `frameCount`, `frameType`, `saveFrames`, the `subject` snapshot, the `filter`), whether
 the run is `unattended` (the phone is paged for its alerts; a record without it is attended), the
 start time and the progress (`completedCount`, `savedCount`, `integrationSeconds`). It is
 written when the run starts and after each completed frame and each save, and removed when the
@@ -216,7 +258,7 @@ startup is a run that did not end: after a deploy (SIGTERM) or a crash alike.
   anything until Chris starts or resumes a run. Starting any new run replaces the record. There
   is no dismiss: the interrupted view stays, across further restarts, until a run starts.
 - **Resume.** `POST /api/rigs/:rigId/capture/resume` takes no input (the halt rule above) and starts a
-  new run with the same exposure, repeat, `saveFrames`, frame type, subject snapshot and Unattended choice (Chris, 2026-10-27: resuming after a night page means he
+  new run with the same exposure, repeat, `saveFrames`, frame type, subject snapshot, filter and Unattended choice (Chris, 2026-10-27: resuming after a night page means he
   still wants to be paged). A run
   with a count resumes with `frameCount - completedCount`; a repeat with no count repeats until
   stopped; an unfinished single exposure repeats once. It is an ordinary start: the Rig lease,

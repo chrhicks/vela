@@ -217,6 +217,37 @@ it('retains subject intent across reopen, rejects malformed snapshots, and reads
   expect(await fs.readFile(metadataPath, 'utf8')).toBe(legacyText)
 })
 
+it('keeps the filter across reopen, keeps none as none, and reads metadata without one as unknown', async () => {
+  const root = await temporary()
+  const store = await openFileSavedImageStore(root)
+  const metadataPath = (id: string) =>
+    join(
+      root,
+      createHash('sha256').update('rig').digest('hex'),
+      createHash('sha256').update(id).digest('hex'),
+      'metadata.json',
+    )
+
+  const named = await store.save('rig', { ...image, filter: 'L-Ultimate' }, files)
+  const none = await store.save('rig', { ...image, id: 'no-filter', filter: null }, files)
+  const reopened = await openFileSavedImageStore(root)
+
+  expect((await reopened.get('rig', image.id))?.filter).toBe('L-Ultimate')
+  expect((await reopened.get('rig', 'no-filter'))?.filter).toBeNull()
+
+  const { filter: _filter, ...legacy } = named
+  const legacyText = JSON.stringify(legacy)
+  await writeFile(metadataPath(image.id), legacyText)
+  const read = await reopened.get('rig', image.id)
+
+  expect(read).not.toHaveProperty('filter')
+  expect(await fs.readFile(metadataPath(image.id), 'utf8')).toBe(legacyText)
+  expect(none.filter).toBeNull()
+
+  await writeFile(metadataPath(image.id), JSON.stringify({ ...named, filter: 7 }))
+  await expect(reopened.get('rig', image.id)).rejects.toThrow('Invalid saved image metadata')
+})
+
 it('keeps a calibration frame type across reopen and reads metadata without one as a light', async () => {
   const root = await temporary()
   const store = await openFileSavedImageStore(root)

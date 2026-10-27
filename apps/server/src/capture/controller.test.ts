@@ -1096,6 +1096,38 @@ describe('the settings written into the FITS header', () => {
     })
   })
 
+  it.each(['light', 'flat'] as const)('names the filter on a %s frame, and the image carries it', async frameType => {
+    const { header, image } = await take(async () => ({ gain: 100 }), { frameType, filter: 'L-Ultimate' })
+
+    expect(header).toMatchObject({ FILTER: "'L-Ultimate'" })
+    expect(image.filter).toBe('L-Ultimate')
+  })
+
+  it.each([
+    ['None', null, null],
+    ['not said', undefined, undefined],
+  ])('writes no FILTER key when the filter is %s, and keeps unknown apart from none', async (_name, filter, recorded) => {
+    const { header, image } = await take(async () => ({ gain: 100 }), { filter })
+
+    expect(header).not.toHaveProperty('FILTER')
+    expect(image.filter).toBe(recorded)
+  })
+
+  it.each(['dark', 'dark-flat', 'bias'] as const)('writes no FILTER key on a %s frame', async frameType => {
+    const { header } = await take(async () => ({ gain: 100 }), { frameType, filter: 'L-Ultimate' })
+
+    expect(header).not.toHaveProperty('FILTER')
+  })
+
+  it('keeps the filter when the camera cannot be read', async () => {
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { header } = await take(() => Promise.reject(new Error('no fresh gain')), { filter: 'L-Ultimate' })
+
+    expect(header).toMatchObject({ FILTER: "'L-Ultimate'" })
+    expect(header).not.toHaveProperty('GAIN')
+    warning.mockRestore()
+  })
+
   it('reads the settings for each frame, not once for the run', async () => {
     const gains = [100, 250]
     const test = setup(undefined, undefined, undefined, undefined, async () => ({ gain: gains.shift()! }))

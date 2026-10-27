@@ -97,6 +97,8 @@ export interface CaptureRunOptions {
   /** What the run takes; default `light`. Only a light run has a subject. */
   frameType?: FrameType
   subject?: CaptureSubject | null
+  /** The filter Chris named for the run; null for none. Left out, it is unknown. Only a light or a flat carries one. */
+  filter?: string | null | undefined
   /** Pages the phone for this run's alerts; default off. */
   unattended?: boolean
   /** The rig's effective focal length when the run starts, for the FITS header. */
@@ -180,6 +182,7 @@ export function createCaptureController(
       frameCount: unfinished.frameCount,
       saveFrames: unfinished.saveFrames,
       frameType: unfinished.frameType,
+      filter: unfinished.filter,
       completedCount: unfinished.completedCount,
       subject: unfinished.subject,
       unattended: unfinished.unattended,
@@ -304,6 +307,7 @@ export function createCaptureController(
     saveFrames: boolean,
     frameType: FrameType,
     subject: CaptureSubject | null,
+    filter: string | null | undefined,
     focalLengthMm: number | undefined,
     runGeneration: number,
     runId: string,
@@ -496,6 +500,7 @@ export function createCaptureController(
             cameraName,
             frameType,
             objectName: subject?.name,
+            filterName: filter,
             settings: frameSettings,
           }),
         ])
@@ -509,6 +514,7 @@ export function createCaptureController(
           id,
           frameType,
           subject,
+          filter,
           imageUrl: `/api/rigs/${encodeURIComponent(settings.rigId)}/capture/images/${id}`,
           width: frame.width,
           height: frame.height,
@@ -627,6 +633,7 @@ export function createCaptureController(
       saveFrames = false,
       frameType = 'light',
       subject = null,
+      filter,
       unattended = false,
       focalLengthMm,
     }: CaptureRunOptions = {},
@@ -651,6 +658,7 @@ export function createCaptureController(
       frameType,
       saveFrames,
       subject: runSubject,
+      filter,
       unattended,
       completedCount: 0,
       savedCount: 0,
@@ -670,6 +678,7 @@ export function createCaptureController(
       completedCount: 0,
       lostFrameCount: 0,
       subject: runSubject,
+      filter,
       unattended,
       savedCount: 0,
       integrationSeconds: 0,
@@ -703,6 +712,7 @@ export function createCaptureController(
       saveFrames,
       frameType,
       runSubject,
+      filter,
       focalLengthMm,
       runGeneration,
       runId,

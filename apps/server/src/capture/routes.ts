@@ -15,7 +15,7 @@ import type {
   CaptureView,
   NavigationCapture,
 } from '@vela/model/web'
-import { frameTypes } from '../imaging/frame-type.js'
+import { carriesFilter, frameTypes } from '../imaging/frame-type.js'
 import type { RigCatalogRecord } from '../rig/contracts.js'
 import type { RigCatalog } from '../rig/catalog.js'
 import type { RigOperations } from '../rig/operations.js'
@@ -236,6 +236,7 @@ export function registerCapture(
         cooling: null,
         captureReadState: 'current',
       }),
+      filters: rig.filters ?? [],
       savedImageCount,
     })
 
@@ -321,16 +322,18 @@ export function registerCapture(
           saveFrames: z.boolean().optional(),
           frameType: z.enum(frameTypes).optional(),
           targetId: z.string().trim().min(1).max(100).optional(),
+          filter: z.string().nullable().optional(),
           unattended: z.boolean().optional(),
         })
         .refine(value => value.frameCount === undefined || value.repeat === true)
         .refine(value => value.targetId === undefined || (value.frameType ?? 'light') === 'light')
+        .refine(value => !value.filter || carriesFilter(value.frameType ?? 'light'))
         .safeParse(request.body)
 
       if (!request.headers['content-type']?.startsWith('application/json') || !parsed.success) {
         return reply.code(400).send({
           error:
-            `Expected exposureSeconds between 0.1 and 600, optional boolean repeat, saveFrames and unattended, optional frameType (${frameTypes.join(', ')}; default light), optional targetId (only for light), and optional frameCount (a whole number from 1 to ${MAX_FRAME_COUNT}, only with repeat: true).`,
+            `Expected exposureSeconds between 0.1 and 600, optional boolean repeat, saveFrames and unattended, optional frameType (${frameTypes.join(', ')}; default light), optional targetId (only for light), optional filter (a name from the rig's filter list, or null for none; only for light and flat), and optional frameCount (a whole number from 1 to ${MAX_FRAME_COUNT}, only with repeat: true).`,
         })
       }
 
@@ -340,6 +343,15 @@ export function registerCapture(
       if (subject === undefined)
         return reply.code(400).send({ error: 'The selected capture subject was not found.' })
 
+      const filter = body.filter ?? null
+
+      if (filter !== null) {
+        const rig = await catalog.get(request.params.rigId)
+
+        if (rig && !rig.filters?.some(listed => listed.name === filter))
+          return reply.code(400).send({ error: "The selected filter is not in the rig's filter list." })
+      }
+
       return startRun(request.params.rigId, reply, {
         exposureSeconds: body.exposureSeconds,
         repeat: body.repeat === true,
@@ -347,6 +359,7 @@ export function registerCapture(
         saveFrames: body.saveFrames === true,
         frameType: body.frameType ?? 'light',
         subject,
+        filter,
         unattended: body.unattended === true,
       })
     },
@@ -420,6 +433,7 @@ export function registerCapture(
       const result = await controller
         .start(run.exposureSeconds, camera, view.camera.name, {
           subject: run.subject,
+          filter: run.filter,
           unattended: run.unattended,
           focalLengthMm: settings.rig.focalLengthMm,
           // A calibration frame has no stars to judge, but still shows the camera is producing.
@@ -442,6 +456,7 @@ export function registerCapture(
 
       return {
         ...result,
+        filters: view.filters,
         savedImageCount: view.savedImageCount,
         // The run now owns the Rig, so cooling is re-marked after it started.
         cooling: withCoolingBlocker(view.rigId, view.cooling),
