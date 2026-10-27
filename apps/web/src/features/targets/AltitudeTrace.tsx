@@ -1,5 +1,5 @@
 import type { TargetSkyPath } from '@vela/model/web'
-import { horizonNote, horizonRuns } from './horizon'
+import { horizonNote, horizonRuns, observedRuns } from './horizon'
 import { skyTime } from './sky-time'
 
 /** Time/altitude projection of the server's samples, marked where the rig's approximate horizon profile hides or does not cover the target. */
@@ -83,6 +83,15 @@ export function AltitudeTrace({
       ))}
       {marked('behind').map((points) => (
         <polyline key={points} points={points} className="tonight-sky__behind" />
+      ))}
+      {observedRuns(sky).map(({ from }) => (
+        <circle
+          key={from}
+          cx={x(sky.samples[from]!.at)}
+          cy={y(sky.samples[from]!.altitudeDegrees)}
+          r="5"
+          className="tonight-sky__observed"
+        />
       ))}
       {inSpan && (
         <>

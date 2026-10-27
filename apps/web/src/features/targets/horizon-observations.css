@@ -1,0 +1,10 @@
+.horizon-observations { grid-column: 1 / -1; display: grid; gap: 14px; margin-top: 24px; padding: 24px; border-radius: 6px; background: var(--vela-surface); }
+.horizon-observations * { box-sizing: border-box; }
+.horizon-observations :where(h2, p, ul) { margin: 0; }
+.horizon-observations > header { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 4px 16px; }
+.horizon-observations h2 { font: 400 24px/30px var(--vela-font-heading); }
+.horizon-observations__muted { color: var(--vela-text-muted); font-size: 14px; line-height: 20px; }
+.horizon-observations__list { display: grid; gap: 8px; padding: 0; list-style: none; font-size: 15px; line-height: 22px; }
+.horizon-observations__list > li { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-left: 12px; border-left: 3px solid var(--vela-warning); }
+.horizon-observations [role='alert'] { color: var(--vela-danger); }
+.horizon-observations :focus-visible { outline: 2px solid var(--vela-focus); outline-offset: 2px; }

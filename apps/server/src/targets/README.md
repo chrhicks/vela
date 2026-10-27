@@ -200,8 +200,9 @@ repo. It is a separate file so a re-import of the survey never wipes it. A rig i
 
 `strongBefore` is the run's baseline of strong stars (median of the frames no alert called bad) and `strongAt`
 the strong-star count of the frame where the collapse began. A missing file is no observations. A malformed
-file is ignored with one warning (no values) and is not overwritten by reads. Writes are atomic and
-serialized, so a delete and a record never lose each other.
+file is ignored with one warning (no values) and is never overwritten: a record or delete against it fails
+(409 on the delete route) until it is fixed or removed. Writes are atomic and serialized, so a delete and a
+record never lose each other.
 
 **Merge rule, at read time.** An observation says "the skyline is at least this high at this azimuth", for the
 profile bin that azimuth falls in. Per bin:

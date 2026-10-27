@@ -213,6 +213,11 @@
   stroke-dasharray: 1 5;
   stroke-linecap: round;
 }
+.tonight-sky__observed {
+  fill: var(--vela-canvas);
+  stroke: var(--vela-warning);
+  stroke-width: 2.5;
+}
 .tonight-sky__marker {
   fill: var(--vela-canvas);
   stroke: var(--vela-text-muted);

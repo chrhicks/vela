@@ -112,8 +112,8 @@ dropping frame and the run id.
   without pointing records nothing and names no tree. The poll is every 10 s and a tracking mount moves
   0.25° a minute, so the position is good to well under a bin.
 - **Not recorded.** Calibration runs (no stars, not pointed), runs that do not save their frames (framing and
-  focus runs lose stars to defocus, not to trees), frames without pointing, and any drop while the mount was
-  slewing. Chris deletes an observation that was a cloud.
+  focus runs lose stars to defocus, not to trees), frames without pointing, a pointing at or below 0° altitude, and any drop while
+  the mount was slewing or its reads were failing. Chris deletes an observation that was a cloud.
 - **Limit.** A cloud looks like a tree to these numbers. Nothing here tells them apart; deleting a wrong
   record is the correction, and the next run reads the file again.
 - Nothing is logged: the file is the only place the numbers go. A failed write leaves one warning without

@@ -236,6 +236,7 @@ export function registerTargets(
   const horizonFor = async (rig: RigCatalogRecord) => (await horizons?.skyline(rig.id)) ?? null
 
   registerTargetDiscovery(app, catalog, { now, siteView, horizonFor, targetView })
+
   if (horizons) registerHorizonObservations(app, catalog, horizons.observations)
 
   app.get<{ Params: { rigId: string }; Querystring: { q?: string; offset?: string } }>(

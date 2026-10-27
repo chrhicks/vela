@@ -129,7 +129,6 @@ function binAt(skyline: Skyline, azimuthDegrees: number) {
   return skyline.bins[binIndex(skyline.bins.length, skyline.stepDegrees, azimuthDegrees)]!
 }
 
-/** Null without a skyline. */
 export function horizonBin(skyline: Skyline | null, azimuthDegrees: number): HorizonBinKind | null {
   return skyline ? binAt(skyline, azimuthDegrees).kind : null
 }

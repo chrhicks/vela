@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { observationsFilePath } from '../targets/horizon-observations.js'
-import { createHorizon, horizonFilePath, writeHorizonProfile, type Horizon } from '../targets/horizon.js'
+import { createHorizon, horizonFilePath, writeHorizonProfile } from '../targets/horizon.js'
 import { syntheticProfile } from '../targets/horizon.fixture.js'
 import { createAlertMonitor, type AlertMonitor, type RunStart } from './monitor.js'
 import { starStatistics } from './test-statistics.js'
@@ -23,7 +23,11 @@ const southAt30: MountReading = {
 }
 
 const directories: string[] = []
+
 const monitors: AlertMonitor[] = []
+
+/** The skyline reads a file when a run starts; a run is only judged once that read is done. */
+const skylineLoads: Array<Promise<unknown>> = []
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'setTimeout', 'clearTimeout', 'Date'] })
@@ -46,6 +50,15 @@ async function setup(profile: ReturnType<typeof syntheticProfile> | null, readMo
 
   const horizon = createHorizon(directory)
   const add = vi.spyOn(horizon.observations, 'add')
+  const skyline = horizon.skyline
+
+  horizon.skyline = rigId => {
+    const load = skyline(rigId)
+
+    skylineLoads.push(load)
+
+    return load
+  }
 
   const monitor = createAlertMonitor({
     rigId: 'fra-400',
@@ -81,6 +94,7 @@ async function frame(monitor: AlertMonitor, stars: number, runId = 'run-1') {
 
 async function startRun(monitor: AlertMonitor, start: RunStart = imaging) {
   monitor.runStarted(60, start)
+  await Promise.all(skylineLoads.splice(0))
   await vi.advanceTimersByTimeAsync(0)
 }
 
@@ -208,6 +222,7 @@ describe('an observed obstruction', () => {
 
     await startRun(monitor)
     await healthyFrames(monitor)
+
     for (const stars of [20, 20, 20]) await frame(monitor, stars)
 
     expect(monitor.view().alerts.map(alert => alert.id)).toContain('stars-dropping')

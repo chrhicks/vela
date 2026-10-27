@@ -775,6 +775,7 @@ describe('the horizon in a star alert', () => {
 
   it('leaves the causes unchanged above the skyline, without pointing, and without a horizon', () => {
     const plain = run([20, 30, 25], () => null)
+
     const message = (frames: Frame[], horizon?: Partial<Pick<RigHistory, 'behindSkyline'>>) =>
       conditions(frames, horizon).find(condition => condition.id === 'stars-dropping')!.message
 

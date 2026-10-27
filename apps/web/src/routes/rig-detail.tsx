@@ -3,6 +3,7 @@ import { Button, Dialog } from '@vela/ui'
 import { useEffect, useId, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { AlertsCard } from '../features/alerts/AlertsCard'
+import { HorizonObservations } from '../features/targets/HorizonObservations'
 import { loadHome } from '../features/home/load-home'
 import { ImagingSetup } from '../features/imaging-camera/ImagingSetup'
 import { useImagingCamera } from '../features/imaging-camera/use-imaging-camera'
@@ -176,6 +177,7 @@ function Equipment({ rigId }: { rigId: string }) {
           </div>
         </section>
         <AlertsCard />
+        <HorizonObservations rigId={rigId} />
       </div>
       <footer className="equipment__freshness">
         <span>{interrupted ? 'Last updated' : 'State checked'} {formatAge(view.refreshedAt)} · Disconnected devices have no live measurements</span>
