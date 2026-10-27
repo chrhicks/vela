@@ -18,6 +18,19 @@ export interface TargetView extends TargetPosition {
   sky: TargetSkyPath | null
 }
 
+/**
+ * Against the rig's approximate backyard horizon profile. `unknown` is a stretch the
+ * survey could not trace: neither clear nor blocked.
+ */
+export type HorizonStatus = 'clear' | 'behind' | 'unknown'
+
+/** Minutes of a window, counted in 15-minute sky samples, by horizon status. */
+export interface HorizonWindow {
+  checkedMinutes: number
+  behindMinutes: number
+  unknownMinutes: number
+}
+
 export interface TargetSkyPath {
   observedAt: string
   startsAt: string
@@ -27,6 +40,8 @@ export interface TargetSkyPath {
     /** Geometric horizontal coordinates; azimuth increases eastward from north. */
     azimuthDegrees: number
     altitudeDegrees: number
+    /** Null when the rig has no horizon profile. */
+    horizon: HorizonStatus | null
     sunAltitudeDegrees: number
     moon: {
       azimuthDegrees: number
@@ -78,6 +93,8 @@ export interface TargetDiscoveryItem extends TargetView {
   filterChoice: TargetFilterChoice
   filterReason: string
   opportunity: TargetOpportunity | null
+  /** The opportunity window against the horizon profile; null without a profile or a window. Warn only. */
+  horizonInWindow: HorizonWindow | null
 }
 
 /** A frozen calculation shared by every page and filter until explicit refresh. */
@@ -104,7 +121,7 @@ export interface TargetDiscoveryView {
 }
 
 /** Catalog browsing has no inferred observing location or sky calculation. */
-export type TargetCatalogItem = Omit<TargetDiscoveryItem, 'sky' | 'opportunity'>
+export type TargetCatalogItem = Omit<TargetDiscoveryItem, 'sky' | 'opportunity' | 'horizonInWindow'>
 
 export interface TargetCatalogView {
   query: string

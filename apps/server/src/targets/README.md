@@ -8,8 +8,9 @@ framing request cannot take that lease until device work and cleanup finish.
 `catalog/` owns the pinned OpenNGC adaptation and its CC BY-SA provenance.
 Search accepts familiar aliases, catalog numbers and object types. Discovery
 ranks the full catalog for photographic interest and remaining observing time. Sky paths use the
-mount's observed site and current UTC time; no saved obstruction map or implicit
-environmental safety policy exists. Darkness means Sun below −18°. The paths
+mount's observed site and current UTC time; the only obstruction model is the
+optional approximate backyard horizon below, and no implicit environmental safety
+policy exists. Darkness means Sun below −18°. The paths
 and displayed windows are sampled at 15-minute intervals and are approximate.
 Morning after astronomical dawn selects the coming night; before dawn retains
 the active night. Polar day/night and unavailable site data remain explicit.
@@ -27,8 +28,9 @@ context, not a brightness forecast or a target-quality restriction.
 aberration correction. Catalog and solved coordinates are J2000. Only J2000 and
 topocentric mount frames are currently supported; other or unknown frames are
 never relabeled. Independent ERFA reference values exercise the conversion.
-Atmospheric refraction, proper motion of foreground stars, solar-system targets
-and a horizon-obstruction model are outside this deep-sky catalog capability.
+Atmospheric refraction, proper motion of foreground stars and solar-system targets
+are outside this deep-sky catalog capability. Local obstructions are the optional,
+approximate backyard horizon described next.
 
 Effective focal length is a durable, explicitly configured rig fact. Sensor
 pixel sizes, binning and current subframe are observed from the selected camera.
@@ -107,6 +109,66 @@ reports failure and requires state inspection before another command.
 Last solved coordinates retain their timestamp when they cease to be current.
 Browser reconnection observes server-owned progress; server restart loses the
 ephemeral operation and check, and does not resume either.
+
+## Backyard horizon (approximate, warn only)
+
+On 2026-10-26 a tree at about 43° altitude in the north-east blocked both scopes
+and Vela had no idea trees exist. A rig can now have a **horizon profile**: the
+altitude of the skyline (trees, roofs) at each azimuth bin, from Chris's photo
+survey. It only warns. It never blocks, filters or re-ranks a target, a slew or a
+run, and it changes no alert. The profile is approximate: the survey's north is
+not demonstrated true north and the offsets come from one Sun sighting.
+
+**The file.** `horizon-<rigId>.json` sits in Vela's data directory next to
+`rigs.yaml` (`dirname(VELA_RIG_CATALOG_PATH)`), mode 600, never in the repo.
+`<rigId>` must match `[A-Za-z0-9][A-Za-z0-9_-]*`, otherwise the rig has no profile.
+It is read on each request, so a re-import takes effect without a restart.
+
+```json
+{
+  "version": 1,
+  "approximate": true,
+  "note": "Approximate ...",
+  "importedAt": "2026-10-28T00:00:00.000Z",
+  "offsets": { "azimuthDegrees": 13.44, "altitudeDegrees": 0.94 },
+  "stepDegrees": 1,
+  "altitudesDegrees": [12.5, null, 3.2]
+}
+```
+
+`altitudesDegrees[i]` covers azimuth `[i·step, (i+1)·step)`, 0° north, increasing
+eastward, with `360 / step` entries (`step` divides 360). A number is a **traced**
+bin: the skyline altitude, 0 to 90. `null` is an **unknown** bin: the survey had
+no trace there. Unknown is not open sky and not blocked. A malformed or
+unreadable file is ignored with one warning in the server log (no values), and
+the rig behaves as if it had no profile.
+
+**Import.** `tools/horizon-import` converts the survey's `horizon-data.json`
+(`stepDeg`, `samples[]` with `az`, `smooth`, `supported`) into that file. Each
+survey azimuth gets the azimuth offset, then falls in an output bin. A bin takes
+the highest `smooth` of its samples plus the altitude offset, floored at 0. A
+bin is unknown when it has no sample, or any of its samples is unsupported. The
+offsets are required arguments, not defaults. The command writes to a directory
+you name and never guesses Vela's data directory. See its README.
+
+**Classification.** `horizonStatus(profile, azimuth, altitude)` returns `behind`
+when the altitude is at or below a traced bin's skyline, `clear` when above it,
+and `unknown` for an unknown bin. No profile means no status (`null`), never
+`clear`.
+
+**What the page gets.** Each sky sample carries `horizon`: `clear`, `behind`,
+`unknown`, or `null` without a profile. Each discovery item carries
+`horizonInWindow`, the minutes of its above-30° window (counted in the 15-minute
+samples inside it) that are behind and unknown, or `null` without a profile or
+without a sample in the window. The skyline itself, its azimuths and the offsets
+never leave the server: not in responses, logs, traces or test fixtures. Tests
+use a synthetic profile.
+
+**Where it shows.** The altitude trace marks the stretches behind the profile
+and the stretches with an unknown horizon, and its text says so. The target list
+says "May be behind trees" for the planned window, with the minutes, and says
+the horizon is untraced for part of the window when bins are unknown. A window
+that is both shows both.
 
 ## Survey boundary
 
