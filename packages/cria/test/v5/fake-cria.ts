@@ -19,6 +19,9 @@
  *   Readings stay as they started. A cancel, or a halt queued behind a motion,
  *   stops it `stopMs` later unless it ends first. `settle(id, outcome)` ends a
  *   running operation now with any outcome.
+ * - Switch: a PPBA-like box with Dew A and Dew B duty channels (0 to 100) and an Auto dew channel (0 or 1).
+ *   `switch-set` changes the value the device reports and confirms the value it holds; a duty while Auto dew is
+ *   on is refused as Cria refuses it, and so is a duty off the channel's step of 10 (the PPBA driver's). `setSwitch` seeds a value, `switchValue` reads one.
  * - Faults: `dropReply(route)` applies the next request on a route and loses its
  *   reply; `delay(route, ms)` makes the next one land `ms` later, and with
  *   `dropReply` its caller fails at once. A delayed request is lost if Cria is
@@ -114,7 +117,7 @@ export interface Received {
 
 interface Rigged {
   readonly id: DeviceId
-  readonly kind: 'camera' | 'mount' | 'focuser'
+  readonly kind: 'camera' | 'mount' | 'focuser' | 'switch'
   readonly name: string
   readonly failureDomain: FailureDomain
 }
@@ -123,7 +126,16 @@ const rig: ReadonlyArray<Rigged> = [
   { id: DeviceId.make('camera'), kind: 'camera', name: 'Fake CCD', failureDomain: FailureDomain.make('fake-ccd') },
   { id: DeviceId.make('mount'), kind: 'mount', name: 'ZWO AM5', failureDomain: FailureDomain.make('zwo-am5') },
   { id: DeviceId.make('focuser'), kind: 'focuser', name: 'Fake Focuser', failureDomain: FailureDomain.make('fake-focuser') },
+  { id: DeviceId.make('switch'), kind: 'switch', name: 'Fake PPB', failureDomain: FailureDomain.make('fake-ppb') },
 ]
+
+const switchChannels = [
+  { id: 0, name: 'Dew A duty (%)', maximum: 100, step: 10 },
+  { id: 1, name: 'Dew B duty (%)', maximum: 100, step: 10 },
+  { id: 2, name: 'Auto dew', maximum: 1, step: 1 },
+] as const
+
+const autoDewChannel = 2
 
 const frame = { width: 4, height: 3 }
 
@@ -169,6 +181,7 @@ export class FakeCria {
   stopMs = 0
   /** How long each kind runs before it confirms. A capture runs for its exposure. */
   readonly durationMs: Partial<Record<CommandKind, number>> = {}
+  private readonly switchValues = new Map<number, number>(switchChannels.map(channel => [channel.id, 0]))
   private instance = this.boot()
   private readonly subscribers = new Set<Subscriber>()
   private readonly lostReplies = new Set<Route>()
@@ -179,6 +192,16 @@ export class FakeCria {
 
   get instanceId(): InstanceId {
     return this.instance.id
+  }
+
+  /** Sets what the switch reports for a channel, as if the box had changed it itself. */
+  switchValue(channelId: number): number {
+    return this.switchValues.get(channelId) ?? 0
+  }
+
+  setSwitch(channelId: number, value: number): void {
+    this.switchValues.set(channelId, value)
+    this.instance.revision++
   }
 
   nameOf(deviceId: string): string {
@@ -388,6 +411,8 @@ export class FakeCria {
 
     this.instance.operations.set(operation.id, operation)
 
+    if (kind === 'switch-set') return this.schedule(operation, afterMs, this.setSwitchChannel(parameters.channelId, parameters.value))
+
     let values: import('@cria/wire').OperationResult['values'] = {}
 
     if (kind === 'focuser-move') values = { position: parameters.position }
@@ -397,6 +422,23 @@ export class FakeCria {
     if (kind === 'mount-axis') values = { travelledDegrees: parameters.rateDegreesPerSecond * parameters.durationSeconds }
 
     this.schedule(operation, afterMs, { kind: 'confirmed', value: { values, image: null } })
+  }
+
+  private setSwitchChannel(channelId: number, value: number): Ending {
+    const channel = switchChannels.find(candidate => candidate.id === channelId)
+
+    if (!channel) return { kind: 'failed', reason: 'invalid', message: `The switch has no channel ${channelId}` }
+
+    if (channelId !== autoDewChannel && (this.switchValues.get(autoDewChannel) ?? 0) > 0)
+      return { kind: 'failed', reason: 'invalid', message: `${channel.name} is set automatically while Auto dew is on; switch Auto dew (channel ${autoDewChannel}) off first` }
+
+    if (value < 0 || value > channel.maximum) return { kind: 'failed', reason: 'invalid', message: `${channel.name} takes 0 to ${channel.maximum}` }
+
+    // Like the PPBA driver: a value off the channel's step is refused, not rounded.
+    if (value % channel.step !== 0) return { kind: 'failed', reason: 'invalid', message: `${channel.name} accepts 0-${channel.maximum} in steps of ${channel.step}` }
+    this.switchValues.set(channelId, value)
+
+    return { kind: 'confirmed', value: { values: { value }, image: null } }
   }
 
   private schedule(operation: Running, afterMs: number, outcome: Ending): void {
@@ -580,7 +622,20 @@ export class FakeCria {
         return { ...identity, kind: 'mount', readings: mountReadings(name, observedAt) }
       case 'focuser':
         return { ...identity, kind: 'focuser', readings: focuserReadings(name, observedAt) }
+      case 'switch':
+        return {
+          ...identity,
+          kind: 'switch',
+          readings: fresh({ connected: true, name, channelCount: switchChannels.length }, observedAt),
+          channels: switchChannels.map(channel => this.switchChannel(channel, observedAt)),
+        }
     }
+  }
+
+  private switchChannel(channel: (typeof switchChannels)[number], observedAt: number) {
+    const value = this.switchValues.get(channel.id) ?? 0
+
+    return fresh({ id: channel.id, name: channel.name, writable: true, minimum: 0, maximum: channel.maximum, step: channel.step, on: value > 0, value }, observedAt)
   }
 
   /** SPEC "Device": the reasons the fake models, in their order of precedence. */

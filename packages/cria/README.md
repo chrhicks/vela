@@ -43,6 +43,12 @@ unanswered for 20 seconds it is `uncertain` with a hold. `mount-home.ts` keeps, 
 confirmed a home (any home through `equipment.ts` or `mount-control.ts`): `forget` runs on every mount command
 except tracking, and when a reading shows the mount slewing.
 
+`switch-control.ts` sends one `switch-set` for a channel of a configured switch and returns the value Cria
+confirms. Cria refuses a duty while Auto dew is on, before it sends anything to the box; that refusal comes back as
+`failed` with Cria's message. The provider carries each switch channel's `minimum`, `maximum` and `step` into the inspection;
+the PPBA's duty channels have a step of 10, and Cria refuses a duty off it. The fake Cria has a PPBA-like switch (Dew A and
+Dew B duty in steps of 10, Auto dew) for it and refuses an off-step duty as Cria does.
+
 A capture carries its frame type. Cria's `capture` takes `light` (the shutter is
 open) and, for a flat or bias, a `frameType` that Cria sets on the camera's INDI frame
 type. A dark flat goes as a dark. `frameType` is sent only for a flat or bias, because a

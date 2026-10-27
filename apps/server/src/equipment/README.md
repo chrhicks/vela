@@ -174,3 +174,28 @@ requests or submit commands. These admission markers last only for this server
 process, like the command state itself. Each request also carries the Vela server
 instance identity from its control view: a new instance rejects an old write and
 reports the old admission as unknown, rather than claiming it never happened.
+
+Dew heaters are a second, narrower capability at the same boundary: `createSwitchControl(rig)` returns a
+`SwitchControl` for a Cria rig and nothing for an Alpaca rig, so an Alpaca rig has no dew section.
+`apps/server/src/rig/dew-control.ts` adds `dewControl` to the rig detail view of a switch device that has dew channels,
+and `POST /api/rigs/:rigId/dew` (`{ deviceId, requestId, serverInstanceId, action }`) with `/dew/check`, which work
+as the mount routes do: one request ID admitted at most once, a check that retires an unseen ID without a write, a
+new server instance that refuses an old page. The action is `{ kind: 'auto', on }` or
+`{ kind: 'duty', channelId, percent }` with `percent` from 0 to 100; anything else is a 400 and nothing is read. Vela
+picks the channels from the names Cria gives the PPBA: `Auto dew` and the `Dew ... duty` channels (`Dew A duty (%)`). The
+box's binary `Dew A` and `Dew B` outputs (0 or 1) are not duties and are not offered, so a channel id that is not one
+of those is a 404 and the power outputs and USB are unreachable. Auto dew is written as 1
+or 0 to its channel; a duty goes to its own channel.
+
+Each dew channel in the view carries `minimum`, `maximum` and `step`, which Cria reports per channel (the PPBA's duties
+step by 10; 0, 100 and 1 when the box does not say). A duty that is not `minimum` plus a whole number of steps is a
+400 `invalid-dew-duty` whose message gives the allowed step, and nothing is sent: Cria would refuse it anyway.
+
+The command does not take the rig operation lane: a capture run needs the heaters on and nothing in it moves the
+rig. A second command for the box is refused while one is in flight. While Auto dew is on the box sets the duty itself,
+so every duty control is disabled with "Auto dew is on" (an unknown Auto dew state disables them too). Cria confirms
+a duty by what the box holds, which can differ a little from the request (10 % reads back as 9.8 %), so a confirmed
+duty reports the held value. An unknown outcome stays `uncertain` and nothing is sent again; Cria holds the box, and
+once fresh readings (no hold) show the requested duty within 0.4 points or the Auto dew state asked for, the command
+resolves to `confirmed`, otherwise to `failed`. A box that is disconnected has no channel readings, so it has no dew
+section.

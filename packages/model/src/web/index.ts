@@ -102,6 +102,8 @@ export type { NavigationCapture, NavigationView } from './navigation.js'
 
 export type { MountControlAction, MountControlAvailability, MountControlView } from './mount-control.js'
 
+export type { DewChannelView, DewControlAction, DewControlView } from './dew-control.js'
+
 export type {
   AlertDelivery,
   AlertLevel,

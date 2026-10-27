@@ -231,6 +231,7 @@ function setup({ savedCameraName = 'Camera' }: { savedCameraName?: string } = {}
         execute: async () => ({ outcome: 'failed', reason: 'unsupported' }),
       }
     },
+    createSwitchControl: () => undefined,
     createCooling(source) {
       select('cooling', source)
 

@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import type { RigDeviceConnectionSummary } from '@vela/model/rig'
 import type { HomeView, RigDetailView } from '@vela/model/web'
+import { dewControlSchema } from '../features/rig-detail/dew-control-api'
 import { mountControlSchema } from '../features/rig-detail/mount-control-api'
 
 const text = z.string().refine(value => value.trim().length > 0)
@@ -98,6 +99,9 @@ const switchStatus = z.object({
         name: text,
         on: z.boolean().optional(),
         value: z.number().optional(),
+        minimum: z.number().optional(),
+        maximum: z.number().optional(),
+        step: z.number().optional(),
       }),
     )
     .refine(channels => new Set(channels.map(channel => channel.id)).size === channels.length)
@@ -109,6 +113,7 @@ const identity = z.object({
   name: text,
   configuredName: text,
   mountControl: mountControlSchema.optional(),
+  dewControl: dewControlSchema.optional(),
   observation: z.object({
     state: z.enum(['current', 'partial', 'interrupted']),
     observedAt: isoDate.optional(),

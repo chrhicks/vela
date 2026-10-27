@@ -15,6 +15,7 @@ import { createCriaProvider } from './provider.js'
 import { DeviceReadings } from './readings.js'
 import { createCriaMountControl } from './mount-control.js'
 import { createMountHome } from './mount-home.js'
+import { createCriaSwitchControl } from './switch-control.js'
 
 /** `busy` is Cria refusing because an operation is still open on the device. */
 export type CriaRecovery =
@@ -425,6 +426,7 @@ export function createCriaEquipment(connection: CriaConnection, bindings: Readon
   return {
     acquisition, framing, focuser, cooling,
     mountControl: createCriaMountControl(connection, bindings, mountHome),
+    switchControl: createCriaSwitchControl(connection, bindings),
     provider: createCriaProvider(connection, bindings),
     holds,
     async recover(deviceId: string, note: string): Promise<CriaRecovery> {

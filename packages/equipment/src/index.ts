@@ -66,3 +66,5 @@ export type {
   MountControlCommandResult,
   MountControlObservation,
 } from './mount-control.js'
+
+export type { SwitchControl, SwitchSetCommand, SwitchSetResult } from './switch-control.js'

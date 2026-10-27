@@ -20,6 +20,7 @@ import {
 import { loadRigDetailView } from './rig/detail.js'
 import { loadHomeView } from './rig/home.js'
 import { createRigOperations } from './rig/operations.js'
+import { registerDewControls } from './rig/dew-control.js'
 import { registerMountControls } from './rig/mount-control.js'
 import { getTarget } from './targets/catalog/index.js'
 import { registerCapture } from './capture/routes.js'
@@ -93,6 +94,11 @@ export function buildApp({
   const mountControls = registerMountControls(app, rigCatalog, operations, {
     createInspector,
     createMountControl: equipment.createMountControl,
+  })
+
+  const dewControls = registerDewControls(app, rigCatalog, {
+    createInspector,
+    createSwitchControl: equipment.createSwitchControl,
   })
 
   registerAlignment(app, rigCatalog, alignment, operations, undefined, {
@@ -396,7 +402,7 @@ export function buildApp({
         return reply.code(404).send({ error: 'rig-not-found' })
       }
 
-      return mountControls.decorate(result.view)
+      return dewControls.decorate(await mountControls.decorate(result.view))
     } finally {
       request.raw.removeListener('aborted', cancel)
       reply.raw.removeListener('close', cancel)

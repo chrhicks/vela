@@ -42,7 +42,12 @@
 .rig-controls__mount > p:not(.rig-controls__reading) { color: var(--vela-text-muted); font-size: 14px; line-height: 20px; }
 .rig-controls__actions { display: flex; flex-wrap: wrap; gap: 12px; }
 
+.rig-controls__dew { display: grid; gap: 16px; }
+.rig-controls__dew form { display: grid; gap: 12px; }
+.rig-controls__dew > p { color: var(--vela-text-muted); }
+.rig-controls__dew dl,
 .rig-controls__cooler dl { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0; }
+.rig-controls__dew dd,
 .rig-controls__cooler dd { margin: 0; color: var(--vela-text); }
 .rig-controls__cooler form { display: grid; gap: 16px; }
 .rig-controls__cooler-note { display: inline-grid; }

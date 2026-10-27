@@ -46,6 +46,13 @@ export class DeviceReadings {
 
   optionalNumber(key: string) { return this.optional(key, Schema.Number) }
 
+  /** A number the device may not report; a missing or stale one is left out and does not make the device partial. */
+  advisoryNumber(key: string) {
+    const reading = this.readings[key]
+
+    return reading?.status === 'fresh' && Schema.is(Schema.Number)(reading.value) ? reading.value : undefined
+  }
+
   supportedNumber(key: string) {
     const reading = this.readings[key]
 

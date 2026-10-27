@@ -271,6 +271,12 @@ function telemetry(r: DeviceReadings): DeviceTelemetry {
 
         if (on !== undefined) result = { ...result, on }
 
+        for (const key of ['minimum', 'maximum', 'step'] as const) {
+          const limit = channel.advisoryNumber(key)
+
+          if (limit !== undefined) result = { ...result, [key]: limit }
+        }
+
         channels.push(result)
         r.include(channel)
       }

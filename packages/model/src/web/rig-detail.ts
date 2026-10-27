@@ -1,3 +1,4 @@
+import type { DewControlView } from './dew-control.js'
 import type { MountControlView } from './mount-control.js'
 import type { ConnectionStatus, DeviceKind } from '../device/index.js'
 import type {
@@ -129,6 +130,10 @@ export interface RigSwitchChannelView {
   readonly name: string
   readonly on?: boolean
   readonly value?: number
+  /** The range and step the device accepts for this channel, when it reports them. */
+  readonly minimum?: number
+  readonly maximum?: number
+  readonly step?: number
 }
 
 export interface RigSwitchStatus {
@@ -137,7 +142,9 @@ export interface RigSwitchStatus {
   readonly channels?: ReadonlyArray<RigSwitchChannelView>
 }
 
-export type RigSwitchDeviceView = RigDeviceView<'switch', RigSwitchStatus>
+export type RigSwitchDeviceView = RigDeviceView<'switch', RigSwitchStatus> & {
+  readonly dewControl?: DewControlView
+}
 
 type SupportedRigDeviceKind =
   | 'camera'

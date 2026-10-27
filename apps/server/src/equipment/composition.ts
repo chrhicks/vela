@@ -19,6 +19,7 @@ import {
   type Focuser,
   type Framing,
   type MountControl,
+  type SwitchControl,
 } from '@vela/equipment'
 import { createRigDeviceInventory, type RigDeviceInventory } from '../device/inventory.js'
 import type { RigCatalogRecord, RigEquipmentSource } from '../rig/contracts.js'
@@ -40,6 +41,8 @@ export interface EquipmentComposition {
   createFraming(rig: RigCatalogRecord): Framing
   createFocuser(rig: RigCatalogRecord): Focuser
   createMountControl(rig: RigCatalogRecord): MountControl
+  /** Only a Cria rig has a switch Vela commands; an Alpaca rig has none. */
+  createSwitchControl(rig: RigCatalogRecord): SwitchControl | undefined
   createCooling(rig: RigCatalogRecord): CameraCooling
   alignmentSettings(rig: RigCatalogRecord): AlignmentSettings | undefined
 }
@@ -128,6 +131,7 @@ export function createEquipmentComposition(
     createMountControl: rig => rig.source
       ? cria(rig).mountControl
       : createAlpacaMountControl({ baseUrl: alpacaEndpoint(rig) }),
+    createSwitchControl: rig => rig.source ? cria(rig).switchControl : undefined,
     createCooling: rig => rig.source
       ? cria(rig).cooling
       : createAlpacaCameraCooling({ baseUrl: alpacaEndpoint(rig) }),
