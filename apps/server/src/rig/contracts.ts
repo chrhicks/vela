@@ -1,4 +1,5 @@
 import type { DeviceKind } from '@vela/model/device'
+import type { RigFilter } from '@vela/model/web'
 import type { IsoDateTime, RigEndpoint, RigId } from '@vela/model/rig'
 
 /**
@@ -12,6 +13,8 @@ export interface RigCatalogRecord {
   readonly source?: RigSource
   readonly imagingCamera?: { readonly uniqueId: string; readonly name: string }
   readonly focalLengthMm?: number
+  /** The filters Chris can put in front of the camera, edited in the catalog file. "None" is not listed. */
+  readonly filters?: ReadonlyArray<RigFilter>
   readonly addedAt: IsoDateTime
   readonly lastObservedInventory: ObservedRigInventory
 }
