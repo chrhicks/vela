@@ -10,6 +10,7 @@ import { Button, Input, Panel, Select } from '@vela/ui'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { AltitudeTrace } from './AltitudeTrace'
+import { horizonNote, horizonWindowNote } from './horizon'
 import { skyTime } from './sky-time'
 import { SkyInspection } from './SkyInspection'
 import { useCatalog } from './use-catalog'
@@ -397,6 +398,11 @@ function ExploreSubjects({
                             ? 'Observing window unavailable'
                             : 'Choose a rig for sky timing'}
                     </p>
+                    {horizonWindowNote(item?.horizonInWindow ?? null).map((line) => (
+                      <p className="vela-discovery__horizon" key={line}>
+                        {line}
+                      </p>
+                    ))}
                     <Button
                       tone="quiet"
                       aria-pressed={selected?.id === target.id}
@@ -482,7 +488,16 @@ function ExploreSubjects({
                     <dd>{Math.round(sky.currentMoonSeparationDegrees)}°</dd>
                   </div>
                 </dl>
-                <p>Sky estimates don’t include local obstructions or weather.</p>
+                {horizonNote(sky).map((line) => (
+                  <p className="vela-discovery__horizon" key={line}>
+                    {line}
+                  </p>
+                ))}
+                <p>
+                  {sky.samples.some((sample) => sample.horizon !== null)
+                    ? 'Trees and roofs are approximate. Sky estimates don’t include weather.'
+                    : 'Sky estimates don’t include local obstructions or weather.'}
+                </p>
               </>
             ) : (
               <>

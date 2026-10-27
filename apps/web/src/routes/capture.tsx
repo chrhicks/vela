@@ -12,6 +12,7 @@ import { pagingLabel } from '../features/alerts/presentation'
 import { useRigObservation } from '../features/rig-detail/RigContext'
 import { useTonightTarget } from '../features/targets/use-tonight-target'
 import { AltitudeTrace } from '../features/targets/AltitudeTrace'
+import { horizonNote } from '../features/targets/horizon'
 import { skyTime } from '../features/targets/sky-time'
 import { EquipmentSummary } from '../features/observation/EquipmentSummary'
 import './capture.css'
@@ -513,6 +514,9 @@ function CapturePage({ rigId }: { rigId: string }) {
                     {skyStale ? 'Last calculation' : 'Calculated'} {skyTime(sky.observedAt)}
                   </span>
                 </div>
+                {horizonNote(sky).map((line) => (
+                  <p key={line}>{line}</p>
+                ))}
                 {skyStale && (
                   <p role="status">Sky updates interrupted · last calculation shown.</p>
                 )}

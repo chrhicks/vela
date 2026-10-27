@@ -46,6 +46,7 @@ const saved: TargetDiscoveryView = {
         bestAltitudeDegrees: 80,
         currentAltitudeDegrees: 48,
       },
+      horizonInWindow: null,
     },
   ],
 }
@@ -378,7 +379,7 @@ for (const route of ['/explore', '/rigs/rig-1/observe/targets']) {
       const catalog = {
         query: next.query, category: next.category, filter: next.filter,
         offset, pageSize, total: next.total,
-        targets: next.targets.map(({ sky: _sky, opportunity: _opportunity, ...target }) => target),
+        targets: next.targets.map(({ sky: _sky, opportunity: _opportunity, horizonInWindow: _horizon, ...target }) => target),
       }
 
       await request.fulfill({ json: route === '/explore' ? catalog : next })

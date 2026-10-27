@@ -18,6 +18,7 @@ const samples: TargetSkyPath['samples'] = Array.from({ length: 97 }, (_, index) 
     at: new Date(start + index * 900_000).toISOString(),
     azimuthDegrees: (50 + index * 3) % 360,
     altitudeDegrees: 35 + 20 * Math.sin(index / 15),
+    horizon: null,
     sunAltitudeDegrees,
     moon: {
       azimuthDegrees: (170 + index * 2) % 360,

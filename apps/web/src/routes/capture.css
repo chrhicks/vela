@@ -200,6 +200,19 @@
   stroke: var(--vela-text-muted);
   stroke-width: 2.5;
 }
+.tonight-sky__behind {
+  fill: none;
+  stroke: var(--vela-warning);
+  stroke-width: 3.5;
+  stroke-linecap: round;
+}
+.tonight-sky__unknown {
+  fill: none;
+  stroke: var(--vela-warning);
+  stroke-width: 2.5;
+  stroke-dasharray: 1 5;
+  stroke-linecap: round;
+}
 .tonight-sky__marker {
   fill: var(--vela-canvas);
   stroke: var(--vela-text-muted);

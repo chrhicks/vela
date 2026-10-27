@@ -93,6 +93,12 @@
   color: var(--vela-text-muted);
   margin: 0;
 }
+.vela-discovery__horizon {
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--vela-warning);
+  margin: 0;
+}
 .vela-discovery__card-facts {
   display: flex;
   flex-wrap: wrap;
@@ -343,6 +349,15 @@
 .vela-discovery__subject .tonight-sky__trace polyline {
   stroke-dasharray: none;
   stroke-width: 3;
+}
+.vela-discovery__subject .tonight-sky__trace polyline.tonight-sky__behind {
+  stroke: var(--vela-warning);
+  stroke-width: 4;
+}
+.vela-discovery__subject .tonight-sky__trace polyline.tonight-sky__unknown {
+  stroke: var(--vela-warning);
+  stroke-width: 3;
+  stroke-dasharray: 1 6;
 }
 .vela-discovery__subject .tonight-sky__trace path.tonight-sky__future {
   stroke-dasharray: 3 5;
