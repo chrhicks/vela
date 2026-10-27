@@ -346,7 +346,8 @@ test('framing prerequisite recovery opens the Controls panel with the mount sect
   await expect(mount(page).getByRole('button', { name: 'Turn tracking on', exact: true })).toBeVisible()
   expect(fixture.writes).toEqual([])
   expect(explore.commands).toEqual([])
-  expect(fixture.scene.unknownRequests).toEqual([])
+  // The targets page stays mounted under the panel, so its own sky survey read may land in the catch-all. It is not a rig command.
+  expect(fixture.scene.unknownRequests.filter(request => !request.startsWith('GET /api/survey/'))).toEqual([])
 })
 
 for (const mode of ['light', 'dark'] as const) {
