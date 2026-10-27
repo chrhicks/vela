@@ -57,8 +57,16 @@ export interface AutofocusRunOptions {
   stepSize?: number
   offsetSteps?: number
   exposureSeconds?: number
+  /** The air temperature the caller already read when it checked the rig was ready. */
+  airTemperatureStartC?: number | null
   onSettled?: () => void
 }
+
+/** The air temperature now, or null. It may reject; the controller treats that as null. */
+export type AutofocusAirTemperature = (signal: AbortSignal) => Promise<number | null>
+
+/** The end reading starts when the walk finishes and runs beside the restore, so this bounds only its tail. */
+const airTemperatureTimeoutMs = 3000
 
 const rSquaredGate = 0.7
 
@@ -84,12 +92,16 @@ export function createAutofocusController(
   now = Date.now,
   measure: AutofocusMeasure = measureAutofocusStars,
   record: AutofocusRecord = () => {},
+  readAirTemperature: AutofocusAirTemperature = async () => null,
 ) {
   let view: AutofocusView = emptyView(settings, DEFAULT_STEP_SIZE, DEFAULT_OFFSET_STEPS)
   let startedAt: string | undefined
   let settledAt: string | null = null
   /** The star table of `view.samples[i]`, kept apart so the polled view stays small. */
   let starTables: AutofocusStar[][] = []
+  let airTemperatureStartC: number | null = null
+  let airTemperatureEndC: number | null = null
+  let endReading: Promise<number | null> | undefined
   let running: Promise<void> | undefined
   let cancellation: AbortController | undefined
   let plannedReady: { resolve: () => void; reject: (error: Error) => void } | undefined
@@ -179,6 +191,24 @@ export function createAutofocusController(
     return point
   }
 
+  function beginEndReading() {
+    if (endReading || !view.samples.length) return
+
+    const abandoned = new AbortController()
+    let timer: ReturnType<typeof setTimeout>
+
+    const expired = new Promise<null>(resolve => {
+      timer = setTimeout(() => {
+        abandoned.abort()
+        resolve(null)
+      }, airTemperatureTimeoutMs)
+    })
+
+    endReading = Promise.race([readAirTemperature(abandoned.signal).catch(() => null), expired]).finally(
+      () => clearTimeout(timer),
+    )
+  }
+
   /** The run so far, or the last one: its setup, fit and every sample with its star table. Null before a first sample. */
   function currentRun(): AutofocusRun | null {
     if (!startedAt || !view.samples.length) return null
@@ -195,6 +225,7 @@ export function createAutofocusController(
       offsetSteps: view.offsetSteps,
       exposureSeconds: view.exposureSeconds,
       fit: view.fit,
+      airTemperatureC: { start: airTemperatureStartC, end: airTemperatureEndC },
       samples: view.samples.map((sample, index) => ({ ...sample, stars: starTables[index] ?? [] })),
     }
   }
@@ -361,6 +392,7 @@ export function createAutofocusController(
       patch({ phase: 'confirming', activity: 'moving' })
       await approach(focuser, plan, fit.position, 'best-focus', () => signal)
       await sample(camera, fit.position, exposureSeconds, signal)
+      beginEndReading()
       signal.throwIfAborted()
       patch({
         phase: 'complete',
@@ -372,6 +404,7 @@ export function createAutofocusController(
       })
     } catch (error) {
       const cancelled = error instanceof AutofocusStoppedError
+      beginEndReading()
 
       try {
         await focuser.halt()
@@ -411,6 +444,7 @@ export function createAutofocusController(
       stepSize = DEFAULT_STEP_SIZE,
       offsetSteps = DEFAULT_OFFSET_STEPS,
       exposureSeconds = 2,
+      airTemperatureStartC: startTemperatureC = null,
       onSettled,
     }: AutofocusRunOptions = {},
   ) {
@@ -428,6 +462,9 @@ export function createAutofocusController(
     startedAt = new Date(now()).toISOString()
     settledAt = null
     starTables = []
+    airTemperatureStartC = startTemperatureC
+    airTemperatureEndC = null
+    endReading = undefined
     patch({
       ...emptyView(settings, stepSize, offsetSteps),
       cameraName: settings.cameraName,
@@ -449,7 +486,8 @@ export function createAutofocusController(
       offsetSteps,
       exposureSeconds,
       cancellation.signal,
-    ).finally(() => {
+    ).finally(async () => {
+      airTemperatureEndC = (await endReading) ?? null
       running = undefined
       settledAt = new Date(now()).toISOString()
       patch({

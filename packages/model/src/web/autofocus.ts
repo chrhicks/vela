@@ -36,6 +36,12 @@ export interface AutofocusRun {
   offsetSteps: number
   exposureSeconds: number
   fit: AutofocusFit | null
+  /**
+   * Air temperature from the rig's observing-conditions device when the run began and when it
+   * settled. Null when the rig has no such device or it could not be read in time. The end is null
+   * in the live view until the run settles.
+   */
+  airTemperatureC: { start: number | null; end: number | null }
   samples: AutofocusStarSample[]
 }
 

@@ -82,6 +82,7 @@ Both are an `AutofocusRun` (`packages/model/src/web/autofocus.ts`):
   "offsetSteps": 4,
   "exposureSeconds": 2,
   "fit": { "position": 32838, "p": 32837.9, "a": 2.27, "b": 99.9, "rSquared": 0.999, "minSamplePosition": 32842 },
+  "airTemperatureC": { "start": 8.0, "end": 7.6 },
   "samples": [
     {
       "position": 33042,
@@ -116,15 +117,26 @@ Both are an `AutofocusRun` (`packages/model/src/web/autofocus.ts`):
   focuser ended. Only a `complete` run ended at `fit.position`. `settledAt` is null
   only in the live route, during the walk.
 
+- `airTemperatureC` is the air temperature in degrees Celsius when the run began and when it
+  settled, so a run's best focus can be set against it. Best focus moved about 14 steps per degree
+  on this rig, and the EAF has no temperature compensation. It is the reading the rig page shows
+  as `temperatureC` for the rig's observing-conditions device (the Pegasus PPBA on the FRA 400). The
+  start is the reading from the check that the rig was ready, so it adds no read. The end is one more
+  read that starts when the walk finishes and runs beside the restore. It is abandoned after 3 s.
+  Either is `null`, never a guess, when the rig has no such device, it reports no temperature, it is
+  disconnected, its reading is last-known after an interruption, two devices report, or the read
+  failed or ran out of time. A `null` never fails or delays the walk. A run recorded by a build
+  before this has no `airTemperatureC`. In the live route the end is `null` until the run settles.
+
 Size: a star is about 50 bytes of JSON. A simulated 10-sample run of about 25 stars a
 sample is 12.6 KB. A run of 12 samples with the cap reached is at most about 60 KB,
 and a rich field out of focus usually has 20 to 60 stars a sample. A night of ten
 runs is under 1 MB.
 
-To list a run's chosen focus and star counts:
+To list a run's chosen focus, star counts and air temperature:
 
 ```sh
-jq -c 'select(.phase == "complete") | {startedAt, fit: .fit.position, stars: [.samples[] | [.position, .detectedStars, (.stars | length)]]}' autofocus.jsonl
+jq -c 'select(.phase == "complete") | {startedAt, fit: .fit.position, airC: .airTemperatureC, stars: [.samples[] | [.position, .detectedStars, (.stars | length)]]}' autofocus.jsonl
 ```
 
 Stop takes no input. Send it as a POST with an empty body. Any non-empty body, `{}` included, is
