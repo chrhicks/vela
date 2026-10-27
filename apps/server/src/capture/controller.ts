@@ -7,6 +7,7 @@ import type {
   CaptureView,
   FrameType,
 } from '@vela/model/web'
+import type { FrameSettings } from '../imaging/fits.js'
 import { frameImaging, type FrameImaging } from '../imaging/frame-imaging.js'
 import type { ImageColor } from '../imaging/preview.js'
 import { PREVIEW_VERSION } from '../imaging/background.js'
@@ -47,7 +48,15 @@ export interface CaptureCamera {
    * A camera that is not told the frame type has no such time and omits this.
    */
   biasExposureSeconds?(signal: AbortSignal): Promise<number>
+  /**
+   * What the camera and mount are set to now, for the frame just taken. Rejects when the camera
+   * cannot be read, and leaves out any value it could not read. A camera that cannot say omits this.
+   */
+  frameSettings?(signal: AbortSignal): Promise<FrameSettings>
 }
+
+/** Longest a frame waits for its settings before it is saved without them. */
+const FRAME_SETTINGS_TIMEOUT_MS = 2000
 
 /** Only the acquisition boundary can confirm cancellation finished cleanup. */
 export class CaptureStoppedError extends Error {
@@ -88,6 +97,8 @@ export interface CaptureRunOptions {
   /** What the run takes; default `light`. Only a light run has a subject. */
   frameType?: FrameType
   subject?: CaptureSubject | null
+  /** The rig's effective focal length when the run starts, for the FITS header. */
+  focalLengthMm?: number | undefined
   onSettled?: () => void
   /** Called with each frame once it is published, whether or not it is saved. */
   onFrame?: (image: CaptureImage) => void
@@ -254,6 +265,31 @@ export function createCaptureController(
     return minimum
   }
 
+  /**
+   * Settings are a courtesy to the file, never a condition of it: a read that fails or runs long
+   * costs the frame its settings keys, not the frame. The rig's focal length needs no read.
+   */
+  async function frameSettingsOf(camera: CaptureCamera, focalLengthMm: number | undefined) {
+    const read: FrameSettings = {}
+
+    if (camera.frameSettings) {
+      const reading = new AbortController()
+      const timer = setTimeout(() => reading.abort(), FRAME_SETTINGS_TIMEOUT_MS)
+
+      try {
+        Object.assign(read, await camera.frameSettings(reading.signal))
+      } catch (error) {
+        console.warn('Frame settings unavailable; the FITS header omits them', error)
+      } finally {
+        clearTimeout(timer)
+      }
+    }
+
+    if (focalLengthMm !== undefined) read.focalLengthMm = focalLengthMm
+
+    return read
+  }
+
   async function acquire(
     requestedSeconds: number,
     signal: AbortSignal,
@@ -264,6 +300,7 @@ export function createCaptureController(
     saveFrames: boolean,
     frameType: FrameType,
     subject: CaptureSubject | null,
+    focalLengthMm: number | undefined,
     runGeneration: number,
     runId: string,
     onFrame: CaptureRunOptions['onFrame'],
@@ -441,6 +478,7 @@ export function createCaptureController(
         if (!signal.aborted) patch({ phase: 'reading' })
         const id = randomUUID()
         const processStartedAt = performance.now()
+        const frameSettings = await frameSettingsOf(camera, focalLengthMm)
 
         const [previews, statistics, fits] = await Promise.all([
           imaging.render(frame.width, frame.height, frame.pixels, frame.color),
@@ -449,7 +487,13 @@ export function createCaptureController(
 
             return null
           }),
-          imaging.encodeFits(frame, { exposureSeconds, cameraName, frameType }),
+          imaging.encodeFits(frame, {
+            exposureSeconds,
+            cameraName,
+            frameType,
+            objectName: subject?.name,
+            settings: frameSettings,
+          }),
         ])
 
         span.setAttributes({
@@ -579,6 +623,7 @@ export function createCaptureController(
       saveFrames = false,
       frameType = 'light',
       subject = null,
+      focalLengthMm,
     }: CaptureRunOptions = {},
   ) {
     if (running) throw new Error('An exposure is already running')
@@ -651,6 +696,7 @@ export function createCaptureController(
       saveFrames,
       frameType,
       runSubject,
+      focalLengthMm,
       runGeneration,
       runId,
       onFrame,

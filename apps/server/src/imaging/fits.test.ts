@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { encodeCaptureFits } from './fits.js'
+import { encodeCaptureFits, type FrameSettings } from './fits.js'
+import { readRetainedFits } from './read-retained-fits.js'
 
 const metadata = { exposureSeconds: 1.5, cameraName: "Chris's camera" }
 
@@ -192,5 +193,150 @@ describe('IMAGETYP', () => {
 
   it('writes LIGHT when the caller names no type', async () => {
     expect(header(await encodeCaptureFits(frame, metadata))).toContain("IMAGETYP= 'LIGHT'".padEnd(80))
+  })
+})
+
+describe('camera, optics and target settings', () => {
+  const settings: FrameSettings = {
+    gain: 100,
+    offset: 10,
+    binX: 2,
+    binY: 2,
+    pixelWidthMicrons: 7.52,
+    pixelHeightMicrons: 7.52,
+    sensorTemperatureC: -10.2,
+    setpointC: -10,
+    focalLengthMm: 400,
+    pierSide: 'west',
+  }
+
+  /** Every keyword in the header with its raw value, and whether any keyword repeats. */
+  function keywords(fits: Buffer) {
+    const cards = header(fits)
+      .filter(card => card.trim() !== '' && !card.startsWith('COMMENT'))
+      .map(card => ({ key: card.slice(0, 8).trim(), value: card.slice(10).trim() }))
+
+    return {
+      values: new Map(cards.map(({ key, value }) => [key, value])),
+      repeated: cards.length !== new Set(cards.map(({ key }) => key)).size,
+    }
+  }
+
+  const baseline = ['SIMPLE', 'BITPIX', 'NAXIS', 'NAXIS1', 'NAXIS2', 'DATE-OBS', 'EXPTIME', 'IMAGETYP', 'INSTRUME', 'ROWORDER', 'END']
+
+  const settingKeys = ['GAIN', 'OFFSET', 'XBINNING', 'YBINNING', 'XPIXSZ', 'YPIXSZ', 'CCD-TEMP', 'SET-TEMP', 'FOCALLEN', 'OBJECT', 'PIERSIDE']
+
+  it('writes every setting with its value and units on a light frame', async () => {
+    const fits = await encodeCaptureFits(frame, { ...metadata, objectName: 'M 31', settings })
+    const { values } = keywords(fits)
+
+    expect(Object.fromEntries(settingKeys.map(key => [key, values.get(key)]))).toEqual({
+      GAIN: '100',
+      OFFSET: '10',
+      XBINNING: '2',
+      YBINNING: '2',
+      XPIXSZ: '7.52',
+      YPIXSZ: '7.52',
+      'CCD-TEMP': '-10.2',
+      'SET-TEMP': '-10',
+      FOCALLEN: '400',
+      OBJECT: "'M 31'",
+      PIERSIDE: "'WEST'",
+    })
+
+    expect(header(fits)).toContain('CCD-TEMP=                -10.2'.padEnd(80))
+    await expect(readRetainedFits(fits)).resolves.toMatchObject({ width: 3, height: 2 })
+  })
+
+  it.each(['dark', 'flat', 'dark-flat', 'bias'] as const)('names no object on a %s frame', async frameType => {
+    const fits = await encodeCaptureFits(frame, { ...metadata, frameType, objectName: 'M 31', settings })
+
+    expect(keywords(fits).values.has('OBJECT')).toBe(false)
+    expect(keywords(fits).values.get('GAIN')).toBe('100')
+  })
+
+  it('names no object on a light frame without a subject', async () => {
+    expect(keywords(await encodeCaptureFits(frame, { ...metadata, settings })).values.has('OBJECT')).toBe(false)
+  })
+
+  it('leaves out exactly the settings that could not be read, and the file still reads back', async () => {
+    const { gain: _gain, binX: _binX, setpointC: _setpoint, pierSide: _pierSide, ...unread } = settings
+    const fits = await encodeCaptureFits(frame, { ...metadata, settings: unread })
+    const { values } = keywords(fits)
+
+    expect(settingKeys.filter(key => !values.has(key))).toEqual(['GAIN', 'XBINNING', 'SET-TEMP', 'OBJECT', 'PIERSIDE'])
+    expect(values.get('OFFSET')).toBe('10')
+    expect((await readRetainedFits(fits)).pixels).toEqual(Int32Array.from(frame.pixels))
+  })
+
+  it('writes no setting card when none was read', async () => {
+    const withNone = [await encodeCaptureFits(frame, metadata), await encodeCaptureFits(frame, { ...metadata, settings: {} })]
+
+    for (const fits of withNone)
+      expect([...keywords(fits).values.keys()]).toEqual(baseline)
+  })
+
+  it('leaves out a setting that is not a finite number rather than writing an invalid card', async () => {
+    const fits = await encodeCaptureFits(frame, { ...metadata, settings: { gain: NaN, offset: Infinity, binX: 1 } })
+    const { values } = keywords(fits)
+
+    expect(values.has('GAIN') || values.has('OFFSET')).toBe(false)
+    expect(values.get('XBINNING')).toBe('1')
+  })
+
+  it('writes every card as 80 ASCII characters, once, in the first header block, and escapes apostrophes', async () => {
+    const fits = await encodeCaptureFits(
+      { ...frame, color: { kind: 'bayer', pattern: 'rggb' }, capturedAtSource: 'server-estimate' },
+      { ...metadata, objectName: "Barnard's Loop é", settings },
+    )
+
+    const cards = header(fits)
+
+    expect(cards.every(card => card.length === 80 && /^[\x20-\x7e]+$/.test(card))).toBe(true)
+    expect(keywords(fits).repeated).toBe(false)
+    expect(cards).toContain("OBJECT  = 'Barnard''s Loop ?'".padEnd(80))
+    expect(cards.indexOf('END'.padEnd(80))).toBeLessThan(36)
+  })
+
+  it('keeps every existing card as it was', async () => {
+    const without = await encodeCaptureFits(frame, metadata)
+    const withSettings = await encodeCaptureFits(frame, { ...metadata, objectName: 'M 31', settings })
+    const added = new Set(settingKeys)
+
+    const written = (fits: Buffer) => header(fits).filter(card => card.trim() !== '')
+
+    expect(written(withSettings).filter(card => !added.has(card.slice(0, 8).trim()))).toEqual(written(without))
+    expect(withSettings.subarray(2880)).toEqual(without.subarray(2880))
+  })
+
+  it('writes no site or pointing key under any input', async () => {
+    const hostile = {
+      ...settings,
+      SITELAT: 1,
+      SITELONG: 2,
+      LAT: 3,
+      LONG: 4,
+      ELEVATION: 5,
+      latitudeDegrees: 6,
+      longitudeDegrees: 7,
+      elevationMeters: 8,
+      rightAscensionDegrees: 9,
+      declinationDegrees: 10,
+    }
+
+    const extra = { siteLatitude: 1, ra: 2 }
+
+    const fits = await encodeCaptureFits(
+      { ...frame, pixels: [0, 1, 2, 3, 4, 5], color: { kind: 'bayer', pattern: 'rggb' }, capturedAtSource: 'server-estimate' },
+      { ...metadata, ...extra, objectName: 'M 31', settings: hostile },
+    )
+
+    const written = [...keywords(fits).values.keys()]
+
+    const allowed = [...baseline, 'BZERO', 'BSCALE', 'TIMESRC', 'BAYERPAT', ...settingKeys]
+
+    expect(written.filter(key => !allowed.includes(key))).toEqual([])
+
+    expect(written.filter(key => /^(SITE|LAT|LONG|ELEV|ALT-OBS|OBSGEO|OBJCT|RA|DEC|CRVAL|MNT|TELE?RA|TELEDEC)/.test(key))).toEqual([])
   })
 })

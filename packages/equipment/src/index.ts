@@ -15,6 +15,7 @@ export type {
   CaptureFrameType,
   CaptureOptions,
   CaptureProvenance,
+  ExposureSettings,
   Frame,
   FrameColor,
   Pointing,

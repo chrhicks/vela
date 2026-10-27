@@ -68,13 +68,15 @@ function setup(
     createCooling?: (settings: CaptureSettings) => AlpacaCameraCooling
     alerts?: NonNullable<Parameters<typeof registerCapture>[3]>['alerts']
     runs?: CaptureRunStore
+    focalLengthMm?: number
   } = {},
 ) {
   const app = Fastify()
   const { imagingCamera: _, ...unselected } = record
+  const configured = options.focalLengthMm === undefined ? unselected : { ...unselected, focalLengthMm: options.focalLengthMm }
 
   const catalog = createMemoryRigCatalog([
-    selection ? { ...unselected, imagingCamera: selection } : unselected,
+    selection ? { ...configured, imagingCamera: selection } : configured,
   ])
 
   const operations = createRigOperations()
@@ -878,6 +880,53 @@ it('reads the bias exposure from the acquisition for the configured camera, and 
   expect(await configuredCamera(settings, { capture, biasExposureSeconds }).biasExposureSeconds!(signal)).toBe(0.000032)
   expect(biasExposureSeconds).toHaveBeenCalledExactlyOnceWith('camera', signal)
   expect(configuredCamera(settings, { capture })).not.toHaveProperty('biasExposureSeconds')
+})
+
+describe('the settings a configured camera reads for the FITS header', () => {
+  const capture: Acquisition['capture'] = async () => expect.unreachable('not exposing')
+  const signal = new AbortController().signal
+  const camera = { rig: record, cameraId: 'camera', expectedCameraName: 'Main camera' }
+
+  const withTelescopes = (...ids: string[]) => ({
+    ...camera,
+    rig: {
+      ...record,
+      lastObservedInventory: {
+        ...record.lastObservedInventory,
+        devices: [...record.lastObservedInventory.devices, ...ids.map(uniqueId => ({ uniqueId, kind: 'telescope' as const, name: uniqueId }))],
+      },
+    },
+  })
+
+  it('reads the camera and the rig\'s one telescope from the acquisition, and offers none when the acquisition has none', async () => {
+    const exposureSettings = vi.fn(async () => ({ gain: 100 }))
+
+    expect(await configuredCamera(withTelescopes('mount'), { capture, exposureSettings }).frameSettings!(signal)).toEqual({ gain: 100 })
+    expect(exposureSettings).toHaveBeenCalledExactlyOnceWith({ cameraId: 'camera', telescopeId: 'mount' }, signal)
+    expect(configuredCamera(camera, { capture })).not.toHaveProperty('frameSettings')
+  })
+
+  it.each([
+    ['no telescope', []],
+    ['two telescopes', ['mount', 'guide']],
+  ])('names no telescope for %s, since its pier side cannot be told', async (_name, telescopes) => {
+    const exposureSettings = vi.fn(async () => ({}))
+    await configuredCamera(withTelescopes(...telescopes), { capture, exposureSettings }).frameSettings!(signal)
+
+    expect(exposureSettings).toHaveBeenCalledExactlyOnceWith({ cameraId: 'camera' }, signal)
+  })
+})
+
+it('writes the rig\'s focal length into the saved FITS', async () => {
+  const subject = setup(record.imagingCamera, { focalLengthMm: 400 })
+  expect((await subject.start({ exposureSeconds: 10, saveFrames: true })).statusCode).toBe(200)
+  subject.captures[0]!.resolve(frame)
+  await vi.waitFor(async () => expect(await subject.savedImages.list('sim')).toHaveLength(1))
+
+  const [saved] = await subject.savedImages.list('sim')
+  const fits = (await subject.savedImages.file('sim', saved!.id, 'fits'))!.toString('ascii', 0, 2880)
+
+  expect(fits).toContain('FOCALLEN=                  400')
 })
 
 it('never lets a calibration run raise star alerts, yet still shows the camera is producing', async () => {

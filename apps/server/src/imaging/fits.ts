@@ -1,7 +1,14 @@
 import { setImmediate } from 'node:timers/promises'
+import type { ExposureSettings } from '@vela/equipment'
 import type { CaptureImage, FrameType } from '@vela/model/web'
 import { imageTypeKeyword } from './frame-type.js'
 import type { ImageColor } from './preview.js'
+
+/** What a frame was taken with: the camera and mount as read, plus the rig's optics. */
+export interface FrameSettings extends ExposureSettings {
+  /** Effective focal length of the rig's optics, in millimetres. */
+  focalLengthMm?: number
+}
 
 /** Export acquisition samples without stretching, calibration, or row reversal. */
 export async function encodeCaptureFits(
@@ -13,7 +20,15 @@ export async function encodeCaptureFits(
     capturedAtSource?: CaptureImage['capturedAtSource']
     color?: ImageColor
   },
-  metadata: { exposureSeconds: number; cameraName: string; frameType?: FrameType },
+  metadata: {
+    exposureSeconds: number
+    cameraName: string
+    frameType?: FrameType
+    /** The subject's name. Only a light frame carries one. */
+    objectName?: string | undefined
+    /** Absent keys are left out of the header, never defaulted. */
+    settings?: FrameSettings
+  },
 ): Promise<Buffer> {
   const { width, height, pixels } = frame
 
@@ -80,6 +95,7 @@ export async function encodeCaptureFits(
   // The acquisition adapter already shifts this pattern to the image origin.
   if (frame.color?.kind === 'bayer')
     cards.push(textCard('BAYERPAT', frame.color.pattern.toUpperCase()))
+  cards.push(...settingCards(metadata))
   cards.push('END'.padEnd(80))
 
   const header = Buffer.from(
@@ -107,6 +123,42 @@ export async function encodeCaptureFits(
   }
 
   return result
+}
+
+/**
+ * The camera, optics, subject and pier side, in the order stacking software expects to find them.
+ * Never the site or the mount's pointing: Chris shares these files.
+ */
+function settingCards({
+  frameType = 'light',
+  objectName,
+  settings = {},
+}: {
+  frameType?: FrameType
+  objectName?: string | undefined
+  settings?: FrameSettings
+}) {
+  const numbers: ReadonlyArray<readonly [string, number | undefined]> = [
+    ['GAIN', settings.gain],
+    ['OFFSET', settings.offset],
+    ['XBINNING', settings.binX],
+    ['YBINNING', settings.binY],
+    ['XPIXSZ', settings.pixelWidthMicrons],
+    ['YPIXSZ', settings.pixelHeightMicrons],
+    ['CCD-TEMP', settings.sensorTemperatureC],
+    ['SET-TEMP', settings.setpointC],
+    ['FOCALLEN', settings.focalLengthMm],
+  ]
+
+  const cards = numbers.flatMap(([key, value]) =>
+    value !== undefined && Number.isFinite(value) ? [numberCard(key, value)] : [],
+  )
+
+  if (frameType === 'light' && objectName?.trim()) cards.push(textCard('OBJECT', objectName.trim()))
+
+  if (settings.pierSide) cards.push(textCard('PIERSIDE', settings.pierSide.toUpperCase()))
+
+  return cards
 }
 
 function textCard(key: string, value: string) {

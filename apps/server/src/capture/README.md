@@ -97,6 +97,13 @@ idempotent artifact command and does not enable saving later frames. Neither
 browsing saved images nor keeping an available frame requires a connected camera.
 See [saved images](../saved-images/README.md) for durable storage and FITS details.
 
+After a frame is accepted and before its FITS is written, the controller asks the camera
+for its settings (`CaptureCamera.frameSettings`), once for each frame. The FITS header
+records them with the run's subject and the rig's focal length; see
+[settings in the header](../imaging/README.md#settings-in-the-header). The read gets two
+seconds. If it fails or runs long, the controller logs a warning and the frame is saved
+without those keys. The capture, the save and the frame record are unchanged.
+
 Capture views include confirmed imaging-camera cooling when the camera reports
 CoolerOn. Sensor temperature near a retained setpoint is not CoolerOn. POST
 `/api/rigs/:rigId/capture/cooling` accepts `coolerOn` and/or `setpointC`. Setting
