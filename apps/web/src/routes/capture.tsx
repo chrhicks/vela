@@ -8,7 +8,6 @@ import { captureActivity, useCapture } from '../features/capture/use-capture'
 import { carriesFilter, frameTypeChoices, frameTypes, isCalibration } from '../features/capture/frame-types'
 import { filterLabel, listedFilter, rememberedFilter, rememberFilter } from '../features/capture/filter-choice'
 import { MAX_FRAME_COUNT, parseFrameCount } from '../features/capture/validation'
-import { CaptureCooling, coolingBlocker } from '../features/capture/CaptureCooling'
 import { pagingLabel } from '../features/alerts/presentation'
 import { useRigObservation } from '../features/rig-detail/RigContext'
 import { useTonightTarget } from '../features/targets/use-tonight-target'
@@ -37,7 +36,6 @@ function CapturePage({ rigId }: { rigId: string }) {
   const [chosenFrameType, setChosenFrameType] = useState<FrameType>('light')
   // Remembered for each rig: the filter rarely changes between nights, and the slot is manual.
   const [chosenFilter, setChosenFilter] = useState(() => rememberedFilter(rigId))
-  const [coolingOpen, setCoolingOpen] = useState(false)
   const { view, offline, pending, refreshing, error, commandUnconfirmed } = capture
   const chosenTargetId = params.get('target') ?? undefined
 
@@ -274,16 +272,7 @@ function CapturePage({ rigId }: { rigId: string }) {
                               : 'Receiving the completed exposure.'}
                     </p>
                   )}
-                  <div className="tonight-capture__unattended">
-                    <Checkbox
-                      label="Unattended (page my phone)"
-                      description={pagingLabel(view.unattended)}
-                      checked={view.unattended}
-                      disabled={!capture.canSetUnattended}
-                      onChange={event => void capture.setUnattended(event.target.checked)}
-                    />
-                    {capture.unattendedError && <p role="alert">{capture.unattendedError}</p>}
-                  </div>
+                  <p className="tonight-capture__paging">{pagingLabel(view.unattended)}</p>
                   <div className="tonight-capture__actions">
                     <div>
                       {view.savedCount} saved · {integrationTime(view.integrationSeconds)}{' '}
@@ -547,38 +536,7 @@ function CapturePage({ rigId }: { rigId: string }) {
         rigId={rigId}
         cooling={view.cooling}
         coolingStale={offline || capture.coolingUnconfirmed}
-        coolingAction={
-          (view.cooling || capture.coolingError) && (
-            <button
-              className="tonight-link"
-              type="button"
-              aria-expanded={coolingOpen}
-              aria-controls="tonight-cooling"
-              onClick={() => setCoolingOpen(open => !open)}
-            >
-              Camera cooling
-            </button>
-          )
-        }
       />
-      {(view.cooling || capture.coolingError) && (
-        <div id="tonight-cooling" className="tonight-cooling" hidden={!coolingOpen}>
-          <CaptureCooling
-            cooling={view.cooling}
-            disabled={!capture.canCool}
-            pending={capture.coolingPending}
-            checking={refreshing}
-            error={capture.coolingError}
-            unconfirmed={capture.coolingUnconfirmed}
-            runActive={view.active}
-            stale={offline || capture.coolingUnconfirmed}
-            blocker={coolingBlocker(view.cooling?.blockedBy, base)}
-            onCooler={coolerOn => void capture.setCooler(coolerOn)}
-            onSetpoint={setpointC => void capture.setCoolingTemperature(setpointC)}
-            onCheck={() => void capture.refresh()}
-          />
-        </div>
-      )}
     </section>
   )
 }

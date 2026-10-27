@@ -29,27 +29,8 @@ The inspection read has a five-second deadline so a stalled request cannot lock
 the dialog. Timeout restores dismissal and keeps the unknown outcome for the
 next explicit check; it never enables an uninspected DELETE retry.
 
-## Clear hold
+## Controls moved out
 
-A device Cria holds (quarantined, or a command whose outcome Vela does not know)
-carries `observation.hold` with Cria's reason and the id the recover route takes.
-Its Equipment row shows the reason and a Clear hold button outside the collapsed
-details, so a phone at the rig sees it without opening anything. The button is
-the only recovery control; a device that is not held never shows it, and one
-button clears one device.
-
-Clear hold opens a confirmation: the hold reason as Cria gave it, then
-"Clearing the hold tells Cria it is safe to command <device> again. Only do this
-after you have checked the equipment." Only "I have checked it, clear the hold"
-sends the request, and both buttons are disabled while it is in flight, so a
-double click sends once. The note is generated ("Cleared from the Vela page by
-the operator at <time>"); nothing is typed.
-
-| Reply | The page |
-| --- | --- |
-| 200 | Closes the confirmation and refreshes the view; the hold disappears once Cria stops reporting it. |
-| 409 `device-busy` | "An operation is still running on this device. Stop it first." The hold stays. |
-| Any other failure | Shows the server's message in the confirmation. The hold stays. |
-
-Vela never clears a hold by itself, and the control is separate from polar
-alignment's Stop.
+Equipment shows device details and readings only. Tracking, Unpark and Clear hold are in the
+[Controls panel](../rig-controls/README.md), opened from the header. A held device still shows
+its reason on its row, outside the collapsed details, with a note to clear it in Controls.

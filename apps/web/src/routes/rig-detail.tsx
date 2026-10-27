@@ -1,7 +1,7 @@
 import type { RigDetailView, RigDeviceDetailView } from '@vela/model/web'
 import { Button, Dialog } from '@vela/ui'
 import { useEffect, useId, useRef, useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { AlertsCard } from '../features/alerts/AlertsCard'
 import { loadHome } from '../features/home/load-home'
 import { ImagingSetup } from '../features/imaging-camera/ImagingSetup'
@@ -22,7 +22,6 @@ export function RigDetail() {
 
 function Equipment({ rigId }: { rigId: string }) {
   const navigate = useNavigate()
-  const location = useLocation()
   const { view, refreshing, interrupted, initialError, refresh } = useRigObservation()!
   const observation = useObservation(rigId)
   const camera = useImagingCamera(rigId)
@@ -116,7 +115,6 @@ function Equipment({ rigId }: { rigId: string }) {
 
   const isSelected = (device: RigDeviceDetailView) => device.kind === 'camera' && device.id === camera.view?.selectedDeviceId && device.name === selected?.name
   const selectedDevice = view.devices.find(isSelected)
-  const mountDevice = view.devices.find(device => device.kind === 'telescope')
   const cameraConnected = selectedDevice?.connection === 'connected' && !camera.offline && camera.view?.state === 'ready'
   const presentation = observation.view ? readinessPresentation(observation.view, busy, observation.interrupted) : null
 
@@ -166,9 +164,6 @@ function Equipment({ rigId }: { rigId: string }) {
               device={device}
               stale={interrupted}
               imagingCamera={isSelected(device)}
-              rigId={rigId}
-              refresh={() => refresh({ force: true })}
-              revealMount={device.id === mountDevice?.id && location.hash === '#mount-controls'}
             />
           ))}
         </section>

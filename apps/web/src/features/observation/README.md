@@ -22,9 +22,9 @@ must remain accurate for unsupported devices and partial telemetry as well as
 the specimen's simple fixtures.
 
 Observe now composes Fieldroom capture preparation: the selected subject,
-last matching temporary framing exposure, capture settings, confirmed camera
-cooling and equipment context. One `useCapture` owns Start and cooling; the old
-CaptureHub is removed. Existing active capture opens Tonight instead of starting
+last matching temporary framing exposure, capture settings and equipment context.
+One `useCapture` owns Start; the old CaptureHub is removed. Camera cooling lives in
+the [Controls panel](../rig-controls/README.md), not on this page. Existing active capture opens Tonight instead of starting
 a second run. Framing Continue carries explicit target intent but takes no image.
 Only a confirmed successful Start response navigates to Tonight; uncertain or
 failed responses remain here with explicit state inspection and no replay.
@@ -42,10 +42,9 @@ Equipment & settings remains in the equipment footer.
 
 Camera selection is a browser draft until the existing ID-and-name save boundary
 confirms it. Start remains unavailable for a changed unsaved camera. A confirmed
-selection triggers a readiness read, never a capture command. Cooling switch and
-setpoint are distinct commands; a sensor near its requested value is not proof
-that the cooler is on. Capture can start while confirmed cooling continues.
+selection triggers a readiness read, never a capture command. Capture can start
+while confirmed cooling continues.
 
-The equipment footer shares the same selected-camera cooling projection as its
-controls and the shared rig observation for focuser state. See
+The equipment footer shows the selected-camera cooling projection the Controls
+panel changes, and the shared rig observation for focuser state. See
 [imaging camera](../imaging-camera/README.md) for configuration-write reconciliation.

@@ -2,8 +2,6 @@ import { Button, Checkbox, Input, Select } from '@vela/ui'
 import { useEffect, useId, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { captureActivity, useCapture } from '../features/capture/use-capture'
-import { PreparationCooling } from '../features/capture/PreparationCooling'
-import { coolingBlocker } from '../features/capture/CaptureCooling'
 import { useImagingCamera } from '../features/imaging-camera/use-imaging-camera'
 import { EquipmentSummary } from '../features/observation/EquipmentSummary'
 import { RigReadiness } from '../features/observation/RigReadiness'
@@ -282,20 +280,6 @@ function Preparation({ rigId }: { rigId: string }) {
               </Button>
             )}
           </form>
-
-          <PreparationCooling
-            cooling={view?.cooling ?? null}
-            disabled={!capture.canCool && !capture.coolingPending}
-            pending={capture.coolingPending}
-            checking={capture.refreshing}
-            error={capture.coolingError}
-            unconfirmed={capture.coolingUnconfirmed}
-            runActive={view?.active}
-            blocker={coolingBlocker(view?.cooling?.blockedBy, base)}
-            onCooler={value => void capture.setCooler(value)}
-            onSetpoint={value => void capture.setCoolingTemperature(value)}
-            onCheck={() => void capture.refresh()}
-          />
         </div>
       </div>
 
@@ -304,7 +288,6 @@ function Preparation({ rigId }: { rigId: string }) {
         rigName={observation.view?.rig.name ?? view?.rigName ?? 'Current rig'}
         cooling={view?.cooling ?? null}
         coolingStale={capture.offline || capture.coolingUnconfirmed}
-        coolingAction={null}
       />
     </section>
   )

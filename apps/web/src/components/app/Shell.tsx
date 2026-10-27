@@ -3,6 +3,7 @@ import { AlertBanner } from '../../features/alerts/AlertBanner'
 import { AlertsProvider } from '../../features/alerts/AlertsProvider'
 import { AppNavigation } from '../../features/navigation/AppNavigation'
 import { useNavigation } from '../../features/navigation/use-navigation'
+import { RigControls } from '../../features/rig-controls/RigControls'
 import { RigObservationProvider } from '../../features/rig-detail/RigContext'
 import { useAppearance } from '../../appearance/AppearanceProvider'
 
@@ -31,7 +32,7 @@ export default function Shell() {
       <AlertsProvider rigId={alertsRigId}>
         {rigId ? (
           <RigObservationProvider key={rigId} rigId={rigId} paused={paused}>
-            {content}
+            <RigControls rigId={rigId}>{content}</RigControls>
           </RigObservationProvider>
         ) : (
           content

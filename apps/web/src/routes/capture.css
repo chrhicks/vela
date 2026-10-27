@@ -242,56 +242,6 @@
   color: var(--vela-text);
   font-weight: 500;
 }
-.tonight-cooling {
-  margin-top: 20px;
-  color: var(--vela-text-muted);
-  font-size: 14px;
-}
-.capture-page__cooling {
-  max-width: 452px;
-  padding: 20px 22px;
-  border: 1px solid var(--vela-line);
-  border-radius: var(--vela-card-radius);
-}
-.capture-page__cooling h3 {
-  margin: 0 0 16px;
-  font-size: 16px;
-  font-weight: 500;
-}
-.capture-page__cooling dl {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin: 0;
-}
-.capture-page__cooling dd {
-  margin: 0;
-  color: var(--vela-text);
-}
-.capture-page__cooling .capture-page__cooling-feedback {
-  margin: 12px 0 0;
-}
-.capture-page__cooling-feedback[data-held] {
-  visibility: hidden;
-}
-.capture-page__cooling-note {
-  display: inline-grid;
-}
-.capture-page__cooling-note > span {
-  grid-area: 1 / 1;
-}
-.capture-page__cooling-note > [aria-hidden='true'] {
-  visibility: hidden;
-}
-.capture-page__cooling-feedback .tonight-link {
-  margin-top: 4px;
-  color: inherit;
-}
-.capture-page__cooling form {
-  display: grid;
-  gap: 16px;
-  margin-top: 16px;
-}
 .capture-page__warning {
   border: 1px solid var(--vela-warning);
   border-radius: var(--vela-card-radius);
@@ -382,13 +332,9 @@
 .capture-page[data-interrupted] .tonight-sky__altitude > span:not(.vela-type-metric),
 .capture-page[data-interrupted] .tonight-sky .tonight-context__heading strong { font-size: 14px; line-height: 20px; }
 .tonight-equipment > div > span { white-space: pre-wrap; }
-.tonight-capture__unattended {
-  display: grid;
-  gap: 6px;
-}
-.tonight-capture__unattended p[role='alert'] {
+.tonight-capture__paging {
   margin: 0;
+  color: var(--vela-text-muted);
   font-size: 14px;
   line-height: 20px;
-  color: var(--vela-danger);
 }

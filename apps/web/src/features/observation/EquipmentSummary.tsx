@@ -1,18 +1,15 @@
 import type { CaptureCoolingView } from '@vela/model/web'
-import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { useRigObservation } from '../rig-detail/RigContext'
 
 export function EquipmentSummary({
   rigName,
   rigId,
-  coolingAction,
   cooling,
   coolingStale,
 }: {
   rigName: string
   rigId: string
-  coolingAction: ReactNode
   cooling: CaptureCoolingView | null
   coolingStale: boolean
 }) {
@@ -44,7 +41,6 @@ export function EquipmentSummary({
         </span>
       </div>
       <div>
-        {coolingAction}
         {observation?.interrupted && (
           <span role="status">
             Last known ·{' '}

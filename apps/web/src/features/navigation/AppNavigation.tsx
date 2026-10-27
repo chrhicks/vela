@@ -1,6 +1,7 @@
 import type { NavigationCapture } from '@vela/model/web'
 import {
   Appearance,
+  Button,
   NavigationBar,
   type NavigationActivity,
   type NavigationBarProps,
@@ -10,6 +11,7 @@ import { useEffect, useRef, useState } from 'react'
 import { matchPath, useLocation, useNavigate } from 'react-router'
 import { useAppearance } from '../../appearance/AppearanceProvider'
 import { useRigObservation } from '../rig-detail/RigContext'
+import { useRigControls } from '../rig-controls/RigControls'
 import { rigConnectionLabel } from './rig-connection'
 import type { NavigationState } from './use-navigation'
 
@@ -17,6 +19,7 @@ export function AppNavigation({ navigation }: { navigation: NavigationState }) {
   const appearance = useAppearance()
   const [appearanceOpen, setAppearanceOpen] = useState(false)
   const rig = useRigObservation()
+  const controls = useRigControls()
   const connection = rig ? rigConnectionLabel(rig) : undefined
   const { pathname, search } = useLocation()
   const navigate = useNavigate()
@@ -90,14 +93,17 @@ export function AppNavigation({ navigation }: { navigation: NavigationState }) {
         )
       }
       actions={
-        <Appearance
-          open={appearanceOpen}
-          onOpenChange={setAppearanceOpen}
-          value={appearance.preference}
-          onValueChange={appearance.setPreference}
-          systemMode={appearance.systemMode}
-          persistence={appearance.persistence}
-        />
+        <>
+          {controls && <Button className="rig-controls__open" onClick={controls.open}>Controls</Button>}
+          <Appearance
+            open={appearanceOpen}
+            onOpenChange={setAppearanceOpen}
+            value={appearance.preference}
+            onValueChange={appearance.setPreference}
+            systemMode={appearance.systemMode}
+            persistence={appearance.persistence}
+          />
+        </>
       }
       utility={
         <>

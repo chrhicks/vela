@@ -8,6 +8,7 @@ import { skyTime } from '../features/targets/sky-time'
 import { SkyInspection } from '../features/targets/SkyInspection'
 import { SurveyField } from '../features/targets/SurveyField'
 import { useFraming } from '../features/targets/use-framing'
+import { useRigControls } from '../features/rig-controls/RigControls'
 import { TargetBrowser } from '../features/targets/TargetBrowser'
 import { arcminutes, CenteringProgress, FramingStatus } from '../features/targets/CenteringFeedback'
 import { FramingExposure } from '../features/targets/FramingExposure'
@@ -40,6 +41,7 @@ function TargetComposition({ rigId, targetId }: { rigId: string; targetId: strin
   const [focalLength, setFocalLength] = useState('')
   const [seconds, setSeconds] = useState('2')
   const framing = useFraming(rigId)
+  const controls = useRigControls()
   const { view, offline, pending, error, commandUnconfirmed } = framing
   const initialized = useRef(false)
   const heading = useRef<HTMLHeadingElement>(null)
@@ -278,13 +280,11 @@ function TargetComposition({ rigId, targetId }: { rigId: string; targetId: strin
             {view?.error && <p role="alert">{view.error}</p>}
             {view?.mountControlReason && !view.active && !view.error && (
               <p>{view.mountControlReason === 'parked'
-                ? 'The mount is parked. Unpark it in Your rig before framing.'
-                : 'Tracking is off. Turn it on in Your rig before checking the current frame.'}</p>
+                ? 'The mount is parked. Unpark it in Controls before framing.'
+                : 'Tracking is off. Turn it on in Controls before checking the current frame.'}</p>
             )}
             {view?.mountControlReason && !view.active && (
-              <Link className="vela-button" to={`/rigs/${encodeURIComponent(rigId)}#mount-controls`}>
-                Mount controls in Your rig →
-              </Link>
+              <Button onClick={controls?.open}>Open Controls →</Button>
             )}
             {error && <p role="alert">{error}</p>}
             {view?.active && !matching && (

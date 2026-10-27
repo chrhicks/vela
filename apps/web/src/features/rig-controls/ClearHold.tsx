@@ -1,7 +1,7 @@
 import type { RigDetailView } from '@vela/model/web'
 import { Button, Dialog } from '@vela/ui'
 import { useId, useRef, useState } from 'react'
-import { clearHold } from './clear-hold-api'
+import { clearHold } from '../rig-detail/clear-hold-api'
 
 export const busyMessage = 'An operation is still running on this device. Stop it first.'
 
@@ -43,7 +43,7 @@ export function ClearHold({ rigId, deviceName, hold, refresh }: {
     <>
       <Button id={openerId} onClick={() => { setError(''); setOpen(true) }}>Clear hold</Button>
       <Dialog
-        className="equipment__hold-dialog"
+        className="rig-controls__hold-dialog"
         open={open}
         title={`Clear the hold on ${deviceName}?`}
         showCloseButton={false}

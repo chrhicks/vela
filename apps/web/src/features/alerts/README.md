@@ -25,5 +25,6 @@ whether it was acknowledged and how the phone is getting on; the browser only pr
   attended, and "Sent once · stopped when Unattended went off". The server pages the phone only while the run is
   Unattended (`unattended` in the view).
 - The banner (when it shows alerts) and the card say in one line whether the phone is being paged for this run:
-  "Phone: on, unattended" or "Phone: off" (`pagingLabel`). The capture page uses the same words under its Unattended
-  switch. The control itself lives with the run, see `apps/web/src/features/capture/README.md`.
+  "Phone: on, unattended" or "Phone: off" (`pagingLabel`). The capture page shows the same words in the run summary
+  line. The live switch is in the Controls panel, see `apps/web/src/features/rig-controls/README.md`; the start form
+  keeps its checkbox, see `apps/web/src/features/capture/README.md`.
