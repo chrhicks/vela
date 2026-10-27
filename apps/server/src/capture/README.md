@@ -176,8 +176,10 @@ goes to the camera unchanged; it is also what the run view, the interrupted-run 
 resume and the frames-stalled alert use. The other frame types record the requested time.
 
 If the minimum cannot be read (no fresh reading, or not a positive number), the bias run
-ends `failed` before its first exposure with a message that says so, and nothing is
-exposed or recorded for that attempt. Vela does not fall back to the request: that would
+ends `failed` with a message that says so, and nothing is exposed or recorded for that
+attempt. When it is the first frame, the run exposes nothing. When it is a later frame of a
+repeating run, the frames already saved keep their true minimum, and the failing frame and
+the rest of the run are not taken. Vela does not fall back to the request: that would
 write an exposure the sensor never integrated into a file Chris may stack later. An Alpaca
 camera is not told the frame type, so its "bias" is a short exposure for the requested
 time; it records that time, because that is what the camera did.
