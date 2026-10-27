@@ -316,7 +316,7 @@ function CapturePage({ rigId }: { rigId: string }) {
                         since. {interruptedProgress(view)}
                       </p>
                       {view.unattended && (
-                        <p>Resume starts with Unattended off. Switch it on once the run is going.</p>
+                        <p>Resume keeps Unattended on: the phone is paged for the resumed run.</p>
                       )}
                       {view.interruption.remainingCount === 0 ? (
                         <p>It had taken all its frames.</p>

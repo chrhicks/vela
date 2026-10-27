@@ -80,8 +80,8 @@ running run the same checkbox is a live switch with no confirmation: it calls `P
 with `{on}` and shows the server's value, "Phone: on, unattended" or "Phone: off", under it. The switch stays
 available whenever a run is active and the page is not mid-command, including during image receipt. A 409 (the run
 ended) or a failed request shows its message under the switch and never marks the capture command outcome unknown,
-because a switch cannot change what the camera is doing. An interrupted Unattended run's notice says Resume starts
-with Unattended off, because resume begins a new run.
+because a switch cannot change what the camera is doing. An interrupted Unattended run's notice says Resume keeps
+Unattended on, as the server does (vela#198).
 
 Save frames is an explicit per-run option, ticked on a new controller and restored
 from the active server projection. Keep this image targets the image whose pixels

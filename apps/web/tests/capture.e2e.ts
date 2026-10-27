@@ -1076,11 +1076,11 @@ test('a refused Unattended switch shows the server message and the switch follow
   await expect(page.getByRole('button', { name: 'Stop capture' })).toBeEnabled()
 })
 
-test('an interrupted Unattended run says Resume starts with Unattended off', async ({ page }) => {
+test('an interrupted Unattended run says Resume keeps Unattended on', async ({ page }) => {
   await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, { ...interrupted, unattended: true }))
   await page.goto('/rigs/rig-1/observe/capture')
   await expect(page.getByRole('status', { name: 'Interrupted capture run' })).toContainText(
-    'Resume starts with Unattended off.',
+    'Resume keeps Unattended on',
   )
 })
 
