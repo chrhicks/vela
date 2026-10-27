@@ -2,6 +2,7 @@ import { z } from 'zod'
 import type { AlertsView } from '@vela/model/web'
 import type { FastifyInstance } from 'fastify'
 import type { RigCatalog } from '../rig/catalog.js'
+import type { Horizon } from '../targets/horizon.js'
 import { createAlertMonitor, type AlertMonitor } from './monitor.js'
 import type { Notifier } from './notifier.js'
 import type { MountReading } from './rules.js'
@@ -13,6 +14,8 @@ export interface AlertsOptions {
   notifier: Notifier | null
   mountReaderFor?: (rigId: string) => (signal: AbortSignal) => Promise<MountReading | null>
   focuserReaderFor?: (rigId: string) => (signal: AbortSignal) => Promise<number | null>
+  /** Lets a collapse of the star count teach the horizon where stars vanished, and read it for a cause. */
+  horizon?: Horizon
   now?: () => number
 }
 
@@ -29,6 +32,7 @@ export function registerAlerts(
     notifier,
     mountReaderFor,
     focuserReaderFor,
+    horizon,
     now,
   }: AlertsOptions,
 ) {
@@ -45,6 +49,7 @@ export function registerAlerts(
         notifier,
         ...(mountReaderFor && { readMount: mountReaderFor(rig.id) }),
         ...(focuserReaderFor && { readFocuser: focuserReaderFor(rig.id) }),
+        ...(horizon && { horizon }),
         ...(now && { now }),
       })
 

@@ -7,6 +7,7 @@ import {
   type MountReading,
   type RigHistory,
   type RunState,
+  type SkyPoint,
 } from './rules.js'
 import type { FrameEvidence } from './cause.js'
 import { defaultThresholds, thresholdsSchema, type AlertThresholds } from './thresholds.js'
@@ -301,7 +302,9 @@ function mountReading(fields: Partial<MountReading>): MountReading {
     slewing: false,
     parked: false,
     rightAscensionHours: 12,
+    declinationDegrees: 20,
     siderealTimeHours: 10,
+    latitudeDegrees: 40,
     pierSide: 'west',
     ...fields,
   }
@@ -326,7 +329,9 @@ const polls = fixture('night-20261018-mount.csv')
         slewing: slewing === 'True',
         parked: parked === 'True',
         rightAscensionHours: numberOrNull(ra),
+        declinationDegrees: null,
         siderealTimeHours: numberOrNull(lst),
+        latitudeDegrees: null,
         pierSide: pier === 'east' || pier === 'west' ? pier : null,
       } satisfies MountReading,
     }
@@ -706,3 +711,77 @@ describe('the cause of a star alert', () => {
     expect(messages(parts)['stars-dropping']).toMatch(/sky brightened$/)
   })
 })
+
+describe('the horizon in a star alert', () => {
+  const usual: FrameEvidence = { peaks: 500, blended: 15, sky: 680, axisRatio: 1.2 }
+  const tree = { altitudeDegrees: 20, azimuthDegrees: 200 }
+  const open = { altitudeDegrees: 60, azimuthDegrees: 200 }
+
+  /** One frame a minute: healthy ones, then the given strong counts, each pointed where `pointing` says. */
+  function run(counts: number[], pointing: (index: number) => SkyPoint | null = () => open) {
+    return [100, 104, 98, 102, 100, ...counts].map(
+      (stars, index): Frame => ({ capturedAt: index * 60_000, stars, hfrPixels: 3, evidence: usual, pointing: pointing(index) }),
+    )
+  }
+
+  const behind = (point: { altitudeDegrees: number }) => point.altitudeDegrees <= 30
+
+  function conditions(frames: Frame[], horizon: Partial<Pick<RigHistory, 'behindSkyline'>> = { behindSkyline: behind }) {
+    return evaluateAlerts(history({ frames, ...horizon }), defaultThresholds, 0).conditions
+  }
+
+  it('describes the frame where the collapse began, with the baseline before it', () => {
+    const frames = run([0, 0, 0], index => (index === 5 ? tree : open))
+    const collapsed = conditions(frames).find(condition => condition.id === 'stars-collapsed')!
+
+    expect(collapsed.drop).toEqual({
+      capturedAt: 5 * 60_000,
+      strongBefore: 100,
+      strongAt: 0,
+      pointing: tree,
+    })
+  })
+
+  it('takes the first of the confirming frames, not the one that raised it', () => {
+    const collapsed = conditions(run([30, 30, 3, 2, 2]), {}).find(condition => condition.id === 'stars-collapsed')!
+
+    expect(collapsed.drop).toMatchObject({ capturedAt: 8 * 60_000, strongBefore: 100, strongAt: 2 })
+  })
+
+  it('has no drop on any other alert', () => {
+    for (const condition of conditions(run([0, 0, 0])))
+      if (condition.id !== 'stars-collapsed') expect(condition.drop).toBeUndefined()
+  })
+
+  it('carries no pointing for a frame without one', () => {
+    const collapsed = conditions(run([0, 0, 0], () => null)).find(condition => condition.id === 'stars-collapsed')!
+
+    expect(collapsed.drop!.pointing).toBeNull()
+  })
+
+  it('names the trees when the latest frame was pointed behind the skyline', () => {
+    const frames = run([20, 30, 25], index => (index >= 5 ? tree : open))
+    const dropping = conditions(frames).find(condition => condition.id === 'stars-dropping')!
+
+    expect(dropping.message).toBe('Star count dropping: median 25 (normal ≈100 stars), behind the trees')
+  })
+
+  it('names the trees over a cause the frames show, and on a collapse as well', () => {
+    const flash = { ...usual, sky: 7148, peaks: 56 }
+    const frames = run([0, 0, 0], () => tree).map((frame, index) => (index >= 5 ? { ...frame, evidence: flash } : frame))
+
+    expect(conditions(frames).find(condition => condition.id === 'stars-collapsed')!.message).toMatch(/, behind the trees$/)
+  })
+
+  it('leaves the causes unchanged above the skyline, without pointing, and without a horizon', () => {
+    const plain = run([20, 30, 25], () => null)
+    const message = (frames: Frame[], horizon?: Partial<Pick<RigHistory, 'behindSkyline'>>) =>
+      conditions(frames, horizon).find(condition => condition.id === 'stars-dropping')!.message
+
+    expect(message(run([20, 30, 25], () => open))).toBe(message(plain))
+    expect(message(plain)).toBe('Star count dropping: median 25 (normal ≈100 stars)')
+    expect(message(run([20, 30, 25], () => tree), {})).toBe(message(plain))
+    expect(message(plain, { behindSkyline: () => true })).toBe(message(plain))
+  })
+})
+

@@ -672,7 +672,9 @@ describe('while the run is polled', () => {
     slewing: false,
     parked: false,
     rightAscensionHours: 2,
+    declinationDegrees: 20,
     siderealTimeHours: 1,
+    latitudeDegrees: 40,
     pierSide: 'west',
     ...overrides,
   })

@@ -107,6 +107,7 @@ export function buildApp({
     ...alertSettings,
     mountReaderFor: rigId => mountReaderFor(rigId, rigCatalog, equipment),
     focuserReaderFor: rigId => focuserReaderFor(rigId, rigCatalog, equipment),
+    ...(targets?.horizon && { horizon: targets.horizon }),
   })
 
   const capture = registerCapture(app, rigCatalog, operations, {

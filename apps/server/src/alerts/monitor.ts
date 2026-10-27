@@ -1,5 +1,6 @@
 import { trace, SpanStatusCode } from '@opentelemetry/api'
 import type { CaptureImage } from '@vela/model/web'
+import { horizonStatus, type Horizon, type Skyline } from '../targets/horizon.js'
 import { alertFrame } from './frame.js'
 import { emergencyExpireSeconds, NotifierError, type Notification, type Notifier } from './notifier.js'
 import {
@@ -10,7 +11,10 @@ import {
   type Frame,
   type MountReading,
   type RunState,
+  type SkyPoint,
+  type StarDrop,
 } from './rules.js'
+import { skyPointOf } from './pointing.js'
 import type { AlertThresholds } from './thresholds.js'
 
 const tracer = trace.getTracer('vela.alerts')
@@ -116,9 +120,24 @@ export interface AlertMonitorOptions {
    * the mount read is what says the rig stopped answering.
    */
   readFocuser?: (signal: AbortSignal) => Promise<number | null>
+  /** What the horizon knows and learns for this rig. Without it nothing is read or recorded. */
+  horizon?: Horizon
   now?: () => number
   mountPollMs?: number
 }
+
+/**
+ * What the mount polls since the last frame say about where it pointed during the exposure: the latest
+ * point, and whether every reading was steady. A frame is only pointed somewhere known if there was a
+ * reading and none of them says slewing, or fails to say.
+ */
+interface PointingWindow {
+  readings: number
+  steady: boolean
+  latest: SkyPoint | null
+}
+
+const newWindow = (): PointingWindow => ({ readings: 0, steady: true, latest: null })
 
 /** One raised alert, from the evaluation that raised it until the one that clears it. */
 interface Episode extends ActiveAlert {
@@ -166,6 +185,7 @@ export function createAlertMonitor({
   notifier,
   readMount,
   readFocuser,
+  horizon,
   now = Date.now,
   mountPollMs: pollMs = mountPollMs,
 }: AlertMonitorOptions) {
@@ -175,6 +195,10 @@ export function createAlertMonitor({
   let frames: Frame[] = []
   let focuserPosition: number | null = null
   let mountReadings: MountReading[] = []
+  let pointingWindow = newWindow()
+  let skyline: Skyline | null = null
+  let runId: string | null = null
+  let horizonWarned = false
   let observationsInterruptedSince: number | null = null
   let unavailable: string[] = []
   let phone: PhoneAlerts = notifier ? { state: 'ready' } : { state: 'not-configured' }
@@ -196,7 +220,13 @@ export function createAlertMonitor({
       run.status === 'running' && autofocusing ? { ...run, waitingForFrameSince: at } : run
 
     const evaluation = evaluateAlerts(
-      { run: watched, frames, mountReadings, observationsInterruptedSince },
+      {
+        run: watched,
+        frames,
+        mountReadings,
+        observationsInterruptedSince,
+        ...(skyline && { behindSkyline: point => horizonStatus(skyline, point.azimuthDegrees, point.altitudeDegrees) === 'behind' }),
+      },
       thresholds,
       at,
     )
@@ -230,8 +260,12 @@ export function createAlertMonitor({
 
     if (cleared !== undefined && at - cleared < reRaiseGuardMs) return []
 
+    if (condition.drop) learnFrom(condition.drop)
+
+    const { drop: _drop, ...alert } = condition
+
     const episode: Episode = {
-      ...condition,
+      ...alert,
       raisedAt: at,
       acknowledged: false,
       eligibleAt: at,
@@ -252,6 +286,46 @@ export function createAlertMonitor({
       .end()
 
     return [episode]
+  }
+
+  /**
+   * A star count that collapsed in an imaging run while the mount stood steady, pointed above the
+   * horizon, is a place stars vanished: the horizon learns it. A framing or focus run loses stars to
+   * defocus, not to trees, and a cloud looks the same as a tree: Chris deletes that one.
+   */
+  function learnFrom(drop: StarDrop) {
+    const { pointing } = drop
+
+    if (!horizon || runId === null || run.status !== 'running' || !run.imaging) return
+
+    if (!pointing || pointing.altitudeDegrees <= 0) return
+
+    horizon.observations
+      .add(rigId, {
+        at: new Date(drop.capturedAt).toISOString(),
+        altitudeDegrees: Math.min(90, pointing.altitudeDegrees),
+        azimuthDegrees: pointing.azimuthDegrees,
+        strongBefore: drop.strongBefore,
+        strongAt: drop.strongAt,
+        runId,
+      })
+      .catch(() => {
+        if (horizonWarned) return
+
+        horizonWarned = true
+        console.warn(`Could not record a horizon observation for rig ${rigId}.`)
+      })
+  }
+
+  /** The skyline is read once per run, so what a run records never renames the alert that caused it. */
+  async function loadSkyline(token: number) {
+    try {
+      const next = (await horizon?.skyline(rigId)) ?? null
+
+      if (token === runToken) skyline = next
+    } catch {
+      if (token === runToken) skyline = null
+    }
   }
 
   /** Tells the phone, unless a stronger alert already does. */
@@ -538,12 +612,16 @@ export function createAlertMonitor({
 
           if (token !== runToken) return
 
-          if (reading) mountReadings.push(reading)
+          if (reading) {
+            mountReadings.push(reading)
+            pointingWindow = windowWith(pointingWindow, reading)
+          }
 
           observationsInterruptedSince = null
         } catch {
           if (token !== runToken) return
 
+          pointingWindow.steady = false
           observationsInterruptedSince ??= now()
         }
       }
@@ -579,9 +657,29 @@ export function createAlertMonitor({
     focuserPosition = position
   }
 
+  function windowWith(window: PointingWindow, reading: MountReading): PointingWindow {
+    const point = skyPointOf(reading)
+
+    return {
+      readings: window.readings + 1,
+      steady: window.steady && reading.slewing === false && point !== null,
+      latest: point,
+    }
+  }
+
+  /** Where the mount pointed for the frame that has just arrived, then a fresh window for the next. */
+  function takePointing(): SkyPoint | null {
+    const window = pointingWindow
+
+    pointingWindow = newWindow()
+
+    return window.readings > 0 && window.steady && observationsInterruptedSince === null ? window.latest : null
+  }
+
   function startPolling() {
     const token = runToken
 
+    void loadSkyline(token)
     void pollMount(token)
     pollTimer = setInterval(() => void pollMount(token), pollMs)
     pollTimer.unref()
@@ -608,6 +706,9 @@ export function createAlertMonitor({
       frames = []
       focuserPosition = null
       mountReadings = []
+      pointingWindow = newWindow()
+      skyline = null
+      runId = null
       observationsInterruptedSince = null
       run = { status: 'running', exposureSeconds, waitingForFrameSince: now(), imaging, calibration }
       evaluate()
@@ -618,14 +719,16 @@ export function createAlertMonitor({
     },
 
     /** A frame arrived. One without star measurements still proves the camera is producing. */
-    frameCaptured(image: Pick<CaptureImage, 'capturedAt' | 'statistics'>) {
+    frameCaptured(image: Pick<CaptureImage, 'capturedAt' | 'statistics'>, frameRunId?: string) {
       if (run.status !== 'running') return
 
       run = { ...run, waitingForFrameSince: now() }
+      runId = frameRunId ?? runId
 
       const frame = image.statistics && alertFrame(Date.parse(image.capturedAt), image.statistics)
+      const pointing = takePointing()
 
-      if (frame) frames.push(frame)
+      if (frame) frames.push({ ...frame, pointing })
 
       evaluate()
     },

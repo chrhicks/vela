@@ -437,7 +437,8 @@ export function registerCapture(
           unattended: run.unattended,
           focalLengthMm: settings.rig.focalLengthMm,
           // A calibration frame has no stars to judge, but still shows the camera is producing.
-          onFrame: image => watch?.frameCaptured(light ? image : { capturedAt: image.capturedAt, statistics: null }),
+          onFrame: (image, runId) =>
+            watch?.frameCaptured(light ? image : { capturedAt: image.capturedAt, statistics: null }, runId),
           onSettled() {
             release()
             watch?.runEnded(controller.snapshot().phase === 'failed' ? 'failed' : 'stopped')

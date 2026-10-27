@@ -28,7 +28,7 @@ export function mountReaderFor(
       equipment.createAcquisition(rig).pointing(telescopeId, signal),
     ])
 
-    // The hour angle is only right against a topocentric right ascension.
+    // The hour angle, and so the altitude, is only right against a topocentric right ascension.
     const topocentric = status.coordinateSystem === 'topocentric'
 
     return {
@@ -36,7 +36,9 @@ export function mountReaderFor(
       slewing: status.slewing,
       parked: status.parked,
       rightAscensionHours: topocentric ? status.rightAscensionDegrees / 15 : null,
+      declinationDegrees: topocentric ? status.declinationDegrees : null,
       siderealTimeHours: pointing.siderealTimeDegrees / 15,
+      latitudeDegrees: pointing.latitudeDegrees,
       pierSide: status.pierSide === 'east' || status.pierSide === 'west' ? status.pierSide : null,
     }
   }
