@@ -1,5 +1,5 @@
 import { Dialog } from '@vela/ui'
-import { createContext, useCallback, useContext, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { RigControlsPanel } from './RigControlsPanel'
 import './rig-controls.css'
@@ -11,6 +11,20 @@ export function RigControls({ rigId, children }: { rigId: string; children: Reac
   const [open, setOpen] = useState(false)
   const openPanel = useCallback(() => setOpen(true), [])
   const value = useMemo(() => ({ open: openPanel }), [openPanel])
+
+  // A command that disables the focused control drops focus to the page, where the dialog's own
+  // Escape handler never sees the key. The dialogs mark a handled Escape as default-prevented.
+  useEffect(() => {
+    if (!open) return
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !event.defaultPrevented) setOpen(false)
+    }
+
+    document.addEventListener('keydown', closeOnEscape)
+
+    return () => document.removeEventListener('keydown', closeOnEscape)
+  }, [open])
 
   return (
     <RigControlsContext value={value}>

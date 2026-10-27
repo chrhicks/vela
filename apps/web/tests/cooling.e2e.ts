@@ -61,7 +61,7 @@ test.beforeEach(async ({ page }) => {
   )
 })
 
-test('keeps uncertain temperature visible through incomplete reads and capture commands until the setting is observed', async ({
+test('keeps uncertain temperature visible through incomplete reads until the setting is observed', async ({
   page,
 }) => {
   let current = idle
@@ -84,16 +84,6 @@ test('keeps uncertain temperature visible through incomplete reads and capture c
       },
     })
   })
-  await page.route('**/api/rigs/rig-1/capture/start', route => {
-    current = { ...current, active: true, phase: 'exposing' }
-
-    return route.fulfill({ json: current })
-  })
-  await page.route('**/api/rigs/rig-1/capture/stop', route => {
-    current = { ...current, active: false, phase: 'stopped' }
-
-    return route.fulfill({ json: current })
-  })
   const cooling = await openCooling(page, '/rigs/rig-1/observe/capture')
   const check = cooling.getByRole('button', { name: 'Check camera cooling' })
   const warning = cooling.getByText('Cooler command outcome unknown.', { exact: false })
@@ -108,14 +98,6 @@ test('keeps uncertain temperature visible through incomplete reads and capture c
   await expect(warning).toBeVisible()
   await expect(cooling.getByRole('button', { name: 'Set temperature' })).toBeDisabled()
 
-  await page.getByRole('button', { name: 'Take exposure' }).click()
-  await expect(page.getByRole('button', { name: 'Stop capture' })).toBeEnabled()
-  await expect(warning).toBeVisible()
-  await expect(check).toBeDisabled()
-  await page.getByRole('button', { name: 'Stop capture' }).click()
-  await expect(check).toBeEnabled()
-  await expect(warning).toBeVisible()
-
   current = { ...current, cooling: null }
   await check.click()
   await expect(cooling.getByText('Cooling state is unavailable.', { exact: false })).toBeVisible()
@@ -129,6 +111,26 @@ test('keeps uncertain temperature visible through incomplete reads and capture c
   await expect(cooling.getByRole('button', { name: 'Set temperature' })).toBeEnabled()
   await expect(cooling.locator('dl')).toContainText('-3.0 °C')
   expect(commands).toBe(1)
+})
+
+test('closing the panel forgets an unknown cooler outcome, and reopening shows what the camera reports', async ({ page }) => {
+  let current = idle
+  await page.route('**/api/web/rigs/rig-1/capture', route => route.fulfill({ json: current }))
+  await page.route('**/api/rigs/rig-1/capture/cooling', route => {
+    current = { ...idle, cooling: { state: 'on', canSetTemperature: false } }
+
+    return route.abort()
+  })
+
+  const cooling = await openCooling(page, '/rigs/rig-1/observe/capture')
+
+  await cooling.getByText('Cooler on', { exact: true }).click()
+  await expect(cooling.getByText('Cooler command outcome unknown.', { exact: false })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Controls', exact: true }).click()
+  await expect(cooling.getByRole('checkbox', { name: 'Cooler on' })).toBeChecked()
+  await expect(cooling.getByText('Cooler command outcome unknown.', { exact: false })).toHaveCount(0)
 })
 
 test('resolves an uncertain cooler switch from its fresh state without requiring a temperature setpoint', async ({

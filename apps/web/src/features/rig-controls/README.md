@@ -39,7 +39,9 @@ offline or a cooling outcome is unknown, the heading reads "Cooler · last known
 
 An uncertain command retains the affected setting until an explicit check observes it again: CoolerOn for a
 switch command, requested setpoint for a temperature command. A fresh setting resolves uncertainty even if it differs
-from the requested value; the panel shows the observed state rather than claiming the write won.
+from the requested value; the panel shows the observed state rather than claiming the write won. Closing the panel
+forgets the unknown outcome (the state lives in the panel's own `useCapture`); reopening reads the camera fresh and
+shows what it reports, never the command's intent.
 
 ## Phone
 
