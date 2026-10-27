@@ -14,6 +14,7 @@ import type { Motion } from './v5/operation.js'
 import { createCriaProvider } from './provider.js'
 import { DeviceReadings } from './readings.js'
 import { createCriaMountControl } from './mount-control.js'
+import { createMountHome } from './mount-home.js'
 
 /** `busy` is Cria refusing because an operation is still open on the device. */
 export type CriaRecovery =
@@ -45,6 +46,8 @@ function failure(message: string) {
 }
 
 export function createCriaEquipment(connection: CriaConnection, bindings: ReadonlyArray<CriaEquipmentBinding>) {
+  const mountHome = createMountHome()
+
   const equipment = (session: Session = connection.session()) => createRemoteEquipment(session, bindings.map(binding => ({
     deviceId: binding.providerDeviceId,
     criaDeviceId: binding.id,
@@ -91,10 +94,16 @@ export function createCriaEquipment(connection: CriaConnection, bindings: Readon
 
   async function runMount(id: string, command: Motion, signal?: AbortSignal) {
     binding(id, 'mount')
+
+    // Whatever this command does, the mount may no longer be where the last home left it.
+    if (command.kind !== 'mount-tracking') mountHome.forget(id)
     const result = await outcomeOf(equipment().run(id, command), signal)
 
     switch (result.kind) {
-      case 'confirmed': return result.value
+      case 'confirmed':
+        if (command.kind === 'mount-home') mountHome.confirm(id)
+
+        return result.value
       case 'stopped': throw new FramingStoppedError()
       case 'failed':
       case 'uncertain': throw failure(result.message)
@@ -415,7 +424,7 @@ export function createCriaEquipment(connection: CriaConnection, bindings: Readon
 
   return {
     acquisition, framing, focuser, cooling,
-    mountControl: createCriaMountControl(connection, bindings),
+    mountControl: createCriaMountControl(connection, bindings, mountHome),
     provider: createCriaProvider(connection, bindings),
     holds,
     async recover(deviceId: string, note: string): Promise<CriaRecovery> {

@@ -30,19 +30,50 @@ const requestSchema = z.strictObject({
   deviceId: z.string().min(1),
   requestId: z.uuid(),
   serverInstanceId: z.uuid(),
-  action: z.enum(['unpark', 'tracking-on', 'tracking-off']),
+  action: z.enum(['unpark', 'tracking-on', 'tracking-off', 'home']),
 })
+
+/** Stop is a halt, not a command: no request ID or server instance, so a Vela restart cannot refuse it. */
+const stopSchema = z.strictObject({ deviceId: z.string().min(1) })
+
+type StateAction = Exclude<MountControlAction, 'home'>
 
 function disabled(reason: string): MountControlAvailability {
   return { enabled: false, reason }
 }
 
-function requestedState(action: MountControlAction, observation: MountControlObservation) {
+function requestedState(action: StateAction, observation: MountControlObservation) {
   return action === 'unpark' ? observation.parked : observation.tracking
 }
 
-function matches(action: MountControlAction, observation: MountControlObservation) {
+function matches(action: StateAction, observation: MountControlObservation) {
   return requestedState(action, observation) === (action === 'tracking-on')
+}
+
+/**
+ * A halt never needs readings, a free rig or an idle command slot, because a Stop that cannot reach a
+ * moving mount is worse than one that interrupts a run. It is offered unless the mount is known to be
+ * still, which includes while a command of the panel is pending or its outcome is unknown.
+ */
+function stopAvailability(
+  device: RigTelescopeDeviceView,
+  observation: MountControlObservation | undefined,
+  command: CommandRecord | undefined,
+  canStop: boolean,
+): MountControlAvailability {
+  const enabled: MountControlAvailability = { enabled: true, reason: null }
+
+  if (!canStop) return disabled('Vela cannot stop this rig’s mount.')
+
+  if (device.connection !== 'connected') return disabled('Connect the mount before stopping it.')
+
+  if (command?.view.state === 'pending' || command?.view.state === 'uncertain') return enabled
+
+  if (!observation || observation.slewing !== false) return enabled
+
+  if (observation.parked === true) return disabled('The mount is parked.')
+
+  return observation.tracking === false ? disabled('The mount is not moving.') : enabled
 }
 
 function currentMountView(
@@ -96,16 +127,21 @@ export function registerMountControls(
 
     if (command.expectedTelescopeName !== telescopeName) return
 
-    if (requestedState(command.view.action, observation) === undefined) return
+    const { action } = command.view
 
-    const confirmed = matches(command.view.action, observation)
+    // A home leaves no reading to confirm it: an idle mount after an unknown outcome is not a confirmed home.
+    if (action !== 'home' && requestedState(action, observation) === undefined) return
+
+    const confirmed = action !== 'home' && matches(action, observation)
     command.view = {
       requestId: command.view.requestId,
-      action: command.view.action,
+      action,
       state: confirmed ? 'confirmed' : 'failed',
-      message: confirmed
-        ? 'The requested mount state is now confirmed.'
-        : 'Fresh mount readings confirm the requested state was not reached.',
+      message: action === 'home'
+        ? 'The mount is idle again, but Vela cannot tell whether it reached home. Home is not confirmed.'
+        : confirmed
+          ? 'The requested mount state is now confirmed.'
+          : 'Fresh mount readings confirm the requested state was not reached.',
     }
     command.release?.()
     delete command.release
@@ -115,10 +151,13 @@ export function registerMountControls(
     rigId: string,
     device: RigTelescopeDeviceView,
     observation: MountControlObservation | undefined,
+    canStop: boolean,
     ownsLane = false,
   ): MountControlView {
     const command = commands.get(key(rigId, device.id))
     reconcile(command, observation, device.name)
+    const stop = stopAvailability(device, observation, command, canStop)
+    const homeConfirmedAt = observation?.homeConfirmedAt ?? null
     let reason: string | undefined
 
     if (command?.view.state === 'pending') reason = 'Waiting for the mount command to finish.'
@@ -132,7 +171,10 @@ export function registerMountControls(
       reason = observation.slewing ? 'Wait for the mount to stop slewing.' : 'Mount motion is unknown.'
 
     if (reason) {
-      return { serverInstanceId, unpark: disabled(reason), trackingOn: disabled(reason), trackingOff: disabled(reason), command: command?.view ?? null }
+      return {
+        serverInstanceId, unpark: disabled(reason), trackingOn: disabled(reason), trackingOff: disabled(reason),
+        home: disabled(reason), stop, canStop, homeConfirmedAt, command: command?.view ?? null,
+      }
     }
 
     const state = observation!
@@ -161,7 +203,21 @@ export function registerMountControls(
           : state.tracking ? disabled('Tracking is already on.') : enabled
     }
 
-    return { serverInstanceId, unpark, trackingOn, trackingOff, command: command?.view ?? null }
+    const home = state.canFindHome !== true
+      ? disabled('This mount does not report home support.')
+      : state.parked === undefined
+        ? disabled('Mount parking state is unknown.')
+        : state.parked ? disabled('Unpark the mount before homing.') : enabled
+
+    return { serverInstanceId, unpark, trackingOn, trackingOff, home, stop, canStop, homeConfirmedAt, command: command?.view ?? null }
+  }
+
+  function mountControlOf(rig: RigCatalogRecord) {
+    try {
+      return options.createMountControl(rig)
+    } catch {
+      return undefined
+    }
   }
 
   async function decorate(view: RigDetailView): Promise<RigDetailView> {
@@ -177,11 +233,12 @@ export function registerMountControls(
       )
 
       let observation: MountControlObservation | undefined
+      const adapter = mountControlOf(rig)
       const pending = commands.get(key(rig.id, device.id))?.view.state === 'pending'
 
-      if (identity && !pending && device.connection === 'connected' && device.observation?.state !== 'interrupted') {
+      if (adapter && identity && !pending && device.connection === 'connected' && device.observation?.state !== 'interrupted') {
         try {
-          observation = await options.createMountControl(rig).observe(identity.uniqueId)
+          observation = await adapter.observe(identity.uniqueId)
         } catch {
           observation = undefined
         }
@@ -189,7 +246,7 @@ export function registerMountControls(
 
       const current = currentMountView(device, observation)
 
-      return { ...current, mountControl: controls(rig.id, current, observation) }
+      return { ...current, mountControl: controls(rig.id, current, observation, adapter?.canStop ?? false) }
     }))
 
     return { ...view, devices }
@@ -276,12 +333,13 @@ export function registerMountControls(
       const observation = await adapter.observe(inspection.providerDeviceId).catch(() => undefined)
 
       // This request owns the lane; controls uses owner state only for other workflows.
-      const readiness = controls(rigId, device, observation, true)
+      const readiness = controls(rigId, device, observation, adapter.canStop, true)
 
       const available = {
         unpark: readiness.unpark,
         'tracking-on': readiness.trackingOn,
         'tracking-off': readiness.trackingOff,
+        home: readiness.home,
       }[action]
 
       if (!available.enabled)
@@ -306,9 +364,11 @@ export function registerMountControls(
       try {
         const identity = { telescopeId: inspection.providerDeviceId, expectedTelescopeName: inspection.name }
 
-        const result = await adapter.execute(action === 'unpark'
-          ? { ...identity, kind: 'unpark' }
-          : { ...identity, kind: 'set-tracking', tracking: action === 'tracking-on' })
+        const result = await adapter.execute(
+          action === 'unpark' || action === 'home'
+            ? { ...identity, kind: action }
+            : { ...identity, kind: 'set-tracking', tracking: action === 'tracking-on' },
+        )
 
         if (result.outcome === 'confirmed') confirmedObservation = result.observation
         command.view = {
@@ -329,9 +389,44 @@ export function registerMountControls(
         retainOwnership = true
       }
 
-      return controls(rigId, device, confirmedObservation, true)
+      return controls(rigId, device, confirmedObservation, adapter.canStop, true)
     } finally {
       if (!retainOwnership) release()
+    }
+  })
+
+  app.post<{ Params: { rigId: string } }>('/api/rigs/:rigId/mount/stop', async (request, reply) => {
+    const parsed = stopSchema.safeParse(request.body)
+
+    if (!parsed.success) return reply.code(400).send({ error: 'invalid-mount-command' })
+    const { rigId } = request.params
+    const { deviceId } = parsed.data
+    const rig = await catalog.get(rigId)
+
+    if (!rig) return reply.code(404).send({ error: 'rig-not-found' })
+
+    const identity = rig.lastObservedInventory.devices.find(device =>
+      device.kind === 'telescope' && rigDeviceId(rigId, device.uniqueId) === deviceId,
+    )
+
+    if (!identity) return reply.code(404).send({ error: 'mount-not-found' })
+    const adapter = mountControlOf(rig)
+
+    if (!adapter?.canStop)
+      return reply.code(409).send({ error: 'mount-stop-unavailable', message: 'Vela cannot stop this rig’s mount.' })
+
+    // No lane, no inspection and no command record: a run or a pending home must not stand between Stop and the mount.
+    try {
+      const result = await adapter.execute({ kind: 'stop', telescopeId: identity.uniqueId, expectedTelescopeName: identity.name })
+
+      return {
+        outcome: result.outcome,
+        message: result.outcome === 'confirmed' ? null : result.message ?? 'The mount did not confirm it stopped. Check it before moving it.',
+      }
+    } catch (error) {
+      request.log.warn({ err: error, rigId, deviceId }, 'Mount stop outcome is uncertain')
+
+      return { outcome: 'uncertain', message: 'The stop could not be confirmed. Check the mount before moving it.' }
     }
   })
 

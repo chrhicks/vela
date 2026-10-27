@@ -226,6 +226,7 @@ function setup({ savedCameraName = 'Camera' }: { savedCameraName?: string } = {}
     },
     createMountControl() {
       return {
+        canStop: false,
         observe: async () => undefined,
         execute: async () => ({ outcome: 'failed', reason: 'unsupported' }),
       }

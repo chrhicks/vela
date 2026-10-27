@@ -1,8 +1,8 @@
 import type { MountControlAction, MountControlView, RigDetailView, RigTelescopeDeviceView } from '@vela/model/web'
-import { Button } from '@vela/ui'
+import { Button, Dialog } from '@vela/ui'
 import { useEffect, useId, useRef, useState } from 'react'
 import { ApiError } from '../../lib/api'
-import { checkMountCommand, createRequestId, sendMountCommand } from '../rig-detail/mount-control-api'
+import { checkMountCommand, createRequestId, sendMountCommand, stopMount } from '../rig-detail/mount-control-api'
 
 type Command = NonNullable<MountControlView['command']> & { serverInstanceId: string }
 
@@ -14,7 +14,10 @@ const confirmed = {
   unpark: 'Mount confirmed unparked.',
   'tracking-on': 'Tracking confirmed on.',
   'tracking-off': 'Tracking confirmed off.',
+  home: 'Homing finished.',
 }
+
+const clock = (iso: string) => new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })
 
 export function MountControls({ rigId, device, stale, refresh }: {
   rigId: string
@@ -28,9 +31,15 @@ export function MountControls({ rigId, device, stale, refresh }: {
   const [checking, setChecking] = useState(false)
   const [checkMessage, setCheckMessage] = useState('')
   const [serverRestarted, setServerRestarted] = useState(false)
+  const [confirmingHome, setConfirmingHome] = useState(false)
+  const [stopping, setStopping] = useState(false)
+  const [stopResult, setStopResult] = useState<Awaited<ReturnType<typeof stopMount>> | null>(null)
   const requestInFlight = useRef(false)
+  const stopInFlight = useRef(false)
   const mounted = useRef(false)
   const messageId = useId()
+  const homeOpenerId = useId()
+  const homeCancelId = useId()
 
   useEffect(() => {
     mounted.current = true
@@ -54,16 +63,19 @@ export function MountControls({ rigId, device, stale, refresh }: {
     try {
       setSending(true)
       setCheckMessage('')
+      setStopResult(null)
       setLocal({ requestId, serverInstanceId, action, state: 'pending', message: null })
       const result = await sendMountCommand(rigId, device.id, action, requestId, serverInstanceId)
 
       if (!mounted.current) return
+      setStopResult(null)
       setLocal(result.command && { ...result.command, serverInstanceId })
       await refresh()
     } catch (error) {
       if (!mounted.current) return
       const rejected = error instanceof ApiError && [400, 404, 409].includes(error.status)
 
+      setStopResult(null)
       setLocal({
         requestId,
         serverInstanceId,
@@ -79,6 +91,28 @@ export function MountControls({ rigId, device, stale, refresh }: {
 
       if (mounted.current) setSending(false)
     }
+  }
+
+  /** Never gated by a command of this panel: a Stop must reach a mount that is mid-home or mid-slew. */
+  async function stop() {
+    if (stopInFlight.current) return
+    stopInFlight.current = true
+    setStopping(true)
+    setStopResult(null)
+
+    try {
+      const result = await stopMount(rigId, device.id)
+
+      if (mounted.current) setStopResult(result)
+    } catch {
+      if (mounted.current) setStopResult({ outcome: 'uncertain', message: 'The stop request failed or its reply was lost. Check the mount, and press Stop again if it is still moving.' })
+    } finally {
+      stopInFlight.current = false
+
+      if (mounted.current) setStopping(false)
+    }
+
+    if (mounted.current) await refresh()
   }
 
   async function check() {
@@ -127,18 +161,27 @@ export function MountControls({ rigId, device, stale, refresh }: {
 
   const reason = stale ? 'Current mount state is unavailable. The values above are last known.'
     : showUnpark && !view.unpark.enabled ? view.unpark.reason
-      : !tracking.enabled ? tracking.reason : null
+      : !tracking.enabled ? tracking.reason
+        : !view.home.enabled ? view.home.reason : null
 
   const reading = status ? `${trackingLabels[status.tracking]} · ${parkingLabels[status.parking]}` : 'Mount state unavailable'
 
   const outcome = command?.state === 'confirmed' ? confirmed[command.action] : command?.message
 
-  const message = pending ? 'Waiting for the mount to confirm the change…'
-    : checkMessage || outcome || reason || 'Tracking follows the sky. It does not slew to your selected subject.'
+  const homing = pending && command?.action === 'home'
+
+  const stopMessage = stopResult?.outcome === 'confirmed' ? 'Stopped. The mount confirmed it is still.' : stopResult?.message
+
+  const message = stopping ? 'Stopping…'
+    : stopMessage ? stopMessage
+      : homing ? 'Homing… Stop ends it.'
+        : pending ? 'Waiting for the mount to confirm the change…'
+          : checkMessage || outcome || reason || 'Tracking follows the sky. It does not slew to your selected subject.'
 
   return (
     <div className="rig-controls__mount" aria-label="Mount controls">
       <p className="rig-controls__reading">{stale && status ? `${reading} · last known` : reading}</p>
+      {view.homeConfirmedAt && !homing && <p className="rig-controls__home">Home confirmed at <time dateTime={view.homeConfirmedAt}>{clock(view.homeConfirmedAt)}</time></p>}
       <div className="rig-controls__actions">
         {showUnpark && (
           <Button
@@ -152,13 +195,30 @@ export function MountControls({ rigId, device, stale, refresh }: {
         )}
         <Button
           disabled={disabled || !tracking.enabled}
-          aria-busy={pending && command?.action !== 'unpark'}
+          aria-busy={pending && (command?.action === 'tracking-on' || command?.action === 'tracking-off')}
           aria-describedby={messageId}
           onClick={() => void execute(trackingOn ? 'tracking-off' : 'tracking-on')}
         >
           {pending && command?.action === 'tracking-on' ? 'Turning tracking on…'
             : pending && command?.action === 'tracking-off' ? 'Turning tracking off…'
               : trackingOn ? 'Turn tracking off' : 'Turn tracking on'}
+        </Button>
+        <Button
+          id={homeOpenerId}
+          disabled={disabled || !view.home.enabled}
+          aria-busy={homing}
+          aria-describedby={messageId}
+          onClick={() => setConfirmingHome(true)}
+        >
+          {homing ? 'Homing…' : 'Home'}
+        </Button>
+        <Button
+          tone="accent"
+          disabled={!view.canStop || !(view.stop.enabled || pending || unconfirmed) || stopping}
+          aria-busy={stopping}
+          onClick={() => void stop()}
+        >
+          {stopping ? 'Stopping…' : 'Stop'}
         </Button>
         {(stale || unconfirmed || command?.state === 'failed' || !!reason) && (
           <Button disabled={pending || checking} aria-busy={checking} onClick={() => void check()}>
@@ -169,6 +229,19 @@ export function MountControls({ rigId, device, stale, refresh }: {
       </div>
       <p id={messageId} role="status">{message}</p>
       {reason && reason !== message && <p>{reason}</p>}
+      {!view.stop.enabled && (!view.canStop || (!pending && !unconfirmed)) && view.stop.reason && <p>Stop is off. {view.stop.reason}</p>}
+      <Dialog
+        open={confirmingHome}
+        title="Are you sure?"
+        showCloseButton={false}
+        initialFocusId={homeCancelId}
+        returnFocusId={homeOpenerId}
+        onDismiss={() => setConfirmingHome(false)}
+        footer={<>
+          <Button id={homeCancelId} onClick={() => setConfirmingHome(false)}>Cancel</Button>
+          <Button tone="accent" onClick={() => { setConfirmingHome(false); void execute('home') }}>Home the mount</Button>
+        </>}
+      />
     </div>
   )
 }

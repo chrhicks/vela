@@ -14,7 +14,9 @@ const on = { enabled: true, reason: null }
 
 const off = { enabled: false, reason: 'The mount state does not permit this action.' }
 
-const mountControl: MountControlView = { serverInstanceId, unpark: off, trackingOn: on, trackingOff: off, command: null }
+const mountControl: MountControlView = {
+  serverInstanceId, unpark: off, trackingOn: on, trackingOff: off, home: on, stop: on, canStop: true, homeConfirmedAt: null, command: null,
+}
 
 const idle: CaptureView = {
   captureReadState: 'current',

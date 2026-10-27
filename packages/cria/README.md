@@ -36,6 +36,13 @@ recovery resolves it. Cancel is resent until a 2xx, 404, or 410, and Vela follow
 the actual ending. The remote operation has no Vela completion deadline while
 snapshots arrive. Cria owns settling, including the mount's bounded stop.
 
+`mount-control.ts` also sends Home (`mount-home`) and Stop (`mount-stop`). A stopped home settles `stopped`
+(Cria confirms it from the coordinates, cria#23), so it comes back as `failed` with reason `stopped` and the
+mount is not held. Stop is Cria's halt: it is admitted on a busy or held mount, it is never cancelled, and
+unanswered for 20 seconds it is `uncertain` with a hold. `mount-home.ts` keeps, in memory, when each mount last
+confirmed a home (any home through `equipment.ts` or `mount-control.ts`): `forget` runs on every mount command
+except tracking, and when a reading shows the mount slewing.
+
 A capture carries its frame type. Cria's `capture` takes `light` (the shutter is
 open) and, for a flat or bias, a `frameType` that Cria sets on the camera's INDI frame
 type. A dark flat goes as a dark. `frameType` is sent only for a flat or bias, because a

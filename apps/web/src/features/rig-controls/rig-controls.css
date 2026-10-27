@@ -29,7 +29,7 @@
 
 .rig-controls__open { min-height: 46px; margin-right: 8px; }
 
-/* Sections stack; a later Home, Stop or dew heater control joins its section's .rig-controls__actions or adds a section. */
+/* Sections stack; a later control joins its section's .rig-controls__actions or adds a section. */
 .rig-controls__sections { display: grid; gap: 0; }
 .rig-controls__section { display: grid; gap: 12px; padding: 20px 0; border-top: 1px solid var(--vela-line); }
 .rig-controls__section:first-child { padding-top: 4px; border-top: 0; }

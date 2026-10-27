@@ -139,4 +139,14 @@ describe('Alpaca mount preparation controls', () => {
     expect(await replaced.control.execute(trackingOn)).toMatchObject({ outcome: 'uncertain', reason: 'verification-unavailable' })
     expect(replaced.writes).toHaveLength(1)
   })
+
+  it('does not home or stop an Alpaca mount, and sends nothing', async () => {
+    const f = fixture()
+    const target = { telescopeId: 'mount', expectedTelescopeName: 'Fixture Mount' }
+
+    expect(f.control.canStop).toBe(false)
+    expect(await f.control.execute({ ...target, kind: 'home' })).toMatchObject({ outcome: 'failed', reason: 'unsupported' })
+    expect(await f.control.execute({ ...target, kind: 'stop' })).toMatchObject({ outcome: 'failed', reason: 'unsupported' })
+    expect(f.writes).toEqual([])
+  })
 })

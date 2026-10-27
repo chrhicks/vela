@@ -9,9 +9,13 @@ export const mountControlSchema = z.object({
   unpark: availability,
   trackingOn: availability,
   trackingOff: availability,
+  home: availability,
+  stop: availability,
+  canStop: z.boolean(),
+  homeConfirmedAt: z.string().nullable(),
   command: z.object({
     requestId: z.uuid(),
-    action: z.enum(['unpark', 'tracking-on', 'tracking-off']),
+    action: z.enum(['unpark', 'tracking-on', 'tracking-off', 'home']),
     state: z.enum(['pending', 'confirmed', 'failed', 'uncertain']),
     message: z.string().nullable(),
   }).nullable(),
@@ -43,7 +47,8 @@ export async function sendMountCommand(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ deviceId, action, requestId, serverInstanceId }),
-    signal: AbortSignal.timeout(30_000),
+    // The request stays open for the whole home, which Cria bounds at three minutes.
+    signal: AbortSignal.timeout(action === 'home' ? 200_000 : 30_000),
   })
 
   const view = mountControlSchema.parse(response)
@@ -52,6 +57,23 @@ export async function sendMountCommand(
     throw new Error('Mount command response does not match the request')
 
   return view
+}
+
+const stopSchema = z.object({
+  outcome: z.enum(['confirmed', 'failed', 'uncertain']),
+  message: z.string().nullable(),
+})
+
+/** Stop has no request ID: it only stops motion, so sending it again is safe. */
+export async function stopMount(rigId: string, deviceId: string) {
+  const response = await api(`rigs/${encodeURIComponent(rigId)}/mount/stop`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ deviceId }),
+    signal: AbortSignal.timeout(30_000),
+  })
+
+  return stopSchema.parse(response)
 }
 
 /** Retire an unseen request before reading state; this never sends a device command. */

@@ -323,4 +323,6 @@ following the [ASCOM telescope contract](https://ascom-standards.org/newdocs/tel
 Readback must confirm the requested state and `Slewing=false`. Unpark may finish
 asynchronously, so confirmation is bounded. A lost write response is reconciled
 with read-only state and never replayed. This capability never sends tracking as
-a side effect of Unpark, or sends park, home, slew or abort commands.
+a side effect of Unpark, or sends park, home, slew or abort commands. Its `MountControl` has `canStop: false`
+and answers `home` and `stop` as `unsupported` without sending anything: the Controls panel's Home and Stop are
+Cria-only.

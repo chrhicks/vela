@@ -1,5 +1,5 @@
 /** Explicit, server-owned mount commands; never an automatic preparation sequence. */
-export type MountControlAction = 'unpark' | 'tracking-on' | 'tracking-off'
+export type MountControlAction = 'unpark' | 'tracking-on' | 'tracking-off' | 'home'
 
 export interface MountControlAvailability {
   readonly enabled: boolean
@@ -11,6 +11,13 @@ export interface MountControlView {
   readonly unpark: MountControlAvailability
   readonly trackingOn: MountControlAvailability
   readonly trackingOff: MountControlAvailability
+  readonly home: MountControlAvailability
+  /** Stop is a halt, not a command: it never waits for, and is never recorded in, `command`. */
+  readonly stop: MountControlAvailability
+  /** The rig's adapter can stop this mount at all. When false, Stop is never offered, not even while a command is pending. */
+  readonly canStop: boolean
+  /** When the last home Vela ran or saw confirmed, until the next move or a Vela restart. The mount reports no at-home state. */
+  readonly homeConfirmedAt: string | null
   readonly command: {
     readonly requestId: string
     readonly action: MountControlAction
