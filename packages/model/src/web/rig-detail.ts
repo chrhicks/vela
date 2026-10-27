@@ -1,3 +1,4 @@
+import type { DewControlView } from './dew-control.js'
 import type { MountControlView } from './mount-control.js'
 import type { ConnectionStatus, DeviceKind } from '../device/index.js'
 import type {
@@ -137,7 +138,9 @@ export interface RigSwitchStatus {
   readonly channels?: ReadonlyArray<RigSwitchChannelView>
 }
 
-export type RigSwitchDeviceView = RigDeviceView<'switch', RigSwitchStatus>
+export type RigSwitchDeviceView = RigDeviceView<'switch', RigSwitchStatus> & {
+  readonly dewControl?: DewControlView
+}
 
 type SupportedRigDeviceKind =
   | 'camera'
