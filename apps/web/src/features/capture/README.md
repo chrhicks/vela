@@ -75,7 +75,7 @@ only for runs the server reports as interrupted; that check still covers a contr
 lost with no record.
 
 Unattended ("page my phone") is a per-run choice, off for every new run and never carried over from the last
-one. The start form has it as a checkbox under Save frames, and the start body always carries `unattended`. On a
+one. A run the page sees begin, from this tab or another, clears a ticked choice. The start form has it as a checkbox under Save frames, and the start body always carries `unattended`. On a
 running run the same checkbox is a live switch with no confirmation: it calls `PUT /api/rigs/:rigId/capture/unattended`
 with `{on}` and shows the server's value, "Phone: on, unattended" or "Phone: off", under it. The switch stays
 available whenever a run is active and the page is not mid-command, including during image receipt. A 409 (the run
