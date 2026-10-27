@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import { horizonFilePath, writeHorizonProfile } from '@vela/server/targets/horizon'
-import { convertSurvey } from './convert.ts'
+import { convertSurvey, surveySchema } from './convert.ts'
 
 const usage = `usage: horizon-import SURVEY_JSON --rig RIG_ID --dir DATA_DIR --az-offset DEG --alt-offset DEG [--step DEG]
 
@@ -28,6 +28,7 @@ const { values, positionals } = parseArgs({
 })
 
 const [source] = positionals
+
 const { rig, dir } = values
 
 if (!source || positionals.length !== 1 || !rig || !dir || !values['az-offset'] || !values['alt-offset'])
@@ -38,7 +39,7 @@ const path = horizonFilePath(resolve(dir), rig)
 if (!path) fail('The rig id may use only letters, digits, hyphens and underscores.')
 
 try {
-  const { profile, traced, unknown } = convertSurvey(JSON.parse(await readFile(source, 'utf8')), {
+  const { profile, traced, unknown } = convertSurvey(surveySchema.parse(JSON.parse(await readFile(source, 'utf8'))), {
     azimuthOffsetDegrees: Number(values['az-offset']),
     altitudeOffsetDegrees: Number(values['alt-offset']),
     stepDegrees: Number(values.step),

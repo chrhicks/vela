@@ -2,7 +2,7 @@ import { z } from 'zod'
 import type { HorizonProfile } from '@vela/server/targets/horizon'
 
 /** The survey file's fields this tool reads. Others (wires, sources, metadata) are ignored. */
-const surveySchema = z.object({
+export const surveySchema = z.object({
   stepDeg: z.number().positive(),
   samples: z
     .array(
@@ -14,6 +14,8 @@ const surveySchema = z.object({
     )
     .min(1),
 })
+
+export type Survey = z.infer<typeof surveySchema>
 
 export interface ConvertOptions {
   azimuthOffsetDegrees: number
@@ -35,7 +37,7 @@ const wrap = (degrees: number) => ((degrees % 360) + 360) % 360
  * altitude of its samples plus the altitude offset, floored at 0. It is unknown when it has
  * no sample or any sample is unsupported: an untraced stretch is never read as open sky.
  */
-export function convertSurvey(survey: unknown, options: ConvertOptions): Conversion {
+export function convertSurvey(survey: Survey, options: ConvertOptions): Conversion {
   const { stepDegrees, azimuthOffsetDegrees, altitudeOffsetDegrees } = options
   const bins = Math.round(360 / stepDegrees)
 
@@ -45,7 +47,7 @@ export function convertSurvey(survey: unknown, options: ConvertOptions): Convers
   if (!Number.isFinite(azimuthOffsetDegrees) || !Number.isFinite(altitudeOffsetDegrees))
     throw new RangeError('Both offsets must be finite numbers.')
 
-  const { samples } = surveySchema.parse(survey)
+  const { samples } = survey
   const highest: Array<number | null> = Array.from({ length: bins }, () => null)
   const untraced = new Set<number>()
 

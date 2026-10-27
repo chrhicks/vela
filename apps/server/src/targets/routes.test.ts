@@ -156,6 +156,7 @@ function setup(
   }
 
   if (settings.solver !== false) options.createSolver = () => solver
+
   if (settings.horizonDirectory) options.horizonDirectory = settings.horizonDirectory
 
   function createApp() {
@@ -794,6 +795,7 @@ describe('backyard horizon over HTTP', () => {
   async function withProfile(profile: HorizonProfile | null) {
     const horizonDirectory = await mkdtemp(join(tmpdir(), 'vela-horizon-routes-'))
     directories.push(horizonDirectory)
+
     if (profile) await writeHorizonProfile(horizonFilePath(horizonDirectory, 'rig')!, profile)
 
     return setup({ horizonDirectory })
@@ -802,13 +804,16 @@ describe('backyard horizon over HTTP', () => {
   const flat = (altitude: number | null) =>
     syntheticProfile({ stepDegrees: 360, altitudesDegrees: [altitude] })
 
-  type Item = {
+  interface Item {
+    id: string
     sky: { samples: Array<{ horizon: string | null }> }
     horizonInWindow: { checkedMinutes: number; behindMinutes: number; unknownMinutes: number } | null
   }
 
   async function discovery(subject: Awaited<ReturnType<typeof withProfile>>) {
-    return (await subject.app.inject('/api/web/rigs/rig/target-discovery')).json() as { targets: Item[] }
+    const view: { targets: Item[] } = (await subject.app.inject('/api/web/rigs/rig/target-discovery')).json()
+
+    return view
   }
 
   it('has no statuses at all without a profile', async () => {
@@ -823,9 +828,7 @@ describe('backyard horizon over HTTP', () => {
     const plain = await discovery(await withProfile(null))
     const blocked = await discovery(await withProfile(flat(89)))
 
-    expect(blocked.targets.map(item => (item as unknown as { id: string }).id)).toEqual(
-      plain.targets.map(item => (item as unknown as { id: string }).id),
-    )
+    expect(blocked.targets.map(item => item.id)).toEqual(plain.targets.map(item => item.id))
 
     for (const item of blocked.targets) {
       expect(item.horizonInWindow).not.toBeNull()

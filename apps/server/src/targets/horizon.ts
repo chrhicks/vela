@@ -4,22 +4,12 @@ import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import type { HorizonStatus, HorizonWindow } from '@vela/model/web'
 
-/** Altitude of the skyline per azimuth bin; `null` is a bin the survey could not trace. */
-export interface HorizonProfile {
-  version: 1
-  approximate: true
-  note: string
-  importedAt: string
-  offsets: { azimuthDegrees: number; altitudeDegrees: number }
-  stepDegrees: number
-  altitudesDegrees: Array<number | null>
-}
-
 const sampleMinutes = 15
 
 const rigIdPattern = /^[A-Za-z0-9][A-Za-z0-9_-]*$/
 
-const profileSchema = z
+/** Altitude of the skyline per azimuth bin; `null` is a bin the survey could not trace. */
+export const horizonProfileSchema = z
   .strictObject({
     version: z.literal(1),
     approximate: z.literal(true),
@@ -33,9 +23,10 @@ const profileSchema = z
     message: 'bins must cover exactly 360 degrees',
   })
 
-export function parseHorizonProfile(value: unknown): HorizonProfile {
-  return profileSchema.parse(value)
-}
+export type HorizonProfile = z.infer<typeof horizonProfileSchema>
+
+const isMissingFile = (error: unknown): error is NodeJS.ErrnoException =>
+  error instanceof Error && 'code' in error && error.code === 'ENOENT'
 
 export function horizonFilePath(directory: string, rigId: string): string | null {
   return rigIdPattern.test(rigId) ? join(directory, `horizon-${rigId}.json`) : null
@@ -45,7 +36,7 @@ export function horizonFilePath(directory: string, rigId: string): string | null
 export async function writeHorizonProfile(path: string, profile: HorizonProfile) {
   const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`
 
-  await writeFile(temporary, `${JSON.stringify(parseHorizonProfile(profile))}\n`, { mode: 0o600 })
+  await writeFile(temporary, `${JSON.stringify(horizonProfileSchema.parse(profile))}\n`, { mode: 0o600 })
   await chmod(temporary, 0o600)
   await rename(temporary, path)
 }
@@ -83,13 +74,11 @@ export function createHorizonStore(
       try {
         text = await readFile(path, 'utf8')
       } catch (error) {
-        return (error as NodeJS.ErrnoException).code === 'ENOENT'
-          ? null
-          : ignore(rigId, 'it could not be read')
+        return isMissingFile(error) ? null : ignore(rigId, 'it could not be read')
       }
 
       try {
-        return parseHorizonProfile(JSON.parse(text))
+        return horizonProfileSchema.parse(JSON.parse(text))
       } catch {
         return ignore(rigId, 'it is not a valid profile')
       }
@@ -123,6 +112,7 @@ export function horizonInWindow(
   const inside = samples.filter(sample => Date.parse(sample.at) >= start && Date.parse(sample.at) <= end)
 
   if (inside.length === 0 || inside.some(sample => sample.horizon === null)) return null
+
   const minutes = (status: HorizonStatus) =>
     inside.filter(sample => sample.horizon === status).length * sampleMinutes
 

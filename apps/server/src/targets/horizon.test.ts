@@ -1,13 +1,15 @@
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import type { HorizonStatus } from '@vela/model/web'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   createHorizonStore,
   horizonFilePath,
   horizonInWindow,
   horizonStatus,
-  parseHorizonProfile,
+  horizonProfileSchema,
+  type HorizonProfile,
   writeHorizonProfile,
 } from './horizon.js'
 import { syntheticProfile } from './horizon.fixture.js'
@@ -53,20 +55,20 @@ describe('horizon status', () => {
 
 describe('horizon profile file', () => {
   it('rejects anything that is not exactly 360 degrees of bins or leaves an altitude out of range', () => {
-    expect(() => parseHorizonProfile(syntheticProfile())).not.toThrow()
-    expect(() => parseHorizonProfile(syntheticProfile({ altitudesDegrees: [1, 2, 3] }))).toThrow()
-    expect(() => parseHorizonProfile(syntheticProfile({ stepDegrees: 0 }))).toThrow()
-    expect(() => parseHorizonProfile({ ...syntheticProfile(), extra: 1 })).toThrow()
-    expect(() => parseHorizonProfile({ ...syntheticProfile(), approximate: false })).toThrow()
+    expect(() => horizonProfileSchema.parse(syntheticProfile())).not.toThrow()
+    expect(() => horizonProfileSchema.parse(syntheticProfile({ altitudesDegrees: [1, 2, 3] }))).toThrow()
+    expect(() => horizonProfileSchema.parse(syntheticProfile({ stepDegrees: 0 }))).toThrow()
+    expect(() => horizonProfileSchema.parse({ ...syntheticProfile(), extra: 1 })).toThrow()
+    expect(() => horizonProfileSchema.parse({ ...syntheticProfile(), approximate: false })).toThrow()
 
     expect(() =>
-      parseHorizonProfile(
+      horizonProfileSchema.parse(
         syntheticProfile({ stepDegrees: 120, altitudesDegrees: [1, 95, 2] }),
       ),
     ).toThrow()
 
     expect(() =>
-      parseHorizonProfile(syntheticProfile({ stepDegrees: 120, altitudesDegrees: [1, -1, 2] })),
+      horizonProfileSchema.parse(syntheticProfile({ stepDegrees: 120, altitudesDegrees: [1, -1, 2] })),
     ).toThrow()
   })
 
@@ -118,13 +120,8 @@ describe('horizon profile file', () => {
 describe('horizon over a window', () => {
   const at = (minutes: number) => new Date(Date.UTC(2026, 0, 1, 0, minutes)).toISOString()
 
-  const samples = [
-    'clear',
-    'behind',
-    'behind',
-    'unknown',
-    'clear',
-  ].map((horizon, index) => ({ at: at(index * 15), horizon: horizon as 'clear' }))
+  const statuses: HorizonStatus[] = ['clear', 'behind', 'behind', 'unknown', 'clear']
+  const samples = statuses.map((horizon, index) => ({ at: at(index * 15), horizon }))
 
   it('counts the 15-minute samples inside the window by status', () => {
     expect(horizonInWindow(samples, { startsAt: at(15), endsAt: at(45) })).toEqual({

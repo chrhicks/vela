@@ -2,8 +2,8 @@ import { mkdtemp, readFile, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { horizonFilePath, parseHorizonProfile, writeHorizonProfile } from '@vela/server/targets/horizon'
-import { convertSurvey, type ConvertOptions } from './convert.ts'
+import { horizonFilePath, horizonProfileSchema, writeHorizonProfile } from '@vela/server/targets/horizon'
+import { convertSurvey, surveySchema, type ConvertOptions } from './convert.ts'
 
 /** Synthetic survey, 1 degree source step: flat 5 degrees, a 30 degree tree at 100 to 109, no trace at 200 to 209. */
 function survey() {
@@ -98,8 +98,8 @@ describe('convertSurvey', () => {
     expect(() => convertSurvey(survey(), { ...options, stepDegrees: 7 })).toThrow(RangeError)
     expect(() => convertSurvey(survey(), { ...options, stepDegrees: 0 })).toThrow(RangeError)
     expect(() => convertSurvey(survey(), { ...options, azimuthOffsetDegrees: Number.NaN })).toThrow(RangeError)
-    expect(() => convertSurvey({ stepDeg: 1, samples: [] }, options)).toThrow()
-    expect(() => convertSurvey({ samples: [{ az: 0 }] }, options)).toThrow()
+    expect(() => surveySchema.parse({ stepDeg: 1, samples: [] })).toThrow()
+    expect(() => surveySchema.parse({ samples: [{ az: 0 }] })).toThrow()
   })
 
   it('produces a file the server reader accepts, private to its owner', async () => {
@@ -109,7 +109,7 @@ describe('convertSurvey', () => {
     const { profile } = convertSurvey(survey(), options)
 
     await writeHorizonProfile(path, profile)
-    expect(parseHorizonProfile(JSON.parse(await readFile(path, 'utf8')))).toEqual(profile)
+    expect(horizonProfileSchema.parse(JSON.parse(await readFile(path, 'utf8')))).toEqual(profile)
     expect((await stat(path)).mode & 0o777).toBe(0o600)
   })
 })
