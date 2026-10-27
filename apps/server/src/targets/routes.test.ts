@@ -11,7 +11,7 @@ import { registerTargets, type TargetOptions } from './routes.js'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { horizonFilePath, writeHorizonProfile, type HorizonProfile } from './horizon.js'
+import { createHorizon, horizonFilePath, writeHorizonProfile, type Horizon, type HorizonProfile } from './horizon.js'
 import { syntheticProfile } from './horizon.fixture.js'
 import { haltBodyError } from '../http/halt-body.js'
 import { emptyHaltRequests, refusedHaltRequests } from '../http/halt-requests.fixture.js'
@@ -52,7 +52,7 @@ function setup(
     record?: RigCatalogRecord
     solver?: boolean
     offsetDegrees?: number
-    horizonDirectory?: string
+    horizon?: Horizon
   } = {},
 ) {
   const catalog = createMemoryRigCatalog([settings.record ?? record])
@@ -157,7 +157,7 @@ function setup(
 
   if (settings.solver !== false) options.createSolver = () => solver
 
-  if (settings.horizonDirectory) options.horizonDirectory = settings.horizonDirectory
+  if (settings.horizon) options.horizon = settings.horizon
 
   function createApp() {
     const app = Fastify()
@@ -798,7 +798,7 @@ describe('backyard horizon over HTTP', () => {
 
     if (profile) await writeHorizonProfile(horizonFilePath(horizonDirectory, 'rig')!, profile)
 
-    return setup({ horizonDirectory })
+    return setup({ horizon: createHorizon(horizonDirectory) })
   }
 
   const flat = (altitude: number | null) =>
@@ -876,5 +876,98 @@ describe('backyard horizon over HTTP', () => {
     expect(warn).toHaveBeenCalledOnce()
     expect(String(warn.mock.calls[0]![0])).not.toContain('41.5')
     warn.mockRestore()
+  })
+})
+
+describe('observed obstructions over HTTP', () => {
+  const directories: string[] = []
+
+  afterEach(async () => {
+    await Promise.all(directories.splice(0).map(path => rm(path, { recursive: true, force: true })))
+  })
+
+  async function withObservations() {
+    const directory = await mkdtemp(join(tmpdir(), 'vela-horizon-observations-routes-'))
+    directories.push(directory)
+
+    const horizon = createHorizon(directory)
+    const observation = { altitudeDegrees: 25, azimuthDegrees: 100, strongBefore: 40, strongAt: 1, runId: 'run' }
+    const older = await horizon.observations.add('rig', { ...observation, at: '2026-01-01T03:00:00.000Z' })
+    const newer = await horizon.observations.add('rig', { ...observation, at: '2026-01-02T03:00:00.000Z', runId: 'later' })
+
+    return { ...setup({ horizon }), directory, horizon, older, newer }
+  }
+
+  it('lists a rig\'s observations, newest first', async () => {
+    const { app, older, newer } = await withObservations()
+    const response = await app.inject('/api/web/rigs/rig/horizon-observations')
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toEqual({ rigId: 'rig', observations: [newer, older] })
+  })
+
+  it('deletes one observation and leaves the other, the sky and the profile alone', async () => {
+    const { app, horizon, older, newer, directory } = await withObservations()
+    const profilePath = horizonFilePath(directory, 'rig')!
+
+    await writeHorizonProfile(profilePath, syntheticProfile())
+
+    const deleted = await app.inject({ method: 'DELETE', url: `/api/rigs/rig/horizon-observations/${older.id}` })
+
+    expect(deleted.statusCode).toBe(204)
+    expect(await horizon.observations.list('rig')).toEqual([newer])
+
+    const listed = (await app.inject('/api/web/rigs/rig/horizon-observations')).json()
+
+    expect(listed.observations).toEqual([newer])
+  })
+
+  it('refuses what is not there: a rig, an observation, a second delete', async () => {
+    const { app, older } = await withObservations()
+    const url = (rigId: string, id: string) => `/api/rigs/${rigId}/horizon-observations/${id}`
+
+    expect((await app.inject('/api/web/rigs/nope/horizon-observations')).statusCode).toBe(404)
+    expect((await app.inject({ method: 'DELETE', url: url('nope', older.id) })).statusCode).toBe(404)
+    expect((await app.inject({ method: 'DELETE', url: url('rig', 'missing') })).statusCode).toBe(404)
+    expect((await app.inject({ method: 'DELETE', url: url('rig', older.id) })).statusCode).toBe(204)
+    expect((await app.inject({ method: 'DELETE', url: url('rig', older.id) })).statusCode).toBe(404)
+  })
+
+  it('answers 409 and leaves an unusable file alone when asked to delete from it', async () => {
+    const { writeFile, readFile } = await import('node:fs/promises')
+    const { app, directory } = await withObservations()
+    const path = join(directory, 'horizon-observations-rig.json')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    await writeFile(path, '{"version":1,"observations":[{"altitudeDegrees":33.25')
+
+    expect((await app.inject({ method: 'DELETE', url: '/api/rigs/rig/horizon-observations/x' })).statusCode).toBe(409)
+    expect((await app.inject('/api/web/rigs/rig/horizon-observations')).json().observations).toEqual([])
+    expect(await readFile(path, 'utf8')).toContain('33.25')
+    warn.mockRestore()
+  })
+
+  it('marks a sample observed where an observation raised the horizon, and still warns only', async () => {
+    const { app, horizon, directory } = await withObservations()
+
+    await writeHorizonProfile(
+      horizonFilePath(directory, 'rig')!,
+      syntheticProfile({ stepDegrees: 360, altitudesDegrees: [5] }),
+    )
+
+    await horizon.observations.add('rig', {
+      at: '2026-01-03T03:00:00.000Z',
+      altitudeDegrees: 80,
+      azimuthDegrees: 10,
+      strongBefore: 30,
+      strongAt: 0,
+      runId: 'run',
+    })
+
+    const single = (await app.inject('/api/web/rigs/rig/targets/ngc6205')).json()
+    const samples: Array<{ horizon: string; horizonBin: string }> = single.sky.samples
+
+    expect(samples.every(sample => sample.horizonBin === 'observed')).toBe(true)
+    expect(new Set(samples.map(sample => sample.horizon))).toEqual(new Set(['behind', 'unknown']))
   })
 })

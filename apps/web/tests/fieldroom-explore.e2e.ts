@@ -279,7 +279,7 @@ test('a subject behind the approximate horizon profile is warned, an untraced st
   await page.setViewportSize({ width: 1440, height: 900 })
   const { scene } = await openExploreScene(page, 'explore-light')
   await expect(page.locator('.vela-discovery__horizon')).toHaveCount(0)
-  await expect(page.locator('polyline.tonight-sky__behind, polyline.tonight-sky__unknown')).toHaveCount(0)
+  await expect(page.locator('polyline.tonight-sky__behind, polyline.tonight-sky__unknown, circle.tonight-sky__observed')).toHaveCount(0)
   await expect(page.getByText('Sky estimates don’t include local obstructions or weather.')).toBeVisible()
   await page.route('**/api/web/rigs/fra400/target-discovery?*', route => {
     const url = new URL(route.request().url())
@@ -293,6 +293,7 @@ test('a subject behind the approximate horizon profile is warned, an untraced st
       altitudeDegrees: 40,
       sunAltitudeDegrees: -25,
       horizon: index < 6 ? 'clear' : index < 10 ? 'behind' : index < 14 ? 'unknown' : 'clear',
+      horizonBin: index < 6 ? 'traced' : index < 10 ? 'observed' : index < 14 ? 'unknown' : 'traced',
     }))
 
     first.horizonInWindow = { checkedMinutes: 180, behindMinutes: 90, unknownMinutes: 30 }
@@ -305,10 +306,12 @@ test('a subject behind the approximate horizon profile is warned, an untraced st
   await expect(warnings).toHaveText(['May be behind trees for 1 h 30 min', 'Horizon untraced for 30 min'])
   await expect(page.locator('.vela-discovery__subject .vela-discovery__horizon')).toHaveText([
     /^May be behind trees \d\d:\d\d–\d\d:\d\d\.$/,
+    'Stars have dropped out here before.',
     /^Horizon untraced \d\d:\d\d–\d\d:\d\d\.$/,
   ])
   await expect(page.locator('.vela-discovery__subject polyline.tonight-sky__behind')).toHaveCount(1)
   await expect(page.locator('.vela-discovery__subject polyline.tonight-sky__unknown')).toHaveCount(1)
+  await expect(page.locator('.vela-discovery__subject circle.tonight-sky__observed')).toHaveCount(1)
   await expect(page.getByText(/blocked/i)).toHaveCount(0)
   await expect(page.locator('.vela-discovery__card').first().getByRole('button')).toBeEnabled()
   expect(scene.commands).toEqual([])

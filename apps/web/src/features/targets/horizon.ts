@@ -12,11 +12,11 @@ export interface HorizonRun {
   to: number
 }
 
-export function horizonRuns(sky: TargetSkyPath, status: HorizonStatus): HorizonRun[] {
+function runsOf(sky: TargetSkyPath, matches: (sample: Sample) => boolean): HorizonRun[] {
   const runs: HorizonRun[] = []
 
   sky.samples.forEach((sample, index) => {
-    if (!planned(sample) || sample.horizon !== status) return
+    if (!planned(sample) || !matches(sample)) return
     const last = runs.at(-1)
 
     if (last && last.to === index - 1) last.to = index
@@ -25,6 +25,13 @@ export function horizonRuns(sky: TargetSkyPath, status: HorizonStatus): HorizonR
 
   return runs
 }
+
+export const horizonRuns = (sky: TargetSkyPath, status: HorizonStatus) =>
+  runsOf(sky, sample => sample.horizon === status)
+
+/** Stretches behind a bin that stars dropped out in, higher than the survey traced: where the horizon learned. */
+export const observedRuns = (sky: TargetSkyPath) =>
+  runsOf(sky, sample => sample.horizon === 'behind' && sample.horizonBin === 'observed')
 
 const minutes = (value: number) =>
   value < 60 ? `${value} min` : `${Math.floor(value / 60)} h${value % 60 ? ` ${value % 60} min` : ''}`
@@ -38,9 +45,11 @@ export function horizonNote(sky: TargetSkyPath): string[] {
 
   const behind = spans('behind')
   const unknown = spans('unknown')
+  const observed = observedRuns(sky).length > 0
 
   return [
     ...(behind ? [`May be behind trees ${behind}.`] : []),
+    ...(observed ? ['Stars have dropped out here before.'] : []),
     ...(unknown ? [`Horizon untraced ${unknown}.`] : []),
   ]
 }

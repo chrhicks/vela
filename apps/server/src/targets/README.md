@@ -169,6 +169,65 @@ says "May be behind trees" for the planned window, with the minutes, and says
 the horizon is untraced for part of the window when bins are unknown. A window
 that is both shows both.
 
+### Learned from star dropouts (observed obstructions)
+
+The survey's north is not verified, so the horizon also learns from real nights. When a light run raises
+`stars-collapsed` (including the empty-frame case), the mount knows exactly where it pointed. The alert
+monitor records that as an **observed obstruction** and the profile gets corrected where stars really vanished.
+Recording is spelled out in [Alerts](../alerts/README.md#observed-obstructions); this section owns the file and
+the read-time rule.
+
+**The file.** `horizon-observations-<rigId>.json` sits beside `horizon-<rigId>.json`, mode 600, never in the
+repo. It is a separate file so a re-import of the survey never wipes it. A rig id that starts with
+`observations-` has no profile (its file name would collide with another rig's observations).
+
+```json
+{
+  "version": 1,
+  "observations": [
+    {
+      "id": "6f1c0a9e-...",
+      "at": "2026-10-28T03:12:00.000Z",
+      "altitudeDegrees": 20,
+      "azimuthDegrees": 100,
+      "strongBefore": 48,
+      "strongAt": 2,
+      "runId": "..."
+    }
+  ]
+}
+```
+
+`strongBefore` is the run's baseline of strong stars (median of the frames no alert called bad) and `strongAt`
+the strong-star count of the frame where the collapse began. A missing file is no observations. A malformed
+file is ignored with one warning (no values) and is never overwritten: a record or delete against it fails
+(409 on the delete route) until it is fixed or removed. Writes are atomic and serialized, so a delete and a
+record never lose each other.
+
+**Merge rule, at read time.** An observation says "the skyline is at least this high at this azimuth", for the
+profile bin that azimuth falls in. Per bin:
+
+- an observation higher than the bin's traced altitude (or any observation in an unknown bin) makes the bin
+  **observed**, with the highest observed altitude;
+- an observation at or below the traced altitude changes nothing, and the bin stays **traced**;
+- a bin has no observation: it stays traced or unknown as the profile says.
+
+Bins are `traced`, `observed` or `unknown`; the profile is never rewritten. Classification
+(`horizonStatus`): `behind` at or below a traced or observed altitude, `clear` above a traced bin, and
+`unknown` above an observed bin or in an unknown bin. Above an observed altitude the observation only proves
+the skyline is *at least* that high, so it is not `clear`. Without a profile there is no skyline at all (`null`),
+even when observations exist: they refine a survey, they do not replace one.
+
+**What the page gets.** Each sky sample also carries `horizonBin` (`traced`, `observed`, `unknown`, or `null`
+without a profile). `GET /api/web/rigs/:rigId/horizon-observations` lists the observations, newest first, and
+`DELETE /api/rigs/:rigId/horizon-observations/:id` removes one (404 when it is not there). Deleting is the
+only edit: a cloud is not a tree. The list shows time, azimuth, altitude and the star counts to Chris. Nothing
+else carries observed altitudes or azimuths: not logs, traces, test fixtures or the repo.
+
+**Where it shows.** The altitude trace puts a marker at the start of each stretch behind an **observed** bin,
+and its text says the stars dropped out there before. The rig page lists the observations with a delete button
+for each.
+
 ## Survey boundary
 
 `survey.ts` accepts only DSS2 color HiPS metadata/HEALPix tile paths and canonical

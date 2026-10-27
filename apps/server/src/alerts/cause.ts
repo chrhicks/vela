@@ -71,11 +71,21 @@ export function normalEvidence(accepted: FrameEvidence[], t: AlertThresholds): N
   }
 }
 
+export const behindTheTrees = 'behind the trees'
+
 /**
  * Why the stars fell, from the last `starsSmoothingFrames` frames against the normal, or null when the
- * evidence is not clear. A majority of those frames must carry evidence.
+ * evidence is not clear. A majority of those frames must carry evidence. A mount pointed at or below the
+ * rig's horizon comes first and needs none: the position explains everything the frames could say.
  */
-export function starCause(recent: FrameEvidence[], normal: NormalEvidence | null, t: AlertThresholds) {
+export function starCause(
+  recent: FrameEvidence[],
+  normal: NormalEvidence | null,
+  t: AlertThresholds,
+  pointedBehindHorizon = false,
+) {
+  if (pointedBehindHorizon) return behindTheTrees
+
   if (recent.length * 2 <= t.starsSmoothingFrames) return null
 
   const summary: Recent = {

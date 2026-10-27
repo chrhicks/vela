@@ -1065,7 +1065,7 @@ it('tells the alert monitor a calibration run is one, never lets it raise star a
     expect(monitor.runStarted).toHaveBeenCalledExactlyOnceWith(10, { imaging: false, calibration: true, unattended: false })
     subject.captures[0]!.resolve(frame)
     await vi.waitFor(() => expect(monitor.frameCaptured).toHaveBeenCalledOnce())
-    expect(monitor.frameCaptured).toHaveBeenCalledWith({ capturedAt: frame.capturedAt, statistics: null })
+    expect(monitor.frameCaptured).toHaveBeenCalledWith({ capturedAt: frame.capturedAt, statistics: null }, expect.any(String))
   }
 })
 

@@ -23,6 +23,8 @@ const horizontal = z.object({
 
 const horizonStatus = z.enum(['clear', 'behind', 'unknown'])
 
+const horizonBin = z.enum(['traced', 'observed', 'unknown'])
+
 const moon = horizontal.extend({
   illuminationFraction: z.number().min(0).max(1),
   waxing: z.boolean(),
@@ -46,6 +48,7 @@ const sky = z
           moon,
           sunAltitudeDegrees: z.number(),
           horizon: horizonStatus.nullable(),
+          horizonBin: horizonBin.nullable(),
         }),
       )
       .min(2),

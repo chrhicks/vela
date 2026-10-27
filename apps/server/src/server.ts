@@ -15,6 +15,7 @@ import { loadCriaConfiguration, registerConfiguredCriaRigs } from './equipment/c
 import { createEquipmentComposition } from './equipment/composition.js'
 import { loadAlertsConfiguration } from './alerts/config.js'
 import { createPushoverNotifier } from './alerts/pushover.js'
+import { createHorizon } from './targets/horizon.js'
 
 const telemetry = startTelemetry(process.env.VELA_TRACE_PATH)
 
@@ -95,18 +96,18 @@ try {
       : resolve(dirname(rigCatalogPath), 'saved-images'),
   )
 
-  const horizonDirectory = dirname(rigCatalogPath)
+  const horizon = createHorizon(dirname(rigCatalogPath))
 
   const targets =
     process.env.VELA_ASTAP && process.env.VELA_STAR_CATALOG
       ? {
-          horizonDirectory,
+          horizon,
           solver: {
             executable: process.env.VELA_ASTAP,
             catalogPath: process.env.VELA_STAR_CATALOG,
           },
         }
-      : { horizonDirectory }
+      : { horizon }
 
   const surveyCache = createSurveyCache(
     process.env.VELA_SURVEY_CACHE_PATH

@@ -42,14 +42,21 @@ zero stars.
 last three frames show it: `Star count dropping: median 20 (normal ≈49 stars), few peaks`. No cause
 is named when the evidence is not clear, and the message is as it was. `cause.ts` holds the table,
 checked in this order; the first that holds is named, and each compares the last three frames with
-the frames no alert called bad.
+the frames no alert called bad (except `behind the trees`, which compares the mount's position with the
+[horizon](../targets/README.md#backyard-horizon-approximate-warn-only)).
 
 | Cause | Evidence | Threshold |
 | --- | --- | --- |
+| `behind the trees` | The mount's position at the latest frame is at or below the rig's horizon (traced or observed) | none |
 | `sky brightened` | The brightest sky of the three frames against the normal sky | `causeSkyRatio` (1.5) |
 | `stars trailed` | The axis ratio of the strong stars, from at least two frames, all of them elongated | `causeTrailedAxisRatio` (1.7) |
 | `stars smeared or soft` | The share of peaks left out as blended rose above the normal share | `causeBlendedShareRise` (0.4) |
 | `few peaks` | The peaks found before any gate, against the normal | `causePeaksRatio` (0.5) |
+
+`behind the trees` goes first because a position behind the skyline explains everything else on the table. It
+needs the frame's pointing (below) and a horizon profile; without either, or when the position is above the
+skyline or in an unknown bin, it does not hold and the causes below apply unchanged. The horizon it reads is
+loaded when the run starts, so an observation this run records does not rename the alert that caused it.
 
 Smeared and soft stars look the same to these outputs (every peak blended, no strong star to take a
 shape from), so the label says both. The noise output adds nothing: it moves with the sky level
@@ -87,6 +94,30 @@ the frames of a cloud-out or haze are not read again as a slope once it has pass
 Star counts rise as focus worsens (167 to 278 stars while HFR went 1.55 to 2.12), so a refocus
 makes them fall. The history starts over, as it does when autofocus ends, whenever the focuser
 position changes between two mount polls.
+
+### Observed obstructions
+
+When `stars-collapsed` is raised (the empty-frame case included) in an imaging run, the monitor records the
+mount's position at the frame where the collapse began as an observation in the rig's
+[horizon observations](../targets/README.md#learned-from-star-dropouts-observed-obstructions), so a tree the
+survey missed, or a survey whose north is off, corrects itself. One record per `stars-collapsed` episode, with
+the time, altitude and azimuth, the baseline `strong` count before the drop, the `strong` count of the
+dropping frame and the run id.
+
+- **Pointing of a frame.** Altitude and azimuth are computed from the mount's right ascension, declination,
+  sidereal time and the latitude the mount reports (`pointing.ts`); geometric, no refraction. It needs a
+  topocentric mount. A frame's pointing is the latest mount reading since the previous frame (or the run
+  start), and only if there was at least one, the mount was not reporting itself slewing or unreadable in any
+  of them, and every needed value was present. Otherwise the frame has no pointing, and a drop at a frame
+  without pointing records nothing and names no tree. The poll is every 10 s and a tracking mount moves
+  0.25° a minute, so the position is good to well under a bin.
+- **Not recorded.** Calibration runs (no stars, not pointed), runs that do not save their frames (framing and
+  focus runs lose stars to defocus, not to trees), frames without pointing, a pointing at or below 0° altitude, and any drop while
+  the mount was slewing or its reads were failing. Chris deletes an observation that was a cloud.
+- **Limit.** A cloud looks like a tree to these numbers. Nothing here tells them apart; deleting a wrong
+  record is the correction, and the next run reads the file again.
+- Nothing is logged: the file is the only place the numbers go. A failed write leaves one warning without
+  values and the alert unchanged.
 
 ## Episodes
 

@@ -5,10 +5,12 @@ import type { HorizonStatus } from '@vela/model/web'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   createHorizonStore,
+  horizonBin,
   horizonFilePath,
   horizonInWindow,
   horizonStatus,
   horizonProfileSchema,
+  skylineOf,
   writeHorizonProfile,
 } from './horizon.js'
 import { syntheticProfile } from './horizon.fixture.js'
@@ -28,7 +30,7 @@ afterEach(async () => {
 })
 
 describe('horizon status', () => {
-  const profile = syntheticProfile()
+  const profile = skylineOf(syntheticProfile(), [])
 
   it('is behind a traced skyline, clear above it, and unknown over an untraced bin at any altitude', () => {
     expect(horizonStatus(profile, 2, 39)).toBe('behind')
@@ -77,6 +79,7 @@ describe('horizon profile file', () => {
     expect(horizonFilePath('/data', 'a/b')).toBeNull()
     expect(horizonFilePath('/data', '.hidden')).toBeNull()
     expect(horizonFilePath('/data', '')).toBeNull()
+    expect(horizonFilePath('/data', 'observations-rig')).toBeNull()
   })
 
   it('writes mode 600 and reads it back', async () => {
@@ -143,18 +146,18 @@ describe('sky path against a profile', () => {
 
   it('marks every sample null without a profile and never changes the path or windows', () => {
     const plain = skyPath(target, site, now)
-    const flat = skyPath(target, site, now, syntheticProfile({ stepDegrees: 360, altitudesDegrees: [89] }))
+    const flat = skyPath(target, site, now, skylineOf(syntheticProfile({ stepDegrees: 360, altitudesDegrees: [89] }), []))
 
     expect(plain.samples.every(sample => sample.horizon === null)).toBe(true)
     expect(flat.aboveHorizonDuringDarkness).toEqual(plain.aboveHorizonDuringDarkness)
 
-    expect(flat.samples.map(({ horizon: _h, ...rest }) => rest)).toEqual(
-      plain.samples.map(({ horizon: _h, ...rest }) => rest),
+    expect(flat.samples.map(({ horizon: _h, horizonBin: _b, ...rest }) => rest)).toEqual(
+      plain.samples.map(({ horizon: _h, horizonBin: _b, ...rest }) => rest),
     )
   })
 
   it('classifies each sample by its own azimuth and altitude', () => {
-    const profile = syntheticProfile({ stepDegrees: 360, altitudesDegrees: [50] })
+    const profile = skylineOf(syntheticProfile({ stepDegrees: 360, altitudesDegrees: [50] }), [])
     const { samples } = skyPath(target, site, now, profile)
 
     for (const sample of samples)
@@ -165,8 +168,76 @@ describe('sky path against a profile', () => {
   })
 
   it('reports an all-untraced profile as unknown everywhere, never clear', () => {
-    const { samples } = skyPath(target, site, now, syntheticProfile({ stepDegrees: 360, altitudesDegrees: [null] }))
+    const { samples } = skyPath(target, site, now, skylineOf(syntheticProfile({ stepDegrees: 360, altitudesDegrees: [null] }), []))
 
     expect(samples.every(sample => sample.horizon === 'unknown')).toBe(true)
+  })
+})
+
+describe('skyline with observed obstructions', () => {
+  const profile = syntheticProfile()
+  const at = (azimuthDegrees: number, altitudeDegrees: number) => ({ azimuthDegrees, altitudeDegrees })
+
+  it('raises a traced bin that an observation is higher than, and marks it observed', () => {
+    const skyline = skylineOf(profile, [at(100, 25)])
+
+    expect(skyline!.bins[25]).toEqual({ kind: 'observed', altitudeDegrees: 25 })
+    expect(horizonBin(skyline, 101)).toBe('observed')
+    expect(horizonStatus(skyline, 101, 25)).toBe('behind')
+    expect(horizonStatus(skyline, 101, 24)).toBe('behind')
+    expect(horizonStatus(skyline, 103, 6)).toBe('behind')
+  })
+
+  it('is not clear above an observation, since it only proves the skyline is at least that high', () => {
+    const skyline = skylineOf(profile, [at(100, 25)])
+
+    expect(horizonStatus(skyline, 101, 26)).toBe('unknown')
+    expect(horizonStatus(skyline, 105, 26)).toBe('clear')
+  })
+
+  it('treats an observation in an untraced bin as observed, behind at and below it and unknown above', () => {
+    const skyline = skylineOf(profile, [at(6, 12)])
+
+    expect(horizonBin(skyline, 6)).toBe('observed')
+    expect(horizonStatus(skyline, 6, 12)).toBe('behind')
+    expect(horizonStatus(skyline, 6, 13)).toBe('unknown')
+    expect(horizonBin(skylineOf(profile, []), 6)).toBe('unknown')
+  })
+
+  it('leaves a traced bin traced when the observation is at or below the traced altitude', () => {
+    const skyline = skylineOf(profile, [at(2, 40), at(2, 10)])
+
+    expect(skyline!.bins[0]).toEqual({ kind: 'traced', altitudeDegrees: 40 })
+    expect(horizonStatus(skyline, 2, 41)).toBe('clear')
+  })
+
+  it('keeps the highest of several observations in a bin, whatever their order', () => {
+    for (const order of [[at(100, 20), at(101, 30), at(102, 25)], [at(102, 25), at(101, 30), at(100, 20)]])
+      expect(skylineOf(profile, order)!.bins[25]).toEqual({ kind: 'observed', altitudeDegrees: 30 })
+  })
+
+  it('wraps an observation azimuth into the first bin and never touches another bin', () => {
+    const skyline = skylineOf(profile, [at(359.5, 60)])
+
+    expect(skyline!.bins[89]).toEqual({ kind: 'observed', altitudeDegrees: 60 })
+    expect(skyline!.bins.filter(bin => bin.kind === 'observed')).toHaveLength(1)
+  })
+
+  it('has no skyline without a profile, even with observations', () => {
+    expect(skylineOf(null, [at(100, 25)])).toBeNull()
+    expect(horizonBin(null, 100)).toBeNull()
+  })
+
+  it('shows on a sky path as the bin kind of each sample', () => {
+    const site = { latitudeDegrees: 40, longitudeDegrees: -75, elevationMeters: 0 }
+    const target = { raDegrees: 10.68470833, decDegrees: 41.26875 }
+    const now = new Date('2026-09-07T04:00:00Z')
+    const whole = skylineOf(syntheticProfile({ stepDegrees: 360, altitudesDegrees: [10] }), [at(0, 50)])
+    const { samples } = skyPath(target, site, now, whole)
+
+    expect(samples.every(sample => sample.horizonBin === 'observed')).toBe(true)
+
+    for (const sample of samples)
+      expect(sample.horizon).toBe(sample.altitudeDegrees <= 50 ? 'behind' : 'unknown')
   })
 })

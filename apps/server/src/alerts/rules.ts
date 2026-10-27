@@ -23,6 +23,25 @@ export interface AlertCondition {
   id: AlertId
   level: AlertLevel
   message: string
+  /** Only on `stars-collapsed`: the frame where the collapse began. */
+  drop?: StarDrop
+}
+
+/** Where the mount pointed, geometric, azimuth 0 at north and increasing eastward. */
+export interface SkyPoint {
+  altitudeDegrees: number
+  azimuthDegrees: number
+}
+
+/** The frame where a collapse of the star count began, for the horizon to learn from. */
+export interface StarDrop {
+  capturedAt: number
+  /** The baseline of strong stars before the drop. */
+  strongBefore: number
+  /** The strong stars of the dropping frame. */
+  strongAt: number
+  /** Null when the frame has no trustworthy pointing, so nothing can be learned from it. */
+  pointing: SkyPoint | null
 }
 
 /** One finished exposure. Times are epoch milliseconds. */
@@ -32,6 +51,8 @@ export interface Frame {
   hfrPixels: number | null
   /** What the measurement says about why the stars changed. Absent when it did not say. */
   evidence?: FrameEvidence
+  /** Where the mount pointed during the exposure. Null or absent when that is not known to be steady. */
+  pointing?: SkyPoint | null
 }
 
 /** One poll of the mount. A reading the mount did not give is null. */
@@ -40,7 +61,9 @@ export interface MountReading {
   slewing: boolean | null
   parked: boolean | null
   rightAscensionHours: number | null
+  declinationDegrees: number | null
   siderealTimeHours: number | null
+  latitudeDegrees: number | null
   pierSide: 'east' | 'west' | null
 }
 
@@ -66,6 +89,8 @@ export interface RigHistory {
   mountReadings: MountReading[]
   /** When Cria stopped answering, or null while reads are current. */
   observationsInterruptedSince: number | null
+  /** Whether a point is at or below the rig's horizon; absent without a horizon profile. */
+  behindSkyline?: (point: SkyPoint) => boolean
 }
 
 export interface AlertEvaluation {
@@ -94,7 +119,7 @@ export function evaluateAlerts(history: RigHistory, thresholds: AlertThresholds,
   if (run.calibration) return { conditions: rigConditions, unavailable: [] }
 
   const meridian = watchMeridian(history.mountReadings.at(-1), thresholds)
-  const frames = watchFrames(history.frames, thresholds)
+  const frames = watchFrames(history.frames, thresholds, history.behindSkyline)
 
   return {
     conditions: [
@@ -117,7 +142,7 @@ export function evaluateAlerts(history: RigHistory, thresholds: AlertThresholds,
  * accepted when neither it nor an alert standing says the sky or camera is off, so a stretch of
  * cloud or a snagged camera never becomes the new normal.
  */
-function watchFrames(frames: Frame[], t: AlertThresholds) {
+function watchFrames(frames: Frame[], t: AlertThresholds, behindSkyline?: (point: SkyPoint) => boolean) {
   const acceptedStars: number[] = []
   const acceptedEvidence: FrameEvidence[] = []
   const smoothed: number[] = []
@@ -128,10 +153,13 @@ function watchFrames(frames: Frame[], t: AlertThresholds) {
   let hfrBad = calm
   let baseline = 0
   let baselineFormed = false
+  const baselines: number[] = []
+  let dropIndex = 0
   let trendFrom = 0
 
   for (const [index, frame] of frames.entries()) {
     baseline = baselineStars(acceptedStars, t)
+    baselines.push(baseline)
     baselineFormed ||= hasStars(baseline, t)
     smoothed.push(smoothedStars(frames, index, t))
 
@@ -149,7 +177,12 @@ function watchFrames(frames: Frame[], t: AlertThresholds) {
     if (dropping || collapsed) trendFrom = index + 1
 
     starsDropping = latch(starsDropping, dropping, recovered, t.confirmFrames, t.confirmFrames)
+    const collapseRaised = starsCollapsed.raised
+
     starsCollapsed = latch(starsCollapsed, collapsed, recovered, t.confirmFrames, t.confirmFrames)
+
+    // It raised on `confirmFrames` collapsed frames in a row, so the first of them is where the drop began.
+    if (starsCollapsed.raised && !collapseRaised) dropIndex = index - (t.confirmFrames - 1)
     starsDeclining = latch(
       starsDeclining,
       trend !== null && trend.recent < t.starsDecliningRatio * trend.before,
@@ -184,14 +217,28 @@ function watchFrames(frames: Frame[], t: AlertThresholds) {
   const conditions: AlertCondition[] = []
 
   const recentEvidence = frames.slice(-t.starsSmoothingFrames).flatMap(frame => (frame.evidence ? [frame.evidence] : []))
-  const cause = starCause(recentEvidence, normalEvidence(acceptedEvidence, t), t)
+  const pointedBehind = latest.pointing != null && behindSkyline?.(latest.pointing) === true
+  const cause = starCause(recentEvidence, normalEvidence(acceptedEvidence, t), t, pointedBehind)
   const because = cause === null ? '' : `, ${cause}`
 
   if (starsDropping.raised)
     conditions.push({ id: 'stars-dropping', level: 'warn', message: `Star count dropping: median ${medianStars} (${normal})${because}` })
 
-  if (starsCollapsed.raised)
-    conditions.push({ id: 'stars-collapsed', level: 'critical', message: `Star count fell to ${latest.stars} (median ${medianStars}, ${normal})${because}` })
+  if (starsCollapsed.raised) {
+    const dropped = frames[dropIndex]!
+
+    conditions.push({
+      id: 'stars-collapsed',
+      level: 'critical',
+      message: `Star count fell to ${latest.stars} (median ${medianStars}, ${normal})${because}`,
+      drop: {
+        capturedAt: dropped.capturedAt,
+        strongBefore: Math.round(baselines[dropIndex]!),
+        strongAt: dropped.stars,
+        pointing: dropped.pointing ?? null,
+      },
+    })
+  }
 
   if (starsDeclining.raised && trend)
     conditions.push({ id: 'stars-declining', level: 'warn', message: `Star count falling: median ${Math.round(trend.recent)} (≈${Math.round(trend.before)} the ${t.starsDecliningWindowMinutes} min before)${because}` })

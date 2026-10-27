@@ -143,6 +143,7 @@ export const reviewTarget: TargetView = {
       altitudeDegrees: 18 + 56 * Math.sin((index / 24) * Math.PI),
       azimuthDegrees: (180 + index * 7.5) % 360,
       horizon: null,
+      horizonBin: null,
       sunAltitudeDegrees: -22,
       moon: {
         altitudeDegrees: -20,

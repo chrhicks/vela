@@ -105,7 +105,7 @@ export interface CaptureRunOptions {
   focalLengthMm?: number | undefined
   onSettled?: () => void
   /** Called with each frame once it is published, whether or not it is saved. */
-  onFrame?: (image: CaptureImage) => void
+  onFrame?: (image: CaptureImage, runId: string) => void
   repeat?: boolean
   /** Ends a repeating run after this many finished frames; omitted means until stopped. */
   frameCount?: number | undefined
@@ -553,7 +553,7 @@ export function createCaptureController(
 
         // An observer of the frame must never end the run that produced it.
         try {
-          onFrame?.(metadata)
+          onFrame?.(metadata, runId)
         } catch (error) {
           console.warn('Capture frame observer failed', error)
         }

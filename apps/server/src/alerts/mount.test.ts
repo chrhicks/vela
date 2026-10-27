@@ -81,7 +81,9 @@ describe('reading a Cria rig mount for the alert rules', () => {
       slewing: false,
       parked: false,
       rightAscensionHours: 2,
+      declinationDegrees: 42,
       siderealTimeHours: 1,
+      latitudeDegrees: 40,
       pierSide: 'west',
     })
 
@@ -91,7 +93,7 @@ describe('reading a Cria rig mount for the alert rules', () => {
   it('leaves right ascension out when it is not topocentric, because the hour angle would be wrong', async () => {
     const { read } = reader({ status: status({ coordinateSystem: 'j2000' }) })
 
-    expect(await read(signal)).toMatchObject({ rightAscensionHours: null })
+    expect(await read(signal)).toMatchObject({ rightAscensionHours: null, declinationDegrees: null })
   })
 
   it('does not know a pier side the mount cannot give', async () => {

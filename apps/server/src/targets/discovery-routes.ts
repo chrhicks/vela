@@ -7,19 +7,19 @@ import type { RigCatalogRecord } from '../rig/contracts.js'
 import { listTargets, normalizeCatalogName, type CatalogTarget } from './catalog/index.js'
 import { discoverTargets } from './discovery.js'
 import type { Site } from './sky.js'
-import { horizonInWindow, type HorizonProfile } from './horizon.js'
+import { horizonInWindow, type Skyline } from './horizon.js'
 
 interface DiscoveryBoundary {
   now: () => Date
   siteView: (
     rig: RigCatalogRecord,
   ) => Promise<{ site: Site | null; siteUnavailableReason: string | null }>
-  horizonFor: (rig: RigCatalogRecord) => Promise<HorizonProfile | null>
+  horizonFor: (rig: RigCatalogRecord) => Promise<Skyline | null>
   targetView: (
     target: CatalogTarget,
     site: Site | null,
     at: Date,
-    horizon: HorizonProfile | null,
+    horizon: Skyline | null,
   ) => TargetView
 }
 
