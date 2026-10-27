@@ -168,6 +168,7 @@ export function useCapture(rigId: string) {
           frameType: FrameType
           unattended: boolean
           targetId?: string
+          filter?: string
           frameCount?: number
         }
       | { coolerOn: boolean }
@@ -313,6 +314,7 @@ export function useCapture(rigId: string) {
       frameType,
       unattended,
       targetId,
+      filter,
       frameCount,
     }: {
       seconds: number
@@ -321,6 +323,7 @@ export function useCapture(rigId: string) {
       frameType: FrameType
       unattended: boolean
       targetId?: string | undefined
+      filter?: string | undefined
       frameCount?: number | undefined
     }) => {
       if (!Number.isFinite(seconds) || seconds < 0.1 || seconds > 600) return Promise.resolve()
@@ -332,6 +335,7 @@ export function useCapture(rigId: string) {
         frameType,
         unattended,
         ...(targetId !== undefined && { targetId }),
+        ...(filter !== undefined && { filter }),
         ...(frameCount !== undefined && { frameCount }),
       })
     },

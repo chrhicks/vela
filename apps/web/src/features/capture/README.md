@@ -62,6 +62,15 @@ frames" and the page sends no `targetId`. While a run is active the field is gon
 the run's own type shows beside the exposure count. The field is a single select, so it
 fits 390 px without wrapping.
 
+The Filter field sits under Frame type, for a light or a flat only. The rig has one manual slot and
+nothing reports what is in it, so Chris says. It lists None, then each of the view's `filters` as the
+name and, when there is one, its description. A rig with no filters shows no field and sends none.
+It starts on the choice Chris last made for this rig, kept in the browser's local storage by rig ID; a
+remembered name the rig no longer lists reads as None. A start with None sends no `filter`, a start
+with a filter sends its name, and a dark, dark flat or bias sends none. While a run is active the field
+is gone and the run's own filter shows beside the exposure count. A view or image without `filter`
+shows nothing: unknown is not None.
+
 An interrupted run (phase `interrupted`, `interruption` set) shows a notice above the form:
 the reason ("Vela restarted during this run, and nothing has been exposed since"), the subject
 or frame type, how many frames were taken and the exposure. Its Resume button reads "Resume · 18
