@@ -148,8 +148,9 @@ identity and measurement metadata do not change. The field is optional for older
 API fixtures, which retain the original-preview URL contract. The server owns
 refresh policy and file publication; the model owns no rendering or migration.
 
-`RigTelescopeDeviceView.mountControl` carries independent Unpark and tracking
-action readiness, plus the latest ephemeral command outcome and request identity.
+`RigTelescopeDeviceView.mountControl` carries independent Unpark, tracking, Home and Stop
+action readiness (Stop is a halt, never in `command`), `homeConfirmedAt` (when Vela last saw a home confirmed, null
+after a restart or a later move),  plus the latest ephemeral command outcome and request identity.
 Its server instance identity prevents a restart from falsely resolving an old
 request as never admitted.
 Parking and tracking remain separate observed facts in the device status. A

@@ -28,7 +28,11 @@ as compatibility exports and wrappers, so existing consumers need not migrate
 with the extraction.
 
 `MountControl` exposes fresh parked/tracking/motion facts and the explicit Unpark
-or tracking on/off commands. Missing booleans remain unknown. Adapters check
+or tracking on/off commands, Home, and Stop. Missing booleans remain unknown. Home needs `canFindHome` and a
+stationary unparked mount; it is always sent, because the AM5 reports no at-home state, and `homeConfirmedAt`
+records when the adapter last saw one confirmed. Stop is the exception to "check, then write once": it needs no
+readings, is safe to repeat, and `canStop` says whether the adapter has one. A home a Stop ended is `failed` with
+reason `stopped`. Adapters check
 identity, connection, stationary state and the relevant capability before one
 write, and distinguish confirmed readback, known failure and unresolved outcome.
 It does not compose unpark, tracking and motion into a workflow.

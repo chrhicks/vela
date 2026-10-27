@@ -31,6 +31,6 @@ next explicit check; it never enables an uninspected DELETE retry.
 
 ## Controls moved out
 
-Equipment shows device details and readings only. Tracking, Unpark and Clear hold are in the
+Equipment shows device details and readings only. Tracking, Unpark, Home, Stop and Clear hold are in the
 [Controls panel](../rig-controls/README.md), opened from the header. A held device still shows
 its reason on its row, outside the collapsed details, with a note to clear it in Controls.

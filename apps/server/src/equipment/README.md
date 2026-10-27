@@ -142,6 +142,30 @@ and keeps the rig blocked through its hold until recovery. Fresh stationary adap
 that uncertainty without another write. The existing detail projection carries
 action readiness and the latest command identity/outcome to every browser.
 
+Home is one more command of that lane (`action: 'home'`). It is sent to Cria as `mount-home` and the request
+stays open until Cria settles it, up to Cria's three-minute bound, while the detail projection shows
+`command.state: 'pending'` to every browser. The AM5 reports no at-home state, so Vela cannot read "at home".
+`MountControlView.homeConfirmedAt` is instead the time the last home settled `confirmed` through Vela, kept in the
+Cria equipment's memory (`packages/cria/src/mount-home.ts`). A restart of Vela forgets it, and so does any
+`mount-slew`, `mount-axis`, `mount-rotate` or another `mount-home` that Vela sends, or a slew its readings catch
+in progress. A change of tracking does not: tracking on does move the RA axis, so the time says when Vela last saw
+a home confirmed, not that the mount is still there. A home that Cria cannot confirm leaves the mount held; once
+fresh readings show it idle again, the command resolves to `failed` ("Home is not confirmed"), never `confirmed`,
+because no reading can tell. Home needs an idle, unparked mount that reports `canFindHome`.
+
+Stop is not a command of that lane. `POST /api/rigs/:rigId/mount/stop` takes `{ deviceId }` and answers
+`{ outcome: 'confirmed' | 'failed' | 'uncertain', message }`. It takes no request ID or server instance, claims no
+lane, inspects nothing and records nothing in `command`, so none of these can stand between Stop and the mount: not a
+pending home or other command of the panel, not an uncertain one, not a restart of Vela, not a hold. It is
+allowed while capture, alignment, autofocus or framing holds the rig, and it interrupts a run that is moving the
+mount, because a Stop that cannot reach a slewing mount is worse than one that ends a run; that run reports its own
+stop. It is sent to Cria as `mount-stop`, which Cria admits on a busy or held mount, and a stopped home settles
+`stopped` and does not hold the mount (cria#23). Sending it twice only stops motion twice. `MountControl.canStop`
+says whether the rig's adapter reaches a mount at all (Cria does, Alpaca does not), since the readings that other
+actions need are absent while Cria runs the home. `stop.enabled` is false only for a mount that is not connected,
+that Vela cannot stop, or that is known to be still (parked, or idle with tracking off); unknown readings, a
+slew, tracking or any command of the panel in flight leave it on.
+
 A browser with a lost mount-command response can explicitly check its request ID.
 The check only reads equipment: it retires an unseen ID before inspection, so a
 delayed original request cannot later issue its write. It preserves an admitted

@@ -16,10 +16,30 @@ Sections, in this order. Each is present only when the rig has what it controls;
 
 ## Mount
 
-Tracking on or off, and Unpark while the mount is not unparked: `MountControls`, unchanged. It disables a button
+Tracking on or off, Unpark while the mount is not unparked, Home and Stop: `MountControls`. It disables a button
 with the server's reason when the state does not permit the action, waits for the mount to confirm, and offers
 Check mount state after an unknown outcome. It never repeats a command. Closing the panel mid-command keeps the
 server's record; reopening reads it back.
+
+**Home** opens a dialog titled "Are you sure?" with Cancel and "Home the mount", and nothing else. It is the same
+kind of command as Unpark and tracking, with a request ID, so a lost reply is never replayed. The button reads
+"Homing…" and the status line "Homing… Stop ends it." for as long as Cria's operation runs (tens of seconds; the
+request waits up to 200 s), including in another browser or after a reload, because the server's record is
+`pending`. When it confirms, the section shows "Home confirmed at HH:MM" in the browser's clock. The AM5 reports no
+at-home state, so that is the last home Vela saw confirmed, not a reading. It disappears on the next slew Vela
+commands or sees begin, another home, or a restart of Vela; a tracking change does not clear it. A home that is
+stopped or whose outcome is unknown never shows it: a stopped home says "Homing was stopped." and an unknown one
+resolves to "Home is not confirmed" once the mount is idle.
+
+**Stop** has no confirmation and sits beside Home. It is enabled whenever the mount could be moving, which is
+anything but a connected mount known to be still (parked, or idle with tracking off), so unknown readings, a
+slew, homing and tracking all leave it on. It is never gated by the panel's own state: not by a pending home,
+tracking or Unpark, not by an unknown outcome or Check mount state, not by a stale view, and not by a run holding
+the rig. It sends `POST /api/rigs/:rigId/mount/stop` with `{deviceId}` and shows the answer: "Stopped. The mount
+confirmed it is still.", or Cria's message when it did not confirm, with the button free to press again. While a
+capture, alignment, autofocus or framing run holds the rig, Stop still goes to the mount and interrupts a run that is
+moving it: a Stop that cannot reach a slewing mount is worse than one that ends a run. A rig whose mount Vela cannot
+stop (Alpaca) shows it disabled with that reason; Home is Cria-only too.
 
 ## Cooler
 
@@ -74,6 +94,6 @@ Vela never clears a hold by itself, and the control is separate from polar align
 
 ## Layout and what comes next
 
-The panel is a stack of sections; a section's buttons sit in a wrapping row. Home and Stop (the mount's own
-routes, with an "Are you sure?" on Home) join the Mount row, and the dew heaters get a section after Cooler. Park
-stays out: parking rotates the rig sideways and the home is unknown after a restart.
+The panel is a stack of sections; a section's buttons sit in a wrapping row, and the Mount row holds Unpark,
+tracking, Home and Stop. The dew heaters get a section after Cooler. Park stays out: parking rotates the rig sideways
+and the home is unknown after a restart.
