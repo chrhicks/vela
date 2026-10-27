@@ -67,8 +67,7 @@ function alertsView(patch: Partial<AlertsView> = {}): AlertsView {
     alerts: [],
     unavailable: [],
     phone: { state: 'ready' },
-    phoneAlertsOn: true,
-    pagingWindow: { state: 'astro-dark', until: null },
+    unattended: true,
     thresholds: { starsCollapsedRatio: 0.3, hfrBadPixels: 6, meridianNearMinutes: 20 },
     ...patch,
   }
@@ -92,19 +91,6 @@ async function useRig(page: Page, initial: AlertsView) {
   await page.route('**/api/rigs/rig-1/alerts/stars-collapsed/acknowledge', route => {
     posts.push('acknowledge')
     current = { ...current, alerts: current.alerts.map(alert => ({ ...alert, acknowledged: true })) }
-
-    return route.fulfill({ json: current })
-  })
-
-  await page.route('**/api/rigs/rig-1/alerts/phone', route => {
-    const on = route.request().postDataJSON().on === true
-
-    posts.push(on ? 'phone-on' : 'phone-off')
-    current = {
-      ...current,
-      phoneAlertsOn: on,
-      alerts: current.alerts.map(alert => (on ? alert : { ...alert, delivery: { state: 'muted' } })),
-    }
 
     return route.fulfill({ json: current })
   })
@@ -220,113 +206,19 @@ test('without phone keys the card says so and does not offer a test it cannot se
   await expect(card.getByRole('button', { name: 'Send test' })).toBeDisabled()
 })
 
-test('the card switches phone alerts off and on, and says which', async ({ page }) => {
-  const rig = await useRig(page, alertsView({ alerts: [collapsed] }))
+test('an alert not sent because the run is attended, and one stopped when Unattended went off, say so on the card', async ({ page }) => {
+  await useRig(page, alertsView({ unattended: false, alerts: [{ ...collapsed, delivery: { state: 'attended' } }] }))
   await page.goto('/rigs/rig-1')
   const card = page.getByRole('region', { name: 'Alerts', exact: true })
-  const banner = page.getByRole('region', { name: 'Rig alerts' })
 
-  await expect(card).toContainText('Phone alerts: on')
-  await expect(banner).not.toContainText('Phone alerts: off')
+  await expect(card).toContainText('Not sent · Unattended is off')
+  await expect(card.getByRole('button', { name: 'Send test' })).toBeEnabled()
+  await expect(page.getByRole('region', { name: 'Rig alerts' })).toContainText('Stars dropped from about 1100 to 0')
+  await expect(page.getByRole('region', { name: 'Rig alerts' })).not.toContainText('Not sent')
 
-  await card.getByRole('button', { name: 'Turn off' }).click()
-
-  await expect(card).toContainText('Phone alerts: off')
-  await expect(card).toContainText('Not sent · phone alerts are off')
-  await expect(banner).toContainText('Phone alerts: off')
-  await expect(banner).toContainText('Stars dropped from about 1100 to 0')
-  await expect(card.getByRole('button', { name: 'Send test' })).toBeDisabled()
-  await expect(card).toContainText('Turn phone alerts on to send a test.')
-
-  await card.getByRole('button', { name: 'Turn on' }).click()
-
-  await expect(card).toContainText('Phone alerts: on')
-  await expect(banner).not.toContainText('Phone alerts: off')
-  expect(rig.posts).toEqual(['phone-off', 'phone-on'])
-})
-
-test('a quiet rig with phone alerts off says so on the capture page, on a phone-width screen', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 800 })
-
-  const rig = await useRig(page, alertsView({ phoneAlertsOn: false }))
-  await page.goto('/rigs/rig-1/observe')
-  const banner = page.getByRole('region', { name: 'Rig alerts' })
-
-  await expect(banner).toContainText('Phone alerts: off')
-  await expect(banner).toContainText('alerts show here only')
-  await expect(banner.getByRole('button', { name: 'Turn on' })).toBeInViewport()
-
-  const width = await page.evaluate(() => document.documentElement.scrollWidth)
-  expect(width).toBeLessThanOrEqual(390)
-
-  await banner.getByRole('button', { name: 'Turn on' }).click()
-  await expect(banner).toHaveCount(0)
-  expect(rig.posts).toEqual(['phone-on'])
-})
-
-test('the capture page switches phone alerts off and on, on a phone-width screen', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 800 })
-
-  const rig = await useRig(page, alertsView())
-  await page.goto('/rigs/rig-1/observe/capture')
-  const banner = page.getByRole('region', { name: 'Rig alerts' })
-
-  await expect(banner).toContainText('Phone alerts: on')
-  await expect(banner.getByRole('button', { name: 'Turn off' })).toBeInViewport()
-
-  await banner.getByRole('button', { name: 'Turn off' }).click()
-
-  await expect(banner).toContainText('Phone alerts: off')
-  await expect(banner).toContainText('alerts show here only')
-  await banner.getByRole('button', { name: 'Turn on' }).click()
-
-  await expect(banner).toContainText('Phone alerts: on')
-  await expect(banner.getByRole('button', { name: 'Turn off' })).toBeInViewport()
-
-  const width = await page.evaluate(() => document.documentElement.scrollWidth)
-  expect(width).toBeLessThanOrEqual(390)
-  expect(rig.posts).toEqual(['phone-off', 'phone-on'])
-})
-
-test('the capture page says when the phone is paged, and an alert held for darkness says so, on a phone-width screen', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 800 })
-
-  const dusk = Date.parse('2026-10-25T19:42:00')
-  const dawn = Date.parse('2026-10-26T05:31:00')
-  const held = { ...collapsed, delivery: { state: 'outside-dark' } } as const
-
-  const rig = await useRig(page, alertsView({ alerts: [held], pagingWindow: { state: 'not-dark', from: dusk, until: dawn } }))
-  await page.goto('/rigs/rig-1/observe/capture')
-  const banner = page.getByRole('region', { name: 'Rig alerts' })
-
-  await expect(banner).toContainText(/Phone alerts: on · pages in astro dark, .+ to .+/)
-  await expect(banner.getByRole('button', { name: 'Turn off' })).toBeInViewport()
-
-  const width = await page.evaluate(() => document.documentElement.scrollWidth)
-  expect(width).toBeLessThanOrEqual(390)
-
-  rig.set(alertsView({ pagingWindow: { state: 'astro-dark', until: dawn } }))
-  await expect(banner).toContainText(/Phone alerts: on · paging now \(astro dark until .+\)/)
-
-  rig.set(alertsView({ pagingWindow: { state: 'site-unknown' } }))
-  await expect(banner).toContainText('Phone alerts: on · pages at any hour · rig location unknown')
-
-  rig.set(alertsView({ alerts: [held], pagingWindow: { state: 'not-dark', from: dusk, until: dawn } }))
+  await useRig(page, alertsView({ alerts: [{ ...collapsed, delivery: { state: 'stopped' } }] }))
   await page.goto('/rigs/rig-1')
-  await expect(page.getByRole('region', { name: 'Alerts', exact: true })).toContainText('Not sent · outside astro dark')
-
-  rig.set(alertsView({ alerts: [{ ...collapsed, delivery: { state: 'stopped-at-dawn' } }], pagingWindow: { state: 'not-dark', from: dusk, until: dawn } }))
-  await page.goto('/rigs/rig-1')
-  await expect(page.getByRole('region', { name: 'Alerts', exact: true })).toContainText('Sent once · stopped at dawn')
-})
-
-test('without phone keys there is no switch, since there is no phone to hold back', async ({ page }) => {
-  await useRig(page, alertsView({ phone: { state: 'not-configured' }, phoneAlertsOn: false }))
-  await page.goto('/rigs/rig-1')
-
-  await expect(page.getByRole('region', { name: 'Alerts', exact: true })).toContainText('Phone alerts are not set up')
-  await expect(page.getByRole('button', { name: /^Turn (on|off)$/ })).toHaveCount(0)
-  await expect(page.getByRole('region', { name: 'Rig alerts' })).toHaveCount(0)
+  await expect(card).toContainText('Sent once · stopped when Unattended went off')
 })
 
 test('a known critical alert stays on screen through navigation while the server is unreachable', async ({ page }) => {

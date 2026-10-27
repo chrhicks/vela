@@ -17,8 +17,7 @@ const view: AlertsView = {
   ],
   unavailable: ['meridian watch unavailable: pier side'],
   phone: { state: 'failing', reason: 'Pushover answered 500', since: 1_760_758_340_000 },
-  phoneAlertsOn: true,
-  pagingWindow: { state: 'not-dark', from: 1_760_790_000_000, until: 1_760_822_000_000 },
+  unattended: true,
   thresholds: { hfrBadPixels: 6 },
 }
 
@@ -34,23 +33,9 @@ describe('alerts boundary', () => {
     expect(isAlertsView({ ...view, phone: { state: 'failing', since: 1 } }, 'fra')).toBe(false)
   })
 
-  it('accepts every paging window and an alert held for darkness, and requires the window', () => {
-    for (const pagingWindow of [
-      { state: 'site-unknown' },
-      { state: 'astro-dark', until: 1_760_822_000_000 },
-      { state: 'astro-dark', until: null },
-      { state: 'not-dark', from: null, until: null },
-    ])
-      expect(isAlertsView({ ...view, pagingWindow }, 'fra')).toBe(true)
-
-    expect(isAlertsView({ ...view, alerts: [{ ...view.alerts[0], delivery: { state: 'outside-dark' } }] }, 'fra')).toBe(true)
-    expect(isAlertsView({ ...view, alerts: [{ ...view.alerts[0], delivery: { state: 'stopped-at-dawn' } }] }, 'fra')).toBe(true)
-    expect(isAlertsView({ ...view, pagingWindow: undefined }, 'fra')).toBe(false)
-    expect(isAlertsView({ ...view, pagingWindow: { state: 'not-dark', from: 1 } }, 'fra')).toBe(false)
-  })
-
-  it('accepts a muted alert and requires the switch state', () => {
-    expect(isAlertsView({ ...view, phoneAlertsOn: false, alerts: [{ ...view.alerts[0], delivery: { state: 'muted' } }] }, 'fra')).toBe(true)
-    expect(isAlertsView({ ...view, phoneAlertsOn: undefined }, 'fra')).toBe(false)
+  it('accepts an alert not sent because Unattended is off, or stopped when it went off, and requires the switch state', () => {
+    expect(isAlertsView({ ...view, unattended: false, alerts: [{ ...view.alerts[0], delivery: { state: 'attended' } }] }, 'fra')).toBe(true)
+    expect(isAlertsView({ ...view, alerts: [{ ...view.alerts[0], delivery: { state: 'stopped' } }] }, 'fra')).toBe(true)
+    expect(isAlertsView({ ...view, unattended: undefined }, 'fra')).toBe(false)
   })
 })

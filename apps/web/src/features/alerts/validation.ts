@@ -4,7 +4,7 @@ import type { AlertsView } from '@vela/model/web'
 const text = z.string().refine(value => value.trim().length > 0)
 
 const delivery = z.discriminatedUnion('state', [
-  z.object({ state: z.enum(['sent', 'sending', 'covered', 'not-configured', 'muted', 'outside-dark', 'stopped-at-dawn']) }),
+  z.object({ state: z.enum(['sent', 'sending', 'covered', 'not-configured', 'attended', 'stopped']) }),
   z.object({
     state: z.literal('retrying'),
     failures: z.number().int().positive(),
@@ -28,22 +28,13 @@ const phone = z.discriminatedUnion('state', [
   z.object({ state: z.literal('failing'), reason: text, since: z.number() }),
 ])
 
-const time = z.number().nullable()
-
-const pagingWindow = z.discriminatedUnion('state', [
-  z.object({ state: z.literal('site-unknown') }),
-  z.object({ state: z.literal('astro-dark'), until: time }),
-  z.object({ state: z.literal('not-dark'), from: time, until: time }),
-])
-
 const alertsView = z.object({
   rigId: text,
   watching: z.boolean(),
   alerts: z.array(alert),
   unavailable: z.array(text),
   phone,
-  phoneAlertsOn: z.boolean(),
-  pagingWindow,
+  unattended: z.boolean(),
   thresholds: z.record(z.string(), z.number()),
 })
 

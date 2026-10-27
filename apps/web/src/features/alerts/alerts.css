@@ -33,7 +33,3 @@
 .alerts-card dl > div { display: grid; gap: 2px; }
 .alerts-card dt { color: var(--vela-text-muted); font-size: 14px; line-height: 20px; }
 .alerts-card :focus-visible, .alert-banner :focus-visible { outline: 2px solid var(--vela-focus); outline-offset: 2px; }
-.phone-alerts-switch { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
-.phone-alerts-switch p { margin: 0; }
-.phone-alerts-switch[data-phone-alerts='off'] strong { color: var(--vela-warning); }
-.phone-alerts-switch__note { color: var(--vela-text-muted); font-size: 14px; }
