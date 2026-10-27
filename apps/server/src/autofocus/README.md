@@ -29,7 +29,7 @@ down onto the target, so the slack is taken up the same way the samples saw it.
 The overshoot is clamped to the focuser travel. It may pass above the walk window
 by up to that amount, never beyond travel. At the very top of travel there is no
 room above, and the move goes direct. The 300 is a guess at several times the EAF
-backlash, not a measurement on this rig. The curve fit is unchanged.
+backlash, not a measurement on this rig. How the samples become a fitted position is under Curve fit.
 
 The view's `finalApproach` records the last such move (`purpose`, `target`, `via`;
 `via` is null for a direct move), so a real night can confirm it. The walk's first
@@ -48,13 +48,48 @@ the current position and the operation lease remain intact. Stop clears the read
 indicator and waits for camera cleanup and restoration; settled or cancelled
 capture callbacks cannot revive it.
 
+## Curve fit
+
+The walk's samples become a fitted position in three steps, all in `hyperbola.ts`. The walk
+itself (window, step, order), the final approach and the confirming sample are untouched.
+
+1. **Weight each sample by how well it is measured.** The weight is the star count over the
+   squared spread of the star HFRs (1.4826 × the median absolute deviation), with the spread
+   never below 0.3 px. A single star weighs about 11, a dozen tightly grouped stars about 130,
+   a dozen scattered ones (a spread near 1.2 px) about 9. The count is the floor: a handful of stars cannot look
+   precise by luck of their spread.
+2. **Fit the V, not the flat stretch.** From the lowest sample, each side keeps the samples that
+   keep rising with defocus, and ends at the first one that rises by less than its own error
+   over the one before it. It only judges samples that already stand well above the floor, so
+   noise at the bottom of a wide curve never ends a side. The recorded runs show why: after the
+   walk's upward move to the top of its window, the first samples read about the same HFR
+   (run 2: 5.09, 5.19, 5.28 px), where the rest of the curve rises 1.5 to 2 px a step. A symmetric
+   hyperbola cannot follow that, and fitting across it dragged the vertex toward the flat side. The
+   likely cause is the focuser's backlash holding the first few samples at one optical position;
+   that is an inference from two runs, not a measurement.
+3. **Accept the fit only if it is a V.** The fit is `null`, and the run ends "did not find a
+   focus inside the sampled window" and restores the start, unless all of these hold:
+   - the V has at least five samples, and the lowest has a neighbour on each side (so a window
+     that does not contain the minimum, with the lowest sample at an edge, gives no fit);
+   - the weighted R² of the fit on the V alone is at least 0.7 (`rSquaredGate`, in
+     `controller.ts`); a flat or noisy curve scores well under it;
+   - the fitted vertex lies inside the sampled window.
+
+`fit.rSquared` is that R² on the V alone. Run 2 of 2026-10-26 sat on the old gate at 0.7000619
+because the flat stretch counted against it. Its V alone scores 0.989.
+
+The fit does not match stars across positions. In the same two runs a given star shows up in
+at most 4 of the 9 samples and usually in one or two (best-case overlap between neighbouring
+samples is 30 to 55%, with the frame drifting about 2 px a sample), because defocus changes
+which stars pass the policy. There is no stable set to follow.
+
 ## Star tables
 
-Each sample is measured from a list of stars, and only the count and the median HFR
-reach the walk and the fit. The list is also recorded, so a later estimator can be
-tried on real runs without a new night. Recording changes nothing the walk does:
-the measurement policy, the samples, the fit and the final approach are the same
-with or without it.
+Each sample is measured from a list of stars. The walk reads the count and the median HFR.
+The fit also reads the spread of the star HFRs, to weight the sample. The list is recorded
+too, so a later estimator can be tried on real runs without a new night. Recording changes
+nothing the walk does: the measurement policy, the samples and the final approach are the
+same with or without it, and a sample with no list is weighted by its count alone.
 
 Where to read a run:
 

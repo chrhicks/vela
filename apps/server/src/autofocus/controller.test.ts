@@ -7,6 +7,7 @@ import {
   type AutofocusRecord,
 } from './controller.js'
 import type { AutofocusStar } from '@vela/model/web'
+import { recordedRuns } from './fixtures/recorded-runs.js'
 import { hyperbola } from './hyperbola.js'
 import { APPROACH_OVERSHOOT_STEPS } from './walk.js'
 
@@ -37,6 +38,7 @@ function setup(
     backlash = 0,
     hfrAt = (optical: number) => hyperbola(optical, 2.18, 95, 32838),
     starsAt,
+    detectedAt = () => 40,
     record,
   }: {
     holdMoves?: boolean
@@ -44,6 +46,7 @@ function setup(
     backlash?: number
     hfrAt?: (optical: number) => number
     starsAt?: (position: number) => AutofocusStar[]
+    detectedAt?: (position: number) => number
     record?: AutofocusRecord
   } = {},
 ) {
@@ -116,7 +119,7 @@ function setup(
 
       const found = {
         algorithm: { version: 2 },
-        detectedStars: 40,
+        detectedStars: detectedAt(position),
         medianHfrPixels: hfrAt(position + lag),
       }
 
@@ -558,3 +561,28 @@ it('shortens the overshoot to stay inside the focuser travel', async () => {
   expect(moves.slice(-2)).toEqual([33099, 32842])
   expect(controller.snapshot().finalApproach).toMatchObject({ target: 32842, via: 33099 })
 })
+
+it.each(recordedRuns)(
+  'replays the run recorded from $startPosition and lands on its floor with a fit well clear of the gate',
+  async run => {
+    const recorded = new Map(run.samples.map(sample => [sample.position, sample]))
+
+    const { controller, camera, focuser, land } = setup(run.startPosition, 60000, {
+      hfrAt: position => recorded.get(position)?.hfrPixels ?? run.confirming.hfrPixels,
+      starsAt: position => recorded.get(position)?.stars ?? [],
+      detectedAt: position => recorded.get(position)?.detectedStars ?? 10,
+    })
+
+    await controller.start(camera, focuser)
+
+    for (let count = 0; count < 10; count++) await land()
+
+    await vi.waitFor(() => expect(controller.active()).toBe(false))
+    const view = controller.snapshot()
+    const lowest = view.fit!.minSamplePosition
+
+    expect(view.phase).toBe('complete')
+    expect(Math.abs(view.fit!.position - lowest)).toBeLessThan(view.stepSize)
+    expect(view.fit!.rSquared).toBeGreaterThan(0.95)
+  },
+)
