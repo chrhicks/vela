@@ -8,6 +8,11 @@ import type { MonoFrame, PlateSolver } from '../plate-solving/solver.js'
 import type { FramingView } from '@vela/model/web'
 import type { FramingHardware } from './framing.js'
 import { registerTargets, type TargetOptions } from './routes.js'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { horizonFilePath, writeHorizonProfile, type HorizonProfile } from './horizon.js'
+import { syntheticProfile } from './horizon.fixture.js'
 import { haltBodyError } from '../http/halt-body.js'
 import { emptyHaltRequests, refusedHaltRequests } from '../http/halt-requests.fixture.js'
 
@@ -43,7 +48,12 @@ afterEach(async () => {
 })
 
 function setup(
-  settings: { record?: RigCatalogRecord; solver?: boolean; offsetDegrees?: number } = {},
+  settings: {
+    record?: RigCatalogRecord
+    solver?: boolean
+    offsetDegrees?: number
+    horizonDirectory?: string
+  } = {},
 ) {
   const catalog = createMemoryRigCatalog([settings.record ?? record])
   const operations = createRigOperations()
@@ -146,6 +156,7 @@ function setup(
   }
 
   if (settings.solver !== false) options.createSolver = () => solver
+  if (settings.horizonDirectory) options.horizonDirectory = settings.horizonDirectory
 
   function createApp() {
     const app = Fastify()
@@ -771,4 +782,96 @@ it('serves exact framing PNG resources without reacquisition and reports missing
   expect((await s.app.inject(view.preview!.previewUrl!.replace('/rig/', '/missing/'))).statusCode).toBe(404)
   expect(s.hardware.capture).toHaveBeenCalledTimes(1)
   expect(s.hardware.slew).not.toHaveBeenCalled()
+})
+
+describe('backyard horizon over HTTP', () => {
+  const directories: string[] = []
+
+  afterEach(async () => {
+    await Promise.all(directories.splice(0).map(path => rm(path, { recursive: true, force: true })))
+  })
+
+  async function withProfile(profile: HorizonProfile | null) {
+    const horizonDirectory = await mkdtemp(join(tmpdir(), 'vela-horizon-routes-'))
+    directories.push(horizonDirectory)
+    if (profile) await writeHorizonProfile(horizonFilePath(horizonDirectory, 'rig')!, profile)
+
+    return setup({ horizonDirectory })
+  }
+
+  const flat = (altitude: number | null) =>
+    syntheticProfile({ stepDegrees: 360, altitudesDegrees: [altitude] })
+
+  type Item = {
+    sky: { samples: Array<{ horizon: string | null }> }
+    horizonInWindow: { checkedMinutes: number; behindMinutes: number; unknownMinutes: number } | null
+  }
+
+  async function discovery(subject: Awaited<ReturnType<typeof withProfile>>) {
+    return (await subject.app.inject('/api/web/rigs/rig/target-discovery')).json() as { targets: Item[] }
+  }
+
+  it('has no statuses at all without a profile', async () => {
+    const subject = await withProfile(null)
+    const view = await discovery(subject)
+
+    expect(view.targets.every(item => item.horizonInWindow === null)).toBe(true)
+    expect(view.targets.every(item => item.sky.samples.every(sample => sample.horizon === null))).toBe(true)
+  })
+
+  it('warns for a window behind a skyline without removing or reordering any target', async () => {
+    const plain = await discovery(await withProfile(null))
+    const blocked = await discovery(await withProfile(flat(89)))
+
+    expect(blocked.targets.map(item => (item as unknown as { id: string }).id)).toEqual(
+      plain.targets.map(item => (item as unknown as { id: string }).id),
+    )
+
+    for (const item of blocked.targets) {
+      expect(item.horizonInWindow).not.toBeNull()
+      expect(item.horizonInWindow!.behindMinutes).toBe(item.horizonInWindow!.checkedMinutes)
+      expect(item.horizonInWindow!.unknownMinutes).toBe(0)
+    }
+  })
+
+  it('is clear above a low skyline and unknown, never clear or blocked, over untraced bins', async () => {
+    for (const item of (await discovery(await withProfile(flat(5)))).targets)
+      expect(item.horizonInWindow).toMatchObject({ behindMinutes: 0, unknownMinutes: 0 })
+
+    for (const item of (await discovery(await withProfile(flat(null)))).targets) {
+      expect(item.horizonInWindow!.unknownMinutes).toBe(item.horizonInWindow!.checkedMinutes)
+      expect(item.horizonInWindow!.behindMinutes).toBe(0)
+    }
+  })
+
+  it('marks the single-target sky and the target list the same way, and sends no skyline', async () => {
+    const subject = await withProfile(flat(45))
+    const single = (await subject.app.inject('/api/web/rigs/rig/targets/ngc6205')).json()
+    const listed = (await subject.app.inject('/api/web/rigs/rig/targets')).json()
+    const statuses = new Set(single.sky.samples.map((sample: { horizon: string }) => sample.horizon))
+
+    expect(statuses).toEqual(new Set(['behind', 'clear']))
+    expect(listed.targets[0].sky.samples.every((sample: { horizon: string }) => sample.horizon)).toBe(true)
+    expect(JSON.stringify([single, listed])).not.toMatch(/altitudesDegrees|offsets|stepDegrees/)
+    expect(subject.hardware.slew).not.toHaveBeenCalled()
+  })
+
+  it('serves targets normally when the profile file is unusable', async () => {
+    const subject = await withProfile(null)
+    const { writeFile } = await import('node:fs/promises')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    await writeFile(
+      horizonFilePath(directories[0]!, 'rig')!,
+      '{"altitudesDegrees":[41.5',
+    )
+
+    const view = await discovery(subject)
+
+    expect(view.targets.length).toBeGreaterThan(0)
+    expect(view.targets.every(item => item.horizonInWindow === null)).toBe(true)
+    expect(warn).toHaveBeenCalledOnce()
+    expect(String(warn.mock.calls[0]![0])).not.toContain('41.5')
+    warn.mockRestore()
+  })
 })

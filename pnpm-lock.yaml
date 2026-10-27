@@ -295,6 +295,28 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
 
+  tools/horizon-import:
+    dependencies:
+      '@vela/server':
+        specifier: workspace:*
+        version: link:../../apps/server
+      zod:
+        specifier: 4.5.4
+        version: 4.5.4
+    devDependencies:
+      '@types/node':
+        specifier: ^26.2.0
+        version: 26.2.0
+      '@vela/model':
+        specifier: workspace:*
+        version: link:../../packages/model
+      tsx:
+        specifier: ^4.21.0
+        version: 4.23.12
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
   tools/rig-session:
     dependencies:
       '@duckdb/node-api':
