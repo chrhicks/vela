@@ -49,3 +49,27 @@ Interrupted reads preserve the loaded solve and past-tense corrections; Stop sta
 available during device-read retry but is disabled while the browser cannot reach
 Vela or while an end command is stopping/unconfirmed. Finish is an operator action,
 not an assertion of measured alignment accuracy.
+
+## Good enough
+
+Chris reaches about two arcminutes of polar error in a few minutes, then spends much
+longer chasing the last few arcseconds, where each correction shifts the other axis.
+The adjustment readout tells him when to stop. While the latest solved correction is
+live and its total error is **under 2 arcminutes (120″, a strict comparison, so exactly
+120″ does not qualify)**, a calm "Good enough" note sits under the total and states the
+drift that error causes in a 3 minute exposure. It is information only. Measuring
+continues, the azimuth and altitude directions stay, and Finish is unchanged.
+
+Polar error E (arcminutes) makes a star drift at most about π/12 × E ≈ 0.2618 × E
+arcseconds per minute of exposure, the worst case, when the field sits where the
+error does the most damage. At 2′ over 3 minutes that is about 1.6″, under one pixel
+on the FRA 400 and ASI2600MC (1.92″ per pixel). The threshold is a constant, not
+derived from the plate scale. The alignment view carries camera field height and image
+size but not a pixel scale it vouches for, and this change adds no server field. It is a
+first guess to tune against real nights. There is no hysteresis: measurements arrive
+seconds apart and the note is only information, so a flicker at the edge costs nothing.
+
+The note follows the same live-versus-last rule as the directions. It is absent during
+setup and baseline, when there is no measurement, and whenever the readout is showing
+the "Last:" correction (a stopped or finished run, an interrupted or retrying read, a
+pending or unconfirmed command). It disappears if the error climbs back to 2′.

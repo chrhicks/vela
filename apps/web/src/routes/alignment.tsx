@@ -9,6 +9,7 @@ import {
   AlignmentImageDialog,
   type ExpandedAlignmentImage,
 } from '../features/alignment/AlignmentImage'
+import { goodEnoughDrift, REFERENCE_EXPOSURE_MINUTES } from '../features/alignment/good-enough'
 import './alignment.css'
 
 function useAlignment(rigId: string) {
@@ -362,6 +363,7 @@ function AlignmentPage({ rigId }: { rigId: string }) {
   const interrupted = offline || retrying
   const imageReadState = offline ? 'offline' : retrying ? 'retrying' : 'current'
   const lastCorrection = !view.active || interrupted || endUnconfirmed || pending
+  const goodEnough = measurement && !lastCorrection ? goodEnoughDrift(measurement.totalArcsec) : null
 
   const nextInstruction = view.active
     ? 'After the third solve, the adjustment view will show your alignment error and the target reticle.'
@@ -585,6 +587,15 @@ function AlignmentPage({ rigId }: { rigId: string }) {
             </div>
             <strong>{angle(measurement.totalArcsec)}</strong>
           </div>
+          {goodEnough !== null && (
+            <div className="vela-polar-good-enough">
+              <strong>Good enough</strong>
+              <p>
+                Drift is about {goodEnough.toFixed(1)} arcseconds over a{' '}
+                {REFERENCE_EXPOSURE_MINUTES} minute exposure. You can stop here, or keep refining.
+              </p>
+            </div>
+          )}
           <AlignmentImage
             frame={{
               ...imagePair!.measurement,
