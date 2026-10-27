@@ -5,6 +5,7 @@ import type { RigCatalogRecord } from '../rig/contracts.js'
 import type { AutofocusRun, AutofocusView } from '@vela/model/web'
 import type { RigCatalog } from '../rig/catalog.js'
 import { inspectRigDetail, type RigDetailOptions } from '../rig/detail.js'
+import { airTemperatureC } from './air-temperature.js'
 import type { RigOperations } from '../rig/operations.js'
 import { confirmedCameraName } from '../rig/imaging-camera.js'
 import {
@@ -101,7 +102,12 @@ export function registerAutofocus(
 
   async function readiness(rigId: string): Promise<{
     view?: AutofocusView
-    devices?: { rig: RigCatalogRecord; cameraId: string; focuserId: string }
+    devices?: {
+      rig: RigCatalogRecord
+      cameraId: string
+      focuserId: string
+      airTemperatureC: number | null
+    }
   }> {
     const rig = await catalog.get(rigId)
 
@@ -244,6 +250,7 @@ export function registerAutofocus(
         rig,
         cameraId: rig.imagingCamera.uniqueId,
         focuserId: focuser.providerDeviceId,
+        airTemperatureC: airTemperatureC(detail.view.devices),
       },
     }
   }
@@ -316,11 +323,19 @@ export function registerAutofocus(
             Date.now,
             measure ?? measureAutofocusStars,
             run => records.append(run),
+            async signal => {
+              const now = await inspectRigDetail(catalog, view.rigId, { createInspector, signal })
+
+              return now.state === 'current' ? airTemperatureC(now.view.devices) : null
+            },
           )
           controllers.set(view.rigId, controller)
         }
 
-        const options: AutofocusRunOptions = { onSettled: release }
+        const options: AutofocusRunOptions = {
+          airTemperatureStartC: devices.airTemperatureC,
+          onSettled: release,
+        }
 
         if (parsed.data.stepSize !== undefined) options.stepSize = parsed.data.stepSize
 

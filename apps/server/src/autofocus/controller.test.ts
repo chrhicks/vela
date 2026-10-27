@@ -4,6 +4,7 @@ import {
   createAutofocusController,
   type AutofocusCamera,
   type AutofocusFocuser,
+  type AutofocusAirTemperature,
   type AutofocusRecord,
 } from './controller.js'
 import type { AutofocusStar } from '@vela/model/web'
@@ -38,6 +39,7 @@ function setup(
     hfrAt = (optical: number) => hyperbola(optical, 2.18, 95, 32838),
     starsAt,
     record,
+    airTemperature,
   }: {
     holdMoves?: boolean
     holdFinalMeasurement?: boolean
@@ -45,6 +47,7 @@ function setup(
     hfrAt?: (optical: number) => number
     starsAt?: (position: number) => AutofocusStar[]
     record?: AutofocusRecord
+    airTemperature?: AutofocusAirTemperature
   } = {},
 ) {
   let position = start
@@ -123,6 +126,7 @@ function setup(
       return starsAt ? { ...found, stars: starsAt(position) } : found
     },
     record,
+    airTemperature,
   )
 
   async function land() {
@@ -326,6 +330,87 @@ it('records a stopped run with the samples it had', async () => {
   expect(recorded).toHaveBeenCalledOnce()
   expect(recorded.mock.calls[0]![0]).toMatchObject({ phase: 'stopped', fit: null })
   expect(recorded.mock.calls[0]![0].samples).toHaveLength(1)
+})
+
+it('records the air temperature given at the start and the one read when the run settles', async () => {
+  const recorded = vi.fn()
+  const read = vi.fn<AutofocusAirTemperature>(async () => 5.2)
+  const { controller, camera, focuser, land } = setup(32842, 60000, { record: recorded, airTemperature: read })
+
+  await controller.start(camera, focuser, { airTemperatureStartC: 4.7 })
+  expect(read).not.toHaveBeenCalled()
+
+  for (let count = 0; count < 10; count++) await land()
+
+  await vi.waitFor(() => expect(controller.active()).toBe(false))
+  expect(read).toHaveBeenCalledOnce()
+  expect(controller.run()!.airTemperatureC).toEqual({ start: 4.7, end: 5.2 })
+  expect(recorded.mock.calls[0]![0].airTemperatureC).toEqual({ start: 4.7, end: 5.2 })
+})
+
+it('reads the end temperature for a stopped run', async () => {
+  const recorded = vi.fn()
+  const read = vi.fn<AutofocusAirTemperature>(async () => 8)
+  const { controller, camera, focuser, land } = setup(32842, 60000, { record: recorded, airTemperature: read })
+
+  await controller.start(camera, focuser, { airTemperatureStartC: 7.5 })
+  await land()
+  await vi.waitFor(() => expect(controller.snapshot().samples).toHaveLength(1))
+  await controller.stop()
+
+  expect(recorded.mock.calls[0]![0]).toMatchObject({ phase: 'stopped', airTemperatureC: { start: 7.5, end: 8 } })
+})
+
+it('leaves the end temperature null and still records the run when the read fails', async () => {
+  const recorded = vi.fn()
+  const read = vi.fn<AutofocusAirTemperature>().mockRejectedValue(new Error('Cria did not answer'))
+  const { controller, camera, focuser, land } = setup(32842, 60000, { record: recorded, airTemperature: read })
+
+  await controller.start(camera, focuser, { airTemperatureStartC: 4.7 })
+
+  for (let count = 0; count < 10; count++) await land()
+
+  await vi.waitFor(() => expect(controller.active()).toBe(false))
+  expect(controller.snapshot().phase).toBe('complete')
+  expect(recorded.mock.calls[0]![0].airTemperatureC).toEqual({ start: 4.7, end: null })
+})
+
+it('stops waiting for an end temperature that does not arrive', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+
+  const recorded = vi.fn()
+  let abandoned: AbortSignal | undefined
+
+  const read: AutofocusAirTemperature = signal => {
+    abandoned = signal
+
+    return new Promise(() => {})
+  }
+
+  const { controller, camera, focuser, land } = setup(32842, 60000, { record: recorded, airTemperature: read })
+
+  try {
+    await controller.start(camera, focuser, { airTemperatureStartC: 4.7 })
+
+    for (let count = 0; count < 10; count++) await land()
+    await vi.waitFor(() => expect(abandoned).toBeDefined())
+    expect(recorded).not.toHaveBeenCalled()
+
+    await vi.advanceTimersByTimeAsync(3000)
+    await vi.waitFor(() => expect(controller.active()).toBe(false))
+    expect(abandoned!.aborted).toBe(true)
+    expect(recorded.mock.calls[0]![0].airTemperatureC).toEqual({ start: 4.7, end: null })
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+it('does not read an end temperature for a run that took no sample', async () => {
+  const read = vi.fn<AutofocusAirTemperature>(async () => 5)
+  const { controller, camera, focuser } = setup(80, 60000, { airTemperature: read })
+
+  await controller.start(camera, focuser)
+  expect(read).not.toHaveBeenCalled()
 })
 
 it('records nothing for a run that took no sample', async () => {

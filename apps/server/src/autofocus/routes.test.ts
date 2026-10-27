@@ -28,6 +28,11 @@ const record = {
   },
 }
 
+interface Air {
+  temperatureC?: number
+  interrupted?: boolean
+}
+
 const cleanups: Array<() => Promise<void>> = []
 
 afterEach(async () => {
@@ -47,14 +52,27 @@ function deferred() {
 function setup(
   start = 32842,
   inventory = record.lastObservedInventory,
-  { travel = { maxStep: 60000 }, bestFocus = 32838, records = noAutofocusRecords }: {
+  { travel = { maxStep: 60000 }, bestFocus = 32838, records = noAutofocusRecords, air }: {
     travel?: { minStep?: number; maxStep: number }
     bestFocus?: number
     records?: AutofocusRecords
+    air?: Air
   } = {},
 ) {
   const app = Fastify()
-  const catalog = createMemoryRigCatalog([{ ...record, lastObservedInventory: inventory }])
+
+  const rigInventory = air
+    ? {
+        ...inventory,
+        devices: [
+          ...inventory.devices,
+          { uniqueId: 'ppba', kind: 'observing-conditions' as const, name: 'PPBA' },
+        ],
+      }
+    : inventory
+
+  const catalog = createMemoryRigCatalog([{ ...record, lastObservedInventory: rigInventory }])
+  const conditions = { ...air }
   const operations = createRigOperations()
   let position = start
   const moves: number[] = []
@@ -93,6 +111,29 @@ function setup(
     },
   }
 
+  function conditionsDevice(): AlpacaDeviceInspection {
+    const reading = { kind: 'observing-conditions' as const, humidityPercent: 60 }
+
+    const device: AlpacaDeviceInspection = {
+      providerDeviceId: 'ppba',
+      kind: 'observing-conditions',
+      configuredName: 'PPBA',
+      name: 'PPBA',
+      connection: 'connected',
+      telemetry: {
+        availability: 'complete',
+        values:
+          conditions.temperatureC === undefined
+            ? reading
+            : { ...reading, temperatureC: conditions.temperatureC },
+      },
+    }
+
+    return conditions.interrupted
+      ? { ...device, observation: { state: 'interrupted', commandReady: false } }
+      : device
+  }
+
   registerAutofocus(app, catalog, operations, {
     createInspector: () => ({
       async inspectDevices(): Promise<ReadonlyArray<AlpacaDeviceInspection>> {
@@ -116,6 +157,7 @@ function setup(
               values: { kind: 'focuser', position, moving: false, ...travel },
             },
           },
+          ...(air ? [conditionsDevice()] : []),
         ]
       },
     }),
@@ -171,6 +213,7 @@ function setup(
       throw new Error('Autofocus walk did not finish')
     },
     operations,
+    conditions,
     moves,
     windows,
     focuserIds,
@@ -274,6 +317,61 @@ it('serves the run so far with its star tables, and appends the settled run to t
 
   expect(lines).toHaveLength(1)
   expect(JSON.parse(lines[0]!)).toEqual(done)
+})
+
+async function recordedRuns(settle: (subject: ReturnType<typeof setup>) => Promise<void>, air?: Air) {
+  const directory = await mkdtemp(join(tmpdir(), 'vela-autofocus-records-test-'))
+  cleanups.push(() => rm(directory, { recursive: true, force: true }))
+  const file = join(directory, 'autofocus.jsonl')
+  const records: AutofocusRecords = openJsonlRecords(file, { name: 'autofocus records' })
+  const subject = setup(32842, undefined, air ? { records, air } : { records })
+
+  await settle(subject)
+  await records.close()
+
+  return (await readFile(file, 'utf8')).trimEnd().split('\n').map(line => JSON.parse(line))
+}
+
+it('records the air temperature the rig page reads at the start and again at the end', async () => {
+  const [run] = await recordedRuns(async subject => {
+    subject.conditions.temperatureC = 4.7
+    await subject.start()
+    subject.conditions.temperatureC = 5.2
+    await subject.finish()
+  }, { temperatureC: 4.7 })
+
+  expect(run).toMatchObject({ phase: 'complete', airTemperatureC: { start: 4.7, end: 5.2 } })
+})
+
+it('leaves the air temperature null when the rig has no observing-conditions device', async () => {
+  const [run] = await recordedRuns(async subject => {
+    await subject.start()
+    await subject.finish()
+  })
+
+  expect(run).toMatchObject({ phase: 'complete', airTemperatureC: { start: null, end: null } })
+})
+
+it('does not record a last-known air temperature from an interrupted device', async () => {
+  const [run] = await recordedRuns(
+    async subject => {
+      await subject.start()
+      await subject.finish()
+    },
+    { temperatureC: 9, interrupted: true },
+  )
+
+  expect(run.airTemperatureC).toEqual({ start: null, end: null })
+})
+
+it('records a null end temperature when the device stops reporting during the run', async () => {
+  const [run] = await recordedRuns(async subject => {
+    await subject.start()
+    delete subject.conditions.temperatureC
+    await subject.finish()
+  }, { temperatureC: 6.1 })
+
+  expect(run).toMatchObject({ phase: 'complete', airTemperatureC: { start: 6.1, end: null } })
 })
 
 it('returns to setup for a travel-limit start without moving', async () => {
