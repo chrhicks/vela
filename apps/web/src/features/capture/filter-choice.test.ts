@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { filterLabel, listedFilter, rememberedFilter, rememberFilter } from './filter-choice'
 
 const filters = [
@@ -10,12 +10,14 @@ describe('capture filter choice', () => {
   beforeEach(() => {
     const data = new Map<string, string>()
 
-    globalThis.localStorage = {
-      getItem: key => data.get(key) ?? null,
-      setItem: (key, value) => void data.set(key, value),
-      removeItem: key => void data.delete(key),
-    } as Storage
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => data.get(key) ?? null,
+      setItem: (key: string, value: string) => void data.set(key, value),
+      removeItem: (key: string) => void data.delete(key),
+    })
   })
+
+  afterEach(() => vi.unstubAllGlobals())
 
   it('remembers the last choice for each rig on its own', () => {
     rememberFilter('rig-1', 'L-Ultimate')
@@ -45,17 +47,11 @@ describe('capture filter choice', () => {
   })
 
   it('still works when storage throws', () => {
-    globalThis.localStorage = {
-      getItem() {
-        throw new Error('disabled')
-      },
-      setItem() {
-        throw new Error('disabled')
-      },
-      removeItem() {
-        throw new Error('disabled')
-      },
-    } as unknown as Storage
+    const disabled = () => {
+      throw new Error('disabled')
+    }
+
+    vi.stubGlobal('localStorage', { getItem: disabled, setItem: disabled, removeItem: disabled })
 
     expect(rememberedFilter('rig-1')).toBeNull()
     expect(() => rememberFilter('rig-1', 'L-Ultimate')).not.toThrow()

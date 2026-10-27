@@ -220,6 +220,7 @@ it('retains subject intent across reopen, rejects malformed snapshots, and reads
 it('keeps the filter across reopen, keeps none as none, and reads metadata without one as unknown', async () => {
   const root = await temporary()
   const store = await openFileSavedImageStore(root)
+
   const metadataPath = (id: string) =>
     join(
       root,

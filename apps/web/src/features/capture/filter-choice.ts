@@ -25,7 +25,6 @@ export function listedFilter(name: string | null, filters: ReadonlyArray<RigFilt
   return filters.some(filter => filter.name === name) ? name : null
 }
 
-/** The dropdown's text for a filter: the name, then its description when it has one. */
 export function filterLabel({ name, description }: RigFilter) {
   return description ? `${name} · ${description}` : name
 }
