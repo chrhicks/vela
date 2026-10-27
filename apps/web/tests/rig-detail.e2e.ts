@@ -525,6 +525,31 @@ test.describe('clearing a device hold', () => {
     expect(note).toMatch(/^Cleared from the Vela page by the operator at \d{4}-\d{2}-\d{2}T/)
   })
 
+  test('sends one request when a second click lands before the button is disabled', async ({ page }) => {
+    let recovers = 0
+    let cleared = false
+    await page.route('**/api/web/rigs/rig-1', route => fulfillJson(route, cleared ? liveDetail() : heldDetail()))
+    await page.route(recoverUrl, async route => {
+      recovers++
+      await new Promise(resolve => setTimeout(resolve, 300))
+      cleared = true
+      await fulfillJson(route, { outcome: 'confirmed', found: 'Cria recovered ZWO AM5' })
+    })
+
+    await page.goto('/rigs/rig-1')
+    await page.getByRole('button', { name: 'Clear hold' }).click()
+    const dialog = page.getByRole('dialog', { name: 'Clear the hold on Mount?' })
+    const confirm = dialog.getByRole('button', { name: 'I have checked it, clear the hold' })
+
+    await confirm.evaluate((button: HTMLButtonElement) => {
+      button.click()
+      button.click()
+    })
+
+    await expect(dialog).toHaveCount(0)
+    expect(recovers).toBe(1)
+  })
+
   test('says an operation is still running, and keeps the hold, when Cria is busy', async ({ page }) => {
     await page.route('**/api/web/rigs/rig-1', route => fulfillJson(route, heldDetail()))
     await page.route(recoverUrl, route => fulfillJson(route, { error: 'device-busy', reason: 'Cria: An operation is open' }, 409))
