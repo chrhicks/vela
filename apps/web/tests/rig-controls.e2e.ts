@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import type { Page, Route } from '@playwright/test'
-import type { CaptureView, MountControlView, RigTelescopeDeviceView } from '@vela/model/web'
+import type { CaptureView, DewControlView, MountControlView, RigDetailView, RigSwitchDeviceView, RigTelescopeDeviceView } from '@vela/model/web'
 import { createEquipmentScene } from './fixtures/fieldroom/equipment'
 import { routeQuietAlerts } from './fixtures/fieldroom/browser'
 
@@ -17,6 +17,24 @@ const off = { enabled: false, reason: 'The mount state does not permit this acti
 const mountControl: MountControlView = {
   serverInstanceId, unpark: off, trackingOn: on, trackingOff: off, home: on, stop: on, canStop: true, homeConfirmedAt: null, command: null,
 }
+
+const dewOn = { enabled: true, reason: null }
+
+const dewView = (patch: Partial<DewControlView> = {}): DewControlView => ({
+  serverInstanceId,
+  auto: { on: false, set: dewOn },
+  channels: [
+    { id: 1, name: 'Dew A duty (%)', dutyPercent: 0, set: dewOn },
+    { id: 2, name: 'Dew B duty (%)', dutyPercent: 0, set: dewOn },
+  ],
+  command: null,
+  ...patch,
+})
+
+const autoDewOn = dewView({
+  auto: { on: true, set: dewOn },
+  channels: dewView().channels.map(channel => ({ ...channel, dutyPercent: 55, set: { enabled: false, reason: 'Auto dew is on' } })),
+})
 
 const idle: CaptureView = {
   captureReadState: 'current',
@@ -53,16 +71,33 @@ const exposing: CaptureView = {
 const respond = <Body>(route: Route, body: Body, status = 200) => route.fulfill({ status, json: body })
 
 /** A rig with a mount, a held focuser, a camera cooler and a capture run the tests can start and stop. */
-async function controlsScene(page: Page, options: { mount?: boolean; held?: boolean; capture?: CaptureView | null } = {}) {
+async function controlsScene(page: Page, options: { mount?: boolean; held?: boolean; capture?: CaptureView | null; dew?: DewControlView } = {}) {
   const { mount = true, held = true } = options
   const scene = createEquipmentScene('equipment-connected')
   const writes: Array<{ method: string; path: string; body: unknown }> = []
   let capture: CaptureView | null = options.capture === undefined ? idle : options.capture
+  let dew = options.dew
+  let dewReply: 'answered' | 'lost' = 'answered'
+
+  const withDew = (rig: RigDetailView): RigDetailView => ({
+    ...rig,
+    devices: rig.devices.map(device => device.kind === 'switch' && dew ? { ...device, dewControl: dew } : device),
+  })
+
   const rig = scene.snapshot().rig
+
+  const powerBox: RigSwitchDeviceView = {
+    id: 'fra400-power', name: 'Pegasus PPBA', configuredName: 'Pegasus PPBA', kind: 'switch', connection: 'connected',
+    observedAt: scene.time,
+    observation: { state: 'current', commandReady: true, observedAt: scene.time },
+    status: { availability: 'complete', activity: 'reporting', channels: [
+      { id: 1, name: 'Dew A duty (%)', value: 0 }, { id: 2, name: 'Dew B duty (%)', value: 0 }, { id: 3, name: 'Auto dew', on: false },
+    ] },
+  }
 
   scene.setRig({
     ...rig,
-    devices: rig.devices.flatMap(device => {
+    devices: [...rig.devices, ...(dew ? [powerBox] : [])].flatMap(device => {
       if (device.kind === 'telescope') {
         if (!mount) return []
 
@@ -87,7 +122,7 @@ async function controlsScene(page: Page, options: { mount?: boolean; held?: bool
 
   await page.route('**/api/**', route => route.fulfill({ status: 503, json: { error: 'No fixture for this request' } }))
   await page.route('**/api/web/navigation', route => respond(route, { rigs: [], captures: [] }))
-  await page.route('**/api/web/rigs/fra400', route => respond(route, scene.snapshot().rig))
+  await page.route('**/api/web/rigs/fra400', route => respond(route, withDew(scene.snapshot().rig)))
   await page.route('**/api/web/rigs/fra400/capture', route => capture ? respond(route, capture) : respond(route, { error: 'No camera' }, 503))
   await page.route('**/api/rigs/fra400/capture/cooling', route => {
     const body = route.request().postDataJSON()
@@ -110,9 +145,43 @@ async function controlsScene(page: Page, options: { mount?: boolean; held?: bool
 
     return respond(route, { outcome: 'confirmed', found: 'Cria recovered the focuser' })
   })
+  await page.route('**/api/rigs/fra400/dew', route => {
+    const body = route.request().postDataJSON()
+
+    writes.push({ method: 'POST', path: 'dew', body })
+
+    if (dewReply === 'lost') return route.abort()
+    const held = body.action.kind === 'duty' ? 39.8 : undefined
+
+    const auto = body.action.kind === 'auto' ? body.action.on : dew?.auto?.on ?? false
+
+    dew = dewView({
+      auto: { on: auto, set: dewOn },
+      channels: dew!.channels.map(channel => ({
+        ...channel,
+        dutyPercent: channel.id === body.action.channelId ? held ?? null : channel.dutyPercent,
+        set: auto ? { enabled: false, reason: 'Auto dew is on' } : dewOn,
+      })),
+      command: {
+        requestId: body.requestId, action: body.action, state: 'confirmed',
+        message: held === undefined ? null : `The box holds ${held}%.`,
+      },
+    })
+
+    return respond(route, dew)
+  })
+  await page.route('**/api/rigs/fra400/dew/check', route => {
+    writes.push({ method: 'POST', path: 'dew-check', body: route.request().postDataJSON() })
+
+    return respond(route, { admission: 'not-admitted', control: dewView() })
+  })
   await routeQuietAlerts(page)
 
-  return { writes, setCapture: (value: CaptureView | null) => { capture = value } }
+  return {
+    writes,
+    setCapture: (value: CaptureView | null) => { capture = value },
+    loseDewReply: () => { dewReply = 'lost' },
+  }
 }
 
 const controlsButton = (page: Page) => page.getByRole('button', { name: 'Controls', exact: true })
@@ -296,4 +365,87 @@ test('Escape closes the panel and returns focus to the Controls button', async (
   await page.keyboard.press('Escape')
   await expect(panel(page)).toHaveCount(0)
   await expect(controlsButton(page)).toBeFocused()
+})
+
+test('Dew heaters follow Cooler and are offered only for a switch with dew channels', async ({ page }) => {
+  await controlsScene(page, { dew: dewView() })
+  await page.goto('/rigs/fra400')
+  await openPanel(page)
+  await expect(panel(page).getByRole('heading', { level: 3 })).toHaveText(['Mount', 'Cooler', 'Dew heaters', 'Clear hold'])
+  await page.keyboard.press('Escape')
+
+  await controlsScene(page)
+  await page.goto('/rigs/fra400')
+  await openPanel(page)
+  await expect(panel(page).getByRole('heading', { level: 3 })).toHaveText(['Mount', 'Cooler', 'Clear hold'])
+})
+
+test('a fixed duty is sent once and confirmed with what the box holds', async ({ page }) => {
+  const fixture = await controlsScene(page, { dew: dewView() })
+  await page.goto('/rigs/fra400')
+  await openPanel(page)
+  const dew = panel(page).getByRole('region', { name: 'Dew heaters' })
+
+  await dew.getByLabel('Dew A duty (%) · fixed duty').fill('40')
+  await dew.getByRole('button', { name: 'Set duty' }).first().click()
+  await expect(dew.getByRole('status')).toHaveText('The box holds 39.8%.')
+  await expect(dew.getByText('39.8%', { exact: true })).toBeVisible()
+  expect(fixture.writes).toHaveLength(1)
+  expect(fixture.writes[0]).toMatchObject({ path: 'dew', body: { action: { kind: 'duty', channelId: 1, percent: 40 } } })
+})
+
+test('a duty outside 0 to 100 cannot be sent', async ({ page }) => {
+  const fixture = await controlsScene(page, { dew: dewView() })
+  await page.goto('/rigs/fra400')
+  await openPanel(page)
+  const dew = panel(page).getByRole('region', { name: 'Dew heaters' })
+
+  for (const value of ['101', '-1', '']) {
+    await dew.getByLabel('Dew A duty (%) · fixed duty').fill(value)
+    await expect(dew.getByRole('button', { name: 'Set duty' }).first()).toBeDisabled()
+  }
+
+  expect(fixture.writes).toEqual([])
+})
+
+test('Auto dew on disables the fixed duty with the reason, and turning it off sends one request', async ({ page }) => {
+  const fixture = await controlsScene(page, { dew: autoDewOn })
+  await page.goto('/rigs/fra400')
+  await openPanel(page)
+  const dew = panel(page).getByRole('region', { name: 'Dew heaters' })
+
+  await expect(dew.getByRole('checkbox', { name: 'Auto dew' })).toBeChecked()
+  await expect(dew.getByLabel('Dew A duty (%) · fixed duty')).toBeDisabled()
+  await expect(dew.getByText('Auto dew is on', { exact: true })).toHaveCount(2)
+  await dew.getByText('Auto dew', { exact: true }).click()
+  await expect.poll(() => fixture.writes.length).toBe(1)
+  expect(fixture.writes[0]).toMatchObject({ path: 'dew', body: { action: { kind: 'auto', on: false } } })
+  await expect(dew.getByLabel('Dew A duty (%) · fixed duty')).toBeEnabled()
+})
+
+test('a lost reply is reported as unconfirmed, is checked without a second write, and is never repeated', async ({ page }) => {
+  const fixture = await controlsScene(page, { dew: dewView() })
+  fixture.loseDewReply()
+  await page.goto('/rigs/fra400')
+  await openPanel(page)
+  const dew = panel(page).getByRole('region', { name: 'Dew heaters' })
+
+  await dew.getByLabel('Dew A duty (%) · fixed duty').fill('40')
+  await dew.getByRole('button', { name: 'Set duty' }).first().click()
+  await expect(dew.getByText(/Vela has not repeated the request/)).toBeVisible()
+  await expect(dew.getByRole('button', { name: 'Set duty' }).first()).toBeDisabled()
+  await dew.getByRole('button', { name: 'Check dew heaters' }).click()
+  await expect(dew.getByText(/No dew heater change was admitted/)).toBeVisible()
+  expect(fixture.writes.map(write => write.path)).toEqual(['dew', 'dew-check'])
+})
+
+test('the dew section fits a phone', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await controlsScene(page, { dew: autoDewOn })
+  await page.goto('/rigs/fra400')
+  await openPanel(page)
+  await expect(panel(page).getByRole('region', { name: 'Dew heaters' })).toBeVisible()
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await panel(page).getByRole('region', { name: 'Dew heaters' }).scrollIntoViewIfNeeded()
+  await page.screenshot({ path: testInfo.outputPath('rig-controls-dew-390.png') })
 })

@@ -96,15 +96,19 @@ function reconcile(command: CommandRecord | undefined, device: RigSwitchDeviceVi
   const { auto, duties } = dewChannelsOf(device)
   const { action } = command.view
 
-  const observed = action.kind === 'auto'
-    ? auto && autoIsOn(auto)
-    : duties.find(channel => channel.id === action.channelId)?.value
+  let reached: boolean | undefined
 
-  if (observed === undefined) return
+  if (action.kind === 'auto') {
+    const on = auto && autoIsOn(auto)
 
-  const reached = action.kind === 'auto'
-    ? observed === action.on
-    : Math.abs((observed as number) - action.percent) <= dutyTolerancePercent
+    reached = on === undefined ? undefined : on === action.on
+  } else {
+    const duty = duties.find(channel => channel.id === action.channelId)?.value
+
+    reached = duty === undefined ? undefined : Math.abs(duty - action.percent) <= dutyTolerancePercent
+  }
+
+  if (reached === undefined) return
 
   command.view = {
     requestId: command.view.requestId,
@@ -125,7 +129,10 @@ export function registerDewControls(app: FastifyInstance, catalog: RigCatalog, o
   const sending = new Set<string>()
   const key = (rigId: string, deviceId: string) => JSON.stringify([rigId, deviceId])
 
-  /** `ownsSlot`: the caller is the request in flight. `afterWrite`: the device was read before the write, so it cannot settle an unknown outcome. */
+  /**
+   * `ownsSlot`: the caller is the request in flight.
+   * `afterWrite`: the device was read before the write, so it cannot settle an unknown outcome.
+   */
   function controls(
     rigId: string,
     device: RigSwitchDeviceView,
@@ -135,6 +142,7 @@ export function registerDewControls(app: FastifyInstance, catalog: RigCatalog, o
 
     if (duties.length === 0) return undefined
     const command = commands.get(key(rigId, device.id))
+
     if (!afterWrite) reconcile(command, device)
     let reason: string | undefined
 

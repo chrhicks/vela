@@ -1,3 +1,4 @@
+import { Schema } from 'effect'
 import type { SwitchControl, SwitchSetResult } from '@vela/equipment'
 import { outcomeOf, type CriaConnection } from './connection.js'
 import { createCriaEquipment as createRemoteEquipment } from './v5/equipment.js'
@@ -27,7 +28,7 @@ export function createCriaSwitchControl(
         case 'confirmed': {
           const held = result.value.values.value
 
-          return typeof held === 'number' ? { outcome: 'confirmed', value: held } : { outcome: 'confirmed' }
+          return Schema.is(Schema.Number)(held) ? { outcome: 'confirmed', value: held } : { outcome: 'confirmed' }
         }
 
         case 'uncertain': return { outcome: 'uncertain', reason: 'write-outcome-unknown', message: result.message }

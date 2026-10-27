@@ -12,7 +12,7 @@ capture poll runs only then, next to the page's own poll. It reads the Shell's r
 for holds, and asks it for one fresh read when it opens: polar alignment pauses the periodic read, so what the
 panel would show could be minutes old.
 
-Sections, in this order. Each is present only when the rig has what it controls; with none, the panel says so.
+Sections, in this order: Mount, Cooler, Dew heaters, Phone, Clear hold. Each is present only when the rig has what it controls; with none, the panel says so.
 
 ## Mount
 
@@ -63,6 +63,21 @@ from the requested value; the panel shows the observed state rather than claimin
 forgets the unknown outcome (the state lives in the panel's own `useCapture`); reopening reads the camera fresh and
 shows what it reports, never the command's intent.
 
+## Dew heaters
+
+`DewControls`, shown only when the rig has a power box with dew channels (a switch device whose channels include
+`Dew ... duty` and optionally `Auto dew`; on the real rig, the Pegasus PPBA). Its other channels, the power outputs and
+USB, are not here, and neither is the guide scope's own USB heater, which stays manual. It shows each dew channel's
+duty as the box reports it, an Auto dew switch, and per channel a fixed duty (a whole number, 0 to 100) with Set duty.
+
+While Auto dew is on the box sets each duty, so the fixed duty fields are disabled with the reason "Auto dew is on".
+They are disabled, with the server's reason, whenever the power box is held or unread. A change takes the same rules as
+the mount: it has a request ID, waits for the box to confirm ("Waiting for the power box to confirm the change…"), and
+never repeats. A confirmed duty says what the box holds ("The box holds 39.8%."), which can differ a little from the
+request. A lost reply or an unknown outcome disables the dew controls and offers Check dew heaters, which reads the
+box again and never sends the change. Heaters need no free rig: they stay available during a capture run, because that
+is when dew forms.
+
 ## Phone
 
 The live Unattended switch (vela#198, #200), shown only while a run is active. It sends
@@ -95,5 +110,5 @@ Vela never clears a hold by itself, and the control is separate from polar align
 ## Layout and what comes next
 
 The panel is a stack of sections; a section's buttons sit in a wrapping row, and the Mount row holds Unpark,
-tracking, Home and Stop. The dew heaters get a section after Cooler. Park stays out: parking rotates the rig sideways
+tracking, Home and Stop. The dew heaters sit after Cooler. Park stays out: parking rotates the rig sideways
 and the home is unknown after a restart.

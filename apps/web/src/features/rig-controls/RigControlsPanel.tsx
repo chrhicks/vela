@@ -6,11 +6,12 @@ import { useRigObservation } from '../rig-detail/RigContext'
 import { ClearHold } from './ClearHold'
 import { coolingBlocker } from './cooling-blocker'
 import { CoolerControls } from './CoolerControls'
+import { DewControls } from './DewControls'
 import { MountControls } from './MountControls'
 
 /**
  * The sections, in order, each present only when the rig has what it controls:
- * Mount, Cooler, Phone, Clear hold. A control that cannot run now stays visible and says why.
+ * Mount, Cooler, Dew heaters, Phone, Clear hold. A control that cannot run now stays visible and says why.
  */
 export function RigControlsPanel({ rigId }: { rigId: string }) {
   const rig = useRigObservation()
@@ -20,6 +21,7 @@ export function RigControlsPanel({ rigId }: { rigId: string }) {
   const stale = !!rig?.interrupted
   const base = `/rigs/${encodeURIComponent(rigId)}`
   const mount = view?.devices.find(device => device.kind === 'telescope')
+  const power = view?.devices.find(device => device.kind === 'switch' && device.dewControl)
   const held = view?.devices.filter(device => device.observation?.hold) ?? []
   const cooler = !!capture.view?.cooling || !!capture.coolingError
   const phone = !!capture.view?.active
@@ -29,7 +31,7 @@ export function RigControlsPanel({ rigId }: { rigId: string }) {
     void refreshRig?.()
   }, [refreshRig])
 
-  const empty = !mount?.mountControl && !cooler && !phone && held.length === 0
+  const empty = !mount?.mountControl && !cooler && !power && !phone && held.length === 0
 
   return (
     <div className="rig-controls__sections">
@@ -59,6 +61,17 @@ export function RigControlsPanel({ rigId }: { rigId: string }) {
           onSetpoint={setpointC => void capture.setCoolingTemperature(setpointC)}
           onCheck={() => void capture.refresh()}
         />
+      )}
+      {power?.kind === 'switch' && refreshRig && (
+        <section className="rig-controls__section" aria-label="Dew heaters">
+          <h3>{stale || power.observation?.state === 'interrupted' ? 'Dew heaters · last known' : 'Dew heaters'}</h3>
+          <DewControls
+            rigId={rigId}
+            device={power}
+            stale={stale || power.observation?.state === 'interrupted'}
+            refresh={() => refreshRig({ force: true })}
+          />
+        </section>
       )}
       {capture.view && phone && (
         <section className="rig-controls__section" aria-label="Phone">

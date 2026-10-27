@@ -36,8 +36,11 @@ afterEach(async () => {
 function submitted() {
   return cria.received
     .filter(request => request.route === 'submit')
-    .map(request => JSON.parse(request.body ?? '{}') as { kind: string; parameters: unknown })
-    .map(({ kind, parameters }) => ({ kind, parameters }))
+    .map(request => {
+      const sent: { kind: string; parameters: unknown } = JSON.parse(request.body ?? '{}')
+
+      return { kind: sent.kind, parameters: sent.parameters }
+    })
 }
 
 describe('switch control', () => {
