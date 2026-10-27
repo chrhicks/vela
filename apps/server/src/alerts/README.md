@@ -143,7 +143,7 @@ no sunlight rule: leaving the rig to itself is the one thing that says nobody is
   switches it on a running run at any time, with no other condition, and answers with the capture view
   (`unattended`). It is 409 when no run is active. The monitor holds a copy for the run it watches
   (`runStarted`, `setUnattended`, `runInterrupted`) and shows it as `unattended` in the alerts view. A resumed
-  run is a new run and starts attended.
+  run keeps the Unattended choice of the run it resumes.
 - **An alert raised while it is off** has delivery `attended` ("Not sent · Unattended is off"). Nothing is sent
   for it, no retry, no `cleared` message.
 - **Switching it on pages what is standing, once** (the choice for open question 1 of the spec: going to bed

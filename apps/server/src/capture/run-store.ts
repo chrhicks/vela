@@ -76,14 +76,14 @@ export function remainingFrames(record: CaptureRunRecord): number | null {
   return Math.max(0, record.frameCount - record.completedCount)
 }
 
-/** The same run over again for what is left of it, or undefined when nothing is. A new run starts attended. */
+/** The same run over again for what is left of it, or undefined when nothing is. It keeps the run's Unattended choice. */
 export function resumeRequest(record: CaptureRunRecord): CaptureRunRequest | undefined {
   const remaining = remainingFrames(record)
 
   if (remaining === 0) return undefined
 
-  const { exposureSeconds, repeat, saveFrames, frameType, subject } = record
-  const request: CaptureRunRequest = { exposureSeconds, repeat, saveFrames, frameType, subject, unattended: false }
+  const { exposureSeconds, repeat, saveFrames, frameType, subject, unattended } = record
+  const request: CaptureRunRequest = { exposureSeconds, repeat, saveFrames, frameType, subject, unattended }
 
   return record.repeat && remaining !== null ? { ...request, frameCount: remaining } : request
 }

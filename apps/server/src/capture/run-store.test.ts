@@ -135,8 +135,9 @@ it('says how many frames a resumed run takes, and resumes with that count and th
   })
 })
 
-it('resumes an Unattended run as a new run that is not, since every run starts attended', () => {
-  expect(resumeRequest(record({ unattended: true }))).toMatchObject({ unattended: false })
+it('resumes a run with the Unattended choice it had', () => {
+  expect(resumeRequest(record({ unattended: true }))).toMatchObject({ unattended: true })
+  expect(resumeRequest(record({ unattended: false }))).toMatchObject({ unattended: false })
 })
 
 it('resumes a run that had no count as another run with no count', () => {
