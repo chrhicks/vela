@@ -104,14 +104,8 @@ export function createCriaMountControl(
     if (command.kind !== 'home' && (command.kind === 'unpark' && before.parked === false || matches(command, before)))
       return { outcome: 'confirmed', observation: before }
 
-    const operation = command.kind === 'unpark'
-      ? { kind: 'mount-unpark' as const, parameters: {} }
-      : command.kind === 'home'
-        ? { kind: 'mount-home' as const, parameters: {} }
-        : { kind: 'mount-tracking' as const, parameters: { tracking: command.tracking } }
-
     if (command.kind === 'home') home.forget(command.telescopeId)
-    const result = await outcomeOf(remote().run(command.telescopeId, operation), command.signal)
+    const result = await outcomeOf(remote().run(command.telescopeId, operationFor(command)), command.signal)
 
     switch (result.kind) {
       case 'confirmed': {
@@ -142,6 +136,16 @@ export function createCriaMountControl(
   }
 
   return { canStop: true, observe, execute }
+}
+
+type Move = Exclude<MountControlCommand, { kind: 'stop' }>
+
+function operationFor(command: Move) {
+  switch (command.kind) {
+    case 'unpark': return { kind: 'mount-unpark', parameters: {} } as const
+    case 'home': return { kind: 'mount-home', parameters: {} } as const
+    case 'set-tracking': return { kind: 'mount-tracking', parameters: { tracking: command.tracking } } as const
+  }
 }
 
 function matches(command: Exclude<MountControlCommand, { kind: 'home' | 'stop' }>, observation: MountControlObservation) {

@@ -41,7 +41,7 @@ async function untilCriaIsRead() {
 function submitted() {
   return cria.received
     .filter(request => request.route === 'submit')
-    .map(request => JSON.parse(request.body ?? '{}').kind as string)
+    .map(request => String(JSON.parse(request.body ?? '{}').kind))
 }
 
 function mountReadings(readings: Partial<Extract<Device, { kind: 'mount' }>['readings']>) {
@@ -79,7 +79,7 @@ describe('home', () => {
   })
 
   it('refuses a parked mount without sending anything', async () => {
-    mountReadings({ parked: { status: 'fresh', value: true, observedAt: Date.now() } } as never)
+    mountReadings({ parked: { status: 'fresh', value: true, observedAt: Date.now() } })
     await vi.advanceTimersByTimeAsync(1100)
 
     expect(await equipment.mountControl.execute(home)).toMatchObject({ outcome: 'failed', reason: 'parked' })
