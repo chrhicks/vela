@@ -504,6 +504,112 @@ test('omits frameCount when the field is blank', async ({ page }) => {
   await expect.poll(() => body).toEqual({ exposureSeconds: 2, repeat: true, saveFrames: true, frameType: 'light', unattended: false })
 })
 
+test.describe('the Filter field', () => {
+  const filters = [
+    { name: 'L-Ultimate', description: 'Optolong L-Ultimate, dual-band H-alpha + OIII, 3 nm' },
+    { name: 'UV/IR cut' },
+  ]
+
+  async function routes(page: import('@playwright/test').Page, view: Partial<CaptureView> = {}) {
+    const starts: unknown[] = []
+    await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, { ...idle, repeat: true, filters, ...view }))
+    await page.route('**/api/rigs/rig-1/capture/start', route => {
+      const body = route.request().postDataJSON()
+      starts.push(body)
+
+      return respond(route, { ...idle, repeat: true, filters, phase: 'exposing', active: true, filter: body.filter ?? null })
+    })
+
+    return starts
+  }
+
+  test('lists None and the rig\'s filters with their descriptions, and sends the choice', async ({ page }) => {
+    const starts = await routes(page)
+    await page.goto('/rigs/rig-1/observe/capture')
+    const filter = page.getByLabel('Filter')
+    await expect(filter).toBeVisible()
+
+    expect(await filter.locator('option').allTextContents()).toEqual([
+      'None',
+      'L-Ultimate · Optolong L-Ultimate, dual-band H-alpha + OIII, 3 nm',
+      'UV/IR cut',
+    ])
+
+    await expect(filter).toHaveValue('')
+    await filter.selectOption('L-Ultimate')
+    await page.getByRole('button', { name: 'Start capture' }).click()
+    await expect.poll(() => starts).toEqual([{ exposureSeconds: 2, repeat: true, saveFrames: true, frameType: 'light', unattended: false, filter: 'L-Ultimate' }])
+    await expect(page.getByRole('region', { name: 'Capture images' })).toContainText('L-Ultimate · Exposure 1')
+    await expect(page.getByLabel('Filter')).toHaveCount(0)
+  })
+
+  test('fits 390 px with the longest description', async ({ page }) => {
+    await routes(page)
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto('/rigs/rig-1/observe/capture')
+
+    const box = await page.getByLabel('Filter').boundingBox()
+
+    expect(box!.x).toBeGreaterThanOrEqual(0)
+    expect(box!.x + box!.width).toBeLessThanOrEqual(390)
+
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth),
+    ).toBeLessThanOrEqual(0)
+  })
+
+  test('sends no filter for None', async ({ page }) => {
+    const starts = await routes(page)
+    await page.goto('/rigs/rig-1/observe/capture')
+    await page.getByRole('button', { name: 'Start capture' }).click()
+    await expect.poll(() => starts).toEqual([{ exposureSeconds: 2, repeat: true, saveFrames: true, frameType: 'light', unattended: false }])
+  })
+
+  test('remembers the last choice for the rig, and falls back to None for a filter the rig dropped', async ({ page }) => {
+    await routes(page)
+    await page.goto('/rigs/rig-1/observe/capture')
+    await page.getByLabel('Filter').selectOption('UV/IR cut')
+    await page.reload()
+    await expect(page.getByLabel('Filter')).toHaveValue('UV/IR cut')
+
+    await page.getByLabel('Filter').selectOption('')
+    await page.reload()
+    await expect(page.getByLabel('Filter')).toHaveValue('')
+
+    await page.getByLabel('Filter').selectOption('UV/IR cut')
+    await page.unroute('**/api/web/rigs/rig-1/capture')
+    await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, { ...idle, repeat: true, filters: [filters[0]!] }))
+    await page.reload()
+    await expect(page.getByLabel('Filter')).toHaveValue('')
+  })
+
+  test('is offered for a flat and hidden for a dark, which sends none', async ({ page }) => {
+    const starts = await routes(page)
+    await page.goto('/rigs/rig-1/observe/capture')
+    await page.getByLabel('Filter').selectOption('L-Ultimate')
+    await page.getByLabel('Frame type').selectOption('flat')
+    await expect(page.getByLabel('Filter')).toHaveValue('L-Ultimate')
+    await page.getByLabel('Frame type').selectOption('dark')
+    await expect(page.getByLabel('Filter')).toHaveCount(0)
+    await page.getByRole('button', { name: 'Start capture' }).click()
+    await expect.poll(() => starts).toEqual([{ exposureSeconds: 2, repeat: true, saveFrames: true, frameType: 'dark', unattended: false }])
+  })
+
+  test('shows no field for a rig without filters', async ({ page }) => {
+    await routes(page, { filters: [] })
+    await page.goto('/rigs/rig-1/observe/capture')
+    await expect(page.getByLabel('Frame type')).toBeVisible()
+    await expect(page.getByLabel('Filter')).toHaveCount(0)
+  })
+
+  test('says nothing about the filter of a run recorded without one', async ({ page }) => {
+    await routes(page, { phase: 'exposing', active: true })
+    await page.goto('/rigs/rig-1/observe/capture')
+    await expect(page.getByRole('region', { name: 'Capture images' })).toContainText('Exposure 1')
+    await expect(page.getByRole('region', { name: 'Capture images' })).not.toContainText('None')
+  })
+})
+
 test('displays completed downloads during faster frame arrivals and coalesces pending images without mislabeling Fit', async ({
   page,
 }) => {
