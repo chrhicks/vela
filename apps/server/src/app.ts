@@ -365,7 +365,9 @@ export function buildApp({
       if (!rig) return reply.code(404).send({ error: 'rig-not-found' })
       const result = await equipment.recover(rig, request.params.deviceId, parsed.data.note)
 
-      return reply.code(result.outcome === 'confirmed' ? 200 : 409).send(result)
+      if (result.outcome === 'confirmed') return result
+
+      return reply.code(409).send({ error: result.busy ? 'device-busy' : 'recovery-failed', reason: result.message })
     },
   )
 

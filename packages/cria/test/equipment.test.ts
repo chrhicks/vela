@@ -452,4 +452,38 @@ describe('protocol 5 Promise capabilities', () => {
     await vi.advanceTimersByTimeAsync(1000)
     await rejected
   })
+  describe('recovering a held device', () => {
+    async function holdTheMount() {
+      cria.durationMs['mount-slew'] = 60_000
+      const slewing = expect(equipment.framing.slew({ telescopeId: 'mount', coordinateSystem: 'topocentric', rightAscensionDegrees: 10, declinationDegrees: 20 })).rejects.toBeInstanceOf(EquipmentError)
+
+      await vi.advanceTimersByTimeAsync(300)
+      const state = await (await cria.fetch(`${cria.origin}/v2/state`)).json()
+
+      cria.settle(state.operations[0].id, { kind: 'uncertain', reason: 'stop-not-confirmed', message: 'The mount did not stand still' })
+      await vi.advanceTimersByTimeAsync(300)
+      await slewing
+    }
+
+    it('reports the hold on the mount and no other device', async () => {
+      await holdTheMount()
+      const held = (await equipment.provider.inspectDevices()).flatMap(device => (device.observation?.hold ? [device.providerDeviceId] : []))
+
+      expect(held).toEqual(['mount'])
+    })
+
+    it('says an open operation is why Cria refused, and keeps the hold', async () => {
+      await holdTheMount()
+      cria.durationMs['mount-stop'] = 60_000
+      void equipment.framing.abortTelescope('mount').catch(() => undefined)
+      await vi.advanceTimersByTimeAsync(300)
+
+      const refused = equipment.recover('mount', 'Checked the mount')
+
+      await vi.advanceTimersByTimeAsync(500)
+
+      expect(await refused).toMatchObject({ outcome: 'failed', busy: true })
+      expect(equipment.holds().map(hold => hold.deviceId)).toEqual(['mount'])
+    })
+  })
 })

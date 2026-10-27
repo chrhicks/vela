@@ -1,6 +1,7 @@
 import type { RigDetailView, RigDeviceDetailView, RigSwitchChannelView } from '@vela/model/web'
 import { IconButton } from '@vela/ui'
 import { useEffect, useId, useRef, useState } from 'react'
+import { ClearHold } from './ClearHold'
 import { DeviceIcon } from './DeviceIcon'
 import { MountControls } from './MountControls'
 
@@ -79,6 +80,7 @@ export function RigDeviceRow({ device, stale, imagingCamera = false, rigId, refr
     }
   }
 
+  const hold = device.observation?.hold
   const detailsAvailable = presentation.metrics.length > 0 || !!presentation.channels?.length
 
   return (
@@ -102,11 +104,17 @@ export function RigDeviceRow({ device, stale, imagingCamera = false, rigId, refr
           onClick={() => setOpen(value => !value)}
         />
       </div>
+      {hold && rigId && refresh && (
+        <div className="equipment__hold" role="group" aria-label={`${device.name} is held`}>
+          <p>{hold.reason}</p>
+          <ClearHold rigId={rigId} deviceName={device.name} hold={hold} refresh={refresh} />
+        </div>
+      )}
       <div id={id} hidden={!open} className="equipment__device-details">
         {stale && <p>Last known measurements; live updates are interrupted.
           {device.observation?.observedAt && <> Observed {new Date(device.observation.observedAt).toLocaleTimeString()}.</>}
         </p>}
-        {device.observation?.message && <p>{device.observation.message}</p>}
+        {device.observation?.message && !hold && <p>{device.observation.message}</p>}
         <p>{presentation.note}</p>
         {device.configuredName !== device.name && <p>Configured as {device.configuredName}</p>}
         {presentation.metrics.length > 0 && (

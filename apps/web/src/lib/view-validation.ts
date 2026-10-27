@@ -114,6 +114,7 @@ const identity = z.object({
     observedAt: isoDate.optional(),
     commandReady: z.boolean(),
     message: text.optional(),
+    hold: z.object({ deviceId: text, reason: text }).optional(),
   }).optional(),
 })
 

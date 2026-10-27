@@ -133,4 +133,12 @@ export interface EquipmentObservation {
   readonly observedAt?: string
   readonly commandReady: boolean
   readonly message?: string
+  /** Set while the device is held: nothing commands it until a person recovers it. */
+  readonly hold?: EquipmentHold
+}
+
+export interface EquipmentHold {
+  /** The id the recover route takes. */
+  readonly deviceId: string
+  readonly reason: string
 }

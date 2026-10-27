@@ -15,6 +15,11 @@ import { createCriaProvider } from './provider.js'
 import { DeviceReadings } from './readings.js'
 import { createCriaMountControl } from './mount-control.js'
 
+/** `busy` is Cria refusing because an operation is still open on the device. */
+export type CriaRecovery =
+  | { readonly outcome: 'confirmed'; readonly found: string }
+  | { readonly outcome: 'failed'; readonly busy: boolean; readonly message: string }
+
 export interface CriaEquipmentBinding {
   readonly providerDeviceId: string
   readonly id: string
@@ -413,17 +418,17 @@ export function createCriaEquipment(connection: CriaConnection, bindings: Readon
     mountControl: createCriaMountControl(connection, bindings),
     provider: createCriaProvider(connection, bindings),
     holds,
-    async recover(deviceId: string, note: string): Promise<{ outcome: 'confirmed'; found: string } | { outcome: 'failed'; message: string }> {
+    async recover(deviceId: string, note: string): Promise<CriaRecovery> {
       const hold = holds().find(hold => hold.deviceId === deviceId)
 
-      if (!hold) return { outcome: 'failed', message: 'This device has no hold. Check its current state.' }
+      if (!hold) return { outcome: 'failed', busy: false, message: 'This device has no hold. Check its current state.' }
       const result = await outcomeOf(equipment().recover(hold.token, { confirmed: true, note }))
 
       switch (result.kind) {
         case 'confirmed': return { outcome: 'confirmed', found: result.value.found }
-        case 'failed':
-        case 'uncertain': return { outcome: 'failed', message: result.message }
-        case 'stopped': return { outcome: 'failed', message: 'Recovery stopped before it was confirmed.' }
+        case 'failed': return { outcome: 'failed', busy: result.reason === 'busy', message: result.message }
+        case 'uncertain': return { outcome: 'failed', busy: false, message: result.message }
+        case 'stopped': return { outcome: 'failed', busy: false, message: 'Recovery stopped before it was confirmed.' }
       }
     },
   }

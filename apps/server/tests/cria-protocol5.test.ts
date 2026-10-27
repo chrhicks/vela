@@ -462,7 +462,10 @@ describe("a mount hold through today's lease routes", () => {
 
     expect((await request('/api/web/rigs/fixture/capture')).json()).toMatchObject({ enabled: false, unavailableReason: reason })
     expect((await request('/api/web/rigs/fixture/autofocus')).json()).toMatchObject({ enabled: false, unavailableReason: reason })
-    expect(mountOf(await request('/api/web/rigs/fixture'))).toMatchObject({ observation: { commandReady: false, message: reason } })
+    const heldDetail = await request('/api/web/rigs/fixture')
+
+    expect(mountOf(heldDetail)).toMatchObject({ observation: { commandReady: false, message: reason, hold: { deviceId: 'cria:fixture:mount', reason } } })
+    expect(heldDetail.json().devices.filter((device: { readonly observation?: { readonly hold?: unknown } }) => device.observation?.hold !== undefined)).toHaveLength(1)
     expect((await request(post('/api/rigs/fixture/autofocus/start', { exposureSeconds: 1 }))).statusCode).toBe(409)
 
     const forget = await request({ method: 'DELETE', url: '/api/rigs/fixture' })
@@ -486,6 +489,7 @@ describe("a mount hold through today's lease routes", () => {
     expect(cria.received.flatMap(received => (received.route === 'recover' ? [[received.path, JSON.parse(received.body ?? never())]] : []))).toEqual([
       ['/v2/devices/mount/recover', { instanceId: cria.instanceId, bindingId: binding, externalRecoveryConfirmed: true, note: 'Checked the mount at the pier' }],
     ])
+    expect(mountOf(await request('/api/web/rigs/fixture')).observation).not.toHaveProperty('hold')
     expect((await request('/api/web/rigs/fixture/capture')).json()).toMatchObject({ enabled: true, unavailableReason: null })
     expect((await request('/api/web/rigs/fixture/autofocus')).json()).toMatchObject({ enabled: true, unavailableReason: null })
     expect((await request(post('/api/rigs/fixture/connections'))).json()).toMatchObject({ outcome: 'complete', command: 'not-needed' })

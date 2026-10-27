@@ -28,6 +28,10 @@ interface RigDeviceIdentity {
     readonly observedAt?: IsoDateTime
     readonly commandReady: boolean
     readonly message?: string
+    readonly hold?: {
+      readonly deviceId: string
+      readonly reason: string
+    }
   }
 }
 
