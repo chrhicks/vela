@@ -49,6 +49,7 @@ const view: CaptureView = {
 describe('capture response validation', () => {
   it('requires an explicit capture-read state independently of phase', () => {
     expect(isCaptureView({ ...view, captureReadState: 'retrying' }, 'rig-1')).toBe(true)
+    expect(isCaptureView({ ...view, unattended: true }, 'rig-1')).toBe(true)
 
     for (const captureReadState of [undefined, null, 'recovered']) {
       expect(isCaptureView({ ...view, captureReadState }, 'rig-1')).toBe(false)
@@ -225,6 +226,8 @@ it('validates confirmed retention and exact same-origin download resources', () 
 
   for (const patch of [
     { saveFrames: undefined },
+    { unattended: undefined },
+    { unattended: 'yes' },
     { savedImageCount: -1 },
     { savedImageCount: undefined },
     { savedImageCount: 0.5 },

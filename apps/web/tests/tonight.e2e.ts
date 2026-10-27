@@ -65,7 +65,7 @@ for (const width of [1440, 390]) {
         expect(geometry.image.y).toBe(116)
         expect(geometry.image.width).toBeCloseTo(888, 0)
         expect(geometry.card.width).toBeCloseTo(452, 0)
-        expect(geometry.card.height).toBe(214)
+        expect(geometry.card.height).toBe(274)
       }
 
       expect(createHash('sha256').update(reference).digest('hex')).toBe(referenceImage.sha256)
@@ -193,7 +193,7 @@ test('pending target choice cannot relabel an active run and theme changes prese
   await page.getByRole('button', { name: 'Start capture' }).click()
   await expect
     .poll(() => starts)
-    .toEqual([{ exposureSeconds: 42, repeat: true, saveFrames: true, frameType: 'light', targetId: 'next' }])
+    .toEqual([{ exposureSeconds: 42, repeat: true, saveFrames: true, frameType: 'light', unattended: false, targetId: 'next' }])
 })
 
 

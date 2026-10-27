@@ -1,6 +1,6 @@
 import type { CaptureView, FrameType } from '@vela/model/web'
 import { Button, Checkbox, Input, Select } from '@vela/ui'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { CaptureInterruption } from '../features/capture/CaptureInterruption'
 import { LatestImage } from '../features/capture/LatestImage'
@@ -8,6 +8,7 @@ import { captureActivity, useCapture } from '../features/capture/use-capture'
 import { frameTypeChoices, frameTypes, isCalibration } from '../features/capture/frame-types'
 import { MAX_FRAME_COUNT, parseFrameCount } from '../features/capture/validation'
 import { CaptureCooling, coolingBlocker } from '../features/capture/CaptureCooling'
+import { pagingLabel } from '../features/alerts/presentation'
 import { useRigObservation } from '../features/rig-detail/RigContext'
 import { useTonightTarget } from '../features/targets/use-tonight-target'
 import { AltitudeTrace } from '../features/targets/AltitudeTrace'
@@ -29,11 +30,18 @@ function CapturePage({ rigId }: { rigId: string }) {
   const [saveFrames, setSaveFrames] = useState<boolean | null>(null)
   const [repeat, setRepeat] = useState<boolean | null>(null)
   const [frames, setFrames] = useState('')
+  // Never carried over: every new run starts with the phone off.
+  const [unattended, setUnattended] = useState(false)
   // Always light until chosen: a calibration run has no target, so it is never the carried-over default.
   const [chosenFrameType, setChosenFrameType] = useState<FrameType>('light')
   const [coolingOpen, setCoolingOpen] = useState(false)
   const { view, offline, pending, refreshing, error, commandUnconfirmed } = capture
   const chosenTargetId = params.get('target') ?? undefined
+
+  // A run that begins, from this page or another, uses up the choice: the next form starts with the phone off.
+  useEffect(() => {
+    if (view?.active) setUnattended(false)
+  }, [view?.active])
 
   const targetId = view?.active
     ? view.subject?.targetId
@@ -259,6 +267,16 @@ function CapturePage({ rigId }: { rigId: string }) {
                               : 'Receiving the completed exposure.'}
                     </p>
                   )}
+                  <div className="tonight-capture__unattended">
+                    <Checkbox
+                      label="Unattended (page my phone)"
+                      description={pagingLabel(view.unattended)}
+                      checked={view.unattended}
+                      disabled={!capture.canSetUnattended}
+                      onChange={event => void capture.setUnattended(event.target.checked)}
+                    />
+                    {capture.unattendedError && <p role="alert">{capture.unattendedError}</p>}
+                  </div>
                   <div className="tonight-capture__actions">
                     <div>
                       {view.savedCount} saved · {integrationTime(view.integrationSeconds)}{' '}
@@ -297,6 +315,9 @@ function CapturePage({ rigId }: { rigId: string }) {
                         {view.interruption.reason} during this run, and nothing has been exposed
                         since. {interruptedProgress(view)}
                       </p>
+                      {view.unattended && (
+                        <p>Resume keeps Unattended on: the phone is paged for the resumed run.</p>
+                      )}
                       {view.interruption.remainingCount === 0 ? (
                         <p>It had taken all its frames.</p>
                       ) : (
@@ -331,6 +352,7 @@ function CapturePage({ rigId }: { rigId: string }) {
                           repeat: repeating,
                           saveFrames: savingFrames,
                           frameType,
+                          unattended,
                           targetId: calibration
                             ? undefined
                             : (chosenTargetId ?? view.subject?.targetId),
@@ -395,6 +417,13 @@ function CapturePage({ rigId }: { rigId: string }) {
                       checked={savingFrames}
                       disabled={busy || offline}
                       onChange={event => setSaveFrames(event.target.checked)}
+                    />
+                    <Checkbox
+                      label="Unattended (page my phone)"
+                      description="Alerts always show here. Your phone is paged only while this is on."
+                      checked={unattended}
+                      disabled={busy || offline}
+                      onChange={event => setUnattended(event.target.checked)}
                     />
                     <Button
                       type="submit"

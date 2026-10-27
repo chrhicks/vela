@@ -1,6 +1,6 @@
 import type { AlertView } from '@vela/model/web'
 import { Button } from '@vela/ui'
-import { ageLabel, bannerPhoneNote, clockTime } from './presentation'
+import { ageLabel, bannerPhoneNote, clockTime, pagingLabel } from './presentation'
 import { useRigAlerts } from './AlertsProvider'
 import './alerts.css'
 
@@ -25,6 +25,8 @@ export function AlertBanner() {
           Alert checks interrupted · showing the last view Vela received
         </p>
       )}
+
+      <p className="alert-banner__paging">{pagingLabel(view.unattended)}</p>
 
       <ul>
         {view.alerts.map(alert => (

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AlertView } from '@vela/model/web'
-import { ageLabel, bannerPhoneNote, deliveryLabel, phoneLabel, thresholdRows } from './presentation'
+import { ageLabel, bannerPhoneNote, deliveryLabel, pagingLabel, phoneLabel, thresholdRows } from './presentation'
 
 const critical: AlertView = {
   id: 'stars-collapsed',
@@ -10,6 +10,13 @@ const critical: AlertView = {
   acknowledged: false,
   delivery: { state: 'sent' },
 }
+
+describe('paging wording', () => {
+  it('says plainly whether this run pages the phone', () => {
+    expect(pagingLabel(true)).toBe('Phone: on, unattended')
+    expect(pagingLabel(false)).toBe('Phone: off')
+  })
+})
 
 describe('alert delivery wording', () => {
   it('says an unacknowledged emergency repeats, and stops saying so once acknowledged', () => {

@@ -30,6 +30,7 @@ const idle: CaptureView = {
   saveFrames: false,
   frameType: 'light',
   savedImageCount: 0,
+  unattended: false,
   subject: null,
   savedCount: 0,
   integrationSeconds: 0,
@@ -354,7 +355,7 @@ test('repeating capture restores server settings and can stop during image recei
   await expect(page.getByRole('checkbox', { name: 'Repeat until stopped' })).toBeChecked()
   await expect(page.getByRole('checkbox', { name: 'Save frames' })).toBeChecked()
   await page.getByRole('button', { name: 'Start capture' }).click()
-  expect(startBody).toEqual({ exposureSeconds: 2, repeat: true, saveFrames: true, frameType: 'light' })
+  expect(startBody).toEqual({ exposureSeconds: 2, repeat: true, saveFrames: true, frameType: 'light', unattended: false })
   await expect(page.getByRole('button', { name: 'Stop capture' })).toBeEnabled()
   current = { ...current, completedCount: 2, latestImage: firstImage, phase: 'reading' }
   await page.reload()
@@ -409,7 +410,7 @@ test('starts with a frame count, shows progress, and fits a 390 px page', async 
   ).toBeLessThanOrEqual(0)
 
   await page.getByRole('button', { name: 'Start capture' }).click()
-  expect(starts).toEqual([{ exposureSeconds: 2, repeat: true, saveFrames: true, frameType: 'light', frameCount: 30 }])
+  expect(starts).toEqual([{ exposureSeconds: 2, repeat: true, saveFrames: true, frameType: 'light', unattended: false, frameCount: 30 }])
   await expect(page.getByRole('region', { name: 'Capture images' })).toContainText('12 of 30 frames')
   await expect(page.getByRole('button', { name: 'Stop capture' })).toBeInViewport()
 
@@ -465,7 +466,7 @@ test('chooses a frame type at 390 px, says to cap darks and bias, and starts a c
   expect(box!.x + box!.width).toBeLessThanOrEqual(390)
 
   await page.getByRole('button', { name: 'Start capture' }).click()
-  expect(starts).toEqual([{ exposureSeconds: 2, repeat: true, saveFrames: true, frameType: 'dark' }])
+  expect(starts).toEqual([{ exposureSeconds: 2, repeat: true, saveFrames: true, frameType: 'dark', unattended: false }])
   await expect(page.getByRole('region', { name: 'Capture images' })).toContainText('Dark · Exposure 1')
   await expect(page.getByLabel('Frame type')).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Stop capture' })).toBeInViewport()
@@ -487,7 +488,7 @@ test('a single exposure ignores an invalid Frames entry', async ({ page }) => {
   await page.getByLabel('Frames · optional').fill('2.5')
   await page.getByText('Repeat until stopped', { exact: true }).click()
   await page.getByRole('button', { name: 'Take exposure' }).click()
-  await expect.poll(() => body).toEqual({ exposureSeconds: 2, repeat: false, saveFrames: true, frameType: 'light' })
+  await expect.poll(() => body).toEqual({ exposureSeconds: 2, repeat: false, saveFrames: true, frameType: 'light', unattended: false })
 })
 
 test('omits frameCount when the field is blank', async ({ page }) => {
@@ -500,7 +501,7 @@ test('omits frameCount when the field is blank', async ({ page }) => {
   })
   await page.goto('/rigs/rig-1/observe/capture')
   await page.getByRole('button', { name: 'Start capture' }).click()
-  await expect.poll(() => body).toEqual({ exposureSeconds: 2, repeat: true, saveFrames: true, frameType: 'light' })
+  await expect.poll(() => body).toEqual({ exposureSeconds: 2, repeat: true, saveFrames: true, frameType: 'light', unattended: false })
 })
 
 test('displays completed downloads during faster frame arrivals and coalesces pending images without mislabeling Fit', async ({
@@ -985,4 +986,117 @@ test('a refused Resume shows the server message and leaves Resume available', as
   await page.getByRole('button', { name: 'Resume · 18 frames left' }).click()
   await expect(page.getByText(haltRefusal)).toBeVisible()
   await expect(page.getByRole('button', { name: 'Resume · 18 frames left' })).toBeEnabled()
+})
+
+test('Unattended is off on a new run, starts a run that pages the phone when ticked, and is off again afterwards', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 800 })
+  let current: CaptureView = { ...idle, repeat: true }
+  const starts: unknown[] = []
+  await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, current))
+  await page.route('**/api/rigs/rig-1/capture/start', route => {
+    const body = route.request().postDataJSON()
+    starts.push(body)
+    current = { ...current, phase: 'exposing', active: true, unattended: body.unattended }
+
+    return respond(route, current)
+  })
+  await page.route('**/api/rigs/rig-1/capture/stop', route => {
+    current = { ...current, phase: 'stopped', active: false }
+
+    return respond(route, current)
+  })
+  await page.goto('/rigs/rig-1/observe/capture')
+
+  const unattended = page.getByRole('checkbox', { name: 'Unattended (page my phone)' })
+  await expect(unattended).not.toBeChecked()
+  await expect(unattended).toBeVisible()
+
+  await page.getByText('Unattended (page my phone)', { exact: true }).click()
+  await expect(unattended).toBeChecked()
+  await page.getByRole('button', { name: 'Start capture' }).click()
+  expect(starts).toEqual([{ exposureSeconds: 2, repeat: true, saveFrames: true, frameType: 'light', unattended: true }])
+
+  const run = page.getByRole('region', { name: 'Capture images' })
+  await expect(run.getByRole('checkbox', { name: /Unattended/ })).toBeChecked()
+  await expect(run).toContainText('Phone: on, unattended')
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth),
+  ).toBeLessThanOrEqual(0)
+
+  await page.getByRole('button', { name: 'Stop capture' }).click()
+  await expect(page.getByRole('button', { name: 'Start capture' })).toBeEnabled()
+  await expect(page.getByRole('checkbox', { name: 'Unattended (page my phone)' })).not.toBeChecked()
+})
+
+test('Unattended switches on and off during a run with no confirmation, and Stop stays available', async ({ page }) => {
+  let current: CaptureView = { ...idle, phase: 'exposing', active: true, repeat: true }
+  const switches: unknown[] = []
+  await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, current))
+  await page.route('**/api/rigs/rig-1/capture/unattended', route => {
+    const body = route.request().postDataJSON()
+    switches.push({ method: route.request().method(), body })
+    current = { ...current, unattended: body.on }
+
+    return respond(route, current)
+  })
+  await page.goto('/rigs/rig-1/observe/capture')
+
+  const run = page.getByRole('region', { name: 'Capture images' })
+  const toggle = run.getByRole('checkbox', { name: /Unattended/ })
+  const label = run.getByText('Unattended (page my phone)', { exact: true })
+  await expect(toggle).not.toBeChecked()
+  await expect(run).toContainText('Phone: off')
+
+  await label.click()
+  await expect(toggle).toBeChecked()
+  await expect(run).toContainText('Phone: on, unattended')
+  await label.click()
+  await expect(toggle).not.toBeChecked()
+  await expect(run).toContainText('Phone: off')
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Stop capture' })).toBeEnabled()
+  expect(switches).toEqual([
+    { method: 'PUT', body: { on: true } },
+    { method: 'PUT', body: { on: false } },
+  ])
+})
+
+test('a refused Unattended switch shows the server message and the switch follows the server', async ({ page }) => {
+  const exposing: CaptureView = { ...idle, phase: 'exposing', active: true }
+  const refusal = 'There is no running capture to switch Unattended on.'
+  await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, exposing))
+  await page.route('**/api/rigs/rig-1/capture/unattended', route => respond(route, { error: refusal }, 409))
+  await page.goto('/rigs/rig-1/observe/capture')
+  const toggle = page.getByRole('checkbox', { name: /Unattended/ })
+  const label = page.getByText('Unattended (page my phone)', { exact: true })
+  await label.click()
+  await expect(page.getByRole('alert')).toHaveText(refusal)
+  await expect(toggle).not.toBeChecked()
+  await expect(page.getByText(/Command outcome unknown/)).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Stop capture' })).toBeEnabled()
+})
+
+test('an interrupted Unattended run says Resume keeps Unattended on', async ({ page }) => {
+  await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, { ...interrupted, unattended: true }))
+  await page.goto('/rigs/rig-1/observe/capture')
+  await expect(page.getByRole('status', { name: 'Interrupted capture run' })).toContainText(
+    'Resume keeps Unattended on',
+  )
+})
+
+test('a run started elsewhere uses up a ticked Unattended choice on the start form', async ({ page }) => {
+  let current: CaptureView = { ...idle, repeat: true }
+  await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, current))
+  await page.goto('/rigs/rig-1/observe/capture')
+
+  const unattended = page.getByRole('checkbox', { name: 'Unattended (page my phone)' })
+  await page.getByText('Unattended (page my phone)', { exact: true }).click()
+  await expect(unattended).toBeChecked()
+
+  current = { ...current, phase: 'exposing', active: true }
+  await expect(page.getByRole('button', { name: 'Stop capture' })).toBeEnabled()
+
+  current = { ...current, phase: 'stopped', active: false }
+  await expect(page.getByRole('button', { name: 'Start capture' })).toBeEnabled()
+  await expect(unattended).not.toBeChecked()
 })

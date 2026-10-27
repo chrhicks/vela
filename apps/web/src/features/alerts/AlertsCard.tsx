@@ -1,5 +1,5 @@
 import { Button } from '@vela/ui'
-import { clockTime, deliveryLabel, phoneLabel, thresholdRows } from './presentation'
+import { clockTime, deliveryLabel, pagingLabel, phoneLabel, thresholdRows } from './presentation'
 import { useRigAlerts } from './AlertsProvider'
 import './alerts.css'
 
@@ -32,6 +32,8 @@ export function AlertsCard() {
               : 'Not watching · starts with a capture run'}
         </p>
       </header>
+
+      <p data-paging={view.unattended ? 'on' : 'off'}>{pagingLabel(view.unattended)}</p>
 
       {view.phone.state !== 'ready' && (
         <p data-phone={view.phone.state} role={view.phone.state === 'failing' ? 'alert' : undefined}>

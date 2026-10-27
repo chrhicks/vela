@@ -47,6 +47,11 @@ export function bannerPhoneNote(alert: AlertView) {
   return repeating || state === 'retrying' || state === 'gave-up' ? deliveryLabel(alert) : null
 }
 
+/** Whether this run's alerts page the phone; the same words on the capture page, the banner and the card. */
+export function pagingLabel(unattended: boolean) {
+  return unattended ? 'Phone: on, unattended' : 'Phone: off'
+}
+
 export function phoneLabel(phone: AlertsView['phone']) {
   switch (phone.state) {
     case 'ready':

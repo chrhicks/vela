@@ -97,6 +97,7 @@ function Preparation({ rigId }: { rigId: string }) {
       repeat: repeatValue,
       saveFrames: saveValue,
       frameType: 'light',
+      unattended: false,
       targetId,
     })
 

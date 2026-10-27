@@ -82,6 +82,7 @@ const captureView = z.object({
   frameType: z.enum(frameTypes),
   frameCount: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).nullable().optional(),
   subject: subject.nullable(),
+  unattended: z.boolean(),
   savedCount: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
   integrationSeconds: z.number().finite().nonnegative(),
   completedCount: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
