@@ -112,8 +112,7 @@ ephemeral operation and check, and does not resume either.
 
 ## Backyard horizon (approximate, warn only)
 
-On 2026-10-26 a tree at about 43° altitude in the north-east blocked both scopes
-and Vela had no idea trees exist. A rig can now have a **horizon profile**: the
+On 2026-10-26 a tree blocked both scopes and Vela had no idea trees exist. A rig can now have a **horizon profile**: the
 altitude of the skyline (trees, roofs) at each azimuth bin, from Chris's photo
 survey. It only warns. It never blocks, filters or re-ranks a target, a slew or a
 run, and it changes no alert. The profile is approximate: the survey's north is
@@ -130,7 +129,7 @@ It is read on each request, so a re-import takes effect without a restart.
   "approximate": true,
   "note": "Approximate ...",
   "importedAt": "2026-10-28T00:00:00.000Z",
-  "offsets": { "azimuthDegrees": 13.44, "altitudeDegrees": 0.94 },
+  "offsets": { "azimuthDegrees": 10, "altitudeDegrees": 1 },
   "stepDegrees": 1,
   "altitudesDegrees": [12.5, null, 3.2]
 }
