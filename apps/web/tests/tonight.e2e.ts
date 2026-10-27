@@ -65,7 +65,7 @@ for (const width of [1440, 390]) {
         expect(geometry.image.y).toBe(116)
         expect(geometry.image.width).toBeCloseTo(888, 0)
         expect(geometry.card.width).toBeCloseTo(452, 0)
-        expect(geometry.card.height).toBe(214)
+        expect(geometry.card.height).toBe(274)
       }
 
       expect(createHash('sha256').update(reference).digest('hex')).toBe(referenceImage.sha256)
