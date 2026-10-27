@@ -66,9 +66,19 @@ baseline of 3 stars, a ratio needs 10), so a whole night is lost without a word.
 Only an imaging run is watched: the capture route calls `runStarted(exposureSeconds, imaging)` with
 `imaging` true for a run that repeats and saves its frames. A single exposure, a repeating run that
 saves nothing (framing, focusing) and a run with `frameCount` below `noStarsFrames` never raise it.
-A frame whose star measurement failed does not count as a frame without stars. Calibration frames
-(darks, bias) have stars in no frame, so they must not be an imaging run; the capture view has no
-frame types yet, and when it does the route should pass `imaging: false` for them.
+A frame whose star measurement failed does not count as a frame without stars.
+
+### Calibration runs
+
+A calibration run (frame type dark, flat, dark flat or bias) has no stars and needs no tracking. The
+capture route calls `runStarted(exposureSeconds, imaging, calibration)` with `imaging` false and
+`calibration` true, and the monitor knows that from the first reading. Such a run can raise
+`rig-unreachable`, `frames-stalled`, `run-failed` and the meridian alerts, which read the mount's pointing
+whatever the frame type. It cannot raise a star alert, `no-stars` or `tracking-stopped`: `tracking-stopped`
+is not evaluated at all, so a mount left standing still on purpose (indoors, homed, tracking off) neither
+shows an alert nor pages the phone. A restart that interrupts a calibration run raises nothing. A light run is
+unchanged: it raises `tracking-stopped` after two consecutive readings of a mount that is not tracking, not
+slewing and not parked.
 
 The baseline is the median of the last five frames that no alert called bad, so a long cloud never
 becomes normal. A weaker alert is hidden while a stronger one covers it (`stars-dropping` and

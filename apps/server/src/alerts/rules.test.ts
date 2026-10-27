@@ -375,10 +375,18 @@ describe('the real night: the AM5 stops past the meridian', () => {
 describe('tracking-stopped', () => {
   const steady = [mountReading({}), mountReading({})]
   const stopped = mountReading({ tracking: false })
+  const calibration: RunState = { ...running, imaging: false, calibration: true }
 
   it('raises when tracking is false for 20 s of 10 s polls, and not on a single reading', () => {
     expect(ids(history({ mountReadings: [...steady, stopped] }))).not.toContain('tracking-stopped')
     expect(ids(history({ mountReadings: [...steady, stopped, stopped, stopped] }))).toContain('tracking-stopped')
+  })
+
+  it('never raises for a calibration run, which has no use for tracking', () => {
+    const readings = [stopped, stopped, stopped, stopped]
+
+    expect(ids(history({ run: calibration, mountReadings: readings }))).not.toContain('tracking-stopped')
+    expect(ids(history({ run: { ...running, imaging: false }, mountReadings: readings }))).toContain('tracking-stopped')
   })
 
   it('ignores a mount that is slewing or parked', () => {

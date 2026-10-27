@@ -45,7 +45,14 @@ export interface MountReading {
 }
 
 export type RunState =
-  | { status: 'running'; exposureSeconds: number; waitingForFrameSince: number; imaging: boolean }
+  | {
+      status: 'running'
+      exposureSeconds: number
+      waitingForFrameSince: number
+      imaging: boolean
+      /** A dark, flat, dark flat or bias run: it never needs the mount to track. */
+      calibration?: boolean
+    }
   | { status: 'stopped' }
   | { status: 'failed' }
   /** The server restarted while the run was active; `message` says how far it got. */
@@ -85,7 +92,7 @@ export function evaluateAlerts(history: RigHistory, thresholds: AlertThresholds,
     conditions: [
       ...frames.conditions,
       ...(run.imaging ? watchStarBaseline(history.frames.length, frames.baselineFormed, thresholds) : []),
-      ...watchTracking(history.mountReadings, thresholds),
+      ...(run.calibration ? [] : watchTracking(history.mountReadings, thresholds)),
       ...meridian.conditions,
       ...watchReachability(history.observationsInterruptedSince, thresholds, now),
       ...watchFrameArrival(run, thresholds, now),
