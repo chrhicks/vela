@@ -2,6 +2,7 @@ import { Body, Equator, Horizon, Illumination, MoonPhase, Observer } from 'astro
 import type { TargetPosition, TargetSkyPath } from '@vela/model/web'
 import type { PlateWcs } from '../plate-solving/solver.js'
 import { angularDistance, toMount, type Site } from '../astronomy/coordinates.js'
+import { horizonStatus, type HorizonProfile } from './horizon.js'
 
 export { angularDistance, fromMount, toMount, type Site } from '../astronomy/coordinates.js'
 
@@ -34,7 +35,12 @@ export function plateCorners(wcs: PlateWcs): TargetPosition[] {
   ].map(([x, y]) => skyAtPixel(wcs, x!, y!))
 }
 
-export function skyPath(target: TargetPosition, site: Site, now: Date): TargetSkyPath {
+export function skyPath(
+  target: TargetPosition,
+  site: Site,
+  now: Date,
+  horizon: HorizonProfile | null = null,
+): TargetSkyPath {
   const observer = new Observer(
     site.latitudeDegrees,
     site.longitudeDegrees,
@@ -72,6 +78,7 @@ export function skyPath(target: TargetPosition, site: Site, now: Date): TargetSk
       at: at.toISOString(),
       azimuthDegrees: targetHorizontal.azimuth,
       altitudeDegrees: targetHorizontal.altitude,
+      horizon: horizonStatus(horizon, targetHorizontal.azimuth, targetHorizontal.altitude),
       sunAltitudeDegrees: Horizon(at, observer, sun.ra, sun.dec).altitude,
       moon: {
         azimuthDegrees: moonHorizontal.azimuth,

@@ -142,6 +142,7 @@ export const reviewTarget: TargetView = {
       at: new Date(start + index * 900000).toISOString(),
       altitudeDegrees: 18 + 56 * Math.sin((index / 24) * Math.PI),
       azimuthDegrees: (180 + index * 7.5) % 360,
+      horizon: null,
       sunAltitudeDegrees: -22,
       moon: {
         altitudeDegrees: -20,

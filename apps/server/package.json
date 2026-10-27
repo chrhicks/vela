@@ -9,7 +9,8 @@
     "./alerts/thresholds": "./src/alerts/thresholds.ts",
     "./imaging/fits": "./src/imaging/fits.ts",
     "./imaging/read-retained-fits": "./src/imaging/read-retained-fits.ts",
-    "./imaging/statistics": "./src/imaging/statistics.ts"
+    "./imaging/statistics": "./src/imaging/statistics.ts",
+    "./targets/horizon": "./src/targets/horizon.ts"
   },
   "scripts": {
     "dev": "tsx watch src/server.ts",

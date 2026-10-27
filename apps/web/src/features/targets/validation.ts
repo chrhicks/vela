@@ -21,6 +21,8 @@ const horizontal = z.object({
   altitudeDegrees: z.number().min(-90).max(90),
 })
 
+const horizonStatus = z.enum(['clear', 'behind', 'unknown'])
+
 const moon = horizontal.extend({
   illuminationFraction: z.number().min(0).max(1),
   waxing: z.boolean(),
@@ -37,7 +39,16 @@ const sky = z
     currentAzimuthDegrees: z.number().min(0).lt(360),
     currentAltitudeDegrees: z.number(),
     highestAltitudeDegrees: z.number(),
-    samples: z.array(horizontal.extend({ at: date, moon, sunAltitudeDegrees: z.number() })).min(2),
+    samples: z
+      .array(
+        horizontal.extend({
+          at: date,
+          moon,
+          sunAltitudeDegrees: z.number(),
+          horizon: horizonStatus.nullable(),
+        }),
+      )
+      .min(2),
     aboveHorizonDuringDarkness: z.array(window),
   })
   .refine(value => {
@@ -99,6 +110,13 @@ const discovery = targets.extend({
           usefulMinutes: z.number().positive(),
           bestAltitudeDegrees: z.number(),
           currentAltitudeDegrees: z.number(),
+        })
+        .nullable(),
+      horizonInWindow: z
+        .object({
+          checkedMinutes: z.number().nonnegative(),
+          behindMinutes: z.number().nonnegative(),
+          unknownMinutes: z.number().nonnegative(),
         })
         .nullable(),
     }),

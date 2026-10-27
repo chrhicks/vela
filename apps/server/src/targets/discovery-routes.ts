@@ -7,13 +7,20 @@ import type { RigCatalogRecord } from '../rig/contracts.js'
 import { listTargets, normalizeCatalogName, type CatalogTarget } from './catalog/index.js'
 import { discoverTargets } from './discovery.js'
 import type { Site } from './sky.js'
+import { horizonInWindow, type HorizonProfile } from './horizon.js'
 
 interface DiscoveryBoundary {
   now: () => Date
   siteView: (
     rig: RigCatalogRecord,
   ) => Promise<{ site: Site | null; siteUnavailableReason: string | null }>
-  targetView: (target: CatalogTarget, site: Site | null, at: Date) => TargetView
+  horizonFor: (rig: RigCatalogRecord) => Promise<HorizonProfile | null>
+  targetView: (
+    target: CatalogTarget,
+    site: Site | null,
+    at: Date,
+    horizon: HorizonProfile | null,
+  ) => TargetView
 }
 
 const categories = [
@@ -48,11 +55,13 @@ export function registerTargetDiscovery(
 
   async function createSnapshot(rig: RigCatalogRecord) {
     const location = await boundary.siteView(rig)
+    const horizon = await boundary.horizonFor(rig)
     const at = boundary.now()
 
     return {
       rigId: rig.id,
       ...location,
+      horizon,
       at,
       calculation: discoverTargets({ targets: listTargets(), site: location.site, now: at }),
     }
@@ -66,7 +75,7 @@ export function registerTargetDiscovery(
     const calculation = discoverTargets({ targets: listTargets(), site: null, now: boundary.now() })
 
     const page = catalogPage(calculation, parsed.data, target =>
-      boundary.targetView(target, null, boundary.now()),
+      boundary.targetView(target, null, boundary.now(), null),
     )
 
     const view: TargetCatalogView = {
@@ -74,7 +83,9 @@ export function registerTargetDiscovery(
       category,
       filter,
       ...page,
-      targets: page.targets.map(({ sky: _sky, opportunity: _opportunity, ...target }) => target),
+      targets: page.targets.map(
+        ({ sky: _sky, opportunity: _opportunity, horizonInWindow: _horizon, ...target }) => target,
+      ),
     }
 
     return view
@@ -122,7 +133,7 @@ export function registerTargetDiscovery(
     }
 
     const page = catalogPage(snapshot.calculation, values, target =>
-      boundary.targetView(target, snapshot.site, snapshot.at),
+      boundary.targetView(target, snapshot.site, snapshot.at, snapshot.horizon),
     )
 
     const view: TargetDiscoveryView = {
@@ -183,12 +194,20 @@ function catalogPage(
     offset: pageOffset,
     pageSize,
     total: matches.length,
-    targets: matches.slice(pageOffset, pageOffset + pageSize).map(candidate => ({
-      ...targetView(candidate.target),
-      category: candidate.category,
-      filterChoice: candidate.filter,
-      filterReason: reasons[candidate.filterReason],
-      opportunity: candidate.opportunity,
-    })),
+    targets: matches.slice(pageOffset, pageOffset + pageSize).map(candidate => {
+      const view = targetView(candidate.target)
+
+      return {
+        ...view,
+        category: candidate.category,
+        filterChoice: candidate.filter,
+        filterReason: reasons[candidate.filterReason],
+        opportunity: candidate.opportunity,
+        horizonInWindow:
+          view.sky && candidate.opportunity
+            ? horizonInWindow(view.sky.samples, candidate.opportunity)
+            : null,
+      }
+    }),
   }
 }

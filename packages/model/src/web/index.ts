@@ -76,6 +76,8 @@ export type {
   TargetPosition,
   TargetView,
   TargetSkyPath,
+  HorizonStatus,
+  HorizonWindow,
   TargetsView,
   FramingView,
   FramingPreview,

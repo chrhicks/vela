@@ -16,6 +16,7 @@ import {
   type CatalogTarget,
 } from './catalog/index.js'
 import { skyPath, type Site } from './sky.js'
+import { createHorizonStore, type HorizonProfile, type HorizonStore } from './horizon.js'
 import { registerTargetDiscovery } from './discovery-routes.js'
 import { haltBodyError, registerHaltRoutes } from '../http/halt-body.js'
 import type { FrameImaging } from '../imaging/frame-imaging.js'
@@ -27,6 +28,8 @@ export interface TargetOptions {
   createHardware?: (rig: RigCatalogRecord, telescopeId: string) => FramingHardware
   createSolver?: (fieldHeightDegrees: number) => PlateSolver
   createInspector: RigDetailOptions['createInspector']
+  /** Where the approximate backyard horizon profiles live; absent means no rig has one. */
+  horizonDirectory?: string
   now?: () => Date
   images?: Pick<FrameImaging, 'render' | 'analyze'>
   waitForMountObservation?: (signal: AbortSignal) => Promise<void>
@@ -39,6 +42,7 @@ export function registerTargets(
   options: TargetOptions,
 ) {
   const now = options.now ?? (() => new Date())
+  const horizons: HorizonStore | null = options.horizonDirectory ? createHorizonStore(options.horizonDirectory) : null
   const controllers = new Map<string, ReturnType<typeof createFramingController>>()
   const adapters = new Map<string, Framing>()
 
@@ -205,7 +209,12 @@ export function registerTargets(
     }
   }
 
-  function targetView(target: CatalogTarget, site: Site | null, at = now()): TargetView {
+  function targetView(
+    target: CatalogTarget,
+    site: Site | null,
+    at = now(),
+    horizon: HorizonProfile | null = null,
+  ): TargetView {
     const fov = Math.max(0.5, Math.min(5, ((target.majorAxisArcminutes ?? 45) / 60) * 1.8))
 
     return {
@@ -219,11 +228,13 @@ export function registerTargets(
       sizeArcminutes: target.majorAxisArcminutes,
       minorSizeArcminutes: target.minorAxisArcminutes,
       thumbnailUrl: `/api/survey/thumbnail?ra=${target.raDegrees}&dec=${target.decDegrees}&fov=${fov}`,
-      sky: site ? skyPath(target, site, at) : null,
+      sky: site ? skyPath(target, site, at, horizon) : null,
     }
   }
 
-  registerTargetDiscovery(app, catalog, { now, siteView, targetView })
+  const horizonFor = async (rig: RigCatalogRecord) => (await horizons?.forRig(rig.id)) ?? null
+
+  registerTargetDiscovery(app, catalog, { now, siteView, horizonFor, targetView })
 
   app.get<{ Params: { rigId: string }; Querystring: { q?: string; offset?: string } }>(
     '/api/web/rigs/:rigId/targets',
@@ -266,6 +277,7 @@ export function registerTargets(
           ].flatMap(id => getTarget(id) ?? [])
 
       const location = await siteView(rig)
+      const horizon = await horizonFor(rig)
 
       const view: TargetsView = {
         rigId: rig.id,
@@ -273,7 +285,7 @@ export function registerTargets(
         total: matches.length,
         targets: matches
           .slice(offset, offset + 24)
-          .map(target => targetView(target, location.site)),
+          .map(target => targetView(target, location.site, now(), horizon)),
         ...location,
       }
 
@@ -288,7 +300,7 @@ export function registerTargets(
 
       if (!rig || !target) return reply.code(404).send({ error: 'Target or rig not found' })
 
-      return targetView(target, (await siteView(rig)).site)
+      return targetView(target, (await siteView(rig)).site, now(), await horizonFor(rig))
     },
   )
   app.get<{ Params: { rigId: string } }>('/api/web/rigs/:rigId/framing', async (request, reply) => {

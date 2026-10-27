@@ -44,15 +44,15 @@ const opportunity = {
 
 export const exploreTargets: TargetDiscoveryItem[] = [
   { ...reviewTarget, thumbnailUrl: '/api/review/images/crescent', category: 'emission',
-    filterChoice: 'dual-band', filterReason: 'The L-Ultimate isolates Hα and O III emission. Filter advice does not detect an installed filter.', opportunity },
+    filterChoice: 'dual-band', filterReason: 'The L-Ultimate isolates Hα and O III emission. Filter advice does not detect an installed filter.', opportunity, horizonInWindow: null },
   { ...reviewTarget, id: 'ngc0224', name: 'Andromeda Galaxy', catalog: 'M31 · NGC 224',
     constellation: 'Andromeda', kind: 'Galaxy', raDegrees: 10.68479167, decDegrees: 41.26905556,
     sizeArcminutes: 177.8, minorSizeArcminutes: 69.7, thumbnailUrl: '/api/review/images/andromeda',
-    category: 'galaxy', filterChoice: 'broadband', filterReason: 'Broadband preserves the galaxy’s starlight. Filter advice does not detect an installed filter.', opportunity },
+    category: 'galaxy', filterChoice: 'broadband', filterReason: 'Broadband preserves the galaxy’s starlight. Filter advice does not detect an installed filter.', opportunity, horizonInWindow: null },
   { ...reviewTarget, id: 'ngc6205', name: 'Great Hercules Cluster', catalog: 'M13 · NGC 6205',
     constellation: 'Hercules', kind: 'Globular cluster', raDegrees: 250.42345833, decDegrees: 36.46130556,
     sizeArcminutes: 16.6, minorSizeArcminutes: null, thumbnailUrl: '/api/review/images/m13',
-    category: 'cluster', filterChoice: 'broadband', filterReason: 'Broadband preserves the cluster’s starlight. Filter advice does not detect an installed filter.', opportunity },
+    category: 'cluster', filterChoice: 'broadband', filterReason: 'Broadband preserves the cluster’s starlight. Filter advice does not detect an installed filter.', opportunity, horizonInWindow: null },
 ]
 
 export const reviewFraming: FramingView = {
@@ -232,7 +232,7 @@ export function createExploreScene(name: ExploreScene) {
 
         if (pathname === '/api/web/target-catalog') {
           const catalog: TargetCatalogView = { ...common,
-            targets: common.targets.map(({ sky: _sky, opportunity: _opportunity, ...target }) => target) }
+            targets: common.targets.map(({ sky: _sky, opportunity: _opportunity, horizonInWindow: _horizon, ...target }) => target) }
 
           return json(catalog)
         }
@@ -244,7 +244,7 @@ export function createExploreScene(name: ExploreScene) {
           status: noSite ? 'site-unavailable' : name === 'explore-no-darkness' ? 'no-darkness' : 'available',
           night: noSite || name === 'explore-no-darkness' ? null : { startsAt: '2026-09-29T23:00:00.000Z', endsAt: '2026-09-30T05:00:00.000Z', kind: 'current-night' },
           site: noSite ? null : { latitudeDegrees: 40, longitudeDegrees: -75 }, siteUnavailableReason: noSite ? 'Mount location is unavailable.' : null,
-          targets: common.targets.map(target => noSite ? { ...target, sky: null, opportunity: null } : target) }
+          targets: common.targets.map(target => noSite ? { ...target, sky: null, opportunity: null, horizonInWindow: null } : target) }
 
         return json(discovery)
       }

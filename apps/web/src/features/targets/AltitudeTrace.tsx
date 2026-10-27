@@ -1,7 +1,8 @@
 import type { TargetSkyPath } from '@vela/model/web'
+import { horizonNote, horizonRuns } from './horizon'
 import { skyTime } from './sky-time'
 
-/** Time/altitude projection of the server's samples; no assumed local obstructions. */
+/** Time/altitude projection of the server's samples, marked where the rig's approximate horizon profile hides or does not cover the target. */
 export function AltitudeTrace({
   sky,
   stale,
@@ -39,13 +40,21 @@ export function AltitudeTrace({
 
   if (inSpan) past.push(`${nowX},${nowY}`)
 
+  const marked = (status: 'behind' | 'unknown') =>
+    horizonRuns(sky, status).map(({ from, to }) =>
+      sky.samples
+        .slice(from, to + 2)
+        .map((sample) => `${x(sample.at)},${y(sample.altitudeDegrees)}`)
+        .join(' '),
+    )
+
   return (
     <svg
       className="tonight-sky__trace"
       data-variant={variant}
       viewBox={`0 0 ${plot.width} ${plot.height}`}
       role="img"
-      aria-label={`Altitude from ${skyTime(sky.startsAt)} to ${skyTime(sky.endsAt)}. ${stale ? 'Last calculated' : 'Calculated'} altitude ${Math.round(sky.currentAltitudeDegrees)} degrees.`}
+      aria-label={`Altitude from ${skyTime(sky.startsAt)} to ${skyTime(sky.endsAt)}. ${stale ? 'Last calculated' : 'Calculated'} altitude ${Math.round(sky.currentAltitudeDegrees)} degrees.${horizonNote(sky).map((line) => ` ${line}`).join('')}`}
     >
       <path d={`M${plot.left} ${plot.baseline}H${plot.right}`} className="tonight-sky__axis" />
       {explore && (
@@ -69,6 +78,12 @@ export function AltitudeTrace({
       )}
       <polyline points={points.join(' ')} className="tonight-sky__future" />
       <polyline points={past.join(' ')} className="tonight-sky__past" />
+      {marked('unknown').map((points) => (
+        <polyline key={points} points={points} className="tonight-sky__unknown" />
+      ))}
+      {marked('behind').map((points) => (
+        <polyline key={points} points={points} className="tonight-sky__behind" />
+      ))}
       {inSpan && (
         <>
           <path

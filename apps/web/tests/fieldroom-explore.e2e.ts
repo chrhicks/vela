@@ -275,6 +275,45 @@ test('a refreshed subject below the horizon is not described as above it', async
   expect(scene.commands).toEqual([])
 })
 
+test('a subject behind the approximate horizon profile is warned, an untraced stretch stays unknown, and nothing is blocked', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  const { scene } = await openExploreScene(page, 'explore-light')
+  await expect(page.locator('.vela-discovery__horizon')).toHaveCount(0)
+  await expect(page.locator('polyline.tonight-sky__behind, polyline.tonight-sky__unknown')).toHaveCount(0)
+  await expect(page.getByText('Sky estimates don’t include local obstructions or weather.')).toBeVisible()
+  await page.route('**/api/web/rigs/fra400/target-discovery?*', route => {
+    const url = new URL(route.request().url())
+    const view = structuredClone(scene.respond('GET', `${url.pathname}${url.search}`).json)
+
+    if (!isTargetDiscovery(view, 'fra400')) throw new Error('Invalid discovery fixture')
+    const first = view.targets[0]!
+
+    first.sky!.samples = first.sky!.samples.map((sample, index) => ({
+      ...sample,
+      altitudeDegrees: 40,
+      sunAltitudeDegrees: -25,
+      horizon: index < 6 ? 'clear' : index < 10 ? 'behind' : index < 14 ? 'unknown' : 'clear',
+    }))
+
+    first.horizonInWindow = { checkedMinutes: 180, behindMinutes: 90, unknownMinutes: 30 }
+
+    return route.fulfill({ json: view })
+  })
+  await page.getByRole('button', { name: 'Update sky' }).click()
+
+  const warnings = page.locator('.vela-discovery__card').first().locator('.vela-discovery__horizon')
+  await expect(warnings).toHaveText(['May be behind trees for 1 h 30 min', 'Horizon untraced for 30 min'])
+  await expect(page.locator('.vela-discovery__subject .vela-discovery__horizon')).toHaveText([
+    /^May be behind trees \d\d:\d\d–\d\d:\d\d\.$/,
+    /^Horizon untraced \d\d:\d\d–\d\d:\d\d\.$/,
+  ])
+  await expect(page.locator('.vela-discovery__subject polyline.tonight-sky__behind')).toHaveCount(1)
+  await expect(page.locator('.vela-discovery__subject polyline.tonight-sky__unknown')).toHaveCount(1)
+  await expect(page.getByText(/blocked/i)).toHaveCount(0)
+  await expect(page.locator('.vela-discovery__card').first().getByRole('button')).toBeEnabled()
+  expect(scene.commands).toEqual([])
+})
+
 for (const width of [1280, 390]) {
   test(`empty framing instructions fit their preview at ${width}`, async ({ page }) => {
     await page.setViewportSize({ width, height: 800 })
