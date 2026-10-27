@@ -68,12 +68,14 @@ export function MountControls({ rigId, device, stale, refresh }: {
       const result = await sendMountCommand(rigId, device.id, action, requestId, serverInstanceId)
 
       if (!mounted.current) return
+      setStopResult(null)
       setLocal(result.command && { ...result.command, serverInstanceId })
       await refresh()
     } catch (error) {
       if (!mounted.current) return
       const rejected = error instanceof ApiError && [400, 404, 409].includes(error.status)
 
+      setStopResult(null)
       setLocal({
         requestId,
         serverInstanceId,
@@ -171,9 +173,10 @@ export function MountControls({ rigId, device, stale, refresh }: {
   const stopMessage = stopResult?.outcome === 'confirmed' ? 'Stopped. The mount confirmed it is still.' : stopResult?.message
 
   const message = stopping ? 'Stopping…'
-    : homing ? 'Homing… Stop ends it.'
-      : pending ? 'Waiting for the mount to confirm the change…'
-        : stopMessage || checkMessage || outcome || reason || 'Tracking follows the sky. It does not slew to your selected subject.'
+    : stopMessage ? stopMessage
+      : homing ? 'Homing… Stop ends it.'
+        : pending ? 'Waiting for the mount to confirm the change…'
+          : checkMessage || outcome || reason || 'Tracking follows the sky. It does not slew to your selected subject.'
 
   return (
     <div className="rig-controls__mount" aria-label="Mount controls">
