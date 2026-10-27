@@ -19,7 +19,9 @@ const lan = 'http://polaris.test'
 // Backstop for the LAN-origin test: the reserved name resolves only to loopback, so nothing leaves this machine.
 test.use({ launchOptions: { args: ['--host-resolver-rules=MAP polaris.test 127.0.0.1'] } })
 
-const available: MountControlView = { serverInstanceId, unpark: off, trackingOn: on, trackingOff: off, command: null }
+const available: MountControlView = {
+  serverInstanceId, unpark: off, trackingOn: on, trackingOff: off, home: on, stop: on, homeConfirmedAt: null, command: null,
+}
 
 type Command = NonNullable<MountControlView['command']>
 
@@ -41,11 +43,13 @@ async function mountScene(page: Page, mode: 'light' | 'dark' = 'light') {
   const scene = createEquipmentScene(mode === 'dark' ? 'equipment-dark' : 'equipment-connected')
   const writes: Write[] = []
   const checks: Write[] = []
+  const stops: { deviceId: string }[] = []
   let admission: 'known' | 'not-admitted' | 'unknown' = 'known'
 
   let handleCheck = () => {}
 
   let handleWrite: (route: Route, body: Write) => Promise<void> = route => route.fulfill({ status: 500 })
+  let handleStop: (route: Route) => Promise<void> = route => route.fulfill({ json: { outcome: 'confirmed', message: null } })
   let holdDetail: Promise<void> | null = null
 
   function setMount(tracking: 'on' | 'off' | 'unknown', parking: 'parked' | 'unparked' | 'unknown', view: MountControlView = available, interrupted = false) {
@@ -74,6 +78,13 @@ async function mountScene(page: Page, mode: 'light' | 'dark' = 'light') {
       return
     }
 
+    if (request.method() === 'POST' && pathname === `${mountPath}/stop`) {
+      stops.push(request.postDataJSON())
+      await handleStop(route)
+
+      return
+    }
+
     if (request.method() === 'POST' && pathname === `${mountPath}/check`) {
       checks.push(request.postDataJSON())
       handleCheck()
@@ -94,7 +105,8 @@ async function mountScene(page: Page, mode: 'light' | 'dark' = 'light') {
   await routeQuietAlerts(page)
 
   return {
-    scene, writes, checks, setMount,
+    scene, writes, checks, stops, setMount,
+    handleStop(handler: typeof handleStop) { handleStop = handler },
     setAdmission(value: typeof admission) { admission = value },
     handleCheck(handler: () => void) { handleCheck = handler },
     handleWrite(handler: typeof handleWrite) { handleWrite = handler },
@@ -157,6 +169,116 @@ test('unpark is a separate command and displays the freshly observed tracking co
   expect(fixture.scene.unknownRequests).toEqual([])
 })
 
+test.describe('home and stop', () => {
+  test.use({ timezoneId: 'UTC' })
+
+  test('Home asks once and nothing more, and Cancel sends nothing', async ({ page }) => {
+    const fixture = await mountScene(page)
+    await fixture.open()
+    await mount(page).getByRole('button', { name: 'Home', exact: true }).click()
+    await expect(page.getByRole('dialog', { name: 'Are you sure?' })).toBeVisible()
+    await expect(page.getByRole('dialog', { name: 'Are you sure?' }).getByText(/\w/).filter({ hasNotText: /Are you sure\?|Cancel|Home the mount/ })).toHaveCount(0)
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+    await expect(page.getByRole('dialog', { name: 'Are you sure?' })).toHaveCount(0)
+    expect(fixture.writes).toEqual([])
+    expect(fixture.scene.unknownRequests).toEqual([])
+  })
+
+  test('Home shows Homing… while Cria runs it, then when it was confirmed', async ({ page }) => {
+    const fixture = await mountScene(page)
+    const finish = deferred()
+    const homeConfirmedAt = '2026-10-27T03:14:20.000Z'
+
+    fixture.handleWrite(async (route, body) => {
+      fixture.setMount('off', 'unparked', { ...available, command: { ...body, state: 'pending', message: null } })
+      await finish.promise
+      const command: Command = { ...body, state: 'confirmed', message: null }
+      fixture.setMount('off', 'unparked', { ...available, homeConfirmedAt, command })
+      await route.fulfill({ json: { ...available, homeConfirmedAt, command } })
+    })
+    await fixture.open()
+    await mount(page).getByRole('button', { name: 'Home', exact: true }).click()
+    await page.getByRole('button', { name: 'Home the mount', exact: true }).click()
+    await expect(mount(page).getByRole('button', { name: 'Homing…', exact: true })).toBeDisabled()
+    await expect(mount(page).getByRole('status')).toHaveText('Homing… Stop ends it.')
+    await expect(mount(page).getByText(/Home confirmed at/)).toHaveCount(0)
+    expect(fixture.writes).toEqual([{ serverInstanceId, deviceId, action: 'home', requestId: expect.stringMatching(/^[0-9a-f-]{36}$/) }])
+    finish.resolve()
+    await expect(mount(page).getByText('Home confirmed at 03:14', { exact: true })).toBeVisible()
+    await expect(mount(page).getByRole('button', { name: 'Home', exact: true })).toBeEnabled()
+    expect(fixture.writes).toHaveLength(1)
+    expect(fixture.scene.unknownRequests).toEqual([])
+  })
+
+  test('Stop stays enabled and reaches the mount while Home is pending, and the stopped home is not confirmed', async ({ page }) => {
+    const fixture = await mountScene(page)
+    const sent = deferred()
+    let home: { route: Route; body: Write } | undefined
+
+    fixture.handleWrite(async (route, body) => {
+      fixture.setMount('off', 'unparked', { ...available, unpark: off, trackingOn: off, home: off, command: { ...body, state: 'pending', message: null } })
+      home = { route, body }
+      sent.resolve()
+    })
+    await fixture.open()
+    await mount(page).getByRole('button', { name: 'Home', exact: true }).click()
+    await page.getByRole('button', { name: 'Home the mount', exact: true }).click()
+    await sent.promise
+    await expect(mount(page).getByRole('button', { name: 'Homing…', exact: true })).toBeDisabled()
+    await expect(mount(page).getByRole('button', { name: 'Turn tracking on', exact: true })).toBeDisabled()
+    await expect(mount(page).getByRole('button', { name: 'Stop', exact: true })).toBeEnabled()
+    await mount(page).getByRole('button', { name: 'Stop', exact: true }).click()
+    await expect(mount(page).getByRole('status')).toHaveText('Stopped. The mount confirmed it is still.')
+    expect(fixture.stops).toEqual([{ deviceId }])
+
+    const command: Command = { ...home!.body, state: 'failed', message: 'Homing was stopped.' }
+    fixture.setMount('off', 'unparked', { ...available, command })
+    await home!.route.fulfill({ json: { ...available, command } })
+    await expect(mount(page).getByRole('status')).toHaveText('Homing was stopped.')
+    await expect(mount(page).getByRole('button', { name: 'Home', exact: true })).toBeEnabled()
+    await expect(mount(page).getByText(/Home confirmed at/)).toHaveCount(0)
+    expect(fixture.writes).toHaveLength(1)
+    expect(fixture.scene.unknownRequests).toEqual([])
+  })
+
+  test('Stop is offered while the rest is disabled, says why when the mount is still, and can be pressed again after an unconfirmed stop', async ({ page }) => {
+    const fixture = await mountScene(page)
+    const busy = { enabled: false, reason: 'Wait for the active rig operation to finish.' }
+    let answers = 0
+
+    fixture.setMount('on', 'unparked', { ...available, unpark: busy, trackingOn: busy, trackingOff: busy, home: busy })
+    fixture.handleStop(async route => {
+      answers++
+      await route.fulfill({ json: answers === 1
+        ? { outcome: 'uncertain', message: 'Cria did not confirm the mount stopped. Check it before moving it.' }
+        : { outcome: 'confirmed', message: null } })
+    })
+    await fixture.open()
+    await expect(mount(page).getByRole('button', { name: 'Home', exact: true })).toBeDisabled()
+    await expect(mount(page).getByRole('button', { name: 'Turn tracking off', exact: true })).toBeDisabled()
+    await expect(mount(page).getByRole('button', { name: 'Stop', exact: true })).toBeEnabled()
+    await mount(page).getByRole('button', { name: 'Stop', exact: true }).click()
+    await expect(mount(page).getByRole('status')).toHaveText('Cria did not confirm the mount stopped. Check it before moving it.')
+    await expect(mount(page).getByRole('button', { name: 'Stop', exact: true })).toBeEnabled()
+    await mount(page).getByRole('button', { name: 'Stop', exact: true }).click()
+    await expect(mount(page).getByRole('status')).toHaveText('Stopped. The mount confirmed it is still.')
+    expect(fixture.stops).toHaveLength(2)
+    expect(fixture.writes).toEqual([])
+
+  })
+
+  test('Stop is disabled with its reason when the mount is known to be still', async ({ page }) => {
+    const fixture = await mountScene(page)
+
+    fixture.setMount('off', 'unparked', { ...available, stop: { enabled: false, reason: 'The mount is not moving.' } })
+    await fixture.open()
+    await expect(mount(page).getByRole('button', { name: 'Stop', exact: true })).toBeDisabled()
+    await expect(mount(page).getByText('Stop is off. The mount is not moving.', { exact: true })).toBeVisible()
+    expect(fixture.stops).toEqual([])
+    expect(fixture.scene.unknownRequests).toEqual([])
+  })
+})
+
 test('a delayed pre-command refresh cannot replace the confirmed post-command observation', async ({ page }) => {
   const fixture = await mountScene(page)
   const oldRead = deferred()
@@ -200,7 +322,7 @@ test('a delayed pre-command refresh cannot replace the confirmed post-command ob
 
 test('unknown or interrupted mount observations prevent physical commands', async ({ page }) => {
   const fixture = await mountScene(page)
-  fixture.setMount('unknown', 'unknown', { ...available, unpark: off, trackingOn: off, trackingOff: off, command: null })
+  fixture.setMount('unknown', 'unknown', { ...available, unpark: off, trackingOn: off, trackingOff: off, home: off, command: null })
   await fixture.open()
   await expect(mount(page).getByText('Tracking unknown · Parking unknown', { exact: true })).toBeVisible()
   await expect(mount(page).getByRole('button', { name: 'Unpark mount', exact: true })).toBeDisabled()
