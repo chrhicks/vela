@@ -7,6 +7,8 @@ import { createRigOperations } from './operations.js'
 import { registerMountControls } from './mount-control.js'
 import { loadRigDetailView } from './detail.js'
 
+const homeConfirmedAt = '2026-10-27T03:14:00.000Z'
+
 function fixture() {
   const rig = {
     id: 'rig',
@@ -20,7 +22,7 @@ function fixture() {
   }
 
   let observation: MountControlObservation | undefined = {
-    parked: false, tracking: false, slewing: false, canSetTracking: true, canUnpark: true,
+    parked: false, tracking: false, slewing: false, canSetTracking: true, canUnpark: true, canFindHome: true,
   }
 
   let inspection: EquipmentInspection = {
@@ -37,10 +39,13 @@ function fixture() {
   const inspectDevices = vi.fn(async () => [inspection])
   const createInspector = () => ({ inspectDevices })
 
+  let canStop = true
+
   const execute = vi.fn<MountControl['execute']>(async command => {
-    observation = command.kind === 'unpark'
-      ? { ...observation, parked: false }
-      : { ...observation, tracking: command.tracking }
+    if (command.kind === 'stop') return { outcome: 'confirmed', observation: { slewing: false } }
+
+    if (command.kind === 'home') observation = { ...observation, homeConfirmedAt: homeConfirmedAt, slewing: false }
+    else observation = command.kind === 'unpark' ? { ...observation, parked: false } : { ...observation, tracking: command.tracking }
 
     return { outcome: 'confirmed', observation }
   })
@@ -49,7 +54,7 @@ function fixture() {
 
   const controls = registerMountControls(app, catalog, operations, {
     createInspector,
-    createMountControl: () => ({ observe: async () => observation, execute }),
+    createMountControl: () => ({ canStop, observe: async () => observation, execute }),
   })
 
   async function deviceView() {
@@ -64,12 +69,16 @@ function fixture() {
     return mount
   }
 
+  const stop = (deviceId = 'rig-mount') => app.inject({ method: 'POST', url: '/api/rigs/rig/mount/stop', payload: { deviceId } })
+
   const post = (action = 'tracking-on', deviceId = 'rig-mount', requestId = randomUUID()) => app.inject({
     method: 'POST', url: '/api/rigs/rig/mount', payload: { action, deviceId, requestId, serverInstanceId: controls.serverInstanceId },
   })
 
   return {
-    app, serverInstanceId: controls.serverInstanceId, inspectDevices, deviceView, view: async () => (await deviceView()).mountControl!, execute, post, operations,
+    app, serverInstanceId: controls.serverInstanceId, inspectDevices, deviceView, view: async () => (await deviceView()).mountControl!, execute, post, stop, operations,
+    setCanStop(value: boolean) { canStop = value },
+    disconnect() { inspection = { ...inspection, connection: 'disconnected' } },
     rename(value: string) { inspection = { ...inspection, name: value } },
     setObservation(value: MountControlObservation | undefined) { observation = value },
     interrupt() { inspection = { ...inspection, observation: { state: 'interrupted', commandReady: false } } },
@@ -215,3 +224,199 @@ describe('explicit mount controls', () => {
     } finally { await f.app.close() }
   })
 })
+
+describe('home', () => {
+  it('is offered on an idle unparked mount that can find home, with the reason when it is not', async () => {
+    const f = fixture()
+
+    try {
+      expect(await f.view()).toMatchObject({ home: { enabled: true }, homeConfirmedAt: null })
+      f.setObservation({ parked: true, tracking: false, slewing: false, canSetTracking: true, canUnpark: true, canFindHome: true })
+      expect((await f.view()).home).toEqual({ enabled: false, reason: 'Unpark the mount before homing.' })
+      f.setObservation({ parked: false, tracking: false, slewing: false, canSetTracking: true, canUnpark: true })
+      expect((await f.view()).home).toEqual({ enabled: false, reason: 'This mount does not report home support.' })
+      f.setObservation({ parked: false, tracking: true, slewing: true, canFindHome: true })
+      expect((await f.view()).home).toEqual({ enabled: false, reason: 'Wait for the mount to stop slewing.' })
+      expect((await f.post('home')).statusCode).toBe(409)
+      expect(f.execute).not.toHaveBeenCalled()
+    } finally { await f.app.close() }
+  })
+
+  it('is disabled with the reason while another feature holds the rig', async () => {
+    const f = fixture()
+    f.operations.acquire('rig', 'capture')
+
+    try {
+      expect((await f.view()).home.enabled).toBe(false)
+      expect((await f.post('home')).statusCode).toBe(409)
+      expect(f.execute).not.toHaveBeenCalled()
+    } finally { await f.app.close() }
+  })
+
+  it('sends one home, shows it pending to every browser, then reports when it was confirmed', async () => {
+    const f = fixture()
+    let finish!: (value: MountControlCommandResult) => void
+    f.execute.mockImplementation(() => new Promise(resolve => { finish = resolve }))
+
+    try {
+      const pending = f.post('home')
+      await vi.waitFor(() => expect(f.execute).toHaveBeenCalledOnce())
+      expect(f.execute).toHaveBeenCalledWith({ telescopeId: 'mount', expectedTelescopeName: 'Actual mount', kind: 'home' })
+      expect(await f.view()).toMatchObject({ command: { action: 'home', state: 'pending' }, home: { enabled: false } })
+      finish({ outcome: 'confirmed', observation: { parked: false, tracking: false, slewing: false, canFindHome: true, homeConfirmedAt } })
+      expect((await pending).json()).toMatchObject({ command: { action: 'home', state: 'confirmed', message: null }, homeConfirmedAt })
+      expect(f.operations.owner('rig')).toBeUndefined()
+    } finally { await f.app.close() }
+  })
+
+  it('keeps showing the confirmed home from the next fresh reading, and not once the adapter forgets it', async () => {
+    const f = fixture()
+
+    try {
+      await f.post('home')
+      expect(await f.view()).toMatchObject({ homeConfirmedAt })
+      f.setObservation({ parked: false, tracking: false, slewing: false, canFindHome: true })
+      expect((await f.view()).homeConfirmedAt).toBeNull()
+    } finally { await f.app.close() }
+  })
+
+  it('reports a home a Stop ended as failed, releases the rig and holds nothing', async () => {
+    const f = fixture()
+    let finish!: (value: MountControlCommandResult) => void
+    f.execute.mockImplementation(command => command.kind === 'stop'
+      ? Promise.resolve({ outcome: 'confirmed', observation: { slewing: false } })
+      : new Promise(resolve => { finish = resolve }))
+
+    try {
+      const home = f.post('home')
+      await vi.waitFor(() => expect(f.execute).toHaveBeenCalledOnce())
+      expect((await f.stop()).json()).toEqual({ outcome: 'confirmed', message: null })
+      finish({ outcome: 'failed', reason: 'stopped', message: 'Homing was stopped.' })
+      expect((await home).json()).toMatchObject({ command: { action: 'home', state: 'failed', message: 'Homing was stopped.' } })
+      expect(f.operations.owner('rig')).toBeUndefined()
+      expect((await f.view()).home.enabled).toBe(true)
+    } finally { await f.app.close() }
+  })
+
+  it('never calls an unknown home confirmed: an idle mount after it resolves to failed, without replay', async () => {
+    const f = fixture()
+    f.execute.mockResolvedValue({ outcome: 'uncertain', reason: 'write-outcome-unknown', message: 'Cria lost the home' })
+
+    try {
+      expect((await f.post('home')).json()).toMatchObject({ command: { action: 'home', state: 'uncertain' } })
+      f.setObservation({ parked: false, tracking: false, slewing: true, canFindHome: true })
+      expect(await f.view()).toMatchObject({ command: { state: 'uncertain' } })
+      f.setObservation({ parked: false, tracking: false, slewing: false, canFindHome: true })
+
+      expect(await f.view()).toMatchObject({
+        command: { action: 'home', state: 'failed', message: expect.stringContaining('Home is not confirmed') },
+        homeConfirmedAt: null,
+        home: { enabled: true },
+      })
+      expect(f.execute).toHaveBeenCalledOnce()
+    } finally { await f.app.close() }
+  })
+})
+
+describe('stop', () => {
+  it('sends one stop to the mount, with no request ID and no rig operation', async () => {
+    const f = fixture()
+
+    try {
+      expect((await f.stop()).json()).toEqual({ outcome: 'confirmed', message: null })
+      expect(f.execute).toHaveBeenCalledExactlyOnceWith({ kind: 'stop', telescopeId: 'mount', expectedTelescopeName: 'Mount slot' })
+      expect(f.operations.owner('rig')).toBeUndefined()
+      expect((await f.view()).command).toBeNull()
+    } finally { await f.app.close() }
+  })
+
+  it('is offered whenever the mount could be moving, and says why when it is known to be still', async () => {
+    const f = fixture()
+
+    try {
+      expect((await f.view()).stop).toEqual({ enabled: false, reason: 'The mount is not moving.' })
+      f.setObservation({ parked: false, tracking: true, slewing: false })
+      expect((await f.view()).stop.enabled).toBe(true)
+      f.setObservation({ parked: false, tracking: false, slewing: true })
+      expect((await f.view()).stop.enabled).toBe(true)
+      f.setObservation({ parked: false, tracking: false })
+      expect((await f.view()).stop.enabled).toBe(true)
+      f.setObservation(undefined)
+      expect((await f.view()).stop.enabled).toBe(true)
+      f.setObservation({ parked: true, tracking: false, slewing: false })
+      expect((await f.view()).stop).toEqual({ enabled: false, reason: 'The mount is parked.' })
+    } finally { await f.app.close() }
+  })
+
+  it('is disabled for a mount that is not connected or that Vela cannot stop', async () => {
+    const f = fixture()
+
+    try {
+      f.setObservation({ parked: false, tracking: true, slewing: true })
+      f.setCanStop(false)
+      expect((await f.view()).stop.enabled).toBe(false)
+      expect((await f.stop()).statusCode).toBe(409)
+      f.setCanStop(true)
+      f.disconnect()
+      expect((await f.view()).stop).toEqual({ enabled: false, reason: 'Connect the mount before stopping it.' })
+      expect(f.execute).not.toHaveBeenCalled()
+    } finally { await f.app.close() }
+  })
+
+  it('is not blocked by a pending command of the panel, an uncertain one or another feature holding the rig', async () => {
+    const f = fixture()
+    f.execute.mockImplementation(command => command.kind === 'stop'
+      ? Promise.resolve({ outcome: 'confirmed', observation: { slewing: false } })
+      : new Promise(() => {}))
+
+    try {
+      void f.post('tracking-on')
+      await vi.waitFor(() => expect(f.execute).toHaveBeenCalledOnce())
+      expect((await f.view()).stop.enabled).toBe(true)
+      expect((await f.stop()).json()).toEqual({ outcome: 'confirmed', message: null })
+      expect(f.operations.owner('rig')).toBe('mount-control')
+    } finally { await f.app.close() }
+
+    const held = fixture()
+    held.operations.acquire('rig', 'alignment')
+
+    try {
+      expect((await held.stop()).json()).toEqual({ outcome: 'confirmed', message: null })
+      expect(held.execute).toHaveBeenCalledOnce()
+    } finally { await held.app.close() }
+  })
+
+  it('does not need the server instance, so a restarted Vela can still stop the mount', async () => {
+    const f = fixture()
+
+    try {
+      expect((await f.app.inject({ method: 'POST', url: '/api/rigs/rig/mount/stop', payload: { deviceId: 'rig-mount', serverInstanceId: randomUUID() } })).statusCode).toBe(400)
+      expect((await f.stop()).statusCode).toBe(200)
+    } finally { await f.app.close() }
+  })
+
+  it('refuses a request for a mount the rig does not have', async () => {
+    const f = fixture()
+
+    try {
+      expect((await f.stop('mount')).statusCode).toBe(404)
+      expect((await f.app.inject({ method: 'POST', url: '/api/rigs/missing/mount/stop', payload: { deviceId: 'rig-mount' } })).statusCode).toBe(404)
+      expect((await f.app.inject({ method: 'POST', url: '/api/rigs/rig/mount/stop', payload: {} })).statusCode).toBe(400)
+      expect(f.execute).not.toHaveBeenCalled()
+    } finally { await f.app.close() }
+  })
+
+  it('reports what Cria did not confirm, never a confirmed stop', async () => {
+    const f = fixture()
+
+    try {
+      f.execute.mockResolvedValueOnce({ outcome: 'uncertain', reason: 'write-outcome-unknown', message: 'Cria did not answer mount-stop within 20 seconds' })
+      expect((await f.stop()).json()).toEqual({ outcome: 'uncertain', message: 'Cria did not answer mount-stop within 20 seconds' })
+      f.execute.mockResolvedValueOnce({ outcome: 'failed', reason: 'rejected' })
+      expect((await f.stop()).json()).toMatchObject({ outcome: 'failed', message: expect.stringContaining('did not confirm') })
+      f.execute.mockRejectedValueOnce(new Error('boom'))
+      expect((await f.stop()).json()).toMatchObject({ outcome: 'uncertain' })
+    } finally { await f.app.close() }
+  })
+})
+
