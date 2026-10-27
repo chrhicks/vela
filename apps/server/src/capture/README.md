@@ -216,8 +216,8 @@ startup is a run that did not end: after a deploy (SIGTERM) or a crash alike.
   anything until Chris starts or resumes a run. Starting any new run replaces the record. There
   is no dismiss: the interrupted view stays, across further restarts, until a run starts.
 - **Resume.** `POST /api/rigs/:rigId/capture/resume` takes no input (the halt rule above) and starts a
-  new run with the same exposure, repeat, `saveFrames`, frame type and subject snapshot. It starts attended,
-  like every new run; Chris switches Unattended on again if he wants it. A run
+  new run with the same exposure, repeat, `saveFrames`, frame type, subject snapshot and Unattended choice (Chris, 2026-10-27: resuming after a night page means he
+  still wants to be paged). A run
   with a count resumes with `frameCount - completedCount`; a repeat with no count repeats until
   stopped; an unfinished single exposure repeats once. It is an ordinary start: the Rig lease,
   camera connected and idle, and the alert monitor all apply, so a refusal leaves the run

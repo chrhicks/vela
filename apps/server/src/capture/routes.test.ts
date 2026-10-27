@@ -1210,11 +1210,11 @@ describe('after the server restarts', () => {
     )
   })
 
-  it('resumes as a new run that starts attended, even if the interrupted one was Unattended', async () => {
+  it('resumes an Unattended run as Unattended', async () => {
     const { after, alerts, resume } = await restarted({ exposureSeconds: 30, repeat: true, frameCount: 5, saveFrames: true, unattended: true })
 
-    expect((await resume()).json()).toMatchObject({ phase: 'exposing', unattended: false })
-    expect(alerts.runStarted).toHaveBeenCalledExactlyOnceWith(30, { imaging: true, calibration: false, unattended: false })
+    expect((await resume()).json()).toMatchObject({ phase: 'exposing', unattended: true })
+    expect(alerts.runStarted).toHaveBeenCalledExactlyOnceWith(30, { imaging: true, calibration: false, unattended: true })
     expect(after.captures).toHaveLength(1)
   })
 
