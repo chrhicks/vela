@@ -1,6 +1,6 @@
 import type { CaptureView, FrameType } from '@vela/model/web'
 import { Button, Checkbox, Input, Select } from '@vela/ui'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { CaptureInterruption } from '../features/capture/CaptureInterruption'
 import { LatestImage } from '../features/capture/LatestImage'
@@ -37,6 +37,11 @@ function CapturePage({ rigId }: { rigId: string }) {
   const [coolingOpen, setCoolingOpen] = useState(false)
   const { view, offline, pending, refreshing, error, commandUnconfirmed } = capture
   const chosenTargetId = params.get('target') ?? undefined
+
+  // A run that begins, from this page or another, uses up the choice: the next form starts with the phone off.
+  useEffect(() => {
+    if (view?.active) setUnattended(false)
+  }, [view?.active])
 
   const targetId = view?.active
     ? view.subject?.targetId
@@ -342,21 +347,17 @@ function CapturePage({ rigId }: { rigId: string }) {
                       event.preventDefault()
 
                       if (validExposure && (!repeating || frameCount.valid))
-                        void capture
-                          .start({
-                            seconds,
-                            repeat: repeating,
-                            saveFrames: savingFrames,
-                            frameType,
-                            unattended,
-                            targetId: calibration
-                              ? undefined
-                              : (chosenTargetId ?? view.subject?.targetId),
-                            frameCount: repeating ? frameCount.frameCount : undefined,
-                          })
-                          .then(started => {
-                            if (started) setUnattended(false)
-                          })
+                        void capture.start({
+                          seconds,
+                          repeat: repeating,
+                          saveFrames: savingFrames,
+                          frameType,
+                          unattended,
+                          targetId: calibration
+                            ? undefined
+                            : (chosenTargetId ?? view.subject?.targetId),
+                          frameCount: repeating ? frameCount.frameCount : undefined,
+                        })
                     }}
                   >
                     <Select

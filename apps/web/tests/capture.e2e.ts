@@ -1083,3 +1083,20 @@ test('an interrupted Unattended run says Resume starts with Unattended off', asy
     'Resume starts with Unattended off.',
   )
 })
+
+test('a run started elsewhere uses up a ticked Unattended choice on the start form', async ({ page }) => {
+  let current: CaptureView = { ...idle, repeat: true }
+  await page.route('**/api/web/rigs/rig-1/capture', route => respond(route, current))
+  await page.goto('/rigs/rig-1/observe/capture')
+
+  const unattended = page.getByRole('checkbox', { name: 'Unattended (page my phone)' })
+  await page.getByText('Unattended (page my phone)', { exact: true }).click()
+  await expect(unattended).toBeChecked()
+
+  current = { ...current, phase: 'exposing', active: true }
+  await expect(page.getByRole('button', { name: 'Stop capture' })).toBeEnabled()
+
+  current = { ...current, phase: 'stopped', active: false }
+  await expect(page.getByRole('button', { name: 'Start capture' })).toBeEnabled()
+  await expect(unattended).not.toBeChecked()
+})
