@@ -1006,6 +1006,24 @@ describe('frame types', () => {
       })
     })
 
+    it('keeps the saved frames and ends the run when the minimum cannot be read for a later bias frame', async () => {
+      const readings = [async () => 0.000032, () => Promise.reject(new Error('Cria has no fresh exposureMinimum'))]
+      const test = withMinimum(() => readings.shift()!())
+      await test.controller.start(0.1, { repeat: true, frameCount: 3, saveFrames: true, frameType: 'bias' })
+      await vi.waitFor(() => expect(test.requests).toHaveLength(1))
+      test.requests[0]!.resolve(test.frame)
+      await vi.waitFor(() => expect(test.controller.active()).toBe(false))
+
+      expect(test.requests).toHaveLength(1)
+      expect(test.records).toMatchObject([{ frameType: 'bias', exposureSeconds: 0.000032, outcome: 'saved' }])
+      expect(test.controller.snapshot()).toMatchObject({
+        phase: 'failed',
+        completedCount: 1,
+        integrationSeconds: 0.000032,
+        error: expect.stringContaining('could not be read'),
+      })
+    })
+
     it('is a stop, not a failure, when Stop arrives while the minimum is being read', async () => {
       const reading = deferred<number>()
       const test = withMinimum(async () => reading.promise)
