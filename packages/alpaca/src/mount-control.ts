@@ -73,6 +73,8 @@ export function createAlpacaMountControl({
   }
 
   async function execute(command: MountControlCommand): Promise<MountControlCommandResult> {
+    if (command.kind === 'home' || command.kind === 'stop')
+      return { outcome: 'failed', reason: 'unsupported', message: 'Vela does not home or stop an Alpaca mount from the controls.' }
     const { signal } = command
     signal?.throwIfAborted()
     const device = await telescope(command.telescopeId, signal)
@@ -145,10 +147,10 @@ export function createAlpacaMountControl({
       : { outcome: 'failed', reason: 'not-confirmed' }
   }
 
-  return { observe, execute }
+  return { canStop: false, observe, execute }
 }
 
-function matches(command: MountControlCommand, observation: MountControlObservation) {
+function matches(command: Exclude<MountControlCommand, { kind: 'home' | 'stop' }>, observation: MountControlObservation) {
   return observation.slewing === false && (command.kind === 'unpark'
     ? observation.parked === false && observation.tracking !== undefined
     : observation.tracking === command.tracking && observation.parked !== undefined &&

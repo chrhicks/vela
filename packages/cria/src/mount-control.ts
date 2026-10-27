@@ -3,11 +3,13 @@ import type { MountControl, MountControlCommand, MountControlCommandResult, Moun
 import { outcomeOf, type CriaConnection } from './connection.js'
 import { createCriaEquipment as createRemoteEquipment } from './v5/equipment.js'
 import type { CriaEquipmentBinding } from './equipment.js'
+import type { MountHome } from './mount-home.js'
 import { DeviceReadings } from './readings.js'
 
 export function createCriaMountControl(
   connection: CriaConnection,
   bindings: ReadonlyArray<CriaEquipmentBinding>,
+  home: MountHome,
 ): MountControl {
   const remote = () => createRemoteEquipment(connection.session(), bindings.map(binding => ({
     deviceId: binding.providerDeviceId, criaDeviceId: binding.id, expectedName: binding.expectedName,
@@ -38,11 +40,11 @@ export function createCriaMountControl(
       return undefined
     const readings = new DeviceReadings(device)
     let observation: MountControlObservation = {}
-    const keys = ['parked', 'tracking', 'slewing', 'canUnpark', 'canSetTracking'] as const
+    const keys = ['parked', 'tracking', 'slewing', 'canUnpark', 'canSetTracking', 'canFindHome'] as const
     const measured: string[] = []
 
     for (const key of keys) {
-      const metadata = key === 'canUnpark' || key === 'canSetTracking'
+      const metadata = key.startsWith('can')
       const value = readings.optionalBoolean(key)
 
       if (value === undefined) continue
@@ -53,7 +55,23 @@ export function createCriaMountControl(
 
     if (measured.length) observation = { ...observation, observedAt: readings.observedAt(measured) }
 
-    return observation
+    // A slew someone else started also leaves the last home behind.
+    if (observation.slewing === true) home.forget(id)
+    const homeConfirmedAt = home.confirmedAt(id)
+
+    return homeConfirmedAt ? { ...observation, homeConfirmedAt } : observation
+  }
+
+  /** A halt needs no readings: Cria admits it on a busy or held mount, and sending it twice only stops motion twice. */
+  async function stop(telescopeId: string): Promise<MountControlCommandResult> {
+    const result = await outcomeOf(remote().halt(telescopeId, 'mount-stop'))
+
+    switch (result.kind) {
+      case 'confirmed': return { outcome: 'confirmed', observation: { ...await observe(telescopeId).catch(() => undefined), slewing: false } }
+      case 'uncertain': return { outcome: 'uncertain', reason: 'write-outcome-unknown', message: result.message }
+      case 'stopped': return { outcome: 'uncertain', reason: 'cancelled' }
+      case 'failed': return { outcome: 'failed', reason: 'rejected', message: result.message }
+    }
   }
 
   async function execute(command: MountControlCommand): Promise<MountControlCommandResult> {
@@ -61,6 +79,7 @@ export function createCriaMountControl(
 
     if (!selected) return { outcome: 'failed', reason: 'device-not-found' }
 
+    if (command.kind === 'stop') return stop(command.telescopeId)
     command.signal?.throwIfAborted()
     const before = await observe(command.telescopeId, command.signal)
 
@@ -69,7 +88,7 @@ export function createCriaMountControl(
     if (before.slewing === true) return { outcome: 'failed', reason: 'busy', message: 'Wait for mount motion to stop.' }
 
     if (before.slewing !== false) return { outcome: 'failed', reason: 'unavailable', message: 'Mount motion state is unavailable.' }
-    const capability = command.kind === 'unpark' ? before.canUnpark : before.canSetTracking
+    const capability = { unpark: before.canUnpark, 'set-tracking': before.canSetTracking, home: before.canFindHome }[command.kind]
 
     if (capability !== true) return { outcome: 'failed', reason: capability === false ? 'unsupported' : 'unavailable' }
 
@@ -79,18 +98,30 @@ export function createCriaMountControl(
     if (command.kind === 'set-tracking' && command.tracking && before.parked)
       return { outcome: 'failed', reason: 'parked', message: 'Unpark the mount before turning tracking on.' }
 
-    if (command.kind === 'unpark' && before.parked === false || matches(command, before))
+    if (command.kind === 'home' && before.parked) return { outcome: 'failed', reason: 'parked', message: 'Unpark the mount before homing.' }
+
+    // The AM5 reports no at-home state, so a home is always sent.
+    if (command.kind !== 'home' && (command.kind === 'unpark' && before.parked === false || matches(command, before)))
       return { outcome: 'confirmed', observation: before }
 
     const operation = command.kind === 'unpark'
       ? { kind: 'mount-unpark' as const, parameters: {} }
-      : { kind: 'mount-tracking' as const, parameters: { tracking: command.tracking } }
+      : command.kind === 'home'
+        ? { kind: 'mount-home' as const, parameters: {} }
+        : { kind: 'mount-tracking' as const, parameters: { tracking: command.tracking } }
 
+    if (command.kind === 'home') home.forget(command.telescopeId)
     const result = await outcomeOf(remote().run(command.telescopeId, operation), command.signal)
 
     switch (result.kind) {
       case 'confirmed': {
         const { observedAt: _, ...facts } = before
+
+        if (command.kind === 'home') {
+          home.confirm(command.telescopeId)
+
+          return { outcome: 'confirmed', observation: { ...facts, slewing: false, homeConfirmedAt: home.confirmedAt(command.telescopeId)! } }
+        }
 
         const observation = command.kind === 'unpark'
           ? { ...facts, parked: false, slewing: false }
@@ -100,15 +131,20 @@ export function createCriaMountControl(
       }
 
       case 'uncertain': return { outcome: 'uncertain', reason: 'write-outcome-unknown', message: result.message }
-      case 'stopped': return { outcome: 'uncertain', reason: 'cancelled' }
+
+      case 'stopped':
+        return command.kind === 'home'
+          ? { outcome: 'failed', reason: 'stopped', message: 'Homing was stopped. The mount is not held; check where it stands before moving it.' }
+          : { outcome: 'uncertain', reason: 'cancelled' }
+
       case 'failed': return { outcome: 'failed', reason: 'rejected', message: result.message }
     }
   }
 
-  return { observe, execute }
+  return { canStop: true, observe, execute }
 }
 
-function matches(command: MountControlCommand, observation: MountControlObservation) {
+function matches(command: Exclude<MountControlCommand, { kind: 'home' | 'stop' }>, observation: MountControlObservation) {
   return observation.slewing === false && (command.kind === 'unpark'
     ? observation.parked === false && observation.tracking !== undefined
     : observation.tracking === command.tracking && observation.parked !== undefined &&
