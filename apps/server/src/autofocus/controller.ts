@@ -9,7 +9,7 @@ import type {
 } from '@vela/model/web'
 import type { CaptureFrame } from '../capture/controller.js'
 import { measureAutofocusStars } from '../imaging/statistics.js'
-import { fitHyperbola } from './hyperbola.js'
+import { fitHyperbola, sampleWeight } from './hyperbola.js'
 import {
   DEFAULT_OFFSET_STEPS,
   DEFAULT_STEP_SIZE,
@@ -71,8 +71,8 @@ const airTemperatureTimeoutMs = 3000
 const rSquaredGate = 0.7
 
 /**
- * What the walk reads from a frame: the count and median HFR. The stars behind them are only
- * recorded, never fed back into the walk or the fit.
+ * What the walk reads from a frame: the count and median HFR. The stars behind them are recorded,
+ * and the fit reads their HFR spread to weight the sample. They never steer the walk.
  */
 export type AutofocusMeasure = (
   ...args: Parameters<typeof measureAutofocusStars>
@@ -381,7 +381,7 @@ export function createAutofocusController(
       }
 
       patch({ phase: 'fitting', activity: 'fitting' })
-      const fit = bestFocus(view.samples)
+      const fit = bestFocus(view.samples, starTables)
 
       if (!fit)
         throw new Error(
@@ -572,9 +572,20 @@ function extraFloor(plan: AutofocusWalkPlan) {
   return plan.start - (plan.offsetSteps + 2) * plan.stepSize
 }
 
-function bestFocus(samples: AutofocusSample[]): AutofocusFit | null {
-  const points = samples.flatMap(sample =>
-    sample.hfrPixels === null ? [] : [{ x: sample.position, y: sample.hfrPixels }],
+function bestFocus(samples: AutofocusSample[], starTables: AutofocusStar[][]): AutofocusFit | null {
+  const points = samples.flatMap((sample, index) =>
+    sample.hfrPixels === null
+      ? []
+      : [
+          {
+            x: sample.position,
+            y: sample.hfrPixels,
+            weight: sampleWeight(
+              sample.detectedStars,
+              (starTables[index] ?? []).map(star => star.hfr),
+            ),
+          },
+        ],
   )
 
   const curve = fitHyperbola(points)
