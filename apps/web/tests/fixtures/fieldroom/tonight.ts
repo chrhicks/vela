@@ -132,6 +132,7 @@ export const reviewTarget: TargetView = {
     currentMoonSeparationDegrees: 112,
     currentAltitudeDegrees: 68,
     highestAltitudeDegrees: 74,
+    horizonProblem: null,
     aboveHorizonDuringDarkness: [
       {
         startsAt: new Date(start).toISOString(),

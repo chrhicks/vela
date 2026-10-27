@@ -23,6 +23,7 @@ function sky(rows: Array<[HorizonStatus | null, number?, number?, HorizonBinKind
     currentAzimuthDegrees: 10,
     currentAltitudeDegrees: 40,
     highestAltitudeDegrees: 40,
+    horizonProblem: null,
     aboveHorizonDuringDarkness: [],
   }
 }

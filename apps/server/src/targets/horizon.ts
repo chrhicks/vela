@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { z } from 'zod'
-import type { HorizonBinKind, HorizonStatus, HorizonWindow } from '@vela/model/web'
+import type { HorizonBinKind, HorizonProblem, HorizonStatus, HorizonWindow } from '@vela/model/web'
 import { createObservationStore, type Observation, type ObservationStore } from './horizon-observations.js'
 import { isMissingFile, writePrivateFile } from './private-file.js'
 
@@ -40,6 +40,8 @@ export function writeHorizonProfile(path: string, profile: HorizonProfile) {
 export interface HorizonStore {
   /** `null` when the rig has no usable profile. */
   forRig(rigId: string): Promise<HorizonProfile | null>
+  /** `unreadable` when the file exists but cannot be used. A missing file is not a problem. */
+  read(rigId: string): Promise<{ profile: HorizonProfile | null; unreadable: boolean }>
 }
 
 /** Reads on every call, so a re-import applies without a restart. An unusable file warns once per process, without values. */
@@ -57,29 +59,31 @@ export function createHorizonStore(
       warn(message)
     }
 
-    return null
+    return { profile: null, unreadable: true }
   }
 
-  return {
-    async forRig(rigId) {
-      const path = horizonFilePath(directory, rigId)
+  async function read(rigId: string) {
+    const path = horizonFilePath(directory, rigId)
 
-      if (!path) return null
-      let text: string
+    if (!path) return { profile: null, unreadable: false }
+    let text: string
 
-      try {
-        text = await readFile(path, 'utf8')
-      } catch (error) {
-        return isMissingFile(error) ? null : ignore(rigId, 'it could not be read')
-      }
+    try {
+      text = await readFile(path, 'utf8')
+    } catch (error) {
+      return isMissingFile(error)
+        ? { profile: null, unreadable: false }
+        : ignore(rigId, 'it could not be read')
+    }
 
-      try {
-        return horizonProfileSchema.parse(JSON.parse(text))
-      } catch {
-        return ignore(rigId, 'it is not a valid profile')
-      }
-    },
+    try {
+      return { profile: horizonProfileSchema.parse(JSON.parse(text)), unreadable: false }
+    } catch {
+      return ignore(rigId, 'it is not a valid profile')
+    }
   }
+
+  return { read, forRig: async rigId => (await read(rigId)).profile }
 }
 
 /**
@@ -154,9 +158,19 @@ export function horizonStatus(
   return bin.kind === 'observed' ? 'unknown' : 'clear'
 }
 
+/** What a request knows about the rig's horizon: the skyline, and whether a file could not be read. */
+export interface HorizonRead {
+  skyline: Skyline | null
+  problem: HorizonProblem | null
+}
+
+export const noHorizon: HorizonRead = { skyline: null, problem: null }
+
 export interface Horizon {
   /** The rig's skyline as it stands now; null when the rig has no usable profile. */
   skyline(rigId: string): Promise<Skyline | null>
+  /** The skyline with what is wrong with the files behind it. Neither blocks anything. */
+  view(rigId: string): Promise<HorizonRead>
   observations: ObservationStore
 }
 
@@ -164,14 +178,17 @@ export function createHorizon(directory: string): Horizon {
   const profiles = createHorizonStore(directory)
   const observations = createObservationStore(directory)
 
-  return {
-    observations,
-    async skyline(rigId) {
-      const profile = await profiles.forRig(rigId)
+  async function view(rigId: string) {
+    const { profile, unreadable } = await profiles.read(rigId)
+    const learned = await observations.read(rigId)
 
-      return profile && skylineOf(profile, await observations.list(rigId))
-    },
+    return {
+      skyline: profile && skylineOf(profile, learned.observations),
+      problem: unreadable || learned.unreadable ? ('unreadable' as const) : null,
+    }
   }
+
+  return { observations, view, skyline: async rigId => (await view(rigId)).skyline }
 }
 
 /** Counts the 15-minute sky samples inside a window; null when none falls in it. */

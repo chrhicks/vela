@@ -47,6 +47,9 @@ export interface HorizonObservationsView {
   observations: HorizonObservationView[]
 }
 
+/** A horizon file exists but cannot be used, so the page shows no trees. Not a fault: nothing is blocked. */
+export type HorizonProblem = 'unreadable'
+
 /** Minutes of a window, counted in 15-minute sky samples, by horizon status. */
 export interface HorizonWindow {
   checkedMinutes: number
@@ -81,6 +84,8 @@ export interface TargetSkyPath {
   currentAzimuthDegrees: number
   currentAltitudeDegrees: number
   highestAltitudeDegrees: number
+  /** Set when the rig's horizon file or its observations file exists but cannot be read. */
+  horizonProblem: HorizonProblem | null
   aboveHorizonDuringDarkness: Array<{ startsAt: string; endsAt: string }>
 }
 

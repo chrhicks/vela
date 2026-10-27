@@ -35,6 +35,8 @@ export function observationsFilePath(directory: string, rigId: string): string |
 export interface ObservationStore {
   /** Oldest first. Empty when the rig has none, or its file cannot be used. */
   list(rigId: string): Promise<Observation[]>
+  /** Like `list`, and says whether the file exists but cannot be used. */
+  read(rigId: string): Promise<{ observations: Observation[]; unreadable: boolean }>
   /** Throws when the rig id has no file or the existing file is unusable: a file is never overwritten blind. */
   add(rigId: string, observation: NewObservation): Promise<Observation>
   /** False when no such observation exists. */
@@ -109,16 +111,22 @@ export function createObservationStore(
     return { path, observations: current.observations }
   }
 
+  async function readState(rigId: string) {
+    const path = observationsFilePath(directory, rigId)
+
+    if (!path) return { observations: [], unreadable: false }
+
+    const current = await read(rigId, path)
+
+    return current.state === 'ok'
+      ? { observations: current.observations, unreadable: false }
+      : { observations: [], unreadable: true }
+  }
+
   return {
-    async list(rigId) {
-      const path = observationsFilePath(directory, rigId)
+    read: readState,
 
-      if (!path) return []
-
-      const current = await read(rigId, path)
-
-      return current.state === 'ok' ? current.observations : []
-    },
+    list: async rigId => (await readState(rigId)).observations,
 
     add: (rigId, observation) =>
       inOrder(rigId, async () => {

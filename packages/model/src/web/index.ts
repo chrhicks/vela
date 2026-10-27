@@ -78,6 +78,7 @@ export type {
   TargetSkyPath,
   HorizonBinKind,
   HorizonObservationView,
+  HorizonProblem,
   HorizonObservationsView,
   HorizonStatus,
   HorizonWindow,

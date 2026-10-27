@@ -12,7 +12,7 @@ import { pagingLabel } from '../features/alerts/presentation'
 import { useRigObservation } from '../features/rig-detail/RigContext'
 import { useTonightTarget } from '../features/targets/use-tonight-target'
 import { AltitudeTrace } from '../features/targets/AltitudeTrace'
-import { horizonNote } from '../features/targets/horizon'
+import { horizonNote, horizonProblemNote } from '../features/targets/horizon'
 import { skyTime } from '../features/targets/sky-time'
 import { EquipmentSummary } from '../features/observation/EquipmentSummary'
 import './capture.css'
@@ -517,6 +517,9 @@ function CapturePage({ rigId }: { rigId: string }) {
                 {horizonNote(sky).map((line) => (
                   <p key={line}>{line}</p>
                 ))}
+                {horizonProblemNote(sky) && (
+                  <p className="tonight-sky__horizon-problem">{horizonProblemNote(sky)}</p>
+                )}
                 {skyStale && (
                   <p role="status">Sky updates interrupted · last calculation shown.</p>
                 )}

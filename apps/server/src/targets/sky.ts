@@ -1,5 +1,5 @@
 import { Body, Equator, Horizon, Illumination, MoonPhase, Observer } from 'astronomy-engine'
-import type { TargetPosition, TargetSkyPath } from '@vela/model/web'
+import type { HorizonProblem, TargetPosition, TargetSkyPath } from '@vela/model/web'
 import type { PlateWcs } from '../plate-solving/solver.js'
 import { angularDistance, toMount, type Site } from '../astronomy/coordinates.js'
 import { horizonBin, horizonStatus, type Skyline } from './horizon.js'
@@ -40,6 +40,7 @@ export function skyPath(
   site: Site,
   now: Date,
   horizon: Skyline | null = null,
+  horizonProblem: HorizonProblem | null = null,
 ): TargetSkyPath {
   const observer = new Observer(
     site.latitudeDegrees,
@@ -118,6 +119,7 @@ export function skyPath(
     currentAltitudeDegrees: current.altitude,
     currentAzimuthDegrees: current.azimuth,
     highestAltitudeDegrees: Math.max(...samples.map(sample => sample.altitudeDegrees)),
+    horizonProblem,
     aboveHorizonDuringDarkness: windows,
   }
 }

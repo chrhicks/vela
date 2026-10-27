@@ -99,6 +99,12 @@
   color: var(--vela-warning);
   margin: 0;
 }
+.vela-discovery__horizon-problem {
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--vela-text-muted);
+  margin: 0;
+}
 .vela-discovery__card-facts {
   display: flex;
   flex-wrap: wrap;
