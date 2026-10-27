@@ -54,7 +54,7 @@ interface CaptureRouteOptions {
   createInspector: RigDetailOptions['createInspector']
   createCooling: (settings: CaptureSettings) => CameraCooling
   /** Watches each run for the alert rules. */
-  alerts?: { monitorFor(rig: RigCatalogRecord): Pick<AlertMonitor, 'runStarted' | 'frameCaptured' | 'runEnded' | 'runInterrupted'> }
+  alerts?: { monitorFor(rig: RigCatalogRecord): Pick<AlertMonitor, 'runStarted' | 'frameCaptured' | 'runEnded' | 'runInterrupted' | 'setUnattended'> }
 }
 
 const MAX_FRAME_COUNT = 10_000
@@ -226,6 +226,7 @@ export function registerCapture(
         saveFrames: false,
         completedCount: 0,
         subject: null,
+        unattended: false,
         savedCount: 0,
         integrationSeconds: 0,
         exposureSeconds: 2,
@@ -320,6 +321,7 @@ export function registerCapture(
           saveFrames: z.boolean().optional(),
           frameType: z.enum(frameTypes).optional(),
           targetId: z.string().trim().min(1).max(100).optional(),
+          unattended: z.boolean().optional(),
         })
         .refine(value => value.frameCount === undefined || value.repeat === true)
         .refine(value => value.targetId === undefined || (value.frameType ?? 'light') === 'light')
@@ -328,7 +330,7 @@ export function registerCapture(
       if (!request.headers['content-type']?.startsWith('application/json') || !parsed.success) {
         return reply.code(400).send({
           error:
-            `Expected exposureSeconds between 0.1 and 600, optional boolean repeat and saveFrames, optional frameType (${frameTypes.join(', ')}; default light), optional targetId (only for light), and optional frameCount (a whole number from 1 to ${MAX_FRAME_COUNT}, only with repeat: true).`,
+            `Expected exposureSeconds between 0.1 and 600, optional boolean repeat, saveFrames and unattended, optional frameType (${frameTypes.join(', ')}; default light), optional targetId (only for light), and optional frameCount (a whole number from 1 to ${MAX_FRAME_COUNT}, only with repeat: true).`,
         })
       }
 
@@ -345,6 +347,7 @@ export function registerCapture(
         saveFrames: body.saveFrames === true,
         frameType: body.frameType ?? 'light',
         subject,
+        unattended: body.unattended === true,
       })
     },
   )
@@ -408,11 +411,16 @@ export function registerCapture(
       const light = run.frameType === 'light'
       const camera = cameraFactory(settings)
 
-      watch?.runStarted(run.exposureSeconds, light && run.repeat && run.saveFrames, !light)
+      watch?.runStarted(run.exposureSeconds, {
+        imaging: light && run.repeat && run.saveFrames,
+        calibration: !light,
+        unattended: run.unattended,
+      })
 
       const result = await controller
         .start(run.exposureSeconds, camera, view.camera.name, {
           subject: run.subject,
+          unattended: run.unattended,
           focalLengthMm: settings.rig.focalLengthMm,
           // A calibration frame has no stars to judge, but still shows the camera is producing.
           onFrame: image => watch?.frameCaptured(light ? image : { capturedAt: image.capturedAt, statistics: null }),
@@ -551,6 +559,25 @@ export function registerCapture(
     }),
   )
 
+  // Chris may switch Unattended on or off at any time during a run, with no other condition.
+  app.put<{ Params: { rigId: string } }>('/api/rigs/:rigId/capture/unattended', async (request, reply) => {
+    const body = z.strictObject({ on: z.boolean() }).safeParse(request.body)
+
+    if (!request.headers['content-type']?.startsWith('application/json') || !body.success)
+      return reply.code(400).send({ error: 'Expected { "on": true | false }' })
+
+    const rig = await catalog.get(request.params.rigId)
+
+    if (!rig) return reply.code(404).send({ error: 'Rig not found' })
+
+    if (!controllers.get(rig.id)?.setUnattended(body.data.on))
+      return reply.code(409).send({ error: 'There is no running capture to switch Unattended on.' })
+
+    await alerts?.monitorFor(rig).setUnattended(body.data.on)
+
+    return (await rigView(rig.id)) ?? reply.code(404).send({ error: 'Rig not found' })
+  })
+
   app.get<{ Params: { rigId: string; imageId: string } }>(
     '/api/rigs/:rigId/capture/images/:imageId',
     async (request, reply) => {
@@ -625,17 +652,15 @@ export function registerCapture(
     },
   )
 
-  // A run that was active when the server went down is shown as interrupted, and a light run
-  // is told to the phone. Nothing exposes: only Chris's start or resume does.
+  // A run that was active when the server went down is shown as interrupted and raises its alert,
+  // which pages the phone if the run was Unattended. Nothing exposes: only Chris's start or resume does.
   app.addHook('onReady', async () => {
     for (const rig of await catalog.list()) {
       const record = runs.unfinished(rig.id)
 
       if (!record) continue
       controllerFor(rig.id, rig.name)
-
-      if (record.frameType === 'light')
-        void alerts?.monitorFor(rig).runInterrupted(interruptionAlert(record))
+      alerts?.monitorFor(rig).runInterrupted(interruptionAlert(record), record.unattended)
     }
   })
 

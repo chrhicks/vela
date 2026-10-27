@@ -200,6 +200,8 @@ export interface CaptureView {
   lostFrameCount?: number
   /** Snapshot of the selected subject for this run. */
   subject: CaptureSubject | null
+  /** The phone is paged for this run's alerts. Chris switches it, on or off, at any time during the run. */
+  unattended: boolean
   /** Images from this run durably retained, including explicit Keep. */
   savedCount: number
   /** Sum of exposure durations actually published during this run. */

@@ -20,6 +20,7 @@ const record = (overrides: Partial<CaptureRunRecord> = {}): CaptureRunRecord => 
   frameType: 'light',
   saveFrames: true,
   subject: { targetId: 'm31', name: 'Andromeda Galaxy', catalog: 'M 31' },
+  unattended: false,
   completedCount: 12,
   savedCount: 12,
   integrationSeconds: 1440,
@@ -130,7 +131,12 @@ it('says how many frames a resumed run takes, and resumes with that count and th
     saveFrames: true,
     frameType: 'light',
     subject: { targetId: 'm31', name: 'Andromeda Galaxy', catalog: 'M 31' },
+    unattended: false,
   })
+})
+
+it('resumes an Unattended run as a new run that is not, since every run starts attended', () => {
+  expect(resumeRequest(record({ unattended: true }))).toMatchObject({ unattended: false })
 })
 
 it('resumes a run that had no count as another run with no count', () => {
@@ -150,4 +156,16 @@ it('has nothing to resume once every frame was taken, and keeps a calibration fr
   expect(remainingFrames(record({ completedCount: 30 }))).toBe(0)
   expect(resumeRequest(record({ completedCount: 30 }))).toBeUndefined()
   expect(resumeRequest(record({ frameType: 'dark', subject: null }))).toMatchObject({ frameType: 'dark', subject: null })
+})
+
+it('reads a record written before the Unattended field as attended, and keeps one that is', async () => {
+  const path = await temporary()
+  const { unattended: _, ...older } = record()
+
+  await writeFile(path, JSON.stringify({ runs: { 'fra-400': older, 'fra-401': record({ rigId: 'fra-401', unattended: true }) } }))
+
+  const store = await openFileCaptureRunStore(path)
+
+  expect(store.unfinished('fra-400')).toMatchObject({ unattended: false })
+  expect(store.unfinished('fra-401')).toMatchObject({ unattended: true })
 })

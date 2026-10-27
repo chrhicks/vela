@@ -201,11 +201,11 @@ it('tells the alert monitor a run is an imaging run only when it repeats and sav
     const runStarted = vi.fn()
 
     const subject = setup(undefined, {
-      alerts: { monitorFor: () => ({ runStarted, frameCaptured: vi.fn(), runEnded: vi.fn(), runInterrupted: vi.fn() }) },
+      alerts: { monitorFor: () => ({ runStarted, frameCaptured: vi.fn(), runEnded: vi.fn(), runInterrupted: vi.fn(), setUnattended: vi.fn() }) },
     })
 
     expect((await subject.start(body)).statusCode).toBe(200)
-    expect(runStarted).toHaveBeenCalledExactlyOnceWith(10, imaging, false)
+    expect(runStarted).toHaveBeenCalledExactlyOnceWith(10, { imaging, calibration: false, unattended: false })
   }
 })
 
@@ -931,30 +931,100 @@ it('writes the rig\'s focal length into the saved FITS', async () => {
 
 it('tells the alert monitor a calibration run is one, never lets it raise star alerts, and still shows the camera is producing', async () => {
   for (const frameType of ['dark', 'flat', 'dark-flat', 'bias'] as const) {
-    const monitor = { runStarted: vi.fn(), frameCaptured: vi.fn(), runEnded: vi.fn(), runInterrupted: vi.fn() }
+    const monitor = { runStarted: vi.fn(), frameCaptured: vi.fn(), runEnded: vi.fn(), runInterrupted: vi.fn(), setUnattended: vi.fn() }
     const subject = setup(record.imagingCamera, { alerts: { monitorFor: () => monitor } })
     const body = { exposureSeconds: 10, repeat: true, saveFrames: true, frameType }
     expect((await subject.start(body)).statusCode).toBe(200)
-    expect(monitor.runStarted).toHaveBeenCalledExactlyOnceWith(10, false, true)
+    expect(monitor.runStarted).toHaveBeenCalledExactlyOnceWith(10, { imaging: false, calibration: true, unattended: false })
     subject.captures[0]!.resolve(frame)
     await vi.waitFor(() => expect(monitor.frameCaptured).toHaveBeenCalledOnce())
     expect(monitor.frameCaptured).toHaveBeenCalledWith({ capturedAt: frame.capturedAt, statistics: null })
   }
 })
 
+it('starts a run attended unless asked, and tells the monitor and the run record what it asked', async () => {
+  for (const [body, unattended] of [
+    [{ exposureSeconds: 10, repeat: true }, false],
+    [{ exposureSeconds: 10, repeat: true, unattended: false }, false],
+    [{ exposureSeconds: 10, repeat: true, unattended: true }, true],
+  ] as const) {
+    const monitor = { runStarted: vi.fn(), frameCaptured: vi.fn(), runEnded: vi.fn(), runInterrupted: vi.fn(), setUnattended: vi.fn() }
+    const runs = createMemoryCaptureRunStore()
+    const subject = setup(record.imagingCamera, { alerts: { monitorFor: () => monitor }, runs })
+    const started = await subject.start(body)
+
+    expect(started.statusCode).toBe(200)
+    expect(started.json()).toMatchObject({ unattended })
+    expect(monitor.runStarted).toHaveBeenCalledExactlyOnceWith(10, { imaging: false, calibration: false, unattended })
+    expect(runs.unfinished('sim')).toMatchObject({ unattended })
+  }
+
+  expect((await setup().start({ exposureSeconds: 10, unattended: 'yes' })).statusCode).toBe(400)
+})
+
+describe('switching Unattended', () => {
+  const put = (subject: ReturnType<typeof setup>, payload: unknown, rigId = 'sim') =>
+    subject.app.inject({ method: 'PUT', url: `/api/rigs/${rigId}/capture/unattended`, headers: { 'content-type': 'application/json' }, payload: payload as string })
+
+  it('changes a running run at any time, tells the monitor, and keeps the choice in the run record', async () => {
+    const monitor = { runStarted: vi.fn(), frameCaptured: vi.fn(), runEnded: vi.fn(), runInterrupted: vi.fn(), setUnattended: vi.fn() }
+    const runs = createMemoryCaptureRunStore()
+    const subject = setup(record.imagingCamera, { alerts: { monitorFor: () => monitor }, runs })
+
+    expect((await subject.start({ exposureSeconds: 10, repeat: true })).statusCode).toBe(200)
+
+    const on = await put(subject, { on: true })
+
+    expect(on.statusCode).toBe(200)
+    expect(on.json()).toMatchObject({ unattended: true, active: true })
+    expect(monitor.setUnattended).toHaveBeenLastCalledWith(true)
+    expect(runs.unfinished('sim')).toMatchObject({ unattended: true })
+    expect((await subject.get()).json()).toMatchObject({ unattended: true })
+
+    expect((await put(subject, { on: false })).json()).toMatchObject({ unattended: false })
+    expect(monitor.setUnattended).toHaveBeenLastCalledWith(false)
+    expect(runs.unfinished('sim')).toMatchObject({ unattended: false })
+  })
+
+  it('refuses when no run is active, for a body that is not { on }, and for an unknown rig', async () => {
+    const subject = setup()
+
+    expect((await put(subject, { on: true })).statusCode).toBe(409)
+
+    await subject.start({ exposureSeconds: 10, repeat: true })
+
+    expect((await put(subject, {})).statusCode).toBe(400)
+    expect((await put(subject, { on: 1 })).statusCode).toBe(400)
+    expect((await put(subject, { on: true, extra: true })).statusCode).toBe(400)
+    expect((await put(subject, { on: true }, 'nope')).statusCode).toBe(404)
+  })
+
+  it('does not touch the interrupted view after a restart', async () => {
+    const runs = createMemoryCaptureRunStore()
+    const before = setup(record.imagingCamera, { runs })
+
+    await before.start({ exposureSeconds: 10, repeat: true, unattended: true })
+
+    const after = setup(record.imagingCamera, { runs })
+
+    expect((await put(after, { on: false })).statusCode).toBe(409)
+    expect((await after.get()).json()).toMatchObject({ phase: 'interrupted', unattended: true })
+  })
+})
+
 it('keeps star alerts for a light run that repeats and saves', async () => {
-  const monitor = { runStarted: vi.fn(), frameCaptured: vi.fn(), runEnded: vi.fn(), runInterrupted: vi.fn() }
+  const monitor = { runStarted: vi.fn(), frameCaptured: vi.fn(), runEnded: vi.fn(), runInterrupted: vi.fn(), setUnattended: vi.fn() }
   const subject = setup(record.imagingCamera, { alerts: { monitorFor: () => monitor } })
   const body = { exposureSeconds: 10, repeat: true, saveFrames: true, frameType: 'light' }
   expect((await subject.start(body)).statusCode).toBe(200)
-  expect(monitor.runStarted).toHaveBeenCalledExactlyOnceWith(10, true, false)
+  expect(monitor.runStarted).toHaveBeenCalledExactlyOnceWith(10, { imaging: true, calibration: false, unattended: false })
   subject.captures[0]!.resolve(frame)
   await vi.waitFor(() => expect(monitor.frameCaptured).toHaveBeenCalledOnce())
   expect(monitor.frameCaptured.mock.calls[0]![0].statistics).not.toBeNull()
 })
 
 describe('after the server restarts', () => {
-  const monitor = () => ({ runStarted: vi.fn(), frameCaptured: vi.fn(), runEnded: vi.fn(), runInterrupted: vi.fn() })
+  const monitor = () => ({ runStarted: vi.fn(), frameCaptured: vi.fn(), runEnded: vi.fn(), runInterrupted: vi.fn(), setUnattended: vi.fn() })
 
   /** A server that was killed with a run half done, and the one that replaces it. */
   async function restarted(
@@ -1079,6 +1149,7 @@ describe('after the server restarts', () => {
       frameType: 'light',
       saveFrames: true,
       subject: null,
+      unattended: false,
       completedCount: 2,
       savedCount: 2,
       integrationSeconds: 60,
@@ -1108,22 +1179,43 @@ describe('after the server restarts', () => {
     expect(after.captures).toEqual([])
   })
 
-  it('tells the monitor once about an interrupted light run', async () => {
-    const { after, alerts } = await restarted()
+  it('tells the monitor once about an interrupted run, with whether it was Unattended', async () => {
+    const attended = await restarted()
 
-    await after.get()
-    await after.get()
+    await attended.after.get()
+    await attended.after.get()
 
-    expect(alerts.runInterrupted).toHaveBeenCalledExactlyOnceWith(
+    expect(attended.alerts.runInterrupted).toHaveBeenCalledExactlyOnceWith(
       'Capture was interrupted: Vela restarted (2 of 5 frames taken)',
+      false,
+    )
+
+    const unattended = await restarted({ exposureSeconds: 30, repeat: true, frameCount: 5, saveFrames: true, unattended: true })
+
+    expect((await unattended.after.get()).json()).toMatchObject({ phase: 'interrupted', unattended: true })
+
+    expect(unattended.alerts.runInterrupted).toHaveBeenCalledExactlyOnceWith(
+      'Capture was interrupted: Vela restarted (2 of 5 frames taken)',
+      true,
     )
   })
 
-  it('does not tell the monitor about an interrupted calibration run', async () => {
-    const { after, alerts } = await restarted({ exposureSeconds: 5, repeat: true, frameType: 'flat' }, 1)
+  it('tells the monitor about an interrupted calibration run, because a rig problem still matters', async () => {
+    const { after, alerts } = await restarted({ exposureSeconds: 5, repeat: true, frameType: 'flat', unattended: true }, 1)
 
     expect((await after.get()).json().phase).toBe('interrupted')
-    expect(alerts.runInterrupted).not.toHaveBeenCalled()
+    expect(alerts.runInterrupted).toHaveBeenCalledExactlyOnceWith(
+      'Capture was interrupted: Vela restarted (1 frames taken)',
+      true,
+    )
+  })
+
+  it('resumes as a new run that starts attended, even if the interrupted one was Unattended', async () => {
+    const { after, alerts, resume } = await restarted({ exposureSeconds: 30, repeat: true, frameCount: 5, saveFrames: true, unattended: true })
+
+    expect((await resume()).json()).toMatchObject({ phase: 'exposing', unattended: false })
+    expect(alerts.runStarted).toHaveBeenCalledExactlyOnceWith(30, { imaging: true, calibration: false, unattended: false })
+    expect(after.captures).toHaveLength(1)
   })
 
   it('reports a run that a graceful shutdown ended, and not one that Chris stopped', async () => {
