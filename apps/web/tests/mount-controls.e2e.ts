@@ -215,18 +215,21 @@ test.describe('home and stop', () => {
     const sent = deferred()
     let home: { route: Route; body: Write } | undefined
 
+    // The view still says the mount is still, as it does until the next read after a Home starts from rest.
+    fixture.setMount('off', 'unparked', { ...available, stop: { enabled: false, reason: 'The mount is not moving.' } })
     fixture.handleWrite(async (route, body) => {
-      fixture.setMount('off', 'unparked', { ...available, unpark: off, trackingOn: off, home: off, command: { ...body, state: 'pending', message: null } })
       home = { route, body }
       sent.resolve()
     })
     await fixture.open()
+    await expect(mount(page).getByRole('button', { name: 'Stop', exact: true })).toBeDisabled()
     await mount(page).getByRole('button', { name: 'Home', exact: true }).click()
     await page.getByRole('button', { name: 'Home the mount', exact: true }).click()
     await sent.promise
     await expect(mount(page).getByRole('button', { name: 'Homing…', exact: true })).toBeDisabled()
     await expect(mount(page).getByRole('button', { name: 'Turn tracking on', exact: true })).toBeDisabled()
     await expect(mount(page).getByRole('button', { name: 'Stop', exact: true })).toBeEnabled()
+    await expect(mount(page).getByText(/Stop is off/)).toHaveCount(0)
     await mount(page).getByRole('button', { name: 'Stop', exact: true }).click()
     await expect(mount(page).getByRole('status')).toHaveText('Stopped. The mount confirmed it is still.')
     expect(fixture.stops).toEqual([{ deviceId }])

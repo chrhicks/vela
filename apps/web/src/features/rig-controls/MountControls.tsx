@@ -214,7 +214,7 @@ export function MountControls({ rigId, device, stale, refresh }: {
         </Button>
         <Button
           tone="accent"
-          disabled={!view.stop.enabled || stopping}
+          disabled={!(view.stop.enabled || pending || unconfirmed) || stopping}
           aria-busy={stopping}
           onClick={() => void stop()}
         >
@@ -229,7 +229,7 @@ export function MountControls({ rigId, device, stale, refresh }: {
       </div>
       <p id={messageId} role="status">{message}</p>
       {reason && reason !== message && <p>{reason}</p>}
-      {!view.stop.enabled && view.stop.reason && <p>Stop is off. {view.stop.reason}</p>}
+      {!view.stop.enabled && !pending && !unconfirmed && view.stop.reason && <p>Stop is off. {view.stop.reason}</p>}
       <Dialog
         open={confirmingHome}
         title="Are you sure?"
