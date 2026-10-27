@@ -140,7 +140,8 @@ eastward, with `360 / step` entries (`step` divides 360). A number is a **traced
 bin: the skyline altitude, 0 to 90. `null` is an **unknown** bin: the survey had
 no trace there. Unknown is not open sky and not blocked. A malformed or
 unreadable file is ignored with one warning in the server log (no values), and
-the rig behaves as if it had no profile.
+the rig behaves as if it had no profile. The page is told (see below), because
+Chris would otherwise think the trees were gone.
 
 **Import.** `tools/horizon-import` converts the survey's `horizon-data.json`
 (`stepDeg`, `samples[]` with `az`, `smooth`, `supported`) into that file. Each
@@ -162,6 +163,14 @@ samples inside it) that are behind and unknown, or `null` without a profile or
 without a sample in the window. The skyline itself, its azimuths and the offsets
 never leave the server: not in responses, logs, traces or test fixtures. Tests
 use a synthetic profile.
+
+**When a file cannot be read.** A missing file is silent: no profile is a normal state. A file that
+exists but is unusable (not readable, not valid JSON, not a valid profile), for the profile or the
+observations file, sets `horizonProblem: 'unreadable'` on the sky path of every target view
+(`TargetSkyPath`). It carries no values and names no file. The targets page (details of the selected
+subject) and Tonight show one muted line under the altitude trace, "Horizon file unreadable, some trees
+may not be shown." Nothing is blocked: the rest of the sky, and a readable half (say the profile when only the
+observations are broken), still apply.
 
 **Where it shows.** The altitude trace marks the stretches behind the profile
 and the stretches with an unknown horizon, and its text says so. The target list

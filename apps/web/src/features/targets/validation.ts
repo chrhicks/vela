@@ -41,6 +41,7 @@ const sky = z
     currentAzimuthDegrees: z.number().min(0).lt(360),
     currentAltitudeDegrees: z.number(),
     highestAltitudeDegrees: z.number(),
+    horizonProblem: z.literal('unreadable').nullable(),
     samples: z
       .array(
         horizontal.extend({

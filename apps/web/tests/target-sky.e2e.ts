@@ -39,6 +39,7 @@ const sky: TargetSkyPath = {
   currentAzimuthDegrees: samples[18]!.azimuthDegrees,
   currentAltitudeDegrees: samples[18]!.altitudeDegrees,
   highestAltitudeDegrees: 55,
+  horizonProblem: null,
   aboveHorizonDuringDarkness: [{ startsAt: samples[13]!.at, endsAt: samples[50]!.at }],
 }
 

@@ -116,6 +116,37 @@ describe('horizon observations file', () => {
   })
 })
 
+describe('horizon problem', () => {
+  it('is none for missing files and for readable ones', async () => {
+    const dir = await directory()
+    const horizon = createHorizon(dir)
+
+    expect((await horizon.view('rig')).problem).toBeNull()
+    await writeHorizonProfile(horizonFilePath(dir, 'rig')!, syntheticProfile())
+    await horizon.observations.add('rig', observation())
+    expect((await horizon.view('rig')).problem).toBeNull()
+  })
+
+  it('says unreadable for an unusable profile or observations file, without losing the other', async () => {
+    const dir = await directory()
+    const horizon = createHorizon(dir)
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    await writeFile(horizonFilePath(dir, 'broken')!, '{"altitudesDegrees":[41.5')
+    expect(await horizon.view('broken')).toEqual({ skyline: null, problem: 'unreadable' })
+
+    await writeHorizonProfile(horizonFilePath(dir, 'rig')!, syntheticProfile())
+    await writeFile(observationsFilePath(dir, 'rig')!, '{"observations":[33.25')
+
+    const view = await horizon.view('rig')
+
+    expect(view.problem).toBe('unreadable')
+    expect(view.skyline!.bins[25]).toEqual({ kind: 'traced', altitudeDegrees: 5 })
+    expect(JSON.stringify(view)).not.toMatch(/33\.25|41\.5/)
+    warn.mockRestore()
+  })
+})
+
 describe('horizon with observations', () => {
   it('folds observations into the profile on every call and never rewrites the profile', async () => {
     const dir = await directory()

@@ -223,6 +223,12 @@
   stroke: var(--vela-text-muted);
   stroke-width: 1.5;
 }
+.tonight-sky__horizon-problem {
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--vela-text-muted);
+  margin: 0;
+}
 .tonight-sky__facts {
   display: flex;
   justify-content: space-between;

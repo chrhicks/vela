@@ -7,19 +7,19 @@ import type { RigCatalogRecord } from '../rig/contracts.js'
 import { listTargets, normalizeCatalogName, type CatalogTarget } from './catalog/index.js'
 import { discoverTargets } from './discovery.js'
 import type { Site } from './sky.js'
-import { horizonInWindow, type Skyline } from './horizon.js'
+import { horizonInWindow, noHorizon, type HorizonRead } from './horizon.js'
 
 interface DiscoveryBoundary {
   now: () => Date
   siteView: (
     rig: RigCatalogRecord,
   ) => Promise<{ site: Site | null; siteUnavailableReason: string | null }>
-  horizonFor: (rig: RigCatalogRecord) => Promise<Skyline | null>
+  horizonFor: (rig: RigCatalogRecord) => Promise<HorizonRead>
   targetView: (
     target: CatalogTarget,
     site: Site | null,
     at: Date,
-    horizon: Skyline | null,
+    horizon: HorizonRead,
   ) => TargetView
 }
 
@@ -75,7 +75,7 @@ export function registerTargetDiscovery(
     const calculation = discoverTargets({ targets: listTargets(), site: null, now: boundary.now() })
 
     const page = catalogPage(calculation, parsed.data, target =>
-      boundary.targetView(target, null, boundary.now(), null),
+      boundary.targetView(target, null, boundary.now(), noHorizon),
     )
 
     const view: TargetCatalogView = {

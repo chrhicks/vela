@@ -16,7 +16,7 @@ import {
   type CatalogTarget,
 } from './catalog/index.js'
 import { skyPath, type Site } from './sky.js'
-import { type Horizon, type Skyline } from './horizon.js'
+import { noHorizon, type Horizon, type HorizonRead } from './horizon.js'
 import { registerTargetDiscovery } from './discovery-routes.js'
 import { registerHorizonObservations } from './horizon-routes.js'
 import { haltBodyError, registerHaltRoutes } from '../http/halt-body.js'
@@ -214,7 +214,7 @@ export function registerTargets(
     target: CatalogTarget,
     site: Site | null,
     at = now(),
-    horizon: Skyline | null = null,
+    horizon: HorizonRead = noHorizon,
   ): TargetView {
     const fov = Math.max(0.5, Math.min(5, ((target.majorAxisArcminutes ?? 45) / 60) * 1.8))
 
@@ -229,11 +229,11 @@ export function registerTargets(
       sizeArcminutes: target.majorAxisArcminutes,
       minorSizeArcminutes: target.minorAxisArcminutes,
       thumbnailUrl: `/api/survey/thumbnail?ra=${target.raDegrees}&dec=${target.decDegrees}&fov=${fov}`,
-      sky: site ? skyPath(target, site, at, horizon) : null,
+      sky: site ? skyPath(target, site, at, horizon.skyline, horizon.problem) : null,
     }
   }
 
-  const horizonFor = async (rig: RigCatalogRecord) => (await horizons?.skyline(rig.id)) ?? null
+  const horizonFor = async (rig: RigCatalogRecord) => (await horizons?.view(rig.id)) ?? noHorizon
 
   registerTargetDiscovery(app, catalog, { now, siteView, horizonFor, targetView })
 

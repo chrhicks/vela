@@ -806,7 +806,7 @@ describe('backyard horizon over HTTP', () => {
 
   interface Item {
     id: string
-    sky: { samples: Array<{ horizon: string | null }> }
+    sky: { horizonProblem: string | null; samples: Array<{ horizon: string | null }> }
     horizonInWindow: { checkedMinutes: number; behindMinutes: number; unknownMinutes: number } | null
   }
 
@@ -873,9 +873,18 @@ describe('backyard horizon over HTTP', () => {
 
     expect(view.targets.length).toBeGreaterThan(0)
     expect(view.targets.every(item => item.horizonInWindow === null)).toBe(true)
+    expect(view.targets.every(item => item.sky.horizonProblem === 'unreadable')).toBe(true)
     expect(warn).toHaveBeenCalledOnce()
     expect(String(warn.mock.calls[0]![0])).not.toContain('41.5')
     warn.mockRestore()
+  })
+
+  it('carries no problem for a missing or readable profile', async () => {
+    const missing = await discovery(await withProfile(null))
+    const readable = await discovery(await withProfile(syntheticProfile()))
+
+    for (const view of [missing, readable])
+      expect(view.targets.every(item => item.sky.horizonProblem === null)).toBe(true)
   })
 })
 

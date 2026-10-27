@@ -247,3 +247,21 @@ test('Tonight uses capture-camera cooling and current sky direction instead of i
   await expect(page.locator('.tonight-equipment')).toContainText('Temperature / cooling unavailable')
   await expect(page.locator('.tonight-equipment')).not.toContainText('25.0°C')
 })
+
+test('Tonight says when the horizon file cannot be read and still shows the sky', async ({ page }) => {
+  const scene = createTonightScene('tonight-light')
+  await page.route('**/api/**', (route) => {
+    const pathname = new URL(route.request().url()).pathname
+
+    if (pathname.endsWith('/targets/ngc6888'))
+      return route.fulfill({ json: { ...reviewTarget, sky: { ...reviewTarget.sky!, horizonProblem: 'unreadable' } } })
+    const response = scene.respond(route.request().method(), pathname)
+
+    return response.image
+      ? route.fulfill({ contentType: 'image/jpeg', body: reference })
+      : route.fulfill({ status: response.status, json: response.json })
+  })
+  await page.goto(scene.route)
+  await expect(page.locator('.tonight-sky')).toContainText('68°')
+  await expect(page.locator('.tonight-sky')).toContainText('Horizon file unreadable, some trees may not be shown.')
+})
