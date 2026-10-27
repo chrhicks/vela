@@ -469,11 +469,11 @@ describe('a capture run feeds the alerts', () => {
 
     await subject.start()
 
-    const put = (url: string, payload: unknown) => subject.app.inject({ method: 'PUT', url, headers: jsonBody, payload: payload as string })
+    const put = (url: string, payload: string) => subject.app.inject({ method: 'PUT', url, headers: jsonBody, payload })
 
-    expect((await put('/api/rigs/sim/capture/unattended', {})).statusCode).toBe(400)
-    expect((await put('/api/rigs/sim/capture/unattended', { on: 'yes' })).statusCode).toBe(400)
-    expect((await put('/api/rigs/sim/capture/unattended', { on: true, extra: 1 })).statusCode).toBe(400)
-    expect((await put('/api/rigs/nope/capture/unattended', { on: true })).statusCode).toBe(404)
+    expect((await put('/api/rigs/sim/capture/unattended', JSON.stringify({}))).statusCode).toBe(400)
+    expect((await put('/api/rigs/sim/capture/unattended', JSON.stringify({ on: 'yes' }))).statusCode).toBe(400)
+    expect((await put('/api/rigs/sim/capture/unattended', JSON.stringify({ on: true, extra: 1 }))).statusCode).toBe(400)
+    expect((await put('/api/rigs/nope/capture/unattended', JSON.stringify({ on: true }))).statusCode).toBe(404)
   })
 })

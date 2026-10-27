@@ -963,8 +963,8 @@ it('starts a run attended unless asked, and tells the monitor and the run record
 })
 
 describe('switching Unattended', () => {
-  const put = (subject: ReturnType<typeof setup>, payload: unknown, rigId = 'sim') =>
-    subject.app.inject({ method: 'PUT', url: `/api/rigs/${rigId}/capture/unattended`, headers: { 'content-type': 'application/json' }, payload: payload as string })
+  const put = (subject: ReturnType<typeof setup>, payload: string, rigId = 'sim') =>
+    subject.app.inject({ method: 'PUT', url: `/api/rigs/${rigId}/capture/unattended`, headers: { 'content-type': 'application/json' }, payload })
 
   it('changes a running run at any time, tells the monitor, and keeps the choice in the run record', async () => {
     const monitor = { runStarted: vi.fn(), frameCaptured: vi.fn(), runEnded: vi.fn(), runInterrupted: vi.fn(), setUnattended: vi.fn() }
@@ -973,7 +973,7 @@ describe('switching Unattended', () => {
 
     expect((await subject.start({ exposureSeconds: 10, repeat: true })).statusCode).toBe(200)
 
-    const on = await put(subject, { on: true })
+    const on = await put(subject, JSON.stringify({ on: true }))
 
     expect(on.statusCode).toBe(200)
     expect(on.json()).toMatchObject({ unattended: true, active: true })
@@ -981,7 +981,7 @@ describe('switching Unattended', () => {
     expect(runs.unfinished('sim')).toMatchObject({ unattended: true })
     expect((await subject.get()).json()).toMatchObject({ unattended: true })
 
-    expect((await put(subject, { on: false })).json()).toMatchObject({ unattended: false })
+    expect((await put(subject, JSON.stringify({ on: false }))).json()).toMatchObject({ unattended: false })
     expect(monitor.setUnattended).toHaveBeenLastCalledWith(false)
     expect(runs.unfinished('sim')).toMatchObject({ unattended: false })
   })
@@ -989,14 +989,14 @@ describe('switching Unattended', () => {
   it('refuses when no run is active, for a body that is not { on }, and for an unknown rig', async () => {
     const subject = setup()
 
-    expect((await put(subject, { on: true })).statusCode).toBe(409)
+    expect((await put(subject, JSON.stringify({ on: true }))).statusCode).toBe(409)
 
     await subject.start({ exposureSeconds: 10, repeat: true })
 
-    expect((await put(subject, {})).statusCode).toBe(400)
-    expect((await put(subject, { on: 1 })).statusCode).toBe(400)
-    expect((await put(subject, { on: true, extra: true })).statusCode).toBe(400)
-    expect((await put(subject, { on: true }, 'nope')).statusCode).toBe(404)
+    expect((await put(subject, JSON.stringify({}))).statusCode).toBe(400)
+    expect((await put(subject, JSON.stringify({ on: 1 }))).statusCode).toBe(400)
+    expect((await put(subject, JSON.stringify({ on: true, extra: true }))).statusCode).toBe(400)
+    expect((await put(subject, JSON.stringify({ on: true }), 'nope')).statusCode).toBe(404)
   })
 
   it('does not touch the interrupted view after a restart', async () => {
@@ -1007,7 +1007,7 @@ describe('switching Unattended', () => {
 
     const after = setup(record.imagingCamera, { runs })
 
-    expect((await put(after, { on: false })).statusCode).toBe(409)
+    expect((await put(after, JSON.stringify({ on: false }))).statusCode).toBe(409)
     expect((await after.get()).json()).toMatchObject({ phase: 'interrupted', unattended: true })
   })
 })
