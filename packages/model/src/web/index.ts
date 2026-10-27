@@ -101,6 +101,5 @@ export type {
   AlertLevel,
   AlertsView,
   AlertView,
-  PagingWindow,
   PhoneAlertsView,
 } from './alerts.js'

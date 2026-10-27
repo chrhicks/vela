@@ -1,11 +1,9 @@
 import { readFileSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { InMemorySpanExporter, NodeTracerProvider, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-node'
-import { darkOutlook } from '../astronomy/sun.js'
 import { createAlertMonitor, type AlertMonitor } from './monitor.js'
 import { NotifierError, type Notification, type Notifier } from './notifier.js'
 import { starStatistics } from './test-statistics.js'
-import type { Site } from '../astronomy/coordinates.js'
 import type { CaptureImageStatistics } from '@vela/model/web'
 import type { MountReading } from './rules.js'
 import { defaultThresholds } from './thresholds.js'
@@ -80,9 +78,7 @@ const settle = () => (vi.isFakeTimers() ? vi.advanceTimersByTimeAsync(0) : new P
 function rig(
   options: {
     readMount?: (signal: AbortSignal) => Promise<MountReading | null>
-    readSite?: (signal: AbortSignal) => Promise<Site | null>
     connected?: boolean
-    phoneAlertsOn?: boolean
   } = {},
 ) {
   let clock = Date.parse('2026-10-18T02:00:00Z')
@@ -93,10 +89,8 @@ function rig(
     rigName: 'FRA 400',
     thresholds: defaultThresholds,
     notifier: options.connected === false ? null : notifier,
-    ...(options.phoneAlertsOn !== undefined && { phoneAlertsOn: options.phoneAlertsOn }),
     now: () => clock,
     ...(options.readMount && { readMount: options.readMount }),
-    ...(options.readSite && { readSite: options.readSite }),
   })
 
   return {
@@ -153,7 +147,7 @@ async function replayNight(fixture: ReturnType<typeof watched>, until = '23:59:5
   const frames = night.filter(frame => frame.time <= until)
 
   fixture.at(frames[0]!.at)
-  fixture.monitor.runStarted(60, true)
+  fixture.monitor.runStarted(60, { imaging: true, unattended: true })
 
   for (const frame of frames) {
     fixture.at(frame.at)
@@ -261,7 +255,7 @@ describe('the real night: camera snagged a tripod leg', () => {
 // Episodes
 
 function runOf(fixture: ReturnType<typeof watched>, hfr: Array<number | null>, stars = 1200) {
-  fixture.monitor.runStarted(60, true)
+  fixture.monitor.runStarted(60, { imaging: true, unattended: true })
 
   return async (index: number) => {
     fixture.tick(60_000)
@@ -290,7 +284,7 @@ describe('no stars from the first frame', () => {
   it('pages once on the fifth frame, and says cleared when the run ends', async () => {
     const fixture = watched()
 
-    fixture.monitor.runStarted(60, true)
+    fixture.monitor.runStarted(60, { imaging: true, unattended: true })
     await frames(fixture, 4, 0)
     expect(raised(fixture)).toEqual([])
 
@@ -310,7 +304,7 @@ describe('no stars from the first frame', () => {
   it('clears when the stars come in', async () => {
     const fixture = watched()
 
-    fixture.monitor.runStarted(60, true)
+    fixture.monitor.runStarted(60, { imaging: true, unattended: true })
     await frames(fixture, 5, 0)
     expect(raised(fixture)).toEqual(['no-stars'])
 
@@ -322,7 +316,7 @@ describe('no stars from the first frame', () => {
     const fixture = watched()
     const { strong: _strong, ...withoutStrong } = starStatistics(0, null)
 
-    fixture.monitor.runStarted(60, true)
+    fixture.monitor.runStarted(60, { imaging: true, unattended: true })
 
     for (const statistics of [{ ...starStatistics(0, null), algorithm: { version: 2 } }, withoutStrong]) {
       for (let index = 0; index < 8; index++) {
@@ -338,7 +332,7 @@ describe('no stars from the first frame', () => {
   it('stays quiet for a run that does not save its frames', async () => {
     const fixture = watched()
 
-    fixture.monitor.runStarted(60, false)
+    fixture.monitor.runStarted(60, { imaging: false, unattended: true })
     await frames(fixture, 8, 0)
 
     expect(raised(fixture)).toEqual([])
@@ -348,7 +342,7 @@ describe('no stars from the first frame', () => {
   it('stays quiet for a single exposure', async () => {
     const fixture = watched()
 
-    fixture.monitor.runStarted(60, false)
+    fixture.monitor.runStarted(60, { imaging: false, unattended: true })
     await frames(fixture, 1, 0)
     fixture.monitor.runEnded('stopped')
 
@@ -406,7 +400,7 @@ describe('episodes', () => {
 
   it('raises run-failed as an emergency when the run fails, and drops it when the next run starts', async () => {
     const fixture = watched()
-    fixture.monitor.runStarted(60, true)
+    fixture.monitor.runStarted(60, { imaging: true, unattended: true })
 
     fixture.monitor.runEnded('failed')
     await settle()
@@ -415,7 +409,7 @@ describe('episodes', () => {
     expect(fixture.phone.emergencies()).toHaveLength(1)
 
     fixture.tick(60_000)
-    fixture.monitor.runStarted(60, true)
+    fixture.monitor.runStarted(60, { imaging: true, unattended: true })
     await settle()
 
     expect(fixture.monitor.view().alerts).toEqual([])
@@ -707,7 +701,7 @@ describe('while the run is polled', () => {
     let mount = tracking()
     const { monitor, phone } = polled(async () => mount)
 
-    monitor.runStarted(1800, true)
+    monitor.runStarted(1800, { imaging: true, unattended: true })
     await vi.advanceTimersByTimeAsync(0)
     expect(monitor.view().alerts).toEqual([])
 
@@ -737,7 +731,7 @@ describe('while the run is polled', () => {
       return tracking({ tracking: false })
     })
 
-    monitor.runStarted(1800, false, true)
+    monitor.runStarted(1800, { imaging: false, calibration: true, unattended: true })
     await vi.advanceTimersByTimeAsync(5 * 60_000)
 
     expect(reads).toBeGreaterThan(20)
@@ -749,7 +743,7 @@ describe('while the run is polled', () => {
   it('pages for tracking stopped on the second reading of a light run whose mount stood still from the start', async () => {
     const { monitor, phone } = polled(async () => tracking({ tracking: false }))
 
-    monitor.runStarted(1800, false, false)
+    monitor.runStarted(1800, { imaging: false, unattended: true })
     await vi.advanceTimersByTimeAsync(0)
     expect(monitor.view().alerts).toEqual([])
 
@@ -778,7 +772,7 @@ describe('while the run is polled', () => {
     let mount = tracking({ tracking: false })
     const { monitor, phone } = polled(async () => mount)
 
-    monitor.runStarted(1800, true)
+    monitor.runStarted(1800, { imaging: true, unattended: true })
     await vi.advanceTimersByTimeAsync(10_000)
     expect(phone.emergencies()).toHaveLength(1)
 
@@ -815,7 +809,7 @@ describe('while the run is polled', () => {
     async function failedDuringOutage() {
       const { monitor, phone } = polled(async () => tracking())
 
-      monitor.runStarted(60, true)
+      monitor.runStarted(60, { imaging: true, unattended: true })
       await vi.advanceTimersByTimeAsync(0)
 
       phone.down = 'Pushover answered HTTP 503'
@@ -861,7 +855,7 @@ describe('while the run is polled', () => {
     it('does not retry an alert the next run has already cleared', async () => {
       const { monitor, phone } = await failedDuringOutage()
 
-      monitor.runStarted(60, true)
+      monitor.runStarted(60, { imaging: true, unattended: true })
       phone.down = null
       await vi.advanceTimersByTimeAsync(2 * 60_000)
 
@@ -875,7 +869,7 @@ describe('while the run is polled', () => {
       phone.down = 'Pushover answered HTTP 503'
       phone.sendGate = new Promise<void>(resolve => (release = resolve))
 
-      monitor.runStarted(60, true)
+      monitor.runStarted(60, { imaging: true, unattended: true })
       monitor.runEnded('failed')
       await vi.advanceTimersByTimeAsync(0)
 
@@ -901,7 +895,7 @@ describe('while the run is polled', () => {
   it('says the meridian watch is unavailable instead of looking safe when the mount does not give its pier side', async () => {
     const { monitor } = polled(async () => tracking({ pierSide: null }))
 
-    monitor.runStarted(60, true)
+    monitor.runStarted(60, { imaging: true, unattended: true })
     await vi.advanceTimersByTimeAsync(0)
 
     expect(monitor.view().unavailable).toEqual(['meridian watch unavailable: pier side'])
@@ -916,7 +910,7 @@ describe('while the run is polled', () => {
       return tracking()
     })
 
-    monitor.runStarted(1800, true)
+    monitor.runStarted(1800, { imaging: true, unattended: true })
     await vi.advanceTimersByTimeAsync(30_000)
     expect(monitor.view().alerts).toEqual([])
 
@@ -934,10 +928,10 @@ describe('while the run is polled', () => {
     let finish!: (reading: MountReading) => void
     const { monitor } = polled(() => new Promise<MountReading>(resolve => (finish = resolve)))
 
-    monitor.runStarted(60, true)
+    monitor.runStarted(60, { imaging: true, unattended: true })
     await vi.advanceTimersByTimeAsync(0)
     monitor.runEnded('stopped')
-    monitor.runStarted(60, true)
+    monitor.runStarted(60, { imaging: true, unattended: true })
     expect(monitor.view().unavailable).toEqual(['meridian watch unavailable: mount readings'])
 
     finish(tracking({ pierSide: null }))
@@ -949,7 +943,7 @@ describe('while the run is polled', () => {
   it('warns when frames stop coming, but not while autofocus runs inside the run', async () => {
     const { monitor, phone } = polled(async () => tracking())
 
-    monitor.runStarted(60, true)
+    monitor.runStarted(60, { imaging: true, unattended: true })
     await vi.advanceTimersByTimeAsync(0)
 
     monitor.autofocusStarted()
@@ -979,7 +973,7 @@ describe('while the run is polled', () => {
       monitor.frameCaptured({ capturedAt: new Date().toISOString(), statistics: starStatistics(stars, 3) })
     }
 
-    monitor.runStarted(60, true)
+    monitor.runStarted(60, { imaging: true, unattended: true })
 
     for (let index = 0; index < 6; index++) {
       await vi.advanceTimersByTimeAsync(60_000)
@@ -1005,7 +999,7 @@ describe('while the run is polled', () => {
       const { monitor, phone } = polled(async () => tracking(), readFocuser)
       let stars = 1500
 
-      monitor.runStarted(60, true)
+      monitor.runStarted(60, { imaging: true, unattended: true })
 
       for (let index = 0; index < 12; index++) {
         if (index === 6) stars = 300
@@ -1055,7 +1049,7 @@ describe('while the run is polled', () => {
         throw new Error('Cria did not answer')
       })
 
-      monitor.runStarted(1800, true)
+      monitor.runStarted(1800, { imaging: true, unattended: true })
       await vi.advanceTimersByTimeAsync(120_000)
 
       expect(monitor.view().alerts.map(alert => alert.id)).not.toContain('rig-unreachable')
@@ -1064,70 +1058,119 @@ describe('while the run is polled', () => {
 })
 
 // ---------------------------------------------------------------------------
-// The phone alerts switch
+// Unattended
 
-describe('the phone alerts switch', () => {
-  function failedRun(fixture: ReturnType<typeof watched>) {
-    fixture.monitor.runStarted(60, true)
+describe('Unattended', () => {
+  function failedRun(fixture: ReturnType<typeof watched>, unattended = true) {
+    fixture.monitor.runStarted(60, { imaging: true, unattended })
     fixture.monitor.runEnded('failed')
 
     return settle()
   }
 
-  it('is on until Chris turns it off', () => {
-    expect(watched().monitor.view().phoneAlertsOn).toBe(true)
-    expect(watched({ phoneAlertsOn: false }).monitor.view().phoneAlertsOn).toBe(false)
+  it('is off for a new run, and the run says so', () => {
+    const fixture = watched()
+
+    expect(fixture.monitor.view().unattended).toBe(false)
+
+    fixture.monitor.runStarted(60, { imaging: true })
+    expect(fixture.monitor.view().unattended).toBe(false)
+
+    fixture.monitor.runStarted(60, { imaging: true, unattended: true })
+    expect(fixture.monitor.view().unattended).toBe(true)
+
+    fixture.monitor.runStarted(60, { imaging: true })
+    expect(fixture.monitor.view().unattended).toBe(false)
   })
 
-  it('sends nothing for an alert raised while off, and still shows it', async () => {
-    const fixture = watched({ phoneAlertsOn: false })
+  it('sends nothing for a run that is not Unattended, and still shows the alert', async () => {
+    const fixture = watched()
 
-    await failedRun(fixture)
+    await failedRun(fixture, false)
 
     expect(fixture.phone.events).toEqual([])
     expect(fixture.monitor.view().alerts).toEqual([
-      expect.objectContaining({ id: 'run-failed', level: 'critical', delivery: { state: 'muted' } }),
+      expect.objectContaining({ id: 'run-failed', level: 'critical', delivery: { state: 'attended' } }),
     ])
   })
 
-  it('cancels an emergency that is repeating when turned off, and says nothing when the alert clears', async () => {
+  it('pages standing alerts once when switched on, and never again for the same alert', async () => {
+    const fixture = watched()
+
+    await failedRun(fixture, false)
+    await fixture.monitor.setUnattended(true)
+    await settle()
+
+    expect(fixture.phone.emergencies()).toHaveLength(1)
+    expect(fixture.monitor.view().alerts[0]!.delivery).toEqual({ state: 'sent' })
+
+    await fixture.monitor.setUnattended(true)
+    await fixture.monitor.setUnattended(false)
+    await fixture.monitor.setUnattended(true)
+    await settle()
+
+    expect(fixture.phone.emergencies()).toHaveLength(1)
+  })
+
+  it('does not page a standing alert Chris acknowledged before switching on', async () => {
+    const fixture = watched()
+
+    await failedRun(fixture, false)
+    await fixture.monitor.acknowledge('run-failed')
+    await fixture.monitor.setUnattended(true)
+    await settle()
+
+    expect(fixture.phone.events).toEqual([])
+  })
+
+  it('pages the stronger alert when switched on, and not the weaker one it covers', async () => {
+    const fixture = watched()
+    const frame = runOf(fixture, [3, 3, 3, 3, 3, 7, 7, 7, 7])
+
+    fixture.monitor.runStarted(60, { imaging: true })
+
+    for (let index = 0; index < 9; index++) await frame(index)
+
+    await fixture.monitor.setUnattended(true)
+    await settle()
+
+    expect(fixture.phone.sends().map(event => event.message)).toEqual([expect.stringContaining('HFR 7.0')])
+  })
+
+  it('cancels an emergency that is repeating when switched off, and says nothing when the alert clears', async () => {
     const fixture = watched()
 
     await failedRun(fixture)
     expect(fixture.phone.emergencies()).toHaveLength(1)
 
-    await fixture.monitor.setPhoneAlerts(false)
+    await fixture.monitor.setUnattended(false)
 
     expect(fixture.phone.cancels()).toEqual([expect.objectContaining({ receipt: 'receipt-1' })])
     expect(fixture.monitor.view()).toMatchObject({
-      phoneAlertsOn: false,
-      alerts: [expect.objectContaining({ id: 'run-failed', delivery: { state: 'muted' } })],
+      unattended: false,
+      alerts: [expect.objectContaining({ id: 'run-failed', delivery: { state: 'stopped' } })],
     })
 
-    fixture.monitor.runStarted(60, true)
+    fixture.monitor.runStarted(60, { imaging: true })
     await settle()
 
     expect(fixture.monitor.view().alerts).toEqual([])
     expect(fixture.phone.sends().map(event => event.priority)).toEqual([2])
   })
 
-  it('pages only alerts raised after it comes back on, not the one raised while off', async () => {
-    const fixture = watched({ phoneAlertsOn: false })
+  it('does not page again an emergency that was paged and then switched off, however often it is switched on', async () => {
+    const fixture = watched()
 
     await failedRun(fixture)
-    await fixture.monitor.setPhoneAlerts(true)
+    await fixture.monitor.setUnattended(false)
+    await fixture.monitor.setUnattended(true)
     await settle()
 
-    expect(fixture.phone.events).toEqual([])
-    expect(fixture.monitor.view().alerts[0]!.delivery).toEqual({ state: 'muted' })
-
-    await failedRun(fixture)
-
     expect(fixture.phone.emergencies()).toHaveLength(1)
-    expect(fixture.monitor.view().alerts[0]!.delivery).toEqual({ state: 'sent' })
+    expect(fixture.monitor.view().alerts[0]!.delivery).toEqual({ state: 'stopped' })
   })
 
-  it('stops a retry that was waiting for the phone when turned off', async () => {
+  it('stops a retry that was waiting for the phone when switched off, and pages it when switched on', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
 
     const fixture = watched()
@@ -1136,28 +1179,33 @@ describe('the phone alerts switch', () => {
     await failedRun(fixture)
     expect(fixture.monitor.view().alerts[0]!.delivery.state).toBe('retrying')
 
-    await fixture.monitor.setPhoneAlerts(false)
+    await fixture.monitor.setUnattended(false)
     fixture.phone.down = null
     fixture.tick(5 * 60_000)
     await vi.advanceTimersByTimeAsync(5 * 60_000)
 
     expect(fixture.phone.events).toEqual([])
-    expect(fixture.monitor.view().alerts[0]!.delivery).toEqual({ state: 'muted' })
+    expect(fixture.monitor.view().alerts[0]!.delivery).toEqual({ state: 'attended' })
+
+    await fixture.monitor.setUnattended(true)
+    await settle()
+
+    expect(fixture.phone.emergencies()).toHaveLength(1)
   })
 
-  it('cancels an emergency whose send was still in flight when turned off', async () => {
+  it('cancels an emergency whose send was still in flight when switched off', async () => {
     const fixture = watched()
     let release!: () => void
     fixture.phone.sendGate = new Promise<void>(resolve => (release = resolve))
 
-    fixture.monitor.runStarted(60, true)
+    fixture.monitor.runStarted(60, { imaging: true, unattended: true })
     fixture.monitor.runEnded('failed')
     await settle()
 
-    const turnedOff = fixture.monitor.setPhoneAlerts(false)
+    const switchedOff = fixture.monitor.setUnattended(false)
 
     release()
-    await turnedOff
+    await switchedOff
 
     expect(fixture.phone.emergencies()).toHaveLength(1)
     expect(fixture.phone.cancels()).toEqual([expect.objectContaining({ receipt: 'receipt-1' })])
@@ -1171,7 +1219,7 @@ describe('the phone alerts switch', () => {
     await failedRun(fixture)
     fixture.phone.down = 'could not reach Pushover'
 
-    await fixture.monitor.setPhoneAlerts(false)
+    await fixture.monitor.setUnattended(false)
 
     expect(fixture.monitor.view().phone).toMatchObject({
       state: 'failing',
@@ -1186,7 +1234,7 @@ describe('the phone alerts switch', () => {
     expect(fixture.monitor.view().phone).toEqual({ state: 'ready' })
   })
 
-  it('does not tell the phone an alert cleared when that alert was sent before it was turned off', async () => {
+  it('does not tell the phone an alert cleared when it was switched off after that alert was sent', async () => {
     const fixture = watched()
     const frame = runOf(fixture, [3, 3, 3, 3, 3, 4.5, 4.5])
 
@@ -1196,514 +1244,57 @@ describe('the phone alerts switch', () => {
 
     const sent = fixture.phone.sends().length
 
-    await fixture.monitor.setPhoneAlerts(false)
+    await fixture.monitor.setUnattended(false)
     fixture.monitor.runEnded('stopped')
     await settle()
 
     expect(fixture.phone.sends()).toHaveLength(sent)
   })
 
-  it('refuses a test while off', async () => {
-    const fixture = watched({ phoneAlertsOn: false })
-
-    expect(await fixture.monitor.sendTest()).toEqual({ outcome: 'off' })
-    expect(fixture.phone.events).toEqual([])
-  })
-})
-
-describe('paging only in astronomical darkness', () => {
-  const greenwich: Site = { latitudeDegrees: 51.4769, longitudeDegrees: -0.0005 }
-
-  const noon = Date.parse('2026-10-18T12:00:00Z')
-  const outlook = darkOutlook(greenwich, new Date(noon))
-
-  if (outlook.dark || !outlook.from || !outlook.until) throw new Error('expected a dusk and a dawn at Greenwich in October')
-
-  const dusk = outlook.from.getTime()
-  const dawn = outlook.until.getTime()
-  const afterDawn = darkOutlook(greenwich, new Date(dawn + 3_600_000))
-
-  if (afterDawn.dark || !afterDawn.from) throw new Error('expected a second dusk')
-
-  const secondDusk = afterDawn.from.getTime()
-
-  /** A rig whose mount reports Greenwich, with the clock at `time` and the site already read. */
-  async function atGreenwich(time: number, options: Parameters<typeof watched>[0] = {}) {
-    const fixture = watched({ readSite: async () => greenwich, ...options })
-
-    fixture.at(time)
-    await fixture.monitor.learnSite()
-
-    return fixture
-  }
-
-  it('holds a no-stars alert raised in daylight and pages it once from the frame that crosses dusk', async () => {
-    const fixture = await atGreenwich(dusk - 7.5 * 60_000)
-    const frame = runOf(fixture, [], 0)
-
-    for (let index = 0; index < 5; index++) await frame(index)
-
-    expect(fixture.monitor.view().alerts).toEqual([expect.objectContaining({ id: 'no-stars', delivery: { state: 'outside-dark' } })])
-    expect(fixture.phone.events).toEqual([])
-
-    for (let index = 5; index < 10; index++) await frame(index)
-
-    expect(fixture.phone.emergencies()).toHaveLength(1)
-    expect(fixture.phone.sends()).toHaveLength(1)
-    expect(deliveryOfFirst(fixture)).toEqual({ state: 'sent' })
-  })
-
-  function failedRun(fixture: ReturnType<typeof watched>) {
-    fixture.monitor.runStarted(60, true)
-    fixture.monitor.runEnded('failed')
-
-    return settle()
-  }
-
-  /** Moves the clock and the timers on together in ten minute steps, as time passes on a server. */
-  async function passUntil(fixture: ReturnType<typeof watched>, time: number) {
-    while (fixture.clock() < time) {
-      const step = Math.min(600_000, time - fixture.clock())
-
-      fixture.tick(step)
-      await vi.advanceTimersByTimeAsync(step)
-    }
-  }
-
-  const deliveryOfFirst = (fixture: ReturnType<typeof watched>) => fixture.monitor.view().alerts[0]!.delivery
-
-  it('sends nothing in daylight, shows the alert with the reason, and says when paging starts', async () => {
-    const fixture = await atGreenwich(noon)
-
-    await failedRun(fixture)
-
-    expect(fixture.phone.events).toEqual([])
-
-    expect(fixture.monitor.view()).toMatchObject({
-      phoneAlertsOn: true,
-      pagingWindow: { state: 'not-dark', from: expect.closeTo(dusk, -4), until: expect.closeTo(dawn, -4) },
-      alerts: [expect.objectContaining({ id: 'run-failed', level: 'critical', delivery: { state: 'outside-dark' } })],
-    })
-  })
-
-  it('sends in astronomical darkness, and says when it stops', async () => {
-    const fixture = await atGreenwich(dusk + 3_600_000)
-
-    await failedRun(fixture)
-
-    expect(fixture.phone.emergencies()).toHaveLength(1)
-    expect(fixture.monitor.view().pagingWindow).toEqual({ state: 'astro-dark', until: expect.closeTo(dawn, -4) })
-    expect(deliveryOfFirst(fixture)).toEqual({ state: 'sent' })
-  })
-
-  it('pages an alert still standing when dark begins, once, from the frame that crosses dusk', async () => {
-    const fixture = await atGreenwich(dusk - 7.5 * 60_000)
-    const frame = runOf(fixture, [3, 3, 3, 3, 3, 7, 7, 7, 7, 7])
+  it('sends the cleared message when it is switched off and on again before the alert clears', async () => {
+    const fixture = watched()
+    const frame = runOf(fixture, [3, 3, 3, 3, 3, 4.5, 4.5])
 
     for (let index = 0; index < 7; index++) await frame(index)
 
-    expect(fixture.monitor.view().alerts.map(alert => alert.id)).toEqual(['hfr-bad'])
-    expect(fixture.phone.events).toEqual([])
-    expect(deliveryOfFirst(fixture)).toEqual({ state: 'outside-dark' })
-
-    await frame(7)
-
-    expect(fixture.phone.emergencies()).toHaveLength(1)
-    expect(deliveryOfFirst(fixture)).toEqual({ state: 'sent' })
-
-    await frame(8)
-    await frame(9)
-
-    expect(fixture.phone.sends()).toHaveLength(1)
-  })
-
-  it('pages at dusk with no frame or poll to notice it, once, for an alert a failed run left standing', async () => {
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
-
-    const fixture = await atGreenwich(noon)
-
-    await failedRun(fixture)
-    await passUntil(fixture, dusk - 60_000)
-
-    expect(fixture.phone.events).toEqual([])
-
-    await passUntil(fixture, dusk + 60_000)
-
-    expect(fixture.phone.emergencies()).toHaveLength(1)
-    expect(deliveryOfFirst(fixture)).toEqual({ state: 'sent' })
-
-    await passUntil(fixture, dusk + 1_800_000)
-
-    expect(fixture.phone.sends()).toHaveLength(1)
-  })
-
-  it('does not page an alert the evaluation at dusk clears, before the timer has noticed dusk', async () => {
-    const fixture = await atGreenwich(noon)
-
-    await failedRun(fixture)
-    fixture.at(dusk + 10_000)
-    fixture.monitor.runStarted(60, true)
+    await fixture.monitor.setUnattended(false)
+    await fixture.monitor.setUnattended(true)
+    fixture.monitor.runEnded('stopped')
     await settle()
 
-    expect(fixture.monitor.view().alerts).toEqual([])
-    expect(fixture.phone.events).toEqual([])
+    expect(fixture.phone.sends().map(event => event.message)).toEqual([
+      expect.stringContaining('HFR 4.5'),
+      expect.stringContaining('cleared'),
+    ])
   })
 
-  it('does not page an alert that cleared before dark', async () => {
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+  it('pages the failure that ends an Unattended run, and the failure of a run switched on while it ran', async () => {
+    const fixture = watched()
 
-    const fixture = await atGreenwich(noon)
-
-    await failedRun(fixture)
-    fixture.monitor.runStarted(60, true)
-    await settle()
-
-    expect(fixture.monitor.view().alerts).toEqual([])
-
-    await passUntil(fixture, dusk + 600_000)
-
-    expect(fixture.phone.events).toEqual([])
-  })
-
-  it('counts the hour of retries from dusk, not from when the alert was raised', async () => {
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
-
-    const fixture = await atGreenwich(noon)
-
-    await failedRun(fixture)
-    fixture.phone.down = 'Pushover answered HTTP 500'
-    await passUntil(fixture, dusk + 30_000)
-
-    expect(deliveryOfFirst(fixture)).toMatchObject({ state: 'retrying', failures: 1 })
-
-    const delivery = deliveryOfFirst(fixture)
-
-    if (delivery.state !== 'retrying') throw new Error('expected a retry')
-
-    expect(delivery.giveUpAt).toBeGreaterThan(dusk + 3_500_000)
-    expect(delivery.giveUpAt).toBeLessThan(dusk + 3_700_000)
-  })
-
-  it('cancels an emergency still repeating when dark ends, and says nothing when the alert clears', async () => {
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
-
-    const fixture = await atGreenwich(dawn - 600_000)
-
-    await failedRun(fixture)
-    expect(fixture.phone.emergencies()).toHaveLength(1)
-
-    await passUntil(fixture, dawn + 60_000)
-
-    expect(fixture.phone.cancels()).toEqual([expect.objectContaining({ receipt: 'receipt-1' })])
-    expect(deliveryOfFirst(fixture)).toEqual({ state: 'stopped-at-dawn' })
-    expect(fixture.monitor.view().pagingWindow).toMatchObject({ state: 'not-dark', from: secondDusk })
-
-    fixture.monitor.runStarted(60, true)
-    await settle()
-
-    expect(fixture.phone.sends()).toHaveLength(1)
-  })
-
-  it('does not page again at the next dusk an emergency dawn stopped, however many nights it stands', async () => {
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
-
-    const fixture = await atGreenwich(dawn - 600_000)
-
-    await failedRun(fixture)
-    await passUntil(fixture, secondDusk + 600_000)
-
-    expect(fixture.phone.emergencies()).toHaveLength(1)
-    expect(fixture.phone.cancels()).toHaveLength(1)
-    expect(deliveryOfFirst(fixture)).toEqual({ state: 'stopped-at-dawn' })
-  })
-
-  it('does not page an emergency dawn stopped when the switch goes off and on again before dusk', async () => {
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
-
-    const fixture = await atGreenwich(dawn - 600_000)
-
-    await failedRun(fixture)
-    await passUntil(fixture, dawn + 60_000)
-    await fixture.monitor.setPhoneAlerts(false)
-    await fixture.monitor.setPhoneAlerts(true)
-    await passUntil(fixture, secondDusk + 600_000)
-
-    expect(fixture.phone.emergencies()).toHaveLength(1)
-    expect(deliveryOfFirst(fixture)).toEqual({ state: 'stopped-at-dawn' })
-  })
-
-  it('pages an alert raised in daylight that never reached the phone at the next dusk, once', async () => {
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
-
-    const fixture = await atGreenwich(dawn + 600_000)
-
-    await failedRun(fixture)
-    await passUntil(fixture, secondDusk - 60_000)
-
-    expect(fixture.phone.events).toEqual([])
-    expect(deliveryOfFirst(fixture)).toEqual({ state: 'outside-dark' })
-
-    await passUntil(fixture, secondDusk + 600_000)
-
-    expect(fixture.phone.emergencies()).toHaveLength(1)
-    expect(deliveryOfFirst(fixture)).toEqual({ state: 'sent' })
-  })
-
-  it('pages at the next dusk an alert whose first page was still failing when dark ended', async () => {
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
-
-    const fixture = await atGreenwich(dawn - 600_000)
-
-    fixture.phone.down = 'Pushover answered HTTP 500'
-    await failedRun(fixture)
-    await passUntil(fixture, dawn + 60_000)
-
-    expect(fixture.phone.emergencies()).toHaveLength(0)
-    expect(deliveryOfFirst(fixture)).toEqual({ state: 'outside-dark' })
-
-    fixture.phone.down = null
-    await passUntil(fixture, secondDusk + 600_000)
-
-    expect(fixture.phone.emergencies()).toHaveLength(1)
-    expect(deliveryOfFirst(fixture)).toEqual({ state: 'sent' })
-  })
-
-  it('pages a condition that clears and raises again as a new alert, even after dawn stopped the first', async () => {
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
-
-    const fixture = await atGreenwich(dawn - 600_000)
-
-    await failedRun(fixture)
-    await passUntil(fixture, dawn + 60_000)
-
-    expect(deliveryOfFirst(fixture)).toEqual({ state: 'stopped-at-dawn' })
-
-    fixture.monitor.runStarted(60, true)
-    await settle()
-
-    expect(fixture.monitor.view().alerts).toEqual([])
-
+    fixture.monitor.runStarted(60, { imaging: true })
+    await fixture.monitor.setUnattended(true)
     fixture.monitor.runEnded('failed')
     await settle()
 
-    expect(deliveryOfFirst(fixture)).toEqual({ state: 'outside-dark' })
-
-    await passUntil(fixture, secondDusk + 600_000)
-
-    expect(fixture.phone.emergencies()).toHaveLength(2)
-    expect(deliveryOfFirst(fixture)).toEqual({ state: 'sent' })
-  })
-
-  it('does not page again at dusk an alert Chris acknowledged', async () => {
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
-
-    const fixture = await atGreenwich(dawn - 600_000)
-
-    await failedRun(fixture)
-    await fixture.monitor.acknowledge('run-failed')
-    await passUntil(fixture, secondDusk + 600_000)
-
     expect(fixture.phone.emergencies()).toHaveLength(1)
-    expect(deliveryOfFirst(fixture)).toEqual({ state: 'sent' })
   })
 
-  it('does not page an alert Chris acknowledged while it waited for dark', async () => {
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+  it('sends a test whatever the run', async () => {
+    const fixture = watched()
 
-    const fixture = await atGreenwich(noon)
-
-    await failedRun(fixture)
-    await fixture.monitor.acknowledge('run-failed')
-    await passUntil(fixture, dusk + 600_000)
-
-    expect(fixture.phone.events).toEqual([])
-  })
-
-  describe('when the site is not known', () => {
-    it('pages at any hour, as it did before, and says the site is unknown', async () => {
-      const fixture = watched()
-
-      fixture.at(noon)
-      await failedRun(fixture)
-
-      expect(fixture.phone.emergencies()).toHaveLength(1)
-      expect(fixture.monitor.view().pagingWindow).toEqual({ state: 'site-unknown' })
-    })
-
-    it('pages at any hour when the mount gives no usable location', async () => {
-      const fixture = await atGreenwich(noon, { readSite: async () => null })
-
-      await failedRun(fixture)
-
-      expect(fixture.phone.emergencies()).toHaveLength(1)
-      expect(fixture.monitor.view().pagingWindow).toEqual({ state: 'site-unknown' })
-    })
-
-    it('asks the mount again no sooner than every 30 seconds, and learns the site once it answers', async () => {
-      let answer: Site | null = null
-      const readSite = vi.fn(async () => answer)
-      const fixture = await atGreenwich(noon, { readSite })
-
-      await fixture.monitor.learnSite()
-      fixture.tick(29_000)
-      await fixture.monitor.learnSite()
-
-      expect(readSite).toHaveBeenCalledTimes(1)
-
-      answer = greenwich
-      fixture.tick(2_000)
-      await fixture.monitor.learnSite()
-
-      expect(readSite).toHaveBeenCalledTimes(2)
-      expect(fixture.monitor.view().pagingWindow.state).toBe('not-dark')
-
-      await fixture.monitor.learnSite()
-      expect(readSite).toHaveBeenCalledTimes(2)
-    })
-
-    it('keeps paging when the mount will not answer', async () => {
-      const fixture = await atGreenwich(noon, {
-        readSite: async () => {
-          throw new Error('Cria is not answering')
-        },
-      })
-
-      await failedRun(fixture)
-
-      expect(fixture.phone.emergencies()).toHaveLength(1)
-    })
-
-    it('stops what it paged at any hour once the site shows the sun is up', async () => {
-      let answer: Site | null = null
-      const fixture = await atGreenwich(noon, { readSite: async () => answer })
-
-      await failedRun(fixture)
-      expect(fixture.phone.emergencies()).toHaveLength(1)
-
-      answer = greenwich
-      fixture.tick(31_000)
-      await fixture.monitor.learnSite()
-      await settle()
-
-      expect(fixture.phone.cancels()).toEqual([expect.objectContaining({ receipt: 'receipt-1' })])
-      expect(deliveryOfFirst(fixture)).toEqual({ state: 'stopped-at-dawn' })
-    })
-
-    it('forgets a site the mount no longer reports, and pages at any hour again', async () => {
-      let answer: Site | null = greenwich
-      const fixture = await atGreenwich(noon, { readSite: async () => answer })
-
-      answer = null
-      fixture.monitor.runStarted(60, true)
-      await settle()
-      fixture.monitor.runEnded('failed')
-      await settle()
-
-      expect(fixture.phone.emergencies()).toHaveLength(1)
-      expect(fixture.monitor.view().pagingWindow).toEqual({ state: 'site-unknown' })
-    })
-
-    it('pages what was held under the old site as soon as the mount says the site is unknown', async () => {
-      let answer: Site | null = greenwich
-      const fixture = await atGreenwich(noon, { readSite: async () => answer })
-
-      answer = null
-      fixture.monitor.runStarted(60, true)
-      fixture.monitor.runEnded('failed')
-
-      expect(fixture.phone.events).toEqual([])
-
-      await settle()
-
-      expect(fixture.phone.emergencies()).toHaveLength(1)
-    })
-
-    it('keeps the old site when the mount cannot be reached', async () => {
-      let broken = false
-
-      const fixture = await atGreenwich(noon, {
-        readSite: async () => {
-          if (broken) throw new Error('Cria is not answering')
-
-          return greenwich
-        },
-      })
-
-      broken = true
-      fixture.monitor.runStarted(60, true)
-      await settle()
-
-      expect(fixture.monitor.view().pagingWindow.state).toBe('not-dark')
-    })
-
-    it('reads the site again when a run starts, since the mount may have been set since', async () => {
-      const readSite = vi.fn(async () => greenwich)
-      const fixture = await atGreenwich(noon, { readSite })
-
-      fixture.monitor.runStarted(60, true)
-      await settle()
-
-      expect(readSite).toHaveBeenCalledTimes(2)
-    })
-  })
-
-  describe('with the phone alerts switch', () => {
-    it('off still wins in the dark', async () => {
-      const fixture = await atGreenwich(dusk + 3_600_000, { phoneAlertsOn: false })
-
-      await failedRun(fixture)
-
-      expect(fixture.phone.events).toEqual([])
-      expect(deliveryOfFirst(fixture)).toEqual({ state: 'muted' })
-    })
-
-    it('off keeps an alert that waited for dark from paging at dusk, even if the switch comes back on first', async () => {
-      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
-
-      const fixture = await atGreenwich(noon)
-
-      await failedRun(fixture)
-      await fixture.monitor.setPhoneAlerts(false)
-
-      expect(deliveryOfFirst(fixture)).toEqual({ state: 'muted' })
-
-      await fixture.monitor.setPhoneAlerts(true)
-      await passUntil(fixture, dusk + 600_000)
-
-      expect(fixture.phone.events).toEqual([])
-      expect(deliveryOfFirst(fixture)).toEqual({ state: 'muted' })
-    })
-
-    it('on at dusk pages what waited, and off at dusk does not', async () => {
-      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
-
-      const fixture = await atGreenwich(noon)
-
-      await failedRun(fixture)
-      await passUntil(fixture, dusk + 60_000)
-
-      expect(fixture.phone.emergencies()).toHaveLength(1)
-
-      await fixture.monitor.setPhoneAlerts(false)
-
-      expect(fixture.phone.cancels()).toHaveLength(1)
-      expect(deliveryOfFirst(fixture)).toEqual({ state: 'muted' })
-    })
-  })
-
-  it('sends a test in daylight, because Chris asked for it', async () => {
-    const fixture = await atGreenwich(noon)
+    fixture.monitor.runStarted(60, { imaging: true })
 
     expect(await fixture.monitor.sendTest()).toEqual({ outcome: 'delivered' })
     expect(fixture.phone.sends()).toHaveLength(1)
   })
 
-  it('watches nothing when there are no phone keys', async () => {
-    const readSite = vi.fn(async () => greenwich)
-    const fixture = await atGreenwich(noon, { connected: false, readSite })
+  it('has no phone to page without keys, and says so', async () => {
+    const fixture = watched({ connected: false })
 
-    expect(readSite).not.toHaveBeenCalled()
-    expect(fixture.monitor.view().pagingWindow).toEqual({ state: 'site-unknown' })
+    await failedRun(fixture)
+
+    expect(fixture.monitor.view().alerts[0]!.delivery).toEqual({ state: 'not-configured' })
+    expect(await fixture.monitor.sendTest()).toEqual({ outcome: 'not-configured' })
   })
 })
 
@@ -1711,106 +1302,39 @@ describe('paging only in astronomical darkness', () => {
 // A server restart ends the run
 
 describe('an interrupted run', () => {
-  const greenwich: Site = { latitudeDegrees: 51.4769, longitudeDegrees: -0.0005 }
-  const noon = Date.parse('2026-10-18T12:00:00Z')
-  const night = Date.parse('2026-10-19T00:00:00Z')
   const message = 'Capture was interrupted: Vela restarted (12 of 30 frames taken)'
 
-  it('raises one run-interrupted emergency, and drops it when the next run starts', async () => {
+  it('pages an Unattended run with one run-interrupted emergency, and drops it when the next run starts', async () => {
     const fixture = watched()
 
-    await fixture.monitor.runInterrupted(message)
+    fixture.monitor.runInterrupted(message, true)
     await settle()
 
-    expect(fixture.monitor.view().alerts).toEqual([
-      expect.objectContaining({ id: 'run-interrupted', level: 'critical', message }),
-    ])
+    expect(fixture.monitor.view()).toMatchObject({
+      unattended: true,
+      alerts: [expect.objectContaining({ id: 'run-interrupted', level: 'critical', message })],
+    })
 
     expect(fixture.phone.emergencies()).toHaveLength(1)
 
     fixture.tick(60_000)
-    fixture.monitor.runStarted(60, true)
+    fixture.monitor.runStarted(60, { imaging: true })
     await settle()
 
     expect(fixture.monitor.view().alerts).toEqual([])
     expect(fixture.phone.cancels()).toHaveLength(1)
   })
 
-  it('does not page in daylight once the rig has said where it is', async () => {
-    const fixture = watched({ readSite: async () => greenwich })
+  it('shows the alert but does not page a run that was not Unattended', async () => {
+    const fixture = watched()
 
-    fixture.at(noon)
-    await fixture.monitor.runInterrupted(message)
+    fixture.monitor.runInterrupted(message, false)
     await settle()
 
     expect(fixture.phone.events).toEqual([])
 
     expect(fixture.monitor.view().alerts).toEqual([
-      expect.objectContaining({ id: 'run-interrupted', delivery: { state: 'outside-dark' } }),
+      expect.objectContaining({ id: 'run-interrupted', delivery: { state: 'attended' } }),
     ])
-  })
-
-  it('pages at night once the rig has said where it is', async () => {
-    const fixture = watched({ readSite: async () => greenwich })
-
-    fixture.at(night)
-    await fixture.monitor.runInterrupted(message)
-    await settle()
-
-    expect(fixture.phone.emergencies()).toHaveLength(1)
-  })
-
-  it('waits for a mount that has not answered yet before it decides whether it is dark', async () => {
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
-
-    const readSite = vi.fn<() => Promise<Site | null>>().mockRejectedValueOnce(new Error('starting up')).mockResolvedValue(greenwich)
-    const fixture = watched({ readSite })
-
-    fixture.at(noon)
-
-    const raising = fixture.monitor.runInterrupted(message)
-
-    await settle()
-
-    expect(fixture.monitor.view().alerts).toEqual([])
-
-    await vi.advanceTimersByTimeAsync(30_000)
-    await raising
-
-    expect(readSite).toHaveBeenCalledTimes(2)
-    expect(fixture.phone.events).toEqual([])
-    expect(fixture.monitor.view().alerts).toEqual([expect.objectContaining({ delivery: { state: 'outside-dark' } })])
-  })
-
-  it('pages at any hour when the mount never answers, as every alert does for an unknown site', async () => {
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
-
-    const readSite = vi.fn<() => Promise<Site | null>>().mockRejectedValue(new Error('unreachable'))
-    const fixture = watched({ readSite })
-
-    fixture.at(noon)
-
-    const raising = fixture.monitor.runInterrupted(message)
-
-    await vi.advanceTimersByTimeAsync(3 * 30_000)
-    await raising
-
-    expect(readSite).toHaveBeenCalledTimes(4)
-    expect(fixture.phone.emergencies()).toHaveLength(1)
-  })
-
-  it('gives way to a run that starts while it waits', async () => {
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
-
-    const fixture = watched({ readSite: vi.fn().mockRejectedValue(new Error('starting up')) })
-    const raising = fixture.monitor.runInterrupted(message)
-
-    await settle()
-    fixture.monitor.runStarted(60, true)
-    await vi.advanceTimersByTimeAsync(3 * 30_000)
-    await raising
-
-    expect(fixture.monitor.view().alerts).toEqual([])
-    expect(fixture.phone.events).toEqual([])
   })
 })

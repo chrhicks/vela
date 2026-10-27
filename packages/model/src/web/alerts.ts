@@ -2,7 +2,11 @@ export type AlertLevel = 'warn' | 'critical'
 
 /** How the phone is getting on with one alert. */
 export type AlertDelivery =
-  | { state: 'sent' | 'sending' | 'covered' | 'not-configured' | 'muted' | 'outside-dark' | 'stopped-at-dawn' }
+  | { state: 'sent' | 'sending' | 'covered' | 'not-configured' }
+  /** The run is not Unattended, so the phone was not told. Switching Unattended on pages it, once, if it still stands. */
+  | { state: 'attended' }
+  /** The emergency reached the phone and was cancelled when Unattended went off. It is not sent again. */
+  | { state: 'stopped' }
   | { state: 'retrying'; failures: number; nextAttemptAt: number; giveUpAt: number }
   | { state: 'gave-up'; failures: number }
 
@@ -22,16 +26,6 @@ export type PhoneAlertsView =
   | { state: 'ready' }
   | { state: 'failing'; reason: string; since: number }
 
-/**
- * When the phone is paged for this rig: only while the sun is below -18 degrees at the rig's site.
- * Times are epoch milliseconds; null means the sun does not cross that line within two days.
- */
-export type PagingWindow =
-  /** The mount gave no location, so alerts page at any hour. */
-  | { state: 'site-unknown' }
-  | { state: 'astro-dark'; until: number | null }
-  | { state: 'not-dark'; from: number | null; until: number | null }
-
 /** The server's watch on one rig: what is wrong now, what cannot be watched, and the phone. */
 export interface AlertsView {
   rigId: string
@@ -42,10 +36,8 @@ export interface AlertsView {
   /** Watches that cannot run, such as "meridian watch unavailable: pier side". */
   unavailable: string[]
   phone: PhoneAlertsView
-  /** Chris's switch for this rig. Off means Vela sends nothing to the phone; alerts still show here. */
-  phoneAlertsOn: boolean
-  /** When the switch, if on, actually pages. Alerts raised outside it show here with delivery `outside-dark`. */
-  pagingWindow: PagingWindow
+  /** The phone is paged only while the current run is Unattended; alerts show here either way. */
+  unattended: boolean
   /** Every number the rules use, by name. */
   thresholds: Readonly<Record<string, number>>
 }

@@ -4,11 +4,9 @@ import type { AlpacaDeviceInspection } from '@vela/alpaca'
 import * as statistics from '../imaging/statistics.js'
 import { CaptureStoppedError, type CaptureCamera, type CaptureFrame } from '../capture/controller.js'
 import { registerCapture } from '../capture/routes.js'
-import type { Site } from '../astronomy/coordinates.js'
 import { createMemoryRigCatalog } from '../rig/catalog.js'
 import { createRigOperations } from '../rig/operations.js'
 import { NotifierError, type Notification, type Notifier } from './notifier.js'
-import { createMemoryPhoneAlertsPreference, type PhoneAlertsPreference } from './preference.js'
 import { registerAlerts } from './routes.js'
 import { defaultThresholds } from './thresholds.js'
 
@@ -66,7 +64,7 @@ function fakePhone() {
 
 const settle = () => new Promise(resolve => setTimeout(resolve, 0))
 
-function setup(options: { keys?: boolean; phoneAlerts?: PhoneAlertsPreference; site?: Site; now?: () => number } = {}) {
+function setup(options: { keys?: boolean; now?: () => number } = {}) {
   const app = Fastify()
   const catalog = createMemoryRigCatalog([rig])
   const { phone, notifier } = fakePhone()
@@ -74,8 +72,6 @@ function setup(options: { keys?: boolean; phoneAlerts?: PhoneAlertsPreference; s
   const alerts = registerAlerts(app, catalog, {
     thresholds: defaultThresholds,
     notifier: options.keys === false ? null : notifier,
-    ...(options.phoneAlerts && { phoneAlerts: options.phoneAlerts }),
-    ...(options.site && { siteReaderFor: () => async () => options.site! }),
     ...(options.now && { now: options.now }),
   })
 
@@ -101,19 +97,6 @@ describe('alerts routes', () => {
       phone: { state: 'ready' },
       thresholds: { starsCollapsedRatio: 0.15, hfrBadPixels: 6, meridianTrackLimitHours: 0.0669 },
     })
-  })
-
-  it('says the site is unknown until the mount gives one, then when the phone is paged', async () => {
-    const greenwich = { latitudeDegrees: 51.4769, longitudeDegrees: -0.0005 }
-    const { app } = setup({ site: greenwich, now: () => Date.parse('2026-10-18T12:00:00Z') })
-
-    const first = await app.inject({ method: 'GET', url: '/api/web/rigs/sim/alerts' })
-    expect(first.json().pagingWindow).toEqual({ state: 'site-unknown' })
-
-    await settle()
-
-    const second = await app.inject({ method: 'GET', url: '/api/web/rigs/sim/alerts' })
-    expect(second.json().pagingWindow).toMatchObject({ state: 'not-dark', from: expect.any(Number), until: expect.any(Number) })
   })
 
   it('says phone alerts are not configured when there are no keys, and refuses a test', async () => {
@@ -149,85 +132,23 @@ describe('alerts routes', () => {
     expect(view.json().phone).toMatchObject({ state: 'failing', reason: 'Pushover answered HTTP 429' })
   })
 
-  describe('the phone alerts switch', () => {
-    const put = (app: ReturnType<typeof setup>['app'], payload: string, url = '/api/rigs/sim/alerts/phone') =>
-      app.inject({ method: 'PUT', url, headers: jsonBody, payload })
+  it('has no phone alerts switch: the phone is paged by the run being Unattended', async () => {
+    const { app } = setup()
 
-    it('is on in the view until it is turned off, and the choice shows in the view it answers with', async () => {
-      const { app } = setup()
+    const view = await app.inject({ method: 'GET', url: '/api/web/rigs/sim/alerts' })
+    expect(view.json()).toMatchObject({ unattended: false })
+    expect(view.json()).not.toHaveProperty('phoneAlertsOn')
+    expect(view.json()).not.toHaveProperty('pagingWindow')
 
-      const before = await app.inject({ method: 'GET', url: '/api/web/rigs/sim/alerts' })
-      expect(before.json().phoneAlertsOn).toBe(true)
+    const put = await app.inject({ method: 'PUT', url: '/api/rigs/sim/alerts/phone', headers: jsonBody, payload: { on: false } })
+    expect(put.statusCode).toBe(404)
+  })
 
-      const off = await put(app, JSON.stringify({ on: false }))
-      expect(off.statusCode).toBe(200)
-      expect(off.json().phoneAlertsOn).toBe(false)
+  it('sends a test whatever the run', async () => {
+    const { phone, post } = setup()
 
-      const after = await app.inject({ method: 'GET', url: '/api/web/rigs/sim/alerts' })
-      expect(after.json().phoneAlertsOn).toBe(false)
-    })
-
-    it('stops an alert reaching the phone, cancels a repeating emergency, and refuses a test', async () => {
-      const { app, alerts, phone, post } = setup()
-      const monitor = alerts.monitorFor({ id: 'sim', name: 'Simulator' })
-
-      monitor.runStarted(60, true)
-      monitor.runEnded('failed')
-      await settle()
-      expect(phone.sent).toHaveLength(1)
-
-      await put(app, JSON.stringify({ on: false }))
-      expect(phone.cancelled).toEqual(['receipt-1'])
-
-      const test = await post('/api/rigs/sim/alerts/test')
-      expect(test.statusCode).toBe(409)
-      expect(test.json()).toEqual({ error: 'phone-alerts-off' })
-
-      monitor.runStarted(60, true)
-      monitor.runEnded('failed')
-      await settle()
-      expect(phone.sent).toHaveLength(1)
-    })
-
-    it('is remembered by a server that starts again with the same preference', async () => {
-      const phoneAlerts = createMemoryPhoneAlertsPreference()
-
-      await put(setup({ phoneAlerts }).app, JSON.stringify({ on: false }))
-
-      const restarted = setup({ phoneAlerts })
-      const view = await restarted.app.inject({ method: 'GET', url: '/api/web/rigs/sim/alerts' })
-      expect(view.json().phoneAlertsOn).toBe(false)
-
-      restarted.alerts.monitorFor({ id: 'sim', name: 'Simulator' }).runStarted(60, true)
-      restarted.alerts.monitorFor({ id: 'sim', name: 'Simulator' }).runEnded('failed')
-      await settle()
-      expect(restarted.phone.sent).toEqual([])
-    })
-
-    it('does not change the monitor when the choice could not be saved', async () => {
-      const phoneAlerts: PhoneAlertsPreference = {
-        isOn: () => true,
-        set: () => Promise.reject(new Error('disk full')),
-      }
-
-      const { app } = setup({ phoneAlerts })
-
-      const response = await put(app, JSON.stringify({ on: false }))
-      expect(response.statusCode).toBe(500)
-      expect(response.json()).toEqual({ error: 'phone-alerts-not-saved' })
-
-      const view = await app.inject({ method: 'GET', url: '/api/web/rigs/sim/alerts' })
-      expect(view.json().phoneAlertsOn).toBe(true)
-    })
-
-    it('rejects a body that is not exactly { on: boolean }, and an unknown rig', async () => {
-      const { app } = setup()
-
-      expect((await put(app, JSON.stringify({}))).statusCode).toBe(400)
-      expect((await put(app, JSON.stringify({ on: 'no' }))).statusCode).toBe(400)
-      expect((await put(app, JSON.stringify({ on: false, extra: 1 }))).statusCode).toBe(400)
-      expect((await put(app, JSON.stringify({ on: false }), '/api/rigs/nope/alerts/phone')).statusCode).toBe(404)
-    })
+    expect((await post('/api/rigs/sim/alerts/test')).statusCode).toBe(200)
+    expect(phone.sent).toEqual([{ title: 'Vela: Simulator', message: 'test', priority: 0 }])
   })
 
   it('answers 404 for an unknown rig on every route', async () => {
@@ -256,7 +177,7 @@ describe('alerts routes', () => {
       const fixture = setup()
       const monitor = fixture.alerts.monitorFor({ id: 'sim', name: 'Simulator' })
 
-      monitor.runStarted(60, true)
+      monitor.runStarted(60, { imaging: true, unattended: true })
       monitor.runEnded('failed')
       await settle()
 
@@ -300,7 +221,7 @@ describe('alerts routes', () => {
       const monitor = alerts.monitorFor({ id: 'sim', name: 'Simulator' })
       phone.down = 'Pushover answered HTTP 503'
 
-      monitor.runStarted(60, true)
+      monitor.runStarted(60, { imaging: true, unattended: true })
       monitor.runEnded('failed')
       await vi.advanceTimersByTimeAsync(0)
 
@@ -407,13 +328,15 @@ describe('a capture run feeds the alerts', () => {
       app,
       phone,
       captures,
-      start: () =>
+      start: (unattended = true) =>
         app.inject({
           method: 'POST',
           url: '/api/rigs/sim/capture/start',
           headers: jsonBody,
-          payload: { exposureSeconds: 60, repeat: true },
+          payload: { exposureSeconds: 60, repeat: true, unattended },
         }),
+      switchUnattended: (on: boolean) =>
+        app.inject({ method: 'PUT', url: '/api/rigs/sim/capture/unattended', headers: jsonBody, payload: { on } }),
       stop: () => app.inject({ method: 'POST', url: '/api/rigs/sim/capture/stop' }),
       alerts: async () => (await app.inject({ method: 'GET', url: '/api/web/rigs/sim/alerts' })).json(),
     }
@@ -491,5 +414,66 @@ describe('a capture run feeds the alerts', () => {
 
     expect(await stopped.alerts()).toMatchObject({ watching: false, alerts: [] })
     expect(stopped.phone.sent).toEqual([])
+  })
+
+  it('shows but does not page the failure of a run started without Unattended', async () => {
+    const attended = runningRig()
+
+    expect((await attended.start(false)).json()).toMatchObject({ unattended: false })
+    expect(await attended.alerts()).toMatchObject({ unattended: false })
+    await vi.waitFor(() => expect(attended.captures).toHaveLength(1))
+    attended.captures[0]!.reject(new Error('Camera disconnected'))
+
+    await vi.waitFor(async () =>
+      expect((await attended.alerts()).alerts).toEqual([
+        expect.objectContaining({ id: 'run-failed', delivery: { state: 'attended' } }),
+      ]),
+    )
+
+    expect(attended.phone.sent).toEqual([])
+  })
+
+  it('switches Unattended on during a run, pages the failure that follows, and refuses once the run has ended', async () => {
+    const subject = runningRig()
+
+    await subject.start(false)
+    await vi.waitFor(() => expect(subject.captures).toHaveLength(1))
+
+    const on = await subject.switchUnattended(true)
+    expect(on.statusCode).toBe(200)
+    expect(on.json()).toMatchObject({ unattended: true, active: true })
+    expect(await subject.alerts()).toMatchObject({ unattended: true })
+
+    subject.captures[0]!.reject(new Error('Camera disconnected'))
+    await vi.waitFor(() => expect(subject.phone.sent).toEqual([expect.objectContaining({ priority: 2 })]))
+
+    const off = await subject.switchUnattended(false)
+    expect(off.statusCode).toBe(409)
+    expect(off.json().error).toMatch(/no running capture/)
+  })
+
+  it('switches Unattended off during a run, and the alerts view follows', async () => {
+    const subject = runningRig()
+
+    await subject.start()
+    await vi.waitFor(() => expect(subject.captures).toHaveLength(1))
+
+    expect((await subject.switchUnattended(false)).json()).toMatchObject({ unattended: false })
+    expect(await subject.alerts()).toMatchObject({ unattended: false })
+  })
+
+  it('refuses to switch Unattended when no run is active, on a body that is not { on }, and for an unknown rig', async () => {
+    const subject = runningRig()
+
+    expect((await subject.switchUnattended(true)).statusCode).toBe(409)
+
+    await subject.start()
+
+    const put = (url: string, payload: unknown) => subject.app.inject({ method: 'PUT', url, headers: jsonBody, payload: payload as string })
+
+    expect((await put('/api/rigs/sim/capture/unattended', {})).statusCode).toBe(400)
+    expect((await put('/api/rigs/sim/capture/unattended', { on: 'yes' })).statusCode).toBe(400)
+    expect((await put('/api/rigs/sim/capture/unattended', { on: true, extra: 1 })).statusCode).toBe(400)
+    expect((await put('/api/rigs/nope/capture/unattended', { on: true })).statusCode).toBe(404)
   })
 })

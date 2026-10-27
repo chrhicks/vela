@@ -1,13 +1,13 @@
 # Alerts
 
-Tells Chris when a capture run goes wrong, on screen and on his phone. It never stops capture
-or moves the mount.
+Tells Chris when a capture run goes wrong, on screen always and on his phone only when the run is
+[Unattended](#unattended). It never stops capture or moves the mount.
 
 - `rules.ts` is pure: a rig's history in, the conditions that hold now out. All the numbers live in
   `thresholds.ts`.
 - `monitor.ts` keeps that history for one rig, feeds the rules, and turns conditions into episodes.
 - `pushover.ts` is the phone, behind the `Notifier` interface in `notifier.ts`. `config.ts` reads
-  `alerts.json`. `preference.ts` keeps the phone alerts switch. `mount.ts` reads a Cria rig's mount. `site.ts` reads where a rig is. `routes.ts` is the HTTP surface. The browser side (banner and rig-page card) is
+  `alerts.json`. `mount.ts` reads a Cria rig's mount. `routes.ts` is the HTTP surface. The browser side (banner and rig-page card) is
   `apps/web/src/features/alerts`; its contract is `AlertsView` in `@vela/model/web`.
 
 ## Star counts
@@ -70,15 +70,14 @@ A frame whose star measurement failed does not count as a frame without stars.
 
 ### Calibration runs
 
-A calibration run (frame type dark, flat, dark flat or bias) has no stars and needs no tracking. The
-capture route calls `runStarted(exposureSeconds, imaging, calibration)` with `imaging` false and
-`calibration` true, and the monitor knows that from the first reading. Such a run can raise
-`rig-unreachable`, `frames-stalled`, `run-failed` and the meridian alerts, which read the mount's pointing
-whatever the frame type. It cannot raise a star alert, `no-stars` or `tracking-stopped`: `tracking-stopped`
-is not evaluated at all, so a mount left standing still on purpose (indoors, homed, tracking off) neither
-shows an alert nor pages the phone. A restart that interrupts a calibration run raises nothing. A light run is
-unchanged: it raises `tracking-stopped` after two consecutive readings of a mount that is not tracking, not
-slewing and not parked.
+Rules apply by run kind. A calibration run (frame type dark, flat, dark flat or bias) has no stars,
+needs no tracking and is not pointed anywhere, so only the rig can go wrong: it can raise
+`rig-unreachable`, `frames-stalled`, `run-failed` and `run-interrupted`, and nothing else. An
+Unattended overnight dark series therefore pages only for a rig problem. The capture route calls
+`runStarted(exposureSeconds, { imaging, calibration, unattended })` with `imaging` false and
+`calibration` true, and the monitor knows that from the first reading; the meridian watch is not
+evaluated for it, so it does not report itself unavailable either. A light run raises `tracking-stopped`
+after two consecutive readings of a mount that is not tracking, not slewing and not parked.
 
 The baseline is the median of the last five frames that no alert called bad, so a long cloud never
 becomes normal. A weaker alert is hidden while a stronger one covers it (`stars-dropping` and
@@ -107,7 +106,7 @@ until it is acknowledged, because Pushover does that, not Vela.
   clears. The first retry comes after a minute, and each pause doubles up to five minutes. Vela
   gives up once the next try would fall an hour (an emergency's `expire`) after the alert was raised,
   because Pushover would have stopped repeating by then. Each alert in the alerts view carries its
-  `delivery`: `sent`, `sending`, `not-configured`, `outside-dark`, `stopped-at-dawn`, `retrying` (with `failures`, `nextAttemptAt` and
+  `delivery`: `sent`, `sending`, `covered`, `not-configured`, `attended`, `stopped`, `retrying` (with `failures`, `nextAttemptAt` and
   `giveUpAt`) or `gave-up`. The retry has its own timer, so it carries on after the run has ended:
   a `run-failed` emergency refused during a phone outage still goes out when the phone is back, if
   that is within the hour. The alerts view says "phone alerts failing" with the reason meanwhile.
@@ -125,82 +124,45 @@ until it is acknowledged, because Pushover does that, not Vela.
 ## An interrupted run
 
 A server restart that finds a capture run unfinished (see [capture restarts](../capture/README.md#restarts))
-calls `runInterrupted(message)` for a light run, and the rules raise `run-interrupted` (critical,
-an emergency) with "Capture was interrupted: Vela restarted (12 of 30 frames taken)". A
-calibration run raises nothing. It clears when a run starts, like `run-failed`, and obeys the
-switch, astro dark and one page per alert like every alert.
+calls `runInterrupted(message, unattended)`, with `unattended` read from the run's record, and the rules raise
+`run-interrupted` (critical, an emergency) with "Capture was interrupted: Vela restarted (12 of 30 frames
+taken)". It is raised for a calibration run too, since a restart is a rig problem whatever the frame type.
+It pages the phone if the run was Unattended and is shown in the banner either way. It clears when a run
+starts, like `run-failed`. The episode is in memory, so every server start with an unfinished record raises it
+again.
 
-A server that has only just started often cannot reach the mount yet, and an unknown site pages at any hour. So
-the alert first asks for the site, up to four tries 30 s apart, and only then evaluates: a daytime
-deploy does not buzz the phone. If the mount never answers the alert fails open, as any alert does
-for an unknown site. A run started during the wait supersedes it. The episode is in memory, so every
-server start with an unfinished record raises it again.
+## Unattended
 
-## The phone alerts switch
+Alerts raise, clear and show in the banner on every run. The phone is paged only while the current run is
+**Unattended**, a per-run choice of Chris's, and a new run starts with it off. There is no per-rig switch and
+no sunlight rule: leaving the rig to itself is the one thing that says nobody is looking, and he says so.
 
-Each rig has a switch, on unless Chris turns it off from the app. Off means Vela sends that rig
-nothing to Pushover: no new alert, no retry, no `cleared` message and no test. Alerts still raise,
-clear and show in the banner, with delivery `muted`. Turning it off while an emergency repeats
-cancels its receipt the same way acknowledging does; if Pushover will not take the cancel, the
-receipt joins the strays above and the view says phone alerts are failing until it succeeds.
-
-Turning it back on does not replay anything. An alert raised or silenced while off stays `muted`
-until it clears, and only alerts raised afterwards page. An alert the phone was told about as a
-quiet message before the switch went off still gets its `cleared` message if the switch is on again
-by then.
-
-- `PUT /api/rigs/:rigId/alerts/phone` with `{ "on": boolean }` saves the choice, applies it to
-  the monitor and answers with the alerts view (`phoneAlertsOn`). A save that fails answers 500
-  and changes nothing.
-- The choice is stored in `phone-alerts.json` next to the rig catalog (`rigs.yaml`), as
-  `{ "phoneAlerts": { "<rigId>": false } }`, so it survives a restart. A rig with no entry is on.
-  The server will not start on a file it cannot read, rather than page a phone Chris turned off.
-  `alerts.json` is never touched.
-- With no Pushover keys there is nothing to switch, and the browser hides the control.
-
-## Astronomical darkness
-
-The phone is paged only while the sun is below -18 degrees (`astronomicalDarkDegrees` in
-`../astronomy/sun.ts`, fixed in code) at the rig's site, because that is the only time a rig is
-left unattended. Outside it, alerts still raise, clear and show in the banner, with delivery
-`outside-dark` ("Not sent · outside astro dark"). The switch comes first: off is `muted`, and
-only a switch that is on goes on to ask about the sun. A test message is Chris asking for a page,
-so it ignores the sun.
-
-- **Site.** `site.ts` asks the rig's only telescope for the latitude and longitude its mount
-  already reports, so Chris types no coordinates. A mount reporting nothing, a value off the globe,
-  or exactly 0 N 0 E (what a mount with no location set says) counts as no site. The monitor reads
-  it when the alerts view is asked for and the site is unknown (no more often than every 30 s),
-  and again when a run starts. A site that is known is not read again between runs. If the mount
-  answers at run start with no usable location, the old site is dropped (the rig may have moved)
-  and the rig pages at any hour; a mount that does not answer leaves the old site.
-- **Unknown site fails open.** A missed alert on an unattended rig costs more than an extra page, so
-  an unknown site pages at any hour, as before. The view says `pagingWindow: site-unknown` and the
-  switch reads "pages at any hour · rig location unknown". Learning the site later in daylight
-  takes the same step as dawn, below.
-- **Sun.** `sunAltitudeDegrees` and `darkOutlook` use Astronomy Engine, already a dependency, with
-  no refraction, as twilight is defined. `darkOutlook` also finds the coming dusk and dawn, or null
-  when the sun does not cross -18 within two days (a Greenwich midsummer, or a polar winter).
-- **Held alerts.** An alert raised in daylight has delivery `held`. The view shows `outside-dark`.
-  An alert that cleared before dark was never sent, so it never pages.
-- **Dusk.** When dark begins, or the site becomes unknown, every alert still standing that was held
-  and not acknowledged is told to the phone, once, as if raised then. An evaluation reconciles the
-  conditions first, so an alert it clears is never released. Its retry hour starts at dusk. The monitor notices
-  from its next evaluation (a frame or a mount poll) or from its own timer, which sleeps until the
-  next crossing (never more than 6 h), so a failed run's alert still pages at dusk with no poll
-  running.
-- **Dawn.** When dark ends, an emergency repeating on the phone is cancelled through the same path
-  as turning the switch off. That was its page, so its delivery becomes `stopped-at-dawn` ("Sent once
-  · stopped at dawn") and it stays that way until it clears. One waiting to go out, or being retried,
-  is held. A warn that was already sent stays sent. There is no `cleared` message in daylight, and a
-  stopped emergency gets none when it clears later.
-- **One page per alert.** An alert that reached the phone never pages again: not at the next dusk, not
-  after the switch goes off and on. An alert that never did (raised in daylight, waiting, or still
-  failing to send at dawn) pages once at the next dusk. A condition that clears and raises again is a
-  new alert and may page. Learning in daylight that the site is not dark stops what was paged at any
-  hour the same way.
-- **Switch and sun.** Turning the switch off mutes held alerts too, so turning it on again before
-  dusk does not page them. Turning it on pages nothing it had not already.
+- **Where it lives.** In the run record (`unattended`, see [capture restarts](../capture/README.md#restarts)),
+  so it survives a Vela restart and an interrupted Unattended run pages. The capture routes own it: the start
+  body takes `unattended` (default false), and `PUT /api/rigs/:rigId/capture/unattended` with `{ "on": boolean }`
+  switches it on a running run at any time, with no other condition, and answers with the capture view
+  (`unattended`). It is 409 when no run is active. The monitor holds a copy for the run it watches
+  (`runStarted`, `setUnattended`, `runInterrupted`) and shows it as `unattended` in the alerts view. A resumed
+  run is a new run and starts attended.
+- **An alert raised while it is off** has delivery `attended` ("Not sent · Unattended is off"). Nothing is sent
+  for it, no retry, no `cleared` message.
+- **Switching it on pages what is standing, once** (the choice for open question 1 of the spec: going to bed
+  with a live problem must still wake Chris). Every alert that was not told to the phone and is not
+  acknowledged is sent as if raised then, with its retry hour counted from the switch. A weaker alert that a
+  stronger one covers is still covered, not sent.
+- **Switching it off** stops what is repeating the way acknowledging does: the emergency's receipt is cancelled,
+  and if Pushover will not take the cancel the receipt joins the strays below and the view says phone alerts are
+  failing until it succeeds. A retry that was waiting is dropped, and nothing more is sent for the run until it
+  is switched on again.
+- **One page per alert.** An alert that reached the phone never pages again: an emergency cancelled by switching
+  off has delivery `stopped` and switching on does not release it; a quiet message still gets its `cleared`
+  message if Unattended is on again by the time the alert clears. A condition that clears and raises again is a
+  new alert and may page.
+- **`run-failed` and a retry outlive the run.** Unattended stays as the run left it until the next run starts, so
+  a failed Unattended run still pages, and a send the phone refused keeps being retried after the run ended.
+- A test message still pages on request, whatever the run (`POST /api/rigs/:rigId/alerts/test`).
+- With no Pushover keys there is nothing to page and the browser says phone alerts are not set up.
+- A leftover `phone-alerts.json` from the removed per-rig switch is ignored; the server logs one warning at start.
 
 ## What feeds the monitor
 
