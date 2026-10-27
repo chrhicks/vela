@@ -1,9 +1,7 @@
-import type { RigDetailView, RigDeviceDetailView, RigSwitchChannelView } from '@vela/model/web'
+import type { RigDeviceDetailView, RigSwitchChannelView } from '@vela/model/web'
 import { IconButton } from '@vela/ui'
-import { useEffect, useId, useRef, useState } from 'react'
-import { ClearHold } from './ClearHold'
+import { useId, useState } from 'react'
 import { DeviceIcon } from './DeviceIcon'
-import { MountControls } from './MountControls'
 
 interface Metric {
   readonly label: string
@@ -32,30 +30,14 @@ const kindLabels = {
   unknown: 'Device',
 } as const
 
-export function RigDeviceRow({ device, stale, imagingCamera = false, rigId, refresh, revealMount = false }: {
+export function RigDeviceRow({ device, stale, imagingCamera = false }: {
   readonly device: RigDeviceDetailView
   readonly stale: boolean
   readonly imagingCamera?: boolean
-  readonly rigId?: string
-  readonly refresh?: () => Promise<RigDetailView | undefined>
-  readonly revealMount?: boolean
 }) {
-  const [open, setOpen] = useState(revealMount)
-  const controls = useRef<HTMLDivElement>(null)
+  const [open, setOpen] = useState(false)
   const id = useId()
 
-  useEffect(() => {
-    if (!revealMount) return
-
-    setOpen(true)
-
-    const frame = requestAnimationFrame(() => {
-      controls.current?.scrollIntoView({ block: 'center' })
-      controls.current?.focus({ preventScroll: true })
-    })
-
-    return () => cancelAnimationFrame(frame)
-  }, [revealMount])
   stale = stale || device.observation?.state === 'interrupted'
   const connection = connectionPresentation(device, stale)
   const presentation = devicePresentation(device)
@@ -104,10 +86,10 @@ export function RigDeviceRow({ device, stale, imagingCamera = false, rigId, refr
           onClick={() => setOpen(value => !value)}
         />
       </div>
-      {hold && rigId && refresh && (
+      {hold && (
         <div className="equipment__hold" role="group" aria-label={`${device.name} is held`}>
           <p>{hold.reason}</p>
-          <ClearHold rigId={rigId} deviceName={device.name} hold={hold} refresh={refresh} />
+          <p>Clear the hold in Controls.</p>
         </div>
       )}
       <div id={id} hidden={!open} className="equipment__device-details">
@@ -131,11 +113,6 @@ export function RigDeviceRow({ device, stale, imagingCamera = false, rigId, refr
           ))}</dl>
         )}
         {!detailsAvailable && <p>Detailed status is not available from this device.</p>}
-        {device.kind === 'telescope' && rigId && refresh && (
-          <div ref={controls} id={revealMount ? 'mount-controls' : undefined} tabIndex={-1} aria-label={`${device.name} mount controls`}>
-            <MountControls rigId={rigId} device={device} stale={stale} refresh={refresh} />
-          </div>
-        )}
       </div>
     </section>
   )

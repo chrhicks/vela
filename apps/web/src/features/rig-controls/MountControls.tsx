@@ -2,9 +2,13 @@ import type { MountControlAction, MountControlView, RigDetailView, RigTelescopeD
 import { Button } from '@vela/ui'
 import { useEffect, useId, useRef, useState } from 'react'
 import { ApiError } from '../../lib/api'
-import { checkMountCommand, createRequestId, sendMountCommand } from './mount-control-api'
+import { checkMountCommand, createRequestId, sendMountCommand } from '../rig-detail/mount-control-api'
 
 type Command = NonNullable<MountControlView['command']> & { serverInstanceId: string }
+
+const trackingLabels = { on: 'Tracking on', off: 'Tracking off', unknown: 'Tracking unknown' }
+
+const parkingLabels = { parked: 'Parked', unparked: 'Not parked', unknown: 'Parking unknown' }
 
 const confirmed = {
   unpark: 'Mount confirmed unparked.',
@@ -92,7 +96,7 @@ export function MountControls({ rigId, device, stale, refresh }: {
           setCheckMessage('No mount command was admitted. The old request is cancelled.')
         } else if (result.admission === 'unknown') {
           setServerRestarted(true)
-          setCheckMessage('Vela restarted and cannot establish the previous command’s outcome. Reload Your rig to inspect current state before choosing a new action. The old request will not be repeated.')
+          setCheckMessage('Vela restarted and cannot establish the previous command’s outcome. Reload the page to inspect current state before choosing a new action. The old request will not be repeated.')
         } else if (result.control.serverInstanceId === local.serverInstanceId && result.control.command?.requestId === local.requestId) {
           setLocal({ ...result.control.command, serverInstanceId: local.serverInstanceId })
         }
@@ -125,14 +129,17 @@ export function MountControls({ rigId, device, stale, refresh }: {
     : showUnpark && !view.unpark.enabled ? view.unpark.reason
       : !tracking.enabled ? tracking.reason : null
 
+  const reading = status ? `${trackingLabels[status.tracking]} · ${parkingLabels[status.parking]}` : 'Mount state unavailable'
+
   const outcome = command?.state === 'confirmed' ? confirmed[command.action] : command?.message
 
   const message = pending ? 'Waiting for the mount to confirm the change…'
     : checkMessage || outcome || reason || 'Tracking follows the sky. It does not slew to your selected subject.'
 
   return (
-    <div className="equipment__mount-controls" aria-label="Mount controls">
-      <div className="equipment__mount-actions">
+    <div className="rig-controls__mount" aria-label="Mount controls">
+      <p className="rig-controls__reading">{stale && status ? `${reading} · last known` : reading}</p>
+      <div className="rig-controls__actions">
         {showUnpark && (
           <Button
             disabled={disabled || !view.unpark.enabled}
@@ -158,7 +165,7 @@ export function MountControls({ rigId, device, stale, refresh }: {
             {checking ? 'Checking mount state…' : 'Check mount state'}
           </Button>
         )}
-        {serverRestarted && <Button onClick={() => window.location.reload()}>Reload Your rig</Button>}
+        {serverRestarted && <Button onClick={() => window.location.reload()}>Reload the page</Button>}
       </div>
       <p id={messageId} role="status">{message}</p>
       {reason && reason !== message && <p>{reason}</p>}

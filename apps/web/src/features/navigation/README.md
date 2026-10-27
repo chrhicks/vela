@@ -28,6 +28,9 @@ lost instead of claiming completion. A confirmed stopped/complete snapshot
 clears the activity. A failed outcome remains visible until superseded. No
 capture state is persisted as a resumable workflow.
 
+On a rig page the bar's actions start with a Controls button that opens the [rig controls panel](../rig-controls/README.md); the
+bar only renders the button, and `RigControls` in the Shell owns the panel.
+
 The shared Appearance utility consumes the browser-owned preference controller.
 Connection copy uses the shell-scoped rig observation, independently of the
 navigation endpoint: Connected means every inventoried device is confirmed

@@ -469,6 +469,14 @@ function heldDetail(): RigDetailView {
 test.describe('clearing a device hold', () => {
   const recoverUrl = '**/api/rigs/rig-1/devices/cria%3Arig-1%3Amount/recover'
 
+  const panel = (page: Page) => page.getByRole('dialog', { name: 'Controls' })
+
+  async function openControls(page: Page) {
+    await page.goto('/rigs/rig-1')
+    await page.getByRole('button', { name: 'Controls', exact: true }).click()
+    await expect(panel(page)).toBeVisible()
+  }
+
   test('offers Clear hold on the held device only, and sends nothing until it is confirmed', async ({ page }) => {
     let recovers = 0
     await page.route('**/api/web/rigs/rig-1', route => fulfillJson(route, heldDetail()))
@@ -478,7 +486,10 @@ test.describe('clearing a device hold', () => {
     })
 
     await page.goto('/rigs/rig-1')
-    const held = page.getByRole('group', { name: 'Mount is held' })
+    await expect(page.getByRole('group', { name: 'Mount is held' })).toContainText('Clear the hold in Controls.')
+    await expect(page.getByRole('button', { name: 'Clear hold' })).toHaveCount(0)
+    await openControls(page)
+    const held = panel(page).getByRole('group', { name: 'Mount is held' })
 
     await expect(held).toContainText(holdReason)
     await expect(page.getByRole('button', { name: 'Clear hold' })).toHaveCount(1)
@@ -509,7 +520,7 @@ test.describe('clearing a device hold', () => {
       await fulfillJson(route, { outcome: 'confirmed', found: 'Cria recovered ZWO AM5' })
     })
 
-    await page.goto('/rigs/rig-1')
+    await openControls(page)
     await page.getByRole('button', { name: 'Clear hold' }).click()
     const dialog = page.getByRole('dialog', { name: 'Clear the hold on Mount?' })
     const confirm = dialog.getByRole('button', { name: 'I have checked it, clear the hold' })
@@ -536,7 +547,7 @@ test.describe('clearing a device hold', () => {
       await fulfillJson(route, { outcome: 'confirmed', found: 'Cria recovered ZWO AM5' })
     })
 
-    await page.goto('/rigs/rig-1')
+    await openControls(page)
     await page.getByRole('button', { name: 'Clear hold' }).click()
     const dialog = page.getByRole('dialog', { name: 'Clear the hold on Mount?' })
     const confirm = dialog.getByRole('button', { name: 'I have checked it, clear the hold' })
@@ -554,21 +565,21 @@ test.describe('clearing a device hold', () => {
     await page.route('**/api/web/rigs/rig-1', route => fulfillJson(route, heldDetail()))
     await page.route(recoverUrl, route => fulfillJson(route, { error: 'device-busy', reason: 'Cria: An operation is open' }, 409))
 
-    await page.goto('/rigs/rig-1')
+    await openControls(page)
     await page.getByRole('button', { name: 'Clear hold' }).click()
     const dialog = page.getByRole('dialog', { name: 'Clear the hold on Mount?' })
 
     await dialog.getByRole('button', { name: 'I have checked it, clear the hold' }).click()
     await expect(dialog.getByRole('alert')).toHaveText('An operation is still running on this device. Stop it first.')
     await dialog.getByRole('button', { name: 'Cancel' }).click()
-    await expect(page.getByRole('group', { name: 'Mount is held' })).toContainText(holdReason)
+    await expect(panel(page).getByRole('group', { name: 'Mount is held' })).toContainText(holdReason)
   })
 
   test('shows the server message and keeps the hold when clearing fails', async ({ page }) => {
     await page.route('**/api/web/rigs/rig-1', route => fulfillJson(route, heldDetail()))
     await page.route(recoverUrl, route => fulfillJson(route, { error: 'recovery-failed', reason: 'This hold has changed. Check it again before you recover.' }, 409))
 
-    await page.goto('/rigs/rig-1')
+    await openControls(page)
     await page.getByRole('button', { name: 'Clear hold' }).click()
     const dialog = page.getByRole('dialog', { name: 'Clear the hold on Mount?' })
 
@@ -576,6 +587,6 @@ test.describe('clearing a device hold', () => {
     await expect(dialog.getByRole('alert')).toHaveText('This hold has changed. Check it again before you recover.')
     await expect(dialog.getByRole('button', { name: 'I have checked it, clear the hold' })).toBeEnabled()
     await dialog.getByRole('button', { name: 'Cancel' }).click()
-    await expect(page.getByRole('button', { name: 'Clear hold' })).toBeVisible()
+    await expect(panel(page).getByRole('button', { name: 'Clear hold' })).toBeVisible()
   })
 })

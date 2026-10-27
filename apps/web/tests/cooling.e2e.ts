@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 import type { CaptureView } from '@vela/model/web'
 import { openExploreScene } from './fixtures/fieldroom/browser'
 import { createTonightScene, reviewTime } from './fixtures/fieldroom/tonight'
@@ -43,6 +43,17 @@ const idle: CaptureView = {
   },
 }
 
+/** The cooler lives in the Controls panel, which every rig page opens from its header. */
+async function openCooling(page: Page, path: string) {
+  await page.goto(path)
+  await page.getByRole('button', { name: 'Controls', exact: true }).click()
+  const panel = page.getByRole('dialog', { name: 'Controls' })
+
+  await expect(panel).toBeVisible()
+
+  return panel.getByRole('region', { name: 'Camera cooling' })
+}
+
 test.beforeEach(async ({ page }) => {
   await page.route('**/api/**', route => route.fulfill({ status: 503, json: { error: 'No fixture for this request' } }))
   await page.route('**/api/web/navigation', route =>
@@ -50,7 +61,7 @@ test.beforeEach(async ({ page }) => {
   )
 })
 
-test('keeps uncertain temperature visible through incomplete reads and capture commands until the setting is observed', async ({
+test('keeps uncertain temperature visible through incomplete reads until the setting is observed', async ({
   page,
 }) => {
   let current = idle
@@ -73,19 +84,7 @@ test('keeps uncertain temperature visible through incomplete reads and capture c
       },
     })
   })
-  await page.route('**/api/rigs/rig-1/capture/start', route => {
-    current = { ...current, active: true, phase: 'exposing' }
-
-    return route.fulfill({ json: current })
-  })
-  await page.route('**/api/rigs/rig-1/capture/stop', route => {
-    current = { ...current, active: false, phase: 'stopped' }
-
-    return route.fulfill({ json: current })
-  })
-  await page.goto('/rigs/rig-1/observe/capture')
-  await page.getByText('Camera cooling', { exact: true }).first().click()
-  const cooling = page.getByRole('region', { name: 'Camera cooling' })
+  const cooling = await openCooling(page, '/rigs/rig-1/observe/capture')
   const check = cooling.getByRole('button', { name: 'Check camera cooling' })
   const warning = cooling.getByText('Cooler command outcome unknown.', { exact: false })
   await cooling.getByRole('spinbutton').fill('-5')
@@ -98,14 +97,6 @@ test('keeps uncertain temperature visible through incomplete reads and capture c
   await expect(check).toBeEnabled()
   await expect(warning).toBeVisible()
   await expect(cooling.getByRole('button', { name: 'Set temperature' })).toBeDisabled()
-
-  await page.getByRole('button', { name: 'Take exposure' }).click()
-  await expect(page.getByRole('button', { name: 'Stop capture' })).toBeEnabled()
-  await expect(warning).toBeVisible()
-  await expect(check).toBeDisabled()
-  await page.getByRole('button', { name: 'Stop capture' }).click()
-  await expect(check).toBeEnabled()
-  await expect(warning).toBeVisible()
 
   current = { ...current, cooling: null }
   await check.click()
@@ -122,6 +113,26 @@ test('keeps uncertain temperature visible through incomplete reads and capture c
   expect(commands).toBe(1)
 })
 
+test('closing the panel forgets an unknown cooler outcome, and reopening shows what the camera reports', async ({ page }) => {
+  let current = idle
+  await page.route('**/api/web/rigs/rig-1/capture', route => route.fulfill({ json: current }))
+  await page.route('**/api/rigs/rig-1/capture/cooling', route => {
+    current = { ...idle, cooling: { state: 'on', canSetTemperature: false } }
+
+    return route.abort()
+  })
+
+  const cooling = await openCooling(page, '/rigs/rig-1/observe/capture')
+
+  await cooling.getByText('Cooler on', { exact: true }).click()
+  await expect(cooling.getByText('Cooler command outcome unknown.', { exact: false })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Controls', exact: true }).click()
+  await expect(cooling.getByRole('checkbox', { name: 'Cooler on' })).toBeChecked()
+  await expect(cooling.getByText('Cooler command outcome unknown.', { exact: false })).toHaveCount(0)
+})
+
 test('resolves an uncertain cooler switch from its fresh state without requiring a temperature setpoint', async ({
   page,
 }) => {
@@ -132,9 +143,7 @@ test('resolves an uncertain cooler switch from its fresh state without requiring
 
     return route.abort()
   })
-  await page.goto('/rigs/rig-1/observe/capture')
-  await page.getByText('Camera cooling', { exact: true }).first().click()
-  const cooling = page.getByRole('region', { name: 'Camera cooling' })
+  const cooling = await openCooling(page, '/rigs/rig-1/observe/capture')
   await cooling.getByText('Cooler on', { exact: true }).click()
   await expect(cooling.getByText('Cooler command outcome unknown.', { exact: false })).toBeVisible()
   await cooling.getByRole('button', { name: 'Check camera cooling' }).click()
@@ -185,10 +194,7 @@ for (const mode of ['light', 'dark'] as const) {
 
         return route.fulfill({ status: response.status, json: response.json })
       })
-      await page.goto(scene.route)
-      await page.getByRole('button', { name: 'Camera cooling', exact: true }).click()
-
-      const cooling = page.getByRole('region', { name: 'Camera cooling' })
+      const cooling = await openCooling(page, scene.route)
       const switchControl = cooling.getByRole('checkbox', { name: 'Cooler on' })
       const blocker = cooling.getByRole('status').filter({ hasText: 'Cooling unavailable' })
       await expect(switchControl).toBeDisabled()
@@ -232,11 +238,9 @@ test('a refused cooling tap leaves the switch and page where they were on a phon
 
     return route.fulfill({ status: 409, json: { error: 'Another Rig operation is in progress.' } })
   })
-  await page.goto('/rigs/rig-1/observe/capture')
-  await page.getByText('Camera cooling', { exact: true }).first().click()
-  const cooling = page.getByRole('region', { name: 'Camera cooling' })
+  const cooling = await openCooling(page, '/rigs/rig-1/observe/capture')
   const switchControl = cooling.locator('.vela-checkbox')
-  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+  await cooling.locator('.vela-checkbox').scrollIntoViewIfNeeded()
 
   const position = async () => ({
     scrollY: await page.evaluate(() => Math.round(window.scrollY)),
@@ -253,15 +257,16 @@ test('a refused cooling tap leaves the switch and page where they were on a phon
   expect(await position()).toEqual(before)
 })
 
-test('Observe disables its cooling switch with the same server reason', async ({ page }) => {
+test('the Controls panel on Observe disables its cooling switch with the same server reason', async ({ page }) => {
   const { scene } = await openExploreScene(page, 'preparation-light')
   await page.route('**/api/web/rigs/fra400/capture', route =>
     route.fulfill({
       json: alignmentHolds(sceneCapture(scene, 'fra400')),
     }),
   )
-  const cooling = page.getByRole('region', { name: 'Camera cooling' })
-  await expect(cooling.getByRole('switch', { name: 'Cooler on' })).toBeDisabled()
+  await page.getByRole('button', { name: 'Controls', exact: true }).click()
+  const cooling = page.getByRole('dialog', { name: 'Controls' }).getByRole('region', { name: 'Camera cooling' })
+  await expect(cooling.getByRole('checkbox', { name: 'Cooler on' })).toBeDisabled()
   await expect(cooling.getByText('Polar alignment is using the rig.', { exact: false })).toBeVisible()
   await expect(cooling.getByRole('link', { name: 'Open polar alignment' })).toHaveAttribute(
     'href',
@@ -292,9 +297,7 @@ for (const width of [320, 390]) {
 
         return route.fulfill({ status: 409, json: { error: 'Another Rig operation is in progress.' } })
       })
-      await page.goto('/rigs/rig-1/observe/capture')
-      await page.getByRole('button', { name: 'Camera cooling', exact: true }).click()
-      const cooling = page.getByRole('region', { name: 'Camera cooling' })
+      const cooling = await openCooling(page, '/rigs/rig-1/observe/capture')
       const refusal = cooling.getByRole('status').filter({ hasText: 'Cooling command failed' })
       const confirming = cooling.getByText('Confirming cooler state…')
       await page.evaluate(() => document.fonts.ready)
@@ -305,7 +308,7 @@ for (const width of [320, 390]) {
       })
 
       // First tap from a clean card, then a repeated tap while the refusal is shown.
-      await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+      await cooling.locator('.vela-checkbox').scrollIntoViewIfNeeded()
       const clean = await position()
       await cooling.getByText('Cooler on', { exact: true }).click()
       await expect(confirming).toBeVisible()
@@ -313,7 +316,7 @@ for (const width of [320, 390]) {
       await expect(refusal).toBeVisible()
       await expect(confirming).toBeHidden()
 
-      await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+      await cooling.locator('.vela-checkbox').scrollIntoViewIfNeeded()
       const refused = await position()
       await cooling.getByText('Cooler on', { exact: true }).click()
       await expect(confirming).toBeVisible()
@@ -347,10 +350,8 @@ test('an unknown turn-off with failed reads labels cooling last known without mo
 
     return route.abort()
   })
-  await page.goto('/rigs/rig-1/observe/capture')
-  await page.getByRole('button', { name: 'Camera cooling', exact: true }).click()
-  const cooling = page.getByRole('region', { name: 'Camera cooling' })
-  await expect(cooling.getByRole('heading', { name: 'Cooling', exact: true })).toBeVisible()
+  const cooling = await openCooling(page, '/rigs/rig-1/observe/capture')
+  await expect(cooling.getByRole('heading', { name: 'Cooler', exact: true })).toBeVisible()
 
   const switchOffset = async () => {
     const card = (await cooling.boundingBox())!
@@ -363,7 +364,7 @@ test('an unknown turn-off with failed reads labels cooling last known without mo
   await cooling.getByText('Cooler on', { exact: true }).click()
   await expect(cooling.getByText('Cooler command outcome unknown.', { exact: false })).toBeVisible()
   await expect(page.locator('[data-interrupted="true"]')).toBeVisible()
-  await expect(cooling.getByRole('heading', { name: 'Cooling · last known' })).toBeVisible()
+  await expect(cooling.getByRole('heading', { name: 'Cooler · last known' })).toBeVisible()
   await expect(cooling).not.toContainText('live')
   await expect(cooling.getByRole('checkbox', { name: 'Cooler on' })).toBeDisabled()
   await expect(cooling.getByRole('checkbox', { name: 'Cooler on' })).toBeChecked()
@@ -372,41 +373,3 @@ test('an unknown turn-off with failed reads labels cooling last known without mo
   await expect(cooling.getByText('Cooler command outcome unknown.', { exact: false })).toBeVisible()
   expect(commands).toBe(1)
 })
-
-for (const width of [320, 390]) {
-  test(`a refused tap keeps the Observe cooling switch still at ${width}px`, async ({ page }) => {
-    await page.setViewportSize({ width, height: 782 })
-    const { scene } = await openExploreScene(page, 'preparation-light')
-    let commands = 0
-    await page.route('**/api/rigs/fra400/capture/cooling', async route => {
-      commands++
-      await new Promise(resolve => setTimeout(resolve, 600))
-
-      return route.fulfill({ status: 409, json: { error: 'Another Rig operation is in progress.' } })
-    })
-    const cooling = page.getByRole('region', { name: 'Camera cooling' })
-    const control = cooling.getByRole('switch', { name: 'Cooler on' })
-    await expect(control).toBeEnabled()
-    await control.scrollIntoViewIfNeeded()
-    await page.evaluate(() => document.fonts.ready)
-
-    const position = async () => ({
-      scrollY: await page.evaluate(() => Math.round(window.scrollY)),
-      switchY: Math.round((await control.boundingBox())!.y),
-    })
-
-    const before = await position()
-    await control.click()
-    await expect(cooling.getByText('Confirming cooler state…')).toBeVisible()
-    expect(await position()).toEqual(before)
-    await expect(cooling.getByText('Another Rig operation is in progress.')).toBeVisible()
-    expect(await position()).toEqual(before)
-    await control.click()
-    await expect(cooling.getByText('Confirming cooler state…')).toBeVisible()
-    expect(await position()).toEqual(before)
-    await expect(cooling.getByText('Another Rig operation is in progress.')).toBeVisible()
-    expect(await position()).toEqual(before)
-    expect(commands).toBe(2)
-    expect(scene.unknownRequests).toEqual([])
-  })
-}

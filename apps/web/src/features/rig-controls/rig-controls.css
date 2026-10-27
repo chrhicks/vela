@@ -1,0 +1,83 @@
+.vela-dialog-layer:has(> .rig-controls) {
+  padding: 0;
+  place-items: end stretch;
+}
+.rig-controls {
+  width: 100%;
+  /* Fixed, so a notice or a new section never moves the control under a thumb. */
+  height: min(88dvh, 100%);
+  border-bottom: 0;
+  border-radius: var(--vela-overlay-radius) var(--vela-overlay-radius) 0 0;
+  padding-bottom: max(var(--vela-overlay-padding), env(safe-area-inset-bottom));
+  animation: rig-controls-rise 180ms ease-out;
+}
+.rig-controls .vela-dialog__header h2 { font-size: 24px; line-height: 32px; }
+@media (min-width: 900px) {
+  .vela-dialog-layer:has(> .rig-controls) { place-items: stretch end; }
+  .rig-controls {
+    width: min(28rem, 100%);
+    height: 100%;
+    border-block: 0;
+    border-right: 0;
+    border-radius: 0;
+    animation-name: rig-controls-slide;
+  }
+}
+@keyframes rig-controls-rise { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes rig-controls-slide { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: translateX(0); } }
+@media (prefers-reduced-motion: reduce) { .rig-controls { animation: none; } }
+
+.rig-controls__open { min-height: 46px; margin-right: 8px; }
+
+/* Sections stack; a later Home, Stop or dew heater control joins its section's .rig-controls__actions or adds a section. */
+.rig-controls__sections { display: grid; gap: 0; }
+.rig-controls__section { display: grid; gap: 12px; padding: 20px 0; border-top: 1px solid var(--vela-line); }
+.rig-controls__section:first-child { padding-top: 4px; border-top: 0; }
+.rig-controls__section h3 { margin: 0; font: 500 16px/24px var(--vela-font); }
+.rig-controls__section p { margin: 0; font: 400 14px/20px var(--vela-font); }
+.rig-controls__empty { color: var(--vela-text-muted); font: 400 14px/20px var(--vela-font); }
+.rig-controls__error { color: var(--vela-danger); }
+
+.rig-controls__mount { display: grid; gap: 12px; }
+.rig-controls__mount > p:not(.rig-controls__reading) { color: var(--vela-text-muted); font-size: 14px; line-height: 20px; }
+.rig-controls__actions { display: flex; flex-wrap: wrap; gap: 12px; }
+
+.rig-controls__cooler dl { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0; }
+.rig-controls__cooler dd { margin: 0; color: var(--vela-text); }
+.rig-controls__cooler form { display: grid; gap: 16px; }
+.rig-controls__cooler-note { display: inline-grid; }
+.rig-controls__cooler-note > span { grid-area: 1 / 1; }
+.rig-controls__cooler-note > [aria-hidden='true'] { visibility: hidden; }
+
+.rig-controls__notice {
+  padding: 14px 16px;
+  border: 1px solid var(--vela-warning);
+  border-radius: var(--vela-card-radius);
+  background: var(--vela-warning-surface);
+  color: var(--vela-warning);
+  font-size: 14px;
+  line-height: 20px;
+}
+.rig-controls__notice[data-held] { visibility: hidden; }
+.rig-controls__notice strong { font-size: 16px; line-height: 24px; font-weight: 500; }
+.rig-controls__notice p { margin: 6px 0 0; }
+.rig-controls__notice .vela-button { margin-top: 12px; }
+.rig-controls__notice .tonight-link { margin-top: 4px; color: inherit; }
+
+.rig-controls__hold {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border-radius: 6px;
+  background: var(--vela-warning-surface);
+  color: var(--vela-warning);
+  font-size: 14px;
+  line-height: 20px;
+}
+.rig-controls__hold .vela-button { flex-shrink: 0; }
+@media (max-width: 480px) {
+  .rig-controls__hold { flex-direction: column; align-items: stretch; }
+}
+.rig-controls__hold-dialog .vela-dialog__body { display: grid; gap: 12px; }

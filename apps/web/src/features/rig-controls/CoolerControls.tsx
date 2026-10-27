@@ -1,7 +1,8 @@
 import { Button, Checkbox, Input } from '@vela/ui'
-import type { CaptureCoolingBlocker, CaptureCoolingView } from '@vela/model/web'
+import type { CaptureCoolingView } from '@vela/model/web'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
+import type { CoolingBlocker } from './cooling-blocker'
 
 function formatTemperature(value: number) {
   return `${value.toLocaleString(undefined, { maximumFractionDigits: 1, minimumFractionDigits: 1 })} °C`
@@ -11,51 +12,7 @@ function formatPower(value: number) {
   return `${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}%`
 }
 
-export function coolingSummary(cooling: CaptureCoolingView | null | undefined) {
-  if (!cooling) return null
-
-  const sensor =
-    cooling.sensorTemperatureC === undefined ? null : formatTemperature(cooling.sensorTemperatureC)
-
-  if (cooling.state === 'off') {
-    return sensor ? `Cooler off · sensor ${sensor}` : 'Cooler off'
-  }
-
-  const power =
-    cooling.powerPercent === undefined ? null : ` · ${formatPower(cooling.powerPercent)} power`
-
-  return sensor ? `Cooler on · sensor ${sensor}${power ?? ''}` : `Cooler on${power ?? ''}`
-}
-
-/** What currently holds the rig, and where Chris can resolve it. */
-export function coolingBlocker(blockedBy: CaptureCoolingBlocker | undefined, rigPath: string) {
-  switch (blockedBy) {
-    case undefined:
-      return null
-    case 'alignment':
-      return {
-        message: 'Polar alignment is using the rig. Stop or finish alignment to change cooling.',
-        action: { label: 'Open polar alignment', to: `${rigPath}/observe/alignment` },
-      }
-    case 'autofocus':
-      return {
-        message: 'Autofocus is using the rig. Cooling can change when it finishes.',
-        action: { label: 'Open autofocus', to: `${rigPath}/observe/autofocus` },
-      }
-    case 'framing':
-      return { message: 'Framing is using the rig. Cooling can change when it finishes.' }
-    case 'capture':
-      return { message: 'Cooling is locked while capture runs so Stop stays available.' }
-    case 'rig':
-      return { message: 'Another rig command is finishing. Cooling will be available when it does.' }
-    default:
-      return { message: blockedBy.reason }
-  }
-}
-
-export type CoolingBlocker = ReturnType<typeof coolingBlocker>
-
-export function CaptureCooling({
+export function CoolerControls({
   cooling,
   disabled,
   pending,
@@ -126,8 +83,8 @@ export function CaptureCooling({
   }
 
   return (
-    <section className="capture-page__cooling" aria-label="Camera cooling">
-      <h3>{stale ? 'Cooling · last known' : 'Cooling'}</h3>
+    <section className="rig-controls__section rig-controls__cooler" aria-label="Camera cooling">
+      <h3>{stale ? 'Cooler · last known' : 'Cooler'}</h3>
       {cooling ? (
         <dl>
           <div>
@@ -163,7 +120,7 @@ export function CaptureCooling({
             label="Cooler on"
             description={
               // Both notes occupy one cell so confirming never changes the switch's height.
-              <span className="capture-page__cooling-note">
+              <span className="rig-controls__cooler-note">
                 <span aria-hidden={pending || undefined}>Vela does not turn this on by itself.</span>
                 <span aria-hidden={!pending || undefined}>Confirming cooler state…</span>
               </span>
@@ -228,7 +185,7 @@ function CoolingFeedback({
   // current blocker then explains the state better than an earlier refusal.
   if (unconfirmed || (error && !blocker)) {
     return (
-      <div className="capture-page__warning capture-page__cooling-feedback" role="status">
+      <div className="rig-controls__notice" role="status">
         <strong>{unconfirmed ? 'Command outcome unknown' : 'Cooling command failed'}</strong>
         <p>
           {unconfirmed
@@ -247,7 +204,7 @@ function CoolingFeedback({
   if (held && !blocker) {
     return (
       <div
-        className="capture-page__warning capture-page__cooling-feedback"
+        className="rig-controls__notice"
         data-held=""
         aria-hidden="true"
       >
@@ -260,7 +217,7 @@ function CoolingFeedback({
   if (!blocker) return null
 
   return (
-    <div className="capture-page__warning capture-page__cooling-feedback" role="status">
+    <div className="rig-controls__notice" role="status">
       <strong>Cooling unavailable</strong>
       <p>{blocker.message}</p>
       {blocker.action && (

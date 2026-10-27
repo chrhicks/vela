@@ -85,11 +85,8 @@ lost with no record.
 
 Unattended ("page my phone") is a per-run choice, off for every new run and never carried over from the last
 one. A run the page sees begin, from this tab or another, clears a ticked choice. The start form has it as a checkbox under Save frames, and the start body always carries `unattended`. On a
-running run the same checkbox is a live switch with no confirmation: it calls `PUT /api/rigs/:rigId/capture/unattended`
-with `{on}` and shows the server's value, "Phone: on, unattended" or "Phone: off", under it. The switch stays
-available whenever a run is active and the page is not mid-command, including during image receipt. A 409 (the run
-ended) or a failed request shows its message under the switch and never marks the capture command outcome unknown,
-because a switch cannot change what the camera is doing. An interrupted Unattended run's notice says Resume keeps
+running run the page shows only the server's value, "Phone: on, unattended" or "Phone: off", in the run summary; the live
+switch is in the [Controls panel](../rig-controls/README.md#phone), one place for the control. An interrupted Unattended run's notice says Resume keeps
 Unattended on, as the server does (vela#198).
 
 Save frames is an explicit per-run option, ticked on a new controller and restored
@@ -99,26 +96,7 @@ state, so it never prevents stopping an exposure or claims a camera command fail
 The immutable loaded metadata is supplemented by confirmed save responses and the
 matching current projection's saved flag.
 
-Cooling controls sit with capture prep. Confirmed CoolerOn, sensor temperature,
-requested setpoint and power are server projections. A sensor near the requested
-temperature is not treated as cooling enabled. Cooler on/off and target temperature
-are explicit commands; setting a target does not turn the cooler on. Cooling is
-disabled while a capture run is active so Stop stays available. Cooler command
-failures stay in the cooling region and do not label capture unavailable.
-When the server marks cooling `blockedBy` another operation, the switch is disabled
-and the cooling region names what holds the rig, with a link to alignment or
-autofocus where Chris can resolve it. Command feedback (blocker, refusal or unknown
-outcome) has one slot directly below the switch. The description above it explains
-observed state without claiming freshness and never changes with a command; the
-switch's own note and "Confirming cooler state…" share one cell, and a previous
-refusal keeps its space invisibly while the next command confirms, so a tap never
-moves the control. While capture is offline or a cooling outcome is unknown, the
-card heading reads "Cooling · last known", matching the Tonight footer.
-An uncertain command retains the affected setting until an explicit check observes
-it again: CoolerOn for a switch command, requested setpoint for a temperature
-command. Missing telemetry and successful exposure commands do not dismiss that
-warning. A fresh setting resolves uncertainty even if it differs from the requested
-value; the interface shows the observed state rather than claiming the write won.
+Cooling is not on this page. The cooler switch and target temperature are in the [Controls panel](../rig-controls/README.md#cooler); the footer below the run shows the sensor reading and cooler state.
 
 Saved images are available at the per-rig `/observe/saved-images` route independently
 of camera readiness. [Photographs](../photographs/README.md) owns the dated

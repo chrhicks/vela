@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { coolingBlocker } from './CaptureCooling'
+import { coolingBlocker } from './cooling-blocker'
 
 it('explains a device hold with the reason the server reported', () => {
   expect(
