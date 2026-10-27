@@ -156,3 +156,7 @@ request as never admitted.
 Parking and tracking remain separate observed facts in the device status. A
 confirmed Unpark command does not imply either tracking state; an uncertain
 command remains explicit until fresh stationary readings resolve it.
+
+`RigSwitchDeviceView.dewControl` is present only for a power box with dew channels. It carries Auto dew (`auto`, null
+when the box has none) and each dew channel with its reported duty, each with its own availability and reason, plus
+the latest command and the server instance identity. It carries no other channel of the box.

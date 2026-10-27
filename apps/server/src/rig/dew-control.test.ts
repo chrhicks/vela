@@ -60,7 +60,7 @@ function fixture(options: { source?: boolean } = {}) {
 
   const dutyA = (percent: number) => ({ kind: 'duty', channelId: 1, percent }) as const
 
-  const post = (action: unknown = dutyA(40), requestId: string = randomUUID(), deviceId = 'rig-power') => app.inject({
+  const post = (action: Readonly<Record<string, string | number | boolean>> = dutyA(40), requestId: string = randomUUID(), deviceId = 'rig-power') => app.inject({
     method: 'POST', url: '/api/rigs/rig/dew', payload: { deviceId, requestId, serverInstanceId: controls.serverInstanceId, action },
   })
 
@@ -263,6 +263,7 @@ describe('dew heater controls', () => {
 
     try {
       expect((await f.check(randomUUID(), randomUUID())).json()).toMatchObject({ admission: 'unknown' })
+
       const stale = await f.app.inject({
         method: 'POST', url: '/api/rigs/rig/dew',
         payload: { deviceId: 'rig-power', requestId: randomUUID(), serverInstanceId: randomUUID(), action: f.dutyA(10) },
