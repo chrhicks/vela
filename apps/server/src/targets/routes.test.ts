@@ -971,4 +971,3 @@ describe('observed obstructions over HTTP', () => {
     expect(new Set(samples.map(sample => sample.horizon))).toEqual(new Set(['behind', 'unknown']))
   })
 })
-

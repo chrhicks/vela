@@ -785,4 +785,3 @@ describe('the horizon in a star alert', () => {
     expect(message(plain, { behindSkyline: () => true })).toBe(message(plain))
   })
 })
-
