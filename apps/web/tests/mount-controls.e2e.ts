@@ -32,6 +32,11 @@ function deferred() {
   return { promise, resolve }
 }
 
+async function openPanelOn(page: Page) {
+  await page.getByRole('button', { name: 'Controls', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: 'Controls' })).toBeVisible()
+}
+
 async function mountScene(page: Page, mode: 'light' | 'dark' = 'light') {
   const scene = createEquipmentScene(mode === 'dark' ? 'equipment-dark' : 'equipment-connected')
   const writes: Write[] = []
@@ -52,6 +57,8 @@ async function mountScene(page: Page, mode: 'light' | 'dark' = 'light') {
       mountControl: view,
     } satisfies RigTelescopeDeviceView : device) })
   }
+
+  const openPanel = () => openPanelOn(page)
 
   setMount('off', 'unparked')
   await page.addInitScript(value => localStorage.setItem('vela.appearance', value), mode)
@@ -82,6 +89,8 @@ async function mountScene(page: Page, mode: 'light' | 'dark' = 'light') {
     const response = scene.respond(request.method(), pathname, request.postData() ? request.postDataJSON() : undefined)
     await route.fulfill({ status: response.status, json: response.json })
   })
+  // The panel reads capture for its cooler and phone sections; this rig has no camera to offer them.
+  await page.route('**/api/web/rigs/fra400/capture', route => route.fulfill({ status: 503, json: { error: 'No capture fixture' } }))
   await routeQuietAlerts(page)
 
   return {
@@ -90,12 +99,17 @@ async function mountScene(page: Page, mode: 'light' | 'dark' = 'light') {
     handleCheck(handler: () => void) { handleCheck = handler },
     handleWrite(handler: typeof handleWrite) { handleWrite = handler },
     holdDetail(promise: Promise<void> | null) { holdDetail = promise },
-    open: () => page.goto('/rigs/fra400#mount-controls'),
+    goto: () => page.goto('/rigs/fra400'),
+    openPanel,
+    async open() {
+      await page.goto('/rigs/fra400')
+      await openPanel()
+    },
   }
 }
 
 function mount(page: Page) {
-  return page.getByRole('region', { name: 'ASI Mount', exact: true })
+  return page.getByRole('dialog', { name: 'Controls' }).getByRole('region', { name: 'Mount', exact: true })
 }
 
 test('tracking writes once, stays pending with observed off state, and waits for fresh detail', async ({ page }) => {
@@ -107,22 +121,20 @@ test('tracking writes once, stays pending with observed off state, and waits for
     await route.fulfill({ json: { ...available, command: { ...body, state: 'confirmed', message: 'Tracking is on.' } } })
   })
   await fixture.open()
-  await expect(page.locator('#mount-controls')).toBeFocused()
-  await expect(mount(page).getByRole('button', { name: 'Hide ASI Mount details' })).toHaveAttribute('aria-expanded', 'true')
   fixture.holdDetail(detail.promise)
   await mount(page).getByRole('button', { name: 'Turn tracking on', exact: true }).click()
   await expect(mount(page).getByRole('button', { name: 'Turning tracking on…', exact: true })).toBeDisabled()
-  await expect(mount(page).getByText('Tracking off', { exact: true })).toBeVisible()
+  await expect(mount(page).getByText('Tracking off · Not parked', { exact: true })).toBeVisible()
   expect(fixture.writes).toEqual([{ serverInstanceId, deviceId, action: 'tracking-on', requestId: expect.stringMatching(/^[0-9a-f-]{36}$/) }])
   const freshRead = page.waitForRequest(request => new URL(request.url()).pathname === '/api/web/rigs/fra400')
   response.resolve()
   await freshRead
   await expect(mount(page).getByRole('button', { name: 'Turning tracking on…', exact: true })).toBeDisabled()
-  await expect(mount(page).getByText('Tracking off', { exact: true })).toBeVisible()
+  await expect(mount(page).getByText('Tracking off · Not parked', { exact: true })).toBeVisible()
   fixture.setMount('on', 'unparked', { ...available, trackingOn: off, trackingOff: on, command: { ...fixture.writes[0]!, state: 'confirmed', message: 'Tracking is on.' } })
   detail.resolve()
   await expect(mount(page).getByRole('button', { name: 'Turn tracking off', exact: true })).toBeEnabled()
-  await expect(mount(page).getByText('Tracking on', { exact: true })).toBeVisible()
+  await expect(mount(page).getByText('Tracking on · Not parked', { exact: true })).toBeVisible()
   expect(fixture.writes).toHaveLength(1)
   expect(fixture.scene.unknownRequests).toEqual([])
 })
@@ -140,7 +152,7 @@ test('unpark is a separate command and displays the freshly observed tracking co
   await mount(page).getByRole('button', { name: 'Unpark mount', exact: true }).click()
   await expect(mount(page).getByRole('button', { name: 'Turn tracking off', exact: true })).toBeEnabled()
   await expect(mount(page).getByRole('button', { name: 'Unpark mount', exact: true })).toHaveCount(0)
-  await expect(mount(page).getByText('Tracking on', { exact: true })).toBeVisible()
+  await expect(mount(page).getByText('Tracking on · Not parked', { exact: true })).toBeVisible()
   expect(fixture.writes).toEqual([{ serverInstanceId, deviceId, action: 'unpark', requestId: expect.any(String) }])
   expect(fixture.scene.unknownRequests).toEqual([])
 })
@@ -171,15 +183,16 @@ test('a delayed pre-command refresh cannot replace the confirmed post-command ob
     fixture.setMount('on', 'unparked', control)
     await route.fulfill({ json: control })
   })
-  await fixture.open()
+  await fixture.goto()
   await page.getByRole('button', { name: 'Refresh state', exact: true }).click()
   await expect.poll(() => reads).toBe(2)
+  await fixture.openPanel()
   await mount(page).getByRole('button', { name: 'Turn tracking on', exact: true }).click()
   await expect(mount(page).getByRole('button', { name: 'Turn tracking off', exact: true })).toBeEnabled()
   expect(reads).toBe(3)
   oldRead.resolve()
   await oldReadFinished.promise
-  await expect(mount(page).getByText('Tracking on', { exact: true })).toBeVisible()
+  await expect(mount(page).getByText('Tracking on · Not parked', { exact: true })).toBeVisible()
   await expect(mount(page).getByRole('button', { name: 'Turn tracking off', exact: true })).toBeEnabled()
   expect(fixture.writes).toHaveLength(1)
   expect(fixture.scene.unknownRequests).toEqual([])
@@ -189,12 +202,12 @@ test('unknown or interrupted mount observations prevent physical commands', asyn
   const fixture = await mountScene(page)
   fixture.setMount('unknown', 'unknown', { ...available, unpark: off, trackingOn: off, trackingOff: off, command: null })
   await fixture.open()
-  await expect(mount(page).getByText('Tracking unknown', { exact: true }).first()).toBeVisible()
+  await expect(mount(page).getByText('Tracking unknown · Parking unknown', { exact: true })).toBeVisible()
   await expect(mount(page).getByRole('button', { name: 'Unpark mount', exact: true })).toBeDisabled()
   await expect(mount(page).getByRole('button', { name: 'Turn tracking on', exact: true })).toBeDisabled()
   fixture.setMount('off', 'unparked', available, true)
   await mount(page).getByRole('button', { name: 'Check mount state', exact: true }).click()
-  await expect(mount(page).getByText('Last known measurements;', { exact: false })).toBeVisible()
+  await expect(mount(page).getByText('Current mount state is unavailable.', { exact: false }).first()).toBeVisible()
   await expect(mount(page).getByRole('button', { name: 'Turn tracking on', exact: true })).toBeDisabled()
   expect(fixture.writes).toEqual([])
   expect(fixture.scene.unknownRequests).toEqual([])
@@ -234,7 +247,7 @@ test('a request that never reached the server clears only after an explicit admi
   expect(fixture.checks).toEqual([])
   await mount(page).getByRole('button', { name: 'Check mount state', exact: true }).click()
   await expect(mount(page).getByRole('button', { name: 'Turn tracking on', exact: true })).toBeEnabled()
-  await expect(mount(page).getByText('Tracking off', { exact: true })).toBeVisible()
+  await expect(mount(page).getByText('Tracking off · Not parked', { exact: true })).toBeVisible()
   expect(fixture.checks).toEqual(fixture.writes)
   expect(fixture.writes).toHaveLength(1)
   expect(fixture.scene.unknownRequests).toEqual([])
@@ -254,9 +267,11 @@ test('a restarted server keeps an old uncertain request blocked until explicit r
   await expect(mount(page).getByRole('status')).toContainText('cannot establish the previous command’s outcome')
   await expect(mount(page).getByRole('button', { name: 'Turn tracking on', exact: true })).toBeDisabled()
   expect(fixture.checks).toEqual(fixture.writes)
-  await mount(page).getByRole('button', { name: 'Reload Your rig', exact: true }).click()
+  await mount(page).getByRole('button', { name: 'Reload the page', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: 'Controls' })).toHaveCount(0)
+  await fixture.openPanel()
   await expect(mount(page).getByRole('button', { name: 'Turn tracking on', exact: true })).toBeEnabled()
-  await expect(mount(page).getByText('Tracking off', { exact: true })).toBeVisible()
+  await expect(mount(page).getByText('Tracking off · Not parked', { exact: true })).toBeVisible()
   expect(fixture.writes).toHaveLength(1)
   expect(fixture.scene.unknownRequests).toEqual([])
 })
@@ -283,7 +298,8 @@ test.describe('from a plain-HTTP LAN origin', () => {
       fixture.setMount('on', 'unparked', { ...available, trackingOn: off, trackingOff: on, command })
       await route.fulfill({ json: { ...available, trackingOn: off, trackingOff: on, command } })
     })
-    await page.goto(`${lan}/rigs/fra400#mount-controls`)
+    await page.goto(`${lan}/rigs/fra400`)
+    await fixture.openPanel()
     expect(await page.evaluate(() => ({ origin: location.origin, secure: isSecureContext, randomUUID: 'randomUUID' in crypto })))
       .toEqual({ origin: lan, secure: false, randomUUID: false })
 
@@ -306,14 +322,14 @@ test.describe('from a plain-HTTP LAN origin', () => {
   })
 })
 
-test('framing prerequisite recovery opens and focuses the mount controls', async ({ page }) => {
+test('framing prerequisite recovery opens the Controls panel with the mount section', async ({ page }) => {
   const { scene: explore } = await openExploreScene(page, 'framing-light')
   await page.route('**/api/web/rigs/fra400/framing', route => route.fulfill({ json: {
     ...reviewFraming, active: false, phase: 'needs-check', mountControlReason: 'tracking-off',
-    error: 'Mount tracking is off. Turn tracking on in Your rig, then choose Check current frame.',
+    error: 'Mount tracking is off. Turn tracking on in Controls, then choose Check current frame.',
   } }))
   await page.reload()
-  const recovery = page.getByRole('link', { name: 'Mount controls in Your rig →', exact: true })
+  const recovery = page.getByRole('button', { name: 'Open Controls →', exact: true })
   await expect(recovery).toBeVisible()
   const equipment = createEquipmentScene('equipment-connected')
   const rig = equipment.snapshot().rig
@@ -325,8 +341,8 @@ test('framing prerequisite recovery opens and focuses the mount controls', async
   await expect(recovery).toBeVisible()
   const fixture = await mountScene(page)
   await recovery.click()
-  await expect(page).toHaveURL(/\/rigs\/fra400#mount-controls$/)
-  await expect(page.locator('#mount-controls')).toBeFocused()
+  await expect(page).toHaveURL(/\/rigs\/fra400\/observe\/targets/)
+  await expect(page.getByRole('dialog', { name: 'Controls' })).toBeVisible()
   await expect(mount(page).getByRole('button', { name: 'Turn tracking on', exact: true })).toBeVisible()
   expect(fixture.writes).toEqual([])
   expect(explore.commands).toEqual([])
@@ -334,7 +350,7 @@ test('framing prerequisite recovery opens and focuses the mount controls', async
 })
 
 for (const mode of ['light', 'dark'] as const) {
-  test(`expanded mount controls fit phone and desktop in ${mode}`, async ({ page }, testInfo) => {
+  test(`the mount section fits phone and desktop in ${mode}`, async ({ page }, testInfo) => {
     const fixture = await mountScene(page, mode)
     fixture.setMount('off', 'parked', { ...available, unpark: on, trackingOn: off })
     await fixture.open()

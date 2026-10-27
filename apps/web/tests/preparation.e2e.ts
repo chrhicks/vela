@@ -142,10 +142,13 @@ test('prepared test exposure keeps native pixels, pan and return focus through e
 
 test('uncertain cooler state remains explicit and its check never replays a write', async ({ page }) => {
   const { scene } = await openExploreScene(page, 'preparation-cooling-uncertain')
-  await page.getByRole('switch', { name: 'Cooler on' }).click()
-  await expect(page.getByText('Cooler command outcome unknown.', { exact: false })).toBeVisible()
-  await page.getByRole('button', { name: 'Check camera cooling', exact: true }).click()
-  await expect(page.getByRole('switch', { name: 'Cooler on' })).toBeDisabled()
+  await expect(page.getByRole('switch', { name: 'Cooler on' })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Controls', exact: true }).click()
+  const cooling = page.getByRole('dialog', { name: 'Controls' }).getByRole('region', { name: 'Camera cooling' })
+  await cooling.getByText('Cooler on', { exact: true }).click()
+  await expect(cooling.getByText('Cooler command outcome unknown.', { exact: false })).toBeVisible()
+  await cooling.getByRole('button', { name: 'Check camera cooling', exact: true }).click()
+  await expect(cooling.getByRole('checkbox', { name: 'Cooler on' })).toBeDisabled()
   expect(scene.commands).toHaveLength(1)
   expect(scene.commands[0]).toMatchObject({ pathname: '/api/rigs/fra400/capture/cooling', body: { coolerOn: false } })
 })
