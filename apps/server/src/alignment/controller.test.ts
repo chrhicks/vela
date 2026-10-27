@@ -36,7 +36,7 @@ afterEach(async () => {
   expect(cadence.waits).toHaveLength(0)
 })
 
-function setup() {
+function setup(openDiagnostics?: Parameters<typeof createAlignmentController>[0]['openDiagnostics']) {
   let ra = 10
   let dec = 60
 
@@ -44,6 +44,7 @@ function setup() {
     'j2000'
 
   let exposures = 0
+  const requestedExposures: number[] = []
   let moves = 0
   let siderealOffset = 0
   let captureOverride: ((signal: AbortSignal) => Promise<AlpacaFrame>) | undefined
@@ -70,8 +71,9 @@ function setup() {
         coordinateSystem,
       }
     },
-    async capture({ signal }) {
+    async capture({ signal, exposureSeconds }) {
       exposures++
+      requestedExposures.push(exposureSeconds)
 
       if (captureOverride) return captureOverride(signal!)
 
@@ -106,6 +108,7 @@ function setup() {
     settings,
     hardware,
     solver,
+    openDiagnostics,
     waitForNextExposure: cadence.wait,
     now: () => 1_700_000_000_000 + (exposures + 1) * 1000,
     async prepareDisplay(frame, signal) {
@@ -162,6 +165,7 @@ function setup() {
     solve,
     baseline,
     exposures: () => exposures,
+    requestedExposures,
     moves: () => moves,
     setPointing: (position: { ra: number; dec: number; frame: typeof coordinateSystem }) => {
       ra = position.ra
@@ -183,6 +187,27 @@ function setup() {
     },
   }
 }
+
+it('takes every exposure of a run, the view and the run record from the chosen exposure', async () => {
+  const run = vi.fn<NonNullable<Parameters<typeof setup>[0]>>(async () => undefined)
+  const subject = setup(run)
+  await subject.controller.start('sim', 'Simulator', undefined, 5)
+  expect(subject.controller.snapshot().exposureSeconds).toBe(5)
+  expect(run).toHaveBeenCalledWith(expect.objectContaining({ exposureSeconds: 5 }))
+
+  for (let position = 0; position < 3; position++) subject.solve(await subject.nextSolve())
+  await vi.waitFor(() => expect(subject.controller.snapshot().measurement).not.toBeNull())
+  cadence.waits.shift()!()
+  await subject.nextSolve()
+  expect(subject.requestedExposures).toEqual([5, 5, 5, 5])
+  await subject.controller.stop()
+
+  await subject.controller.start('sim', 'Simulator')
+  await subject.nextSolve()
+  expect(subject.requestedExposures.at(-1)).toBe(1)
+  expect(subject.controller.snapshot().exposureSeconds).toBe(1)
+  expect(run).toHaveBeenLastCalledWith(expect.objectContaining({ exposureSeconds: 1 }))
+})
 
 it('rejects another start while acquisition remains active', async () => {
   const subject = setup()

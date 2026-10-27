@@ -78,6 +78,12 @@ const { focalLengthMm: _focalLength, ...withoutFocalLength } = rig
 
 const { focalLengthMm: _offlineFocalLength, ...offlineRig } = withoutCamera
 
+interface StartBody {
+  exposureSeconds?: number | string | null
+  gain?: number
+  other?: number
+}
+
 const apps: ReturnType<typeof Fastify>[] = []
 
 let release: (() => void) | undefined
@@ -143,7 +149,7 @@ function setup(
   const command = (
     name: string,
     rigId = 'rig',
-    payload: null | string | readonly string[] | { exposureSeconds?: number } = {},
+    payload: null | string | readonly string[] | StartBody = {},
   ) =>
     app.inject({
       method: 'POST',
@@ -433,10 +439,66 @@ describe('alignment routes', () => {
     const { command, operations } = setup()
     expect((await command('warp')).statusCode).toBe(404)
 
-    for (const body of [null, [], { exposureSeconds: 5 }, 'start'])
+    for (const body of [null, [], 'start', { other: 1 }])
       expect((await command('start', 'rig', body)).statusCode).toBe(400)
     expect(mocks.acquisition).not.toHaveBeenCalled()
     expect(operations.owner('rig')).toBeUndefined()
+  })
+  it.each([
+    [undefined, 2],
+    [1, 1],
+    [2.5, 2.5],
+    [5, 5],
+    [10, 10],
+  ])('starts with exposure %s as %s seconds', async (chosen, expected) => {
+    const { command } = setup()
+    const payload = chosen === undefined ? {} : { exposureSeconds: chosen }
+    expect((await command('start', 'rig', payload)).statusCode).toBe(200)
+    expect(mocks.start).toHaveBeenCalledWith('rig', 'FRA', expect.any(Function), expected)
+  })
+  it('starts an offline run with the chosen exposure', async () => {
+    const { command } = setup([rig], true, 'offline')
+    expect((await command('start', 'rig', { exposureSeconds: 5 })).statusCode).toBe(200)
+    expect(mocks.start).toHaveBeenCalledWith('rig', 'FRA', expect.any(Function), 5)
+  })
+  it('falls back to the rig’s configured exposure when Start names none', async () => {
+    const criaRig: RigCatalogRecord = { ...rig, source: { kind: 'cria', configurationId: 'fixture' } }
+    const app = Fastify()
+    apps.push(app)
+    const settings = alignmentSettings({ ...env, VELA_ALIGNMENT_MODE: 'physical' })!
+
+    registerAlignment(app, createMemoryRigCatalog([criaRig]), undefined, createRigOperations(), mocks, {
+      ...equipment,
+      settingsForRig: () => ({ ...settings, rigId: criaRig.id, exposureSeconds: 4 }),
+      createAcquisition: () => createAlpacaAcquisition({ baseUrl: 'http://unused.invalid' }),
+      createFraming: () => createAlpacaFraming({ baseUrl: 'http://unused.invalid' }),
+    })
+
+    expect((await app.inject({ method: 'POST', url: '/api/rigs/rig/alignment/start', payload: {} })).statusCode).toBe(200)
+    expect(mocks.start).toHaveBeenCalledWith('rig', 'FRA', expect.any(Function), 4)
+  })
+  it.each([
+    0,
+    0.99,
+    11,
+    -1,
+    '5',
+    null,
+    Number.MAX_SAFE_INTEGER,
+  ])('refuses exposure %j with a plain message and starts nothing', async exposureSeconds => {
+    const { command, operations } = setup()
+    const response = await command('start', 'rig', { exposureSeconds })
+    expect(response.statusCode).toBe(400)
+    expect(response.json()).toEqual({
+      error: 'Expected a JSON object with an optional exposureSeconds from 1 to 10',
+    })
+    expect(mocks.controller).not.toHaveBeenCalled()
+    expect(operations.owner('rig')).toBeUndefined()
+  })
+  it('refuses extra fields beside a valid exposure', async () => {
+    const { command } = setup()
+    expect((await command('start', 'rig', { exposureSeconds: 5, gain: 100 })).statusCode).toBe(400)
+    expect(mocks.controller).not.toHaveBeenCalled()
   })
   it('releases ownership if physical composition fails', async () => {
     const { command, operations } = setup()

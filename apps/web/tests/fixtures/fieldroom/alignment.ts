@@ -44,6 +44,8 @@ type Command = 'start' | 'stop' | 'finish'
 
 const imageUrl = '/api/rigs/fra400/alignment/images/review-solve-1'
 
+const startRequest = z.strictObject({ exposureSeconds: z.number().min(1).max(10).optional() })
+
 export const alignmentMeasuredAt = '2026-10-01T01:02:14.000Z'
 
 export const alignmentMeasurement: NonNullable<AlignmentView['measurement']> = {
@@ -280,8 +282,10 @@ export function createAlignmentScene(name: AlignmentScene) {
       ) {
         writes.push({ method, pathname, body: structuredClone(body) })
 
-        if (command === 'start' ? !z.strictObject({}).safeParse(body).success : body !== undefined)
-          return result(400, { error: command === 'start' ? 'Expected an empty JSON object' : haltBodyError })
+        const start = startRequest.safeParse(body)
+
+        if (command === 'start' ? !start.success : body !== undefined)
+          return result(400, { error: command === 'start' ? 'Expected a JSON object with an optional exposureSeconds from 1 to 10' : haltBodyError })
 
         if (
           outcomes[command] === 'rejected' ||
@@ -297,6 +301,7 @@ export function createAlignmentScene(name: AlignmentScene) {
             active: true,
             position: 0,
             solvedPositions: 0,
+            exposureSeconds: start.data?.exposureSeconds ?? view.exposureSeconds,
             measurement: null,
             preview: null,
             measuredAt: null,
