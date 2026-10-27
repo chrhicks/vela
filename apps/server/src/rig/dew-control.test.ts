@@ -11,6 +11,8 @@ const channels = (auto = false, dutyA = 0): ReadonlyArray<SwitchChannel> => [
   { id: 1, name: 'Dew A duty (%)', value: dutyA, on: dutyA > 0 },
   { id: 2, name: 'Dew B duty (%)', value: 0, on: false },
   { id: 3, name: 'Auto dew', value: auto ? 1 : 0, on: auto },
+  { id: 4, name: 'Dew A', value: 1, on: true },
+  { id: 5, name: 'Dew B', value: 1, on: true },
 ]
 
 function fixture(options: { source?: boolean } = {}) {
@@ -89,6 +91,7 @@ describe('dew heater controls', () => {
       expect(view.channels.map(channel => [channel.id, channel.name, channel.dutyPercent])).toEqual([[1, 'Dew A duty (%)', 0], [2, 'Dew B duty (%)', 0]])
       expect((await f.post({ kind: 'duty', channelId: 0, percent: 1 })).json()).toEqual({ error: 'dew-channel-not-found' })
       expect((await f.post({ kind: 'duty', channelId: 3, percent: 1 })).json()).toEqual({ error: 'dew-channel-not-found' })
+      expect((await f.post({ kind: 'duty', channelId: 4, percent: 40 })).json()).toEqual({ error: 'dew-channel-not-found' })
       expect(f.set).not.toHaveBeenCalled()
     } finally { await f.app.close() }
   })

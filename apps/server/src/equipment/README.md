@@ -182,8 +182,9 @@ and `POST /api/rigs/:rigId/dew` (`{ deviceId, requestId, serverInstanceId, actio
 as the mount routes do: one request ID admitted at most once, a check that retires an unseen ID without a write, a
 new server instance that refuses an old page. The action is `{ kind: 'auto', on }` or
 `{ kind: 'duty', channelId, percent }` with `percent` from 0 to 100; anything else is a 400 and nothing is read. Vela
-picks the channels from the names Cria gives the PPBA, `Auto dew` and those starting `Dew` (`Dew A duty (%)`), so a
-channel id that is not one of those is a 404 and the power outputs and USB are unreachable. Auto dew is written as 1
+picks the channels from the names Cria gives the PPBA: `Auto dew` and the `Dew ... duty` channels (`Dew A duty (%)`). The
+box's binary `Dew A` and `Dew B` outputs (0 or 1) are not duties and are not offered, so a channel id that is not one
+of those is a 404 and the power outputs and USB are unreachable. Auto dew is written as 1
 or 0 to its channel; a duty goes to its own channel.
 
 The command does not take the rig operation lane: a capture run needs the heaters on and nothing in it moves the

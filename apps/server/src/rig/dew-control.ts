@@ -49,11 +49,14 @@ function disabled(reason: string): MountControlAvailability {
   return { enabled: false, reason }
 }
 
-/** The channels Vela offers, by the names Cria gives the PPBA's: "Auto dew", "Dew A duty (%)", "Dew B duty (%)". */
+/**
+ * The channels Vela offers, by the names Cria gives the PPBA's: "Auto dew", "Dew A duty (%)", "Dew B duty (%)".
+ * The box also has binary "Dew A" and "Dew B" outputs (0 or 1) that are not duties and are not offered.
+ */
 function dewChannelKind(channel: RigSwitchChannelView): 'auto' | 'duty' | undefined {
   if (/^auto dew$/i.test(channel.name.trim())) return 'auto'
 
-  return /^dew\b/i.test(channel.name.trim()) ? 'duty' : undefined
+  return /^dew\b.*\bduty\b/i.test(channel.name.trim()) ? 'duty' : undefined
 }
 
 function autoIsOn(channel: RigSwitchChannelView) {

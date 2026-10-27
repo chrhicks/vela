@@ -36,3 +36,7 @@ reason `stopped`. Adapters check
 identity, connection, stationary state and the relevant capability before one
 write, and distinguish confirmed readback, known failure and unresolved outcome.
 It does not compose unpark, tracking and motion into a workflow.
+
+`SwitchControl` writes one channel of a power box (`set({ switchId, channelId, value })`), once, and returns the
+value the device reports holding. It offers no reading and no list of channels; the caller chooses which channels
+it may write.
