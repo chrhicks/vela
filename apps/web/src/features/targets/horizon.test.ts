@@ -1,20 +1,21 @@
-import type { HorizonStatus, TargetSkyPath } from '@vela/model/web'
+import type { HorizonBinKind, HorizonStatus, TargetSkyPath } from '@vela/model/web'
 import { describe, expect, it } from 'vitest'
 import { horizonNote, horizonRuns, horizonWindowNote } from './horizon'
 
 const start = Date.UTC(2026, 0, 1, 0, 0)
 
 /** One sample per 15 minutes: [horizon, altitude, sun altitude]. */
-function sky(rows: Array<[HorizonStatus | null, number?, number?]>): TargetSkyPath {
+function sky(rows: Array<[HorizonStatus | null, number?, number?, HorizonBinKind?]>): TargetSkyPath {
   return {
     observedAt: new Date(start).toISOString(),
     startsAt: new Date(start).toISOString(),
     endsAt: new Date(start + (rows.length - 1) * 900_000).toISOString(),
-    samples: rows.map(([horizon, altitude = 40, sun = -30], index) => ({
+    samples: rows.map(([horizon, altitude = 40, sun = -30, horizonBin = horizon === 'unknown' ? 'unknown' : 'traced'], index) => ({
       at: new Date(start + index * 900_000).toISOString(),
       azimuthDegrees: 10,
       altitudeDegrees: altitude,
       horizon,
+      horizonBin,
       sunAltitudeDegrees: sun,
       moon: { azimuthDegrees: 0, altitudeDegrees: 0, illuminationFraction: 0, waxing: true },
     })),

@@ -11,7 +11,7 @@ import { registerTargets, type TargetOptions } from './routes.js'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { horizonFilePath, writeHorizonProfile, type HorizonProfile } from './horizon.js'
+import { createHorizon, horizonFilePath, writeHorizonProfile, type Horizon, type HorizonProfile } from './horizon.js'
 import { syntheticProfile } from './horizon.fixture.js'
 import { haltBodyError } from '../http/halt-body.js'
 import { emptyHaltRequests, refusedHaltRequests } from '../http/halt-requests.fixture.js'
@@ -52,7 +52,7 @@ function setup(
     record?: RigCatalogRecord
     solver?: boolean
     offsetDegrees?: number
-    horizonDirectory?: string
+    horizon?: Horizon
   } = {},
 ) {
   const catalog = createMemoryRigCatalog([settings.record ?? record])
@@ -157,7 +157,7 @@ function setup(
 
   if (settings.solver !== false) options.createSolver = () => solver
 
-  if (settings.horizonDirectory) options.horizonDirectory = settings.horizonDirectory
+  if (settings.horizon) options.horizon = settings.horizon
 
   function createApp() {
     const app = Fastify()
@@ -798,7 +798,7 @@ describe('backyard horizon over HTTP', () => {
 
     if (profile) await writeHorizonProfile(horizonFilePath(horizonDirectory, 'rig')!, profile)
 
-    return setup({ horizonDirectory })
+    return setup({ horizon: createHorizon(horizonDirectory) })
   }
 
   const flat = (altitude: number | null) =>

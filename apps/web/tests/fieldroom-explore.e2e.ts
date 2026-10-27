@@ -293,6 +293,7 @@ test('a subject behind the approximate horizon profile is warned, an untraced st
       altitudeDegrees: 40,
       sunAltitudeDegrees: -25,
       horizon: index < 6 ? 'clear' : index < 10 ? 'behind' : index < 14 ? 'unknown' : 'clear',
+      horizonBin: index < 6 ? 'traced' : index < 10 ? 'observed' : index < 14 ? 'unknown' : 'traced',
     }))
 
     first.horizonInWindow = { checkedMinutes: 180, behindMinutes: 90, unknownMinutes: 30 }

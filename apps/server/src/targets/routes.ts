@@ -16,8 +16,9 @@ import {
   type CatalogTarget,
 } from './catalog/index.js'
 import { skyPath, type Site } from './sky.js'
-import { createHorizonStore, type HorizonProfile, type HorizonStore } from './horizon.js'
+import { type Horizon, type Skyline } from './horizon.js'
 import { registerTargetDiscovery } from './discovery-routes.js'
+import { registerHorizonObservations } from './horizon-routes.js'
 import { haltBodyError, registerHaltRoutes } from '../http/halt-body.js'
 import type { FrameImaging } from '../imaging/frame-imaging.js'
 
@@ -28,8 +29,8 @@ export interface TargetOptions {
   createHardware?: (rig: RigCatalogRecord, telescopeId: string) => FramingHardware
   createSolver?: (fieldHeightDegrees: number) => PlateSolver
   createInspector: RigDetailOptions['createInspector']
-  /** Where the approximate backyard horizon profiles live; absent means no rig has one. */
-  horizonDirectory?: string
+  /** The approximate backyard horizon and what star dropouts taught it; absent means no rig has one. */
+  horizon?: Horizon
   now?: () => Date
   images?: Pick<FrameImaging, 'render' | 'analyze'>
   waitForMountObservation?: (signal: AbortSignal) => Promise<void>
@@ -42,7 +43,7 @@ export function registerTargets(
   options: TargetOptions,
 ) {
   const now = options.now ?? (() => new Date())
-  const horizons: HorizonStore | null = options.horizonDirectory ? createHorizonStore(options.horizonDirectory) : null
+  const horizons = options.horizon ?? null
   const controllers = new Map<string, ReturnType<typeof createFramingController>>()
   const adapters = new Map<string, Framing>()
 
@@ -213,7 +214,7 @@ export function registerTargets(
     target: CatalogTarget,
     site: Site | null,
     at = now(),
-    horizon: HorizonProfile | null = null,
+    horizon: Skyline | null = null,
   ): TargetView {
     const fov = Math.max(0.5, Math.min(5, ((target.majorAxisArcminutes ?? 45) / 60) * 1.8))
 
@@ -232,9 +233,10 @@ export function registerTargets(
     }
   }
 
-  const horizonFor = async (rig: RigCatalogRecord) => (await horizons?.forRig(rig.id)) ?? null
+  const horizonFor = async (rig: RigCatalogRecord) => (await horizons?.skyline(rig.id)) ?? null
 
   registerTargetDiscovery(app, catalog, { now, siteView, horizonFor, targetView })
+  if (horizons) registerHorizonObservations(app, catalog, horizons.observations)
 
   app.get<{ Params: { rigId: string }; Querystring: { q?: string; offset?: string } }>(
     '/api/web/rigs/:rigId/targets',

@@ -24,6 +24,29 @@ export interface TargetView extends TargetPosition {
  */
 export type HorizonStatus = 'clear' | 'behind' | 'unknown'
 
+/**
+ * What a stretch of the horizon rests on. `observed` is a bin that stars dropped out in, higher than the
+ * survey traced (or untraced): the skyline is at least the observed altitude there.
+ */
+export type HorizonBinKind = 'traced' | 'observed' | 'unknown'
+
+/** Where the mount pointed when stars dropped out of a light run. */
+export interface HorizonObservationView {
+  id: string
+  at: string
+  altitudeDegrees: number
+  azimuthDegrees: number
+  strongBefore: number
+  strongAt: number
+  runId: string
+}
+
+/** Newest first. */
+export interface HorizonObservationsView {
+  rigId: string
+  observations: HorizonObservationView[]
+}
+
 /** Minutes of a window, counted in 15-minute sky samples, by horizon status. */
 export interface HorizonWindow {
   checkedMinutes: number
@@ -42,6 +65,8 @@ export interface TargetSkyPath {
     altitudeDegrees: number
     /** Null when the rig has no horizon profile. */
     horizon: HorizonStatus | null
+    /** The kind of horizon bin the sample falls in; null when the rig has no horizon profile. */
+    horizonBin: HorizonBinKind | null
     sunAltitudeDegrees: number
     moon: {
       azimuthDegrees: number

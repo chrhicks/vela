@@ -2,7 +2,7 @@ import { Body, Equator, Horizon, Illumination, MoonPhase, Observer } from 'astro
 import type { TargetPosition, TargetSkyPath } from '@vela/model/web'
 import type { PlateWcs } from '../plate-solving/solver.js'
 import { angularDistance, toMount, type Site } from '../astronomy/coordinates.js'
-import { horizonStatus, type HorizonProfile } from './horizon.js'
+import { horizonBin, horizonStatus, type Skyline } from './horizon.js'
 
 export { angularDistance, fromMount, toMount, type Site } from '../astronomy/coordinates.js'
 
@@ -39,7 +39,7 @@ export function skyPath(
   target: TargetPosition,
   site: Site,
   now: Date,
-  horizon: HorizonProfile | null = null,
+  horizon: Skyline | null = null,
 ): TargetSkyPath {
   const observer = new Observer(
     site.latitudeDegrees,
@@ -79,6 +79,7 @@ export function skyPath(
       azimuthDegrees: targetHorizontal.azimuth,
       altitudeDegrees: targetHorizontal.altitude,
       horizon: horizonStatus(horizon, targetHorizontal.azimuth, targetHorizontal.altitude),
+      horizonBin: horizonBin(horizon, targetHorizontal.azimuth),
       sunAltitudeDegrees: Horizon(at, observer, sun.ra, sun.dec).altitude,
       moon: {
         azimuthDegrees: moonHorizontal.azimuth,
