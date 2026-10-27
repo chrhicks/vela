@@ -99,6 +99,9 @@ const switchStatus = z.object({
         name: text,
         on: z.boolean().optional(),
         value: z.number().optional(),
+        minimum: z.number().optional(),
+        maximum: z.number().optional(),
+        step: z.number().optional(),
       }),
     )
     .refine(channels => new Set(channels.map(channel => channel.id)).size === channels.length)

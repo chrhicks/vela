@@ -10,6 +10,9 @@ export const dewControlSchema = z.object({
   channels: z.array(z.object({
     id: z.int(),
     name: z.string(),
+    minimum: z.number(),
+    maximum: z.number(),
+    step: z.number().positive(),
     dutyPercent: z.number().nullable(),
     set: availability,
   })),

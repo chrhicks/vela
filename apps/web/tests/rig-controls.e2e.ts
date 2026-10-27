@@ -24,8 +24,8 @@ const dewView = (patch: Partial<DewControlView> = {}): DewControlView => ({
   serverInstanceId,
   auto: { on: false, set: dewOn },
   channels: [
-    { id: 1, name: 'Dew A duty (%)', dutyPercent: 0, set: dewOn },
-    { id: 2, name: 'Dew B duty (%)', dutyPercent: 0, set: dewOn },
+    { id: 1, name: 'Dew A duty (%)', minimum: 0, maximum: 100, step: 10, dutyPercent: 0, set: dewOn },
+    { id: 2, name: 'Dew B duty (%)', minimum: 0, maximum: 100, step: 10, dutyPercent: 0, set: dewOn },
   ],
   command: null,
   ...patch,
@@ -386,7 +386,7 @@ test('a fixed duty is sent once and confirmed with what the box holds', async ({
   await openPanel(page)
   const dew = panel(page).getByRole('region', { name: 'Dew heaters' })
 
-  await dew.getByLabel('Dew A duty (%) · fixed duty').fill('40')
+  await dew.getByLabel('Dew A duty (%) · fixed duty').selectOption('40')
   await dew.getByRole('button', { name: 'Set duty' }).first().click()
   await expect(dew.getByRole('status')).toHaveText('The box holds 39.8%.')
   await expect(dew.getByText('39.8%', { exact: true })).toBeVisible()
@@ -394,17 +394,16 @@ test('a fixed duty is sent once and confirmed with what the box holds', async ({
   expect(fixture.writes[0]).toMatchObject({ path: 'dew', body: { action: { kind: 'duty', channelId: 1, percent: 40 } } })
 })
 
-test('a duty outside 0 to 100 cannot be sent', async ({ page }) => {
+test('a duty is chosen from the channel\'s step, so 25 cannot be sent', async ({ page }) => {
   const fixture = await controlsScene(page, { dew: dewView() })
   await page.goto('/rigs/fra400')
   await openPanel(page)
   const dew = panel(page).getByRole('region', { name: 'Dew heaters' })
+  const field = dew.getByLabel('Dew A duty (%) · fixed duty')
 
-  for (const value of ['101', '-1', '']) {
-    await dew.getByLabel('Dew A duty (%) · fixed duty').fill(value)
-    await expect(dew.getByRole('button', { name: 'Set duty' }).first()).toBeDisabled()
-  }
-
+  await expect(field.locator('option')).toHaveText(['0%', '10%', '20%', '30%', '40%', '50%', '60%', '70%', '80%', '90%', '100%'])
+  await expect(dew.getByText('The box takes 0 to 100 in steps of 10.').first()).toBeVisible()
+  await expect(field.locator('option[value="25"]')).toHaveCount(0)
   expect(fixture.writes).toEqual([])
 })
 
@@ -430,7 +429,7 @@ test('a lost reply is reported as unconfirmed, is checked without a second write
   await openPanel(page)
   const dew = panel(page).getByRole('region', { name: 'Dew heaters' })
 
-  await dew.getByLabel('Dew A duty (%) · fixed duty').fill('40')
+  await dew.getByLabel('Dew A duty (%) · fixed duty').selectOption('40')
   await dew.getByRole('button', { name: 'Set duty' }).first().click()
   await expect(dew.getByText(/Vela has not repeated the request/)).toBeVisible()
   await expect(dew.getByRole('button', { name: 'Set duty' }).first()).toBeDisabled()

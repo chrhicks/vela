@@ -293,6 +293,12 @@ function switchStatus(
 
     if (channel.value !== undefined) view = { ...view, value: channel.value }
 
+    if (channel.minimum !== undefined) view = { ...view, minimum: channel.minimum }
+
+    if (channel.maximum !== undefined) view = { ...view, maximum: channel.maximum }
+
+    if (channel.step !== undefined) view = { ...view, step: channel.step }
+
     return view
   })
 

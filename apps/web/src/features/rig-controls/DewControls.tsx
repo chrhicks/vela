@@ -1,5 +1,5 @@
-import type { DewControlAction, DewControlView, RigDetailView, RigSwitchDeviceView } from '@vela/model/web'
-import { Button, Checkbox, Input } from '@vela/ui'
+import type { DewChannelView, DewControlAction, DewControlView, RigDetailView, RigSwitchDeviceView } from '@vela/model/web'
+import { Button, Checkbox, Select } from '@vela/ui'
 import { useEffect, useId, useRef, useState } from 'react'
 import { ApiError } from '../../lib/api'
 import { checkDewCommand, sendDewCommand } from '../rig-detail/dew-control-api'
@@ -9,6 +9,15 @@ type Command = NonNullable<DewControlView['command']> & { serverInstanceId: stri
 
 const dutyText = (percent: number | null) =>
   percent === null ? 'Not reported' : `${percent.toLocaleString(undefined, { maximumFractionDigits: 1 })}%`
+
+/** Every duty the channel accepts: `minimum`, then each `step` up to `maximum`. */
+function dutyChoices({ minimum, maximum, step }: DewChannelView) {
+  const duties: number[] = []
+
+  for (let index = 0; minimum + index * step <= maximum + 1e-9; index++) duties.push(Math.round((minimum + index * step) * 1000) / 1000)
+
+  return duties
+}
 
 export function DewControls({ rigId, device, stale, refresh }: {
   rigId: string
@@ -143,9 +152,11 @@ export function DewControls({ rigId, device, stale, refresh }: {
         />
       )}
       {view.channels.map(channel => {
-        const requested = drafts[channel.id] ?? (channel.dutyPercent === null ? '' : String(Math.round(channel.dutyPercent)))
-        const percent = Number(requested)
-        const valid = requested.trim() !== '' && Number.isFinite(percent) && percent >= 0 && percent <= 100
+        const duties = dutyChoices(channel)
+        // The box holds a duty to a finer grain than it accepts (9.8 for a set 10), so start from the nearest choice.
+        const nearest = channel.dutyPercent === null ? undefined : duties.reduce((best, duty) => Math.abs(duty - channel.dutyPercent!) < Math.abs(best - channel.dutyPercent!) ? duty : best, duties[0]!)
+        const requested = drafts[channel.id] ?? (nearest === undefined ? '' : String(nearest))
+        const valid = requested !== '' && duties.includes(Number(requested))
 
         return (
           <form
@@ -153,20 +164,19 @@ export function DewControls({ rigId, device, stale, refresh }: {
             onSubmit={event => {
               event.preventDefault()
 
-              if (valid) void execute({ kind: 'duty', channelId: channel.id, percent })
+              if (valid) void execute({ kind: 'duty', channelId: channel.id, percent: Number(requested) })
             }}
           >
-            <Input
+            <Select
               label={`${channel.name} · fixed duty`}
-              type="number"
-              min="0"
-              max="100"
-              step="1"
-              inputMode="numeric"
               value={requested}
               disabled={disabled || !channel.set.enabled}
               invalid={!valid && channel.set.enabled}
-              message={channel.set.enabled ? valid ? 'Choose 0 to 100.' : 'Choose a whole number from 0 to 100.' : channel.set.reason ?? undefined}
+              message={channel.set.enabled ? valid ? `The box takes ${channel.minimum} to ${channel.maximum} in steps of ${channel.step}.` : 'Choose a duty.' : channel.set.reason ?? undefined}
+              options={[
+                ...(requested === '' ? [{ value: '', label: 'Choose a duty', disabled: true }] : []),
+                ...duties.map(duty => ({ value: String(duty), label: `${duty}%` })),
+              ]}
               onChange={event => setDrafts(current => ({ ...current, [channel.id]: event.target.value }))}
             />
             <Button

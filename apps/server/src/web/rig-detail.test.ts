@@ -205,7 +205,7 @@ describe('Rig device detail mapping', () => {
         status: {
           availability: 'complete',
           activity: 'reporting',
-          channels: [{ id: 0, name: 'Output', value: 1, on: true }],
+          channels: [{ id: 0, name: 'Output', value: 1, on: true, minimum: 0, maximum: 1, step: 1 }],
         },
       },
     ])

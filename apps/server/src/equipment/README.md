@@ -187,6 +187,10 @@ box's binary `Dew A` and `Dew B` outputs (0 or 1) are not duties and are not off
 of those is a 404 and the power outputs and USB are unreachable. Auto dew is written as 1
 or 0 to its channel; a duty goes to its own channel.
 
+Each dew channel in the view carries `minimum`, `maximum` and `step`, which Cria reports per channel (the PPBA's duties
+step by 10; 0, 100 and 1 when the box does not say). A duty that is not `minimum` plus a whole number of steps is a
+400 `invalid-dew-duty` whose message gives the allowed step, and nothing is sent: Cria would refuse it anyway.
+
 The command does not take the rig operation lane: a capture run needs the heaters on and nothing in it moves the
 rig. A second command for the box is refused while one is in flight. While Auto dew is on the box sets the duty itself,
 so every duty control is disabled with "Auto dew is on" (an unknown Auto dew state disables them too). Cria confirms

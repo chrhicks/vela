@@ -43,6 +43,18 @@ const requestSchema = checkSchema.extend({
 /** The PPBA holds a duty in 1/255 steps, so a confirmed 10 % reads back as 9.8 %. */
 const dutyTolerancePercent = 0.4
 
+const grid = (channel: RigSwitchChannelView) => ({
+  minimum: Math.max(channel.minimum ?? 0, 0),
+  maximum: Math.min(channel.maximum ?? 100, 100),
+  step: channel.step !== undefined && channel.step > 0 ? channel.step : 1,
+})
+
+const onGrid = (percent: number, { minimum, maximum, step }: ReturnType<typeof grid>) => {
+  const steps = (percent - minimum) / step
+
+  return percent >= minimum && percent <= maximum && Math.abs(steps - Math.round(steps)) < 1e-9
+}
+
 const enabled: MountControlAvailability = { enabled: true, reason: null }
 
 function disabled(reason: string): MountControlAvailability {
@@ -170,6 +182,7 @@ export function registerDewControls(app: FastifyInstance, catalog: RigCatalog, o
     const channels: DewChannelView[] = duties.map(channel => ({
       id: channel.id,
       name: channel.name,
+      ...grid(channel),
       dutyPercent: channel.value ?? null,
       set: duty(),
     }))
@@ -272,6 +285,16 @@ export function registerDewControls(app: FastifyInstance, catalog: RigCatalog, o
       const target = readiness && targetOf(action, device, readiness)
 
       if (!target) return reply.code(404).send({ error: 'dew-channel-not-found' })
+
+      // Cria refuses a duty off the channel's step, so say so here instead of sending it.
+      const dutyChannel = action.kind === 'duty' ? readiness?.channels.find(item => item.id === action.channelId) : undefined
+
+      if (action.kind === 'duty' && dutyChannel && !onGrid(action.percent, dutyChannel)) {
+        return reply.code(400).send({
+          error: 'invalid-dew-duty',
+          message: `${dutyChannel.name} takes ${dutyChannel.minimum} to ${dutyChannel.maximum} in steps of ${dutyChannel.step}.`,
+        })
+      }
 
       if (!target.availability.enabled)
         return reply.code(409).send({ error: 'dew-command-unavailable', message: target.availability.reason })

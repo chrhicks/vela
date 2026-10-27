@@ -130,6 +130,10 @@ export interface RigSwitchChannelView {
   readonly name: string
   readonly on?: boolean
   readonly value?: number
+  /** The range and step the device accepts for this channel, when it reports them. */
+  readonly minimum?: number
+  readonly maximum?: number
+  readonly step?: number
 }
 
 export interface RigSwitchStatus {

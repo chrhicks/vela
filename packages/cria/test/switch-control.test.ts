@@ -68,12 +68,33 @@ describe('switch control', () => {
   it('turns Auto dew off and then takes a duty', async () => {
     cria.setSwitch(2, 1)
 
-    for (const command of [{ ...autoDew, value: 0 }, { ...dewA, value: 25 }]) {
+    for (const command of [{ ...autoDew, value: 0 }, { ...dewA, value: 30 }]) {
       const set = equipment.switchControl.set(command)
 
       await vi.advanceTimersByTimeAsync(1500)
       expect(await set).toMatchObject({ outcome: 'confirmed' })
     }
+  })
+
+  it('carries each channel\'s range and step from Cria into the inspection', async () => {
+    const [inspection] = (await equipment.provider.inspectDevices()).filter(device => device.providerDeviceId === 'switch')
+    const channels = inspection?.telemetry?.values?.kind === 'switch' ? inspection.telemetry.values.channels : undefined
+
+    expect(channels?.map(channel => [channel.id, channel.minimum, channel.maximum, channel.step])).toEqual([[0, 0, 100, 10], [1, 0, 100, 10], [2, 0, 1, 1]])
+  })
+
+  it('refuses a duty off the channel step with Cria\'s message and writes nothing, then takes 40', async () => {
+    const off = equipment.switchControl.set({ ...dewA, value: 25 })
+
+    await vi.advanceTimersByTimeAsync(300)
+    expect(await off).toEqual({ outcome: 'failed', reason: 'rejected', message: 'Dew A duty (%) accepts 0-100 in steps of 10' })
+    expect(cria.switchValue(0)).toBe(0)
+
+    const on = equipment.switchControl.set({ ...dewA, value: 40 })
+
+    await vi.advanceTimersByTimeAsync(300)
+    expect(await on).toEqual({ outcome: 'confirmed', value: 40 })
+    expect(cria.switchValue(0)).toBe(40)
   })
 
   it('does not send for a device that is not a configured switch or has another name', async () => {

@@ -8,8 +8,8 @@ import { loadRigDetailView } from './detail.js'
 
 const channels = (auto = false, dutyA = 0): ReadonlyArray<SwitchChannel> => [
   { id: 0, name: '12V', on: true, value: 1 },
-  { id: 1, name: 'Dew A duty (%)', value: dutyA, on: dutyA > 0 },
-  { id: 2, name: 'Dew B duty (%)', value: 0, on: false },
+  { id: 1, name: 'Dew A duty (%)', value: dutyA, on: dutyA > 0, minimum: 0, maximum: 100, step: 10 },
+  { id: 2, name: 'Dew B duty (%)', value: 0, on: false, minimum: 0, maximum: 100, step: 10 },
   { id: 3, name: 'Auto dew', value: auto ? 1 : 0, on: auto },
   { id: 4, name: 'Dew A', value: 1, on: true },
   { id: 5, name: 'Dew B', value: 1, on: true },
@@ -164,6 +164,39 @@ describe('dew heater controls', () => {
       expect((await f.post(f.dutyA(100))).statusCode).toBe(200)
       expect(f.set).toHaveBeenCalledTimes(2)
       expect((await f.post(f.dutyA(40), randomUUID(), 'power')).statusCode).toBe(404)
+    } finally { await f.app.close() }
+  })
+
+  it('refuses a duty off the channel step with the allowed step before any write, and takes one on it', async () => {
+    const f = fixture()
+
+    try {
+      const view = await f.view()
+
+      expect(view.channels.map(channel => [channel.minimum, channel.maximum, channel.step])).toEqual([[0, 100, 10], [0, 100, 10]])
+
+      for (const percent of [25, 40.5, 5, 99]) {
+        const response = await f.post(f.dutyA(percent))
+
+        expect(response.statusCode).toBe(400)
+        expect(response.json()).toEqual({ error: 'invalid-dew-duty', message: 'Dew A duty (%) takes 0 to 100 in steps of 10.' })
+      }
+
+      expect(f.set).not.toHaveBeenCalled()
+      expect((await f.post(f.dutyA(40))).statusCode).toBe(200)
+      expect(f.set).toHaveBeenCalledTimes(1)
+      expect(f.set).toHaveBeenCalledWith(expect.objectContaining({ channelId: 1, value: 40 }))
+    } finally { await f.app.close() }
+  })
+
+  it('takes any whole duty when the box reports no step', async () => {
+    const f = fixture()
+
+    try {
+      f.show([{ id: 1, name: 'Dew A duty (%)', value: 0, on: false }, { id: 3, name: 'Auto dew', value: 0, on: false }])
+      expect((await f.view()).channels.map(channel => [channel.minimum, channel.maximum, channel.step])).toEqual([[0, 100, 1]])
+      expect((await f.post(f.dutyA(25))).statusCode).toBe(200)
+      expect((await f.post(f.dutyA(25.5))).statusCode).toBe(400)
     } finally { await f.app.close() }
   })
 

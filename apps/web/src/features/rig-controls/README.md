@@ -68,7 +68,8 @@ shows what it reports, never the command's intent.
 `DewControls`, shown only when the rig has a power box with dew channels (a switch device whose channels include
 `Dew ... duty` and optionally `Auto dew`; on the real rig, the Pegasus PPBA). Its other channels, the power outputs and
 USB, are not here, and neither is the guide scope's own USB heater, which stays manual. It shows each dew channel's
-duty as the box reports it, an Auto dew switch, and per channel a fixed duty (a whole number, 0 to 100) with Set duty.
+duty as the box reports it, an Auto dew switch, and per channel a fixed duty with Set duty. The duty is a select of the values the channel accepts, 0 to 100 in the channel's step (10 on
+the PPBA, as the view reports it), so an off-step duty such as 25 cannot be picked.
 
 While Auto dew is on the box sets each duty, so the fixed duty fields are disabled with the reason "Auto dew is on".
 They are disabled, with the server's reason, whenever the power box is held or unread. A change takes the same rules as

@@ -8,6 +8,10 @@ export type DewControlAction =
 export interface DewChannelView {
   readonly id: number
   readonly name: string
+  /** The duties the box accepts: `minimum` to `maximum` in multiples of `step` from `minimum`. 0, 100 and 1 when the box does not say. */
+  readonly minimum: number
+  readonly maximum: number
+  readonly step: number
   /** What the box reports now, which can differ a little from what was set (it quantizes). */
   readonly dutyPercent: number | null
   /** Setting a fixed duty. Disabled with "Auto dew is on" while the box sets its own duty. */

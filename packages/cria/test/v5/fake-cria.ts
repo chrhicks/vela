@@ -21,7 +21,7 @@
  *   running operation now with any outcome.
  * - Switch: a PPBA-like box with Dew A and Dew B duty channels (0 to 100) and an Auto dew channel (0 or 1).
  *   `switch-set` changes the value the device reports and confirms the value it holds; a duty while Auto dew is
- *   on is refused as Cria refuses it. `setSwitch` seeds a value.
+ *   on is refused as Cria refuses it, and so is a duty off the channel's step of 10 (the PPBA driver's). `setSwitch` seeds a value, `switchValue` reads one.
  * - Faults: `dropReply(route)` applies the next request on a route and loses its
  *   reply; `delay(route, ms)` makes the next one land `ms` later, and with
  *   `dropReply` its caller fails at once. A delayed request is lost if Cria is
@@ -130,9 +130,9 @@ const rig: ReadonlyArray<Rigged> = [
 ]
 
 const switchChannels = [
-  { id: 0, name: 'Dew A duty (%)', maximum: 100 },
-  { id: 1, name: 'Dew B duty (%)', maximum: 100 },
-  { id: 2, name: 'Auto dew', maximum: 1 },
+  { id: 0, name: 'Dew A duty (%)', maximum: 100, step: 10 },
+  { id: 1, name: 'Dew B duty (%)', maximum: 100, step: 10 },
+  { id: 2, name: 'Auto dew', maximum: 1, step: 1 },
 ] as const
 
 const autoDewChannel = 2
@@ -195,6 +195,10 @@ export class FakeCria {
   }
 
   /** Sets what the switch reports for a channel, as if the box had changed it itself. */
+  switchValue(channelId: number): number {
+    return this.switchValues.get(channelId) ?? 0
+  }
+
   setSwitch(channelId: number, value: number): void {
     this.switchValues.set(channelId, value)
     this.instance.revision++
@@ -429,6 +433,9 @@ export class FakeCria {
       return { kind: 'failed', reason: 'invalid', message: `${channel.name} is set automatically while Auto dew is on; switch Auto dew (channel ${autoDewChannel}) off first` }
 
     if (value < 0 || value > channel.maximum) return { kind: 'failed', reason: 'invalid', message: `${channel.name} takes 0 to ${channel.maximum}` }
+
+    // Like the PPBA driver: a value off the channel's step is refused, not rounded.
+    if (value % channel.step !== 0) return { kind: 'failed', reason: 'invalid', message: `${channel.name} accepts 0-${channel.maximum} in steps of ${channel.step}` }
     this.switchValues.set(channelId, value)
 
     return { kind: 'confirmed', value: { values: { value }, image: null } }
@@ -628,7 +635,7 @@ export class FakeCria {
   private switchChannel(channel: (typeof switchChannels)[number], observedAt: number) {
     const value = this.switchValues.get(channel.id) ?? 0
 
-    return fresh({ id: channel.id, name: channel.name, writable: true, minimum: 0, maximum: channel.maximum, step: 1, on: value > 0, value }, observedAt)
+    return fresh({ id: channel.id, name: channel.name, writable: true, minimum: 0, maximum: channel.maximum, step: channel.step, on: value > 0, value }, observedAt)
   }
 
   /** SPEC "Device": the reasons the fake models, in their order of precedence. */
