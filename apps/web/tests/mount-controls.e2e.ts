@@ -20,7 +20,7 @@ const lan = 'http://polaris.test'
 test.use({ launchOptions: { args: ['--host-resolver-rules=MAP polaris.test 127.0.0.1'] } })
 
 const available: MountControlView = {
-  serverInstanceId, unpark: off, trackingOn: on, trackingOff: off, home: on, stop: on, homeConfirmedAt: null, command: null,
+  serverInstanceId, unpark: off, trackingOn: on, trackingOff: off, home: on, stop: on, canStop: true, homeConfirmedAt: null, command: null,
 }
 
 type Command = NonNullable<MountControlView['command']>
@@ -242,6 +242,29 @@ test.describe('home and stop', () => {
     await expect(mount(page).getByText(/Home confirmed at/)).toHaveCount(0)
     expect(fixture.writes).toHaveLength(1)
     expect(fixture.scene.unknownRequests).toEqual([])
+  })
+
+  test('a mount Vela cannot stop never offers Stop, not even while tracking is pending', async ({ page }) => {
+    const fixture = await mountScene(page)
+    const sent = deferred()
+    let tracking: Route | undefined
+
+    fixture.setMount('off', 'unparked', {
+      ...available, canStop: false, home: { enabled: false, reason: 'Vela cannot home this rig’s mount.' },
+      stop: { enabled: false, reason: 'Vela cannot stop this rig’s mount.' },
+    })
+    fixture.handleWrite(async route => {
+      tracking = route
+      sent.resolve()
+    })
+    await fixture.open()
+    await expect(mount(page).getByRole('button', { name: 'Stop', exact: true })).toBeDisabled()
+    await mount(page).getByRole('button', { name: 'Turn tracking on', exact: true }).click()
+    await sent.promise
+    await expect(mount(page).getByRole('button', { name: 'Stop', exact: true })).toBeDisabled()
+    await expect(mount(page).getByText('Stop is off. Vela cannot stop this rig’s mount.')).toBeVisible()
+    expect(fixture.stops).toEqual([])
+    await tracking!.abort()
   })
 
   test('Stop is offered while the rest is disabled, says why when the mount is still, and can be pressed again after an unconfirmed stop', async ({ page }) => {

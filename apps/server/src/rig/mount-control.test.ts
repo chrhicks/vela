@@ -353,8 +353,9 @@ describe('stop', () => {
 
     try {
       f.setObservation({ parked: false, tracking: true, slewing: true })
+      expect((await f.view()).canStop).toBe(true)
       f.setCanStop(false)
-      expect((await f.view()).stop.enabled).toBe(false)
+      expect(await f.view()).toMatchObject({ canStop: false, stop: { enabled: false } })
       expect((await f.stop()).statusCode).toBe(409)
       f.setCanStop(true)
       f.disconnect()
@@ -419,4 +420,3 @@ describe('stop', () => {
     } finally { await f.app.close() }
   })
 })
-

@@ -11,6 +11,7 @@ export const mountControlSchema = z.object({
   trackingOff: availability,
   home: availability,
   stop: availability,
+  canStop: z.boolean(),
   homeConfirmedAt: z.string().nullable(),
   command: z.object({
     requestId: z.uuid(),

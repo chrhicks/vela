@@ -173,7 +173,7 @@ export function registerMountControls(
     if (reason) {
       return {
         serverInstanceId, unpark: disabled(reason), trackingOn: disabled(reason), trackingOff: disabled(reason),
-        home: disabled(reason), stop, homeConfirmedAt, command: command?.view ?? null,
+        home: disabled(reason), stop, canStop, homeConfirmedAt, command: command?.view ?? null,
       }
     }
 
@@ -209,7 +209,7 @@ export function registerMountControls(
         ? disabled('Mount parking state is unknown.')
         : state.parked ? disabled('Unpark the mount before homing.') : enabled
 
-    return { serverInstanceId, unpark, trackingOn, trackingOff, home, stop, homeConfirmedAt, command: command?.view ?? null }
+    return { serverInstanceId, unpark, trackingOn, trackingOff, home, stop, canStop, homeConfirmedAt, command: command?.view ?? null }
   }
 
   function mountControlOf(rig: RigCatalogRecord) {
