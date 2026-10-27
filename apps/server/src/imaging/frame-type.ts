@@ -14,3 +14,8 @@ export const imageTypeKeyword = {
 
 // SAFETY: the keys of a record over every FrameType are exactly the FrameTypes, and there are five.
 export const frameTypes = Object.keys(imageTypeKeyword) as [FrameType, ...FrameType[]]
+
+/** A filter matters for a light and for the flat that calibrates it. A dark, dark flat or bias has none. */
+export function carriesFilter(frameType: FrameType) {
+  return frameType === 'light' || frameType === 'flat'
+}

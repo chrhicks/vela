@@ -90,6 +90,72 @@ describe('file Rig catalog', () => {
     }
   })
 
+  it('reads the rig filters from the file and keeps them when the catalog rewrites it', async () => {
+    const path = await catalogPath()
+
+    try {
+      await writeFile(
+        path,
+        validCatalog.replace(
+          '    name: Backyard rig',
+          [
+            '    filters:',
+            '      - name: L-Ultimate',
+            '        description: Optolong L-Ultimate, dual-band H-alpha + OIII, 3 nm',
+            '      - name: UV/IR cut',
+            '    name: Backyard rig',
+          ].join('\n'),
+        ),
+      )
+
+      const filters = [
+        { name: 'L-Ultimate', description: 'Optolong L-Ultimate, dual-band H-alpha + OIII, 3 nm' },
+        { name: 'UV/IR cut' },
+      ]
+
+      const catalog = await openFileRigCatalog(path)
+      await expect(catalog.get('rig-1')).resolves.toMatchObject({ filters })
+      await expect(catalog.setFocalLength('rig-1', 400)).resolves.toBe(true)
+      await expect((await openFileRigCatalog(path)).get('rig-1')).resolves.toMatchObject({ filters })
+    } finally {
+      await rm(dirname(path), { recursive: true, force: true })
+    }
+  })
+
+  it('reads a rig without filters as having none listed', async () => {
+    const path = await catalogPath()
+
+    try {
+      await writeFile(path, validCatalog)
+      const rig = await (await openFileRigCatalog(path)).get('rig-1')
+      expect(rig?.filters).toBeUndefined()
+    } finally {
+      await rm(dirname(path), { recursive: true, force: true })
+    }
+  })
+
+  it.each([
+    ['a duplicate name', ['      - name: Ha', '      - name: Ha']],
+    ['None, which is always offered', ['      - name: none']],
+    ['a name with outside spaces', ['      - name: " Ha"']],
+    ['an empty name', ['      - name: ""']],
+    ['a name FITS cannot hold', ['      - name: Hα']],
+    ['a name over 30 characters', [`      - name: ${'x'.repeat(31)}`]],
+    ['an unknown field', ['      - name: Ha', '        wavelength: 656']],
+  ])('refuses filters with %s, so a typo never reaches a FITS header', async (_label, lines) => {
+    const path = await catalogPath()
+
+    try {
+      await writeFile(
+        path,
+        validCatalog.replace('    name: Backyard rig', `    filters:\n${lines.join('\n')}\n    name: Backyard rig`),
+      )
+      await expect(openFileRigCatalog(path)).rejects.toThrow(RigCatalogFileError)
+    } finally {
+      await rm(dirname(path), { recursive: true, force: true })
+    }
+  })
+
   it('starts empty when the file is missing and survives a restart after the first add', async () => {
     const path = await catalogPath()
     const observed = inventory('2026-09-02T20:00:00.000Z', { uniqueId: 'camera-1' })

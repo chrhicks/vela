@@ -170,3 +170,31 @@ it('reads a record written before the Unattended field as attended, and keeps on
   expect(store.unfinished('fra-400')).toMatchObject({ unattended: false })
   expect(store.unfinished('fra-401')).toMatchObject({ unattended: true })
 })
+
+it('keeps the filter a run was started with, None as None, and reads a record without one as unknown', async () => {
+  const path = await temporary()
+  const { filter: _, ...older } = record({ filter: 'x' })
+
+  await writeFile(
+    path,
+    JSON.stringify({
+      runs: {
+        'fra-400': record({ filter: 'L-Ultimate' }),
+        'fra-401': record({ rigId: 'fra-401', filter: null }),
+        'fra-402': { ...older, rigId: 'fra-402' },
+      },
+    }),
+  )
+
+  const store = await openFileCaptureRunStore(path)
+
+  expect(store.unfinished('fra-400')).toMatchObject({ filter: 'L-Ultimate' })
+  expect(store.unfinished('fra-401')).toMatchObject({ filter: null })
+  expect(store.unfinished('fra-402')).not.toHaveProperty('filter')
+})
+
+it('resumes a run with the filter it had, and a run that predates filters as unknown', () => {
+  expect(resumeRequest(record({ filter: 'L-Ultimate' }))).toMatchObject({ filter: 'L-Ultimate' })
+  expect(resumeRequest(record({ filter: null }))).toMatchObject({ filter: null })
+  expect(resumeRequest(record())).not.toHaveProperty('filter')
+})

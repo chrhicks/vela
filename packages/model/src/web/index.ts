@@ -64,6 +64,7 @@ export type {
   CapturePhase,
   CaptureView,
   FrameType,
+  RigFilter,
   SavedImage,
   SavedImagesView,
   SavedImageView,

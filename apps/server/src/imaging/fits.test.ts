@@ -224,10 +224,10 @@ describe('camera, optics and target settings', () => {
 
   const baseline = ['SIMPLE', 'BITPIX', 'NAXIS', 'NAXIS1', 'NAXIS2', 'DATE-OBS', 'EXPTIME', 'IMAGETYP', 'INSTRUME', 'ROWORDER', 'END']
 
-  const settingKeys = ['GAIN', 'OFFSET', 'XBINNING', 'YBINNING', 'XPIXSZ', 'YPIXSZ', 'CCD-TEMP', 'SET-TEMP', 'FOCALLEN', 'OBJECT', 'PIERSIDE']
+  const settingKeys = ['GAIN', 'OFFSET', 'XBINNING', 'YBINNING', 'XPIXSZ', 'YPIXSZ', 'CCD-TEMP', 'SET-TEMP', 'FOCALLEN', 'OBJECT', 'FILTER', 'PIERSIDE']
 
   it('writes every setting with its value and units on a light frame', async () => {
-    const fits = await encodeCaptureFits(frame, { ...metadata, objectName: 'M 31', settings })
+    const fits = await encodeCaptureFits(frame, { ...metadata, objectName: 'M 31', filterName: 'L-Ultimate', settings })
     const { values } = keywords(fits)
 
     expect(Object.fromEntries(settingKeys.map(key => [key, values.get(key)]))).toEqual({
@@ -241,6 +241,7 @@ describe('camera, optics and target settings', () => {
       'SET-TEMP': '-10',
       FOCALLEN: '400',
       OBJECT: "'M 31'",
+      FILTER: "'L-Ultimate'",
       PIERSIDE: "'WEST'",
     })
 
@@ -255,6 +256,25 @@ describe('camera, optics and target settings', () => {
     expect(keywords(fits).values.get('GAIN')).toBe('100')
   })
 
+  it.each(['light', 'flat'] as const)('names the filter on a %s frame', async frameType => {
+    const fits = await encodeCaptureFits(frame, { ...metadata, frameType, filterName: 'L-Ultimate', settings })
+
+    expect(keywords(fits).values.get('FILTER')).toBe("'L-Ultimate'")
+  })
+
+  it.each(['dark', 'dark-flat', 'bias'] as const)('names no filter on a %s frame', async frameType => {
+    const fits = await encodeCaptureFits(frame, { ...metadata, frameType, filterName: 'L-Ultimate', settings })
+
+    expect(keywords(fits).values.has('FILTER')).toBe(false)
+  })
+
+  it.each([null, undefined, '  '])('writes no FILTER key, never the word None, for %j', async filterName => {
+    const fits = await encodeCaptureFits(frame, { ...metadata, filterName, settings })
+
+    expect(keywords(fits).values.has('FILTER')).toBe(false)
+    expect(header(fits).join('')).not.toMatch(/none/i)
+  })
+
   it('names no object on a light frame without a subject', async () => {
     expect(keywords(await encodeCaptureFits(frame, { ...metadata, settings })).values.has('OBJECT')).toBe(false)
   })
@@ -264,7 +284,7 @@ describe('camera, optics and target settings', () => {
     const fits = await encodeCaptureFits(frame, { ...metadata, settings: unread })
     const { values } = keywords(fits)
 
-    expect(settingKeys.filter(key => !values.has(key))).toEqual(['GAIN', 'XBINNING', 'SET-TEMP', 'OBJECT', 'PIERSIDE'])
+    expect(settingKeys.filter(key => !values.has(key))).toEqual(['GAIN', 'XBINNING', 'SET-TEMP', 'OBJECT', 'FILTER', 'PIERSIDE'])
     expect(values.get('OFFSET')).toBe('10')
     expect((await readRetainedFits(fits)).pixels).toEqual(Int32Array.from(frame.pixels))
   })

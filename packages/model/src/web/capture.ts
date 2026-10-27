@@ -12,6 +12,17 @@ export interface CaptureSubject {
 export type FrameType = 'light' | 'dark' | 'flat' | 'dark-flat' | 'bias'
 
 /**
+ * A filter the rig can have in front of its camera. The slot is manual and nothing reports what
+ * is in it, so Chris says which one when he starts a run.
+ */
+export interface RigFilter {
+  /** The FITS `FILTER` value: short, ASCII, and stable, because stacking software groups frames by it. */
+  name: string
+  /** Shown in the app only, for example "dual-band, H-alpha + OIII, 3 nm". */
+  description?: string | undefined
+}
+
+/**
  * Which revision of the star measurement produced a frame's numbers. A count or HFR from one
  * version is not comparable with another. Records saved before the stamp existed are version 1.
  * Version 2 lowers the Bayer HFR floor from 1.4 to 1.0 px.
@@ -85,6 +96,11 @@ export interface CaptureImage {
   frameType: FrameType
   /** Absent on legacy artifacts; null explicitly means no selected subject. Always null unless `light`. */
   subject?: CaptureSubject | null
+  /**
+   * The filter name Chris said was in place. Null means no filter, and is always the value on a
+   * dark, dark flat or bias. Absent on frames saved before filters, so unknown, never none.
+   */
+  filter?: string | null | undefined
   imageUrl: string
   /** Smaller display preview; imageUrl always retains native resolution. */
   fitImageUrl?: string
@@ -200,6 +216,13 @@ export interface CaptureView {
   lostFrameCount?: number
   /** Snapshot of the selected subject for this run. */
   subject: CaptureSubject | null
+  /**
+   * The filter the current or most recent run was started with; null for none. Absent when an
+   * interrupted run's record predates filters, so unknown, never none.
+   */
+  filter?: string | null | undefined
+  /** The rig's filters, in the order Chris listed them. "None" is always offered and is not in the list. Absent reads as no filters. */
+  filters?: ReadonlyArray<RigFilter>
   /** The phone is paged for this run's alerts. Chris switches it, on or off, at any time during the run. */
   unattended: boolean
   /** Images from this run durably retained, including explicit Keep. */

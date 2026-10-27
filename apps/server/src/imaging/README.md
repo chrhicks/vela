@@ -21,7 +21,7 @@ camera, `ROWORDER=TOP-DOWN` and origin-adjusted Bayer pattern are preserved.
 A captured original also records what the frame was taken with, because stacking and
 calibration software matches darks, flats and bias frames to lights by gain, offset,
 temperature, binning, exposure and filter. Each key below is written only when its value
-was read for that frame. A value that could not be read is left out. Nothing is defaulted
+was read for that frame (`FILTER` is the exception: Chris chose it). A value that could not be read is left out. Nothing is defaulted
 or carried over from an earlier frame.
 
 | Key | Value | Source |
@@ -33,6 +33,7 @@ or carried over from an earlier frame.
 | `SET-TEMP` | Cooler setpoint in °C | The last setpoint the camera driver acknowledged |
 | `FOCALLEN` | Effective focal length in mm | The rig's configured value |
 | `OBJECT` | The subject's name | The run's subject. Light frames only; a dark, flat, dark flat or bias has none |
+| `FILTER` | The filter's name, as listed for the rig | Chris's choice when the run started. Light and flat frames only, and only when a filter was chosen: with None there is no key, never the word `None`. A dark, dark flat or bias has none |
 | `PIERSIDE` | `EAST` or `WEST` | Mount reading. Tells a meridian flip, which turns the image 180 degrees |
 
 Which keys are omitted, by rig:
@@ -43,10 +44,18 @@ Which keys are omitted, by rig:
 | Alpaca | `GAIN`, `OFFSET`, `XBINNING`, `YBINNING`, `XPIXSZ`, `YPIXSZ`, `CCD-TEMP`, `SET-TEMP`, `PIERSIDE`. Its adapter does not read them |
 | Either, no focal length configured | `FOCALLEN` |
 
-`FILTER` and `TELESCOP` are not written. Cria does not know the filter, and the rig record
-has no scope name. A read that fails or takes longer than two seconds costs the frame its
-settings keys and nothing else: the frame is still saved. The frame record does not note
-which keys were left out; the server logs a warning when a read fails.
+`TELESCOP` is not written: the rig record has no scope name. A read that fails or takes
+longer than two seconds costs the frame its settings keys and nothing else: the frame is
+still saved. The frame record does not note which keys were left out; the server logs a
+warning when a read fails.
+
+`FILTER` is the one key that is Chris's word and not a reading. The rig has one manual
+filter slot and nothing reports what is in it, so Chris names the filter when he starts a
+run (see [the capture filter](../capture/README.md#filter)). A failed settings read never
+costs the frame its `FILTER`. FITS has no standard keys for a passband, and Siril and
+PixInsight group lights with their flats by the `FILTER` string, so the header carries the
+name alone, and it must stay the same from night to night. The description is shown in the
+app and never written.
 
 The site and the mount's pointing are never written: no `SITELAT`, `SITELONG`, `LAT`,
 `LONG`, `ELEVATION` or similar, and no right ascension or declination. Chris shares these

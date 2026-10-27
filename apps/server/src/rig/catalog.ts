@@ -77,6 +77,23 @@ const inventorySchema = z.strictObject({
     ),
 })
 
+// FITS headers are ASCII, and a card holds 68 characters of value even when apostrophes double.
+const filterSchema = z.strictObject({
+  name: z
+    .string()
+    .max(30)
+    .regex(/^[\x20-\x7e]+$/)
+    .refine(name => name === name.trim() && name.toLowerCase() !== 'none'),
+  description: nonEmptyString.max(200).optional(),
+})
+
+const filtersSchema = z
+  .array(filterSchema)
+  .refine(
+    filters => new Set(filters.map(filter => filter.name)).size === filters.length,
+    'Filter names must be unique within a Rig',
+  )
+
 const rigSchema = z
   .strictObject({
     id: canonicalString,
@@ -86,14 +103,17 @@ const rigSchema = z
     addedAt: isoDateTime,
     imagingCamera: z.strictObject({ uniqueId: canonicalString, name: nonEmptyString }).optional(),
     focalLengthMm: z.number().min(10).max(20000).optional(),
+    filters: filtersSchema.optional(),
     lastObservedInventory: inventorySchema,
   })
-  .transform(({ imagingCamera, focalLengthMm, source, ...required }): RigCatalogRecord => {
+  .transform(({ imagingCamera, focalLengthMm, filters, source, ...required }): RigCatalogRecord => {
     let rig: RigCatalogRecord = required
 
     if (imagingCamera !== undefined) rig = { ...rig, imagingCamera }
 
     if (focalLengthMm !== undefined) rig = { ...rig, focalLengthMm }
+
+    if (filters !== undefined) rig = { ...rig, filters }
 
     if (source !== undefined) rig = { ...rig, source }
 
@@ -409,6 +429,8 @@ function copyRecord(record: RigCatalogRecord): RigCatalogRecord {
   }
 
   if (record.source) copy = { ...copy, source: { ...record.source } }
+
+  if (record.filters) copy = { ...copy, filters: record.filters.map(filter => ({ ...filter })) }
 
   if (record.imagingCamera) return { ...copy, imagingCamera: { ...record.imagingCamera } }
 

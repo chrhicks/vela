@@ -5,7 +5,8 @@ import { Link, useParams, useSearchParams } from 'react-router'
 import { CaptureInterruption } from '../features/capture/CaptureInterruption'
 import { LatestImage } from '../features/capture/LatestImage'
 import { captureActivity, useCapture } from '../features/capture/use-capture'
-import { frameTypeChoices, frameTypes, isCalibration } from '../features/capture/frame-types'
+import { carriesFilter, frameTypeChoices, frameTypes, isCalibration } from '../features/capture/frame-types'
+import { filterLabel, listedFilter, rememberedFilter, rememberFilter } from '../features/capture/filter-choice'
 import { MAX_FRAME_COUNT, parseFrameCount } from '../features/capture/validation'
 import { CaptureCooling, coolingBlocker } from '../features/capture/CaptureCooling'
 import { pagingLabel } from '../features/alerts/presentation'
@@ -34,6 +35,8 @@ function CapturePage({ rigId }: { rigId: string }) {
   const [unattended, setUnattended] = useState(false)
   // Always light until chosen: a calibration run has no target, so it is never the carried-over default.
   const [chosenFrameType, setChosenFrameType] = useState<FrameType>('light')
+  // Remembered for each rig: the filter rarely changes between nights, and the slot is manual.
+  const [chosenFilter, setChosenFilter] = useState(() => rememberedFilter(rigId))
   const [coolingOpen, setCoolingOpen] = useState(false)
   const { view, offline, pending, refreshing, error, commandUnconfirmed } = capture
   const chosenTargetId = params.get('target') ?? undefined
@@ -66,6 +69,9 @@ function CapturePage({ rigId }: { rigId: string }) {
   const savingFrames = view?.active ? view.saveFrames : (saveFrames ?? true)
   const frameType = view?.active ? view.frameType : chosenFrameType
   const calibration = isCalibration(frameType)
+  const filters = view?.filters ?? []
+  const filter = listedFilter(chosenFilter, filters)
+  const filterChoosable = carriesFilter(frameType) && filters.length > 0
   const seconds = Number(exposureValue)
   const frameCount = parseFrameCount(frames)
 
@@ -231,7 +237,8 @@ function CapturePage({ rigId }: { rigId: string }) {
                 </strong>
                 {view.active && (
                   <span>
-                    {calibration && `${frameTypeChoices[frameType].label} · `}Exposure{' '}
+                    {calibration && `${frameTypeChoices[frameType].label} · `}
+                    {view.filter && `${view.filter} · `}Exposure{' '}
                     {view.completedCount + 1}
                   </span>
                 )}
@@ -356,6 +363,7 @@ function CapturePage({ rigId }: { rigId: string }) {
                           targetId: calibration
                             ? undefined
                             : (chosenTargetId ?? view.subject?.targetId),
+                          filter: filterChoosable ? (filter ?? undefined) : undefined,
                           frameCount: repeating ? frameCount.frameCount : undefined,
                         })
                     }}
@@ -375,6 +383,27 @@ function CapturePage({ rigId }: { rigId: string }) {
                         if (next) setChosenFrameType(next)
                       }}
                     />
+                    {filterChoosable && (
+                      <Select
+                        label="Filter"
+                        value={filter ?? ''}
+                        options={[
+                          { value: '', label: 'None' },
+                          ...filters.map(listed => ({
+                            value: listed.name,
+                            label: filterLabel(listed),
+                          })),
+                        ]}
+                        message="Choose the filter that is in the camera now. Vela cannot see it."
+                        disabled={busy || offline}
+                        onChange={event => {
+                          const next = listedFilter(event.target.value, filters)
+
+                          setChosenFilter(next)
+                          rememberFilter(rigId, next)
+                        }}
+                      />
+                    )}
                     <Input
                       label="Exposure · seconds"
                       type="number"

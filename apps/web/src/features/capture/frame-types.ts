@@ -40,3 +40,8 @@ export const frameTypes = Object.keys(frameTypeChoices) as [FrameType, ...FrameT
 export function isCalibration(frameType: FrameType) {
   return frameType !== 'light'
 }
+
+/** A filter matters for a light and for the flat that calibrates it. The server refuses one on the other types. */
+export function carriesFilter(frameType: FrameType) {
+  return frameType === 'light' || frameType === 'flat'
+}

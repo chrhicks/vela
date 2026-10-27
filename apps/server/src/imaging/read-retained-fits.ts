@@ -37,6 +37,7 @@ export async function readRetainedFits(bytes: Buffer): Promise<PreviewFrame> {
     'SET-TEMP',
     'FOCALLEN',
     'OBJECT',
+    'FILTER',
     'PIERSIDE',
   ])
 

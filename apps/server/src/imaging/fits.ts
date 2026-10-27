@@ -1,7 +1,7 @@
 import { setImmediate } from 'node:timers/promises'
 import type { ExposureSettings } from '@vela/equipment'
 import type { CaptureImage, FrameType } from '@vela/model/web'
-import { imageTypeKeyword } from './frame-type.js'
+import { carriesFilter, imageTypeKeyword } from './frame-type.js'
 import type { ImageColor } from './preview.js'
 
 /** What a frame was taken with: the camera and mount as read, plus the rig's optics. */
@@ -26,6 +26,8 @@ export async function encodeCaptureFits(
     frameType?: FrameType
     /** The subject's name. Only a light frame carries one. */
     objectName?: string | undefined
+    /** The filter name Chris said was in place. Only a light or a flat carries one; null or absent leaves the key out. */
+    filterName?: string | null | undefined
     /** Absent keys are left out of the header, never defaulted. */
     settings?: FrameSettings
   },
@@ -126,16 +128,18 @@ export async function encodeCaptureFits(
 }
 
 /**
- * The camera, optics, subject and pier side, in the order stacking software expects to find them.
+ * The camera, optics, subject, filter and pier side, in the order stacking software expects to find them.
  * Never the site or the mount's pointing: Chris shares these files.
  */
 function settingCards({
   frameType = 'light',
   objectName,
+  filterName,
   settings = {},
 }: {
   frameType?: FrameType
   objectName?: string | undefined
+  filterName?: string | null | undefined
   settings?: FrameSettings
 }) {
   const numbers: ReadonlyArray<readonly [string, number | undefined]> = [
@@ -155,6 +159,8 @@ function settingCards({
   )
 
   if (frameType === 'light' && objectName?.trim()) cards.push(textCard('OBJECT', objectName.trim()))
+
+  if (carriesFilter(frameType) && filterName?.trim()) cards.push(textCard('FILTER', filterName.trim()))
 
   if (settings.pierSide) cards.push(textCard('PIERSIDE', settings.pierSide.toUpperCase()))
 

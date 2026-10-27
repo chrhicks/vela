@@ -33,6 +33,8 @@ const text = z.string().refine(value => value.trim().length > 0)
 
 const subject = z.object({ targetId: text, name: text, catalog: text })
 
+const rigFilter = z.strictObject({ name: text, description: text.optional() })
+
 const timestamp = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}T.+Z$/)
@@ -43,6 +45,7 @@ const captureImage = z
     id: text,
     frameType: z.enum(frameTypes),
     subject: subject.nullable().optional(),
+    filter: z.string().nullable().optional(),
     cameraName: text,
     saved: z.boolean(),
     imageUrl: z.string(),
@@ -82,6 +85,8 @@ const captureView = z.object({
   frameType: z.enum(frameTypes),
   frameCount: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).nullable().optional(),
   subject: subject.nullable(),
+  filter: z.string().nullable().optional(),
+  filters: z.array(rigFilter).optional(),
   unattended: z.boolean(),
   savedCount: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
   integrationSeconds: z.number().finite().nonnegative(),
