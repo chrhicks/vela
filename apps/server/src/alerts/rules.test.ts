@@ -570,6 +570,38 @@ describe('run state', () => {
   })
 })
 
+describe('a calibration run', () => {
+  const calibration: RunState = { ...running, imaging: false, calibration: true }
+
+  const trouble = history({
+    run: calibration,
+    observationsInterruptedSince: 0,
+    frames: [1200, 1200, 1200, 1200, 1200, 0, 0, 0, 0].map((stars, index): Frame => ({ capturedAt: index * 60_000, stars, hfrPixels: 9 })),
+    mountReadings: [
+      mountReading({ tracking: false, pierSide: 'west', siderealTimeHours: 12.2, rightAscensionHours: 12 }),
+      mountReading({ tracking: false, pierSide: 'west', siderealTimeHours: 12.2, rightAscensionHours: 12 }),
+      mountReading({ tracking: false, pierSide: 'west', siderealTimeHours: 12.2, rightAscensionHours: 12 }),
+    ],
+  })
+
+  it('raises only the rig alerts, whatever the stars, the mount and the meridian say', () => {
+    const light = ids({ ...trouble, run: { ...running, imaging: true } }, 600_000)
+
+    expect(light).toEqual(expect.arrayContaining(['stars-dropping', 'hfr-bad', 'tracking-stopped', 'meridian-imminent']))
+    expect(ids(trouble, 600_000)).toEqual(['rig-unreachable', 'frames-stalled'])
+  })
+
+  it('does not report the meridian watch as unavailable, which is not being watched', () => {
+    expect(evaluateAlerts(history({ run: calibration }), defaultThresholds, 0).unavailable).toEqual([])
+    expect(evaluateAlerts(history({ run: { ...running, imaging: false } }), defaultThresholds, 0).unavailable).not.toEqual([])
+  })
+
+  it('still reports run-failed and run-interrupted', () => {
+    expect(ids({ ...trouble, run: { status: 'failed' } })).toEqual(['run-failed'])
+    expect(ids({ ...trouble, run: { status: 'interrupted', message: 'x' } })).toEqual(['run-interrupted'])
+  })
+})
+
 describe('levels', () => {
   it('gives each condition the level the spec assigns it', () => {
     const everything = evaluateAlerts(

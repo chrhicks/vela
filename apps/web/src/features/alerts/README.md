@@ -20,19 +20,9 @@ whether it was acknowledged and how the phone is getting on; the browser only pr
 - The banner mentions the phone only when an emergency is repeating or an alert is not getting
   through. Every alert's `delivery` state is on the card.
 - The card's Send test is disabled while no Pushover keys are configured, because the server would
-  refuse it.
-- The phone alerts switch is `PhoneAlertsSwitch`: "Phone alerts: on" or "off" beside a Turn off / Turn on
-  button. It sits on the card always. On the banner it shows on the capture page always (Chris starts runs
-  there and can turn the phone off or on without leaving), and on other pages only while phone alerts are
-  off, so a quiet page still says Chris will not be paged and offers the way back. It is hidden while no Pushover keys are
-  set up, and disabled while the view is stale. The control PUTs `{ on }` to
-  `/api/rigs/:rigId/alerts/phone` and shows the view the server answers with. Alerts stay in the banner
-  while it is off, with delivery "Not sent · phone alerts are off". Send test is disabled while off.
-- The server pages only in astronomical darkness (sun below -18 degrees at the rig's site), so the
-  switch says when it actually pages, from the view's `pagingWindow`: "on · pages in astro dark,
-  19:42 to 05:31", "on · paging now (astro dark until 05:31)", "on · no astro dark soon, so no pages", or
-  "on · pages at any hour · rig location unknown" when the mount gave no location. Times are in the
-  browser's time zone. The note is one short line that wraps beside the button, so it fits a 390 px
-  screen. An alert raised in daylight shows on the card with delivery "Not sent · outside astro dark"
-  and is not mentioned in the banner, like one muted by the switch. An emergency that was paged and then
-  cancelled at dawn shows "Sent once · stopped at dawn" and is not paged again.
+  refuse it. It pages whatever the run.
+- The card's delivery states include "Not sent · Unattended is off" for an alert raised while the run is
+  attended, and "Sent once · stopped when Unattended went off". The server pages the phone only while the run is
+  Unattended (`unattended` in the view). The browser has no control for it yet: the start form and the running run
+  get the Unattended control in the next change, which calls `PUT /api/rigs/:rigId/capture/unattended`. Until
+  then a run is Unattended only if started with `unattended: true`.

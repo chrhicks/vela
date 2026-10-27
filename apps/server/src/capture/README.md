@@ -81,6 +81,11 @@ interface explicitly requests repetition by default. The server snapshots `subje
 starts explicitly use null. This is chosen intent, never proof of pointing. Each
 image receives that snapshot, so later selections cannot relabel a retained frame.
 
+A start may also say `unattended` (default false): the phone is paged for the run's alerts only while it is
+Unattended. `PUT /api/rigs/:rigId/capture/unattended` with `{ "on": boolean }` switches it on the running run at
+any time, rewrites the run record and tells the alert monitor, and answers with the capture view. It is 409 when
+no run is active. See [alerts](../alerts/README.md#unattended).
+
 `savedCount` counts unique images retained from the current or most recent run;
 `integrationSeconds` sums only published exposure durations. Both reset on an
 accepted start along with `completedCount`. A private generation on cached frames
@@ -197,7 +202,8 @@ trend alert. They still show the camera is producing frames.
 A restart used to drop a running capture and show idle, so an unattended night could be lost
 unseen. Now the active run is written to `capture-runs.json` next to the rig catalog
 (`rigs.yaml`; `run-store.ts`), as `{ "runs": { "<rigId>": record } }`. A record holds the
-request (exposure, repeat, `frameCount`, `frameType`, `saveFrames`, the `subject` snapshot), the
+request (exposure, repeat, `frameCount`, `frameType`, `saveFrames`, the `subject` snapshot), whether
+the run is `unattended` (the phone is paged for its alerts; a record without it is attended), the
 start time and the progress (`completedCount`, `savedCount`, `integrationSeconds`). It is
 written when the run starts and after each completed frame and each save, and removed when the
 run ends by itself, fails or is stopped by Chris. A run that ends because the server is shutting
@@ -210,7 +216,8 @@ startup is a run that did not end: after a deploy (SIGTERM) or a crash alike.
   anything until Chris starts or resumes a run. Starting any new run replaces the record. There
   is no dismiss: the interrupted view stays, across further restarts, until a run starts.
 - **Resume.** `POST /api/rigs/:rigId/capture/resume` takes no input (the halt rule above) and starts a
-  new run with the same exposure, repeat, `saveFrames`, frame type and subject snapshot. A run
+  new run with the same exposure, repeat, `saveFrames`, frame type, subject snapshot and Unattended choice (Chris, 2026-10-27: resuming after a night page means he
+  still wants to be paged). A run
   with a count resumes with `frameCount - completedCount`; a repeat with no count repeats until
   stopped; an unfinished single exposure repeats once. It is an ordinary start: the Rig lease,
   camera connected and idle, and the alert monitor all apply, so a refusal leaves the run
@@ -218,12 +225,11 @@ startup is a run that did not end: after a deploy (SIGTERM) or a crash alike.
   subject is the stored snapshot, not a fresh lookup, so a target removed meanwhile does not
   block it. The new run counts from zero; the earlier frames stay in the saved-images
   gallery, and a second interruption reports what is left of the resumed run.
-- **A light run raises one alert.** On startup the route tells the rig's monitor
-  (`runInterrupted`), which raises `run-interrupted` (critical) through the usual phone rules:
-  the switch, astro dark and one page per alert. See [alerts](../alerts/README.md#an-interrupted-run).
-  A calibration run raises none. The alert is raised once per server start while the record
-  stands, because the monitor's episode is memory only: an alert held for daylight is not
-  lost if the server restarts again before dusk.
+- **A run raises one alert.** On startup the route tells the rig's monitor
+  (`runInterrupted(message, unattended)`), which raises `run-interrupted` (critical) for a light or a
+  calibration run alike. It pages the phone only if the record says the run was Unattended. See
+  [alerts](../alerts/README.md#an-interrupted-run). The alert is raised once per server start while the record
+  stands, because the monitor's episode is memory only.
 - **A frame in flight at the restart.** Cria keeps exposing: it owns the camera and its
   operation ledger holds the capture after Vela's connection is gone. Vela cannot see that
   operation after a restart, never fetches its image, and does not count it. The camera

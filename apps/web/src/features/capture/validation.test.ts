@@ -26,6 +26,7 @@ const view: CaptureView = {
   frameType: 'light',
   completedCount: 1,
   subject: null,
+  unattended: false,
   savedCount: 0,
   integrationSeconds: 2,
   cooling: null,

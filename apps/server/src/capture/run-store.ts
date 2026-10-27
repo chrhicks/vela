@@ -18,6 +18,8 @@ export interface CaptureRunRecord {
   frameType: FrameType
   saveFrames: boolean
   subject: CaptureSubject | null
+  /** Whether the phone is paged for this run's alerts. Kept so a restart's `run-interrupted` alert follows it. */
+  unattended: boolean
   completedCount: number
   savedCount: number
   integrationSeconds: number
@@ -31,6 +33,7 @@ export interface CaptureRunRequest {
   saveFrames: boolean
   frameType: FrameType
   subject: CaptureSubject | null
+  unattended: boolean
 }
 
 /**
@@ -73,14 +76,14 @@ export function remainingFrames(record: CaptureRunRecord): number | null {
   return Math.max(0, record.frameCount - record.completedCount)
 }
 
-/** The same run over again for what is left of it, or undefined when nothing is. */
+/** The same run over again for what is left of it, or undefined when nothing is. It keeps the run's Unattended choice. */
 export function resumeRequest(record: CaptureRunRecord): CaptureRunRequest | undefined {
   const remaining = remainingFrames(record)
 
   if (remaining === 0) return undefined
 
-  const { exposureSeconds, repeat, saveFrames, frameType, subject } = record
-  const request: CaptureRunRequest = { exposureSeconds, repeat, saveFrames, frameType, subject }
+  const { exposureSeconds, repeat, saveFrames, frameType, subject, unattended } = record
+  const request: CaptureRunRequest = { exposureSeconds, repeat, saveFrames, frameType, subject, unattended }
 
   return record.repeat && remaining !== null ? { ...request, frameCount: remaining } : request
 }
@@ -98,6 +101,7 @@ const recordSchema = z.strictObject({
   frameType: z.enum(frameTypes),
   saveFrames: z.boolean(),
   subject: subjectSchema.nullable(),
+  unattended: z.boolean().default(false),
   completedCount: z.number().int().nonnegative(),
   savedCount: z.number().int().nonnegative(),
   integrationSeconds: z.number().nonnegative().finite(),

@@ -50,7 +50,7 @@ export type RunState =
       exposureSeconds: number
       waitingForFrameSince: number
       imaging: boolean
-      /** A dark, flat, dark flat or bias run: it never needs the mount to track. */
+      /** A dark, flat, dark flat or bias run: only the rig-level alerts apply to it. */
       calibration?: boolean
     }
   | { status: 'stopped' }
@@ -85,6 +85,14 @@ export function evaluateAlerts(history: RigHistory, thresholds: AlertThresholds,
 
   if (run.status === 'stopped') return { conditions: [], unavailable: [] }
 
+  const rigConditions = [
+    ...watchReachability(history.observationsInterruptedSince, thresholds, now),
+    ...watchFrameArrival(run, thresholds, now),
+  ]
+
+  // A calibration run has no stars and needs no tracking or pointing, so only the rig can go wrong.
+  if (run.calibration) return { conditions: rigConditions, unavailable: [] }
+
   const meridian = watchMeridian(history.mountReadings.at(-1), thresholds)
   const frames = watchFrames(history.frames, thresholds)
 
@@ -92,10 +100,9 @@ export function evaluateAlerts(history: RigHistory, thresholds: AlertThresholds,
     conditions: [
       ...frames.conditions,
       ...(run.imaging ? watchStarBaseline(history.frames.length, frames.baselineFormed, thresholds) : []),
-      ...(run.calibration ? [] : watchTracking(history.mountReadings, thresholds)),
+      ...watchTracking(history.mountReadings, thresholds),
       ...meridian.conditions,
-      ...watchReachability(history.observationsInterruptedSince, thresholds, now),
-      ...watchFrameArrival(run, thresholds, now),
+      ...rigConditions,
     ],
     unavailable: meridian.unavailable,
   }

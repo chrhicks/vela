@@ -1,7 +1,5 @@
 import { trace, SpanStatusCode } from '@opentelemetry/api'
-import type { CaptureImage, PagingWindow } from '@vela/model/web'
-import type { Site } from '../astronomy/coordinates.js'
-import { astronomicalDarkDegrees, darkOutlook, sunAltitudeDegrees } from '../astronomy/sun.js'
+import type { CaptureImage } from '@vela/model/web'
 import { alertFrame } from './frame.js'
 import { emergencyExpireSeconds, NotifierError, type Notification, type Notifier } from './notifier.js'
 import {
@@ -34,21 +32,6 @@ const longestRetryPauseMs = 5 * 60_000
 
 const giveUpAfterMs = emergencyExpireSeconds * 1000
 
-/** An unknown site is asked for again no sooner than this, so a rig that is off is not asked every second. */
-const siteRetryMs = 30_000
-
-/** The sun's crossing is found to a second or so; the timer waits this long past it so the check sees the new side. */
-const sunTimerMarginMs = 1_000
-
-/** The longest the sun timer sleeps before it looks again, so a clock that jumped cannot strand it. */
-const sunRecheckMs = 6 * 3_600_000
-
-/**
- * A server that has just started may not have reached the mount yet. An interruption waits this
- * many times for the site before it gives up and pages at any hour, so a daytime deploy does not buzz the phone.
- */
-const siteAttemptsAtStart = 4
-
 const mountPollMs = 10_000
 
 const mountReadTimeoutMs = 5_000
@@ -66,9 +49,11 @@ const coveredBy: Partial<Record<AlertId, AlertId>> = {
 
 /** How the phone is getting on with one alert. */
 export type AlertDelivery =
-  | { state: 'sent' | 'sending' | 'covered' | 'not-configured' | 'muted' | 'outside-dark' }
-  /** The emergency reached the phone and was cancelled at dawn. It is not sent again. */
-  | { state: 'stopped-at-dawn' }
+  | { state: 'sent' | 'sending' | 'covered' | 'not-configured' }
+  /** The run is not Unattended, so the phone was not told. Switching Unattended on pages it, once, if it still stands. */
+  | { state: 'attended' }
+  /** The emergency reached the phone and was cancelled when Unattended went off. It is not sent again. */
+  | { state: 'stopped' }
   /** The phone refused it `failures` times. Vela tries again at `nextAttemptAt` and stops at `giveUpAt`. */
   | { state: 'retrying'; failures: number; nextAttemptAt: number; giveUpAt: number }
   /** Vela stopped trying: the hour ran out, or the alert was acknowledged before the phone took it. */
@@ -101,8 +86,8 @@ export interface AlertsView {
   /** Watches that cannot run right now, such as "meridian watch unavailable: pier side". */
   unavailable: string[]
   phone: PhoneAlerts
-  phoneAlertsOn: boolean
-  pagingWindow: PagingWindow
+  /** The phone is paged only while the current run is Unattended. */
+  unattended: boolean
   thresholds: AlertThresholds
 }
 
@@ -114,7 +99,6 @@ export type AcknowledgeResult =
 export type TestResult =
   | { outcome: 'delivered' }
   | { outcome: 'not-configured' }
-  | { outcome: 'off' }
   | { outcome: 'failed'; reason: string }
 
 export interface AlertMonitorOptions {
@@ -122,13 +106,6 @@ export interface AlertMonitorOptions {
   rigName: string
   thresholds: AlertThresholds
   notifier: Notifier | null
-  /** Off sends nothing to the phone. Defaults to on. */
-  phoneAlertsOn?: boolean
-  /**
-   * Where the rig is, from its mount. The phone is paged only in astronomical darkness at this site.
-   * Null, or no reader, means the site is unknown and the phone is paged at any hour.
-   */
-  readSite?: (signal: AbortSignal) => Promise<Site | null>
   /**
    * A failed read means the rig stopped answering. Null means this rig has no mount to read,
    * so the mount watches report themselves unavailable instead.
@@ -147,14 +124,13 @@ export interface AlertMonitorOptions {
 interface Episode extends ActiveAlert {
   /**
    * Unsent is retried on its own schedule until it gets through, is acknowledged or runs out of
-   * time, which makes it gave-up. Skipped was covered by a stronger alert. Muted was silenced
-   * by Chris's switch and is never sent, even when the switch comes back on. Held waits for
-   * astronomical darkness, and is sent when it begins if the alert still stands. Stopped reached
-   * the phone as an emergency that dawn then cancelled: that was its one page, so dusk does not
-   * release it.
+   * time, which makes it gave-up. Skipped was covered by a stronger alert. Attended waits for the
+   * run to be Unattended, and is sent when it is if the alert still stands. Stopped reached the
+   * phone as an emergency that switching Unattended off then cancelled: that was its one page, so
+   * switching it on again does not release it.
    */
-  delivery: 'unsent' | 'sending' | 'sent' | 'skipped' | 'muted' | 'held' | 'stopped' | 'gave-up'
-  /** When the phone could first be told: the raise, or the dusk that released it. The retry hour counts from here. */
+  delivery: 'unsent' | 'sending' | 'sent' | 'skipped' | 'attended' | 'stopped' | 'gave-up'
+  /** When the phone could first be told: the raise, or the Unattended switch that released it. The retry hour counts from here. */
   eligibleAt: number
   /** Sends the phone refused. */
   failures: number
@@ -176,11 +152,6 @@ interface StrayReceipt {
   since: number
 }
 
-type Sun = 'dark' | 'light' | 'unknown'
-
-/** Open: the phone may be told. Off is Chris's switch. Not dark: the sun is too high to page. */
-type Gate = 'open' | 'off' | 'not-dark'
-
 type PhoneOutcome<T> = { ok: true; value: T } | { ok: false; reason: string }
 
 /**
@@ -193,10 +164,8 @@ export function createAlertMonitor({
   rigName,
   thresholds,
   notifier,
-  phoneAlertsOn = true,
   readMount,
   readFocuser,
-  readSite,
   now = Date.now,
   mountPollMs: pollMs = mountPollMs,
 }: AlertMonitorOptions) {
@@ -209,12 +178,7 @@ export function createAlertMonitor({
   let observationsInterruptedSince: number | null = null
   let unavailable: string[] = []
   let phone: PhoneAlerts = notifier ? { state: 'ready' } : { state: 'not-configured' }
-  let phoneOn = phoneAlertsOn
-  let site: Site | null = null
-  let siteTriedAt: number | null = null
-  let siteRead: Promise<void> | null = null
-  let sunSeen: Sun = 'unknown'
-  let sunTimer: ReturnType<typeof setTimeout> | undefined
+  let unattended = false
   let pollTimer: ReturnType<typeof setInterval> | undefined
   let polling = false
 
@@ -239,9 +203,6 @@ export function createAlertMonitor({
 
     unavailable = evaluation.unavailable
     reconcile(evaluation.conditions, at)
-
-    // After reconcile, so an alert this evaluation clears is not released to the phone first.
-    syncSun()
   }
 
   function reconcile(conditions: AlertCondition[], at: number) {
@@ -295,7 +256,7 @@ export function createAlertMonitor({
 
   /** Tells the phone, unless a stronger alert already does. */
   function announce(episode: Episode) {
-    if (phoneOn && isCovered(episode.id)) episode.delivery = 'skipped'
+    if (unattended && isCovered(episode.id)) episode.delivery = 'skipped'
     else sendRaised(episode)
   }
 
@@ -322,7 +283,7 @@ export function createAlertMonitor({
 
       await cancelOrKeepTrying(episode)
 
-      if (phoneGate() !== 'open') return
+      if (!unattended) return
 
       await callPhone('clear', episode.id, -1, () =>
         notifier.send({ title: title(), message: `cleared: ${episode.message}`, priority: -1 }),
@@ -366,10 +327,8 @@ export function createAlertMonitor({
   function sendRaised(episode: Episode) {
     if (!notifier) return
 
-    const gate = phoneGate()
-
-    if (gate !== 'open') {
-      episode.delivery = closedDelivery(gate)
+    if (!unattended) {
+      episode.delivery = 'attended'
 
       return
     }
@@ -383,10 +342,8 @@ export function createAlertMonitor({
     }
 
     afterPreviousCalls(episode, async () => {
-      const gate = phoneGate()
-
-      if (gate !== 'open') {
-        episode.delivery = closedDelivery(gate)
+      if (!unattended) {
+        episode.delivery = 'attended'
 
         return
       }
@@ -444,125 +401,19 @@ export function createAlertMonitor({
   }
 
   /**
-   * The phone is closed to this alert, because the switch went off or the sun came up: stop what is
-   * repeating on the phone and what is still waiting to go out. An alert waiting for dark that is
-   * switched off stays off, like every alert silenced by the switch.
+   * Unattended went off: stop what is repeating on the phone and what is still waiting to go out.
+   * An emergency that was paged keeps its one page and is not released when Unattended comes back.
    */
   async function holdBack(episode: Episode) {
-    const gate = phoneGate()
-
-    if (gate === 'open') return
+    if (unattended) return
 
     if (episode.delivery === 'sent' && episode.receipt !== null) {
       await cancelOrKeepTrying(episode)
-      episode.delivery = gate === 'off' ? 'muted' : 'stopped'
-    } else if (episode.delivery === 'unsent' || episode.delivery === 'skipped' || episode.delivery === 'held') {
+      episode.delivery = 'stopped'
+    } else if (episode.delivery === 'unsent' || episode.delivery === 'skipped') {
       stopRetrying(episode)
-      episode.delivery = closedDelivery(gate)
+      episode.delivery = 'attended'
     }
-  }
-
-  function closedDelivery(gate: Exclude<Gate, 'open'>) {
-    return gate === 'off' ? 'muted' : 'held'
-  }
-
-  function phoneGate(): Gate {
-    if (!phoneOn) return 'off'
-
-    return sunNow() === 'light' ? 'not-dark' : 'open'
-  }
-
-  /** An unknown site fails open: a missed alert on an unattended rig costs more than an extra page. */
-  function sunNow(): Sun {
-    if (!site) return 'unknown'
-
-    return sunAltitudeDegrees(site, new Date(now())) < astronomicalDarkDegrees ? 'dark' : 'light'
-  }
-
-  /**
-   * Acts when the sun crosses the dark line. At dusk, or when the site turns out unknown, every alert
-   * still standing that waited for dark is told to the phone, once. At dawn what repeats on the phone is cancelled
-   * for good and what waits is held for the next dusk.
-   */
-  function syncSun() {
-    const sun = sunNow()
-
-    if (sun === sunSeen) return
-
-    sunSeen = sun
-
-    if (sun !== 'light') {
-      for (const episode of episodes.values()) {
-        if (episode.delivery !== 'held' || episode.acknowledged) continue
-
-        episode.failures = 0
-        episode.eligibleAt = now()
-        announce(episode)
-      }
-    } else {
-      for (const episode of episodes.values()) void afterPreviousCalls(episode, () => holdBack(episode))
-    }
-  }
-
-  /** Dusk and dawn arrive with no poll or frame to notice them, such as while a failed run's alert stands. */
-  function watchSun() {
-    clearTimeout(sunTimer)
-
-    if (closed || !site || !notifier) return
-
-    const outlook = darkOutlook(site, new Date(now()))
-    const change = outlook.dark ? outlook.until : outlook.from
-    const wait = change ? change.getTime() - now() + sunTimerMarginMs : sunRecheckMs
-
-    sunTimer = setTimeout(() => {
-      syncSun()
-      watchSun()
-    }, Math.min(Math.max(wait, sunTimerMarginMs), sunRecheckMs))
-
-    sunTimer.unref()
-  }
-
-  /** Reads where the rig is from its mount. A site that is known is read again when a run starts. A mount that cannot be reached leaves it as it was. */
-  async function learnSite(startingRun = false) {
-    if (!readSite || !notifier || closed || siteRead) return
-
-    if (site && !startingRun) return
-
-    const at = now()
-
-    if (!site && !startingRun && siteTriedAt !== null && at - siteTriedAt < siteRetryMs) return
-
-    siteTriedAt = at
-
-    siteRead = (async () => {
-      try {
-        const read = await readSite(AbortSignal.timeout(mountReadTimeoutMs))
-
-        if (closed) return
-
-        // A mount that answers with no usable location drops the old site: the rig may have moved,
-        // and daylight at the old place must not hold back a page.
-        site = read
-        syncSun()
-        watchSun()
-      } catch {
-        // The mount is not answering. The site stays as it was, and the next try is soon.
-      } finally {
-        siteRead = null
-      }
-    })()
-
-    await siteRead
-  }
-
-  function pagingWindow(): PagingWindow {
-    if (!site) return { state: 'site-unknown' }
-
-    const outlook = darkOutlook(site, new Date(now()))
-
-    if (outlook.dark) return { state: 'astro-dark', until: outlook.until?.getTime() ?? null }
-
-    return { state: 'not-dark', from: outlook.from?.getTime() ?? null, until: outlook.until?.getTime() ?? null }
   }
 
   /** The alert is gone from the banner, so nothing else would ever stop the phone repeating. */
@@ -646,12 +497,10 @@ export function createAlertMonitor({
         return { state: episode.delivery }
       case 'skipped':
         return { state: 'covered' }
-      case 'muted':
-        return { state: 'muted' }
-      case 'held':
-        return { state: 'outside-dark' }
+      case 'attended':
+        return { state: 'attended' }
       case 'stopped':
-        return { state: 'stopped-at-dawn' }
+        return { state: 'stopped' }
       case 'gave-up':
         return { state: 'gave-up', failures: episode.failures }
       case 'unsent':
@@ -747,13 +596,14 @@ export function createAlertMonitor({
 
   return {
     /**
-     * `imaging` is a repeating run that saves its frames: the unattended kind, where no stars is a
-     * lost night. `calibration` is a dark, flat, dark flat or bias run, which is not watched for
-     * a mount that stopped tracking.
+     * `imaging` is a repeating run that saves its frames, where no stars is a lost night.
+     * `calibration` is a dark, flat, dark flat or bias run, which only the rig-level alerts watch.
+     * The phone is paged only if `unattended`, which a new run starts without.
      */
-    runStarted(exposureSeconds: number, imaging: boolean, calibration = false) {
+    runStarted(exposureSeconds: number, { imaging, calibration = false, unattended: on = false }: RunStart) {
       stopPolling()
       runToken++
+      unattended = on
       autofocusing = false
       frames = []
       focuserPosition = null
@@ -765,7 +615,6 @@ export function createAlertMonitor({
       // Everything from the last run has cleared by now. A new run starts with no guard.
       clearedAt.clear()
       startPolling()
-      void learnSite(true)
     },
 
     /** A frame arrived. One without star measurements still proves the camera is producing. */
@@ -781,26 +630,11 @@ export function createAlertMonitor({
       evaluate()
     },
 
-    /**
-     * The server restarted while a run was active. The alert waits for the rig's site, because the
-     * phone is paged only in astronomical darkness; a run started meanwhile supersedes it.
-     */
-    async runInterrupted(message: string) {
+    /** The server restarted while a run was active. Whether the phone is paged is the run's own Unattended choice. */
+    runInterrupted(message: string, on: boolean) {
       stopPolling()
-      const token = ++runToken
-
-      for (let attempt = 1; attempt <= siteAttemptsAtStart && !site && notifier && readSite && !closed; attempt++) {
-        if (attempt > 1) await new Promise(resolve => setTimeout(resolve, siteRetryMs).unref())
-
-        if (token !== runToken) return
-
-        await learnSite(true)
-
-        if (token !== runToken) return
-      }
-
-      if (closed) return
-
+      runToken++
+      unattended = on
       run = { status: 'interrupted', message }
       evaluate()
     },
@@ -843,8 +677,7 @@ export function createAlertMonitor({
         alerts,
         unavailable,
         phone: phoneWithStrays(),
-        phoneAlertsOn: phoneOn,
-        pagingWindow: pagingWindow(),
+        unattended,
         thresholds,
       }
     },
@@ -872,28 +705,34 @@ export function createAlertMonitor({
     },
 
     /**
-     * Turning it off first stops every message from here on, then cancels the emergencies already
-     * repeating. Turning it on again pages only alerts raised after that.
+     * Turning it on pages every alert standing that was not yet told to the phone and is not
+     * acknowledged, once, so going to bed with a live problem still wakes Chris. Turning it off stops
+     * every message from here on, then cancels the emergencies already repeating.
      */
-    async setPhoneAlerts(on: boolean) {
-      phoneOn = on
+    async setUnattended(on: boolean) {
+      if (on === unattended) return
 
-      if (on) return
+      unattended = on
+
+      if (on) {
+        for (const episode of episodes.values()) {
+          if (episode.delivery !== 'attended' || episode.acknowledged) continue
+
+          episode.failures = 0
+          episode.eligibleAt = now()
+          announce(episode)
+        }
+
+        return
+      }
 
       await Promise.all([...episodes.values()].map(episode => afterPreviousCalls(episode, () => holdBack(episode))))
-    },
-
-    /** Finds where the rig is, once, so the view can say when the phone is paged. Asks again soon if the mount is silent. */
-    learnSite() {
-      return learnSite()
     },
 
     async sendTest(): Promise<TestResult> {
       if (!notifier) return { outcome: 'not-configured' }
 
-      if (!phoneOn) return { outcome: 'off' }
-
-      // A test is Chris asking for a page, so it goes out in daylight too.
+      // A test is Chris asking for a page, so it goes out whatever the run.
       const sent = await callPhone('test', 'test', 0, () =>
         notifier.send({ title: title(), message: 'test', priority: 0 }),
       )
@@ -907,13 +746,18 @@ export function createAlertMonitor({
       stopPolling()
       clearTimeout(strayTimer)
       strayTimer = undefined
-      clearTimeout(sunTimer)
 
       for (const episode of episodes.values()) stopRetrying(episode)
 
       runToken++
     },
   }
+}
+
+export interface RunStart {
+  imaging: boolean
+  calibration?: boolean
+  unattended?: boolean
 }
 
 export type AlertMonitor = ReturnType<typeof createAlertMonitor>

@@ -2,6 +2,7 @@ import { buildApp } from './app.js'
 import { openFileRigCatalog } from './rig/catalog.js'
 import { resolveRigCatalogPath } from './rig/catalog-path.js'
 import { alignmentSettings } from './alignment/routes.js'
+import { access } from 'node:fs/promises'
 import { dirname, isAbsolute, resolve } from 'node:path'
 import { openFileSavedImageStore } from './saved-images/store.js'
 import { noFrameRecords, openFrameRecords } from './capture/frame-records.js'
@@ -14,7 +15,6 @@ import { loadCriaConfiguration, registerConfiguredCriaRigs } from './equipment/c
 import { createEquipmentComposition } from './equipment/composition.js'
 import { loadAlertsConfiguration } from './alerts/config.js'
 import { createPushoverNotifier } from './alerts/pushover.js'
-import { openFilePhoneAlertsPreference } from './alerts/preference.js'
 
 const telemetry = startTelemetry(process.env.VELA_TRACE_PATH)
 
@@ -75,12 +75,16 @@ try {
 
   const alertsConfiguration = await loadAlertsConfiguration(process.env.VELA_ALERTS_CONFIG_PATH)
 
+  const phoneSwitchPath = resolve(dirname(rigCatalogPath), 'phone-alerts.json')
+
+  if (await access(phoneSwitchPath).then(() => true, () => false))
+    console.warn(`Ignoring ${phoneSwitchPath}: the phone is paged only for a run started or switched to Unattended. Delete the file.`)
+
   const alerts = {
     thresholds: alertsConfiguration.thresholds,
     notifier: alertsConfiguration.pushover
       ? createPushoverNotifier({ ...alertsConfiguration.pushover, fetch })
       : null,
-    phoneAlerts: await openFilePhoneAlertsPreference(resolve(dirname(rigCatalogPath), 'phone-alerts.json')),
   }
 
   captureRuns = await openFileCaptureRunStore(resolve(dirname(rigCatalogPath), 'capture-runs.json'))

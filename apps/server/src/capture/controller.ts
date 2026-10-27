@@ -97,6 +97,8 @@ export interface CaptureRunOptions {
   /** What the run takes; default `light`. Only a light run has a subject. */
   frameType?: FrameType
   subject?: CaptureSubject | null
+  /** Pages the phone for this run's alerts; default off. */
+  unattended?: boolean
   /** The rig's effective focal length when the run starts, for the FITS header. */
   focalLengthMm?: number | undefined
   onSettled?: () => void
@@ -136,6 +138,7 @@ export function createCaptureController(
     completedCount: 0,
     lostFrameCount: 0,
     subject: null,
+    unattended: false,
     savedCount: 0,
     integrationSeconds: 0,
     exposureSeconds: 2,
@@ -179,6 +182,7 @@ export function createCaptureController(
       frameType: unfinished.frameType,
       completedCount: unfinished.completedCount,
       subject: unfinished.subject,
+      unattended: unfinished.unattended,
       savedCount: unfinished.savedCount,
       integrationSeconds: unfinished.integrationSeconds,
       exposureSeconds: unfinished.exposureSeconds,
@@ -623,6 +627,7 @@ export function createCaptureController(
       saveFrames = false,
       frameType = 'light',
       subject = null,
+      unattended = false,
       focalLengthMm,
     }: CaptureRunOptions = {},
   ) {
@@ -646,6 +651,7 @@ export function createCaptureController(
       frameType,
       saveFrames,
       subject: runSubject,
+      unattended,
       completedCount: 0,
       savedCount: 0,
       integrationSeconds: 0,
@@ -664,6 +670,7 @@ export function createCaptureController(
       completedCount: 0,
       lostFrameCount: 0,
       subject: runSubject,
+      unattended,
       savedCount: 0,
       integrationSeconds: 0,
       exposureSeconds,
@@ -718,6 +725,17 @@ export function createCaptureController(
     return view
   }
 
+  /** Whether the running run's alerts page the phone. Persisted, so a restart's alert follows it. False when no run is active. */
+  function setUnattended(on: boolean) {
+    if (!running || !runRecord) return false
+
+    runRecord = { ...runRecord, unattended: on }
+    patch({ unattended: on })
+    persist()
+
+    return true
+  }
+
   /** Ends the run for a server shutdown, leaving its record behind so the next start reports it. */
   async function close() {
     closing = true
@@ -728,6 +746,7 @@ export function createCaptureController(
   return {
     start,
     stop,
+    setUnattended,
     close,
     /** The unfinished run this controller found at startup, while no run has started since. */
     interrupted: () => (view.phase === 'interrupted' ? unfinished : undefined),

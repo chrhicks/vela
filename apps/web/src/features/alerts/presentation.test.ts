@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AlertView } from '@vela/model/web'
-import { ageLabel, bannerPhoneNote, clockTime, deliveryLabel, pagingNote, phoneLabel, thresholdRows } from './presentation'
+import { ageLabel, bannerPhoneNote, deliveryLabel, phoneLabel, thresholdRows } from './presentation'
 
 const critical: AlertView = {
   id: 'stars-collapsed',
@@ -24,8 +24,6 @@ describe('alert delivery wording', () => {
 
     expect(bannerPhoneNote(warn)).toBeNull()
     expect(bannerPhoneNote({ ...warn, delivery: { state: 'not-configured' } })).toBeNull()
-    expect(bannerPhoneNote({ ...warn, delivery: { state: 'muted' } })).toBeNull()
-    expect(deliveryLabel({ ...warn, delivery: { state: 'muted' } })).toBe('Not sent · phone alerts are off')
     expect(bannerPhoneNote({ ...warn, delivery: { state: 'gave-up', failures: 3 } })).toBe(
       'Not delivered to your phone · Vela stopped trying',
     )
@@ -34,17 +32,17 @@ describe('alert delivery wording', () => {
     )
   })
 
-  it('says an alert held for darkness was not sent, and keeps it out of the banner note', () => {
-    const held: AlertView = { ...critical, delivery: { state: 'outside-dark' } }
+  it('says an alert raised while Unattended is off was not sent, and keeps it out of the banner note', () => {
+    const attended: AlertView = { ...critical, delivery: { state: 'attended' } }
 
-    expect(deliveryLabel(held)).toBe('Not sent · outside astro dark')
-    expect(bannerPhoneNote(held)).toBeNull()
+    expect(deliveryLabel(attended)).toBe('Not sent · Unattended is off')
+    expect(bannerPhoneNote(attended)).toBeNull()
   })
 
-  it('says an emergency dawn stopped was sent once, and keeps it out of the banner note', () => {
-    const stopped: AlertView = { ...critical, delivery: { state: 'stopped-at-dawn' } }
+  it('says an emergency stopped when Unattended went off was sent once, and keeps it out of the banner note', () => {
+    const stopped: AlertView = { ...critical, delivery: { state: 'stopped' } }
 
-    expect(deliveryLabel(stopped)).toBe('Sent once · stopped at dawn')
+    expect(deliveryLabel(stopped)).toBe('Sent once · stopped when Unattended went off')
     expect(bannerPhoneNote(stopped)).toBeNull()
   })
 
@@ -53,28 +51,6 @@ describe('alert delivery wording', () => {
       /^Phone alerts failing: Pushover answered 500 · since /,
     )
     expect(phoneLabel({ state: 'not-configured' })).toBe('Phone alerts are not set up · alerts show here only')
-  })
-})
-
-describe('when the phone is paged', () => {
-  const dusk = Date.parse('2026-10-18T19:42:00')
-  const dawn = Date.parse('2026-10-19T05:31:00')
-
-  it('gives the window when the sun is up', () => {
-    expect(pagingNote({ state: 'not-dark', from: dusk, until: dawn })).toBe(
-      `pages in astro dark, ${clockTime(dusk)} to ${clockTime(dawn)}`,
-    )
-    expect(pagingNote({ state: 'not-dark', from: dusk, until: null })).toBe(`pages in astro dark from ${clockTime(dusk)}`)
-    expect(pagingNote({ state: 'not-dark', from: null, until: null })).toBe('no astro dark soon, so no pages')
-  })
-
-  it('says it is paging now, and until when', () => {
-    expect(pagingNote({ state: 'astro-dark', until: dawn })).toBe(`paging now (astro dark until ${clockTime(dawn)})`)
-    expect(pagingNote({ state: 'astro-dark', until: null })).toBe('paging now (astro dark)')
-  })
-
-  it('says every hour pages when the rig location is not known', () => {
-    expect(pagingNote({ state: 'site-unknown' })).toBe('pages at any hour · rig location unknown')
   })
 })
 
