@@ -728,6 +728,52 @@ describe('while the run is polled', () => {
     expect(phone.cancels()).toHaveLength(1)
   })
 
+  it('never raises or pages for tracking stopped on a calibration run, however long the mount stands still', async () => {
+    let reads = 0
+
+    const { monitor, phone } = polled(async () => {
+      reads++
+
+      return tracking({ tracking: false })
+    })
+
+    monitor.runStarted(1800, false, true)
+    await vi.advanceTimersByTimeAsync(5 * 60_000)
+
+    expect(reads).toBeGreaterThan(20)
+    expect(monitor.view().alerts).toEqual([])
+    expect(phone.sendAttempts).toEqual([])
+    expect(phone.events).toEqual([])
+  })
+
+  it('pages for tracking stopped on the second reading of a light run whose mount stood still from the start', async () => {
+    const { monitor, phone } = polled(async () => tracking({ tracking: false }))
+
+    monitor.runStarted(1800, false, false)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(monitor.view().alerts).toEqual([])
+
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(monitor.view().alerts).toEqual([expect.objectContaining({ id: 'tracking-stopped', level: 'critical' })])
+    expect(phone.emergencies()).toHaveLength(1)
+  })
+
+  it('says nothing about tracking when no run is active, because the mount is not read', async () => {
+    let reads = 0
+
+    const { monitor, phone } = polled(async () => {
+      reads++
+
+      return tracking({ tracking: false })
+    })
+
+    await vi.advanceTimersByTimeAsync(5 * 60_000)
+
+    expect(reads).toBe(0)
+    expect(monitor.view().alerts).toEqual([])
+    expect(phone.sendAttempts).toEqual([])
+  })
+
   it('keeps trying to stop an emergency that Pushover would not cancel, and says so meanwhile', async () => {
     let mount = tracking({ tracking: false })
     const { monitor, phone } = polled(async () => mount)

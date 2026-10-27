@@ -205,7 +205,7 @@ it('tells the alert monitor a run is an imaging run only when it repeats and sav
     })
 
     expect((await subject.start(body)).statusCode).toBe(200)
-    expect(runStarted).toHaveBeenCalledExactlyOnceWith(10, imaging)
+    expect(runStarted).toHaveBeenCalledExactlyOnceWith(10, imaging, false)
   }
 })
 
@@ -929,13 +929,13 @@ it('writes the rig\'s focal length into the saved FITS', async () => {
   expect(fits).toContain('FOCALLEN=                  400')
 })
 
-it('never lets a calibration run raise star alerts, yet still shows the camera is producing', async () => {
+it('tells the alert monitor a calibration run is one, never lets it raise star alerts, and still shows the camera is producing', async () => {
   for (const frameType of ['dark', 'flat', 'dark-flat', 'bias'] as const) {
     const monitor = { runStarted: vi.fn(), frameCaptured: vi.fn(), runEnded: vi.fn(), runInterrupted: vi.fn() }
     const subject = setup(record.imagingCamera, { alerts: { monitorFor: () => monitor } })
     const body = { exposureSeconds: 10, repeat: true, saveFrames: true, frameType }
     expect((await subject.start(body)).statusCode).toBe(200)
-    expect(monitor.runStarted).toHaveBeenCalledExactlyOnceWith(10, false)
+    expect(monitor.runStarted).toHaveBeenCalledExactlyOnceWith(10, false, true)
     subject.captures[0]!.resolve(frame)
     await vi.waitFor(() => expect(monitor.frameCaptured).toHaveBeenCalledOnce())
     expect(monitor.frameCaptured).toHaveBeenCalledWith({ capturedAt: frame.capturedAt, statistics: null })
@@ -947,7 +947,7 @@ it('keeps star alerts for a light run that repeats and saves', async () => {
   const subject = setup(record.imagingCamera, { alerts: { monitorFor: () => monitor } })
   const body = { exposureSeconds: 10, repeat: true, saveFrames: true, frameType: 'light' }
   expect((await subject.start(body)).statusCode).toBe(200)
-  expect(monitor.runStarted).toHaveBeenCalledExactlyOnceWith(10, true)
+  expect(monitor.runStarted).toHaveBeenCalledExactlyOnceWith(10, true, false)
   subject.captures[0]!.resolve(frame)
   await vi.waitFor(() => expect(monitor.frameCaptured).toHaveBeenCalledOnce())
   expect(monitor.frameCaptured.mock.calls[0]![0].statistics).not.toBeNull()

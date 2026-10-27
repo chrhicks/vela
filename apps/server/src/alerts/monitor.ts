@@ -746,8 +746,12 @@ export function createAlertMonitor({
   // -------------------------------------------------------------------------
 
   return {
-    /** `imaging` is a repeating run that saves its frames: the unattended kind, where no stars is a lost night. */
-    runStarted(exposureSeconds: number, imaging: boolean) {
+    /**
+     * `imaging` is a repeating run that saves its frames: the unattended kind, where no stars is a
+     * lost night. `calibration` is a dark, flat, dark flat or bias run, which is not watched for
+     * a mount that stopped tracking.
+     */
+    runStarted(exposureSeconds: number, imaging: boolean, calibration = false) {
       stopPolling()
       runToken++
       autofocusing = false
@@ -755,7 +759,7 @@ export function createAlertMonitor({
       focuserPosition = null
       mountReadings = []
       observationsInterruptedSince = null
-      run = { status: 'running', exposureSeconds, waitingForFrameSince: now(), imaging }
+      run = { status: 'running', exposureSeconds, waitingForFrameSince: now(), imaging, calibration }
       evaluate()
 
       // Everything from the last run has cleared by now. A new run starts with no guard.
