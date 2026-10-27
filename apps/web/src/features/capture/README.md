@@ -74,7 +74,7 @@ run" and the button fits 390 px. This replaces the earlier "no longer tracks the
 only for runs the server reports as interrupted; that check still covers a controller the server
 lost with no record.
 
-Save frames is an explicit per-run option, off on a new controller and restored
+Save frames is an explicit per-run option, ticked on a new controller and restored
 from the active server projection. Keep this image targets the image whose pixels
 have actually loaded. Its idempotent storage request has separate pending/error
 state, so it never prevents stopping an exposure or claims a camera command failed.
