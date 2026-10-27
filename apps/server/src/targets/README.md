@@ -168,8 +168,8 @@ use a synthetic profile.
 exists but is unusable (not readable, not valid JSON, not a valid profile), for the profile or the
 observations file, sets `horizonProblem: 'unreadable'` on the sky path of every target view
 (`TargetSkyPath`). It carries no values and names no file. The targets page (details of the selected
-subject) and Tonight show one muted line under the altitude trace, "Horizon file unreadable, trees not
-shown." Nothing is blocked: the rest of the sky, and a readable half (say the profile when only the
+subject) and Tonight show one muted line under the altitude trace, "Horizon file unreadable, some trees
+may not be shown." Nothing is blocked: the rest of the sky, and a readable half (say the profile when only the
 observations are broken), still apply.
 
 **Where it shows.** The altitude trace marks the stretches behind the profile

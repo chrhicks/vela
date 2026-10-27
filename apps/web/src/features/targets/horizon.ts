@@ -56,7 +56,7 @@ export function horizonNote(sky: TargetSkyPath): string[] {
 
 /** One muted line when a horizon file exists but could not be read. The rig works without it. */
 export const horizonProblemNote = (sky: TargetSkyPath): string | null =>
-  sky.horizonProblem ? 'Horizon file unreadable, trees not shown.' : null
+  sky.horizonProblem ? 'Horizon file unreadable, some trees may not be shown.' : null
 
 /** Lines for a target card's observing window. Empty without a profile, and for a clear window. */
 export function horizonWindowNote(window: HorizonWindow | null): string[] {

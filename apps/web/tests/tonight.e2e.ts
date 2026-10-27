@@ -263,5 +263,5 @@ test('Tonight says when the horizon file cannot be read and still shows the sky'
   })
   await page.goto(scene.route)
   await expect(page.locator('.tonight-sky')).toContainText('68°')
-  await expect(page.locator('.tonight-sky')).toContainText('Horizon file unreadable, trees not shown.')
+  await expect(page.locator('.tonight-sky')).toContainText('Horizon file unreadable, some trees may not be shown.')
 })
