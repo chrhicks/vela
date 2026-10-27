@@ -9,7 +9,6 @@ import {
   horizonInWindow,
   horizonStatus,
   horizonProfileSchema,
-  type HorizonProfile,
   writeHorizonProfile,
 } from './horizon.js'
 import { syntheticProfile } from './horizon.fixture.js'
