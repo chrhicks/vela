@@ -127,6 +127,7 @@ test('a critical alert shows on every page, and acknowledging keeps it until it 
     await expect(banner).toContainText('Stars dropped from about 1100 to 0')
     await expect(banner).toContainText('Raised 03:31')
     await expect(banner).toContainText('repeating on your phone until acknowledged')
+    await expect(banner).toContainText('Phone: on, unattended')
   }
 
   await page.goto('/rigs/rig-1/observe')
@@ -211,6 +212,8 @@ test('an alert not sent because the run is attended, and one stopped when Unatte
   await page.goto('/rigs/rig-1')
   const card = page.getByRole('region', { name: 'Alerts', exact: true })
 
+  await expect(card).toContainText('Phone: off')
+  await expect(page.getByRole('region', { name: 'Rig alerts' })).toContainText('Phone: off')
   await expect(card).toContainText('Not sent · Unattended is off')
   await expect(card.getByRole('button', { name: 'Send test' })).toBeEnabled()
   await expect(page.getByRole('region', { name: 'Rig alerts' })).toContainText('Stars dropped from about 1100 to 0')
@@ -218,6 +221,7 @@ test('an alert not sent because the run is attended, and one stopped when Unatte
 
   await useRig(page, alertsView({ alerts: [{ ...collapsed, delivery: { state: 'stopped' } }] }))
   await page.goto('/rigs/rig-1')
+  await expect(card).toContainText('Phone: on, unattended')
   await expect(card).toContainText('Sent once · stopped when Unattended went off')
 })
 

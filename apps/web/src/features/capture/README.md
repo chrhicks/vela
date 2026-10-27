@@ -74,6 +74,15 @@ run" and the button fits 390 px. This replaces the earlier "no longer tracks the
 only for runs the server reports as interrupted; that check still covers a controller the server
 lost with no record.
 
+Unattended ("page my phone") is a per-run choice, off for every new run and never carried over from the last
+one. The start form has it as a checkbox under Save frames, and the start body always carries `unattended`. On a
+running run the same checkbox is a live switch with no confirmation: it calls `PUT /api/rigs/:rigId/capture/unattended`
+with `{on}` and shows the server's value, "Phone: on, unattended" or "Phone: off", under it. The switch stays
+available whenever a run is active and the page is not mid-command, including during image receipt. A 409 (the run
+ended) or a failed request shows its message under the switch and never marks the capture command outcome unknown,
+because a switch cannot change what the camera is doing. An interrupted Unattended run's notice says Resume starts
+with Unattended off, because resume begins a new run.
+
 Save frames is an explicit per-run option, ticked on a new controller and restored
 from the active server projection. Keep this image targets the image whose pixels
 have actually loaded. Its idempotent storage request has separate pending/error

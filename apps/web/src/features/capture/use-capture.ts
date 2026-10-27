@@ -32,6 +32,7 @@ export function useCapture(rigId: string) {
   const [coolingPending, setCoolingPending] = useState(false)
   const [coolingError, setCoolingError] = useState<string | null>(null)
   const [coolingUnconfirmed, setCoolingUnconfirmed] = useState(false)
+  const [unattendedError, setUnattendedError] = useState<string | null>(null)
   const unconfirmedCoolingField = useRef<'coolerOn' | 'setpointC' | null>(null)
   const request = useRef<AbortController | null>(null)
   const lastView = useRef<CaptureView | null>(null)
@@ -143,6 +144,9 @@ export function useCapture(rigId: string) {
 
   const canStop = !!view?.active && view.phase !== 'stopping' && !offline && !pending
 
+  // No other condition: Chris may switch the phone on or off at any moment of a running run.
+  const canSetUnattended = !!view?.active && !offline && !pending && !commandUnconfirmed
+
   // The server marks cooling blocked whenever its command would be refused.
   const canCool =
     !!view?.cooling &&
@@ -155,18 +159,20 @@ export function useCapture(rigId: string) {
     !commandUnconfirmed
 
   async function post(
-    path: 'start' | 'stop' | 'resume' | 'cooling',
+    path: 'start' | 'stop' | 'resume' | 'cooling' | 'unattended',
     body?:
       | {
           exposureSeconds: number
           repeat: boolean
           saveFrames: boolean
           frameType: FrameType
+          unattended: boolean
           targetId?: string
           frameCount?: number
         }
       | { coolerOn: boolean }
-      | { setpointC: number },
+      | { setpointC: number }
+      | { on: boolean },
   ) {
     if (writing.current || !alive.current) return
 
@@ -177,6 +183,8 @@ export function useCapture(rigId: string) {
     if (path === 'stop') allowed = canStop
 
     if (path === 'resume') allowed = canResume
+
+    if (path === 'unattended') allowed = canSetUnattended
 
     if (!allowed) return
 
@@ -195,11 +203,12 @@ export function useCapture(rigId: string) {
     } else {
       setPending(true)
       setError(null)
+      setUnattendedError(null)
     }
 
     try {
       const next = await api(`rigs/${encodeURIComponent(rigId)}/capture/${path}`, {
-        method: 'POST',
+        method: path === 'unattended' ? 'PUT' : 'POST',
         ...(body && { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
         signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]),
       })
@@ -242,6 +251,16 @@ export function useCapture(rigId: string) {
         return
       }
 
+      if (path === 'unattended') {
+        setUnattendedError(
+          cause instanceof ApiError && cause.status === 409 && cause.code
+            ? cause.code
+            : 'Vela could not confirm the change. The switch shows what the server reports.',
+        )
+
+        return
+      }
+
       if (
         (path === 'stop' || path === 'resume') &&
         cause instanceof ApiError &&
@@ -279,17 +298,20 @@ export function useCapture(rigId: string) {
     refreshing,
     error,
     coolingError,
+    unattendedError,
     commandUnconfirmed,
     coolingUnconfirmed,
     canStart,
     canResume,
     canStop,
+    canSetUnattended,
     canCool,
     start: ({
       seconds,
       repeat,
       saveFrames,
       frameType,
+      unattended,
       targetId,
       frameCount,
     }: {
@@ -297,6 +319,7 @@ export function useCapture(rigId: string) {
       repeat: boolean
       saveFrames: boolean
       frameType: FrameType
+      unattended: boolean
       targetId?: string | undefined
       frameCount?: number | undefined
     }) => {
@@ -307,12 +330,14 @@ export function useCapture(rigId: string) {
         repeat,
         saveFrames,
         frameType,
+        unattended,
         ...(targetId !== undefined && { targetId }),
         ...(frameCount !== undefined && { frameCount }),
       })
     },
     stop: () => post('stop'),
     resume: () => post('resume'),
+    setUnattended: (on: boolean) => post('unattended', { on }),
     setCooler: (coolerOn: boolean) => post('cooling', { coolerOn }),
     setCoolingTemperature: (setpointC: number) => post('cooling', { setpointC }),
     refresh: () => read(true),

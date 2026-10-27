@@ -28,6 +28,7 @@ export const reviewCapture: CaptureView = {
   savedImageCount: 12,
   completedCount: 12,
   subject,
+  unattended: false,
   savedCount: 12,
   integrationSeconds: 2160,
   exposureSeconds: 180,

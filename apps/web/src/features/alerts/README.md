@@ -23,6 +23,7 @@ whether it was acknowledged and how the phone is getting on; the browser only pr
   refuse it. It pages whatever the run.
 - The card's delivery states include "Not sent · Unattended is off" for an alert raised while the run is
   attended, and "Sent once · stopped when Unattended went off". The server pages the phone only while the run is
-  Unattended (`unattended` in the view). The browser has no control for it yet: the start form and the running run
-  get the Unattended control in the next change, which calls `PUT /api/rigs/:rigId/capture/unattended`. Until
-  then a run is Unattended only if started with `unattended: true`.
+  Unattended (`unattended` in the view).
+- The banner (when it shows alerts) and the card say in one line whether the phone is being paged for this run:
+  "Phone: on, unattended" or "Phone: off" (`pagingLabel`). The capture page uses the same words under its Unattended
+  switch. The control itself lives with the run, see `apps/web/src/features/capture/README.md`.

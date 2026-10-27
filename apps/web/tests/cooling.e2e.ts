@@ -28,6 +28,7 @@ const idle: CaptureView = {
   saveFrames: false,
   frameType: 'light',
   savedImageCount: 0,
+  unattended: false,
   subject: null,
   savedCount: 0,
   integrationSeconds: 0,

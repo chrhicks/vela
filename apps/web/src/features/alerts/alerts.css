@@ -7,7 +7,7 @@
 .alert-banner__alert[data-level='critical'] { --alert-tone: var(--vela-danger); --alert-surface: var(--vela-danger-surface); }
 .alert-banner__level { flex: none; min-width: 72px; font-weight: 600; }
 .alert-banner__text { flex: 1; min-width: 0; }
-.alert-banner__detail, .alert-banner__interrupted { color: var(--vela-text-muted); font-size: 14px; line-height: 20px; }
+.alert-banner__detail, .alert-banner__interrupted, .alert-banner__paging { color: var(--vela-text-muted); font-size: 14px; line-height: 20px; }
 .alert-banner .vela-button { flex: none; }
 @media (max-width: 700px) {
   .alert-banner { padding-inline: 20px; }

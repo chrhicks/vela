@@ -382,3 +382,13 @@
 .capture-page[data-interrupted] .tonight-sky__altitude > span:not(.vela-type-metric),
 .capture-page[data-interrupted] .tonight-sky .tonight-context__heading strong { font-size: 14px; line-height: 20px; }
 .tonight-equipment > div > span { white-space: pre-wrap; }
+.tonight-capture__unattended {
+  display: grid;
+  gap: 6px;
+}
+.tonight-capture__unattended p[role='alert'] {
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--vela-danger);
+}
