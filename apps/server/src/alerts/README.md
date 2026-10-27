@@ -63,7 +63,7 @@ baseline of 3 stars, a ratio needs 10), so a whole night is lost without a word.
 | --- | --- | --- | --- |
 | `no-stars` | critical | A run that repeats and saves its frames has `noStarsFrames` (5, the `baselineFrames` window) frames with star measurements and still no baseline of `minBaselineStarsForEmptyFrame` (3) stars. Says "No stars after 5 frames". | A baseline forms: a cloudy start clears about three frames after the sky does, as the baseline fills with sky. Once one has formed it does not return. A loss of stars after that is `stars-collapsed`'s. It also clears when the run ends or the history starts over (a focuser move, autofocus ending), which counts the frames again. |
 
-Only an imaging run is watched: the capture route calls `runStarted(exposureSeconds, imaging)` with
+Only an imaging run is watched: the capture route calls `runStarted(exposureSeconds, { imaging, calibration, unattended })` with
 `imaging` true for a run that repeats and saves its frames. A single exposure, a repeating run that
 saves nothing (framing, focusing) and a run with `frameCount` below `noStarsFrames` never raise it.
 A frame whose star measurement failed does not count as a frame without stars.
