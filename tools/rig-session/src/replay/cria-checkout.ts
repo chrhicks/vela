@@ -19,7 +19,7 @@ const run = promisify(execFile)
  * definitions with no device and no name that real drivers send as one malformed light, Cria dropped the connection
  * on it, and every device of a real recording read as unavailable.
  */
-export const criaPin = 'f82674d6efbc56c3f71e9533968d1f73590919fa'
+export const criaPin = '9333a927408d712449c587813db388525c6f7311'
 
 export interface CriaCheckout {
   /** Cria's `ts/` folder. */

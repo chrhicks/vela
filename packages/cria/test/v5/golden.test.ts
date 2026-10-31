@@ -2,8 +2,8 @@
  * Cria's recorded protocol 5 wire, decoded with @cria/wire.
  *
  * wire.golden.json is a verbatim copy of ts/testing/golden/wire.golden.json in
- * public Cria at f82674d6efbc56c3f71e9533968d1f73590919fa, so `git hash-object`
- * on it prints that file's blob, 0ba9cd294c35a862d5074192ba73fca978450227.
+ * public Cria at 9333a927408d712449c587813db388525c6f7311, so `git hash-object`
+ * on it prints that file's blob, 858c2ac20a4a0a54e6b55f3201071e763a400b7e.
  * Cria's golden test recorded it from a running Cria and replaced IDs and times
  * with placeholders; `resolve` puts back values the schemas accept. Replace the
  * copy only together with the Cria pin.
@@ -115,10 +115,10 @@ describe('the protocol 5 golden', () => {
     }
 
     expect(problems).toEqual([])
-    expect(golden).toHaveLength(130)
+    expect(golden).toHaveLength(136)
   })
 
-  it('accepts every request body Cria accepted, and rejects the five Cria refused as malformed', () => {
+  it('accepts every request body Cria accepted, and rejects the eight Cria refused as malformed', () => {
     const sent = golden.filter(entry => entry.sent !== undefined)
     const strictly = { onExcessProperty: 'error' } as const
 
@@ -134,9 +134,12 @@ describe('the protocol 5 golden', () => {
       ['refused: invalid request', 2, 400],
       ['refused: invalid request', 3, 400],
       ['refused: invalid request', 5, 413],
-      ['no acknowledgement: uncertain, held by quarantine, then recovered', 7, 400],
+      ['refused: capture frame type that disagrees with light, or is not one', 1, 400],
+      ['refused: capture frame type that disagrees with light, or is not one', 2, 400],
+      ['refused: capture frame type that disagrees with light, or is not one', 3, 400],
+      ['no acknowledgement: uncertain, the camera is not held, the next capture runs, a recovery is still accepted', 8, 400],
     ])
-    expect(sent).toHaveLength(65)
+    expect(sent).toHaveLength(69)
   })
 
   it('serves each original with the length and SHA-256 its Image names', () => {
@@ -182,6 +185,17 @@ describe('the golden entries the design depends on', () => {
     expect(focuser(3)?.readings.temperatureC).toMatchObject({ status: 'fresh' })
   })
 
+  it('leaves the camera free after an uncertain capture: it is not held, and the next capture runs (cria#34)', () => {
+    const scenario = 'no acknowledgement: uncertain, the camera is not held, the next capture runs, a recovery is still accepted'
+    const lost = decode(Operation, step(scenario, 2), 'body')
+    const camera = decode(State, step(scenario, 3), 'body').devices.find(device => device.kind === 'camera')
+    const next = decode(Operation, step(scenario, 5), 'body')
+
+    expect(lost.state === 'settled' ? lost.outcome : null).toMatchObject({ kind: 'uncertain', reason: 'no-acknowledgement' })
+    expect([camera?.quarantine, camera?.availability]).toEqual([{ held: false }, { ready: true }])
+    expect(next).toMatchObject({ state: 'settled', outcome: { kind: 'confirmed' } })
+  })
+
   it('answers recover on a domain that is not held 200 with a new binding (P11)', () => {
     const scenario = 'recover refused while a mount-stop runs'
     const requests = golden.filter(entry => entry.scenario === scenario).map(entry => entry.request)
@@ -209,6 +223,8 @@ const replayed = [
   { scenario: 'refused: invalid request', deviceId: 'camera' },
   { scenario: 'refused: device busy', deviceId: 'camera' },
   { scenario: 'refused: commands disabled', deviceId: 'camera' },
+  { scenario: 'refused: capture frame type that disagrees with light, or is not one', deviceId: 'camera' },
+  { scenario: 'capture a flat and a bias, with their frame types', deviceId: 'camera' },
   { scenario: 'cancel a running capture, then cancel it again', deviceId: 'camera' },
   { scenario: 'recover refused while a mount-stop runs', deviceId: 'mount' },
 ]
