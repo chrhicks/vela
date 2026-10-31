@@ -316,6 +316,16 @@ describe('quarantine', () => {
     expect(await refusal(await submit(request('mount', 'mount-slew', slewTo, 'slew-2')))).toEqual({ status: 409, code: 'device-blocked' })
     expect((await device('camera')).quarantine).toEqual({ held: false })
   })
+
+  it('does not hold the camera for an uncertain ending (cria#34): the next capture runs', async () => {
+    const lost = { kind: 'uncertain', reason: 'no-acknowledgement', message: 'CCD_EXPOSURE on Fake CCD: no answer within 600ms' } as const
+
+    cria.settle((await admitted(request('camera', 'capture', { exposureSeconds: 1, light: true }))).id, lost)
+    await advance(1_000)
+
+    expect(await device('camera')).toMatchObject({ quarantine: { held: false }, availability: { ready: true } })
+    expect(await operation((await admitted(request('camera', 'capture', { exposureSeconds: 0.05, light: true }, 'capture-2'))).id)).toMatchObject({ state: 'running' })
+  })
 })
 
 describe('recover', () => {
