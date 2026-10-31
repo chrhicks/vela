@@ -76,14 +76,15 @@ export function nextInPass(
   return { kind: 'closed', lowest: lowest.position }
 }
 
-/** The measured sample with the lowest HFR. The first one measured wins a tie. */
-export function lowestMeasured<T extends MeasuredPosition>(samples: T[]): (T & { hfrPixels: number }) | undefined {
-  let lowest: (T & { hfrPixels: number }) | undefined
+/** The position and HFR of the measured sample with the lowest HFR. The first one measured wins a tie. */
+export function lowestMeasured(samples: MeasuredPosition[]) {
+  let lowest: { position: number; hfrPixels: number } | undefined
 
   for (const sample of samples) {
     if (sample.hfrPixels === null) continue
 
-    if (!lowest || sample.hfrPixels < lowest.hfrPixels) lowest = sample as T & { hfrPixels: number }
+    if (!lowest || sample.hfrPixels < lowest.hfrPixels)
+      lowest = { position: sample.position, hfrPixels: sample.hfrPixels }
   }
 
   return lowest

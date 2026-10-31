@@ -1,6 +1,8 @@
 import type {
   AutofocusApproach,
-  AutofocusFit,
+  AutofocusLanding,
+  AutofocusLandingAttempt,
+  AutofocusPass,
   AutofocusRun,
   AutofocusSample,
   AutofocusStar,
@@ -9,15 +11,18 @@ import type {
 } from '@vela/model/web'
 import type { CaptureFrame } from '../capture/controller.js'
 import { measureAutofocusStars } from '../imaging/statistics.js'
-import { fitHyperbola } from './hyperbola.js'
+import { chooseFocus, confirmsBest, type FocusChoice } from './choice.js'
+import { nextInPass, planPass, type PassSettings } from './passes.js'
 import {
+  DEFAULT_CONFIRM_TOLERANCE,
+  DEFAULT_FINE_OFFSET_STEPS,
+  DEFAULT_FINE_STEP_SIZE,
   DEFAULT_OFFSET_STEPS,
   DEFAULT_STEP_SIZE,
   approachFromAbove,
-  extraInwardPosition,
   planStarHfrWalk,
   assertCommandedPosition,
-  type AutofocusWalkPlan,
+  type FocuserTravel,
 } from './walk.js'
 
 // Device boundaries may report cancellation only after confirming cleanup.
@@ -65,8 +70,14 @@ export interface AutofocusCamera {
 }
 
 export interface AutofocusRunOptions {
+  /** The coarse pass: step, and steps on each side of the start. */
   stepSize?: number
   offsetSteps?: number
+  /** The fine pass, centred on the coarse minimum. */
+  fineStepSize?: number
+  fineOffsetSteps?: number
+  /** How much worse than the best fine-pass sample a confirm frame may be; 0.1 is 10 %. */
+  confirmTolerance?: number
   exposureSeconds?: number
   /** The air temperature the caller already read when it checked the rig was ready. */
   airTemperatureStartC?: number | null
@@ -79,11 +90,19 @@ export type AutofocusAirTemperature = (signal: AbortSignal) => Promise<number | 
 /** The end reading starts when the walk finishes and runs beside the restore, so this bounds only its tail. */
 const airTemperatureTimeoutMs = 3000
 
-const rSquaredGate = 0.7
+/** The settings of one run, all read before its first move. */
+interface RunSettings {
+  stepSize: number
+  offsetSteps: number
+  fineStepSize: number
+  fineOffsetSteps: number
+  confirmTolerance: number
+  exposureSeconds: number
+}
 
 /**
- * What the walk reads from a frame: the count and median HFR. The stars behind them are only
- * recorded, never fed back into the walk or the fit.
+ * What the walk reads from a frame: the count and median HFR. The stars behind them are recorded,
+ * and the fine pass reads their HFR spread to weight each sample. They never steer the walk.
  */
 export type AutofocusMeasure = (
   ...args: Parameters<typeof measureAutofocusStars>
@@ -105,11 +124,12 @@ export function createAutofocusController(
   record: AutofocusRecord = () => {},
   readAirTemperature: AutofocusAirTemperature = async () => null,
 ) {
-  let view: AutofocusView = emptyView(settings, DEFAULT_STEP_SIZE, DEFAULT_OFFSET_STEPS)
+  let view: AutofocusView = emptyView(settings, defaultRunSettings)
   let startedAt: string | undefined
   let settledAt: string | null = null
   /** The star table of `view.samples[i]`, kept apart so the polled view stays small. */
   let starTables: AutofocusStar[][] = []
+  let travel: FocuserTravel | null = null
   let airTemperatureStartC: number | null = null
   let airTemperatureEndC: number | null = null
   let endReading: Promise<number | null> | undefined
@@ -121,16 +141,12 @@ export function createAutofocusController(
     view = { ...view, ...next }
   }
 
-  async function restore(
-    focuser: AutofocusFocuser,
-    plan: AutofocusWalkPlan | undefined,
-    start: number,
-  ) {
+  async function restore(focuser: AutofocusFocuser, limits: FocuserTravel | undefined, start: number) {
     patch({ activity: 'restoring' })
 
     try {
-      if (plan) {
-        const arrived = await approach(focuser, plan, start, 'restore-start', () =>
+      if (limits) {
+        const arrived = await approach(focuser, limits, start, 'restore-start', () =>
           AbortSignal.timeout(60_000),
         )
 
@@ -152,6 +168,7 @@ export function createAutofocusController(
     position: number,
     exposureSeconds: number,
     signal: AbortSignal,
+    pass: AutofocusPass,
   ): Promise<AutofocusSample> {
     patch({
       activity: 'exposing',
@@ -194,6 +211,7 @@ export function createAutofocusController(
       detectedStars: stars.detectedStars,
       hfrPixels: stars.medianHfrPixels,
       capturedAt: frame.capturedAt,
+      pass,
     }
 
     starTables.push(stars.stars ?? [])
@@ -234,29 +252,30 @@ export function createAutofocusController(
       startPosition: view.startPosition,
       stepSize: view.stepSize,
       offsetSteps: view.offsetSteps,
+      fineStepSize: view.fineStepSize ?? DEFAULT_FINE_STEP_SIZE,
+      fineOffsetSteps: view.fineOffsetSteps ?? DEFAULT_FINE_OFFSET_STEPS,
+      confirmTolerance: view.confirmTolerance ?? DEFAULT_CONFIRM_TOLERANCE,
+      travel,
       exposureSeconds: view.exposureSeconds,
       fit: view.fit,
+      landing: view.landing ?? null,
       airTemperatureC: { start: airTemperatureStartC, end: airTemperatureEndC },
       samples: view.samples.map((sample, index) => ({ ...sample, stars: starTables[index] ?? [] })),
     }
   }
 
-  async function go(
+  async function moveTo(
     focuser: AutofocusFocuser,
-    plan: AutofocusWalkPlan,
+    limits: FocuserTravel,
     position: number,
-    signal: AbortSignal,
+    signal: () => AbortSignal,
   ) {
-    assertCommandedPosition(position, plan, extraFloor(plan))
-    patch({ activity: 'moving', currentPosition: view.currentPosition })
+    assertCommandedPosition(position, limits)
 
     const arrived = await focuser.move(
       position,
-      {
-        minPosition: Math.max(plan.travel.min, extraFloor(plan)),
-        maxPosition: plan.maxPosition,
-      },
-      signal,
+      { minPosition: limits.min, maxPosition: limits.max },
+      signal(),
     )
 
     patch({ currentPosition: arrived.position })
@@ -264,29 +283,49 @@ export function createAutofocusController(
     return arrived.position
   }
 
+  /**
+   * Goes up to the target plus the overshoot, inside travel, then down onto it, so the gear slack is
+   * taken up the way every sample saw it.
+   */
+  async function comeDownOnto(
+    focuser: AutofocusFocuser,
+    limits: FocuserTravel,
+    target: number,
+    signal: () => AbortSignal,
+  ) {
+    const { via } = approachFromAbove(limits, target)
+
+    if (via !== null) await moveTo(focuser, limits, via, signal)
+
+    return moveTo(focuser, limits, target, signal)
+  }
+
+  /** A run-ending move: it comes down onto the target and records its route. */
   async function approach(
     focuser: AutofocusFocuser,
-    plan: AutofocusWalkPlan,
+    limits: FocuserTravel,
     target: number,
     purpose: AutofocusApproach['purpose'],
     signal: () => AbortSignal,
   ) {
-    const route = approachFromAbove(plan, target)
-    const floor = extraFloor(plan)
-    const window = { minPosition: Math.max(plan.travel.min, floor), maxPosition: plan.approachMax }
-    patch({ finalApproach: { purpose, ...route } })
+    patch({ finalApproach: { purpose, ...approachFromAbove(limits, target) } })
 
-    async function moveTo(position: number) {
-      assertCommandedPosition(position, plan, floor, plan.approachMax)
-      const arrived = await focuser.move(position, window, signal())
-      patch({ currentPosition: arrived.position })
+    return comeDownOnto(focuser, limits, target, signal)
+  }
 
-      return arrived.position
-    }
+  /** A move to a sample. Going down it is one move; going up it comes down onto the target like the end of a run. */
+  async function moveToSample(
+    focuser: AutofocusFocuser,
+    limits: FocuserTravel,
+    target: number,
+    signal: () => AbortSignal,
+  ) {
+    patch({ activity: 'moving' })
 
-    if (route.via !== null) await moveTo(route.via)
+    if (view.currentPosition !== null && target < view.currentPosition)
+      return moveTo(focuser, limits, target, signal)
 
-    return moveTo(target)
+    return comeDownOnto(focuser, limits, target, signal)
   }
 
   function abortStart(
@@ -301,6 +340,7 @@ export function createAutofocusController(
       startPosition: null,
       samples: [],
       fit: null,
+      landing: null,
       error: message,
       exposureStartedAt: null,
       currentPosition: status?.position ?? view.currentPosition,
@@ -314,12 +354,12 @@ export function createAutofocusController(
   async function run(
     camera: AutofocusCamera,
     focuser: AutofocusFocuser,
-    stepSize: number,
-    offsetSteps: number,
-    exposureSeconds: number,
+    options: RunSettings,
     signal: AbortSignal,
   ) {
-    let plan: AutofocusWalkPlan
+    let limits: FocuserTravel
+    let start: number
+    let coarsePositions: number[]
 
     try {
       const status = await focuser.status(signal)
@@ -338,8 +378,8 @@ export function createAutofocusController(
 
       const planned = planStarHfrWalk(
         status.position,
-        stepSize,
-        offsetSteps,
+        options.stepSize,
+        options.offsetSteps,
         status.maxStep,
         status.minStep,
       )
@@ -350,19 +390,23 @@ export function createAutofocusController(
         return
       }
 
-      plan = planned.plan
+      limits = planned.plan.travel
+      start = planned.plan.start
+      coarsePositions = planned.plan.positions
+      travel = limits
       patch({
         phase: 'walking',
-        startPosition: plan.start,
-        currentPosition: plan.start,
+        startPosition: start,
+        currentPosition: start,
         minStep: status.minStep ?? null,
         maxStep: status.maxStep,
-        stepSize: plan.stepSize,
-        offsetSteps: plan.offsetSteps,
+        stepSize: planned.plan.stepSize,
+        offsetSteps: planned.plan.offsetSteps,
         restoredStart: false,
         finalApproach: null,
         samples: [],
         fit: null,
+        landing: null,
         error: null,
       })
       plannedReady?.resolve()
@@ -373,36 +417,98 @@ export function createAutofocusController(
       return
     }
 
+    /**
+     * Samples one pass until its lowest HFR has a sample on each side, extending the window toward
+     * the lower HFR when it does not. Returns the position of that lowest sample.
+     */
+    async function sweep(pass: 'coarse' | 'fine', centre: number, settings: PassSettings, planned?: number[]) {
+      const positions = planned ?? planPass(centre, settings, limits)
+
+      for (;;) {
+        signal.throwIfAborted()
+        const next = nextInPass(positions, settings.stepSize, limits, view.samples.filter(sample => sample.pass === pass))
+
+        if (next.kind === 'closed') return next.lowest
+
+        if (next.kind === 'no-stars')
+          throw new Error(`The ${pass} pass measured no stars. Returning to the start position.`)
+
+        if (next.kind === 'travel-limit') {
+          throw new Error(
+            `HFR was still falling at the ${next.edge} end of the focuser travel (${next.lowest}). Vela did not move past it. Returning to the start position.`,
+          )
+        }
+
+        await moveToSample(focuser, limits, next.position, () => signal)
+        await sample(camera, next.position, options.exposureSeconds, signal, pass)
+      }
+    }
+
+    /**
+     * Comes down onto the fitted position, or the best sample if there was no fit, and takes a confirm
+     * frame. A frame worse than the best sample by more than the tolerance sends the focuser to that
+     * sample, again from above, for a second frame.
+     */
+    async function land(choice: FocusChoice): Promise<AutofocusLanding> {
+      const attempts: AutofocusLandingAttempt[] = []
+      let source = choice.source
+      let position = choice.position
+
+      for (;;) {
+        patch({ activity: 'moving' })
+        await approach(focuser, limits, position, source === 'fit' ? 'best-focus' : 'best-sample', () => signal)
+        const confirm = await sample(camera, position, options.exposureSeconds, signal, 'confirm')
+        const withinTolerance = confirmsBest(confirm.hfrPixels, choice.best.hfrPixels, options.confirmTolerance)
+
+        attempts.push({
+          source,
+          position,
+          sampleIndex: view.samples.length - 1,
+          hfrPixels: confirm.hfrPixels,
+          withinTolerance,
+        })
+
+        if (withinTolerance || position === choice.best.position) break
+        source = 'best-sample'
+        position = choice.best.position
+      }
+
+      const last = attempts[attempts.length - 1]!
+
+      return {
+        position: last.position,
+        outcome: !last.withinTolerance ? 'unconfirmed' : attempts.length > 1 ? 'fell-back' : 'confirmed',
+        bestSample: choice.best,
+        tolerance: options.confirmTolerance,
+        attempts,
+      }
+    }
+
     try {
-      const targets = [...plan.positions]
+      const coarseMinimum = await sweep(
+        'coarse',
+        start,
+        { stepSize: options.stepSize, offsetSteps: options.offsetSteps },
+        coarsePositions,
+      )
 
-      for (const position of targets) {
-        signal.throwIfAborted()
-        await go(focuser, plan, position, signal)
-        await sample(camera, position, exposureSeconds, signal)
-      }
-
-      while (true) {
-        const extra = extraInwardPosition(plan, view.samples)
-
-        if (extra === undefined) break
-        signal.throwIfAborted()
-        await go(focuser, plan, extra, signal)
-        await sample(camera, extra, exposureSeconds, signal)
-      }
+      await sweep('fine', coarseMinimum, { stepSize: options.fineStepSize, offsetSteps: options.fineOffsetSteps })
 
       patch({ phase: 'fitting', activity: 'fitting' })
-      const fit = bestFocus(view.samples)
 
-      if (!fit)
-        throw new Error(
-          'The hyperbola did not find a focus inside the sampled window. Returning to the start position.',
-        )
-      patch({ fit })
+      const choice = chooseFocus(
+        view.samples.flatMap((sample, index) =>
+          sample.pass === 'fine'
+            ? [{ ...sample, starHfrs: (starTables[index] ?? []).map(star => star.hfr) }]
+            : [],
+        ),
+      )
+
+      if (!choice) throw new Error('The fine pass measured no stars. Returning to the start position.')
+      patch({ fit: choice.fit })
       signal.throwIfAborted()
       patch({ phase: 'confirming', activity: 'moving' })
-      await approach(focuser, plan, fit.position, 'best-focus', () => signal)
-      await sample(camera, fit.position, exposureSeconds, signal)
+      const landing = await land(choice)
       beginEndReading()
       signal.throwIfAborted()
       patch({
@@ -410,6 +516,7 @@ export function createAutofocusController(
         activity: 'idle',
         active: false,
         restoredStart: false,
+        landing,
         error: null,
         exposureStartedAt: null,
       })
@@ -437,7 +544,7 @@ export function createAutofocusController(
       }
 
       try {
-        await restore(focuser, plan, plan.start)
+        await restore(focuser, limits, start)
         patch({
           phase: cancelled ? 'stopped' : 'failed',
           activity: 'idle',
@@ -467,6 +574,9 @@ export function createAutofocusController(
     {
       stepSize = DEFAULT_STEP_SIZE,
       offsetSteps = DEFAULT_OFFSET_STEPS,
+      fineStepSize = DEFAULT_FINE_STEP_SIZE,
+      fineOffsetSteps = DEFAULT_FINE_OFFSET_STEPS,
+      confirmTolerance = DEFAULT_CONFIRM_TOLERANCE,
       exposureSeconds = 2,
       airTemperatureStartC: startTemperatureC = null,
       onSettled,
@@ -480,37 +590,49 @@ export function createAutofocusController(
     if (!Number.isSafeInteger(offsetSteps) || offsetSteps < 1 || offsetSteps > 10)
       throw new Error('Offset steps must be an integer from 1 to 10')
 
+    if (!Number.isSafeInteger(fineStepSize) || fineStepSize < 1 || fineStepSize > 2000)
+      throw new Error('Fine step size must be an integer from 1 to 2000')
+
+    if (!Number.isSafeInteger(fineOffsetSteps) || fineOffsetSteps < 1 || fineOffsetSteps > 10)
+      throw new Error('Fine offset steps must be an integer from 1 to 10')
+
+    if (!Number.isFinite(confirmTolerance) || confirmTolerance <= 0 || confirmTolerance > 1)
+      throw new Error('Confirm tolerance must be above 0 and at most 1')
+
     if (!Number.isFinite(exposureSeconds) || exposureSeconds < 0.1 || exposureSeconds > 30)
       throw new Error('Exposure duration must be between 0.1 and 30 seconds')
     cancellation = new AbortController()
     startedAt = new Date(now()).toISOString()
     settledAt = null
     starTables = []
+    travel = null
     airTemperatureStartC = startTemperatureC
     airTemperatureEndC = null
     endReading = undefined
+
+    const runSettings: RunSettings = {
+      stepSize,
+      offsetSteps,
+      fineStepSize,
+      fineOffsetSteps,
+      confirmTolerance,
+      exposureSeconds,
+    }
+
     patch({
-      ...emptyView(settings, stepSize, offsetSteps),
+      ...emptyView(settings, runSettings),
       cameraName: settings.cameraName,
       focuserName: settings.focuserName,
       phase: 'walking',
       activity: 'moving',
       active: true,
-      exposureSeconds,
     })
 
     const whenPlanned = new Promise<void>((resolve, reject) => {
       plannedReady = { resolve, reject }
     })
 
-    running = run(
-      camera,
-      focuser,
-      stepSize,
-      offsetSteps,
-      exposureSeconds,
-      cancellation.signal,
-    ).finally(async () => {
+    running = run(camera, focuser, runSettings, cancellation.signal).finally(async () => {
       airTemperatureEndC = (await endReading) ?? null
       running = undefined
       settledAt = new Date(now()).toISOString()
@@ -554,6 +676,15 @@ export function createAutofocusController(
   return { start, stop, snapshot: () => view, run: currentRun, active: () => !!running }
 }
 
+const defaultRunSettings: RunSettings = {
+  stepSize: DEFAULT_STEP_SIZE,
+  offsetSteps: DEFAULT_OFFSET_STEPS,
+  fineStepSize: DEFAULT_FINE_STEP_SIZE,
+  fineOffsetSteps: DEFAULT_FINE_OFFSET_STEPS,
+  confirmTolerance: DEFAULT_CONFIRM_TOLERANCE,
+  exposureSeconds: 2,
+}
+
 function emptyView(
   settings: {
     rigId: string
@@ -561,8 +692,7 @@ function emptyView(
     cameraName: string
     focuserName: string
   },
-  stepSize: number,
-  offsetSteps: number,
+  run: RunSettings,
 ): AutofocusView {
   return {
     rigId: settings.rigId,
@@ -579,49 +709,19 @@ function emptyView(
     currentPosition: null,
     minStep: null,
     maxStep: null,
-    stepSize,
-    offsetSteps,
-    exposureSeconds: 2,
+    stepSize: run.stepSize,
+    offsetSteps: run.offsetSteps,
+    fineStepSize: run.fineStepSize,
+    fineOffsetSteps: run.fineOffsetSteps,
+    confirmTolerance: run.confirmTolerance,
+    exposureSeconds: run.exposureSeconds,
     elapsedSeconds: 0,
     exposureStartedAt: null,
     samples: [],
     fit: null,
+    landing: null,
     restoredStart: false,
     finalApproach: null,
     error: null,
-  }
-}
-
-function extraFloor(plan: AutofocusWalkPlan) {
-  return plan.start - (plan.offsetSteps + 2) * plan.stepSize
-}
-
-function bestFocus(samples: AutofocusSample[]): AutofocusFit | null {
-  const points = samples.flatMap(sample =>
-    sample.hfrPixels === null ? [] : [{ x: sample.position, y: sample.hfrPixels }],
-  )
-
-  const curve = fitHyperbola(points)
-
-  if (!curve || curve.rSquared < rSquaredGate) return null
-  const sampled = samples.map(sample => sample.position)
-  const position = Math.round(curve.p)
-
-  if (position < Math.min(...sampled) || position > Math.max(...sampled)) return null
-  const measured = samples.filter(sample => sample.hfrPixels !== null)
-
-  if (!measured.length) return null
-
-  const lowest = measured.reduce((best, sample) =>
-    sample.hfrPixels! < best.hfrPixels! ? sample : best,
-  )
-
-  return {
-    position,
-    p: curve.p,
-    a: curve.a,
-    b: curve.b,
-    rSquared: curve.rSquared,
-    minSamplePosition: lowest.position,
   }
 }

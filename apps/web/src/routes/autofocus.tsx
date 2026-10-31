@@ -39,7 +39,7 @@ function AutofocusPage({ rigId }: { rigId: string }) {
   const { view, offline, pending, error, stopUnconfirmed, start, stop } =
     useAutofocus(rigId)
 
-  const [stepSize, setStepSize] = useState('50')
+  const [stepSize, setStepSize] = useState('150')
   const [returnedToSetup, setReturnedToSetup] = useState(false)
 
   useEffect(() => {
@@ -70,7 +70,7 @@ function AutofocusPage({ rigId }: { rigId: string }) {
       </section>
     )
 
-  const step = Math.max(1, Math.floor(Number(stepSize) || 50))
+  const step = Math.max(1, Math.floor(Number(stepSize) || 150))
   const disabled = pending || offline || stopUnconfirmed
   const setup = !view.active && (view.phase === 'setup' || returnedToSetup)
 
@@ -395,7 +395,8 @@ function ActiveStatus({
   pending: boolean
   action: ReactNode
 }) {
-  let badge = 'Walking'
+  const pass = view.samples.at(-1)?.pass
+  let badge = pass === 'fine' ? 'Fine pass' : 'Coarse pass'
 
   if (pending) badge = 'Sending command…'
   else if (view.activity === 'restoring') badge = 'Restoring start…'
@@ -414,10 +415,7 @@ function ActiveStatus({
           )}
           {badge}
         </strong>
-        <span>
-          {view.samples.length} of{' '}
-          {Math.max(view.offsetSteps * 2 + 1, view.samples.length)} samples
-        </span>
+        <span>{view.samples.length} samples</span>
       </div>
       <p className="vela-af-desktop-activity">
         {view.activity === 'exposing' && !pending
@@ -562,10 +560,10 @@ function autofocusOutcome(
     return {
       eyebrow: 'Confirmed completion',
       title: view.fit ? 'Fitted focus is ready' : 'Autofocus completed',
-      body: `Focuser position ${number(view.currentPosition)} is confirmed. The fitted minimum and lowest measured sample remain distinct.`,
+      body: landingBody(view),
       fact: `Fitted focus ${number(view.fit?.position ?? null)} · Lowest sample ${number(lowest?.position ?? null)}`,
       footer: 'Return to setup before another walk',
-      tone: 'active',
+      tone: view.landing?.outcome === 'unconfirmed' ? 'warning' : 'active',
     }
 
   if (!setup && view.phase === 'stopped' && view.restoredStart)
@@ -589,6 +587,24 @@ function autofocusOutcome(
     }
 
   return null
+}
+
+/** What the landing's confirm frames say, in the tolerance the run used. */
+function landingBody(view: AutofocusView) {
+  const position = number(view.currentPosition)
+  const landing = view.landing
+
+  if (!landing)
+    return `Focuser position ${position} is confirmed. The fitted minimum and lowest measured sample remain distinct.`
+  const percent = `${Math.round(landing.tolerance * 100)}%`
+
+  if (landing.outcome === 'confirmed')
+    return `Focuser position ${position} is confirmed: its confirm frame is within ${percent} of the best fine-pass sample.`
+
+  if (landing.outcome === 'fell-back')
+    return `The fitted position did not confirm, so the focuser went back to the best measured sample at ${position}, and its confirm frame is within ${percent} of that sample.`
+
+  return `The focuser is at ${position}, but its confirm frame is more than ${percent} worse than the best fine-pass sample. Check focus before imaging.`
 }
 
 function PlannedWindow({

@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import {
   APPROACH_OVERSHOOT_STEPS,
   approachFromAbove,
-  extraInwardPosition,
   planStarHfrWalk,
   assertCommandedPosition,
 } from './walk.js'
@@ -44,16 +43,15 @@ describe('autofocus walk window', () => {
     if (!low.ok) throw new Error(low.message)
     expect(low.plan.positions).toEqual([15900, 15850, 15800, 15750, 15700, 15650, 15600, 15550, 15500])
     expect(low.plan.travel).toEqual({ min: 15500, max: 38000 })
-    expect(() => assertCommandedPosition(15500, low.plan, 15500)).not.toThrow()
-    expect(() => assertCommandedPosition(15499, low.plan, 15400)).toThrow(/outside the focuser travel/)
-    expect(extraInwardPosition(low.plan, [{ position: 15500, hfrPixels: 2 }])).toBeUndefined()
+    expect(() => assertCommandedPosition(15500, low.plan.travel)).not.toThrow()
+    expect(() => assertCommandedPosition(15499, low.plan.travel)).toThrow(/outside the focuser travel/)
 
     const high = planStarHfrWalk(37800, 50, 4, 38000, 15500)
 
     if (!high.ok) throw new Error(high.message)
     expect(high.plan.positions[0]).toBe(38000)
-    expect(() => assertCommandedPosition(38000, high.plan)).not.toThrow()
-    expect(() => assertCommandedPosition(38001, high.plan)).toThrow(/outside the focuser travel/)
+    expect(() => assertCommandedPosition(38000, high.plan.travel)).not.toThrow()
+    expect(() => assertCommandedPosition(38001, high.plan.travel)).toThrow(/outside the focuser travel/)
   })
 
   it('refuses a start or window outside a Cria travel window', () => {
@@ -104,75 +102,34 @@ describe('autofocus walk window', () => {
     if (!planned.ok) throw new Error(planned.message)
     expect(planned.plan.travel).toEqual({ min: 1, max: 59999 })
     expect(planned.plan.positions[0]).toBe(59999)
-    expect(() => assertCommandedPosition(60000, planned.plan)).toThrow(/outside the focuser travel/)
+    expect(() => assertCommandedPosition(60000, planned.plan.travel)).toThrow(/outside the focuser travel/)
   })
 
-  it('refuses Move(0) even if a caller asks', () => {
+  it('refuses Move(0) even if a caller asks, and anything outside travel', () => {
     const planned = planStarHfrWalk(32842, 50, 4, 60000)
     expect(planned.ok).toBe(true)
 
     if (!planned.ok) return
-    expect(() => assertCommandedPosition(0, planned.plan)).toThrow(/not a home/)
-    expect(() => assertCommandedPosition(60000, planned.plan)).toThrow(/outside the focuser travel/)
-    expect(() => assertCommandedPosition(30000, planned.plan)).toThrow(
-      /window around the starting position/,
-    )
-  })
-
-  it('offers extra inward samples only while the V minimum is still at the inner edge', () => {
-    const planned = planStarHfrWalk(32842, 50, 4, 60000)
-    expect(planned.ok).toBe(true)
-
-    if (!planned.ok) return
-
-    const inner = planned.plan.positions.map(position => ({
-      position,
-      hfrPixels: position === 32642 ? 2.1 : 4,
-    }))
-
-    expect(extraInwardPosition(planned.plan, inner)).toBe(32592)
-    inner.push({ position: 32592, hfrPixels: 2.4 })
-    expect(extraInwardPosition(planned.plan, inner)).toBeUndefined()
+    expect(() => assertCommandedPosition(0, planned.plan.travel)).toThrow(/not a home/)
+    expect(() => assertCommandedPosition(60000, planned.plan.travel)).toThrow(/outside the focuser travel/)
+    expect(() => assertCommandedPosition(30000, planned.plan.travel)).not.toThrow()
   })
 })
 
 describe('autofocus final approach', () => {
-  function planned(start: number, maxStep: number, minStep?: number) {
-    const result = planStarHfrWalk(start, 50, 4, maxStep, minStep)
+  const travel = { min: 1, max: 59999 }
 
-    if (!result.ok) throw new Error(result.message)
-
-    return result.plan
-  }
-
-  it('passes through a position above the target, past the window if it must', () => {
-    const plan = planned(32842, 60000)
-
-    expect(approachFromAbove(plan, 32838)).toEqual({
+  it('passes through a position above the target', () => {
+    expect(approachFromAbove(travel, 32838)).toEqual({
       target: 32838,
       via: 32838 + APPROACH_OVERSHOOT_STEPS,
     })
-    expect(approachFromAbove(plan, plan.maxPosition)).toEqual({
-      target: plan.maxPosition,
-      via: plan.maxPosition + APPROACH_OVERSHOOT_STEPS,
-    })
-    expect(plan.approachMax).toBe(plan.maxPosition + APPROACH_OVERSHOOT_STEPS)
   })
 
   it('clamps the overshoot to the travel and goes direct from the top of it', () => {
-    const plan = planned(37800, 38000, 15500)
+    const cria = { min: 15500, max: 38000 }
 
-    expect(approachFromAbove(plan, 37800)).toEqual({ target: 37800, via: 38000 })
-    expect(approachFromAbove(plan, 38000)).toEqual({ target: 38000, via: null })
-  })
-
-  it('only lets a final approach above the walk window up to approachMax', () => {
-    const plan = planned(32842, 60000)
-
-    expect(() => assertCommandedPosition(plan.approachMax, plan, undefined, plan.approachMax)).not.toThrow()
-    expect(() => assertCommandedPosition(plan.approachMax + 1, plan, undefined, plan.approachMax)).toThrow(
-      /leave the autofocus window/,
-    )
-    expect(() => assertCommandedPosition(plan.maxPosition + 1, plan)).toThrow(/leave the autofocus window/)
+    expect(approachFromAbove(cria, 37800)).toEqual({ target: 37800, via: 38000 })
+    expect(approachFromAbove(cria, 38000)).toEqual({ target: 38000, via: null })
   })
 })

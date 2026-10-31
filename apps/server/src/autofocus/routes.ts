@@ -19,7 +19,13 @@ import {
 } from './controller.js'
 import { measureAutofocusStars } from '../imaging/statistics.js'
 import { noRecords, type JsonlRecords } from '../records.js'
-import { DEFAULT_OFFSET_STEPS, DEFAULT_STEP_SIZE } from './walk.js'
+import {
+  DEFAULT_CONFIRM_TOLERANCE,
+  DEFAULT_FINE_OFFSET_STEPS,
+  DEFAULT_FINE_STEP_SIZE,
+  DEFAULT_OFFSET_STEPS,
+  DEFAULT_STEP_SIZE,
+} from './walk.js'
 import { haltBodyError, registerHaltRoutes } from '../http/halt-body.js'
 
 interface AutofocusRouteOptions {
@@ -134,11 +140,15 @@ export function registerAutofocus(
         captureReadState: 'current',
         stepSize: DEFAULT_STEP_SIZE,
         offsetSteps: DEFAULT_OFFSET_STEPS,
+        fineStepSize: DEFAULT_FINE_STEP_SIZE,
+        fineOffsetSteps: DEFAULT_FINE_OFFSET_STEPS,
+        confirmTolerance: DEFAULT_CONFIRM_TOLERANCE,
         exposureSeconds: 2,
         elapsedSeconds: 0,
         exposureStartedAt: null,
         samples: [],
         fit: null,
+        landing: null,
         restoredStart: false,
         error: null,
       }
@@ -283,6 +293,9 @@ export function registerAutofocus(
         .strictObject({
           stepSize: z.number().int().min(1).max(2000).optional(),
           offsetSteps: z.number().int().min(1).max(10).optional(),
+          fineStepSize: z.number().int().min(1).max(2000).optional(),
+          fineOffsetSteps: z.number().int().min(1).max(10).optional(),
+          confirmTolerance: z.number().gt(0).max(1).optional(),
           exposureSeconds: z.number().min(0.1).max(30).optional(),
         })
         .safeParse(request.body)
@@ -290,7 +303,7 @@ export function registerAutofocus(
       if (!request.headers['content-type']?.startsWith('application/json') || !parsed.success) {
         return reply.code(400).send({
           error:
-            'Expected optional integer stepSize, offsetSteps, and exposureSeconds between 0.1 and 30.',
+            'Expected optional integer stepSize, offsetSteps, fineStepSize and fineOffsetSteps, confirmTolerance above 0 and at most 1, and exposureSeconds between 0.1 and 30.',
         })
       }
 
@@ -343,6 +356,14 @@ export function registerAutofocus(
         if (parsed.data.stepSize !== undefined) options.stepSize = parsed.data.stepSize
 
         if (parsed.data.offsetSteps !== undefined) options.offsetSteps = parsed.data.offsetSteps
+
+        if (parsed.data.fineStepSize !== undefined) options.fineStepSize = parsed.data.fineStepSize
+
+        if (parsed.data.fineOffsetSteps !== undefined)
+          options.fineOffsetSteps = parsed.data.fineOffsetSteps
+
+        if (parsed.data.confirmTolerance !== undefined)
+          options.confirmTolerance = parsed.data.confirmTolerance
 
         if (parsed.data.exposureSeconds !== undefined)
           options.exposureSeconds = parsed.data.exposureSeconds

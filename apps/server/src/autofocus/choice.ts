@@ -29,10 +29,9 @@ const rSquaredGate = 0.7
  * measured place is better than an estimate nobody trusts. Null only when no sample measured a star.
  */
 export function chooseFocus(samples: FocusSample[]): FocusChoice | null {
-  const best = lowestMeasured(samples)
+  const lowest = lowestMeasured(samples)
 
-  if (!best) return null
-  const lowest = { position: best.position, hfrPixels: best.hfrPixels }
+  if (!lowest) return null
 
   const curve = fitHyperbola(
     samples.flatMap(sample =>
