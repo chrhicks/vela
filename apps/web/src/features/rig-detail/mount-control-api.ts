@@ -1,25 +1,7 @@
 import type { MountControlAction, MountControlView } from '@vela/model/web'
 import { z } from 'zod'
 import { api } from '../../lib/api'
-
-const availability = z.object({ enabled: z.boolean(), reason: z.string().nullable() })
-
-export const mountControlSchema = z.object({
-  serverInstanceId: z.uuid(),
-  unpark: availability,
-  trackingOn: availability,
-  trackingOff: availability,
-  home: availability,
-  stop: availability,
-  canStop: z.boolean(),
-  homeConfirmedAt: z.string().nullable(),
-  command: z.object({
-    requestId: z.uuid(),
-    action: z.enum(['unpark', 'tracking-on', 'tracking-off', 'home']),
-    state: z.enum(['pending', 'confirmed', 'failed', 'uncertain']),
-    message: z.string().nullable(),
-  }).nullable(),
-})
+import { mountControlSchema } from './control-schema'
 
 /**
  * A new command's request ID (UUID v4). It comes from `crypto.getRandomValues` because
