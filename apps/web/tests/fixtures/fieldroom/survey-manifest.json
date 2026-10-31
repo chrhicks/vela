@@ -7,6 +7,13 @@
     "source": "https://alasky.cds.unistra.fr/DSS/DSSColor/Norder3/Allsky.jpg"
   },
   {
+    "resource": "survey:Norder3/Dir0/Npix206.jpg",
+    "path": "apps/web/tests/fixtures/fieldroom/survey/Norder3/Dir0/Npix206.jpg",
+    "contentType": "image/jpeg",
+    "sha256": "b564dfe14d35dee37ea986b323277200936382805d391d0b1d2c9255919b7632",
+    "source": "https://alasky.cds.unistra.fr/DSS/DSSColor/Norder3/Dir0/Npix206.jpg"
+  },
+  {
     "resource": "survey:Norder3/Dir0/Npix225.jpg",
     "path": "apps/web/tests/fixtures/fieldroom/survey/Norder3/Dir0/Npix225.jpg",
     "contentType": "image/jpeg",
