@@ -1,8 +1,7 @@
 import { z } from 'zod'
 import type { RigDeviceConnectionSummary } from '@vela/model/rig'
 import type { HomeView, RigDetailView } from '@vela/model/web'
-import { dewControlSchema } from '../features/rig-detail/dew-control-api'
-import { mountControlSchema } from '../features/rig-detail/mount-control-api'
+import { dewControlSchema, mountControlSchema } from '../features/rig-detail/control-schema'
 
 const text = z.string().refine(value => value.trim().length > 0)
 

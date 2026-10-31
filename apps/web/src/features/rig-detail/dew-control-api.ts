@@ -1,31 +1,7 @@
 import type { DewControlAction, DewControlView } from '@vela/model/web'
 import { z } from 'zod'
 import { api } from '../../lib/api'
-
-const availability = z.object({ enabled: z.boolean(), reason: z.string().nullable() })
-
-export const dewControlSchema = z.object({
-  serverInstanceId: z.uuid(),
-  auto: z.object({ on: z.boolean().nullable(), set: availability }).nullable(),
-  channels: z.array(z.object({
-    id: z.int(),
-    name: z.string(),
-    minimum: z.number(),
-    maximum: z.number(),
-    step: z.number().positive(),
-    dutyPercent: z.number().nullable(),
-    set: availability,
-  })),
-  command: z.object({
-    requestId: z.uuid(),
-    action: z.discriminatedUnion('kind', [
-      z.object({ kind: z.literal('auto'), on: z.boolean() }),
-      z.object({ kind: z.literal('duty'), channelId: z.int(), percent: z.number() }),
-    ]),
-    state: z.enum(['pending', 'confirmed', 'failed', 'uncertain']),
-    message: z.string().nullable(),
-  }).nullable(),
-})
+import { dewControlSchema } from './control-schema'
 
 export async function sendDewCommand(
   rigId: string,
