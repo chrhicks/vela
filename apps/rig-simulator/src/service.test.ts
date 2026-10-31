@@ -142,7 +142,7 @@ describe('simulator Alpaca boundary', () => {
     const expected = renderSky(
       stars,
       cameraPose({
-        latitudeDegrees: 40,
+        latitudeDegrees: 33.45,
         altitudeErrorDegrees: 0,
         azimuthErrorDegrees: 0,
         raAxisDegrees: 30,
@@ -335,8 +335,8 @@ it('declares J2000 and handles asynchronous slews, invalid coordinates and cance
   await put('telescope', 'connected', { Connected: 'true' })
   expect((await get('telescope', 'equatorialsystem')).Value).toBe(2)
   expect((await get('telescope', 'canslewasync')).Value).toBe(true)
-  expect((await get('telescope', 'sitelongitude')).Value).toBe(-75)
-  expect((await get('telescope', 'siteelevation')).Value).toBe(0)
+  expect((await get('telescope', 'sitelongitude')).Value).toBe(-112.07)
+  expect((await get('telescope', 'siteelevation')).Value).toBe(331)
   expect((await get('telescope', 'rightascension')).Value).toBe(2)
   expect((await get('telescope', 'declination')).Value).toBe(60)
   await put('telescope', 'tracking', { Tracking: 'false' })

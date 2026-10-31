@@ -140,7 +140,7 @@ describe('horizon over a window', () => {
 })
 
 describe('sky path against a profile', () => {
-  const site = { latitudeDegrees: 40, longitudeDegrees: -75, elevationMeters: 0 }
+  const site = { latitudeDegrees: 33.45, longitudeDegrees: -112.07, elevationMeters: 331 }
   const now = new Date('2026-09-07T04:00:00Z')
   const target = { raDegrees: 10.68470833, decDegrees: 41.26875 }
 
@@ -229,7 +229,7 @@ describe('skyline with observed obstructions', () => {
   })
 
   it('shows on a sky path as the bin kind of each sample', () => {
-    const site = { latitudeDegrees: 40, longitudeDegrees: -75, elevationMeters: 0 }
+    const site = { latitudeDegrees: 33.45, longitudeDegrees: -112.07, elevationMeters: 331 }
     const target = { raDegrees: 10.68470833, decDegrees: 41.26875 }
     const now = new Date('2026-09-07T04:00:00Z')
     const whole = skylineOf(syntheticProfile({ stepDegrees: 360, altitudesDegrees: [10] }), [at(0, 50)])

@@ -40,7 +40,7 @@ function reader(options: { rig?: RigCatalogRecord; status?: TelescopeStatus } = 
     rightAscensionDegrees: 30,
     declinationDegrees: 42,
     siderealTimeDegrees: 15,
-    latitudeDegrees: 40,
+    latitudeDegrees: 33.45,
     tracking: true,
     coordinateSystem: 'topocentric',
   }))
@@ -83,7 +83,7 @@ describe('reading a Cria rig mount for the alert rules', () => {
       rightAscensionHours: 2,
       declinationDegrees: 42,
       siderealTimeHours: 1,
-      latitudeDegrees: 40,
+      latitudeDegrees: 33.45,
       pierSide: 'west',
     })
 

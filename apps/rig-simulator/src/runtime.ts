@@ -187,7 +187,7 @@ export class SimulatorRuntime {
   }
   private pose() {
     return cameraPose({
-      latitudeDegrees: 40,
+      latitudeDegrees: 33.45,
       altitudeErrorDegrees: this.altitude / 3600,
       azimuthErrorDegrees: this.azimuth / 3600,
       raAxisDegrees: this.joint,

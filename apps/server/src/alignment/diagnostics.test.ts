@@ -72,7 +72,7 @@ const evidence: AlignmentFrameEvidence = {
     rightAscensionDegrees: 10,
     declinationDegrees: 60,
     siderealTimeDegrees: 0,
-    latitudeDegrees: 40,
+    latitudeDegrees: 33.45,
     tracking: true,
     coordinateSystem: 'j2000',
   },

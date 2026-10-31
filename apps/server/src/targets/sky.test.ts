@@ -3,9 +3,11 @@ import { projectSky, type PlateWcs } from '../plate-solving/solver.js'
 import { angularDistance, fromMount, plateCorners, skyAtPixel, skyPath, toMount } from './sky.js'
 
 // Deliberately synthetic geographic site; this is not observatory configuration.
-const site = { latitudeDegrees: 40, longitudeDegrees: -75, elevationMeters: 0 }
+const site = { latitudeDegrees: 33.45, longitudeDegrees: -112.07, elevationMeters: 331 }
 
-const date = new Date('2026-09-07T04:00:00Z')
+// A sample falls on every quarter hour from local solar noon, 19:28:16.8Z here, so the
+// reference instants are chosen on that grid.
+const date = new Date('2026-09-07T04:13:16.800Z')
 
 // Independent reference: ERFA 2.0.1.5 atco13, derived from IAU SOFA.
 // https://github.com/liberfa/erfa/blob/master/src/atco13.c
@@ -19,23 +21,23 @@ const date = new Date('2026-09-07T04:00:00Z')
 const benchmarks = [
   {
     catalog: { raDegrees: 359.99, decDegrees: 82 },
-    apparent: { raDegrees: 0.35785842911299515, decDegrees: 82.14840755360858 },
-    altitude: 46.73537485217423,
+    apparent: { raDegrees: 0.3576715819832179, decDegrees: 82.14837605435447 },
+    altitude: 36.73128383937928,
   },
   {
     catalog: { raDegrees: 10.68470833, decDegrees: 41.26875 },
-    apparent: { raDegrees: 11.058091306851674, decDegrees: 41.41611865040379 },
-    altitude: 60.06028088597603,
+    apparent: { raDegrees: 11.058050448057408, decDegrees: 41.41610127083678 },
+    altitude: 32.81140772523498,
   },
   {
     catalog: { raDegrees: 0.01, decDegrees: -80 },
-    apparent: { raDegrees: 0.3931427977204232, decDegrees: -79.848558666562 },
-    altitude: -30.983898663858042,
+    apparent: { raDegrees: 0.39299945220005783, decDegrees: -79.84852690328833 },
+    altitude: -28.39472276287391,
   },
   {
     catalog: { raDegrees: 279.23473479, decDegrees: 38.78368896 },
-    apparent: { raDegrees: 279.4629823829434, decDegrees: 38.81040994135053 },
-    altitude: 50.541090008198246,
+    apparent: { raDegrees: 279.4630181301258, decDegrees: 38.810390985628224 },
+    altitude: 74.50009777394008,
   },
 ]
 
@@ -87,7 +89,7 @@ describe('target sky coordinates', () => {
 describe('target sky night', () => {
   it('keeps target azimuth in the same apparent frame, clockwise from north', () => {
     // ERFA atco13 aob output, with the same inputs as benchmarks above.
-    const azimuths = [5.56350130287918, 74.13530018467179, 174.25467450209425, 285.543875717234]
+    const azimuths = [8.723328440523188, 58.84117314667341, 169.72765107251035, 295.38345950915414]
 
     for (const [index, benchmark] of benchmarks.entries()) {
       const path = skyPath(benchmark.catalog, site, date)
@@ -102,7 +104,7 @@ describe('target sky night', () => {
   })
 
   it('matches independent airless topocentric Moon positions and geocentric illumination', () => {
-    // JPL Horizons DE441, Moon (301), UTC, geodetic site -75,40,0 km,
+    // JPL Horizons DE441, Moon (301), UTC, geodetic site -112.07,33.45,0.331 km,
     // quantities 4 (airless az/el). Quantity 10 from center 500@399 gives
     // geocentric illumination. https://ssd-api.jpl.nasa.gov/doc/horizons.html
     // 0.01° allows the shorter lunar model; still rejects missing parallax,
@@ -110,8 +112,8 @@ describe('target sky night', () => {
     const path = skyPath(benchmarks[1]!.catalog, site, date)
 
     for (const [at, azimuth, altitude] of [
-      ['2026-09-07T04:00:00.000Z', 34.392562, -17.794425],
-      ['2026-09-07T06:15:00.000Z', 58.19021, -0.122525],
+      ['2026-09-07T04:13:16.800Z', 2.833996, -32.612073],
+      ['2026-09-07T09:13:16.800Z', 61.82537, 0.301333],
     ] as const) {
       const moon = path.samples.find(sample => sample.at === at)!.moon
       expect(Math.abs(moon.azimuthDegrees - azimuth)).toBeLessThan(0.01)
@@ -119,7 +121,7 @@ describe('target sky night', () => {
     }
 
     const moon = path.samples.find(sample => sample.at === date.toISOString())!.moon
-    expect(Math.abs(moon.illuminationFraction - 0.1948491)).toBeLessThan(0.0001)
+    expect(Math.abs(moon.illuminationFraction - 0.193997)).toBeLessThan(0.0001)
     expect(path.samples.some(sample => sample.moon.altitudeDegrees > 0)).toBe(true)
     expect(path.samples.some(sample => sample.moon.altitudeDegrees < 0)).toBe(true)
   })
@@ -127,8 +129,8 @@ describe('target sky night', () => {
   it('calculates current Moon separation in the same observer frame and at the exact observation time', () => {
     // Independent ERFA target az/el and JPL Moon az/el already pinned above.
     const reference = angularDistance(
-      { raDegrees: 74.13530018467179, decDegrees: benchmarks[1]!.altitude },
-      { raDegrees: 34.392562, decDegrees: -17.794425 },
+      { raDegrees: 58.84117314667341, decDegrees: benchmarks[1]!.altitude },
+      { raDegrees: 2.833996, decDegrees: -32.612073 },
     )
 
     expect(skyPath(benchmarks[1]!.catalog, site, date).currentMoonSeparationDegrees).toBeCloseTo(reference, 2)
@@ -169,8 +171,8 @@ describe('target sky night', () => {
   it('spans the active observing night in observatory solar time and reports sampled dark visibility', () => {
     const path = skyPath(benchmarks[1]!.catalog, site, date)
     expect(path.observedAt).toBe(date.toISOString())
-    expect(path.startsAt).toBe('2026-09-06T17:00:00.000Z')
-    expect(path.endsAt).toBe('2026-09-07T17:00:00.000Z')
+    expect(path.startsAt).toBe('2026-09-06T19:28:16.800Z')
+    expect(path.endsAt).toBe('2026-09-07T19:28:16.800Z')
     expect(path.samples).toHaveLength(97)
     expect(path.aboveHorizonDuringDarkness).toHaveLength(1)
     const window = path.aboveHorizonDuringDarkness[0]!
@@ -190,14 +192,14 @@ describe('target sky night', () => {
 
   it('switches morning planning to the upcoming night after astronomical dawn', () => {
     const target = benchmarks[1]!.catalog
-    const beforeDawn = skyPath(target, site, new Date('2026-09-07T08:00:00Z'))
-    expect(beforeDawn.startsAt).toBe('2026-09-06T17:00:00.000Z')
-    expect(beforeDawn.aboveHorizonDuringDarkness[0]!.endsAt < '2026-09-07T12:00:00Z').toBe(true)
+    const beforeDawn = skyPath(target, site, new Date('2026-09-07T10:30:00Z'))
+    expect(beforeDawn.startsAt).toBe('2026-09-06T19:28:16.800Z')
+    expect(beforeDawn.aboveHorizonDuringDarkness[0]!.endsAt < '2026-09-07T14:30:00Z').toBe(true)
 
-    for (const time of ['2026-09-07T10:00:00Z', '2026-09-07T14:00:00Z']) {
+    for (const time of ['2026-09-07T12:30:00Z', '2026-09-07T16:30:00Z']) {
       const morning = skyPath(target, site, new Date(time))
-      expect(morning.startsAt).toBe('2026-09-07T17:00:00.000Z')
-      expect(morning.endsAt).toBe('2026-09-08T17:00:00.000Z')
+      expect(morning.startsAt).toBe('2026-09-07T19:28:16.800Z')
+      expect(morning.endsAt).toBe('2026-09-08T19:28:16.800Z')
       expect(morning.aboveHorizonDuringDarkness.length).toBeGreaterThan(0)
       expect(morning.aboveHorizonDuringDarkness.every(window => window.startsAt > time)).toBe(true)
     }

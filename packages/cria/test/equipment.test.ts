@@ -33,7 +33,7 @@ afterEach(async () => {
 describe('protocol 5 Promise capabilities', () => {
   it('reads named mount facts and the usable inclusive focuser window', async () => {
     expect(await equipment.framing.telescopeStatus('mount', undefined, { includeAlignmentObservations: true })).toMatchObject({
-      coordinateSystem: 'topocentric', trackingRate: 'sidereal', pierSide: 'east', latitudeDegrees: 40, longitudeDegrees: -75,
+      coordinateSystem: 'topocentric', trackingRate: 'sidereal', pierSide: 'east', latitudeDegrees: 33.45, longitudeDegrees: -112.07,
     })
     expect(await equipment.focuser.status('focuser')).toEqual({ absolute: true, position: 20000, minStep: 15500, maxStep: 38000, moving: false })
     expect(await equipment.provider.inspectDevices()).toMatchObject([

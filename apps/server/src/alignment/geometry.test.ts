@@ -11,7 +11,7 @@ function sample(
   joint: number,
   sidereal: number,
   declination = 60,
-  latitudeDegrees = 40,
+  latitudeDegrees = 33.45,
 ): AlignmentSample {
   const latitude = latitudeDegrees * radians
   const dec = declination * radians
@@ -52,7 +52,7 @@ function check(
   actual: { altitudeArcsec: number; azimuthArcsec: number; totalArcsec: number },
   altitude: number,
   azimuth: number,
-  latitudeDegrees = 40,
+  latitudeDegrees = 33.45,
 ) {
   const latitude = latitudeDegrees * radians
   expect(actual.altitudeArcsec).toBeCloseTo(altitude, 5)

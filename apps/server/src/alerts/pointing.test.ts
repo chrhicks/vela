@@ -8,9 +8,9 @@ const reading = (fields: Partial<MountReading>): MountReading => ({
   slewing: false,
   parked: false,
   rightAscensionHours: 5,
-  declinationDegrees: -20,
+  declinationDegrees: -26.55,
   siderealTimeHours: 5,
-  latitudeDegrees: 40,
+  latitudeDegrees: 33.45,
   pierSide: 'west',
   ...fields,
 })
@@ -36,12 +36,12 @@ describe('where a mount points', () => {
   it('puts the celestial pole at the latitude, due north', () => {
     const pole = skyPointOf(reading({ declinationDegrees: 90 }))!
 
-    expect(pole.altitudeDegrees).toBeCloseTo(40, 9)
+    expect(pole.altitudeDegrees).toBeCloseTo(33.45, 9)
     expect(Math.min(pole.azimuthDegrees, 360 - pole.azimuthDegrees)).toBeCloseTo(0, 6)
   })
 
   it('agrees with an independent horizontal conversion over a spread of positions', () => {
-    const site = { latitude: 40, longitude: -75 }
+    const site = { latitude: 33.45, longitude: -112.07 }
     const observer = new Observer(site.latitude, site.longitude, 0)
 
     for (const [iso, ra, dec] of [

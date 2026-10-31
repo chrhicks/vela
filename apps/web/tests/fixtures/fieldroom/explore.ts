@@ -243,7 +243,7 @@ export function createExploreScene(name: ExploreScene) {
           snapshotId: '00000000-0000-0000-0000-000000000001', calculatedAt: reviewTime,
           status: noSite ? 'site-unavailable' : name === 'explore-no-darkness' ? 'no-darkness' : 'available',
           night: noSite || name === 'explore-no-darkness' ? null : { startsAt: '2026-09-29T23:00:00.000Z', endsAt: '2026-09-30T05:00:00.000Z', kind: 'current-night' },
-          site: noSite ? null : { latitudeDegrees: 40, longitudeDegrees: -75 }, siteUnavailableReason: noSite ? 'Mount location is unavailable.' : null,
+          site: noSite ? null : { latitudeDegrees: 33.45, longitudeDegrees: -112.07 }, siteUnavailableReason: noSite ? 'Mount location is unavailable.' : null,
           targets: common.targets.map(target => noSite ? { ...target, sky: null, opportunity: null, horizonInWindow: null } : target) }
 
         return json(discovery)

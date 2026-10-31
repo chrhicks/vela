@@ -23,7 +23,7 @@ it('exports correlated steps while a detached alignment is active and records ca
       rightAscensionDegrees: 12,
       declinationDegrees: 60,
       siderealTimeDegrees: 0,
-      latitudeDegrees: 40,
+      latitudeDegrees: 33.45,
       tracking: true,
       coordinateSystem: 'j2000',
     }),

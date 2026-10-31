@@ -21,7 +21,7 @@ function setup() {
   const hardware: FramingHardware = {
     status: vi.fn(async () => ({ rightAscensionDegrees: 10, declinationDegrees: 20,
       coordinateSystem: 'j2000', tracking: true, slewing: false, parked: false,
-      observedAt: capturedAt, latitudeDegrees: 40, longitudeDegrees: -75 })),
+      observedAt: capturedAt, latitudeDegrees: 33.45, longitudeDegrees: -112.07 })),
     tracking: vi.fn(), slew: vi.fn(), capture: vi.fn(async () => frame),
   }
 

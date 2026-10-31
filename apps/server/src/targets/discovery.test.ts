@@ -4,7 +4,7 @@ import { getTarget, listTargets, type CatalogTarget } from './catalog/index.js'
 import { discoverTargets } from './discovery.js'
 import { fromMount, toMount } from './sky.js'
 
-const site = { latitudeDegrees: 40, longitudeDegrees: -75, elevationMeters: 0 }
+const site = { latitudeDegrees: 33.45, longitudeDegrees: -112.07, elevationMeters: 331 }
 
 const now = new Date('2026-09-07T04:00:00Z')
 
@@ -28,7 +28,7 @@ function preciseAltitude(record: CatalogTarget, at: string, location = site) {
 
   return Horizon(
     date,
-    new Observer(location.latitudeDegrees, location.longitudeDegrees, 0),
+    new Observer(location.latitudeDegrees, location.longitudeDegrees, location.elevationMeters),
     position.raDegrees / 15,
     position.decDegrees,
   ).altitude
@@ -72,7 +72,7 @@ describe('target discovery', () => {
 
     const m31 = result.candidates.find(candidate => candidate.target.id === 'ngc0224')!
     // Independent ERFA/SOFA apparent altitude benchmark documented in sky.test.ts.
-    expect(Math.abs(m31.opportunity!.currentAltitudeDegrees - 60.06028088597603)).toBeLessThan(0.02)
+    expect(Math.abs(m31.opportunity!.currentAltitudeDegrees - 30.446193837077807)).toBeLessThan(0.02)
   })
 
   it('finds the upcoming night during daylight, including targets below the horizon now', () => {
@@ -121,7 +121,7 @@ describe('target discovery', () => {
 
     const grazer = target(
       'grazer',
-      fromMount({ raDegrees, decDegrees: -19.99 }, 'topocentric', peak, site),
+      fromMount({ raDegrees, decDegrees: -26.54 }, 'topocentric', peak, site),
     )
 
     const hidden = target('hidden', { decDegrees: -80 })
@@ -219,9 +219,9 @@ describe('target discovery', () => {
   it('ranks a long opportunity above a showpiece that is almost set', () => {
     const lst = (SiderealTime(now) * 15 + site.longitudeDegrees + 360) % 360
 
-    // At latitude 40, declination 0 reaches altitude 30 at hour angle ~49.25°.
+    // At latitude 33.45, declination 0 reaches altitude 30 at hour angle ~53.18°.
     const setting = target('ngc1976', {
-      ...fromMount({ raDegrees: (lst - 49 + 360) % 360, decDegrees: 0 }, 'topocentric', now, site),
+      ...fromMount({ raDegrees: (lst - 52.93 + 360) % 360, decDegrees: 0 }, 'topocentric', now, site),
       type: 'Nebula',
       majorAxisArcminutes: 120,
     })
