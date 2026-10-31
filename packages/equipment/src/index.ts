@@ -4,6 +4,7 @@ export {
   CaptureRetryableError,
   CaptureUncertainError,
   FocuserStoppedError,
+  FocuserUncertainError,
   FramingStoppedError,
   FrameLostError,
 } from './error.js'

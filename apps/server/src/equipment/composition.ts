@@ -30,6 +30,8 @@ import { alpacaEndpoint } from './source.js'
 export interface EquipmentComposition {
   holdsOf(rigId: string): ReadonlyArray<{ readonly deviceId: string; readonly reason: string }>
   recover(rig: RigCatalogRecord, deviceId: string, note: string): Promise<CriaRecovery>
+  /** Drops a device's uncertain-ending warning. It never touches a hold. */
+  dismissWarning(rig: RigCatalogRecord, deviceId: string): void
   start(): void
   close(): Promise<void>
   readonly alpacaDiscovery: AlpacaDiscovery
@@ -107,6 +109,9 @@ export function createEquipmentComposition(
     recover: (rig, deviceId, note) => rig.source
       ? cria(rig).recover(deviceId, note)
       : Promise.resolve({ outcome: 'failed', busy: false, message: 'This rig has no Cria recovery.' }),
+    dismissWarning: (rig, deviceId) => {
+      if (rig.source) cria(rig).dismissWarning(deviceId)
+    },
     start() {
       for (const client of clients.values()) client.start()
     },

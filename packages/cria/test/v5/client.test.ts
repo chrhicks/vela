@@ -244,6 +244,60 @@ describe('cancel', () => {
   })
 })
 
+describe('uncertain endings on a device Cria does not hold', () => {
+  const focus = { kind: 'focuser-move', parameters: { position: 5000, minPosition: 1, maxPosition: 60000 } } as const
+
+  const warned = (rig: CriaEquipment) => Effect.runSync(rig.warnings).map(({ deviceId, reason }) => ({ deviceId, reason }))
+
+  const endUncertain = async (rig: CriaEquipment, command: typeof focus | typeof slew, deviceId: string) => {
+    cria.durationMs[command.kind] = 60_000
+    const run = execute(rig.run(deviceId, command))
+
+    await vi.advanceTimersByTimeAsync(300)
+    const latest = current(rig)
+    const [operation] = latest.state === 'live' ? latest.snapshot.operations : []
+
+    cria.settle(operation?.id ?? never(), { kind: 'uncertain', reason: 'not-confirmed', message: 'The focuser never read back the target' })
+    await vi.advanceTimersByTimeAsync(300)
+
+    return run
+  }
+
+  it('warns with Cria\'s reason, blocks nothing, and clears on the next confirmed command', async () => {
+    const { rig } = await connected()
+    const first = await endUncertain(rig, focus, 'fra-focuser')
+
+    expect(first.outcome).toMatchObject({ kind: 'uncertain', reason: 'not-confirmed' })
+    expect(warned(rig)).toEqual([{ deviceId: 'fra-focuser', reason: 'The focuser never read back the target' }])
+    expect(holds(rig)).toEqual([])
+
+    cria.durationMs['focuser-move'] = 100
+    const next = execute(rig.run('fra-focuser', focus))
+
+    await vi.advanceTimersByTimeAsync(1_500)
+    expect(next.outcome).toMatchObject({ kind: 'confirmed' })
+    expect(warned(rig)).toEqual([])
+  })
+
+  it('goes when Chris dismisses it, and leaves other devices alone', async () => {
+    const { rig } = await connected()
+
+    await endUncertain(rig, focus, 'fra-focuser')
+    Effect.runSync(rig.dismissWarning('fra-camera'))
+    expect(warned(rig)).toHaveLength(1)
+    Effect.runSync(rig.dismissWarning('fra-focuser'))
+    expect(warned(rig)).toEqual([])
+  })
+
+  it('does not warn for the mount, which Cria holds', async () => {
+    const { rig } = await connected()
+
+    await endUncertain(rig, slew, 'fra-mount')
+    expect(warned(rig)).toEqual([])
+    expect(holds(rig)).toEqual([{ deviceId: 'fra-mount', kind: 'quarantine' }])
+  })
+})
+
 describe('halts', () => {
   it('admits a halt on a held mount, sends its lost reply again with the same request ID, and confirms it', async () => {
     const { rig } = await connected()

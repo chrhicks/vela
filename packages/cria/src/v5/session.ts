@@ -15,6 +15,7 @@ import {
 import { makeLocalHolds, type LocalHolds } from './holds.js'
 import { download, request, type CriaConnection, type Reply } from './http.js'
 import { journalStates } from './journal.js'
+import { makeLocalWarnings, type LocalWarnings } from './warnings.js'
 
 export type Received =
   | { readonly state: 'live'; readonly snapshot: State; readonly receivedAt: number }
@@ -31,6 +32,7 @@ export type Looked =
 export interface Session {
   readonly received: Effect.Effect<Received>
   readonly holds: LocalHolds
+  readonly warnings: LocalWarnings
   readonly post: (operation: OperationRequest) => Effect.Effect<Reply<Operation>>
   readonly lookup: (instanceId: InstanceId, requestId: RequestId) => Effect.Effect<Looked>
   /** Sent again every 500 ms until a 2xx, which only acknowledges it. A 404 or 410 also ends it: Cria holds nothing left to cancel. */
@@ -64,6 +66,7 @@ export function openSession(connection: CriaConnection): Effect.Effect<Session, 
     })
 
     const holds = yield* makeLocalHolds()
+    const warnings = yield* makeLocalWarnings()
 
     const nextChange = (current: Received) =>
       SubscriptionRef.changes(received).pipe(
@@ -197,6 +200,7 @@ export function openSession(connection: CriaConnection): Effect.Effect<Session, 
     return {
       received: SubscriptionRef.get(received),
       holds,
+      warnings,
       post: operation => request(connection, 'POST', '/v2/operations', Operation, operation),
       lookup,
       cancel,

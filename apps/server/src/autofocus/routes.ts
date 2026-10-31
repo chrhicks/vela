@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { FastifyInstance } from 'fastify'
-import { CaptureStoppedError, FocuserStoppedError, type Acquisition, type Focuser, type FocuserMove } from '@vela/equipment'
+import { CaptureStoppedError, FocuserStoppedError, FocuserUncertainError, type Acquisition, type Focuser, type FocuserMove } from '@vela/equipment'
 import type { RigCatalogRecord } from '../rig/contracts.js'
 import type { AutofocusRun, AutofocusView } from '@vela/model/web'
 import type { RigCatalog } from '../rig/catalog.js'
@@ -9,6 +9,7 @@ import { airTemperatureC } from './air-temperature.js'
 import type { RigOperations } from '../rig/operations.js'
 import { confirmedCameraName } from '../rig/imaging-camera.js'
 import {
+  AutofocusFocuserUncertainError,
   AutofocusStoppedError,
   createAutofocusController,
   type AutofocusCamera,
@@ -75,6 +76,8 @@ function configuredFocuser(settings: { focuserId: string }, focuser: Focuser): A
         return await focuser.move(command)
       } catch (error) {
         if (error instanceof FocuserStoppedError) throw new AutofocusStoppedError()
+
+        if (error instanceof FocuserUncertainError) throw new AutofocusFocuserUncertainError(error.message)
         throw error
       }
     },

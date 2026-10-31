@@ -65,6 +65,14 @@ export class CaptureRetryableError extends Error {
   }
 }
 
+/** The adapter cannot say whether a focuser move reached its target. Nothing should move the focuser again without a person's say. */
+export class FocuserUncertainError extends EquipmentError {
+  constructor(message: string, options: EquipmentErrorOptions) {
+    super(message, options)
+    this.name = 'FocuserUncertainError'
+  }
+}
+
 /** The adapter cannot say whether the exposure ran. The camera needs a person's check before it is used again. */
 export class CaptureUncertainError extends EquipmentError {
   constructor(message: string, options: EquipmentErrorOptions) {

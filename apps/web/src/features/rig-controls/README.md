@@ -108,6 +108,15 @@ generated ("Cleared from the Vela page by the operator at <time>"); nothing is t
 
 Vela never clears a hold by itself, and the control is separate from polar alignment's Stop.
 
+## Warnings
+
+Cria holds only the mount. When a command on a camera, focuser, weather or switch device ends uncertain, the device
+stays free, and Vela shows a warning with Cria's reason on that device's row on Your rig and at the foot of this
+panel (`DeviceWarning`). It is not a hold: nothing is blocked and there is no Clear hold. It goes at the device's next
+confirmed command or when Chris presses Dismiss (`DELETE /api/rigs/:rigId/devices/:deviceId/warning`). It sends no
+alert. It lives in the Vela server's memory, so a restart forgets it. An autofocus run whose focuser move ends
+uncertain fails without the restore move and says so.
+
 ## Layout and what comes next
 
 The panel is a stack of sections; a section's buttons sit in a wrapping row, and the Mount row holds Unpark,

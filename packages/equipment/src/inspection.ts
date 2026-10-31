@@ -135,6 +135,15 @@ export interface EquipmentObservation {
   readonly message?: string
   /** Set while the device is held: nothing commands it until a person recovers it. */
   readonly hold?: EquipmentHold
+  readonly warning?: EquipmentWarning
+}
+
+/** The last command on the device ended uncertain. The device is not held; this goes until its next confirmed command or a dismissal. */
+export interface EquipmentWarning {
+  /** The id the dismiss route takes. */
+  readonly deviceId: string
+  readonly reason: string
+  readonly since: string
 }
 
 export interface EquipmentHold {

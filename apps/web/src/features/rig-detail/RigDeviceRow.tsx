@@ -2,6 +2,7 @@ import type { RigDeviceDetailView, RigSwitchChannelView } from '@vela/model/web'
 import { IconButton } from '@vela/ui'
 import { useId, useState } from 'react'
 import { DeviceIcon } from './DeviceIcon'
+import { DeviceWarning } from './DeviceWarning'
 
 interface Metric {
   readonly label: string
@@ -63,6 +64,7 @@ export function RigDeviceRow({ device, stale, imagingCamera = false }: {
   }
 
   const hold = device.observation?.hold
+  const warning = device.observation?.warning
   const detailsAvailable = presentation.metrics.length > 0 || !!presentation.channels?.length
 
   return (
@@ -92,6 +94,7 @@ export function RigDeviceRow({ device, stale, imagingCamera = false }: {
           <p>Clear the hold in Controls.</p>
         </div>
       )}
+      {warning && <DeviceWarning deviceName={device.name} warning={warning} />}
       <div id={id} hidden={!open} className="equipment__device-details">
         {stale && <p>Last known measurements; live updates are interrupted.
           {device.observation?.observedAt && <> Observed {new Date(device.observation.observedAt).toLocaleTimeString()}.</>}

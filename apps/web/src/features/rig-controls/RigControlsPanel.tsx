@@ -2,6 +2,7 @@ import { Checkbox } from '@vela/ui'
 import { useEffect } from 'react'
 import { pagingLabel } from '../alerts/presentation'
 import { useCapture } from '../capture/use-capture'
+import { DeviceWarning } from '../rig-detail/DeviceWarning'
 import { useRigObservation } from '../rig-detail/RigContext'
 import { ClearHold } from './ClearHold'
 import { coolingBlocker } from './cooling-blocker'
@@ -23,6 +24,7 @@ export function RigControlsPanel({ rigId }: { rigId: string }) {
   const mount = view?.devices.find(device => device.kind === 'telescope')
   const power = view?.devices.find(device => device.kind === 'switch' && device.dewControl)
   const held = view?.devices.filter(device => device.observation?.hold) ?? []
+  const warned = view?.devices.filter(device => device.observation?.warning) ?? []
   const cooler = !!capture.view?.cooling || !!capture.coolingError
   const phone = !!capture.view?.active
 
@@ -31,7 +33,7 @@ export function RigControlsPanel({ rigId }: { rigId: string }) {
     void refreshRig?.()
   }, [refreshRig])
 
-  const empty = !mount?.mountControl && !cooler && !power && !phone && held.length === 0
+  const empty = !mount?.mountControl && !cooler && !power && !phone && held.length === 0 && warned.length === 0
 
   return (
     <div className="rig-controls__sections">
@@ -102,6 +104,9 @@ export function RigControlsPanel({ rigId }: { rigId: string }) {
           ))}
         </section>
       )}
+      {warned.map(device => device.observation?.warning && (
+        <DeviceWarning deviceName={device.name} warning={device.observation.warning} key={device.id} />
+      ))}
       {empty && (
         <p role="status" className="rig-controls__empty">
           {view || capture.view ? 'This rig has nothing to control right now.' : 'Checking what this rig offers…'}

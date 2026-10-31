@@ -1,5 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import {
+  AutofocusFocuserUncertainError,
   AutofocusStoppedError,
   createAutofocusController,
   type AutofocusCamera,
@@ -592,6 +593,26 @@ it('would land short of best focus by the backlash if the last move came up from
   await focuser.move(32900 + APPROACH_OVERSHOOT_STEPS, window)
   await focuser.move(32900, window)
   expect(optical()).toBe(32900)
+})
+
+it('ends the run and sends no restore move when a focuser move ends uncertain', async () => {
+  const { controller, camera, focuser, land, moves } = setup()
+  const move = focuser.move.bind(focuser)
+  let calls = 0
+
+  focuser.move = async (target, window, signal) => {
+    if (++calls === 2) throw new AutofocusFocuserUncertainError('The focuser never read back the target')
+
+    return move(target, window, signal)
+  }
+
+  await controller.start(camera, focuser)
+  await land()
+
+  await vi.waitFor(() => expect(controller.active()).toBe(false))
+  expect(controller.snapshot()).toMatchObject({ phase: 'failed', restoredStart: false })
+  expect(controller.snapshot().error).toContain('The focuser never read back the target. Vela did not move the focuser again')
+  expect(moves).toHaveLength(1)
 })
 
 it('returns to the start from above after a failed fit', async () => {
