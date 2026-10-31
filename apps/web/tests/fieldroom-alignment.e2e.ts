@@ -80,10 +80,16 @@ for (const width of [1440, 768, 390]) {
 
         await expect(stop).toBeEnabled()
 
-        if (width === 390)
-          expect(
-            (await stop.boundingBox())!.y + (await stop.boundingBox())!.height,
-          ).toBeLessThanOrEqual(782)
+        // The big error and directions come first on a phone (#154), so Stop is below the first screen.
+        // One page of scrolling must reach it.
+        if (width === 390) {
+          const stopBottom = await stop.evaluate(element => element.getBoundingClientRect().bottom + scrollY)
+
+          expect(stopBottom).toBeLessThanOrEqual(2 * 782)
+          await stop.scrollIntoViewIfNeeded()
+          await expect(stop).toBeInViewport({ ratio: 1 })
+        }
+
         expect(scene.unknownRequests).toEqual([])
         expect(scene.writes).toEqual([])
       })
