@@ -44,7 +44,7 @@ function baseline(altitude: number, azimuth: number) {
       sample(altitude, azimuth, 30, 359.1),
       sample(altitude, azimuth, 50, 359.2),
     ],
-    40,
+    33.45,
   )
 }
 
@@ -118,7 +118,7 @@ describe('polar measurement from solved directions', () => {
             sample(altitude, azimuth, -76, 359.1, declination),
             sample(altitude, azimuth, -22, 359.2, declination),
           ],
-          40,
+          33.45,
         )
 
         check(reference.measurement, altitude, azimuth)
@@ -142,7 +142,7 @@ describe('polar measurement from solved directions', () => {
         sample(72000, -72000, -76, 359.1, 80),
         sample(72000, -72000, -22, 359.2, 80),
       ],
-      40,
+      33.45,
     )
 
     check(reference.measurement, 72000, -72000)
@@ -217,14 +217,14 @@ describe('polar measurement from solved directions', () => {
   it('rejects a numerical jump to the second altitude solution instead of reporting a false correction', () => {
     const reference = createAlignmentBaseline(
       [
-        sample(72000, -72000, -130, 359),
-        sample(72000, -72000, -76, 359.1),
-        sample(72000, -72000, -22, 359.2),
+        sample(90000, -72000, -130, 359),
+        sample(90000, -72000, -76, 359.1),
+        sample(90000, -72000, -22, 359.2),
       ],
-      40,
+      33.45,
     )
 
-    // This sightline fits both zero altitude error and an alternative ~44.76° root.
+    // This sightline fits both zero altitude error and an alternative ~57.86° root.
     // Undamped iteration crosses the elevation fold and would publish the latter.
     expect(() => measureAlignment(reference, sample(0, 0, -25, 2.2), true)).toThrow(
       /ambiguous sightline geometry/,
@@ -235,7 +235,7 @@ describe('polar measurement from solved directions', () => {
   })
   it('rejects coincident baselines and malformed measurements instead of reporting an aligned pole', () => {
     const point = sample(0, 0, 10, 1)
-    expect(() => createAlignmentBaseline([point, point, point], 40)).toThrow(/baseline/)
+    expect(() => createAlignmentBaseline([point, point, point], 33.45)).toThrow(/baseline/)
     expect(() => measureAlignment(baseline(480, -360), { ...point, raDegrees: NaN }, true)).toThrow(
       /sample/,
     )

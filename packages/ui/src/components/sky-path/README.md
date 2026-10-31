@@ -12,7 +12,7 @@ from 20:00 through 04:00. Indices 6, 18, 30, and 42 represent 21:00, 23:00,
 show rising and setting without inventing a second visibility model.
 
 The paths use the spherical equatorial-to-horizontal transform with an
-explicitly invented 40° observer latitude and nominal 15° rotation per hour.
+explicitly invented 33.45° observer latitude and nominal 15° rotation per hour.
 There is no longitude, date, sidereal-time lookup, refraction correction, or
 external request. Azimuth is clockwise from north; altitude is above the
 geometric horizon. Each synthetic target has a fixed declination and a chosen
@@ -20,10 +20,10 @@ transit time:
 
 | Sample ID | Invented declination | Sample transit | Purpose |
 | --- | ---: | --- | --- |
-| `andromeda` | 42° | 01:00 | Passes within 2° of zenith |
+| `andromeda` | 35.45° | 01:00 | Passes within 2° of zenith |
 | `m13` | 25° | 18:00 | Descends and sets during the sample night |
-| `crescent` | 26° | 00:00 | High midnight pass, peaking at 76° |
-| `low-target` | −32° | 00:00 | Rises and sets on a low southern arc, peaking at 18° |
+| `crescent` | 19.45° | 00:00 | High midnight pass, peaking at 76° |
+| `low-target` | −38.55° | 00:00 | Rises and sets on a low southern arc, peaking at 18° |
 
 `getDemoHorizon(profileState)` supplies four specimen states:
 

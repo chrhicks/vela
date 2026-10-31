@@ -7,14 +7,14 @@ export type DemoSkyTargetId = 'andromeda' | 'm13' | 'crescent' | 'low-target'
 
 // Entirely invented workshop geometry. These are not catalog ephemerides or
 // an observer's real location; see README.md for the specimen assumptions.
-const sampleLatitudeDegrees = 40
+const sampleLatitudeDegrees = 33.45
 
 const sampleTargets: Record<DemoSkyTargetId, { declinationDegrees: number; transitHour: number }> =
   {
-    andromeda: { declinationDegrees: 42, transitHour: 25 },
+    andromeda: { declinationDegrees: 35.45, transitHour: 25 },
     m13: { declinationDegrees: 25, transitHour: 18 },
-    crescent: { declinationDegrees: 26, transitHour: 24 },
-    'low-target': { declinationDegrees: -32, transitHour: 24 },
+    crescent: { declinationDegrees: 19.45, transitHour: 24 },
+    'low-target': { declinationDegrees: -38.55, transitHour: 24 },
   }
 
 const radians = (degrees: number) => (degrees * Math.PI) / 180
