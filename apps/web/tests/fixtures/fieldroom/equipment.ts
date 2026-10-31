@@ -234,6 +234,9 @@ export function createEquipmentScene(name: EquipmentScene) {
 
     if (method === 'GET' && pathname === '/api/web/rigs/fra400/observe') return response('detail', 200, observation())
 
+    // The rig page lists star dropouts below the equipment (#206). Nothing recorded yet.
+    if (method === 'GET' && pathname === '/api/web/rigs/fra400/horizon-observations') return response('detail', 200, { rigId: rig.id, observations: [] })
+
     if (method === 'GET' && pathname === '/api/web/rigs/fra400/imaging-camera') return response('camera', 200, camera)
 
     if (method === 'GET' && pathname === '/api/web/rigs/fra400/framing') return response('focal', 200, framing)
