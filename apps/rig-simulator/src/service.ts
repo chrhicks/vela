@@ -371,9 +371,9 @@ export function buildSimulator({
               canpulseguide: false,
               equatorialsystem: 2,
               alignmentmode: 2,
-              sitelatitude: 40,
-              sitelongitude: -75,
-              siteelevation: 0,
+              sitelatitude: 33.45,
+              sitelongitude: -112.07,
+              siteelevation: 331,
               siderealtime: runtime.siderealTimeHours(),
             }
 

@@ -333,7 +333,7 @@ describe('physical alignment sweep', () => {
     { tracking: false },
     { trackingRate: 'solar' },
     { pierSide: 'west' },
-    { latitudeDegrees: 40 },
+    { latitudeDegrees: 33.45 },
     { longitudeDegrees: -76 },
     { elevationMeters: 151 },
     { rightAscensionDegrees: 10.1 },

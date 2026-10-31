@@ -26,7 +26,7 @@ produces background noise without stars, so solving actually fails.
   coordinates, while the rendered camera pose includes polar-axis error. That
   difference is what Vela measures during a framing check.
 - The synthetic sidereal clock starts at zero on reset. Site metadata is fixed
-  at latitude 40°, longitude −75°, elevation 0 m. This reproducible clock is not
+  at latitude 33.45°, longitude −112.07°, elevation 331 m. This reproducible clock is not
   derived from today’s UTC or longitude; the simulation does not model the
   current local horizon or real-sky polar alignment.
 - Positive altitude error raises the polar axis; positive azimuth error turns

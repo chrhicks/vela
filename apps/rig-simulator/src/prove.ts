@@ -37,7 +37,7 @@ for (const [name, altitudeArcsec, azimuthArcsec] of [
 
   for (let index = 0; index < 3; index++) {
     const position: MountPosition = {
-      latitudeDegrees: 40,
+      latitudeDegrees: 33.45,
       altitudeErrorDegrees: altitudeArcsec / 3600,
       azimuthErrorDegrees: azimuthArcsec / 3600,
       raAxisDegrees: 10 + index * 20,
@@ -78,10 +78,10 @@ for (const [name, altitudeArcsec, azimuthArcsec] of [
 
   const length = Math.hypot(...axis) * (axis[2] < 0 ? -1 : 1)
   axis = [axis[0] / length, axis[1] / length, axis[2] / length]
-  const latitude = 40 * radians
+  const latitude = 33.45 * radians
   const altitude = Math.asin(axis[0] * Math.cos(latitude) + axis[2] * Math.sin(latitude))
   const azimuth = Math.atan2(axis[1], -axis[0] * Math.sin(latitude) + axis[2] * Math.cos(latitude))
-  const measuredAltitude = (altitude / radians - 40) * 3600
+  const measuredAltitude = (altitude / radians - 33.45) * 3600
   const measuredAzimuth = (azimuth / radians) * 3600
   const total = (Math.atan2(Math.hypot(axis[0], axis[1]), axis[2]) / radians) * 3600
 
@@ -101,7 +101,7 @@ for (const [name, altitudeArcsec, azimuthArcsec] of [
 const obscuredPath = join(output, 'obscured.fits')
 
 const pose = cameraPose({
-  latitudeDegrees: 40,
+  latitudeDegrees: 33.45,
   altitudeErrorDegrees: 0,
   azimuthErrorDegrees: 0,
   raAxisDegrees: 30,

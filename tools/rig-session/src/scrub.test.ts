@@ -19,11 +19,11 @@ const scrub = (path: string, text: string | Buffer) => scrubFile(path, Buffer.fr
 
 test('INDI site elements and latitude or longitude fields are flagged unless they are a made-up site', () => {
   const real = '<defNumberVector device="M" name="GEOGRAPHIC_COORD"><defNumber name="LAT">12.5</defNumber><defNumber name="LONG">250.25</defNumber></defNumberVector>'
-  const fake = '<defNumberVector device="M" name="GEOGRAPHIC_COORD"><defNumber name="LAT">40</defNumber><defNumber name="LONG">285</defNumber></defNumberVector>'
+  const fake = '<defNumberVector device="M" name="GEOGRAPHIC_COORD"><defNumber name="LAT">33.45</defNumber><defNumber name="LONG">247.93</defNumber></defNumberVector>'
 
   expect(scrub('t.xml', `${fake}\n${real}`)).toEqual(['2 indi-site'])
-  expect(scrub('t.txt', 'sent GEOGRAPHIC_COORD LAT=40 LONG=285 ELEV=0\nsent GEOGRAPHIC_COORD LAT=12.5 LONG=250.25')).toEqual(['2 indi-site'])
-  expect(scrub('t.json', '{ "latitudeDegrees": 40, "longitudeDegrees": -75 }\n{ "latitudeDegrees": 12.5 }\n{ "longitudeDegrees": 250.25 }')).toEqual(['2 site-coordinate', '3 site-coordinate'])
+  expect(scrub('t.txt', 'sent GEOGRAPHIC_COORD LAT=33.45 LONG=247.93 ELEV=0\nsent GEOGRAPHIC_COORD LAT=12.5 LONG=250.25')).toEqual(['2 indi-site'])
+  expect(scrub('t.json', '{ "latitudeDegrees": 33.45, "longitudeDegrees": -112.07 }\n{ "latitudeDegrees": 12.5 }\n{ "longitudeDegrees": 250.25 }')).toEqual(['2 site-coordinate', '3 site-coordinate'])
   expect(scrub('t.json', '{ "latitudeDegrees": 10, "longitudeDegrees": 20 }')).toEqual([])
 })
 
@@ -48,7 +48,7 @@ test('a mount log that pairs UTC with local sidereal time is flagged when the ti
     return `utc,ra_h,lst_h\n2030-01-01T03:00:00,1.5,${sidereal}\n`
   }
 
-  expect(scrub('mount.csv', log(-75))).toEqual([])
+  expect(scrub('mount.csv', log(-112.07))).toEqual([])
   expect(scrub('mount.csv', log(20))).toEqual([])
   expect(scrub('mount.csv', log(-100.25))).toEqual(['2 implied-site-longitude'])
   expect(scrub('other.csv', 'a,b\n1,2\n')).toEqual([])

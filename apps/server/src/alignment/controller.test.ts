@@ -66,7 +66,7 @@ function setup(openDiagnostics?: Parameters<typeof createAlignmentController>[0]
         rightAscensionDegrees: ra,
         declinationDegrees: dec,
         siderealTimeDegrees: (((exposures + 1) * 360) / 86164.0905 + siderealOffset + 360) % 360,
-        latitudeDegrees: 40,
+        latitudeDegrees: 33.45,
         tracking: true,
         coordinateSystem,
       }

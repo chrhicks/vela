@@ -72,7 +72,7 @@ const evidence: AlignmentFrameEvidence = {
     rightAscensionDegrees: 10,
     declinationDegrees: 60,
     siderealTimeDegrees: 0,
-    latitudeDegrees: 40,
+    latitudeDegrees: 33.45,
     tracking: true,
     coordinateSystem: 'j2000',
   },
@@ -104,9 +104,9 @@ describe('bounded alignment diagnostic recording', () => {
       })
     }
 
-    const baseline = createAlignmentBaseline(samples, 40)
+    const baseline = createAlignmentBaseline(samples, 33.45)
     const measurement = measureAlignment(baseline, samples[2], true)
-    await run.recordBaseline(samples, 40, baseline.measurement)
+    await run.recordBaseline(samples, 33.45, baseline.measurement)
     await run.recordMeasurement(samples[2], measurement)
     await run.finish({ phase: 'finished', error: null })
     const firstDirectory = (await readdir(root))[0]!

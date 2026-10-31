@@ -14,7 +14,7 @@ const saved: TargetDiscoveryView = {
     endsAt: '2026-09-08T09:00:00.000Z',
     kind: 'current-night',
   },
-  site: { latitudeDegrees: 40, longitudeDegrees: -75 },
+  site: { latitudeDegrees: 33.45, longitudeDegrees: -112.07 },
   siteUnavailableReason: null,
   query: '',
   category: 'all',

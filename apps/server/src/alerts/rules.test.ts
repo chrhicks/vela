@@ -304,7 +304,7 @@ function mountReading(fields: Partial<MountReading>): MountReading {
     rightAscensionHours: 12,
     declinationDegrees: 20,
     siderealTimeHours: 10,
-    latitudeDegrees: 40,
+    latitudeDegrees: 33.45,
     pierSide: 'west',
     ...fields,
   }

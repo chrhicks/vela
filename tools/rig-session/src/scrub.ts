@@ -21,7 +21,7 @@ export interface Finding {
 
 /** Sites that are made up. Longitudes are east positive. */
 export const fakeSites = [
-  { latitude: 40, longitude: -75 },
+  { latitude: 33.45, longitude: -112.07 },
   { latitude: 10, longitude: 20 },
 ]
 

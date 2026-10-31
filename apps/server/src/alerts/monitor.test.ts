@@ -674,7 +674,7 @@ describe('while the run is polled', () => {
     rightAscensionHours: 2,
     declinationDegrees: 20,
     siderealTimeHours: 1,
-    latitudeDegrees: 40,
+    latitudeDegrees: 33.45,
     pierSide: 'west',
     ...overrides,
   })

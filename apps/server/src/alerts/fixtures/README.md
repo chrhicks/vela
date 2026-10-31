@@ -6,7 +6,7 @@ Recorded on the night of 2026-10-17 local (2026-10-18 UTC), Andromeda Galaxy, 60
   The camera snagged a tripod leg after the 03:30:02Z frame; frames from 03:31:10Z have 0-2 stars.
   Chris recovered by 04:12:09Z. The 02:11 and 02:22 frames (focusing, before the run proper) are left out.
 - `night-20261018-mount.csv` — the AM5 polled every 10 s from 03:42:22Z to 04:12:24Z, trimmed to these rows, with `ra_h` and `lst_h` shifted by one
-  constant (hour angle unchanged) so the UTC/LST pairing implies the fake site (40°N, 75°W) used by the rig simulator. Tracking stopped at 04:03:33Z, at hour angle +0.0669 h,
+  constant (hour angle unchanged) so the UTC/LST pairing implies the fake site (33.45°N, 112.07°W) used by the rig simulator. Tracking stopped at 04:03:33Z, at hour angle +0.0669 h,
   and came back after the slew to the other pier side at 04:10:33Z.
 
 Recorded on the night of 2026-10-23 local (2026-10-23T23:22Z to 2026-10-24T05:58Z UTC), 90 s frames through a 3 nm dual-band filter.

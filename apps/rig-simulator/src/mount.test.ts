@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { cameraPose, polarAxis, type MountPosition, type Vector } from './mount.js'
 
 const position: MountPosition = {
-  latitudeDegrees: 40,
+  latitudeDegrees: 33.45,
   altitudeErrorDegrees: 0,
   azimuthErrorDegrees: 0,
   raAxisDegrees: 30,
@@ -47,11 +47,11 @@ describe('rig geometry', () => {
   })
 
   it('applies altitude upward and azimuth eastward in local horizon coordinates', () => {
-    const latitude = (40 * Math.PI) / 180
+    const latitude = (33.45 * Math.PI) / 180
     const north: Vector = [-Math.sin(latitude), 0, Math.cos(latitude)]
     const zenith: Vector = [Math.cos(latitude), 0, Math.sin(latitude)]
     const axis = polarAxis({ ...position, altitudeErrorDegrees: 1, azimuthErrorDegrees: 2 })
-    expect((Math.asin(dot(axis, zenith)) * 180) / Math.PI).toBeCloseTo(41, 10)
+    expect((Math.asin(dot(axis, zenith)) * 180) / Math.PI).toBeCloseTo(34.45, 10)
     expect((Math.atan2(axis[1], dot(axis, north)) * 180) / Math.PI).toBeCloseTo(2, 10)
   })
 })

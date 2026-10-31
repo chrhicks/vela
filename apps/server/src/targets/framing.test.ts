@@ -58,8 +58,8 @@ function workshop(
     slewing: false,
     parked: false,
     observedAt: at,
-    latitudeDegrees: 40,
-    longitudeDegrees: -75,
+    latitudeDegrees: 33.45,
+    longitudeDegrees: -112.07,
   }
 
   const slews: TargetPosition[] = []

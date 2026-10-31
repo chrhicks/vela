@@ -10,15 +10,15 @@ import { starStatistics } from './test-statistics.js'
 import type { MountReading } from './rules.js'
 import { defaultThresholds } from './thresholds.js'
 
-/** Latitude 40, hour angle 0, declination -20: due south at altitude 30. Synthetic bins are 4 degrees: south is bin 45. */
+/** Latitude 33.45, hour angle 0, declination -26.55: due south at altitude 30. Synthetic bins are 4 degrees: south is bin 45. */
 const southAt30: MountReading = {
   tracking: true,
   slewing: false,
   parked: false,
   rightAscensionHours: 5,
-  declinationDegrees: -20,
+  declinationDegrees: -26.55,
   siderealTimeHours: 5,
-  latitudeDegrees: 40,
+  latitudeDegrees: 33.45,
   pierSide: 'west',
 }
 

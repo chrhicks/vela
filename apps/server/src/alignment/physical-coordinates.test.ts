@@ -9,12 +9,12 @@ import {
 import type { PlateWcs, SkyPosition } from '../plate-solving/solver.js'
 
 // Independent ERFA 2.0.1.5 / SOFA fixtures, with no production conversion used.
-// At a deliberately generic latitude 40°, a Dec 60° vector rotates through mechanical joints
+// At a deliberately synthetic latitude 33.45° (Phoenix), a Dec 60° vector rotates through mechanical joints
 // 10°, 28°, 46° at elapsed 0, 50, 130 seconds. Tilt about local east by the
 // altitude error, then rotate north/east about zenith by the azimuth error.
 // Convert that horizon vector to apparent RA/Dec using gst06a + longitude.
 // atoc13('R', RA + eo06a, Dec, ...) gives catalog positions: UTC, DUT1=0,
-// elevation=100m, polar motion=0, pressure=0, temperature=10°C, humidity=0, wavelength=.55µm.
+// elevation=331m, polar motion=0, pressure=0, temperature=10°C, humidity=0, wavelength=.55µm.
 // The final frame is at 250 seconds; joint motion compensates elapsed GAST.
 // https://github.com/liberfa/erfa/blob/master/src/atoc13.c
 // https://github.com/liberfa/erfa/blob/master/src/gst06a.c
