@@ -178,6 +178,8 @@ function setup({ savedCameraName = 'Camera' }: { savedCameraName?: string } = {}
     observation: { state: 'on', canSetTemperature: true, canGetPower: false },
   }))
 
+  const dismissWarning = vi.fn<EquipmentComposition['dismissWarning']>()
+
   const recover = vi.fn<EquipmentComposition['recover']>(async (_rig, deviceId) => {
     if (!holds.some(hold => hold.deviceId === deviceId))
       return { outcome: 'failed', busy: false, message: 'That device is not held.' }
@@ -250,6 +252,7 @@ function setup({ savedCameraName = 'Camera' }: { savedCameraName?: string } = {}
     }),
     holdsOf: rigId => (rigId === rig.id ? holds : []),
     recover,
+    dismissWarning,
   }
 
   const app = buildApp({
@@ -266,7 +269,7 @@ function setup({ savedCameraName = 'Camera' }: { savedCameraName?: string } = {}
   apps.push(app)
 
   return {
-    app, capture, selected, unexpectedFetch, focuser, setCooling, recover,
+    app, capture, selected, unexpectedFetch, focuser, setCooling, recover, dismissWarning,
     hold(reason: string) { holds = [{ deviceId: 'cria:mount', reason }] },
     disconnected() { connected = false },
     interrupted() { ready = false },
@@ -385,6 +388,17 @@ describe('device holds through the lease routes', () => {
     await vi.waitFor(() => expect(subject.capture).toHaveBeenCalledOnce())
     expect(subject.focuser.move.mock.calls[0]![0].position).toBe(1040)
     expect((await subject.app.inject({ method: 'POST', url: `/api/rigs/${rig.id}/autofocus/stop` })).statusCode).toBe(200)
+  })
+
+  it('dismisses a device warning for the rig and device in the URL, and never recovers', async () => {
+    const subject = setup()
+
+    const dismissed = await subject.app.inject({ method: 'DELETE', url: `/api/rigs/${rig.id}/devices/cria:focuser/warning` })
+
+    expect(dismissed.statusCode).toBe(204)
+    expect(subject.dismissWarning.mock.calls.map(([target, deviceId]) => [target.id, deviceId])).toEqual([[rig.id, 'cria:focuser']])
+    expect(subject.recover).not.toHaveBeenCalled()
+    expect((await subject.app.inject({ method: 'DELETE', url: '/api/rigs/nope/devices/cria:focuser/warning' })).statusCode).toBe(404)
   })
 
   it('validates the temporary recover request and reports a recovery that did not confirm', async () => {

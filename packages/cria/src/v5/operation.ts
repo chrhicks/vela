@@ -109,14 +109,33 @@ export function remoteOperation(
       const requested = { requestId: request.requestId, operationId: null, imageId: null }
 
       observe?.(requested)
-      const operation = yield* admit(session, request, device)
 
-      observe?.({ ...requested, operationId: operation.id })
-      const settled = yield* follow(session, operation, cancelsOnStop)
+      return yield* Effect.gen(function* () {
+        const operation = yield* admit(session, request, device)
 
-      return yield* outcomeOf(settled)
+        observe?.({ ...requested, operationId: operation.id })
+        const settled = yield* follow(session, operation, cancelsOnStop)
+
+        return yield* outcomeOf(settled)
+      }).pipe(withWarning(session, device))
     }),
   )
+}
+
+/**
+ * Cria holds only a mount after an uncertain ending. For any other device the ending is a
+ * warning Chris sees until the device's next confirmed command.
+ */
+function withWarning(session: Session, device: Device) {
+  return <A>(operation: Effect.Effect<A, Ending>): Effect.Effect<A, Ending> =>
+    operation.pipe(
+      Effect.tap(() => session.warnings.clear(device.id)),
+      Effect.tapError(ending =>
+        ending instanceof Uncertain && device.kind !== 'mount'
+          ? session.warnings.note(device.id, ending.message)
+          : Effect.void,
+      ),
+    )
 }
 
 export function capture(

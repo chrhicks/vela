@@ -1,7 +1,7 @@
 import { Effect, Exit, Schema } from 'effect'
 import type { Device, ParamsOf } from '@cria/wire'
 import {
-  CaptureStoppedError, CaptureRetryableError, CaptureUncertainError, EquipmentError, FocuserStoppedError,
+  CaptureStoppedError, CaptureRetryableError, CaptureUncertainError, EquipmentError, FocuserStoppedError, FocuserUncertainError,
   FrameLostError, FramingStoppedError,
   type Acquisition, type CameraCooling, type CaptureFrameType, type CameraCoolingObservation,
   type ExposureSettings, type Focuser, type Framing, type TelescopeStatus,
@@ -371,8 +371,8 @@ export function createCriaEquipment(connection: CriaConnection, bindings: Readon
         }
 
         case 'stopped': throw new FocuserStoppedError()
-        case 'failed':
-        case 'uncertain': throw failure(result.message)
+        case 'uncertain': throw new FocuserUncertainError(result.message, { reason: 'protocol-error', endpoint: 'Cria' })
+        case 'failed': throw failure(result.message)
       }
     },
     async halt(id) {
@@ -422,6 +422,7 @@ export function createCriaEquipment(connection: CriaConnection, bindings: Readon
   }
 
   const holds = () => Effect.runSync(equipment().holds)
+  const dismissWarning = (deviceId: string) => Effect.runSync(equipment().dismissWarning(deviceId))
 
   return {
     acquisition, framing, focuser, cooling,
@@ -429,6 +430,7 @@ export function createCriaEquipment(connection: CriaConnection, bindings: Readon
     switchControl: createCriaSwitchControl(connection, bindings),
     provider: createCriaProvider(connection, bindings),
     holds,
+    dismissWarning,
     async recover(deviceId: string, note: string): Promise<CriaRecovery> {
       const hold = holds().find(hold => hold.deviceId === deviceId)
 

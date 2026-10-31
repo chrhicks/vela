@@ -101,3 +101,8 @@
 @container equipment (width < 600px) {
   .equipment__hold { margin-left: 0; }
 }
+
+.equipment__device .device-warning { margin: 0 0 16px 64px; }
+@container equipment (width < 600px) {
+  .equipment__device .device-warning { margin-left: 0; }
+}

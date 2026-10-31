@@ -57,6 +57,7 @@ export function createCriaProvider(connection: CriaConnection, bindings: Readonl
     const equipment = remote()
     const received = Effect.runSync(equipment.received)
     const holds = Effect.runSync(equipment.holds)
+    const warnings = Effect.runSync(equipment.warnings)
 
     return bindings.map(binding => {
       if (received.state === 'interrupted') return interrupted(binding, received.message)
@@ -85,6 +86,10 @@ export function createCriaProvider(connection: CriaConnection, bindings: Readonl
         if (message) observation = { ...observation, message }
 
         if (hold) observation = { ...observation, hold: { deviceId: hold.deviceId, reason: hold.reason } }
+
+        const warning = warnings.find(warning => warning.deviceId === binding.providerDeviceId)
+
+        if (warning) observation = { ...observation, warning: { deviceId: warning.deviceId, reason: warning.reason, since: new Date(warning.since).toISOString() } }
 
         const inspection: EquipmentInspection = {
           providerDeviceId: binding.providerDeviceId,

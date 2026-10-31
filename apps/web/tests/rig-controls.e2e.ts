@@ -6,6 +6,8 @@ import { routeQuietAlerts } from './fixtures/fieldroom/browser'
 
 const rigId = 'fra400'
 
+const warningReason = 'The focuser never read back the target position'
+
 const holdReason = 'Blocked until a person recovers it: home on ZWO AM5: stop was not confirmed within 20s'
 
 const serverInstanceId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
@@ -71,17 +73,25 @@ const exposing: CaptureView = {
 const respond = <Body>(route: Route, body: Body, status = 200) => route.fulfill({ status, json: body })
 
 /** A rig with a mount, a held focuser, a camera cooler and a capture run the tests can start and stop. */
-async function controlsScene(page: Page, options: { mount?: boolean; held?: boolean; capture?: CaptureView | null; dew?: DewControlView } = {}) {
+async function controlsScene(page: Page, options: { mount?: boolean; held?: boolean; capture?: CaptureView | null; dew?: DewControlView; warned?: boolean } = {}) {
   const { mount = true, held = true } = options
   const scene = createEquipmentScene('equipment-connected')
   const writes: Array<{ method: string; path: string; body: unknown }> = []
   let capture: CaptureView | null = options.capture === undefined ? idle : options.capture
   let dew = options.dew
   let dewReply: 'answered' | 'lost' = 'answered'
+  let warned = options.warned ?? false
 
   const withDew = (rig: RigDetailView): RigDetailView => ({
     ...rig,
     devices: rig.devices.map(device => device.kind === 'switch' && dew ? { ...device, dewControl: dew } : device),
+  })
+
+  const withWarning = (rig: RigDetailView): RigDetailView => ({
+    ...rig,
+    devices: rig.devices.map(device => device.kind === 'focuser' && warned && !device.observation?.hold
+      ? { ...device, observation: { state: 'current', commandReady: true, observedAt: scene.time, warning: { deviceId: 'cria:fra400:focuser', reason: warningReason, since: scene.time } } }
+      : device),
   })
 
   const rig = scene.snapshot().rig
@@ -122,7 +132,7 @@ async function controlsScene(page: Page, options: { mount?: boolean; held?: bool
 
   await page.route('**/api/**', route => route.fulfill({ status: 503, json: { error: 'No fixture for this request' } }))
   await page.route('**/api/web/navigation', route => respond(route, { rigs: [], captures: [] }))
-  await page.route('**/api/web/rigs/fra400', route => respond(route, withDew(scene.snapshot().rig)))
+  await page.route('**/api/web/rigs/fra400', route => respond(route, withWarning(withDew(scene.snapshot().rig))))
   await page.route('**/api/web/rigs/fra400/capture', route => capture ? respond(route, capture) : respond(route, { error: 'No camera' }, 503))
   await page.route('**/api/rigs/fra400/capture/cooling', route => {
     const body = route.request().postDataJSON()
@@ -144,6 +154,12 @@ async function controlsScene(page: Page, options: { mount?: boolean; held?: bool
     writes.push({ method: 'POST', path: 'recover', body: route.request().postDataJSON() })
 
     return respond(route, { outcome: 'confirmed', found: 'Cria recovered the focuser' })
+  })
+  await page.route('**/api/rigs/fra400/devices/*/warning', route => {
+    writes.push({ method: 'DELETE', path: 'warning', body: route.request().url().split('/').at(-2) })
+    warned = false
+
+    return route.fulfill({ status: 204 })
   })
   await page.route('**/api/rigs/fra400/dew', route => {
     const body = route.request().postDataJSON()
@@ -349,6 +365,25 @@ test('Clear hold lives in the panel: one confirmed request, and the panel stays 
   await expect(panel(page)).toBeVisible()
   expect(fixture.writes).toHaveLength(1)
   expect(fixture.writes[0]).toMatchObject({ method: 'POST', path: 'recover' })
+})
+
+test('an uncertain ending on a device that is not held shows a warning with Cria\'s reason, and Dismiss clears it', async ({ page }) => {
+  const fixture = await controlsScene(page, { held: false, warned: true })
+  await page.goto('/rigs/fra400')
+
+  const row = page.getByRole('region', { name: 'ZWO Focuser' })
+
+  await expect(row.getByRole('group', { name: 'ZWO Focuser warning' })).toContainText(warningReason)
+  await expect(row.getByRole('group', { name: 'ZWO Focuser is held' })).toHaveCount(0)
+
+  await openPanel(page)
+  const inPanel = panel(page).getByRole('group', { name: 'ZWO Focuser warning' })
+
+  await expect(inPanel).toContainText(warningReason)
+  await expect(panel(page).getByRole('button', { name: 'Clear hold' })).toHaveCount(0)
+  await inPanel.getByRole('button', { name: 'Dismiss' }).click()
+  await expect(page.getByRole('group', { name: 'ZWO Focuser warning' })).toHaveCount(0)
+  expect(fixture.writes).toEqual([{ method: 'DELETE', path: 'warning', body: 'cria%3Afra400%3Afocuser' }])
 })
 
 test('Your rig keeps readings and no longer holds tracking, Unpark or Clear hold buttons', async ({ page }) => {

@@ -661,8 +661,9 @@ export class FakeCria {
     return { held: true, reason: first.outcome.message, since: first.settledAt }
   }
 
+  /** cria#34: only the mount holds. Any other device settles uncertain and stays free. */
   private holds(operation: Operation): boolean {
-    return operation.state === 'settled' && operation.outcome.kind === 'uncertain' && operation.bindingId === this.binding(operation.failureDomain)
+    return this.rigged(operation.deviceId).kind === 'mount' && operation.state === 'settled' && operation.outcome.kind === 'uncertain' && operation.bindingId === this.binding(operation.failureDomain)
   }
 
   private withRecovery(operation: Operation): Operation {

@@ -376,6 +376,18 @@ export function buildApp({
     },
   )
 
+  app.delete<{ Params: { rigId: string; deviceId: string } }>(
+    '/api/rigs/:rigId/devices/:deviceId/warning',
+    async (request, reply) => {
+      const rig = await rigCatalog.get(request.params.rigId)
+
+      if (!rig) return reply.code(404).send({ error: 'rig-not-found' })
+      equipment.dismissWarning(rig, request.params.deviceId)
+
+      return reply.code(204).send()
+    },
+  )
+
   app.get<{ Params: { rigId: string } }>('/api/web/rigs/:rigId', async (request, reply) => {
     const controller = new AbortController()
     const cancel = () => controller.abort(new Error('Rig detail requester disconnected'))

@@ -33,6 +33,11 @@ interface RigDeviceIdentity {
       readonly deviceId: string
       readonly reason: string
     }
+    readonly warning?: {
+      readonly deviceId: string
+      readonly reason: string
+      readonly since: IsoDateTime
+    }
   }
 }
 

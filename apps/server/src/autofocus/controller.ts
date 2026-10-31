@@ -28,6 +28,17 @@ export class AutofocusStoppedError extends Error {
   }
 }
 
+/**
+ * A focuser move whose outcome is unknown. Cria no longer holds the focuser, so nothing else
+ * stops the run's restore move; the run ends instead and leaves the focuser where it is.
+ */
+export class AutofocusFocuserUncertainError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'AutofocusFocuserUncertainError'
+  }
+}
+
 export interface AutofocusFocuser {
   status(signal?: AbortSignal): Promise<{
     absolute: boolean
@@ -410,6 +421,19 @@ export function createAutofocusController(
         await focuser.halt()
       } catch {
         /* halt is best-effort before restore */
+      }
+
+      if (error instanceof AutofocusFocuserUncertainError) {
+        patch({
+          phase: 'failed',
+          activity: 'idle',
+          active: false,
+          restoredStart: false,
+          error: `${error.message}. Vela did not move the focuser again; check where it is.`,
+          exposureStartedAt: null,
+        })
+
+        return
       }
 
       try {
