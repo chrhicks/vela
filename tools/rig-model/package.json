@@ -1,0 +1,22 @@
+{
+  "name": "@vela/rig-model-tools",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "guards": "node guards/prove.ts",
+    "no-real-site": "node no-real-site/check.ts",
+    "decode-journals": "node decode-journals.ts",
+    "resolve-trial": "node resolve-trial.ts",
+    "test:types": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/node": "26.2.0",
+    "@vela/rig-astap": "workspace:*",
+    "@vela/rig-events": "workspace:*",
+    "@vela/rig-model": "workspace:*",
+    "@vela/rig-sky": "workspace:*",
+    "@vela/rig-testing": "workspace:*",
+    "typescript": "7.0.2"
+  }
+}

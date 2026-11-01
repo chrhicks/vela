@@ -1,0 +1,20 @@
+{
+  "name": "@vela/rig-astap",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test:types": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@vela/rig-events": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "26.2.0",
+    "@vela/rig-testing": "workspace:*",
+    "typescript": "7.0.2"
+  }
+}

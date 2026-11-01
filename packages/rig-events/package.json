@@ -1,0 +1,22 @@
+{
+  "name": "@vela/rig-events",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test:types": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@cria/primitives": "catalog:",
+    "@cria/wire": "catalog:",
+    "effect": "4.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "26.2.0",
+    "@vela/rig-testing": "workspace:*",
+    "typescript": "7.0.2"
+  }
+}

@@ -156,7 +156,7 @@ describe('polar measurement from solved directions', () => {
   ])(
     'recovers the positive corridor with $legDegrees-degree legs and offsets ($altitude, $azimuth)',
     ({ legDegrees, altitude, azimuth }) => {
-      const latitudeDegrees = 39.755
+      const latitudeDegrees = 33.45
       const siderealDegreesPerSecond = 360 / 86164.0905
       const initialSidereal = 359.7
       const finalElapsedSeconds = 145

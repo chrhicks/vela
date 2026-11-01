@@ -4,6 +4,7 @@ packages:
   - tools/rig-session
   - tools/star-bench
   - tools/horizon-import
+  - tools/rig-model
 
 # The one Cria pin. Both packages must name the same commit; bump them together and
 # regenerate the lockfile.
