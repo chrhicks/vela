@@ -21,7 +21,7 @@ function contentKey(draft: Draft): string {
 export function eventIdOf(draft: Draft): EventId {
   switch (draft.kind) {
     case 'cria.state':
-      return brandEventId(`state:${draft.body.freshness}:${draft.body.state.instanceId}:${draft.body.state.sequence}`)
+      return brandEventId(`state:${draft.source}:${draft.body.freshness}:${draft.body.state.instanceId}:${draft.body.state.sequence}`)
     case 'frame':
       return brandEventId(draft.body.image ? `frame:${draft.body.image.id}` : `frame:${draft.body.runId}:${draft.body.attempt}`)
     case 'solve':

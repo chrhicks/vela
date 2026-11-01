@@ -4,6 +4,7 @@ import {
   eventIdOf,
   kinds,
   rigId,
+  sourceId,
   subjectOf,
   type AssessKind,
   type Draft,
@@ -73,6 +74,12 @@ describe('event ids', () => {
 
     expect(eventIdOf(first)).toBe(eventIdOf(stateDraft(1)))
     expect(eventIdOf(first)).not.toBe(eventIdOf(second))
+  })
+
+  it('keeps the snapshots of two sources apart when both number them alike', () => {
+    const imported: Draft = { ...stateDraft(1), source: sourceId('import:indi-recording') }
+
+    expect(eventIdOf(imported)).not.toBe(eventIdOf(stateDraft(1)))
   })
 
   it('keeps live and rebuilt snapshots of one sequence apart', () => {

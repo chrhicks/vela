@@ -8,6 +8,8 @@ export * from './hash.ts'
 
 export * from './ids.ts'
 
+export * from './indi.ts'
+
 export * from './journal.ts'
 
 export * from './primitives.ts'
