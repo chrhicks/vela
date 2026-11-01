@@ -10,6 +10,8 @@ const RecordingLine = Schema.Union([
   Schema.Struct({ k: Schema.Literals(['conn', 'op', 'gap', 'end']), at: EpochMs }),
 ])
 
+export const decodeRecordingLine = Schema.decodeUnknownSync(RecordingLine)
+
 /** The part of a recording's `manifest.json` the importer needs. */
 export const RecordingManifest = Schema.Struct({
   instanceId: Schema.String,

@@ -10,6 +10,8 @@ export * from './ids.ts'
 
 export * from './indi.ts'
 
+export * from './indi-message.ts'
+
 export * from './journal.ts'
 
 export * from './primitives.ts'
