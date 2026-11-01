@@ -22,7 +22,7 @@ Open points that did not block a unit. Each one names the unit it came from.
 
 - `knownMaxAgeMs` is 30 minutes. A solve every few minutes keeps a position known, and nothing else has measured how long a steady mount stays where a solve left it.
 - `streamQuietMs` is 10 s, and `hiddenMoveArcmin` is 5. Both are set from the one-second snapshot tick and the AM5's 30 arcsecond display step. Real recordings may show guiding moves the reported position more than expected.
-- The restart rule keeps the last fix as `uncertain` when the first position after a Cria restart equals the last one and the mount is tracking, and goes `unknown(power-cycled)` otherwise. This is the open question 2 in the design for Chris, answered the way the base candidate proposed.
+- A Cria restart resets the mount position to `unknown` whatever the first position after it is (Chris, 2026-10-31). A restart fails the run and returns everything to its default state: Cria stops a slew on shutdown and pending exposures end. This replaces the earlier rule that kept the last fix as `uncertain` when the position was unchanged and tracking was on.
 - Only the first solve of an image counts. A second solve of the same image by another solver version is ignored.
 
 ## Not done yet

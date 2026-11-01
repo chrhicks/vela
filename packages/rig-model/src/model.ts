@@ -307,22 +307,12 @@ function followMotion(w: Working, out: Output[], observation: MountObservation, 
 }
 
 function onRestart(w: Working, out: Output[], observation: MountObservation) {
-  const previous = lastSample(w.track)
-  const arrived = observation.position
-
-  const sameSpot =
-    previous !== undefined &&
-    arrived !== null &&
-    arrived.frame === previous.frame &&
-    observation.tracking === true &&
-    separationDegrees(previous, { raHours: arrived.raHours, decDegrees: arrived.decDegrees }) * 3600 <= w.config.positionStepArcsec
-
   breakEpoch(w, w.track.coveredUntil ?? observation.at)
   w.link = { ...w.link, operations: new Map() }
 
   if (w.holds.motion) endMotion(w, out, 'uncertain')
 
-  moveMount(w, out, sameSpot ? { t: 'continuity-lost', at: observation.at, why: 'instance-changed' } : { t: 'power-cycled', at: observation.at })
+  moveMount(w, out, { t: 'power-cycled', at: observation.at })
 }
 
 function onState(w: Working, out: Output[], event: Envelope<'cria.state'>) {

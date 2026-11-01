@@ -23,9 +23,9 @@ export interface PointingFix {
 
 export type UnknownReason = 'never-solved' | 'session-start' | 'power-cycled'
 
-export type UncertainReason = 'moved-without-solve' | 'operation-uncertain' | 'stream-gap' | 'instance-changed' | 'mount-unavailable' | 'stale'
+export type UncertainReason = 'moved-without-solve' | 'operation-uncertain' | 'stream-gap' | 'mount-unavailable' | 'stale'
 
-export type ContinuityLoss = 'stream-gap' | 'instance-changed' | 'mount-unavailable'
+export type ContinuityLoss = 'stream-gap' | 'mount-unavailable'
 
 export type Resting =
   | { readonly state: 'unknown'; readonly since: EpochMs; readonly reason: UnknownReason }
@@ -87,7 +87,8 @@ function newer(current: PointingFix | null, offered: PointingFix): boolean {
  *                               uncertain
  *   uncertain      moving       uncertain             uncertain             known (if not older)   uncertain
  *
- * session-start and power-cycled go to unknown from every row. A fix reaches this table only after the
+ * session-start and power-cycled go to unknown from every row. A Cria restart is a power-cycled input: Cria stops a slew
+ * on shutdown and ends pending exposures, so nothing from before it can be trusted. A fix reaches this table only after the
  * reducer has checked that its exposure sits inside the current motion epoch, so the table never decides
  * eligibility.
  */

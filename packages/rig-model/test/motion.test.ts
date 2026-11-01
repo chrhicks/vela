@@ -78,17 +78,38 @@ describe('motion that the readings do not show', () => {
 describe('when Cria restarts', () => {
   const restart = (position: typeof home) => snapshot({ at: s(60), instanceId: otherInstance, mount: { at: s(60), ...position } })
 
-  it('keeps the last fix as uncertain when the mount is where it was and still tracking', () => {
+  it('goes to unknown even when the mount is where it was and still tracking', () => {
     const { out, model } = run(inOrder(knownAt20(), tracking(20, 59, home), restart(home), tracking(61, 90, home)))
 
-    expect(positions(out)).toEqual(['unknown:session-start', 'known:solved', 'uncertain:instance-changed'])
-    expect(model.mount.value.state === 'uncertain' && model.mount.value.lastFix?.imageId).toBe(imageIdOf(1))
+    expect(positions(out)).toEqual(['unknown:session-start', 'known:solved', 'unknown:power-cycled'])
+    expect(model.mount.value.state).toBe('unknown')
   })
 
-  it('goes to unknown when the mount is somewhere else, which a power cycle would explain', () => {
+  it('goes to unknown when the mount is somewhere else', () => {
     const { out } = run(inOrder(knownAt20(), tracking(20, 59, home), restart(away), tracking(61, 90, away)))
 
     expect(positions(out)).toEqual(['unknown:session-start', 'known:solved', 'unknown:power-cycled'])
+  })
+
+  it('goes to unknown when the mount was uncertain, and drops the fix it kept', () => {
+    const { out, model } = run(inOrder(knownAt20(), tracking(20, 30, home), streamEnded(s(30.5)), tracking(45, 59, home), restart(home), tracking(61, 90, home)))
+
+    expect(positions(out)).toEqual(['unknown:session-start', 'known:solved', 'uncertain:stream-gap', 'unknown:power-cycled'])
+    expect(model.mount.value).toMatchObject({ state: 'unknown', reason: 'power-cycled' })
+  })
+
+  it('goes to unknown when the mount was moving', () => {
+    const running = snapshot({ at: s(20), mount: { at: s(20), ...home }, operations: [homeOperation({ id: operationId(1), acceptedAt: s(19.9), startedAt: s(20) })] })
+    const { out } = run(inOrder(knownAt20(), running, tracking(21, 59, home), restart(home), tracking(61, 90, home)))
+
+    expect(positions(out).at(-1)).toBe('unknown:power-cycled')
+  })
+
+  it('knows the mount again from a solve taken after the restart', () => {
+    const { out, model } = run(inOrder(knownAt20(), tracking(20, 59, home), restart(home), tracking(61, 120, home), light(65, 20, 90, 2)))
+
+    expect(positions(out)).toEqual(['unknown:session-start', 'known:solved', 'unknown:power-cycled', 'known:solved'])
+    expect(model.mount.value.state).toBe('known')
   })
 
   it('rejects an exposure that spans the restart, even though the mount did not move', () => {
