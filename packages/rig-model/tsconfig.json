@@ -1,0 +1,7 @@
+{
+  "extends": "../../tools/rig-model/tsconfig.base.json",
+  "include": [
+    "src",
+    "test"
+  ]
+}

@@ -42,8 +42,8 @@ async function open(tracking: boolean) {
         tracking: { status: 'fresh', value: tracking, observedAt: Date.now() },
         trackingRate: { status: 'fresh', value: 'sidereal', observedAt: Date.now() },
         pierSide: { status: 'fresh', value: 'unknown', observedAt: Date.now() },
-        latitudeDegrees: { status: 'fresh', value: 39.755, observedAt: Date.now() },
-        longitudeDegrees: { status: 'fresh', value: -74.267778, observedAt: Date.now() },
+        latitudeDegrees: { status: 'fresh', value: 33.45, observedAt: Date.now() },
+        longitudeDegrees: { status: 'fresh', value: -112.07, observedAt: Date.now() },
         elevationMeters: { status: 'fresh', value: 0, observedAt: Date.now() },
         rightAscensionRateSecondsPerSiderealSecond: { status: 'unavailable', reason: 'unsupported' },
         declinationRateArcsecondsPerSecond: { status: 'unavailable', reason: 'unsupported' },
@@ -94,7 +94,7 @@ it('lets polar alignment read the AM5 it could not before, and picks 8x for the 
     trackingRate: 'sidereal',
     rightAscensionRateSecondsPerSiderealSecond: 0,
     declinationRateArcsecondsPerSecond: 0,
-    latitudeDegrees: 39.755,
+    latitudeDegrees: 33.45,
   })
 
   const mount = await framing.telescopeStatus('cria:am5:mount', signal, { includeAlignmentObservations: true })

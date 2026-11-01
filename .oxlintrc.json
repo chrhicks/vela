@@ -57,7 +57,8 @@
     "anti-slop-effect/prefer-effect-match": "error",
     "no-restricted-imports": ["error", { "patterns": [
       { "group": ["@vela/alpaca", "@vela/cria"], "message": "Only apps/server/src/equipment/composition.ts chooses a rig mode. Take the capability as an argument." },
-      { "group": ["@cria/wire", "@cria/wire/**"], "message": "Wire types stay inside packages/cria." }
+      { "group": ["@cria/wire", "@cria/wire/**"], "message": "Wire types stay inside packages/cria." },
+      { "group": ["@vela/rig-*/**"], "message": "Import a rig package by its name, not a deep path." }
     ] }]
   },
   "overrides": [
@@ -88,6 +89,89 @@
         { "group": ["@vela/alpaca", "@vela/cria"], "message": "Only apps/server/src/equipment/composition.ts chooses a rig mode. Take the capability as an argument." },
         { "group": ["effect", "effect/**", "@cria/**"], "message": "Shared contracts and the browser must stay free of Effect and Cria imports." }
       ] }] }
+    },
+    {
+      "files": ["packages/rig-*/**", "tools/rig-model/**"],
+      "plugins": ["typescript", "import", "oxc", "unicorn"],
+      "rules": {
+        "import/no-namespace": "error",
+        "no-restricted-imports": ["error", { "patterns": [
+          { "group": ["@vela/**", "!@vela/rig-*"], "message": "The rig model does not depend on the rest of Vela. Vela depends on @vela/rig-*." },
+          { "group": ["@cria/**"], "message": "@cria/wire is imported only by packages/rig-events/src/wire.ts." },
+          { "group": ["@vela/rig-*/**"], "message": "Import a rig package by its name, not a deep path." }
+        ] }]
+      }
+    },
+    {
+      "files": ["**/packages/rig-events/src/**"],
+      "plugins": ["typescript", "import", "oxc", "unicorn"],
+      "rules": {
+        "import/no-nodejs-modules": "error",
+        "no-restricted-globals": ["error", "fetch", "process", "performance", "setTimeout", "setInterval", "WebSocket", "XMLHttpRequest"],
+        "no-restricted-properties": ["error",
+          { "object": "Date", "property": "now", "message": "The model has no clock. Time arrives in events." },
+          { "object": "Math", "property": "random", "message": "The model has no randomness." }
+        ],
+        "no-restricted-imports": ["error", { "patterns": [
+          { "group": ["@vela/**"], "message": "@vela/rig-events is a leaf. It imports no other rig package and nothing else in Vela." },
+          { "group": ["@cria/**"], "message": "@cria/wire is imported only by packages/rig-events/src/wire.ts." },
+          { "group": ["nats", "nats/**", "@nats-io/**"], "message": "The vocabulary has no transport. NATS belongs to the bus package." }
+        ] }]
+      }
+    },
+    {
+      "files": ["**/packages/rig-sky/src/**"],
+      "plugins": ["typescript", "import", "oxc", "unicorn"],
+      "rules": {
+        "import/no-nodejs-modules": "error",
+        "no-restricted-globals": ["error", "fetch", "process", "performance", "setTimeout", "setInterval", "WebSocket", "XMLHttpRequest"],
+        "no-restricted-properties": ["error",
+          { "object": "Date", "property": "now", "message": "Sky math takes its time as an argument." },
+          { "object": "Math", "property": "random", "message": "Sky math is deterministic." }
+        ],
+        "no-restricted-imports": ["error", { "patterns": [
+          { "group": ["@vela/**"], "message": "@vela/rig-sky is a leaf. It imports no other rig package and nothing else in Vela." },
+          { "group": ["@cria/**"], "message": "@cria/wire is imported only by packages/rig-events/src/wire.ts." },
+          { "group": ["effect", "effect/**", "nats", "nats/**", "@nats-io/**"], "message": "Sky math is plain functions over astronomy-engine." }
+        ] }]
+      }
+    },
+    {
+      "files": ["**/packages/rig-model/src/**"],
+      "plugins": ["typescript", "import", "oxc", "unicorn"],
+      "rules": {
+        "import/no-nodejs-modules": "error",
+        "no-restricted-globals": ["error", "fetch", "process", "performance", "setTimeout", "setInterval", "WebSocket", "XMLHttpRequest"],
+        "no-restricted-properties": ["error",
+          { "object": "Date", "property": "now", "message": "The reducer has no clock. Time arrives as clock events." },
+          { "object": "Math", "property": "random", "message": "The reducer has no randomness." }
+        ],
+        "no-restricted-imports": ["error", { "patterns": [
+          { "group": ["@vela/**", "!@vela/rig-events", "!@vela/rig-sky"], "message": "@vela/rig-model imports only @vela/rig-events and @vela/rig-sky." },
+          { "group": ["@cria/**"], "message": "@cria/wire is imported only by packages/rig-events/src/wire.ts." },
+          { "group": ["@vela/rig-*/**"], "message": "Import a rig package by its name, not a deep path." },
+          { "group": ["effect", "effect/**", "nats", "nats/**", "@nats-io/**"], "message": "The reducer is plain TypeScript. It has no Effect runtime and no transport." }
+        ] }]
+      }
+    },
+    {
+      "files": ["**/packages/rig-astap/src/**"],
+      "rules": {
+        "no-restricted-imports": ["error", { "patterns": [
+          { "group": ["@vela/**", "!@vela/rig-events", "!@vela/rig-sky"], "message": "@vela/rig-astap imports only @vela/rig-events and @vela/rig-sky. The solver does not depend on the model." },
+          { "group": ["@cria/**"], "message": "@cria/wire is imported only by packages/rig-events/src/wire.ts." },
+          { "group": ["nats", "nats/**", "@nats-io/**"], "message": "The solver has no transport. NATS belongs to the bus package." }
+        ] }]
+      }
+    },
+    {
+      "files": ["**/packages/rig-events/src/wire.ts"],
+      "rules": {
+        "no-restricted-imports": ["error", { "patterns": [
+          { "group": ["@vela/**"], "message": "@vela/rig-events is a leaf. It imports no other rig package and nothing else in Vela." },
+          { "group": ["nats", "nats/**", "@nats-io/**"], "message": "The vocabulary has no transport. NATS belongs to the bus package." }
+        ] }]
+      }
     }
   ]
 }

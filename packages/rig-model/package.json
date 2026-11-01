@@ -1,0 +1,22 @@
+{
+  "name": "@vela/rig-model",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test:types": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@vela/rig-events": "workspace:*",
+    "@vela/rig-sky": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "26.2.0",
+    "@vela/rig-testing": "workspace:*",
+    "astronomy-engine": "2.1.19",
+    "typescript": "7.0.2"
+  }
+}
