@@ -386,7 +386,7 @@ describe('device holds through the lease routes', () => {
     const started = await subject.app.inject({ method: 'POST', url: `/api/rigs/${rig.id}/autofocus/start`, payload: { stepSize: 10 } })
     expect(started.statusCode).toBe(200)
     await vi.waitFor(() => expect(subject.capture).toHaveBeenCalledOnce())
-    expect(subject.focuser.move.mock.calls[0]![0].position).toBe(1040)
+    expect(subject.focuser.move.mock.calls.map(([move]) => move.position).slice(0, 2)).toEqual([1340, 1040])
     expect((await subject.app.inject({ method: 'POST', url: `/api/rigs/${rig.id}/autofocus/stop` })).statusCode).toBe(200)
   })
 

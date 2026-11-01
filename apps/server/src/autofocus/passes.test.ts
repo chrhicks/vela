@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { lowestMeasured, nextInPass, planPass } from './passes.js'
 
 const travel = { min: 100, max: 1000 }
+
 const settings = { stepSize: 50, offsetSteps: 2 }
 
 describe('planning a pass', () => {
