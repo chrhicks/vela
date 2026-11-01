@@ -58,7 +58,22 @@ export interface StateOptions {
   readonly instanceId?: string
   readonly bindingId?: string
   readonly lost?: boolean
+  readonly withoutMount?: boolean
   readonly operations?: readonly object[]
+}
+
+function mountDevice(options: StateOptions) {
+  return {
+    id: 'mount',
+    kind: 'mount',
+    name: 'Synthetic mount',
+    bindingId: options.bindingId ?? defaultBindingId,
+    failureDomain: 'mount',
+    availability: options.lost ? { ready: false, reason: 'disconnected', message: 'unplugged' } : { ready: true },
+    quarantine: { held: false },
+    afterOperation: null,
+    readings: mountReadings(options.mount),
+  }
 }
 
 export function mountState(options: StateOptions) {
@@ -68,19 +83,7 @@ export function mountState(options: StateOptions) {
     sequence: options.sequence,
     generatedAt: options.generatedAt ?? options.mount.at,
     commandsEnabled: false,
-    devices: [
-      {
-        id: 'mount',
-        kind: 'mount',
-        name: 'Synthetic mount',
-        bindingId: options.bindingId ?? defaultBindingId,
-        failureDomain: 'mount',
-        availability: options.lost ? { ready: false, reason: 'disconnected', message: 'unplugged' } : { ready: true },
-        quarantine: { held: false },
-        afterOperation: null,
-        readings: mountReadings(options.mount),
-      },
-    ],
+    devices: options.withoutMount ? [] : [mountDevice(options)],
     operations: options.operations ?? [],
   })
 }

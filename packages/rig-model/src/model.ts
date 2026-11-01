@@ -306,19 +306,30 @@ function followMotion(w: Working, out: Output[], observation: MountObservation, 
   endMotionIfDone(w, out)
 }
 
-function onRestart(w: Working, out: Output[], observation: MountObservation) {
-  breakEpoch(w, w.track.coveredUntil ?? observation.at)
+function onRestart(w: Working, out: Output[], at: EpochMs) {
+  breakEpoch(w, w.track.coveredUntil ?? at)
   w.link = { ...w.link, operations: new Map() }
 
   if (w.holds.motion) endMotion(w, out, 'uncertain')
 
-  moveMount(w, out, { t: 'power-cycled', at: observation.at })
+  moveMount(w, out, { t: 'power-cycled', at })
+}
+
+/** A snapshot with no mount still tells us Cria restarted, and what the mount did before it is no longer known. */
+function onStateWithoutMount(w: Working, out: Output[], event: Envelope<'cria.state'>) {
+  const { state } = event.body
+  const { instanceId } = w.link
+
+  if (instanceId === null || instanceId === state.instanceId) return
+
+  w.link = { ...w.link, instanceId: state.instanceId, lastSeenAt: event.seenAt }
+  onRestart(w, out, epochMs(state.generatedAt))
 }
 
 function onState(w: Working, out: Output[], event: Envelope<'cria.state'>) {
   const observation = observeMount(event.body.state)
 
-  if (observation === null) return
+  if (observation === null) return onStateWithoutMount(w, out, event)
 
   const { at } = observation
   const link = w.link
@@ -329,7 +340,7 @@ function onState(w: Working, out: Output[], event: Envelope<'cria.state'>) {
   if (observation.site && JSON.stringify(observation.site) !== JSON.stringify(w.site.value))
     w.site = believe('site', observation.site, 'high', at, [event.id])
 
-  if (restarted) onRestart(w, out, observation)
+  if (restarted) onRestart(w, out, at)
 
   if (observation.lost) {
     if (!w.holds.unavailable) {

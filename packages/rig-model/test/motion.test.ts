@@ -98,6 +98,14 @@ describe('when Cria restarts', () => {
     expect(model.mount.value).toMatchObject({ state: 'unknown', reason: 'power-cycled' })
   })
 
+  it('goes to unknown on a restart whose snapshot lists no mount', () => {
+    const noMount = snapshot({ at: s(60), instanceId: otherInstance, withoutMount: true, mount: { at: s(60), ...home } })
+    const { out, model } = run(inOrder(knownAt20(), tracking(20, 59, home), noMount, tracking(61, 90, home)))
+
+    expect(positions(out)).toEqual(['unknown:session-start', 'known:solved', 'unknown:power-cycled'])
+    expect(model.mount.value.state).toBe('unknown')
+  })
+
   it('goes to unknown when the mount was moving', () => {
     const running = snapshot({ at: s(20), mount: { at: s(20), ...home }, operations: [homeOperation({ id: operationId(1), acceptedAt: s(19.9), startedAt: s(20) })] })
     const { out } = run(inOrder(knownAt20(), running, tracking(21, 59, home), restart(home), tracking(61, 90, home)))
