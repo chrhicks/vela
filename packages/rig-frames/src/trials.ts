@@ -1,7 +1,7 @@
 import { Schema } from 'effect'
 import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import { ImageId, SkyPosition, type EpochMs } from '@vela/rig-events'
+import { SkyPosition, type EpochMs } from '@vela/rig-events'
 import { readJsonl, reasonOf, type SourceProblem } from './jsonl.ts'
 import type { CapturedAtSource } from './saved-images.ts'
 import { instantOf } from './times.ts'
@@ -54,8 +54,8 @@ export interface TrialFrame {
   readonly phase: 'baseline' | 'adjusting'
   readonly position: number
   readonly filename: string
-  /** The Cria image id in the filename, when it has one. */
-  readonly imageId: typeof ImageId.Type | null
+  /** The UUID in the filename, when it has one. Vela's trial writer makes it for the file; it names no Cria or saved image. */
+  readonly fileId: string | null
   readonly bytes: number
   readonly sha256: string
   readonly capturedAt: EpochMs
@@ -87,8 +87,6 @@ export interface Trials {
   readonly trials: readonly Trial[]
   readonly problems: readonly SourceProblem[]
 }
-
-const decodeImageId = Schema.decodeUnknownOption(ImageId)
 
 const folderName = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})-[A-Za-z0-9]+$/
 
@@ -126,15 +124,12 @@ async function readTrial(directory: string, runId: string, problems: SourceProbl
           break
         }
 
-        const uuid = /-([0-9a-f-]{36})\.fits$/.exec(value.original.filename)?.[1]
-        const imageId = uuid === undefined ? null : decodeImageId(uuid)
-
         frames.push({
           line,
           phase: value.evidence.phase,
           position: value.evidence.position,
           filename: value.original.filename,
-          imageId: imageId?._tag === 'Some' ? imageId.value : null,
+          fileId: /-([0-9a-f-]{36})\.fits$/.exec(value.original.filename)?.[1] ?? null,
           bytes: value.original.bytes,
           sha256: value.original.sha256,
           capturedAt,
