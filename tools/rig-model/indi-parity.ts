@@ -14,9 +14,11 @@ const from = option('from', '2026-10-24T00:00:00Z')
 
 const to = option('to', '2026-10-25T12:00:00Z')
 
-const recordings = option('recordings', '/mnt/storage/rig/imports/errai-recordings')
+const recordings = option('recordings', '')
 
 const journal = option('journal', join(homedir(), '.local/share/vela/traces/cria-journal-20261015-20261025.jsonl'))
+
+if (recordings === '') throw new Error('--recordings DIR is required: the folder that holds one folder per Cria run')
 
 const windowStart = Date.parse(from)
 
