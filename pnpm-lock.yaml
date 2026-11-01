@@ -314,6 +314,25 @@ importers:
         specifier: 7.0.2
         version: 7.0.2
 
+  packages/rig-frames:
+    dependencies:
+      '@vela/rig-events':
+        specifier: workspace:*
+        version: link:../rig-events
+      effect:
+        specifier: 4.0.3
+        version: 4.0.3
+    devDependencies:
+      '@types/node':
+        specifier: 26.2.0
+        version: 26.2.0
+      '@vela/rig-testing':
+        specifier: workspace:*
+        version: link:../rig-testing
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+
   packages/rig-model:
     dependencies:
       '@vela/rig-events':
@@ -420,6 +439,9 @@ importers:
       '@vela/rig-events':
         specifier: workspace:*
         version: link:../../packages/rig-events
+      '@vela/rig-frames':
+        specifier: workspace:*
+        version: link:../../packages/rig-frames
       '@vela/rig-model':
         specifier: workspace:*
         version: link:../../packages/rig-model

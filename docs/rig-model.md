@@ -1,12 +1,13 @@
 # Rig model
 
-A read-only live model of the astrophotography rig, fed by a local NATS JetStream broker. Chris decided on 2026-10-31 that it lives in this repository as companion packages rather than in its own repo. Units 0 to 4 of its design are here; the design itself is kept in Chris's private notes. Nothing in this model sends a command to the rig, and the Vela server does not depend on it yet.
+A read-only live model of the astrophotography rig, fed by a local NATS JetStream broker. Chris decided on 2026-10-31 that it lives in this repository as companion packages rather than in its own repo. Units 0 to 4 and 6 of its design are here; the design itself is kept in Chris's private notes. Nothing in this model sends a command to the rig, and the Vela server does not depend on it yet.
 
 | Package | Directory | What it holds |
 | --- | --- | --- |
 | `@vela/rig-events` | `packages/rig-events` | the event registry, envelope, bodies, codec and the importer for Vela's Cria journals |
 | `@vela/rig-sky` | `packages/rig-sky` | Vela's coordinate maths (a copy, see below) and the tangent-plane offset |
 | `@vela/rig-astap` | `packages/rig-astap` | a saved-FITS reader, an ASTAP solver and `solveFrame` |
+| `@vela/rig-frames` | `packages/rig-frames` | readers for Vela's saved images, frame records and alignment trials, and their join on `image.id` |
 | `@vela/rig-model` | `packages/rig-model` | the pure reducer |
 | `@vela/rig-testing` | `packages/rig-testing` | a synthetic site and State builders, for tests only |
 
@@ -26,6 +27,7 @@ Its commands (`pnpm check` and the journal and trial checks) are in [tools/rig-m
 | `@vela/rig-sky` | `astronomy-engine` | `node:*`, `effect`, `nats`, any other `@vela/rig-*` |
 | `@vela/rig-model` | `@vela/rig-events`, `@vela/rig-sky` | `node:*`, `effect`, `nats`, `@cria/*`, `fetch`, `Date.now`, `Math.random` |
 | `@vela/rig-astap` | `node:*`, `@vela/rig-events`, `@vela/rig-sky` | `@vela/rig-model`, `nats`, `@cria/*` |
+| `@vela/rig-frames` | `node:fs/promises` (read functions only), `node:path`, `node:crypto`, `node:url`, `effect`, `@vela/rig-events` | any `node:fs/promises` function that writes, `node:fs`, `node:child_process`, any other `@vela/rig-*`, `nats`, `@cria/*` |
 | any rig package or tool | | the rest of `@vela/*`, a deep `@vela/rig-x/src/...` path |
 
 `packages/rig-events/src/wire.ts` is the one file that imports `@cria/wire`. It is a list of read-side re-exports and nothing else. `tools/rig-model/guards/wire-gateway.ts` holds the allowlist, so no rig code can name a Cria command.
@@ -33,6 +35,26 @@ Its commands (`pnpm check` and the journal and trial checks) are in [tools/rig-m
 ## The site stays out of the repo
 
 Vela is public. The real site comes from the mount's readings at runtime, and tests use a synthetic site. The check that keeps the real one out of the tree is described in [tools/rig-model/README.md](../tools/rig-model/README.md#no-real-site).
+
+## Frame sources
+
+`@vela/rig-frames` finds the frames Vela has already kept. It only reads, and a lint rule keeps write functions out of it. Everything it names is in Vela's data folder (`VELA_DATA_DIR`, by default `~/.local/share/vela`).
+
+| Source | Where | Read as |
+| --- | --- | --- |
+| Saved images | `saved-images/<sha256 of rig id>/<sha256 of image id>/` with `metadata.json` and `original.fits` | `readSavedImages`. The folder names are checked against the metadata, as Vela's own store does. A `.pending-*` folder is an unfinished save and is skipped. |
+| Frame records | `traces/frames.jsonl`, one line per settled exposure attempt | `readFrameRecords`. A last line without a newline is still being written and is left out. |
+| Alignment trials | `alignment-diagnostics/trials/<run id>-<suffix>/journal.jsonl` and its FITS files | `readTrials`, through a schema that names no site field. |
+
+`joinFrames` joins images to records on `image.id` and puts every miss in a named bucket. An image captured before the rig's first record is `predatesRecords` (Vela began writing frame records on 2026-10-19). One captured after is `unexplained`, which the check treats as a failure. A record of a `saved` attempt whose image is gone is `missing`, also a failure. `unsaved` and `save-failed` records name images Vela did not keep, which is by design.
+
+`frameDraft` turns a record into the `frame` fact of `@vela/rig-events`, with `origin: 'capture-run'`. Its `at` and `seenAt` are the moment the attempt settled.
+
+`nightOf` names a night for the local date it starts, noon to noon. The package does not know the site, so the caller passes the site's UTC offset.
+
+An alignment trial's journal holds the site in `evidence.physical.site` and in other fields. `readTrials` never carries those out, and its problems name a line and a reason, never the line's text.
+
+`pnpm rig-model:frame-sources` reads the real data folder and prints the nights, the join and the trials.
 
 ## The model
 

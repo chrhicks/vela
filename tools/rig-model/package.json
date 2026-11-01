@@ -8,12 +8,14 @@
     "no-real-site": "node no-real-site/check.ts",
     "decode-journals": "node decode-journals.ts",
     "resolve-trial": "node resolve-trial.ts",
-    "test:types": "tsc -p tsconfig.json"
+    "test:types": "tsc -p tsconfig.json",
+    "frame-sources": "node frame-sources.ts"
   },
   "devDependencies": {
     "@types/node": "26.2.0",
     "@vela/rig-astap": "workspace:*",
     "@vela/rig-events": "workspace:*",
+    "@vela/rig-frames": "workspace:*",
     "@vela/rig-model": "workspace:*",
     "@vela/rig-sky": "workspace:*",
     "@vela/rig-testing": "workspace:*",

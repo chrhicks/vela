@@ -165,6 +165,28 @@
       }
     },
     {
+      "files": ["**/packages/rig-frames/src/**"],
+      "rules": {
+        "no-restricted-imports": ["error", {
+          "paths": [
+            {
+              "name": "node:fs/promises",
+              "importNames": ["appendFile", "chmod", "chown", "copyFile", "cp", "link", "lchmod", "lchown", "mkdir", "mkdtemp", "open", "rename", "rm", "rmdir", "symlink", "truncate", "unlink", "utimes", "writeFile"],
+              "message": "@vela/rig-frames only reads Vela's data folder. It never writes there."
+            },
+            { "name": "node:fs", "message": "Use node:fs/promises with only its read functions: @vela/rig-frames never writes Vela's data folder." },
+            { "name": "node:child_process", "message": "@vela/rig-frames reads files. It starts no process." }
+          ],
+          "patterns": [
+            { "group": ["@vela/**", "!@vela/rig-events"], "message": "@vela/rig-frames imports only @vela/rig-events. It does not depend on the model or the solver." },
+            { "group": ["@cria/**"], "message": "@cria/wire is imported only by packages/rig-events/src/wire.ts." },
+            { "group": ["@vela/rig-*/**"], "message": "Import a rig package by its name, not a deep path." },
+            { "group": ["nats", "nats/**", "@nats-io/**"], "message": "Reading frame sources has no transport. NATS belongs to the bus package." }
+          ]
+        }]
+      }
+    },
+    {
       "files": ["**/packages/rig-events/src/wire.ts"],
       "rules": {
         "no-restricted-imports": ["error", { "patterns": [
