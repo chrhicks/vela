@@ -27,7 +27,7 @@ describe('readTrials', () => {
       ['adjusting', false],
       ['adjusting', true],
     ])
-    expect(trial?.frames[0]?.imageId).toBe('11111111-1111-4111-8111-111111111111')
+    expect(trial?.frames[0]?.fileId).toBe('11111111-1111-4111-8111-111111111111')
     expect(trial?.frames[0]?.solved.wcs.cd).toHaveLength(4)
   })
 
