@@ -89,6 +89,27 @@ function elementOf(kind: Vector['kind'], label: string, text: string): Element {
   }
 }
 
+function vectorFrom(xml: string, word: string, headText: string): Vector | undefined {
+  const kind = kinds.get(word)
+  const attributes = attributesOf(headText)
+  const device = attributes.get('device')
+  const name = attributes.get('name')
+
+  if (kind === undefined || device === undefined || name === undefined) return undefined
+
+  const elements = new Map<string, Element>()
+  const child = new RegExp(`<(?:def|one)${word}\\b([^>]*)>([\\s\\S]*?)</(?:def|one)${word}>`, 'g')
+
+  for (const [, childHead, content] of xml.matchAll(child)) {
+    const found = attributesOf(childHead!)
+    const elementName = found.get('name')
+
+    if (elementName !== undefined) elements.set(elementName, elementOf(kind, found.get('label') ?? elementName, content!))
+  }
+
+  return { device, name, kind, state: stateOf(attributes.get('state')), perm: permissionOf(attributes.get('perm')), elements }
+}
+
 /**
  * Reads one recorded INDI element. Numbers, switches and texts become a `Vector`; lights, BLOBs, `getProperties`
  * and `new*` requests (which indiserver relays from other clients) are not mount readings and give `undefined`.
@@ -108,25 +129,14 @@ export function parseMessage(xml: string): Message | undefined {
 
   if (!head) return undefined
 
-  const [, verb, word, text] = head
-  const kind = kinds.get(word!)
-  const attributes = attributesOf(text!)
-  const device = attributes.get('device')
-  const name = attributes.get('name')
+  const vector = vectorFrom(xml, head[2]!, head[3]!)
 
-  if (kind === undefined || device === undefined || name === undefined) return undefined
+  return vector === undefined ? undefined : { type: head[1] === 'def' ? 'def' : 'set', vector }
+}
 
-  const elements = new Map<string, Element>()
-  const child = new RegExp(`<(?:def|one)${word}\\b([^>]*)>([\\s\\S]*?)</(?:def|one)${word}>`, 'g')
+/** Reads one `newNumberVector`, `newSwitchVector` or `newTextVector`, the command a client sends. Anything else gives `undefined`. */
+export function parseRequest(xml: string): Vector | undefined {
+  const head = /^\s*<new(Number|Switch|Text)Vector\b([^>]*)>/.exec(xml)
 
-  for (const [, childHead, content] of xml.matchAll(child)) {
-    const found = attributesOf(childHead!)
-    const elementName = found.get('name')
-
-    if (elementName !== undefined) elements.set(elementName, elementOf(kind, found.get('label') ?? elementName, content!))
-  }
-
-  const vector = { device, name, kind, state: stateOf(attributes.get('state')), perm: permissionOf(attributes.get('perm')), elements }
-
-  return verb === 'def' ? { type: 'def', vector } : { type: 'set', vector }
+  return head ? vectorFrom(xml, head[1]!, head[2]!) : undefined
 }

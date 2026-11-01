@@ -3,6 +3,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { createInterface } from 'node:readline'
 import { createIndiImporter, createJournalImporter, decodeManifest, rigId, sourceId, type RigEvent } from '@vela/rig-events'
+import { displayStep } from './indi-format.ts'
 
 const option = (name: string, fallback: string) => {
   const index = process.argv.indexOf(`--${name}`)
@@ -68,25 +69,6 @@ function sampleOf(event: RigEvent): { instanceId: string; sample: Sample } | und
       },
     },
   }
-}
-
-/** INDI's `%<width>.<fraction>m` prints sexagesimal; fraction 6 is whole seconds, 8 tenths, 9 hundredths. */
-function displayStep(format: string): number {
-  const fraction = /^%\d*\.(\d)m$/.exec(format)?.[1]
-
-  const steps = new Map([
-    ['3', 1 / 60],
-    ['5', 0.1 / 60],
-    ['6', 1 / 3600],
-    ['8', 0.1 / 3600],
-    ['9', 0.01 / 3600],
-  ])
-
-  const step = steps.get(fraction ?? '')
-
-  if (step === undefined) throw new Error(`Unknown INDI number format ${format}`)
-
-  return step
 }
 
 const timeOf = (line: string) => Number(/"at":(\d+)/.exec(line)?.[1] ?? Number.NaN)
