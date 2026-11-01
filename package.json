@@ -21,6 +21,7 @@
     "rig-model:no-real-site": "pnpm --filter @vela/rig-model-tools no-real-site",
     "rig-model:decode-journals": "pnpm --filter @vela/rig-model-tools decode-journals",
     "rig-model:resolve-trial": "pnpm --filter @vela/rig-model-tools resolve-trial",
+    "rig-model:frame-sources": "pnpm --filter @vela/rig-model-tools frame-sources",
     "replay": "pnpm --filter @vela/server... build && pnpm --filter @vela/rig-session replay",
     "scenarios": "vitest run --config tools/rig-session/vitest.scenarios.mts"
   },
