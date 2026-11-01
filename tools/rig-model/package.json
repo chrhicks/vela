@@ -9,7 +9,8 @@
     "decode-journals": "node decode-journals.ts",
     "resolve-trial": "node resolve-trial.ts",
     "test:types": "tsc -p tsconfig.json",
-    "frame-sources": "node frame-sources.ts"
+    "frame-sources": "node frame-sources.ts",
+    "indi-parity": "node indi-parity.ts"
   },
   "devDependencies": {
     "@types/node": "26.2.0",
