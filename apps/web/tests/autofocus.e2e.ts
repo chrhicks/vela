@@ -34,7 +34,7 @@ test('setup starts from the current EAF position and never offers a home to 0', 
   await expect(page.getByRole('heading', { name: 'Autofocus' })).toBeVisible()
   await expect(page.locator('.vela-af-window--desktop')).toContainText('32,842')
   await expect(page.locator('.vela-af-facts')).toContainText('60,000')
-  await expect(page.locator('.vela-af-window-facts')).toContainText('32,642 – 33,042')
+  await expect(page.locator('.vela-af-window-facts')).toContainText('32,242 – 33,442')
   await expect(page.getByRole('button', { name: 'Start autofocus' })).toBeEnabled()
   await expect(page.locator('.vela-af-facts')).not.toContainText('0 in / 0 out')
   await expect(page.locator('.vela-autofocus')).not.toContainText('Move(0)')
@@ -251,6 +251,42 @@ test('focus again returns to setup instead of starting another walk', async ({ p
   await expect(page.getByLabel('Step size')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Start autofocus' })).toBeVisible()
   await expect(page.locator('.vela-autofocus')).not.toContainText('should not start')
+})
+
+test('the result says when the fitted position did not confirm and the focuser went back to the best sample', async ({ page }) => {
+  const fellBack: AutofocusView = {
+    ...setup,
+    phase: 'complete',
+    activity: 'idle',
+    active: false,
+    startPosition: 32474,
+    currentPosition: 32524,
+    fineStepSize: 25,
+    fineOffsetSteps: 6,
+    confirmTolerance: 0.1,
+    samples: [
+      { position: 32574, detectedStars: 14, hfrPixels: 2.4, capturedAt: '2026-09-17T00:00:10.000Z', pass: 'fine' },
+      { position: 32524, detectedStars: 14, hfrPixels: 1.75, capturedAt: '2026-09-17T00:00:20.000Z', pass: 'fine' },
+      { position: 32562, detectedStars: 14, hfrPixels: 2.59, capturedAt: '2026-09-17T00:00:30.000Z', pass: 'confirm' },
+      { position: 32524, detectedStars: 14, hfrPixels: 1.78, capturedAt: '2026-09-17T00:00:40.000Z', pass: 'confirm' },
+    ],
+    fit: { position: 32562, p: 32562.1, a: 1.44, b: 44.2, rSquared: 0.93, minSamplePosition: 32524 },
+    landing: {
+      position: 32524,
+      outcome: 'fell-back',
+      bestSample: { position: 32524, hfrPixels: 1.75 },
+      tolerance: 0.1,
+      attempts: [
+        { source: 'fit', position: 32562, sampleIndex: 2, hfrPixels: 2.59, withinTolerance: false },
+        { source: 'best-sample', position: 32524, sampleIndex: 3, hfrPixels: 1.78, withinTolerance: true },
+      ],
+    },
+  }
+
+  await page.route('**/api/web/rigs/rig-1/autofocus', route => route.fulfill({ json: fellBack }))
+  await page.goto('/rigs/rig-1/observe/autofocus')
+  await expect(page.locator('.vela-af-notice')).toContainText('went back to the best measured sample at 32,524')
+  await expect(page.locator('.vela-af-notice')).toContainText('within 10%')
 })
 
 test('an unknown Stop stays blocked through active reads until a terminal result is confirmed', async ({ page }) => {

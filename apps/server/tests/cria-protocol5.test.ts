@@ -501,7 +501,7 @@ describe("a mount hold through today's lease routes", () => {
 
     await vi.advanceTimersByTimeAsync(1_000)
 
-    expect(submitted()).toEqual([`mount ${kind}`, 'focuser focuser-move', 'camera capture'])
+    expect(submitted()).toEqual([`mount ${kind}`, 'focuser focuser-move', 'focuser focuser-move', 'camera capture'])
 
     const stopping = send(postNoBody('/api/rigs/fixture/autofocus/stop'))
 

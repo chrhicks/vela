@@ -185,7 +185,16 @@ function setup(
   return {
     get: () => app.inject({ method: 'GET', url: '/api/web/rigs/fra/autofocus' }),
     getRun: () => app.inject({ method: 'GET', url: '/api/web/rigs/fra/autofocus/run' }),
-    start: (body: { stepSize?: number; exposureSeconds?: number } = { stepSize: 50 }) =>
+    start: (
+      body: {
+        stepSize?: number
+        offsetSteps?: number
+        fineStepSize?: number
+        fineOffsetSteps?: number
+        confirmTolerance?: number
+        exposureSeconds?: number
+      } = { stepSize: 50 },
+    ) =>
       app.inject({
         method: 'POST',
         url: '/api/rigs/fra/autofocus/start',
@@ -227,12 +236,41 @@ it('rejects malformed start bodies before acquiring the rig', async () => {
     { stepSize: 0 },
     { stepSize: 50.5 },
     { exposureSeconds: 0 },
+    { fineStepSize: 0 },
+    { fineOffsetSteps: 11 },
+    { confirmTolerance: 0 },
+    { confirmTolerance: 1.5 },
     { extra: true },
   ]) {
     expect((await subject.start(body)).statusCode).toBe(400)
   }
 
   expect(subject.operations.owner('fra')).toBeUndefined()
+})
+
+it('takes the coarse and fine passes and the confirm tolerance from the start body, and defaults them otherwise', async () => {
+  const subject = setup()
+
+  const started = await subject.start({
+    stepSize: 100,
+    offsetSteps: 3,
+    fineStepSize: 20,
+    fineOffsetSteps: 5,
+    confirmTolerance: 0.2,
+    exposureSeconds: 2,
+  })
+
+  expect(started.json()).toMatchObject({
+    stepSize: 100,
+    offsetSteps: 3,
+    fineStepSize: 20,
+    fineOffsetSteps: 5,
+    confirmTolerance: 0.2,
+  })
+  await subject.finish()
+
+  const defaults = setup()
+  expect((await defaults.get()).json()).toMatchObject({ stepSize: 150, offsetSteps: 4, fineStepSize: 25, fineOffsetSteps: 6, confirmTolerance: 0.1 })
 })
 
 it.each(emptyHaltRequests)('accepts a stop with %s', async (_name, options) => {
@@ -310,7 +348,9 @@ it('serves the run so far with its star tables, and appends the settled run to t
   const done = (await subject.getRun()).json()
   expect(done).toMatchObject({ phase: 'complete', fit: { position: expect.any(Number) } })
   expect(done.settledAt).not.toBeNull()
-  expect(done.samples).toHaveLength(10)
+  expect(done.samples).toHaveLength(23)
+  expect(done.samples.at(-1)).toMatchObject({ pass: 'confirm' })
+  expect(done).toMatchObject({ fineStepSize: 25, fineOffsetSteps: 6, confirmTolerance: 0.1 })
   await records.close()
 
   const lines = (await readFile(file, 'utf8')).trimEnd().split('\n')
@@ -405,7 +445,7 @@ it('walks from the low end of the reported travel and commands MinStep itself', 
     .toMatchObject({ active: true, phase: 'walking', minStep: 15500 })
   await subject.finish()
 
-  expect(subject.moves).toEqual([15900, 15850, 15800, 15750, 15700, 15650, 15600, 15550, 15500, 16000, 15700])
+  expect(subject.moves).toEqual([16200, 15900, 15850, 15800, 15750, 15700, 15650, 15600, 15550, 15500, 16000, 15700])
   expect(Math.min(...subject.windows.map(window => window.minPosition))).toBe(15500)
   expect((await subject.get()).json()).toMatchObject({ phase: 'failed', restoredStart: true })
 })
@@ -447,7 +487,7 @@ it('keeps the legacy floor of 1 and ceiling below MaxStep when the focuser repor
   await subject.start({ stepSize: 50, exposureSeconds: 2 })
   await subject.finish()
 
-  expect(subject.moves.slice(0, 9)).toEqual([401, 351, 301, 251, 201, 151, 101, 51, 1])
+  expect(subject.moves.slice(0, 10)).toEqual([701, 401, 351, 301, 251, 201, 151, 101, 51, 1])
   expect(Math.min(...subject.windows.map(window => window.minPosition))).toBe(1)
   expect(subject.moves).not.toContain(0)
 })

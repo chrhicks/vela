@@ -1,6 +1,15 @@
+/** The coarse pass: 150 steps apart, 4 on each side of the start, so ±600. */
+export const DEFAULT_STEP_SIZE = 150
+
 export const DEFAULT_OFFSET_STEPS = 4
 
-export const DEFAULT_STEP_SIZE = 50
+/** The fine pass: 25 steps apart, 6 on each side of the coarse minimum, so ±150. */
+export const DEFAULT_FINE_STEP_SIZE = 25
+
+export const DEFAULT_FINE_OFFSET_STEPS = 6
+
+/** A confirm frame this much worse than the best fine-pass sample (0.1 is 10 %) sends the focuser back to that sample. */
+export const DEFAULT_CONFIRM_TOLERANCE = 0.1
 
 /**
  * How far past a final target the focuser goes before coming back down onto it. Must exceed the
@@ -15,6 +24,7 @@ export interface FocuserTravel {
   max: number
 }
 
+/** The coarse pass around the start: its window inside the travel, and its positions top first. */
 export interface AutofocusWalkPlan {
   start: number
   stepSize: number
@@ -22,8 +32,6 @@ export interface AutofocusWalkPlan {
   travel: FocuserTravel
   minPosition: number
   maxPosition: number
-  /** Highest position a final approach may pass through: the window plus the overshoot, inside travel. */
-  approachMax: number
   positions: number[]
 }
 
@@ -113,73 +121,30 @@ export function planStarHfrWalk(
       travel,
       minPosition,
       maxPosition,
-      approachMax: Math.min(maxPosition + APPROACH_OVERSHOOT_STEPS, travel.max),
       positions,
     },
   }
 }
 
 /**
- * All samples but the first are taken after a downward move, so the curve fit describes the focuser as it sits
- * after coming down. The final move to best focus, and the return to the start, come down the same
- * way. `via` is null only when the target is at the top of travel and there is nowhere above it.
+ * Every sample is taken after a downward move, so the curve describes the focuser as it sits after
+ * coming down; a run-ending move comes down onto its target the same way. `via` is null only when the
+ * target is at the top of travel and there is nowhere above it.
  */
-export function approachFromAbove(plan: AutofocusWalkPlan, target: number): FinalApproach {
-  const via = Math.min(target + APPROACH_OVERSHOOT_STEPS, plan.approachMax)
+export function approachFromAbove(travel: FocuserTravel, target: number): FinalApproach {
+  const via = Math.min(target + APPROACH_OVERSHOOT_STEPS, travel.max)
 
   return { target, via: via > target ? via : null }
 }
 
-export function assertCommandedPosition(
-  position: number,
-  plan: AutofocusWalkPlan,
-  extraMin?: number,
-  ceiling = plan.maxPosition,
-) {
+export function assertCommandedPosition(position: number, travel: FocuserTravel) {
   if (position === 0) {
     throw new Error(
       'Focuser position 0 is a mechanical stop, not a home. Vela will not command Move(0).',
     )
   }
 
-  if (
-    !Number.isSafeInteger(position) ||
-    position < plan.travel.min ||
-    position > plan.travel.max
-  ) {
+  if (!Number.isSafeInteger(position) || position < travel.min || position > travel.max) {
     throw new Error('That focuser move is outside the focuser travel. Vela will not command it.')
   }
-
-  const floor = extraMin ?? plan.minPosition
-
-  if (position < floor || position > ceiling) {
-    throw new Error(
-      'That focuser move would leave the autofocus window around the starting position.',
-    )
-  }
-}
-
-/** One or two extra inward samples to close a V whose minimum is still at the inner edge. */
-export function extraInwardPosition(
-  plan: AutofocusWalkPlan,
-  samples: { position: number; hfrPixels: number | null }[],
-): number | undefined {
-  if (samples.length >= plan.positions.length + 2) return undefined
-  const measured = samples.filter(sample => sample.hfrPixels !== null)
-
-  if (!measured.length) return undefined
-
-  const lowest = measured.reduce((best, sample) =>
-    sample.hfrPixels! < best.hfrPixels! ? sample : best,
-  )
-
-  const inner = Math.min(...samples.map(sample => sample.position))
-
-  if (lowest.position !== inner) return undefined
-  const next = inner - plan.stepSize
-  const floor = plan.start - (plan.offsetSteps + 2) * plan.stepSize
-
-  if (next < plan.travel.min || next < floor || next > plan.travel.max) return undefined
-
-  return next
 }
