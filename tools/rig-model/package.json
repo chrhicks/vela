@@ -14,7 +14,8 @@
     "am5-profile": "node am5-profile.ts",
     "backfill": "node backfill.ts",
     "corpus": "node corpus.ts",
-    "solve-verdict": "node solve-verdict.ts"
+    "solve-verdict": "node solve-verdict.ts",
+    "rigidity": "node rigidity-check.ts"
   },
   "devDependencies": {
     "@types/node": "26.2.0",
