@@ -13,7 +13,8 @@
     "indi-parity": "node indi-parity.ts",
     "am5-profile": "node am5-profile.ts",
     "backfill": "node backfill.ts",
-    "corpus": "node corpus.ts"
+    "corpus": "node corpus.ts",
+    "solve-verdict": "node solve-verdict.ts"
   },
   "devDependencies": {
     "@types/node": "26.2.0",
