@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { syntheticSite } from '@vela/rig-testing'
 import { readTrials } from '@vela/rig-frames'
-import { dataDirectory, trialRunId, writeTrial } from './support.ts'
+import { dataDirectory, loggedRunId, rigName, trialRunId, writeLoggedTrial, writeTrial } from './support.ts'
 
 const root = (dir: string) => join(dir, 'alignment-diagnostics/trials')
 
@@ -95,5 +95,41 @@ describe('readTrials', () => {
 
     expect(trials.map(trial => trial.runId)).toEqual(['bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'])
     expect(problems.map(problem => problem.reason).sort()).toEqual(['no readable run line', 'the run id differs from the folder name'])
+  })
+
+  it('reads a trial from the run log\'s alignment events beside one from a journal, and nothing of the site', async () => {
+    const dir = await dataDirectory()
+    const directory = await writeLoggedTrial(dir)
+    await writeTrial(dir, { createdAt: '2026-10-26T23:38:03.990Z', outcome: 'finished' })
+
+    const { trials, problems } = await readTrials(root(dir), join(dir, 'run-log'))
+    const [journal, logged] = trials
+
+    expect(problems).toEqual([])
+    expect(trials.map(trial => trial.runId)).toEqual([trialRunId, loggedRunId])
+    expect(logged).toMatchObject({ directory, rigId: rigName, mode: 'offline', createdAt: Date.parse('2026-10-27T01:30:00.000Z'), exposureSeconds: 2, outcome: 'finished', baselines: 0, measurements: 1 })
+    expect(logged?.frames.map(frame => [frame.line, frame.phase, frame.position, frame.fileId, frame.onDisk])).toEqual([[2, 'baseline', 1, '55555555-5555-4555-8555-555555555555', true]])
+    expect(logged?.fits.map(fit => [fit.line, fit.positions, fit.status])).toEqual([[3, [1], 'rigid']])
+    expect(logged?.dropped).toEqual([{ line: 4, position: 2, reason: 'no-solve' }])
+    expect(logged?.readings.map(reading => [reading.line, reading.phase, Object.keys(reading).sort()])).toEqual([
+      [3, 'baseline', ['altitudeArcsec', 'at', 'azimuthArcsec', 'line', 'phase', 'totalArcsec']],
+      [5, 'adjusting', ['altitudeArcsec', 'at', 'azimuthArcsec', 'line', 'phase', 'totalArcsec']],
+    ])
+    expect(journal?.directory).not.toBe(logged?.directory)
+
+    for (const text of ['41.5', '211.75', 'simulator', 'latitude', 'sidereal']) expect(JSON.stringify(logged)).not.toContain(text)
+  })
+
+  it('keeps an event the log wrote twice once, and takes a missing run log as a problem only when one is named', async () => {
+    const dir = await dataDirectory()
+    await writeLoggedTrial(dir, { duplicate: true })
+
+    const twice = await readTrials(root(dir), join(dir, 'run-log'))
+    const missing = await readTrials(root(dir), join(dir, 'no-run-log'))
+    const unnamed = await readTrials(root(dir))
+
+    expect(twice.trials[0]?.frames).toHaveLength(1)
+    expect(missing.problems[0]).toEqual({ path: join(dir, 'no-run-log'), line: null, reason: 'ENOENT' })
+    expect(unnamed.trials).toEqual([])
   })
 })

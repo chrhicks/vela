@@ -2,9 +2,10 @@ import { execFileSync } from 'node:child_process'
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
-import { cameraOrientation, rigidityVerdict, type Baseline, type BaselinePosition, type CameraOrientation, type SolvedField } from '@vela/rig-sky'
+import { cameraOrientation, rigidityVerdict, type Baseline, type BaselinePosition, type CameraOrientation } from '@vela/rig-sky'
+import { trialEntries } from './trial-entries.ts'
 
-const usage = `usage: rigidity-check.ts [--tool DIR] [--trials DIR] [--report FILE.md]
+const usage = `usage: rigidity-check.ts [--tool DIR] [--trials DIR] [--run-log DIR] [--report FILE.md]
 exit 0 the plan's check holds, 1 it does not, 2 bad arguments`
 
 const given = new Map<string, string>()
@@ -27,6 +28,8 @@ const fixturesDirectory = join(toolDirectory, 'tests', 'fixtures')
 
 const trialsDirectory = given.get('trials') ?? join(homedir(), '.local/share/vela/alignment-diagnostics/trials')
 
+const runLogDirectory = given.get('run-log') ?? process.env.VELA_RUN_LOG_DIR ?? join(homedir(), '.local/share/vela/run-log')
+
 const agreementArcmin = 1e-6
 
 const recordedToleranceArcmin = 0.3
@@ -46,17 +49,6 @@ const readSmallOnTheNight = new Map([
 interface FixtureRow {
   readonly trial: string
   readonly baseline: Baseline
-}
-
-/** What a trial journal's baseline frame holds that the conversion needs. Its site fields are never read or printed. */
-interface JournalFrame {
-  readonly type: string
-  readonly evidence?: {
-    readonly phase: string
-    readonly sample?: { readonly capturedAt: string; readonly siderealTimeDegrees: number }
-    readonly solution: { readonly wcs: SolvedField }
-    readonly physical?: { readonly before: { readonly rightAscensionDegrees: number } }
-  }
 }
 
 interface PythonRow {
@@ -93,25 +85,22 @@ function readFixture(file: string): FixtureRow {
 }
 
 /** The three baseline positions the way Vela's alignment builds them from a trial's recorded solves. */
-function baselineFromSolves(trial: string): Baseline | undefined {
+async function baselineFromSolves(trial: string): Promise<Baseline | undefined> {
   const directory = readdirSync(trialsDirectory).find(name => name.startsWith(trial))
 
   if (directory === undefined) return undefined
 
-  // SAFETY: Vela's diagnostic journal writes one JSON object per line; only the fields named in JournalFrame are read.
-  const frames = readFileSync(join(trialsDirectory, directory, 'journal.jsonl'), 'utf8')
-    .split('\n')
-    .filter(line => line.trim() !== '')
-    .map(line => JSON.parse(line) as JournalFrame)
-    .filter(line => line.type === 'frame' && line.evidence?.phase === 'baseline' && line.evidence.sample !== undefined)
+  const frames = (await trialEntries(join(trialsDirectory, directory), runLogDirectory))
+    .filter(entry => entry.type === 'frame')
+    .filter(frame => frame.evidence.phase === 'baseline')
     .slice(0, 3)
 
   const [first, second, third] = frames.map((frame): BaselinePosition => {
-    const { sample, solution, physical } = frame.evidence!
+    const { sample, solution, physical } = frame.evidence
 
     return {
-      mountAngleDegrees: physical!.before.rightAscensionDegrees - sample!.siderealTimeDegrees,
-      orientation: cameraOrientation(solution.wcs, new Date(sample!.capturedAt), sample!.siderealTimeDegrees),
+      mountAngleDegrees: physical!.before.rightAscensionDegrees - sample.siderealTimeDegrees,
+      orientation: cameraOrientation(solution.wcs, new Date(sample.capturedAt), sample.siderealTimeDegrees),
     }
   })
 
@@ -169,8 +158,8 @@ const orientationDifferenceArcmin = (a: CameraOrientation, b: CameraOrientation)
   (180 / Math.PI) *
   60
 
-const fromSolves = fixtures.map(({ trial, baseline }) => {
-  const solved = baselineFromSolves(trial)
+const fromSolves = await Promise.all(fixtures.map(async ({ trial, baseline }) => {
+  const solved = await baselineFromSolves(trial)
 
   if (solved === undefined) return { trial, missing: true as const }
 
@@ -183,7 +172,7 @@ const fromSolves = fixtures.map(({ trial, baseline }) => {
     orientationDifference: Math.max(...solved.map((position, index) => orientationDifferenceArcmin(position.orientation, baseline[index]!.orientation))),
     mountAngleDifference: Math.max(...solved.map((position, index) => Math.abs(((position.mountAngleDegrees - baseline[index]!.mountAngleDegrees + 540) % 360) - 180))),
   }
-})
+}))
 
 const largestDifference = Math.max(...rows.map(row => Math.abs(row.difference)))
 

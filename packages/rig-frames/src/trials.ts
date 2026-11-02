@@ -1,10 +1,11 @@
 import { Schema } from 'effect'
 import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import { SkyPosition, type EpochMs } from '@vela/rig-events'
+import { RigEventSchema, SkyPosition, type Envelope, type EpochMs } from '@vela/rig-events'
+import { runLogFiles } from './frame-records.ts'
 import { readJsonl, reasonOf, type SourceProblem } from './jsonl.ts'
 import type { CapturedAtSource } from './saved-images.ts'
-import { instantOf } from './times.ts'
+import { instantOf, isoOf } from './times.ts'
 
 const Position = SkyPosition
 
@@ -135,9 +136,14 @@ export interface Trials {
 
 const folderName = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})-[A-Za-z0-9]+$/
 
-async function readTrial(directory: string, runId: string, problems: SourceProblem[]): Promise<Trial | undefined> {
-  const path = join(directory, 'journal.jsonl')
-  const read = await readJsonl(path, Entry)
+const polarOf = ({ altitudeArcsec, azimuthArcsec, totalArcsec }: typeof Polar.Type) => ({ altitudeArcsec, azimuthArcsec, totalArcsec })
+
+interface TrialRows {
+  readonly path: string
+  readonly rows: readonly { readonly line: number; readonly value: typeof Entry.Type }[]
+}
+
+async function readTrial(directory: string, runId: string, { path, rows }: TrialRows, problems: SourceProblem[]): Promise<Trial | undefined> {
   const files = new Set(await readdir(directory).catch(() => []))
   const frames: TrialFrame[] = []
   const readings: AlignmentReading[] = []
@@ -148,9 +154,7 @@ async function readTrial(directory: string, runId: string, problems: SourceProbl
   let baselines = 0
   let measurements = 0
 
-  problems.push(...read.problems)
-
-  for (const { line, value } of read.rows) {
+  for (const { line, value } of rows) {
     switch (value.type) {
       case 'run':
         run ??= value
@@ -164,7 +168,7 @@ async function readTrial(directory: string, runId: string, problems: SourceProbl
         else measurements++
 
         if (at === undefined) problems.push({ path, line, reason: 'a timestamp is not an instant' })
-        else readings.push({ line, phase: value.type === 'baseline' ? 'baseline' : 'adjusting', at, ...value.measurement })
+        else readings.push({ line, phase: value.type === 'baseline' ? 'baseline' : 'adjusting', at, ...polarOf(value.measurement) })
 
         break
       }
@@ -185,7 +189,7 @@ async function readTrial(directory: string, runId: string, problems: SourceProbl
 
         fits.push({ line, at, positions: value.fixes.map(fix => fix.position), status, missArcmin, thresholdArcmin, steps: steps.map(step => ({ before: step.labelBefore, after: step.labelAfter })) })
 
-        if (status === 'rigid' && value.polar) readings.push({ line, phase: 'baseline', at, ...value.polar })
+        if (status === 'rigid' && value.polar) readings.push({ line, phase: 'baseline', at, ...polarOf(value.polar) })
 
         break
       }
@@ -235,27 +239,88 @@ async function readTrial(directory: string, runId: string, problems: SourceProbl
   return { directory, runId, rigId: run.run.rigId, mode: run.run.mode, createdAt, exposureSeconds: run.run.exposureSeconds, outcome, frames, readings, fits, dropped, baselines, measurements }
 }
 
-/**
- * Lists alignment trials under Vela's `alignment-diagnostics/trials` (`<run id>-<suffix>/journal.jsonl` and the saved
- * FITS files), oldest first. It reads each journal through a schema that leaves the site out, and writes nothing.
- */
-export async function readTrials(root: string): Promise<Trials> {
-  const trials: Trial[] = []
-  const problems: SourceProblem[] = []
-  let entries: string[]
+function entryOf(event: Envelope<'alignment'>): typeof Entry.Type {
+  const { body } = event
+
+  if (body.type !== 'run') return body
+
+  return { type: 'run', createdAt: isoOf(event.at), run: { runId: body.runId, rigId: event.rig, mode: body.mode, exposureSeconds: body.exposureSeconds } }
+}
+
+async function readLoggedTrials(runLog: string, problems: SourceProblem[]): Promise<Map<string, TrialRows>> {
+  const byRun = new Map<string, { folder?: string; rows: { line: number; value: typeof Entry.Type }[] }>()
+  const seen = new Set<string>()
+  let files: readonly string[]
 
   try {
-    entries = (await readdir(root, { withFileTypes: true })).filter(entry => entry.isDirectory()).map(entry => entry.name).sort()
+    files = await runLogFiles(runLog)
   } catch (error) {
-    return { trials, problems: [{ path: root, line: null, reason: reasonOf(error) }] }
+    problems.push({ path: runLog, line: null, reason: reasonOf(error) })
+
+    return new Map()
   }
 
-  for (const name of entries) {
+  for (const file of files) {
+    const read = await readJsonl(file, RigEventSchema, text => !text.includes('"kind":"alignment"'))
+
+    problems.push(...read.problems)
+
+    for (const { value: event } of read.rows) {
+      if (event.kind !== 'alignment' || seen.has(event.id)) continue
+
+      seen.add(event.id)
+
+      const { runId, n } = event.body
+      const run = byRun.get(runId) ?? { rows: [] }
+
+      byRun.set(runId, run)
+      run.rows.push({ line: n, value: entryOf(event) })
+
+      if (event.body.type === 'run') run.folder = event.body.folder
+    }
+  }
+
+  return new Map(
+    [...byRun.values()].flatMap(({ folder, rows }) => (folder === undefined ? [] : [[folder, { path: runLog, rows: rows.toSorted((a, b) => a.line - b.line) }] as const])),
+  )
+}
+
+/**
+ * Lists alignment trials, oldest first. A trial is a folder under Vela's `alignment-diagnostics/trials`
+ * (`<run id>-<suffix>`, with the saved FITS files) whose entries are either its `journal.jsonl` or the
+ * `alignment` events of the run log (`runLog`, a directory or a file) that name the folder. It reads both through a schema
+ * that leaves the site out, and writes nothing.
+ */
+export async function readTrials(root: string, runLog?: string): Promise<Trials> {
+  const trials: Trial[] = []
+  const problems: SourceProblem[] = []
+  let entries: string[] = []
+
+  try {
+    entries = (await readdir(root, { withFileTypes: true })).filter(entry => entry.isDirectory()).map(entry => entry.name)
+  } catch (error) {
+    problems.push({ path: root, line: null, reason: reasonOf(error) })
+  }
+
+  const logged = runLog === undefined ? new Map<string, TrialRows>() : await readLoggedTrials(runLog, problems)
+
+  for (const name of [...new Set([...entries, ...logged.keys()])].toSorted()) {
     const runId = folderName.exec(name)?.[1]
 
     if (runId === undefined) continue
 
-    const trial = await readTrial(join(root, name), runId, problems)
+    const directory = join(root, name)
+    let source = logged.get(name)
+
+    if (source === undefined) {
+      const path = join(directory, 'journal.jsonl')
+      const read = await readJsonl(path, Entry)
+
+      problems.push(...read.problems)
+      source = { path, rows: read.rows }
+    }
+
+    const trial = await readTrial(directory, runId, source, problems)
 
     if (trial) trials.push(trial)
   }

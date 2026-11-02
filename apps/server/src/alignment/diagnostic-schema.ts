@@ -93,8 +93,8 @@ const camera = z.object({
 const pointing = z.object({
   rightAscensionDegrees: ra,
   declinationDegrees: dec,
-  siderealTimeDegrees: ra,
-  latitudeDegrees: dec,
+  siderealTimeDegrees: ra.optional(),
+  latitudeDegrees: dec.optional(),
   tracking: z.boolean(),
   coordinateSystem,
 })
@@ -206,3 +206,12 @@ export const diagnosticEntrySchema = z.discriminatedUnion('type', [
 export type DiagnosticEntry = z.infer<typeof diagnosticEntrySchema>
 
 export type DiagnosticFrameEntry = z.infer<typeof frameEntry>
+
+/** Runs `read`, and says which entry (by its 1-based place) when it does not match the schema. */
+export function readEntry(index: number, read: () => DiagnosticEntry): DiagnosticEntry {
+  try {
+    return read()
+  } catch (error) {
+    throw new Error(`Invalid alignment diagnostic journal entry ${index + 1}`, { cause: error })
+  }
+}

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { constants } from 'node:fs'
 import { open } from 'node:fs/promises'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import {
   cameraOrientation,
   fitPolarAxis,
@@ -16,6 +16,7 @@ import {
   diagnosticJournalName,
   maximumFitsBytes,
   maximumJournalBytes,
+  readEntry,
   type DiagnosticEntry,
   type DiagnosticFrameEntry,
 } from './diagnostic-schema.js'
@@ -27,6 +28,7 @@ import {
   type AlignmentMeasurement,
   type AlignmentSample,
 } from './geometry.js'
+import { loggedJournalEntries } from './alignment-events.js'
 import { physicalAlignmentSample } from './physical-coordinates.js'
 import { sweepFix } from './sweep-fit.js'
 
@@ -60,11 +62,7 @@ export interface AlignmentDiagnosticReplayReport {
   }
 }
 
-/** Re-executes recorded inputs through production mathematics. This neither runs
- * a solver nor independently validates the physical mount, sky, or measurement. */
-export async function replayAlignmentDiagnostics(
-  directory: string,
-): Promise<AlignmentDiagnosticReplayReport> {
+async function journalEntries(directory: string) {
   const journal = (
     await readBoundedFile(join(directory, diagnosticJournalName), maximumJournalBytes)
   ).toString('utf8')
@@ -74,13 +72,18 @@ export async function replayAlignmentDiagnostics(
   // A newline commits an entry. Even a parseable final object without it is incomplete.
   lines.pop()
 
-  const entries = lines.map((line, index) => {
-    try {
-      return diagnosticEntrySchema.parse(JSON.parse(line))
-    } catch (error) {
-      throw new Error(`Invalid alignment diagnostic journal entry ${index + 1}`, { cause: error })
-    }
-  })
+  return { entries: lines.map((line, index) => readEntry(index, () => diagnosticEntrySchema.parse(JSON.parse(line)))), truncatedFinalLine }
+}
+
+/** Re-executes recorded inputs through production mathematics. This neither runs
+ * a solver nor independently validates the physical mount, sky, or measurement.
+ * The entries are the trial's `journal.jsonl`, or, when `runLog` holds `alignment` events for the trial's folder, those events. */
+export async function replayAlignmentDiagnostics(
+  directory: string,
+  runLog?: string,
+): Promise<AlignmentDiagnosticReplayReport> {
+  const logged = runLog === undefined ? undefined : await loggedJournalEntries(runLog, basename(directory))
+  const { entries, truncatedFinalLine } = logged ? { entries: logged, truncatedFinalLine: false } : await journalEntries(directory)
 
   const first = entries.shift()
 

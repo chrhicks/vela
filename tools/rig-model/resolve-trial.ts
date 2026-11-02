@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { astapVersion, createAstapSolver, readFits, solveFrame } from '@vela/rig-astap'
 import { imageId } from '@vela/rig-events'
 import { angularDistance } from '@vela/rig-sky'
+import { trialEntries } from './trial-entries.ts'
 
 const share = join(homedir(), '.local/share/vela')
 
@@ -31,24 +32,11 @@ if (trial === undefined) {
   process.exit(2)
 }
 
-interface Recorded {
-  readonly original: { readonly filename: string; readonly sha256: string }
-  readonly evidence: {
-    readonly phase: string
-    readonly fieldHeightDegrees: number
-    readonly hint: { readonly raDegrees: number; readonly decDegrees: number }
-    readonly solution: { readonly status: string; readonly raDegrees: number; readonly decDegrees: number; readonly wcs: { readonly cd: readonly number[] } }
-  }
-}
-
 const directory = join(trialsRoot, trial)
 
-const baselines = readFileSync(join(directory, 'journal.jsonl'), 'utf8')
-  .split('\n')
-  .filter(line => line.trim() !== '')
-  .map(line => JSON.parse(line))
-  .filter(line => line.type === 'frame' && line.evidence?.phase === 'baseline')
-  .map((line): Recorded => line)
+const runLog = option('--run-log', process.env.VELA_RUN_LOG_DIR ?? join(share, 'run-log'))
+
+const baselines = (await trialEntries(directory, runLog)).filter(entry => entry.type === 'frame').filter(frame => frame.evidence.phase === 'baseline')
 
 const version = await astapVersion(executable)
 

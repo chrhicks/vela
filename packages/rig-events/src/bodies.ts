@@ -166,7 +166,6 @@ const AlignmentMeasurement = Schema.Struct({
 
 const AlignmentCoordinateSystem = Schema.Literals(['other', 'topocentric', 'j2000', 'j2050', 'b1950'])
 
-/** The mount's own reading at an exposure. Its site (latitude, longitude, elevation) is left out: the run log's `cria.state` snapshots hold it. */
 const AlignmentMount = Schema.Struct({
   rightAscensionDegrees: Schema.Number,
   declinationDegrees: Schema.Number,
@@ -223,10 +222,8 @@ const AlignmentRun = {
 }
 
 /**
- * One entry of an alignment trial, as the per-trial `journal.jsonl` held it before plan step 13b. A body names no site: a physical trial's
- * site is the first mount snapshot of its rig in the same run log, and the sidereal time of every sample follows from that site and the
- * sample's time. An offline trial has no real site, so its run names the simulator's latitude and the sidereal time at one instant, which
- * advances at the sidereal rate. The trial's FITS files stay in its `folder`, named by the `frame` events.
+ * One entry of an alignment trial. No body names a site or a sidereal time. A physical trial's site is the first mount snapshot of its
+ * rig in the same run log file, and an offline trial's `run` names the simulator's latitude and its sidereal time at one instant.
  */
 export const AlignmentBody = Schema.Union([
   Schema.Struct({ ...AlignmentRun, mode: Schema.Literal('physical') }),
