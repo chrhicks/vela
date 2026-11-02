@@ -195,6 +195,7 @@ const framing = z
     checkCurrent: z.boolean(),
     observedAt: date,
     error: z.string().nullable(),
+    notice: z.string().nullable().optional(),
     unavailableReason: z.string().nullable(),
     targetId: z.string().nullable(),
     exposureSeconds: z.number(),
