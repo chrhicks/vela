@@ -1,5 +1,5 @@
 import { Effect, Exit, Option, Schema } from 'effect'
-import { ErrorBody, type ErrorCode, type OperationRequest, type RecoveryRequest, type EnvelopeRequest, type FixRequest } from '@cria/wire'
+import { ErrorBody, type ErrorCode, type OperationRequest, type RecoveryRequest, type EnvelopeRequest, type FixRequest, type LeaseRequest } from '@cria/wire'
 import type { Journal } from './journal.js'
 
 export interface CriaConnection {
@@ -24,7 +24,7 @@ export function request<S extends Decodable>(
   method: 'GET' | 'POST',
   path: string,
   schema: S,
-  body?: OperationRequest | RecoveryRequest | typeof EnvelopeRequest.Type | typeof FixRequest.Type,
+  body?: OperationRequest | RecoveryRequest | typeof EnvelopeRequest.Type | typeof FixRequest.Type | LeaseRequest,
 ): Effect.Effect<Reply<S['Type']>> {
   return Effect.suspend(() => {
     const startedAt = Date.now()
@@ -97,7 +97,7 @@ function exchange(
   connection: CriaConnection,
   method: 'GET' | 'POST',
   path: string,
-  body: OperationRequest | RecoveryRequest | typeof EnvelopeRequest.Type | typeof FixRequest.Type | undefined,
+  body: OperationRequest | RecoveryRequest | typeof EnvelopeRequest.Type | typeof FixRequest.Type | LeaseRequest | undefined,
 ): Effect.Effect<Exchanged> {
   const headers = new Headers()
 

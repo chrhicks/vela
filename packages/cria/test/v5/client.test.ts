@@ -2,7 +2,7 @@ import { Effect, Exit, Fiber, Scope } from 'effect'
 import { settle, type Ending, type Outcome } from '@cria/primitives'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createCriaEquipment, type CriaEquipment } from '../../src/v5/equipment.js'
-import { noJournal } from '../../src/v5/journal.js'
+import { noJournal, type Journal, type JournalEntry } from '../../src/v5/journal.js'
 import { openSession, type Session } from '../../src/v5/session.js'
 import { FakeCria, type Route } from './fake-cria.js'
 
@@ -34,8 +34,8 @@ interface Opened {
   readonly rig: CriaEquipment
 }
 
-function open(): Opened {
-  const session = Effect.runSync(Scope.provide(scope)(openSession({ origin: cria.origin, token: undefined, fetch: cria.fetch, journal: noJournal })))
+function open(journal: Journal = noJournal): Opened {
+  const session = Effect.runSync(Scope.provide(scope)(openSession({ origin: cria.origin, token: undefined, fetch: cria.fetch, journal })))
 
   const rig = createCriaEquipment(session, [
     { deviceId: 'fra-camera', criaDeviceId: 'camera', expectedName: 'Fake CCD' },
@@ -46,8 +46,8 @@ function open(): Opened {
   return { session, rig }
 }
 
-async function connected(): Promise<Opened> {
-  const opened = open()
+async function connected(journal: Journal = noJournal): Promise<Opened> {
+  const opened = open(journal)
 
   await vi.advanceTimersByTimeAsync(10)
 
@@ -416,3 +416,35 @@ describe('the session', () => {
 function never(): never {
   throw new Error('The fake did not produce what this test set up')
 }
+
+describe('mount leases', () => {
+  it('renews off the request path until the move settles and then releases', async () => {
+    const { rig } = await connected()
+    cria.durationMs['mount-slew'] = 2_000
+    const run = execute(rig.run('fra-mount', slew))
+
+    await vi.advanceTimersByTimeAsync(1_200)
+    expect(run.outcome).toBeUndefined()
+    const actions = () => cria.received.filter(request => request.route === 'lease').map(request => JSON.parse(request.body!).action)
+
+    expect(actions()[0]).toBe('acquire')
+    expect(actions().filter(action => action === 'renew').length).toBeGreaterThanOrEqual(3)
+    await vi.advanceTimersByTimeAsync(1_200)
+    expect(run.outcome?.kind).toBe('confirmed')
+    expect(actions().at(-1)).toBe('release')
+  })
+
+  it('reports a lost renewal in health and the journal while Cria stops the move', async () => {
+    const entries: JournalEntry[] = []
+    const { rig } = await connected({ record: entry => { entries.push(entry) } })
+    cria.durationMs['mount-slew'] = 30_000
+    const run = execute(rig.run('fra-mount', slew))
+
+    await vi.advanceTimersByTimeAsync(100)
+    cria.dropReply('lease')
+    await vi.advanceTimersByTimeAsync(2_000)
+    expect(Effect.runSync(rig.warnings)).toEqual([expect.objectContaining({ reason: expect.stringMatching(/lease renewal failed/) })])
+    expect(run.outcome?.kind).toBe('stopped')
+    expect(entries).toContainEqual(expect.objectContaining({ kind: 'exchange', route: '/v2/devices/mount/lease', reply: expect.objectContaining({ kind: 'lost' }) }))
+  })
+})

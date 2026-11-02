@@ -122,3 +122,10 @@ route scenarios. The golden corpus comes from Cria commit
 `test/pin.test.ts` fails unless both `@cria/*` entries in `pnpm-workspace.yaml` name the commit it
 records and `test/v5/wire.golden.json` hashes (as `git hash-object`) to the blob it records next to it.
 All tests use fakes or local fixtures and never contact observatory hardware.
+
+Mount moves acquire a one-second Cria lane lease before admission. A separate
+fiber renews it every 250 ms while admission and settlement are followed. A failed
+renewal ends renewal and raises a device warning; the decoded lease exchange also
+reaches the run log. Cria is expected to abort the move when the lease lapses.
+Settlement releases the lease. Stops do not require one. Deploy this client and
+Cria's lease requirement together outside a session, with Chris at the rig.

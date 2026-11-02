@@ -3,6 +3,8 @@ import type { CaptureProvenance } from '@vela/equipment'
 import { Failed, Stopped, Uncertain, type Ending, type FailedReason } from '@cria/primitives'
 import {
   RequestId,
+  needsMountLease,
+  mountLeaseRenewMs,
   type Command,
   type CommandKind,
   type Device,
@@ -110,14 +112,38 @@ export function remoteOperation(
 
       observe?.(requested)
 
-      return yield* Effect.gen(function* () {
-        const operation = yield* admit(session, request, device)
+      return yield* Effect.scoped(Effect.gen(function* () {
+        let leasedRequest = request
+
+        if (needsMountLease(command)) {
+          const identity = { instanceId: request.instanceId, bindingId: request.bindingId }
+          const acquired = yield* session.lease(device.id, { ...identity, action: 'acquire', holder: 'vela' })
+
+          if (acquired.kind !== 'answered') return yield* new Failed({ reason: 'unavailable', message: `Mount lease refused: ${acquired.message}` })
+          const leaseId = acquired.body.id
+          leasedRequest = { ...request, leaseId }
+          yield* Effect.addFinalizer(() => session.lease(device.id, { ...identity, action: 'release', leaseId }).pipe(Effect.asVoid))
+          yield* Effect.forkScoped(Effect.interruptible(Effect.gen(function* () {
+            while (true) {
+              yield* Effect.sleep(mountLeaseRenewMs)
+              const renewed = yield* session.lease(device.id, { ...identity, action: 'renew', leaseId })
+
+              if (renewed.kind !== 'answered') {
+                yield* session.warnings.note(device.id, `Mount lease renewal failed: ${renewed.message}. Cria is expected to stop the mount.`)
+
+                return
+              }
+            }
+          })))
+        }
+
+        const operation = yield* admit(session, leasedRequest, device)
 
         observe?.({ ...requested, operationId: operation.id })
         const settled = yield* follow(session, operation, cancelsOnStop)
 
         return yield* outcomeOf(settled)
-      }).pipe(withWarning(session, device))
+      })).pipe(withWarning(session, device))
     }),
   )
 }

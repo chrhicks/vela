@@ -37,6 +37,11 @@ import { createHash, randomUUID } from 'node:crypto'
 import { Schema } from 'effect'
 import {
   MountFeedback,
+  MountLease,
+  LeaseRequest,
+  LeaseId,
+  mountLeaseMs,
+  needsMountLease,
   EnvelopeRequest,
   FixRequest,
   BindingId,
@@ -61,9 +66,10 @@ import {
   type ErrorCode,
 } from '@cria/wire'
 
-export type Route = 'envelope' | 'fix' | 'feedback' | 'health' | 'state' | 'events' | 'submit' | 'operation' | 'cancel' | 'lookup' | 'recover' | 'image'
+export type Route = 'lease' | 'envelope' | 'fix' | 'feedback' | 'health' | 'state' | 'events' | 'submit' | 'operation' | 'cancel' | 'lookup' | 'recover' | 'image'
 
 const routes: ReadonlyArray<readonly [string, RegExp, Route]> = [
+  ['POST', /^\/v2\/devices\/([^/]+)\/lease$/, 'lease'],
   ['POST', /^\/v2\/devices\/([^/]+)\/envelope$/, 'envelope'],
   ['POST', /^\/v2\/devices\/([^/]+)\/fix$/, 'fix'],
   ['GET', /^\/v2\/devices\/([^/]+)\/feedback$/, 'feedback'],
@@ -175,6 +181,49 @@ const settledShown = 20
 const maxBodyBytes = 16 * 1024
 
 export class FakeCria {
+  private readonly leases = new Map<string, { lease: MountLease; timer: ReturnType<typeof setTimeout> }>()
+
+  private lease(deviceId: string, body: string): Response {
+    const request = decode(LeaseRequest, body)
+    const device = rig.find(device => device.id === deviceId && device.kind === 'mount')
+
+    if (!request || !device) return this.refuse('request-error', 'Invalid lease request')
+
+    if (request.instanceId !== this.instance.id || request.bindingId !== this.binding(device.failureDomain)) return this.refuse('request-error', 'Mount instance or binding changed')
+
+    if (!this.commandsEnabled) return this.refuse('request-error', 'Commands are disabled')
+    const current = this.leases.get(deviceId)
+    let lease: MountLease
+
+    if (request.action === 'acquire') {
+      if (current || this.openIn(device.failureDomain).length) return this.refuse('request-error', 'Mount lane is busy')
+      lease = { id: LeaseId.make(randomUUID()), holder: request.holder, expiresAt: Date.now() + mountLeaseMs }
+    } else {
+      if (!current || current.lease.id !== request.leaseId || current.lease.expiresAt <= Date.now()) return this.refuse('request-error', 'Mount lease expired')
+      clearTimeout(current.timer)
+      lease = { ...current.lease, expiresAt: Date.now() + (request.action === 'release' ? 0 : mountLeaseMs) }
+    }
+
+    const expire = () => {
+      this.leases.delete(deviceId)
+
+      for (const operation of this.openIn(device.failureDomain))
+        if (operation.state === 'running' && needsMountLease(operation) && operation.leaseId === lease.id) this.stop(operation)
+    }
+
+    if (request.action === 'release') {
+      expire()
+
+      return this.reply(MountLease, lease, 200)
+    }
+
+    const timer = setTimeout(expire, Math.max(0, lease.expiresAt - Date.now()))
+
+    this.leases.set(deviceId, { lease, timer })
+
+    return this.reply(MountLease, lease, 200)
+  }
+
   readonly feedback = new Map<string, MountFeedback>()
   readonly origin = 'http://cria.fake:4319'
   /** Every request sent while Cria was reachable, in the order sent. A delayed one may land later, or be lost. */
@@ -262,6 +311,9 @@ export class FakeCria {
 
   /** A new Cria process: a new instance with new bindings, remembering nothing. Open streams end. */
   restart(): void {
+    for (const held of this.leases.values()) clearTimeout(held.timer)
+    this.leases.clear()
+
     for (const due of this.instance.due.values()) clearTimeout(due.timer)
 
     for (const subscriber of this.subscribers) this.unsubscribe(subscriber, new TypeError('Cria restarted'))
@@ -270,6 +322,8 @@ export class FakeCria {
   }
 
   close(): void {
+    for (const held of this.leases.values()) clearTimeout(held.timer)
+    this.leases.clear()
     clearInterval(this.reads)
 
     for (const due of this.instance.due.values()) clearTimeout(due.timer)
@@ -331,6 +385,7 @@ export class FakeCria {
     const [first = '', second = ''] = segments
 
     switch (route) {
+      case 'lease': return this.lease(first, body ?? '')
       case 'envelope':
       case 'fix':
       case 'feedback': {
@@ -403,6 +458,13 @@ export class FakeCria {
     if (!this.commandsEnabled) return this.refuse('commands-disabled', 'Commands are disabled')
 
     const now = Date.now()
+
+    if (needsMountLease(request) && (request.leaseId !== undefined || this.leases.has(device.id))) {
+      const held = this.leases.get(device.id)?.lease
+
+      if (!held || held.id !== request.leaseId || held.expiresAt <= now) return this.refuse('request-error', 'A valid mount lease is required')
+    }
+
     const accepted = { ...request, id: OperationId.make(randomUUID()), failureDomain: device.failureDomain, acceptedAt: now }
     const open = this.openIn(device.failureDomain)
     const quarantine = this.quarantineOf(device.failureDomain)
