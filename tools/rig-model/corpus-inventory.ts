@@ -118,7 +118,8 @@ export const specimens: readonly Specimen[] = [
   { id: 'PS-010-refraction-fields', file: null, cases: ['PS-010', 'PS-011'], note: 'The eq and n60 fields at altitudes 20 to 85 degrees with and without refraction, 36 batch cases.' },
   { id: 'PS-012-distortion-fields', file: null, cases: ['PS-012'], note: 'Radial distortion of 0.2% to 2% with the distortion centre 400 px right and 250 px up from the frame centre.' },
   { id: 'PS-013-far-hint-field', file: null, cases: ['PS-013', 'PS-024', 'PS-036'], note: 'A real-scale field solved with hints 40 to 175 degrees off and field heights 0.5 to 2 times the truth.' },
-  { id: 'PS-015-fits-variants', file: null, cases: ['PS-015'], note: 'One field written with ROWORDER top-down, bottom-up and absent, with Bayer pattern right, wrong and absent, as 16-bit and 32-bit.' },
+  { id: 'PS-015-fits-variants', file: null, cases: ['PS-015', 'PS-030'], note: 'One field written with ROWORDER top-down, bottom-up and absent, with Bayer pattern right, wrong and absent, as 16-bit and 32-bit.' },
+  { id: 'PS-034-clean-sweeps', file: null, cases: ['PS-034'], note: 'The clean sweep over both parities, rotations 0 to 360, rggb and mono, fields at declination +85 to -88, and 40 further random fields (centre within 0.039 arcsec).' },
   { id: 'PS-025-wrap-and-pole-fields', file: null, cases: ['PS-025', 'PS-034'], note: 'Fields across RA 0/360 and at declination -88, rggb and mono, both parities.' },
 ]
 
