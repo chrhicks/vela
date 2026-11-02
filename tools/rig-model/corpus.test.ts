@@ -31,7 +31,7 @@ function frameOf(index: number, options: { onDisk?: boolean; scale?: number; mir
   }
 }
 
-const trialOf = (runId: string, frames: readonly TrialFrame[]): Trial => ({ directory: `/trials/${runId}`, runId, rigId: 'test-rig', mode: 'physical', createdAt: epochMs(at), exposureSeconds: 5, outcome: 'finished', frames, readings: [], baselines: 0, measurements: 0 })
+const trialOf = (runId: string, frames: readonly TrialFrame[]): Trial => ({ directory: `/trials/${runId}`, runId, rigId: 'test-rig', mode: 'physical', createdAt: epochMs(at), exposureSeconds: 5, outcome: 'finished', frames, readings: [], fits: [], dropped: [], baselines: 0, measurements: 0 })
 
 const imageOf = (index: number): SavedImage => ({
   id: imageIdOf(index),

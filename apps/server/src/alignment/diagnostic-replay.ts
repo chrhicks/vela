@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { constants } from 'node:fs'
 import { open } from 'node:fs/promises'
 import { join } from 'node:path'
-import type { RigidityVerdict, Site } from '@vela/rig-sky'
+import { fitPolarAxis, type PolarFit, type RigidityVerdict, type Site } from '@vela/rig-sky'
 import {
   diagnosticEntrySchema,
   diagnosticJournalName,
@@ -12,6 +12,7 @@ import {
   type DiagnosticFrameEntry,
 } from './diagnostic-schema.js'
 import {
+  baselineFromAxis,
   createAlignmentBaseline,
   measureAlignment,
   type AlignmentBaseline,
@@ -20,6 +21,7 @@ import {
 } from './geometry.js'
 import { baselineRigidity, type RigidityFrame } from './baseline-rigidity.js'
 import { physicalAlignmentSample } from './physical-coordinates.js'
+import { sweepFix } from './sweep-fit.js'
 
 export interface AlignmentDiagnosticReplayReport {
   validation: 'production-math-reproducibility-only'
@@ -34,7 +36,11 @@ export interface AlignmentDiagnosticReplayReport {
     verifiedOriginals: number
   }
   baseline: AlignmentBaseline | null
-  /** Judged again from the three recorded baseline solves; null for an offline run, which has no mount reading. */
+  /** The polar axis fitted again from the recorded sweep fixes; null for a three-point journal. */
+  fit: PolarFit | null
+  /** Sweep positions that gave no fix, with the reason the journal recorded. */
+  dropped: { position: number; reason: string }[]
+  /** Judged again from the recorded solves: the fit's verdict, or for a three-point physical journal the three-point one. Null for a three-point offline run, which has no mount reading. */
   rigidity: RigidityVerdict | null
   finalMeasurement: AlignmentMeasurement | null
   maximumDiscrepancies: {
@@ -43,6 +49,7 @@ export interface AlignmentDiagnosticReplayReport {
     physicalSampleDegrees: number
     physicalSampleTimeMs: number
     rigidityMissArcmin: number
+    fitArcsec: number
   }
 }
 
@@ -80,6 +87,8 @@ export async function replayAlignmentDiagnostics(
     truncatedFinalLine,
     counts: { frames: 0, measurements: 0, physicalFrames: 0, verifiedOriginals: 0 },
     baseline: null,
+    fit: null,
+    dropped: [],
     rigidity: null,
     finalMeasurement: null,
     maximumDiscrepancies: {
@@ -88,11 +97,14 @@ export async function replayAlignmentDiagnostics(
       physicalSampleDegrees: 0,
       physicalSampleTimeMs: 0,
       rigidityMissArcmin: 0,
+      fitArcsec: 0,
     },
   }
 
   const baselineFrames: DiagnosticFrameEntry[] = []
   const originalNames = new Set<string>()
+  let lastPosition = 0
+  const closed = () => report.baseline ?? report.fit
   let latestFrame: DiagnosticFrameEntry | undefined
   let latestAdjustment: DiagnosticFrameEntry | undefined
   let outcome: Extract<DiagnosticEntry, { type: 'outcome' }> | undefined
@@ -111,14 +123,10 @@ export async function replayAlignmentDiagnostics(
         originalNames.add(entry.original.filename)
 
         if (entry.evidence.phase === 'baseline') {
-          if (
-            report.baseline ||
-            baselineFrames.length >= 3 ||
-            entry.evidence.position !== baselineFrames.length + 1
-          ) {
+          if (closed() || entry.evidence.position <= lastPosition)
             throw new Error('Alignment diagnostic baseline frames are out of order')
-          }
 
+          lastPosition = entry.evidence.position
           baselineFrames.push(entry)
         } else {
           if (!report.baseline)
@@ -163,9 +171,39 @@ export async function replayAlignmentDiagnostics(
         break
       }
 
+      case 'dropped':
+        if (closed() || entry.position <= lastPosition)
+          throw new Error('Alignment diagnostic dropped fix is out of order')
+        lastPosition = entry.position
+        report.dropped.push({ position: entry.position, reason: entry.reason })
+        break
+      case 'fit': {
+        if (
+          closed() ||
+          entry.fixes.length !== baselineFrames.length ||
+          !entry.fixes.every(
+            (fix, index) =>
+              fix.position === baselineFrames[index]!.evidence.position &&
+              sameSample(fix.sample, baselineFrames[index]!.evidence.sample),
+          )
+        ) {
+          throw new Error('Alignment diagnostic fit does not match its solved frames')
+        }
+
+        const fixes = baselineFrames.map(frame => sweepFix(frame.evidence.position, frame.evidence))
+        report.fit = fitPolarAxis(fixes, entry.latitudeDegrees)
+        report.rigidity = report.fit.verdict
+        compareFit(report, report.fit, entry)
+
+        if (report.fit.verdict.status === 'rigid' && entry.polar)
+          report.baseline = baselineFromAxis(entry.polar.axis, entry.fixes.at(-1)!.sample, entry.latitudeDegrees)
+
+        break
+      }
+
       case 'baseline': {
         if (
-          report.baseline ||
+          closed() ||
           baselineFrames.length !== 3 ||
           !entry.samples.every((sample, index) =>
             sameSample(sample, baselineFrames[index]!.evidence.sample),
@@ -238,6 +276,33 @@ export async function replayAlignmentDiagnostics(
     report.outcome = { phase: outcome.phase, error: outcome.error }
 
   return report
+}
+
+function compareFit(
+  report: AlignmentDiagnosticReplayReport,
+  fit: PolarFit,
+  recorded: Extract<DiagnosticEntry, { type: 'fit' }>,
+) {
+  const { verdict } = recorded
+  const poses = (steps: readonly { labelBefore: string; labelAfter: string }[]) => steps.map(step => `${step.labelBefore}>${step.labelAfter}`)
+
+  if (
+    fit.verdict.status !== verdict.status ||
+    poses(fit.verdict.steps).join() !== poses(verdict.steps).join() ||
+    Number.isFinite(fit.totalArcsec) !== (recorded.polar !== null)
+  ) {
+    throw new Error('Alignment diagnostic fit disagrees with the verdict recomputed from its frames')
+  }
+
+  const discrepancies = report.maximumDiscrepancies
+  discrepancies.rigidityMissArcmin = Math.abs(fit.verdict.missArcmin - verdict.missArcmin)
+
+  if (recorded.polar)
+    discrepancies.fitArcsec = Math.max(
+      Math.abs(fit.altitudeArcsec - recorded.polar.altitudeArcsec),
+      Math.abs(fit.azimuthArcsec - recorded.polar.azimuthArcsec),
+      Math.abs(fit.totalArcsec - recorded.polar.totalArcsec),
+    )
 }
 
 function rigidityFrame(frame: DiagnosticFrameEntry): RigidityFrame {

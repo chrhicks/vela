@@ -1,3 +1,4 @@
+import { minimumFixes } from '@vela/rig-sky'
 import { z } from 'zod'
 
 export const diagnosticJournalName = 'journal.jsonl'
@@ -5,6 +6,9 @@ export const diagnosticJournalName = 'journal.jsonl'
 export const maximumJournalBytes = 4 * 1024 * 1024
 
 export const maximumFitsBytes = 128 * 1024 * 1024
+
+/** The most sweep positions a trial records, kept or dropped. */
+export const maximumFixes = 16
 
 const number = z.number().finite()
 
@@ -32,6 +36,20 @@ const rigidity = z.object({
   missArcmin: number.nonnegative(),
   thresholdArcmin: number.positive(),
 })
+
+const step = z.object({
+  labelBefore: z.string(),
+  labelAfter: z.string(),
+  excessArcmin: number.nonnegative(),
+  baselineArcmin: number.nonnegative(),
+  turnDegrees: number,
+  mountAngleBeforeDegrees: number,
+  mountAngleAfterDegrees: number,
+})
+
+export const droppedReasons = ['no-solve', 'rejected', 'capture-failed'] as const
+
+export type DroppedReason = (typeof droppedReasons)[number]
 
 const site = z.object({
   latitudeDegrees: dec,
@@ -111,7 +129,7 @@ const frameEntry = z.object({
   }),
   evidence: z.object({
     phase: z.enum(['baseline', 'adjusting']),
-    position: positiveInteger.max(3),
+    position: positiveInteger.max(maximumFixes),
     solution: position.extend({
       status: z.literal('solved'),
       capturedAt: timestamp,
@@ -147,6 +165,28 @@ export const diagnosticEntrySchema = z.discriminatedUnion('type', [
     latitudeDegrees: number.gt(0).lt(85),
     measurement,
     rigidity: rigidity.optional(),
+  }),
+  z.object({
+    type: z.literal('fit'),
+    latitudeDegrees: number.gt(0).lt(85),
+    /** The fixes the fit used, in sweep order. Each is the sample of the `baseline` frame at that position. */
+    fixes: z.array(z.object({ position: positiveInteger.max(maximumFixes), sample })).min(minimumFixes).max(maximumFixes),
+    /** The axis in the hour-angle frame (z up) and its error; null when the camera never turned, so there is no axis. */
+    polar: z
+      .object({
+        axis: z.tuple([number, number, number]),
+        altitudeArcsec: number,
+        azimuthArcsec: number,
+        totalArcsec: number.nonnegative(),
+      })
+      .nullable(),
+    verdict: rigidity.extend({ steps: z.array(step) }),
+  }),
+  z.object({
+    type: z.literal('dropped'),
+    position: positiveInteger.max(maximumFixes),
+    reason: z.enum(droppedReasons),
+    detail: z.string().max(500).nullable(),
   }),
   z.object({
     type: z.literal('measurement'),

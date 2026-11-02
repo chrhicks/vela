@@ -224,6 +224,8 @@ function trial(outcome: Trial['outcome'], at: number, totalArcsec: number): Tria
     outcome,
     frames: [],
     readings: [{ line: 1, phase: 'adjusting', at: epochMs(at), altitudeArcsec: totalArcsec, azimuthArcsec: 0, totalArcsec }],
+    fits: [],
+    dropped: [],
     baselines: 1,
     measurements: 1,
   }

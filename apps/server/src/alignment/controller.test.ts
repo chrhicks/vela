@@ -271,7 +271,7 @@ it('does not use a solve the verdict rejects: no position is counted and the rea
   const recordFrame = vi.fn(async () => undefined)
 
   const subject = setup(
-    async () => ({ recordFrame, recordBaseline: async () => undefined, recordMeasurement: async () => undefined, finish: async () => undefined }),
+    async () => ({ recordFrame, recordBaseline: async () => undefined, recordFit: async () => undefined, recordDropped: async () => undefined, recordMeasurement: async () => undefined, finish: async () => undefined }),
     astapReturning(falseSolve({ raDegrees: 10, decDegrees: 60 }, { width: 4, height: 4 })),
   )
 

@@ -7,16 +7,19 @@ import type {
   Pointing,
   TelescopeStatus,
 } from '@vela/equipment'
-import type { RigidityVerdict, Site } from '@vela/rig-sky'
+import type { PolarFit, RigidityVerdict, Site } from '@vela/rig-sky'
 import { encodeCaptureFits } from '../imaging/fits.js'
 import type { SkyPosition, SolveResult } from '../plate-solving/judged-solver.js'
 import type { AlignmentMeasurement, AlignmentSample } from './geometry.js'
 import {
+  diagnosticEntrySchema,
   diagnosticJournalName,
   diagnosticRunInfoSchema,
   maximumFitsBytes,
+  maximumFixes,
   maximumJournalBytes,
   type DiagnosticEntry,
+  type DroppedReason,
 } from './diagnostic-schema.js'
 
 export type AlignmentDiagnosticRunInfo = {
@@ -54,6 +57,14 @@ export interface AlignmentDiagnosticRun {
     measurement: AlignmentMeasurement,
     rigidity?: RigidityVerdict,
   ): Promise<void>
+  /** The polar axis fit over the good fixes of a sweep; `fixes` are their positions and samples. */
+  recordFit(
+    fixes: readonly { position: number; sample: AlignmentSample }[],
+    latitudeDegrees: number,
+    fit: PolarFit,
+  ): Promise<void>
+  /** A sweep position that gave no fix, and why. The sweep does not expose it again. */
+  recordDropped(position: number, reason: DroppedReason, detail: string | null): Promise<void>
   recordMeasurement(
     sample: AlignmentSample,
     measurement: AlignmentMeasurement,
@@ -138,8 +149,8 @@ export function createAlignmentDiagnostics(
               throw new Error('Alignment diagnostic FITS exceeds 128 MiB or has invalid dimensions')
             }
 
-            if (evidence.phase === 'baseline' && baselineFrames >= 3)
-              throw new Error('Alignment diagnostics already has three baseline originals')
+            if (evidence.phase === 'baseline' && baselineFrames >= maximumFixes)
+              throw new Error(`Alignment diagnostics already has ${maximumFixes} baseline originals`)
             const fits = await encodeCaptureFits(frame, run)
             const filename = `${evidence.phase}-${randomUUID()}.fits`
             await writeFile(join(directory, filename), fits, { flag: 'wx' })
@@ -178,6 +189,20 @@ export function createAlignmentDiagnostics(
               measurement,
               ...(rigidity && { rigidity }),
             }),
+          ),
+        recordFit: (fixes, latitudeDegrees, fit) =>
+          record(() => {
+            const { axis, altitudeArcsec, azimuthArcsec, totalArcsec, verdict } = fit
+            // A camera that never turned has no axis; a polar number is journalled only with the axis it came from.
+            const polar = axis.every(Number.isFinite) ? { axis, altitudeArcsec, azimuthArcsec, totalArcsec } : null
+
+            return append(diagnosticEntrySchema.parse({ type: 'fit', fixes, latitudeDegrees, polar, verdict }))
+          }),
+        recordDropped: (position, reason, detail) =>
+          record(() =>
+            append(
+              diagnosticEntrySchema.parse({ type: 'dropped', position, reason, detail: detail?.slice(0, 500) ?? null }),
+            ),
           ),
         // Both current alignment modes measure with sidereal tracking enabled.
         recordMeasurement: (sample, measurement, mount) =>
