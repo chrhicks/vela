@@ -9,8 +9,8 @@ import { expect, it } from 'vitest'
  * `git -C CRIA rev-parse COMMIT:ts/testing/golden/wire.golden.json`.
  */
 const golden = {
-  commit: '022b09c902c36fca567f86c71696d8ab182cb3a4',
-  blob: '686467b7d22099a03a20ecfd0e6d42b346d60857',
+  commit: 'a80cdfcc33b9d0f6a167ff4a678c8df8b0b5f3cd',
+  blob: '39682830d370f84e8a592127a4aaffb1a2679e9b',
 }
 
 const workspace = readFileSync(new URL('../../../pnpm-workspace.yaml', import.meta.url), 'utf8')

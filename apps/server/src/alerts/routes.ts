@@ -1,3 +1,5 @@
+import type { MountEnvelope } from '../equipment/composition.js'
+import { mountEnvelope, stubEnvelope } from '../equipment/envelope.js'
 import { z } from 'zod'
 import type { AlertsView } from '@vela/model/web'
 import type { FastifyInstance } from 'fastify'
@@ -9,6 +11,7 @@ import type { MountReading } from './rules.js'
 import type { AlertThresholds } from './thresholds.js'
 
 export interface AlertsOptions {
+  envelopeFor?: (rigId: string) => MountEnvelope
   thresholds: AlertThresholds
   /** Null when no Pushover keys are configured: alerts then show in Vela only. */
   notifier: Notifier | null
@@ -29,6 +32,7 @@ export function registerAlerts(
   {
     thresholds,
     notifier,
+    envelopeFor = () => mountEnvelope(stubEnvelope, thresholds, null),
     mountReaderFor,
     focuserReaderFor,
     horizon,
@@ -50,6 +54,7 @@ export function registerAlerts(
 
     if (!monitor) {
       monitor = createAlertMonitor({
+        envelope: () => envelopeFor(rig.id),
         rigId: rig.id,
         rigName: rig.name,
         thresholds,

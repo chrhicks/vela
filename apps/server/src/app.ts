@@ -113,6 +113,7 @@ export function buildApp({
     runLog,
     createInspector,
     settingsForRig: equipment.alignmentSettings,
+    sendFix: equipment.sendFix,
     createAcquisition: equipment.createAcquisition,
     createFraming: equipment.createFraming,
     createAlignmentEndpointAcquisition: equipment.createAlignmentEndpointAcquisition,
@@ -120,6 +121,7 @@ export function buildApp({
 
   const alerts = registerAlerts(app, rigCatalog, {
     ...alertSettings,
+    envelopeFor: equipment.envelopeFor,
     attestationWarnings: attestation.warningsFor,
     mountReaderFor: rigId => mountReaderFor(rigId, rigCatalog, equipment),
     focuserReaderFor: rigId => focuserReaderFor(rigId, rigCatalog, equipment),
@@ -159,6 +161,7 @@ export function buildApp({
   registerImagingCamera(app, rigCatalog, operations, { createInspector })
   registerTargets(app, rigCatalog, operations, {
     ...targets,
+    sendFix: equipment.sendFix,
     createInspector,
     createAdapter: equipment.createFraming,
     createAcquisition: equipment.createAcquisition,

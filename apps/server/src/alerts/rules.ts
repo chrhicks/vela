@@ -1,3 +1,4 @@
+import type { MountEnvelope } from '../equipment/composition.js'
 import { normalEvidence, starCause, type FrameEvidence } from './cause.js'
 import { median } from './median.js'
 import type { AlertThresholds } from './thresholds.js'
@@ -99,7 +100,7 @@ export interface AlertEvaluation {
   unavailable: string[]
 }
 
-export function evaluateAlerts(history: RigHistory, thresholds: AlertThresholds, now: number): AlertEvaluation {
+export function evaluateAlerts(history: RigHistory, thresholds: AlertThresholds, now: number, envelope: MountEnvelope): AlertEvaluation {
   const { run } = history
 
   if (run.status === 'failed')
@@ -118,7 +119,7 @@ export function evaluateAlerts(history: RigHistory, thresholds: AlertThresholds,
   // A calibration run has no stars and needs no tracking or pointing, so only the rig can go wrong.
   if (run.calibration) return { conditions: rigConditions, unavailable: [] }
 
-  const meridian = watchMeridian(history.mountReadings.at(-1), thresholds)
+  const meridian = watchMeridian(history.mountReadings.at(-1), thresholds, envelope)
   const frames = watchFrames(history.frames, thresholds, history.behindSkyline)
 
   return {
@@ -344,7 +345,9 @@ function watchTracking(readings: MountReading[], t: AlertThresholds): AlertCondi
  * On the pre-meridian (west) pier side the mount stops tracking a fixed hour
  * angle past the meridian. After a flip (east) there is nothing to watch.
  */
-function watchMeridian(reading: MountReading | undefined, t: AlertThresholds) {
+function watchMeridian(reading: MountReading | undefined, t: AlertThresholds, envelope: MountEnvelope) {
+  if (envelope.meridianLimitDegrees === undefined) return meridianUnavailable(['envelope meridian limit'])
+
   if (!reading) return meridianUnavailable(['mount readings'])
 
   const { siderealTimeHours, rightAscensionHours, pierSide } = reading
@@ -364,7 +367,7 @@ function watchMeridian(reading: MountReading | undefined, t: AlertThresholds) {
   if (pierSide === 'east') return { conditions: [], unavailable: [] }
 
   const hourAngle = wrapHours(siderealTimeHours - rightAscensionHours)
-  const minutesToStop = (t.meridianTrackLimitHours - hourAngle) * 60
+  const minutesToStop = (envelope.meridianLimitDegrees / 15 - hourAngle) * 60
   const conditions: AlertCondition[] = []
 
   if (minutesToStop <= t.meridianNearMinutes) {

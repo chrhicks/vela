@@ -1,7 +1,8 @@
+import { mountEnvelope, stubEnvelope } from '../equipment/envelope.js'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
-  evaluateAlerts,
+  evaluateAlerts as evaluateWithEnvelope,
   type AlertId,
   type Frame,
   type MountReading,
@@ -20,6 +21,10 @@ const running: RunState = { status: 'running', exposureSeconds: 60, waitingForFr
 
 function history(parts: Partial<RigHistory>): RigHistory {
   return { run: running, frames: [], mountReadings: [], observationsInterruptedSince: null, ...parts }
+}
+
+function evaluateAlerts(history: RigHistory, thresholds: AlertThresholds, now: number) {
+  return evaluateWithEnvelope(history, thresholds, now, mountEnvelope(stubEnvelope, thresholds, null))
 }
 
 function ids(h: RigHistory, now = 0, thresholds: AlertThresholds = defaultThresholds) {

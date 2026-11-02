@@ -1,3 +1,5 @@
+import type { MountEnvelope } from '../equipment/composition.js'
+import { mountEnvelope, stubEnvelope } from '../equipment/envelope.js'
 import { trace, SpanStatusCode } from '@opentelemetry/api'
 import type { CaptureImage } from '@vela/model/web'
 import { horizonStatus, type Horizon, type Skyline } from '../targets/horizon.js'
@@ -106,6 +108,7 @@ export type TestResult =
   | { outcome: 'failed'; reason: string }
 
 export interface AlertMonitorOptions {
+  envelope?: () => MountEnvelope
   rigId: string
   rigName: string
   thresholds: AlertThresholds
@@ -182,6 +185,7 @@ export function createAlertMonitor({
   rigId,
   rigName,
   thresholds,
+  envelope = () => mountEnvelope(stubEnvelope, thresholds, null),
   notifier,
   readMount,
   readFocuser,
@@ -229,6 +233,7 @@ export function createAlertMonitor({
       },
       thresholds,
       at,
+      envelope(),
     )
 
     unavailable = evaluation.unavailable

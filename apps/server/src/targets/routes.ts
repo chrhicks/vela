@@ -8,7 +8,7 @@ import type { RigCatalogRecord } from '../rig/contracts.js'
 import type { RigOperations } from '../rig/operations.js'
 import { confirmedCameraName } from '../rig/imaging-camera.js'
 import { inspectRigDetail, type RigDetailOptions } from '../rig/detail.js'
-import { createPlateSolver, type PlateSolver } from '../plate-solving/judged-solver.js'
+import { reportAcceptedFix, createPlateSolver, type PlateSolver } from '../plate-solving/judged-solver.js'
 import { createFramingController, mountSite, type FramingHardware } from './framing.js'
 import {
   getTarget,
@@ -25,6 +25,7 @@ import { haltBodyError, registerHaltRoutes } from '../http/halt-body.js'
 import type { FrameImaging } from '../imaging/frame-imaging.js'
 
 export interface TargetOptions {
+  sendFix?: (rig: RigCatalogRecord, fix: import('../equipment/composition.js').AcceptedFix) => Promise<void>
   recordRejected?: ReturnType<typeof createFramingRejections>
   solver?: { executable: string; catalogPath: string }
   createAdapter: (rig: RigCatalogRecord) => Framing
@@ -487,7 +488,7 @@ export function registerTargets(
             },
           },
           hardware,
-          solver,
+          options.sendFix ? reportAcceptedFix(solver, fix => options.sendFix!(rig, fix)) : solver,
           release,
         )
         started = true

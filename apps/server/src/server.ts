@@ -116,7 +116,7 @@ try {
       : {},
   )
 
-  const equipmentOptions: NonNullable<Parameters<typeof createEquipmentComposition>[1]> = {}
+  const equipmentOptions: NonNullable<Parameters<typeof createEquipmentComposition>[1]> = { catalog: rigCatalog, horizon, thresholds: alerts.thresholds }
 
   if (runLog) equipmentOptions.runLog = runLog
 

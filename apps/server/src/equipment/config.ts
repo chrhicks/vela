@@ -1,5 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { z } from 'zod'
+import { parseMountEnvelope } from '@vela/cria'
+import { stubEnvelope } from './envelope.js'
 import type { RigCatalog } from '../rig/catalog.js'
 import type { RigEndpoint } from '@vela/model/rig'
 
@@ -22,6 +24,15 @@ const rigSchema = z.strictObject({
   }, 'Cria URL must be an HTTP(S) origin without credentials'),
   tokenEnv: z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/).optional(),
   devices: z.array(deviceSchema).min(1),
+  envelope: z.unknown().transform((value, context) => {
+    try {
+      return parseMountEnvelope(value ?? stubEnvelope)
+    } catch {
+      context.addIssue({ code: 'custom', message: 'Invalid mount envelope' })
+
+      return z.NEVER
+    }
+  }).optional(),
   imagingCameraId: identifier.max(64).optional(),
   focalLengthMm: z.number().min(10).max(20000).optional(),
   alignment: z.strictObject({

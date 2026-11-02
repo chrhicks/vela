@@ -2,8 +2,8 @@
  * Cria's recorded protocol 5 wire, decoded with @cria/wire.
  *
  * wire.golden.json is a verbatim copy of ts/testing/golden/wire.golden.json in
- * public Cria at 022b09c902c36fca567f86c71696d8ab182cb3a4, so `git hash-object`
- * on it prints that file's blob, 686467b7d22099a03a20ecfd0e6d42b346d60857.
+ * public Cria at a80cdfcc33b9d0f6a167ff4a678c8df8b0b5f3cd, so `git hash-object`
+ * on it prints that file's blob, 39682830d370f84e8a592127a4aaffb1a2679e9b.
  * Cria's golden test recorded it from a running Cria and replaced IDs and times
  * with placeholders; `resolve` puts back values the schemas accept. Replace the
  * copy only together with the Cria pin.
@@ -11,7 +11,7 @@
 import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { Option, Schema } from 'effect'
-import { Device, ErrorBody, Health, Operation, OperationRequest, RecoveryRequest, State } from '@cria/wire'
+import { EnvelopeRequest, FixRequest, MountFeedback, Device, ErrorBody, Health, Operation, OperationRequest, RecoveryRequest, State } from '@cria/wire'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { FakeCria, routeOf, statusOf, type Route } from './fake-cria.js'
 
@@ -35,6 +35,9 @@ const Original = Schema.Struct({
 })
 
 const replies = {
+  envelope: MountFeedback,
+  fix: MountFeedback,
+  feedback: MountFeedback,
   health: Health,
   state: State,
   events: State,
@@ -116,17 +119,24 @@ describe('the protocol 5 golden', () => {
     }
 
     expect(problems).toEqual([])
-    expect(golden).toHaveLength(136)
+    expect(golden).toHaveLength(140)
   })
 
   it('accepts every request body Cria accepted, and rejects the eight Cria refused as malformed', () => {
     const sent = golden.filter(entry => entry.sent !== undefined)
     const strictly = { onExcessProperty: 'error' } as const
 
-    const accepted = (entry: Entry) =>
-      routeIn(entry) === 'recover'
-        ? Option.isSome(Schema.decodeUnknownOption(RecoveryRequest)(entry.sent, strictly))
-        : Option.isSome(Schema.decodeUnknownOption(OperationRequest)(entry.sent, strictly))
+    const accepted = (entry: Entry) => {
+      const route = routeIn(entry)
+
+      if (route === 'envelope') return Option.isSome(Schema.decodeUnknownOption(EnvelopeRequest)(entry.sent, strictly))
+
+      if (route === 'fix') return Option.isSome(Schema.decodeUnknownOption(FixRequest)(entry.sent, strictly))
+
+      if (route === 'recover') return Option.isSome(Schema.decodeUnknownOption(RecoveryRequest)(entry.sent, strictly))
+
+      return Option.isSome(Schema.decodeUnknownOption(OperationRequest)(entry.sent, strictly))
+    }
 
     const malformed = sent.filter(entry => !accepted(entry))
 
@@ -140,7 +150,7 @@ describe('the protocol 5 golden', () => {
       ['refused: capture frame type that disagrees with light, or is not one', 3, 400],
       ['no acknowledgement: uncertain, the camera is not held, the next capture runs, a recovery is still accepted', 8, 400],
     ])
-    expect(sent).toHaveLength(69)
+    expect(sent).toHaveLength(71)
   })
 
   it('serves each original with the length and SHA-256 its Image names', () => {

@@ -16,7 +16,7 @@ it('returns the position and plate of an accepted solve, stamped with the frame 
   const solution = goodSolve(claimed, frame)
 
   if (solution.status !== 'solved') throw new Error('Expected fixture')
-  await expect(solve(solution)).resolves.toEqual({ status: 'solved', capturedAt: frame.capturedAt, wcs: solution.wcs, ...solution.centre })
+  await expect(solve(solution)).resolves.toEqual({ status: 'solved', capturedAt: frame.capturedAt, wcs: solution.wcs, error: { scaleError: expect.any(Number), hintOffsetDegrees: expect.any(Number) }, ...solution.centre })
 })
 
 it.each(['framing', 'alignment'] as const)('does not use the audit\'s false solve for %s', async purpose => {

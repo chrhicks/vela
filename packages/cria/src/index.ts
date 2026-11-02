@@ -1,3 +1,10 @@
+import { Schema } from 'effect'
+import { MountEnvelope } from '@cria/wire'
+
+export const parseMountEnvelope = Schema.decodeUnknownSync(MountEnvelope)
+
+export type { MountEnvelope, AcceptedFix } from '@cria/wire'
+
 export { createCriaConnection } from './connection.js'
 
 export type { CriaConnection, CriaConnectionOptions } from './connection.js'
