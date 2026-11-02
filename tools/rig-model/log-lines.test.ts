@@ -11,7 +11,8 @@ const T0 = Date.UTC(2030, 0, 1, 3, 0, 0)
 
 const state = (index: number) => mountState({ sequence: index, mount: { at: T0 + index * 1000, raHours: 5 + index * 0.01, decDegrees: -5 } })
 
-const runLogLine = (index: number) => encodeEvent(criaEvent({ kind: 'state', at: T0 + index * 1000 + 40, origin: 'http://cria.test', state: state(index) }, { rig: rigId('test-rig'), source: sourceId('vela:cria') }))
+const runLogLine = (index: number, generatedAt = T0 + index * 1000) =>
+  encodeEvent(criaEvent({ kind: 'state', at: T0 + index * 1000 + 40, origin: 'http://cria.test', state: mountState({ sequence: index, generatedAt, mount: { at: generatedAt, raHours: 5, decDegrees: -5 } }) }, { rig: rigId('test-rig'), source: sourceId('vela:cria') }))
 
 type Cell = ReturnType<typeof JSON.parse>
 
@@ -86,5 +87,18 @@ describe('reading Vela logs', () => {
     for await (const event of loggedMount([runLog], { from: epochMs(T0 + 3000), to: epochMs(T0 + 5000) })) seen.push(event.seenAt)
 
     expect(seen).toEqual([T0 + 3040, T0 + 4040])
+  })
+
+  it('stops on when Vela saw a snapshot, not on the time Cria stamped it', async () => {
+    const { root } = await files()
+    const skewed = join(root, 'skewed.jsonl')
+
+    await writeFile(skewed, `${runLogLine(1, T0 + 20_000)}\n${runLogLine(2)}\n${runLogLine(20)}\n`)
+
+    const seen: number[] = []
+
+    for await (const event of loggedMount([skewed], { from: epochMs(T0), to: epochMs(T0 + 10_000) })) seen.push(event.seenAt)
+
+    expect(seen).toEqual([T0 + 1040, T0 + 2040])
   })
 })

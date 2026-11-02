@@ -100,11 +100,13 @@ export async function* loggedMount(paths: readonly string[], window: Window): As
   const reader = createLogReader({ rig: rigId('backfill'), source: sourceId('import:vela-journal') })
 
   for await (const line of logLines(paths)) {
-    if (timeOf(line) >= window.to) break
-
     const result = reader.read(line)
 
-    if (result.ok && result.event.kind === 'cria.state' && result.event.seenAt >= window.from && result.event.seenAt < window.to) yield result.event
+    if (!result.ok) continue
+
+    if (result.event.seenAt >= window.to) break
+
+    if (result.event.kind === 'cria.state' && result.event.seenAt >= window.from) yield result.event
   }
 }
 
