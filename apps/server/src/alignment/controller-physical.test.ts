@@ -5,7 +5,7 @@ import {
   NodeTracerProvider,
   SimpleSpanProcessor,
 } from '@opentelemetry/sdk-trace-node'
-import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createTestCadence } from './test-cadence.js'
@@ -63,7 +63,8 @@ afterEach(async () => {
   expect(control.waits).toHaveLength(0)
 })
 
-function setup(openDiagnostics?: AlignmentDiagnosticsFactory) {
+/** `looseDegrees`: how far the mount's own turn to the third position differs from the turn the camera made. */
+function setup(openDiagnostics?: AlignmentDiagnosticsFactory, looseDegrees = 0) {
   let exposures = 0
   let externalChange = false
   const captures: AlpacaCaptureOptions[] = []
@@ -100,8 +101,12 @@ function setup(openDiagnostics?: AlignmentDiagnosticsFactory) {
       physicalAlignmentSample(solved, capture, fixture.site),
   )
 
-  const observedMount = () => ({
-    rightAscensionDegrees: 40,
+  const observedMount = (index = Math.max(0, exposures - 1)) => ({
+    rightAscensionDegrees: physicalAlignmentSample(
+      frames[index]!.solved,
+      { capturedAt: frames[index]!.capturedAt, exposureSeconds: 2 },
+      fixture.site,
+    ).raDegrees + (index === 2 ? looseDegrees : 0),
     declinationDegrees: 60,
     coordinateSystem: 'topocentric' as const,
     ...fixture.site,
@@ -119,7 +124,7 @@ function setup(openDiagnostics?: AlignmentDiagnosticsFactory) {
       latitude: fixture.site.latitudeDegrees,
       observation: {
         site: fixture.site,
-        mount: observedMount(),
+        mount: observedMount(exposures),
         camera: {
           cameraName: 'Selected RGGB camera',
           sensorWidthPixels: 4,
@@ -702,11 +707,13 @@ it('replays a physical controller trial from its actual recorded bundle', async 
       mode: 'physical',
       outcome: { phase: 'finished', error: null },
       counts: { frames: 4, measurements: 2, physicalFrames: 4, verifiedOriginals: 4 },
+      rigidity: { status: 'rigid', thresholdArcmin: 2 },
       maximumDiscrepancies: {
         measurementArcsec: 0,
         correctionTargetDegrees: 0,
         physicalSampleDegrees: 0,
         physicalSampleTimeMs: 0,
+        rigidityMissArcmin: 0,
       },
     })
     expect(report.finalMeasurement?.totalArcsec).toBe(
@@ -714,6 +721,53 @@ it('replays a physical controller trial from its actual recorded bundle', async 
     )
   } finally {
     await subject.controller.stop()
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+it('reports not rigid, with the miss and no polar error, when the mount did not turn as one body', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'vela-physical-not-rigid-'))
+  const errors: Error[] = []
+  const subject = setup(createAlignmentDiagnostics(directory, error => errors.push(error)), 0.5)
+
+  try {
+    await subject.baseline()
+    await vi.waitFor(() => expect(subject.controller.snapshot().active).toBe(false))
+    const view = subject.controller.snapshot()
+
+    expect(view).toMatchObject({
+      phase: 'not-rigid',
+      activity: 'idle',
+      solvedPositions: 3,
+      error: null,
+      warning: null,
+      measurement: null,
+      rigidity: { thresholdArcmin: 2 },
+    })
+    expect(view.rigidity!.missArcmin).toBeGreaterThan(2)
+    expect(control.waits).toHaveLength(0)
+    expect(subject.captures).toHaveLength(3)
+    expect(await subject.controller.stop()).toMatchObject({ phase: 'not-rigid', measurement: null })
+    expect(errors).toEqual([])
+
+    const [trial] = await readdir(directory)
+
+    const entries = (await readFile(join(directory, trial!, 'journal.jsonl'), 'utf8'))
+      .trim()
+      .split('\n')
+      .map(line => JSON.parse(line))
+
+    expect(entries.find(entry => entry.type === 'baseline').rigidity).toMatchObject({
+      status: 'not-rigid',
+      missArcmin: view.rigidity!.missArcmin,
+      thresholdArcmin: 2,
+    })
+    expect(entries.some(entry => entry.type === 'measurement')).toBe(false)
+    expect(await replayAlignmentDiagnostics(join(directory, trial!))).toMatchObject({
+      rigidity: { status: 'not-rigid', missArcmin: view.rigidity!.missArcmin },
+      maximumDiscrepancies: { rigidityMissArcmin: 0 },
+    })
+  } finally {
     await rm(directory, { recursive: true, force: true })
   }
 })

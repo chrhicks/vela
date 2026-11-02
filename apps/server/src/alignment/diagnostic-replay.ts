@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { constants } from 'node:fs'
 import { open } from 'node:fs/promises'
 import { join } from 'node:path'
-import type { Site } from '@vela/rig-sky'
+import type { RigidityVerdict, Site } from '@vela/rig-sky'
 import {
   diagnosticEntrySchema,
   diagnosticJournalName,
@@ -18,6 +18,7 @@ import {
   type AlignmentMeasurement,
   type AlignmentSample,
 } from './geometry.js'
+import { baselineRigidity, type RigidityFrame } from './baseline-rigidity.js'
 import { physicalAlignmentSample } from './physical-coordinates.js'
 
 export interface AlignmentDiagnosticReplayReport {
@@ -33,12 +34,15 @@ export interface AlignmentDiagnosticReplayReport {
     verifiedOriginals: number
   }
   baseline: AlignmentBaseline | null
+  /** Judged again from the three recorded baseline solves; null for an offline run, which has no mount reading. */
+  rigidity: RigidityVerdict | null
   finalMeasurement: AlignmentMeasurement | null
   maximumDiscrepancies: {
     measurementArcsec: number
     correctionTargetDegrees: number
     physicalSampleDegrees: number
     physicalSampleTimeMs: number
+    rigidityMissArcmin: number
   }
 }
 
@@ -76,12 +80,14 @@ export async function replayAlignmentDiagnostics(
     truncatedFinalLine,
     counts: { frames: 0, measurements: 0, physicalFrames: 0, verifiedOriginals: 0 },
     baseline: null,
+    rigidity: null,
     finalMeasurement: null,
     maximumDiscrepancies: {
       measurementArcsec: 0,
       correctionTargetDegrees: 0,
       physicalSampleDegrees: 0,
       physicalSampleTimeMs: 0,
+      rigidityMissArcmin: 0,
     },
   }
 
@@ -170,6 +176,19 @@ export async function replayAlignmentDiagnostics(
 
         report.baseline = createAlignmentBaseline(entry.samples, entry.latitudeDegrees)
         compareMeasurement(report, report.baseline.measurement, entry.measurement)
+
+        if (first.run.mode === 'physical') {
+          report.rigidity = baselineRigidity(
+            // SAFETY: three baseline frames were checked above, and a physical frame has its mount reading.
+            baselineFrames.map(rigidityFrame) as [RigidityFrame, RigidityFrame, RigidityFrame],
+          )
+
+          if (entry.rigidity)
+            report.maximumDiscrepancies.rigidityMissArcmin = Math.abs(
+              report.rigidity.missArcmin - entry.rigidity.missArcmin,
+            )
+        }
+
         break
       }
 
@@ -219,6 +238,14 @@ export async function replayAlignmentDiagnostics(
     report.outcome = { phase: outcome.phase, error: outcome.error }
 
   return report
+}
+
+function rigidityFrame(frame: DiagnosticFrameEntry): RigidityFrame {
+  return {
+    solved: frame.evidence.solution.wcs,
+    sample: frame.evidence.sample,
+    mountRightAscensionDegrees: frame.evidence.physical!.before.rightAscensionDegrees,
+  }
 }
 
 function validateFrame(frame: DiagnosticFrameEntry, mode: 'physical' | 'offline') {

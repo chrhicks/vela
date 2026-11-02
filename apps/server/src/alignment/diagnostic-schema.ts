@@ -27,6 +27,12 @@ const measurement = z.object({
   correctionTarget: position,
 })
 
+const rigidity = z.object({
+  status: z.enum(['rigid', 'not-rigid']),
+  missArcmin: number.nonnegative(),
+  thresholdArcmin: number.positive(),
+})
+
 const site = z.object({
   latitudeDegrees: dec,
   longitudeDegrees: number.min(-180).max(180),
@@ -140,6 +146,7 @@ export const diagnosticEntrySchema = z.discriminatedUnion('type', [
     samples: z.tuple([sample, sample, sample]).readonly(),
     latitudeDegrees: number.gt(0).lt(85),
     measurement,
+    rigidity: rigidity.optional(),
   }),
   z.object({
     type: z.literal('measurement'),
