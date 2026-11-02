@@ -17,10 +17,10 @@ const expected: Expectation = { arcsecPerPixel: 1.94, parity: 1 }
 
 const claimed = { raDegrees: 90, decDegrees: 10 }
 
-function solved(overrides: { scale?: number; parity?: 1 | -1; centre?: { raDegrees: number; decDegrees: number } } = {}): SolveOutcome {
-  const { scale = expected.arcsecPerPixel, parity = 1, centre = claimed } = overrides
+function solved(overrides: { scale?: number; stretch?: number; parity?: 1 | -1; centre?: { raDegrees: number; decDegrees: number } } = {}): SolveOutcome {
+  const { scale = expected.arcsecPerPixel, stretch = 1, parity = 1, centre = claimed } = overrides
   const degrees = scale / 3600
-  const wcs = { width: 6248, height: 4176, referenceX: 3124.5, referenceY: 2088.5, ...centre, cd: [0, degrees, -degrees * parity, 0] as const }
+  const wcs = { width: 6248, height: 4176, referenceX: 3124.5, referenceY: 2088.5, ...centre, cd: [0, degrees / stretch, -degrees * parity * stretch, 0] as const }
 
   return { status: 'solved', wcs }
 }
@@ -46,6 +46,10 @@ describe('judgeSolve', () => {
       expect(reasonsOf(judgeSolve(facts({ solution: solved({ scale: expected.arcsecPerPixel * (1 + limit * 1.05) }) }), expected, purpose))).toEqual(['scale'])
       expect(reasonsOf(judgeSolve(facts({ solution: solved({ scale: expected.arcsecPerPixel * (1 - limit * 1.05) }) }), expected, purpose))).toEqual(['scale'])
       expect(judgeSolve(facts({ solution: solved({ scale: expected.arcsecPerPixel * (1 + limit * 0.95) }) }), expected, purpose).status).toBe('accepted')
+    })
+
+    it('rejects a stretched matrix whose determinant has the right scale', () => {
+      expect(reasonsOf(judgeSolve(facts({ solution: solved({ stretch: 1.2 }) }), expected, purpose))).toEqual(['scale'])
     })
 
     it('rejects a mirrored solve, and a solve of the other parity when that is what the rig expects', () => {

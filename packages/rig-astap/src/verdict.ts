@@ -33,7 +33,7 @@ export interface SolveFacts {
 
 export interface Measured {
   readonly arcsecPerPixel: number
-  /** Signed fraction: 0.02 is 2% larger than expected. */
+  /** Signed fraction of the worst of the two axis scales and the area scale: 0.02 is 2% larger than expected. */
   readonly scaleError: number
   readonly parity: 1 | -1
   readonly hintOffsetDegrees: number | null
@@ -77,14 +77,21 @@ function separationDegrees(a: SkyPosition, b: SkyPosition): number {
   return (2 * Math.asin(Math.sqrt(Math.max(0, Math.min(1, half))))) / radians
 }
 
+/** The worst of the two axis scales and the area scale, so a stretched or sheared matrix cannot hide behind a right determinant. */
+function scaleError(cd: Solved['wcs']['cd'], expected: Expectation, determinant: number): number {
+  const [a, b, c, d] = cd
+  const arcsecPerPixel = [Math.hypot(a, c), Math.hypot(b, d), Math.sqrt(Math.abs(determinant))].map(degrees => degrees * 3600)
+
+  return arcsecPerPixel.map(scale => scale / expected.arcsecPerPixel - 1).reduce((worst, error) => (Number.isNaN(error) || Math.abs(error) > Math.abs(worst) ? error : worst))
+}
+
 function measure(wcs: Solved['wcs'], facts: SolveFacts, expected: Expectation): Measured {
   const [a, b, c, d] = wcs.cd
   const determinant = a * d - b * c
-  const arcsecPerPixel = Math.sqrt(Math.abs(determinant)) * 3600
 
   return {
-    arcsecPerPixel,
-    scaleError: arcsecPerPixel / expected.arcsecPerPixel - 1,
+    arcsecPerPixel: Math.sqrt(Math.abs(determinant)) * 3600,
+    scaleError: scaleError(wcs.cd, expected, determinant),
     parity: determinant > 0 ? 1 : -1,
     hintOffsetDegrees: facts.claimed === null ? null : separationDegrees(wcs, facts.claimed),
     stars: facts.stars,

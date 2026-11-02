@@ -148,7 +148,7 @@ const lines = [
 
 const falseHeld = falseSolves.length > 0 && falseSolves.every(entry => purposes.every(purpose => entry.verdicts[purpose].status === 'rejected'))
 
-const goodHeld = good.every(entry => entry.verdicts.alignment.status === 'accepted')
+const goodHeld = good.length > 0 && good.every(entry => entry.verdicts.alignment.status === 'accepted')
 
 lines.push(falseHeld && goodHeld ? 'Result: the false solve is rejected and every good frame is accepted for alignment.' : 'Result: the check does not hold.', '')
 
