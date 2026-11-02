@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createJournalImporter, encodeEvent, rigId, sourceId, type RigEvent, type State } from '@vela/rig-events'
+import { createJournalImporter, createLogReader, criaEvent, encodeEvent, rigId, sourceId, type RigEvent, type State } from '@vela/rig-events'
 import { mountState } from '@vela/rig-testing'
 
 type Cell = ReturnType<typeof JSON.parse>
@@ -184,5 +184,35 @@ describe('the journal importer', () => {
 
     expect(into.read('{broken').ok).toBe(false)
     expect(into.read(JSON.stringify({ kind: 'mystery', at })).ok).toBe(false)
+  })
+})
+
+describe('the log reader', () => {
+  const reader = () => createLogReader({ rig: rigId('test-rig'), source: sourceId('import:test') })
+  const kept = criaEvent({ kind: 'state', at: at + 40, origin: 'http://cria.test', state: walk[0]! }, { rig: rigId('run-rig'), source: sourceId('vela:cria') })
+
+  it('reads a run-log line as it is written, with its own rig and source', () => {
+    const result = reader().read(encodeEvent(kept))
+
+    expect(result).toEqual({ ok: true, event: kept })
+  })
+
+  it('rebuilds a journal line as the journal importer does', () => {
+    const lines = journalLines(walk)
+    const into = reader()
+
+    expect(lines.map(line => into.read(line))).toEqual(readAll(lines).map(event => ({ ok: true, event })))
+  })
+
+  it('reads a file that is journal lines followed by run-log lines', () => {
+    const into = reader()
+    const results = [...journalLines(walk.slice(0, 2)), encodeEvent(kept)].map(line => into.read(line))
+
+    expect(results.map(result => result.ok && result.event.source)).toEqual(['import:test', 'import:test', 'vela:cria'])
+  })
+
+  it('reports a line that is not JSON and a run-log line that does not decode', () => {
+    expect(reader().read('{broken').ok).toBe(false)
+    expect(reader().read(JSON.stringify({ v: 1, kind: 'cria.state' })).ok).toBe(false)
   })
 })
