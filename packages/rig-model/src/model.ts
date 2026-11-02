@@ -263,9 +263,10 @@ function sampleOf(observation: MountObservation, previous: MountSample | undefin
   }
 }
 
-// Step 3 AM5 profile: largest measured 9x speed 11002 arcsec/s. Double it for receive-time jitter.
+// am5-peak-speed.ts over the 19 imported recordings: 261 goto sample pairs, peak 27.02581248590796 deg/s
+// on 2026-10-24 (0.246 s receive interval), above every other motion kind. Double for receive-time jitter.
 // A faster reported change can be a reference reset, so its distance is unknown until another solve.
-const maxReportedSpeedDegreesPerSecond = 2 * 11002 / 3600
+const maxReportedSpeedDegreesPerSecond = 2 * 27.02581248590796
 
 function plausibleTravel(degrees: number, elapsedMs: number): number {
   return degrees <= maxReportedSpeedDegreesPerSecond * elapsedMs / 1000 ? degrees : Infinity

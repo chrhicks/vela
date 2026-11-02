@@ -121,11 +121,13 @@ it.each([89, -89, 90, -90])('does not count an RA jump at declination %s as a ha
   expect(assess(next).position.state).toBe('unknown')
 })
 
-it('makes an impossible reported jump unbounded until the next current-epoch fix', () => {
-  let model = fixed()
+it.each([88, 90])('makes a one-second %s-degree jump unbounded until the next current-epoch fix', decDegrees => {
+  let model = step(fixed(), snapshot({
+    at: s(10), mount: { at: s(10), raHours: 2, decDegrees: 0, slewing: true },
+  })).model
 
   const inputs = inOrder(
-    tracking(11, 20, { raHours: 2, decDegrees: 90 }),
+    tracking(11, 20, { raHours: 2, decDegrees }),
     frame({ image: imageIdOf(4), capturedAt: s(12), exposureSeconds: 2, seenAt: s(14) }),
     solved(imageIdOf(4), { raDegrees: 30, decDegrees: 89.9 }, s(15)),
   )
@@ -162,4 +164,16 @@ it.each([89, -89, 90, -90])('does not trust an impossible operation axis jump at
 
   expect(assess(model)).toMatchObject({ blindTravelDegrees: Infinity, budgetArcmin: Infinity, confidence: 'none' })
   expect(assess(step(model, event).model).blindTravelDegrees).toBe(Infinity)
+})
+
+it('counts a goto-speed sample as finite travel after a fix', () => {
+  const model = step(fixed(), snapshot({ at: s(10), mount: { at: s(10), raHours: 2.001, decDegrees: 0 } })).model
+
+  const next = step(model, snapshot({
+    at: s(11),
+    mount: { at: s(11), raHours: 2.441, decDegrees: 0, slewing: true },
+  })).model
+
+  expect(assess(next).blindTravelDegrees - assess(model).blindTravelDegrees).toBeCloseTo(6.6)
+  expect(assess(next).budgetArcmin).toBeCloseTo(assess(model).budgetArcmin + 6.6 * blindErrorArcminPerDegree)
 })
