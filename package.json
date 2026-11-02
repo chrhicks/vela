@@ -23,6 +23,7 @@
     "rig-model:resolve-trial": "pnpm --filter @vela/rig-model-tools resolve-trial",
     "rig-model:frame-sources": "pnpm --filter @vela/rig-model-tools frame-sources",
     "rig-model:am5-profile": "pnpm --filter @vela/rig-model-tools am5-profile",
+    "rig-model:backfill": "pnpm --filter @vela/rig-model-tools backfill",
     "replay": "pnpm --filter @vela/server... build && pnpm --filter @vela/rig-session replay",
     "scenarios": "vitest run --config tools/rig-session/vitest.scenarios.mts"
   },

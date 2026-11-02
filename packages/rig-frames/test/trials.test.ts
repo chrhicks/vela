@@ -31,6 +31,23 @@ describe('readTrials', () => {
     expect(trial?.frames[0]?.solved.wcs.cd).toHaveLength(4)
   })
 
+  it('reads the polar error each baseline and measurement gave, at the time of its last sample, and nothing of the site', async () => {
+    const dir = await dataDirectory()
+    await writeTrial(dir, { createdAt: '2026-10-26T23:38:03.990Z', outcome: 'finished', adjusting: 3 })
+
+    const { trials, problems } = await readTrials(root(dir))
+    const [trial] = trials
+
+    expect(problems).toEqual([])
+    expect(trial?.readings.map(reading => [reading.phase, reading.at, reading.altitudeArcsec, reading.azimuthArcsec, reading.totalArcsec])).toEqual([
+      ['baseline', Date.parse('2026-10-26T23:38:36.936Z'), 1, 2, 2.2],
+      ['adjusting', Date.parse('2026-10-26T23:38:36.936Z'), 1, 2, 2.2],
+      ['adjusting', Date.parse('2026-10-26T23:38:36.936Z'), 1, 2, 2.2],
+      ['adjusting', Date.parse('2026-10-26T23:38:36.936Z'), 1, 2, 2.2],
+    ])
+    expect(JSON.stringify(trial?.readings)).not.toContain(String(syntheticSite.latitudeDegrees))
+  })
+
   it('calls a trial with no outcome line unfinished and lists trials oldest first', async () => {
     const dir = await dataDirectory()
     await writeTrial(dir, { runId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', createdAt: '2026-10-27T01:30:00.000Z' })
