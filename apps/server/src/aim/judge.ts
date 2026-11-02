@@ -30,7 +30,7 @@ export function judgeAim(goal: AimGoal): AimResult {
   const gotoSolve = firstLanding < 0 ? undefined : goal.events.slice(firstLanding + 1).find(event => event.kind === 'solve')
   const corrections = goal.events.filter(event => event.kind === 'move' && event.correction > 0).length
   const residualArcmin = lastSolve?.kind === 'solve' ? lastSolve.residualArcmin : null
-  
+
   const numbers = {
     goalId: goal.goalId,
     target: goal.target,
