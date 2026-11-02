@@ -78,6 +78,59 @@ export const FrameBody = Schema.Struct({
   origin: Schema.Literals(['capture-run', 'alignment-trial', 'framing', 'autofocus', 'import']),
 })
 
+const AutofocusFit = Schema.Struct({
+  position: Schema.Number,
+  p: Schema.Number,
+  a: Schema.Number,
+  b: Schema.Number,
+  rSquared: Schema.Number,
+  minSamplePosition: Schema.Number,
+})
+
+const AutofocusLanding = Schema.Struct({
+  position: Schema.Number,
+  outcome: Schema.Literals(['confirmed', 'fell-back', 'unconfirmed']),
+  bestSample: Schema.Struct({ position: Schema.Number, hfrPixels: Schema.Number }),
+  tolerance: Schema.Number,
+  attempts: Schema.Array(
+    Schema.Struct({
+      source: Schema.Literals(['fit', 'best-sample']),
+      position: Schema.Number,
+      sampleIndex: Schema.Int,
+      hfrPixels: Schema.NullOr(Schema.Number),
+      withinTolerance: Schema.Boolean,
+    }),
+  ),
+})
+
+const AutofocusSample = Schema.Struct({
+  position: Schema.Number,
+  detectedStars: Schema.Number,
+  hfrPixels: Schema.NullOr(Schema.Number),
+  capturedAt: Schema.String,
+  pass: Schema.optionalKey(Schema.Literals(['coarse', 'fine', 'confirm'])),
+  stars: Schema.Array(Schema.Struct({ x: Schema.Number, y: Schema.Number, snr: Schema.Number, hfr: Schema.Number })),
+})
+
+export const AutofocusBody = Schema.Struct({
+  startedAt: Schema.String,
+  settledAt: Schema.NullOr(Schema.String),
+  phase: Schema.Literals(['setup', 'walking', 'fitting', 'confirming', 'complete', 'stopped', 'failed']),
+  error: Schema.NullOr(Schema.String),
+  startPosition: Schema.NullOr(Schema.Number),
+  stepSize: Schema.Number,
+  offsetSteps: Schema.Number,
+  fineStepSize: Schema.Number,
+  fineOffsetSteps: Schema.Number,
+  confirmTolerance: Schema.Number,
+  travel: Schema.NullOr(Schema.Struct({ min: Schema.Number, max: Schema.Number })),
+  exposureSeconds: Schema.Number,
+  fit: Schema.NullOr(AutofocusFit),
+  landing: Schema.NullOr(AutofocusLanding),
+  airTemperatureC: Schema.Struct({ start: Schema.NullOr(Schema.Number), end: Schema.NullOr(Schema.Number) }),
+  samples: Schema.Array(AutofocusSample),
+})
+
 const PlateWcs = Schema.Struct({
   width: Schema.Number,
   height: Schema.Number,
@@ -176,6 +229,8 @@ export type CriaImageBody = typeof CriaImageBody.Type
 export type CriaStreamBody = typeof CriaStreamBody.Type
 
 export type FrameBody = typeof FrameBody.Type
+
+export type AutofocusBody = typeof AutofocusBody.Type
 
 export type SolveBody = typeof SolveBody.Type
 

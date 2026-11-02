@@ -198,10 +198,12 @@ in `@vela/rig-frames` reads them and the run log alike.
 
 ### Autofocus records
 
-Set `VELA_AUTOFOCUS_RECORDS_PATH` to a JSONL file path and the server appends one line per autofocus run when it
-settles, with the brightest stars of every sample (position, S/N, HFR). It is off when the variable is unset. The format,
-size and a `jq` example are in `apps/server/src/autofocus/README.md`. `compose.yaml` writes it to
-`data/traces/autofocus.jsonl`.
+When `VELA_RUN_LOG_DIR` is set, the server files an `autofocus` event in the run log for each autofocus run when it
+settles, with the brightest stars of every sample (position, S/N, HFR). The envelope's rig is the catalog rig id, as for
+`frame` events. The format, size and a `jq` example are in `apps/server/src/autofocus/README.md`.
+
+Until plan step 13c, Vela wrote the same record, with `version: 1` and `rigId`, as one line of `traces/autofocus.jsonl`.
+Those files stay where they are. Nothing in the repo reads them.
 
 ## Alerts
 

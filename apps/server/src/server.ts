@@ -6,8 +6,7 @@ import { access } from 'node:fs/promises'
 import { dirname, isAbsolute, resolve } from 'node:path'
 import { openFileSavedImageStore } from './saved-images/store.js'
 import { frameRecordsOn, frameRigId, noFrameRecords } from './capture/frame-records.js'
-import { noAutofocusRecords, type AutofocusRecords } from './autofocus/routes.js'
-import { openJsonlRecords } from './records.js'
+import { autofocusRecordsOn, noAutofocusRecords } from './autofocus/records.js'
 import { noCaptureRuns, openFileCaptureRunStore, type CaptureRunStore } from './capture/run-store.js'
 import { createSurveyCache } from './targets/survey.js'
 import { startTelemetry } from './telemetry.js'
@@ -20,13 +19,11 @@ import { openRunLog, type RunLog } from './run-log/run-log.js'
 
 const telemetry = startTelemetry(process.env.VELA_TRACE_PATH)
 
-const autofocusRecords: AutofocusRecords = process.env.VELA_AUTOFOCUS_RECORDS_PATH
-  ? openJsonlRecords(process.env.VELA_AUTOFOCUS_RECORDS_PATH, { name: 'autofocus records' })
-  : noAutofocusRecords
-
 const runLog: RunLog | undefined = process.env.VELA_RUN_LOG_DIR ? openRunLog({ directory: resolve(process.env.VELA_RUN_LOG_DIR) }) : undefined
 
 const frameRecords = runLog ? frameRecordsOn(runLog) : noFrameRecords
+
+const autofocusRecords = runLog ? autofocusRecordsOn(runLog) : noAutofocusRecords
 
 let app: ReturnType<typeof buildApp> | undefined
 
@@ -42,7 +39,6 @@ function shutdown() {
     } finally {
       await runLog?.close()
       await captureRuns.close()
-      await autofocusRecords.close()
       await telemetry.shutdown()
     }
   })()

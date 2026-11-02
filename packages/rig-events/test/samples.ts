@@ -65,6 +65,37 @@ export function sampleEvents(): RigEvent[] {
     }),
     seal({
       ...stamp(at),
+      kind: 'autofocus',
+      body: {
+        startedAt: '2026-10-26T20:10:00.000Z',
+        settledAt: '2026-10-26T20:14:00.000Z',
+        phase: 'complete',
+        error: null,
+        startPosition: 32_842,
+        stepSize: 50,
+        offsetSteps: 4,
+        fineStepSize: 25,
+        fineOffsetSteps: 6,
+        confirmTolerance: 0.1,
+        travel: { min: 0, max: 60_000 },
+        exposureSeconds: 2,
+        fit: { position: 32_838, p: 32_837.6, a: 1.2, b: 0.004, rSquared: 0.99, minSamplePosition: 32_850 },
+        landing: {
+          position: 32_838,
+          outcome: 'confirmed',
+          bestSample: { position: 32_850, hfrPixels: 2.1 },
+          tolerance: 0.1,
+          attempts: [{ source: 'fit', position: 32_838, sampleIndex: 1, hfrPixels: 2.05, withinTolerance: true }],
+        },
+        airTemperatureC: { start: 4.7, end: null },
+        samples: [
+          { position: 32_800, detectedStars: 40, hfrPixels: 3.2, capturedAt: '2026-10-26T20:10:05.000Z', pass: 'coarse', stars: [{ x: 10, y: 20, snr: 300, hfr: 3.2 }] },
+          { position: 32_838, detectedStars: 0, hfrPixels: null, capturedAt: '2026-10-26T20:13:00.000Z', stars: [] },
+        ],
+      },
+    }),
+    seal({
+      ...stamp(at),
       kind: 'solve',
       body: {
         status: 'solved',

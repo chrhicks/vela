@@ -24,6 +24,8 @@ export function eventIdOf(draft: Draft): EventId {
       return brandEventId(`state:${draft.source}:${draft.body.freshness}:${draft.body.state.instanceId}:${draft.body.state.sequence}`)
     case 'frame':
       return brandEventId(draft.body.image ? `frame:${draft.body.image.id}` : `frame:${draft.body.runId}:${draft.body.attempt}`)
+    case 'autofocus':
+      return brandEventId(`autofocus:${draft.rig}:${draft.body.startedAt}`)
     case 'solve':
       return brandEventId(`solve:${draft.body.imageId}:${draft.body.solverVersion}`)
     case 'session':

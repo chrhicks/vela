@@ -120,11 +120,11 @@ Where to read a run:
 - `GET /api/web/rigs/:rigId/autofocus/run` returns the current or last run held in
   memory, growing as the walk takes samples. It is 404 until the first sample, and
   lost on a restart. The polled `AutofocusView` carries no star lists, to stay small.
-- `VELA_AUTOFOCUS_RECORDS_PATH` names a JSONL file. When it is set, the server
-  appends one line when a run settles, whatever the outcome, if it took at least one
-  sample. It is off when unset. A write failure, or a backlog over 1 MiB, turns
-  recording off until restart and logs why once. The walk is never affected. It uses
-  the same appender as the frame records (`apps/server/src/records.ts`).
+- When `VELA_RUN_LOG_DIR` is set, the server files one `autofocus` event in the run
+  log (`docs/run-log.md`) when a run settles, whatever the outcome, if it took at least
+  one sample. The event's rig is the catalog rig id and its body is the run below
+  without `version` and `rigId`. A disk that fails is retried and shows on
+  `/api/health`; the walk is never affected.
 
 Both are an `AutofocusRun` (`packages/model/src/web/autofocus.ts`):
 
@@ -226,7 +226,7 @@ of ten runs is about 0.5 MB.
 To list a run's landing, its confirm frames and the air temperature:
 
 ```sh
-jq -c 'select(.phase == "complete") | {startedAt, landed: .landing.position, outcome: .landing.outcome, best: .landing.bestSample, confirm: [.landing.attempts[] | [.position, .hfrPixels]], airC: .airTemperatureC}' autofocus.jsonl
+jq -c 'select(.kind == "autofocus" and .body.phase == "complete") | .body | {startedAt, landed: .landing.position, outcome: .landing.outcome, best: .landing.bestSample, confirm: [.landing.attempts[] | [.position, .hfrPixels]], airC: .airTemperatureC}' run-log/run-*.jsonl
 ```
 
 Two runs at the same air temperature should land within 25 steps of each other, and the
