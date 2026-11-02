@@ -247,7 +247,7 @@ pnpm --filter @vela/rig-simulator prove:http
 This opt-in command builds the model, Alpaca boundary and server, then starts an isolated
 simulator on a random loopback port. It connects using the normal provider and
 acquires images and primary-axis movement through `createAlpacaAcquisition`.
-The server's actual ASTAP adapter and alignment geometry fit three solved
+The server's actual ASTAP adapter and alignment geometry fit the polar axis to six solved
 positions, then measure partial, near, and zero adjustments against that same
 baseline. The proof also obscures the camera to produce a genuine ASTAP failure,
 clears it to recover, and cancels an active exposure before checking a fresh

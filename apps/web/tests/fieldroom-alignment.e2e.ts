@@ -101,6 +101,8 @@ for (const name of [
   'alignment-setup',
   'alignment-baseline-solving',
   'alignment-baseline-no-solution',
+  'alignment-baseline-dropped',
+  'alignment-fit-dropped',
   'alignment-unavailable',
   'alignment-stopped',
   'alignment-finished',
@@ -123,11 +125,39 @@ test('a baseline that was not rigid shows the miss and the limit, and no polar e
   await expect(page.getByRole('alert')).toContainText('Not rigid')
   await expect(page.getByRole('alert')).toContainText('33.4′')
   await expect(page.getByRole('alert')).toContainText('limit is 2′')
+  await expect(page.getByRole('alert')).toContainText('between positions 3 and 4')
+  await expect(page.locator('.vela-polar-points li')).toHaveCount(6)
   await expect(page.getByRole('heading', { name: 'Mount is not rigid', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Start again', exact: true })).toBeEnabled()
   await expect(page.locator('.vela-polar-total')).toHaveCount(0)
   await expect(page.getByText(/Move (left|right|up|down)/)).toHaveCount(0)
+  await expect(page.locator('.vela-polar-image svg')).toHaveCount(0)
   expect(scene.writes).toEqual([])
+})
+
+test('a rigid six-fix run shows its six positions and the fit’s error', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 782 })
+  await openAlignmentScene(page, 'alignment-phone-adjusting')
+  await expect(page.locator('.vela-polar-total strong')).toHaveText('38″')
+  await expect(page.getByText('Fitted from 6 of 6 positions')).toBeVisible()
+})
+
+test('a dropped fix is marked with its reason and counted', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 782 })
+  await openAlignmentScene(page, 'alignment-baseline-dropped')
+
+  const points = page.locator('.vela-polar-points li')
+  await expect(points).toHaveCount(6)
+  await expect(points.nth(2)).toContainText('Dropped · Plate-solving failed (no star pattern matched)')
+  await expect(points.nth(3)).toContainText('Solved')
+  await expect(points.nth(4)).toContainText('Measuring')
+  await expect(page.getByText('3 of 6 positions solved · 1 dropped')).toBeVisible()
+})
+
+test('a fit that dropped one fix says it used five of six', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 782 })
+  await openAlignmentScene(page, 'alignment-fit-dropped')
+  await expect(page.getByText('Fitted from 5 of 6 positions')).toBeVisible()
 })
 
 test('appearance preserves alignment viewport, solve and command state', async ({ page }) => {

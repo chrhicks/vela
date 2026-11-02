@@ -21,6 +21,8 @@ export const alignmentScenes = [
   'alignment-baseline-exposing',
   'alignment-baseline-solving',
   'alignment-baseline-no-solution',
+  'alignment-baseline-dropped',
+  'alignment-fit-dropped',
   'alignment-offline',
   'alignment-image-failed',
   'alignment-stop-pending',
@@ -78,8 +80,8 @@ export const alignmentAdjusting: AlignmentView = {
   phase: 'adjusting',
   activity: 'waiting',
   active: true,
-  position: 3,
-  solvedPositions: 3,
+  position: 6,
+  solvedPositions: 6,
   exposureSeconds: 2,
   exposureStartedAt: null,
   measuredAt: alignmentMeasuredAt,
@@ -175,6 +177,15 @@ export function createAlignmentScene(name: AlignmentScene) {
     }
   }
 
+  const droppedPosition = { position: 3, detail: 'Plate-solving failed (no star pattern matched)' }
+
+  if (name === 'alignment-baseline-dropped') {
+    view = { ...view, activity: 'exposing', position: 5, solvedPositions: 3, dropped: [droppedPosition], preview: null }
+    view.exposureStartedAt = alignmentMeasuredAt
+  }
+
+  if (name === 'alignment-fit-dropped') view = { ...view, solvedPositions: 5, dropped: [droppedPosition] }
+
   if (interrupted) {
     view.activity = 'retrying'
     view.warning = 'Device connection interrupted. Retrying automatically.'
@@ -201,11 +212,11 @@ export function createAlignmentScene(name: AlignmentScene) {
       phase: 'not-rigid',
       active: false,
       activity: 'idle',
-      position: 3,
-      solvedPositions: 3,
+      position: 6,
+      solvedPositions: 6,
       measuredAt: null,
       measurement: null,
-      rigidity: { missArcmin: 33.4, thresholdArcmin: 2 },
+      rigidity: { missArcmin: 33.4, thresholdArcmin: 2, steps: [{ beforePosition: 3, afterPosition: 4 }] },
     }
   }
 

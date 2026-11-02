@@ -218,6 +218,7 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
       exposureStartedAt: null,
       error: null,
       rigidity: null,
+      dropped: [],
       warning: null,
     })
     images.clear()
@@ -756,7 +757,10 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
         await diagnostics?.recordDropped(position, reason, detail)
         signal.throwIfAborted()
         dropped.push({ position, detail: describeDropped(attempt.dropped) })
-        patch({ warning: `${describeDropped(attempt.dropped)}. Skipping position ${position}.` })
+        patch({
+          dropped: [...dropped],
+          warning: `${describeDropped(attempt.dropped)}. Skipping position ${position}.`,
+        })
 
         // The adjusting baseline is a frame taken where the mount now points, so the last position cannot be skipped.
         const reachable = fixes.length + SWEEP_POSITIONS - position >= minimumFixes
