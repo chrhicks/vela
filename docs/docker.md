@@ -87,6 +87,7 @@ application dependency graph.
 
 ```sh
 uv run --script tools/nats/provision.py init
+mkdir -p "${VELA_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/vela}/model"
 docker compose up -d nats
 uv run --script tools/nats/provision.py apply
 ```
@@ -287,15 +288,28 @@ The service and archive replay share `createStreamModel`, which calls the same
 `step` and `assess` exports as the server host. After each unique fact, a clock
 input advances to that fact's `seenAt`. No wall clock enters replay. Accepted
 `solve-result` events use the legacy solve join; rejected C1 verdicts cannot fix
-pointing. Delivery order matters. Duplicate event IDs are ignored.
+pointing. Delivery order matters. Redeliveries at or below each stream's applied sequence are ignored.
 
-Before acknowledgement, each input is saved in the model state directory using
-the archive writer. Create `model` under the data directory before starting the
-service. On restart it replays those inputs in broker order and republishes
-stable output IDs. Archive reads deduplicate repeated outputs. State storage and
-replay memory grow with the input history; there is no compaction in this step.
+The model keeps no input archive. It checkpoints every 128 deliveries or 2 seconds,
+whichever comes first, before acknowledging that batch. This bounds unacknowledged
+work below the consumer's 256-message limit and limits idle checkpoint delay.
+A normal restart loads the checkpoint and resumes `model-v1` without archive reads.
+If the checkpoint is missing, invalid, or behind the durable consumer's ack floor,
+it rebuilds through that floor from step 37's read-only archive in broker order.
+If the archive has not reached that floor, startup fails without acknowledging more facts.
 
-Run the synthetic broker check without touching hardware or the live compose project:
+Each rig has two fixed checkpoint slots, with a 16 MiB limit per slot, and a
+shared atomic manifest containing stream sequence high-water marks. Temp writes,
+file sync, rename, and directory sync commit a complete generation before ack.
+A failed write can leave one temp file per rig, so storage is at most 48 MiB per
+rig plus the manifest. Exceeding the limit stops consumption rather than dropping
+reducer state. The private V8 checkpoint format is versioned with the reducer.
+The reducer's session-scoped `decided` map is preserved unchanged.
+
+Create the `model` data directory in the provisioning steps above before starting
+compose. Its bind mount uses `create_host_path: false`. The archive mount is read-only.
+
+Run the disposable-broker check with:
 
 ```sh
 uv run tools/nats/verify-model.py

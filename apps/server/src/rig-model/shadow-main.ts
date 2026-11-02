@@ -11,6 +11,7 @@ try {
     url: process.env.VELA_NATS_URL ?? 'nats://127.0.0.1:4222',
     credentialsFile: process.env.VELA_NATS_CREDENTIALS_FILE ?? '/credentials.json',
     directory: process.env.VELA_MODEL_STATE_DIR ?? '/data/model',
+    archiveDirectory: process.env.VELA_ARCHIVE_DIR ?? '/data/archive',
     signal: stop.signal,
   })
 } catch {

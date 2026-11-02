@@ -38,7 +38,7 @@ it.skipIf(!process.env.TEST_NATS_URL)('broker live assessments equal ordered arc
 
   const { baseline, shadow } = modelFixture()
   const events = inOrder(baseline, shadow).filter(event => event.kind !== 'session')
-  const options = { url, credentialsFile, directory: join(directory, 'state') }
+  const options = { url, credentialsFile, directory: join(directory, 'state'), archiveDirectory: join(directory, 'archive') }
   let deliveries = 0
   let restarted: Promise<void> | undefined
 
@@ -60,7 +60,9 @@ it.skipIf(!process.env.TEST_NATS_URL)('broker live assessments equal ordered arc
 
     await first
     expect(deliveries).toBe(35)
-    restarted = runShadowModel({ ...options, signal: secondStop.signal })
+    const resumedSequences: number[] = []
+
+    restarted = runShadowModel({ ...options, signal: secondStop.signal, onPublished: async sequence => { resumedSequences.push(sequence) } })
       .catch(error => { if (!secondStop.signal.aborted) throw error })
 
     await expect.poll(async () => {
@@ -71,6 +73,7 @@ it.skipIf(!process.env.TEST_NATS_URL)('broker live assessments equal ordered arc
     const info = await manager.consumers.info('RIG_FACTS', 'model-v1')
 
     expect(info.delivered.consumer_seq).toBeGreaterThan(events.length)
+    expect(resumedSequences[0]).toBe(1)
 
     for (const stream of ['RIG_FACTS', 'RIG_ASSESS']) {
       await expect.poll(async () => {
@@ -78,6 +81,22 @@ it.skipIf(!process.env.TEST_NATS_URL)('broker live assessments equal ordered arc
 
         return state.num_pending + state.num_ack_pending
       }, { timeout: 10000 }).toBe(0)
+    }
+
+    secondStop.abort()
+    await restarted
+
+    for (const recovery of ['checkpoint', 'archive'] as const) {
+      if (recovery === 'archive') await rm(options.directory, { recursive: true })
+      const stop = new AbortController()
+      let recovered: string | undefined
+
+      await runShadowModel({ ...options,
+        archiveDirectory: recovery === 'checkpoint' ? join(directory, 'does-not-exist') : options.archiveDirectory,
+        signal: stop.signal,
+        onRecovery: path => { recovered = path; stop.abort() },
+      }).catch(error => { if (!stop.signal.aborted) throw error })
+      expect(recovered).toBe(recovery)
     }
 
     const range = { from: s(0), to: s(60) }
@@ -92,7 +111,7 @@ it.skipIf(!process.env.TEST_NATS_URL)('broker live assessments equal ordered arc
 
     expect(JSON.parse(cli)).toEqual(comparison)
     expect(comparison).toHaveProperty('assessments')
-    console.log(JSON.stringify({ comparison, facts: events.length, deliveries: info.delivered.consumer_seq, restart: true, redelivery: true }))
+    console.log(JSON.stringify({ comparison, facts: events.length, deliveries: info.delivered.consumer_seq, restart: true, redelivery: true, checkpointWithoutArchive: true, lostCheckpointRebuilt: true }))
     archiveStop.abort()
     await archive
     const day = new Date(shadow.at).toISOString().slice(0, 10)
