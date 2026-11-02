@@ -93,6 +93,9 @@ importers:
       '@vela/model':
         specifier: workspace:*
         version: link:../../packages/model
+      '@vela/rig-events':
+        specifier: workspace:*
+        version: link:../../packages/rig-events
       '@vela/rig-sky':
         specifier: workspace:*
         version: link:../../packages/rig-sky
@@ -112,6 +115,9 @@ importers:
       '@types/node':
         specifier: ^26.2.0
         version: 26.2.0
+      '@vela/rig-testing':
+        specifier: workspace:*
+        version: link:../../packages/rig-testing
       tsx:
         specifier: ^4.21.0
         version: 4.23.12

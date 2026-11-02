@@ -16,6 +16,7 @@ RUN pnpm --config.block-exotic-subdeps=false --filter @vela/server deploy --prod
 
 FROM node:26-slim AS server
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=3001
+ENV NODE_OPTIONS=--conditions=built
 WORKDIR /app
 COPY --from=build /out/server ./
 USER node

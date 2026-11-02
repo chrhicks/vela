@@ -15,7 +15,7 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/server.js"
+    "start": "node --conditions=built dist/server.js"
   },
   "dependencies": {
     "@opentelemetry/api": "1.9.1",
@@ -30,10 +30,12 @@
     "yaml": "^2.9.0",
     "zod": "4.5.4",
     "@vela/equipment": "workspace:*",
-    "@vela/cria": "workspace:*"
+    "@vela/cria": "workspace:*",
+    "@vela/rig-events": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
+    "@vela/rig-testing": "workspace:*",
     "tsx": "^4.21.0",
     "typescript": "^7.0.2"
   }

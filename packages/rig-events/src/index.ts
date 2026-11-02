@@ -2,6 +2,8 @@ export * from './bodies.ts'
 
 export * from './codec.ts'
 
+export * from './cria-entry.ts'
+
 export * from './event.ts'
 
 export * from './hash.ts'

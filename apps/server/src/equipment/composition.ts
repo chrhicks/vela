@@ -8,7 +8,8 @@ import {
   createAlpacaProvider,
   type AlpacaDiscovery,
 } from '@vela/alpaca'
-import { createCriaConnection, createCriaEquipment, openJournalFile, type CriaConnection, type CriaConnectionOptions, type CriaRecovery } from '@vela/cria'
+import { createCriaConnection, createCriaEquipment, type CriaConnection, type CriaConnectionOptions, type CriaRecovery, type JournalSink } from '@vela/cria'
+import { criaEvent, rigId, sourceId } from '@vela/rig-events'
 import {
   EquipmentError,
   type Acquisition,
@@ -25,6 +26,7 @@ import { createRigDeviceInventory, type RigDeviceInventory } from '../device/inv
 import type { RigCatalogRecord, RigEquipmentSource } from '../rig/contracts.js'
 import type { AlignmentSettings } from '../alignment/controller.js'
 import { criaDeviceId, type CriaRigConfiguration } from './config.js'
+import type { RunLog } from '../run-log/run-log.js'
 import { alpacaEndpoint } from './source.js'
 
 export interface EquipmentComposition {
@@ -53,8 +55,23 @@ interface CompositionOptions {
   solver?: { executable: string; catalogPath: string }
   diagnosticsPath?: string
   fetch?: typeof globalThis.fetch
-  /** Where each Cria connection appends what it decodes; off when absent. */
-  criaJournalPath?: string
+  /** Where each Cria connection reports what it decodes; nothing is kept when absent. */
+  runLog?: Pick<RunLog, 'append'>
+}
+
+const criaSource = sourceId('vela:cria')
+
+function criaRigId(id: string) {
+  try {
+    return rigId(id)
+  } catch {
+    throw new Error(`Cria rig id "${id}" cannot name a rig in the run log: use lowercase letters, digits and hyphens.`)
+  }
+}
+
+/** The sink one Cria connection reports to: each entry becomes an envelope for this rig. */
+function criaSink(log: Pick<RunLog, 'append'>, rig: ReturnType<typeof rigId>): JournalSink {
+  return { record: entry => log.append(criaEvent(entry, { rig, source: criaSource })) }
 }
 
 /** Select equipment ownership at composition; workflows receive only the capabilities they use. */
@@ -64,7 +81,6 @@ export function createEquipmentComposition(
 ): EquipmentComposition {
   const clients = new Map<string, CriaConnection>()
   const equipment = new Map<string, ReturnType<typeof createCriaEquipment>>()
-  const journal = options.criaJournalPath ? openJournalFile(options.criaJournalPath) : undefined
 
   for (const configuration of configurations) {
     let client = clients.get(configuration.url)
@@ -76,7 +92,8 @@ export function createEquipmentComposition(
 
       if (options.fetch) connection = { ...connection, fetch: options.fetch }
 
-      if (journal) connection = { ...connection, journal }
+      if (options.runLog) connection = { ...connection, journal: criaSink(options.runLog, criaRigId(configuration.id)) }
+
       client = createCriaConnection(connection)
       clients.set(configuration.url, client)
     }
@@ -117,7 +134,6 @@ export function createEquipmentComposition(
     },
     async close() {
       await Promise.all([...clients.values()].map(client => client.close()))
-      await journal?.close()
     },
     alpacaDiscovery: createAlpacaDiscovery(),
     createInventory: rig => createRigDeviceInventory(rig, { provider: provider(rig) }),
