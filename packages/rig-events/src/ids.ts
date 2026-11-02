@@ -28,6 +28,8 @@ export function eventIdOf(draft: Draft): EventId {
       return brandEventId(`autofocus:${draft.rig}:${draft.body.startedAt}`)
     case 'alignment':
       return brandEventId(`alignment:${draft.body.runId}:${draft.body.n}`)
+    case 'aim':
+      return brandEventId(`aim:${draft.rig}:${draft.body.goalId}`)
     case 'attestation':
       return brandEventId(`attestation:${draft.rig}:${draft.at}`)
     case 'solve':

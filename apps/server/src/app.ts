@@ -164,6 +164,7 @@ export function buildApp({
   registerImagingCamera(app, rigCatalog, operations, { createInspector })
   registerTargets(app, rigCatalog, operations, {
     ...targets,
+    ...(runLog && { aim: { ...(models && { models }), log: runLog } }),
     sendFix: equipment.sendFix,
     createInspector,
     createAdapter: equipment.createFraming,

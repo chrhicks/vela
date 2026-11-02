@@ -1,3 +1,5 @@
+import { assess, createModel, defaultConfig } from '@vela/rig-model'
+import { rigId, sourceId, type RigEvent } from '@vela/rig-events'
 import { describe, expect, it, vi } from 'vitest'
 import type { TargetPosition } from '@vela/model/web'
 import { judgedSolver, type MonoFrame, type PlateSolver, type SolveResult } from '../plate-solving/judged-solver.js'
@@ -47,9 +49,10 @@ function workshop(
   wait: (signal: AbortSignal) => Promise<void> = async signal => {
     signal.throwIfAborted()
   },
+  aim?: Parameters<typeof createFramingController>[4],
 ) {
   let date = new Date(at)
-  const controller = createFramingController(() => date, wait)
+  const controller = createFramingController(() => date, wait, undefined, undefined, aim)
 
   const mount: FramingMount = {
     rightAscensionDegrees: 10,
@@ -895,4 +898,39 @@ describe('geometric pointing correction', () => {
       ),
     ).toThrow('opposite')
   })
+})
+
+
+it('leaves framing and corrections unchanged and logs one Aim result per goal', async () => {
+  const events: RigEvent[] = []
+  const assessment = assess(createModel(defaultConfig(rigId('test-rig'), sourceId('test:model'))))
+
+  const attached = workshop(undefined, {
+    models: { get: () => ({ ...assessment, confidence: 'low', budgetArcmin: 2 }) },
+    log: { append: event => { events.push(event) } },
+  })
+
+  const plain = workshop()
+
+  for (const fake of [plain, attached]) {
+    await fake.start().finished
+    expect(fake.controller.snapshot().phase).toBe('checked')
+    fake.solver.solve = vi.fn(async () => solution(desired))
+    await fake.start({ center: true }).finished
+  }
+
+  expect(attached.slews).toEqual(plain.slews)
+  expect(attached.controller.snapshot()).toMatchObject({ phase: 'checked', centering: { outcome: 'centered', correction: 1 } })
+  expect(events.map(event => event.kind === 'aim' && event.body.status)).toEqual(['missed', 'aimed'])
+  expect(new Set(events.map(event => event.id)).size).toBe(2)
+})
+
+it('records refusal without blocking framing when the model has no confidence', async () => {
+  const events: RigEvent[] = []
+  const fake = workshop(undefined, { log: { append: event => { events.push(event) } } })
+
+  await fake.start().finished
+  expect(fake.controller.snapshot().phase).toBe('checked')
+  expect(fake.slews).toHaveLength(1)
+  expect(events).toMatchObject([{ kind: 'aim', body: { status: 'refused', reason: 'no-confidence' } }])
 })

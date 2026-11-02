@@ -400,3 +400,22 @@ export type GapBody = typeof GapBody.Type
 export type MountPositionBody = typeof MountPositionBody.Type
 
 export type PointingFixBody = typeof PointingFixBody.Type
+
+export const AimBody = Schema.Struct({
+  goalId: Schema.String,
+  target: Schema.Struct({ raDegrees: Schema.Number, decDegrees: Schema.Number }),
+  status: Schema.Literals(['aimed', 'missed', 'refused']),
+  reason: Schema.Literals(['within-tolerance', 'outside-tolerance', 'budget', 'no-solve', 'interrupted', 'no-confidence', 'mount-unavailable', 'mount-held', 'outside-envelope']),
+  elapsedMs: Schema.Number,
+  corrections: Schema.Number,
+  residualArcmin: Schema.NullOr(Schema.Number),
+  toleranceArcmin: Schema.Number,
+  maxCorrections: Schema.Number,
+  maxElapsedMs: Schema.Number,
+  gotoWarningArcmin: Schema.Number,
+  gotoMissArcmin: Schema.NullOr(Schema.Number),
+  gotoWarning: Schema.Boolean,
+  confidence: Schema.Literals(['high', 'low', 'none']),
+  pointingBudgetArcmin: Schema.NullOr(Schema.Number),
+  blindTravelDegrees: Schema.NullOr(Schema.Number),
+})

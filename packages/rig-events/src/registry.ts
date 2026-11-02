@@ -15,6 +15,7 @@ export const kinds = {
   frame: { branch: 'fact', producers: ['vela'] },
   autofocus: { branch: 'fact', producers: ['vela'] },
   attestation: { branch: 'fact', producers: ['vela'] },
+  aim: { branch: 'assess', producers: ['vela'] },
   alignment: { branch: 'fact', producers: ['vela'] },
   solve: { branch: 'fact', producers: ['solver'] },
   session: { branch: 'fact', producers: ['operator'] },
