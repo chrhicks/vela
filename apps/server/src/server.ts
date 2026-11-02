@@ -1,3 +1,4 @@
+import { openPublisher } from './run-log/publisher.js'
 import { createRejectedStore, createFramingRejections } from './plate-solving/rejected.js'
 import { buildApp } from './app.js'
 import { openFileRigCatalog } from './rig/catalog.js'
@@ -17,7 +18,7 @@ import { loadAlertsConfiguration } from './alerts/config.js'
 import { createPushoverNotifier } from './alerts/pushover.js'
 import { createHorizon } from './targets/horizon.js'
 import { openRunLog, type RunLog } from './run-log/run-log.js'
-import { createModelHost, modelRunLog } from './rig-model/host.js'
+import { createModelHost } from './rig-model/host.js'
 import { createAttestation } from './attestation/attestation.js'
 
 const telemetry = startTelemetry(process.env.VELA_TRACE_PATH)
@@ -28,14 +29,21 @@ const models = createModelHost(runLogDirectory)
 
 void models.ready.catch(error => console.error('Rig model restore failed:', error))
 
-const runLog: RunLog | undefined = runLogDirectory ? modelRunLog(openRunLog({
+const publisher = runLogDirectory && process.env.VELA_NATS_URL && process.env.VELA_NATS_CREDENTIALS_FILE
+  ? openPublisher({ url: process.env.VELA_NATS_URL, credentialsFile: process.env.VELA_NATS_CREDENTIALS_FILE }) : undefined
+
+const runLog: RunLog | undefined = runLogDirectory ? openRunLog({
+  onAppend(event) {
+    models.onAppend(event)
+    publisher?.append(event)
+  },
   directory: runLogDirectory,
   async openFile(...args) {
     await models.ready.catch(() => {})
 
     return open(...args)
   },
-}), models) : undefined
+}) : undefined
 
 const frameRecords = runLog ? frameRecordsOn(runLog) : noFrameRecords
 
@@ -53,6 +61,7 @@ function shutdown() {
     try {
       await app?.close()
     } finally {
+      await publisher?.close()
       models.close()
       await runLog?.close()
       await captureRuns.close()
@@ -160,7 +169,7 @@ try {
 
     const options = { models, rigCatalog, savedImages, frameRecords, autofocusRecords, captureRuns,
       targets: { ...targets, ...(recordRejected && { recordRejected }) },
-      surveyCache, equipment, alerts, attestation, ...(runLog && { runLog }),
+      surveyCache, equipment, alerts, attestation, ...(publisher && { publisher }), ...(runLog && { runLog }),
     }
 
     app = buildApp(alignment ? { ...options, alignment } : options)
