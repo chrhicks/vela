@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { constants } from 'node:fs'
 import { open } from 'node:fs/promises'
 import { join } from 'node:path'
-import type { Site } from '../astronomy/coordinates.js'
+import type { Site } from '@vela/rig-sky'
 import {
   diagnosticEntrySchema,
   diagnosticJournalName,

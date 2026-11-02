@@ -1,10 +1,7 @@
 # Astronomy coordinates
 
-`coordinates.ts` converts distant J2000 catalog positions to and from airless
-topocentric apparent coordinates, using Astronomy Engine precession/nutation and
-annual/diurnal aberration. Site longitude is east-positive. It owns no mount
-commands, target discovery, or alignment operation state. The targets sky module
-re-exports these helpers for its existing consumers.
+Coordinate conversion lives in `@vela/rig-sky`: J2000 catalog positions to and from airless topocentric apparent
+coordinates, with precession/nutation and annual/diurnal aberration. Site longitude is east-positive.
 
 Physical alignment converts each solved sightline at exposure midpoint and pairs
 it with Greenwich apparent sidereal time plus site longitude. Its geometry output

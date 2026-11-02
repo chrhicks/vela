@@ -8,7 +8,7 @@ import {
   type FramingHardware,
   type FramingMount,
 } from './framing.js'
-import { angularDistance } from './sky.js'
+import { angularDistance } from '@vela/rig-sky'
 
 function deferred<T>() {
   let resolve!: (value: T) => void

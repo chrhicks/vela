@@ -6,7 +6,7 @@ import type { RigCatalog } from '../rig/catalog.js'
 import type { RigCatalogRecord } from '../rig/contracts.js'
 import { listTargets, normalizeCatalogName, type CatalogTarget } from './catalog/index.js'
 import { discoverTargets } from './discovery.js'
-import type { Site } from './sky.js'
+import type { Site } from '@vela/rig-sky'
 import { horizonInWindow, noHorizon, type HorizonRead } from './horizon.js'
 
 interface DiscoveryBoundary {

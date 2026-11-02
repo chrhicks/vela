@@ -1,5 +1,5 @@
 import { SiderealTime } from 'astronomy-engine'
-import { fromMount, toMount, type Site } from '../astronomy/coordinates.js'
+import { fromMount, toMount, type Site } from '@vela/rig-sky'
 import { projectSky, type PlateWcs, type SkyPosition } from '../plate-solving/solver.js'
 import type { AlignmentSample } from './geometry.js'
 

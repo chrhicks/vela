@@ -96,6 +96,9 @@ importers:
       '@vela/rig-events':
         specifier: workspace:*
         version: link:../../packages/rig-events
+      '@vela/rig-sky':
+        specifier: workspace:*
+        version: link:../../packages/rig-sky
       astronomy-engine:
         specifier: 2.1.19
         version: 2.1.19
@@ -287,6 +290,9 @@ importers:
       '@vela/rig-events':
         specifier: workspace:*
         version: link:../rig-events
+      '@vela/rig-sky':
+        specifier: workspace:*
+        version: link:../rig-sky
     devDependencies:
       '@types/node':
         specifier: 26.2.0

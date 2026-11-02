@@ -10,7 +10,8 @@ import type {
 } from '@vela/model/web'
 import { frameImaging, type FrameImaging } from '../imaging/frame-imaging.js'
 import type { MonoFrame, PlateSolver } from '../plate-solving/solver.js'
-import { angularDistance, fromMount, plateCorners, toMount, type Site } from './sky.js'
+import { angularDistance, fromMount, toMount, type Site } from '@vela/rig-sky'
+import { plateCorners } from './sky.js'
 
 export interface FramingMount {
   rightAscensionDegrees: number

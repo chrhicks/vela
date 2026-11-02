@@ -1,4 +1,5 @@
 import type { SkyPosition } from '@vela/rig-events'
+import { angularDistance } from '@vela/rig-sky'
 import type { AstapSolution } from './solver.ts'
 
 type Solved = Extract<AstapSolution, { readonly status: 'solved' }>
@@ -67,16 +68,6 @@ export const fewestStars = 10
 
 const noSolutionReason = { 'no-match': 'no-match', 'too-few-stars': 'few-stars' } as const satisfies Record<Unsolved['reason'], Reason>
 
-const radians = Math.PI / 180
-
-function separationDegrees(a: SkyPosition, b: SkyPosition): number {
-  const half =
-    Math.sin(((b.decDegrees - a.decDegrees) * radians) / 2) ** 2 +
-    Math.cos(a.decDegrees * radians) * Math.cos(b.decDegrees * radians) * Math.sin(((b.raDegrees - a.raDegrees) * radians) / 2) ** 2
-
-  return (2 * Math.asin(Math.sqrt(Math.max(0, Math.min(1, half))))) / radians
-}
-
 /**
  * The two principal scales of the CD matrix, in arcsec/px, from its singular values. They are equal for a rotation
  * and a mirror, so a stretched or sheared matrix cannot hide behind a determinant with the right area scale.
@@ -103,7 +94,7 @@ function measure(wcs: Solved['wcs'], facts: SolveFacts, expected: Expectation): 
     arcsecPerPixel: Math.sqrt(Math.abs(determinant)) * 3600,
     scaleError: scaleError(wcs.cd, expected),
     parity: determinant > 0 ? 1 : -1,
-    hintOffsetDegrees: facts.claimed === null ? null : separationDegrees(wcs, facts.claimed),
+    hintOffsetDegrees: facts.claimed === null ? null : angularDistance(wcs, facts.claimed),
     stars: facts.stars,
   }
 }

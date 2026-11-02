@@ -24,6 +24,7 @@
     "@opentelemetry/sdk-trace-node": "2.11.0",
     "@vela/alpaca": "workspace:*",
     "@vela/model": "workspace:*",
+    "@vela/rig-sky": "workspace:*",
     "astronomy-engine": "2.1.19",
     "fastify": "^5.12.0",
     "yaml": "^2.9.0",
