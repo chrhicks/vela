@@ -71,6 +71,7 @@ export async function replayNight(options: {
   readonly solved: readonly Solved[]
   readonly mount: AsyncIterable<RigEvent>
   readonly settleMs: number
+  readonly onStep?: (result: ReturnType<typeof step>, input: ModelInput) => void
 }): Promise<{ readonly rows: readonly FrameRow[]; readonly model: RigModel; readonly mountEvents: number }> {
   const config = defaultConfig(rigId('backfill'), sourceId('model:backfill'))
   const frames = options.solved.map(solved => ({ solved, ...arrivals(solved) })).toSorted((a, b) => a.solved.capture.image.capturedAt - b.solved.capture.image.capturedAt)
@@ -84,6 +85,7 @@ export async function replayNight(options: {
     const result = step(model, input)
 
     model = result.model
+    options.onStep?.(result, input)
 
     for (const draft of result.out) if (draft.kind === 'pointing-fix') decisions.set(draft.body.outcome === 'fix' ? draft.body.fix.imageId : draft.body.imageId, draft.body)
   }
