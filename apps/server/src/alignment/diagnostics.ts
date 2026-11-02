@@ -177,8 +177,8 @@ export function createAlignmentDiagnostics(
         recordFit: (fixes, latitudeDegrees, fit) =>
           record(() => {
             const { axis, altitudeArcsec, azimuthArcsec, totalArcsec, verdict } = fit
-            // A camera that never turned has no axis; a polar number is journalled only with the axis it came from.
-            const polar = axis.every(Number.isFinite) ? { axis, altitudeArcsec, azimuthArcsec, totalArcsec } : null
+            // A fit that is not rigid has no polar error, so none is journalled with it.
+            const polar = verdict.status === 'rigid' ? { axis, altitudeArcsec, azimuthArcsec, totalArcsec } : null
 
             return append(diagnosticEntrySchema.parse({ type: 'fit', fixes, latitudeDegrees, polar, verdict }))
           }),

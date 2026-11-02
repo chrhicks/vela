@@ -153,7 +153,8 @@ describe('a journal of five fixes and one dropped position', () => {
     expect(trials[0]?.fits[0]?.missArcmin).toBeGreaterThan(trials[0]!.fits[0]!.thresholdArcmin)
     expect(trials[0]?.readings).toEqual([])
     expect([report.rigidity?.status, report.baseline, report.finalMeasurement]).toEqual(['not-rigid', null, null])
-    expect(report.fit?.verdict.steps.map(step => [step.labelBefore, step.labelAfter])).toEqual([['3', '5']])
+    expect(report.fit).toBeNull()
+    expect(report.rigidity && 'steps' in report.rigidity && report.rigidity.steps.map(step => [step.labelBefore, step.labelAfter])).toEqual([['3', '5']])
   })
 
   it('refuses a fit entry that disagrees with the frames it names', async () => {

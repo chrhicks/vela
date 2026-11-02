@@ -772,8 +772,10 @@ it('reports not rigid, with the miss and the step and no polar error, when the m
       thresholdArcmin: 2,
       steps: [{ labelBefore: '3', labelAfter: '4' }],
     })
+    expect(entries.find(entry => entry.type === 'fit').polar).toBeNull()
     expect(entries.some(entry => entry.type === 'measurement')).toBe(false)
     expect(await replayAlignmentDiagnostics(join(directory, trial!))).toMatchObject({
+      fit: null,
       rigidity: { status: 'not-rigid', missArcmin: view.rigidity!.missArcmin },
       maximumDiscrepancies: { rigidityMissArcmin: 0 },
     })
