@@ -8,6 +8,10 @@ import { instantOf } from './times.ts'
 
 const Position = SkyPosition
 
+const Polar = Schema.Struct({ altitudeArcsec: Schema.Number, azimuthArcsec: Schema.Number, totalArcsec: Schema.Number })
+
+const Sample = Schema.Struct({ capturedAt: Schema.String })
+
 const Wcs = Schema.Struct({
   width: Schema.Number,
   height: Schema.Number,
@@ -41,8 +45,8 @@ const Entry = Schema.Union([
       fieldHeightDegrees: Schema.Number,
     }),
   }),
-  Schema.Struct({ type: Schema.Literal('baseline') }),
-  Schema.Struct({ type: Schema.Literal('measurement') }),
+  Schema.Struct({ type: Schema.Literal('baseline'), samples: Schema.Array(Sample), measurement: Polar }),
+  Schema.Struct({ type: Schema.Literal('measurement'), sample: Sample, measurement: Polar }),
   Schema.Struct({ type: Schema.Literal('outcome'), phase: Schema.Literals(['finished', 'stopped', 'failed']) }),
 ])
 
@@ -69,6 +73,16 @@ export interface TrialFrame {
   readonly onDisk: boolean
 }
 
+/** The polar-axis error Vela measured, with the time of the sample it came from (the last one, for a baseline). */
+export interface AlignmentReading {
+  readonly line: number
+  readonly phase: 'baseline' | 'adjusting'
+  readonly at: EpochMs
+  readonly altitudeArcsec: number
+  readonly azimuthArcsec: number
+  readonly totalArcsec: number
+}
+
 export interface Trial {
   readonly directory: string
   /** The folder name's run id; the `run` line carries the same. */
@@ -79,6 +93,7 @@ export interface Trial {
   readonly exposureSeconds: number
   readonly outcome: TrialOutcome
   readonly frames: readonly TrialFrame[]
+  readonly readings: readonly AlignmentReading[]
   readonly baselines: number
   readonly measurements: number
 }
@@ -95,6 +110,7 @@ async function readTrial(directory: string, runId: string, problems: SourceProbl
   const read = await readJsonl(path, Entry)
   const files = new Set(await readdir(directory).catch(() => []))
   const frames: TrialFrame[] = []
+  const readings: AlignmentReading[] = []
   let run: Extract<typeof Entry.Type, { type: 'run' }> | undefined
   let outcome: TrialOutcome = 'unfinished'
   let baselines = 0
@@ -108,11 +124,19 @@ async function readTrial(directory: string, runId: string, problems: SourceProbl
         run ??= value
         break
       case 'baseline':
-        baselines++
+      case 'measurement': {
+        const sample = value.type === 'baseline' ? value.samples[value.samples.length - 1] : value.sample
+        const at = sample === undefined ? undefined : instantOf(sample.capturedAt)
+
+        if (value.type === 'baseline') baselines++
+        else measurements++
+
+        if (at === undefined) problems.push({ path, line, reason: 'a timestamp is not an instant' })
+        else readings.push({ line, phase: value.type === 'baseline' ? 'baseline' : 'adjusting', at, ...value.measurement })
+
         break
-      case 'measurement':
-        measurements++
-        break
+      }
+
       case 'outcome':
         outcome = value.phase
         break
@@ -155,7 +179,7 @@ async function readTrial(directory: string, runId: string, problems: SourceProbl
 
   if (run.run.runId !== runId) problems.push({ path, line: null, reason: 'the run id differs from the folder name' })
 
-  return { directory, runId, rigId: run.run.rigId, mode: run.run.mode, createdAt, exposureSeconds: run.run.exposureSeconds, outcome, frames, baselines, measurements }
+  return { directory, runId, rigId: run.run.rigId, mode: run.run.mode, createdAt, exposureSeconds: run.run.exposureSeconds, outcome, frames, readings, baselines, measurements }
 }
 
 /**

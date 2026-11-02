@@ -15,7 +15,7 @@ Open points that did not block a unit. Each one names the unit it came from.
 
 ## Contracts the sources must keep
 
-- **`seenAt` of a frame or a solve is arrival on the Cria stream's clock (unit 7 must synthesize it).** The backfill stamps a solve with its frame's capture end plus solve time. A source stamped with the import time makes every pair look 120 s late and the model rejects it as `solve-missing`. A test pins this (`time.test.ts`, "takes seenAt as arrival"). Review round 2 asked for the model to accept such pairs as history; the model cannot tell an import clock from a late delivery, and round 1 needed the arrival times to decide expiry the same way with or without clock inputs.
+- **`seenAt` of a frame or a solve is arrival on the Cria stream's clock (`arrivals` in `tools/rig-model/backfill-replay.ts` synthesizes it).** The backfill stamps a frame with the end of its exposure and a solve with that plus its solve time. A source stamped with the import time makes every pair look 120 s late and the model rejects it as `solve-missing`. A test pins this (`time.test.ts`, "takes seenAt as arrival"). Review round 2 asked for the model to accept such pairs as history; the model cannot tell an import clock from a late delivery, and round 1 needed the arrival times to decide expiry the same way with or without clock inputs.
 - **Decisions are remembered until the next setup starts.** An image id and its decision time cost about 100 bytes, so a night is about a megabyte. A redelivery at any age is refused. Review round 3 showed that a bounded memory needs one age key shared by the frame and its solve, and a solve does not carry its frame's exposure end.
 
 ## Guesses to revisit with real nights (unit 5 onward)
@@ -25,9 +25,13 @@ Open points that did not block a unit. Each one names the unit it came from.
 - A Cria restart resets the mount position to `unknown` whatever the first position after it is (Chris, 2026-10-31). A restart fails the run and returns everything to its default state: Cria stops a slew on shutdown and pending exposures end. This replaces the earlier rule that kept the last fix as `uncertain` when the position was unchanged and tracking was on.
 - Only the first solve of an image counts. A second solve of the same image by another solver version is ignored.
 
+- `rig backfill` (step 4) holds a run of back-to-back exposures to the last alignment reading. A run is fitted with 4 fixes over 5 minutes or more, and a pause of over 60 s ends it. The speed of its drift (east and north together) gives a least polar error, and more than 20 arcmin above the alignment counts as a disagreement. The bracket ends at the shortest stretch from the run's start that disagrees alone, and a later alignment reading at least as large as the drift needs corroborates that a polar error caused it (a tracking-rate error would drift the field too). The 20 is a first guess from three nights: the quiet runs on 2026-10-23 and 2026-10-24 need at most 10.0 arcmin, and the event run on 2026-10-26 needs 41.8. Using the north drift alone (the Dec drift a polar error classically makes) separated them by only 5.9 against 11.5, so the first margin (5, then 8) sat inside the noise; the speed is the better statistic because a polar error drifts the field in both directions. A tracking-rate or refraction drift adds to it, so it stays a lower bound only while nothing else drifts the field.
+- A commanded exposure counts as kept when a saved image or a trial frame file starts within 30 s of it and has the same length.
+
 ## Not done yet
 
-- The model has not seen a real night. Units 5 to 7 bring errai's recordings.
+- The model has now seen real nights through `rig backfill`. Two nights hold no mount history at all (2026-10-14 and 2026-10-17: the Cria journal starts on 2026-10-19 and errai's recordings on 2026-10-23), so their frames are solved and not joined. A night takes its mount from the recordings when any overlaps it and from the journal otherwise, never both; a night half covered by recordings would lose its uncovered frames.
+- ASTAP crashes with a floating point exception on a frame with no stars and still exits 0 with no solution file, which `solveFrame` reports as `solver-error` (31 frames on the morning of 2026-10-24). They are not a solver fault to fix; step 6's verdict can name the case.
 - `tangentOffsetArcmin` gives no answer past 89 degrees, and the model rejects such a fix as `offset-undefined`. A mount that points more than 89 degrees from the sky it reports would be a fault to surface, not only a rejected frame.
 
 ## Comment pass (Comment Sicko, Sonnet 5.5) flags left open
