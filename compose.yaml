@@ -46,6 +46,8 @@ services:
       VELA_SURVEY_CACHE_PATH: /data/survey-cache
       VELA_TRACE_PATH: /data/traces/observing.jsonl
       VELA_RUN_LOG_DIR: /data/run-log
+      VELA_NATS_URL: nats://nats:4222
+      VELA_NATS_CREDENTIALS_FILE: /data/nats/credentials.json
       VELA_ALIGNMENT_DIAGNOSTICS_PATH: /data/alignment-diagnostics/trials
       VELA_ASTAP: /astap/astap_cli
       VELA_STAR_CATALOG: /astap/catalog/opt/astap

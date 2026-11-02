@@ -276,3 +276,12 @@ describe('a disk that fails', () => {
     expect(problems).toHaveLength(1)
   })
 })
+
+it('keeps the run log writable when its second sink throws', async () => {
+  const log = openLog({ onAppend() { throw new Error('sink unavailable') } })
+  const event = exchange(1000)
+
+  expect(() => log.append(event)).not.toThrow()
+  await log.close()
+  expect(await eventsOnDisk()).toEqual([event])
+})

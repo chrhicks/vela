@@ -145,3 +145,22 @@ pull acknowledgments, checks repeat provisioning, and removes its container and 
 ```sh
 uv run --script tools/nats/verify.py
 ```
+
+The server publishes the run log to JetStream when both `VELA_NATS_URL` and
+`VELA_NATS_CREDENTIALS_FILE` are set. Compose sets these to the internal broker
+and `/data/nats/credentials.json`. The file is read once at startup; the server
+uses only its `publisher` role. Without both variables the publisher is off.
+`/api/health` reports `publisher` alongside `runLog`.
+
+The publisher retains at most 128 envelopes or 5 MiB of encoded payloads,
+whichever fills first. That is 128 snapshots at the step 12a estimate of 40 KiB,
+about two minutes at one snapshot per second. A single in-flight publish can
+retain another 1 MiB. Oversized messages are dropped. A full queue drops its
+oldest event. After recovery, a `gap` per affected rig reports the dropped count
+and the first and last lost observation times before the retained tail resumes.
+The queue is volatile and shutdown does not flush it. JetStream uses each
+envelope's id as `Nats-Msg-Id`.
+
+Run `TMPDIR=/path/to/scratch uv run tools/nats/verify-publisher.py` to provision a
+disposable broker, kill it during FakeCria capture, restart it and read the gap
+and retained tail back. The check removes its container and private files.
