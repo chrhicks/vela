@@ -167,7 +167,7 @@ try {
       createRejectedStore(resolve(dirname(rigCatalogPath), 'rejected')), runLog,
     )
 
-    const options = { models, ...(process.env.VELA_SHADOW_MODEL_STATE_DIR && { shadowStateDirectory: process.env.VELA_SHADOW_MODEL_STATE_DIR }), rigCatalog, savedImages, frameRecords, autofocusRecords, captureRuns,
+    const options = { models, telemetry, ...(process.env.VELA_SHADOW_MODEL_STATE_DIR && { shadowStateDirectory: process.env.VELA_SHADOW_MODEL_STATE_DIR }), rigCatalog, savedImages, frameRecords, autofocusRecords, captureRuns,
       targets: { ...targets, ...(recordRejected && { recordRejected }) },
       surveyCache, equipment, alerts, attestation, ...(publisher && { publisher }), ...(runLog && { runLog }),
     }

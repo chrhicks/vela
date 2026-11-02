@@ -42,9 +42,19 @@ last queued batch.
 The SDK queue is bounded at 2048 spans, exporting up to 128 at a time. The async
 writer bounds queued serialized data at 4 MiB and retains five files of at most
 20 MiB each (the active file and `.1` through `.4`). Use one path per running
-server. Export failures are reported to stderr and do not fail device commands;
-a disk failure disables further writes for that exporter. Restart the server
-after resolving it. Graceful server shutdown closes active controllers before
+server. Export failures are reported to stderr and do not fail device commands.
+
+A failed write drops its spans and the writer tries again, so tracing resumes by itself
+when the disk does. Nothing queues for the retry. Spans arriving during the pause are
+dropped too, without touching the disk. The pause after the first failure is 5 s, then
+30 s, then 60 s for every later failure in a row, and a successful write resets it.
+Before each retry the writer re-reads the file size and truncates a torn last line, so
+the journal stays whole JSON lines. A traces directory that cannot be written at start
+fails the first write the same way and is retried. `GET /api/health` shows it under
+`telemetry`: `state` is `ok`, `failing` or `off` (no `VELA_TRACE_PATH`), with `dropped`
+(spans lost since the process started, for any reason), `lastWriteAt` and
+`lastError` (`at`, `message`) as epoch milliseconds. `failing` lasts until a write
+succeeds. Graceful server shutdown closes active controllers before
 flushing tracing, with a five-second telemetry shutdown limit. No device request
 waits for disk flushing.
 

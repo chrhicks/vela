@@ -1,4 +1,4 @@
-import { appendFile, mkdir, rename, rm, stat } from 'node:fs/promises'
+import { appendFile, mkdir, rename, rm, stat, truncate } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { ExportResultCode, type ExportResult } from '@opentelemetry/core'
 import { resourceFromAttributes } from '@opentelemetry/resources'
@@ -14,7 +14,26 @@ interface TraceFileOptions {
   retainedFiles?: number
   maxPendingBytes?: number
   onError?: (error: Error) => void
+  appendFile?: typeof appendFile
+  now?: () => number
 }
+
+const retryDelaysMs = [5_000, 30_000, 60_000]
+
+export type TraceHealth =
+  | { readonly state: 'off' }
+  | {
+      readonly state: 'ok' | 'failing'
+      readonly dropped: number
+      readonly lastWriteAt: number | null
+      readonly lastError: { readonly at: number; readonly message: string } | null
+    }
+
+export interface TraceFileExporter extends SpanExporter {
+  health(): Extract<TraceHealth, { state: 'ok' | 'failing' }>
+}
+
+const backingOff = new Error('Trace writer is backing off after a write failure; spans were dropped')
 
 /** One process owns this journal. Completed spans are readable during a run;
  * an unfinished parent does not hold back its completed children. */
@@ -25,8 +44,10 @@ export function createTraceFileExporter(
     retainedFiles = 5,
     maxPendingBytes = 4 * 1024 * 1024,
     onError = error => console.error('Vela tracing:', error.message),
+    appendFile: append = appendFile,
+    now = Date.now,
   }: TraceFileOptions = {},
-): SpanExporter {
+): TraceFileExporter {
   if (
     ![maxFileBytes, retainedFiles, maxPendingBytes].every(
       value => Number.isSafeInteger(value) && value > 0,
@@ -39,10 +60,31 @@ export function createTraceFileExporter(
   let pending = Promise.resolve()
   let pendingBytes = 0
   let fileBytes = 0
+  let committedBytes: number | undefined
   let initialized = false
   let closed = false
-  let failed: Error | undefined
+  let failures = 0
+  let retryAt = 0
+  let dropped = 0
+  let lastWriteAt: number | null = null
+  let lastError: { at: number; message: string } | null = null
   let reported = false
+
+  const isBackingOff = () => failures > 0 && now() < retryAt
+
+  function fail(error: Error) {
+    failures++
+    retryAt = now() + retryDelaysMs[Math.min(failures, retryDelaysMs.length) - 1]!
+    lastError = { at: now(), message: error.message }
+    initialized = false
+    report(error)
+  }
+
+  function succeed() {
+    failures = 0
+    reported = false
+    lastWriteAt = now()
+  }
 
   function report(error: Error) {
     if (reported) return
@@ -57,13 +99,16 @@ export function createTraceFileExporter(
   async function write(lines: string[]) {
     if (!initialized) {
       await mkdir(dirname(file), { recursive: true })
-      fileBytes = await stat(file).then(
+      const size = await stat(file).then(
         info => info.size,
         error => {
           if (error.code === 'ENOENT') return 0
           throw error
         },
       )
+      committedBytes ??= size
+      if (size > committedBytes) await truncate(file, committedBytes)
+      fileBytes = Math.min(size, committedBytes)
       initialized = true
     }
 
@@ -71,8 +116,9 @@ export function createTraceFileExporter(
 
     async function flushChunk() {
       if (!chunk) return
-      await appendFile(file, chunk, { mode: 0o600 })
+      await append(file, chunk, { mode: 0o600 })
       chunk = ''
+      committedBytes = fileBytes
     }
 
     for (const line of lines) {
@@ -100,6 +146,7 @@ export function createTraceFileExporter(
         }
 
         fileBytes = 0
+        committedBytes = 0
       }
 
       chunk += line
@@ -112,11 +159,13 @@ export function createTraceFileExporter(
   return {
     export(spans, callback) {
       const reject = (error: Error) => {
-        report(error)
+        dropped += spans.length
+        if (error !== backingOff) report(error)
         callback({ code: ExportResultCode.FAILED, error })
       }
 
-      if (closed || failed) return reject(failed ?? new Error('Trace exporter is closed'))
+      if (closed) return reject(new Error('Trace exporter is closed'))
+      if (isBackingOff()) return reject(backingOff)
       let lines: string[]
 
       try {
@@ -135,20 +184,19 @@ export function createTraceFileExporter(
       pendingBytes += bytes
 
       const task = pending.then(async () => {
-        if (failed) throw failed
+        if (isBackingOff()) throw backingOff
         await write(lines)
       })
 
-      pending = task.then(
-        () => undefined,
-        cause => {
-          failed = asError(cause)
-          report(failed)
-        },
-      )
+      pending = task.then(succeed, cause => {
+        if (cause !== backingOff) fail(asError(cause))
+      })
       void task.then(
         () => finish({ code: ExportResultCode.SUCCESS }),
-        cause => finish({ code: ExportResultCode.FAILED, error: asError(cause) }),
+        cause => {
+          dropped += spans.length
+          finish({ code: ExportResultCode.FAILED, error: asError(cause) })
+        },
       )
 
       function finish(result: ExportResult) {
@@ -156,6 +204,12 @@ export function createTraceFileExporter(
         callback(result)
       }
     },
+    health: () => ({
+      state: failures > 0 ? 'failing' : 'ok',
+      dropped,
+      lastWriteAt,
+      lastError,
+    }),
     async shutdown() {
       closed = true
       await pending
@@ -208,7 +262,12 @@ function traceRecord(span: ReadableSpan) {
 /** SDK ownership belongs to the server bootstrap; importing the API elsewhere
  * remains a no-op when local tracing is not configured. */
 export function startTelemetry(path: string | undefined) {
-  if (!path?.trim()) return { shutdown: async () => {}, forceFlush: async () => {} }
+  if (!path?.trim())
+    return {
+      shutdown: async () => {},
+      forceFlush: async () => {},
+      health: (): TraceHealth => ({ state: 'off' }),
+    }
   const exporter = createTraceFileExporter(path)
 
   const provider = new NodeTracerProvider({
@@ -228,6 +287,7 @@ export function startTelemetry(path: string | undefined) {
 
   return {
     forceFlush: () => provider.forceFlush(),
+    health: (): TraceHealth => exporter.health(),
     async shutdown() {
       let timeout: ReturnType<typeof setTimeout> | undefined
 
