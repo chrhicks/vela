@@ -39,7 +39,28 @@ export interface SurveyCacheOptions {
   directory?: string
   fetch?: typeof globalThis.fetch
   maxBytes?: number
+  now?: () => number
+  timeoutMs?: number
 }
+
+/** The survey host is paused or busy. The request never reached it, so retrying later is safe. */
+export class SurveyUnavailableError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'SurveyUnavailableError'
+  }
+}
+
+/** After an upstream timeout or connection failure, fail every uncached request fast for this long. */
+const PAUSE_MS = 60_000
+
+/**
+ * A browser holds six connections per origin, and the status polls share them. Upstream fetches slower than
+ * this count as slow, and while this many are slow, new uncached requests are refused at once.
+ */
+const SLOW_FETCH_MS = 3000
+
+const MAX_SLOW_FETCHES = 4
 
 function validatePath(path: string): void {
   if (path === 'properties' || path === 'Norder3/Allsky.jpg') return
@@ -124,6 +145,8 @@ export function createSurveyCache(options: SurveyCacheOptions = {}) {
   const directory = options.directory ?? join(homedir(), '.cache', 'vela', 'survey', VERSION)
   const fetchImage = options.fetch ?? globalThis.fetch
   const maxBytes = options.maxBytes ?? 256 * 1024 * 1024
+  const now = options.now ?? Date.now
+  const timeoutMs = options.timeoutMs ?? 15000
 
   if (!Number.isSafeInteger(maxBytes) || maxBytes < 1024) {
     throw new RangeError('Survey cache size must be at least 1024 bytes')
@@ -133,6 +156,8 @@ export function createSurveyCache(options: SurveyCacheOptions = {}) {
   const entries = new Map<string, { bytes: number; used: number }>()
   const pending = new Map<string, Promise<SurveyImage>>()
   let totalBytes = 0
+  /** pausedUntil is 0 while the upstream is believed up. One probe follows each pause. */
+  const upstream = { pausedUntil: 0, probing: false, started: new Map<number, number>(), lastId: 0 }
   // Disk bookkeeping is serialized; network reads remain independent.
   let diskQueue = Promise.resolve()
 
@@ -187,6 +212,27 @@ export function createSurveyCache(options: SurveyCacheOptions = {}) {
   // merely because the cache was composed before its first use.
   void ready.catch(() => {})
 
+  /** Refuse an uncached request while the upstream is paused or has too many slow fetches; otherwise count it. */
+  function admit() {
+    const at = now()
+
+    if (at < upstream.pausedUntil)
+      throw new SurveyUnavailableError('The survey host did not answer. Cached areas stay available; trying again soon.')
+
+    if ([...upstream.started.values()].filter(started => at - started >= SLOW_FETCH_MS).length >= MAX_SLOW_FETCHES)
+      throw new SurveyUnavailableError('The survey host is slow. Try again in a moment.')
+
+    if (upstream.pausedUntil !== 0) {
+      if (upstream.probing) throw new SurveyUnavailableError('Checking whether the survey host is back.')
+      upstream.probing = true
+    }
+
+    const id = ++upstream.lastId
+    upstream.started.set(id, at)
+
+    return id
+  }
+
   async function load(url: string, contentType: SurveyImage['contentType']): Promise<SurveyImage> {
     await ready
     const key = `${VERSION}\n${url}`
@@ -226,12 +272,21 @@ export function createSurveyCache(options: SurveyCacheOptions = {}) {
 
     if (cached) return cached
 
+    const fetchId = admit()
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 15000)
+    let timedOut = false
+
+    const timeout = setTimeout(() => {
+      timedOut = true
+      controller.abort()
+    }, timeoutMs)
+
     let body: Buffer
+    let answered = false
 
     try {
       const response = await fetchImage(url, { signal: controller.signal, redirect: 'error' })
+      answered = true
 
       if (!response.ok) throw new Error(`DSS2 service returned HTTP ${response.status}`)
       const actualType = response.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase()
@@ -264,10 +319,18 @@ export function createSurveyCache(options: SurveyCacheOptions = {}) {
 
       body = Buffer.concat(chunks)
       validateBody(body, contentType)
+    } catch (error) {
+      upstream.pausedUntil = timedOut || !answered ? now() + PAUSE_MS : 0
+
+      throw error
     } finally {
       clearTimeout(timeout)
       controller.abort()
+      upstream.started.delete(fetchId)
+      upstream.probing = false
     }
+
+    upstream.pausedUntil = 0
 
     await onDisk(async () => {
       const header = JSON.stringify({ key, attribution: SURVEY_ATTRIBUTION }) + '\n'
@@ -348,6 +411,9 @@ export function registerSurvey(app: FastifyInstance, cache: SurveyCache) {
           .send(image.body)
       } catch (error) {
         if (error instanceof RangeError) return reply.code(400).send({ error: error.message })
+
+        if (error instanceof SurveyUnavailableError)
+          return reply.code(503).header('retry-after', '5').send({ error: error.message })
         request.log.warn(error, 'Survey reference image unavailable')
 
         return reply
@@ -398,6 +464,9 @@ export function registerSurvey(app: FastifyInstance, cache: SurveyCache) {
           .send(image.body)
       } catch (error) {
         if (error instanceof RangeError) return reply.code(400).send({ error: error.message })
+
+        if (error instanceof SurveyUnavailableError)
+          return reply.code(503).header('retry-after', '5').send({ error: error.message })
         request.log.warn(error, 'Survey thumbnail unavailable')
 
         return reply.code(503).send({ error: 'Survey thumbnail is unavailable.' })

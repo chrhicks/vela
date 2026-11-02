@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import Fastify from 'fastify'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createSurveyCache, registerSurvey } from './survey.js'
+import { createSurveyCache, registerSurvey, SurveyUnavailableError } from './survey.js'
 
 const directories: string[] = []
 
@@ -212,6 +212,94 @@ describe('DSS2 persistent survey cache', () => {
 
       expect(fetch).not.toHaveBeenCalled()
       expect((await app.inject('/api/survey/dss2/Norder3/Allsky.jpg')).statusCode).toBe(503)
+    } finally {
+      await app.close()
+    }
+  })
+})
+
+describe('DSS2 survey upstream pause', () => {
+  const hanging = () =>
+    vi.fn<typeof globalThis.fetch>(
+      (_url, options) =>
+        new Promise((_resolve, reject) => {
+          options?.signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true })
+        }),
+    )
+
+  it('fails uncached requests at once for a minute after a timeout, keeps cached tiles, then probes once', async () => {
+    let clock = 0
+    const fetch = vi.fn<typeof globalThis.fetch>().mockImplementationOnce(async () => response())
+    const cache = createSurveyCache({ directory: await directory(), fetch, now: () => clock })
+    await cache.get('Norder0/Dir0/Npix1.jpg')
+
+    vi.useFakeTimers()
+    fetch.mockImplementation(hanging())
+    const stalled = expect(cache.get('Norder0/Dir0/Npix2.jpg')).rejects.toThrow('aborted')
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(2))
+    clock = 15000
+    await vi.advanceTimersByTimeAsync(15000)
+    await stalled
+
+    await expect(cache.get('Norder0/Dir0/Npix3.jpg')).rejects.toBeInstanceOf(SurveyUnavailableError)
+    expect(fetch).toHaveBeenCalledTimes(2)
+    expect((await cache.get('Norder0/Dir0/Npix1.jpg')).body).toEqual(jpeg())
+
+    clock = 15000 + 59_999
+    await expect(cache.get('Norder0/Dir0/Npix3.jpg')).rejects.toBeInstanceOf(SurveyUnavailableError)
+    expect(fetch).toHaveBeenCalledTimes(2)
+
+    clock = 15000 + 60_000
+    fetch.mockImplementation(async () => response())
+    const probe = cache.get('Norder0/Dir0/Npix3.jpg')
+    await expect(cache.get('Norder0/Dir0/Npix4.jpg')).rejects.toBeInstanceOf(SurveyUnavailableError)
+    expect((await probe).body).toEqual(jpeg())
+    expect((await cache.get('Norder0/Dir0/Npix4.jpg')).body).toEqual(jpeg())
+  })
+
+  it('pauses after a failed connection but not after an HTTP error from a host that answered', async () => {
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(new Response('unavailable', { status: 503 }))
+      .mockRejectedValueOnce(new Error('connect ECONNREFUSED'))
+
+    const cache = createSurveyCache({ directory: await directory(), fetch, now: () => 0 })
+    await expect(cache.get('Norder0/Dir0/Npix1.jpg')).rejects.toThrow('HTTP 503')
+    await expect(cache.get('Norder0/Dir0/Npix2.jpg')).rejects.toThrow('ECONNREFUSED')
+    await expect(cache.get('Norder0/Dir0/Npix3.jpg')).rejects.toBeInstanceOf(SurveyUnavailableError)
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('refuses new uncached requests while four fetches are slow, freeing the caller at once', async () => {
+    let clock = 0
+    const fetch = hanging()
+    const cache = createSurveyCache({ directory: await directory(), fetch, now: () => clock, timeoutMs: 1500 })
+
+    const slow = [1, 2, 3, 4].map(pixel =>
+      expect(cache.get(`Norder0/Dir0/Npix${pixel}.jpg`)).rejects.toThrow('aborted'),
+    )
+
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(4))
+    clock = 2999
+    const early = expect(cache.get('Norder0/Dir0/Npix5.jpg')).rejects.toThrow('aborted')
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(5))
+    clock = 3000
+    await expect(cache.get('Norder0/Dir0/Npix6.jpg')).rejects.toBeInstanceOf(SurveyUnavailableError)
+    expect(fetch).toHaveBeenCalledTimes(5)
+    await Promise.all([...slow, early])
+  })
+
+  it('answers 503 with a retry hint while paused', async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>().mockRejectedValue(new Error('offline'))
+    const app = Fastify()
+    registerSurvey(app, createSurveyCache({ directory: await directory(), fetch, now: () => 0 }))
+
+    try {
+      expect((await app.inject('/api/survey/thumbnail?ra=10&dec=20&fov=1')).statusCode).toBe(503)
+      const paused = await app.inject('/api/survey/dss2/Norder3/Allsky.jpg')
+      expect(paused.statusCode).toBe(503)
+      expect(paused.headers['retry-after']).toBe('5')
+      expect(fetch).toHaveBeenCalledTimes(1)
     } finally {
       await app.close()
     }
