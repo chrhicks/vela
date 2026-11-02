@@ -13,6 +13,7 @@ export const kinds = {
   'cria.image': { branch: 'fact', producers: ['vela'] },
   'cria.stream': { branch: 'fact', producers: ['vela'] },
   frame: { branch: 'fact', producers: ['vela'] },
+  autofocus: { branch: 'fact', producers: ['vela'] },
   solve: { branch: 'fact', producers: ['solver'] },
   session: { branch: 'fact', producers: ['operator'] },
   gap: { branch: 'fact', producers: ['vela', 'cria', 'solver'] },

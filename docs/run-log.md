@@ -4,7 +4,7 @@ The run log is the one record of what Vela's Cria client saw. The server writes 
 
 ## Format
 
-One JSONL file per server run, `run-<start time>-<part>.jsonl`, in that directory. Each line is one `@vela/rig-events` envelope in canonical JSON, so `decodeLine` reads it. A Cria connection reports four kinds, and each capture attempt files a `frame` event:
+One JSONL file per server run, `run-<start time>-<part>.jsonl`, in that directory. Each line is one `@vela/rig-events` envelope in canonical JSON, so `decodeLine` reads it. A Cria connection reports four kinds, each capture attempt files a `frame` event and each settled autofocus run an `autofocus` event:
 
 | Kind | Holds |
 | --- | --- |
@@ -12,6 +12,7 @@ One JSONL file per server run, `run-<start time>-<part>.jsonl`, in that director
 | `cria.exchange` | one request to Cria with its reply. |
 | `cria.image` | whether a fetched original matched its size and SHA-256. The bytes are never kept. |
 | `cria.stream` | the event stream opening and ending. |
+| `autofocus` | one settled autofocus run: its settings, every sample with its stars, the fit and the landing. Its rig is the catalog rig id. |
 | `frame` | one settled exposure attempt, with why it failed if it did, the ids Cria gave it and the saved FITS (`docs/local-tracing.md`). Its rig is the catalog rig id. |
 
 The rig is the Cria rig id from `cria.json`, which must be lowercase letters, digits and hyphens. The source is `vela:cria`.

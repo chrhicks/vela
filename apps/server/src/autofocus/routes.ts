@@ -18,7 +18,7 @@ import {
   type AutofocusRunOptions,
 } from './controller.js'
 import { measureAutofocusStars } from '../imaging/statistics.js'
-import { noRecords, type JsonlRecords } from '../records.js'
+import { noAutofocusRecords, type AutofocusRecords } from './records.js'
 import {
   DEFAULT_CONFIRM_TOLERANCE,
   DEFAULT_FINE_OFFSET_STEPS,
@@ -41,10 +41,6 @@ interface AutofocusRouteOptions {
   measure?: AutofocusMeasure
   records?: AutofocusRecords
 }
-
-export type AutofocusRecords = JsonlRecords<AutofocusRun>
-
-export const noAutofocusRecords: AutofocusRecords = noRecords
 
 function configuredCamera(settings: {
   rig: RigCatalogRecord

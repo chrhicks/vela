@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, open, readdir, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import Fastify, { type InjectOptions } from 'fastify'
@@ -6,8 +6,11 @@ import { afterEach, expect, it, vi } from 'vitest'
 import type { AlpacaDeviceInspection } from '@vela/alpaca'
 import { createMemoryRigCatalog } from '../rig/catalog.js'
 import { createRigOperations } from '../rig/operations.js'
-import { openJsonlRecords } from '../records.js'
-import { noAutofocusRecords, registerAutofocus, type AutofocusRecords } from './routes.js'
+import { buildApp } from '../app.js'
+import { openRunLog, type RunLogOptions } from '../run-log/run-log.js'
+import { decodeLine, type Envelope } from '@vela/rig-events'
+import { autofocusRecordsOn, noAutofocusRecords, type AutofocusRecords } from './records.js'
+import { registerAutofocus } from './routes.js'
 import type { AutofocusCamera, AutofocusFocuser } from './controller.js'
 import { hyperbola } from './hyperbola.js'
 import { haltBodyError } from '../http/halt-body.js'
@@ -326,11 +329,8 @@ it('publishes samples onto the live view as the walk runs', async () => {
   expect(subject.moves).not.toContain(0)
 })
 
-it('serves the run so far with its star tables, and appends the settled run to the records file', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'vela-autofocus-records-test-'))
-  cleanups.push(() => rm(directory, { recursive: true, force: true }))
-  const file = join(directory, 'nested', 'autofocus.jsonl')
-  const records: AutofocusRecords = openJsonlRecords(file, { name: 'autofocus records' })
+it('serves the run so far with its star tables, and files the settled run in the run log', async () => {
+  const { records, close, events } = await runLogRecords()
   const subject = setup(32842, undefined, { records })
 
   expect((await subject.getRun()).statusCode).toBe(404)
@@ -351,29 +351,74 @@ it('serves the run so far with its star tables, and appends the settled run to t
   expect(done.samples).toHaveLength(23)
   expect(done.samples.at(-1)).toMatchObject({ pass: 'confirm' })
   expect(done).toMatchObject({ fineStepSize: 25, fineOffsetSteps: 6, confirmTolerance: 0.1 })
-  await records.close()
+  await close()
 
-  const lines = (await readFile(file, 'utf8')).trimEnd().split('\n')
+  const [event, ...rest] = await events()
+  const { version: _version, rigId: _rigId, ...body } = done
 
-  expect(lines).toHaveLength(1)
-  expect(JSON.parse(lines[0]!)).toEqual(done)
+  expect(rest).toEqual([])
+  expect(event).toMatchObject({ kind: 'autofocus', rig: 'fra', at: Date.parse(done.settledAt), body })
 })
 
-async function recordedRuns(settle: (subject: ReturnType<typeof setup>) => Promise<void>, air?: Air) {
+async function runLogRecords(options: Partial<RunLogOptions> = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'vela-autofocus-records-test-'))
-  cleanups.push(() => rm(directory, { recursive: true, force: true }))
-  const file = join(directory, 'autofocus.jsonl')
-  const records: AutofocusRecords = openJsonlRecords(file, { name: 'autofocus records' })
+
+  const log = openRunLog({ directory, retry: { firstMs: 5, lastMs: 20 }, onProblem: () => {}, ...options })
+  cleanups.push(async () => {
+    await log.close()
+    await rm(directory, { recursive: true, force: true })
+  })
+
+  async function events() {
+    const found: Envelope<'autofocus'>[] = []
+
+    for (const name of await readdir(directory)) {
+      for (const line of (await readFile(join(directory, name), 'utf8')).split('\n')) {
+        const decoded = line === '' ? undefined : decodeLine(line)
+
+        if (decoded?.ok && decoded.event.kind === 'autofocus') found.push(decoded.event)
+      }
+    }
+
+    return found
+  }
+
+  return { log, records: autofocusRecordsOn(log), close: () => log.close(), events }
+}
+
+async function recordedRun(settle: (subject: ReturnType<typeof setup>) => Promise<void>, air?: Air) {
+  const { records, close, events } = await runLogRecords()
   const subject = setup(32842, undefined, air ? { records, air } : { records })
 
   await settle(subject)
-  await records.close()
+  await close()
 
-  return (await readFile(file, 'utf8')).trimEnd().split('\n').map(line => JSON.parse(line))
+  const [event, ...rest] = await events()
+
+  expect(rest).toEqual([])
+
+  return event!.body
 }
 
+it('keeps walking through a full disk, shows the run log error on /api/health, and drops nothing it can still write', async () => {
+  const { log, records } = await runLogRecords({ openFile: () => open('/dev/full', 'a') })
+  const subject = setup(32842, undefined, { records })
+  const health = buildApp({ runLog: log })
+
+  cleanups.push(() => health.close())
+  await subject.start({ stepSize: 50, exposureSeconds: 2 })
+  await subject.finish()
+
+  expect((await subject.get()).json()).toMatchObject({ phase: 'complete' })
+  await vi.waitFor(() => expect(log.health().state).toBe('retrying'))
+
+  const answer = (await health.inject('/api/health')).json()
+
+  expect(answer).toMatchObject({ status: 'ok', runLog: { state: 'retrying', lastError: { message: expect.stringContaining('ENOSPC') } } })
+})
+
 it('records the air temperature the rig page reads at the start and again at the end', async () => {
-  const [run] = await recordedRuns(async subject => {
+  const run = await recordedRun(async subject => {
     subject.conditions.temperatureC = 4.7
     await subject.start()
     subject.conditions.temperatureC = 5.2
@@ -384,7 +429,7 @@ it('records the air temperature the rig page reads at the start and again at the
 })
 
 it('leaves the air temperature null when the rig has no observing-conditions device', async () => {
-  const [run] = await recordedRuns(async subject => {
+  const run = await recordedRun(async subject => {
     await subject.start()
     await subject.finish()
   })
@@ -393,7 +438,7 @@ it('leaves the air temperature null when the rig has no observing-conditions dev
 })
 
 it('does not record a last-known air temperature from an interrupted device', async () => {
-  const [run] = await recordedRuns(
+  const run = await recordedRun(
     async subject => {
       await subject.start()
       await subject.finish()
@@ -405,7 +450,7 @@ it('does not record a last-known air temperature from an interrupted device', as
 })
 
 it('records a null end temperature when the device stops reporting during the run', async () => {
-  const [run] = await recordedRuns(async subject => {
+  const run = await recordedRun(async subject => {
     await subject.start()
     delete subject.conditions.temperatureC
     await subject.finish()
