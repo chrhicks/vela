@@ -30,7 +30,7 @@ export interface PolarFit {
   /** Positive when the axis points east of north. */
   readonly azimuthArcsec: number
   readonly totalArcsec: number
-  /** The error above is a polar error only when this says rigid. */
+  /** The error above is a polar error only when this says rigid: no step, a small miss, and a camera that turned. */
   readonly verdict: SweepVerdict
 }
 
@@ -128,11 +128,13 @@ function widestTurnPair(fixes: readonly SweepFix[]) {
   return pairs.reduce((widest, pair) => (pair.turn > widest.turn ? pair : widest))
 }
 
-function sweepVerdict(fixes: readonly SweepFix[]): SweepVerdict {
+function sweepVerdict(fixes: readonly SweepFix[], axis: Vec3): SweepVerdict {
   const { i, j } = widestTurnPair(fixes)
   const missArcmin = Math.max(...fixes.map(fix => rigidityVerdict([fixes[i]!, fixes[j]!, fix]).missArcmin))
+  const steps = findSteps(fixes)
+  const rigid = missArcmin < rigidMissArcmin && steps.length === 0 && axis.every(Number.isFinite)
 
-  return { status: missArcmin < rigidMissArcmin ? 'rigid' : 'not-rigid', missArcmin, thresholdArcmin: rigidMissArcmin, steps: findSteps(fixes) }
+  return { status: rigid ? 'rigid' : 'not-rigid', missArcmin, thresholdArcmin: rigidMissArcmin, steps }
 }
 
 function poleError(axis: Vec3, latitudeDegrees: number) {
@@ -158,5 +160,5 @@ export function fitPolarAxis(fixes: readonly SweepFix[], latitudeDegrees: number
   const ordered = byTime(fixes)
   const axis = meanAxis(ordered)
 
-  return { axis, ...poleError(axis, latitudeDegrees), verdict: sweepVerdict(ordered) }
+  return { axis, ...poleError(axis, latitudeDegrees), verdict: sweepVerdict(ordered, axis) }
 }

@@ -64,7 +64,7 @@ function randoms(seed: number) {
 
 interface Sweep {
   readonly mountAngles: readonly number[]
-  readonly slips?: readonly { readonly fromIndex: number; readonly arcmin: number }[]
+  readonly slips?: readonly { readonly fromIndex: number; readonly arcmin: number; readonly aboutBoresight?: boolean }[]
   readonly axis?: Vec3
   readonly noiseArcsec?: number
   readonly seed?: number
@@ -78,7 +78,7 @@ function sweep({ mountAngles, slips = [], axis: mountAxisVector = axis, noiseArc
     let orientation = turnCamera(cameraAtMeridian, mountAxisVector, mountAngleDegrees)
 
     for (const slip of slips) {
-      if (index >= slip.fromIndex) orientation = turnCamera(orientation, [0, 1, 0], arcminutesToDegrees(slip.arcmin))
+      if (index >= slip.fromIndex) orientation = turnCamera(orientation, slip.aboutBoresight ? orientation.boresight : [0, 1, 0], arcminutesToDegrees(slip.arcmin))
     }
 
     orientation = turnCamera(turnCamera(turnCamera(orientation, [1, 0, 0], noise()), [0, 1, 0], noise()), [0, 0, 1], noise())
@@ -140,6 +140,26 @@ describe('fitPolarAxis', () => {
     const fit = fitPolarAxis(sweep({ mountAngles: sixDegreeLegs, slips: [{ fromIndex: 3, arcmin: stepFloorArcmin - 4 }] }), syntheticSite.latitudeDegrees)
 
     expect(fit.verdict.steps).toEqual([])
+    expect(fit.verdict.status).toBe('not-rigid')
+  })
+
+  it('says not rigid for a step that only rolls the image, which no boresight miss sees', () => {
+    const fit = fitPolarAxis(
+      sweep({ mountAngles: sixDegreeLegs, axis: pole, slips: [{ fromIndex: 3, arcmin: 30, aboutBoresight: true }] }),
+      syntheticSite.latitudeDegrees,
+    )
+
+    expect(fit.verdict.missArcmin).toBeLessThan(fit.verdict.thresholdArcmin)
+    expect(fit.verdict.steps.map(step => step.labelAfter)).toEqual(['p3'])
+    expect(fit.verdict.status).toBe('not-rigid')
+  })
+
+  it('says not rigid, with no axis, when the camera did not turn while the mount did', () => {
+    const stuck = sweep({ mountAngles: sixDegreeLegs }).map((fix, _index, fixes) => ({ ...fix, orientation: fixes[0]!.orientation }))
+
+    const fit = fitPolarAxis(stuck, syntheticSite.latitudeDegrees)
+
+    expect(fit.axis.every(Number.isNaN)).toBe(true)
     expect(fit.verdict.status).toBe('not-rigid')
   })
 
