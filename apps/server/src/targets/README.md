@@ -98,7 +98,8 @@ When `VELA_TRACE_PATH` is enabled, [framing tracing](../../../../docs/local-trac
 persists exact desired/solved positions, WCS, pre/post mount readings, commands and
 per-correction outcomes under one trace. Completed child records are available
 before the operation finishes. This is numerical evidence; original framing FITS pixels
-are not retained. Save the rotating journal after a trial that needs investigation.
+are retained for rejected solves in the data directory’s `rejected/` store, newest 200 frames or 5 GiB.
+The run log’s `frame` event carries the verdict JSON in `message` and the FITS path and hash in `image.ref`.
 
 **Check current frame** takes an exposure and solves the current field without a
 slew or tracking change. Use it to establish a fresh measurement after a rejected
@@ -301,7 +302,7 @@ Each controller retains at most three fitted/native PNG pairs in memory. Exact
 acquisition-ID GETs never touch hardware and return 404 for missing or expired
 resources. The immutable URL always means the same image; when the renderer does
 not need to downsample, Fit and Native serve the same native PNG. Restart loses
-these resources. No FITS retention, capture identity or Saved status is implied.
+these resources. Accepted frames have no FITS retention, capture identity or Saved status. Rejected frames use the bounded store above.
 
 ## Catalog-only browsing
 

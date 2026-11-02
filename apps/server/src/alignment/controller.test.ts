@@ -42,6 +42,7 @@ const settings = {
 /** A journal that remembers what the controller wrote to it. */
 function recording() {
   return {
+    recordRejected: vi.fn<AlignmentDiagnosticRun['recordRejected']>(async () => {}),
     recordFrame: vi.fn<AlignmentDiagnosticRun['recordFrame']>(async () => {}),
     recordFit: vi.fn<AlignmentDiagnosticRun['recordFit']>(async () => {}),
     recordDropped: vi.fn<AlignmentDiagnosticRun['recordDropped']>(async () => {}),
@@ -309,7 +310,8 @@ it('does not use a solve the verdict rejects: each position is dropped and the r
   expect(subject.controller.snapshot().error).toContain('the image is mirrored')
   expect(subject.controller.snapshot().error).toContain('degrees from where the mount points')
   expect(journal.recordFrame).not.toHaveBeenCalled()
-  expect(journal.recordDropped.mock.calls.map(([position, reason]) => [position, reason])).toEqual([[1, 'rejected'], [2, 'rejected']])
+  expect(journal.recordRejected).toHaveBeenCalledTimes(2)
+  expect(journal.recordRejected.mock.calls.map(([, position]) => position)).toEqual([1, 2])
   expect(subject.exposures()).toBe(2)
 })
 
@@ -328,7 +330,7 @@ it('drops a fix that did not solve without exposing again, and fits the other fi
   const subject = setup(async () => journal)
   await subject.sweep([3])
   await vi.waitFor(() => expect(subject.controller.snapshot().phase).toBe('adjusting'))
-  expect(journal.recordDropped).toHaveBeenCalledExactlyOnceWith(3, 'no-solve', 'no star pattern matched')
+  expect(journal.recordRejected).toHaveBeenCalledExactlyOnceWith(expect.anything(), 3, expect.objectContaining({ reasons: ['no-match'] }), expect.anything())
   expect(journal.recordFit.mock.calls[0]![0].map(fix => fix.position)).toEqual([1, 2, 4, 5, 6])
   expect(subject.exposures()).toBe(6)
   expect(subject.controller.snapshot()).toMatchObject({
