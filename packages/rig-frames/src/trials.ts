@@ -12,6 +12,8 @@ const Polar = Schema.Struct({ altitudeArcsec: Schema.Number, azimuthArcsec: Sche
 
 const Sample = Schema.Struct({ capturedAt: Schema.String })
 
+const Step = Schema.Struct({ labelBefore: Schema.String, labelAfter: Schema.String })
+
 const Wcs = Schema.Struct({
   width: Schema.Number,
   height: Schema.Number,
@@ -46,6 +48,13 @@ const Entry = Schema.Union([
     }),
   }),
   Schema.Struct({ type: Schema.Literal('baseline'), samples: Schema.Array(Sample), measurement: Polar }),
+  Schema.Struct({
+    type: Schema.Literal('fit'),
+    fixes: Schema.Array(Schema.Struct({ position: Schema.Int, sample: Sample })),
+    polar: Schema.NullOr(Polar),
+    verdict: Schema.Struct({ status: Schema.Literals(['rigid', 'not-rigid']), missArcmin: Schema.Number, thresholdArcmin: Schema.Number, steps: Schema.Array(Step) }),
+  }),
+  Schema.Struct({ type: Schema.Literal('dropped'), position: Schema.Int, reason: Schema.Literals(['no-solve', 'rejected', 'capture-failed']) }),
   Schema.Struct({ type: Schema.Literal('measurement'), sample: Sample, measurement: Polar }),
   Schema.Struct({ type: Schema.Literal('outcome'), phase: Schema.Literals(['finished', 'stopped', 'failed']) }),
 ])
@@ -83,6 +92,24 @@ export interface AlignmentReading {
   readonly totalArcsec: number
 }
 
+/** A sweep fit: which positions it used and whether the mount turned rigidly. A step names the two positions either side of it. */
+export interface TrialFit {
+  readonly line: number
+  readonly at: EpochMs
+  readonly positions: readonly number[]
+  readonly status: 'rigid' | 'not-rigid'
+  readonly missArcmin: number
+  readonly thresholdArcmin: number
+  readonly steps: readonly { readonly before: string; readonly after: string }[]
+}
+
+/** A sweep position that gave no fix, and why. */
+export interface DroppedFix {
+  readonly line: number
+  readonly position: number
+  readonly reason: 'no-solve' | 'rejected' | 'capture-failed'
+}
+
 export interface Trial {
   readonly directory: string
   /** The folder name's run id; the `run` line carries the same. */
@@ -93,7 +120,10 @@ export interface Trial {
   readonly exposureSeconds: number
   readonly outcome: TrialOutcome
   readonly frames: readonly TrialFrame[]
+  /** Polar errors Vela reported. A not-rigid fit adds none: its error is not a polar error. */
   readonly readings: readonly AlignmentReading[]
+  readonly fits: readonly TrialFit[]
+  readonly dropped: readonly DroppedFix[]
   readonly baselines: number
   readonly measurements: number
 }
@@ -111,6 +141,8 @@ async function readTrial(directory: string, runId: string, problems: SourceProbl
   const files = new Set(await readdir(directory).catch(() => []))
   const frames: TrialFrame[] = []
   const readings: AlignmentReading[] = []
+  const fits: TrialFit[] = []
+  const dropped: DroppedFix[] = []
   let run: Extract<typeof Entry.Type, { type: 'run' }> | undefined
   let outcome: TrialOutcome = 'unfinished'
   let baselines = 0
@@ -133,6 +165,27 @@ async function readTrial(directory: string, runId: string, problems: SourceProbl
 
         if (at === undefined) problems.push({ path, line, reason: 'a timestamp is not an instant' })
         else readings.push({ line, phase: value.type === 'baseline' ? 'baseline' : 'adjusting', at, ...value.measurement })
+
+        break
+      }
+
+      case 'dropped':
+        dropped.push({ line, position: value.position, reason: value.reason })
+        break
+      case 'fit': {
+        const last = value.fixes[value.fixes.length - 1]
+        const at = last === undefined ? undefined : instantOf(last.sample.capturedAt)
+
+        if (at === undefined) {
+          problems.push({ path, line, reason: 'a timestamp is not an instant' })
+          break
+        }
+
+        const { status, missArcmin, thresholdArcmin, steps } = value.verdict
+
+        fits.push({ line, at, positions: value.fixes.map(fix => fix.position), status, missArcmin, thresholdArcmin, steps: steps.map(step => ({ before: step.labelBefore, after: step.labelAfter })) })
+
+        if (status === 'rigid' && value.polar) readings.push({ line, phase: 'baseline', at, ...value.polar })
 
         break
       }
@@ -179,7 +232,7 @@ async function readTrial(directory: string, runId: string, problems: SourceProbl
 
   if (run.run.runId !== runId) problems.push({ path, line: null, reason: 'the run id differs from the folder name' })
 
-  return { directory, runId, rigId: run.run.rigId, mode: run.run.mode, createdAt, exposureSeconds: run.run.exposureSeconds, outcome, frames, readings, baselines, measurements }
+  return { directory, runId, rigId: run.run.rigId, mode: run.run.mode, createdAt, exposureSeconds: run.run.exposureSeconds, outcome, frames, readings, fits, dropped, baselines, measurements }
 }
 
 /**

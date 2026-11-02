@@ -47,15 +47,21 @@ export function createAlignmentBaseline(
     throw new Error('The three solved positions do not provide a usable rotation baseline')
   }
 
-  let axis = scale(normal, 1 / length(normal))
+  return baselineFromAxis(scale(normal, 1 / length(normal)), samples[2], latitudeDegrees)
+}
 
-  if (axis[2] < 0) axis = scale(axis, -1)
+/** The adjusting baseline for a polar axis (hour-angle frame, z up) and the sample the adjustments are measured from. */
+export function baselineFromAxis(
+  fitted: readonly [number, number, number],
+  reference: AlignmentSample,
+  latitudeDegrees: number,
+): AlignmentBaseline {
+  const axis = fitted[2] < 0 ? scale(fitted, -1) : fitted
   const errors = axisErrors(axis, latitudeDegrees)
   assertFiniteAngles(errors.altitudeArcsec, errors.azimuthArcsec)
-  const reference = { ...samples[2] }
 
   const nominalDirection = unadjust(
-    points[2]!,
+    localDirection(reference),
     (errors.altitudeArcsec * rad) / 3600,
     (errors.azimuthArcsec * rad) / 3600,
     latitudeDegrees,
@@ -63,7 +69,7 @@ export function createAlignmentBaseline(
 
   return {
     latitudeDegrees,
-    reference,
+    reference: { ...reference },
     nominalDirection,
     measurement: {
       ...errors,

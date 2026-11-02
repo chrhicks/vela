@@ -577,6 +577,8 @@ function recording(): AlignmentDiagnosticRun {
   return {
     recordFrame: vi.fn(async () => {}),
     recordBaseline: vi.fn(async () => {}),
+    recordFit: vi.fn(async () => {}),
+    recordDropped: vi.fn(async () => {}),
     recordMeasurement: vi.fn(async () => {}),
     finish: vi.fn(async () => {}),
   }
