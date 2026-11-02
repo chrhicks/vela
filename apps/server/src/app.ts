@@ -1,3 +1,4 @@
+import type { Publisher } from './run-log/publisher.js'
 import { z } from 'zod'
 import { EquipmentError, type EquipmentConnector, type EquipmentInspector } from '@vela/equipment'
 import { createEquipmentComposition, type EquipmentComposition } from './equipment/composition.js'
@@ -49,6 +50,7 @@ import type { RunLog } from './run-log/run-log.js'
 interface BuildAppOptions {
   readonly equipment?: EquipmentComposition
   readonly models?: Pick<ModelHost, 'get'>
+  readonly publisher?: Pick<Publisher, 'health'>
   readonly runLog?: Pick<RunLog, 'health' | 'append'>
   readonly attestation?: Attestation
   readonly targets?: Omit<TargetOptions, 'createAdapter' | 'createAcquisition' | 'createInspector'>
@@ -84,6 +86,7 @@ export function buildApp({
   alerts: alertSettings = { thresholds: defaultThresholds, notifier: null },
   equipment = createEquipmentComposition(),
   runLog,
+  publisher,
   models,
   attestation = noAttestation,
   alpacaDiscovery = equipment.alpacaDiscovery,
@@ -188,7 +191,7 @@ export function buildApp({
     return assessment ?? reply.code(503).send({ error: 'rig-model-unavailable' })
   })
 
-  app.get('/api/health', async () => ({ status: 'ok', runLog: runLog?.health() ?? { state: 'off' } }))
+  app.get('/api/health', async () => ({ status: 'ok', runLog: runLog?.health() ?? { state: 'off' }, publisher: publisher?.health() ?? { state: 'off' } }))
 
   app.post('/api/rigs/discovery', async (request, reply) => {
     const input = parseDiscoverRigsInput(request.body)

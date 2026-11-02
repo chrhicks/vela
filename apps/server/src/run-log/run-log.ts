@@ -25,6 +25,7 @@ const batchBytes = 1024 * 1024
 
 export interface RunLogOptions {
   readonly directory: string
+  readonly onAppend?: (event: RigEvent) => void
   /** A file past this size is closed and the next write starts a new one. */
   readonly maxFileBytes?: number
   /** Run files kept in the directory, this run's included. Older ones are deleted. */
@@ -87,6 +88,7 @@ function messageOf(error: unknown) {
  */
 export function openRunLog({
   directory,
+  onAppend,
   maxFileBytes = defaultMaxFileBytes,
   maxFiles = defaultMaxFiles,
   maxPendingBytes = defaultMaxPendingBytes,
@@ -115,6 +117,10 @@ export function openRunLog({
   let working: Promise<void> = Promise.resolve()
   let wake = () => {}
 
+  function tap(event: RigEvent) {
+    try { onAppend?.(event) } catch {}
+  }
+
   function lose(event: RigEvent) {
     const key = `${event.rig}|${event.source}`
     const known = lost.get(key)
@@ -134,8 +140,11 @@ export function openRunLog({
   function recordGaps() {
     const at = epochMs(Math.round(now()))
 
-    for (const { rig, source, from, count } of lost.values())
-      enqueue(`${encodeEvent(seal({ kind: 'gap', rig, source, at: epochMs(Math.round(from)), seenAt: at, body: { source, from: epochMs(Math.round(from)), to: at, reason: 'disk', dropped: count } }))}\n`)
+    for (const { rig, source, from, count } of lost.values()) {
+      const event = seal({ kind: 'gap', rig, source, at: epochMs(Math.round(from)), seenAt: at, body: { source, from: epochMs(Math.round(from)), to: at, reason: 'disk', dropped: count } })
+      enqueue(`${encodeEvent(event)}\n`)
+      tap(event)
+    }
 
     lost.clear()
   }
@@ -252,6 +261,7 @@ export function openRunLog({
   return {
     append(event) {
       if (closing) return
+      tap(event)
       let line: string
 
       try {

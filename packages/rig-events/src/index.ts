@@ -23,3 +23,5 @@ export * from './primitives.ts'
 export * from './registry.ts'
 
 export * from './wire.ts'
+
+export * from './archive.ts'

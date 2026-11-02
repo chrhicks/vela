@@ -145,3 +145,78 @@ pull acknowledgments, checks repeat provisioning, and removes its container and 
 ```sh
 uv run --script tools/nats/verify.py
 ```
+
+The server publishes the run log to JetStream when both `VELA_NATS_URL` and
+`VELA_NATS_CREDENTIALS_FILE` are set. Compose sets these to the internal broker
+and `/data/nats/credentials.json`. The file is read once at startup; the server
+uses only its `publisher` role. Without both variables the publisher is off.
+`/api/health` reports `publisher` alongside `runLog`.
+
+The publisher retains at most 128 envelopes or 5 MiB of encoded payloads,
+whichever fills first. That is 128 snapshots at the step 12a estimate of 40 KiB,
+about two minutes at one snapshot per second. A single in-flight publish can
+retain another 1 MiB. Oversized messages are dropped. A full queue drops its
+oldest event. After recovery, a `gap` per affected rig reports the dropped count
+and the first and last lost observation times before the retained tail resumes.
+The queue is volatile and shutdown does not flush it. JetStream uses each
+envelope's id as `Nats-Msg-Id`.
+
+Run `TMPDIR=/path/to/scratch uv run tools/nats/verify-publisher.py` to provision a
+disposable broker, kill it during FakeCria capture, restart it and read the gap
+and retained tail back. The check removes its container and private files.
+
+## Archive the rig event stream
+
+The `archiver` Compose service uses the server image with a separate entry point.
+Its disk work and failures are independent of the capture server. It pulls the
+existing `archiver-v1` durable consumer on both streams, using the `archiver`
+password from the private credentials file. Errors contain no credential or event
+payload. The service restarts on failure and resumes the durable consumers.
+
+Before starting it, create `/mnt/storage/rig/archive/` owned by the configured
+Compose UID and GID. The bind mount refuses to create a missing host directory.
+`VELA_ARCHIVE_DIR` can select another host directory. This step adds the service
+but does not deploy it or create the production archive.
+
+Files have the layout `YYYY-MM-DD/<kind>/<batch-uuid>.jsonl`, using the envelope's
+UTC event time. Each line is a canonical envelope. Batches contain at most 128
+messages per stream. A writer fsyncs each temporary file, renames it to JSONL,
+and fsyncs its directory and all newly created directory entries before it acks
+any message in the batch. An I/O or decode error stops the process without an ack.
+Incomplete `.tmp` files are ignored. They can remain after a crash.
+
+Deduplication is **on read**, by event ID across the entire replay. A crash after
+rename and before ack can leave repeated envelopes in separate files. The reader
+returns each matching ID once, even after broker redelivery or a later republish.
+Do not treat a raw concatenation of JSONL files as an exactly-once replay.
+
+`createArchiveReader({ from, to, kinds })` in `@vela/rig-events` filters decoded
+lines by an inclusive event-time range and optional kinds. Keep one instance per
+replay. The filesystem adapter `readArchive(directory, range)` in
+`apps/server/src/run-log/archive.ts` streams committed files through that reader.
+It discovers file listings as it traverses them and returns file order, not time
+order. Replay a stopped archive for a stable snapshot, and sort events when the
+consumer requires chronological order. Corrupt committed JSONL fails the replay
+rather than silently skipping data. Memory use grows with the matching unique IDs.
+
+There is no archive retention or compaction in this step. At the run log's measured
+rate of about 1.6 GB per day of `cria.state`, allow about 48 GB per 30 days, plus
+other events, redeliveries, and filesystem overhead. A read-only check on the
+implementation host found about 1.86 TB free on `/mnt/storage`, enough for this
+step. Capacity still needs monitoring before long-term unattended use.
+
+Run the crash check with a disposable broker and temporary archive only:
+
+```sh
+uv run tools/nats/verify-archiver.py
+```
+
+On the development host, this check requires Docker, a user systemd session, and
+the shared `safe-kill` helper. When using the runner, pass `XDG_RUNTIME_DIR`
+explicitly so the test scope can reach the user session.
+
+It publishes to both streams, SIGKILLs an archiver PID after durable writes and
+before ack, restarts it, and compares the reader's IDs with all published IDs.
+It also checks that raw redeliveries occurred and that no credential reached the
+child's output. It removes its container and temporary files. It does not contact
+hardware or the live Compose project.
