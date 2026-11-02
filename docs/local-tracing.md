@@ -147,16 +147,10 @@ jq 'select(.name | startswith("capture."))' data/traces/observing.jsonl
 
 ### Frame records
 
-Set `VELA_FRAME_RECORDS_PATH` to a JSONL file path and the server appends one line when each
-capture attempt settles, whatever the outcome. Unlike the trace journal, it holds the star
-statistics of every frame, not only the last three in memory. It is off when the variable is
-unset. If a write fails or falls behind by more than 1 MiB, recording stays off until the server
-restarts and the server logs why once; capture is never affected. Each line is:
+Each capture attempt, whatever its outcome, files one `frame` event in the [run log](run-log.md) when it settles. It is on whenever `VELA_RUN_LOG_DIR` is set. Unlike the trace journal, it holds the star statistics of every frame, not only the last three in memory. The run log never switches itself off, so a full disk delays these events and does not drop them until its queue is full; capture is never affected. The body of the event is:
 
 ```json
 {
-  "version": 1,
-  "rigId": "fra 400",
   "runId": "f3a1…",
   "attempt": 3,
   "startedAt": "2026-10-17T03:31:00.120Z",
@@ -173,25 +167,16 @@ restarts and the server logs why once; capture is never affected. Each line is:
     "capturedAtSource": "camera",
     "receivedAt": "2026-10-17T03:31:12.470Z",
     "width": 6248,
-    "height": 4176
+    "height": 4176,
+    "ref": { "uri": "file:///…/original.fits", "bytes": 52000000, "sha256": null }
   },
-  "statistics": {
-    "algorithm": { "version": 3 },
-    "detectedStars": 412,
-    "medianHfrPixels": 2.9,
-    "detections": 1141,
-    "measured": 412,
-    "strong": 180,
-    "rejected": { "…": 0 },
-    "sky": 539,
-    "noise": 13.7,
-    "axisRatio": 1.21
-  }
+  "statistics": { "detectedStars": 412, "medianHfrPixels": 2.9 },
+  "origin": "capture-run"
 }
 ```
 
 - `runId` identifies the capture run; `attempt` counts from 1 within it, as `capture.frame.index`
-  does. `startedAt` and `settledAt` use the Vela server's clock.
+  does. `startedAt` and `settledAt` use the Vela server's clock; the envelope's `at` is `settledAt`.
 - `outcome` is one of the `capture.frame.outcome` values above. `saved`, `unsaved` and
   `save-failed` hold an image. `lost`, `failed`, `uncertain` and `stopped` do not, so `image` and
   `statistics` are null. `message` is why the attempt did not end well, and null for `saved` and
@@ -201,14 +186,15 @@ restarts and the server logs why once; capture is never affected. Each line is:
   (null otherwise). A lost frame keeps all three. It is null when the rig's adapter has no such
   IDs (Alpaca). `requestId` joins to Cria's operation record of the same exposure.
 - `image.id` is Vela's ID; `saved-images/<hash>/metadata.json` carries the same `id` and the same
-  `provenance`. `statistics` is null when star measurement was unavailable, and a starless frame
-  is `detectedStars: 0`.
-- `frameType` is `light`, `dark`, `flat`, `dark-flat` or `bias`; records from before frame types read as `light`.
-- `statistics.algorithm.version` says which star measurement produced the numbers; counts from different versions are
-  not comparable, and records without it are version 1. `detections` (peaks found), `measured` (equal to
-  `detectedStars`), `strong` (S/N 100 or more), `rejected` (counts by first failed gate), `sky`, `noise` and `axisRatio`
-  (null with too few S/N 200 stars) are absent on records written before they existed.
-  `apps/server/src/imaging/README.md` defines each.
+  `provenance`. `image.ref` names the saved `original.fits` when the outcome is `saved`; the pixels stay in that
+  file. `statistics` is null when star measurement was unavailable, and a starless frame is `detectedStars: 0`.
+  The full star measurement stays in `metadata.json`.
+- The envelope's rig is the catalog rig id, which must be lowercase letters, digits and hyphens. The server
+  refuses to start with a run log and a catalog rig that breaks the rule.
+
+Until plan step 13a, Vela wrote the same record as one line of `traces/frames.jsonl`, with
+`version: 1` and `rigId`, the full `statistics` and no `image.ref`. Those files stay where they are. `readFrameRecords`
+in `@vela/rig-frames` reads them and the run log alike.
 
 ### Autofocus records
 

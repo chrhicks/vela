@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, open, readdir, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { InjectOptions } from 'fastify'
@@ -6,12 +6,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import { FakeCria } from '../../../packages/cria/test/v5/fake-cria.js'
 import { buildApp } from '../src/app.js'
-import type { FrameRecord } from '../src/capture/frame-records.js'
+import { frameRecordsOn, type FrameRecord } from '../src/capture/frame-records.js'
 import { createEquipmentComposition } from '../src/equipment/composition.js'
 import { registerConfiguredCriaRigs, type CriaRigConfiguration } from '../src/equipment/config.js'
 import * as statistics from '../src/imaging/statistics.js'
 import { createMemoryRigCatalog } from '../src/rig/catalog.js'
 import { openFileSavedImageStore } from '../src/saved-images/store.js'
+import { openRunLog, type RunLog, type RunLogOptions } from '../src/run-log/run-log.js'
+import { decodeLine } from '@vela/rig-events'
 
 let cria: FakeCria
 
@@ -38,7 +40,7 @@ afterEach(async () => {
   await rm(directory, { recursive: true, force: true })
 })
 
-async function openRig(savedImages = openFileSavedImageStore(join(directory, 'saved-images'))) {
+async function openRig(savedImages = openFileSavedImageStore(join(directory, 'saved-images')), runLog?: RunLog) {
   const configuration: CriaRigConfiguration = {
     id: 'fixture',
     name: 'Fixture',
@@ -60,7 +62,8 @@ async function openRig(savedImages = openFileSavedImageStore(join(directory, 'sa
     equipment: createEquipmentComposition([configuration], { fetch: cria.fetch }),
     rigCatalog,
     savedImages: await savedImages,
-    frameRecords: { append: record => records.push(record), close: async () => {} },
+    frameRecords: runLog ? frameRecordsOn(runLog) : { append: record => void records.push(record) },
+    ...(runLog && { runLog }),
   })
 
   await app.ready()
@@ -122,7 +125,6 @@ describe('one frame record for every capture attempt', () => {
 
     expect(records).toEqual([
       {
-        version: 1,
         rigId: 'fixture',
         runId: expect.any(String),
         attempt: 1,
@@ -142,6 +144,7 @@ describe('one frame record for every capture attempt', () => {
           width: 4,
           height: 3,
         },
+        fits: { path: expect.stringMatching(/original\.fits$/), bytes: expect.any(Number) },
         statistics: {
           algorithm: { version: 3 },
           detectedStars: expect.any(Number),
@@ -273,5 +276,89 @@ describe('one frame record for every capture attempt', () => {
       provenance: { operationId: expect.any(String), imageId: expect.any(String) },
       image: { id: expect.any(String) },
     })
+  })
+})
+
+describe('frame events in the run log', () => {
+  const logs: RunLog[] = []
+
+  afterEach(async () => {
+    await Promise.all(logs.splice(0).map(log => log.close()))
+  })
+
+  function openLog(options: Partial<RunLogOptions> = {}) {
+    const log = openRunLog({ directory: join(directory, 'run-log'), retry: { firstMs: 5, lastMs: 20 }, onProblem: () => {}, ...options })
+
+    logs.push(log)
+
+    return log
+  }
+
+  async function frameEvents() {
+    const events = []
+
+    for (const name of await readdir(join(directory, 'run-log')).catch(() => [])) {
+      for (const line of (await readFile(join(directory, 'run-log', name), 'utf8')).split('\n')) {
+        const decoded = line === '' ? undefined : decodeLine(line)
+
+        if (decoded?.ok && decoded.event.kind === 'frame') events.push(decoded.event)
+      }
+    }
+
+    return events
+  }
+
+  const completed = async () => z.object({ completedCount: z.number() }).parse((await request('/api/web/rigs/fixture/capture')).json()).completedCount
+
+  it('files a saved frame with the path of its FITS, and a lost frame with why it was lost', async () => {
+    const log = openLog()
+
+    await openRig(undefined, log)
+    cria.delay('image', 500)
+    await startCapture({ exposureSeconds: 1, repeat: true, saveFrames: true })
+    await vi.advanceTimersByTimeAsync(1_400)
+    cria.dropImage(cria.received.find(received => received.route === 'image')!.path.split('/')[3]!)
+    await vi.advanceTimersByTimeAsync(2_000)
+    const stopping = stopCapture()
+
+    await vi.advanceTimersByTimeAsync(2_000)
+    await stopping
+    await log.close()
+
+    const [lost, ...rest] = await frameEvents()
+    const saved = rest.find(event => event.body.outcome === 'saved')
+
+    expect(lost?.body).toMatchObject({ outcome: 'lost', message: expect.stringContaining('Cria dropped image'), image: null, origin: 'capture-run' })
+    expect(lost?.rig).toBe('fixture')
+    expect(saved?.body.image?.ref?.uri).toMatch(/^file:\/\/\/.*original\.fits$/)
+    expect(saved?.body.image?.ref?.bytes).toBeGreaterThan(0)
+  })
+
+  it('keeps capturing through a full disk, shows the error on /api/health, and writes the frames once the disk recovers', async () => {
+    const state = { full: true }
+    const log = openLog({ openFile: (path, flags, mode) => (state.full ? open('/dev/full', 'a') : open(path, flags, mode)) })
+
+    await openRig(undefined, log)
+    await startCapture({ exposureSeconds: 1, repeat: true })
+    await vi.advanceTimersByTimeAsync(5_000)
+
+    for (let step = 0; step < 20 && (await completed()) < 2; step++) await vi.advanceTimersByTimeAsync(500)
+    expect(await completed()).toBeGreaterThanOrEqual(2)
+
+    const health = z.object({ status: z.string(), runLog: z.object({ state: z.string(), lastError: z.object({ message: z.string() }).nullable() }) }).parse((await request('/api/health')).json())
+
+    expect(health).toMatchObject({ status: 'ok', runLog: { state: 'retrying', lastError: { message: expect.stringContaining('ENOSPC') } } })
+
+    state.full = false
+
+    for (let step = 0; step < 50 && log.health().state !== 'ok'; step++) await vi.advanceTimersByTimeAsync(100)
+    expect(log.health().state).toBe('ok')
+    const stopping = stopCapture()
+
+    await vi.advanceTimersByTimeAsync(2_000)
+    await stopping
+    await log.close()
+
+    expect((await frameEvents()).length).toBeGreaterThanOrEqual(2)
   })
 })

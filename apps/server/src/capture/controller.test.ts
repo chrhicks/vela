@@ -337,7 +337,7 @@ describe('frame count', () => {
   it('ends the run cleanly after exactly N finished frames, with N records and no error', async () => {
     const records: FrameRecord[] = []
     const settled = vi.fn()
-    const { controller, requests, frame } = setup(createMemorySavedImageStore(), { append: record => void records.push(record), close: async () => {} })
+    const { controller, requests, frame } = setup(createMemorySavedImageStore(), { append: record => void records.push(record) })
     await controller.start(10, { repeat: true, frameCount: 2, onSettled: settled })
     expect(controller.snapshot().frameCount).toBe(2)
     requests[0]!.resolve(frame)
@@ -790,7 +790,7 @@ describe('capture telemetry', () => {
 
   it('puts the ids the camera reported on the frame span, the image and the frame record', async () => {
     const records: FrameRecord[] = []
-    const { controller, requests, frame } = setup(undefined, { append: record => records.push(record), close: async () => {} })
+    const { controller, requests, frame } = setup(undefined, { append: record => records.push(record) })
     await controller.start(10)
     requests[0]!.onProvenance({ requestId: 'request-1', operationId: null, imageId: null })
     requests[0]!.onProvenance({ requestId: 'request-1', operationId: 'operation-1', imageId: 'image-1' })
@@ -814,7 +814,7 @@ describe('capture telemetry', () => {
 
   it('records a camera that reports no ids as carrying none', async () => {
     const records: FrameRecord[] = []
-    const { controller, requests, frame } = setup(undefined, { append: record => records.push(record), close: async () => {} })
+    const { controller, requests, frame } = setup(undefined, { append: record => records.push(record) })
     await controller.start(10)
     requests[0]!.resolve(frame)
     await vi.waitFor(() => expect(controller.active()).toBe(false))
@@ -826,7 +826,7 @@ describe('capture telemetry', () => {
 
   it('records an exposure the adapter could not account for as uncertain', async () => {
     const records: FrameRecord[] = []
-    const { controller, requests } = setup(undefined, { append: record => records.push(record), close: async () => {} })
+    const { controller, requests } = setup(undefined, { append: record => records.push(record) })
     await controller.start(10, { repeat: true })
     requests[0]!.reject(new CaptureUncertainError('Cria restarted while capture was running'))
     await vi.waitFor(() => expect(controller.active()).toBe(false))
@@ -906,7 +906,7 @@ describe('frame types', () => {
     ['bias', 'BIAS'],
   ] as const)('carries %s into the run, the frame, the saved record, the FITS and the frame record', async (frameType, keyword) => {
     const records: FrameRecord[] = []
-    const { controller, requests, frame, savedImages } = setup(undefined, { append: record => void records.push(record), close: async () => {} })
+    const { controller, requests, frame, savedImages } = setup(undefined, { append: record => void records.push(record) })
     expect(await controller.start(10, { saveFrames: true, frameType })).toMatchObject({ frameType, subject: null })
     expect(requests[0]).toMatchObject({ frameType })
     requests[0]!.resolve(frame)
@@ -924,7 +924,7 @@ describe('frame types', () => {
 
     function withMinimum(biasExposureSeconds?: CaptureCamera['biasExposureSeconds']) {
       const records: FrameRecord[] = []
-      const frameRecords = { append: (record: FrameRecord) => void records.push(record), close: async () => {} }
+      const frameRecords = { append: (record: FrameRecord) => void records.push(record) }
 
       return { ...setup(undefined, frameRecords, undefined, biasExposureSeconds), records }
     }
@@ -1157,7 +1157,7 @@ describe('the settings written into the FITS header', () => {
   it('saves the frame with the settings left out when the camera cannot be read', async () => {
     const warning = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const records: FrameRecord[] = []
-    const frameRecords = { append: (record: FrameRecord) => void records.push(record), close: async () => {} }
+    const frameRecords = { append: (record: FrameRecord) => void records.push(record) }
     const test = setup(undefined, frameRecords, undefined, undefined, () => Promise.reject(new Error('Cria has no fresh gain')))
     await test.controller.start(10, { saveFrames: true, subject, focalLengthMm: 400 })
     await vi.waitFor(() => expect(test.requests).toHaveLength(1))

@@ -13,7 +13,7 @@ export const noRecords: JsonlRecords<never> = {
 }
 
 interface JsonlRecordOptions {
-  /** What the file holds, in plain words, for the messages: "frame records". */
+  /** What the file holds, in plain words, for the messages: "autofocus records". */
   name: string
   maxPendingBytes?: number
   onError?: (error: Error) => void
