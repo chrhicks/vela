@@ -20,7 +20,13 @@ import {
 } from '@vela/alpaca'
 import { createAlignmentController } from './controller.js'
 import type { PhysicalAlignment } from './physical.js'
-import { physicalAlignmentSample, projectPhysicalAlignmentTarget } from './physical-coordinates.js'
+import { axisOfPoleError } from './geometry.js'
+import {
+  localSiderealDegrees,
+  physicalAlignmentSample,
+  projectPhysicalAlignmentTarget,
+} from './physical-coordinates.js'
+import { rigidField } from './sweep-fixture.js'
 import type { PlateSolver, SkyPosition, SolveResult } from '../plate-solving/judged-solver.js'
 import {
   createAlignmentDiagnostics,
@@ -36,7 +42,17 @@ const control: {
   beforeDisplay?: ((signal: AbortSignal) => Promise<void>) | undefined
 } = createTestCadence()
 
-const frames = [...fixture.cases[0]!.samples, fixture.cases[0]!.adjusted]
+const { latitudeDegrees } = fixture.site
+
+/** The six sweep positions, then one exposure after the user's adjustment halved the tilt: the mount's angles are the physical corridor's. */
+const frames = [130, 107.2, 84.4, 61.6, 38.8, 16, 16].map((mountAngleDegrees, index) => {
+  const capturedAt = new Date(Date.UTC(2026, 9, 1, 4, 0, index * 30)).toISOString()
+  const midpoint = new Date(Date.parse(capturedAt) + 1000)
+  const tilt = index < 6 ? { altitudeArcsec: 240, azimuthArcsec: -180 } : { altitudeArcsec: 120, azimuthArcsec: -90 }
+  const { cd, ...solved } = rigidField(axisOfPoleError(tilt, latitudeDegrees), mountAngleDegrees, 80, midpoint, localSiderealDegrees(midpoint, fixture.site))
+
+  return { capturedAt, solved, cd }
+})
 
 const frameBytes = () =>
   new Float64Array([900, 200, 900, 200, 200, 50, 200, 50, 900, 200, 900, 200, 200, 50, 200, 50])
@@ -63,7 +79,7 @@ afterEach(async () => {
   expect(control.waits).toHaveLength(0)
 })
 
-/** `looseDegrees`: how far the mount's own turn to the third position differs from the turn the camera made. */
+/** `looseDegrees`: how far the mount's own turn from the fourth position on differs from the turn the camera made. */
 function setup(openDiagnostics?: AlignmentDiagnosticsFactory, looseDegrees = 0) {
   let exposures = 0
   let externalChange = false
@@ -106,7 +122,7 @@ function setup(openDiagnostics?: AlignmentDiagnosticsFactory, looseDegrees = 0) 
       frames[index]!.solved,
       { capturedAt: frames[index]!.capturedAt, exposureSeconds: 2 },
       fixture.site,
-    ).raDegrees + (index === 2 ? looseDegrees : 0),
+    ).raDegrees + (index >= 3 ? looseDegrees : 0),
     declinationDegrees: 60,
     coordinateSystem: 'topocentric' as const,
     ...fixture.site,
@@ -174,7 +190,7 @@ function setup(openDiagnostics?: AlignmentDiagnosticsFactory, looseDegrees = 0) 
                 referenceX: 2.5,
                 referenceY: 2.5,
                 ...frame.solved,
-                cd: [0.1, 0, 0, -0.1],
+                cd: frame.cd,
               },
             })
           },
@@ -212,7 +228,7 @@ function setup(openDiagnostics?: AlignmentDiagnosticsFactory, looseDegrees = 0) 
   async function baseline(onSettled?: () => void, exposureSeconds?: number) {
     await controller.start('physical', 'Physical rig', onSettled, exposureSeconds)
 
-    for (let index = 0; index < 3; index++) (await nextSolve()).complete()
+    for (let index = 0; index < 6; index++) (await nextSolve()).complete()
   }
 
   return {
@@ -237,8 +253,8 @@ it('uses physical optics, selected Bayer camera, and midpoint geometry while pre
   expect(subject.solverFactory).toHaveBeenCalledWith(fieldHeightDegrees)
   expect(subject.hardware.pointing).not.toHaveBeenCalled()
   expect(subject.hardware.move).not.toHaveBeenCalled()
-  expect(subject.physical.move).toHaveBeenCalledTimes(2)
-  expect(subject.captures).toHaveLength(3)
+  expect(subject.physical.move).toHaveBeenCalledTimes(5)
+  expect(subject.captures).toHaveLength(6)
 
   for (const capture of subject.captures) {
     expect(capture).toMatchObject({
@@ -254,15 +270,18 @@ it('uses physical optics, selected Bayer camera, and midpoint geometry while pre
     phase: 'adjusting',
     mode: 'physical',
     cameraName: 'Selected RGGB camera',
-    measuredAt: frames[2]!.capturedAt,
+    measuredAt: frames[5]!.capturedAt,
     measurement: { fieldHeightDegrees, capturedAtSource: 'server-estimate' },
   })
-  expect(subject.sample.mock.calls[2]![1]).toEqual({
-    capturedAt: frames[2]!.capturedAt,
+  // The sweep was built with this tilt; the fit and the adjusting loop must give it back.
+  expect(Math.abs(view.measurement!.altitudeArcsec - 240)).toBeLessThan(3)
+  expect(Math.abs(view.measurement!.azimuthArcsec + 180)).toBeLessThan(3)
+  expect(subject.sample.mock.calls[5]![1]).toEqual({
+    capturedAt: frames[5]!.capturedAt,
     exposureSeconds: 2,
   })
   expect(
-    Date.parse(subject.sample.mock.results[2]!.value.capturedAt) - Date.parse(view.measuredAt!),
+    Date.parse(subject.sample.mock.results[5]!.value.capturedAt) - Date.parse(view.measuredAt!),
   ).toBe(1000)
   const imageId = view.measurement!.imageUrl.split('/').at(-1)!
   const png = (await subject.controller.image(imageId, 'native'))!
@@ -275,7 +294,7 @@ it('requests a chosen exposure and centres every sample on its midpoint', async 
   await subject.baseline(undefined, 10)
   await vi.waitFor(() => expect(subject.controller.snapshot().measurement).not.toBeNull())
   expect(subject.controller.snapshot().exposureSeconds).toBe(10)
-  expect(subject.captures.map(capture => capture.exposureSeconds)).toEqual([10, 10, 10])
+  expect(subject.captures.map(capture => capture.exposureSeconds)).toEqual(Array(6).fill(10))
 
   for (const [index, [, capture]] of subject.sample.mock.calls.entries()) {
     expect(capture.exposureSeconds).toBe(10)
@@ -302,6 +321,7 @@ it.each(['during solve', 'during preview'] as const)(
     second.complete()
 
     if (timing === 'during solve') {
+      for (let position = 3; position <= 5; position++) (await subject.nextSolve()).complete()
       const final = await subject.nextSolve()
       expect(subject.controller.snapshot()).toMatchObject({
         activity: 'solving',
@@ -385,14 +405,14 @@ it('keeps the baseline and last measurement through repeated read interruptions 
       measurement: previous.measurement,
       measuredAt: previous.measuredAt,
     })
-    expect(subject.captures).toHaveLength(3)
+    expect(subject.captures).toHaveLength(6)
   }
 
   control.waits.shift()!()
   const solve = await subject.nextSolve()
   solve.complete()
   await vi.waitFor(() =>
-    expect(subject.controller.snapshot().measuredAt).toBe(frames[3]!.capturedAt),
+    expect(subject.controller.snapshot().measuredAt).toBe(frames[6]!.capturedAt),
   )
   expect(subject.controller.snapshot()).toMatchObject({
     active: true,
@@ -400,7 +420,7 @@ it('keeps the baseline and last measurement through repeated read interruptions 
     warning: null,
   })
   expect(subject.physical.prepare).toHaveBeenCalledTimes(1)
-  expect(subject.physical.move).toHaveBeenCalledTimes(2)
+  expect(subject.physical.move).toHaveBeenCalledTimes(5)
 })
 
 it('stops promptly while a read is waiting to retry', async () => {
@@ -416,7 +436,7 @@ it('stops promptly while a read is waiting to retry', async () => {
     phase: 'stopped',
     warning: null,
   })
-  expect(subject.captures).toHaveLength(3)
+  expect(subject.captures).toHaveLength(6)
 })
 
 it('retries validation of the same captured frame without repeating an exposure', async () => {
@@ -435,36 +455,20 @@ it('retries validation of the same captured frame without repeating an exposure'
   })
 })
 
-it('retries an explicitly recoverable capture but stops on an unclassified transport failure', async () => {
+it('drops a position whose exposure failed safely without exposing it again, but stops on an unclassified transport failure', async () => {
   const subject = setup()
-  vi.mocked(subject.hardware.capture).mockRejectedValueOnce(
-    new AlpacaCaptureRetryableError(readTimeout()),
-  )
+  vi.mocked(subject.hardware.capture)
+    .mockRejectedValueOnce(new AlpacaCaptureRetryableError(readTimeout()))
+    .mockRejectedValueOnce(readTimeout())
   await subject.controller.start('physical', 'Physical rig')
-  await vi.waitFor(() => expect(subject.controller.snapshot().activity).toBe('retrying'))
-  vi.mocked(subject.hardware.capture).mockRejectedValueOnce(readTimeout())
-  control.waits.shift()!()
   await vi.waitFor(() => expect(subject.controller.active()).toBe(false))
   expect(subject.hardware.capture).toHaveBeenCalledTimes(2)
+  expect(subject.physical.move).toHaveBeenCalledOnce()
   expect(subject.physical.pointing).toHaveBeenCalledTimes(2)
   expect(subject.controller.snapshot()).toMatchObject({
     phase: 'failed',
     error: 'Device read timed out',
   })
-})
-
-it('revalidates mount state before a fresh pre-start capture retry', async () => {
-  const subject = setup()
-  vi.mocked(subject.hardware.capture).mockRejectedValueOnce(
-    new AlpacaCaptureRetryableError(readTimeout()),
-  )
-  await subject.controller.start('physical', 'Physical rig')
-  await vi.waitFor(() => expect(control.waits).toHaveLength(1))
-  vi.mocked(subject.physical.pointing).mockRejectedValueOnce(new Error('Tracking is off'))
-  control.waits.shift()!()
-  await vi.waitFor(() => expect(subject.controller.active()).toBe(false))
-  expect(subject.hardware.capture).toHaveBeenCalledOnce()
-  expect(subject.controller.snapshot()).toMatchObject({ phase: 'failed', error: 'Tracking is off' })
 })
 
 it('preserves the alignment baseline and timer through same-exposure read recovery, then publishes only the solved result', async () => {
@@ -484,8 +488,8 @@ it('preserves the alignment baseline and timer through same-exposure read recove
     return frame
   })
   control.waits.shift()!()
-  await vi.waitFor(() => expect(subject.captures).toHaveLength(4))
-  const pending = subject.captures[3]!
+  await vi.waitFor(() => expect(subject.captures).toHaveLength(7))
+  const pending = subject.captures[6]!
   const startedAt = subject.controller.snapshot().exposureStartedAt
   pending.onReadState!('retrying')
   expect(subject.controller.snapshot()).toMatchObject({
@@ -505,8 +509,8 @@ it('preserves the alignment baseline and timer through same-exposure read recove
     measurement: previous.measurement,
     measuredAt: previous.measuredAt,
   })
-  expect(subject.hardware.capture).toHaveBeenCalledTimes(4)
-  expect(subject.physical.move).toHaveBeenCalledTimes(2)
+  expect(subject.hardware.capture).toHaveBeenCalledTimes(7)
+  expect(subject.physical.move).toHaveBeenCalledTimes(5)
   complete()
   const solve = await subject.nextSolve()
   pending.onReadState!('retrying')
@@ -517,7 +521,7 @@ it('preserves the alignment baseline and timer through same-exposure read recove
   })
   solve.complete()
   await vi.waitFor(() =>
-    expect(subject.controller.snapshot().measuredAt).toBe(frames[3]!.capturedAt),
+    expect(subject.controller.snapshot().measuredAt).toBe(frames[6]!.capturedAt),
   )
 })
 
@@ -567,8 +571,8 @@ it.each([
       measurement: previous.measurement,
       measuredAt: previous.measuredAt,
     })
-    expect(subject.hardware.capture).toHaveBeenCalledTimes(4)
-    expect(subject.physical.move).toHaveBeenCalledTimes(2)
+    expect(subject.hardware.capture).toHaveBeenCalledTimes(7)
+    expect(subject.physical.move).toHaveBeenCalledTimes(5)
     expect(released).toHaveBeenCalledOnce()
   },
 )
@@ -576,7 +580,6 @@ it.each([
 function recording(): AlignmentDiagnosticRun {
   return {
     recordFrame: vi.fn(async () => {}),
-    recordBaseline: vi.fn(async () => {}),
     recordFit: vi.fn(async () => {}),
     recordDropped: vi.fn(async () => {}),
     recordMeasurement: vi.fn(async () => {}),
@@ -598,7 +601,7 @@ it('records the exact solved baseline, midpoint, site and existing mount observa
       exposureSeconds: 2,
     }),
   )
-  expect(evidence.recordFrame).toHaveBeenCalledTimes(3)
+  expect(evidence.recordFrame).toHaveBeenCalledTimes(6)
   const [frame, recorded] = vi.mocked(evidence.recordFrame).mock.calls[0]!
   expect(frame.capturedAtSource).toBe('server-estimate')
   expect(recorded).toMatchObject({
@@ -612,17 +615,20 @@ it('records the exact solved baseline, midpoint, site and existing mount observa
     },
   })
   expect(Date.parse(recorded.sample.capturedAt) - Date.parse(frame.capturedAt)).toBe(1000)
-  expect(vi.mocked(evidence.recordBaseline).mock.calls[0]![0]).toEqual(
-    subject.sample.mock.results.map(result => result.value),
-  )
+  const [fixes, latitude, fit] = vi.mocked(evidence.recordFit).mock.calls[0]!
+  expect(fixes.map(fix => fix.position)).toEqual([1, 2, 3, 4, 5, 6])
+  expect(fixes.map(fix => fix.sample)).toEqual(subject.sample.mock.results.map(result => result.value))
+  expect(latitude).toBe(latitudeDegrees)
+  expect(fit.verdict.status).toBe('rigid')
+  expect(evidence.recordDropped).not.toHaveBeenCalled()
 
   control.waits.shift()!()
   const adjusted = await subject.nextSolve()
   adjusted.complete()
   await vi.waitFor(() => expect(control.waits).toHaveLength(1))
   expect(evidence.recordFrame).toHaveBeenLastCalledWith(
-    expect.objectContaining({ capturedAt: frames[3]!.capturedAt }),
-    expect.objectContaining({ phase: 'adjusting', position: 3 }),
+    expect.objectContaining({ capturedAt: frames[6]!.capturedAt }),
+    expect.objectContaining({ phase: 'adjusting', position: 6 }),
   )
   expect(evidence.recordMeasurement).toHaveBeenCalledTimes(2)
   expect(vi.mocked(evidence.recordMeasurement).mock.calls[1]![1]).toMatchObject({
@@ -631,7 +637,7 @@ it('records the exact solved baseline, midpoint, site and existing mount observa
   })
   await subject.controller.stop(true)
   expect(evidence.finish).toHaveBeenCalledExactlyOnceWith({ phase: 'finished', error: null })
-  expect(subject.captures).toHaveLength(4)
+  expect(subject.captures).toHaveLength(7)
 })
 
 it('waits for an in-flight diagnostic write on Stop and starts no further exposure or movement', async () => {
@@ -681,9 +687,9 @@ it('reports an unavailable diagnostic destination without losing the alignment o
       phase: 'adjusting',
       error: null,
     })
-    expect(subject.captures).toHaveLength(3)
+    expect(subject.captures).toHaveLength(6)
     expect(subject.physical.prepare).toHaveBeenCalledTimes(1)
-    expect(subject.physical.move).toHaveBeenCalledTimes(2)
+    expect(subject.physical.move).toHaveBeenCalledTimes(5)
   } finally {
     await subject.controller.stop()
     await rm(directory, { recursive: true, force: true })
@@ -708,7 +714,7 @@ it('replays a physical controller trial from its actual recorded bundle', async 
     expect(report).toMatchObject({
       mode: 'physical',
       outcome: { phase: 'finished', error: null },
-      counts: { frames: 4, measurements: 2, physicalFrames: 4, verifiedOriginals: 4 },
+      counts: { frames: 7, measurements: 2, physicalFrames: 7, verifiedOriginals: 7 },
       rigidity: { status: 'rigid', thresholdArcmin: 2 },
       maximumDiscrepancies: {
         measurementArcsec: 0,
@@ -716,6 +722,7 @@ it('replays a physical controller trial from its actual recorded bundle', async 
         physicalSampleDegrees: 0,
         physicalSampleTimeMs: 0,
         rigidityMissArcmin: 0,
+        fitArcsec: 0,
       },
     })
     expect(report.finalMeasurement?.totalArcsec).toBe(
@@ -727,7 +734,7 @@ it('replays a physical controller trial from its actual recorded bundle', async 
   }
 })
 
-it('reports not rigid, with the miss and no polar error, when the mount did not turn as one body', async () => {
+it('reports not rigid, with the miss and the step and no polar error, when the mount did not turn as one body', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'vela-physical-not-rigid-'))
   const errors: Error[] = []
   const subject = setup(createAlignmentDiagnostics(directory, error => errors.push(error)), 0.5)
@@ -740,15 +747,15 @@ it('reports not rigid, with the miss and no polar error, when the mount did not 
     expect(view).toMatchObject({
       phase: 'not-rigid',
       activity: 'idle',
-      solvedPositions: 3,
+      solvedPositions: 6,
       error: null,
       warning: null,
       measurement: null,
-      rigidity: { thresholdArcmin: 2 },
+      rigidity: { thresholdArcmin: 2, steps: [{ beforePosition: 3, afterPosition: 4 }] },
     })
     expect(view.rigidity!.missArcmin).toBeGreaterThan(2)
     expect(control.waits).toHaveLength(0)
-    expect(subject.captures).toHaveLength(3)
+    expect(subject.captures).toHaveLength(6)
     expect(await subject.controller.stop()).toMatchObject({ phase: 'not-rigid', measurement: null })
     expect(errors).toEqual([])
 
@@ -759,10 +766,11 @@ it('reports not rigid, with the miss and no polar error, when the mount did not 
       .split('\n')
       .map(line => JSON.parse(line))
 
-    expect(entries.find(entry => entry.type === 'baseline').rigidity).toMatchObject({
+    expect(entries.find(entry => entry.type === 'fit').verdict).toMatchObject({
       status: 'not-rigid',
       missArcmin: view.rigidity!.missArcmin,
       thresholdArcmin: 2,
+      steps: [{ labelBefore: '3', labelAfter: '4' }],
     })
     expect(entries.some(entry => entry.type === 'measurement')).toBe(false)
     expect(await replayAlignmentDiagnostics(join(directory, trial!))).toMatchObject({
@@ -809,11 +817,7 @@ it('uses the adjustment window as the settling allowance and gates each correcti
   await subject.baseline()
   await vi.waitFor(() => expect(control.waits).toHaveLength(1))
   const baselineCalls = vi.mocked(subject.physical.pointing).mock.calls
-  expect(baselineCalls.map(call => call[1])).toEqual([
-    { afterSettling: false },
-    { afterSettling: false },
-    { afterSettling: false },
-  ])
+  expect(baselineCalls.map(call => call[1])).toEqual(Array(6).fill({ afterSettling: false }))
   const validations = vi.mocked(subject.physical.validate).mock.calls.length
   const previous = subject.controller.snapshot().measurement
 
@@ -821,7 +825,7 @@ it('uses the adjustment window as the settling allowance and gates each correcti
   const adjusted = await subject.nextSolve()
   adjusted.complete()
   await vi.waitFor(() => expect(subject.controller.snapshot().measurement).not.toBe(previous))
-  expect(vi.mocked(subject.physical.pointing).mock.calls[3]![1]).toEqual({ afterSettling: true })
+  expect(vi.mocked(subject.physical.pointing).mock.calls[6]![1]).toEqual({ afterSettling: true })
   // One capture check alongside processing, then one final check before publication.
   expect(vi.mocked(subject.physical.validate).mock.calls.length - validations).toBe(2)
 })
@@ -901,7 +905,7 @@ it('keeps a published correction’s image through Stop, waiting for its display
   })
   expect(subject.controller.snapshot().preview!.frameId).toBe(published.frameId)
   expect(subject.controller.snapshot().preview).not.toEqual(previous.preview)
-  expect(subject.captures).toHaveLength(4)
+  expect(subject.captures).toHaveLength(7)
 })
 
 it('records one compact timing summary for each published exposure', async () => {
@@ -916,9 +920,7 @@ it('records one compact timing summary for each published exposure', async () =>
     const spans = exporter.getFinishedSpans()
     const frames = spans.filter(span => span.name === 'alignment.frame')
     expect(frames.map(span => span.attributes['alignment.frame.outcome'])).toEqual([
-      'baseline',
-      'baseline',
-      'baseline',
+      ...Array(6).fill('baseline'),
       'measurement',
     ])
     const measured = frames.at(-1)!.attributes

@@ -9,7 +9,10 @@ export interface FixEvidence {
   offlinePointing?: { rightAscensionDegrees: number } | undefined
 }
 
-/** One solved frame of the sweep as the polar axis fit takes it. The label is the position, so a step names its poses by position. */
+/**
+ * One solved frame of the sweep as the polar axis fit takes it. The label is the position, so a step names its poses by position.
+ * The offline simulator's sky has the pole and sidereal time of J2000 itself, so its fixes stay in that frame.
+ */
 export function sweepFix(position: number, { sample, solution, physical, offlinePointing }: FixEvidence): SweepFix {
   const mountRightAscensionDegrees = physical?.before.rightAscensionDegrees ?? offlinePointing?.rightAscensionDegrees
 
@@ -21,6 +24,6 @@ export function sweepFix(position: number, { sample, solution, physical, offline
     label: String(position),
     atSeconds: capturedAt.getTime() / 1000,
     mountAngleDegrees: mountRightAscensionDegrees - sample.siderealTimeDegrees,
-    orientation: cameraOrientation(solution.wcs, capturedAt, sample.siderealTimeDegrees),
+    orientation: cameraOrientation(solution.wcs, capturedAt, sample.siderealTimeDegrees, { fixedFrame: offlinePointing !== undefined }),
   }
 }

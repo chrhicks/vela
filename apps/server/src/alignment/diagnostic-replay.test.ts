@@ -23,7 +23,8 @@ import {
   maximumJournalBytes,
   type DiagnosticEntry,
 } from './diagnostic-schema.js'
-import { createAlignmentBaseline, measureAlignment } from './geometry.js'
+import { axisOfPoleError, baselineFromAxis, measureAlignment } from './geometry.js'
+import { appendThreePointBaseline } from './sweep-fixture.js'
 import { physicalAlignmentSample } from './physical-coordinates.js'
 import { fixture } from './physical-fixture.js'
 
@@ -66,8 +67,16 @@ async function physicalTrial(
     ),
   )
 
-  const baseline = createAlignmentBaseline(
-    [samples[0]!, samples[1]!, samples[2]!],
+  const recorded = baselineFromAxis(
+    axisOfPoleError({ altitudeArcsec: reference.altitude, azimuthArcsec: reference.azimuth }, fixture.site.latitudeDegrees),
+    samples[2]!,
+    fixture.site.latitudeDegrees,
+  )
+
+  // Replay reads a three-point journal's recorded pole and rebuilds the baseline from it.
+  const baseline = baselineFromAxis(
+    axisOfPoleError(recorded.measurement, fixture.site.latitudeDegrees),
+    samples[2]!,
     fixture.site.latitudeDegrees,
   )
 
@@ -161,10 +170,11 @@ async function physicalTrial(
 
   for (const [index, input] of reference.samples.entries())
     await capture(input, 'baseline', index + 1)
-  await run.recordBaseline(
+  await appendThreePointBaseline(
+    join(root, (await readdir(root))[0]!),
     [samples[0]!, samples[1]!, samples[2]!],
     fixture.site.latitudeDegrees,
-    baseline.measurement,
+    recorded.measurement,
   )
   await run.recordMeasurement(samples[2]!, measureAlignment(baseline, samples[2]!, true), mount)
   const adjusted = await capture(reference.adjusted, 'adjusting', 3)

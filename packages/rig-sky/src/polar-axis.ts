@@ -137,7 +137,8 @@ function sweepVerdict(fixes: readonly SweepFix[], axis: Vec3): SweepVerdict {
   return { status: rigid ? 'rigid' : 'not-rigid', missArcmin, thresholdArcmin: rigidMissArcmin, steps }
 }
 
-function poleError(axis: Vec3, latitudeDegrees: number) {
+/** The altitude, azimuth and total error of a polar axis in the hour-angle frame, in arcseconds, as polar alignment reports them. */
+export function poleError(axis: Vec3, latitudeDegrees: number) {
   const latitude = latitudeDegrees * radians
   const altitude = Math.asin(Math.max(-1, Math.min(1, axis[0] * Math.cos(latitude) + axis[2] * Math.sin(latitude))))
   const azimuth = Math.atan2(axis[1], -axis[0] * Math.sin(latitude) + axis[2] * Math.cos(latitude))

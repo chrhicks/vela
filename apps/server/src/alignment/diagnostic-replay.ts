@@ -2,7 +2,14 @@ import { createHash } from 'node:crypto'
 import { constants } from 'node:fs'
 import { open } from 'node:fs/promises'
 import { join } from 'node:path'
-import { fitPolarAxis, type PolarFit, type RigidityVerdict, type Site } from '@vela/rig-sky'
+import {
+  cameraOrientation,
+  fitPolarAxis,
+  rigidityVerdict,
+  type PolarFit,
+  type RigidityVerdict,
+  type Site,
+} from '@vela/rig-sky'
 import {
   diagnosticEntrySchema,
   diagnosticJournalName,
@@ -12,14 +19,13 @@ import {
   type DiagnosticFrameEntry,
 } from './diagnostic-schema.js'
 import {
+  axisOfPoleError,
   baselineFromAxis,
-  createAlignmentBaseline,
   measureAlignment,
   type AlignmentBaseline,
   type AlignmentMeasurement,
   type AlignmentSample,
 } from './geometry.js'
-import { baselineRigidity, type RigidityFrame } from './baseline-rigidity.js'
 import { physicalAlignmentSample } from './physical-coordinates.js'
 import { sweepFix } from './sweep-fit.js'
 
@@ -195,8 +201,8 @@ export async function replayAlignmentDiagnostics(
         report.rigidity = report.fit.verdict
         compareFit(report, report.fit, entry)
 
-        if (report.fit.verdict.status === 'rigid' && entry.polar)
-          report.baseline = baselineFromAxis(entry.polar.axis, entry.fixes.at(-1)!.sample, entry.latitudeDegrees)
+        if (report.fit.verdict.status === 'rigid')
+          report.baseline = baselineFromAxis(report.fit.axis, entry.fixes.at(-1)!.sample, entry.latitudeDegrees)
 
         break
       }
@@ -212,14 +218,18 @@ export async function replayAlignmentDiagnostics(
           throw new Error('Alignment diagnostic baseline does not match its three solved frames')
         }
 
-        report.baseline = createAlignmentBaseline(entry.samples, entry.latitudeDegrees)
+        // A three-point journal is read, not refitted: its recorded pole stands, and only its rigidity is judged again.
+        report.baseline = baselineFromAxis(
+          axisOfPoleError(entry.measurement, entry.latitudeDegrees),
+          entry.samples[2],
+          entry.latitudeDegrees,
+        )
         compareMeasurement(report, report.baseline.measurement, entry.measurement)
 
         if (first.run.mode === 'physical') {
-          report.rigidity = baselineRigidity(
-            // SAFETY: three baseline frames were checked above, and a physical frame has its mount reading.
-            baselineFrames.map(rigidityFrame) as [RigidityFrame, RigidityFrame, RigidityFrame],
-          )
+          // A physical frame has its mount reading, and three baseline frames were checked above.
+          const [one, two, three] = baselineFrames.map(threePointPosition)
+          report.rigidity = rigidityVerdict([one!, two!, three!])
 
           if (entry.rigidity)
             report.maximumDiscrepancies.rigidityMissArcmin = Math.abs(
@@ -305,11 +315,12 @@ function compareFit(
     )
 }
 
-function rigidityFrame(frame: DiagnosticFrameEntry): RigidityFrame {
+function threePointPosition({ evidence }: DiagnosticFrameEntry) {
+  const { sample, solution, physical } = evidence
+
   return {
-    solved: frame.evidence.solution.wcs,
-    sample: frame.evidence.sample,
-    mountRightAscensionDegrees: frame.evidence.physical!.before.rightAscensionDegrees,
+    mountAngleDegrees: physical!.before.rightAscensionDegrees - sample.siderealTimeDegrees,
+    orientation: cameraOrientation(solution.wcs, new Date(sample.capturedAt), sample.siderealTimeDegrees),
   }
 }
 

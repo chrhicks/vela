@@ -7,7 +7,7 @@ import type {
   Pointing,
   TelescopeStatus,
 } from '@vela/equipment'
-import type { PolarFit, RigidityVerdict, Site } from '@vela/rig-sky'
+import type { PolarFit, Site } from '@vela/rig-sky'
 import { encodeCaptureFits } from '../imaging/fits.js'
 import type { SkyPosition, SolveResult } from '../plate-solving/judged-solver.js'
 import type { AlignmentMeasurement, AlignmentSample } from './geometry.js'
@@ -51,12 +51,6 @@ export type AlignmentFrameEvidence = {
 
 export interface AlignmentDiagnosticRun {
   recordFrame(frame: Frame, evidence: AlignmentFrameEvidence): Promise<void>
-  recordBaseline(
-    samples: readonly [AlignmentSample, AlignmentSample, AlignmentSample],
-    latitudeDegrees: number,
-    measurement: AlignmentMeasurement,
-    rigidity?: RigidityVerdict,
-  ): Promise<void>
   /** The polar axis fit over the good fixes of a sweep; `fixes` are their positions and samples. */
   recordFit(
     fixes: readonly { position: number; sample: AlignmentSample }[],
@@ -180,16 +174,6 @@ export function createAlignmentDiagnostics(
               if (previous) await unlink(join(directory, previous))
             }
           }),
-        recordBaseline: (samples, latitudeDegrees, measurement, rigidity) =>
-          record(() =>
-            append({
-              type: 'baseline',
-              samples,
-              latitudeDegrees,
-              measurement,
-              ...(rigidity && { rigidity }),
-            }),
-          ),
         recordFit: (fixes, latitudeDegrees, fit) =>
           record(() => {
             const { axis, altitudeArcsec, azimuthArcsec, totalArcsec, verdict } = fit

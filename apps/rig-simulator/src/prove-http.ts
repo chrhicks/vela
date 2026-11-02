@@ -16,12 +16,14 @@ import {
   createAlpacaAcquisition,
   createAlpacaProvider,
 } from '../../../packages/alpaca/dist/index.js'
+import { fitPolarAxis } from '../../../packages/rig-sky/dist/index.js'
+import { createAlignmentController } from '../../server/dist/alignment/controller.js'
 import {
-  createAlignmentBaseline,
+  baselineFromAxis,
   measureAlignment,
-  type AlignmentSample,
   type AlignmentMeasurement,
 } from '../../server/dist/alignment/geometry.js'
+import { sweepFix } from '../../server/dist/alignment/sweep-fit.js'
 import { createPlateSolver } from '../../server/dist/plate-solving/judged-solver.js'
 import { imageWidth, imageHeight } from './optics.js'
 import { loadCatalog } from './catalog.js'
@@ -99,13 +101,15 @@ async function exposure() {
   return { pointing, frame, solved, pointingObservedAt }
 }
 
-async function sample(): Promise<{ sample: AlignmentSample; latitude: number }> {
+async function sample() {
   const { pointing, frame, solved, pointingObservedAt } = await exposure()
   assert.equal(solved.status, 'solved', 'Clear synthetic exposure must actually solve')
 
   if (solved.status !== 'solved') throw new Error('Unreachable no-solution')
 
   return {
+    solution: solved,
+    offlinePointing: pointing,
     sample: {
       raDegrees: solved.raDegrees,
       decDegrees: solved.decDegrees,
@@ -122,7 +126,7 @@ async function sample(): Promise<{ sample: AlignmentSample; latitude: number }> 
 
 function check(
   name: string,
-  measurement: AlignmentMeasurement,
+  measurement: Pick<AlignmentMeasurement, 'altitudeArcsec' | 'azimuthArcsec'>,
   altitudeArcsec: number,
   azimuthArcsec: number,
 ) {
@@ -371,17 +375,39 @@ try {
   }
 
   await control('reset', { preset: 'large-error' }, 'POST')
-  await hardware.move(telescopeId, -1.5, 12, signal)
-  const first = await sample()
-  await hardware.move(telescopeId, 1.5, 12, signal)
-  const second = await sample()
-  await hardware.move(telescopeId, 1.5, 12, signal)
-  const third = await sample()
 
-  const baseline = createAlignmentBaseline(
-    [first.sample, second.sample, third.sample],
-    first.latitude,
+  const controller = createAlignmentController({
+    mode: 'offline',
+    settings: { cameraId, telescopeId, exposureSeconds: 2, fieldHeightDegrees: 3 },
+    hardware,
+    solver,
+  })
+
+  await controller.start('proof', 'Simulator proof')
+
+  while (!controller.snapshot().measurement && controller.active()) await delay(200)
+  await controller.stop()
+  const viewed = controller.snapshot()
+  assert.ok(viewed.measurement, `The controller measured nothing: ${viewed.phase} ${viewed.error}`)
+  assert.equal(viewed.solvedPositions, 6)
+  check('controller-large', viewed.measurement, 480, -360)
+  await control('reset', { preset: 'large-error' }, 'POST')
+  await hardware.move(telescopeId, -1.5, 12, signal)
+
+  const sweep: Awaited<ReturnType<typeof sample>>[] = []
+
+  for (let position = 1; position <= 6; position++) {
+    if (position > 1) await hardware.move(telescopeId, 1.5, 4.8, signal)
+    sweep.push(await sample())
+  }
+
+  const fit = fitPolarAxis(
+    sweep.map((fix, index) => sweepFix(index + 1, fix)),
+    sweep[0]!.latitude,
   )
+
+  assert.equal(fit.verdict.status, 'rigid', `The sweep was not rigid: ${JSON.stringify(fit.verdict)}`)
+  const baseline = baselineFromAxis(fit.axis, sweep.at(-1)!.sample, sweep[0]!.latitude)
 
   check('baseline-large', baseline.measurement, 480, -360)
 

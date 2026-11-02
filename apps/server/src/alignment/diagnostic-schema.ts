@@ -159,6 +159,7 @@ export const diagnosticEntrySchema = z.discriminatedUnion('type', [
     run: diagnosticRunInfoSchema,
   }),
   frameEntry,
+  /** Read only: the three-point journals of before plan step 34b. Nothing writes this entry now. */
   z.object({
     type: z.literal('baseline'),
     samples: z.tuple([sample, sample, sample]).readonly(),

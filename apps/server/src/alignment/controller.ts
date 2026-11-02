@@ -8,8 +8,11 @@ import {
   type Acquisition,
   type Frame,
 } from '@vela/equipment'
-import { baselineRigidity, type RigidityFrame } from './baseline-rigidity.js'
-import { createAlignmentBaseline, measureAlignment, type AlignmentSample } from './geometry.js'
+import { fitPolarAxis, minimumFixes } from '@vela/rig-sky'
+import { baselineFromAxis, measureAlignment, type AlignmentSample } from './geometry.js'
+import { SWEEP_POSITIONS } from './sweep.js'
+import { sweepFix } from './sweep-fit.js'
+import type { DroppedReason } from './diagnostic-schema.js'
 import { describeRejection, type PlateSolver, type SkyPosition } from '../plate-solving/judged-solver.js'
 import { projectSky } from '../targets/sky.js'
 import { detailRegion, prepareAlignmentDisplay, type AlignmentDisplay } from './display.js'
@@ -144,16 +147,14 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
   let frameSequence = 0
   let previewSequence = 0
 
+  type SolvedFrame = Exclude<Awaited<ReturnType<typeof acquire>>, { dropped: Dropped }>
+
   function patch(next: Partial<AlignmentView>) {
     view = { ...view, ...next }
   }
 
-  async function retryObservation<T>(
-    read: () => Promise<T>,
-    signal: AbortSignal,
-    retryable = (error: Error) =>
-      error instanceof EquipmentError && error.reason === 'transport',
-  ): Promise<T> {
+  /** A transient read failure keeps the run and its context, and the read is retried at a paced, cancellable interval. */
+  async function retryRead<T>(read: () => Promise<T>, signal: AbortSignal): Promise<T> {
     const activity = view.activity
     let interrupted = false
 
@@ -168,7 +169,7 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
 
         return result
       } catch (error) {
-        if (!(error instanceof Error) || !retryable(error)) throw error
+        if (!(error instanceof EquipmentError && error.reason === 'transport')) throw error
         signal.throwIfAborted()
         interrupted = true
         patch({
@@ -181,7 +182,7 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
             attributes: {
               'alignment.run.id': runId,
               'rig.id': view.rigId,
-              'error.message': error instanceof Error ? error.message : 'Device read interrupted',
+              'error.message': error.message,
             },
           })
           .end()
@@ -291,68 +292,55 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
   async function acquireFrame(signal: AbortSignal, afterSettling: boolean) {
     let exposureRequestedAt: number | undefined
 
-    const acquired = await retryObservation(
-      async () => {
-        // A safe pre-start retry still needs a fresh mount observation and solve hint.
-        const actual = physical
-          ? await retryObservation(() => physical.pointing(signal, { afterSettling }), signal)
-          : undefined
+    const actual = physical
+      ? await retryRead(() => physical.pointing(signal, { afterSettling }), signal)
+      : undefined
 
-        const pointing = actual
-          ? undefined
-          : await retryObservation(() => hardware.pointing(settings.telescopeId, signal), signal)
+    const pointing = actual
+      ? undefined
+      : await retryRead(() => hardware.pointing(settings.telescopeId, signal), signal)
 
-        const pointingObservedAt = now()
+    const pointingObservedAt = now()
 
-        if (pointing && pointing.coordinateSystem !== 'j2000')
-          throw new Error(
-            'This configured alignment model requires the simulator’s J2000 coordinate frame',
-          )
+    if (pointing && pointing.coordinateSystem !== 'j2000')
+      throw new Error('This configured alignment model requires the simulator’s J2000 coordinate frame')
 
-        if (pointing && !pointing.tracking)
-          throw new Error('Tracking must be enabled before measuring alignment')
-        const exposureStartedAt = new Date(now()).toISOString()
-        patch({ activity: 'exposing', exposureStartedAt, warning: null })
-        let capturePending = true
+    if (pointing && !pointing.tracking)
+      throw new Error('Tracking must be enabled before measuring alignment')
+    const exposureStartedAt = new Date(now()).toISOString()
+    patch({ activity: 'exposing', exposureStartedAt, warning: null })
+    let capturePending = true
 
-        const frame = await step(
-          'alignment.capture',
-          () =>
-            hardware.capture({
-              cameraId: settings.cameraId,
-              exposureSeconds,
-              signal,
-              ...(physical
-                ? { expectedCameraName: physical.cameraName }
-                : { monochromeOnly: true }),
-              onExposureRequested() {
-                exposureRequestedAt = performance.now()
-              },
-              onReadState(state) {
-                if (!capturePending || signal.aborted) return
-                patch(
-                  state === 'retrying'
-                    ? {
-                        activity: 'retrying',
-                        exposureStartedAt: null,
-                        warning: 'Device connection interrupted. Retrying automatically.',
-                      }
-                    : { activity: 'exposing', exposureStartedAt, warning: null },
-                )
-              },
-            }),
-          { 'alignment.position': view.position },
-        ).finally(() => {
-          capturePending = false
-        })
+    const frame = await step(
+      'alignment.capture',
+      () =>
+        hardware.capture({
+          cameraId: settings.cameraId,
+          exposureSeconds,
+          signal,
+          ...(physical ? { expectedCameraName: physical.cameraName } : { monochromeOnly: true }),
+          onExposureRequested() {
+            exposureRequestedAt = performance.now()
+          },
+          onReadState(state) {
+            if (!capturePending || signal.aborted) return
+            patch(
+              state === 'retrying'
+                ? {
+                    activity: 'retrying',
+                    exposureStartedAt: null,
+                    warning: 'Device connection interrupted. Retrying automatically.',
+                  }
+                : { activity: 'exposing', exposureStartedAt, warning: null },
+            )
+          },
+        }),
+      { 'alignment.position': view.position },
+    ).finally(() => {
+      capturePending = false
+    })
 
-        return { frame, actual, pointing, pointingObservedAt }
-      },
-      signal,
-      error => error instanceof CaptureRetryableError,
-    )
-
-    return { ...acquired, timing: frameTiming(exposureRequestedAt) }
+    return { frame, actual, pointing, pointingObservedAt, timing: frameTiming(exposureRequestedAt) }
   }
 
   /** Monotonic milestones of one exposure, persisted as compact trace records. */
@@ -476,12 +464,23 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
     }
   }
 
+  /**
+   * One exposure, solved and checked. An exposure that gives no usable solve, or that the camera safely failed to take,
+   * comes back as `dropped` and is never exposed again to repair it; anything else that goes wrong ends the run.
+   */
   async function acquire(solver: Solver, signal: AbortSignal, afterSettling: boolean) {
-    const { frame, actual, pointing, pointingObservedAt, timing } = await acquireFrame(
-      signal,
-      afterSettling,
-    )
+    let taken: Awaited<ReturnType<typeof acquireFrame>>
 
+    try {
+      taken = await acquireFrame(signal, afterSettling)
+    } catch (error) {
+      if (!(error instanceof CaptureRetryableError)) throw error
+      signal.throwIfAborted()
+
+      return { dropped: { reason: 'capture-failed', detail: error.message } satisfies Dropped }
+    }
+
+    const { frame, actual, pointing, pointingObservedAt, timing } = taken
     signal.throwIfAborted()
     patch({ activity: 'solving', exposureStartedAt: null })
     const frameId = randomUUID()
@@ -509,7 +508,7 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
       // The correction path: capture validation beside the solve, then one final check.
       const [afterCapture, solved] = await together(signal, workSignal => [
         physical
-          ? retryObservation(() => physical.validate(workSignal, frame), workSignal)
+          ? retryRead(() => physical.validate(workSignal, frame), workSignal)
           : Promise.resolve(undefined),
         step(
           'alignment.solve',
@@ -540,12 +539,14 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
       }
 
       if (solved.status === 'no-solution') {
-        patch({
-          warning: `Plate-solving failed (${describeRejection(solved)}). Trying a new image.`,
-        })
         timing.published('no-solution', frameRecord)
 
-        return undefined
+        return {
+          dropped: {
+            reason: solved.reasons.includes('no-match') ? 'no-solve' : 'rejected',
+            detail: describeRejection(solved),
+          } satisfies Dropped,
+        }
       }
 
       const solvedAt = new Date(now()).toISOString()
@@ -591,7 +592,7 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
 
       // One observation after all processing gates any correction from this exposure.
       const mount = physical
-        ? await retryObservation(() => physical.validate(signal), signal)
+        ? await retryRead(() => physical.validate(signal), signal)
         : undefined
 
       patch({ warning: null })
@@ -614,6 +615,9 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
       previousSample = sample
 
       return {
+        dropped: undefined,
+        position,
+        evidence,
         frame,
         frameId,
         display: prepare(),
@@ -622,7 +626,6 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
         solved,
         solvedAt,
         sample,
-        mountRightAscensionDegrees: actual?.observation.mount.rightAscensionDegrees,
         mount,
         timing,
         frameRecord,
@@ -636,17 +639,7 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
     }
   }
 
-  async function solvedFrame(solver: Solver, signal: AbortSignal, afterSettling: boolean) {
-    while (true) {
-      const result = await acquire(solver, signal, afterSettling)
-
-      if (result) return result
-      patch({ activity: 'waiting' })
-      await waitForNextExposure(signal)
-      afterSettling = true
-    }
-  }
-
+  /** Six positions along the RA sweep: the offline model's five equal moves, or the physical mount's five rotations. */
   async function run(signal: AbortSignal) {
     let solver: Solver
 
@@ -671,9 +664,9 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
         throw new Error('Reset the simulator to its northern alignment position before measuring')
       }
 
-      // A wide baseline limits amplification of subpixel plate-solve uncertainty.
+      // A wide sweep limits amplification of subpixel plate-solve uncertainty.
       // This sweep belongs to the explicitly configured offline model.
-      const preparationDegrees = 12 - initial.rightAscensionDegrees
+      const preparationDegrees = offlineSweep.startDegrees - initial.rightAscensionDegrees
 
       if (Math.abs(preparationDegrees) > 0.1) {
         patch({ activity: 'moving' })
@@ -686,75 +679,112 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
       }
     }
 
-    const first = await solvedFrame(solver, signal, false)
-    const samples: AlignmentSample[] = [first.sample]
-    const rigidityFrames: RigidityFrame[] = []
-    let current = first
+    const { fixes, current } = await sweep(solver, signal)
+    const latitude = current.latitude
+    const fit = fitPolarAxis(fixes.map(fix => sweepFix(fix.position, fix.evidence)), latitude)
 
-    const keepForRigidity = (frame: typeof first) => {
-      if (frame.mountRightAscensionDegrees !== undefined)
-        rigidityFrames.push({
-          solved: frame.solved.wcs,
-          sample: frame.sample,
-          mountRightAscensionDegrees: frame.mountRightAscensionDegrees,
-        })
-    }
+    if (!Number.isFinite(fit.verdict.missArcmin))
+      throw new Error('A sweep solve has no usable orientation, so rigidity cannot be judged')
 
-    keepForRigidity(first)
-
-    for (let position = 2; position <= 3; position++) {
-      patch({ activity: 'moving', position, solvedPositions: position - 1 })
-
-      if (physical)
-        await step('alignment.move', () => physical.move(signal), {
-          'alignment.position': position,
-        })
-      else await hardware.move(settings.telescopeId, 1.5, 12, signal)
-      current = await solvedFrame(solver, signal, false)
-      samples.push(current.sample)
-      keepForRigidity(current)
-    }
-
-    // SAFETY: the initial sample and the two completed loop iterations supply exactly three solved positions.
-    const baselineSamples = samples as [AlignmentSample, AlignmentSample, AlignmentSample]
-    const baseline = createAlignmentBaseline(baselineSamples, first.latitude)
-
-    // The offline model has no mount reading to judge, so only physical runs carry a verdict.
-    // SAFETY: a physical run keeps one frame for each of its three solved positions.
-    const rigidity = physical
-      ? baselineRigidity(rigidityFrames as [RigidityFrame, RigidityFrame, RigidityFrame])
-      : undefined
-
-    await diagnostics?.recordBaseline(baselineSamples, first.latitude, baseline.measurement, rigidity)
+    await diagnostics?.recordFit(
+      fixes.map(({ position, sample }) => ({ position, sample })),
+      latitude,
+      fit,
+    )
     signal.throwIfAborted()
 
-    if (rigidity) {
-      tracer
-        .startSpan('alignment.rigidity', {
-          attributes: {
-            'alignment.run.id': runId,
-            'rig.id': view.rigId,
-            'alignment.rigidity.status': rigidity.status,
-            'alignment.rigidity.miss_arcmin': rigidity.missArcmin,
-            'alignment.rigidity.threshold_arcmin': rigidity.thresholdArcmin,
-          },
-        })
-        .end()
-    }
+    const { status, missArcmin, thresholdArcmin, steps } = fit.verdict
 
-    if (rigidity?.status === 'not-rigid') {
+    tracer
+      .startSpan('alignment.rigidity', {
+        attributes: {
+          'alignment.run.id': runId,
+          'rig.id': view.rigId,
+          'alignment.rigidity.status': status,
+          'alignment.rigidity.miss_arcmin': missArcmin,
+          'alignment.rigidity.threshold_arcmin': thresholdArcmin,
+        },
+      })
+      .end()
+
+    // A fit that is not rigid has no polar error to show: neither the numbers nor the adjusting loop may follow it.
+    if (status === 'not-rigid') {
       patch({
         phase: 'not-rigid',
         activity: 'idle',
-        solvedPositions: 3,
         warning: null,
-        rigidity: { missArcmin: rigidity.missArcmin, thresholdArcmin: rigidity.thresholdArcmin },
+        rigidity: {
+          missArcmin,
+          thresholdArcmin,
+          steps: steps.map(step => ({
+            beforePosition: Number(step.labelBefore),
+            afterPosition: Number(step.labelAfter),
+          })),
+        },
       })
 
       return
     }
 
-    patch({ phase: 'adjusting', solvedPositions: 3 })
+    patch({ phase: 'adjusting' })
+    await adjust(solver, signal, baselineFromAxis(fit.axis, current.sample, latitude), current)
+  }
+
+  /**
+   * Take a fix at each position of the sweep. A position that gives no fix is written down and skipped; the run
+   * stops as soon as the fit can no longer have the fixes it needs.
+   */
+  async function sweep(solver: Solver, signal: AbortSignal) {
+    const fixes: SolvedFrame[] = []
+    const dropped: { position: number; detail: string }[] = []
+
+    for (let position = 1; position <= SWEEP_POSITIONS; position++) {
+      if (position > 1) {
+        patch({ activity: 'moving', position, solvedPositions: fixes.length })
+
+        if (physical)
+          await step('alignment.move', () => physical.move(signal), {
+            'alignment.position': position,
+          })
+        else await hardware.move(settings.telescopeId, 1.5, offlineSweep.stepDegrees / 1.5, signal)
+      }
+
+      const attempt = await acquire(solver, signal, false)
+
+      if (attempt.dropped) {
+        const { reason, detail } = attempt.dropped
+        await diagnostics?.recordDropped(position, reason, detail)
+        signal.throwIfAborted()
+        dropped.push({ position, detail: describeDropped(attempt.dropped) })
+        patch({ warning: `${describeDropped(attempt.dropped)}. Skipping position ${position}.` })
+
+        // The adjusting baseline is a frame taken where the mount now points, so the last position cannot be skipped.
+        const reachable = fixes.length + SWEEP_POSITIONS - position >= minimumFixes
+
+        if (!reachable || position === SWEEP_POSITIONS)
+          throw new Error(
+            `${reachable ? 'The last sweep position gave no fix, and the adjusting baseline needs one taken where the mount now points.' : `Only ${fixes.length} of ${SWEEP_POSITIONS} sweep positions gave a usable fix and the polar fit needs ${minimumFixes}.`} ${dropped.map(drop => `Position ${drop.position}: ${drop.detail}.`).join(' ')}`,
+          )
+
+        continue
+      }
+
+      fixes.push(attempt)
+    }
+
+    patch({ solvedPositions: fixes.length })
+
+    return { fixes, current: fixes.at(-1)! }
+  }
+
+  /** Measure the polar error of each new exposure against the fitted axis until Stop. */
+  async function adjust(
+    solver: Solver,
+    signal: AbortSignal,
+    baseline: ReturnType<typeof baselineFromAxis>,
+    first: SolvedFrame,
+  ) {
+    let current = first
 
     while (true) {
       const measured = measureAlignment(baseline, current.sample, true)
@@ -805,8 +835,17 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
 
       // A calm adjustment window between exposures; never infer solver progress from
       // elapsed time. It is also the settling allowance before the next exposure.
-      await waitForNextExposure(signal)
-      current = await solvedFrame(solver, signal, true)
+      while (true) {
+        await waitForNextExposure(signal)
+        const attempt = await acquire(solver, signal, true)
+
+        if (!attempt.dropped) {
+          current = attempt
+          break
+        }
+
+        patch({ warning: `${describeDropped(attempt.dropped)}. Trying a new image.`, activity: 'waiting' })
+      }
     }
   }
 
@@ -870,6 +909,16 @@ async function together<A, B>(
     signal.removeEventListener('abort', cancel)
   }
 }
+
+/** A sweep position or an adjusting exposure that gave no usable frame. */
+type Dropped = { reason: DroppedReason; detail: string }
+
+function describeDropped({ reason, detail }: Dropped) {
+  return reason === 'capture-failed' ? `The exposure failed (${detail})` : `Plate-solving failed (${detail})`
+}
+
+/** The offline model's RA sweep in J2000 degrees: five equal moves, the span its three-point baseline covered. */
+const offlineSweep = { startDegrees: 12, stepDegrees: 7.2 }
 
 interface RetainedImage {
   display: Promise<AlignmentDisplay>

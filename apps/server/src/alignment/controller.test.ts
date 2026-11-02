@@ -1,7 +1,9 @@
 import { createTestCadence } from './test-cadence.js'
 import { afterEach, expect, it, vi } from 'vitest'
 import type { AlpacaAcquisition, AlpacaFrame } from '@vela/alpaca'
+import { CaptureRetryableError, EquipmentError } from '@vela/equipment'
 import { createAlignmentController } from './controller.js'
+import type { AlignmentDiagnosticRun } from './diagnostics.js'
 import { prepareAlignmentDisplay } from './display.js'
 import type { AstapSolver } from '@vela/rig-astap'
 import { astapReturning, falseSolve, fieldHeightDegreesFor } from '../plate-solving/false-solve.js'
@@ -35,6 +37,17 @@ const settings = {
   catalogPath: '/unused',
   exposureSeconds: 1,
   fieldHeightDegrees: 3,
+}
+
+/** A journal that remembers what the controller wrote to it. */
+function recording() {
+  return {
+    recordFrame: vi.fn<AlignmentDiagnosticRun['recordFrame']>(async () => {}),
+    recordFit: vi.fn<AlignmentDiagnosticRun['recordFit']>(async () => {}),
+    recordDropped: vi.fn<AlignmentDiagnosticRun['recordDropped']>(async () => {}),
+    recordMeasurement: vi.fn<AlignmentDiagnosticRun['recordMeasurement']>(async () => {}),
+    finish: vi.fn<AlignmentDiagnosticRun['finish']>(async () => {}),
+  }
 }
 
 const stops: Array<ReturnType<typeof createAlignmentController>['stop']> = []
@@ -147,7 +160,10 @@ function setup(
     return requests.shift()!
   }
 
-  function solve(request: Awaited<ReturnType<typeof nextSolve>>, decDegrees = 60) {
+  /** A solve at the pointing the mount reported, the camera rolled `rollDegrees` from the sky's north. */
+  function solve(request: Awaited<ReturnType<typeof nextSolve>>, decDegrees = 60, rollDegrees = 0) {
+    const roll = (rollDegrees * Math.PI) / 180
+
     request.result.resolve({
       status: 'solved',
       capturedAt: request.frame.capturedAt,
@@ -160,15 +176,25 @@ function setup(
         referenceY: 2.5,
         raDegrees: request.hint.raDegrees,
         decDegrees,
-        cd: [0.01, 0, 0, -0.01],
+        cd: [0.01 * Math.cos(roll), 0.01 * Math.sin(roll), 0.01 * Math.sin(roll), -0.01 * Math.cos(roll)],
       },
     })
   }
 
-  async function baseline() {
+  /** The six positions of the sweep, solved; `unsolved` gives up on those positions (1 to 6). */
+  async function sweep(unsolved: number[] = []) {
     await controller.start('sim', 'Simulator')
 
-    for (let position = 0; position < 3; position++) solve(await nextSolve())
+    for (let position = 1; position <= 6; position++) {
+      const request = await nextSolve()
+
+      if (unsolved.includes(position)) request.result.resolve({ status: 'no-solution', reasons: ['no-match'] })
+      else solve(request)
+    }
+  }
+
+  async function baseline() {
+    await sweep()
     await vi.waitFor(() => expect(controller.snapshot().measurement).not.toBeNull())
   }
 
@@ -177,9 +203,11 @@ function setup(
     nextSolve,
     solve,
     baseline,
+    sweep,
     exposures: () => exposures,
     requestedExposures,
     moves: () => moves,
+    rightAscension: () => ra,
     setPointing: (position: { ra: number; dec: number; frame: typeof coordinateSystem }) => {
       ra = position.ra
       dec = position.dec
@@ -208,11 +236,11 @@ it('takes every exposure of a run, the view and the run record from the chosen e
   expect(subject.controller.snapshot().exposureSeconds).toBe(5)
   expect(run).toHaveBeenCalledWith(expect.objectContaining({ exposureSeconds: 5 }))
 
-  for (let position = 0; position < 3; position++) subject.solve(await subject.nextSolve())
+  for (let position = 0; position < 6; position++) subject.solve(await subject.nextSolve())
   await vi.waitFor(() => expect(subject.controller.snapshot().measurement).not.toBeNull())
   cadence.waits.shift()!()
   await subject.nextSolve()
-  expect(subject.requestedExposures).toEqual([5, 5, 5, 5])
+  expect(subject.requestedExposures).toEqual(Array(7).fill(5))
   await subject.controller.stop()
 
   await subject.controller.start('sim', 'Simulator')
@@ -257,7 +285,6 @@ it('publishes a baseline image after its solve attempt, including no-solution, a
   expect((await subject.controller.image(id, 'native'))?.subarray(0, 8)).toEqual(
     Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
   )
-  expect(subject.controller.snapshot().warning).toContain('Plate-solving failed')
   expect(subject.controller.snapshot().preview).toBe(preview)
   await subject.controller.stop()
   expect(subject.controller.snapshot()).toMatchObject({
@@ -267,21 +294,104 @@ it('publishes a baseline image after its solve attempt, including no-solution, a
   })
 })
 
-it('does not use a solve the verdict rejects: no position is counted and the reasons are shown', async () => {
-  const recordFrame = vi.fn(async () => undefined)
+it('does not use a solve the verdict rejects: each position is dropped and the run stops with the reasons', async () => {
+  const journal = recording()
 
   const subject = setup(
-    async () => ({ recordFrame, recordBaseline: async () => undefined, recordFit: async () => undefined, recordDropped: async () => undefined, recordMeasurement: async () => undefined, finish: async () => undefined }),
+    async () => journal,
     astapReturning(falseSolve({ raDegrees: 10, decDegrees: 60 }, { width: 4, height: 4 })),
   )
 
   await subject.controller.start('sim', 'Simulator')
-  await vi.waitFor(() => expect(subject.controller.snapshot().warning).toContain('Plate-solving failed'))
-  expect(subject.controller.snapshot()).toMatchObject({ solvedPositions: 0, measurement: null })
-  expect(subject.controller.snapshot().warning).toContain('the image is mirrored')
-  expect(subject.controller.snapshot().warning).toContain('degrees from where the mount points')
-  expect(recordFrame).not.toHaveBeenCalled()
-  await subject.controller.stop()
+  await vi.waitFor(() => expect(subject.controller.snapshot().active).toBe(false))
+  expect(subject.controller.snapshot()).toMatchObject({ phase: 'failed', solvedPositions: 0, measurement: null })
+  expect(subject.controller.snapshot().error).toContain('Only 0 of 6')
+  expect(subject.controller.snapshot().error).toContain('the image is mirrored')
+  expect(subject.controller.snapshot().error).toContain('degrees from where the mount points')
+  expect(journal.recordFrame).not.toHaveBeenCalled()
+  expect(journal.recordDropped.mock.calls.map(([position, reason]) => [position, reason])).toEqual([[1, 'rejected'], [2, 'rejected']])
+  expect(subject.exposures()).toBe(2)
+})
+
+it('takes six fixes in five equal moves from RA 12 to 48 and fits the polar axis to them', async () => {
+  const subject = setup()
+  expect(subject.rightAscension()).toBe(10)
+  await subject.baseline()
+  expect(subject.exposures()).toBe(6)
+  expect(subject.moves()).toBe(6)
+  expect(subject.rightAscension()).toBeCloseTo(48)
+  expect(subject.controller.snapshot()).toMatchObject({ phase: 'adjusting', solvedPositions: 6, rigidity: null })
+})
+
+it('drops a fix that did not solve without exposing again, and fits the other five', async () => {
+  const journal = recording()
+  const subject = setup(async () => journal)
+  await subject.sweep([3])
+  await vi.waitFor(() => expect(subject.controller.snapshot().phase).toBe('adjusting'))
+  expect(journal.recordDropped).toHaveBeenCalledExactlyOnceWith(3, 'no-solve', 'no star pattern matched')
+  expect(journal.recordFit.mock.calls[0]![0].map(fix => fix.position)).toEqual([1, 2, 4, 5, 6])
+  expect(subject.exposures()).toBe(6)
+  expect(subject.controller.snapshot()).toMatchObject({ solvedPositions: 5, rigidity: null })
+})
+
+it('stops with the reason once fewer than five fixes are possible', async () => {
+  const subject = setup()
+  await subject.controller.start('sim', 'Simulator')
+  subject.solve(await subject.nextSolve())
+
+  for (let position = 2; position <= 3; position++)
+    (await subject.nextSolve()).result.resolve({ status: 'no-solution', reasons: ['no-match'] })
+  await vi.waitFor(() => expect(subject.controller.snapshot().active).toBe(false))
+  expect(subject.controller.snapshot()).toMatchObject({ phase: 'failed', measurement: null })
+  expect(subject.controller.snapshot().error).toBe(
+    'Only 1 of 6 sweep positions gave a usable fix and the polar fit needs 5. Position 2: Plate-solving failed (no star pattern matched). Position 3: Plate-solving failed (no star pattern matched).',
+  )
+  expect(subject.exposures()).toBe(3)
+})
+
+it('stops when the last position gives no fix, because the adjusting baseline needs a frame where the mount now points', async () => {
+  const subject = setup()
+  await subject.sweep([6])
+  await vi.waitFor(() => expect(subject.controller.snapshot().active).toBe(false))
+  expect(subject.controller.snapshot()).toMatchObject({ phase: 'failed', measurement: null })
+  expect(subject.controller.snapshot().error).toContain('The last sweep position gave no fix')
+  expect(subject.exposures()).toBe(6)
+})
+
+it('drops a position whose exposure failed safely and does not expose again', async () => {
+  const subject = setup()
+  const original = vi.fn()
+  subject.setCapture(async () => {
+    original()
+    throw new CaptureRetryableError(new EquipmentError('Camera did not start', { reason: 'transport', endpoint: '/camera' }))
+  })
+  await subject.controller.start('sim', 'Simulator')
+  await vi.waitFor(() => expect(subject.controller.snapshot().active).toBe(false))
+  expect(subject.controller.snapshot().error).toContain('The exposure failed (Camera did not start)')
+  expect(original).toHaveBeenCalledTimes(2)
+})
+
+it('reports not rigid with the miss and the step, and no polar error, when the camera slipped during the sweep', async () => {
+  const journal = recording()
+  const subject = setup(async () => journal)
+  await subject.controller.start('sim', 'Simulator')
+
+  for (let position = 1; position <= 6; position++) subject.solve(await subject.nextSolve(), 60, position >= 4 ? 1 : 0)
+  await vi.waitFor(() => expect(subject.controller.snapshot().active).toBe(false))
+  const view = subject.controller.snapshot()
+  expect(view).toMatchObject({
+    phase: 'not-rigid',
+    activity: 'idle',
+    solvedPositions: 6,
+    error: null,
+    warning: null,
+    measurement: null,
+    rigidity: { thresholdArcmin: 2, steps: [{ beforePosition: 3, afterPosition: 4 }] },
+  })
+  expect(view.rigidity!.missArcmin).toBeGreaterThan(2)
+  expect(journal.recordFit.mock.calls[0]![2].verdict.status).toBe('not-rigid')
+  expect(journal.recordMeasurement).not.toHaveBeenCalled()
+  expect(subject.exposures()).toBe(6)
 })
 
 it('keeps the solved image retrievable after repeated failed adjustment images', async () => {
@@ -436,7 +546,7 @@ it('publishes a correction before its display is ready, and image requests wait 
   const subject = setup()
   await subject.baseline()
   const previous = subject.controller.snapshot()
-  const release = subject.holdDisplay(4)
+  const release = subject.holdDisplay(7)
 
   cadence.waits.shift()!()
   const fresh = await subject.nextSolve()
@@ -468,7 +578,7 @@ it('publishes a correction before its display is ready, and image requests wait 
 it('never lets an older exposure’s late display replace a newer preview', async () => {
   const subject = setup()
   await subject.baseline()
-  const release = subject.holdDisplay(4)
+  const release = subject.holdDisplay(7)
 
   cadence.waits.shift()!()
   subject.solve(await subject.nextSolve(), 59.99)
@@ -491,7 +601,7 @@ it('stops an unpublished exposure’s display preparation with the run, leaving 
   const subject = setup()
   await subject.baseline()
   const previous = subject.controller.snapshot()
-  subject.holdDisplay(4)
+  subject.holdDisplay(7)
 
   cadence.waits.shift()!()
   // A sidereal reset fails this frame after its solve, so its correction is never published.
