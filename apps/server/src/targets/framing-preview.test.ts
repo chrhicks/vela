@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest'
 import { createFramingController, type FramingHardware } from './framing.js'
-import type { PlateSolver, SolveResult } from '../plate-solving/solver.js'
+import type { PlateSolver, SolveResult } from '../plate-solving/judged-solver.js'
 
 const capturedAt = '2026-09-30T23:00:00Z'
 
@@ -57,7 +57,7 @@ it('retains the newer unsolved preview separately from the older solved footprin
   const s = setup()
   await s.check()
   const previous = s.controller.snapshot()
-  s.solve.mockResolvedValueOnce({ status: 'no-solution' })
+  s.solve.mockResolvedValueOnce({ status: 'no-solution', reasons: ['no-match'] })
   await s.check()
   const next = s.controller.snapshot()
   expect(next.phase).toBe('needs-check')

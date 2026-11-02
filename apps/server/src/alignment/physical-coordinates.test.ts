@@ -6,7 +6,7 @@ import {
   physicalAlignmentSample,
   projectPhysicalAlignmentTarget,
 } from './physical-coordinates.js'
-import type { PlateWcs, SkyPosition } from '../plate-solving/solver.js'
+import type { PlateWcs, SkyPosition } from '../plate-solving/judged-solver.js'
 
 // Independent ERFA 2.0.1.5 / SOFA fixtures, with no production conversion used.
 // At a deliberately synthetic latitude 33.45° (Phoenix), a Dec 60° vector rotates through mechanical joints

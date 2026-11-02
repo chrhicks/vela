@@ -5,7 +5,7 @@ import { context, propagation, trace } from '@opentelemetry/api'
 import { expect, it } from 'vitest'
 import { startTelemetry } from '../telemetry.js'
 import { createFramingController, type FramingHardware, type FramingMount } from './framing.js'
-import type { PlateSolver } from '../plate-solving/solver.js'
+import type { PlateSolver } from '../plate-solving/judged-solver.js'
 
 it('persists exact centering inputs and correlated evidence before and after completion', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'vela-framing-trace-'))

@@ -21,7 +21,7 @@ import {
 import { createAlignmentController } from './controller.js'
 import type { PhysicalAlignment } from './physical.js'
 import { physicalAlignmentSample, projectPhysicalAlignmentTarget } from './physical-coordinates.js'
-import type { PlateSolver, SkyPosition, SolveResult } from './solver.js'
+import type { PlateSolver, SkyPosition, SolveResult } from '../plate-solving/judged-solver.js'
 import {
   createAlignmentDiagnostics,
   type AlignmentDiagnosticRun,
@@ -148,7 +148,7 @@ function setup(openDiagnostics?: AlignmentDiagnosticsFactory) {
   }
 
   const solver: PlateSolver = {
-    solve: (_frame, _hint, signal) =>
+    solve: (_frame, _hint, _claimed, signal) =>
       new Promise<SolveResult>((resolve, reject) => {
         const index = exposures - 1
         const abort = () => reject(new DOMException('Stopped', 'AbortError'))

@@ -3,7 +3,15 @@ import { afterEach, expect, it, vi } from 'vitest'
 import type { AlpacaAcquisition, AlpacaFrame } from '@vela/alpaca'
 import { createAlignmentController } from './controller.js'
 import { prepareAlignmentDisplay } from './display.js'
-import type { MonoFrame, PlateSolver, SkyPosition, SolveResult } from './solver.js'
+import type { AstapSolver } from '@vela/rig-astap'
+import { astapReturning, falseSolve, fieldHeightDegreesFor } from '../plate-solving/false-solve.js'
+import {
+  judgedSolver,
+  type MonoFrame,
+  type PlateSolver,
+  type SkyPosition,
+  type SolveResult,
+} from '../plate-solving/judged-solver.js'
 
 const cadence = createTestCadence()
 
@@ -36,7 +44,10 @@ afterEach(async () => {
   expect(cadence.waits).toHaveLength(0)
 })
 
-function setup(openDiagnostics?: Parameters<typeof createAlignmentController>[0]['openDiagnostics']) {
+function setup(
+  openDiagnostics?: Parameters<typeof createAlignmentController>[0]['openDiagnostics'],
+  astap?: AstapSolver,
+) {
   let ra = 10
   let dec = 60
 
@@ -92,8 +103,8 @@ function setup(openDiagnostics?: Parameters<typeof createAlignmentController>[0]
     async abort() {},
   }
 
-  const solver: PlateSolver = {
-    solve(frame, hint, signal) {
+  const deferredSolver: PlateSolver = {
+    solve(frame, hint, _claimed, signal) {
       const result = deferred<SolveResult>()
       const abort = () => result.reject(new DOMException('Stopped', 'AbortError'))
       signal.addEventListener('abort', abort, { once: true })
@@ -102,6 +113,8 @@ function setup(openDiagnostics?: Parameters<typeof createAlignmentController>[0]
       return result.promise.finally(() => signal.removeEventListener('abort', abort))
     },
   }
+
+  const solver = astap ? judgedSolver(astap, fieldHeightDegreesFor(4), 'alignment') : deferredSolver
 
   const controller = createAlignmentController({
     mode: 'offline',
@@ -229,7 +242,7 @@ it('publishes a baseline image after its solve attempt, including no-solution, a
   // Display preparation waits for the solve so it cannot delay a correction.
   await Promise.resolve()
   expect(subject.controller.snapshot().preview).toBeNull()
-  request.result.resolve({ status: 'no-solution' })
+  request.result.resolve({ status: 'no-solution', reasons: ['no-match'] })
   await vi.waitFor(() => expect(subject.controller.snapshot().preview).toBeTruthy())
   const preview = subject.controller.snapshot().preview!
   expect(preview).toMatchObject({
@@ -254,6 +267,23 @@ it('publishes a baseline image after its solve attempt, including no-solution, a
   })
 })
 
+it('does not use a solve the verdict rejects: no position is counted and the reasons are shown', async () => {
+  const recordFrame = vi.fn(async () => undefined)
+
+  const subject = setup(
+    async () => ({ recordFrame, recordBaseline: async () => undefined, recordMeasurement: async () => undefined, finish: async () => undefined }),
+    astapReturning(falseSolve({ raDegrees: 10, decDegrees: 60 }, { width: 4, height: 4 })),
+  )
+
+  await subject.controller.start('sim', 'Simulator')
+  await vi.waitFor(() => expect(subject.controller.snapshot().warning).toContain('Plate-solving failed'))
+  expect(subject.controller.snapshot()).toMatchObject({ solvedPositions: 0, measurement: null })
+  expect(subject.controller.snapshot().warning).toContain('the image is mirrored')
+  expect(subject.controller.snapshot().warning).toContain('degrees from where the mount points')
+  expect(recordFrame).not.toHaveBeenCalled()
+  await subject.controller.stop()
+})
+
 it('keeps the solved image retrievable after repeated failed adjustment images', async () => {
   const subject = setup()
   await subject.baseline()
@@ -264,7 +294,7 @@ it('keeps the solved image retrievable after repeated failed adjustment images',
   for (let attempt = 0; attempt < 6; attempt++) {
     cadence.waits.shift()!()
     const request = await subject.nextSolve()
-    request.result.resolve({ status: 'no-solution' })
+    request.result.resolve({ status: 'no-solution', reasons: ['no-match'] })
     await vi.waitFor(() => expect(cadence.waits).toHaveLength(1))
   }
 
@@ -326,7 +356,7 @@ it('publishes image and readings together only after a solve, retaining the last
   cadence.waits.shift()!()
   const blank = await subject.nextSolve()
   expect(subject.controller.snapshot().measurement).toBe(previous.measurement)
-  blank.result.resolve({ status: 'no-solution' })
+  blank.result.resolve({ status: 'no-solution', reasons: ['no-match'] })
   await vi.waitFor(() =>
     expect(subject.controller.snapshot().warning).toContain('Plate-solving failed'),
   )
@@ -351,7 +381,7 @@ it('publishes image and readings together only after a solve, retaining the last
 
   cadence.waits.shift()!()
   const secondBlank = await subject.nextSolve()
-  secondBlank.result.resolve({ status: 'no-solution' })
+  secondBlank.result.resolve({ status: 'no-solution', reasons: ['no-match'] })
   await vi.waitFor(() =>
     expect(subject.controller.snapshot().warning).toContain('Plate-solving failed'),
   )

@@ -19,11 +19,20 @@ function brightest(image: Uint16Array) {
 it('projects catalog stars through the camera basis and excludes stars behind it', () => {
   const star = { raDegrees: 0, decDegrees: 0, magnitude: 9 }
   expect(brightest(renderSky([star], pose, options))).toEqual([50, 50])
-  expect(brightest(renderSky([{ ...star, raDegrees: 2 }], pose, options))).toEqual([70, 50])
+  expect(brightest(renderSky([{ ...star, raDegrees: 2 }], pose, options))).toEqual([30, 50])
   expect(brightest(renderSky([{ ...star, decDegrees: 2 }], pose, options))).toEqual([50, 30])
   expect(renderSky([{ ...star, raDegrees: 180 }], pose, options)).toEqual(
     renderSky([], pose, options),
   )
+})
+
+it('puts east on the left and north up, so a solve has the real camera\'s handedness', () => {
+  const star = { raDegrees: 0, decDegrees: 0, magnitude: 9 }
+  const [eastX] = brightest(renderSky([{ ...star, raDegrees: 2 }], pose, options))
+  const [, northY] = brightest(renderSky([{ ...star, decDegrees: 2 }], pose, options))
+
+  expect(eastX).toBeLessThan(50)
+  expect(northY).toBeLessThan(50)
 })
 
 it('produces reproducible noise and an obscured frame without stars', () => {

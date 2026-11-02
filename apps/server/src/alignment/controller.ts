@@ -9,7 +9,8 @@ import {
   type Frame,
 } from '@vela/equipment'
 import { createAlignmentBaseline, measureAlignment, type AlignmentSample } from './geometry.js'
-import { createAstapSolver, projectSky, type SkyPosition } from './solver.js'
+import { describeRejection, type PlateSolver, type SkyPosition } from '../plate-solving/judged-solver.js'
+import { projectSky } from '../targets/sky.js'
 import { detailRegion, prepareAlignmentDisplay, type AlignmentDisplay } from './display.js'
 import { fitFactor } from '../imaging/preview.js'
 import type { PhysicalAlignment } from './physical.js'
@@ -35,7 +36,7 @@ export interface AlignmentSettings {
   maxLegSeconds?: number
 }
 
-type Solver = ReturnType<typeof createAstapSolver>
+type Solver = PlateSolver
 
 export type AlignmentControllerOptions = {
   settings: Pick<
@@ -510,9 +511,12 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
         step(
           'alignment.solve',
           async () => {
-            const result = await solver.solve(frame, hint, workSignal)
+            const result = await solver.solve(frame, hint, hint, workSignal)
 
             trace.getActiveSpan()?.setAttribute('alignment.solve.outcome', result.status)
+
+            if (result.status === 'no-solution')
+              trace.getActiveSpan()?.setAttribute('alignment.solve.reasons', result.reasons.join(','))
             timing.solved()
             prepare()
 
@@ -533,7 +537,9 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
       }
 
       if (solved.status === 'no-solution') {
-        patch({ warning: 'Plate-solving failed. Trying a new image.' })
+        patch({
+          warning: `Plate-solving failed (${describeRejection(solved)}). Trying a new image.`,
+        })
         timing.published('no-solution', frameRecord)
 
         return undefined

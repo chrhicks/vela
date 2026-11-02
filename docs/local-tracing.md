@@ -90,23 +90,19 @@ not framing.
 
 ## Plate-solver failures
 
-Inspect `astap.solve` spans beneath the alignment solve step for the overall
-outcome, J2000 hint, configured field height, total timeout and image dimensions/
-capture time. Child `astap.attempt` spans include the radius, remaining timeout
-and process diagnostics for each search. Search expands through 10°, 15°, 30°,
-60°, 120° and 180° on the same image, sharing one total time budget.
+Inspect `astap.solve` spans beneath the alignment or framing solve step for the
+purpose (`framing` or `alignment`), J2000 hint, configured field height and image
+dimensions/capture time. `astap.outcome` is `solved`, `rejected`, `cancelled` or
+`error`. A rejected solve also carries `astap.rejected.reasons`, a comma list from
+`no-match`, `few-stars`, `scale`, `parity` and `off-hint`, and the alignment step
+records the same list as `alignment.solve.reasons`. Search expands through 10°,
+15°, 30°, 60°, 120° and 180° on the same image, sharing one total time budget.
 
-`astap.exit_code` is the process exit code when available; `astap.outcome`
-distinguishes `no-match` (exit 1, try wider) from `insufficient-stars` (exit 2,
-stop). The workflow receives `no-solution` when the full search finds no match
-or the exposure has insufficient stars. Exit 0 is only `solved` after WCS
-validation. Other failures, including budget exhaustion, are `error`; operator
-cancellation is `cancelled`.
-
-Each attempt's `astap.stdout` and `astap.stderr` retain the last 4096 characters
-with `.truncated` flags. Attempt spans appear after each solver process ends,
-even while the overall solve and alignment run remain active. Raw exposure
-pixels are excluded.
+The workflow receives `no-solution` with those reasons when ASTAP finds no match,
+finds too few stars, or finds a solution the verdict rejects for the purpose (a
+scale that does not match the optics, a mirrored image, or a field more than 10°
+from where the mount points, with the distance in degrees in the message). Other failures, including budget exhaustion, are
+`error`; operator cancellation is `cancelled`. Raw exposure pixels are excluded.
 
 ## Cria device interruptions
 

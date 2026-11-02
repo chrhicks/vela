@@ -22,7 +22,7 @@ import {
   type AlignmentSample,
   type AlignmentMeasurement,
 } from '../../server/dist/alignment/geometry.js'
-import { createAstapSolver } from '../../server/dist/alignment/solver.js'
+import { createPlateSolver } from '../../server/dist/plate-solving/judged-solver.js'
 import { imageWidth, imageHeight } from './optics.js'
 import { loadCatalog } from './catalog.js'
 import { buildSimulator } from './service.js'
@@ -50,7 +50,7 @@ const hardware = createAlpacaAcquisition({ baseUrl })
 
 const provider = createAlpacaProvider({ baseUrl })
 
-const solver = createAstapSolver({ executable, catalogPath, fieldHeightDegrees: 3 })
+const solver = createPlateSolver({ executable, catalogPath, fieldHeightDegrees: 3 }, 'alignment')
 
 const signal = new AbortController().signal
 
@@ -89,14 +89,12 @@ async function exposure() {
   assert.equal(pointing.tracking, true)
   const frame = await hardware.capture({ cameraId, exposureSeconds: 2, signal })
 
-  const solved = await solver.solve(
-    frame,
-    {
-      raDegrees: pointing.rightAscensionDegrees,
-      decDegrees: pointing.declinationDegrees,
-    },
-    signal,
-  )
+  const claimed = {
+    raDegrees: pointing.rightAscensionDegrees,
+    decDegrees: pointing.declinationDegrees,
+  }
+
+  const solved = await solver.solve(frame, claimed, claimed, signal)
 
   return { pointing, frame, solved, pointingObservedAt }
 }

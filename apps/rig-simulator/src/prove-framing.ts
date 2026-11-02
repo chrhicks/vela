@@ -140,9 +140,11 @@ try {
     throw new Error('Framing proof timed out')
   }
 
+  const eaglePosition = { raDegrees: eagle.raDegrees, decDegrees: eagle.decDegrees }
+
   const start = (
     exposureSeconds = 2,
-    position = { raDegrees: eagle.raDegrees, decDegrees: eagle.decDegrees },
+    position = eaglePosition,
   ) =>
     command('start', {
       targetId: eagle.id,
@@ -178,7 +180,7 @@ try {
   const nominal = await mount.telescopeStatus(telescopeId)
   assert.ok(Math.abs(nominal.rightAscensionDegrees - eagle.raDegrees) < 1e-6)
   assert.ok(Math.abs(nominal.declinationDegrees - eagle.decDegrees) < 1e-6)
-  await command('center', { checkId: first.checkId })
+  await command('center', { checkId: first.checkId, ...eaglePosition })
   const centered = checked(await finish())
   assert.ok(
     centered.offsetArcminutes < 0.5 && centered.offsetArcminutes < first.offsetArcminutes / 5,
@@ -225,8 +227,8 @@ try {
   await control('camera', { obscured: true })
   await start()
   const obscured = await finish()
-  assert.equal(obscured.phase, 'failed')
-  assert.match(obscured.error ?? '', /could not be plate solved/)
+  assert.equal(obscured.phase, 'needs-check')
+  assert.match(obscured.error ?? '', /could not be solved \(no star pattern matched\)/)
   await control('camera', { obscured: false })
   await start()
   checked(await finish())
@@ -253,7 +255,7 @@ try {
   await catalog.setImagingCamera('proof', { uniqueId: colorId, name: 'Simulator Color Camera' })
   await start()
   const colorFirst = checked(await finish())
-  await command('center', { checkId: colorFirst.checkId })
+  await command('center', { checkId: colorFirst.checkId, ...eaglePosition })
   const colorCentered = checked(await finish())
   assert.ok(colorCentered.offsetArcminutes < 0.5)
   reports.push({
@@ -269,7 +271,7 @@ try {
   for (const seconds of [2, 5]) {
     await start(seconds, crescent)
     const before = checked(await finish())
-    await command('center', { checkId: before.checkId })
+    await command('center', { checkId: before.checkId, ...crescent })
     const after = checked(await finish())
     assert.ok(after.offsetArcminutes < 0.5)
     reports.push({
@@ -283,9 +285,10 @@ try {
   // An established browser session samples a different polar-error orientation
   // and pixel phase than a freshly reset rig. Exercise that centered field too.
   clockOffset += 25 * 60 * 1000
-  await start(5, { raDegrees: 303.02729167, decDegrees: 38.35494444 })
+  const agedPosition = { raDegrees: 303.02729167, decDegrees: 38.35494444 }
+  await start(5, agedPosition)
   const aged = checked(await finish())
-  await command('center', { checkId: aged.checkId })
+  await command('center', { checkId: aged.checkId, ...agedPosition })
   const agedCentered = checked(await finish())
   assert.ok(agedCentered.offsetArcminutes < 0.5)
   reports.push({

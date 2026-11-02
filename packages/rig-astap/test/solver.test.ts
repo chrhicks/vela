@@ -76,6 +76,27 @@ describe('createAstapSolver', () => {
     expect((await readdir(directory)).filter(name => name.startsWith('rig-astap-'))).toEqual([])
   })
 
+  it('throws on an exit code it does not know and on a success that holds no solved plate', async () => {
+    const unknown = await fakeAstap(directory, { exit: 32 })
+
+    await expect(solverFor(unknown.executable).solve(frame(), hint, signal())).rejects.toThrow('exit code 32')
+
+    const executable = join(directory, 'unsolved_astap')
+    await writeFile(executable, '#!/bin/bash\nwhile [ $# -gt 0 ]; do case "$1" in -f) file="$2";; esac; shift; done\necho PLTSOLVD=F > "${file%.fits}.ini"\n')
+    await chmod(executable, 0o755)
+    await expect(solverFor(executable).solve(frame(), hint, signal())).rejects.toThrow('did not contain a solved plate')
+  })
+
+  it('removes its work directory when the solve is cancelled', async () => {
+    const { executable } = await fakeAstap(directory, { sleepSeconds: 5 })
+    const controller = new AbortController()
+    const pending = solverFor(executable).solve(frame(), hint, controller.signal)
+    setTimeout(() => controller.abort(new Error('cancelled')), 100)
+
+    await expect(pending).rejects.toThrow('cancelled')
+    expect((await readdir(directory)).filter(name => name.startsWith('rig-astap-'))).toEqual([])
+  })
+
   it('rejects a hint outside the sky and a configuration it cannot run', async () => {
     const { executable } = await fakeAstap(directory, {})
 

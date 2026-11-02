@@ -7,7 +7,7 @@ import type { RigCatalogRecord } from '../rig/contracts.js'
 import type { RigOperations } from '../rig/operations.js'
 import { confirmedCameraName } from '../rig/imaging-camera.js'
 import { inspectRigDetail, type RigDetailOptions } from '../rig/detail.js'
-import { createAstapSolver, type PlateSolver } from '../plate-solving/solver.js'
+import { createPlateSolver, type PlateSolver } from '../plate-solving/judged-solver.js'
 import { createFramingController, mountSite, type FramingHardware } from './framing.js'
 import {
   getTarget,
@@ -445,10 +445,13 @@ export function registerTargets(
         const solver =
           options.createSolver?.(ready.camera.fieldHeightDegrees) ??
           (options.solver
-            ? createAstapSolver({
-                ...options.solver,
-                fieldHeightDegrees: ready.camera.fieldHeightDegrees,
-              })
+            ? createPlateSolver(
+                {
+                  ...options.solver,
+                  fieldHeightDegrees: ready.camera.fieldHeightDegrees,
+                },
+                'framing',
+              )
             : undefined)
 
         if (!solver) throw new Error('Plate solving is not configured on the Vela server.')

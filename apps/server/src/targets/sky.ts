@@ -1,6 +1,6 @@
 import { Body, Equator, Horizon, Illumination, MoonPhase, Observer } from 'astronomy-engine'
 import type { HorizonProblem, TargetPosition, TargetSkyPath } from '@vela/model/web'
-import type { PlateWcs } from '../plate-solving/solver.js'
+import type { PlateWcs, SkyPosition } from '../plate-solving/judged-solver.js'
 import { angularDistance, toMount, type Site } from '@vela/rig-sky'
 import { horizonBin, horizonStatus, type Skyline } from './horizon.js'
 
@@ -21,6 +21,41 @@ export function skyAtPixel(wcs: PlateWcs, x: number, y: number): TargetPosition 
     raDegrees: wrap(wcs.raDegrees + Math.atan2(east, denominator) / radians),
     decDegrees:
       Math.atan2(Math.sin(dec) + north * Math.cos(dec), Math.hypot(denominator, east)) / radians,
+  }
+}
+
+/** Project a sky position into ASTAP's FITS WCS, in zero-based image pixels. */
+export function projectSky(wcs: PlateWcs, position: SkyPosition): { x: number; y: number } | null {
+  if (
+    !Number.isFinite(position.raDegrees) ||
+    position.raDegrees < 0 ||
+    position.raDegrees >= 360 ||
+    !Number.isFinite(position.decDegrees) ||
+    Math.abs(position.decDegrees) > 90
+  )
+    throw new Error('Invalid plate coordinates')
+
+  const delta = (position.raDegrees - wcs.raDegrees) * radians
+  const dec = position.decDegrees * radians
+  const center = wcs.decDegrees * radians
+
+  const depth =
+    Math.sin(center) * Math.sin(dec) + Math.cos(center) * Math.cos(dec) * Math.cos(delta)
+
+  if (depth <= 0) return null
+  const east = (Math.cos(dec) * Math.sin(delta)) / depth / radians
+
+  const north =
+    (Math.cos(center) * Math.sin(dec) - Math.sin(center) * Math.cos(dec) * Math.cos(delta)) /
+    depth /
+    radians
+
+  const [a, b, c, d] = wcs.cd
+  const determinant = a * d - b * c
+
+  return {
+    x: wcs.referenceX - 1 + (east * d - north * b) / determinant,
+    y: wcs.referenceY - 1 + (north * a - east * c) / determinant,
   }
 }
 

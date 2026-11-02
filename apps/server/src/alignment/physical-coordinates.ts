@@ -1,6 +1,7 @@
 import { SiderealTime } from 'astronomy-engine'
 import { fromMount, toMount, type Site } from '@vela/rig-sky'
-import { projectSky, type PlateWcs, type SkyPosition } from '../plate-solving/solver.js'
+import type { PlateWcs, SkyPosition } from '../plate-solving/judged-solver.js'
+import { projectSky } from '../targets/sky.js'
 import type { AlignmentSample } from './geometry.js'
 
 /** The geometry sample uses exposure midpoint. Keep the original capture start

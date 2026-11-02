@@ -2,7 +2,8 @@ import type { AlignmentView } from '@vela/model/web'
 import { createAlpacaAcquisition, createAlpacaFraming } from '@vela/alpaca'
 import { createAlignmentController } from './controller.js'
 import { createPhysicalAlignment } from './physical.js'
-import { createAstapSolver } from './solver.js'
+import type { AstapConfig } from '@vela/rig-astap'
+import { createPlateSolver } from '../plate-solving/judged-solver.js'
 import Fastify from 'fastify'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryRigCatalog } from '../rig/catalog.js'
@@ -31,11 +32,13 @@ const initialState: AlignmentView = {
   measurement: null,
 }
 
+const plateSolver = (config: AstapConfig) => createPlateSolver(config, 'alignment')
+
 const mocks = {
   acquisition: vi.fn(createAlpacaAcquisition),
   framing: vi.fn(createAlpacaFraming),
   physical: vi.fn(createPhysicalAlignment),
-  solver: vi.fn(createAstapSolver),
+  solver: vi.fn(plateSolver),
   controller: vi.fn(createAlignmentController),
   start: vi.fn<ReturnType<typeof createAlignmentController>['start']>(),
   stop: vi.fn<ReturnType<typeof createAlignmentController>['stop']>(),
@@ -95,7 +98,7 @@ beforeEach(() => {
   mocks.acquisition.mockImplementation(createAlpacaAcquisition)
   mocks.framing.mockImplementation(createAlpacaFraming)
   mocks.physical.mockImplementation(createPhysicalAlignment)
-  mocks.solver.mockImplementation(createAstapSolver)
+  mocks.solver.mockImplementation(plateSolver)
   mocks.start.mockImplementation(async (rigId: string, _name: string, onSettled?: () => void) => {
     mocks.state = { ...mocks.state, rigId, active: true }
     release = onSettled

@@ -9,7 +9,7 @@ import type {
   TargetPosition,
 } from '@vela/model/web'
 import { frameImaging, type FrameImaging } from '../imaging/frame-imaging.js'
-import type { MonoFrame, PlateSolver } from '../plate-solving/solver.js'
+import { describeRejection, type MonoFrame, type PlateSolver } from '../plate-solving/judged-solver.js'
 import { angularDistance, fromMount, toMount, type Site } from '@vela/rig-sky'
 import { plateCorners } from './sky.js'
 
@@ -226,6 +226,7 @@ export function createFramingController(
   async function inspectExposure(
     frame: FramingFrame,
     input: FramingExposureContext,
+    claimed: TargetPosition,
     solver: PlateSolver,
     signal: AbortSignal,
   ) {
@@ -250,7 +251,7 @@ export function createFramingController(
     // All consumers see this acquisition's linear samples. Neither optional
     // image work nor its failure changes the solver result or repeats capture.
     const [solveResult, rendered, analyzed] = await Promise.allSettled([
-      solver.solve(frame, input.desired, signal),
+      solver.solve(frame, input.desired, claimed, signal),
       images.render(frame.width, frame.height, frame.pixels, frame.color),
       images.analyze(frame.width, frame.height, frame.pixels, frame.color),
     ])
@@ -304,11 +305,18 @@ export function createFramingController(
 
       signal.throwIfAborted()
       state = { ...state, phase: 'solving' }
-      const { solved, preview } = await inspectExposure(frame, input, solver, signal)
+
+      const { solved, preview } = await inspectExposure(
+        frame,
+        input,
+        fixedPointing(landed),
+        solver,
+        signal,
+      )
 
       if (solved.status !== 'solved')
         throw new FramingCheckNeeded(
-          'This exposure could not be solved. Adjust the test exposure if needed, then choose Check current frame. Your composition is kept.',
+          `This exposure could not be solved (${describeRejection(solved)}). Adjust the test exposure if needed, then choose Check current frame. Your composition is kept.`,
         )
 
       const actual = {
