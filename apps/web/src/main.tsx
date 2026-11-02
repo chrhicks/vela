@@ -12,6 +12,7 @@ import { Observe } from './routes/observe'
 import { SavedImages } from './routes/saved-images'
 import { Targets } from './routes/targets'
 import { Explore } from './routes/explore'
+import { Model } from './routes/model'
 import { Capture } from './routes/capture'
 import { Shell } from './components/app'
 import { HomeProvider } from './pages/HomeProvider'
@@ -39,6 +40,7 @@ const router = createBrowserRouter([
       },
       { path: 'rigs/:rigId', Component: RigDetail },
       { path: 'explore', Component: Explore },
+      { path: 'rigs/:rigId/model', Component: Model },
       { path: 'rigs/:rigId/observe', Component: Observe },
       { path: 'rigs/:rigId/observe/targets', Component: Targets },
       { path: 'rigs/:rigId/observe/targets/:targetId', Component: Targets },

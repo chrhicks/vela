@@ -1,0 +1,18 @@
+.rig-model { max-width: 76rem; margin: 0 auto; padding: 2rem; color: var(--vela-text); }
+.rig-model__heading { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; flex-wrap: wrap; }
+.rig-model h1 { font-size: 1.8rem; }
+.rig-model h2 { font-size: 1.25rem; }
+.rig-model h3 { margin-top: 1.5rem; }
+.rig-model p, .rig-model figcaption { color: var(--vela-text-muted); margin: .7rem 0; }
+.rig-model__source { margin-top: 1.5rem; }
+.rig-model__source > .vela-panel__body { padding: 1.5rem; }
+.rig-model__position { border-block: 1px solid var(--vela-line); padding-bottom: 1rem; }
+.rig-model__trend { margin: 1rem 0; max-width: 42rem; }
+.rig-model__trend svg { width: 100%; height: auto; color: var(--vela-text-muted); }
+.rig-model__trend text { fill: currentColor; font-size: 12px; }
+.rig-model__table { overflow: auto; max-height: 24rem; }
+.rig-model table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; text-align: left; font-size: .85rem; }
+.rig-model th, .rig-model td { padding: .8rem; border-bottom: 1px solid var(--vela-line); white-space: nowrap; }
+.rig-model th small { display: block; color: var(--vela-text-muted); font-weight: normal; }
+.rig-model caption { text-align: left; padding: .7rem; }
+@media (max-width: 640px) { .rig-model { padding: 1rem; } .rig-model__source > .vela-panel__body { padding: 1rem; } }

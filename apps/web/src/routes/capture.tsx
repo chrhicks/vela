@@ -92,6 +92,7 @@ function CapturePage({ rigId }: { rigId: string }) {
             Check capture state
           </Button>
         )}
+        <Link className="tonight-link" to={`${base}/model`}>Pointing model →</Link>
         <Link className="tonight-link" to={`${base}/observe`}>
           Prepare your rig
         </Link>
