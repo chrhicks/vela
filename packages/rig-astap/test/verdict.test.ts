@@ -52,6 +52,14 @@ describe('judgeSolve', () => {
       expect(reasonsOf(judgeSolve(facts({ solution: solved({ stretch: 1.2 }) }), expected, purpose))).toEqual(['scale'])
     })
 
+    it('rejects a sheared matrix whose axes and determinant look right', () => {
+      const scale = expected.arcsecPerPixel / 3600
+      const shear = Math.PI / 12
+      const sheared: SolveOutcome = { status: 'solved', wcs: { width: 6248, height: 4176, referenceX: 3124.5, referenceY: 2088.5, ...claimed, cd: [scale, scale * Math.sin(shear), 0, scale * Math.cos(shear)] } }
+
+      expect(reasonsOf(judgeSolve(facts({ solution: sheared }), expected, purpose))).toEqual(['scale'])
+    })
+
     it('rejects a mirrored solve, and a solve of the other parity when that is what the rig expects', () => {
       expect(reasonsOf(judgeSolve(facts({ solution: solved({ parity: -1 }) }), expected, purpose))).toEqual(['parity'])
       expect(judgeSolve(facts({ solution: solved({ parity: -1 }) }), { ...expected, parity: -1 }, purpose).status).toBe('accepted')

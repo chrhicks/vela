@@ -33,7 +33,7 @@ export interface SolveFacts {
 
 export interface Measured {
   readonly arcsecPerPixel: number
-  /** Signed fraction of the worst of the two axis scales and the area scale: 0.02 is 2% larger than expected. */
+  /** Signed fraction of the principal scale that is farthest from the expected one: 0.02 is 2% larger than expected. */
   readonly scaleError: number
   readonly parity: 1 | -1
   readonly hintOffsetDegrees: number | null
@@ -48,9 +48,9 @@ export type SolveVerdict =
   | { readonly status: 'rejected'; readonly reasons: readonly [Reason, ...Reason[]]; readonly measured: Measured | null }
 
 /**
- * The configured focal length sits 0.2% to 0.7% from the scale of every good frame of the audit corpus, and the
+ * The configured focal length sits 0.2% to 0.8% from the scale of every good frame of the audit corpus, and the
  * audit's false solves were 8% and 20% off. Alignment fits orientation and scale across frames, so it gets a
- * band 3 times the worst good frame. Framing only needs the field centre, so it gets 7 times, which still
+ * band 3 times the worst good frame. Framing only needs the field centre, so it gets 6 times, which still
  * rejects both false solves.
  */
 export const scaleTolerance = { framing: 0.05, alignment: 0.02 } as const satisfies Record<Purpose, number>
@@ -77,12 +77,22 @@ function separationDegrees(a: SkyPosition, b: SkyPosition): number {
   return (2 * Math.asin(Math.sqrt(Math.max(0, Math.min(1, half))))) / radians
 }
 
-/** The worst of the two axis scales and the area scale, so a stretched or sheared matrix cannot hide behind a right determinant. */
-function scaleError(cd: Solved['wcs']['cd'], expected: Expectation, determinant: number): number {
-  const [a, b, c, d] = cd
-  const arcsecPerPixel = [Math.hypot(a, c), Math.hypot(b, d), Math.sqrt(Math.abs(determinant))].map(degrees => degrees * 3600)
+/**
+ * The two principal scales of the CD matrix, in arcsec/px, from its singular values. They are equal for a rotation
+ * and a mirror, so a stretched or sheared matrix cannot hide behind a determinant with the right area scale.
+ */
+function principalScales([a, b, c, d]: Solved['wcs']['cd']): [number, number] {
+  const sumOfSquares = a * a + b * b + c * c + d * d
+  const determinant = a * d - b * c
+  const spread = Math.sqrt(Math.max(0, sumOfSquares ** 2 - 4 * determinant ** 2))
 
-  return arcsecPerPixel.map(scale => scale / expected.arcsecPerPixel - 1).reduce((worst, error) => (Number.isNaN(error) || Math.abs(error) > Math.abs(worst) ? error : worst))
+  return [Math.sqrt((sumOfSquares + spread) / 2) * 3600, Math.sqrt(Math.max(0, sumOfSquares - spread) / 2) * 3600]
+}
+
+function scaleError(cd: Solved['wcs']['cd'], expected: Expectation): number {
+  return principalScales(cd)
+    .map(scale => scale / expected.arcsecPerPixel - 1)
+    .reduce((worst, error) => (Number.isNaN(error) || Math.abs(error) > Math.abs(worst) ? error : worst))
 }
 
 function measure(wcs: Solved['wcs'], facts: SolveFacts, expected: Expectation): Measured {
@@ -91,7 +101,7 @@ function measure(wcs: Solved['wcs'], facts: SolveFacts, expected: Expectation): 
 
   return {
     arcsecPerPixel: Math.sqrt(Math.abs(determinant)) * 3600,
-    scaleError: scaleError(wcs.cd, expected, determinant),
+    scaleError: scaleError(wcs.cd, expected),
     parity: determinant > 0 ? 1 : -1,
     hintOffsetDegrees: facts.claimed === null ? null : separationDegrees(wcs, facts.claimed),
     stars: facts.stars,
