@@ -14,7 +14,6 @@ import {
 } from '@cria/wire'
 import { makeLocalHolds, type LocalHolds } from './holds.js'
 import { download, request, type CriaConnection, type Reply } from './http.js'
-import { journalStates } from './journal.js'
 import { makeLocalWarnings, type LocalWarnings } from './warnings.js'
 
 export type Received =
@@ -75,7 +74,7 @@ export function openSession(connection: CriaConnection): Effect.Effect<Session, 
         Effect.asVoid,
       )
 
-    yield* Effect.forkScoped(Effect.forever(subscribe(connection, received, journalStates(connection.journal))))
+    yield* Effect.forkScoped(Effect.forever(subscribe(connection, received)))
     yield* Effect.forkScoped(Effect.forever(watchCadence(received, nextChange)))
 
     const lookup = (instanceId: InstanceId, requestId: RequestId) =>
@@ -214,7 +213,6 @@ export function openSession(connection: CriaConnection): Effect.Effect<Session, 
 function subscribe(
   connection: CriaConnection,
   received: SubscriptionRef.SubscriptionRef<Received>,
-  journalState: (state: State, arrivedAt: number) => void,
 ) {
   const ended = (message: string) =>
     Effect.andThen(
@@ -262,7 +260,7 @@ function subscribe(
         if (Exit.isFailure(decoded)) return 'Cria sent a state that is not protocol 5'
         const receivedAt = Date.now()
 
-        journalState(decoded.value, receivedAt)
+        connection.journal.record({ kind: 'state', at: receivedAt, state: decoded.value })
         yield* SubscriptionRef.set(received, { state: 'live', snapshot: decoded.value, receivedAt })
       }
     }

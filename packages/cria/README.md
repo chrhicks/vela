@@ -78,34 +78,25 @@ Capture downloads the confirmed original before returning its frame. An image 41
 is one lost frame and never starts another exposure. A Cria restart leaves an
 in-flight operation uncertain with a local hold; nothing is resubmitted.
 
-## Journal
+## Reporting
 
-Set `VELA_CRIA_JOURNAL_PATH` and the server appends what the client decodes to one JSONL
-file, so a night can be replayed against Cria's own record. It is off when unset. The
-client writes at the decoded boundaries only. It never clones a `fetch` response or adds
-a second reader of the event stream. One line per entry, each with the `origin` and a
-millisecond `at` on the Vela server's clock.
+`createCriaConnection` takes an optional `journal` sink and calls it at the decoded
+boundaries only. It never clones a `fetch` response or adds a second reader of the event
+stream. Each entry carries the connection's `origin` and a millisecond `at` on the Vela
+server's clock. The server's run log is the sink (see [the run log](../../docs/run-log.md)).
 
-- `exchange` is one request with its reply. It holds the method, route, HTTP status
-  (null when no response came) and, for an operation, the `requestId`, device, command kind
-  and parameters. The reply is `answered` with its decoded body (an operation, including an
-  image descriptor), `refused` with Cria's error code and message, or `lost`. A download
-  keeps only its byte count.
+- `exchange` is one request with its reply: method, route, HTTP status (null when no
+  response came) and, for an operation, the `requestId`, device, command kind and
+  parameters. The reply is `answered` with its decoded body, `refused` with Cria's error
+  code and message, or `lost`. A download keeps only its byte count.
 - `image` says whether a fetched original matched the size and SHA-256 its descriptor
   promised: `intact`, `damaged`, `gone` or `failed`. The bytes are never kept.
-- `state` is written for every snapshot that arrives, with `generatedAt`, `sequence` and
-  the arrival time `at`, so a quiet stream shows as a gap. `changed` holds only the cells
-  that differ from the previous entry (`device/<id>/readings.<field>`,
-  `device/<id>/availability`, `operation/<id>`), and `removed` the keys that went away.
-  A reading's `observedAt` alone is not a change. The first entry after a start has
-  `baseline: true` and lists every cell.
+- `state` is every snapshot that arrives, whole, with its arrival time.
 - `stream` marks the event stream opening and ending, with the reason it ended.
 
-The token and request headers are never written. The journal is a sink the client calls and
-forgets. `record` returns at once, a throwing sink is ignored, and the file sink queues at most
-4 MiB, appends at most 256 MiB per process, and turns itself off for good on its first failure
-(a full or slow disk, an unwritable path). The server logs why once. Capture and the
-event stream behave the same with it off, failing or stalled.
+The token and request headers are never reported. `record` returns at once and a sink that
+throws is dropped for good, so a sink must not throw. Capture and the event stream behave
+the same with the sink absent, failing or slow.
 
 ## Holds and recovery
 
