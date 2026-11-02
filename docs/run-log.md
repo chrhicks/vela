@@ -4,7 +4,7 @@ The run log is the one record of what Vela's Cria client saw. The server writes 
 
 ## Format
 
-One JSONL file per server run, `run-<start time>-<part>.jsonl`, in that directory. Each line is one `@vela/rig-events` envelope in canonical JSON, so `decodeLine` reads it. A Cria connection reports four kinds, each capture attempt files a `frame` event, each settled autofocus run an `autofocus` event, and each check at start-up an `attestation` event:
+One JSONL file per server run, `run-<start time>-<part>.jsonl`, in that directory. Each line is one `@vela/rig-events` envelope in canonical JSON, so `decodeLine` reads it. A Cria connection reports four kinds, each capture attempt files a `frame` event, each settled autofocus run an `autofocus` event, each alignment trial files `alignment` events, and each check at start-up an `attestation` event:
 
 | Kind | Holds |
 | --- | --- |
@@ -14,7 +14,7 @@ One JSONL file per server run, `run-<start time>-<part>.jsonl`, in that director
 | `cria.stream` | the event stream opening and ending. |
 | `autofocus` | one settled autofocus run: its settings, every sample with its stars, the fit and the landing. Its rig is the catalog rig id. |
 | `attestation` | One check of the pinned manifest for a rig: each item's status (`match`, `changed`, `missing`, `unpinned`), what was pinned and what was read. A mismatch warns and blocks nothing ([attestation](../apps/server/src/attestation/README.md)). Its rig is the catalog rig id. |
-| `alignment` | one entry of an alignment trial: its `run`, each `frame`, `fit`, `dropped` position, `measurement` and `outcome`, with the id `alignment:<run id>:<n>` and `n` counting from the `run` at 1. It holds no site. A physical trial's site is the first mount snapshot of its rig in the same file; an offline trial's `run` names the simulator's latitude and sidereal time. The trial's FITS stay in its folder under `alignment-diagnostics/trials`, which the `run` and `frame` events name. Nothing writes these events yet (plan step 13b-2); `readTrials` and the alignment replay read them. |
+| `alignment` | one entry of an alignment trial: its `run`, each `frame`, `fit`, `dropped` position, `measurement` and `outcome`, with the id `alignment:<run id>:<n>` and `n` counting from the `run` at 1. It holds no site. A physical trial's site is the first mount snapshot of its rig in the same file; an offline trial's `run` names the simulator's latitude and sidereal time. The trial's FITS stay in its folder under `alignment-diagnostics/trials`, which the `run` and `frame` events name. `diagnostics.ts` writes these events to the shared run log; `readTrials` and the alignment replay read them and older trial journals. |
 | `frame` | one settled exposure attempt, with why it failed if it did, the ids Cria gave it and the saved FITS (`docs/local-tracing.md`). Its rig is the catalog rig id. |
 
 The rig is the Cria rig id from `cria.json`, which must be lowercase letters, digits and hyphens. The source is `vela:cria`.

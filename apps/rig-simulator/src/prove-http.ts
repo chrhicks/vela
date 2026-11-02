@@ -9,7 +9,7 @@ import { createRigOperations } from '../../server/dist/rig/operations.js'
 import { registerImagingCamera } from '../../server/dist/rig/imaging-camera.js'
 import { registerCapture } from '../../server/dist/capture/routes.js'
 import { createEquipmentComposition } from '../../server/dist/equipment/composition.js'
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, writeFile } from 'node:fs/promises'
 import { resolve, join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import {
@@ -17,6 +17,9 @@ import {
   createAlpacaProvider,
 } from '../../../packages/alpaca/dist/index.js'
 import { fitPolarAxis } from '../../../packages/rig-sky/dist/index.js'
+import { openRunLog } from '../../server/dist/run-log/run-log.js'
+import { createAlignmentDiagnostics } from '../../server/dist/alignment/diagnostics.js'
+import { replayAlignmentDiagnostics } from '../../server/dist/alignment/diagnostic-replay.js'
 import { createAlignmentController } from '../../server/dist/alignment/controller.js'
 import {
   baselineFromAxis,
@@ -28,6 +31,13 @@ import { createPlateSolver } from '../../server/dist/plate-solving/judged-solver
 import { imageWidth, imageHeight } from './optics.js'
 import { loadCatalog } from './catalog.js'
 import { buildSimulator } from './service.js'
+
+interface TrialReader {
+  readTrials(root: string, log: string): Promise<{ problems: object[]; trials: { frames: object[] }[] }>
+}
+
+// SAFETY: rig-frames is a source package; this proof's built-server typecheck cannot compile it.
+const { readTrials } = (await import(new URL('../../../packages/rig-frames/src/index.ts', import.meta.url).href)) as TrialReader
 
 const catalogPath = process.env.VELA_STAR_CATALOG
 
@@ -376,7 +386,12 @@ try {
 
   await control('reset', { preset: 'large-error' }, 'POST')
 
+  const runLogPath = join(output, 'run-log')
+  const trialsPath = join(output, 'trials')
+  const runLog = openRunLog({ directory: runLogPath })
+
   const controller = createAlignmentController({
+    openDiagnostics: createAlignmentDiagnostics(trialsPath, runLog, error => { throw error }),
     mode: 'offline',
     settings: { cameraId, telescopeId, exposureSeconds: 2, fieldHeightDegrees: 3 },
     hardware,
@@ -387,7 +402,16 @@ try {
 
   while (!controller.snapshot().measurement && controller.active()) await delay(200)
   await controller.stop()
+  await runLog.close()
   const viewed = controller.snapshot()
+  const found = await readTrials(trialsPath, runLogPath)
+  assert.equal(found.problems.length, 0)
+  assert.ok(found.trials.some(trial => trial.frames.length >= 6))
+  const [folder] = await readdir(trialsPath)
+  const replay = await replayAlignmentDiagnostics(join(trialsPath, folder!), runLogPath)
+  assert.equal(replay.counts.frames, 6)
+  assert.ok(replay.finalMeasurement)
+  console.log('Alignment trial read back from the real run log')
   assert.ok(viewed.measurement, `The controller measured nothing: ${viewed.phase} ${viewed.error}`)
   assert.equal(viewed.solvedPositions, 6)
   check('controller-large', viewed.measurement, 480, -360)

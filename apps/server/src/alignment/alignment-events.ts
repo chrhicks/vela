@@ -1,7 +1,6 @@
 import { createReadStream } from 'node:fs'
 import { readdir, stat } from 'node:fs/promises'
 import { join } from 'node:path'
-import { createInterface } from 'node:readline'
 import { decodeLine, mountSite, type Envelope } from '@vela/rig-events'
 import { localSiderealDegrees, type Site } from '@vela/rig-sky'
 import { diagnosticEntrySchema, readEntry, type DiagnosticEntry } from './diagnostic-schema.js'
@@ -89,7 +88,17 @@ export async function loggedJournalEntries(runLog: string, folder: string): Prom
     const firstSites = new Map<string, Site>()
     let runRig: string | undefined
 
-    for await (const text of createInterface({ input: createReadStream(file), crlfDelay: Infinity })) {
+    async function* committedLines() {
+      let pending = ''
+
+      for await (const chunk of createReadStream(file, { encoding: 'utf8' })) {
+        const lines = (pending + chunk).split('\n')
+        pending = lines.pop()!
+        yield* lines
+      }
+    }
+
+    for await (const text of committedLines()) {
       if (!text.includes('"kind":"alignment"') && !text.includes('"kind":"cria.state"')) continue
 
       const decoded = decodeLine(text)

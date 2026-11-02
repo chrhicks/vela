@@ -10,6 +10,7 @@ export async function trialEntries(directory: string, runLog: string): Promise<r
   if (existsSync(journal))
     return readFileSync(journal, 'utf8')
       .split('\n')
+      .slice(0, -1)
       .filter(line => line.trim() !== '')
       .map((line, index) => readEntry(index, () => diagnosticEntrySchema.parse(JSON.parse(line))))
 

@@ -146,7 +146,7 @@ function setup(
       : undefined,
     operations,
     mocks,
-    equipment,
+    { ...equipment, runLog: { append() {} } },
   )
 
   const command = (

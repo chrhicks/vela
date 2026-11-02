@@ -1,3 +1,4 @@
+import type { RunLog } from '../run-log/run-log.js'
 import { z } from 'zod'
 import { isAbsolute } from 'node:path'
 import type { FastifyInstance, FastifyReply } from 'fastify'
@@ -29,6 +30,7 @@ const defaultFactories: AlignmentFactories = {
 }
 
 export interface AlignmentEquipmentOptions {
+  runLog?: Pick<RunLog, 'append'> | undefined
   settingsForRig?: (rig: RigCatalogRecord) => AlignmentSettings | undefined
   createAcquisition: (rig: RigCatalogRecord) => Acquisition
   createFraming: (rig: RigCatalogRecord) => Framing
@@ -57,11 +59,11 @@ export function registerAlignment(
 
   const settings = legacySettings
 
-  const openDiagnostics = settings?.diagnosticsPath
-    ? createAlignmentDiagnostics(settings.diagnosticsPath, error =>
+  const openDiagnostics = settings?.diagnosticsPath && equipment.runLog
+    ? createAlignmentDiagnostics(settings.diagnosticsPath, equipment.runLog, error =>
         app.log.error(
           { err: error },
-          'Alignment diagnostic recording stopped; observing operation continues',
+          'Alignment diagnostic recording failed; observing operation continues',
         ),
       )
     : undefined
@@ -88,9 +90,9 @@ export function registerAlignment(
   ) {
     const acquisition = equipment.createAcquisition(rig)
 
-    const openDiagnostics = settings.diagnosticsPath
-      ? createAlignmentDiagnostics(settings.diagnosticsPath, error =>
-          app.log.error({ err: error }, 'Alignment diagnostic recording stopped'),
+    const openDiagnostics = settings.diagnosticsPath && equipment.runLog
+      ? createAlignmentDiagnostics(settings.diagnosticsPath, equipment.runLog, error =>
+          app.log.error({ err: error }, 'Alignment diagnostic recording failed'),
         )
       : undefined
 

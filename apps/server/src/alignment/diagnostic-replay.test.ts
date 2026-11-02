@@ -13,18 +13,18 @@ import {
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { AlpacaFrame, AlpacaTelescopeStatus } from '@vela/alpaca'
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createAlignmentDiagnostics, type AlignmentFrameEvidence } from './diagnostics.js'
+import { afterEach, describe, expect, it } from 'vitest'
+import type { AlignmentFrameEvidence } from './diagnostics.js'
+import { legacyTrialFixture } from './legacy-trial-fixture.js'
 import { replayAlignmentDiagnostics } from './diagnostic-replay.js'
 import {
   diagnosticEntrySchema,
   diagnosticJournalName,
   maximumFitsBytes,
-  maximumJournalBytes,
+  maximumLegacyJournalBytes,
   type DiagnosticEntry,
 } from './diagnostic-schema.js'
 import { axisOfPoleError, baselineFromAxis, measureAlignment } from './geometry.js'
-import { appendThreePointBaseline } from './sweep-fixture.js'
 import { physicalAlignmentSample } from './physical-coordinates.js'
 import { fixture } from './physical-fixture.js'
 
@@ -40,12 +40,10 @@ async function physicalTrial(
 ) {
   const root = await mkdtemp(join(tmpdir(), 'vela-diagnostic-replay-test-'))
   roots.push(root)
-  const onError = vi.fn()
   const runId = randomUUID()
 
-  const run = (await createAlignmentDiagnostics(
+  const run = (await legacyTrialFixture(
     root,
-    onError,
   )({
     runId,
     rigId: 'physical',
@@ -170,12 +168,7 @@ async function physicalTrial(
 
   for (const [index, input] of reference.samples.entries())
     await capture(input, 'baseline', index + 1)
-  await appendThreePointBaseline(
-    join(root, (await readdir(root))[0]!),
-    [samples[0]!, samples[1]!, samples[2]!],
-    fixture.site.latitudeDegrees,
-    recorded.measurement,
-  )
+  await appendFile(join(root, (await readdir(root))[0]!, diagnosticJournalName), `${JSON.stringify({ type: 'baseline', samples, latitudeDegrees: fixture.site.latitudeDegrees, measurement: recorded.measurement })}\n`)
   await run.recordMeasurement(samples[2]!, measureAlignment(baseline, samples[2]!, true), mount)
   const adjusted = await capture(reference.adjusted, 'adjusting', 3)
   const measurement = measureAlignment(baseline, adjusted.sample, true)
@@ -185,7 +178,6 @@ async function physicalTrial(
   await run.recordMeasurement(adjusted.sample, measurement, mount)
 
   if (phase) await run.finish({ phase, error: phase === 'failed' ? 'Device read failed' : null })
-  expect(onError).not.toHaveBeenCalled()
   const directory = join(root, (await readdir(root))[0]!)
   const journal = join(directory, diagnosticJournalName)
 
@@ -463,7 +455,7 @@ describe('alignment diagnostic replay', () => {
     const trial = await physicalTrial('finished')
     await appendFile(trial.journal, JSON.stringify(trial.entries[1]) + '\n')
     await expect(replayAlignmentDiagnostics(trial.directory)).rejects.toThrow('after its outcome')
-    await truncate(trial.journal, maximumJournalBytes + 1)
+    await truncate(trial.journal, maximumLegacyJournalBytes + 1)
     await expect(replayAlignmentDiagnostics(trial.directory)).rejects.toThrow('size cap')
   })
 })

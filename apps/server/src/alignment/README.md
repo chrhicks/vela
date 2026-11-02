@@ -2,15 +2,15 @@
 
 The default offline integration connects the approved alignment interface to the local
 simulated rig through ordinary Alpaca acquisition and real ASTAP image solves.
-It is an explicitly configured synthetic-clock workflow, not yet a physical-rig
-polar-alignment implementation. No generator state or true offsets enter the
+It is an explicitly configured synthetic-clock workflow. Physical rigs use the
+observed mount and camera geometry through the physical adapter. No generator state or true offsets enter the
 server's measurement path.
 
 `routes.ts` composes the configured acquisition adapter, ASTAP boundary and
-server-owned controller. `controller.ts` takes three solved positions, constructs
-a baseline, and then solves fresh exposures to measure physical adjustments.
+server-owned controller. `controller.ts` attempts six sweep positions, fits the polar axis
+from at least five accepted fixes, and then solves fresh exposures to measure physical adjustments.
 `geometry.ts` operates on solved sightlines and observed sidereal angles;
-`solver.ts` owns FITS, the bounded external process and WCS. `display.ts` prepares each
+`../plate-solving/judged-solver.ts` owns the ASTAP solve boundary and verdict. `display.ts` prepares each
 exposure's display images from one `../imaging/preview.ts` stretch of a display copy.
 Solver input retains original integer pixels.
 
@@ -102,9 +102,9 @@ the mechanical pole cannot establish a rotation baseline. The preparation endpoi
 is checked before the reference is set. Stop and failures leave the mount where
 it stopped; only a new attempt homes again.
 
-A nominal 0.25° primary-axis probe establishes the driver's mechanical sign. The two
-baseline legs each target roughly 57° westward in RA, accepting 54–60° of observed
-final travel per leg, including the probe's displacement. Allow up to 120° total
+A nominal 0.25° primary-axis probe establishes the driver's mechanical sign. The five
+baseline steps each target 22.8° westward in RA, accepting 21.6–24° of observed
+final travel per step, including the probe's displacement in the first step. Allow up to 120° total
 westward travel and 1° on either side for the direction check. The starting field
 leaves a nominal margin of at least 10° before the meridian after that travel at
 preparation time; this margin shrinks as time passes while tracking.
@@ -171,7 +171,7 @@ finished at 0.2′ and 0.14′. The sweep now takes six fixes along five legs of
 hour-angle frame (`cameraOrientation`); the fit's miss and any step where the camera turned more than the mount
 did decide the verdict. A miss of 2′ or more, or any step, is not rigid.
 
-A position that gives no fix (no solve, a rejected verdict, a capture that failed safely) is journalled with
+A position that gives no fix (no solve, a rejected verdict, a capture that failed safely) is recorded with
 `recordDropped`, listed in the view's `dropped`, and not exposed again. The fit needs five fixes, and the last
 position must be one of them because the adjusting baseline is a frame taken where the mount now points.
 Otherwise the run fails with the reason and the positions.
@@ -181,7 +181,7 @@ each step (`rigidity.steps`). Vela measures no polar error: the view has no meas
 and the adjusting loop never starts. A rigid verdict seeds the adjusting baseline from the fitted axis
 (`baselineFromAxis`). The offline model has no mount reading to judge and carries no verdict.
 
-The journal keeps the sweep's fixes and the fit's verdict, so a trial that reported a small error while loose can
+The run log keeps the sweep's fixes and the fit's verdict, so a trial that reported a small error while loose can
 be told apart later. Replay fits the recorded solves again; journals from before the six-fix sweep still replay
 from their recorded pole. `recorded-trials.test.ts` replays the 19 trials of the mount-rigidity tool through that
 path. It reads `VELA_RECORDED_TRIALS` or `~/.local/share/vela/alignment-diagnostics/trials` and skips when the
@@ -213,34 +213,26 @@ replayable evidence for each new alignment trial. It is off by default. With
 `pnpm dev:observing`, the same setting in `.env.observing.local` may be relative
 to the repository root; the launcher resolves it before starting the server.
 
-Each trial has its own directory and retains:
+Both `VELA_ALIGNMENT_DIAGNOSTICS_PATH` and `VELA_RUN_LOG_DIR` must be set.
+Each trial has a `<run-id>-<suffix>` folder under the diagnostics path. It keeps
+the accepted baseline FITS and the latest accepted adjustment FITS. The `run`
+event names the folder; each `frame` event names its FITS, size and SHA-256.
 
-- the three successfully solved baseline exposures as original-sample FITS;
-- the latest successfully solved adjustment exposure as FITS;
-- a bounded numerical journal containing the run identity/mode, exposure start
-  and provenance, geometry midpoint, exact solved centers/full WCS, hints,
-  baseline inputs, calculated corrections and final outcome;
-- for physical trials, the site, camera geometry and existing mount observations
-  before/after capture and before a correction is published. Recording does not
-  introduce another device read or command.
+Numerical evidence is written as `alignment` events to the shared run log.
+It includes the run, solves, WCS, camera and mount observations, fit, dropped
+positions, measurements and outcome. Physical events carry no site or sidereal
+time. Replay uses the first mount snapshot of the rig in the file containing
+the `run` event. Offline events name their simulator's latitude and clock.
+Recording adds no device read or command.
 
-Earlier adjustment originals are replaced as later solved images arrive; their
-numerical records remain. The three baseline originals remain throughout the
-trial. An acquired image is recorded only after it solves, so a failed solver or
-preview does not imply that its original was retained. A recorded calculation
-is distinct from a published reading: later validation/projection or cancellation
-can still end the operation.
-
-The journal is limited to 4 MiB and each FITS to 128 MiB. The recorder bounds input
-size before encoding using worst-case signed-32 storage; representable samples
-use the shared encoder's smaller unsigned-16 layout. Successful recording keeps
-at most four retained originals per trial (roughly 200 MiB for unsigned-16 or
-400 MiB for signed-32 at FRA resolution);
-replacing an adjustment image needs space for one more, which may remain after an
-interruption or storage failure. A storage or recording
-limit failure is reported in the server log and disables further diagnostics for
-that trial while the observing operation continues. A missing final record means
-the diagnostic record is incomplete, not a successfully finished trial.
+Earlier adjustment originals are removed after a new accepted frame is written;
+their numerical evidence remains. Each FITS is limited to 128 MiB, checked before
+encoding pixels. Up to 16 baseline originals and one adjustment original remain.
+An interrupted replacement may leave one more file. There is no per-trial
+journal cap or first-error switch. FITS failures are reported in the server log;
+later writes are still attempted. The shared run log retries disk failures and
+reports them on `/api/health`. The alignment operation continues. A missing
+outcome means the evidence is incomplete.
 
 Previous trial directories are never pruned automatically. Keep the ones needed
 for comparison and remove them explicitly when finished. Disable the setting
@@ -251,17 +243,17 @@ After building the server, replay a trial without hardware or another solver run
 
 ```sh
 pnpm --filter @vela/server build
-node scripts/replay-alignment.mjs /absolute/path/to/trial-directory
+node scripts/replay-alignment.mjs /absolute/path/to/trial-directory /absolute/path/to/run-log
 ```
 
 Replay validates the recorded input and retained FITS integrity, reconstructs the
 baseline, recomputes its corrections and reports numerical discrepancies. Physical
 trials also replay J2000-to-midpoint conversion from the recorded site and timing.
 Both [Vela FITS encodings](../imaging/README.md#lossless-fits-interchange) are
-supported. Retained files must match journal byte counts and SHA-256 hashes,
+supported. Old per-trial journals remain readable. Retained files must match recorded byte counts and SHA-256 hashes,
 their header dimensions must match the recorded capture, and their primary-image
 layout, scaling cards and padded size must agree. Older adjustment originals may
-have rotated out; their journal sizes must still fit one of the two encodings.
+have rotated out; their recorded sizes must still fit one of the two encodings.
 It uses Vela's production mathematics: this establishes reproducibility, not an
 independent physical alignment measurement. A simulator can exercise recording
 and replay indoors; a fresh sky comparison is still required for physical accuracy.

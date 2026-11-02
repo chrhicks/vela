@@ -15,7 +15,7 @@ import {
   diagnosticEntrySchema,
   diagnosticJournalName,
   maximumFitsBytes,
-  maximumJournalBytes,
+  maximumLegacyJournalBytes,
   readEntry,
   type DiagnosticEntry,
   type DiagnosticFrameEntry,
@@ -64,7 +64,7 @@ export interface AlignmentDiagnosticReplayReport {
 
 async function journalEntries(directory: string) {
   const journal = (
-    await readBoundedFile(join(directory, diagnosticJournalName), maximumJournalBytes)
+    await readBoundedFile(join(directory, diagnosticJournalName), maximumLegacyJournalBytes)
   ).toString('utf8')
 
   const truncatedFinalLine = !journal.endsWith('\n')

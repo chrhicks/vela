@@ -5,7 +5,7 @@ import {
   NodeTracerProvider,
   SimpleSpanProcessor,
 } from '@opentelemetry/sdk-trace-node'
-import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, open, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createTestCadence } from './test-cadence.js'
@@ -34,7 +34,20 @@ import {
   type AlignmentDiagnosticsFactory,
 } from './diagnostics.js'
 import { replayAlignmentDiagnostics } from './diagnostic-replay.js'
-import { readBothWays } from './events-fixture.js'
+import { openRunLog, type RunLogOptions } from '../run-log/run-log.js'
+import { readBothFormats } from './events-fixture.js'
+import { loggedJournalEntries } from './alignment-events.js'
+import { buildApp } from '../app.js'
+import { epochMs, seal, rigId, sourceId } from '@vela/rig-events'
+import type { State } from '@vela/rig-events'
+import type { Site } from '@vela/rig-sky'
+
+interface MountStates {
+  mountState(options: { sequence: number; mount: { at: number; raHours: number; decDegrees: number; site: Required<Site> } }): State
+}
+
+// SAFETY: this test-only dynamic import is the rig-testing index; the server build cannot compile that package's source.
+const { mountState } = (await import(new URL('../../../../packages/rig-testing/src/index.ts', import.meta.url).href)) as MountStates
 
 const control: {
   waits: Array<() => void>
@@ -672,12 +685,21 @@ it('waits for an in-flight diagnostic write on Stop and starts no further exposu
   expect(evidence.finish).toHaveBeenCalledExactlyOnceWith({ phase: 'stopped', error: null })
 })
 
+async function loggedRecording(directory: string, onError: (error: Error) => void, options: Partial<RunLogOptions> = {}) {
+  const log = openRunLog({ directory: join(directory, 'log'), closeTimeoutMs: 20, ...options })
+  const at = epochMs(Date.parse('2026-11-01T00:00:00.000Z'))
+  log.append(seal({ rig: rigId('physical'), source: sourceId('vela:cria'), kind: 'cria.state', at, seenAt: at, body: { origin: 'http://cria.test', freshness: 'qualified', state: mountState({ sequence: 1, mount: { at, raHours: 0, decDegrees: 0, site: fixture.site } }) } }))
+
+  return { log, factory: createAlignmentDiagnostics(directory, log, onError) }
+}
+
 it('reports an unavailable diagnostic destination without losing the alignment or replaying hardware commands', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'vela-alignment-diagnostic-failure-'))
   const blocked = join(directory, 'not-a-directory')
   await writeFile(blocked, 'occupied')
   const errors: Error[] = []
-  const subject = setup(createAlignmentDiagnostics(blocked, error => errors.push(error)))
+  const { log } = await loggedRecording(directory, error => errors.push(error))
+  const subject = setup(createAlignmentDiagnostics(blocked, log, error => errors.push(error)))
 
   try {
     await subject.baseline()
@@ -693,6 +715,7 @@ it('reports an unavailable diagnostic destination without losing the alignment o
     expect(subject.physical.move).toHaveBeenCalledTimes(5)
   } finally {
     await subject.controller.stop()
+    await log.close()
     await rm(directory, { recursive: true, force: true })
   }
 })
@@ -700,7 +723,8 @@ it('reports an unavailable diagnostic destination without losing the alignment o
 it('replays a physical controller trial from its actual recorded bundle', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'vela-physical-controller-replay-'))
   const errors: Error[] = []
-  const subject = setup(createAlignmentDiagnostics(directory, error => errors.push(error)))
+  const { log, factory } = await loggedRecording(directory, error => errors.push(error))
+  const subject = setup(factory)
 
   try {
     await subject.baseline()
@@ -711,7 +735,9 @@ it('replays a physical controller trial from its actual recorded bundle', async 
     await vi.waitFor(() => expect(control.waits).toHaveLength(1))
     await subject.controller.stop(true)
     expect(errors).toEqual([])
-    const report = await replayAlignmentDiagnostics(join(directory, (await readdir(directory))[0]!))
+    await log.close()
+    const folder = (await readdir(directory)).find(name => name !== 'log')!
+    const report = await replayAlignmentDiagnostics(join(directory, folder), join(directory, 'log'))
     expect(report).toMatchObject({
       mode: 'physical',
       outcome: { phase: 'finished', error: null },
@@ -726,36 +752,40 @@ it('replays a physical controller trial from its actual recorded bundle', async 
         fitArcsec: 0,
       },
     })
+    const both = await readBothFormats(join(directory, folder), join(directory, 'log'))
+    expect(both.events).toEqual(both.journal)
+    expect(both.events.trials).toHaveLength(1)
+    expect(both.events.problems).toEqual([])
     expect(report.finalMeasurement?.totalArcsec).toBe(
       subject.controller.snapshot().measurement?.totalArcsec,
     )
   } finally {
     await subject.controller.stop()
+    await log.close()
     await rm(directory, { recursive: true, force: true })
   }
 })
 
-it('gives a physical controller trial the same replay report and trial from alignment events as from its journal', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'vela-physical-controller-events-'))
-  const subject = setup(createAlignmentDiagnostics(directory, () => {}))
+it('keeps aligning through a full disk and reports the real run-log error on /api/health', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'vela-alignment-full-'))
+  const { log, factory } = await loggedRecording(directory, () => {}, { openFile: () => open('/dev/full', 'a') })
+  const subject = setup(factory)
+  const app = buildApp({ runLog: log })
 
   try {
     await subject.baseline()
     await vi.waitFor(() => expect(control.waits).toHaveLength(1))
-    control.waits.shift()!()
-    const adjusted = await subject.nextSolve()
-    adjusted.complete()
-    await vi.waitFor(() => expect(control.waits).toHaveLength(1))
+    expect(subject.controller.snapshot()).toMatchObject({ active: true, phase: 'adjusting', error: null })
+    await vi.waitFor(() => expect(log.health().state).toBe('retrying'))
+    expect((await app.inject('/api/health')).json()).toMatchObject({ runLog: { state: 'retrying', lastError: { message: expect.stringContaining('ENOSPC') } } })
+    expect(subject.captures).toHaveLength(6)
+    expect(subject.physical.move).toHaveBeenCalledTimes(5)
     await subject.controller.stop(true)
-
-    const { journal, events } = await readBothWays(join(directory, (await readdir(directory))[0]!), { site: fixture.site })
-
-    expect(events).toEqual(journal)
-    expect(journal.report).toMatchObject({ mode: 'physical', counts: { frames: 7, measurements: 2, physicalFrames: 7, verifiedOriginals: 7 }, rigidity: { status: 'rigid' } })
-    expect(journal.trials).toHaveLength(1)
-    expect(journal.problems).toEqual([])
+    expect(log.health().pendingBytes).toBeGreaterThan(0)
   } finally {
     await subject.controller.stop()
+    await app.close()
+    await log.close()
     await rm(directory, { recursive: true, force: true })
   }
 })
@@ -763,7 +793,8 @@ it('gives a physical controller trial the same replay report and trial from alig
 it('reports not rigid, with the miss and the step and no polar error, when the mount did not turn as one body', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'vela-physical-not-rigid-'))
   const errors: Error[] = []
-  const subject = setup(createAlignmentDiagnostics(directory, error => errors.push(error)), 0.5)
+  const { log, factory } = await loggedRecording(directory, error => errors.push(error))
+  const subject = setup(factory, 0.5)
 
   try {
     await subject.baseline()
@@ -785,27 +816,25 @@ it('reports not rigid, with the miss and the step and no polar error, when the m
     expect(await subject.controller.stop()).toMatchObject({ phase: 'not-rigid', measurement: null })
     expect(errors).toEqual([])
 
-    const [trial] = await readdir(directory)
+    await log.close()
+    const trial = (await readdir(directory)).find(name => name !== 'log')!
+    const entries = (await loggedJournalEntries(join(directory, 'log'), trial))!
 
-    const entries = (await readFile(join(directory, trial!, 'journal.jsonl'), 'utf8'))
-      .trim()
-      .split('\n')
-      .map(line => JSON.parse(line))
-
-    expect(entries.find(entry => entry.type === 'fit').verdict).toMatchObject({
+    expect(entries.find(entry => entry.type === 'fit')!.verdict).toMatchObject({
       status: 'not-rigid',
       missArcmin: view.rigidity!.missArcmin,
       thresholdArcmin: 2,
       steps: [{ labelBefore: '3', labelAfter: '4' }],
     })
-    expect(entries.find(entry => entry.type === 'fit').polar).toBeNull()
+    expect(entries.find(entry => entry.type === 'fit')!.polar).toBeNull()
     expect(entries.some(entry => entry.type === 'measurement')).toBe(false)
-    expect(await replayAlignmentDiagnostics(join(directory, trial!))).toMatchObject({
+    expect(await replayAlignmentDiagnostics(join(directory, trial!), join(directory, 'log'))).toMatchObject({
       fit: null,
       rigidity: { status: 'not-rigid', missArcmin: view.rigidity!.missArcmin },
       maximumDiscrepancies: { rigidityMissArcmin: 0 },
     })
   } finally {
+    await log.close()
     await rm(directory, { recursive: true, force: true })
   }
 })
