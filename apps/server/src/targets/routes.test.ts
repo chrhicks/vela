@@ -4,7 +4,7 @@ import type { AlpacaDeviceInspection, AlpacaFraming, AlpacaTelescopeStatus } fro
 import { createMemoryRigCatalog } from '../rig/catalog.js'
 import type { RigCatalogRecord } from '../rig/contracts.js'
 import { createRigOperations } from '../rig/operations.js'
-import type { MonoFrame, PlateSolver } from '../plate-solving/solver.js'
+import type { MonoFrame, PlateSolver } from '../plate-solving/judged-solver.js'
 import type { FramingView } from '@vela/model/web'
 import type { FramingHardware } from './framing.js'
 import { registerTargets, type TargetOptions } from './routes.js'

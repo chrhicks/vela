@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { TargetPosition } from '@vela/model/web'
-import type { MonoFrame, PlateSolver, SolveResult } from '../plate-solving/solver.js'
-import { projectSky } from '../plate-solving/solver.js'
+import { judgedSolver, type MonoFrame, type PlateSolver, type SolveResult } from '../plate-solving/judged-solver.js'
+import { projectSky } from './sky.js'
 import {
   correctedPointing,
   createFramingController,
@@ -9,6 +9,7 @@ import {
   type FramingMount,
 } from './framing.js'
 import { angularDistance } from '@vela/rig-sky'
+import { astapReturning, falseSolve, fieldHeightDegreesFor, goodSolve } from '../plate-solving/false-solve.js'
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -365,7 +366,7 @@ describe('framing controller', () => {
       fake.solver.solve = async () => {
         if (failure === 'solver-error') throw new Error('Solver failed to launch')
 
-        return { status: 'no-solution' }
+        return { status: 'no-solution', reasons: ['no-match'] }
       }
 
       const run = fake.start()
@@ -506,7 +507,7 @@ describe('framing controller', () => {
         })
 
         if (solved.status === 'solved' && fake.slews.length > 0)
-          solved.wcs.cd = [0.01, -0.002, -0.003, -0.01]
+          return { ...solved, wcs: { ...solved.wcs, cd: [0.01, -0.002, -0.003, -0.01] as const } }
 
         return solved
       })
@@ -637,7 +638,7 @@ describe('framing controller', () => {
           throw new Error('Slew outcome unknown')
         })
       else if (reason === 'solve-failed')
-        fake.solver.solve = vi.fn<PlateSolver['solve']>(async () => ({ status: 'no-solution' }))
+        fake.solver.solve = vi.fn<PlateSolver['solve']>(async () => ({ status: 'no-solution', reasons: ['no-match'] }))
       else
         fake.hardware.capture = vi.fn(async ({ signal, onReadout }) => {
           onReadout?.()
@@ -848,6 +849,38 @@ describe('geometric pointing correction', () => {
       angularDistance(companion, actual),
       9,
     )
+  })
+
+  it('does not use a solve the verdict rejects, and says why', async () => {
+    const fake = workshop()
+
+    fake.solver.solve = judgedSolver(
+      astapReturning(falseSolve(desired, fake.frame)),
+      fieldHeightDegreesFor(fake.frame.height),
+      'framing',
+    ).solve
+    await fake.start({ check: true }).finished
+    expect(fake.controller.snapshot()).toMatchObject({
+      phase: 'needs-check',
+      actual: null,
+      centering: null,
+      error: expect.stringMatching(/the image is mirrored.*degrees from where the mount points/),
+    })
+    expect(fake.hardware.slew).not.toHaveBeenCalled()
+  })
+
+  it('checks a solve against where the mount points, not against the composition', async () => {
+    const fake = workshop()
+    const composition = { raDegrees: 10, decDegrees: 60 }
+
+    fake.solver.solve = judgedSolver(
+      astapReturning(goodSolve({ raDegrees: 10, decDegrees: 19 }, fake.frame)),
+      fieldHeightDegreesFor(fake.frame.height),
+      'framing',
+    ).solve
+    await fake.start({ check: true, desired: composition }).finished
+    expect(fake.controller.snapshot()).toMatchObject({ phase: 'checked', error: null })
+    expect(fake.controller.snapshot().actual!.offsetArcminutes).toBeGreaterThan(2000)
   })
 
   it('preserves zero offset and refuses an ambiguous antipodal correction', () => {

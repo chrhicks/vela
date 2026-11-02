@@ -261,7 +261,7 @@ function setup({ savedCameraName = 'Camera' }: { savedCameraName?: string } = {}
     ]),
     equipment,
     targets: {
-      createSolver: () => ({ solve: async () => ({ status: 'no-solution' }) }),
+      createSolver: () => ({ solve: async () => ({ status: 'no-solution', reasons: ['no-match'] }) }),
       waitForMountObservation: async () => {},
     },
   })

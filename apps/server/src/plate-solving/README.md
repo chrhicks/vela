@@ -1,38 +1,33 @@
 # Plate solving
 
-This is the shared ASTAP process/WCS boundary. Consumers provide a raw exposure,
-J2000 hint and cancellation signal. Composition supplies the executable, local
-star catalog and camera field height. A solve returns either a checked WCS and
-fixed catalog center, or the documented no-solution outcome. Process, catalog,
-malformed WCS and cleanup failures remain errors.
+`@vela/rig-astap` owns the ASTAP process, its FITS file and its WCS parsing. This
+folder adds the verdict for the two workflows that move or measure the rig.
 
-The shared [imaging FITS encoder](../imaging/README.md#lossless-fits-interchange)
-uses lossless unsigned 16-bit storage when all samples fit, otherwise signed
-32-bit, preserving acquisition samples and origin-adjusted Bayer metadata.
-Bayer input enables ASTAP's `-check` option.
-Each solve owns a scratch directory and waits for process termination before
-removal. Search starts at 10° around the hint, then expands to 15°, 30°, 60°,
-120° and 180° only after ASTAP exit 1 (no match). The first small expansion
-supports moderately inaccurate mount coordinates; doubling thereafter reaches
-the full sky in a bounded number of attempts. 180° covers the celestial sphere,
-so there is no unexplained angular exclusion. All attempts reuse the same FITS,
-hint, field height and options; no new exposure or device command is issued.
-Exit 2 (insufficient stars) stops immediately because expanding the catalog
-search cannot add stars. Other errors and cancellation also stop immediately.
+`judgedSolver` wraps an ASTAP solver for one purpose, `framing` or `alignment`.
+Each solve goes through `judgeSolve` and comes back as either a position with its
+plate (`solved`) or `no-solution` with the verdict's reasons: `no-match`,
+`few-stars`, `scale`, `parity` or `off-hint`. A rejected solve is treated as a
+failed one, so no workflow centres on it or counts it as a measurement. The reasons
+reach the framing message, the alignment warning and the trace.
 
-The configured timeout (30 seconds by default) is one monotonic elapsed-time
-budget shared by preparation and every process attempt, not a fresh timeout
-for each radius. A slow search may exhaust it before reaching the full sky.
-This is a responsiveness budget, not a claim that the image has no solution. Mount coordinate conversion belongs to the astronomy boundary,
-not this adapter. Alignment's solver module re-exports this boundary for existing
-consumers.
+The verdict compares the solution with three facts the caller supplies:
 
-Reference: [ASTAP CLI](https://www.hnsky.org/astap.htm#command_line).
+- the expected scale, from the field height the caller gives ASTAP (the rig's
+  focal length and the camera's pixels) and the frame's height;
+- the parity, always positive: the camera path never mirrors;
+- where the mount claims to point. Alignment's claim is its hint. Framing's hint is
+  the composition, so it passes the mount's reading from just before the exposure.
 
-When local tracing is enabled, `astap.solve` records the overall checked outcome
-(`solved`, `no-match`, `insufficient-stars`, `error`, or `cancelled`), search hint,
-configured field height, total timeout and input image dimensions. Each child
-`astap.attempt` records its radius, remaining timeout, exit code and checked outcome.
-The final 4096 characters of each stdout/stderr stream are retained, with explicit
-truncation flags. Output is available even on a failed or cancelled process;
-no image pixels are traced. See [local tracing](../../../../docs/local-tracing.md).
+The solver searches from 10° to the whole sky, so a solution can be found
+anywhere. A solution more than 10° from the mount's claim is rejected `off-hint`,
+and the workflow asks for another exposure instead of using it. The message names the
+distance in degrees. Vela no longer recovers a lost mount position by trusting a far
+solve: a mount that is not where it thinks it is must be stopped and fixed.
+
+The rig simulator renders with east on the left, as the real camera does, so a solve of
+a simulated frame has the same parity as a solve of a real one.
+
+The star count is not read from ASTAP, so the verdict does not check it.
+
+`projectSky` (a sky position to a pixel of a WCS) lives in `../targets/sky.ts`,
+beside the inverse.

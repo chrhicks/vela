@@ -131,7 +131,8 @@ function* renderStripes(
       const depth = dot(pose.direction)
 
       if (depth <= 0) continue
-      const x = (width - 1) / 2 + (focalPixels * dot(pose.right)) / depth
+      // East points left, as the real camera shows it: ASTAP solves a real frame with a positive CD determinant.
+      const x = (width - 1) / 2 - (focalPixels * dot(pose.right)) / depth
       const y = (height - 1) / 2 - (focalPixels * dot(pose.up)) / depth
 
       if (x < -radius || y < -radius || x > width - 1 + radius || y > height - 1 + radius) continue

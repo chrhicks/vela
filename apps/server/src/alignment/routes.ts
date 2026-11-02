@@ -10,20 +10,21 @@ import { createRigOperations, type RigOperations } from '../rig/operations.js'
 import { confirmedCameraName } from '../rig/imaging-camera.js'
 import type { RigCatalog } from '../rig/catalog.js'
 import { createAlignmentController, type AlignmentSettings } from './controller.js'
-import { createAstapSolver } from './solver.js'
+import { createPlateSolver, type PlateSolver } from '../plate-solving/judged-solver.js'
+import type { AstapConfig } from '@vela/rig-astap'
 import { createPhysicalAlignment } from './physical.js'
 import { createAlignmentDiagnostics } from './diagnostics.js'
 import { haltBodyError, registerHaltRoutes } from '../http/halt-body.js'
 
 export interface AlignmentFactories {
   physical: typeof createPhysicalAlignment
-  solver: typeof createAstapSolver
+  solver: (config: AstapConfig) => PlateSolver
   controller: typeof createAlignmentController
 }
 
 const defaultFactories: AlignmentFactories = {
   physical: createPhysicalAlignment,
-  solver: createAstapSolver,
+  solver: config => createPlateSolver(config, 'alignment'),
   controller: createAlignmentController,
 }
 

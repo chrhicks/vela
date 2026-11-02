@@ -9,7 +9,7 @@ import type {
 } from '@vela/equipment'
 import type { Site } from '@vela/rig-sky'
 import { encodeCaptureFits } from '../imaging/fits.js'
-import type { SkyPosition, SolveResult } from '../plate-solving/solver.js'
+import type { SkyPosition, SolveResult } from '../plate-solving/judged-solver.js'
 import type { AlignmentMeasurement, AlignmentSample } from './geometry.js'
 import {
   diagnosticJournalName,

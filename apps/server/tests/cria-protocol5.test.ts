@@ -7,7 +7,7 @@ import { buildApp } from '../src/app.js'
 import type { FrameImaging } from '../src/imaging/frame-imaging.js'
 import { createEquipmentComposition } from '../src/equipment/composition.js'
 import { registerConfiguredCriaRigs, type CriaRigConfiguration } from '../src/equipment/config.js'
-import type { PlateSolver } from '../src/plate-solving/solver.js'
+import type { PlateSolver } from '../src/plate-solving/judged-solver.js'
 import { createMemoryRigCatalog } from '../src/rig/catalog.js'
 
 let cria: FakeCria
