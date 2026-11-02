@@ -48,6 +48,8 @@ export function sampleEvents(): RigEvent[] {
         frameType: 'light',
         subject: { targetId: 't', name: 'Target', catalog: 'NGC' },
         outcome: 'saved',
+        message: null,
+        provenance: { requestId: 'request-3', operationId: 'operation-3', imageId: 'cria-image-3' },
         image: {
           id: imageId,
           capturedAt: '2026-10-26T20:00:00.500Z',

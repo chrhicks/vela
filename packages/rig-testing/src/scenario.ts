@@ -62,6 +62,8 @@ export function frame(options: FrameOptions): RigEvent {
       frameType: options.frameType ?? 'light',
       subject: null,
       outcome: 'saved',
+      message: null,
+      provenance: null,
       image: {
         id: options.image,
         capturedAt: new Date(options.capturedAt).toISOString(),
