@@ -640,6 +640,11 @@ function handle(w: Working, out: Output[], event: RigEvent) {
       return onFrame(w, out, event)
     case 'solve':
       return onSolve(w, out, event)
+    case 'solve-result':
+      if (event.body.verdict.status === 'accepted')
+        return onSolve(w, out, { ...event, kind: 'solve', body: event.body.solve })
+
+      return
     case 'aim':
     case 'alignment':
     case 'attestation':

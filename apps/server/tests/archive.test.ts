@@ -39,3 +39,24 @@ it('fails a write when storage cannot create an archive, leaving acknowledgement
     await expect(writeArchiveBatch(directory, [event])).rejects.toThrow()
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
+
+it('orders broker sequences across kinds and files, and retains legacy file order', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'archive-order-'))
+  const stamp = { rig: rigId('fixture'), source: sourceId('fixture'), at: epochMs(1000), seenAt: epochMs(1000) }
+  const opened = seal({ ...stamp, kind: 'cria.stream', body: { origin: 'http://fixture.test', event: 'opened', message: null } })
+  const gap = seal({ ...stamp, kind: 'gap', body: { source: stamp.source, from: epochMs(1000), to: null, reason: 'disconnected', dropped: null } })
+
+  try {
+    await writeArchiveBatch(directory, [{ ...gap, broker: { stream: 'RIG_FACTS', sequence: 1 } }])
+    await writeArchiveBatch(directory, [{ ...opened, broker: { stream: 'RIG_FACTS', sequence: 2 } }])
+    await writeArchiveBatch(directory, [{ ...gap, broker: { stream: 'RIG_FACTS', sequence: 1 } }])
+    const result = await Array.fromAsync(readArchive(directory, { from: 0, to: 2000 }))
+
+    expect(result.map(event => event.id)).toEqual([gap.id, opened.id])
+    const legacyDirectory = join(directory, 'legacy')
+
+    await writeArchiveBatch(legacyDirectory, [gap, opened])
+    expect((await Array.fromAsync(readArchive(legacyDirectory, { from: 0, to: 2000 }))).map(event => event.kind))
+      .toEqual(['cria.stream', 'gap'])
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})

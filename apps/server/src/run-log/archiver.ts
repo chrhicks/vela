@@ -42,7 +42,7 @@ export async function runArchiver(options: ArchiverOptions) {
 
           if (!decoded.ok) throw new Error('Invalid broker envelope')
 
-          return decoded.event
+          return { ...decoded.event, broker: { stream: message.info.stream, sequence: message.info.streamSequence } }
         })
 
         await writeArchiveBatch(options.directory, events)

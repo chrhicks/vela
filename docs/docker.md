@@ -87,6 +87,7 @@ application dependency graph.
 
 ```sh
 uv run --script tools/nats/provision.py init
+mkdir -p "${VELA_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/vela}/model"
 docker compose up -d nats
 uv run --script tools/nats/provision.py apply
 ```
@@ -194,10 +195,11 @@ Do not treat a raw concatenation of JSONL files as an exactly-once replay.
 lines by an inclusive event-time range and optional kinds. Keep one instance per
 replay. The filesystem adapter `readArchive(directory, range)` in
 `apps/server/src/run-log/archive.ts` streams committed files through that reader.
-It discovers file listings as it traverses them and returns file order, not time
-order. Replay a stopped archive for a stable snapshot, and sort events when the
-consumer requires chronological order. Corrupt committed JSONL fails the replay
-rather than silently skipping data. Memory use grows with the matching unique IDs.
+Each new record has an additive `broker` field with its `stream` and `sequence`.
+The adapter buffers matching records and returns broker stream/sequence order.
+Legacy records without metadata keep their file order. Replay a stopped archive
+for a stable snapshot. Corrupt committed JSONL fails the replay. Memory use grows
+with the matching records and their unique IDs.
 
 There is no archive retention or compaction in this step. At the run log's measured
 rate of about 1.6 GB per day of `cria.state`, allow about 48 GB per 30 days, plus
@@ -274,3 +276,63 @@ start intervals and settle times with the capture trace to check cadence. Also
 check the publisher drop counter, gaps, and `solver-v1` pending and ack-pending
 counts. Retention loss or missing results makes that check incomplete. The
 recorded replay does not establish live capture cadence.
+
+## Run the model in shadow
+
+The `model` compose service uses the server image and the private `model` broker
+credential. It pulls all facts from `model-v1` and publishes `mount-position` and
+`pointing-fix` assessments. The server host remains the source of the model API.
+The service has no equipment connection or command capability.
+
+The service and archive replay share `createStreamModel`, which calls the same
+`step` and `assess` exports as the server host. After each unique fact, a clock
+input advances to that fact's `seenAt`. No wall clock enters replay. Accepted
+`solve-result` events use the legacy solve join; rejected C1 verdicts cannot fix
+pointing. Delivery order matters. Redeliveries at or below each stream's applied sequence are ignored.
+
+The model keeps no input archive. It checkpoints every 128 deliveries or 2 seconds,
+whichever comes first, before acknowledging that batch. This bounds unacknowledged
+work below the consumer's 256-message limit and limits idle checkpoint delay.
+A normal restart loads the checkpoint and resumes `model-v1` without archive reads.
+If the checkpoint is missing, invalid, or behind the durable consumer's ack floor,
+it rebuilds through that floor from step 37's read-only archive in broker order.
+Recovery uses a disposable SQLite index of sequences and file offsets with an 8 MiB
+page cache, then reads one envelope at a time in sequence order. No input payloads
+are copied. The index is removed on completion or failure and replaced after a
+crash. Its temporary disk use grows with the retained record count. The model
+service uses the Node 26 image, which supplies SQLite without a package dependency.
+The equality CLI continues using the existing archive reader.
+If the archive has not reached that floor, startup fails without acknowledging more facts.
+
+Each rig has two fixed checkpoint slots, with a 16 MiB limit per slot, and a
+shared atomic manifest containing stream sequence high-water marks. Temp writes,
+file sync, rename, and directory sync commit a complete generation before ack.
+A failed write can leave one temp file per rig, so storage is at most 48 MiB per
+rig plus the manifest. Exceeding the limit stops consumption rather than dropping
+reducer state. The private V8 checkpoint format is versioned with the reducer.
+The reducer's session-scoped `decided` map is preserved unchanged.
+
+Create the `model` data directory in the provisioning steps above before starting
+compose. Its bind mount uses `create_host_path: false`. The archive mount is read-only.
+
+Run the disposable-broker check with:
+
+```sh
+uv run tools/nats/verify-model.py
+```
+
+It runs the archiver and model against a disposable broker, restarts the model
+before an acknowledgement, and compares live assessments with ordered replay.
+It checks that broker redelivery converges and credentials stay out of output.
+
+Compare a stopped archive over an inclusive event-time range with epoch-millisecond
+bounds after building the server:
+
+```sh
+node --conditions=built apps/server/dist/rig-model/replay-main.js ARCHIVE FROM_MS TO_MS
+```
+
+The tool reads the whole archive to reconstruct prior state, then compares outputs
+inside the requested range. It reports the first differing envelope and exits 1,
+or prints `equal: true` with the assessment count. An archive missing prior facts
+cannot establish equality for a live model that consumed them.
