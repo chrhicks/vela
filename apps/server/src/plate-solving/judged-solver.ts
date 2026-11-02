@@ -1,3 +1,4 @@
+import { angularDistance } from '@vela/rig-sky'
 import type { AcceptedFix } from '../equipment/composition.js'
 import { trace, SpanStatusCode } from '@opentelemetry/api'
 import {
@@ -33,6 +34,7 @@ export type SolveResult =
   | ({ status: 'solved'; capturedAt: string; wcs: PlateWcs; error?: AcceptedFix['error'] } & SkyPosition)
 
 export interface PlateSolver {
+  readonly claimSource?: 'mount' | 'hint'
   /** `hint` is where ASTAP starts searching. `claimed` is where the mount says it points, which the verdict checks the solution against. */
   solve(frame: MonoFrame, hint: SkyPosition, claimed: SkyPosition, signal: AbortSignal): Promise<SolveResult>
 }
@@ -66,6 +68,8 @@ export function createPlateSolver(config: AstapConfig, purpose: Purpose): PlateS
  */
 export function judgedSolver(astap: AstapSolver, fieldHeightDegrees: number, purpose: Purpose): PlateSolver {
   return {
+    // Alignment supplies its search hint as the claim; framing supplies the mount reading.
+    claimSource: purpose === 'framing' ? 'mount' : 'hint',
     solve: (frame, hint, claimed, signal) =>
       trace.getTracer('vela.plate-solving').startActiveSpan(
         'astap.solve',
@@ -141,6 +145,7 @@ export function reportAcceptedFix(solver: PlateSolver, send: (fix: AcceptedFix) 
           rightAscensionDegrees: result.raDegrees,
           declinationDegrees: result.decDegrees,
           coordinateSystem: 'j2000',
+          pointingErrorArcmin: solver.claimSource === 'mount' ? angularDistance(claimed, result) * 60 : null,
           error: result.error,
         }
 

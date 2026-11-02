@@ -73,3 +73,11 @@ it('sends no feedback for a rejected solve', async () => {
   await expect(solver.solve(frame, claimed, claimed, signal)).resolves.toMatchObject({ status: 'no-solution' })
   expect(send).not.toHaveBeenCalled()
 })
+
+it.each(['framing', 'alignment'] as const)('reports the mount-to-solve error only for a mount claim in %s', async purpose => {
+  const send = vi.fn().mockResolvedValue(undefined)
+  const solver = reportAcceptedFix(judgedSolver(astapReturning(goodSolve(claimed, frame)), fieldHeightDegreesFor(frame.height), purpose), send)
+  await solver.solve(frame, { raDegrees: 50, decDegrees: 30 }, claimed, signal)
+  await vi.waitFor(() => expect(send).toHaveBeenCalledOnce())
+  expect(send.mock.calls[0]?.[0].pointingErrorArcmin).toEqual(purpose === 'framing' ? expect.closeTo(60, 6) : null)
+})

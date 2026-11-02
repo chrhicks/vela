@@ -494,6 +494,7 @@ it('reports an undelivered accepted fix once through the feedback callback', asy
       rightAscensionDegrees: 10,
       declinationDegrees: 20,
       coordinateSystem: 'j2000',
+      pointingErrorArcmin: null,
       error: { scaleError: 0, hintOffsetDegrees: 0 },
     })).resolves.toBeUndefined()
     expect(report).toHaveBeenCalledTimes(1)
