@@ -25,6 +25,7 @@ import { haltBodyError, registerHaltRoutes } from '../http/halt-body.js'
 import type { FrameImaging } from '../imaging/frame-imaging.js'
 
 export interface TargetOptions {
+  aim?: Parameters<typeof createFramingController>[4]
   sendFix?: (rig: RigCatalogRecord, fix: import('../equipment/composition.js').AcceptedFix) => Promise<void>
   recordRejected?: ReturnType<typeof createFramingRejections>
   solver?: { executable: string; catalogPath: string }
@@ -427,7 +428,7 @@ export function registerTargets(
         let controller = controllers.get(rigId)
 
         if (!controller) {
-          controller = createFramingController(now, options.waitForMountObservation, options.images, options.recordRejected)
+          controller = createFramingController(now, options.waitForMountObservation, options.images, options.recordRejected, options.aim)
           controllers.set(rigId, controller)
         }
 

@@ -1,3 +1,7 @@
+import { judgeAim, type AimGoal, type AimEvent } from '../aim/judge.js'
+import { epochMs, rigId, seal, sourceId } from '@vela/rig-events'
+import type { ModelHost } from '../rig-model/host.js'
+import type { RunLog } from '../run-log/run-log.js'
 import type { createFramingRejections } from '../plate-solving/rejected.js'
 import type { FrameSettings } from '../imaging/fits.js'
 import { randomUUID } from 'node:crypto'
@@ -124,7 +128,10 @@ export function createFramingController(
     delay(1000, undefined, { signal }),
   images: Pick<FrameImaging, 'render' | 'analyze'> = frameImaging,
   recordRejected?: ReturnType<typeof createFramingRejections>,
+  aim?: { models?: Pick<ModelHost, 'get'>; log: Pick<RunLog, 'append'> },
 ) {
+  let aimGoal: (Omit<AimGoal, 'events'> & { events: AimEvent[] }) | undefined
+
   let state: Pick<
     FramingView,
     | 'phase'
@@ -320,6 +327,7 @@ export function createFramingController(
       )
 
       if (solved.status !== 'solved') {
+        aimGoal?.events.push({ kind: 'solve', verdict: 'rejected', residualArcmin: null })
         await recordRejected?.({
           frame, verdict: solved, claimed: fixedPointing(landed), rigId: input.rigId, requestId: input.requestId ?? preview.id,
           metadata: { exposureSeconds: input.exposureSeconds, cameraName: input.cameraName, settings: { ...input.settings,
@@ -342,6 +350,8 @@ export function createFramingController(
         offsetArcminutes: angularDistance(input.desired, solved) * 60,
       }
 
+      // Step 6's judged solver has already enforced the framing solve-verdict limits.
+      aimGoal?.events.push({ kind: 'solve', verdict: 'accepted', residualArcmin: actual.offsetArcminutes })
       state = { ...state, actual, preview: { ...preview, checkId: actual.checkId } }
       recordFraming('framing.solved', {
         'framing.check.id': actual.checkId,
@@ -425,6 +435,7 @@ export function createFramingController(
       'framing.command.coordinate_system': mount.coordinateSystem,
       'framing.command.converted_at': convertedAt.toISOString(),
     })
+    aimGoal?.events.push({ kind: 'move', correction: state.centering?.correction ?? 0 })
     await hardware.slew(driverPosition, mount.coordinateSystem, signal)
     signal.throwIfAborted()
     recordFraming('framing.move.completed', {
@@ -509,13 +520,29 @@ export function createFramingController(
       'framing.max_corrections': maxCorrections,
     }
 
+    const aimStartedAt = now().getTime()
+    aimGoal = aim ? {
+      goalId: attributes['framing.run.id'], target: input.desired,
+      assessment: aim.models?.get(input.rigId) ?? null, refusal: null,
+      events: [], elapsedMs: 0, completed: false,
+    } : undefined
+
     pending = trace
       .getTracer('vela.framing')
       .startActiveSpan('framing.run', { attributes }, async span => {
         recordFraming('framing.started', attributes)
 
         try {
-          let mount = await observe(hardware, signal)
+          let mount: FramingMount
+
+          try {
+            mount = await observe(hardware, signal)
+          } catch (error) {
+            if (aimGoal && !signal.aborted) aimGoal.refusal = 'mount-unavailable'
+            throw error
+          }
+
+          if (aimGoal && (mount.parked || mount.slewing)) aimGoal.refusal = 'mount-held'
 
           if (mount.parked || mount.slewing) {
             throw new FramingCheckNeeded(
@@ -644,6 +671,14 @@ export function createFramingController(
             'operation.cancelled': signal.aborted,
           })
           span.end()
+
+          if (aimGoal && aim) {
+            const at = epochMs(now().getTime())
+            const body = judgeAim({ ...aimGoal, elapsedMs: at - aimStartedAt, completed: state.phase === 'checked' })
+            aim.log.append(seal({ kind: 'aim', rig: rigId(input.rigId), source: sourceId('vela:aim'), at, seenAt: at, body }))
+            aimGoal = undefined
+          }
+
           release()
         }
       })

@@ -1,3 +1,4 @@
+import { aimEvent } from './aim-sample.ts'
 import { Schema } from 'effect'
 import { epochMs, ImageId, rigId, seal, sourceId, type Draft, type Envelope, type RigEvent } from '@vela/rig-events'
 import { mountState } from '@vela/rig-testing'
@@ -127,5 +128,6 @@ export function sampleEvents(): RigEvent[] {
     seal({ ...stamp(at), kind: 'gap', body: { source: sourceId('test:samples'), from: epochMs(at - 10_000), to: null, reason: 'dropped', dropped: 3 } }),
     seal({ ...stamp(at), kind: 'mount-position', body: { state: 'unknown', since: epochMs(at), reason: 'session-start', lastFix: null } }),
     seal({ ...stamp(at), kind: 'pointing-fix', body: { outcome: 'rejected', imageId, reason: 'no-solution' } }),
+    aimEvent,
   ]
 }
