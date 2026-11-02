@@ -2,6 +2,8 @@ import { mkdir, mkdtemp, readdir, readFile, readlink, writeFile } from 'node:fs/
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { expect, test } from 'vitest'
+import { criaEvent, encodeEvent, rigId, sourceId, type CriaEntry } from '@vela/rig-events'
+import { mountState } from '@vela/rig-testing'
 import { publishPackage } from './package.ts'
 import { openPackage } from './query.ts'
 import { Secrets } from './sanitize.ts'
@@ -633,5 +635,31 @@ test('a state cell that is not on the list is not exported, and the site a mount
 
   expect(await session.rows('SELECT cell FROM cria_state_changes')).toEqual([{ cell: 'device/mount/readings.tracking' }])
   expect(await session.rows('SELECT message FROM cria_stream')).toEqual([{ message: 'lost [redacted] while the mount at [redacted] was slewing' }])
+  session.close()
+})
+
+test('a run-log directory builds the journal tables, and the origin is removed from every text', async () => {
+  const dir = await scratch()
+  const root = join(dir, 'out')
+  const journalFile = join(dir, 'run-log')
+  const origin = 'http://cria.example.test:4319'
+  const at = Date.parse('2030-01-01T01:02:30Z')
+  const line = (entry: CriaEntry) => `${encodeEvent(criaEvent(entry, { rig: rigId('test-rig'), source: sourceId('vela:cria') }))}\n`
+
+  await mkdir(journalFile)
+
+  await writeFile(
+    join(journalFile, 'run-20300101T010000000Z-00001.jsonl'),
+    line({ kind: 'state', at, origin, state: mountState({ sequence: 1, generatedAt: at, mount: { at, raHours: 5, decDegrees: -5 } }) }) +
+      line({ kind: 'stream', at: at + 1000, origin, event: 'ended', message: `lost ${origin}` }),
+  )
+
+  await buildSession({ name: 'test-night', window, root, savedImagesDir: null, tracesFile: null, mountCsvFile: null, frameRecordsFile: null, recordingDir: null, journalFile })
+
+  const session = await openPackage(join(root, 'package'))
+
+  expect(await session.rows('SELECT DISTINCT baseline FROM cria_state_changes')).toEqual([{ baseline: true }])
+  expect(await session.rows("SELECT count(*)::INTEGER AS n FROM cria_state_changes WHERE cell = 'device/mount/readings.tracking'")).toEqual([{ n: 1 }])
+  expect(await session.rows('SELECT message FROM cria_stream')).toEqual([{ message: 'lost [redacted]' }])
   session.close()
 })

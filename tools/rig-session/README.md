@@ -11,7 +11,7 @@ pnpm --filter @vela/rig-session rig-session build \
   --mount-csv path/to/mount-watch.csv \
   --frame-records ~/.local/share/vela/traces/frames.jsonl \
   --recording ~/recordings/2030-01-01-example \
-  --journal ~/.local/share/vela/traces/cria-journal.jsonl
+  --journal ~/.local/share/vela/run-log
 
 pnpm --filter @vela/rig-session rig-session query ~/.local/share/rig-sessions/2030-01-01-example/package \
   "SELECT detected_stars FROM frames ORDER BY captured_at"
@@ -36,7 +36,7 @@ The inputs are read-only. Every input is optional; `session.json` in the package
 
 ```sh
 pnpm --silent --filter @vela/rig-session accept \
-  --recording ~/recordings/<name> --frame-records <frames.jsonl> --journal <cria-journal.jsonl> \
+  --recording ~/recordings/<name> --frame-records <frames.jsonl> --journal <run-log dir> \
   --traces <observing.jsonl> --saved-images <saved-images dir> [--mount-csv <file>] \
   --from 2030-01-01T18:00:00Z --to 2030-01-02T12:00:00Z
 ```
@@ -45,7 +45,7 @@ It takes the inputs of `build` (all optional), builds a package twice into a thr
 
 - the second build is not byte-identical to the first (`session.json` apart from its build time);
 - the privacy scan of every table and `session.json`, against the values the packager learned from your inputs, finds one. The message names the table, column and rule, never the value;
-- an input changed while it ran (hashed before and after: the files the packager reads, not `blobs/` or the images). An input that only grew (Vela's live journal while Vela runs) fails too, with its own message: run on a copy, or pass `--allow-growth` to make it a warning.
+- an input changed while it ran (hashed before and after: the files the packager reads, not `blobs/` or the images). An input that only grew (Vela's live run log while Vela runs) fails too, with its own message: run on a copy, or pass `--allow-growth` to make it a warning.
 
 The output is counts and names only, never a cell of your data. (`--silent` stops pnpm echoing your arguments, which are your own paths, to the terminal.) Exit 0 means all three held.
 
@@ -96,7 +96,9 @@ A recording is read for `manifest.json` and `traffic.jsonl` only; `blobs/` is ne
 
 ### The journal
 
-The journal is read as a stream and only the entries that start in the build's window are kept, so a journal that spans months builds in constant space. Each entry's `origin` (a host address) is never read into a table; it is learned, so the address and its host are removed wherever they occur. Lines that do not decode are listed in `session.json` (the first 1000).
+`--journal` takes Vela's run log directory (`docs/run-log.md`; `VELA_RUN_LOG_DIR`, in the compose data volume as `run-log`), one run-log file, or an old `cria-journal.jsonl` still on disk. The lines say which: a directory reads its `run-*.jsonl` files in name order, and a run log keeps whole snapshots, so the reader cuts them to the cells that changed (a new `observedAt` alone is no change), as the old journal wrote them. The first snapshot of an origin in each file is the baseline.
+
+The log is read as a stream and only the entries that start in the build's window are kept, so a log that spans months builds in constant space. Each entry's `origin` (a host address) is never read into a table; it is learned, so the address and its host are removed wherever they occur. Lines that do not decode are listed in `session.json` (the first 1000).
 
 ## Replay
 

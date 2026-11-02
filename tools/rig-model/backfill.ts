@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import { mkdir, rename, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -8,10 +9,10 @@ import { observeMount } from '@vela/rig-model'
 import { driftsOf, findingOf, outcomeOf, pointingOf, type Exposure } from './backfill-analysis.ts'
 import { markdownOf, tally, type NightResult } from './backfill-report.ts'
 import { replayNight, type Capture, type Solved } from './backfill-replay.ts'
-import { commandedExposures, journaledMount, nightWindow, overlapping, readRecordings, recordedMount } from './backfill-sources.ts'
+import { commandedExposures, loggedMount, nightWindow, overlapping, readRecordings, recordedMount } from './backfill-sources.ts'
 import { inParallel, sha256File, solveCache, solveImage } from './backfill-solve.ts'
 
-const usage = `usage: backfill.ts --out DIR [--report FILE.md] [--recordings DIR] [--journal FILE]... [--data DIR]
+const usage = `usage: backfill.ts --out DIR [--report FILE.md] [--recordings DIR] [--journal FILE|DIR]... [--data DIR]
   [--utc-offset-minutes N] [--from-night DATE] [--through-night DATE] [--event-night DATE] [--control-night DATE]
   [--astap FILE] [--catalog DIR] [--field-height-degrees N] [--jobs N] [--timeout-ms N]
 exit 0 complete, 1 failed, 2 bad arguments, 3 incomplete`
@@ -57,7 +58,9 @@ const throughNight = option('through-night') ?? '9999-12-31'
 
 const jobs = Number(option('jobs') ?? '4')
 
-const journals = given.get('journal') ?? [join(share, 'traces/cria-journal-20261015-20261025.jsonl'), join(share, 'traces/cria-journal.jsonl')]
+const runLog = process.env.VELA_RUN_LOG_DIR ?? join(dataDirectory, 'run-log')
+
+const journals = given.get('journal') ?? [join(share, 'traces/cria-journal-20261015-20261025.jsonl'), join(share, 'traces/cria-journal.jsonl'), ...(existsSync(runLog) ? [runLog] : [])]
 
 const sources = await scanFrameSources(pathsIn(dataDirectory))
 
@@ -120,7 +123,7 @@ const kept: Exposure[] = [
 const mountOf = (night: string) => {
   const window = nightWindow(night, utcOffsetMinutes)
 
-  return overlapping(recordings, window).length > 0 ? { source: 'recordings' as const, events: () => recordedMount(recordings, window) } : { source: 'journal' as const, events: () => journaledMount(journals, window) }
+  return overlapping(recordings, window).length > 0 ? { source: 'recordings' as const, events: () => recordedMount(recordings, window) } : { source: 'journal' as const, events: () => loggedMount(journals, window) }
 }
 
 /** Where the mount pointed, a sample every 30 s, only to give ASTAP a place to start looking. */

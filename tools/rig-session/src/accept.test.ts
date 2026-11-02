@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, test } from 'vitest'
+import { criaEvent, encodeEvent, rigId, sourceId } from '@vela/rig-events'
 import { acceptSession, formatAcceptance, type AcceptRequest } from './accept.ts'
 import { PrivacyCheckError } from './package.ts'
 import { jsonLines, msgLine, opLine, writeRecording } from './recording-fixture.ts'
@@ -107,4 +108,28 @@ test('a run that found no input fails: a mistyped path must not pass', async () 
   const result = await acceptSession({ ...(await night()), recordingDir: '/nonexistent/recording', frameRecordsFile: null, savedImagesDir: null })
 
   expect(result.problems).toEqual(['no input was found, so nothing was checked'])
+})
+
+test('a run-log directory is an input: it is built twice and its files are watched for change', async () => {
+  const request = await night()
+  const journalFile = join(request.scratch, 'run-log')
+  const at = Date.parse('2030-01-01T01:02:30Z')
+  const line = encodeEvent(criaEvent({ kind: 'stream', at, origin: 'http://cria.example.test:4319', event: 'opened', message: null }, { rig: rigId('test-rig'), source: sourceId('vela:cria') }))
+
+  await mkdir(journalFile)
+  await writeFile(join(journalFile, 'run-20300101T010000000Z-00001.jsonl'), `${line}\n`)
+
+  const result = await acceptSession({ ...request, journalFile })
+
+  expect(result.problems).toEqual([])
+  expect(result.summary?.rows).toMatchObject({ cria_stream: 1 })
+  expect(formatAcceptance(result)).not.toContain('missing cria-journal:')
+
+  const growing = await acceptSession({ ...request, journalFile }, async built => {
+    await writeFile(join(journalFile, 'run-20300101T010000000Z-00001.jsonl'), `${line}\n${line}\n`)
+
+    return buildSession(built)
+  })
+
+  expect(growing.problems.some(problem => problem.startsWith('cria-journal grew while the command ran'))).toBe(true)
 })

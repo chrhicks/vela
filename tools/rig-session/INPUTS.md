@@ -8,7 +8,7 @@ Status: built (PRs #141 to #147); amended where the build differed. The packager
 | --- | --- | --- | --- |
 | `--frame-records <file>` | `frames.jsonl` (`VELA_FRAME_RECORDS_PATH`) | Vela, one line per settled attempt | `FrameRecord` in `apps/server/src/capture/frame-records.ts` |
 | `--recording <dir>` | `manifest.json`, `traffic.jsonl`, `blobs/` | Cria's recorder (`@cria/recording`, `format.ts`) | damage as in "Damage" below; `blobs/` never read |
-| `--journal <file>` | `cria-journal.jsonl` (`VELA_CRIA_JOURNAL_PATH`) | Vela's `@vela/cria` | `JournalEntry` in `packages/cria/src/v5/journal.ts` |
+| `--journal <dir or file>` | the run log directory (`VELA_RUN_LOG_DIR`), a run-log file, or an old `cria-journal.jsonl` | Vela's server (`docs/run-log.md`); the old journal was written by `@vela/cria` | `docs/run-log.md`; the old `JournalEntry` is the shape `journal.ts` keeps |
 
 A line of the frame records or the journal that does not decode is skipped and listed in `session.json` (as for the existing inputs). The window picks the rows that start inside it, and a row a link points to is exported too.
 

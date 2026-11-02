@@ -2,8 +2,9 @@ import { createReadStream, readdirSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { createInterface } from 'node:readline'
-import { createIndiImporter, createJournalImporter, decodeManifest, rigId, sourceId, type RigEvent } from '@vela/rig-events'
+import { createIndiImporter, createLogReader, decodeManifest, rigId, sourceId, type RigEvent } from '@vela/rig-events'
 import { displayStep } from './indi-format.ts'
+import { logLines } from './log-lines.ts'
 
 const option = (name: string, fallback: string) => {
   const index = process.argv.indexOf(`--${name}`)
@@ -122,18 +123,17 @@ async function readRecordings() {
 const circular = (a: number, b: number, period: number) => Math.min(Math.abs(a - b), period - Math.abs(a - b))
 
 async function compareJournal() {
-  const importer = createJournalImporter({ rig: rigId('parity'), source: sourceId('import:vela-journal') })
-  const lines = createInterface({ input: createReadStream(journal), crlfDelay: Infinity })
+  const reader = createLogReader({ rig: rigId('parity'), source: sourceId('import:vela-journal') })
   const cursor = new Map<string, number>()
   const tally = { compared: 0, slewing: 0, positions: new Set<number>(), outsideRecording: 0, unreadable: 0, undecodable: 0, maxRaHours: 0, maxDecDegrees: 0 }
   const disagreements = new Map<string, number>()
 
-  for await (const line of lines) {
+  for await (const line of logLines([journal])) {
     const at = timeOf(line)
 
     if (at >= windowEnd) break
 
-    const result = importer.read(line)
+    const result = reader.read(line)
 
     if (!result.ok) {
       tally.undecodable++

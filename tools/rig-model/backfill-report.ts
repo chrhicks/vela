@@ -119,7 +119,7 @@ export function markdownOf(report: Report): string {
     const { finding } = night
     const readings = night.trials.filter(trial => trial.readings.length > 0)
 
-    lines.push(`## Night ${night.night}`, '', night.mountSource === 'none' ? 'No recording or journal holds the mount for this night, so no frame can be joined to it.' : `Mount history from ${night.mountSource === 'recordings' ? "errai's INDI recordings" : "Vela's Cria journal"}.`, '')
+    lines.push(`## Night ${night.night}`, '', night.mountSource === 'none' ? 'No recording or journal holds the mount for this night, so no frame can be joined to it.' : `Mount history from ${night.mountSource === 'recordings' ? "errai's INDI recordings" : "Vela's Cria log"}.`, '')
 
     lines.push('### Alignment evidence', '')
 
