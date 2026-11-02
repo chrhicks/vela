@@ -10,6 +10,7 @@ export interface MotionOperation {
   readonly startedAt: EpochMs
   readonly settledAt: EpochMs | null
   readonly confirmed: boolean
+  readonly motion?: Extract<State['operations'][number], { readonly state: 'settled' }>['motion']
 }
 
 export interface PositionReading {
@@ -96,6 +97,7 @@ export function observeMount(state: State): MountObservation | null {
               startedAt: epochMs(operation.startedAt),
               settledAt: epochMs(operation.settledAt),
               confirmed: operation.outcome.kind === 'confirmed',
+              motion: operation.motion,
             },
           ]
       }
