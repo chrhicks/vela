@@ -473,7 +473,7 @@ describe('framing controller', () => {
     const fake = workshop()
     fake.mount.tracking = false
     fake.hardware.slew = vi.fn(async () => {
-      throw new Error('EQUATORIAL_EOD_COORD on ZWO AM5: the driver reported Alert')
+      throw new CommandNotStartedError('EQUATORIAL_EOD_COORD on ZWO AM5: the driver reported Alert', 'rejected', { reason: 'protocol-error', endpoint: 'Cria' })
     })
     await fake.start().finished
     expect(fake.controller.snapshot()).toMatchObject({
