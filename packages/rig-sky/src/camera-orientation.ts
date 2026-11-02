@@ -1,5 +1,5 @@
 import { MakeTime, RotateVector, Rotation_EQJ_EQD, Vector } from 'astronomy-engine'
-import type { CameraOrientation } from './rigidity.ts'
+import type { CameraOrientation } from './rotation.ts'
 
 type Vec3 = readonly [number, number, number]
 

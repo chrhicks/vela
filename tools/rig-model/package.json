@@ -15,7 +15,8 @@
     "backfill": "node backfill.ts",
     "corpus": "node corpus.ts",
     "solve-verdict": "node solve-verdict.ts",
-    "rigidity": "node rigidity-check.ts"
+    "rigidity": "node rigidity-check.ts",
+    "polar-fit": "node polar-fit-check.ts"
   },
   "devDependencies": {
     "@types/node": "26.2.0",
