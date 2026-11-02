@@ -1,5 +1,5 @@
 import { Schema } from 'effect'
-import { EpochMs, SkyPosition, SourceId } from './primitives.ts'
+import { EpochMs, EventId, SkyPosition, SourceId } from './primitives.ts'
 import { ImageId, State } from './wire.ts'
 
 export const CriaStateBody = Schema.Struct({
@@ -317,6 +317,26 @@ export const SolveBody = Schema.Union([
     reason: Schema.Literals(['no-match', 'too-few-stars', 'timeout', 'image-missing', 'image-unreadable', 'solver-error']),
   }),
 ])
+
+const SolveMeasured = Schema.Struct({
+  arcsecPerPixel: Schema.Number,
+  scaleError: Schema.Number,
+  parity: Schema.Literals([1, -1]),
+  hintOffsetDegrees: Schema.NullOr(Schema.Number),
+  stars: Schema.NullOr(Schema.Number),
+})
+
+export const SolveResultBody = Schema.Struct({
+  frameEventId: EventId,
+  purpose: Schema.Literals(['framing', 'alignment']),
+  solve: SolveBody,
+  verdict: Schema.Union([
+    Schema.Struct({ status: Schema.Literal('accepted'), measured: SolveMeasured, unchecked: Schema.Array(Schema.Literals(['stars', 'hint'])) }),
+    Schema.Struct({ status: Schema.Literal('rejected'), measured: Schema.NullOr(SolveMeasured), reasons: Schema.Array(Schema.Literals(['no-match', 'few-stars', 'scale', 'parity', 'off-hint'])) }),
+  ]),
+})
+
+export type SolveResultBody = typeof SolveResultBody.Type
 
 export const SessionBody = Schema.Struct({
   phase: Schema.Literals(['started', 'ended']),

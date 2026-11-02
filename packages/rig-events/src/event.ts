@@ -14,6 +14,7 @@ import {
   PointingFixBody,
   SessionBody,
   SolveBody,
+  SolveResultBody,
 } from './bodies.ts'
 import { EpochMs, EventId, RigId, SourceId } from './primitives.ts'
 import type { AssessKind, FactKind, Kind, SameMembers } from './registry.ts'
@@ -42,6 +43,7 @@ export const RigEventSchema = Schema.Union([
   envelope('alignment', AlignmentBody),
   envelope('aim', AimBody),
   envelope('solve', SolveBody),
+  envelope('solve-result', SolveResultBody),
   envelope('session', SessionBody),
   envelope('gap', GapBody),
   envelope('mount-position', MountPositionBody),

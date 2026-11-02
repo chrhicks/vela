@@ -18,6 +18,7 @@ export const kinds = {
   aim: { branch: 'assess', producers: ['vela'] },
   alignment: { branch: 'fact', producers: ['vela'] },
   solve: { branch: 'fact', producers: ['solver'] },
+  'solve-result': { branch: 'fact', producers: ['solver'] },
   session: { branch: 'fact', producers: ['operator'] },
   gap: { branch: 'fact', producers: ['vela', 'cria', 'solver'] },
   'mount-position': { branch: 'assess', producers: ['model'] },

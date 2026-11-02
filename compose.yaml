@@ -91,6 +91,45 @@ services:
         bind:
           create_host_path: false
 
+  solver:
+    build:
+      context: .
+      target: server
+    image: vela-server:local
+    user: "${VELA_UID:-1000}:${VELA_GID:-1000}"
+    restart: unless-stopped
+    command: ["node", "dist/plate-solving/shadow-main.js"]
+    healthcheck:
+      disable: true
+    cpus: 1
+    mem_limit: 1g
+    environment:
+      VELA_NATS_URL: nats://nats:4222
+      VELA_NATS_CREDENTIALS_FILE: /credentials.json
+      VELA_SAVED_IMAGES_PATH: /data/saved-images
+      VELA_ASTAP: /astap/astap_cli
+      VELA_STAR_CATALOG: /astap/catalog/opt/astap
+      VELA_SOLVER_FIELD_HEIGHT_DEGREES: ${VELA_SOLVER_FIELD_HEIGHT_DEGREES:-}
+    volumes:
+      - type: bind
+        source: ${VELA_DATA_DIR:-${XDG_DATA_HOME:-${HOME}/.local/share}/vela}/nats/credentials.json
+        target: /credentials.json
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${VELA_DATA_DIR:-${XDG_DATA_HOME:-${HOME}/.local/share}/vela}/saved-images
+        target: /data/saved-images
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${VELA_DATA_DIR:-${XDG_DATA_HOME:-${HOME}/.local/share}/vela}/astap
+        target: /astap
+        read_only: true
+        bind:
+          create_host_path: false
+
   web:
     build:
       context: .

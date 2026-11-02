@@ -220,3 +220,57 @@ before ack, restarts it, and compares the reader's IDs with all published IDs.
 It also checks that raw redeliveries occurred and that no credential reached the
 child's output. It removes its container and temporary files. It does not contact
 hardware or the live Compose project.
+
+## Solve saved light frames in shadow
+
+The `solver` service uses the server image with its own process. It pulls one
+frame at a time from `solver-v1`, reads only saved light FITS, and publishes a
+`solve-result` fact with the original frame event ID, raw ASTAP outcome, C1
+verdict, measured scale and parity, position, and solve duration. Calibration
+and unsuccessful capture records are acknowledged without a solve. Vela does
+not consume these results or wait for the service.
+
+Set `VELA_SOLVER_FIELD_HEIGHT_DEGREES` from the rig's configured optics before
+starting the solver. It is the full image field height supplied to ASTAP, as in
+backfill. No guessed default is supplied. ASTAP and its catalog, the private
+credential file, and saved images have read-only mounts. The service uses only
+the `solver` password. It has a one-CPU limit and a 1 GiB memory limit.
+
+A solve uses the FITS J2000 `RA` and `DEC` as its search hint and claim when
+present. Older images without those cards use an all-sky search and report the
+hint check as unchecked. The star-count check is also unchecked because the
+ASTAP adapter does not return a count. Alignment-trial frames use the alignment
+purpose; other frames use framing. The configured field height and frame height
+supply the expected scale, with parity +1, as in Vela's judged solver.
+
+Only a confirmed JetStream result publish permits a light frame's ack. A solve
+sends progress every ten seconds to extend the broker's thirty-second ack wait.
+The worker holds one message locally; the durable has the broker's 256-message
+unacked bound and the stream has the documented retention bounds. There is no
+unbounded process queue. Broker or publish failure stops the service without
+acking that frame. Compose restarts it. Redelivery has a stable result ID per
+frame, solver version, and purpose. Archive readers deduplicate that ID even
+outside JetStream's two-minute duplicate window.
+
+After upgrading the image, rerun broker provisioning to add the new registry
+subject to the stream and solver permissions. This change does not deploy it.
+
+Run the recorded-data check with a disposable broker. All data paths are read
+only and the check prints counts only. Select one UTC date of the old frame log
+with saved lights, and the step 4 digest cache for those images.
+
+```sh
+TMPDIR=/path/to/scratch TEST_VELA_DATA=/path/to/vela-data \
+  TEST_NIGHT=YYYY-MM-DD TEST_BACKFILL_CACHE=/path/to/backfill/solves \
+  TEST_FIELD_HEIGHT=FIELD_HEIGHT_DEGREES uv run tools/nats/verify-solver.py
+```
+
+After a real night with Chris, read the archiver's `frame` and `solve-result`
+facts using `readArchive`, with one reader for the entire night. For every saved
+light frame ID, require one unique result whose `body.frameEventId` matches.
+Check `body.verdict`, `body.solve.solveMs`, and `body.solve.centre` for the result.
+Calibration frames must have no result. Compare the frame records' exposure
+start intervals and settle times with the capture trace to check cadence. Also
+check the publisher drop counter, gaps, and `solver-v1` pending and ack-pending
+counts. Retention loss or missing results makes that check incomplete. The
+recorded replay does not establish live capture cadence.
