@@ -49,6 +49,8 @@ export interface AlignmentView {
   measuredAt: string | null
   warning: string | null
   error: string | null
+  /** Sweep positions that gave no usable fix and were not exposed again, with why. Absent before a run starts. */
+  dropped?: { position: number; detail: string }[]
   /**
    * Set with the `not-rigid` phase: the sweep positions did not turn as one rigid body, so Vela measured no polar
    * error. The miss is in arcminutes, and the threshold is the miss at which a sweep stops being rigid. `steps`

@@ -9,6 +9,7 @@ import {
   AlignmentImageDialog,
   type ExpandedAlignmentImage,
 } from '../features/alignment/AlignmentImage'
+import { positionState, POSITIONS } from '../features/alignment/positions'
 import { goodEnoughDrift, REFERENCE_EXPOSURE_MINUTES } from '../features/alignment/good-enough'
 import './alignment.css'
 
@@ -403,16 +404,16 @@ function AlignmentPage({ rigId }: { rigId: string }) {
   const notRigid = view.phase === 'not-rigid' ? view.rigidity : null
 
   const nextInstruction = view.active
-    ? 'After the third solve, the adjustment view will show your alignment error and the target reticle.'
+    ? 'After the sixth position, the adjustment view will show your alignment error and the target reticle.'
     : physical
-      ? 'Each attempt homes, then moves to a consistent starting field at Dec +80°. Prepare a clear movement corridor: after a small direction check, Vela makes two westward RA sweeps of roughly 57°, each in several consecutive rotations at a rate the mount advertises. Allow up to 120° total westward travel and 1° on either side for the direction check.'
-      : 'Start with the simulator’s large-error preset and clear camera. Keep its offsets unchanged until all three positions are measured.'
+      ? 'Each attempt homes, then moves to a consistent starting field at Dec +80°. Prepare a clear movement corridor: after a small direction check, Vela makes five westward RA legs of about 23°, 114° in all, at a rate the mount advertises. Allow up to 120° total westward travel and 1° on either side for the direction check.'
+      : 'Start with the simulator’s large-error preset and clear camera. Keep its offsets unchanged until all six positions are measured.'
 
   const preparationInstruction =
     notRigid
       ? 'Check the telescope clamp, the camera and the cables for play, then start again.'
       : physical && !view.active
-      ? 'Use sidereal tracking. Keep the mount’s adjustment knobs still until all three positions are measured. You can stop at any time.'
+      ? 'Use sidereal tracking. Keep the mount’s adjustment knobs still until all six positions are measured. You can stop at any time.'
       : 'You can stop the measurement at any time.'
 
   let adjustmentInstruction
@@ -433,8 +434,10 @@ function AlignmentPage({ rigId }: { rigId: string }) {
 
   let statusTitle = activity
 
+  const dropped = view.dropped ?? []
+
   let statusDetail = view.active
-    ? 'Baseline set · New measurements arriving'
+    ? `Fitted from ${view.solvedPositions} of ${POSITIONS} positions · New measurements arriving`
     : 'Last measurement kept for reference'
 
   if (pending) {
@@ -460,7 +463,10 @@ function AlignmentPage({ rigId }: { rigId: string }) {
         )}
         <strong>{pending ? 'Sending command…' : activity}</strong>
       </div>
-      <p>{view.solvedPositions} of 3 positions solved · Alignment error not yet available</p>
+      <p>
+        {view.solvedPositions} of {POSITIONS} positions solved
+        {dropped.length > 0 ? ` · ${dropped.length} dropped` : ''} · Alignment error not yet available
+      </p>
       <p>Exposure: {view.exposureSeconds} seconds</p>
       {view.activity === 'exposing' && !interrupted && !pending && (
         <p>{elapsed.toFixed(1)} / {view.exposureSeconds} seconds</p>
@@ -502,6 +508,11 @@ function AlignmentPage({ rigId }: { rigId: string }) {
             The camera did not turn with the mount as one rigid body, so a polar error from these positions
             would not be trustworthy. It missed its predicted position by {notRigid.missArcmin.toFixed(1)}′,
             and the limit is {notRigid.thresholdArcmin.toFixed(0)}′. No polar error is shown.
+            {notRigid.steps && notRigid.steps.length > 0
+              ? ` The camera turned more than the mount between ${notRigid.steps
+                  .map(step => `positions ${step.beforePosition} and ${step.afterPosition}`)
+                  .join(' and between ')}.`
+              : ''}
           </p>
         </div>
       )}
@@ -519,20 +530,23 @@ function AlignmentPage({ rigId }: { rigId: string }) {
             </h2>
             <p>
               {view.active
-                ? 'Keep the mount’s adjustment knobs still while Vela measures three positions.'
+                ? 'Keep the mount’s adjustment knobs still while Vela measures six positions.'
                 : notRigid
-                  ? 'Vela measured no polar error from these three positions.'
-                  : 'Vela will take and solve images at three positions, then show you how to adjust the mount.'}
+                  ? 'Vela measured no polar error from these six positions.'
+                  : 'Vela will take and solve images at six positions, then show you how to adjust the mount.'}
             </p>
-            <ol className="vela-polar-points" aria-label="Three measurement positions">
-              {[1, 2, 3].map(point => {
-                const solved = point <= view.solvedPositions
-                const current = view.active && point === view.position
-                const state = solved ? 'done' : current ? 'current' : 'pending'
+            <ol className="vela-polar-points" aria-label="Six measurement positions">
+              {Array.from({ length: POSITIONS }, (_, index) => index + 1).map(point => {
+                const drop = dropped.find(entry => entry.position === point)
+                const state = positionState(view, point)
+                const solved = state === 'done'
+                const current = state === 'current'
 
                 const status = solved
                   ? 'Solved'
-                  : !current
+                  : state === 'dropped'
+                    ? `Dropped · ${drop?.detail ?? 'no usable fix'}`
+                    : !current
                     ? 'Not measured'
                     : offline || retrying
                       ? 'Observation interrupted'
@@ -544,7 +558,7 @@ function AlignmentPage({ rigId }: { rigId: string }) {
 
                 return (
                   <li key={point} data-state={state}>
-                    <span>{solved ? '✓' : point}</span>
+                    <span>{solved ? '✓' : state === 'dropped' ? '✕' : point}</span>
                     <strong>Position {point}</strong>
                     <small>{status}</small>
                   </li>

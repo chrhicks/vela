@@ -331,7 +331,11 @@ it('drops a fix that did not solve without exposing again, and fits the other fi
   expect(journal.recordDropped).toHaveBeenCalledExactlyOnceWith(3, 'no-solve', 'no star pattern matched')
   expect(journal.recordFit.mock.calls[0]![0].map(fix => fix.position)).toEqual([1, 2, 4, 5, 6])
   expect(subject.exposures()).toBe(6)
-  expect(subject.controller.snapshot()).toMatchObject({ solvedPositions: 5, rigidity: null })
+  expect(subject.controller.snapshot()).toMatchObject({
+    solvedPositions: 5,
+    rigidity: null,
+    dropped: [{ position: 3, detail: 'Plate-solving failed (no star pattern matched)' }],
+  })
 })
 
 it('stops with the reason once fewer than five fixes are possible', async () => {

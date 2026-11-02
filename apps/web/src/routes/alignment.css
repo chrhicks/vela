@@ -369,6 +369,9 @@
 .vela-polar-points [data-state='done'] > span {
   color: var(--vela-positive);
 }
+.vela-polar-points [data-state='dropped'] > span {
+  color: var(--vela-warning);
+}
 .vela-polar-setup-facts {
   margin: 0;
 }

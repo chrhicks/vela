@@ -162,23 +162,30 @@ They do not establish outdoor accuracy, atmospheric refraction, flexure, or the
 actual mount's motion response. Direction and repeatability require a prepared
 physical-rig trial. The configured offline path remains available separately.
 
-## Rigid check
+## Six fixes and the rigid check
 
-Three points always fit one circle, so the baseline's polar error says nothing about whether the mount
-turned as one rigid body. A loose telescope clamp or cable drag breaks that assumption, and on 2026-10-31
-alignments still finished at 0.2′ and 0.14′. After the third physical baseline position, `baseline-rigidity.ts`
-turns each solve into the camera's orientation in the hour-angle frame (`cameraOrientation` in `@vela/rig-sky`)
-and `rigidityVerdict` predicts where the camera should point at position 3 from positions 1 and 2. A miss of
-2′ or more is not rigid.
+Three points always fit one circle, so a three-point polar error says nothing about whether the mount turned as
+one rigid body. A loose telescope clamp or cable drag breaks that assumption, and on 2026-10-31 alignments still
+finished at 0.2′ and 0.14′. The sweep now takes six fixes along five legs of about 22.8° (`sweep.ts`), and
+`fitPolarAxis` in `@vela/rig-sky` fits one polar axis to them. Each solve becomes the camera's orientation in the
+hour-angle frame (`cameraOrientation`); the fit's miss and any step where the camera turned more than the mount
+did decide the verdict. A miss of 2′ or more, or any step, is not rigid.
 
-A `not-rigid` verdict ends the run in the `not-rigid` phase with the miss and the 2′ threshold. Vela measures no
-polar error: the view has no measurement and no adjustment advice, and the adjusting loop never starts. A rigid
-verdict continues as before. The offline model has no mount reading to judge and carries no verdict.
+A position that gives no fix (no solve, a rejected verdict, a capture that failed safely) is journalled with
+`recordDropped`, listed in the view's `dropped`, and not exposed again. The fit needs five fixes, and the last
+position must be one of them because the adjusting baseline is a frame taken where the mount now points.
+Otherwise the run fails with the reason and the positions.
 
-The journal's `baseline` entry keeps the verdict beside the baseline's own numbers, so a trial that reported a
-small error while loose can be told apart later. Replay judges it again from the three recorded solves.
-`recorded-trials.test.ts` replays the 19 trials of the mount-rigidity tool through that path. It reads
-`VELA_RECORDED_TRIALS` or `~/.local/share/vela/alignment-diagnostics/trials` and skips when the trials are absent.
+A `not-rigid` verdict ends the run in the `not-rigid` phase with the miss, the 2′ threshold and the positions of
+each step (`rigidity.steps`). Vela measures no polar error: the view has no measurement and no adjustment advice,
+and the adjusting loop never starts. A rigid verdict seeds the adjusting baseline from the fitted axis
+(`baselineFromAxis`). The offline model has no mount reading to judge and carries no verdict.
+
+The journal keeps the sweep's fixes and the fit's verdict, so a trial that reported a small error while loose can
+be told apart later. Replay fits the recorded solves again; journals from before the six-fix sweep still replay
+from their recorded pole. `recorded-trials.test.ts` replays the 19 trials of the mount-rigidity tool through that
+path. It reads `VELA_RECORDED_TRIALS` or `~/.local/share/vela/alignment-diagnostics/trials` and skips when the
+trials are absent.
 
 ## Adjustment geometry
 
@@ -191,7 +198,7 @@ a numerical jump across that elevation fold is rejected rather than displayed
 as a different physical correction.
 
 This is a local adjustment model, not proof that arbitrary large physical knob
-movements are uniquely recoverable from one image. A new three-position baseline
+movements are uniquely recoverable from one image. A new sweep
 is needed when the local model becomes ambiguous. Independent ideal fixtures
 exercise corrections beyond five degrees, including twenty-degree corrections
 at the physical starting declination, and a known alternate-root rejection.
@@ -290,7 +297,7 @@ Vela with `API_PROXY_TARGET=http://127.0.0.1:3002 pnpm --filter @vela/web exec v
 flow, connect its devices, then follow Observe → Polar alignment.
 
 In the separate simulator controls, select Large error and reset before starting.
-Keep offsets still during the three-position baseline. Once readings appear,
+Keep offsets still during the six-position sweep. Once readings appear,
 lower the altitude and move azimuth east toward zero. There is a three-second
 adjustment window between exposures; the simulator rejects mount adjustments
 during exposure. Fine steps support the final approach. Obscure the camera to

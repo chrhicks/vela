@@ -50,11 +50,18 @@ available during device-read retry but is disabled while the browser cannot reac
 Vela or while an end command is stopping/unconfirmed. Finish is an operator action,
 not an assertion of measured alignment accuracy.
 
+## Six positions
+
+The baseline panel lists the sweep's six positions. A position the server dropped (`dropped`, with its reason) shows
+a cross and the reason, and the count line reads "N of 6 positions solved · M dropped". The adjusting status says
+how many positions the fit used. `positions.ts` holds the count, which must match `SWEEP_POSITIONS` on the server.
+
 ## Not rigid
 
-When the server ends a run in the `not-rigid` phase, the route shows the miss and its threshold in a warning, and
-the baseline panel reads "Mount is not rigid". There is no measurement, so no total, direction or reticle appears,
-and Start again begins a fresh baseline. `rigidity` is only meaningful with that phase.
+When the server ends a run in the `not-rigid` phase, the route shows the miss, its threshold and the positions
+between which the camera turned more than the mount (`rigidity.steps`) in a warning, and the baseline panel reads
+"Mount is not rigid". There is no measurement, so no total, direction or reticle appears, and Start again begins
+a fresh sweep. `rigidity` is only meaningful with that phase.
 
 ## Good enough
 
