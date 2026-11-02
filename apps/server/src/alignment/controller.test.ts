@@ -367,6 +367,7 @@ it('stops when the last position gives no fix, because the adjusting baseline ne
 const exposureError = () =>
   new EquipmentError('The camera reported an exposure error', { reason: 'protocol-error', endpoint: 'Cria' })
 
+
 it('exposes a position whose exposure failed once more, then drops it, and stops when too few positions remain', async () => {
   const journal = recording()
   const subject = setup(async () => journal)
@@ -428,6 +429,20 @@ it('ends the run at once when the camera cannot say whether an exposure ran', as
   await vi.waitFor(() => expect(subject.controller.snapshot().active).toBe(false))
   expect(capture).toHaveBeenCalledOnce()
   expect(subject.controller.snapshot()).toMatchObject({ phase: 'failed', error: 'Cria cannot confirm the exposure' })
+})
+
+it('ends the run on a protocol error from an adapter that does not promise an idle camera', async () => {
+  const subject = setup()
+
+  const capture = vi.fn(async () => {
+    throw new EquipmentError('Abort failed with HTTP 500', { reason: 'protocol-error', endpoint: 'http://simulator' })
+  })
+
+  subject.setCapture(capture)
+  await subject.controller.start('sim', 'Simulator')
+  await vi.waitFor(() => expect(subject.controller.snapshot().active).toBe(false))
+  expect(capture).toHaveBeenCalledOnce()
+  expect(subject.controller.snapshot()).toMatchObject({ phase: 'failed', error: 'Abort failed with HTTP 500' })
 })
 
 it('skips a failed adjusting exposure, says so, and measures again, keeping the last measurement meanwhile', async () => {

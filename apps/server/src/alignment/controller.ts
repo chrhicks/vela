@@ -965,8 +965,8 @@ function exposureFailed({ detail }: Dropped) {
 }
 
 /**
- * A camera that reports a failed exposure has no frame and is idle, so a new exposure is safe. Only the exposure's own
- * failure counts: an uncertain exposure needs a person, and transport and wire errors have their own handling.
+ * Cria answers `failed` only after it confirmed no exposure is running, so its failure leaves no frame and an idle
+ * camera. No other adapter promises that: Alpaca classifies its own safe failures and any other error stays fatal.
  */
 function asFailedExposure(error: Error) {
   if (error instanceof CaptureRetryableError) return error
@@ -974,7 +974,8 @@ function asFailedExposure(error: Error) {
   if (
     error instanceof EquipmentError &&
     !(error instanceof CaptureUncertainError) &&
-    error.reason === 'protocol-error'
+    error.reason === 'protocol-error' &&
+    error.endpoint === 'Cria'
   )
     return new CaptureRetryableError(error)
 
