@@ -18,6 +18,7 @@ import { frameImaging, type FrameImaging } from '../imaging/frame-imaging.js'
 import { describeRejection, type MonoFrame, type PlateSolver } from '../plate-solving/judged-solver.js'
 import { angularDistance, fromMount, toMount, type Site } from '@vela/rig-sky'
 import { plateCorners } from './sky.js'
+import { RefusedGotoError, refusedGoto } from './refused-goto.js'
 
 export interface FramingMount {
   rightAscensionDegrees: number
@@ -142,6 +143,7 @@ export function createFramingController(
     | 'actual'
     | 'preview'
     | 'error'
+    | 'errorDetail'
     | 'exposureSeconds'
     | 'pointingSide'
     | 'centering'
@@ -153,6 +155,7 @@ export function createFramingController(
     actual: null,
     preview: null,
     error: null,
+    errorDetail: null,
     exposureSeconds: 2,
     pointingSide: 'unknown',
     centering: null,
@@ -436,7 +439,13 @@ export function createFramingController(
       'framing.command.converted_at': convertedAt.toISOString(),
     })
     aimGoal?.events.push({ kind: 'move', correction: state.centering?.correction ?? 0 })
-    await hardware.slew(driverPosition, mount.coordinateSystem, signal)
+
+    try {
+      await hardware.slew(driverPosition, mount.coordinateSystem, signal)
+    } catch (error) {
+      throw error instanceof Error ? (refusedGoto(error) ?? error) : error
+    }
+
     signal.throwIfAborted()
     recordFraming('framing.move.completed', {
       'framing.correction': state.centering?.correction ?? 0,
@@ -503,6 +512,7 @@ export function createFramingController(
       active: true,
       phase: input.action === 'check' ? 'settling' : 'slewing',
       error: null,
+      errorDetail: null,
       centering: null,
     }
 
@@ -652,6 +662,7 @@ export function createFramingController(
                 ? 'needs-check'
                 : 'failed',
             error: cancelled ? null : error instanceof Error ? error.message : 'Framing failed',
+            errorDetail: error instanceof RefusedGotoError ? error.detail : null,
           }
 
           if (state.centering)

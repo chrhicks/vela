@@ -248,6 +248,8 @@ export interface FramingView {
       })
     | null
   error: string | null
+  /** The raw device text behind a plain `error`, for a details line. */
+  errorDetail?: string | null
   exposureSeconds: number
   /** A current solve can inform a user-requested correction to the edited composition. */
   canCenter: boolean
