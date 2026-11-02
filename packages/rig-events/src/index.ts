@@ -16,6 +16,8 @@ export * from './indi-message.ts'
 
 export * from './journal.ts'
 
+export * from './mount-site.ts'
+
 export * from './primitives.ts'
 
 export * from './registry.ts'

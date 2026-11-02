@@ -579,6 +579,7 @@ function handle(w: Working, out: Output[], event: RigEvent) {
       return onFrame(w, out, event)
     case 'solve':
       return onSolve(w, out, event)
+    case 'alignment':
     case 'attestation':
     case 'autofocus':
     case 'cria.exchange':

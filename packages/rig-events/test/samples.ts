@@ -1,6 +1,7 @@
 import { Schema } from 'effect'
 import { epochMs, ImageId, rigId, seal, sourceId, type Draft, type Envelope, type RigEvent } from '@vela/rig-events'
 import { mountState } from '@vela/rig-testing'
+import { alignmentEvents } from './alignment-sample.ts'
 
 const stamp = (at: number) => ({ rig: rigId('test-rig'), source: sourceId('test:samples'), at: epochMs(at), seenAt: epochMs(at + 5) })
 
@@ -107,6 +108,7 @@ export function sampleEvents(): RigEvent[] {
         ],
       },
     }),
+    ...alignmentEvents,
     seal({
       ...stamp(at),
       kind: 'solve',
