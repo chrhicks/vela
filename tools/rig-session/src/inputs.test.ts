@@ -1,6 +1,8 @@
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { imageIdOf } from '@vela/rig-testing'
+import { encodeEvent, epochMs, rigId, seal, sourceId } from '@vela/rig-events'
 import { expect, test } from 'vitest'
 import { readFrameRecords, readMountCsv, readSavedImages, readTraces } from './inputs.ts'
 
@@ -206,46 +208,12 @@ const frameRecord = {
   settledAt: '2030-01-01T00:01:00.000Z',
   exposureSeconds: 60,
   subject: null,
-  outcome: 'saved',
+  outcome: 'saved' as const,
   message: null,
   provenance: { requestId: 'request-1', operationId: 'operation-1', imageId: 'cria-image-1' },
-  image: { id: 'frame-1', capturedAt: '2030-01-01T00:00:01.500Z', capturedAtSource: 'camera', receivedAt: '2030-01-01T00:01:00.000Z', width: 100, height: 80 },
+  image: { id: imageIdOf(1), capturedAt: '2030-01-01T00:00:01.500Z', capturedAtSource: 'camera' as const, receivedAt: '2030-01-01T00:01:00.000Z', width: 100, height: 80 },
   statistics: { algorithm: { version: 2 }, detectedStars: 12, medianHfrPixels: 3.5 },
 }
-
-test('frame records written before the algorithm stamp existed read as version 1', async () => {
-  const dir = await scratch()
-  const file = join(dir, 'frames.jsonl')
-
-  await writeFile(file, JSON.stringify({ ...frameRecord, statistics: { detectedStars: 12, medianHfrPixels: 3.5 } }))
-
-  const { items } = await readFrameRecords(file)
-
-  expect(items.map(item => item.starAlgorithmVersion)).toEqual([1])
-})
-
-test('frame records carry the named star outputs, and none when the record lacks them', async () => {
-  const dir = await scratch()
-  const file = join(dir, 'frames.jsonl')
-  const named = { ...frameRecord, statistics: { ...frameRecord.statistics, ...namedOutputs } }
-
-  await writeFile(file, [named, { ...frameRecord, attempt: 2 }].map(line => JSON.stringify(line)).join('\n'))
-
-  const { items } = await readFrameRecords(file)
-
-  expect(items).toMatchObject([
-    namedColumns,
-    {
-      starDetections: null,
-      starMeasured: null,
-      starStrong: null,
-      starRejected: null,
-      skyLevel: null,
-      skyNoise: null,
-      starAxisRatio: null,
-    },
-  ])
-})
 
 test('frame records read every outcome, with or without ids and an image, and skip what cannot be read', async () => {
   const dir = await scratch()
@@ -260,11 +228,24 @@ test('frame records read every outcome, with or without ids and an image, and sk
 
   const { items, skipped } = await readFrameRecords(file)
 
-  expect(items.map(item => [item.attempt, item.outcome, item.requestId, item.operationId, item.criaImageId, item.imageId, item.detectedStars, item.starAlgorithmVersion])).toEqual([
-    [1, 'saved', 'request-1', 'operation-1', 'cria-image-1', 'frame-1', 12, 2],
-    [2, 'lost', 'request-2', null, null, null, null, null],
-    [3, 'saved', null, null, null, 'frame-1', 12, 2],
+  expect(items.map(item => [item.attempt, item.outcome, item.requestId, item.operationId, item.criaImageId, item.imageId, item.detectedStars])).toEqual([
+    [1, 'saved', 'request-1', 'operation-1', 'cria-image-1', imageIdOf(1), 12],
+    [2, 'lost', 'request-2', null, null, null, null],
+    [3, 'saved', null, null, null, imageIdOf(1), 12],
   ])
-  expect(skipped.map(entry => entry.where)).toEqual([`${file}:4`, `${file}:5`, `${file}:6`])
-  expect(skipped[0]?.reason).toBe('repeats the run and attempt of an earlier record')
+  expect(skipped.map(entry => entry.where).toSorted()).toEqual([file, `${file}:4`, `${file}:5`].toSorted())
+  expect(skipped.find(entry => entry.where === `${file}:4`)?.reason).toBe('repeats the run and attempt of an earlier record')
+})
+
+test('frame records read the frame events of a run log directory, as they read an old frames.jsonl', async () => {
+  const dir = await scratch()
+  const { version: _version, rigId: _rigId, ...body } = frameRecord
+  const frame = seal({ rig: rigId('rig-a'), source: sourceId('vela:capture'), kind: 'frame', at: epochMs(1_000), seenAt: epochMs(1_000), body: { ...body, frameType: 'light', image: { ...body.image, ref: null }, origin: 'capture-run' } })
+
+  await writeFile(join(dir, 'run-20300101T000000000Z-00001.jsonl'), `${encodeEvent(frame)}\n`)
+
+  const { items, skipped } = await readFrameRecords(dir)
+
+  expect(skipped).toEqual([])
+  expect(items.map(item => [item.rigId, item.attempt, item.outcome, item.requestId, item.imageId, item.detectedStars])).toEqual([['rig-a', 1, 'saved', 'request-1', imageIdOf(1), 12]])
 })

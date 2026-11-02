@@ -6,7 +6,7 @@ Status: built (PRs #141 to #147); amended where the build differed. The packager
 
 | Flag | File | Written by | Read as |
 | --- | --- | --- | --- |
-| `--frame-records <file>` | `frames.jsonl` (`VELA_FRAME_RECORDS_PATH`) | Vela, one line per settled attempt | `FrameRecord` in `apps/server/src/capture/frame-records.ts` |
+| `--frame-records <dir or file>` | the run log directory (`VELA_RUN_LOG_DIR`), a run-log file, or an old `frames.jsonl` | Vela's server, one `frame` event per settled attempt (`docs/run-log.md`); until plan step 13a, one line of `frames.jsonl` | `readFrameRecords` in `@vela/rig-frames`, which tells the two formats apart by the line |
 | `--recording <dir>` | `manifest.json`, `traffic.jsonl`, `blobs/` | Cria's recorder (`@cria/recording`, `format.ts`) | damage as in "Damage" below; `blobs/` never read |
 | `--journal <dir or file>` | the run log directory (`VELA_RUN_LOG_DIR`), a run-log file, or an old `cria-journal.jsonl` | Vela's server (`docs/run-log.md`); the old journal was written by `@vela/cria` | `docs/run-log.md`; the old `JournalEntry` is the shape `journal.ts` keeps |
 

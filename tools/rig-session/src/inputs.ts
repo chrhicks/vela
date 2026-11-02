@@ -1,6 +1,7 @@
 import { createReadStream } from 'node:fs'
 import { readdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { readFrameRecords as readFrames, type FrameOutcome } from '@vela/rig-frames'
 import { z } from 'zod'
 
 export interface Skipped {
@@ -116,7 +117,7 @@ function starColumns(statistics: StarStatistics | null | undefined) {
   }
 }
 
-/** Star columns shared by saved images and frame records. */
+/** Star columns of a saved image. */
 interface StarColumns {
   /** Null when there are no statistics. 1 for records written before the stamp existed. */
   readonly starAlgorithmVersion: number | null
@@ -277,57 +278,45 @@ export async function readTraces(path: string): Promise<ReadResult<TraceSpan>> {
   return { items, skipped }
 }
 
-const frameRecordLine = z.object({
-  version: z.literal(1),
-  rigId: z.string(),
-  runId: z.string(),
-  attempt: z.int(),
-  startedAt: timestamp,
-  settledAt: timestamp,
-  exposureSeconds: z.number(),
-  outcome: z.enum(['saved', 'unsaved', 'save-failed', 'lost', 'failed', 'uncertain', 'stopped']),
-  message: z.string().nullable(),
-  provenance: z.object({ requestId: z.string(), operationId: z.string().nullable(), imageId: z.string().nullable() }).nullable(),
-  image: z.object({ id: z.string() }).nullable(),
-  statistics: starStatistics.nullable(),
-})
-
 /** One settled capture attempt of Vela's, saved or not. The ids are Cria's, null when the adapter carried none. */
-export interface FrameRecord extends StarColumns {
+export interface FrameRecord {
   readonly rigId: string
   readonly runId: string
   readonly attempt: number
   readonly startedAt: Date
   readonly settledAt: Date
   readonly exposureSeconds: number
-  readonly outcome: z.infer<typeof frameRecordLine>['outcome']
+  readonly outcome: FrameOutcome
   readonly message: string | null
   readonly requestId: string | null
   readonly operationId: string | null
   readonly criaImageId: string | null
   /** The id Vela gave the image; it is the saved image's `id`. */
   readonly imageId: string | null
+  readonly detectedStars: number | null
+  readonly medianHfrPixels: number | null
 }
 
-/** Reads `frames.jsonl`. A record that repeats the run and attempt of an earlier one is skipped. */
+/**
+ * Reads a run log directory or an old `frames.jsonl` with `@vela/rig-frames`, which says which format each line is.
+ * A record that repeats the run and attempt of an earlier one is skipped.
+ */
 export async function readFrameRecords(path: string): Promise<ReadResult<FrameRecord>> {
+  const read = await readFrames([path])
   const items: FrameRecord[] = []
-  const skipped: Skipped[] = []
   const seen = new Set<string>()
-  const lines = (await readFile(path, 'utf8')).split('\n')
 
-  lines.forEach((line, index) => {
-    if (line.trim() === '') return
+  const skipped: Skipped[] = read.problems.map(problem => ({ where: problem.line === null ? problem.path : `${problem.path}:${problem.line}`, reason: problem.reason }))
 
-    const where = `${path}:${index + 1}`
-    const parsed = jsonText(frameRecordLine).safeParse(line)
+  if (read.incompleteTail) skipped.push({ where: path, reason: 'the last line has no newline, so it is still being written and was left out' })
 
-    if (!parsed.success) return void skipped.push({ where, reason: z.prettifyError(parsed.error) })
-
-    const { provenance, image, statistics, ...record } = parsed.data
+  for (const record of read.records) {
     const key = `${record.runId}/${record.attempt}`
 
-    if (seen.has(key)) return void skipped.push({ where, reason: 'repeats the run and attempt of an earlier record' })
+    if (seen.has(key)) {
+      skipped.push({ where: `${path}:${record.line}`, reason: 'repeats the run and attempt of an earlier record' })
+      continue
+    }
 
     seen.add(key)
 
@@ -335,18 +324,19 @@ export async function readFrameRecords(path: string): Promise<ReadResult<FrameRe
       rigId: record.rigId,
       runId: record.runId,
       attempt: record.attempt,
-      startedAt: record.startedAt,
-      settledAt: record.settledAt,
+      startedAt: new Date(record.startedAt),
+      settledAt: new Date(record.settledAt),
       exposureSeconds: record.exposureSeconds,
       outcome: record.outcome,
       message: record.message,
-      requestId: provenance?.requestId ?? null,
-      operationId: provenance?.operationId ?? null,
-      criaImageId: provenance?.imageId ?? null,
-      imageId: image?.id ?? null,
-      ...starColumns(statistics),
+      requestId: record.provenance?.requestId ?? null,
+      operationId: record.provenance?.operationId ?? null,
+      criaImageId: record.provenance?.imageId ?? null,
+      imageId: record.image?.id ?? null,
+      detectedStars: record.statistics?.detectedStars ?? null,
+      medianHfrPixels: record.statistics?.medianHfrPixels ?? null,
     })
-  })
+  }
 
   return { items, skipped }
 }

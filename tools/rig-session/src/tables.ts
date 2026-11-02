@@ -184,16 +184,8 @@ function attemptRow(session: string, record: FrameRecord, frameLink: Link<SavedI
     frame_candidates: candidates(frameLink, candidate => candidate.directory),
     operation_link: linkKind(operationLink),
     operation_candidates: candidates(operationLink, candidate => candidate.id),
-    star_algorithm_version: record.starAlgorithmVersion,
     detected_stars: record.detectedStars,
     median_hfr_px: record.medianHfrPixels,
-    star_detections: record.starDetections,
-    star_measured: record.starMeasured,
-    star_strong: record.starStrong,
-    star_rejected: record.starRejected,
-    sky_level: record.skyLevel,
-    sky_noise: record.skyNoise,
-    star_axis_ratio: record.starAxisRatio,
   }
 }
 

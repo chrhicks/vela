@@ -48,16 +48,8 @@ function record(attempt: number, imageId: string | null, outcome: FrameRecord['o
     operationId: outcome === 'failed' ? null : `operation-${attempt}`,
     criaImageId: imageId === null ? null : `cria-${imageId}`,
     imageId,
-    starAlgorithmVersion: imageId === null ? null : 2,
     detectedStars: imageId === null ? null : 12,
     medianHfrPixels: imageId === null ? null : 3.5,
-    starDetections: imageId === null ? null : 40,
-    starMeasured: imageId === null ? null : 12,
-    starStrong: imageId === null ? null : 5,
-    starRejected: imageId === null ? null : '{"blended":3,"faint":25}',
-    skyLevel: imageId === null ? null : 540.5,
-    skyNoise: imageId === null ? null : 4.25,
-    starAxisRatio: imageId === null ? null : 1.24,
   }
 }
 
