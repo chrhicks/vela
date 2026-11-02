@@ -135,13 +135,17 @@ export function reportAcceptedFix(solver: PlateSolver, send: (fix: AcceptedFix) 
     async solve(frame, hint, claimed, signal) {
       const result = await solver.solve(frame, hint, claimed, signal)
 
-      if (result.status === 'solved' && result.error) await send({
-        capturedAt: Date.parse(result.capturedAt),
-        rightAscensionDegrees: result.raDegrees,
-        declinationDegrees: result.decDegrees,
-        coordinateSystem: 'j2000',
-        error: result.error,
-      })
+      if (result.status === 'solved' && result.error) {
+        const fix: AcceptedFix = {
+          capturedAt: Date.parse(result.capturedAt),
+          rightAscensionDegrees: result.raDegrees,
+          declinationDegrees: result.decDegrees,
+          coordinateSystem: 'j2000',
+          error: result.error,
+        }
+
+        void Promise.resolve().then(() => send(fix)).catch(error => console.warn(String(error)))
+      }
 
       return result
     },

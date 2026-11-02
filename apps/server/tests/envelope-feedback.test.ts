@@ -55,7 +55,7 @@ it('sends the envelope on connection and change, every accepted fix, and uses th
       await solver.solve(frame, claimed, claimed, new AbortController().signal)
     }
 
-    expect(fake.received.filter(request => request.route === 'fix')).toHaveLength(2)
+    await vi.waitFor(() => expect(fake.received.filter(request => request.route === 'fix')).toHaveLength(2))
     expect(fake.feedback.get('mount')?.fix).toMatchObject({ capturedAt: Date.parse(frame.capturedAt), rightAscensionDegrees: 10, declinationDegrees: 21, coordinateSystem: 'j2000', error: { scaleError: expect.any(Number) } })
 
     const history: RigHistory = {

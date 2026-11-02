@@ -473,3 +473,32 @@ describe('a Cria rig whose saved camera name predates protocol 5', () => {
     expect((await subject.app.inject({ method: 'POST', url: `/api/rigs/${rig.id}/${workflow}/stop` })).statusCode).toBe(200)
   })
 })
+
+
+it('reports an undelivered accepted fix once through the feedback callback', async () => {
+  const report = vi.fn()
+
+  const equipment = createEquipmentComposition([{
+    id: rig.id,
+    name: 'Fixture',
+    url: 'http://cria.invalid',
+    devices: [{ id: 'mount', kind: 'mount', expectedName: 'Mount' }],
+  }], {
+    onFeedbackError: report,
+    fetch: vi.fn().mockRejectedValue(new Error('offline')),
+  })
+
+  try {
+    await expect(equipment.sendFix(rig, {
+      capturedAt: 0,
+      rightAscensionDegrees: 10,
+      declinationDegrees: 20,
+      coordinateSystem: 'j2000',
+      error: { scaleError: 0, hintOffsetDegrees: 0 },
+    })).resolves.toBeUndefined()
+    expect(report).toHaveBeenCalledTimes(1)
+    expect(report).toHaveBeenCalledWith(expect.stringContaining('Cria did not receive the accepted fix'))
+  } finally {
+    await equipment.close()
+  }
+})
