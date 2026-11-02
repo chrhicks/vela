@@ -15,7 +15,8 @@ import {
   normalizeCatalogName,
   type CatalogTarget,
 } from './catalog/index.js'
-import { skyPath, type Site } from './sky.js'
+import type { Site } from '@vela/rig-sky'
+import { skyPath } from './sky.js'
 import { noHorizon, type Horizon, type HorizonRead } from './horizon.js'
 import { registerTargetDiscovery } from './discovery-routes.js'
 import { registerHorizonObservations } from './horizon-routes.js'

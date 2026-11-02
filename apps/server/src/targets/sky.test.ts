@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { projectSky, type PlateWcs } from '../plate-solving/solver.js'
-import { angularDistance, fromMount, plateCorners, skyAtPixel, skyPath, toMount } from './sky.js'
+import { angularDistance, fromMount, toMount } from '@vela/rig-sky'
+import { plateCorners, skyAtPixel, skyPath } from './sky.js'
 
 // Deliberately synthetic geographic site; this is not observatory configuration.
 const site = { latitudeDegrees: 33.45, longitudeDegrees: -112.07, elevationMeters: 331 }

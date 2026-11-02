@@ -1,3 +1,3 @@
-export * from './coordinates.ts'
+export * from './coordinates.js'
 
-export * from './tangent.ts'
+export * from './tangent.js'

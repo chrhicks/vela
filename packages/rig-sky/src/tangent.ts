@@ -1,4 +1,4 @@
-import type { EquatorialPosition } from './coordinates.ts'
+import type { EquatorialPosition } from './coordinates.js'
 
 const radians = Math.PI / 180
 

@@ -1,10 +1,8 @@
 import { Body, Equator, Horizon, Illumination, MoonPhase, Observer } from 'astronomy-engine'
 import type { HorizonProblem, TargetPosition, TargetSkyPath } from '@vela/model/web'
 import type { PlateWcs } from '../plate-solving/solver.js'
-import { angularDistance, toMount, type Site } from '../astronomy/coordinates.js'
+import { angularDistance, toMount, type Site } from '@vela/rig-sky'
 import { horizonBin, horizonStatus, type Skyline } from './horizon.js'
-
-export { angularDistance, fromMount, toMount, type Site } from '../astronomy/coordinates.js'
 
 const radians = Math.PI / 180
 

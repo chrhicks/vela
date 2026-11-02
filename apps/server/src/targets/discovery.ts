@@ -12,7 +12,7 @@ import {
 } from 'astronomy-engine'
 import type { TargetCategory, TargetFilterChoice, TargetOpportunity } from '@vela/model/web'
 import type { CatalogTarget } from './catalog/index.js'
-import type { Site } from './sky.js'
+import type { Site } from '@vela/rig-sky'
 
 export interface DiscoveryInput {
   targets: readonly CatalogTarget[]

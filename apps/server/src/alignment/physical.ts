@@ -7,7 +7,7 @@ import type {
   Framing,
   TelescopeStatus,
 } from '@vela/equipment'
-import { fromMount, type Site } from '../astronomy/coordinates.js'
+import { fromMount, type Site } from '@vela/rig-sky'
 import {
   localSiderealDegrees,
   physicalAlignmentSample,

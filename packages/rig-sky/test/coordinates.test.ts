@@ -2,14 +2,6 @@ import { describe, expect, it } from 'vitest'
 import { angularDistance, fromMount, toMount, type EquatorialPosition } from '@vela/rig-sky'
 import { syntheticSite } from '@vela/rig-testing'
 
-const velaCoordinates = new URL('../../../apps/server/src/astronomy/coordinates.ts', import.meta.url).href
-
-const vela: {
-  toMount: typeof toMount
-  fromMount: typeof fromMount
-  angularDistance: typeof angularDistance
-} = await import(velaCoordinates)
-
 function random(seed: number) {
   let state = seed
 
@@ -29,41 +21,21 @@ const cases = Array.from({ length: 1000 }, () => ({
   at: new Date(Date.UTC(2026, 0, 1) + next() * 2 * 365 * 24 * 3600 * 1000),
 }))
 
-describe('@vela/rig-sky against the copy in Vela', () => {
+describe('@vela/rig-sky coordinates', () => {
   it('has 1,000 distinct random cases', () => {
     expect(new Set(cases.map(item => `${item.position.raDegrees}:${item.at.getTime()}`)).size).toBe(1000)
   })
 
-  it('toMount agrees to under 1e-9 degrees', () => {
-    for (const { position, at } of cases)
-      expect(vela.angularDistance(toMount(position, 'topocentric', at, syntheticSite), vela.toMount(position, 'topocentric', at, syntheticSite))).toBeLessThan(1e-9)
-  })
-
-  it('fromMount agrees to under 1e-9 degrees', () => {
-    for (const { position, at } of cases)
-      expect(vela.angularDistance(fromMount(position, 'topocentric', at, syntheticSite), vela.fromMount(position, 'topocentric', at, syntheticSite))).toBeLessThan(1e-9)
-  })
-
-  it('angularDistance agrees to under 1e-9 degrees', () => {
-    for (let index = 1; index < cases.length; index++) {
-      const a = cases[index - 1]!.position
-      const b = cases[index]!.position
-
-      expect(Math.abs(angularDistance(a, b) - vela.angularDistance(a, b))).toBeLessThan(1e-9)
-    }
-  })
-
-  it('treats the j2000 frame as no conversion, as Vela does', () => {
+  it('treats the j2000 frame as no conversion', () => {
     const { position, at } = cases[0]!
 
-    expect(toMount(position, 'j2000', at, syntheticSite)).toEqual(vela.toMount(position, 'j2000', at, syntheticSite))
+    expect(toMount(position, 'j2000', at, syntheticSite)).toEqual(position)
   })
 
-  it('refuses a frame it does not know, as Vela does', () => {
+  it('refuses a frame it does not know', () => {
     const { position, at } = cases[0]!
 
     expect(() => toMount(position, 'galactic', at, syntheticSite)).toThrow(/not supported/)
-    expect(() => vela.toMount(position, 'galactic', at, syntheticSite)).toThrow(/not supported/)
   })
 
   it('goes there and back to within a tenth of an arcsecond', () => {

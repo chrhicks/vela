@@ -10,7 +10,8 @@
     "test:types": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@vela/rig-events": "workspace:*"
+    "@vela/rig-events": "workspace:*",
+    "@vela/rig-sky": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "26.2.0",

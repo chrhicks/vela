@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Horizon, Observer, SiderealTime } from 'astronomy-engine'
 import { getTarget, listTargets, type CatalogTarget } from './catalog/index.js'
 import { discoverTargets } from './discovery.js'
-import { fromMount, toMount } from './sky.js'
+import { fromMount, toMount } from '@vela/rig-sky'
 
 const site = { latitudeDegrees: 33.45, longitudeDegrees: -112.07, elevationMeters: 331 }
 

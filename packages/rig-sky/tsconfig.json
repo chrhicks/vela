@@ -1,7 +1,13 @@
 {
   "extends": "../../tools/rig-model/tsconfig.base.json",
-  "include": [
-    "src",
-    "test"
-  ]
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "noEmit": false,
+    "allowImportingTsExtensions": false,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true
+  },
+  "include": ["src"]
 }
