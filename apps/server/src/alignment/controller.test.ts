@@ -1,7 +1,7 @@
 import { createTestCadence } from './test-cadence.js'
 import { afterEach, expect, it, vi } from 'vitest'
 import type { AlpacaAcquisition, AlpacaFrame } from '@vela/alpaca'
-import { CaptureRetryableError, EquipmentError } from '@vela/equipment'
+import { CaptureRetryableError, CaptureUncertainError, EquipmentError } from '@vela/equipment'
 import { createAlignmentController } from './controller.js'
 import type { AlignmentDiagnosticRun } from './diagnostics.js'
 import { prepareAlignmentDisplay } from './display.js'
@@ -364,17 +364,178 @@ it('stops when the last position gives no fix, because the adjusting baseline ne
   expect(subject.exposures()).toBe(6)
 })
 
-it('drops a position whose exposure failed safely and does not expose again', async () => {
-  const subject = setup()
+const exposureError = () =>
+  new EquipmentError('The camera reported an exposure error', { reason: 'protocol-error', endpoint: 'Cria' })
+
+
+it('exposes a position whose exposure failed once more, then drops it, and stops when too few positions remain', async () => {
+  const journal = recording()
+  const subject = setup(async () => journal)
   const original = vi.fn()
   subject.setCapture(async () => {
     original()
     throw new CaptureRetryableError(new EquipmentError('Camera did not start', { reason: 'transport', endpoint: '/camera' }))
   })
   await subject.controller.start('sim', 'Simulator')
+  await vi.waitFor(() => expect(cadence.waits).toHaveLength(1))
+  expect(subject.controller.snapshot().warning).toBe('Exposure failed (Camera did not start), retrying.')
+  cadence.waits.shift()!()
+  await vi.waitFor(() => expect(cadence.waits).toHaveLength(1))
+  cadence.waits.shift()!()
   await vi.waitFor(() => expect(subject.controller.snapshot().active).toBe(false))
   expect(subject.controller.snapshot().error).toContain('The exposure failed (Camera did not start)')
-  expect(original).toHaveBeenCalledTimes(2)
+  expect(original).toHaveBeenCalledTimes(4)
+  expect(journal.recordDropped.mock.calls.map(([position]) => position)).toEqual([1, 2])
+})
+
+it('retries a failed sweep exposure at the same position and keeps it when the second exposure works', async () => {
+  const journal = recording()
+  const subject = setup(async () => journal)
+  let failures = 1
+
+  subject.setCapture(async () => {
+    if (failures-- > 0) throw exposureError()
+
+    return {
+      width: 4,
+      height: 4,
+      pixels: new Float64Array([0, 500, 300, 100, ...Array(12).fill(0)]),
+      capturedAt: new Date(1_700_000_000_000 + subject.exposures() * 1000).toISOString(),
+      color: { kind: 'mono' },
+    }
+  })
+  await subject.controller.start('sim', 'Simulator')
+  await vi.waitFor(() => expect(cadence.waits).toHaveLength(1))
+  const preparation = subject.moves()
+  cadence.waits.shift()!()
+
+  for (let position = 1; position <= 6; position++) subject.solve(await subject.nextSolve())
+  await vi.waitFor(() => expect(subject.controller.snapshot().measurement).not.toBeNull())
+  expect(subject.exposures()).toBe(7)
+  expect(subject.moves()).toBe(preparation + 5)
+  expect(subject.controller.snapshot()).toMatchObject({ phase: 'adjusting', dropped: [], solvedPositions: 6, warning: null })
+  expect(journal.recordDropped).not.toHaveBeenCalled()
+})
+
+it('ends the run at once when the camera cannot say whether an exposure ran', async () => {
+  const subject = setup()
+
+  const capture = vi.fn(async () => {
+    throw new CaptureUncertainError('Cria cannot confirm the exposure', { reason: 'protocol-error', endpoint: 'Cria' })
+  })
+
+  subject.setCapture(capture)
+  await subject.controller.start('sim', 'Simulator')
+  await vi.waitFor(() => expect(subject.controller.snapshot().active).toBe(false))
+  expect(capture).toHaveBeenCalledOnce()
+  expect(subject.controller.snapshot()).toMatchObject({ phase: 'failed', error: 'Cria cannot confirm the exposure' })
+})
+
+it('ends the run on a protocol error from an adapter that does not promise an idle camera', async () => {
+  const subject = setup()
+
+  const capture = vi.fn(async () => {
+    throw new EquipmentError('Abort failed with HTTP 500', { reason: 'protocol-error', endpoint: 'http://simulator' })
+  })
+
+  subject.setCapture(capture)
+  await subject.controller.start('sim', 'Simulator')
+  await vi.waitFor(() => expect(subject.controller.snapshot().active).toBe(false))
+  expect(capture).toHaveBeenCalledOnce()
+  expect(subject.controller.snapshot()).toMatchObject({ phase: 'failed', error: 'Abort failed with HTTP 500' })
+})
+
+it('skips a failed adjusting exposure, says so, and measures again, keeping the last measurement meanwhile', async () => {
+  const subject = setup()
+  await subject.baseline()
+  const previous = subject.controller.snapshot().measurement!
+  const original = subject.exposures()
+  let failures = 1
+
+  subject.setCapture(async () => {
+    if (failures-- > 0) throw exposureError()
+
+    return {
+      width: 4,
+      height: 4,
+      pixels: new Float64Array([0, 500, 300, 100, ...Array(12).fill(0)]),
+      capturedAt: new Date(1_700_000_000_000 + subject.exposures() * 1000).toISOString(),
+      color: { kind: 'mono' },
+    }
+  })
+  cadence.waits.shift()!()
+  await vi.waitFor(() => expect(cadence.waits).toHaveLength(1))
+  expect(subject.controller.snapshot()).toMatchObject({
+    active: true,
+    phase: 'adjusting',
+    warning: 'Exposure failed (The camera reported an exposure error), retrying.',
+    measurement: previous,
+  })
+  cadence.waits.shift()!()
+  subject.solve(await subject.nextSolve())
+  await vi.waitFor(() => expect(subject.controller.snapshot().measurement).not.toBe(previous))
+  expect(subject.exposures()).toBe(original + 2)
+  expect(subject.controller.snapshot()).toMatchObject({ active: true, warning: null })
+})
+
+it('fails after three failed adjusting exposures in a row and keeps the last measurement', async () => {
+  const journal = recording()
+  const subject = setup(async () => journal)
+  await subject.baseline()
+  const previous = subject.controller.snapshot().measurement!
+  subject.setCapture(async () => {
+    throw exposureError()
+  })
+
+  for (let failure = 1; failure <= 3; failure++) {
+    cadence.waits.shift()!()
+    await vi.waitFor(() => expect(cadence.waits.length === 1 || !subject.controller.snapshot().active).toBe(true))
+  }
+
+  await vi.waitFor(() => expect(subject.controller.snapshot().active).toBe(false))
+  expect(subject.controller.snapshot()).toMatchObject({
+    phase: 'failed',
+    measurement: previous,
+    error:
+      'The camera failed 3 exposures in a row (The camera reported an exposure error). Check its USB connection and start again.',
+  })
+  expect(journal.recordDropped).toHaveBeenCalledTimes(3)
+})
+
+it('counts only consecutive failed exposures and not an unsolved frame between them', async () => {
+  const subject = setup()
+  await subject.baseline()
+  let failing = true
+
+  subject.setCapture(async () => {
+    if (failing) throw exposureError()
+
+    return {
+      width: 4,
+      height: 4,
+      pixels: new Float64Array([0, 500, 300, 100, ...Array(12).fill(0)]),
+      capturedAt: new Date(1_700_000_000_000 + subject.exposures() * 1000).toISOString(),
+      color: { kind: 'mono' },
+    }
+  })
+
+  for (let failure = 1; failure <= 2; failure++) {
+    cadence.waits.shift()!()
+    await vi.waitFor(() => expect(cadence.waits).toHaveLength(1))
+  }
+
+  failing = false
+  cadence.waits.shift()!()
+  ;(await subject.nextSolve()).result.resolve({ status: 'no-solution', reasons: ['no-match'] })
+  await vi.waitFor(() => expect(cadence.waits).toHaveLength(1))
+  failing = true
+
+  for (let failure = 1; failure <= 2; failure++) {
+    cadence.waits.shift()!()
+    await vi.waitFor(() => expect(cadence.waits).toHaveLength(1))
+  }
+
+  expect(subject.controller.snapshot()).toMatchObject({ active: true, phase: 'adjusting' })
 })
 
 it('reports not rigid with the miss and the step, and no polar error, when the camera slipped during the sweep', async () => {

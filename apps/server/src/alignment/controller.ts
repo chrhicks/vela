@@ -5,6 +5,7 @@ import type { AlignmentExposureImage, AlignmentView } from '@vela/model/web'
 import {
   EquipmentError,
   CaptureRetryableError,
+  CaptureUncertainError,
   type Acquisition,
   type Frame,
 } from '@vela/equipment'
@@ -327,9 +328,13 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
           },
         }),
       { 'alignment.position': view.position },
-    ).finally(() => {
-      capturePending = false
-    })
+    )
+      .catch(error => {
+        throw error instanceof Error ? (asFailedExposure(error) ?? error) : error
+      })
+      .finally(() => {
+        capturePending = false
+      })
 
     return { frame, actual, pointing, pointingObservedAt, timing: frameTiming(exposureRequestedAt) }
   }
@@ -457,7 +462,8 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
 
   /**
    * One exposure, solved and checked. An exposure that gives no usable solve, or that the camera safely failed to take,
-   * comes back as `dropped` and is never exposed again to repair it; anything else that goes wrong ends the run.
+   * comes back as `dropped`; anything else that goes wrong ends the run. An unsolved frame is never exposed again to
+   * repair it. A failed exposure left no frame, so its caller decides whether to expose again and records the drop.
    */
   async function acquire(solver: Solver, signal: AbortSignal, afterSettling: boolean) {
     let taken: Awaited<ReturnType<typeof acquireFrame>>
@@ -467,8 +473,6 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
     } catch (error) {
       if (!(error instanceof CaptureRetryableError)) throw error
       signal.throwIfAborted()
-
-      await diagnostics?.recordDropped(view.position, 'capture-failed', error.message)
 
       return { dropped: { reason: 'capture-failed', detail: error.message } satisfies Dropped }
     }
@@ -633,6 +637,10 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
     }
   }
 
+  async function recordCaptureFailure({ reason, detail }: Dropped) {
+    if (reason === 'capture-failed') await diagnostics?.recordDropped(view.position, reason, detail)
+  }
+
   /** Six positions along the RA sweep: the offline model's five equal moves, or the physical mount's five rotations. */
   async function run(signal: AbortSignal) {
     const diagnosticInfo = {
@@ -759,10 +767,19 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
         else await hardware.move(settings.telescopeId, 1.5, offlineSweep.stepDegrees / 1.5, signal)
       }
 
-      const attempt = await acquire(solver, signal, false)
+      let attempt = await acquire(solver, signal, false)
+
+      // A failed exposure left no frame, so the same position gets one more exposure before it is dropped.
+      if (attempt.dropped?.reason === 'capture-failed') {
+        signal.throwIfAborted()
+        patch({ activity: 'waiting', warning: `${exposureFailed(attempt.dropped)}, retrying.` })
+        await waitForNextExposure(signal)
+        attempt = await acquire(solver, signal, false)
+      }
 
       if (attempt.dropped) {
         signal.throwIfAborted()
+        await recordCaptureFailure(attempt.dropped)
         dropped.push({ position, detail: describeDropped(attempt.dropped) })
         patch({
           dropped: [...dropped],
@@ -846,6 +863,8 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
 
       // A calm adjustment window between exposures; never infer solver progress from
       // elapsed time. It is also the settling allowance before the next exposure.
+      let failedExposures = 0
+
       while (true) {
         await waitForNextExposure(signal)
         const attempt = await acquire(solver, signal, true)
@@ -855,7 +874,21 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
           break
         }
 
-        patch({ warning: `${describeDropped(attempt.dropped)}. Trying a new image.`, activity: 'waiting' })
+        signal.throwIfAborted()
+        await recordCaptureFailure(attempt.dropped)
+
+        if (attempt.dropped.reason !== 'capture-failed') {
+          failedExposures = 0
+          patch({ warning: `${describeDropped(attempt.dropped)}. Trying a new image.`, activity: 'waiting' })
+          continue
+        }
+
+        if (++failedExposures >= maximumFailedExposures)
+          throw new Error(
+            `The camera failed ${failedExposures} exposures in a row (${attempt.dropped.detail}). Check its USB connection and start again.`,
+          )
+
+        patch({ warning: `${exposureFailed(attempt.dropped)}, retrying.`, activity: 'waiting' })
       }
     }
   }
@@ -923,6 +956,31 @@ async function together<A, B>(
 
 /** A sweep position or an adjusting exposure that gave no usable frame. */
 type Dropped = { reason: DroppedReason; detail: string }
+
+/** Failed exposures in a row that end an adjusting run: the camera is not coming back on its own. */
+const maximumFailedExposures = 3
+
+function exposureFailed({ detail }: Dropped) {
+  return `Exposure failed (${detail})`
+}
+
+/**
+ * Cria answers `failed` only after it confirmed no exposure is running, so its failure leaves no frame and an idle
+ * camera. No other adapter promises that: Alpaca classifies its own safe failures and any other error stays fatal.
+ */
+function asFailedExposure(error: Error) {
+  if (error instanceof CaptureRetryableError) return error
+
+  if (
+    error instanceof EquipmentError &&
+    !(error instanceof CaptureUncertainError) &&
+    error.reason === 'protocol-error' &&
+    error.endpoint === 'Cria'
+  )
+    return new CaptureRetryableError(error)
+
+  return undefined
+}
 
 function describeDropped({ reason, detail }: Dropped) {
   return reason === 'capture-failed' ? `The exposure failed (${detail})` : `Plate-solving failed (${detail})`
