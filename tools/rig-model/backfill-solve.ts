@@ -29,7 +29,7 @@ export function solveCache(directory: string, solverVersion: string, fieldHeight
   const pathOf = (sha256: string) => join(directory, `${sha256}.json`)
 
   return {
-    async read(sha256: string, image: SavedImage): Promise<SolveBody | undefined> {
+    async read(sha256: string, image: Pick<SavedImage, 'id'>): Promise<SolveBody | undefined> {
       const entry: Entry | undefined = await readFile(pathOf(sha256), 'utf8').then(
         text => JSON.parse(text),
         () => undefined,
@@ -55,7 +55,7 @@ export interface SolveConfig {
   readonly timeoutMs: number
 }
 
-export async function solveImage(config: SolveConfig, image: SavedImage, hint: SkyPosition): Promise<SolveBody> {
+export async function solveImage(config: SolveConfig, image: Pick<SavedImage, 'id' | 'fitsPath'>, hint: SkyPosition): Promise<SolveBody> {
   const solver = createAstapSolver({ executable: config.executable, catalogPath: config.catalogPath, fieldHeightDegrees: config.fieldHeightDegrees, timeoutMs: config.timeoutMs })
 
   return solveFile(solver, { imageId: image.id, hint, solverVersion: config.solverVersion }, image.fitsPath, AbortSignal.timeout(config.timeoutMs + 10_000))
