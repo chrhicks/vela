@@ -93,6 +93,9 @@ importers:
       '@vela/model':
         specifier: workspace:*
         version: link:../../packages/model
+      '@vela/rig-events':
+        specifier: workspace:*
+        version: link:../../packages/rig-events
       astronomy-engine:
         specifier: 2.1.19
         version: 2.1.19
@@ -109,6 +112,9 @@ importers:
       '@types/node':
         specifier: ^26.2.0
         version: 26.2.0
+      '@vela/rig-testing':
+        specifier: workspace:*
+        version: link:../../packages/rig-testing
       tsx:
         specifier: ^4.21.0
         version: 4.23.12

@@ -18,6 +18,7 @@ services:
     restart: unless-stopped
     environment:
       TZ: ${TZ:-America/New_York}
+      NODE_OPTIONS: --conditions=built
       VELA_CRIA_CONFIG_PATH: /config/cria.json
       VELA_ALERTS_CONFIG_PATH: /config/alerts.json
       VELA_RIG_CATALOG_PATH: /data/rigs.yaml
