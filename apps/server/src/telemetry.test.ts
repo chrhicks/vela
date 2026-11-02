@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { appendFile, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -11,6 +11,7 @@ import {
   type ReadableSpan,
   type SpanExporter,
 } from '@opentelemetry/sdk-trace-node'
+import { buildApp } from './app.js'
 import { createTraceFileExporter, startTelemetry } from './telemetry.js'
 
 const directories: string[] = []
@@ -177,5 +178,136 @@ describe('local tracing', () => {
     expect(trace.getTracer('disabled').startSpan('request').isRecording()).toBe(false)
     await telemetry.forceFlush()
     await telemetry.shutdown()
+  })
+})
+
+describe('recovering from write failures', () => {
+  function fakeDisk() {
+    const disk = { failing: false, partial: false, attempts: 0 }
+
+    const append: typeof appendFile = async (path, data, options) => {
+      disk.attempts++
+
+      if (disk.failing) {
+        if (disk.partial) await appendFile(path, String(data).slice(0, 40), options)
+        throw Object.assign(new Error('ENOSPC: no space left on device'), { code: 'ENOSPC' })
+      }
+
+      await appendFile(path, data, options)
+    }
+
+    return { disk, append }
+  }
+
+  function clock() {
+    const time = { now: 1_000_000 }
+
+    return { time, now: () => time.now }
+  }
+
+  async function setup() {
+    const file = join(await directory(), 'trace.jsonl')
+    const { disk, append } = fakeDisk()
+    const { time, now } = clock()
+    const onError = vi.fn()
+    const exporter = createTraceFileExporter(file, { appendFile: append, now, onError })
+
+    return { file, disk, time, onError, exporter, value: await span() }
+  }
+
+  it('drops the span of a failed write, counts it, and resumes after the pause', async () => {
+    const { file, disk, time, onError, exporter, value } = await setup()
+    expect((await exportSpans(exporter, [value])).code).toBe(ExportResultCode.SUCCESS)
+
+    disk.failing = true
+    expect((await exportSpans(exporter, [value])).code).toBe(ExportResultCode.FAILED)
+    expect(exporter.health()).toMatchObject({
+      state: 'failing',
+      dropped: 1,
+      lastError: { at: time.now, message: expect.stringContaining('ENOSPC') },
+    })
+
+    disk.failing = false
+    expect((await exportSpans(exporter, [value])).code).toBe(ExportResultCode.FAILED)
+    expect(exporter.health()).toMatchObject({ state: 'failing', dropped: 2 })
+
+    time.now += 5_000
+    expect((await exportSpans(exporter, [value])).code).toBe(ExportResultCode.SUCCESS)
+    expect(exporter.health()).toMatchObject({ state: 'ok', dropped: 2, lastWriteAt: time.now })
+    expect(onError).toHaveBeenCalledTimes(1)
+    expect(await records(file)).toHaveLength(2)
+  })
+
+  it('backs off 5, 30 then 60 seconds and keeps no queue of failed spans', async () => {
+    const { disk, time, exporter, value } = await setup()
+    disk.failing = true
+    await exportSpans(exporter, [value])
+    expect(disk.attempts).toBe(1)
+
+    const retry = async (wait: number) => {
+      const before = disk.attempts
+      time.now += wait - 1
+      await exportSpans(exporter, [value])
+      expect(disk.attempts).toBe(before)
+      time.now += 1
+      await exportSpans(exporter, [value])
+      expect(disk.attempts).toBe(before + 1)
+    }
+
+    await retry(5_000)
+    await retry(30_000)
+    await retry(60_000)
+    await retry(60_000)
+
+    const attempts = disk.attempts
+    const skipped = await Promise.all(Array.from({ length: 500 }, () => exportSpans(exporter, [value, value])))
+    expect(skipped.every(result => result.code === ExportResultCode.FAILED)).toBe(true)
+    expect(disk.attempts).toBe(attempts)
+    expect(exporter.health()).toMatchObject({ state: 'failing', dropped: 9 + 1000 })
+    await expect(exporter.shutdown()).resolves.toBeUndefined()
+  })
+
+  it('discards the torn line a full disk leaves so later spans stay readable', async () => {
+    const { file, disk, time, exporter, value } = await setup()
+    await exportSpans(exporter, [await span('before')])
+    disk.failing = true
+    disk.partial = true
+    await exportSpans(exporter, [value])
+    disk.failing = false
+    time.now += 5_000
+    await exportSpans(exporter, [await span('after')])
+    expect((await records(file)).map(record => record.name)).toEqual(['before', 'after'])
+  })
+
+  it('retries an unwritable traces directory and starts writing once it appears', async () => {
+    const parent = join(await directory(), 'traces')
+    await writeFile(parent, 'occupied')
+    const { time, now } = clock()
+    const exporter = createTraceFileExporter(join(parent, 'trace.jsonl'), { now, onError: () => {} })
+    const value = await span()
+    expect((await exportSpans(exporter, [value])).code).toBe(ExportResultCode.FAILED)
+    expect(exporter.health().state).toBe('failing')
+
+    await rm(parent)
+    time.now += 5_000
+    expect((await exportSpans(exporter, [value])).code).toBe(ExportResultCode.SUCCESS)
+    expect(exporter.health()).toMatchObject({ state: 'ok', dropped: 1 })
+    expect(await records(join(parent, 'trace.jsonl'))).toHaveLength(1)
+  })
+
+  it('shows failing then ok on /api/health', async () => {
+    const { disk, time, exporter, value } = await setup()
+    const app = buildApp({ telemetry: { health: () => exporter.health() } })
+    const health = async () => (await app.inject('/api/health')).json().telemetry
+
+    expect(await health()).toMatchObject({ state: 'ok', dropped: 0, lastError: null })
+    disk.failing = true
+    await exportSpans(exporter, [value])
+    expect(await health()).toMatchObject({ state: 'failing', dropped: 1, lastError: { message: expect.stringContaining('ENOSPC') } })
+    disk.failing = false
+    time.now += 5_000
+    await exportSpans(exporter, [value])
+    expect(await health()).toMatchObject({ state: 'ok', dropped: 1 })
+    await app.close()
   })
 })

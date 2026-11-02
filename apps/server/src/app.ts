@@ -48,6 +48,7 @@ import { registerTargets, type TargetOptions } from './targets/routes.js'
 import { createSurveyCache, registerSurvey, type SurveyCache } from './targets/survey.js'
 import type { ModelHost } from './rig-model/host.js'
 import type { RunLog } from './run-log/run-log.js'
+import type { TraceHealth } from './telemetry.js'
 
 interface BuildAppOptions {
   readonly equipment?: EquipmentComposition
@@ -55,6 +56,7 @@ interface BuildAppOptions {
   readonly shadowStateDirectory?: string
   readonly publisher?: Pick<Publisher, 'health'>
   readonly runLog?: Pick<RunLog, 'health' | 'append'>
+  readonly telemetry?: { health(): TraceHealth }
   readonly attestation?: Attestation
   readonly targets?: Omit<TargetOptions, 'createAdapter' | 'createAcquisition' | 'createInspector'>
   readonly surveyCache?: SurveyCache
@@ -90,6 +92,7 @@ export function buildApp({
   equipment = createEquipmentComposition(),
   runLog,
   publisher,
+  telemetry,
   models,
   shadowStateDirectory,
   attestation = noAttestation,
@@ -210,7 +213,7 @@ export function buildApp({
     return { rigId, checkedAt, local, shadow } satisfies RigModelView
   })
 
-  app.get('/api/health', async () => ({ status: 'ok', runLog: runLog?.health() ?? { state: 'off' }, publisher: publisher?.health() ?? { state: 'off' } }))
+  app.get('/api/health', async () => ({ status: 'ok', runLog: runLog?.health() ?? { state: 'off' }, publisher: publisher?.health() ?? { state: 'off' }, telemetry: telemetry?.health() ?? { state: 'off' } }))
 
   app.post('/api/rigs/discovery', async (request, reply) => {
     const input = parseDiscoverRigsInput(request.body)

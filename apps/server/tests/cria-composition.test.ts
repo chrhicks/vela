@@ -138,6 +138,6 @@ it('reports the run log on /api/health', async () => {
   const [without, withLog] = await Promise.all([off.inject('/api/health'), on.inject('/api/health')])
 
   await Promise.all([off.close(), on.close(), runLog.close()])
-  expect(without.json()).toEqual({ status: 'ok', runLog: { state: 'off' }, publisher: { state: 'off' } })
+  expect(without.json()).toEqual({ status: 'ok', runLog: { state: 'off' }, publisher: { state: 'off' }, telemetry: { state: 'off' } })
   expect(withLog.json()).toMatchObject({ status: 'ok', runLog: { state: 'ok', file: null, dropped: 0, lastError: null } })
 })
