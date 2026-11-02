@@ -11,7 +11,7 @@
 import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { Option, Schema } from 'effect'
-import { EnvelopeRequest, FixRequest, MountFeedback, Device, ErrorBody, Health, Operation, OperationRequest, RecoveryRequest, State } from '@cria/wire'
+import { EnvelopeRequest, FixRequest, MountFeedback, MountLease, Device, ErrorBody, Health, Operation, OperationRequest, RecoveryRequest, State } from '@cria/wire'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { FakeCria, routeOf, statusOf, type Route } from './fake-cria.js'
 
@@ -35,6 +35,7 @@ const Original = Schema.Struct({
 })
 
 const replies = {
+  lease: MountLease,
   envelope: MountFeedback,
   fix: MountFeedback,
   feedback: MountFeedback,

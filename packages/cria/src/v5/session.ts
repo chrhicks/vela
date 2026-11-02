@@ -3,6 +3,8 @@ import { Effect, Exit, Option, Schedule, Schema, type Scope, Stream, Subscriptio
 import { Failed, Uncertain } from '@cria/primitives'
 import {
   MountFeedback,
+  MountLease,
+  type LeaseRequest,
   type AcceptedFix,
   type MountEnvelope,
   Device,
@@ -32,6 +34,7 @@ export type Looked =
   | { readonly kind: 'unknown'; readonly message: string }
 
 export interface Session {
+  readonly lease: (deviceId: string, request: LeaseRequest) => Effect.Effect<Reply<MountLease>>
   readonly envelope: (deviceId: string, envelope: MountEnvelope) => Effect.Effect<Reply<MountFeedback>>
   readonly fix: (deviceId: string, fix: AcceptedFix) => Effect.Effect<Reply<MountFeedback>>
   readonly received: Effect.Effect<Received>
@@ -202,6 +205,7 @@ export function openSession(connection: CriaConnection): Effect.Effect<Session, 
     }
 
     return {
+      lease: (deviceId, body) => request(connection, 'POST', `/v2/devices/${deviceId}/lease`, MountLease, body),
       envelope: (deviceId, envelope) => Effect.flatMap(SubscriptionRef.get(received), current => current.state === 'live'
         ? request(connection, 'POST', `/v2/devices/${encodeURIComponent(deviceId)}/envelope`, MountFeedback, { instanceId: current.snapshot.instanceId, envelope })
         : Effect.succeed({ kind: 'lost' as const, message: current.message })),

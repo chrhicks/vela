@@ -9,7 +9,7 @@ import { expect, it } from 'vitest'
  * `git -C CRIA rev-parse COMMIT:ts/testing/golden/wire.golden.json`.
  */
 const golden = {
-  commit: 'e4b6aec8bc6c8ef2d32a04ad74270e988024d5f1',
+  commit: 'fe43451fbff9c34148152a22daaba7961418ec22',
   blob: '71ff9bcef82170b26c55cb986c5bfca8282cd849',
 }
 
