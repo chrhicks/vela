@@ -16,6 +16,7 @@ import { createEquipmentComposition } from './equipment/composition.js'
 import { loadAlertsConfiguration } from './alerts/config.js'
 import { createPushoverNotifier } from './alerts/pushover.js'
 import { createHorizon } from './targets/horizon.js'
+import { openRunLog, type RunLog } from './run-log/run-log.js'
 
 const telemetry = startTelemetry(process.env.VELA_TRACE_PATH)
 
@@ -26,6 +27,8 @@ const frameRecords = process.env.VELA_FRAME_RECORDS_PATH
 const autofocusRecords: AutofocusRecords = process.env.VELA_AUTOFOCUS_RECORDS_PATH
   ? openJsonlRecords(process.env.VELA_AUTOFOCUS_RECORDS_PATH, { name: 'autofocus records' })
   : noAutofocusRecords
+
+const runLog: RunLog | undefined = process.env.VELA_RUN_LOG_DIR ? openRunLog({ directory: resolve(process.env.VELA_RUN_LOG_DIR) }) : undefined
 
 let app: ReturnType<typeof buildApp> | undefined
 
@@ -39,6 +42,7 @@ function shutdown() {
     try {
       await app?.close()
     } finally {
+      await runLog?.close()
       await captureRuns.close()
       await frameRecords.close()
       await autofocusRecords.close()
@@ -117,8 +121,7 @@ try {
 
   const equipmentOptions: NonNullable<Parameters<typeof createEquipmentComposition>[1]> = {}
 
-  if (process.env.VELA_CRIA_JOURNAL_PATH)
-    equipmentOptions.criaJournalPath = resolve(process.env.VELA_CRIA_JOURNAL_PATH)
+  if (runLog) equipmentOptions.runLog = runLog
 
   if (targets.solver) equipmentOptions.solver = targets.solver
 
@@ -131,7 +134,7 @@ try {
   const equipment = createEquipmentComposition(cria, equipmentOptions)
 
   if (!shutdownTask) {
-    const options = { rigCatalog, savedImages, frameRecords, autofocusRecords, captureRuns, targets, surveyCache, equipment, alerts }
+    const options = { rigCatalog, savedImages, frameRecords, autofocusRecords, captureRuns, targets, surveyCache, equipment, alerts, ...(runLog && { runLog }) }
     app = buildApp(alignment ? { ...options, alignment } : options)
     await app.listen({ port, host })
   }

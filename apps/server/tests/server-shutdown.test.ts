@@ -1,18 +1,18 @@
-import { execFileSync, spawn } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import { once } from 'node:events'
-import { closeSync, constants, openSync } from 'node:fs'
 import { createServer } from 'node:http'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { expect, it } from 'vitest'
 import { z } from 'zod'
+import { decodeLine } from '@vela/rig-events'
 import { FakeCria } from '../../../packages/cria/test/v5/fake-cria.js'
 
-it('exits on SIGTERM within a bound while the Cria journal is a FIFO nobody reads', async () => {
+it('exits on SIGTERM within a bound and leaves a run log that decodes', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'vela-server-shutdown-'))
-  const fifo = join(directory, 'cria-journal.jsonl')
+  const runLogDirectory = join(directory, 'run-log')
   const service = new FakeCria()
   const state = await (await service.fetch(`${service.origin}/v2/state`)).json()
 
@@ -29,7 +29,6 @@ it('exits on SIGTERM within a bound while the Cria journal is a FIFO nobody read
   await once(remote, 'listening')
   const { port } = z.object({ port: z.number().int().positive() }).parse(remote.address())
 
-  execFileSync('mkfifo', [fifo])
   const configPath = join(directory, 'cria.json')
 
   await writeFile(
@@ -48,7 +47,7 @@ it('exits on SIGTERM within a bound while the Cria journal is a FIFO nobody read
       VELA_RIG_CATALOG_PATH: join(directory, 'rigs.json'),
       VELA_SAVED_IMAGES_PATH: join(directory, 'saved'),
       VELA_SURVEY_CACHE_PATH: join(directory, 'survey'),
-      VELA_CRIA_JOURNAL_PATH: fifo,
+      VELA_RUN_LOG_DIR: runLogDirectory,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
@@ -76,9 +75,15 @@ it('exits on SIGTERM within a bound while the Cria journal is a FIFO nobody read
 
     expect(code, `server still running ${Math.round(performance.now() - stopped)} ms after SIGTERM:\n${logs}`).toBe(0)
     expect(performance.now() - stopped).toBeLessThan(5_000)
+
+    const [name] = await readdir(runLogDirectory)
+    const lines = (await readFile(join(runLogDirectory, name!), 'utf8')).trimEnd().split('\n').map(line => decodeLine(line))
+
+    expect(lines.length).toBeGreaterThan(1)
+    expect(lines.every(line => line.ok)).toBe(true)
+    expect(lines.flatMap(line => (line.ok ? [line.event.kind] : []))).toContain('cria.state')
   } finally {
     if (child.exitCode === null) child.kill('SIGKILL')
-    closeSync(openSync(fifo, constants.O_RDWR | constants.O_NONBLOCK))
     service.close()
     remote.closeAllConnections()
     remote.close()

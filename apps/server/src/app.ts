@@ -40,9 +40,11 @@ import { createMemorySavedImageStore, type SavedImageStore } from './saved-image
 import { registerSavedImages } from './saved-images/routes.js'
 import { registerTargets, type TargetOptions } from './targets/routes.js'
 import { createSurveyCache, registerSurvey, type SurveyCache } from './targets/survey.js'
+import type { RunLog } from './run-log/run-log.js'
 
 interface BuildAppOptions {
   readonly equipment?: EquipmentComposition
+  readonly runLog?: Pick<RunLog, 'health'>
   readonly targets?: Omit<TargetOptions, 'createAdapter' | 'createAcquisition' | 'createInspector'>
   readonly surveyCache?: SurveyCache
   readonly savedImages?: SavedImageStore
@@ -75,6 +77,7 @@ export function buildApp({
   alignment,
   alerts: alertSettings = { thresholds: defaultThresholds, notifier: null },
   equipment = createEquipmentComposition(),
+  runLog,
   alpacaDiscovery = equipment.alpacaDiscovery,
   createConnector = equipment.createConnector,
   createInventory = equipment.createInventory,
@@ -162,7 +165,7 @@ export function buildApp({
     now,
   })
 
-  app.get('/api/health', async () => ({ status: 'ok' }))
+  app.get('/api/health', async () => ({ status: 'ok', runLog: runLog?.health() ?? { state: 'off' } }))
 
   app.post('/api/rigs/discovery', async (request, reply) => {
     const input = parseDiscoverRigsInput(request.body)

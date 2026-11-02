@@ -18,8 +18,12 @@ Config and data live in XDG directories, mounted into the containers (override w
 | `~/.config/vela/alerts.json` | `/config/alerts.json` (read-only) | Pushover keys and alert thresholds; optional, see below |
 | `~/.local/share/vela/rigs.yaml` | `/data/rigs.yaml` | rig catalog, written by Vela |
 | `~/.local/share/vela/saved-images/` | `/data/saved-images` | captured frames |
-| `~/.local/share/vela/survey-cache/`, `traces/`, `alignment-diagnostics/` | `/data/...` | caches, trace journal, evidence bundles |
+| `~/.local/share/vela/survey-cache/`, `traces/`, `run-log/`, `alignment-diagnostics/` | `/data/...` | caches, trace journal, [run log](run-log.md), evidence bundles |
 | `~/.local/share/vela/astap/` | `/astap` (read-only) | `astap_cli` and `catalog/opt/astap/` (D05 star database) |
+
+The server image runs with `NODE_OPTIONS=--conditions=built` (set in `compose.yaml`). It makes
+`@vela/rig-events` load from its built `dist/`, because Node does not run TypeScript source from
+`node_modules`. Anything else that starts `node dist/server.js` needs the same flag; `pnpm start` has it.
 
 The ASTAP binary and star catalog are not in git; copy them into `astap/`. Create the
 directories as the user that runs the stack: the containers run as `VELA_UID:VELA_GID`

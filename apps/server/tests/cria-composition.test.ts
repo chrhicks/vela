@@ -1,5 +1,5 @@
 import { createServer } from 'node:http'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { once } from 'node:events'
@@ -9,7 +9,9 @@ import { FakeCria } from '../../../packages/cria/test/v5/fake-cria.js'
 
 const token = 'test-only-token-for-the-in-memory-fixture'
 
+import { decodeLine } from '@vela/rig-events'
 import { buildApp } from '../src/app.js'
+import { openRunLog } from '../src/run-log/run-log.js'
 import { createMemoryRigCatalog } from '../src/rig/catalog.js'
 import { createEquipmentComposition } from '../src/equipment/composition.js'
 import { registerConfiguredCriaRigs, type CriaRigConfiguration } from '../src/equipment/config.js'
@@ -88,15 +90,15 @@ it('shares one authenticated stream across configured rigs and closes it with th
   }
 })
 
-it('journals what every connection decodes, tagged with its origin, when given a path', async () => {
+it('writes what every connection decodes to the run log as envelopes for its rig', async () => {
   vi.useFakeTimers({ now: Date.UTC(2026, 9, 17, 3) })
-  const directory = await mkdtemp(join(tmpdir(), 'vela-composition-journal-'))
-  const path = join(directory, 'cria-journal.jsonl')
+  const directory = await mkdtemp(join(tmpdir(), 'vela-composition-run-log-'))
   const service = new FakeCria()
+  const runLog = openRunLog({ directory })
 
   const composition = createEquipmentComposition(
     [{ id: 'fixture', name: 'Fixture', url: service.origin, devices: [{ id: 'camera', kind: 'camera', expectedName: 'Fake CCD' }] }],
-    { fetch: service.fetch, criaJournalPath: path },
+    { fetch: service.fetch, runLog },
   )
 
   composition.start()
@@ -104,10 +106,38 @@ it('journals what every connection decodes, tagged with its origin, when given a
   await composition.close()
   service.close()
   vi.useRealTimers()
+  await runLog.close()
 
-  const lines = (await readFile(path, 'utf8')).trimEnd().split('\n').map(line => JSON.parse(line))
+  const [name] = await readdir(directory)
+  const lines = (await readFile(join(directory, name!), 'utf8')).trimEnd().split('\n').map(line => decodeLine(line))
 
   await rm(directory, { recursive: true, force: true })
-  expect(lines.slice(0, 2).map(line => [line.origin, line.kind])).toEqual([[service.origin, 'stream'], [service.origin, 'state']])
-  expect(lines.filter(line => line.kind === 'state').length).toBeGreaterThan(1)
+  expect(lines.every(line => line.ok)).toBe(true)
+
+  const events = lines.flatMap(line => (line.ok ? [line.event] : []))
+
+  expect(events.every(event => event.rig === 'fixture' && event.source === 'vela:cria')).toBe(true)
+  expect(events.slice(0, 2).map(event => event.kind)).toEqual(['cria.stream', 'cria.state'])
+  expect(events.filter(event => event.kind === 'cria.state').length).toBeGreaterThan(1)
+  expect(runLog.health().state).toBe('closed')
+})
+
+it('refuses a Cria rig id the run log cannot name', () => {
+  expect(() =>
+    createEquipmentComposition([{ id: 'Fixture', name: 'Fixture', url: 'http://cria.test', devices: [{ id: 'camera', kind: 'camera', expectedName: 'Fake CCD' }] }], {
+      runLog: { append() {} },
+    }),
+  ).toThrow('Cria rig id "Fixture"')
+})
+
+it('reports the run log on /api/health', async () => {
+  const runLog = openRunLog({ directory: join(tmpdir(), 'vela-health-never-written') })
+  const off = buildApp()
+  const on = buildApp({ runLog })
+
+  const [without, withLog] = await Promise.all([off.inject('/api/health'), on.inject('/api/health')])
+
+  await Promise.all([off.close(), on.close(), runLog.close()])
+  expect(without.json()).toEqual({ status: 'ok', runLog: { state: 'off' } })
+  expect(withLog.json()).toMatchObject({ status: 'ok', runLog: { state: 'ok', file: null, dropped: 0, lastError: null } })
 })
