@@ -296,6 +296,12 @@ work below the consumer's 256-message limit and limits idle checkpoint delay.
 A normal restart loads the checkpoint and resumes `model-v1` without archive reads.
 If the checkpoint is missing, invalid, or behind the durable consumer's ack floor,
 it rebuilds through that floor from step 37's read-only archive in broker order.
+Recovery uses a disposable SQLite index of sequences and file offsets with an 8 MiB
+page cache, then reads one envelope at a time in sequence order. No input payloads
+are copied. The index is removed on completion or failure and replaced after a
+crash. Its temporary disk use grows with the retained record count. The model
+service uses the Node 26 image, which supplies SQLite without a package dependency.
+The equality CLI continues using the existing archive reader.
 If the archive has not reached that floor, startup fails without acknowledging more facts.
 
 Each rig has two fixed checkpoint slots, with a 16 MiB limit per slot, and a

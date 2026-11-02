@@ -13,6 +13,7 @@ import { runArchiver } from '../src/run-log/archiver.js'
 import { readArchive } from '../src/run-log/archive.js'
 import { runShadowModel } from '../src/rig-model/shadow.js'
 import { compareModelReplay } from '../src/rig-model/replay.js'
+import { checkpointStore } from '../src/rig-model/checkpoint.js'
 import { inOrder, s } from '../../../packages/rig-model/test/support.js'
 import { modelFixture } from './fixtures/model-stream.js'
 
@@ -60,6 +61,7 @@ it.skipIf(!process.env.TEST_NATS_URL)('broker live assessments equal ordered arc
 
     await first
     expect(deliveries).toBe(35)
+    const resumeAt = ((await checkpointStore(options.directory).load())?.sequences.get('RIG_FACTS') ?? 0) + 1
     const resumedSequences: number[] = []
 
     restarted = runShadowModel({ ...options, signal: secondStop.signal, onPublished: async sequence => { resumedSequences.push(sequence) } })
@@ -73,7 +75,7 @@ it.skipIf(!process.env.TEST_NATS_URL)('broker live assessments equal ordered arc
     const info = await manager.consumers.info('RIG_FACTS', 'model-v1')
 
     expect(info.delivered.consumer_seq).toBeGreaterThan(events.length)
-    expect(resumedSequences[0]).toBe(1)
+    expect(resumedSequences[0]).toBe(resumeAt)
 
     for (const stream of ['RIG_FACTS', 'RIG_ASSESS']) {
       await expect.poll(async () => {

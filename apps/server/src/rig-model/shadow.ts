@@ -3,7 +3,7 @@ import { connect } from '@nats-io/transport-node'
 import { jetstream, type JsMsg } from '@nats-io/jetstream'
 import { decodeLine, encodeEvent, subjectOf, type RigEvent } from '@vela/rig-events'
 import { z } from 'zod'
-import { readArchive } from '../run-log/archive.js'
+import { recoverFacts } from './recovery.js'
 import { createStreamModel } from './stream.js'
 import { checkpointStore } from './checkpoint.js'
 
@@ -57,8 +57,7 @@ export async function runShadowModel(options: ModelServiceOptions) {
       runtime = createStreamModel(saved)
       options.onRecovery?.('checkpoint')
     } else if (floor > 0) {
-      for await (const record of readArchive(options.archiveDirectory, { from: 0, to: 253402300799999 })) {
-        if (record.broker?.stream !== 'RIG_FACTS' || record.broker.sequence > floor) continue
+      for await (const record of recoverFacts(options.archiveDirectory, options.directory, floor)) {
         await publish(runtime.accept(record))
       }
 
