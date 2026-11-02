@@ -1,4 +1,5 @@
-import { mkdtemp, readdir, readFile, readlink } from 'node:fs/promises'
+import { mkdtemp } from '../../testing/temp-dir.mjs'
+import { readdir, readFile, readlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { expect, test } from 'vitest'
