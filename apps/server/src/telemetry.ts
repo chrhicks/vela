@@ -107,6 +107,7 @@ export function createTraceFileExporter(
           throw error
         },
       )
+
       committedBytes ??= size
 
       if (size > committedBytes) await truncate(file, committedBytes)
