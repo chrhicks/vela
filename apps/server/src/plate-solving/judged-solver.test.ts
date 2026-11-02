@@ -1,7 +1,7 @@
-import { expect, it } from 'vitest'
+import { expect, it, vi } from 'vitest'
 import type { AstapSolution } from '@vela/rig-astap'
 import { astapReturning, falseSolve, fieldHeightDegreesFor, goodSolve } from './false-solve.js'
-import { describeRejection, judgedSolver, type MonoFrame } from './judged-solver.js'
+import { describeRejection, judgedSolver, reportAcceptedFix, type MonoFrame } from './judged-solver.js'
 
 const frame: MonoFrame = { width: 100, height: 80, pixels: new Float64Array(8000), capturedAt: '2026-09-07T04:00:00Z' }
 
@@ -36,4 +36,40 @@ it('says in words why a solve was rejected, and how far off the field was', asyn
   if (rejected.status !== 'no-solution') throw new Error('Expected a rejection')
   expect(describeRejection(rejected)).toBe('the plate scale does not match the optics; the image is mirrored; the field is 100.9 degrees from where the mount points')
   expect(describeRejection({ status: 'no-solution', reasons: ['few-stars'], measured: null })).toBe('too few stars')
+})
+
+
+it.each(['framing', 'alignment'] as const)('keeps an accepted %s solve when feedback rejects', async purpose => {
+  const failure = new Error('Cria unavailable')
+  const report = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  const send = vi.fn().mockRejectedValue(failure)
+  const solver = reportAcceptedFix(judgedSolver(astapReturning(goodSolve(claimed, frame)), fieldHeightDegreesFor(frame.height), purpose), send)
+
+  try {
+    await expect(solver.solve(frame, claimed, claimed, signal)).resolves.toMatchObject({ status: 'solved' })
+    await vi.waitFor(() => expect(report).toHaveBeenCalledExactlyOnceWith(String(failure)))
+    expect(send).toHaveBeenCalledTimes(1)
+  } finally {
+    report.mockRestore()
+  }
+})
+
+it('returns the solve while feedback is still pending', async () => {
+  let finish!: () => void
+  const pending = new Promise<void>(resolve => { finish = resolve })
+  const solver = reportAcceptedFix(judgedSolver(astapReturning(goodSolve(claimed, frame)), fieldHeightDegreesFor(frame.height), 'framing'), () => pending)
+
+  try {
+    await expect(solver.solve(frame, claimed, claimed, signal)).resolves.toMatchObject({ status: 'solved' })
+  } finally {
+    finish()
+  }
+})
+
+it('sends no feedback for a rejected solve', async () => {
+  const send = vi.fn()
+  const solver = reportAcceptedFix(judgedSolver(astapReturning(falseSolve(claimed, frame)), fieldHeightDegreesFor(frame.height), 'framing'), send)
+
+  await expect(solver.solve(frame, claimed, claimed, signal)).resolves.toMatchObject({ status: 'no-solution' })
+  expect(send).not.toHaveBeenCalled()
 })

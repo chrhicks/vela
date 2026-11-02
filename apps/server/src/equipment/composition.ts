@@ -165,7 +165,14 @@ export function createEquipmentComposition(
       if (!configuration) return
       const client = clients.get(configuration.url)!
 
-      for (const mount of configuration.devices.filter(device => device.kind === 'mount')) await client.sendFix(mount.id, fix)
+      for (const mount of configuration.devices.filter(device => device.kind === 'mount')) {
+        try {
+          await client.sendFix(mount.id, fix)
+        } catch (error) {
+          const report = options.onFeedbackError ?? (message => console.warn(message))
+          report(String(error))
+        }
+      }
     },
     holdsOf: rigId => equipment.get(rigId)?.holds() ?? [],
     recover: (rig, deviceId, note) => rig.source
