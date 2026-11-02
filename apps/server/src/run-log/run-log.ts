@@ -184,6 +184,11 @@ export function openRunLog({
     const torn = fileBytes === 0
 
     handle = undefined
+
+    // A batch can fail after some of its lines reached the disk. Cut the file back to the last whole batch so
+    // the retry in the next file does not write those lines twice. If the cut fails, the retry may repeat
+    // events; their ids are stable, so a reader can drop the repeats.
+    await old?.truncate(fileBytes).catch(() => {})
     await old?.close().catch(() => {})
 
     if (old && torn) await unlink(path).catch(() => {})

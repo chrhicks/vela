@@ -198,6 +198,7 @@ describe('a disk that fails', () => {
 
     for (let index = 0; index < 8; index += 1) log.append(exchange(1_792_000_000_000 + index))
     expect(log.health().dropped).toBe(5)
+    await vi.waitFor(() => expect(log.health().lastError?.message).toContain('ENOSPC'))
 
     state.full = false
     await vi.waitFor(() => expect(log.health().state).toBe('ok'), { timeout: 5_000 })
@@ -208,6 +209,44 @@ describe('a disk that fails', () => {
     expect(events.filter(event => event.kind === 'cria.exchange')).toHaveLength(3)
     expect(events.find(event => event.kind === 'gap')).toMatchObject({ rig: context.rig, body: { source: context.source, reason: 'disk', dropped: 5 } })
     expect(log.health().dropped).toBe(5)
+  })
+
+  it('does not write a batch twice when the disk fails partway through it', async () => {
+    let opened = 0
+
+    const openFile: NonNullable<RunLogOptions['openFile']> = async (path, flags, mode) => {
+      const handle = await open(path, flags, mode)
+
+      opened += 1
+
+      if (opened > 1) return handle
+
+      let calls = 0
+      const appendFile = handle.appendFile.bind(handle)
+
+      handle.appendFile = async text => {
+        calls += 1
+
+        if (calls === 1) return appendFile(text)
+
+        const lines = String(text).split('\n')
+
+        await appendFile(`${lines.slice(0, 3).join('\n')}\n${lines[3]?.slice(0, 20)}`)
+        throw Object.assign(new Error('ENOSPC: no space left on device, write'), { code: 'ENOSPC' })
+      }
+
+      return handle
+    }
+
+    const log = openLog({ openFile })
+    const sent = [0, 1, 2, 3, 4, 5].map(offset => exchange(1_792_000_000_000 + offset))
+
+    for (const event of sent) log.append(event)
+    await vi.waitFor(() => expect(log.health().lastError?.message).toContain('ENOSPC'))
+    await settled(log)
+
+    expect(await eventsOnDisk()).toEqual(sent)
+    expect(log.health().dropped).toBe(0)
   })
 
   it('stays up, retrying, when the directory cannot be made', async () => {

@@ -39,6 +39,20 @@ describe('a Cria client entry as an envelope', () => {
     expect(JSON.stringify(observed(first))).not.toContain('1792000002000')
   })
 
+  it('keeps a snapshot whose only change is observedAt', () => {
+    const at = 1_792_000_003_000
+    const before = mountState({ sequence: 9, generatedAt: at, mount: { at: at - 5_000, raHours: 5.5, decDegrees: -5.4 } })
+    const after = mountState({ sequence: 9, generatedAt: at, mount: { at, raHours: 5.5, decDegrees: -5.4 } })
+    const withoutObservedAt = (state: typeof before) => JSON.stringify(state, (key, value) => (key === 'observedAt' ? undefined : value))
+
+    expect(withoutObservedAt(after)).toBe(withoutObservedAt(before))
+
+    const kept = readBack({ kind: 'state', at, origin, state: after })
+
+    expect(kept.kind === 'cria.state' && kept.body.state).toEqual(after)
+    expect(JSON.stringify(after)).not.toBe(JSON.stringify(before))
+  })
+
   it('turns a decoded reply body into plain JSON and drops one that has none', () => {
     const exchange = {
       kind: 'exchange',
