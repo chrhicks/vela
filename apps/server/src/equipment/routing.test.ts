@@ -189,6 +189,8 @@ function setup({ savedCameraName = 'Camera' }: { savedCameraName?: string } = {}
   })
 
   const equipment: EquipmentComposition = {
+    envelopeFor: () => ({ keepOut: [] }),
+    async sendFix() {},
     start() {},
     async close() {},
     alpacaDiscovery: {

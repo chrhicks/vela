@@ -8,6 +8,11 @@ import {
   createAlpacaProvider,
   type AlpacaDiscovery,
 } from '@vela/alpaca'
+import type { AcceptedFix, MountEnvelope } from '@vela/cria'
+import type { RigCatalog } from '../rig/catalog.js'
+import type { Horizon } from '../targets/horizon.js'
+import { defaultThresholds, type AlertThresholds } from '../alerts/thresholds.js'
+import { mountEnvelope, stubEnvelope } from './envelope.js'
 import { createCriaConnection, createCriaEquipment, type CriaConnection, type CriaConnectionOptions, type CriaRecovery, type JournalSink } from '@vela/cria'
 import { criaEvent, rigId, sourceId } from '@vela/rig-events'
 import {
@@ -29,7 +34,11 @@ import { criaDeviceId, type CriaRigConfiguration } from './config.js'
 import type { RunLog } from '../run-log/run-log.js'
 import { alpacaEndpoint } from './source.js'
 
+export type { MountEnvelope, AcceptedFix } from '@vela/cria'
+
 export interface EquipmentComposition {
+  envelopeFor(rigId: string): MountEnvelope
+  sendFix(rig: RigCatalogRecord, fix: AcceptedFix): Promise<void>
   holdsOf(rigId: string): ReadonlyArray<{ readonly deviceId: string; readonly reason: string }>
   recover(rig: RigCatalogRecord, deviceId: string, note: string): Promise<CriaRecovery>
   /** Drops a device's uncertain-ending warning. It never touches a hold. */
@@ -52,6 +61,10 @@ export interface EquipmentComposition {
 }
 
 interface CompositionOptions {
+  catalog?: RigCatalog
+  horizon?: Pick<Horizon, 'skyline'>
+  thresholds?: AlertThresholds
+  onFeedbackError?: (message: string) => void
   solver?: { executable: string; catalogPath: string }
   diagnosticsPath?: string
   fetch?: typeof globalThis.fetch
@@ -79,6 +92,9 @@ export function createEquipmentComposition(
   configurations: ReadonlyArray<CriaRigConfiguration> = [],
   options: CompositionOptions = {},
 ): EquipmentComposition {
+  const envelopes = new Map<string, MountEnvelope>()
+  const thresholds = options.thresholds ?? defaultThresholds
+  const envelopeFor = (rigId: string) => envelopes.get(rigId) ?? mountEnvelope(configurations.find(config => config.id === rigId)?.envelope ?? stubEnvelope, thresholds, null)
   const clients = new Map<string, CriaConnection>()
   const equipment = new Map<string, ReturnType<typeof createCriaEquipment>>()
 
@@ -94,6 +110,26 @@ export function createEquipmentComposition(
 
       if (options.runLog) connection = { ...connection, journal: criaSink(options.runLog, criaRigId(configuration.id)) }
 
+      connection = {
+        ...connection,
+        onFeedbackError: options.onFeedbackError ?? (message => console.warn(message)),
+        async envelopes() {
+          const outgoing: Array<{ deviceId: string; envelope: MountEnvelope }> = []
+
+          for (const configured of configurations.filter(rig => rig.url === configuration.url)) {
+            const rig = await options.catalog?.get(configured.id)
+
+            if (options.catalog && rig?.source?.configurationId !== configured.id) continue
+            const skyline = await options.horizon?.skyline(configured.id) ?? null
+            const envelope = mountEnvelope(configured.envelope ?? stubEnvelope, thresholds, skyline)
+            envelopes.set(configured.id, envelope)
+
+            for (const device of configured.devices.filter(device => device.kind === 'mount')) outgoing.push({ deviceId: device.id, envelope })
+          }
+
+          return outgoing
+        },
+      }
       client = createCriaConnection(connection)
       clients.set(configuration.url, client)
     }
@@ -122,6 +158,15 @@ export function createEquipmentComposition(
   }
 
   return {
+    envelopeFor,
+    async sendFix(rig, fix) {
+      const configuration = configurations.find(item => item.id === rig.source?.configurationId)
+
+      if (!configuration) return
+      const client = clients.get(configuration.url)!
+
+      for (const mount of configuration.devices.filter(device => device.kind === 'mount')) await client.sendFix(mount.id, fix)
+    },
     holdsOf: rigId => equipment.get(rigId)?.holds() ?? [],
     recover: (rig, deviceId, note) => rig.source
       ? cria(rig).recover(deviceId, note)

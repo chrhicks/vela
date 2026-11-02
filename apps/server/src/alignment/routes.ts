@@ -11,7 +11,7 @@ import { createRigOperations, type RigOperations } from '../rig/operations.js'
 import { confirmedCameraName } from '../rig/imaging-camera.js'
 import type { RigCatalog } from '../rig/catalog.js'
 import { createAlignmentController, type AlignmentSettings } from './controller.js'
-import { createPlateSolver, type PlateSolver } from '../plate-solving/judged-solver.js'
+import { reportAcceptedFix, createPlateSolver, type PlateSolver } from '../plate-solving/judged-solver.js'
 import type { AstapConfig } from '@vela/rig-astap'
 import { createPhysicalAlignment } from './physical.js'
 import { createAlignmentDiagnostics } from './diagnostics.js'
@@ -30,6 +30,7 @@ const defaultFactories: AlignmentFactories = {
 }
 
 export interface AlignmentEquipmentOptions {
+  sendFix?: (rig: RigCatalogRecord, fix: import('../equipment/composition.js').AcceptedFix) => Promise<void>
   runLog?: Pick<RunLog, 'append'> | undefined
   settingsForRig?: (rig: RigCatalogRecord) => AlignmentSettings | undefined
   createAcquisition: (rig: RigCatalogRecord) => Acquisition
@@ -90,6 +91,12 @@ export function registerAlignment(
   ) {
     const acquisition = equipment.createAcquisition(rig)
 
+    const solverFor = (config: AstapConfig) => {
+      const solver = factories.solver(config)
+
+      return equipment.sendFix ? reportAcceptedFix(solver, fix => equipment.sendFix!(rig, fix)) : solver
+    }
+
     const openDiagnostics = settings.diagnosticsPath && equipment.runLog
       ? createAlignmentDiagnostics(settings.diagnosticsPath, equipment.runLog, error =>
           app.log.error({ err: error }, 'Alignment diagnostic recording failed'),
@@ -102,7 +109,7 @@ export function registerAlignment(
         settings,
         hardware: acquisition,
         openDiagnostics,
-        solver: factories.solver({
+        solver: solverFor({
           executable: settings.executable,
           catalogPath: settings.catalogPath,
           fieldHeightDegrees: settings.fieldHeightDegrees,
@@ -129,7 +136,7 @@ export function registerAlignment(
       hardware: acquisition,
       physical,
       openDiagnostics,
-      createSolver: fieldHeightDegrees => factories.solver({
+      createSolver: fieldHeightDegrees => solverFor({
         executable: settings.executable,
         catalogPath: settings.catalogPath,
         fieldHeightDegrees,

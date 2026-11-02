@@ -10,6 +10,7 @@ arguments and never import `@vela/alpaca` or `@vela/cria`. The
 `no-restricted-imports` rule in `.oxlintrc.json` enforces this outside tests.
 Its other exceptions, and when each goes:
 
+- `equipment/config.ts` validates the configured envelope with the shared Cria schema.
 - `rig/discovery.ts` stays. Discovery is Alpaca's own UDP scan; it turns replies
   into rig candidates and chooses no mode.
 - `app.ts` maps `AlpacaProviderError` when a rig is added. It goes when connect
@@ -199,3 +200,22 @@ duty reports the held value. An unknown outcome stays `uncertain` and nothing is
 once fresh readings (no hold) show the requested duty within 0.4 points or the Auto dew state asked for, the command
 resolves to `confirmed`, otherwise to `failed`. A box that is disconnected has no channel readings, so it has no dew
 section.
+
+## Mount feedback
+
+Each rig may configure an `envelope` with a `keepOut` table in the shared Cria shape.
+Without one, Vela uses the step 19 stub copied from Cria into `envelope.ts`. Vela
+owns runtime policy, so it does not read a second repository's deploy configuration.
+Cria retains its own startup fallback until Vela supplies the envelope.
+
+The envelope combines that table, the rig's current horizon file and learned
+obstructions, and `meridianTrackLimitHours` from the alert thresholds converted to
+degrees. Unknown horizon bins remain absent. The session checks for changes once
+a second and sends on connection, change, or a new Cria instance. Meridian alerts
+read this same envelope; their thresholds retain only warning lead times.
+
+Every accepted framing or alignment solve sends its exposure time, J2000 position,
+and C1 scale error and hint offset through the existing authenticated session.
+Rejected solves send nothing. Failed delivery reports an error to the workflow;
+feedback never commands hardware. Both peers keep only the latest feedback in
+memory. Deploy the paired Cria and Vela changes together outside a session.

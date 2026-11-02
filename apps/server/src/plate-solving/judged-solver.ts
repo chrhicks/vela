@@ -1,3 +1,4 @@
+import type { AcceptedFix } from '../equipment/composition.js'
 import { trace, SpanStatusCode } from '@opentelemetry/api'
 import {
   createAstapSolver,
@@ -29,7 +30,7 @@ export interface MonoFrame {
  */
 export type SolveResult =
   | { status: 'no-solution'; reasons: readonly Reason[]; measured?: Measured | null; offHintDegrees?: number }
-  | ({ status: 'solved'; capturedAt: string; wcs: PlateWcs } & SkyPosition)
+  | ({ status: 'solved'; capturedAt: string; wcs: PlateWcs; error?: AcceptedFix['error'] } & SkyPosition)
 
 export interface PlateSolver {
   /** `hint` is where ASTAP starts searching. `claimed` is where the mount says it points, which the verdict checks the solution against. */
@@ -109,7 +110,7 @@ export function judgedSolver(astap: AstapSolver, fieldHeightDegrees: number, pur
 
             if (solution.status !== 'solved') throw new Error('An accepted verdict needs a solved outcome')
 
-            return { status: 'solved', capturedAt: frame.capturedAt, wcs: solution.wcs, ...solution.centre }
+            return { status: 'solved', capturedAt: frame.capturedAt, wcs: solution.wcs, error: { scaleError: verdict.measured.scaleError, hintOffsetDegrees: verdict.measured.hintOffsetDegrees }, ...solution.centre }
           } catch (error) {
             span.setAttribute('astap.outcome', signal.aborted ? 'cancelled' : 'error')
 
@@ -126,5 +127,23 @@ export function judgedSolver(astap: AstapSolver, fieldHeightDegrees: number, pur
           }
         },
       ),
+  }
+}
+
+export function reportAcceptedFix(solver: PlateSolver, send: (fix: AcceptedFix) => Promise<void>): PlateSolver {
+  return {
+    async solve(frame, hint, claimed, signal) {
+      const result = await solver.solve(frame, hint, claimed, signal)
+
+      if (result.status === 'solved' && result.error) await send({
+        capturedAt: Date.parse(result.capturedAt),
+        rightAscensionDegrees: result.raDegrees,
+        declinationDegrees: result.decDegrees,
+        coordinateSystem: 'j2000',
+        error: result.error,
+      })
+
+      return result
+    },
   }
 }

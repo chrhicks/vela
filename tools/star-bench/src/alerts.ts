@@ -67,6 +67,7 @@ export function replayAlerts(run: Run, options: ReplayOptions = shippedReplay): 
       },
       options.thresholds,
       frame.capturedAt,
+      { keepOut: [] },
     )
 
     const now = new Map<FrameAlertId, string>()

@@ -69,6 +69,7 @@
     {
       "files": [
         "apps/server/src/equipment/composition.ts",
+        "apps/server/src/equipment/config.ts",
         "**/*.test.ts",
         "apps/server/src/rig/discovery.ts",
         "apps/server/src/app.ts"

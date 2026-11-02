@@ -2,6 +2,9 @@ import { createHash } from 'node:crypto'
 import { Effect, Exit, Option, Schedule, Schema, type Scope, Stream, SubscriptionRef } from 'effect'
 import { Failed, Uncertain } from '@cria/primitives'
 import {
+  MountFeedback,
+  type AcceptedFix,
+  type MountEnvelope,
   Device,
   Operation,
   State,
@@ -29,6 +32,8 @@ export type Looked =
   | { readonly kind: 'unknown'; readonly message: string }
 
 export interface Session {
+  readonly envelope: (deviceId: string, envelope: MountEnvelope) => Effect.Effect<Reply<MountFeedback>>
+  readonly fix: (deviceId: string, fix: AcceptedFix) => Effect.Effect<Reply<MountFeedback>>
   readonly received: Effect.Effect<Received>
   readonly holds: LocalHolds
   readonly warnings: LocalWarnings
@@ -197,6 +202,12 @@ export function openSession(connection: CriaConnection): Effect.Effect<Session, 
     }
 
     return {
+      envelope: (deviceId, envelope) => Effect.flatMap(SubscriptionRef.get(received), current => current.state === 'live'
+        ? request(connection, 'POST', `/v2/devices/${encodeURIComponent(deviceId)}/envelope`, MountFeedback, { instanceId: current.snapshot.instanceId, envelope })
+        : Effect.succeed({ kind: 'lost' as const, message: current.message })),
+      fix: (deviceId, fix) => Effect.flatMap(SubscriptionRef.get(received), current => current.state === 'live'
+        ? request(connection, 'POST', `/v2/devices/${encodeURIComponent(deviceId)}/fix`, MountFeedback, { instanceId: current.snapshot.instanceId, fix })
+        : Effect.succeed({ kind: 'lost' as const, message: current.message })),
       received: SubscriptionRef.get(received),
       holds,
       warnings,

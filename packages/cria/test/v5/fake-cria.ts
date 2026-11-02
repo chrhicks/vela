@@ -36,6 +36,9 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { Schema } from 'effect'
 import {
+  MountFeedback,
+  EnvelopeRequest,
+  FixRequest,
   BindingId,
   Device,
   DeviceId,
@@ -58,9 +61,12 @@ import {
   type ErrorCode,
 } from '@cria/wire'
 
-export type Route = 'health' | 'state' | 'events' | 'submit' | 'operation' | 'cancel' | 'lookup' | 'recover' | 'image'
+export type Route = 'envelope' | 'fix' | 'feedback' | 'health' | 'state' | 'events' | 'submit' | 'operation' | 'cancel' | 'lookup' | 'recover' | 'image'
 
 const routes: ReadonlyArray<readonly [string, RegExp, Route]> = [
+  ['POST', /^\/v2\/devices\/([^/]+)\/envelope$/, 'envelope'],
+  ['POST', /^\/v2\/devices\/([^/]+)\/fix$/, 'fix'],
+  ['GET', /^\/v2\/devices\/([^/]+)\/feedback$/, 'feedback'],
   ['GET', /^\/health$/, 'health'],
   ['GET', /^\/v2\/state$/, 'state'],
   ['GET', /^\/v2\/events$/, 'events'],
@@ -169,6 +175,7 @@ const settledShown = 20
 const maxBodyBytes = 16 * 1024
 
 export class FakeCria {
+  readonly feedback = new Map<string, MountFeedback>()
   readonly origin = 'http://cria.fake:4319'
   /** Every request sent while Cria was reachable, in the order sent. A delayed one may land later, or be lost. */
   readonly received: Received[] = []
@@ -259,6 +266,7 @@ export class FakeCria {
 
     for (const subscriber of this.subscribers) this.unsubscribe(subscriber, new TypeError('Cria restarted'))
     this.instance = this.boot()
+    this.feedback.clear()
   }
 
   close(): void {
@@ -323,6 +331,24 @@ export class FakeCria {
     const [first = '', second = ''] = segments
 
     switch (route) {
+      case 'envelope':
+      case 'fix':
+      case 'feedback': {
+        if (!rig.some(device => device.id === first && device.kind === 'mount')) return this.refuse('not-found', 'No such mount')
+        const feedback = this.feedback.get(first) ?? { envelope: null, fix: null }
+
+        if (route !== 'feedback') {
+          const decoded = route === 'envelope' ? decode(EnvelopeRequest, body ?? '') : decode(FixRequest, body ?? '')
+
+          if (!decoded) return this.refuse('request-error', 'Invalid mount feedback')
+
+          if (decoded.instanceId !== this.instance.id) return this.refuse('instance-changed', 'Cria restarted')
+          this.feedback.set(first, 'envelope' in decoded ? { ...feedback, envelope: decoded.envelope } : { ...feedback, fix: decoded.fix })
+        }
+
+        return this.reply(MountFeedback, this.feedback.get(first) ?? feedback, 200)
+      }
+
       case 'state':
         return this.reply(State, this.snapshot(), 200)
       case 'events':
